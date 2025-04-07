@@ -30,7 +30,7 @@
    responsible of dealing with the process' lifetime. *)
 
 (** Type of the RPC process worker*)
-type t
+type process
 
 (** [create ~comm_socket_path config node_version internal_event_config] creates
     the worker initial state. [comm_socket_path] is a socket path that will be
@@ -44,7 +44,7 @@ val create :
   Config_file.t ->
   Tezos_version.Octez_node_version.t ->
   Internal_event_config.t ->
-  t
+  process
 
 (** Starts the external RPC process using fork+exec calls. It
     implements a watch dog that is responsible of restarting the
@@ -53,7 +53,13 @@ val create :
     until the restart is successful.
     The promise is blocking until the RPC server is fully
     available to answer to RPCs. *)
-val start : t -> unit tzresult Lwt.t
+val start : process -> unit tzresult Lwt.t
 
 (** Stops gracefully the RPC process worker*)
-val stop : t -> unit Lwt.t
+val stop : process -> unit Lwt.t
+
+(** Magic bytes used for the external RPC process handshake. *)
+val rpc_process_socket_magic : bytes
+
+(** Name of the shared socket prefix of the RPC process. *)
+val rpc_process_socket_prefix : string

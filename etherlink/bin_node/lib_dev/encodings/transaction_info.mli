@@ -45,7 +45,8 @@ type t = {
 
 (** [of_receipt_and_object receipt object_] merges [receipt] and [object_]
     into a {!t}. *)
-val of_receipt_and_object : Transaction_receipt.t -> transaction_object -> t
+val of_receipt_and_object :
+  Transaction_receipt.t -> legacy_transaction_object -> t
 
 val receipt_fields_encoding : receipt_fields Data_encoding.t
 

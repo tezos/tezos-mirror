@@ -13,8 +13,11 @@ depends: [
   "ppx_expect"
   "octez-libs" { = version }
   "tezos-protocol-017-PtNairob" { = version }
+  "bls12-381" { with-test & = version }
+  "octez-rust-deps" { with-test & = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
+  "octez-rustzcash-deps" { with-test & = version }
   "octez-proto-libs" { = version }
   "octez-injector" { = version }
   "octez-l2-libs" { = version }
@@ -24,4 +27,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Octez protocol 017-PtNairob libraries"

@@ -13,7 +13,7 @@ let init_store =
   declare_0
     ~section
     ~name:"store_init"
-    ~msg:"Evm_store is being initialized for the first time"
+    ~msg:"store is being initialized for the first time"
     ~level:Notice
     ()
 
@@ -21,7 +21,7 @@ let applied_migration =
   declare_1
     ~section
     ~name:"store_applied_migration"
-    ~msg:"Applied migration {name} to the store"
+    ~msg:"applied migration {name} to the store"
     ~level:Notice
     ("name", Data_encoding.string)
 
@@ -30,8 +30,8 @@ let migrations_from_the_future =
     ~section
     ~name:"migrations_from_the_future"
     ~msg:
-      "Evm_store has {applied} migrations applied but the EVM node is only \
-       aware of {known}"
+      "store has {applied} migrations applied but the EVM node is only aware \
+       of {known}"
     ~level:Error
     ("applied", Data_encoding.int31)
     ("known", Data_encoding.int31)
@@ -40,9 +40,7 @@ let no_l1_latest_level_to_catch_up =
   declare_0
     ~section
     ~name:"no_l1_latest_level"
-    ~msg:
-      "The store is missing the l1 latest level row in its table. We assume no \
-       evm events catch up is needed."
+    ~msg:"no l1 level processed, no EVM events catch up will occur"
     ~level:Warning
     ()
 

@@ -4,6 +4,7 @@
 (executable
  (name test_distribution)
  (libraries
+  bls12-381.archive
   octez-libs.distributed-plonk
   octez-libs.plonk
   octez-libs.plonk.aggregation

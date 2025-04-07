@@ -34,26 +34,34 @@ val init :
   Profile_manager.t ->
   Cryptobox.t ->
   Cryptobox.shards_proofs_precomputation option ->
-  Dal_plugin.proto_parameters ->
   Proto_plugins.t ->
   Store.t ->
   Gossipsub.Worker.t ->
   Gossipsub.Transport_layer.t ->
   Tezos_rpc.Context.generic ->
+  last_finalized_level:int32 ->
   t
 
 (** Returns all the registered plugins *)
 val get_all_plugins : t -> (module Dal_plugin.T) list
 
-(** Returns the plugin to be used for the given (block) level.
+(** Returns the plugin to be used for the given (block) level together with the
+    protocol parameters at that level.
+
     Recall that, for a migration level L:
     * to retrieve the metadata of the block L, one should use the plugin for the
       old protocol;
     * to retrieve context-related information, one should use the plugin for the
       new protocol.
+
     This function returns the plugin of [metadata.protocols.next_protocol], so it is
     tailored for the second use case. To get the plugin for the first use-case, just
     get the plugin for the predecessor of the target level. *)
+val get_plugin_and_parameters_for_level :
+  t -> level:int32 -> ((module Dal_plugin.T) * Types.proto_parameters) tzresult
+
+(** Returns the plugin to be used for the given (block) level. See
+    {!get_plugin_and_parameters_for_level}. *)
 val get_plugin_for_level : t -> level:int32 -> (module Dal_plugin.T) tzresult
 
 (** Tries to add a new plugin for the protocol with level [proto_level] to be used
@@ -71,6 +79,14 @@ val may_add_plugin :
 
 (** Set the protocol plugins to the given value. *)
 val set_proto_plugins : t -> Proto_plugins.t -> unit
+
+(** [get_proto_parameters ~level ctxt] returns the DAL node's protocol
+    parameters. When [level] is [`Last_proto], it returns the last known
+    parameters. If [level] is [`Level level], then the protocol parameters for
+    that level are returned. The parameters returned are obtained via
+    {!get_plugin_and_parameters_for_level}. *)
+val get_proto_parameters :
+  level:[`Last_proto | `Level of int32] -> t -> Types.proto_parameters tzresult
 
 (** Reconstruct the given slot id by calling the [reconstruct]
     function unless a reconstruction for the given slot id is alredy
@@ -98,8 +114,12 @@ val get_config : t -> Configuration_file.t
 (** [get_cryptobox ctxt] returns the DAL node's cryptobox *)
 val get_cryptobox : t -> Cryptobox.t
 
-(** [get_proto_parameters ctxt] returns the DAL node's current protocol parameters. *)
-val get_proto_parameters : t -> Dal_plugin.proto_parameters
+(** Update the node's last finalized level. *)
+val set_last_finalized_level : t -> int32 -> unit
+
+(** Get the node's last finalized level. This level may be equal or higher than
+    the node's last processed level. *)
+val get_last_finalized_level : t -> int32
 
 (** [get_shards_proofs_precomputation ctxt] returns the shards proof's precomputation. *)
 val get_shards_proofs_precomputation :
@@ -129,8 +149,7 @@ val set_ongoing_amplifications : t -> Types.Slot_id.Set.t -> unit
 (** [storage_period ctxt proto_parameters] returns for how many levels should
     the node store data about attested slots. This depends on the node's profile
     and its history mode.  *)
-val storage_period :
-  t -> Dal_plugin.proto_parameters -> [`Always | `Finite of int]
+val storage_period : t -> Types.proto_parameters -> [`Always | `Finite of int]
 
 (** [level_to_gc ctxt proto_parameters ~current_level] returns the oldest level
     that should have attested data (like shards and slots, skip list cells)
@@ -139,7 +158,7 @@ val storage_period :
     no removal is needed (either because the node is thus configured, or the
     current_level is not big enough), the function returns [None]. *)
 val level_to_gc :
-  t -> Dal_plugin.proto_parameters -> current_level:int32 -> int32 option
+  t -> Types.proto_parameters -> current_level:int32 -> int32 option
 
 (** [fetch_assigned_shard_indices ctxt ~level ~pkh] fetches from L1 the shard
     indices assigned to [pkh] at [level].  It internally caches the DAL
@@ -167,6 +186,11 @@ val fetch_committee :
 
 (** [version ctxt] returns the current version of the node *)
 val version : t -> Types.Version.t
+
+(** Emit a warning for each public key hash in the given operator profile (if
+    any) that is not that of a L1-registered delegate. *)
+val warn_if_attesters_not_delegates :
+  t -> Operator_profile.t -> unit tzresult Lwt.t
 
 (** Module for P2P-related accessors.  *)
 module P2P : sig

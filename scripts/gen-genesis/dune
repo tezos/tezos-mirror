@@ -1,6 +1,7 @@
 (executable
  (name gen_genesis)
  (libraries
+   bls12-381.archive
    lwt.unix
    octez-libs.base
    octez-libs.base.unix

@@ -284,6 +284,7 @@ module Consensus : sig
   val operation :
     ?branch:string ->
     ?chain_id:string ->
+    ?with_dal:bool ->
     signer:Account.key ->
     t ->
     Client.t ->
@@ -299,6 +300,7 @@ module Consensus : sig
     ?branch:string ->
     ?chain_id:string ->
     ?error:rex ->
+    protocol:Protocol.t ->
     signer:Account.key ->
     t ->
     Client.t ->
@@ -352,6 +354,14 @@ module Anonymous : sig
   val double_preattestation_evidence :
     operation * Tezos_crypto.Signature.t ->
     operation * Tezos_crypto.Signature.t ->
+    t
+
+  (** [dal_entrapment_evidence] crafts a DAL entrapment evidence operation. *)
+  val dal_entrapment_evidence :
+    attestation:operation * Tezos_crypto.Signature.t ->
+    slot_index:int ->
+    Tezos_crypto_dal.Cryptobox.shard ->
+    Tezos_crypto_dal.Cryptobox.shard_proof ->
     t
 
   (** [kind_to_string kind] return the name of the [kind]. *)
@@ -705,11 +715,25 @@ val inject_error_check_recommended_fee :
 val already_denounced : rex
 
 (** Matches the message produced by
-    [Outdated_denunciation {kind; level; last_cycle}]
+    [Dal_already_denounced {delegate; level}]
+    from [src/proto_xxx/lib_protocol/validate_errors].
+
+    Captures [delegate], [level]. *)
+val already_dal_denounced : rex
+
+(** Matches the message produced by
+    [Outdated_dal_denunciation {kind; level; last_cycle}]
     from [src/proto_xxx/lib_protocol/validate_errors].
 
     Captures [kind], [last_cycle], [level]. *)
 val outdated_denunciation : rex
+
+(** Matches the message produced by
+    [Outdated_dal_denunciation {level; last_cycle}]
+    from [src/proto_xxx/lib_protocol/validate_errors].
+
+    Captures [last_cycle], [level]. *)
+val outdated_dal_denunciation : rex
 
 (** Matches the message
     [Operation %a is branched on either:]

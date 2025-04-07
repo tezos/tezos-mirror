@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -29,5 +30,12 @@ pub enum Commands {
 
         #[arg(short, long, value_name = "DISPLAY_ROOT_HASH")]
         display_root_hash: bool,
+    },
+    MergeSetupFiles {
+        #[arg(short, long, value_name = "OUTPUT_SETUP_FILE")]
+        output: OsString,
+
+        #[arg(short = 'S', long, value_name = "INSTALLER_SETUP_CONFIGS", num_args = 1.., required = true)]
+        setup_files: Vec<OsString>,
     },
 }

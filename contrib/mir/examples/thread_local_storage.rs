@@ -35,7 +35,13 @@ fn run_contract(parameter: Micheline) {
         storage.replace_with(|storage| {
             let storage = Micheline::decode_raw(&parser.arena, storage).unwrap();
             let (_, new_storage) = contract_typechecked
-                .interpret(&mut ctx, &parser.arena, parameter, storage)
+                .interpret(
+                    &mut ctx,
+                    &parser.arena,
+                    parameter,
+                    None,
+                    storage,
+                )
                 .unwrap();
             let TypedValue::Nat(storage_nat) = &new_storage else {
                 unreachable!()

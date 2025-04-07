@@ -74,7 +74,7 @@ module Logging = struct
       ~query:Tezos_rpc.Query.empty
       ~input:Tezos_base.Internal_event_config.encoding
       ~output:Data_encoding.empty
-      Tezos_rpc.Path.(root / "config" / "logging")
+      Tezos_rpc.Path.(path / "logging")
 end
 
 let user_activated_upgrades cctxt =

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -18,8 +18,8 @@ hex = "0.4"
 num-bigint = { version = "0.4", default-features = false }
 num-traits = "0.2.8"
 
-tezos_data_encoding = "0.6"
-tezos_crypto_rs = { version = "0.6", default-features = false }
+tezos_data_encoding.workspace = true
+tezos_crypto_rs.workspace = true
 
 # Adding these to 'dev_dependencies' causes the rand feature in crypto to be enabled
 # on wasm builds, when building the entire workspace.
@@ -47,9 +47,7 @@ debug = []
 testing = [
   "rand",
   "proptest",
-  "tezos-smart-rollup-core/testing",
-  "tezos-smart-rollup-host/testing",
-  "tezos-smart-rollup-entrypoint/testing",
+  "tezos-smart-rollup-core/mock-core-trait",
   "tezos-smart-rollup-encoding/testing",
   "tezos_crypto_rs/std",
 ]

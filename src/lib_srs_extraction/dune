@@ -15,6 +15,7 @@
 (executable
  (name srs_extraction_main)
  (libraries
+  bls12-381.archive
   octez-libs.srs-extraction
   cmdliner
   unix

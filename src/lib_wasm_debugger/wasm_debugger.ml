@@ -23,46 +23,80 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [read_kernel_from_file path] returns the contents stored in [path],
+      along with a boolean hinting if the contents is expected to be binary
+      ([true]) or text ([false]). *)
+let read_kernel_from_file kernel_path =
+  let open Lwt_result_syntax in
+  if Filename.(check_suffix kernel_path ".hex") then
+    let*! content = Repl_helpers.read_file kernel_path in
+    let*? content =
+      match Hex.to_string (`Hex content) with
+      | Some content -> Ok (content, true)
+      | None -> error_with "%S is not a valid hexadecimal file" kernel_path
+    in
+    return content
+  else
+    let*! content = Repl_helpers.read_file kernel_path in
+    let*? binary =
+      if Filename.check_suffix kernel_path ".wasm" then Ok true
+      else if Filename.check_suffix kernel_path ".wast" then Ok false
+      else error_with "Kernels should have .wasm or .wast file extension"
+    in
+    return (content, binary)
+
+let parse_binary_module name module_ =
+  let bytes = Tezos_lazy_containers.Chunked_byte_vector.of_string module_ in
+  Tezos_webassembly_interpreter.Decode.decode ~allow_floats:false ~name ~bytes
+
+(* [typecheck_module module_ast] runs the typechecker on the module, which is
+   not done by the PVM. *)
+let typecheck_module module_ =
+  Repl_helpers.trap_exn (fun () ->
+      Tezos_webassembly_interpreter.Valid.check_module module_)
+
+(* [import_pvm_host_functions ~version ()] registers the host
+   functions of the PVM. *)
+let import_pvm_host_functions ~version () =
+  let lookup name =
+    Lwt.return (Tezos_scoru_wasm.Host_funcs.lookup ~version name)
+  in
+  Repl_helpers.trap_exn (fun () ->
+      Lwt.return
+        (Tezos_webassembly_interpreter.Import.register
+           ~module_name:"smart_rollup_core"
+           lookup))
+
+(* [link module_ast] checks a module actually uses the host functions with their
+   correct type, outside of the PVM. *)
+let link module_ =
+  Repl_helpers.trap_exn (fun () ->
+      Tezos_webassembly_interpreter.Import.link module_)
+
+let check_kernel ~binary ~name version module_ =
+  let open Lwt_result_syntax in
+  let* ast =
+    Repl_helpers.trap_exn (fun () ->
+        if binary then parse_binary_module name module_
+        else Lwt.return (Repl_helpers.parse_module module_))
+  in
+  let* () = typecheck_module ast in
+  let* () = import_pvm_host_functions ~version () in
+  let* _ = link ast in
+  return_unit
+
 module Make (Wasm : Wasm_utils_intf.S) = struct
   let write_debug_default = Commands.write_debug_default
 
   module Commands = Commands.Make (Wasm)
 
-  let parse_binary_module name module_ =
-    let bytes = Tezos_lazy_containers.Chunked_byte_vector.of_string module_ in
-    Tezos_webassembly_interpreter.Decode.decode ~allow_floats:false ~name ~bytes
-
-  (* [typecheck_module module_ast] runs the typechecker on the module, which is
-     not done by the PVM. *)
-  let typecheck_module module_ =
-    Repl_helpers.trap_exn (fun () ->
-        Tezos_webassembly_interpreter.Valid.check_module module_)
-
-  (* [import_pvm_host_functions ~version ()] registers the host
-     functions of the PVM. *)
-  let import_pvm_host_functions ~version () =
-    let lookup name =
-      Lwt.return (Tezos_scoru_wasm.Host_funcs.lookup ~version name)
-    in
-    Repl_helpers.trap_exn (fun () ->
-        Lwt.return
-          (Tezos_webassembly_interpreter.Import.register
-             ~module_name:"smart_rollup_core"
-             lookup))
-
-  (* [link module_ast] checks a module actually uses the host functions with their
-     correct type, outside of the PVM. *)
-  let link module_ =
-    Repl_helpers.trap_exn (fun () ->
-        Tezos_webassembly_interpreter.Import.link module_)
-
-  let set_durable_value tree key value =
+  let set_durable_value ?edit_readonly tree key value =
     let open Lwt_syntax in
     let open Tezos_scoru_wasm.Durable in
     let* durable_storage = Wasm.wrap_as_durable_storage tree in
     let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable_storage in
     let key = key_of_string_exn key in
-    let* durable = set_value_exn durable key value in
+    let* durable = set_value_exn ?edit_readonly durable key value in
     let durable_storage = Tezos_scoru_wasm.Durable.to_storage durable in
     let wrapped_tree = Durable_storage.to_tree_exn durable_storage in
     Wasm.Tree_encoding_runner.encode
@@ -90,18 +124,6 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       wrapped_tree
       tree
 
-  let check_kernel ~binary ~name version module_ =
-    let open Lwt_result_syntax in
-    let* ast =
-      Repl_helpers.trap_exn (fun () ->
-          if binary then parse_binary_module name module_
-          else Lwt.return (Wasm_utils.parse_module module_))
-    in
-    let* () = typecheck_module ast in
-    let* () = import_pvm_host_functions ~version () in
-    let* _ = link ast in
-    return_unit
-
   (* Starting point of the module after reading the kernel file: parsing,
      typechecking and linking for safety before feeding kernel to the PVM, then
      installation into a tree for the PVM interpreter. *)
@@ -126,28 +148,6 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     in
     let*! tree = Wasm.eval_until_input_requested tree in
     return tree
-
-  (** [read_kernel_from_file path] returns the contents stored in [path],
-      along with a boolean hinting if the contents is expected to be binary
-      ([true]) or text ([false]). *)
-  let read_kernel_from_file kernel_path =
-    let open Lwt_result_syntax in
-    if Filename.(check_suffix kernel_path ".hex") then
-      let*! content = Repl_helpers.read_file kernel_path in
-      let*? content =
-        match Hex.to_string (`Hex content) with
-        | Some content -> Ok (content, true)
-        | None -> error_with "%S is not a valid hexadecimal file" kernel_path
-      in
-      return content
-    else
-      let*! content = Repl_helpers.read_file kernel_path in
-      let*? binary =
-        if Filename.check_suffix kernel_path ".wasm" then Ok true
-        else if Filename.check_suffix kernel_path ".wast" then Ok false
-        else error_with "Kernels should have .wasm or .wast file extension"
-      in
-      return (content, binary)
 
   let start ?installer_config ?tree version file =
     let open Lwt_result_syntax in
@@ -483,5 +483,3 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
           e ;
         exit 1
 end
-
-include Make (Wasm_utils)

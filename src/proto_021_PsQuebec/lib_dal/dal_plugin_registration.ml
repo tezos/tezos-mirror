@@ -35,6 +35,8 @@ module Plugin = struct
 
   type dal_attestation = Bitset.t
 
+  type attestation_operation = Kind.attestation Alpha_context.operation
+
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol.Constants_services.parametric cpctxt (chain, block)
@@ -54,11 +56,13 @@ module Plugin = struct
     in
     return
       {
-        Dal_plugin.feature_enable;
+        Tezos_dal_node_services.Types.feature_enable;
         incentives_enable;
         number_of_slots;
         attestation_lag;
         attestation_threshold;
+        traps_fraction = Q.(1 // 1000);
+        (* not used in proto_021 *)
         cryptobox_parameters;
         sc_rollup_challenge_window_in_blocks =
           parametric.sc_rollup.challenge_window_in_blocks;
@@ -69,6 +73,26 @@ module Plugin = struct
             .dal_attested_slots_validity_lag;
         blocks_per_cycle = parametric.blocks_per_cycle;
       }
+
+  type error += DAL_accusation_not_available
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal_accusation_not_available_quebec"
+      ~title:"DAL accusation not available on Quebec"
+      ~description:"DAL accusation is not available in protocol Quebec."
+      ~pp:(fun fmt () ->
+        Format.fprintf fmt "DAL accusation is not available in protocol Quebec")
+      Data_encoding.unit
+      (function DAL_accusation_not_available -> Some () | _ -> None)
+      (fun () -> DAL_accusation_not_available)
+
+  let inject_entrapment_evidence _cctxt ~attested_level:_ _attestation
+      ~slot_index:_ ~shard:_ ~proof:_ =
+    let open Lwt_result_syntax in
+    (* This is supposed to be dead code, but we implement a fallback to be defensive. *)
+    fail [DAL_accusation_not_available]
 
   let block_info ?chain ?block ~metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -112,38 +136,51 @@ module Plugin = struct
            let slot_index = Dal.Slot_index.to_int slot_index in
            return Dal_plugin.({published_level; slot_index; commitment}, status))
 
-  let get_dal_content_of_attestations (block : block_info) =
+  let get_attestations block_info =
     let open Protocol.Alpha_context in
-    match List.hd block.operations with
-    | None ->
-        (* that should be unreachable, as there are 4 operation passes *) []
-    | Some consensus_ops ->
+    let open Protocol_client_context.Alpha_block_services in
+    match block_info.operations with
+    | [consensus_ops; _anonymous; _votes; _managers] ->
         List.filter_map
-          (fun Protocol_client_context.Alpha_block_services.
-                 {receipt; protocol_data; _} ->
-            let delegate_opt =
-              match receipt with
-              | Receipt (Operation_metadata {contents; _}) -> (
-                  match contents with
-                  | Single_result (Attestation_result {delegate; _}) ->
-                      Some delegate
-                  | _ -> None)
-              | Empty | Too_large | Receipt No_operation_metadata -> None
-            in
-            match protocol_data with
-            | Operation_data
-                {
-                  contents =
-                    Single (Attestation {consensus_content; dal_content; _});
-                  _;
-                } ->
-                Some
-                  ( Slot.to_int consensus_content.slot,
-                    delegate_opt,
-                    (Option.map (fun d -> d.attestation) dal_content
-                      :> Bitset.t option) )
+          (fun operation ->
+            let (Operation_data operation_data) = operation.protocol_data in
+            match operation_data.contents with
+            | Single (Attestation attestation) -> (
+                let packed_operation : Kind.attestation Alpha_context.operation
+                    =
+                  {
+                    Alpha_context.shell = operation.shell;
+                    protocol_data = operation_data;
+                  }
+                in
+                let tb_slot = Slot.to_int attestation.consensus_content.slot in
+                let dal_attestation : dal_attestation option =
+                  Option.map
+                    (fun x -> (x.attestation :> dal_attestation))
+                    attestation.dal_content
+                in
+                match operation.receipt with
+                | Receipt (Operation_metadata operation_metadata) -> (
+                    match operation_metadata.contents with
+                    | Single_result (Attestation_result result) ->
+                        let delegate =
+                          Tezos_crypto.Signature.Of_V1.public_key_hash
+                            result.delegate
+                        in
+                        Some
+                          ( tb_slot,
+                            Some delegate,
+                            packed_operation,
+                            dal_attestation )
+                    | _ ->
+                        Some (tb_slot, None, packed_operation, dal_attestation))
+                | Empty | Too_large | Receipt No_operation_metadata ->
+                    Some (tb_slot, None, packed_operation, dal_attestation))
             | _ -> None)
           consensus_ops
+    | _ ->
+        (* that should be unreachable, as there are 4 operation passes *)
+        []
 
   let get_committee ctxt ~level =
     let open Lwt_result_syntax in
@@ -154,8 +191,9 @@ module Plugin = struct
     in
     List.fold_left
       (fun acc ({delegate; indexes} : Plugin.RPC.Dal.S.shards_assignment) ->
-        Signature.Public_key_hash.Map.add delegate indexes acc)
-      Signature.Public_key_hash.Map.empty
+        let delegate = Tezos_crypto.Signature.Of_V1.public_key_hash delegate in
+        Tezos_crypto.Signature.Public_key_hash.Map.add delegate indexes acc)
+      Tezos_crypto.Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
   let dal_attestation (block : block_info) =
@@ -170,6 +208,20 @@ module Plugin = struct
 
   let is_attested attestation slot_index =
     match Bitset.mem attestation slot_index with Ok b -> b | Error _ -> false
+
+  let number_of_attested_slots attestation = Bitset.hamming_weight attestation
+
+  let is_delegate ctxt ~pkh =
+    let open Lwt_result_syntax in
+    let*? pkh = Signature.Of_V_latest.get_public_key_hash pkh in
+    let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
+    (* We just want to know whether <pkh> is a delegate. We call
+       'context/delegates/<pkh>/deactivated' just because it should be cheaper
+       than calling 'context/delegates/<pkh>/' (called [Delegate.info]). *)
+    let*! res =
+      Plugin.Alpha_services.Delegate.deactivated cpctxt (`Main, `Head 0) pkh
+    in
+    return @@ match res with Ok _deactivated -> true | Error _ -> false
 
   (* Section of helpers for Skip lists *)
 
@@ -212,7 +264,8 @@ module Plugin = struct
       let published_level =
         Int32.sub
           attested_level
-          (Int32.of_int dal_constants.Dal_plugin.attestation_lag)
+          (Int32.of_int
+             dal_constants.Tezos_dal_node_services.Types.attestation_lag)
       in
       (* 1. There are no cells for [published_level = 0]. *)
       if published_level <= 0l then return []
@@ -227,7 +280,7 @@ module Plugin = struct
               Lazy.force pred_publication_level_dal_constants
             in
             return
-              ( prev_constants.Dal_plugin.feature_enable,
+              ( prev_constants.Tezos_dal_node_services.Types.feature_enable,
                 prev_constants.number_of_slots )
         in
         let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in

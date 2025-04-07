@@ -7,7 +7,10 @@ set -e
 
 db_version 2.0
 
-TEZOS_HOME=/var/tezos
+if [ -e /etc/default/octez-node ]; then
+  . /etc/default/octez-node
+  TEZOS_HOME=$(dirname $DATADIR)
+fi
 
 # work directory to store temporary files associated to this package
 mkdir -p /run/octez-node
@@ -24,12 +27,11 @@ configure)
   if [ -z "${2:-}" ] || [ -z "$DPKG_RUNNING_VERSION" ]; then
     # these are the defaults for the package and only used
     # in the "configure" stage.
-    DATADIR="$TEZOS_HOME/.tezos-node"
 
     # shellcheck disable=SC2119
     if ! id "tezos" > /dev/null 2>&1; then
       adduser --quiet --disabled-password \
-        --home $TEZOS_HOME --shell /bin/bash \
+        --home "$TEZOS_HOME" --shell /bin/bash \
         --gecos "admin user for octez" tezos
     else
       # setup data directory in case the tezos user was already present
@@ -47,47 +49,59 @@ configure)
 
     db_get octez-node/configure
     case "$RET" in
-    no)
+    false)
       db_get octez-node/network
       NETWORK=${RET}
       db_get octez-node/history-mode
       HISTORY_MODE=${RET}
 
-      if [ ! -e $DATADIR/config.json ]; then
+      if [ ! -e "$DATADIR/config.json" ]; then
         su tezos -c "/usr/bin/octez-node config init --data-dir=$DATADIR            --network=\"$NETWORK\" \
               --history-mode=\"$HISTORY_MODE\" \
               --net-addr=\"[::]:9732\" \
               --rpc-addr=\"127.0.0.1:8732\""
       fi
       ;;
-    *)
+    true)
       echo "Skipping initialization."
       ;;
     esac
   else
-    # the configure script is called with the version of the old
-    # package in case of upgrade. We display a message to the user
-    # in this case
+    echo "Upgrading octez-node from version $2 ( postinst )"
+    # The configure script is called with the version of the old
+    # package in case of upgrade.
+    #
+    # In a testing environment next packages version have an
+    # epoch `1:<version>` to distinguish them from the current packages
+    #
+    # We check if the version string of the old package does NOT contain
+    # an epoch (no colon)
     case "$2" in
-    0.0*)
+    1:*)
+      # If the version of the package contains the epoch `1:*` then
+      # we are upgrading a next package to a next package in a testing
+      # environment. We do nothing.
+      : nop
+      ;;
+    *)
+      # In that case, we are upgrading from a current package to a
+      # next package. It can be a released package as well as a dev package.
+      # This logic is going to be removed after making the next packages
+      # official.
+      echo "octez-node: upgrade warning from current"
       db_set octez-node/configure "yes"
-      echo "Upgrading from version $2"
       if [ -e "$TEZOS_HOME/.tezos-node/config.json" ]; then
         db_input high octez-node/upgrade_note_current || true
         #shellcheck disable=SC2119
         db_go || true
       fi
       ;;
-    *)
-      echo "Upgrading from version $2"
-      echo "DO NOTHING"
-      ;;
     esac
   fi
 
   ;;
 *)
-  echo "postinst noop"
+  : noop
   ;;
 esac
 
@@ -99,5 +113,7 @@ if [ -f /var/lib/octez-node/daemon_was_running ] &&
   $debsystemctl start octez-node.service
   rm /var/lib/octez-node/daemon_was_running
 fi
+
+systemctl daemon-reload || true
 
 #DEBHELPER#

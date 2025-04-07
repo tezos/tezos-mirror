@@ -223,6 +223,27 @@ module Raw_consensus = struct
     {t with attestation_branch = Some attestation_branch}
 end
 
+module Raw_dal = struct
+  type t = {
+    cryptobox : Dal.t option;
+    slot_fee_market : Dal_slot_repr.Slot_market.t;
+        (** records the published slot headers *)
+    slot_accountability : Dal_attestation_repr.Accountability.t;
+        (** records attested shards, in order to determine protocol-attested slots *)
+    attestations : Dal_attestation_repr.t Slot_repr.Map.t;
+        (** records the included DAL attestations *)
+  }
+
+  let init ~number_of_slots =
+    {
+      cryptobox = None;
+      slot_fee_market = Dal_slot_repr.Slot_market.init ~length:number_of_slots;
+      slot_accountability =
+        Dal_attestation_repr.Accountability.init ~number_of_slots;
+      attestations = Slot_repr.Map.empty;
+    }
+end
+
 type back = {
   context : Context.t;
   constants : Constants_parametric_repr.t;
@@ -246,22 +267,7 @@ type back = {
     Stake_repr.t Signature.Public_key_hash.Map.t option;
   reward_coeff_for_current_cycle : Q.t;
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
-  dal_slot_fee_market : Dal_slot_repr.Slot_market.t;
-  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3105
-
-     We associate to a slot header some fees. This enable the use
-     of a fee market for slot publication. However, this is not
-     resilient from the game theory point of view. Probably we can find
-     better incentives here. In any case, because we want the following
-     invariant:
-
-         - For each level and for each slot there is at most one slot
-     header.
-
-         - We need to provide an incentive to avoid byzantines to post
-     dummy slot headers. *)
-  dal_attestation_slot_accountability : Dal_attestation_repr.Accountability.t;
-  dal_cryptobox : Dal.t option;
+  dal : Raw_dal.t;
   adaptive_issuance_enable : bool;
 }
 
@@ -332,6 +338,8 @@ let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 let[@inline] reward_coeff_for_current_cycle ctxt =
   ctxt.back.reward_coeff_for_current_cycle
 
+let[@inline] dal ctxt = ctxt.back.dal
+
 let[@inline] adaptive_issuance_enable ctxt = ctxt.back.adaptive_issuance_enable
 
 let[@inline] update_back ctxt back = {ctxt with back}
@@ -378,6 +386,8 @@ let[@inline] update_sampler_state ctxt sampler_state =
 let[@inline] update_reward_coeff_for_current_cycle ctxt
     reward_coeff_for_current_cycle =
   update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
+
+let[@inline] update_dal ctxt dal = update_back ctxt {ctxt.back with dal}
 
 let[@inline] set_adaptive_issuance_enable ctxt =
   update_back ctxt {ctxt.back with adaptive_issuance_enable = true}
@@ -869,14 +879,10 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
         stake_distribution_for_current_cycle = None;
         reward_coeff_for_current_cycle = Q.one;
         sc_rollup_current_messages;
-        dal_slot_fee_market =
-          Dal_slot_repr.Slot_market.init
-            ~length:constants.Constants_parametric_repr.dal.number_of_slots;
-        dal_attestation_slot_accountability =
-          Dal_attestation_repr.Accountability.init
+        dal =
+          Raw_dal.init
             ~number_of_slots:
               constants.Constants_parametric_repr.dal.number_of_slots;
-        dal_cryptobox = None;
         adaptive_issuance_enable;
       };
   }
@@ -884,7 +890,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) Quebec (* Alpha predecessor *)
+  | (* Alpha predecessor *) R022 (* Alpha predecessor *)
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -901,8 +907,8 @@ let check_and_update_protocol_version ctxt =
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
         else if Compare.String.(s = "alpha_current") then return (Alpha, ctxt)
-        else if (* Alpha predecessor *) Compare.String.(s = "quebec_021") then
-          return (Quebec, ctxt) (* Alpha predecessor *)
+        else if (* Alpha predecessor *) Compare.String.(s = "r022_022") then
+          return (R022, ctxt) (* Alpha predecessor *)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -911,7 +917,7 @@ let check_and_update_protocol_version ctxt =
   return (previous_proto, ctxt)
 
 (* only for the migration *)
-let[@warning "-32"] get_previous_protocol_constants ctxt =
+let get_previous_protocol_constants ctxt =
   let open Lwt_syntax in
   let* bytes_opt = Context.find ctxt constants_key in
   match bytes_opt with
@@ -930,11 +936,11 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
              context."
       | Some constants -> return constants)
 
-(* Start of code to remove at next automatic protocol snapshot *)
+(* Start of code to remove at r022 automatic protocol snapshot *)
 
-(* Please add here any code that should be removed at the next automatic protocol snapshot *)
+(* Please add here any code that should be removed at the r022 automatic protocol snapshot *)
 
-(* End of code to remove at next automatic protocol snapshot *)
+(* End of code to remove at r022 automatic protocol snapshot *)
 
 (* You should ensure that if the type `Constants_parametric_repr.t` is
    different from `Constants_parametric_previous_repr.t` or the value of these
@@ -947,7 +953,7 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
-let prepare_first_block ~level ~timestamp _chain_id ctxt =
+let prepare_first_block ~level ~timestamp chain_id ctxt =
   let open Lwt_result_syntax in
   let* previous_proto, ctxt = check_and_update_protocol_version ctxt in
   let* ctxt, previous_proto_constants =
@@ -968,6 +974,12 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         return (result, None)
     (* Start of Alpha stitching. Comment used for automatic snapshot *)
     | Alpha ->
+        (*
+            FIXME chain_id is used for Q to Alpha migration and nomore after.
+            We ignored for automatic stabilisation, should it be removed in
+            Beta?
+        *)
+        ignore chain_id ;
         let module Previous = Constants_parametric_repr in
         let* c = get_constants ctxt in
         let dal =
@@ -978,6 +990,9 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  attestation_lag;
                  attestation_threshold;
                  cryptobox_parameters;
+                 minimal_participation_ratio;
+                 rewards_ratio;
+                 traps_fraction;
                }
                 : Previous.dal) =
             c.dal
@@ -989,6 +1004,9 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             attestation_lag;
             attestation_threshold;
             cryptobox_parameters;
+            minimal_participation_ratio;
+            rewards_ratio;
+            traps_fraction;
           }
         in
         let reveal_activation_level =
@@ -1105,12 +1123,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
           let ({
                  global_limit_of_staking_over_baking;
                  edge_of_staking_over_delegation;
-                 launch_ema_threshold;
                  adaptive_rewards_params = _;
-                 activation_vote_enable;
-                 autostaking_enable;
-                 force_activation;
-                 ns_enable;
                }
                 : Previous.adaptive_issuance) =
             c.adaptive_issuance
@@ -1119,12 +1132,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             {
               global_limit_of_staking_over_baking;
               edge_of_staking_over_delegation;
-              launch_ema_threshold;
               adaptive_rewards_params;
-              activation_vote_enable;
-              autostaking_enable;
-              force_activation;
-              ns_enable;
             }
         in
         let issuance_weights =
@@ -1135,6 +1143,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  attesting_reward_weight;
                  seed_nonce_revelation_tip_weight;
                  vdf_revelation_tip_weight;
+                 dal_rewards_weight;
                }
                 : Previous.issuance_weights) =
             c.issuance_weights
@@ -1146,6 +1155,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             attesting_reward_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
+            dal_rewards_weight;
           }
         in
         let constants =
@@ -1153,6 +1163,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  consensus_rights_delay;
                  blocks_preservation_cycles;
                  delegate_parameters_activation_delay;
+                 tolerated_inactivity_period;
                  blocks_per_cycle;
                  blocks_per_commitment;
                  nonce_revelation_threshold;
@@ -1176,11 +1187,10 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  minimal_block_delay;
                  delay_increment_per_round;
                  consensus_committee_size;
-                 consensus_threshold;
+                 consensus_threshold_size;
                  minimal_participation_ratio;
                  limit_of_delegation_over_baking;
                  percentage_of_frozen_deposits_slashed_per_double_baking;
-                 percentage_of_frozen_deposits_slashed_per_double_attestation;
                  max_slashing_per_block;
                  max_slashing_threshold;
                  (* The `testnet_dictator` should absolutely be None on mainnet *)
@@ -1194,6 +1204,9 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  zk_rollup = _;
                  adaptive_issuance = _;
                  direct_ticket_spending_enable;
+                 aggregate_attestation;
+                 allow_tz4_delegate_enable;
+                 all_bakers_attest_activation_level;
                }
                 : Previous.t) =
             c
@@ -1202,6 +1215,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             Constants_parametric_repr.consensus_rights_delay;
             blocks_preservation_cycles;
             delegate_parameters_activation_delay;
+            tolerated_inactivity_period;
             blocks_per_cycle;
             blocks_per_commitment;
             nonce_revelation_threshold;
@@ -1225,11 +1239,10 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             minimal_block_delay;
             delay_increment_per_round;
             consensus_committee_size;
-            consensus_threshold;
+            consensus_threshold_size;
             minimal_participation_ratio;
             limit_of_delegation_over_baking;
             percentage_of_frozen_deposits_slashed_per_double_baking;
-            percentage_of_frozen_deposits_slashed_per_double_attestation;
             max_slashing_per_block;
             max_slashing_threshold;
             (* The `testnet_dictator` should absolutely be None on mainnet *)
@@ -1243,6 +1256,9 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             zk_rollup;
             adaptive_issuance;
             direct_ticket_spending_enable;
+            aggregate_attestation;
+            allow_tz4_delegate_enable;
+            all_bakers_attest_activation_level;
           }
         in
         let*! ctxt = add_constants ctxt constants in
@@ -1252,7 +1268,13 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         return (ctxt, Some c)
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | Quebec ->
+    | R022 ->
+        (*
+            FIXME chain_id is used for Q to R022 migration and nomore after.
+            We ignored for automatic stabilisation, should it be removed in
+            Beta?
+        *)
+        ignore chain_id ;
         let module Previous = Constants_parametric_previous_repr in
         let*! c = get_previous_protocol_constants ctxt in
         let dal =
@@ -1263,6 +1285,9 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  attestation_lag;
                  attestation_threshold;
                  cryptobox_parameters;
+                 minimal_participation_ratio;
+                 rewards_ratio;
+                 traps_fraction;
                }
                 : Previous.dal) =
             c.dal
@@ -1274,6 +1299,9 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             attestation_lag;
             attestation_threshold;
             cryptobox_parameters;
+            minimal_participation_ratio;
+            rewards_ratio;
+            traps_fraction;
           }
         in
         let reveal_activation_level =
@@ -1390,12 +1418,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
           let ({
                  global_limit_of_staking_over_baking;
                  edge_of_staking_over_delegation;
-                 launch_ema_threshold;
                  adaptive_rewards_params = _;
-                 activation_vote_enable;
-                 autostaking_enable;
-                 force_activation;
-                 ns_enable;
                }
                 : Previous.adaptive_issuance) =
             c.adaptive_issuance
@@ -1404,12 +1427,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             {
               global_limit_of_staking_over_baking;
               edge_of_staking_over_delegation;
-              launch_ema_threshold;
               adaptive_rewards_params;
-              activation_vote_enable;
-              autostaking_enable;
-              force_activation;
-              ns_enable;
             }
         in
         let issuance_weights =
@@ -1420,6 +1438,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  attesting_reward_weight;
                  seed_nonce_revelation_tip_weight;
                  vdf_revelation_tip_weight;
+                 dal_rewards_weight;
                }
                 : Previous.issuance_weights) =
             c.issuance_weights
@@ -1431,6 +1450,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             attesting_reward_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
+            dal_rewards_weight;
           }
         in
         let constants =
@@ -1438,6 +1458,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  consensus_rights_delay;
                  blocks_preservation_cycles;
                  delegate_parameters_activation_delay;
+                 tolerated_inactivity_period;
                  blocks_per_cycle;
                  blocks_per_commitment;
                  nonce_revelation_threshold;
@@ -1461,24 +1482,26 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                  minimal_block_delay;
                  delay_increment_per_round;
                  consensus_committee_size;
-                 consensus_threshold;
+                 consensus_threshold_size;
                  minimal_participation_ratio;
                  limit_of_delegation_over_baking;
                  percentage_of_frozen_deposits_slashed_per_double_baking;
-                 percentage_of_frozen_deposits_slashed_per_double_attestation;
                  max_slashing_per_block;
                  max_slashing_threshold;
                  (* The `testnet_dictator` should absolutely be None on mainnet *)
                  testnet_dictator;
                  initial_seed;
                  cache_script_size;
-                 cache_stake_distribution_cycles = _;
-                 cache_sampler_state_cycles = _;
+                 cache_stake_distribution_cycles;
+                 cache_sampler_state_cycles;
                  dal = _;
                  sc_rollup = _;
                  zk_rollup = _;
                  adaptive_issuance = _;
                  direct_ticket_spending_enable;
+                 aggregate_attestation;
+                 allow_tz4_delegate_enable;
+                 all_bakers_attest_activation_level;
                }
                 : Previous.t) =
             c
@@ -1487,6 +1510,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             Constants_parametric_repr.consensus_rights_delay;
             blocks_preservation_cycles;
             delegate_parameters_activation_delay;
+            tolerated_inactivity_period;
             blocks_per_cycle;
             blocks_per_commitment;
             nonce_revelation_threshold;
@@ -1510,26 +1534,26 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             minimal_block_delay;
             delay_increment_per_round;
             consensus_committee_size;
-            consensus_threshold;
+            consensus_threshold_size;
             minimal_participation_ratio;
             limit_of_delegation_over_baking;
             percentage_of_frozen_deposits_slashed_per_double_baking;
-            percentage_of_frozen_deposits_slashed_per_double_attestation;
             max_slashing_per_block;
             max_slashing_threshold;
             (* The `testnet_dictator` should absolutely be None on mainnet *)
             testnet_dictator;
             initial_seed;
             cache_script_size;
-            cache_stake_distribution_cycles =
-              consensus_rights_delay + Constants_repr.max_slashing_period + 1;
-            cache_sampler_state_cycles =
-              consensus_rights_delay + Constants_repr.max_slashing_period + 1;
+            cache_stake_distribution_cycles;
+            cache_sampler_state_cycles;
             dal;
             sc_rollup;
             zk_rollup;
             adaptive_issuance;
             direct_ticket_spending_enable;
+            aggregate_attestation;
+            allow_tz4_delegate_enable;
+            all_bakers_attest_activation_level;
           }
         in
         let*! ctxt = add_constants ctxt constants in
@@ -2054,68 +2078,95 @@ module Dal = struct
     let open Result_syntax in
     (* Dal.make takes some time (on the order of 10ms) so we memoize
        its result to avoid calling it more than once per block. *)
-    match ctxt.back.dal_cryptobox with
+    let dal = dal ctxt in
+    match dal.cryptobox with
     | Some cryptobox -> return (ctxt, cryptobox)
     | None -> (
-        let Constants_parametric_repr.{dal = {cryptobox_parameters; _}; _} =
-          ctxt.back.constants
-        in
-        match Dal.make cryptobox_parameters with
+        match Dal.make (constants ctxt).dal.cryptobox_parameters with
         | Ok cryptobox ->
-            let back = {ctxt.back with dal_cryptobox = Some cryptobox} in
-            return ({ctxt with back}, cryptobox)
+            let ctxt = update_dal ctxt {dal with cryptobox = Some cryptobox} in
+            return (ctxt, cryptobox)
         | Error (`Fail explanation) ->
             tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation}))
 
-  let number_of_slots ctxt = ctxt.back.constants.dal.number_of_slots
-
-  let number_of_shards ctxt =
-    ctxt.back.constants.dal.cryptobox_parameters.number_of_shards
-
   let record_number_of_attested_shards ctxt attestation number =
-    let dal_attestation_slot_accountability =
+    let dal = dal ctxt in
+    let slot_accountability =
       Dal_attestation_repr.Accountability.record_number_of_attested_shards
-        ctxt.back.dal_attestation_slot_accountability
+        dal.slot_accountability
         attestation
         number
     in
-    {ctxt with back = {ctxt.back with dal_attestation_slot_accountability}}
+    update_dal ctxt {dal with slot_accountability}
 
-  let register_slot_header ctxt slot_header =
+  let register_slot_header ctxt slot_header ~source =
     let open Result_syntax in
+    let dal = dal ctxt in
     match
-      Dal_slot_repr.Slot_market.register
-        ctxt.back.dal_slot_fee_market
-        slot_header
+      Dal_slot_repr.Slot_market.register dal.slot_fee_market slot_header ~source
     with
     | None ->
-        let length =
-          Dal_slot_repr.Slot_market.length ctxt.back.dal_slot_fee_market
-        in
+        let length = Dal_slot_repr.Slot_market.length dal.slot_fee_market in
         tzfail
           (Dal_errors_repr.Dal_register_invalid_slot_header
              {length; slot_header})
-    | Some (dal_slot_fee_market, updated) ->
+    | Some (slot_fee_market, updated) ->
         if not updated then
           tzfail
             (Dal_errors_repr.Dal_publish_commitment_duplicate {slot_header})
-        else return {ctxt with back = {ctxt.back with dal_slot_fee_market}}
+        else return @@ update_dal ctxt {dal with slot_fee_market}
 
-  let candidates ctxt =
-    Dal_slot_repr.Slot_market.candidates ctxt.back.dal_slot_fee_market
+  let[@inline] candidates ctxt =
+    let dal = dal ctxt in
+    Dal_slot_repr.Slot_market.candidates dal.slot_fee_market
+
+  let record_attestation ctxt ~tb_slot attestation =
+    let dal = dal ctxt in
+    update_dal
+      ctxt
+      {
+        dal with
+        attestations = Slot_repr.Map.add tb_slot attestation dal.attestations;
+      }
+
+  let[@inline] attestations ctxt =
+    let dal = dal ctxt in
+    dal.attestations
 
   let is_slot_index_attested ctxt =
+    let dal = dal ctxt in
+    let constants = constants ctxt in
     let threshold =
-      ctxt.back.constants.Constants_parametric_repr.dal.attestation_threshold
+      constants.Constants_parametric_repr.dal.attestation_threshold
     in
     let number_of_shards =
-      ctxt.back.constants.Constants_parametric_repr.dal.cryptobox_parameters
+      constants.Constants_parametric_repr.dal.cryptobox_parameters
         .number_of_shards
     in
     Dal_attestation_repr.Accountability.is_slot_attested
-      ctxt.back.dal_attestation_slot_accountability
+      dal.slot_accountability
       ~threshold
       ~number_of_shards
+
+  let assert_feature_enabled ctxt =
+    let constants = constants ctxt in
+    error_unless
+      Compare.Bool.(constants.dal.feature_enable = true)
+      Dal_errors_repr.Dal_feature_disabled
+
+  let only_if_feature_enabled ctxt ~default f =
+    let constants = constants ctxt in
+    if constants.dal.feature_enable then f ctxt else default ctxt
+
+  let assert_incentives_enabled ctxt =
+    let constants = constants ctxt in
+    error_unless
+      Compare.Bool.(constants.dal.incentives_enable = true)
+      Dal_errors_repr.Dal_incentives_disabled
+
+  let only_if_incentives_enabled ctxt ~default f =
+    let constants = constants ctxt in
+    if constants.dal.incentives_enable then f ctxt else default ctxt
 end
 
 (* The type for relative context accesses instead from the root. In order for

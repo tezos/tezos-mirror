@@ -35,11 +35,7 @@ module type S = sig
 
   type contents
   type hash
-  type step
-  type metadata
-
-  type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
-  [@@deriving brassaia]
+  type kinded_hash = [ `Contents of hash | `Node of hash ] [@@deriving brassaia]
 
   type 'a inode = { length : int; proofs : (int * 'a) list }
   [@@deriving brassaia]
@@ -97,9 +93,9 @@ module type S = sig
 
       [Extender e] proves that an inode extender [e] exist in the store. *)
   type tree =
-    | Contents of contents * metadata
-    | Blinded_contents of hash * metadata
-    | Node of (step * tree) list
+    | Contents of contents
+    | Blinded_contents of hash
+    | Node of (Path.step * tree) list
     | Blinded_node of hash
     | Inode of inode_tree inode
     | Extender of inode_tree inode_extender
@@ -116,7 +112,7 @@ module type S = sig
       [Inode_extender e] is similar to trees' [Extender]. *)
   and inode_tree =
     | Blinded_inode of hash
-    | Inode_values of (step * tree) list
+    | Inode_values of (Path.step * tree) list
     | Inode_tree of inode_tree inode
     | Inode_extender of inode_tree inode_extender
   [@@deriving brassaia]
@@ -153,7 +149,7 @@ module type S = sig
       the node extender [e]. *)
   type elt =
     | Contents of contents
-    | Node of (step * kinded_hash) list
+    | Node of (Path.step * kinded_hash) list
     | Inode of hash inode
     | Inode_extender of hash inode_extender
   [@@deriving brassaia]
@@ -328,32 +324,19 @@ module type Proof = sig
   val bad_stream_too_long : string -> string -> 'a
   val bad_stream_too_short : string -> string -> 'a
 
-  module Make
-      (C : Type.S)
-      (H : Hash.S)
-      (P : sig
-        type step [@@deriving brassaia]
-      end)
-      (M : Type.S) : sig
-    include
-      S
-        with type contents := C.t
-         and type hash := H.t
-         and type step := P.step
-         and type metadata := M.t
+  module Make (C : Type.S) (H : Hash.S) : sig
+    include S with type contents := C.t and type hash := H.t
   end
 
   module Env
-      (B : Backend.S)
-      (P : S
-             with type contents := B.Contents.Val.t
-              and type hash := B.Hash.t
-              and type step := B.Node.Val.step
-              and type metadata := B.Node.Val.metadata) :
+      (Backend : Backend.S)
+      (Proof : S
+                 with type contents := Backend.Contents.Val.t
+                  and type hash := Backend.Hash.t) :
     Env
-      with type hash := B.Hash.t
-       and type contents := B.Contents.Val.t
-       and type node := B.Node.Val.t
-       and type pnode := B.Node_portable.t
-       and type stream := P.stream
+      with type hash := Backend.Hash.t
+       and type contents := Backend.Contents.Val.t
+       and type node := Backend.Node.Val.t
+       and type pnode := Backend.Node_portable.t
+       and type stream := Proof.stream
 end

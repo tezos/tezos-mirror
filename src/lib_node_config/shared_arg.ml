@@ -258,7 +258,7 @@ let wrap data_dir config_file network connections max_download_speed
 
 let process_command run =
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
+  match Tezos_base_unix.Event_loop.main_run @@ Lwt_exit.wrap_and_exit run with
   | Ok () -> `Ok ()
   | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)
 
@@ -677,8 +677,7 @@ module Term = struct
 
   let external_rpc_listen_addrs =
     let doc =
-      "The URL at which this external RPC server instance can be reached. \
-       Warning: this feature is unstable -- use it with care."
+      "The URL at which this external RPC server instance can be reached."
     in
     Arg.(
       value & opt_all string []
@@ -991,7 +990,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
              the data directory was never used to run an node.
              Thus, the network configuration can be reset. *)
           let*! context_dir =
-            Lwt_unix.file_exists @@ Data_version.context_dir
+            Lwt_unix.file_exists @@ Tezos_context_ops.Context_ops.context_dir
             @@ Option.value ~default:cfg.data_dir args.data_dir
           in
           let*! store_dir =

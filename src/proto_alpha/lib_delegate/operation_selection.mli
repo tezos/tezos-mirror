@@ -32,6 +32,7 @@ type simulation_result = {
   block_header_metadata : Apply_results.block_metadata option;
   operations : packed_operation list list;
   operations_hash : Operation_list_list_hash.t;
+  manager_operations_infos : Baking_state.manager_operations_infos option;
 }
 
 (** [filter_operations_with_simulation incremental fees_config

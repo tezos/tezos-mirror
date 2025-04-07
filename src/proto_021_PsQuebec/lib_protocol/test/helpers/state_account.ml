@@ -243,13 +243,19 @@ let apply_unstake cycle amount staker_name account_map =
                   {delegate with frozen_deposits; unstaked_frozen}
                 in
                 update_account ~f:(fun _ -> delegate) delegate_name account_map
+              else if Tez.(amount = zero) then
+                (* Don't do anything *)
+                account_map
               else
-                (* Case external stake *)
+                (* Case (non-trivial) external stake *)
                 let staked_amount =
                   Frozen_tez.get staker_name delegate.frozen_deposits
                 in
                 let pseudotokens, amount_q =
-                  if Partial_tez.(staked_amount <= of_tez amount) then
+                  let staked_tez =
+                    Partial_tez.to_tez ~round:`Down staked_amount
+                  in
+                  if Tez.(staked_tez <= amount) then
                     (* Unstake all case *)
                     (staker.staking_delegator_numerator, staked_amount)
                   else
@@ -396,6 +402,13 @@ let compute_future_frozen_rights block account_map =
             let current_rights_state =
               CycleMap.find (Block.current_cycle block) acc.frozen_rights
               |> Option.value ~default:Tez.zero
+            in
+            let current_rights_state =
+              if
+                Tez.(
+                  current_rights_state < block.constants.minimal_frozen_stake)
+              then Tez.zero
+              else current_rights_state
             in
             let* current_rights_rpc =
               Context.Delegate.initial_frozen_deposits (B block) acc.pkh

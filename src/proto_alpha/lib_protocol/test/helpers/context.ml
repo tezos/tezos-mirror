@@ -261,7 +261,7 @@ let get_baking_reward_fixed_portion ctxt =
 
 let get_bonus_reward ctxt ~attesting_power =
   let open Lwt_result_wrap_syntax in
-  let* {Constants.parametric = {consensus_threshold; _} as csts; _} =
+  let* {Constants.parametric = {consensus_threshold_size; _} as csts; _} =
     get_constants ctxt
   in
   let*?@ baking_reward_bonus_per_slot =
@@ -269,7 +269,7 @@ let get_bonus_reward ctxt ~attesting_power =
       csts
       ~reward_kind:Baking_reward_bonus_per_slot
   in
-  let multiplier = max 0 (attesting_power - consensus_threshold) in
+  let multiplier = max 0 (attesting_power - consensus_threshold_size) in
   return Tez_helpers.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
 
 let get_attesting_reward ctxt ~expected_attesting_power =
@@ -339,6 +339,9 @@ let get_denunciations ctxt =
 
 let get_denunciations_for_delegate ctxt =
   Alpha_services.Delegate.pending_denunciations rpc_ctxt ctxt
+
+let get_consecutive_round_zero ctxt =
+  Plugin.RPC.consecutive_round_zero rpc_ctxt ctxt
 
 let estimated_shared_pending_slashed_amount ctxt =
   Alpha_services.Delegate.estimated_shared_pending_slashed_amount rpc_ctxt ctxt
@@ -582,6 +585,9 @@ module Delegate = struct
 
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 
+  let dal_participation ctxt pkh =
+    Delegate_services.dal_participation rpc_ctxt ctxt pkh
+
   let is_forbidden ctxt pkh = Delegate_services.is_forbidden rpc_ctxt ctxt pkh
 
   let stake_for_cycle ctxt cycle pkh =
@@ -697,12 +703,13 @@ let tup_get : type a r. (a, r) tup -> a list -> r =
 
 let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?bootstrap_delegations ?bootstrap_consensus_keys ?consensus_committee_size
-    ?consensus_threshold ?min_proposal_quorum ?bootstrap_contracts ?level
+    ?consensus_threshold_size ?min_proposal_quorum ?bootstrap_contracts ?level
     ?cost_per_byte ?issuance_weights ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
-    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance () =
+    ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
+    ?nonce_revelation_threshold ?dal ?adaptive_issuance
+    ?allow_tz4_delegate_enable ?aggregate_attestation () =
   let open Lwt_result_syntax in
   let n = tup_n tup in
   let*? accounts = Account.generate_accounts ?rng_state n in
@@ -720,7 +727,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     Block.genesis
       ?commitments
       ?consensus_committee_size
-      ?consensus_threshold
+      ?consensus_threshold_size
       ?min_proposal_quorum
       ?bootstrap_contracts
       ?level
@@ -733,11 +740,14 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
       ?sc_rollup_private_enable
       ?sc_rollup_riscv_pvm_enable
       ?dal_enable
+      ?dal_incentives_enable
       ?zk_rollup_enable
       ?hard_gas_limit_per_block
       ?nonce_revelation_threshold
       ?dal
       ?adaptive_issuance
+      ?allow_tz4_delegate_enable
+      ?aggregate_attestation
       bootstrap_accounts
   in
   (blk, tup_get tup contracts)

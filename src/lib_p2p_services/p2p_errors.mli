@@ -48,8 +48,6 @@ type error +=
 
 type error += Rejected_no_common_protocol of {announced : Network_version.t}
 
-type error += Decoding_error of Data_encoding.Binary.read_error
-
 type error += Myself of P2p_connection.Id.t
 
 type error += Not_enough_proof_of_work of P2p_peer.Id.t

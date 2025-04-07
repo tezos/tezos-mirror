@@ -1,0 +1,4 @@
+# Files that are needed to build anything from this repository.
+__pervasive: dune, dune-project, scripts/custom-flags.sh, src/rustzcash_deps/include
+# Component definitions.
+tobi: tobi/src

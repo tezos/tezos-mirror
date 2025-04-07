@@ -96,10 +96,21 @@ val dal_attestable_slots :
   Baking_state.delegate_slot list ->
   Baking_state.dal_attestable_slots
 
+(** [get_dal_profiles ctxt delegates] calls the DAL node RPC GET
+    /profiles/ to retrieve the DAL node's profiles. *)
+val get_dal_profiles :
+  Tezos_rpc.Context.generic ->
+  Tezos_dal_node_services.Types.profile tzresult Lwt.t
+
 (** [register_dal_profiles ctxt delegates] calls the DAL node RPC PATCH
     /profiles/ to register each profile corresponding to a delegate in
     [delegates]. *)
 val register_dal_profiles :
   Tezos_rpc.Context.generic ->
-  Baking_state.consensus_key list ->
+  Signature.Public_key_hash.t list ->
   unit tzresult Lwt.t
+
+(** [get_dal_health ctxt] calls the DAL node RPC 'GET /health' *)
+val get_dal_health :
+  Tezos_rpc.Context.generic ->
+  Tezos_dal_node_services.Types.Health.t tzresult Lwt.t

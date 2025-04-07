@@ -52,9 +52,24 @@ module type CONV_OPT = sig
   val secret_key : V_from.Secret_key.t -> V_to.Secret_key.t option
 
   val signature : V_from.t -> V_to.t option
+
+  val get_public_key :
+    V_from.Public_key.t -> V_to.Public_key.t Error_monad.tzresult
+
+  val get_public_key_exn : V_from.Public_key.t -> V_to.Public_key.t
+
+  val get_public_key_hash :
+    V_from.Public_key_hash.t -> V_to.Public_key_hash.t Error_monad.tzresult
+
+  val get_public_key_hash_exn :
+    V_from.Public_key_hash.t -> V_to.Public_key_hash.t
+
+  val get_signature : V_from.t -> V_to.t Error_monad.tzresult
+
+  val get_signature_exn : V_from.t -> V_to.t
 end
 
-module V_latest = Signature_v1
+module V_latest = Signature_v2
 
 module V0 = struct
   include Signature_v0
@@ -67,26 +82,74 @@ module V0 = struct
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
-      | V_latest.Bls _ -> None
+      | V_latest.Bls_aug _ -> None
 
     let public_key : V_latest.Public_key.t -> Public_key.t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
-      | V_latest.Bls _ -> None
+      | V_latest.Bls_aug _ -> None
 
     let secret_key : V_latest.Secret_key.t -> Secret_key.t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
-      | V_latest.Bls _ -> None
+      | V_latest.Bls_aug _ -> None
 
     let signature : V_latest.t -> t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Unknown k -> Some (Unknown k)
-      | V_latest.Bls _ -> None
+      | V_latest.Bls_aug _ -> None
+
+    let get_public_key pk =
+      match public_key pk with
+      | Some pk -> Ok pk
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key from latest signature version to V0 \
+             impossible."
+
+    let get_public_key_exn pk =
+      match public_key pk with
+      | Some pk -> pk
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V0 \
+             impossible."
+
+    let get_public_key_hash pkh =
+      match public_key_hash pkh with
+      | Some pkh -> Ok pkh
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key hash from latest signature version to V0 \
+             impossible."
+
+    let get_public_key_hash_exn pkh =
+      match public_key_hash pkh with
+      | Some pkh -> pkh
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V0 \
+             impossible."
+
+    let get_signature s =
+      match signature s with
+      | Some s -> Ok s
+      | None ->
+          Error_monad.error_with
+            "Conversion of signature from latest signature version to V0 \
+             impossible."
+
+    let get_signature_exn s =
+      match signature s with
+      | Some s -> s
+      | None ->
+          Stdlib.failwith
+            "Conversion of signature from latest signature version to V0 \
+             impossible."
   end
 end
 
@@ -96,6 +159,88 @@ module V1 = struct
   module Of_V_latest :
     CONV_OPT with module V_from := V_latest and module V_to := Signature_v1 =
   struct
+    let public_key_hash : V_latest.Public_key_hash.t -> Public_key_hash.t option
+        = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls_aug k -> Some (Bls k)
+
+    let public_key : V_latest.Public_key.t -> Public_key.t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls_aug k -> Some (Bls k)
+
+    let secret_key : V_latest.Secret_key.t -> Secret_key.t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls_aug k -> Some (Bls k)
+
+    let signature : V_latest.t -> t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Unknown k -> Some (Unknown k)
+      | V_latest.Bls_aug k -> Some (Bls k)
+
+    let get_public_key pk =
+      match public_key pk with
+      | Some pk -> Ok pk
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key from latest signature version to V1 \
+             impossible."
+
+    let get_public_key_exn pk =
+      match public_key pk with
+      | Some pk -> pk
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V1 \
+             impossible."
+
+    let get_public_key_hash pkh =
+      match public_key_hash pkh with
+      | Some pkh -> Ok pkh
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key hash from latest signature version to V1 \
+             impossible."
+
+    let get_public_key_hash_exn pkh =
+      match public_key_hash pkh with
+      | Some pkh -> pkh
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V1 \
+             impossible."
+
+    let get_signature s =
+      match signature s with
+      | Some s -> Ok s
+      | None ->
+          Error_monad.error_with
+            "Conversion of signature from latest signature version to V1 \
+             impossible."
+
+    let get_signature_exn s =
+      match signature s with
+      | Some s -> s
+      | None ->
+          Stdlib.failwith
+            "Conversion of signature from latest signature version to V1 \
+             impossible."
+  end
+end
+
+module V2 = struct
+  include Signature_v2
+
+  module Of_V_latest :
+    CONV_OPT with module V_from := V_latest and module V_to := Signature_v2 =
+  struct
     let public_key_hash = Option.some
 
     let public_key = Option.some
@@ -103,13 +248,61 @@ module V1 = struct
     let secret_key = Option.some
 
     let signature = Option.some
+
+    let get_public_key pk =
+      match public_key pk with
+      | Some pk -> Ok pk
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key from latest signature version to V2 \
+             impossible."
+
+    let get_public_key_exn pk =
+      match public_key pk with
+      | Some pk -> pk
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V2 \
+             impossible."
+
+    let get_public_key_hash pkh =
+      match public_key_hash pkh with
+      | Some pkh -> Ok pkh
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key hash from latest signature version to V2 \
+             impossible."
+
+    let get_public_key_hash_exn pkh =
+      match public_key_hash pkh with
+      | Some pkh -> pkh
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V2 \
+             impossible."
+
+    let get_signature s =
+      match signature s with
+      | Some s -> Ok s
+      | None ->
+          Error_monad.error_with
+            "Conversion of signature from latest signature version to V2 \
+             impossible."
+
+    let get_signature_exn s =
+      match signature s with
+      | Some s -> s
+      | None ->
+          Stdlib.failwith
+            "Conversion of signature from latest signature version to V2 \
+             impossible."
   end
 end
 
 include V_latest
-module Of_V_latest = V1.Of_V_latest
+module Of_V_latest = V2.Of_V_latest
 
-module Of_V1 : CONV with module V_from := V1 and module V_to := V1 = struct
+module Of_V2 : CONV with module V_from := V2 and module V_to := V2 = struct
   let public_key_hash = Fun.id
 
   let public_key = Fun.id

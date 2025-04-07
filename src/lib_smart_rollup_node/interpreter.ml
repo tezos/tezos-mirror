@@ -130,19 +130,16 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
     state_of_head (module Plugin) node_ctxt ctxt predecessor
   in
   let*! initial_tick = Plugin.Pvm.get_tick node_ctxt.kind predecessor_state in
-  let* eval_result =
-    Plugin.Pvm.Fueled.Free.eval_block_inbox
-      ~fuel:(Fuel.Free.of_ticks 0L)
-      node_ctxt
-      inbox_messages
-      predecessor_state
-  in
   let* {
          state = {state; state_hash; inbox_level; tick; _};
          num_messages;
          num_ticks;
        } =
-    Delayed_write_monad.apply node_ctxt eval_result
+    Plugin.Pvm.Fueled.Free.eval_block_inbox
+      ~fuel:(Fuel.Free.of_ticks 0L)
+      node_ctxt
+      inbox_messages
+      predecessor_state
   in
   let*! ctxt = Context.PVMState.set ctxt state in
   (* Produce events. *)
@@ -205,11 +202,11 @@ let start_state_of_block plugin node_ctxt (block : Sc_rollup_block.t) =
     evaluation of messages in the [start_state] for at most [tick_distance]. *)
 let run_to_tick (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt
     start_state tick =
-  let open Delayed_write_monad.Lwt_result_syntax in
+  let open Lwt_result_syntax in
   let tick_distance =
     Z.sub tick start_state.Pvm_plugin_sig.tick |> Z.to_int64
   in
-  let>+ eval_result =
+  let+ eval_result =
     Plugin.Pvm.Fueled.Accounted.eval_messages
       node_ctxt
       {start_state with remaining_fuel = Fuel.Accounted.of_ticks tick_distance}
@@ -232,9 +229,7 @@ let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
   (* TODO: #3384
      We should test that we always have enough blocks to find the tick
      because [state_of_tick] is a critical function. *)
-  let* result_state = run_to_tick plugin node_ctxt start_state tick in
-  let result_state = Delayed_write_monad.ignore result_state in
-  return result_state
+  run_to_tick plugin node_ctxt start_state tick
 
 (* Global cache to share states between different parallel refutation games. *)
 let global_tick_state_cache =

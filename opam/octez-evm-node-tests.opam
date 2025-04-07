@@ -10,18 +10,22 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
+  "bls12-381" {with-test}
+  "octez-evm-node-libs" { with-test & = version }
   "octez-libs" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "octez-alcotezt" {with-test}
-  "octez-evm-node-libs" {with-test}
+  "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "tezt-tezos" {with-test}
+  "tezt-etherlink" { with-test & = version }
   "octez-l2-libs" {with-test}
   "tezos-protocol-alpha" {with-test}
+  "octez-shell-libs" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tests for the EVM Node"

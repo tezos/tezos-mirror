@@ -26,3 +26,8 @@ let to_bytes_exn = Hex.to_bytes
 
 let to_bytes h =
   try Some (Hex.to_bytes h) with Stdlib.Invalid_argument _ -> None
+
+let to_bigstring_exn = Hex.to_bigstring
+
+let to_bigstring h =
+  try Some (Hex.to_bigstring h) with Stdlib.Invalid_argument _ -> None

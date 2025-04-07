@@ -27,16 +27,17 @@ val execute :
   ?log_file:string ->
   ?wasm_entrypoint:string ->
   config:Config.config ->
+  native_execution:bool ->
   t ->
   [< `Input of string] list ->
   t tzresult Lwt.t
 
 (** [init ~kernel] initializes the local [evm_state] with [kernel]. *)
-val init : kernel:string -> t tzresult Lwt.t
+val init : kernel:Wasm_debugger.kernel -> t tzresult Lwt.t
 
 (** [modify ~key ~value evm_state] sets [value] at [key] in the local EVM
     state. *)
-val modify : key:string -> value:string -> t -> t Lwt.t
+val modify : ?edit_readonly:bool -> key:string -> value:string -> t -> t Lwt.t
 
 (** [delete ~kind evm_state key] delete the value/directory at [key] *)
 val delete : kind:Tezos_scoru_wasm.Durable.kind -> t -> string -> t Lwt.t
@@ -49,7 +50,7 @@ val exists : t -> string -> bool Lwt.t
     [evm_state], if any. *)
 val inspect : t -> string -> bytes option Lwt.t
 
-(** [subkeys evm_state key] returns the list of value stored under [key] in
+(** [subkeys evm_state key] returns the list of keys stored under [key] in
     [evm_state]. *)
 val subkeys : t -> string -> string trace Lwt.t
 
@@ -62,6 +63,7 @@ val execute_and_inspect :
   data_dir:string ->
   ?wasm_entrypoint:string ->
   config:Config.config ->
+  native_execution_policy:Configuration.native_execution_policy ->
   input:Simulation.Encodings.simulate_input ->
   t ->
   bytes option list tzresult Lwt.t
@@ -74,7 +76,10 @@ val current_block_height : t -> Ethereum_types.quantity Lwt.t
 val current_block_hash : t -> Ethereum_types.block_hash tzresult Lwt.t
 
 type apply_result =
-  | Apply_success of {evm_state : t; block : Ethereum_types.block}
+  | Apply_success of {
+      evm_state : t;
+      block : Ethereum_types.legacy_transaction_object Ethereum_types.block;
+    }
   | Apply_failure
 
 (** [apply_blueprint ~data-dir ~config state payload] applies the
@@ -91,6 +96,7 @@ val apply_blueprint :
   ?profile:bool ->
   data_dir:string ->
   config:Config.config ->
+  native_execution_policy:Configuration.native_execution_policy ->
   t ->
   Blueprint_types.payload ->
   apply_result tzresult Lwt.t
@@ -109,6 +115,10 @@ val wasm_pvm_version : t -> Tezos_scoru_wasm.Wasm_pvm_state.version Lwt.t
     expected to be located, relatively to the data directory. *)
 val irmin_store_path : data_dir:string -> string
 
+(** [preload_kernel evm_state] ensures the kernel of [evm_state] is added to
+    the kernel cache of the execution runtime in use. This will speed-up the
+    execution time for the first call of this kernel (typically in the context
+    of a RPC call). *)
 val preload_kernel : t -> unit Lwt.t
 
 (** [get_delayed_inbox_item state hash] returns the delayed inbox content behind
@@ -120,4 +130,10 @@ val get_delayed_inbox_item :
 (**[clear_block_storage block state] removes the parent of [block], and all
    durable storage information stored for [block], if this function is called
    they need to be store elsewhere, mainly it consists in transactions. *)
-val clear_block_storage : Ethereum_types.block -> t -> t Lwt.t
+val clear_block_storage :
+  'transaction_object Ethereum_types.block -> t -> t Lwt.t
+
+(** [storage_version tree] returns the current storage version set by the
+    kernel. This storage version is used by the EVM node to determine whether a
+    given feature is implemented by the kernel or not. *)
+val storage_version : t -> int tzresult Lwt.t

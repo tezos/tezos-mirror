@@ -46,7 +46,7 @@ module Make (Args : Args) = struct
 
     module Index =
       Brassaia_index_unix.Index_unix.Make (Pack_index.Key) (Value_unit)
-        (Index.Cache.Unbounded)
+        (Brassaia_index.Index.Cache.Unbounded)
 
     type t = {
       file_manager : File_manager.t;
@@ -61,10 +61,10 @@ module Make (Args : Args) = struct
          files: suffix and control. We just open the file manager for
          simplicity. *)
       let file_manager =
-        File_manager.open_ro config |> File_manager.Errs.raise_if_error
+        File_manager.open_ro config |> Io_errors.raise_if_error
       in
       let dispatcher =
-        Dispatcher.init file_manager |> File_manager.Errs.raise_if_error
+        Dispatcher.init file_manager |> Io_errors.raise_if_error
       in
       let log_size = Conf.index_log_size config in
       { file_manager; dispatcher; log_size; inode_pack; contents_pack }
@@ -249,7 +249,7 @@ module Make (Args : Args) = struct
 
     module Index =
       Brassaia_index_unix.Index_unix.Make (Pack_index.Key) (Value)
-        (Index.Cache.Unbounded)
+        (Brassaia_index.Index.Cache.Unbounded)
 
     type path = string
 

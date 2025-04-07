@@ -8,12 +8,13 @@
 //! Michelson typechecker definitions. Most functions defined as associated
 //! functions on [Micheline], see there for more.
 
-use crate::ast::michelson_address::entrypoint::{check_ep_name_len, Entrypoints};
+use crate::ast::michelson_address::entrypoint::{check_ep_name_len, Direction, Entrypoints};
 use chrono::prelude::DateTime;
+use entrypoint::DEFAULT_EP_NAME;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
 
@@ -54,7 +55,7 @@ pub enum TcError {
     /// Failed to interpret a number as a value of some type due to a numeric
     /// conversion error.
     #[error("numeric conversion failed: {0}")]
-    NumericConversion(#[from] TryFromBigIntError<()>),
+    NumericConversion(TryFromBigIntError<()>),
     /// Types are not equal when they should be.
     #[error(transparent)]
     TypesNotEqual(#[from] TypesNotEqual),
@@ -162,6 +163,18 @@ pub enum TcError {
     MapBlockFail,
 }
 
+impl From<TryFromBigIntError<()>> for TcError {
+    fn from(error: TryFromBigIntError<()>) -> Self {
+        TcError::NumericConversion(error)
+    }
+}
+
+impl From<ByteReprError> for TcError {
+    fn from(value: ByteReprError) -> Self {
+        Self::ByteReprError(Type::Bytes, value)
+    }
+}
+
 /// Errors happening when typechecking a value of type `chain_id`.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum ChainIdError {
@@ -259,7 +272,7 @@ impl<'a> Micheline<'a> {
     ) -> Result<Instruction<'a>, TcError> {
         let entrypoints = self_type
             .map(|ty| {
-                let (entrypoints, ty) = parse_parameter_ty_with_entrypoints(ctx, ty)?;
+                let (entrypoints, _, ty) = parse_parameter_ty_with_entrypoints(ctx, ty)?;
                 ty.ensure_prop(&mut ctx.gas, TypeProperty::Passable)?;
                 Ok::<_, TcError>(entrypoints)
             })
@@ -281,7 +294,7 @@ impl<'a> Micheline<'a> {
     /// Interpreting `Micheline` as a contract parameter type, collect its
     /// entrypoints into [Entrypoints].
     pub fn get_entrypoints(&self, ctx: &mut Ctx) -> Result<Entrypoints, TcError> {
-        let (entrypoints, _) = parse_parameter_ty_with_entrypoints(ctx, self)?;
+        let (entrypoints, _, _) = parse_parameter_ty_with_entrypoints(ctx, self)?;
         Ok(entrypoints)
     }
 
@@ -327,7 +340,7 @@ impl<'a> Micheline<'a> {
                 }
             }
         }
-        let (entrypoints, parameter) = parse_parameter_ty_with_entrypoints(
+        let (entrypoints, anns, parameter) = parse_parameter_ty_with_entrypoints(
             ctx,
             parameter_ty.ok_or(TcError::MissingTopLevelElt(Prim::parameter))?,
         )?;
@@ -355,18 +368,21 @@ impl<'a> Micheline<'a> {
             code,
             parameter,
             storage,
+            annotations: anns,
         })
     }
 }
 
 pub(crate) fn parse_ty(ctx: &mut Ctx, ty: &Micheline) -> Result<Type, TcError> {
-    parse_ty_with_entrypoints(ctx, ty, None)
+    parse_ty_with_entrypoints(ctx, ty, None, &mut HashMap::new(), Vec::new())
 }
 
-fn parse_ty_with_entrypoints(
+fn parse_ty_with_entrypoints<'a>(
     ctx: &mut Ctx,
-    ty: &Micheline,
+    ty: &Micheline<'a>,
     mut entrypoints: Option<&mut Entrypoints>,
+    routed_annotations: &mut HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
+    path: Vec<Direction>,
 ) -> Result<Type, TcError> {
     use Micheline::*;
     use Prim::*;
@@ -431,8 +447,16 @@ fn parse_ty_with_entrypoints(
         App(pair, ..) => unexpected()?,
 
         App(or, [l, r], _) => Type::new_or(
-            parse_ty_with_entrypoints(ctx, l, entrypoints.as_deref_mut())?,
-            parse_ty_with_entrypoints(ctx, r, entrypoints.as_deref_mut())?,
+            parse_ty_with_entrypoints(ctx, l, entrypoints.as_deref_mut(), routed_annotations, {
+                let mut new_path = path.clone();
+                new_path.push(Direction::Left);
+                new_path
+            })?,
+            parse_ty_with_entrypoints(ctx, r, entrypoints.as_deref_mut(), routed_annotations, {
+                let mut new_path = path.clone();
+                new_path.push(Direction::Right);
+                new_path
+            })?,
         ),
 
         App(or, ..) => unexpected()?,
@@ -510,6 +534,7 @@ fn parse_ty_with_entrypoints(
 
         App(prim @ micheline_unsupported_types!(), ..) => Err(TcError::TodoType(*prim))?,
     };
+
     if let Option::Some(eps) = entrypoints {
         // we just ensured it's an application of some type primitive
         irrefutable_match!(ty; App, _prim, _args, anns);
@@ -517,13 +542,16 @@ fn parse_ty_with_entrypoints(
             // NB: field annotations may be longer than entrypoints; however
             // it's not an error to have an overly-long field annotation, it
             // just doesn't count as an entrypoint.
+            routed_annotations.insert(field_ann.clone(), (path, parsed_ty.clone()));
             if let Ok(entrypoint) = Entrypoint::try_from(field_ann) {
                 let entry = eps.entry(entrypoint);
                 match entry {
                     Entry::Occupied(e) => {
                         return Err(TcError::DuplicateEntrypoint(e.key().clone()))
                     }
-                    Entry::Vacant(e) => e.insert(parsed_ty.clone()),
+                    Entry::Vacant(e) => {
+                        e.insert(parsed_ty.clone());
+                    }
                 };
             }
         }
@@ -531,16 +559,33 @@ fn parse_ty_with_entrypoints(
     Ok(parsed_ty)
 }
 
-fn parse_parameter_ty_with_entrypoints(
+fn parse_parameter_ty_with_entrypoints<'a>(
     ctx: &mut Ctx,
-    parameter_ty: &Micheline,
-) -> Result<(Entrypoints, Type), TcError> {
+    parameter_ty: &Micheline<'a>,
+) -> Result<
+    (
+        Entrypoints,
+        HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
+        Type,
+    ),
+    TcError,
+> {
     let mut entrypoints = Entrypoints::new();
-    let parameter = parse_ty_with_entrypoints(ctx, parameter_ty, Some(&mut entrypoints))?;
+    let mut routed_annotations = HashMap::new();
+    let parameter = parse_ty_with_entrypoints(
+        ctx,
+        parameter_ty,
+        Some(&mut entrypoints),
+        &mut routed_annotations,
+        Vec::new(),
+    )?;
     entrypoints
         .entry(Entrypoint::default())
         .or_insert_with(|| parameter.clone());
-    Ok((entrypoints, parameter))
+    routed_annotations
+        .entry(FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME))
+        .or_insert_with(|| (vec![], parameter.clone()));
+    Ok((entrypoints, routed_annotations, parameter))
 }
 
 /// Typecheck a sequence of instructions. Assumes the passed stack is valid, i.e.
@@ -1569,6 +1614,15 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(EMPTY_SET, expect_args!(1), _), _) => unexpected_micheline!(),
 
+        (App(EMPTY_MAP, [kty, vty], _), _) => {
+            let kty = parse_ty(ctx, kty)?;
+            kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            let vty = parse_ty(ctx, vty)?;
+            stack.push(T::new_map(kty.clone(), vty.clone()));
+            I::EmptyMap
+        }
+        (App(EMPTY_MAP, expect_args!(2), _), _) => unexpected_micheline!(),
+
         (App(EMPTY_BIG_MAP, [kty, vty], _), _) => {
             let kty = parse_ty(ctx, kty)?;
             kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
@@ -2251,15 +2305,15 @@ pub(crate) fn typecheck_value<'a>(
         (T::Set(ty), V::Seq(vs)) => TV::Set(typecheck_set(ctx, t, ty, vs)?),
         (T::Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
-            TV::Map(typecheck_map(ctx, t, tk, tv, vs, |v| v)?)
+            TV::Map(typecheck_map(ctx, t, tk, tv, vs)?)
         }
         (T::BigMap(m), v) => {
-            let (id_opt, vs_opt) = match v {
+            let (id_opt, vs_opt, diff) = match v {
                 // All valid instantiations of big map are mentioned in
                 // https://tezos.gitlab.io/michelson-reference/#type-big_map
-                V::Int(i) => (Some(i.clone()), None),
-                V::Seq(vs) => (None, Some(vs)),
-                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (Some(i.clone()), Some(vs)),
+                V::Int(i) => (Some(i.clone()), None, false),
+                V::Seq(vs) => (None, Some(vs), false),
+                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (Some(i.clone()), Some(vs), true),
                 _ => return Err(invalid_value_for_type!()),
             };
 
@@ -2281,7 +2335,7 @@ pub(crate) fn typecheck_value<'a>(
             };
 
             let overlay = if let Some(vs) = vs_opt {
-                typecheck_map(ctx, t, tk, tv, vs, Some)?
+                typecheck_big_map(ctx, t, tk, tv, vs, diff)?
             } else {
                 BTreeMap::default()
             };
@@ -2356,9 +2410,17 @@ pub(crate) fn typecheck_value<'a>(
         (T::Timestamp, V::String(n)) => {
             ctx.gas
                 .consume(gas::tc_cost::timestamp_decoding(n.len())?)?;
-            let dt = DateTime::parse_from_rfc3339(n)
-                .map_err(|e| TcError::InvalidValueForType(e.to_string(), T::Timestamp))?;
-            TV::Timestamp(dt.timestamp().into())
+            // First, try to parse the string as an integer
+            if let Ok(int_value) = n.parse::<i64>() {
+                TV::Timestamp(int_value.into())
+            } else {
+                // If integer parsing fails, try to parse as RFC3339 datetime
+                let dt = DateTime::parse_from_rfc3339(&n);
+                match dt {
+                    Ok(dt) => TV::Timestamp(dt.timestamp().into()),
+                    Err(_) => return Err(invalid_value_for_type!()),
+                }
+            }
         }
         (
             T::Lambda(tys),
@@ -2551,29 +2613,32 @@ fn typecheck_set<'a>(
     .collect::<Result<_, TcError>>()
 }
 
-fn typecheck_map<'a, V>(
+// A helper function that handles the common map-typechecking logic.
+fn typecheck_map_common<'a, V, F>(
     ctx: &mut Ctx,
     map_ty: &Type,
     key_type: &Type,
-    value_type: &Type,
     vs: &[Micheline<'a>],
-    value_mapper: fn(TypedValue<'a>) -> V,
-) -> Result<BTreeMap<TypedValue<'a>, V>, TcError> {
-    ctx.gas.consume(gas::tc_cost::construct_map(
-        key_type.size_for_gas(),
-        vs.len(),
-    )?)?;
+    check_parse_value: F,
+) -> Result<BTreeMap<TypedValue<'a>, V>, TcError>
+where
+    F: Fn(&Micheline<'a>, &mut Ctx) -> Result<V, TcError>,
+{
+    ctx.gas
+        .consume(gas::tc_cost::construct_map(key_type.size_for_gas(), vs.len())?)?;
+
     let ctx_cell = std::cell::RefCell::new(ctx);
-    let tc_elt = |v: &Micheline<'a>, ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
-        match v {
-            Micheline::App(Prim::Elt, [k, v], _) => {
-                let k = typecheck_value(k, ctx, key_type)?;
-                let v = typecheck_value(v, ctx, value_type)?;
-                Ok((k, value_mapper(v)))
+    let tc_elt = |mich: &Micheline<'a>, local_ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
+        match mich {
+            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
+                let k = typecheck_value(k_expr, local_ctx, key_type)?;
+                let v = check_parse_value(v_expr, local_ctx)?;
+                Ok((k, v))
             }
-            _ => Err(TcError::InvalidEltForMap(format!("{v:?}"), map_ty.clone())),
+            _ => Err(TcError::InvalidEltForMap(format!("{mich:?}"), map_ty.clone())),
         }
     };
+
     // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
     // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
     // be very fast in cases where the slice is nearly sorted", so hopefully it doesn't add
@@ -2587,7 +2652,44 @@ fn typecheck_map<'a, V>(
         to_key: |(k, _)| k,
         ctx: &ctx_cell,
     }
-    .collect::<Result<_, TcError>>()
+    .collect()
+}
+
+fn typecheck_map<'a>(
+    ctx: &mut Ctx,
+    map_ty: &Type,
+    key_type: &Type,
+    value_type: &Type,
+    vs: &[Micheline<'a>],
+) -> Result<BTreeMap<TypedValue<'a>, TypedValue<'a>>, TcError> {
+    // Here, parse_value simply calls `typecheck_value` on the value expression.
+    typecheck_map_common(ctx, map_ty, key_type, vs, |val_expr, local_ctx| {
+        typecheck_value(val_expr, local_ctx, value_type)
+    })
+}
+
+fn typecheck_big_map<'a>(
+    ctx: &mut Ctx,
+    map_ty: &Type,
+    key_type: &Type,
+    value_type: &Type,
+    vs: &[Micheline<'a>],
+    diff: bool,
+) -> Result<BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>, TcError> {
+    typecheck_map_common(ctx, map_ty, key_type, vs, |val_expr, local_ctx| {
+        if diff {
+            match val_expr {
+                Micheline::App(Prim::Some, [inner_val], _) => {
+                    let v = typecheck_value(inner_val, local_ctx, value_type)?;
+                    Ok(Some(v))
+                }
+                Micheline::App(Prim::None, [], _) => Ok(None),
+                _ => Err(TcError::InvalidEltForMap(format!("{val_expr:?}"), map_ty.clone())),
+            }
+        } else {
+            typecheck_value(val_expr, local_ctx, value_type).map(Some)
+        }
+    })
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
@@ -2662,10 +2764,12 @@ mod typecheck_tests {
     use super::{Lambda, Or};
     use crate::ast::micheline::test_helpers::*;
     use crate::ast::michelson_address as addr;
+    use crate::ast::michelson_address::entrypoint::DEFAULT_EP_NAME;
     use crate::ast::or::Or::{Left, Right};
     use crate::gas::Gas;
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
+    use std::collections::HashMap;
     use Instruction::*;
     use Option::None;
 
@@ -5932,16 +6036,44 @@ mod typecheck_tests {
             ))
         );
 
-        // ID and overlay - ok case
+        // ID and overlay - forget some
         assert_eq!(
             typecheck_value(
                 &app!(Pair[0, seq!(app!(Elt[7, 8]))]),
                 &mut ctx,
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
+            Err(TcError::InvalidEltForMap(
+                "Int(8)".into(),
+                Type::BigMap((Type::Int, Type::Int).into())
+            ))
+        );
+
+        // ID and overlay - Some case
+        assert_eq!(
+            typecheck_value(
+                &app!(Pair[0, seq!(app!(Elt[7, app!(Some[8])]))]),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
             Ok(TypedValue::BigMap(BigMap {
-                id: Some(id0),
+                id: Some(id0.clone()),
                 overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))]),
+                key_type: Type::Int,
+                value_type: Type::Int
+            }))
+        );
+
+        // ID and overlay - None case
+        assert_eq!(
+            typecheck_value(
+                &app!(Pair[0, seq!(app!(Elt[7, app!(None)]))]),
+                &mut ctx,
+                &Type::new_big_map(Type::Int, Type::Int)
+            ),
+            Ok(TypedValue::BigMap(BigMap {
+                id: Some(id0.clone()),
+                overlay: BTreeMap::from([(TypedValue::int(7), None)]),
                 key_type: Type::Int,
                 value_type: Type::Int
             }))
@@ -6014,7 +6146,11 @@ mod typecheck_tests {
             Ok(ContractScript {
                 parameter: Type::new_contract(Type::Unit),
                 storage: Type::Unit,
-                code: Seq(vec![Drop(None), Unit, Failwith(Type::Unit)])
+                code: Seq(vec![Drop(None), Unit, Failwith(Type::Unit)]),
+                annotations: HashMap::from([(
+                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    (Vec::new(), Type::new_contract(Type::Unit))
+                )]),
             })
         );
     }
@@ -6059,9 +6195,13 @@ mod typecheck_tests {
                 &exp
             );
         }
-        fn hex<T: Into<AddressHash>>(con: fn(Vec<u8>) -> T, hex: &str, ep: &str) -> addr::Address {
+        fn hex<T: Into<AddressHash>>(
+            con: fn(Vec<u8>) -> Result<T, FromBytesError>,
+            hex: &str,
+            ep: &str,
+        ) -> addr::Address {
             addr::Address {
-                hash: con(hex::decode(hex).unwrap()).into(),
+                hash: con(hex::decode(hex).unwrap()).unwrap().into(),
                 entrypoint: Entrypoint::try_from(ep).unwrap(),
             }
         }
@@ -6071,7 +6211,7 @@ mod typecheck_tests {
             r#""tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j""#,
             "0x00007b09f782e0bcd67739510afa819d85976119d5ef",
             hex(
-                ContractTz1Hash,
+                ContractTz1Hash::try_from,
                 "7b09f782e0bcd67739510afa819d85976119d5ef",
                 "default",
             ),
@@ -6080,7 +6220,7 @@ mod typecheck_tests {
             r#""tz29EDhZ4D3XueHxm5RGZsJLHRtj3qSA2MzH""#,
             "0x00010a053e3d8b622a993d3182e3f6cc5638ff5f12fe",
             hex(
-                ContractTz2Hash,
+                ContractTz2Hash::try_from,
                 "0a053e3d8b622a993d3182e3f6cc5638ff5f12fe",
                 "default",
             ),
@@ -6089,7 +6229,7 @@ mod typecheck_tests {
             r#""tz3UoffC7FG7zfpmvmjUmUeAaHvzdcUvAj6r""#,
             "0x00025cfa532f50de3e12befc0ad21603835dd7698d35",
             hex(
-                ContractTz3Hash,
+                ContractTz3Hash::try_from,
                 "5cfa532f50de3e12befc0ad21603835dd7698d35",
                 "default",
             ),
@@ -6098,7 +6238,7 @@ mod typecheck_tests {
             r#""tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN""#,
             "0x00036342f30484dd46b6074373aa6ddca9dfb70083d6",
             hex(
-                ContractTz4Hash,
+                ContractTz4Hash::try_from,
                 "6342f30484dd46b6074373aa6ddca9dfb70083d6",
                 "default",
             ),
@@ -6107,7 +6247,7 @@ mod typecheck_tests {
             r#""KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye""#,
             "0x011f2d825fdd9da219235510335e558520235f4f5400",
             hex(
-                ContractKt1Hash,
+                ContractKt1Hash::try_from,
                 "1f2d825fdd9da219235510335e558520235f4f54",
                 "default",
             ),
@@ -6116,7 +6256,7 @@ mod typecheck_tests {
             r#""sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf""#,
             "0x03d601f22256d2ad1faec0c64374e527c6e62f2e5a00",
             hex(
-                SmartRollupHash,
+                SmartRollupHash::try_from,
                 "d601f22256d2ad1faec0c64374e527c6e62f2e5a",
                 "default",
             ),
@@ -6126,7 +6266,7 @@ mod typecheck_tests {
             r#""tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%foo""#,
             "0x00007b09f782e0bcd67739510afa819d85976119d5ef666f6f",
             hex(
-                ContractTz1Hash,
+                ContractTz1Hash::try_from,
                 "7b09f782e0bcd67739510afa819d85976119d5ef",
                 "foo",
             ),
@@ -6135,7 +6275,7 @@ mod typecheck_tests {
             r#""tz29EDhZ4D3XueHxm5RGZsJLHRtj3qSA2MzH%foo""#,
             "0x00010a053e3d8b622a993d3182e3f6cc5638ff5f12fe666f6f",
             hex(
-                ContractTz2Hash,
+                ContractTz2Hash::try_from,
                 "0a053e3d8b622a993d3182e3f6cc5638ff5f12fe",
                 "foo",
             ),
@@ -6144,7 +6284,7 @@ mod typecheck_tests {
             r#""tz3UoffC7FG7zfpmvmjUmUeAaHvzdcUvAj6r%foo""#,
             "0x00025cfa532f50de3e12befc0ad21603835dd7698d35666f6f",
             hex(
-                ContractTz3Hash,
+                ContractTz3Hash::try_from,
                 "5cfa532f50de3e12befc0ad21603835dd7698d35",
                 "foo",
             ),
@@ -6153,7 +6293,7 @@ mod typecheck_tests {
             r#""tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN%foo""#,
             "0x00036342f30484dd46b6074373aa6ddca9dfb70083d6666f6f",
             hex(
-                ContractTz4Hash,
+                ContractTz4Hash::try_from,
                 "6342f30484dd46b6074373aa6ddca9dfb70083d6",
                 "foo",
             ),
@@ -6162,7 +6302,7 @@ mod typecheck_tests {
             r#""KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%foo""#,
             "0x011f2d825fdd9da219235510335e558520235f4f5400666f6f",
             hex(
-                ContractKt1Hash,
+                ContractKt1Hash::try_from,
                 "1f2d825fdd9da219235510335e558520235f4f54",
                 "foo",
             ),
@@ -6171,7 +6311,7 @@ mod typecheck_tests {
             r#""sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf%foo""#,
             "0x03d601f22256d2ad1faec0c64374e527c6e62f2e5a00666f6f",
             hex(
-                SmartRollupHash,
+                SmartRollupHash::try_from,
                 "d601f22256d2ad1faec0c64374e527c6e62f2e5a",
                 "foo",
             ),
@@ -6283,7 +6423,9 @@ mod typecheck_tests {
     fn test_push_chain_id() {
         let bytes = "f3d48554";
         let exp = hex::decode(bytes).unwrap();
-        let exp = Ok(Push(TypedValue::ChainId(super::ChainId(exp))));
+        let exp = Ok(Push(TypedValue::ChainId(
+            super::ChainId::try_from(exp).unwrap(),
+        )));
         let lit = "NetXynUjJNZm7wi";
         assert_eq!(
             &typecheck_instruction(
@@ -6443,7 +6585,17 @@ mod typecheck_tests {
                     ISelf("foo".try_into().unwrap()),
                     Unit,
                     Failwith(Type::Unit)
-                ])
+                ]),
+                annotations: HashMap::from([
+                    (
+                        FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                        (vec![Direction::Right], Type::Unit)
+                    ),
+                    (
+                        FieldAnnotation::from_str_unchecked("foo"),
+                        (vec![Direction::Left], Type::Int)
+                    )
+                ]),
             })
         );
     }
@@ -6487,7 +6639,17 @@ mod typecheck_tests {
                     ISelf("default".try_into().unwrap()),
                     Unit,
                     Failwith(Type::Unit)
-                ])
+                ]),
+                annotations: HashMap::from([
+                    (
+                        FieldAnnotation::from_str_unchecked("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"),
+                        (vec![Direction::Left], Type::Int)
+                    ),
+                    (
+                        FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                        (vec![Direction::Right], Type::Unit)
+                    ),
+                ]),
             })
         );
     }
@@ -7626,6 +7788,42 @@ mod typecheck_tests {
                 stk
             ),
             Ok(Push(TypedValue::timestamp(1571659294)))
+        );
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PUSH timestamp \"1571659294\"").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Ok(Push(TypedValue::timestamp(1571659294)))
+        );
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PUSH timestamp \"ABCD\"").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::InvalidValueForType(
+                "String(\"ABCD\")".to_string(),
+                Type::Timestamp
+            ))
+        );
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PUSH timestamp \"3.5\"").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::InvalidValueForType(
+                "String(\"3.5\")".to_string(),
+                Type::Timestamp
+            ))
         );
     }
 

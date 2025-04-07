@@ -45,30 +45,24 @@ let fail_to_stake_with_unfinalizable_unstake_requests ~loc staker ~amount =
      - staker = delegate
      - staker != delegate
     Any scenario that begins with this will be duplicated.
-
-    Also, ensures that AI is activated (sets EMA threshold to zero,
-    enables activation vote, and waits for AI activation). *)
+*)
 let init_staker_delegate_or_external =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
   let begin_test ~self_stake =
     let name = if self_stake then "staker" else "delegate" in
-    init_constants ()
-    --> set S.Adaptive_issuance.autostaking_enable false
-    --> Scenario_begin.activate_ai `Force
-    --> begin_test [name]
+    init_constants () --> begin_test [name]
     --> set_delegate_params name init_params
   in
-  Tag "AI activated"
-  --> (Tag "self stake" --> begin_test ~self_stake:true
-      |+ Tag "external stake"
-         --> begin_test ~self_stake:false
-         --> add_account_with_funds
-               "staker"
-               ~funder:"delegate"
-               (Amount (Tez.of_mutez 2_000_000_000_000L))
-         --> set_delegate "staker" (Some "delegate"))
+  (Tag "self stake" --> begin_test ~self_stake:true
+  |+ Tag "external stake"
+     --> begin_test ~self_stake:false
+     --> add_account_with_funds
+           "staker"
+           ~funder:"delegate"
+           (Amount (Tez.of_mutez 2_000_000_000_000L))
+     --> set_delegate "staker" (Some "delegate"))
   --> wait_delegate_parameters_activation
 
 let stake_init =
@@ -88,10 +82,7 @@ let wait_for_unfreeze_and_check wait =
   --> next_cycle
   --> assert_failure_in_check_snapshot_balances ~loc:__LOC__ "wait snap"
 
-let unstake_wait (_, state) =
-  let crd = state.State.constants.consensus_rights_delay in
-  let msp = Protocol.Constants_repr.max_slashing_period in
-  crd + msp
+let unstake_wait (_, state) = State.unstake_wait state
 
 let finalize staker =
   assert_failure_in_check_balance_field
@@ -164,9 +155,7 @@ let shorter_roundtrip_for_baker =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
   init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
   --> set S.consensus_rights_delay consensus_rights_delay
-  --> activate_ai `Force
   --> begin_test ["delegate"; "faucet"]
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> set_delegate_params "delegate" init_params
@@ -364,9 +353,7 @@ let change_delegate_to_self =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force --> begin_test ["delegate"]
+  init_constants () --> begin_test ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
         "staker"
@@ -419,8 +406,6 @@ let change_delegate =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
   init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
   --> begin_test ["delegate1"; "delegate2"]
   --> set_delegate_params "delegate1" init_params
   --> set_delegate_params "delegate2" init_params
@@ -481,9 +466,7 @@ let unset_delegate =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force --> begin_test ["delegate"]
+  init_constants () --> begin_test ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
         "staker"
@@ -521,9 +504,6 @@ let forbid_costaking =
      --> init_constants ~delegate_parameters_activation_delay:0 ()
   |+ Tag "large delegate parameters delay"
      --> init_constants ~delegate_parameters_activation_delay:10 ())
-  (* Set flags *)
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Zero_threshold
   (* Start scenario *)
   --> begin_test ["delegate"]
   --> set_delegate_params "delegate" init_params
@@ -532,7 +512,7 @@ let forbid_costaking =
         ~funder:"delegate"
         (Amount (Tez.of_mutez 2_000_000_000_000L))
   --> set_delegate "staker" (Some "delegate")
-  --> wait_cycle_until (`And (`AI_activation, `delegate_parameters_activation))
+  --> wait_cycle_until `delegate_parameters_activation
   (* try stake in normal conditions *)
   --> stake "staker" amount
   (* Change delegate parameters to forbid staking *)
@@ -564,9 +544,10 @@ let forbid_costaking =
   (* Now possible *)
   --> stake "staker" amount
 
-(* Check that a delegate can be deactivated under AI by unstaking everything, even with stakers.
+(* Check that a delegate gets deactivated after it unstakes everything,
+   even if it has external stakers.
    Check that such a delegate can reactivate later, and still have their stakers *)
-let test_deactivation =
+let test_deactivation_after_unstake_all =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
@@ -580,8 +561,6 @@ let test_deactivation =
   let check_is_deactivated = check_deactivated_status ~expected:true in
   let check_is_not_deactivated = check_deactivated_status ~expected:false in
   init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
   --> begin_test ["delegate"; "faucet"]
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> set_delegate_params "delegate" init_params
@@ -626,9 +605,9 @@ let test_deactivation =
   (* We wait until the delegate is completely deactivated *)
   --> check_is_not_deactivated ~loc:__LOC__ "delegate"
   (* We already waited for [consensus_rights_delay] + 1 cycles since 0 stake,
-     we must wait for [consensus_rights_delay] more. *)
+     we must wait for [tolerated_inactivity_period - 1] more. *)
   --> wait_n_cycles_f (fun (_, state) ->
-          state.State.constants.consensus_rights_delay)
+          state.State.constants.tolerated_inactivity_period - 1)
   --> check_is_not_deactivated ~loc:__LOC__ "delegate"
   --> next_cycle
   --> check_is_deactivated ~loc:__LOC__ "delegate"
@@ -707,7 +686,7 @@ let test_change_delegates =
     in
     set_delegate_params name params
   in
-  init_constants () --> activate_ai `Force
+  init_constants ()
   --> begin_test ["delegate1"; "delegate2"; "delegate3"; "faucet"]
   --> add_account_with_funds
         "staker"
@@ -760,7 +739,8 @@ let tests =
        ("Test unset delegate", unset_delegate);
        ("Test forbid costake", forbid_costaking);
        ("Test stake from unstake", shorter_roundtrip_for_baker);
-       ("Test deactivation under AI", test_deactivation);
+       ( "Test deactivation after delegate unstakes everything",
+         test_deactivation_after_unstake_all );
        ("Test change delegates", test_change_delegates);
      ]
 

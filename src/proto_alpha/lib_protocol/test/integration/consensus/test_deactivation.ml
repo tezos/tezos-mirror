@@ -90,20 +90,18 @@ let test_simple_staking_rights () =
   let open Lwt_result_syntax in
   let* b, (a1, _a2) = Context.init2 () in
   let* balance = Context.Contract.balance (B b) a1 in
-  let delegate1 = Context.Contract.pkh a1 in
-  let* frozen_deposits =
-    Context.Delegate.current_frozen_deposits (B b) delegate1
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      balance
+      Account.default_initial_spendable_balance
   in
-  let expected_initial_balance =
-    Account.default_initial_balance -! frozen_deposits
-  in
-  let* () = Assert.equal_tez ~loc:__LOC__ balance expected_initial_balance in
   let* m1 = Context.Contract.manager (B b) a1 in
   let* info = Context.Delegate.info (B b) m1.pkh in
   let* () =
     Assert.equal_tez
       ~loc:__LOC__
-      Account.default_initial_balance
+      Account.default_initial_full_balance
       info.staking_balance
   in
   check_stake ~loc:__LOC__ b m1
@@ -114,7 +112,7 @@ let test_simple_staking_rights () =
     rights. *)
 let test_simple_staking_rights_after_baking () =
   let open Lwt_result_syntax in
-  let* b, (a1, a2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (a1, a2) = Context.init2 ~consensus_threshold_size:0 () in
   let* m1 = Context.Contract.manager (B b) a1 in
   let* m2 = Context.Contract.manager (B b) a2 in
   let* b = Block.bake_n ~policy:(By_account m2.pkh) 5 b in
@@ -137,7 +135,7 @@ let check_active_staking_balance ~loc ~deactivated b (m : Account.t) =
 
 let run_until_deactivation () =
   let open Lwt_result_syntax in
-  let* b, (a1, a2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (a1, a2) = Context.init2 ~consensus_threshold_size:0 () in
   let* balance_start = Context.Contract.balance (B b) a1 in
   let* m1 = Context.Contract.manager (B b) a1 in
   let* m2 = Context.Contract.manager (B b) a2 in
@@ -343,7 +341,7 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
    first and third accounts. *)
 let test_delegation () =
   let open Lwt_result_syntax in
-  let* b, (a1, a2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (a1, a2) = Context.init2 ~consensus_threshold_size:0 () in
   let m3 = Account.new_account () in
   Account.add_account m3 ;
   let* m1 = Context.Contract.manager (B b) a1 in

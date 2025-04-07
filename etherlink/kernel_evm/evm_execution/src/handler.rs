@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023-2024 PK Lab <contact@pklab.io>
 //
 // SPDX-License-Identifier: MIT
@@ -12,8 +12,10 @@
 use crate::access_record::AccessRecord;
 use crate::account_storage::{
     account_path, AccountStorageError, EthereumAccount, EthereumAccountStorage,
-    CODE_HASH_DEFAULT,
+    StorageValue, CODE_HASH_DEFAULT,
 };
+use crate::precompiles::reentrancy_guard::ReentrancyGuard;
+use crate::precompiles::{FA_BRIDGE_PRECOMPILE_ADDRESS, WITHDRAWAL_ADDRESS};
 use crate::storage::blocks::{get_block_hash, BLOCKS_STORED};
 use crate::storage::tracer;
 use crate::tick_model_opcodes;
@@ -39,20 +41,65 @@ use evm::{
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 use std::cmp::min;
+use std::collections::HashMap;
 use std::fmt::Debug;
+use tezos_data_encoding::enc::{BinResult, BinWriter};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::michelson::ticket::FA2_1Ticket;
-use tezos_smart_rollup_encoding::michelson::{MichelsonContract, MichelsonPair};
+use tezos_smart_rollup_encoding::michelson::{
+    MichelsonBytes, MichelsonContract, MichelsonNat, MichelsonPair, MichelsonTimestamp,
+};
 use tezos_smart_rollup_encoding::outbox::OutboxMessage;
 use tezos_smart_rollup_storage::StorageError;
 
 /// Withdrawal interface of the ticketer contract
 pub type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
 
-/// Outbox message that implements RouterInterface, ready to be encoded and posted
-pub type Withdrawal = OutboxMessage<RouterInterface>;
+/// Interface of the default entrypoint of the fast withdrawal contract.
+///
+/// The parameters corresponds to (from left to right w.r.t. `MichelsonPair`):
+/// * withdrawal_id
+/// * ticket
+/// * timestamp
+/// * withdrawer's address
+/// * generic payload
+/// * l2 caller's address
+pub type FastWithdrawalInterface = MichelsonPair<
+    MichelsonNat,
+    MichelsonPair<
+        FA2_1Ticket,
+        MichelsonPair<
+            MichelsonTimestamp,
+            MichelsonPair<
+                MichelsonContract,
+                MichelsonPair<MichelsonBytes, MichelsonBytes>,
+            >,
+        >,
+    >,
+>;
+
+/// Outbox messages that implements the different withdrawal interfaces,
+/// ready to be encoded and posted.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Withdrawal {
+    Standard(OutboxMessage<RouterInterface>),
+    Fast(OutboxMessage<FastWithdrawalInterface>),
+}
+
+impl BinWriter for Withdrawal {
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        match self {
+            Withdrawal::Standard(outbox_message_full) => {
+                outbox_message_full.bin_write(output)
+            }
+            Withdrawal::Fast(outbox_message_full) => {
+                outbox_message_full.bin_write(output)
+            }
+        }
+    }
+}
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum ExecutionResult {
@@ -289,6 +336,42 @@ mod benchmarks {
     }
 }
 
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
+pub struct StorageKey {
+    pub address: H160,
+    pub index: H256,
+}
+
+#[derive(Clone, Copy)]
+pub enum CacheStorageValue {
+    Read(StorageValue),
+    Write(H256),
+}
+
+impl CacheStorageValue {
+    pub fn h256(&self) -> H256 {
+        match self {
+            CacheStorageValue::Read(storage_value) => storage_value.h256(),
+            CacheStorageValue::Write(storage_value) => *storage_value,
+        }
+    }
+}
+
+/// The layer cache is associating a storage slot which is an
+/// address and an index (StorageKey) to a value (CacheStorageValue).
+pub type LayerCache = HashMap<StorageKey, CacheStorageValue>;
+
+/// The storage cache is associating at each layer (usize) its
+/// own cache (LayerCache). For each slot that is modified or
+/// read during a call it will be added to the cache in its own
+/// layer.
+// NB: The cache is implicitly bounded in memory thanks to the
+// gas limit, because at most we can do 300_000 different SSTORE
+// which costs 100 gas (300_000 × 100 = 30M gas).
+// In memory it means we take at most:
+// 300_000 × 32B = 9_600_000B = 9.6MB
+pub type StorageCache = HashMap<usize, LayerCache>;
+
 /// The implementation of the SputnikVM [Handler] trait
 pub struct EvmHandler<'a, Host: Runtime> {
     /// The host
@@ -318,81 +401,16 @@ pub struct EvmHandler<'a, Host: Runtime> {
     pub enable_warm_cold_access: bool,
     /// Tracer configuration for debugging.
     tracer: Option<TracerInput>,
-    /// State of the storage during a given execution.
-    /// NB: For now, only used for tracing.
-    ///
-    /// TODO: https://gitlab.com/tezos/tezos/-/issues/6879
-    /// With a better representation (map) this could easily be
-    /// used for caching and optimise the VM's execution in terms
-    /// of speed.
-    storage_state: Vec<StorageMapItem>,
-}
-
-#[allow(clippy::too_many_arguments)]
-fn trace<Host: Runtime>(
-    host: &mut Host,
-    tracer_input: &Option<TracerInput>,
-    return_data: Vec<u8>,
-    pc: Result<usize, ExitReason>,
-    opcode: Option<Opcode>,
-    gas: u64,
-    gas_cost: u64,
-    depth: usize,
-    step_result: &Result<(), Capture<ExitReason, Resolve<EvmHandler<'_, Host>>>>,
-    stack: Vec<H256>,
-    memory: Vec<u8>,
-    storage: Vec<StorageMapItem>,
-) -> Result<(), EthereumError> {
-    if let (
-        Some(StructLogger(StructLoggerInput {
-            transaction_hash,
-            config,
-        })),
-        Some(opcode),
-        Ok(pc),
-    ) = (tracer_input, opcode, pc)
-    {
-        let opcode = opcode.as_u8();
-        let pc: u64 = pc.try_into().unwrap_or_default();
-        let depth: u16 = depth.try_into().unwrap_or_default();
-        let stack = (!config.disable_stack).then_some(stack);
-        let return_data = config.enable_return_data.then_some(return_data);
-        let memory = config.enable_memory.then_some(memory);
-        let storage = (!config.disable_storage).then_some(storage);
-
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
-        // For error, find the appropriate value to return for tracing.
-        // The following value is kind of a placeholder.
-        let error = if let Err(Capture::Exit(reason)) = &step_result {
-            match &reason {
-                ExitReason::Error(exit) => {
-                    Some(format!("{:?}", exit).as_bytes().to_vec())
-                }
-                ExitReason::Fatal(exit) => {
-                    Some(format!("{:?}", exit).as_bytes().to_vec())
-                }
-                _ => None,
-            }
-        } else {
-            None
-        };
-
-        let struct_log = StructLog {
-            pc,
-            opcode,
-            gas,
-            gas_cost,
-            depth,
-            error,
-            stack,
-            return_data,
-            memory,
-            storage,
-        };
-
-        tracer::store_struct_log(host, struct_log, transaction_hash)?;
-    }
-    Ok(())
+    /// Storage cache during a given execution.
+    /// NB: See `StorageCache`'s documentation for more information.
+    storage_cache: StorageCache,
+    /// The original storage cache has its own cache because its unrelated
+    /// to the VM, its used by an internal mechanism of Sputnik to quickly
+    /// access storage slots before any transaction happens.
+    /// See: `fn original_storage`.
+    original_storage_cache: LayerCache,
+    /// Reentrancy guard prevents circular calls to impure precompiles
+    reentrancy_guard: ReentrancyGuard,
 }
 
 impl<'a, Host: Runtime> EvmHandler<'a, Host> {
@@ -423,7 +441,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             effective_gas_price,
             enable_warm_cold_access,
             tracer,
-            storage_state: vec![],
+            storage_cache: HashMap::with_capacity(10),
+            original_storage_cache: HashMap::with_capacity(10),
+            reentrancy_guard: ReentrancyGuard::new(vec![
+                WITHDRAWAL_ADDRESS,
+                FA_BRIDGE_PRECOMPILE_ADDRESS,
+            ]),
         }
     }
 
@@ -443,7 +466,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Get the amount of gas still available for the current transaction.
-    fn gas_remaining(&self) -> u64 {
+    pub fn gas_remaining(&self) -> u64 {
         self.transaction_data
             .last()
             .map(|layer| {
@@ -760,6 +783,107 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         Ok(())
     }
 
+    /// Prepare trace info if needed
+    fn prepare_trace(
+        &mut self,
+        runtime: &evm::Runtime,
+        opcode: &Option<Opcode>,
+    ) -> Option<StructLog> {
+        if let (
+            Some(StructLogger(StructLoggerInput {
+                transaction_hash: _,
+                config,
+            })),
+            Some(opcode),
+        ) = (&self.tracer, opcode)
+        {
+            let opcode = opcode.as_u8();
+            let pc: u64 = runtime
+                .machine()
+                .trace_position()
+                .ok()?
+                .try_into()
+                .unwrap_or_default();
+            let gas = self.gas_remaining();
+            let depth: u16 = self.transaction_data.len().try_into().unwrap_or_default();
+            let stack = (!config.disable_stack)
+                .then(|| runtime.machine().stack().data().to_owned());
+            let return_data = config
+                .enable_return_data
+                .then(|| runtime.machine().return_value());
+            let memory = config
+                .enable_memory
+                .then(|| runtime.machine().memory().data()[..].to_vec());
+            let storage = (!config.disable_storage).then(|| {
+                let mut flat_storage = vec![];
+                self.storage_cache
+                    .clone()
+                    .into_iter()
+                    .flat_map(|(_, layer_cache)| layer_cache)
+                    .for_each(|(StorageKey { address, index }, value)| {
+                        flat_storage.push(StorageMapItem {
+                            address,
+                            index,
+                            value: value.h256(),
+                        });
+                    });
+                flat_storage
+            });
+
+            Some(StructLog::prepare(
+                pc,
+                opcode,
+                gas,
+                depth,
+                stack,
+                return_data,
+                memory,
+                storage,
+            ))
+        } else {
+            None
+        }
+    }
+
+    fn complete_and_store_trace(
+        &mut self,
+        trace: Option<StructLog>,
+        gas_cost: u64,
+        step_result: &Result<(), Capture<ExitReason, Resolve<EvmHandler<'_, Host>>>>,
+    ) -> Result<(), EthereumError> {
+        if let (
+            Some(StructLogger(StructLoggerInput {
+                transaction_hash,
+                config: _,
+            })),
+            Some(struct_log),
+        ) = (self.tracer, trace)
+        {
+            // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
+            // For error, find the appropriate value to return for tracing.
+            // The following value is kind of a placeholder.
+            let error = if let Err(Capture::Exit(reason)) = &step_result {
+                match &reason {
+                    ExitReason::Error(exit) => {
+                        Some(format!("{:?}", exit).as_bytes().to_vec())
+                    }
+                    ExitReason::Fatal(exit) => {
+                        Some(format!("{:?}", exit).as_bytes().to_vec())
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            tracer::store_struct_log(
+                self.host,
+                struct_log.finish(gas_cost, error),
+                &transaction_hash,
+            )?;
+        }
+        Ok(())
+    }
+
     /// Execute a SputnikVM run with this handler
     ///
     // DO NOT RENAME: function name is used during benchmark
@@ -776,13 +900,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             // level. At the end of each step if the kernel takes more than the
             // allocated ticks the transaction is marked as failed.
             let opcode = runtime.machine().inspect().map(|p| p.0);
-            let program_counter = runtime.machine().trace_position();
-            let gas_remaining = self.gas_remaining();
-            let return_value = runtime.machine().return_value();
-            let depth = self.transaction_data.len();
-            let stack = runtime.machine().stack().data().to_owned();
-            let memory = runtime.machine().memory().data()[..].to_vec();
-            let storage = self.storage_state.clone();
+            let trace = self.prepare_trace(runtime, &opcode);
 
             #[cfg(feature = "benchmark-opcodes")]
             if let Some(opcode) = opcode {
@@ -808,20 +926,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 benchmarks::end_opcode_section(self.host, gas_cost, &step_result);
             };
 
-            trace(
-                self.host,
-                &self.tracer,
-                return_value,
-                program_counter,
-                opcode,
-                gas_remaining,
-                gas_cost,
-                depth,
-                &step_result,
-                stack,
-                memory,
-                storage,
-            )?;
+            self.complete_and_store_trace(trace, gas_cost, &step_result)?;
 
             match step_result {
                 Ok(()) => (),
@@ -1006,6 +1111,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
+    pub fn can_begin_inter_transaction_call_stack(&self) -> bool {
+        self.stack_depth() < self.config.call_stack_limit
+    }
+
     // Sub function to determine if the `caller` can create a new internal transaction.
     // According to the Ethereum yellow paper (p.37) for `CALL`, `CREATE`, ... instructions that
     // creates a new substate, it must always check that there are no `OutOfFund` or `CallTooDeep`
@@ -1014,7 +1123,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // we can reproduce the exact same check on the stack from the Ethereum yellow paper (p.37).
         match (
             self.has_enough_fund(caller, value),
-            self.stack_depth() < self.config.call_stack_limit,
+            self.can_begin_inter_transaction_call_stack(),
         ) {
             (Ok(true), true) => Precondition::PassPrecondition,
             (Ok(false), _) => {
@@ -1181,6 +1290,14 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         #[cfg(feature = "benchmark-opcodes")]
         benchmarks::start_precompile_section(self.host, address, &input);
 
+        if let Err(err) = self.reentrancy_guard.begin_precompile_call(&address) {
+            return Ok((
+                ExitReason::Fatal(evm::ExitFatal::CallErrorAsFatal(err)),
+                None,
+                vec![],
+            ));
+        }
+
         let precompile_execution_result = self.precompiles.execute(
             self,
             address,
@@ -1189,6 +1306,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             self.is_static(),
             transfer,
         );
+
+        self.reentrancy_guard.end_precompile_call();
 
         #[cfg(feature = "benchmark-opcodes")]
         benchmarks::end_precompile_section(self.host);
@@ -1531,6 +1650,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 }
             }
 
+            commit_storage_cache(self, number_of_tx_layer);
+
             self.evm_account_storage
                 .commit_transaction(self.host)
                 .map_err(EthereumError::from)?;
@@ -1590,6 +1711,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(EthereumError::from)?;
 
         let _ = self.transaction_data.pop();
+        self.storage_cache.clear();
+        self.original_storage_cache.clear();
 
         Ok(ExecutionOutcome {
             gas_used,
@@ -1598,6 +1721,34 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             withdrawals: vec![],
             estimated_ticks_used: self.estimated_ticks_used,
         })
+    }
+
+    fn flush_storage_cache(&mut self) -> Result<(), EthereumError> {
+        let storage_cache_size = self.storage_cache.len();
+        if storage_cache_size > 1 {
+            log!(
+                self.host,
+                Fatal,
+                "The storage cache size is {storage_cache_size} when \
+                 flushing. It is inconsistent with the transaction stack. \
+                 The EVM is most likely broken."
+            );
+            return Err(EthereumError::InconsistentTransactionStack(
+                storage_cache_size,
+                false,
+                false,
+            ));
+        }
+
+        if let Some(cache) = self.storage_cache.get(&0) {
+            for (StorageKey { address, index }, value) in cache.iter() {
+                if let CacheStorageValue::Write(value) = value {
+                    let mut account = self.get_or_create_account(*address)?;
+                    account.set_storage(self.host, index, value)?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// End the initial transaction with either a commit or a rollback. The
@@ -1615,11 +1766,19 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     r
                 );
 
-                self.commit_initial_transaction(if let Some(new_address) = new_address {
-                    ExecutionResult::ContractDeployed(new_address, result)
-                } else {
-                    ExecutionResult::CallSucceeded(r, result)
-                })
+                let commit_result = self.commit_initial_transaction(
+                    if let Some(new_address) = new_address {
+                        ExecutionResult::ContractDeployed(new_address, result)
+                    } else {
+                        ExecutionResult::CallSucceeded(r, result)
+                    },
+                );
+
+                // We flush the storage's cache into the durable storage
+                // by actually writing in it.
+                self.flush_storage_cache()?;
+
+                commit_result
             }
             Ok((ExitReason::Revert(ExitRevert::Reverted), _, result)) => {
                 self.rollback_initial_transaction(ExecutionResult::CallReverted(result))
@@ -1678,7 +1837,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Begin an intermediate transaction
-    fn begin_inter_transaction(
+    pub fn begin_inter_transaction(
         &mut self,
         is_static: bool,
         gas_limit: Option<u64>,
@@ -1734,6 +1893,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         );
 
         let gas_remaining = self.gas_remaining();
+
+        commit_storage_cache(self, number_of_tx_layer);
 
         self.evm_account_storage
             .commit_transaction(self.host)
@@ -1803,6 +1964,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             let _ = self.transaction_data.pop();
         }
 
+        self.storage_cache.remove(&number_of_tx_layer);
+
         self.evm_account_storage
             .rollback_transaction(self.host)
             .map_err(EthereumError::from)
@@ -1833,7 +1996,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     ///
     /// This function applies _only_ to intermediate transactions. Calling
     /// it with only the initial transaction in progress is an error.
-    fn end_inter_transaction<T>(
+    pub fn end_inter_transaction<T>(
         &mut self,
         execution_result: Result<CreateOutcome, EthereumError>,
     ) -> Capture<CreateOutcome, T> {
@@ -1981,7 +2144,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
-    fn nested_call_gas_limit(&mut self, target_gas: Option<u64>) -> Option<u64> {
+    pub fn nested_call_gas_limit(&mut self, target_gas: Option<u64>) -> Option<u64> {
         // Part of EIP-150: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md
         let gas_remaining = self.gas_remaining();
         let max_gas_limit = if self.config.call_l64_after_gas {
@@ -2001,6 +2164,91 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             ExitReason::Error(_) | ExitReason::Revert(_) | ExitReason::Fatal(_) => output,
             ExitReason::Succeed(_) => vec![],
         }
+    }
+
+    /// Test helper used to demonstrate that reentrancy guard is actually the exit reason.
+    #[cfg(test)]
+    pub(crate) fn disable_reentrancy_guard(&mut self) {
+        self.reentrancy_guard.disable();
+    }
+}
+
+fn update_cache<Host: Runtime>(
+    handler: &mut EvmHandler<'_, Host>,
+    address: H160,
+    index: H256,
+    value: CacheStorageValue,
+    layer: usize,
+) {
+    if let Some(cache) = handler.storage_cache.get_mut(&layer) {
+        cache.insert(StorageKey { address, index }, value);
+    } else {
+        let mut cache = HashMap::new();
+        cache.insert(StorageKey { address, index }, value);
+        handler.storage_cache.insert(layer, cache);
+    }
+}
+
+fn find_storage_key<Host: Runtime>(
+    handler: &mut EvmHandler<'_, Host>,
+    address: H160,
+    index: H256,
+    current_layer: usize,
+) -> Option<H256> {
+    for layer in (0..=current_layer).rev() {
+        if let Some(cache) = handler.storage_cache.get(&layer) {
+            if let Some(value) = cache.get(&StorageKey { address, index }) {
+                return Some(value.h256());
+            }
+        }
+    }
+    None
+}
+
+/// Committing the storage cache means that the current layer changes
+/// are propagated to the previous one and the current layer is popped.
+fn commit_storage_cache<Host: Runtime>(
+    handler: &mut EvmHandler<'_, Host>,
+    current_layer: usize,
+) {
+    let commit_layer = current_layer - 1;
+    if let Some(cache) = handler.storage_cache.remove(&current_layer) {
+        if let Some(prev_layer_cache) = handler.storage_cache.get_mut(&commit_layer) {
+            prev_layer_cache.extend(cache);
+        } else {
+            handler.storage_cache.insert(commit_layer, cache);
+        }
+    }
+}
+
+fn cached_storage_access<Host: Runtime>(
+    handler: &mut EvmHandler<'_, Host>,
+    address: H160,
+    index: H256,
+    layer: usize,
+) -> H256 {
+    if let Some(value) = find_storage_key(handler, address, index, layer) {
+        value
+    } else {
+        let value = handler
+            .get_account(address)
+            .ok()
+            .flatten()
+            .and_then(|a| a.read_storage(handler.host, &index).ok());
+
+        // This condition will help avoiding unecessary write access
+        // in the durable storage at the end of the transaction.
+        if let Some(value) = value {
+            update_cache(
+                handler,
+                address,
+                index,
+                CacheStorageValue::Read(value),
+                layer,
+            );
+        }
+
+        value.map(|x| x.h256()).unwrap_or_default()
     }
 }
 
@@ -2049,20 +2297,28 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             .unwrap_or_default()
     }
 
-    fn storage(&self, address: H160, index: H256) -> H256 {
-        self.get_account(address)
-            .ok()
-            .flatten()
-            .and_then(|a| a.get_storage(self.host, &index).ok())
-            .unwrap_or_default()
+    fn storage(&mut self, address: H160, index: H256) -> H256 {
+        let layer = self.evm_account_storage.stack_depth();
+        cached_storage_access(self, address, index, layer)
     }
 
-    fn original_storage(&self, address: H160, index: H256) -> H256 {
-        self.get_original_account(address)
-            .ok()
-            .flatten()
-            .and_then(|a| a.get_storage(self.host, &index).ok())
-            .unwrap_or_default()
+    fn original_storage(&mut self, address: H160, index: H256) -> H256 {
+        let key = StorageKey { address, index };
+        if let Some(value) = self.original_storage_cache.get(&key) {
+            value.h256()
+        } else {
+            let value = self
+                .get_original_account(address)
+                .ok()
+                .flatten()
+                .and_then(|a| a.get_storage(self.host, &index).ok())
+                .unwrap_or_default();
+
+            self.original_storage_cache
+                .insert(key, CacheStorageValue::Read(StorageValue::Hit(value)));
+
+            value
+        }
     }
 
     fn gas_left(&self) -> U256 {
@@ -2175,24 +2431,9 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         index: H256,
         value: H256,
     ) -> Result<(), ExitError> {
-        let mut account = self.get_or_create_account(address).map_err(|_| {
-            ExitError::Other(Cow::from("Could not get account for set_storage"))
-        })?;
-
-        let storage_result = account
-            .set_storage(self.host, &index, &value)
-            .map_err(|_| ExitError::Other(Cow::from("Could not set_storage in handler")));
-
-        // Tracing
-        if self.tracer.is_some() {
-            self.storage_state.push(StorageMapItem {
-                address,
-                index,
-                value,
-            });
-        }
-
-        storage_result
+        let layer = self.evm_account_storage.stack_depth();
+        update_cache(self, address, index, CacheStorageValue::Write(value), layer);
+        Ok(())
     }
 
     fn log(
@@ -2493,7 +2734,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                     code_address,
                     transfer,
                     input.clone(),
-                    transaction_context,
+                    transaction_context.clone(),
                 );
                 let gas_after = self.gas_used();
 
@@ -2511,15 +2752,25 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                                 },
                         })) = self.tracer
                         {
-                            let mut call_trace = CallTrace::new_minimal_trace(
-                                match call_scheme {
-                                    CallScheme::Call => "CALL",
-                                    CallScheme::CallCode => "CALLCODE",
-                                    CallScheme::DelegateCall => "DELEGATECALL",
-                                    CallScheme::StaticCall => "STATICCALL",
+                            let (type_, from) = match call_scheme {
+                                CallScheme::Call => ("CALL", caller),
+                                CallScheme::StaticCall => ("STATICCALL", caller),
+                                CallScheme::DelegateCall => {
+                                    // FIXME: #7738 this only point to parent call
+                                    // address if it was not a DELEGATECALL or
+                                    // CALLCODE itself
+                                    ("DELEGATECALL", transaction_context.context.address)
                                 }
-                                .into(),
-                                caller,
+                                CallScheme::CallCode => {
+                                    // FIXME: #7738 this only point to parent call
+                                    // address if it was not a DELEGATECALL or
+                                    // CALLCODE itself
+                                    ("CALLCODE", transaction_context.context.address)
+                                }
+                            };
+                            let mut call_trace = CallTrace::new_minimal_trace(
+                                type_.into(),
+                                from,
                                 value,
                                 gas_after - gas_before,
                                 input,
@@ -2528,7 +2779,10 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                                 (self.stack_depth() + 1).try_into().unwrap_or_default(),
                             );
 
-                            call_trace.add_to(Some(address));
+                            // for the trace we want the contract address to always be the "to"
+                            // field, not necessarily the address used in the transition context
+                            // which may be something else (eg DELEGATECALL)
+                            call_trace.add_to(Some(code_address));
                             call_trace.add_gas(target_gas);
                             call_trace.add_output(Some(output.to_owned()));
 
@@ -2677,8 +2931,8 @@ mod test {
         address: &H160,
         index: &H256,
     ) -> H256 {
-        let account = handler.get_or_create_account(*address).unwrap();
-        account.get_storage(handler.borrow_host(), index).unwrap()
+        let layer = handler.evm_account_storage.stack_depth();
+        cached_storage_access(handler, *address, *index, layer)
     }
 
     fn dummy_first_block() -> BlockConstants {

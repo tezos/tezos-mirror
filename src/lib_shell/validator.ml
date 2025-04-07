@@ -178,7 +178,11 @@ let chains_watcher {chains_input; _} = Lwt_watcher.create_stream chains_input
 let inject_operation v ?chain_id ~force op =
   let open Lwt_result_syntax in
   let inject_operation_on nv ~handle_missing_prevalidator =
-    match Chain_validator.prevalidator nv with
+    match[@profiler.wrap_s
+           {driver_ids = [OpenTelemetry]}
+             (Opentelemetry_profiler.trace "Validator.inject_operation")]
+      Chain_validator.prevalidator nv
+    with
     | Some pv -> Prevalidator.inject_operation pv ~force op
     | None -> handle_missing_prevalidator
   in

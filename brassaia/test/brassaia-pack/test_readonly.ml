@@ -99,7 +99,7 @@ let ro_reload_after_close () =
   rm_dir root;
   let* rw = S.Repo.init (config ~readonly:false ~fresh:true root) in
   let* ro = S.Repo.init (config ~readonly:true ~fresh:false root) in
-  let tree = binding (S.Tree.singleton ?metadata:None) in
+  let tree = binding S.Tree.singleton in
   let* c1 = S.Commit.init rw ~parents:[] ~info:(info ()) tree in
   S.Repo.close rw >>= fun () ->
   S.reload ro;

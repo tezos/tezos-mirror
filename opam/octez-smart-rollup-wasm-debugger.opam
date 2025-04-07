@@ -10,6 +10,9 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-rust-deps" { = version }
+  "bls12-381" { = version }
+  "octez-l2-libs" { = version }
   "octez-smart-rollup-wasm-debugger-lib" { = version }
 ]
 build: [
@@ -17,4 +20,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos: Debugger for the smart rollups’ WASM kernels"

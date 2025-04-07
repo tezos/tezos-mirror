@@ -1,14 +1,13 @@
 octez-smart-rollup-wasm-debugger
 octez-smart-rollup-node
-octez-dac-client
-octez-dac-node
 octez-dal-node
 octez-signer
 octez-codec
 octez-client
 octez-admin-client
+octez-experimental-agnostic-baker
 octez-node
+octez-accuser-PsRiotum
+octez-baker-PsRiotum
 octez-accuser-PsQuebec
 octez-baker-PsQuebec
-octez-accuser-PsParisC
-octez-baker-PsParisC

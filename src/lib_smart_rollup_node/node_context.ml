@@ -93,7 +93,6 @@ type 'a t = {
   cctxt : Client_context.full;
   degraded : ('a, bool) Reference.t;
   dal_cctxt : Dal_node_client.cctxt option;
-  dac_client : Dac_observer_client.t option;
   data_dir : string;
   l1_ctxt : Layer1.t;
   genesis_info : genesis_info;
@@ -209,8 +208,6 @@ let readonly (node_ctxt : _ t) =
     lpc = Reference.readonly node_ctxt.lpc;
     private_info = Reference.readonly node_ctxt.private_info;
   }
-
-type 'a delayed_write = ('a, rw) Delayed_write_monad.t
 
 (** Abstraction over store  *)
 
@@ -544,10 +541,10 @@ let set_lcc node_ctxt lcc =
   let open Lwt_result_syntax in
   let lcc_l1 = Reference.get node_ctxt.lcc in
   let* () = Store.State.LCC.set node_ctxt.store (lcc.commitment, lcc.level) in
-  Metrics.Info.set_lcc_level_local lcc.level ;
+  Metrics.wrap (fun () -> Metrics.Info.set_lcc_level_local lcc.level) ;
   if lcc.level > lcc_l1.level then (
     Reference.set node_ctxt.lcc lcc ;
-    Metrics.Info.set_lcc_level_l1 lcc.level) ;
+    Metrics.wrap (fun () -> Metrics.Info.set_lcc_level_l1 lcc.level)) ;
   let*! () =
     Commitment_event.last_cemented_commitment_updated lcc.commitment lcc.level
   in
@@ -577,8 +574,9 @@ let register_published_commitment node_ctxt commitment ~first_published_at_level
         {first_published_at_level; published_at_level}
     else return_unit
   in
-  if published_by_us then Metrics.Info.set_lpc_level_local level
-  else Metrics.Info.set_lpc_level_l1 level ;
+  Metrics.wrap (fun () ->
+      if published_by_us then Metrics.Info.set_lpc_level_local level
+      else Metrics.Info.set_lpc_level_l1 level) ;
   when_ published_by_us @@ fun () ->
   let* () =
     Store.State.LPC.set node_ctxt.store (commitment_hash, commitment.inbox_level)
@@ -674,11 +672,10 @@ let get_executable_pending_outbox_messages {store; lcc; current_protocol; _} =
   let max_level = (Reference.get lcc).level in
   let constants = (Reference.get current_protocol).constants.sc_rollup in
   let min_level =
-    Int32.sub
-      max_level
-      (Int32.of_int
-         (constants.max_number_of_stored_cemented_commitments
-        * constants.commitment_period_in_blocks))
+    Int32.sub max_level (Int32.of_int constants.max_active_outbox_levels)
+    |> Int32.succ
+    (* Protocol uses strict inequality, see function [validate_outbox_level] in
+       src/proto_alpha/lib_protocol/sc_rollup_operations.ml. *)
   in
   Store.Outbox_messages.pending store ~min_level ~max_level
 
@@ -765,11 +762,11 @@ let protocol_activation_level node_ctxt protocol_hash =
 let save_protocol_info node_ctxt (block : Layer1.header)
     ~(predecessor : Layer1.header) =
   let open Lwt_result_syntax in
-  let* last_protocol = Store.Protocols.last node_ctxt.store in
-  match last_protocol with
-  | Some {proto_level; _}
-    when proto_level = block.header.proto_level
-         && block.header.proto_level = predecessor.header.proto_level ->
+  let* pred_proto =
+    Store.Protocols.proto_of_level node_ctxt.store predecessor.level
+  in
+  match pred_proto with
+  | Some {proto_level; _} when proto_level = block.header.proto_level ->
       (* Nominal case, no protocol change. Nothing to do. *)
       return_unit
   | None ->
@@ -824,27 +821,60 @@ let save_protocol_info node_ctxt (block : Layer1.header)
       in
       List.iter_es (Store.Protocols.store node_ctxt.store) protocols
   | Some _ ->
-      (* block.header.proto_level <> last_proto_level or head is a migration
-         block, i.e. there is a protocol change w.r.t. last registered one. *)
+      (* There is protocol change in what we know of the predecessor and the
+         head. *)
       let is_head_migration_block =
         block.header.proto_level <> predecessor.header.proto_level
       in
-      let* proto_info =
-        let+ {next_protocol = protocol; _} =
-          Tezos_shell_services.Shell_services.Blocks.protocols
-            node_ctxt.cctxt
-            ~block:(`Hash (block.hash, 0))
-            ()
-        in
-        let level =
-          if is_head_migration_block then
-            Store.Protocols.Activation_level block.level
-          else First_known block.level
-        in
-        Store.Protocols.
-          {level; proto_level = block.header.proto_level; protocol}
+      let* {next_protocol = protocol; _} =
+        Tezos_shell_services.Shell_services.Blocks.protocols
+          node_ctxt.cctxt
+          ~block:(`Hash (block.hash, 0))
+          ()
       in
-      Store.Protocols.store node_ctxt.store proto_info
+      let* cur_proto_info = Store.Protocols.find node_ctxt.store protocol in
+      let to_save =
+        (* Save the protocol information if we are looking at a migration block,
+           or if we had protocol information that we missed (e.g. in degraded
+           mode). *)
+        is_head_migration_block
+        ||
+        match cur_proto_info with
+        | None -> true
+        | Some {level = First_known fl | Activation_level fl; _} ->
+            block.header.level < fl
+      in
+      if not to_save then return_unit
+      else
+        let proto_info =
+          let level =
+            if is_head_migration_block then
+              Store.Protocols.Activation_level block.level
+            else First_known block.level
+          in
+          Store.Protocols.
+            {level; proto_level = block.header.proto_level; protocol}
+        in
+        Store.Protocols.store node_ctxt.store proto_info
+
+let save_protocols_from_l1 {cctxt; store; _} =
+  let open Lwt_result_syntax in
+  let open Tezos_shell_services.Chain_services in
+  let*! protocols = Protocols.list cctxt () in
+  match protocols with
+  | Error _ ->
+      Format.eprintf
+        "Warning: did not fetch protocol activation levels from L1 node" ;
+      return_unit
+  | Ok protocols ->
+      List.iter_es
+        (fun {protocol; proto_level; activation_block = _block, level} ->
+          let proto_info =
+            Store.Protocols.
+              {protocol; proto_level; level = Activation_level level}
+          in
+          Store.Protocols.store store proto_info)
+        protocols
 
 let get_slot_header {store; _} ~published_in_block_hash slot_index =
   Error.trace_lwt_result_with
@@ -879,6 +909,10 @@ let save_slot_header {store; _} ~published_in_block_hash
   Store.Dal_slots_headers.store store published_in_block_hash slot_header
 
 let find_slot_status {store; _} ~confirmed_in_block_hash slot_index =
+  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/7604
+
+     Remove Dal_slots_statuses if MR
+     https://gitlab.com/tezos/tezos/-/merge_requests/15640 is merged. *)
   Store.Dal_slots_statuses.find_slot_status
     store
     confirmed_in_block_hash

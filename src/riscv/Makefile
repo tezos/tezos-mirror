@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -15,8 +16,11 @@ endif
 # We don't want to check all features in CI, so we provide this varible to configure it.
 CHECK_FEATURES ?= --all-features
 
+# The version of nightly that we use for anything that requires it
+NIGHTLY_VERSION = nightly-2025-01-30
+
 .PHONY: build
-build: riscv-dummy.elf riscv-sandbox
+build: riscv-dummy.elf riscv-dummy-sdk.elf riscv-sandbox
 	@cargo build --release --workspace $(NATIVE_OPT)
 	@make -C jstz build
 	@make -C tests build
@@ -35,6 +39,14 @@ riscv-dummy.elf::
 	@make -C dummy_kernel build
 	@ln -f dummy_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy $@
 
+riscv-supervised-dummy.elf::
+	@make -C supervised_dummy_kernel build
+	@ln -f supervised_dummy_kernel/target/riscv64gc-unknown-linux-musl/debug/riscv-supervised-dummy $@
+
+riscv-dummy-sdk.elf::
+	@make -C dummy_sdk_kernel build
+	@ln -f dummy_sdk_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy-sdk $@
+
 # Update checked-in binaries
 .PHONY: update-assets
 update-assets: assets/riscv-dummy.elf assets/jstz
@@ -52,11 +64,17 @@ assets/jstz assets/jstz.checksum::
 
 .PHONY: build-deps
 build-deps:
-	@exec ./scripts/install-rust-std-hermit.sh
+	@make -C jstz build-deps
+	@make -C dummy_kernel build-deps
+	@make -C supervised_dummy_kernel build-deps
+	@make -C dummy_sdk_kernel build-deps
 	@rustup component add rustfmt clippy
 ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
+
+	# Install Nightly for formatting with its Rustfmt, and running Miri
+	@rustup toolchain install $(NIGHTLY_VERSION) -c rustfmt miri rust-src
 
 	# Iterate through all the toolchains. 'rustup show' will install the
 	# toolchain in addition to showing toolchain information.
@@ -68,16 +86,27 @@ test: build
 	@make -C dummy_kernel test
 	@make -C jstz test
 
+.PHONY: test-long
+test-long:
+	@cargo test --release -- test_jstz_determinism test_jstz_proofs_one_step --nocapture --ignored
+
+.PHONY: test-miri
+test-miri:
+	@cargo +$(NIGHTLY_VERSION) miri test -- miri
+
 .PHONY: check
 check:
-	# Check format of all crates
-	@exec ../../scripts/check-format-rust.sh
+	@exec scripts/format.sh --check
+	@taplo format --check $(shell ls **/Cargo.toml)
 
 	@cargo update --workspace --locked
 	@cargo check --workspace --all-targets $(CHECK_FEATURES)
 	@cargo clippy --workspace --all-targets $(CHECK_FEATURES) -- --deny warnings
-	@taplo format --check $(shell git ls-files '**/Cargo.toml')
+	@cargo doc --document-private-items --no-deps $(CHECK_FEATURES)
+
 	@make -C dummy_kernel check
+	@make -C supervised_dummy_kernel check
+	@make -C dummy_sdk_kernel check
 	@make -C jstz check
 	@make -C tests check
 
@@ -95,6 +124,8 @@ audit:
 clean:
 	@cargo clean
 	@make -C dummy_kernel clean
+	@make -C supervised_dummy_kernel clean
+	@make -C dummy_sdk_kernel clean
 	@make -C jstz clean
 	@make -C tests clean
-	@rm -f riscv-sandbox riscv-dummy.elf
+	@rm -f riscv-sandbox riscv-dummy.elf riscv-dummy-sdk.elf

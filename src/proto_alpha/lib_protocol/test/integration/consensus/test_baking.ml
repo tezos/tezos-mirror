@@ -30,7 +30,9 @@
     Component:    Protocol (baking)
     Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_baking.ml
-    Subject:      Rewards and bakers. Tests based on RPCs.
+    Subject:      Bakers and baking/voting power-related tests, based on RPCs.
+                  Note that more detailed tests on baking rewards can be found
+                  in lib_protocol/test/integration/test_scenario_rewards.ml
 *)
 
 open Protocol
@@ -50,7 +52,7 @@ open Alpha_context
       previously. *)
 let test_cycle () =
   let open Lwt_result_syntax in
-  let* b, _contracts = Context.init_n ~consensus_threshold:0 5 () in
+  let* b, _contracts = Context.init_n ~consensus_threshold_size:0 5 () in
   let* csts = Context.get_constants (B b) in
   let blocks_per_cycle = csts.parametric.blocks_per_cycle in
   let pp fmt x = Format.fprintf fmt "%ld" x in
@@ -82,84 +84,100 @@ let test_bake_n_cycles n () =
   let open Lwt_result_syntax in
   let open Block in
   let policy = By_round 0 in
-  let* block, _contract = Context.init1 ~consensus_threshold:0 () in
+  let* block, _contract = Context.init1 ~consensus_threshold_size:0 () in
   let* (_block : block) = Block.bake_until_n_cycle_end ~policy n block in
   return_unit
 
-(** Check that, after one or two voting periods, the voting power of a baker is
-   updated according to the rewards it receives for baking the blocks in the
-   voting periods. Note we consider only one baker. *)
+let fold_es n init f =
+  let open Lwt_result_syntax in
+  let rec aux k accu =
+    if k >= n then return accu
+    else
+      let* accu = f k accu in
+      aux (k + 1) accu
+  in
+  aux 0 init
+
+(** Test that:
+    - [current_voting_power] is updated whenever the baker bakes a
+      block (because of the rewards it receives).
+    - [voting_power] is the snapshot of [current_voting_power] at the
+      start of the current voting period. *)
 let test_voting_power_cache () =
   let open Lwt_result_syntax in
-  let open Block in
-  let policy = By_round 0 in
-  let* genesis, _contract = Context.init1 ~consensus_threshold:0 () in
-  let* csts = Context.get_constants (B genesis) in
+  let* genesis, delegate1 = Context.init1 ~consensus_threshold_size:0 () in
+  let delegate1 = Account.pkh_of_contract_exn delegate1 in
+  let check_voting_power_update
+      (previous_current_voting_power, previous_voting_power) block =
+    let* current_voting_power =
+      Context.get_current_voting_power (B block) delegate1
+    in
+    let* voting_power = Context.get_voting_power (B block) delegate1 in
+    let* delegate1_baked_last_block =
+      let* block_producer = Block.block_producer block in
+      return (Signature.Public_key_hash.equal block_producer.delegate delegate1)
+    in
+    let* voting_period = Context.Vote.get_current_period (B block) in
+    let is_last_block_of_period = Int32.equal voting_period.remaining 0l in
+    Log.debug
+      ~color:Log_helpers.low_debug_color
+      "@[<v2>Checking updates for block at level %ld %sbaked by 'delegate1'@,\
+       %a@,\
+       current_voting_power: previous=%Ld new=%Ld@,\
+       voting_power:         previous=%Ld new=%Ld@,\
+       @]"
+      block.header.shell.level
+      (if delegate1_baked_last_block then "" else "not ")
+      Voting_period.pp_info
+      voting_period
+      previous_current_voting_power
+      current_voting_power
+      previous_voting_power
+      voting_power ;
+    let* () =
+      (if delegate1_baked_last_block then Assert.lt_int64
+       else Assert.equal_int64)
+        ~loc:__LOC__
+        previous_current_voting_power
+        current_voting_power
+    in
+    let* () =
+      (* The context gets set up for a new voting period while
+         applying the last block of the previous period. *)
+      Assert.equal_int64
+        ~loc:__LOC__
+        voting_power
+        (if is_last_block_of_period then current_voting_power
+         else previous_voting_power)
+    in
+    return (current_voting_power, voting_power)
+  in
+  let* constants = Context.get_constants (B genesis) in
   let blocks_per_voting_period =
     Int32.(
-      mul
-        csts.parametric.blocks_per_cycle
-        csts.parametric.cycles_per_voting_period)
+      to_int
+        (mul
+           constants.parametric.blocks_per_cycle
+           constants.parametric.cycles_per_voting_period))
   in
-  let blocks_per_voting_periods n =
-    Int64.of_int (n * Int32.to_int blocks_per_voting_period)
+  let* full_balance = Context.Delegate.full_balance (B genesis) delegate1 in
+  let initial_voting_power = Tez.to_mutez full_balance in
+  let* _ =
+    fold_es
+      (* We bake a bit more than 3 full voting periods. *)
+      ((3 * blocks_per_voting_period) + 2)
+      (genesis, (initial_voting_power, initial_voting_power))
+      (fun (_n : int) (block, prev_powers) ->
+        let* block = Block.bake block in
+        let* new_powers = check_voting_power_update prev_powers block in
+        return (block, new_powers))
   in
-  let* baking_reward = Context.get_baking_reward_fixed_portion (B genesis) in
-  let* bakers = Context.get_bakers (B genesis) in
-  let baker = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
-  let* full_balance = Context.Delegate.full_balance (B genesis) baker in
-  let assert_voting_power ~loc n block =
-    let* voting_power = Context.get_voting_power (B block) baker in
-    Assert.equal_int64 ~loc n voting_power
-  in
-  (* the voting power is the full staking balance *)
-  let initial_voting_power_at_genesis = Tez.to_mutez full_balance in
-  let* () =
-    assert_voting_power ~loc:__LOC__ initial_voting_power_at_genesis genesis
-  in
-  let rewards_after_one_voting_period =
-    Tez_helpers.(baking_reward *! Int64.pred (blocks_per_voting_periods 1))
-  in
-  let expected_delta_voting_power_after_one_voting_period =
-    Tez.to_mutez rewards_after_one_voting_period
-  in
-  let* block =
-    Block.bake_n ~policy (Int32.to_int blocks_per_voting_period - 1) genesis
-  in
-  let expected_voting_power_after_one_voting_period =
-    Int64.add
-      initial_voting_power_at_genesis
-      expected_delta_voting_power_after_one_voting_period
-  in
-  let* () =
-    assert_voting_power
-      ~loc:__LOC__
-      expected_voting_power_after_one_voting_period
-      block
-  in
-  let rewards_after_two_voting_periods =
-    Tez_helpers.(baking_reward *! Int64.pred (blocks_per_voting_periods 2))
-  in
-  let expected_delta_voting_power_after_two_voting_periods =
-    Tez.to_mutez rewards_after_two_voting_periods
-  in
-  let* block =
-    Block.bake_n ~policy (Int32.to_int blocks_per_voting_period) block
-  in
-  let expected_voting_power_after_two_voting_periods =
-    Int64.add
-      initial_voting_power_at_genesis
-      expected_delta_voting_power_after_two_voting_periods
-  in
-  assert_voting_power
-    ~loc:__LOC__
-    expected_voting_power_after_two_voting_periods
-    block
+  return_unit
 
 (** test that after baking, one gets the baking reward fixed portion. *)
 let test_basic_baking_reward () =
   let open Lwt_result_syntax in
-  let* genesis, baker = Context.init1 ~consensus_threshold:0 () in
+  let* genesis, baker = Context.init1 ~consensus_threshold_size:0 () in
   let* b = Block.bake genesis in
   let baker_pkh = Context.Contract.pkh baker in
   let* bal = Context.Contract.balance (B b) baker in
@@ -172,7 +190,7 @@ let test_basic_baking_reward () =
   Assert.equal_tez
     ~loc:__LOC__
     expected_initial_balance
-    Account.default_initial_balance
+    Account.default_initial_full_balance
 
 let get_contract_for_pkh contracts pkh =
   let open Lwt_result_syntax in
@@ -198,7 +216,7 @@ let get_contract_for_pkh contracts pkh =
     [b2].  *)
 let test_rewards_block_and_payload_producer () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init_n ~consensus_threshold:1 10 () in
+  let* genesis, contracts = Context.init_n ~consensus_threshold_size:1 10 () in
   let* baker_b1 = Context.get_baker (B genesis) ~round:Round.zero in
   let* baker_b1_contract = get_contract_for_pkh contracts baker_b1 in
   let* b1 = Block.bake ~policy:(By_round 0) genesis in
@@ -250,7 +268,7 @@ let test_rewards_block_and_payload_producer () =
      plus the fee for the transaction [tx]. *)
   let expected_balance =
     let open Tez_helpers in
-    Account.default_initial_balance -! frozen_deposit +! baking_reward
+    Account.default_initial_full_balance -! frozen_deposit +! baking_reward
     +! bonus_reward +! reward_for_b1 +! fee
   in
   let* () = Assert.equal_tez ~loc:__LOC__ bal expected_balance in
@@ -292,7 +310,7 @@ let test_rewards_block_and_payload_producer () =
   in
   let expected_balance =
     let open Tez_helpers in
-    Account.default_initial_balance +! baking_reward -! frozen_deposit
+    Account.default_initial_full_balance +! baking_reward -! frozen_deposit
     +! reward_for_b1 +! fee
   in
   let* () = Assert.equal_tez ~loc:__LOC__ bal expected_balance in
@@ -310,7 +328,7 @@ let test_rewards_block_and_payload_producer () =
   in
   let expected_balance' =
     let open Tez_helpers in
-    Account.default_initial_balance +! bonus_reward +! reward_for_b1'
+    Account.default_initial_full_balance +! bonus_reward +! reward_for_b1'
     -! frozen_deposits'
   in
   Assert.equal_tez ~loc:__LOC__ bal' expected_balance'
@@ -334,7 +352,7 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
   let* b0, (account1, _account2) =
     Context.init2
       ~bootstrap_balances:[initial_bal1; tpr]
-      ~consensus_threshold:0
+      ~consensus_threshold_size:0
       ()
   in
   let pkh1 = Context.Contract.pkh account1 in
@@ -380,7 +398,7 @@ let test_committee_sampling () =
       {
         Default_parameters.constants_test with
         consensus_committee_size;
-        consensus_threshold = 0;
+        consensus_threshold_size = 0;
       }
     in
     let parameters =
@@ -463,7 +481,7 @@ let tests =
   [
     Tztest.tztest "cycle" `Quick test_cycle;
     Tztest.tztest "bake_n_cycles for 12 cycles" `Quick (test_bake_n_cycles 12);
-    Tztest.tztest "voting_power" `Quick test_voting_power_cache;
+    Tztest.tztest "voting_power cache" `Quick test_voting_power_cache;
     Tztest.tztest
       "the fixed baking reward is given after a bake"
       `Quick

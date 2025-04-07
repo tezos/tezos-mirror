@@ -158,6 +158,76 @@ let () =
     (function Broken_locked_values_invariant -> Some () | _ -> None)
     (fun () -> Broken_locked_values_invariant)
 
+type signing_request = [`Preattestation | `Attestation | `Block_header]
+
+let signing_request_encoding : signing_request Data_encoding.t =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"preattestation"
+        (Tag 0)
+        (constant "preattestation")
+        (function `Preattestation -> Some () | _ -> None)
+        (function () -> `Preattestation);
+      case
+        ~title:"attestation"
+        (Tag 1)
+        (constant "attestation")
+        (function `Attestation -> Some () | _ -> None)
+        (function () -> `Attestation);
+      case
+        ~title:"block_header"
+        (Tag 2)
+        (constant "block_header")
+        (function `Block_header -> Some () | _ -> None)
+        (function () -> `Block_header);
+    ]
+
+let pp_signing_request fmt = function
+  | `Preattestation -> Format.fprintf fmt "a preattestation"
+  | `Attestation -> Format.fprintf fmt "an attestation"
+  | `Block_header -> Format.fprintf fmt "a block header"
+
+type error += Signature_timeout of (float * signing_request)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Signature_timeout"
+    ~title:"Signature timeout"
+    ~description:"Signature call reached a timeout."
+    ~pp:(fun ppf (timeout, request) ->
+      Format.fprintf
+        ppf
+        "@[A call for signing %a has reached the timeout of %f seconds.@]"
+        pp_signing_request
+        request
+        timeout)
+    Data_encoding.(
+      obj2 (req "timeout" float) (req "request" signing_request_encoding))
+    (function
+      | Signature_timeout (timeout, request) -> Some (timeout, request)
+      | _ -> None)
+    (fun (timeout, request) -> Signature_timeout (timeout, request))
+
+type error += Deterministic_nonce_timeout of float
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Deterministic_nonce_timeout"
+    ~title:"Deterministic timeout"
+    ~description:"Deterministic nonce call reached a timeout."
+    ~pp:(fun ppf timeout ->
+      Format.fprintf
+        ppf
+        "@[A deterministic nonce call has reached the timeout of %f seconds.@]"
+        timeout)
+    Data_encoding.(obj1 (req "timeout" float))
+    (function Deterministic_nonce_timeout timeout -> Some timeout | _ -> None)
+    (fun timeout -> Deterministic_nonce_timeout timeout)
+
 type error += Block_vote_file_not_found of string
 
 type error += Block_vote_file_invalid of string
@@ -332,3 +402,36 @@ let () =
       | _ -> None)
     (fun (chain, block_hash, length) ->
       Unexpected_empty_block_list {chain; block_hash; length})
+
+(* DAL node related errors *)
+
+type error += No_dal_node_endpoint | Incompatible_dal_options
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Client_commands.no_dal_node_endpoint"
+    ~title:"Missing_dal_node_argument"
+    ~description:"Explicit DAL node configuration is required."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Please connect a running DAL node using '--dal-node <endpoint>'. If \
+         you do not want to run a DAL node, you have to opt-out using \
+         '--without-dal'.")
+    Data_encoding.unit
+    (function No_dal_node_endpoint -> Some () | _ -> None)
+    (fun () -> No_dal_node_endpoint) ;
+  register_error_kind
+    `Permanent
+    ~id:"Client_commands.incompatible_dal_options"
+    ~title:"Incompatible_dal_options"
+    ~description:"'--dal-node' and '--without-dal' are incompatible."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "'--dal-node <endpoint>' and '--without-dal' are incompatible. Please \
+         do not pass '--without-dal' option.")
+    Data_encoding.unit
+    (function Incompatible_dal_options -> Some () | _ -> None)
+    (fun () -> Incompatible_dal_options)

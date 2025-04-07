@@ -12,6 +12,7 @@ let color = Log.Color.FG.gray
 let auth_configure_docker ~hostname =
   Process.run ~name ~color "gcloud" ["auth"; "configure-docker"; hostname]
 
+(** Retrieves the current Gcloud project ID from local environment. *)
 let config_get_value_project () =
   Process.run_and_read_stdout
     ~name
@@ -99,12 +100,37 @@ module DNS = struct
         description;
       ]
 
+  let list_zones () =
+    let* output =
+      Process.run_and_read_stdout
+        "gcloud"
+        ["dns"; "managed-zones"; "list"; "--format"; "csv(name, dns_name)"]
+    in
+    let lines = String.trim output |> String.split_on_char '\n' |> List.tl in
+    let res =
+      List.fold_left
+        (fun acc line ->
+          match String.trim line |> String.split_on_char ',' with
+          | [zone; dnsname] -> (zone, dnsname) :: acc
+          | _ -> acc)
+        []
+        lines
+    in
+    Lwt.return res
+
   let describe ~zone () =
     Process.run_and_read_stdout
       "gcloud"
       ["dns"; "managed-zones"; "describe"; zone]
 
-  let list ?name_filter ~zone () =
+  let list ~zone () =
+    Process.run_and_read_stdout
+      "gcloud"
+      ["dns"; "record-sets"; "list"; "--zone"; zone]
+
+  (** [list_entries ?name ~zone] lists all DNS entries from specified [~zone]
+      optionally filtering them by [?name_filter]. *)
+  let list_entries ?name_filter ~zone () =
     let name_filter =
       match name_filter with
       | None -> []
@@ -115,83 +141,81 @@ module DNS = struct
       (["dns"; "record-sets"; "list"; "--zone"; zone] @ name_filter)
 
   module Transaction = struct
+    (** [start ~zone ()] starts a DNS transaction in the specified [~zone]. *)
     let start ~zone () =
       Process.run
         "gcloud"
         ["dns"; "record-sets"; "transaction"; "start"; "--zone"; zone]
 
-    let add ?(ttl = 300) ?(typ = "A") ~domain ~zone ~ip () =
+    (** [add ?ttl ?typ ~zone ~name ~value ()] adds a DNS record to the transaction.
+        The record has an optional time-to-live [?ttl], type [?typ]. *)
+    let add ?(ttl = 300) ?(typ = "A") ~zone ~name ~value () =
       let ttl = ["--ttl"; Format.asprintf "%d" ttl] in
       let typ = ["--type"; Format.asprintf "%s" typ] in
-      let domain = ["--name"; domain] in
+      let name = ["--name"; name] in
       let zone = ["--zone"; zone] in
       Process.run
         "gcloud"
         (["dns"; "record-sets"; "transaction"; "add"]
-        @ zone @ ttl @ typ @ domain @ [ip])
+        @ zone @ ttl @ typ @ name @ [value])
 
-    let remove ?(ttl = 300) ?(typ = "A") ~domain ~zone ~ip () =
+    (** [remove ?ttl ?typ ~zone ~name ~value ()] removes a DNS record from the transaction.
+        The record has an optional time-to-live [?ttl], type [?typ]. *)
+    let remove ?(ttl = 300) ?(typ = "A") ~zone ~name ~value () =
       let ttl = ["--ttl"; Format.asprintf "%d" ttl] in
       let typ = ["--type"; Format.asprintf "%s" typ] in
-      let domain = ["--name"; domain] in
+      let name = ["--name"; name] in
       let zone = ["--zone"; zone] in
       Process.run
         "gcloud"
         (["dns"; "record-sets"; "transaction"; "remove"]
-        @ zone @ ttl @ typ @ domain @ [ip])
+        @ zone @ ttl @ typ @ name @ [value])
 
+    (** [execute ~zone ()] executes the current DNS transaction in the specified [~zone]. *)
     let execute ~zone () =
       Process.run
         "gcloud"
         ["dns"; "record-sets"; "transaction"; "execute"; "--zone"; zone]
 
+    (** [abort ~zone ()] aborts the current DNS transaction in the specified [~zone]. *)
     let abort ~zone () =
       Process.run
         "gcloud"
         ["dns"; "record-sets"; "transaction"; "abort"; "--zone"; zone]
+
+    (** [try_update ~zone fn args] tries to perform a DNS update transaction. It starts a
+        transaction, applies the changes using the provided function [fn] with arguments
+        [args], and executes the transaction. If an error occurs, it aborts the transaction. *)
+    let try_update ~zone fn args =
+      Lwt.catch
+        (fun () ->
+          let* () = start ~zone () in
+          let* () = fn args in
+          let* () = execute ~zone () in
+          unit)
+        (fun _ -> abort ~zone ())
   end
 
-  let get_domain ~tezt_cloud ~zone =
+  let get_fqdn ~zone ~name =
     let* output = describe ~zone () in
     let line =
       String.trim output |> String.split_on_char '\n'
       |> List.find_opt (String.starts_with ~prefix:"dnsName:")
     in
     match line with
-    | None -> Test.fail "Unable to find a managed zone. Have you create it?"
-    | Some line ->
-        Lwt.return
-          (Format.asprintf
-             "%s.%s"
-             tezt_cloud
-             (String.split_on_char ' ' line |> Fun.flip List.nth 1))
+    | None -> Lwt.return_none
+    | Some line -> (
+        try
+          let parent = String.split_on_char ' ' line |> Fun.flip List.nth 1 in
+          if String.ends_with name ~suffix:parent then Lwt.return_some name
+          else Lwt.return_some (Format.asprintf "%s.%s" name parent)
+        with _ -> Lwt.return_none)
 
-  let add ~tezt_cloud ~zone ~ip =
-    let* domain = get_domain ~tezt_cloud ~zone in
-    Lwt.catch
-      (fun () ->
-        let* () = Transaction.start ~zone () in
-        let* () = Transaction.add ~domain ~zone ~ip () in
-        let* () = Transaction.execute ~zone () in
-        unit)
-      (fun _ -> Transaction.abort ~zone ())
-
-  let remove ~tezt_cloud ~zone ~ip =
-    let* domain = get_domain ~tezt_cloud ~zone in
-    Lwt.catch
-      (fun () ->
-        let* () = Transaction.start ~zone () in
-        let* () = Transaction.remove ~domain ~zone ~ip () in
-        let* () = Transaction.execute ~zone () in
-        unit)
-      (fun _ -> Transaction.abort ~zone ())
-
-  let get_ip ~tezt_cloud ~zone =
-    let* domain = get_domain ~tezt_cloud ~zone in
-    let* output = list ~name_filter:domain ~zone () in
+  let get_value ~zone ~domain =
+    let* output = list_entries ~name_filter:domain ~zone () in
     (* Example of output
-       NAME                               TYPE  TTL  DATA
-       saroupille.nl-dal.saroupille.com.  A     300  35.187.31.38
+       NAME                           TYPE  TTL  DATA
+       user.nl-dal.domain.com.        A     300  35.187.31.38
     *)
     match String.split_on_char '\n' (String.trim output) with
     | [_header; line] -> (
@@ -202,4 +226,37 @@ module DNS = struct
         | [_domain; _type; _ttl; ip] -> Lwt.return_some ip
         | _ -> assert false)
     | _ -> Lwt.return_none
+
+  let find_zone_for_subdomain domain =
+    (* list_zone will always return domain name with a final dot *)
+    let domain =
+      if String.ends_with ~suffix:"." domain then domain else domain ^ "."
+    in
+    let* zones = list_zones () in
+    let zone =
+      List.find_opt
+        (fun (_, zone_domain) -> String.ends_with ~suffix:zone_domain domain)
+        zones
+    in
+    return zone
+
+  let add_subdomain ~zone ~name ~value =
+    let* name = get_fqdn ~zone ~name in
+    match name with
+    | None ->
+        Log.report "No domain found for zone: '%s'" zone ;
+        Lwt.return_unit
+    | Some name ->
+        Log.report "Adding subdomain '%s'" name ;
+        Transaction.(try_update ~zone @@ add ~zone ~name ~value) ()
+
+  let remove_subdomain ~zone ~name ~value =
+    let* name = get_fqdn ~zone ~name in
+    match name with
+    | None ->
+        Log.report "No domain found for zone: '%s'" zone ;
+        Lwt.return_unit
+    | Some name ->
+        Log.report "Removing subdomain '%s'" name ;
+        Transaction.(try_update ~zone @@ remove ~zone ~name ~value) ()
 end

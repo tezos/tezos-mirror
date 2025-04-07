@@ -42,27 +42,14 @@ type slot_header = {
   commitment : Cryptobox.Verifier.commitment;
 }
 
-type proto_parameters = {
-  feature_enable : bool;
-  incentives_enable : bool;
-  number_of_slots : int;
-  attestation_lag : int;
-  attestation_threshold : int;
-  cryptobox_parameters : Cryptobox.Verifier.parameters;
-  sc_rollup_challenge_window_in_blocks : int;
-  commitment_period_in_blocks : int;
-  dal_attested_slots_validity_lag : int;
-  blocks_per_cycle : int32;
-}
-
-val proto_parameters_encoding : proto_parameters Data_encoding.t
-
 module type T = sig
   module Proto : Registered_protocol.T
 
   type block_info
 
   type dal_attestation
+
+  type attestation_operation
 
   (** [block_info ?chain ?block ~metadata ctxt] returns the information of the
       [block] in [ctxt] for the given [chain]. Block's metadata are included or
@@ -79,18 +66,24 @@ module type T = sig
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
     Tezos_rpc.Context.generic ->
-    proto_parameters tzresult Lwt.t
+    Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
     block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
 
-  (** For a given block, returns for each included attestation, as a list, its
-      Tenderbake slot, its attester (if available in the operation receipt), and
-      its DAL attestation. *)
-  val get_dal_content_of_attestations :
+  (** For a given block, returns for each included attestation, as a
+      list, its Tenderbake slot, its attester if available in the
+      operation receipt, its [attestation] operation and, if it
+      exists, its [dal_attestation] to be passed to the [is_attested]
+      function. *)
+  val get_attestations :
     block_info ->
-    (int * Signature.Public_key_hash.t option * dal_attestation option) list
+    (int
+    * Signature.public_key_hash option
+    * attestation_operation
+    * dal_attestation option)
+    list
 
   (** [get_committee ctxt ~level] retrieves the DAL committee at [level] from L1 as a
       map that associates to the public key hash [pkh] of the member of
@@ -112,12 +105,31 @@ module type T = sig
       is one of the [dal_attestation] and [false] otherwise.  *)
   val is_attested : dal_attestation -> slot_index -> bool
 
+  (** [number_of_attested_slots] returns the number of slots attested in the [dal_attestation]. *)
+  val number_of_attested_slots : dal_attestation -> int
+
   (** [get_round fitness] returns the block round contained in [fitness]. *)
   val get_round : Fitness.t -> int32 tzresult
 
   (** [block_shell_header block_info] returns the shell header of the block
       whose information are given . *)
   val block_shell_header : block_info -> Block_header.shell_header
+
+  (** Call this function to inject an entrapment evidence to the
+      corresponding L1 node. *)
+  val inject_entrapment_evidence :
+    Tezos_rpc.Context.generic ->
+    attested_level:Int32.t ->
+    attestation_operation ->
+    slot_index:slot_index ->
+    shard:Cryptobox.shard ->
+    proof:Cryptobox.shard_proof ->
+    unit tzresult Lwt.t
+
+  val is_delegate :
+    Tezos_rpc.Context.generic ->
+    pkh:Signature.Public_key_hash.t ->
+    bool tzresult Lwt.t
 
   (* Section of helpers for Skip lists *)
 
@@ -155,15 +167,16 @@ module type T = sig
     val cells_of_level :
       block_info ->
       Tezos_rpc.Context.generic ->
-      dal_constants:proto_parameters ->
+      dal_constants:Tezos_dal_node_services.Types.proto_parameters ->
       pred_publication_level_dal_constants:
-        proto_parameters tzresult Lwt.t Lazy.t ->
+        Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t Lazy.t ->
       (hash * cell) list tzresult Lwt.t
   end
 
   module RPC : sig
     (** RPCs directory of the protocol-related part of the DAL node. *)
-    val directory : Skip_list_cells_store.t -> unit Tezos_rpc.Directory.t
+    val directory :
+      Dal_store_sqlite3.Skip_list_cells.t -> unit Tezos_rpc.Directory.t
   end
 end
 

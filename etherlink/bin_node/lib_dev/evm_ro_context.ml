@@ -8,6 +8,7 @@
 type t = {
   preimages : string;
   preimages_endpoint : Uri.t option;
+  native_execution_policy : Configuration.native_execution_policy;
   data_dir : string;
   store : Evm_store.t;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
@@ -16,36 +17,104 @@ type t = {
   block_storage_sqlite3 : bool;
 }
 
-let load ?smart_rollup_address ~data_dir configuration =
-  let open Lwt_result_syntax in
-  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
-  let* index =
-    Irmin_context.(
-      load ~cache_size:100_000 Read_only (Evm_state.irmin_store_path ~data_dir))
-  in
-  let+ smart_rollup_address =
-    match smart_rollup_address with
-    | None -> Evm_store.(use store Metadata.get)
-    | Some smart_rollup_address -> return smart_rollup_address
-  in
-  {
-    store;
-    index;
-    data_dir;
-    preimages = configuration.Configuration.kernel_execution.preimages;
-    preimages_endpoint = configuration.kernel_execution.preimages_endpoint;
-    smart_rollup_address;
-    block_storage_sqlite3 =
-      configuration.experimental_features.block_storage_sqlite3;
-    finalized_view = configuration.finalized_view;
-  }
-
 let get_evm_state ctxt hash =
   let open Lwt_result_syntax in
   Irmin_context.reload ctxt.index ;
   let*! context = Irmin_context.checkout_exn ctxt.index hash in
   let*! res = Irmin_context.PVMState.get context in
   return res
+
+let read state path =
+  let open Lwt_result_syntax in
+  let*! res = Evm_state.inspect state path in
+  return res
+
+let network_sanity_check ~network ctxt =
+  let open Lwt_result_syntax in
+  let expected_smart_rollup_address = Constants.rollup_address network in
+  let (Chain_id expected_chain_id) = Configuration.chain_id network in
+
+  let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
+  let* evm_state = get_evm_state ctxt hash in
+  let*! chain_id = Durable_storage.chain_id (read evm_state) in
+
+  let* () =
+    match chain_id with
+    | Ok (Chain_id chain_id) ->
+        unless Compare.Z.(chain_id = expected_chain_id) @@ fun () ->
+        failwith
+          "Local state is inconsistent with selected network %a: incorrect \
+           chain id (%a instead of %a)"
+          Configuration.pp_supported_network
+          network
+          Z.pp_print
+          chain_id
+          Z.pp_print
+          expected_chain_id
+    | Error _ ->
+        (* The chain id was not already set, which necessarily means we are
+           bootstrapping a chain from scratch. The smart rollup address check
+           will be enough. *)
+        let*! () = Events.missing_chain_id () in
+        return_unit
+  in
+
+  let* () =
+    unless Address.(ctxt.smart_rollup_address = expected_smart_rollup_address)
+    @@ fun () ->
+    failwith
+      "Smart rollup address is inconsistent with selected network %a: %a \
+       instead of %a"
+      Configuration.pp_supported_network
+      network
+      Address.pp
+      ctxt.smart_rollup_address
+      Address.pp
+      expected_smart_rollup_address
+  in
+
+  return_unit
+
+let load ?network ?smart_rollup_address ~data_dir configuration =
+  let open Lwt_result_syntax in
+  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
+  let* index =
+    Irmin_context.(
+      load ~cache_size:100_000 Read_only (Evm_state.irmin_store_path ~data_dir))
+  in
+  let* smart_rollup_address =
+    match smart_rollup_address with
+    | None ->
+        let* metadata = Evm_store.(use store Metadata.get) in
+        return metadata.smart_rollup_address
+    | Some smart_rollup_address -> return smart_rollup_address
+  in
+  let* legacy_mode = Evm_store.(use store Block_storage_mode.legacy) in
+  let* () =
+    when_ legacy_mode @@ fun () -> Lwt_result.ok (Events.legacy_mode ())
+  in
+  let ctxt =
+    {
+      store;
+      index;
+      data_dir;
+      preimages = configuration.Configuration.kernel_execution.preimages;
+      preimages_endpoint = configuration.kernel_execution.preimages_endpoint;
+      native_execution_policy =
+        configuration.kernel_execution.native_execution_policy;
+      smart_rollup_address;
+      block_storage_sqlite3 = not legacy_mode;
+      finalized_view = configuration.finalized_view;
+    }
+  in
+
+  let+ () =
+    match network with
+    | Some network -> network_sanity_check ~network ctxt
+    | None -> return_unit
+  in
+
+  ctxt
 
 let find_latest_hash ctxt =
   let open Lwt_result_syntax in
@@ -140,10 +209,7 @@ struct
       let* hash = find_irmin_hash Ctxt.ctxt block in
       get_evm_state Ctxt.ctxt hash
 
-    let read state path =
-      let open Lwt_result_syntax in
-      let*! res = Evm_state.inspect state path in
-      return res
+    let read = read
 
     let subkeys state path =
       let open Lwt_result_syntax in
@@ -152,14 +218,15 @@ struct
   end
 
   module TxEncoder = struct
-    type transactions = (string * Ethereum_types.transaction_object) list
+    type transactions = (string * Ethereum_types.legacy_transaction_object) list
 
     type messages = string list
 
     let encode_transactions ~smart_rollup_address:_ ~transactions =
       let open Result_syntax in
       List.to_seq transactions
-      |> Seq.map (fun (raw_tx, (obj : Ethereum_types.transaction_object)) ->
+      |> Seq.map
+           (fun (raw_tx, (obj : Ethereum_types.legacy_transaction_object)) ->
              (obj.hash, raw_tx))
       |> Seq.split
       |> fun (l, r) -> (List.of_seq l, List.of_seq r) |> return
@@ -177,7 +244,7 @@ struct
           failwith "Send_raw_transaction failed with message \"%s\"" message
 
     let check_batched_response =
-      let open Services in
+      let open Batch in
       function
       | Batch l -> List.iter_es check_response l
       | Singleton r -> check_response r
@@ -195,7 +262,7 @@ struct
               (Data_encoding.Json.construct
                  Send_raw_transaction.input_encoding
                  message);
-          id = None;
+          id = Some (random_id ());
         }
 
     let publish_messages ~timestamp:_ ~smart_rollup_address:_ ~messages =
@@ -209,7 +276,7 @@ struct
             call_service
               ~keep_alive:Ctxt.keep_alive
               ~base:evm_node_endpoint
-              (Services.dispatch_service ~path:Resto.Path.root)
+              (Batch.dispatch_batch_service ~path:Resto.Path.root)
               ()
               ()
               (Batch methods)
@@ -244,6 +311,7 @@ struct
       in
       let* raw_insights =
         Evm_state.execute_and_inspect
+          ~native_execution_policy:Ctxt.ctxt.native_execution_policy
           ~config
           ~data_dir:Ctxt.ctxt.data_dir
           ~input
@@ -338,6 +406,7 @@ let replay ctxt ?(log_file = "replay") ?profile
     ?profile
     ~data_dir:ctxt.data_dir
     ~config:(pvm_config ctxt)
+    ~native_execution_policy:ctxt.native_execution_policy
     evm_state
     blueprint.blueprint.payload
 
@@ -350,6 +419,11 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
 
     let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
       let open Lwt_result_syntax in
+      let native_execution =
+        match ctxt.native_execution_policy with
+        | Always | Rpcs_only -> true
+        | Never -> false
+      in
       let message =
         List.map (fun s -> `Input s) Simulation.Encodings.(input.messages)
       in
@@ -360,6 +434,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
         ?log_file:input.log_kernel_debug_file
         ~data_dir:ctxt.data_dir
         ~config:pvm_config
+        ~native_execution
         evm_state
         message
   end in
@@ -435,15 +510,73 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
                 failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
         | param -> block_param_to_block_number param
 
-      include
-        Tracer_sig.Make
-          (Executor)
-          (struct
-            let transaction_receipt = Block_storage.transaction_receipt
-          end)
-          (Tracer)
+      include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
     end)
-  else (module Backend)
+  else
+    (module struct
+      include Backend
+
+      module Block_storage = struct
+        (* Current block number is kept in durable storage. *)
+        let current_block_number = Block_storage.current_block_number
+
+        let with_blueprint ~default level k =
+          let open Lwt_result_syntax in
+          let* blueprint =
+            Evm_store.(use ctxt.store @@ fun conn -> Blueprints.find conn level)
+          in
+          match blueprint with
+          | None -> return default
+          | Some blueprint -> k blueprint
+
+        let nth_block ~full_transaction_object level =
+          let open Lwt_result_syntax in
+          let* block = Block_storage.nth_block ~full_transaction_object level in
+          if full_transaction_object then
+            with_blueprint ~default:block block.number @@ fun blueprint ->
+            Lwt.return
+              (Transaction_object.rereconstruct_block blueprint.payload block)
+          else
+            (* [full_transaction_object] being false, we just return hashes, no
+               need to try to reconstruct the transaction objects. *)
+            return block
+
+        let block_by_hash ~full_transaction_object hash =
+          let open Lwt_result_syntax in
+          let* block =
+            Block_storage.block_by_hash ~full_transaction_object hash
+          in
+          if full_transaction_object then
+            with_blueprint ~default:block block.number @@ fun blueprint ->
+            Lwt.return
+              (Transaction_object.rereconstruct_block blueprint.payload block)
+          else
+            (* [full_transaction_object] being false, we just return hashes, no
+               need to try to reconstruct the transaction objects. *)
+            return block
+
+        let block_receipts = Block_storage.block_receipts
+
+        let transaction_receipt = Block_storage.transaction_receipt
+
+        let transaction_object hash =
+          let open Lwt_result_syntax in
+          let* obj = Block_storage.transaction_object hash in
+          match obj with
+          | Some obj -> (
+              match Transaction_object.block_number obj with
+              | Some level ->
+                  with_blueprint ~default:(Some obj) level @@ fun blueprint ->
+                  let*? obj =
+                    Transaction_object.rereconstruct blueprint.payload obj
+                  in
+                  return_some obj
+              | None -> return_some obj)
+          | None -> return_none
+      end
+
+      include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
+    end)
 
 let next_blueprint_number ctxt =
   let open Lwt_result_syntax in
@@ -491,3 +624,7 @@ let evm_services_methods ctxt time_between_blocks =
       smart_rollup_address = ctxt.smart_rollup_address;
       time_between_blocks;
     }
+
+let blueprints_range ctxt ~from ~to_ =
+  Evm_store.use ctxt.store @@ fun conn ->
+  Evm_store.Blueprints.find_range conn ~from ~to_

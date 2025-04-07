@@ -278,7 +278,9 @@ let test_output () =
   in
   assert (message = out) ;
   let*?@ outbox_level = Raw_level_repr.of_int32 last_outbox_level in
-  let output = Sc_rollup_PVM_sig.{outbox_level; message_index; message} in
+  let output =
+    Sc_rollup_PVM_sig.{output_info = {outbox_level; message_index}; message}
+  in
 
   let*! pf = Full_Wasm.produce_output_proof dummy_context final_tree output in
 

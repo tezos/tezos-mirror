@@ -60,6 +60,7 @@ type t = {
   mutable mode : mode;
   runner : Runner.t option;
   dal_node : Dal_node.t option;
+  remote_signer : Uri.t option;
 }
 
 type stresstest_gas_estimation = {
@@ -139,7 +140,7 @@ let address ?(hostname = false) ?from peer =
 
 let create_with_mode ?runner ?(path = Uses.path Constant.octez_client)
     ?(admin_path = Uses.path Constant.octez_admin_client) ?name
-    ?(color = Log.Color.FG.blue) ?base_dir ?dal_node mode =
+    ?(color = Log.Color.FG.blue) ?base_dir ?dal_node ?remote_signer mode =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -155,10 +156,11 @@ let create_with_mode ?runner ?(path = Uses.path Constant.octez_client)
     mode;
     runner;
     dal_node;
+    remote_signer;
   }
 
 let create ?runner ?path ?admin_path ?name ?color ?base_dir ?endpoint
-    ?media_type ?dal_node () =
+    ?media_type ?dal_node ?remote_signer () =
   create_with_mode
     ?runner
     ?path
@@ -167,6 +169,7 @@ let create ?runner ?path ?admin_path ?name ?color ?base_dir ?endpoint
     ?color
     ?base_dir
     ?dal_node
+    ?remote_signer
     (Client (endpoint, media_type))
 
 let base_dir_arg client = ["--base-dir"; client.base_dir]
@@ -215,6 +218,11 @@ let mode_arg client =
   | Light _ -> ["--mode"; "light"; "--sources"; sources_file client]
   | Proxy _ -> ["--mode"; "proxy"]
 
+let remote_signer_arg client =
+  match client.remote_signer with
+  | None -> []
+  | Some uri -> ["--remote-signer"; Uri.to_string uri]
+
 let spawn_command ?log_command ?log_status_on_exit ?log_output
     ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
     ?config_file ?(no_base_dir_warnings = false) ?block client command =
@@ -243,8 +251,8 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
   @ protocol_arg @ media_type_arg client.mode @ mode_arg client
-  @ base_dir_arg client @ config_file_arg @ no_base_dir_warnings_arg @ block_arg
-  @ command
+  @ base_dir_arg client @ config_file_arg @ remote_signer_arg client
+  @ no_base_dir_warnings_arg @ block_arg @ command
 
 let spawn_command_with_stdin ?log_command ?log_status_on_exit ?log_output
     ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
@@ -268,7 +276,7 @@ let spawn_command_with_stdin ?log_command ?log_status_on_exit ?log_output
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
   @ protocol_arg @ media_type_arg client.mode @ mode_arg client
-  @ base_dir_arg client @ command
+  @ base_dir_arg client @ remote_signer_arg client @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -587,6 +595,17 @@ let import_encrypted_secret_key ?hooks ?force ?endpoint client
   let* () = Lwt_io.close output_channel in
   Process.check process
 
+let spawn_import_public_key ?(force = false) ?endpoint client
+    (public_key : Account.secret_key) ~alias =
+  let pk_uri =
+    "unencrypted:" ^ Account.require_unencrypted_secret_key ~__LOC__ public_key
+  in
+  let force = if force then ["--force"] else [] in
+  spawn_command
+    ?endpoint
+    client
+    (["import"; "public"; "key"; alias; pk_uri] @ force)
+
 let spawn_import_secret_key ?(force = false) ?endpoint client
     (secret_key : Account.secret_key) ~alias =
   let sk_uri =
@@ -598,24 +617,31 @@ let spawn_import_secret_key ?(force = false) ?endpoint client
     client
     (["import"; "secret"; "key"; alias; sk_uri] @ force)
 
-let spawn_import_signer_key ?endpoint ?(force = false) client ~public_key_hash
-    ~alias signer_uri =
-  let uri = Uri.with_path signer_uri public_key_hash in
+let spawn_import_signer_key ?endpoint ?(force = false) ?signer ~public_key_hash
+    ~alias client =
+  let key =
+    match signer with
+    | Some signer_uri ->
+        Uri.with_path signer_uri public_key_hash |> Uri.to_string
+    | None -> "remote:" ^ public_key_hash
+  in
   spawn_command
     ?endpoint
     client
-    (["import"; "secret"; "key"; alias; Uri.to_string uri]
-    @ if force then ["--force"] else [])
+    (["import"; "secret"; "key"; alias; key] @ if force then ["--force"] else [])
 
-let import_signer_key ?endpoint ?force client ~public_key_hash ~alias signer_uri
-    =
+let import_signer_key ?endpoint ?force ?signer ~public_key_hash ~alias client =
   spawn_import_signer_key
     ?endpoint
     ?force
-    client
+    ?signer
     ~public_key_hash
     ~alias
-    signer_uri
+    client
+  |> Process.check
+
+let import_public_key ?force ?endpoint client public_key ~alias =
+  spawn_import_public_key ?force ?endpoint client public_key ~alias
   |> Process.check
 
 let import_secret_key ?force ?endpoint client secret_key ~alias =
@@ -660,6 +686,10 @@ let import_keys_from_mnemonic ?endpoint ?force ?passphrase ?encryption_password
   let* () = Lwt_io.write_line output_channel stdin in
   let* () = Lwt_io.close output_channel in
   Process.check process
+
+let forget_all_keys ?endpoint client =
+  spawn_command ?endpoint client ["forget"; "all"; "keys"; "--force"]
+  |> Process.check
 
 module Time = Tezos_base.Time.System
 
@@ -983,6 +1013,20 @@ let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
   spawn_propose_for ?endpoint ?protocol ?key ?force ~minimal_timestamp client
   |> Process.check
 
+let propose_for_and_wait ?endpoint ?minimal_timestamp ?protocol ?key ?force
+    client =
+  let node =
+    match node_of_client_mode client.mode with
+    | Some n -> n
+    | None -> Test.fail "No node found for propose_for_and_wait"
+  in
+  let actual_level_before = Node.get_last_seen_level node in
+  let* () =
+    propose_for ?endpoint ?minimal_timestamp ?protocol ?key ?force client
+  in
+  let* _level = Node.wait_for_level node (actual_level_before + 1) in
+  unit
+
 let id = ref 0
 
 let spawn_gen_keys ?(force = false) ?alias ?sig_alg client =
@@ -1053,8 +1097,9 @@ let add_address ?force client ~alias ~src =
   spawn_add_address ?force client ~alias ~src |> Process.check
 
 let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
-    ?fee ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint ?arg
-    ?(simulation = false) ?(force = false) ~amount ~giver ~receiver client =
+    ?fee ?fee_cap ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint
+    ?arg ?(simulation = false) ?(force = false) ~amount ~giver ~receiver client
+    =
   spawn_command
     ?env
     ?log_output
@@ -1068,6 +1113,7 @@ let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
         ~some:(fun f -> ["--fee"; Tez.to_string f; "--force-low-fee"])
         fee
     @ optional_arg "burn-cap" Tez.to_string burn_cap
+    @ optional_arg "fee-cap" Tez.to_string fee_cap
     @ optional_arg "gas-limit" string_of_int gas_limit
     @ optional_arg "safety-guard" string_of_int safety_guard
     @ optional_arg "storage-limit" string_of_int storage_limit
@@ -1077,9 +1123,9 @@ let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
     @ (if simulation then ["--simulation"] else [])
     @ if force then ["--force"] else [])
 
-let transfer ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
-    ?safety_guard ?storage_limit ?counter ?entrypoint ?arg ?simulation ?force
-    ?expect_failure ~amount ~giver ~receiver client =
+let transfer ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?fee_cap
+    ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint ?arg
+    ?simulation ?force ?expect_failure ~amount ~giver ~receiver client =
   spawn_transfer
     ?env
     ?log_output
@@ -1088,6 +1134,7 @@ let transfer ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     ?wait
     ?burn_cap
     ?fee
+    ?fee_cap
     ?gas_limit
     ?safety_guard
     ?storage_limit
@@ -1244,6 +1291,16 @@ let get_balance_for ?endpoint ~account client =
   in
   return @@ Tez.parse_floating output
 
+let spawn_get_full_balance_for ?endpoint ~account client =
+  spawn_command ?endpoint client ["get"; "full"; "balance"; "for"; account]
+
+let get_full_balance_for ?endpoint ~account client =
+  let* output =
+    spawn_get_full_balance_for ?endpoint ~account client
+    |> Process.check_and_read_stdout
+  in
+  return @@ Tez.parse_floating output
+
 let spawn_ticket_balance ?hooks ~contract ~ticketer ~content_type ~content
     client =
   spawn_command
@@ -1346,13 +1403,12 @@ let set_deposits_limit ?hooks ?endpoint ?wait ~src ~limit client =
   spawn_set_deposits_limit ?hooks ?endpoint ?wait ~src ~limit client
   |> Process.check_and_read_stdout
 
-let unset_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src client =
+let spawn_unset_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src client =
   spawn_command
     ?hooks
     ?endpoint
     client
     (["--wait"; wait] @ ["unset"; "deposits"; "limit"; "for"; src])
-  |> Process.check_and_read_stdout
 
 let increase_paid_storage ?hooks ?endpoint ?(wait = "none") ~contract ~amount
     ~payer client =
@@ -1605,52 +1661,15 @@ let spawn_remember_script ~alias ~src client =
 let remember_script ~alias ~src client =
   spawn_remember_script ~alias ~src client |> Process.check
 
-let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
-    ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
-    ?fresh_probability ?smart_contract_parameters client =
-  let sources =
-    (* [sources] is a string containing all the [source_aliases],
-       [source_pkhs], and [source_accounts] in JSON format, as
-       expected by the [stresstest] client command. If all three lists
-       [source_aliases], [source_pkhs], and [source_accounts] are
-       empty (typically, when none of these optional arguments is
-       provided to {!spawn_stresstest}), then [sources] instead
-       contains the [Constant.bootstrap_keys] i.e. [bootstrap1], ...,
-       [bootstrap5]. *)
-    (* Note: We provide the sources JSON directly as a string, rather
-       than writing it to a file, to avoid concurrency issues (we
-       would need to ensure that each call writes to a different file:
-       this would be doable, but providing a string containing the
-       JSON is simpler). *)
-    let open Account in
-    let account_to_obj account =
-      let sk = require_unencrypted_secret_key ~__LOC__ account.secret_key in
-      `O
-        [
-          ("pkh", `String account.public_key_hash);
-          ("pk", `String account.public_key);
-          ("sk", `String sk);
-        ]
-    in
-    let source_objs =
-      List.map (fun alias -> `O [("alias", `String alias)]) source_aliases
-      @ List.map (fun pkh -> `O [("pkh", `String pkh)]) source_pkhs
-      @ List.map account_to_obj source_accounts
-    in
-    let source_objs =
-      match source_objs with
-      | [] -> Array.map account_to_obj Account.Bootstrap.keys |> Array.to_list
-      | _ :: _ -> source_objs
-    in
-    `A source_objs
-  in
-  (* It is important to write the sources to a file because if we use a few
-     thousands of sources the command line becomes too long. *)
-  let sources_filename =
-    Temp.file (Format.sprintf "sources-%s.json" client.name)
-  in
-  with_open_out sources_filename (fun ch ->
-      output_string ch (JSON.encode_u sources)) ;
+let write_stresstest_sources_file ?runner ~sources filename =
+  match runner with
+  | None -> JSON.encode_to_file_u filename sources |> Lwt.return
+  | Some runner ->
+      Helpers.write_file ~runner filename ~contents:(JSON.encode_u sources)
+
+let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
+    ?transfers ?tps ?fresh_probability ?smart_contract_parameters client
+    sources_filename =
   let seed =
     (* Note: Tezt does not call [Random.self_init] so this is not
        randomized from one run to the other (if the exact same tests
@@ -1698,7 +1717,7 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
                  items));
         ]
   in
-  spawn_command ?endpoint client
+  spawn_command ?env ?endpoint client
   @@ [
        "stresstest";
        "transfer";
@@ -1714,23 +1733,85 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
   @ make_float_opt_arg "--fresh-probability" fresh_probability
   @ smart_contract_parameters_arg
 
-let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
-    ?fee ?gas_limit ?transfers ?tps ?fresh_probability
+let spawn_stresstest ?env ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
+    ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
+    ?fresh_probability ?smart_contract_parameters client =
+  let runner = client.runner in
+  let sources =
+    (* [sources] is a string containing all the [source_aliases],
+       [source_pkhs], and [source_accounts] in JSON format, as
+       expected by the [stresstest] client command. If all three lists
+       [source_aliases], [source_pkhs], and [source_accounts] are
+       empty (typically, when none of these optional arguments is
+       provided to {!spawn_stresstest}), then [sources] instead
+       contains the [Constant.bootstrap_keys] i.e. [bootstrap1], ...,
+       [bootstrap5]. *)
+    (* Note: We provide the sources JSON directly as a string, rather
+       than writing it to a file, to avoid concurrency issues (we
+       would need to ensure that each call writes to a different file:
+       this would be doable, but providing a string containing the
+       JSON is simpler). *)
+    let open Account in
+    let account_to_obj account =
+      let sk = require_unencrypted_secret_key ~__LOC__ account.secret_key in
+      `O
+        [
+          ("pkh", `String account.public_key_hash);
+          ("pk", `String account.public_key);
+          ("sk", `String sk);
+        ]
+    in
+    let source_objs =
+      List.map (fun alias -> `O [("alias", `String alias)]) source_aliases
+      @ List.map (fun pkh -> `O [("pkh", `String pkh)]) source_pkhs
+      @ List.map account_to_obj source_accounts
+    in
+    let source_objs =
+      match source_objs with
+      | [] -> Array.map account_to_obj Account.Bootstrap.keys |> Array.to_list
+      | _ :: _ -> source_objs
+    in
+    `A source_objs
+  in
+  (* It is important to write the sources to a file because if we use a few
+     thousands of sources the command line becomes too long. *)
+  let sources_filename =
+    Temp.file ?runner (Format.sprintf "sources-%s.json" client.name)
+  in
+  let* () = write_stresstest_sources_file ?runner ~sources sources_filename in
+  Lwt.return
+  @@ spawn_stresstest_with_filename
+       ?env
+       ?endpoint
+       ?seed
+       ?fee
+       ?gas_limit
+       ?transfers
+       ?tps
+       ?fresh_probability
+       ?smart_contract_parameters
+       client
+       sources_filename
+
+let stresstest ?env ?endpoint ?source_aliases ?source_pkhs ?source_accounts
+    ?seed ?fee ?gas_limit ?transfers ?tps ?fresh_probability
     ?smart_contract_parameters client =
-  spawn_stresstest
-    ?endpoint
-    ?source_aliases
-    ?source_pkhs
-    ?source_accounts
-    ?seed
-    ?fee
-    ?gas_limit
-    ?transfers
-    ?tps
-    ?fresh_probability
-    ?smart_contract_parameters
-    client
-  |> Process.check
+  Lwt.bind
+    (spawn_stresstest
+       ?env
+       ?endpoint
+       ?source_aliases
+       ?source_pkhs
+       ?source_accounts
+       ?seed
+       ?fee
+       ?gas_limit
+       ?transfers
+       ?tps
+       ?fresh_probability
+       ?smart_contract_parameters
+       client)
+    Process.check
 
 let spawn_run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
     ?self_address ?source ?payer ?gas ?(trace_stack = false) ?level ?now
@@ -1809,9 +1890,10 @@ let stresstest_originate_smart_contracts ?endpoint (source : Account.key) client
     ["stresstest"; "originate"; "smart"; "contracts"; "from"; source.alias]
   |> Process.check
 
-let stresstest_fund_accounts_from_source ?endpoint ~source_key_pkh ?batch_size
-    ?batches_per_block ?initial_amount client =
+let stresstest_fund_accounts_from_source ?env ?endpoint ~source_key_pkh
+    ?batch_size ?batches_per_block ?initial_amount client =
   spawn_command
+    ?env
     ?endpoint
     client
     (["stresstest"; "fund"; "accounts"; "from"; source_key_pkh]
@@ -2753,11 +2835,21 @@ module Zk_rollup = struct
     Lwt.return_unit
 end
 
-let init ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
+let init ?path ?admin_path ?name ?color ?base_dir ?endpoint
+    ?(keys = Constant.all_secret_keys) ?media_type ?remote_signer () =
   let client =
-    create ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type ()
+    create
+      ?path
+      ?admin_path
+      ?name
+      ?color
+      ?base_dir
+      ?endpoint
+      ?media_type
+      ?remote_signer
+      ()
   in
-  Account.write Constant.all_secret_keys ~base_dir:client.base_dir ;
+  Account.write keys ~base_dir:client.base_dir ;
   return client
 
 let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode
@@ -2798,7 +2890,8 @@ let write_sources_file ~min_agreement ~uris client =
       Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
 
 let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
-    ?event_level ?event_sections_levels ?(nodes_args = []) ?dal_node () =
+    ?event_level ?event_sections_levels ?(nodes_args = []) ?dal_node
+    ?remote_signer () =
   let filter_node_arg = function
     | Node.Connections _ | Synchronisation_threshold _ -> None
     | x -> Some x
@@ -2821,6 +2914,7 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
       ?color
       ?base_dir
       ?dal_node
+      ?remote_signer
       (Light (min_agreement, List.map (fun n -> Node n) nodes))
   in
   let* () =
@@ -2913,7 +3007,8 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
 let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
     ?event_level ?event_sections_levels
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
-    ?(keys = Constant.all_secret_keys) ?rpc_external ?dal_node tag () =
+    ?(keys = Constant.all_secret_keys) ?rpc_external ?dal_node ?remote_signer
+    tag () =
   match tag with
   | (`Client | `Proxy) as mode ->
       let* node =
@@ -2931,7 +3026,15 @@ let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
         | `Proxy -> Proxy endpoint
       in
       let client =
-        create_with_mode ?path ?admin_path ?name ?color ?base_dir ?dal_node mode
+        create_with_mode
+          ?path
+          ?admin_path
+          ?name
+          ?color
+          ?base_dir
+          ?dal_node
+          ?remote_signer
+          mode
       in
       Account.write keys ~base_dir:client.base_dir ;
       return (node, client)
@@ -2953,7 +3056,8 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
     ?event_level ?event_sections_levels ?nodes_args
     ?additional_bootstrap_account_count
     ?additional_revealed_bootstrap_account_count ?default_accounts_balance
-    ?parameter_file ?timestamp ?keys ?rpc_external ?dal_node tag ~protocol () =
+    ?parameter_file ?timestamp ?keys ?rpc_external ?dal_node ?remote_signer tag
+    ~protocol () =
   let* node, client =
     init_with_node
       ?path
@@ -2968,6 +3072,7 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
       ?keys
       ?rpc_external
       ?dal_node
+      ?remote_signer
       tag
       ()
   in
@@ -4254,9 +4359,12 @@ let spawn_finalize_unstake ?(wait = "none") ~staker client =
 let finalize_unstake ?wait ~staker client =
   spawn_finalize_unstake ?wait ~staker client |> Process.check
 
-let spawn_set_delegate_parameters ~delegate ~limit ~edge client =
+let spawn_set_delegate_parameters ?(wait = "none") ~delegate ~limit ~edge client
+    =
   spawn_command client
   @@ [
+       "--wait";
+       wait;
        "set";
        "delegate";
        "parameters";
@@ -4268,8 +4376,9 @@ let spawn_set_delegate_parameters ~delegate ~limit ~edge client =
        edge;
      ]
 
-let set_delegate_parameters ~delegate ~limit ~edge client =
-  spawn_set_delegate_parameters ~delegate ~limit ~edge client |> Process.check
+let set_delegate_parameters ?wait ~delegate ~limit ~edge client =
+  spawn_set_delegate_parameters ?wait ~delegate ~limit ~edge client
+  |> Process.check
 
 (* Keep an alias to external RPC module to allow RPC calls *)
 module R = RPC

@@ -325,8 +325,6 @@ where
     ) -> Result<Vec<u8>, RuntimeError> {
         use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 
-        check_path_has_value(self, path)?;
-
         let mut buffer = Vec::with_capacity(max_bytes);
 
         unsafe {
@@ -340,7 +338,9 @@ where
             // returns the total bytes written.
             buffer.set_len(usize::min(MAX_FILE_CHUNK_SIZE, max_bytes));
 
-            let size = self.store_read_slice(path, from_offset, &mut buffer)?;
+            let size = self
+                .store_read_slice(path, from_offset, &mut buffer)
+                .map_err(check_path_has_value(self, path))?;
 
             // SAFETY:
             // We ensure that we set the length of the vector to the
@@ -484,7 +484,9 @@ where
     }
 
     fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
-        check_path_exists(self, path)?;
+        if let Ok(None) = Runtime::store_has(self, path) {
+            return Err(RuntimeError::PathNotFound);
+        }
 
         let res =
             unsafe { SmartRollupCore::store_delete(self, path.as_ptr(), path.size()) };
@@ -520,8 +522,6 @@ where
         from_path: &impl Path,
         to_path: &impl Path,
     ) -> Result<(), RuntimeError> {
-        check_path_exists(self, from_path)?;
-
         let res = unsafe {
             SmartRollupCore::store_move(
                 self,
@@ -533,7 +533,9 @@ where
         };
         match Error::wrap(res) {
             Ok(_) => Ok(()),
-            Err(e) => Err(RuntimeError::HostErr(e)),
+            Err(e) => {
+                Err(RuntimeError::HostErr(e)).map_err(check_path_exists(self, from_path))
+            }
         }
     }
 
@@ -542,8 +544,6 @@ where
         from_path: &impl Path,
         to_path: &impl Path,
     ) -> Result<(), RuntimeError> {
-        check_path_exists(self, from_path)?;
-
         let res = unsafe {
             SmartRollupCore::store_copy(
                 self,
@@ -555,7 +555,9 @@ where
         };
         match Error::wrap(res) {
             Ok(_) => Ok(()),
-            Err(e) => Err(RuntimeError::HostErr(e)),
+            Err(e) => {
+                Err(RuntimeError::HostErr(e)).map_err(check_path_exists(self, from_path))
+            }
         }
     }
 
@@ -664,13 +666,14 @@ where
     }
 
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
-        check_path_exists(self, path)?;
         let res = unsafe {
             SmartRollupCore::store_value_size(self, path.as_ptr(), path.size())
         };
         match Error::wrap(res) {
             Ok(size) => Ok(size),
-            Err(e) => Err(RuntimeError::HostErr(e)),
+            Err(e) => {
+                Err(RuntimeError::HostErr(e)).map_err(check_path_has_value(self, path))
+            }
         }
     }
 
@@ -724,28 +727,31 @@ where
     }
 }
 
-#[cfg(feature = "alloc")]
-fn check_path_has_value<T: Path>(
-    runtime: &impl Runtime,
-    path: &T,
-) -> Result<(), RuntimeError> {
-    if let Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) =
-        runtime.store_has(path)
-    {
-        Ok(())
-    } else {
-        Err(RuntimeError::PathNotFound)
+fn check_path_has_value<'a>(
+    runtime: &'a impl Runtime,
+    path: &'a impl Path,
+) -> impl FnOnce(RuntimeError) -> RuntimeError + 'a {
+    |err| {
+        if let Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) =
+            runtime.store_has(path)
+        {
+            err
+        } else {
+            RuntimeError::PathNotFound
+        }
     }
 }
 
-fn check_path_exists<T: Path>(
-    runtime: &impl Runtime,
-    path: &T,
-) -> Result<(), RuntimeError> {
-    if let Ok(Some(_)) = runtime.store_has(path) {
-        Ok(())
-    } else {
-        Err(RuntimeError::PathNotFound)
+fn check_path_exists<'a, T: Path>(
+    runtime: &'a impl Runtime,
+    path: &'a T,
+) -> impl FnOnce(RuntimeError) -> RuntimeError + 'a {
+    |err| {
+        if let Ok(Some(_)) = runtime.store_has(path) {
+            err
+        } else {
+            RuntimeError::PathNotFound
+        }
     }
 }
 
@@ -873,10 +879,28 @@ mod tests {
     fn mock_path_not_existing(path_bytes: Vec<u8>) -> MockSmartRollupCore {
         let mut mock = MockSmartRollupCore::new();
 
+        let path_bytes_delete = path_bytes.clone();
+        let path_bytes_read = path_bytes.clone();
+        let path_bytes_has = path_bytes.clone();
+
+        mock.expect_store_delete()
+            .withf(move |ptr, size| {
+                let bytes = unsafe { from_raw_parts(*ptr, *size) };
+                path_bytes_delete == bytes
+            })
+            .return_const(tezos_smart_rollup_core::STORE_NOT_A_NODE);
+
+        mock.expect_store_read()
+            .withf(move |ptr, size, _, _, _| {
+                let bytes = unsafe { from_raw_parts(*ptr, *size) };
+                path_bytes_read == bytes
+            })
+            .return_const(tezos_smart_rollup_core::STORE_NOT_A_NODE);
+
         mock.expect_store_has()
             .withf(move |ptr, size| {
                 let bytes = unsafe { from_raw_parts(*ptr, *size) };
-                path_bytes == bytes
+                path_bytes_has == bytes
             })
             .return_const(tezos_smart_rollup_core::VALUE_TYPE_NONE);
 
@@ -1306,6 +1330,8 @@ mod tests {
     fn store_value_size_path_not_found() {
         let mut mock = MockSmartRollupCore::new();
         const PATH: RefPath<'static> = RefPath::assert_from(b"/prefix/of/other/paths");
+        mock.expect_store_value_size()
+            .return_const(tezos_smart_rollup_core::STORE_NOT_A_VALUE);
         mock.expect_store_has()
             .return_const(tezos_smart_rollup_core::VALUE_TYPE_NONE);
 

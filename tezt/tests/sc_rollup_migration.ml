@@ -15,10 +15,7 @@
 
 open Sc_rollup_helpers
 
-let block_time_to_trigger_constant_update_on_migration = function
-  | Protocol.Alpha -> Some 5
-  | Protocol.Quebec -> Some 5
-  | ParisC -> Some 8
+let block_time_to_trigger_constant_update_on_migration = function _ -> Some 5
 
 let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
     ?variant ?(tags = []) ?(timeout = 10) ?(commitment_period = 10) ~kind
@@ -529,11 +526,8 @@ let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
            ~block:(string_of_int (migration_level - 1))
            ()
     in
-    let* l2_head =
+    let* {previous_commitment_hash = last_l2_commitment; _} =
       Sc_rollup_node.RPC.call rollup_node @@ Sc_rollup_rpc.get_global_block ()
-    in
-    let last_l2_commitment =
-      JSON.(l2_head |-> "previous_commitment_hash" |> as_string)
     in
     (* Bake blocks for commitment inclusion *)
     let* () = Sc_rollup_helpers.send_messages 4 tezos_client in
@@ -922,6 +916,7 @@ let test_l2_migration_scenario_event ?parameters_ty
       ?parameters_ty
       ~kind
       ~mode
+      ~allow_degraded:true
       ?boot_sector
       ~operator
       ?rollup_node_name
@@ -987,6 +982,7 @@ let test_refutation_migration ~migrate_from ~migrate_to =
           ~loser_modes:["3 4 0"]
           (inputs_for 10)
           ~final_level:80
+          ~allow_degraded:true
           ~priority:`Priority_loser );
       ( "pvm_proof_2",
         7,
@@ -995,6 +991,7 @@ let test_refutation_migration ~migrate_from ~migrate_to =
           ~loser_modes:["7 7 22_000_002_000"]
           (inputs_for 10)
           ~final_level:80
+          ~allow_degraded:true
           ~priority:`Priority_loser );
     ]
   in
@@ -1048,7 +1045,7 @@ let register_migration_only_wasm ~migrate_from ~migrate_to =
   test_refutation_migration ~migrate_from ~migrate_to
 
 let register ~migrate_from ~migrate_to =
-  assume (migrate_to <> Protocol.ParisC) @@ fun () ->
+  assume (migrate_to <> Protocol.Quebec) @@ fun () ->
   register_migration ~kind:"arith" ~migrate_from ~migrate_to ;
   register_migration ~kind:"wasm_2_0_0" ~migrate_from ~migrate_to ;
   register_migration_only_wasm ~migrate_from ~migrate_to

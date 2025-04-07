@@ -241,6 +241,29 @@ module Peers : sig
   end
 end
 
+module Full_stat : sig
+  type t = {
+    stat : P2p_stat.t;
+    incoming_connections : Connection_metadata.t P2p_connection.Info.t list;
+    outgoing_connections : Connection_metadata.t P2p_connection.Info.t list;
+    peers :
+      (P2p_peer.Id.t * (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t)
+      list;
+    points : (P2p_point.Id.t * P2p_point.Info.t) list;
+  }
+
+  val encoding : t Data_encoding.t
+
+  val to_string : colorize:bool -> t -> string
+
+  module S : sig
+    val full_stat :
+      ([`GET], unit, unit, unit, unit, t) Tezos_rpc.Service.service
+  end
+
+  val full_stat : #simple -> t tzresult Lwt.t
+end
+
 module ACL : sig
   (** Structure that provides a friendly and bounded list of currently
       greylisted IPs. *)

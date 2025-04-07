@@ -53,7 +53,7 @@ let mock_conn ?(reader = Lwt_pipe.Maybe_bounded.create ())
     ~peer_info
     ~messages
     ~canceler
-    ~greylister:(fun () -> ())
+    ~greylister:(fun ~motive:_ -> Lwt.return_unit)
     ~callback
     ~disable_peer_discovery:true
     version

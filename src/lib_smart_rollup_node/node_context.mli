@@ -97,8 +97,6 @@ type 'a t = {
   dal_cctxt : Dal_node_client.cctxt option;
       (** DAL client context to query the dal node, if the rollup node supports
           the DAL. *)
-  dac_client : Dac_observer_client.t option;
-      (** DAC observer client to optionally pull in preimages *)
   data_dir : string;  (** Node data dir. *)
   l1_ctxt : Layer1.t;
       (** Layer 1 context to fetch blocks and monitor heads, etc.*)
@@ -202,9 +200,6 @@ val dal_supported : _ t -> bool
 (** [readonly node_ctxt] returns a read only version of the node context
     [node_ctxt].  *)
 val readonly : _ t -> ro
-
-(** Monad for values with delayed write effects in the node context. *)
-type 'a delayed_write = ('a, rw) Delayed_write_monad.t
 
 (** {2 Abstraction over store} *)
 
@@ -508,6 +503,9 @@ val protocol_activation_level :
     between [block] and [predecessor]. *)
 val save_protocol_info :
   rw -> Layer1.header -> predecessor:Layer1.header -> unit tzresult Lwt.t
+
+(** Save the protocol activation levels from L1 if possible. *)
+val save_protocols_from_l1 : rw -> unit tzresult Lwt.t
 
 (** {3 DAL} *)
 

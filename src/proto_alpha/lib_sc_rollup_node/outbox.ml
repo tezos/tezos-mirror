@@ -69,8 +69,14 @@ let proof_of_output node_ctxt output =
 let proof_of_output_simple node_ctxt ~outbox_level ~message_index =
   let open Lwt_result_syntax in
   let outbox_level = Protocol.Alpha_context.Raw_level.to_int32 outbox_level in
-  let* state = get_state_of_lcc node_ctxt in
   let lcc = Reference.get node_ctxt.lcc in
+  let*? () =
+    error_when
+      (outbox_level > lcc.level)
+      (Rollup_node_errors.Outbox_level_not_cemented
+         {outbox_level; lcc_level = lcc.level})
+  in
+  let* state = get_state_of_lcc node_ctxt in
   match state with
   | None ->
       (* This case should never happen as origination creates an LCC which

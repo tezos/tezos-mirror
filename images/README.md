@@ -84,7 +84,7 @@ The `ci` images is a suite of images, defined as different layer in
 the Dockerfile `ci/Dockerfile`. It is used in the CI to run a wide
 variety of jobs.  Its `runtime` and `build` layers are also used as
 input for the Octez Docker distribution.  To build these images for
-local use, run `create_ci_image.sh`.
+local use, run `create_ci_images.sh`.
 
 
 # Common files in `common`

@@ -6,7 +6,7 @@
 (*****************************************************************************)
 
 type right = {
-  address : Tezos_crypto.Signature.Public_key_hash.t;
+  address : Signature.Public_key_hash.t;
   first_slot : int;
   power : int;
 }

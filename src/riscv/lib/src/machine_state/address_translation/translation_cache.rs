@@ -37,10 +37,10 @@ use super::{AccessType, PAGE_OFFSET_WIDTH};
 use crate::{
     bits::ones,
     cache_utils::FenceCounter,
-    machine_state::{bus::Address, csregisters::CSRRepr, mode::Mode},
+    machine_state::{csregisters::CSRRepr, main_memory::Address, mode::Mode},
     state_backend::{
-        AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Many,
-        Ref,
+        AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, ManagerRead,
+        ManagerReadWrite, ManagerWrite, Many, Ref,
     },
 };
 use strum::EnumCount;
@@ -96,14 +96,17 @@ impl<M: ManagerBase> Cached<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<CachedLayout, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<CachedLayout, F::Output> {
         (
-            self.mode.struct_ref(),
-            self.fence_counter.struct_ref(),
-            self.satp.struct_ref(),
-            self.virt_page.struct_ref(),
-            self.phys_page.struct_ref(),
+            self.mode.struct_ref::<F>(),
+            self.fence_counter.struct_ref::<F>(),
+            self.satp.struct_ref::<F>(),
+            self.virt_page.struct_ref::<F>(),
+            self.phys_page.struct_ref::<F>(),
         )
     }
 
@@ -170,6 +173,18 @@ impl<M: ManagerBase> Cached<M> {
     }
 }
 
+impl<M: ManagerClone> Clone for Cached<M> {
+    fn clone(&self) -> Self {
+        Self {
+            mode: self.mode.clone(),
+            fence_counter: self.fence_counter.clone(),
+            satp: self.satp.clone(),
+            virt_page: self.virt_page.clone(),
+            phys_page: self.phys_page.clone(),
+        }
+    }
+}
+
 /// Caching 65,536 pages of 4 KiB each is 768 MiB of memory cached. The cache state size for this
 /// chosen configuration is 6 MiB.
 const PAGES_BITS: usize = 16;
@@ -202,11 +217,17 @@ impl<M: ManagerBase> AccessCache<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<AccessCacheLayout, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<AccessCacheLayout, F::Output> {
         (
-            self.fence_counter.struct_ref(),
-            self.entries.iter().map(Cached::struct_ref).collect(),
+            self.fence_counter.struct_ref::<F>(),
+            self.entries
+                .iter()
+                .map(|entry| entry.struct_ref::<F>())
+                .collect(),
         )
     }
 
@@ -285,6 +306,20 @@ impl<M: ManagerBase> AccessCache<M> {
     }
 }
 
+impl<M: ManagerClone> Clone for AccessCache<M> {
+    fn clone(&self) -> Self {
+        Self {
+            fence_counter: self.fence_counter.clone(),
+            entries: self
+                .entries
+                .to_vec()
+                .try_into()
+                .map_err(|_| "mismatched vector lengths in translation cache")
+                .unwrap(),
+        }
+    }
+}
+
 /// Number of access types
 const NUM_ACCESS_TYPES: usize = AccessType::COUNT;
 
@@ -315,12 +350,15 @@ impl<M: ManagerBase> TranslationCache<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<TranslationCacheLayout, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<TranslationCacheLayout, F::Output> {
         [
-            self.entries[0].struct_ref(),
-            self.entries[1].struct_ref(),
-            self.entries[2].struct_ref(),
+            self.entries[0].struct_ref::<F>(),
+            self.entries[1].struct_ref::<F>(),
+            self.entries[2].struct_ref::<F>(),
         ]
     }
 
@@ -374,6 +412,14 @@ impl<M: ManagerBase> TranslationCache<M> {
     {
         let access_type_index = access_type_index(access_type);
         self.entries[access_type_index].cache_translation(satp, mode, virt_addr, phys_addr);
+    }
+}
+
+impl<M: ManagerClone> Clone for TranslationCache<M> {
+    fn clone(&self) -> Self {
+        Self {
+            entries: self.entries.clone(),
+        }
     }
 }
 

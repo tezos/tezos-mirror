@@ -26,6 +26,7 @@ COPY --chown=tezos:nogroup dune tezos
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup scripts/custom-flags.sh tezos/scripts/
 COPY --chown=tezos:nogroup src tezos/src
+COPY --chown=tezos:nogroup sdk/rust tezos/sdk/rust
 COPY --chown=tezos:nogroup irmin tezos/irmin
 COPY --chown=tezos:nogroup brassaia tezos/brassaia
 COPY --chown=tezos:nogroup data-encoding tezos/data-encoding
@@ -38,6 +39,8 @@ COPY --chown=tezos:nogroup dune-project tezos/dune-project
 COPY --chown=tezos:nogroup vendors tezos/vendors
 COPY --chown=tezos:nogroup rust-toolchain tezos/rust-toolchain
 COPY --chown=tezos:nogroup cohttp tezos/cohttp
+COPY --chown=tezos:nogroup websocket tezos/websocket
+COPY --chown=tezos:nogroup opentelemetry tezos/opentelemetry
 COPY --chown=tezos:nogroup resto tezos/resto
 COPY --chown=tezos:nogroup prometheus tezos/prometheus
 COPY --chown=tezos:nogroup teztale tezos/teztale
@@ -56,6 +59,7 @@ WORKDIR /home/tezos/
 RUN mkdir -p /home/tezos/evm_kernel
 COPY --chown=tezos:nogroup kernels.mk etherlink.mk evm_kernel/
 COPY --chown=tezos:nogroup src evm_kernel/src
+COPY --chown=tezos:nogroup sdk/rust evm_kernel/sdk/rust
 COPY --chown=tezos:nogroup etherlink evm_kernel/etherlink
 RUN make -C evm_kernel -f etherlink.mk build-deps \
   && make -C evm_kernel -f etherlink.mk EVM_CONFIG=etherlink/config/dailynet.yaml evm_installer.wasm \

@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup-build-utils"
+edition = "2021"
+version = "0.2.2"
+license = "MIT"
+authors = ["TriliTech <contact@trili.tech>"]
+repository = "https://gitlab.com/tezos/tezos.git"
+description = "Build-time utilities for Tezos Smart Rollup crates"
+
+[dependencies]
+rustc_version = "0.4"
+
+[dependencies.proc-macro2]
+version = "1"
+optional = true
+
+[dependencies.quote]
+version = "1"
+optional = true
+
+[features]
+default = []
+macro-support = ["dep:proc-macro2", "dep:quote"]

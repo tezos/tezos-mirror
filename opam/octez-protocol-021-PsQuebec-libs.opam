@@ -13,20 +13,22 @@ depends: [
   "ppx_expect"
   "octez-libs" { = version }
   "tezos-protocol-021-PsQuebec" { = version }
+  "bls12-381" { with-test & = version }
+  "octez-rust-deps" { with-test & = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
+  "octez-rustzcash-deps" { with-test & = version }
   "tezt" { >= "4.1.0" & < "5.0.0" }
   "tezt-tezos" { = version }
   "qcheck-alcotest" { >= "0.20" }
   "octez-proto-libs" { = version }
   "octez-version" { = version }
+  "octez-node-config" { = version }
   "tezos-dal-node-services" { = version }
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
   "octez-protocol-compiler" { = version }
   "tezos-dal-node-lib" { = version }
-  "tezos-dac-lib" { = version }
-  "tezos-dac-client-lib" { = version }
   "octez-injector" { = version }
   "octez-l2-libs" { = version }
   "octez-alcotezt" { with-test & = version }
@@ -36,4 +38,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Octez protocol 021-PsQuebec libraries"

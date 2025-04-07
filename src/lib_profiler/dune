@@ -1,0 +1,10 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_profiler)
+ (public_name octez-libs.octez-profiler)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.data-encoding
+  lwt))

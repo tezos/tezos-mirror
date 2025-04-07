@@ -44,6 +44,7 @@ let alpha_can_stitch_from_its_predecessor = false
 (* Tests that are protocol-independent.
    They do not take a protocol as a parameter and thus need to be registered only once. *)
 let register_protocol_independent_tests () =
+  Agnostic_baker_test.register_protocol_independent () ;
   Binaries.register_protocol_independent () ;
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
@@ -68,8 +69,10 @@ let register_protocol_independent_tests () =
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =
   let migrate_from = Option.get @@ Protocol.previous_protocol migrate_to in
+  Agnostic_baker_test.register ~migrate_from ~migrate_to ;
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Protocol_migration.register ~migrate_from ~migrate_to ;
+  Weeklynet.register () ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
   User_activated_upgrade.register ~migrate_from ~migrate_to ;
   (if alpha_can_stitch_from_its_predecessor then
@@ -87,6 +90,7 @@ let register_protocol_migration_tests () =
     ~from_protocol:migrate_to
     ~to_protocol:Demo
     ~loser_protocols:[migrate_from] ;
+
   Sc_rollup_migration.register ~migrate_from ~migrate_to ;
   Dal.register_migration ~migrate_from ~migrate_to
 
@@ -97,7 +101,9 @@ let register_old_protocol_migration_tests () =
       | _, Alpha -> () (* Already in register_protocol_migration_tests *)
       | None, _ -> ()
       | Some migrate_from, migrate_to ->
-          Sc_rollup_migration.register ~migrate_from ~migrate_to)
+          Agnostic_baker_test.register ~migrate_from ~migrate_to ;
+          Sc_rollup_migration.register ~migrate_from ~migrate_to ;
+          Dal.register_migration ~migrate_from ~migrate_to)
     Protocol.all
 
 (* Register tests that use [Protocol.register_test] and for which we rely on
@@ -174,6 +180,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Normalize.register ~protocols ;
   Operations_liveness.register ~protocols ;
   Operation_size.register ~protocols ;
+  Operation_size_and_gas.register ~protocols ;
   Order_in_top_level.register ~protocols ;
   P2p.register ~protocols ;
   Prevalidator.register ~protocols ;
@@ -181,7 +188,6 @@ let register_protocol_tests_that_use_supports_correctly () =
   Proxy.register ~protocols ;
   Rpc_process.register ~protocols ;
   RPC_test.register protocols ;
-  Rpc_versioning_attestation.register ~protocols ;
   Reject_malformed_micheline.register ~protocols ;
   Replace_by_fees.register ~protocols ;
   Retro.register ~protocols ;

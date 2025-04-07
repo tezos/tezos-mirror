@@ -15,8 +15,6 @@ depends: [
   "tezos-openapi" { = version }
   "octez-node-config" { = version }
   "tezos-dal-node-lib" { = version }
-  "tezos-dac-lib" { = version }
-  "tezos-dac-client-lib" { = version }
   "octez-injector" { = version }
   "octez-version" { = version }
   "octez-l2-libs" { = version }
@@ -27,4 +25,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Octez: library for Smart Rollup node"

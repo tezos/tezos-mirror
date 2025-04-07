@@ -31,10 +31,10 @@ DEV_EXECUTABLES := $(shell cat script-inputs/dev-executables)
 ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXECUTABLES)
 
 #Define octez only executables by excluding the EVM-node and teztale tools.
-OCTEZ_ONLY_EXECUTABLES := $(filter-out octez-evm-node octez-teztale-archiver octez-teztale-server,${ALL_EXECUTABLES})
+OCTEZ_ONLY_EXECUTABLES := $(filter-out etherlink-governance-observer octez-evm-node octez-teztale-archiver octez-teztale-server octez-teztale-snitch,${ALL_EXECUTABLES})
 
 #Define octez layer1 only executables by excluding the EVM-node and teztale tools.
-OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out octez-evm-node octez-teztale-archiver octez-teztale-server octez-smart-rollup-wasm-debugger octez-smart-rollup-node octez-dac-client octez-dac-node octez-dal-node,$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES))
+OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out etherlink-governance-observer octez-evm-node octez-teztale-archiver octez-teztale-server octez-teztale-snitch octez-smart-rollup-wasm-debugger octez-smart-rollup-node octez-dal-node,$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES))
 
 # Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
 # the `build` target's Dune invocation. This is used in the CI to
@@ -108,7 +108,7 @@ octez-layer1:
 
 .PHONY: teztale
 teztale:
-	@$(MAKE) build OCTEZ_EXECUTABLES?="octez-teztale-archiver octez-teztale-server"
+	@$(MAKE) build OCTEZ_EXECUTABLES?="octez-teztale-archiver octez-teztale-server octez-teztale-snitch"
 
 .PHONY: experimental-release
 experimental-release:
@@ -294,6 +294,8 @@ test-protocol-compile:
 
 PROTO_DIRS := $(shell find src/ -maxdepth 1 -type d -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
 NONPROTO_DIRS := $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
+ETHERLINK_DIRS := etherlink/bin_node/test
+
 OTHER_DIRS := $(shell find contrib/ ci/ client-libs/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
 
 .PHONY: test-proto-unit
@@ -321,6 +323,13 @@ test-nonproto-unit:
 		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
 		scripts/test_wrapper.sh test-nonproto-unit \
 		$(addprefix @, $(addsuffix /runtest,$(NONPROTO_DIRS)))
+
+.PHONY: test-etherlink-unit
+test-etherlink-unit:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		scripts/test_wrapper.sh test-etherlink-unit \
+		$(addprefix @, $(addsuffix /runtest,$(ETHERLINK_DIRS)))
 
 .PHONY: test-other-unit
 test-other-unit:
@@ -438,23 +447,22 @@ fmt-ocaml:
 fmt-python:
 	@$(MAKE) -C docs fmt
 
-.PHONY: dpkg-A
-dpkg-A:	all
-	@./scripts/dpkg/make_dpkg.sh scripts/dpkg/A
-
-.PHONY: dpkg-B
-dpkg-B:	all
-	@./scripts/dpkg/make_dpkg.sh scripts/dpkg/B
-
 .PHONY: dpkg
-dpkg:	all dpkg-A dpkg-B
-
-.PHONY: rpm-A
-rpm-A: all
-	@./scripts/rpm/make_rpm.sh
+dpkg: all
+	export TIMESTAMP=$$(date '+%Y%m%d%H%M') ; \
+	export CI_COMMIT_SHORT_SHA=$$(git rev-parse --short HEAD) ; \
+	export CI_COMMIT_REF_NAME=$$(git rev-parse --abbrev-ref HEAD) ; \
+	export CI_COMMIT_TAG=$$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD) ; \
+	./scripts/dpkg/make_dpkg.sh scripts/dpkg/B && \
+	./scripts/dpkg/make_dpkg.sh scripts/dpkg/A
 
 .PHONY: rpm
-rpm: all rpm-A
+rpm: all
+	export TIMESTAMP=$$(date '+%Y%m%d%H%M') ; \
+	export CI_COMMIT_SHORT_SHA=$$(git rev-parse --short HEAD) ; \
+	export CI_COMMIT_REF_NAME=$$(git rev-parse --abbrev-ref HEAD) ; \
+	export CI_COMMIT_TAG=$$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD) ; \
+  ./scripts/rpm/make_rpm.sh
 
 .PHONY: build-deps
 build-deps:
@@ -485,6 +493,11 @@ build-tps: lift-protocol-limits-patch all build-tezt
 build-octogram: all
 	@dune build ./src/bin_octogram
 	@cp -f ./_build/default/src/bin_octogram/octogram_main.exe octogram
+
+.PHONY: build-floodgate
+build-floodgate:
+	@dune build ./etherlink/bin_floodgate
+	@cp -f ./_build/default/etherlink/bin_floodgate/main.exe floodgate
 
 .PHONY: build-unreleased
 build-unreleased: all
@@ -580,6 +593,6 @@ clean-kernels:
 
 .PHONY: wasm_runtime_gen_files
 wasm_runtime_gen_files::
-	@cd src/lib_wasm_runtime; cargo build 2> /dev/null
+	@cd etherlink/lib_wasm_runtime; cargo build 2> /dev/null
 
 octez-evm-node: wasm_runtime_gen_files

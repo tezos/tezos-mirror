@@ -154,6 +154,9 @@ let check_failure_aux ?(loc = __LOC__) ~expected_error :
     | Ok _ -> failwith "%s: Unexpected success@." loc
     | Error err ->
         let* () = expected_error input err in
+        Log.info
+          ~color:assert_block_color
+          "Scenario successfully failed. Rollback." ;
         return input
 
 let check_fail_and_rollback ?(loc = __LOC__) ~expected_error :
@@ -181,7 +184,11 @@ let assert_success ?(loc = __LOC__) : ('a, 'b) scenarios -> ('a, 'a) scenarios =
       exec
         (let open Lwt_result_syntax in
          fun input ->
+           Log.info ~color:assert_block_color "Entering temporary scenario..." ;
            let* _ = run_scenario sc input in
+           Log.info
+             ~color:assert_block_color
+             "Temporary scenario succeeded. Rollback." ;
            return input)
   | _ ->
       exec (fun _ ->

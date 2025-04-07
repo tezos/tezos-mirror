@@ -29,6 +29,7 @@ open Alpha_context
 type unsigned_block = {
   unsigned_block_header : Block_header.t;
   operations : Tezos_base.Operation.t list list;
+  manager_operations_infos : Baking_state.manager_operations_infos option;
 }
 
 type simulation_kind =
@@ -198,7 +199,12 @@ let filter_via_node ~chain_id ~fees_config ~hard_gas_limit_per_block
       ~payload_round
       operation_hashes
   in
-  return (shell_header, operations, payload_hash)
+  let manager_operations_infos =
+    None
+    (* We do not compute operations infos from node results to avoid potential
+       costly computation *)
+  in
+  return (shell_header, operations, manager_operations_infos, payload_hash)
 
 (* [filter_with_context] filters operations using a local context via
    {!Operation_selection.filter_operations_with_simulation} and a fresh state
@@ -221,7 +227,13 @@ let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
       pred_info
       chain_id
   in
-  let* {Operation_selection.operations; validation_result; operations_hash; _} =
+  let* {
+         Operation_selection.operations;
+         validation_result;
+         operations_hash;
+         manager_operations_infos;
+         _;
+       } =
     Operation_selection.filter_operations_with_simulation
       incremental
       fees_config
@@ -269,7 +281,7 @@ let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
         ~payload_round
         operation_hashes
     in
-    return (shell_header, operations, payload_hash)
+    return (shell_header, operations, manager_operations_infos, payload_hash)
 
 (* [apply_via_node] applies already filtered and validated operations in a block
    via {!Node_rpc.preapply_block}. A [shell_header] is recovered from this call
@@ -289,7 +301,12 @@ let apply_via_node ~chain_id ~faked_protocol_data ~timestamp
       operations
   in
   let operations = List.map (List.map convert_operation) operations in
-  return (shell_header, operations, payload_hash)
+  let manager_operations_infos =
+    None
+    (* We do not compute operations infos from node results to avoid potential
+       costly computation *)
+  in
+  return (shell_header, operations, manager_operations_infos, payload_hash)
 
 (* [apply_with_context] is similar to [filter_with_context] but filters
    consensus operations only from an [ordered_pool] via
@@ -372,7 +389,12 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
         ~locked_round:locked_round_when_no_validation_result
     in
     let operations = List.map (List.map convert_operation) operations in
-    return (shell_header, operations, payload_hash)
+    let manager_operations_infos =
+      None
+      (* We do not compute operations infos from node results to avoid potential
+         costly computation *)
+    in
+    return (shell_header, operations, manager_operations_infos, payload_hash)
 
 (* [forge] a new [unsigned_block] in accordance with [simulation_kind] and
    [simulation_mode] *)
@@ -398,7 +420,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
         Filter filtered_pool
     | Apply _ as x -> x
   in
-  let* shell_header, operations, payload_hash =
+  let* shell_header, operations, manager_operations_infos, payload_hash =
     match (simulation_mode, simulation_kind) with
     | Baking_state.Node, Filter operation_pool ->
         let faked_protocol_data =
@@ -508,4 +530,4 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
       protocol_data = {contents; signature = Signature.zero};
     }
   in
-  return {unsigned_block_header; operations}
+  return {unsigned_block_header; operations; manager_operations_infos}

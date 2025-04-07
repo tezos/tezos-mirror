@@ -16,8 +16,10 @@ keywords = ["tezos", "smart", "rollup"]
 proc-macro = true
 
 [features]
-default = []
+default = ["runtime-options", "entrypoint"]
 native-kernel = []
+runtime-options = []
+entrypoint = []
 
 [dependencies]
 proc-macro-error2 = "2.0.1"
@@ -29,6 +31,10 @@ features = ["full"]
 
 [dependencies.shellexpand]
 version = "3.1.0"
+
+[dependencies.tezos-smart-rollup-build-utils]
+path = "../build-utils"
+features = ["macro-support"]
 
 [dev-dependencies.tezos-smart-rollup]
 version = "0.2.2"

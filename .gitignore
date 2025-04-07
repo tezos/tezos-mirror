@@ -53,7 +53,6 @@ __pycache__
 /octez-evm-node
 /tezos-dal-node
 /octez-dal-node
-/octez-dac-*
 /octez-binaries
 /octez-injector-server
 /octez-dsn-node
@@ -62,10 +61,13 @@ __pycache__
 /safety-checker
 /octez-teztale-archiver
 /octez-teztale-server
-/octez-agnostic-baker
+/octez-experimental-agnostic-baker
+/octez-teztale-snitch
 
 /src/riscv/riscv-sandbox*
 /src/riscv/riscv-dummy.elf
+/src/riscv/riscv-supervised-dummy.elf
+/src/riscv/riscv-dummy-sdk.elf
 
 /src/proto_*/parameters/*-parameters.json
 
@@ -78,6 +80,14 @@ __pycache__
 
 client-libs/kaitai-struct-files/doc
 
+# Ignore individual dockerfiles for `tezt-cloud`
+tezt/lib_cloud/dockerfiles/*.Dockerfile
+tezt/lib_cloud/dockerfiles/*.Dockerfile.dockerignore
+# Unless it is an OS specific dockerfile or an Octez one
+!tezt/lib_cloud/dockerfiles/debian.Dockerfile
+!tezt/lib_cloud/dockerfiles/debian.Dockerfile.dockerignore
+!tezt/lib_cloud/dockerfiles/octez.Dockerfile
+!tezt/lib_cloud/dockerfiles/octez.Dockerfile.dockerignore
 .merlin
 
 *~
@@ -118,6 +128,8 @@ _evm_unstripped_installer_preimages/
 
 # etherlink
 /etherlink/kernels-*
+etherlink-governance-observer
+floodgate
 
 # Terraform
 

@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Bin_evm_node
-    Invocation:   dune exec etherlink/bin_evm_node/test/main.exe -- --file test_ethbloom.ml
+    Invocation:   cd etherlink/bin_evm_node/test/; dune exec ./test_ethbloom.exe
     Subject:      Tests for implementation of Ethereum bloom filters
 *)
 
@@ -180,3 +180,5 @@ let tests =
   ]
 
 let () = Alcotest.run ~__FILE__ "Test Ethbloom" tests
+
+let () = Test.run ()

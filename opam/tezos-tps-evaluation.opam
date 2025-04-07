@@ -10,11 +10,13 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-rustzcash-deps" { = version }
+  "bls12-381" { = version }
   "octez-libs" { = version }
   "caqti"
   "caqti-dynload"
   "caqti-lwt" { >= "2.0.1" }
-  "lwt" { >= "5.7.0" }
+  "lwt" { >= "5.7.0" & < "5.9.0" }
   "octez-protocol-alpha-libs" { = version }
   "octez-shell-libs" { = version }
   "tezos-protocol-alpha" { = version }
@@ -27,4 +29,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos TPS evaluation tool"

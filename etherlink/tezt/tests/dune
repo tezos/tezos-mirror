@@ -6,11 +6,13 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
+  bls12-381.archive
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
   tezt-tezos
   tezt_etherlink
   octez-evm-node-libs.evm_node_lib_dev_encoding
+  octez-rustzcash-deps
   tezos-protocol-alpha.protocol)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (library_flags (:standard -linkall))
@@ -24,7 +26,7 @@
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
   -open Tezt_etherlink)
- (modules evm_rollup evm_sequencer validate dal_sequencer eth_call))
+ (modules evm_rollup evm_sequencer validate dal_sequencer eth_call gc))
 
 (executable
  (name main)

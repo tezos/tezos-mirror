@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
+(* Copyright (c) 2024-2025 Trilitech <contact@trili.tech>                    *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -52,8 +52,7 @@ module PVM :
 
   let proof_stop_state = function (_ : proof) -> .
 
-  let state_hash state =
-    Lwt.return (Sc_rollup.State_hash.of_bytes_exn (Backend.state_hash state))
+  let state_hash state = Lwt.return @@ Backend.state_hash state
 
   let initial_state ~empty:_ = Lwt.return (Storage.empty ())
 
@@ -75,6 +74,9 @@ module PVM :
               (Sc_rollup.First_after
                  (Raw_level.of_int32_exn level, Z.of_int64 message_counter)))
     | WaitingForMetadata -> return Sc_rollup.(Needs_reveal Reveal_metadata)
+    | WaitingForReveal ->
+        (* TODO: RV-407: Rollup node handles reveal request from riscv pvm *)
+        assert false
 
   let to_pvm_input (input : Sc_rollup.input) : Backend.input =
     match input with
@@ -143,8 +145,8 @@ let string_of_status status = Backend.string_of_status status
 
 let get_outbox _level _state = Lwt.return []
 
-let eval_many ~reveal_builtins:_ ~write_debug ~is_reveal_enabled:_
-    ?stop_at_snapshot ~max_steps initial_state =
+let eval_many ?check_invalid_kernel:_ ~reveal_builtins:_ ~write_debug
+    ~is_reveal_enabled:_ ?stop_at_snapshot ~max_steps initial_state =
   let debug_printer =
     match write_debug with
     | Tezos_scoru_wasm.Builtins.Noop -> None

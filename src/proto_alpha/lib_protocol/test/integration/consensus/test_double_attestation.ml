@@ -38,11 +38,6 @@ open Alpha_context
 (****************************************************************)
 (*                  Utility functions                           *)
 (****************************************************************)
-let autostaking_disabled =
-  {
-    Default_parameters.constants_test.adaptive_issuance with
-    autostaking_enable = false;
-  }
 
 let block_fork ?excluding b =
   let open Lwt_result_syntax in
@@ -108,7 +103,7 @@ let test_valid_double_attestation_evidence () =
           Default_parameters.constants_test.issuance_weights with
           base_total_issued_per_minute = Tez.zero;
         };
-      consensus_threshold = 0;
+      consensus_threshold_size = 0;
     }
   in
   let* genesis, _contracts = Context.init_with_constants2 constants in
@@ -123,8 +118,8 @@ let test_valid_double_attestation_evidence () =
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
   let* delegate, _ = Context.get_attester (B blk_a) in
-  let* attestation_a = Op.raw_attestation blk_a in
-  let* attestation_b = Op.raw_attestation blk_b in
+  let* attestation_a = Op.raw_attestation ~delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* bakers = Context.get_bakers (B blk_a) in
   let baker = Context.get_first_different_baker delegate bakers in
@@ -169,10 +164,14 @@ let test_valid_double_attestation_evidence () =
   let frozen_deposits_after =
     Tez_helpers.(frozen_deposits_after -! autostaked)
   in
-  let one_minus_p =
-    Percentage.neg
-      constants.percentage_of_frozen_deposits_slashed_per_double_attestation
+  let* slashing_pct =
+    Slashing_helpers.slashing_percentage
+      (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+         attestation_a)
+      ~block_before_slash:blk_a
+      ~all_culprits:[delegate]
   in
+  let one_minus_p = Percentage.neg slashing_pct in
   let {Q.num; den} = Percentage.to_q one_minus_p in
   let expected_frozen_deposits_after =
     Tez_helpers.(frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
@@ -197,19 +196,42 @@ let test_valid_double_attestation_evidence () =
       (Int64.of_int
          constants.adaptive_issuance.global_limit_of_staking_over_baking)
   in
-  let evidence_reward = Tez_helpers.(frozen_deposits_after /! divider) in
+  let evidence_reward =
+    Tez_helpers.((frozen_deposits_before -! frozen_deposits_after) /! divider)
+  in
   let expected_reward = Tez_helpers.(baking_reward +! evidence_reward) in
   let* full_balance_with_rewards =
     Context.Delegate.full_balance (B blk_eoc) baker
   in
   let real_reward = Tez_helpers.(full_balance_with_rewards -! full_balance) in
+  Log.info
+    "@[<v>frozen_deposits_before = %a@,\
+     frozen_deposits_after = %a@,\
+     baking_reward = %a@,\
+     divider = %Ld@,\
+     evidence_reward = %a@,\
+     expected_reward = %a@,\
+     real_reward = %a@]"
+    Tez.pp
+    frozen_deposits_before
+    Tez.pp
+    frozen_deposits_after
+    Tez.pp
+    baking_reward
+    divider
+    Tez.pp
+    evidence_reward
+    Tez.pp
+    expected_reward
+    Tez.pp
+    real_reward ;
   Assert.equal_tez ~loc:__LOC__ expected_reward real_reward
 
 (** Check that a double (pre)attestation evidence with equivalent
     attestations but on different branches succeeds. *)
 let test_different_branch () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk = Block.bake genesis in
   let* attester, _slots = Context.get_attester (B blk) in
   let* attestation_a = Op.raw_attestation ~delegate:attester blk in
@@ -233,7 +255,7 @@ let test_different_branch () =
     and are otherwise identical. *)
 let test_different_slots () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk = Block.bake genesis in
   let* attesters = Context.get_attesters (B blk) in
   let delegate, slot1, slot2 =
@@ -260,7 +282,7 @@ let test_different_slots () =
 (** Say a delegate double-attests twice and say the 2 evidences are timely
    included. Then the delegate can no longer bake. *)
 let test_two_double_attestation_evidences_leadsto_no_bake () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let issuance_weights =
     {
       Default_parameters.constants_test.issuance_weights with
@@ -268,14 +290,14 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
     }
   in
   let* genesis, _contracts =
-    Context.init3 ~consensus_threshold:0 ~issuance_weights ()
+    Context.init3 ~consensus_threshold_size:0 ~issuance_weights ()
   in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
   let* delegate, _ = Context.get_attester (B blk_a) in
-  let* attestation_a = Op.raw_attestation blk_a in
-  let* attestation_b = Op.raw_attestation blk_b in
+  let* attestation_a = Op.raw_attestation ~delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* bakers = Context.get_bakers (B blk_a) in
   let baker = Context.get_first_different_baker delegate bakers in
@@ -288,8 +310,8 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   let* blk_30, blk_40 = block_fork ~excluding:[delegate] blk_with_evidence1 in
   let* blk_3 = Block.bake ~policy:(Excluding [delegate]) blk_30 in
   let* blk_4 = Block.bake ~policy:(Excluding [delegate]) blk_40 in
-  let* attestation_3 = Op.raw_attestation blk_3 in
-  let* attestation_4 = Op.raw_attestation blk_4 in
+  let* attestation_3 = Op.raw_attestation ~delegate blk_3 in
+  let* attestation_4 = Op.raw_attestation ~delegate blk_4 in
   let operation =
     double_attestation (B blk_with_evidence1) attestation_3 attestation_4
   in
@@ -333,53 +355,57 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
         | Validate_errors.Consensus.Forbidden_delegate _ -> true
         | _ -> false)
   in
-  (* Check that all frozen deposits have been slashed at the end of the cycle. *)
-  let* b, metadata, _ =
-    Block.bake_until_n_cycle_end_with_metadata
+  (* Bake until the slashing and check the frozen deposits. *)
+  let* b =
+    Block.bake_until_n_cycle_end
       ~policy:(By_account baker)
-      2
+      (Constants.slashing_delay + 1)
       blk_with_evidence2
   in
-  let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
-  let autostaked = Block.autostaked delegate metadata in
+  let* slashing_pct1 =
+    Slashing_helpers.slashing_percentage
+      (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+         attestation_a)
+      ~block_before_slash:blk_a
+      ~all_culprits:[delegate]
+  in
+  let* slashing_pct2 =
+    Slashing_helpers.slashing_percentage
+      (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+         attestation_3)
+      ~block_before_slash:blk_3
+      ~all_culprits:[delegate]
+  in
+  let one_minus_p =
+    Percentage.(neg (add_bounded slashing_pct1 slashing_pct2))
+  in
+  let {Q.num; den} = Percentage.to_q one_minus_p in
+  let expected_frozen_deposits_after =
+    Tez_helpers.(frozen_deposits_before *! Z.to_int64 num /! Z.to_int64 den)
+  in
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B b) delegate
   in
-  let frozen_deposits_after =
-    Tez_helpers.(frozen_deposits_after -! autostaked)
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      expected_frozen_deposits_after
+      frozen_deposits_after
   in
-  let* base_reward = Context.get_baking_reward_fixed_portion (B genesis) in
-  let* to_liquid =
-    Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
-      (B b)
-      (Block.current_cycle b)
-      delegate
-      base_reward
-  in
-  (* [delegate] baked one block. The block rewards for that block should be all
-     that's left *)
-  Assert.equal_tez
-    ~loc:__LOC__
-    Tez_helpers.(base_reward -! to_liquid)
-    frozen_deposits_after
+  return_unit
 
 (** Say a delegate double-attests twice in a cycle,
     and say the 2 evidences are included in different (valid) cycles.
     Then the delegate is forbidden and can no longer bake. *)
 let test_two_double_attestation_evidences_staggered () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts =
-    Context.init3
-      ~consensus_threshold:0
-      ~adaptive_issuance:autostaking_disabled
-      ()
-  in
+  let* genesis, _contracts = Context.init3 ~consensus_threshold_size:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
   let* delegate, _ = Context.get_attester (B blk_a) in
-  let* attestation_a = Op.raw_attestation blk_a in
-  let* attestation_b = Op.raw_attestation blk_b in
+  let* attestation_a = Op.raw_attestation ~delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* bakers = Context.get_bakers (B blk_a) in
   let baker = Context.get_first_different_baker delegate bakers in
@@ -448,18 +474,13 @@ let test_two_double_attestation_evidences_staggered () =
     is forbidden and can no longer bake. *)
 let test_two_double_attestation_evidences_consecutive_cycles () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts =
-    Context.init3
-      ~consensus_threshold:0
-      ~adaptive_issuance:autostaking_disabled
-      ()
-  in
+  let* genesis, _contracts = Context.init3 ~consensus_threshold_size:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
   let* delegate, _ = Context.get_attester (B blk_a) in
-  let* attestation_a = Op.raw_attestation blk_a in
-  let* attestation_b = Op.raw_attestation blk_b in
+  let* attestation_a = Op.raw_attestation ~delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* bakers = Context.get_bakers (B blk_a) in
   let baker = Context.get_first_different_baker delegate bakers in
@@ -524,7 +545,7 @@ let test_two_double_attestation_evidences_consecutive_cycles () =
       valid attestation fails. *)
 let test_invalid_double_attestation () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init_n ~consensus_threshold:0 10 () in
+  let* genesis, _contracts = Context.init_n ~consensus_threshold_size:0 10 () in
   let* b = Block.bake genesis in
   let* attestation = Op.raw_attestation b in
   let* b = Block.bake ~operation:(Operation.pack attestation) b in
@@ -540,7 +561,7 @@ let test_invalid_double_attestation () =
    incorrect ordering of the attestations fails. *)
 let test_invalid_double_attestation_variant () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* b = Block.bake_until_cycle_end genesis in
   let* blk_1, blk_2 = block_fork b in
   let* blk_a = Block.bake blk_1 in
@@ -563,7 +584,7 @@ let test_invalid_double_attestation_variant () =
 (** Check that a future-cycle double attestation fails. *)
 let test_too_early_double_attestation_evidence () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* b = Block.bake_until_cycle_end genesis in
   let* blk_1, blk_2 = block_fork b in
   let* blk_a = Block.bake blk_1 in
@@ -582,21 +603,16 @@ let test_too_early_double_attestation_evidence () =
     to create a double_attestation anymore. *)
 let test_too_late_double_attestation_evidence () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
-  let max_slashing_period = Constants.max_slashing_period in
-  let* Constants.{parametric = {blocks_per_cycle; _}; _} =
-    Context.get_constants (B genesis)
-  in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
   let* attestation_a = Op.raw_attestation blk_a in
   let* attestation_b = Op.raw_attestation blk_b in
   let* blk =
-    Block.bake_n
-      ((max_slashing_period * Int32.to_int blocks_per_cycle) + 1)
-      blk_a
+    Block.bake_until_n_cycle_end (Constants.denunciation_period + 1) blk_a
   in
+  let* blk = Block.bake blk in
   double_attestation (B blk) attestation_a attestation_b |> fun operation ->
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
@@ -609,7 +625,7 @@ let test_too_late_double_attestation_evidence () =
     attestations made by two different attesters fails. *)
 let test_different_delegates () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* genesis = Block.bake genesis in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
@@ -632,7 +648,7 @@ let test_different_delegates () =
     attestation fails. *)
 let test_wrong_delegate () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
@@ -686,7 +702,10 @@ let test_freeze_more_with_low_balance =
     in
     let* attestation_b = Op.raw_attestation ~delegate:account1 ~slot blk_b in
     let denunciation = double_attestation (B b2) attestation_a attestation_b in
-    Block.bake ~policy:(Excluding [account1]) b2 ~operations:[denunciation]
+    let* b =
+      Block.bake ~policy:(Excluding [account1]) b2 ~operations:[denunciation]
+    in
+    return (b, attestation_a)
   in
   let check_unique_attester b account2 =
     let* attesters_list = Context.get_attesters (B b) in
@@ -704,17 +723,9 @@ let test_freeze_more_with_low_balance =
             Default_parameters.constants_test.issuance_weights with
             base_total_issued_per_minute = Tez.zero;
           };
-        consensus_threshold = 0;
+        consensus_threshold_size = 0;
         origination_size = 0;
         consensus_rights_delay = 5;
-        percentage_of_frozen_deposits_slashed_per_double_attestation =
-          (* enforce that percentage is 50% in the test's params. *)
-          Percentage.p50;
-        adaptive_issuance =
-          {
-            Default_parameters.constants_test.adaptive_issuance with
-            autostaking_enable = false;
-          };
       }
     in
     let* genesis, (c1, c2) = Context.init_with_constants2 constants in
@@ -743,7 +754,7 @@ let test_freeze_more_with_low_balance =
     let* () =
       Assert.equal_tez ~loc:__LOC__ info1.frozen_deposits info2.frozen_deposits
     in
-    let* b3 = double_attest_and_punish b2 account1 in
+    let* b3, duplicate_op = double_attest_and_punish b2 account1 in
     (* Denunciation has happened but slashing hasn't yet.
        We check that frozen deposits haven't changed and still correspond to the
        full balance and itself hasn't changed. *)
@@ -774,10 +785,14 @@ let test_freeze_more_with_low_balance =
     in
     (* We also check that compared to deposits at block [b2], [account1] lost
        50% of its deposits. *)
-    let one_minus_slash_percentage =
-      Percentage.neg
-        constants.percentage_of_frozen_deposits_slashed_per_double_attestation
+    let* slashing_pct =
+      Slashing_helpers.slashing_percentage
+        (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+           duplicate_op)
+        ~block_before_slash:b3
+        ~all_culprits:[account1]
     in
+    let one_minus_slash_percentage = Percentage.neg slashing_pct in
     let {Q.num; den} = Percentage.to_q one_minus_slash_percentage in
     let expected_frozen_deposits_after =
       Tez_helpers.(info2.frozen_deposits *! Z.to_int64 num /! Z.to_int64 den)
@@ -788,7 +803,7 @@ let test_freeze_more_with_low_balance =
         expected_frozen_deposits_after
         info4.current_frozen_deposits
     in
-    let* c2 = double_attest_and_punish c1 account1 in
+    let* c2, _ = double_attest_and_punish c1 account1 in
     (* Second denunciation has happened but slashing not yet, again.
        Current frozen deposits reflect the slashing of 50% of the original
        deposits. *)
@@ -853,13 +868,13 @@ let test_freeze_more_with_low_balance =
 (** Injecting a valid double attestation multiple times raises an error. *)
 let test_two_double_attestation_evidences_leads_to_duplicate_denunciation () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
+  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
   let* delegate, _ = Context.get_attester (B blk_a) in
-  let* attestation_a = Op.raw_attestation blk_a in
-  let* attestation_b = Op.raw_attestation blk_b in
+  let* attestation_a = Op.raw_attestation ~delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let operation2 = double_attestation (B genesis) attestation_b attestation_a in
   let* bakers = Context.get_bakers (B blk_a) in

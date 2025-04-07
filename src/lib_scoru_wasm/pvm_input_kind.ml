@@ -24,7 +24,14 @@
 (*****************************************************************************)
 
 (* You can only add variants to this type. You cannot remove them. *)
-type protocol = Nairobi | Oxford | ParisB | ParisC | Proto_alpha | Quebec
+type protocol =
+  | Nairobi
+  | Oxford
+  | ParisB
+  | ParisC
+  | Proto_alpha
+  | Quebec
+  | R022
 
 (* This type mimics [Sc_rollup_inbox_repr.internal_inbox_messages], without
    fully deserializing the `Transfer`, and is produced by reading the first bytes
@@ -67,6 +74,8 @@ let protocol_from_raw payload =
         Some (Protocol_migration ParisC)
     | payload when String.equal payload Constants.proto_quebec_name ->
         Some (Protocol_migration Quebec)
+    | payload when String.equal payload Constants.proto_r022_name ->
+        Some (Protocol_migration R022)
     | payload when String.equal payload Constants.proto_alpha_name ->
         Some (Protocol_migration Proto_alpha)
     | _ -> None
@@ -106,6 +115,8 @@ module Internal_for_tests = struct
         Data_encoding.(Binary.to_string_exn string Constants.parisc_name)
     | Proto_alpha ->
         Data_encoding.(Binary.to_string_exn string Constants.proto_alpha_name)
+    | R022 ->
+        Data_encoding.(Binary.to_string_exn string Constants.proto_r022_name)
     | Quebec ->
         Data_encoding.(Binary.to_string_exn string Constants.proto_quebec_name)
 

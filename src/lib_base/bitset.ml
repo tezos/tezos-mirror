@@ -9,9 +9,30 @@ open Error_monad
 
 type t = Z.t
 
-type error += Invalid_position of int
+let encoding = Data_encoding.z
 
-let encoding = Data_encoding.n
+type error += Invalid_position of int | Invalid_input of string
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"bitfield_invalid_position"
+    ~title:"Invalid bitfield’s position"
+    ~description:"Bitfields do not accept negative positions"
+    (obj1 (req "position" int31))
+    (function Invalid_position i -> Some i | _ -> None)
+    (fun i -> Invalid_position i) ;
+  register_error_kind
+    `Permanent
+    ~id:"bitfield_invalid_input"
+    ~title:"Invalid argument"
+    ~description:"A bitset function was provided an invalid input"
+    ~pp:(fun ppf name ->
+      Format.fprintf ppf "Invalid input for function %s" name)
+    (obj1 (req "function_name" string))
+    (function Invalid_input f -> Some f | _ -> None)
+    (fun f -> Invalid_input f)
 
 let empty = Z.zero
 
@@ -47,33 +68,22 @@ let to_list field =
 
 let fill ~length =
   let open Result_syntax in
-  let* () = error_when Compare.Int.(length < 0) (Invalid_position length) in
+  let* () = error_when Compare.Int.(length < 0) (Invalid_input "fill") in
   return Z.(pred (shift_left one length))
 
 let inter = Z.logand
 
 let diff b1 b2 = Z.logand b1 (Z.lognot b2)
 
-let () =
-  let open Data_encoding in
-  register_error_kind
-    `Permanent
-    ~id:"bitfield_invalid_position"
-    ~title:"Invalid bitfield’s position"
-    ~description:"Bitfields does not accept negative positions"
-    (obj1 (req "position" int31))
-    (function Invalid_position i -> Some i | _ -> None)
-    (fun i -> Invalid_position i)
-
 let occupied_size_in_bits = Z.numbits
 
 let cardinal =
-  (* Cardinal of bitset is the hamming weight, i.e. the number of ones. *)
+  (* The cardinal of a bitset is its hamming weight, i.e. the number of ones. *)
   Z.popcount
 
 let to_z z = z
 
 let from_z z =
-  if Z.sign z < 0 then
-    error_with "Bitset.from_z: argument %a is negative" Z.pp_print z
-  else Ok z
+  let open Result_syntax in
+  let+ () = error_when (Z.sign z < 0) (Invalid_input "from_z") in
+  z

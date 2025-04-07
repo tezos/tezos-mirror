@@ -56,22 +56,41 @@ pub struct BlockInProgress {
     pub logs_offset: u64,
     /// Timestamp
     pub timestamp: Timestamp,
+    /// The base fee, is adjusted before and after the computation of
+    /// the block
+    pub base_fee_per_gas: U256,
 }
 
 impl Encodable for BlockInProgress {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(11);
-        stream.append(&self.number);
-        append_queue(stream, &self.tx_queue);
-        append_txs(stream, &self.valid_txs);
-        append_txs(stream, &self.delayed_txs);
-        stream.append(&self.cumulative_gas);
-        stream.append(&self.index);
-        stream.append(&self.parent_hash);
-        stream.append(&self.estimated_ticks_in_block);
-        stream.append(&self.logs_bloom);
-        stream.append(&self.logs_offset);
-        append_timestamp(stream, self.timestamp);
+        let BlockInProgress {
+            number,
+            tx_queue,
+            valid_txs,
+            delayed_txs,
+            cumulative_gas,
+            index,
+            parent_hash,
+            estimated_ticks_in_run: _,
+            estimated_ticks_in_block,
+            logs_bloom,
+            logs_offset,
+            timestamp,
+            base_fee_per_gas,
+        } = self;
+        stream.begin_list(12);
+        stream.append(number);
+        append_queue(stream, tx_queue);
+        append_txs(stream, valid_txs);
+        append_txs(stream, delayed_txs);
+        stream.append(cumulative_gas);
+        stream.append(index);
+        stream.append(parent_hash);
+        stream.append(estimated_ticks_in_block);
+        stream.append(logs_bloom);
+        stream.append(logs_offset);
+        append_timestamp(stream, *timestamp);
+        stream.append(base_fee_per_gas);
     }
 }
 
@@ -94,7 +113,7 @@ impl Decodable for BlockInProgress {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 11 {
+        if decoder.item_count()? != 12 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
@@ -111,6 +130,7 @@ impl Decodable for BlockInProgress {
         let logs_bloom: Bloom = decode_field(&next(&mut it)?, "logs_bloom")?;
         let logs_offset: u64 = decode_field(&next(&mut it)?, "logs_offset")?;
         let timestamp = decode_timestamp(&next(&mut it)?)?;
+        let base_fee_per_gas = decode_field(&next(&mut it)?, "base_fee_per_gas")?;
         let bip = Self {
             number,
             tx_queue,
@@ -124,6 +144,7 @@ impl Decodable for BlockInProgress {
             logs_bloom,
             logs_offset,
             timestamp,
+            base_fee_per_gas,
         };
         Ok(bip)
     }
@@ -166,6 +187,7 @@ impl BlockInProgress {
         transactions: VecDeque<Transaction>,
         estimated_ticks_in_run: u64,
         timestamp: Timestamp,
+        base_fee_per_gas: U256,
     ) -> Self {
         Self {
             number,
@@ -180,18 +202,24 @@ impl BlockInProgress {
             logs_bloom: Bloom::default(),
             logs_offset: 0,
             timestamp,
+            base_fee_per_gas,
         }
     }
 
     // constructor of raw structure, used in tests
     #[cfg(test)]
-    pub fn new(number: U256, transactions: VecDeque<Transaction>) -> BlockInProgress {
+    pub fn new(
+        number: U256,
+        transactions: VecDeque<Transaction>,
+        base_fee_per_gas: U256,
+    ) -> BlockInProgress {
         Self::new_with_ticks(
             number,
             H256::zero(),
             transactions,
             0u64,
             Timestamp::from(0i64),
+            base_fee_per_gas,
         )
     }
 
@@ -200,17 +228,23 @@ impl BlockInProgress {
     pub fn constants(
         &self,
         chain_id: U256,
-        block_fees: &BlockFees,
+        minimum_base_fee_per_gas: U256,
+        da_fee_per_byte: U256,
         gas_limit: u64,
         coinbase: H160,
     ) -> BlockConstants {
         let timestamp = U256::from(self.timestamp.as_u64());
+        let block_fees = BlockFees::new(
+            minimum_base_fee_per_gas,
+            self.base_fee_per_gas,
+            da_fee_per_byte,
+        );
         BlockConstants {
             number: self.number,
             coinbase,
             timestamp,
             gas_limit,
-            block_fees: *block_fees,
+            block_fees,
             chain_id,
             prevrandao: None,
         }
@@ -221,6 +255,7 @@ impl BlockInProgress {
         current_block_number: U256,
         parent_hash: H256,
         tick_counter: u64,
+        base_fee_per_gas: U256,
     ) -> BlockInProgress {
         // blueprint is turn into a ring to allow popping from the front
         let ring = blueprint.transactions.into();
@@ -230,6 +265,7 @@ impl BlockInProgress {
             ring,
             tick_counter,
             blueprint.timestamp,
+            base_fee_per_gas,
         )
     }
 
@@ -269,7 +305,9 @@ impl BlockInProgress {
                 hex::encode(transaction.tx_hash)
             );
         };
-        self.add_gas(gas_used.into())?;
+        host.add_execution_gas(gas_used);
+
+        self.add_gas(receipt_info.overall_gas_used)?;
 
         // account for transaction ticks
         self.add_ticks(tick_model::ticks_of_valid_transaction(
@@ -326,17 +364,17 @@ impl BlockInProgress {
     fn receipts_root(
         &self,
         host: &mut impl Runtime,
-        previous_receipts_root: Vec<u8>,
+        previous_receipts_root: &[u8],
     ) -> anyhow::Result<Vec<u8>> {
         if self.valid_txs.is_empty() {
-            Ok(previous_receipts_root)
+            Ok(previous_receipts_root.to_vec())
         } else {
             for hash in &self.valid_txs {
                 let receipt_path = receipt_path(hash)?;
                 let new_receipt_path = concat(&Self::RECEIPTS, &receipt_path)?;
                 host.store_copy(&receipt_path, &new_receipt_path)?;
             }
-            host.store_write_all(&Self::RECEIPTS_PREVIOUS_ROOT, &previous_receipts_root)?;
+            host.store_write_all(&Self::RECEIPTS_PREVIOUS_ROOT, previous_receipts_root)?;
             let receipts_root = Self::safe_store_get_hash(host, &Self::RECEIPTS)?;
             host.store_delete(&Self::RECEIPTS)?;
             Ok(receipts_root)
@@ -350,10 +388,10 @@ impl BlockInProgress {
     fn transactions_root(
         &self,
         host: &mut impl Runtime,
-        previous_transactions_root: Vec<u8>,
+        previous_transactions_root: &[u8],
     ) -> anyhow::Result<Vec<u8>> {
         if self.valid_txs.is_empty() {
-            Ok(previous_transactions_root)
+            Ok(previous_transactions_root.to_vec())
         } else {
             for hash in &self.valid_txs {
                 let object_path = object_path(hash)?;
@@ -362,7 +400,7 @@ impl BlockInProgress {
             }
             host.store_write_all(
                 &Self::OBJECTS_PREVIOUS_ROOT,
-                &previous_transactions_root,
+                previous_transactions_root,
             )?;
             let objects_root = Self::safe_store_get_hash(host, &Self::OBJECTS)?;
             host.store_delete(&Self::OBJECTS)?;
@@ -375,14 +413,18 @@ impl BlockInProgress {
         self,
         host: &mut Host,
         block_constants: &BlockConstants,
-        previous_receipts_root: Vec<u8>,
-        previous_transactions_root: Vec<u8>,
+        previous_receipts_root: &[u8],
+        previous_transactions_root: &[u8],
     ) -> Result<L2Block, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
         let receipts_root = self.receipts_root(host, previous_receipts_root)?;
         let transactions_root =
             self.transactions_root(host, previous_transactions_root)?;
-        let base_fee_per_gas = base_fee_per_gas(host, self.timestamp);
+        let base_fee_per_gas = base_fee_per_gas(
+            host,
+            self.timestamp,
+            block_constants.block_fees.minimum_base_fee_per_gas(),
+        );
         let new_block = L2Block::new(
             self.number,
             self.valid_txs,
@@ -456,7 +498,7 @@ impl BlockInProgress {
                     to,
                     cumulative_gas_used: cumulative_gas,
                     effective_gas_price,
-                    gas_used: U256::from(outcome.gas_used),
+                    gas_used: receipt_info.overall_gas_used,
                     contract_address,
                     logs_bloom: TransactionReceipt::logs_to_bloom(&logs),
                     logs,
@@ -578,12 +620,13 @@ mod tests {
             logs_bloom: Bloom::default(),
             logs_offset: 33,
             timestamp: Timestamp::from(0i64),
+            base_fee_per_gas: U256::from(21000u64),
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f9025f2af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021880000000000000000";
+        let expected = "f902622af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021880000000000000000825208";
 
-        assert_eq!(hex::encode(encoded), expected);
+        pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
         let bytes = hex::decode(expected).expect("Should be valid hex string");
         let decoder = Rlp::new(&bytes);
@@ -613,10 +656,11 @@ mod tests {
             logs_bloom: Bloom::default(),
             logs_offset: 0,
             timestamp: Timestamp::from(0i64),
+            base_fee_per_gas: U256::from(21000u64),
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f902162af87cf83ca00101010101010101010101010101010101010101010101010101010101010101da02d8019401010101010101010101010101010101010101010180f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909e1a002020202020202020202020202020202020202020202020202020202020202020304a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080880000000000000000";
+        let expected = "f902192af87cf83ca00101010101010101010101010101010101010101010101010101010101010101da02d8019401010101010101010101010101010101010101010180f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909e1a002020202020202020202020202020202020202020202020202020202020202020304a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080880000000000000000825208";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
@@ -648,10 +692,11 @@ mod tests {
             logs_bloom: Bloom::default(),
             logs_offset: 4,
             timestamp: Timestamp::from(0i64),
+            base_fee_per_gas: U256::from(21000u64),
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f9022a2af8b1f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004880000000000000000";
+        let expected = "f9022d2af8b1f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004880000000000000000825208";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 

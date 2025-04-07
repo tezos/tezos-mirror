@@ -14,6 +14,8 @@
   octez-shell-libs.shell-context
   octez-shell-libs.brassaia-context
   octez-shell-libs.duo-context-lib)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

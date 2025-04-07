@@ -2,8 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-/// Elements that may be stored using a [Backend]
-pub trait Elem: Copy + 'static {
+/// Types that can be copied and contain no non-static references
+pub trait StaticCopy: Copy + 'static {}
+
+impl<T: Copy + 'static> StaticCopy for T {}
+
+/// Elements that may be stored using a Backend - i.e. implementors of [super::ManagerBase]
+pub trait Elem: StaticCopy {
     /// Copy from `source` and convert to stored representation.
     fn store(&mut self, source: &Self);
 
@@ -56,24 +61,6 @@ impl_elem_prim!(i64);
 impl_elem_prim!(u128);
 impl_elem_prim!(i128);
 
-impl Elem for bool {
-    #[inline(always)]
-    fn store(&mut self, source: &Self) {
-        *self = *source;
-    }
-
-    #[inline(always)]
-    fn to_stored_in_place(&mut self) {}
-
-    #[inline(always)]
-    fn from_stored_in_place(&mut self) {}
-
-    #[inline(always)]
-    fn from_stored(source: &Self) -> Self {
-        *source
-    }
-}
-
 impl<E: Elem, const LEN: usize> Elem for [E; LEN] {
     #[inline(always)]
     fn store(&mut self, source: &Self) {
@@ -111,17 +98,5 @@ impl<E: Elem, const LEN: usize> Elem for [E; LEN] {
         }
 
         new
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_bool_repr() {
-        proptest::proptest!(|(val: u8)| {
-            let bool_val: bool = unsafe {std::mem::transmute_copy(&val)};
-            let truthy = val & 1 == 1;
-            assert_eq!(bool_val, truthy);
-        });
     }
 }

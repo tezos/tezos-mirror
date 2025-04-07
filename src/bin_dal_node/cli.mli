@@ -32,6 +32,8 @@ module Types = Tezos_dal_node_services.Types
     can be used to register a function when the user invokes the
     command. *)
 
+type experimental_features = {sqlite3_backend : bool}
+
 type options = {
   data_dir : string option;
       (** Directory containing files related to the DAL node. *)
@@ -52,6 +54,10 @@ type options = {
   service_name : string option;
       (** Name of the service provided by this node. *)
   service_namespace : string option;  (** Namespace for the service. *)
+  experimental_features : experimental_features;  (** Experimental features.  *)
+  fetch_trusted_setup : bool option;
+      (** Should the trusted setup be installed if required and invalid?
+      In case of [None] at init it is considered as yes.*)
   verbose : bool;
       (** Emit events related to connections. Default value is false. *)
 }
@@ -59,7 +65,7 @@ type options = {
 (** Subcommands that can be used by the DAL node. In the future this type
     could be generalized if a command recgonizes a different set of
     options. *)
-type t = Run | Config_init
+type t = Run | Config_init | Config_update | Debug_print_store_schemas
 
 (** [commands ~run] attaches a callback to each subcommands of the DAL
     node. *)

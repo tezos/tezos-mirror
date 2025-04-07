@@ -17,9 +17,11 @@ val publisher_is_ready : unit -> unit Lwt.t
     will not accept requests anymore. *)
 val publisher_shutdown : unit -> unit Lwt.t
 
-(** [blueprint_applied (level, hash)] advertizes that a blueprint for
-    level [level] has been applied onto the local state. *)
-val blueprint_applied : Z.t * Ethereum_types.block_hash -> unit Lwt.t
+(** [blueprint_applied block duration] advertizes that a blueprint
+    leading to [block] has been applied in [duration] time onto the
+    local state. *)
+val blueprint_applied :
+  'transaction_object Ethereum_types.block -> Time.System.Span.t -> unit Lwt.t
 
 (** [blueprint_injected level] advertizes that a blueprint for level
     [level] has been forwarded to a rollup node  *)
@@ -44,6 +46,10 @@ val blueprint_injection_failed : Z.t -> tztrace -> unit Lwt.t
     Ethereum block. *)
 val invalid_blueprint_produced : Z.t -> unit Lwt.t
 
+(** [invalid_blueprint_applied level] advertizes that the observer received a blueprint
+    for level [level]. *)
+val invalid_blueprint_applied : Z.t -> unit Lwt.t
+
 (** [missing_blueprints count from to_] advertizes that a sequencer has detect
     it is missing [count] blueprints in the provided range. This means the
     sequencer store is inconsistent. *)
@@ -63,3 +69,8 @@ val blueprint_proposal :
     produced a blueprint for [level] in [duration] time. *)
 val blueprint_production :
   Ethereum_types.quantity -> Time.System.Span.t -> unit Lwt.t
+
+(** [worker_request_failed request_view state errs] warns that the
+    blueprints_publisher worker encountered errors [errs]. *)
+val worker_request_failed :
+  Blueprints_publisher_types.Request.view -> Error_monad.tztrace -> unit Lwt.t

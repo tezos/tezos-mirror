@@ -36,6 +36,8 @@ module JSONRPC : sig
       that only fit in 64 bits, which is not supported by Data_encoding. *)
   type id_repr = Id_string of string | Id_float of float
 
+  val random_id : ?seed:Random.State.t -> unit -> id_repr
+
   val id_repr_encoding : id_repr Data_encoding.t
 
   type id = id_repr option
@@ -65,11 +67,11 @@ module JSONRPC : sig
       }
     ]}
   *)
-  type 'data error = {code : int; message : string; data : 'data option}
+  type error = {code : int; message : string; data : Data_encoding.json option}
 
-  val error_encoding : 'a Data_encoding.t -> 'a error Data_encoding.t
+  val error_encoding : error Data_encoding.t
 
-  type value = (Data_encoding.json, Data_encoding.json error) result
+  type value = (Data_encoding.json, error) result
 
   (** JSON-RPC Response object:
   {@js[
@@ -87,15 +89,25 @@ module JSONRPC : sig
   val response_encoding : response Data_encoding.t
 end
 
-(* Errors returned by the RPC server, to be embedded as data to the JSON-RPC
-   error object. *)
-module Error : sig
-  type t = unit
+(* This isn't the JSON-RPC request that is sent to request websocket events but
+   the generic outputed data that is sent through the websocket periodically once
+   the appropriate websocket request was sent (see module [Subscribe]). *)
+module Subscription : sig
+  val version : string
 
-  val encoding : unit Data_encoding.t
+  val method_ : string
+
+  type result = {
+    result : Data_encoding.json;
+    subscription : Ethereum_types.Subscription.id;
+  }
+
+  val result_encoding : result Data_encoding.t
+
+  type notification = {params : result}
+
+  val notification_encoding : notification Data_encoding.t
 end
-
-type 'result rpc_result = ('result, Error.t JSONRPC.error) result
 
 type ('input, 'output) method_ = ..
 
@@ -125,7 +137,7 @@ module Kernel_root_hash :
 module Network_id : METHOD with type input = unit and type output = string
 
 module Chain_id :
-  METHOD with type input = unit and type output = Ethereum_types.quantity
+  METHOD with type input = unit and type output = Ethereum_types.chain_id
 
 module Accounts :
   METHOD with type input = unit and type output = Ethereum_types.address list
@@ -150,12 +162,12 @@ module Block_number :
 module Get_block_by_number :
   METHOD
     with type input = Ethereum_types.Block_parameter.t * bool
-     and type output = Ethereum_types.block
+     and type output = Transaction_object.t Ethereum_types.block
 
 module Get_block_by_hash :
   METHOD
     with type input = Ethereum_types.block_hash * bool
-     and type output = Ethereum_types.block
+     and type output = Transaction_object.t Ethereum_types.block
 
 module Get_block_receipts :
   METHOD
@@ -205,27 +217,27 @@ module Get_transaction_receipt :
 module Get_transaction_by_hash :
   METHOD
     with type input = Ethereum_types.hash
-     and type output = Ethereum_types.transaction_object option
+     and type output = Transaction_object.t option
 
 module Get_transaction_by_block_hash_and_index :
   METHOD
     with type input = Ethereum_types.block_hash * Ethereum_types.quantity
-     and type output = Ethereum_types.transaction_object option
+     and type output = Transaction_object.t option
 
 module Get_transaction_by_block_number_and_index :
   METHOD
     with type input = Ethereum_types.Block_parameter.t * Ethereum_types.quantity
-     and type output = Ethereum_types.transaction_object option
+     and type output = Transaction_object.t option
 
 module Get_uncle_by_block_hash_and_index :
   METHOD
     with type input = Ethereum_types.block_hash * Ethereum_types.quantity
-     and type output = Ethereum_types.block option
+     and type output = Transaction_object.t Ethereum_types.block option
 
 module Get_uncle_by_block_number_and_index :
   METHOD
     with type input = Ethereum_types.Block_parameter.t * Ethereum_types.quantity
-     and type output = Ethereum_types.block option
+     and type output = Transaction_object.t Ethereum_types.block option
 
 module Send_raw_transaction :
   METHOD
@@ -257,11 +269,18 @@ module Web3_sha3 :
      and type output = Ethereum_types.hash
 
 module Get_logs :
-  METHOD with type input = Filter.t and type output = Filter.changes list
+  METHOD
+    with type input = Ethereum_types.Filter.t
+     and type output = Ethereum_types.Filter.changes list
+
+type produce_block_input = {
+  timestamp : Time.Protocol.t option;
+  with_delayed_transactions : bool;
+}
 
 module Produce_block :
   METHOD
-    with type input = Time.Protocol.t
+    with type input = produce_block_input
      and type output = Ethereum_types.quantity
 
 module Produce_proposal :
@@ -269,17 +288,19 @@ module Produce_proposal :
 
 module Inject_transaction :
   METHOD
-    with type input = Ethereum_types.transaction_object * string
-     and type output = unit
+    with type input = Ethereum_types.legacy_transaction_object * string
+     and type output = Ethereum_types.hash
 
 module Durable_state_value :
   METHOD
-    with type input = Durable_storage_path.path
+    with type input =
+      Durable_storage_path.path * Ethereum_types.Block_parameter.extended
      and type output = Bytes.t option
 
 module Durable_state_subkeys :
   METHOD
-    with type input = Durable_storage_path.path
+    with type input =
+      Durable_storage_path.path * Ethereum_types.Block_parameter.extended
      and type output = string list
 
 module Eth_max_priority_fee_per_gas :
@@ -288,7 +309,8 @@ module Eth_max_priority_fee_per_gas :
 module Replay_block :
   METHOD
     with type input = Ethereum_types.quantity
-     and type output = Ethereum_types.block
+     and type output =
+      Ethereum_types.legacy_transaction_object Ethereum_types.block
 
 module Trace_transaction :
   METHOD
@@ -300,6 +322,11 @@ module Trace_call :
     with type input = Tracer_types.call_input
      and type output = Tracer_types.output
 
+module Trace_block :
+  METHOD
+    with type input = Tracer_types.block_input
+     and type output = Tracer_types.block_output
+
 module Eth_fee_history :
   METHOD
     with type input =
@@ -308,6 +335,14 @@ module Eth_fee_history :
 
 module Coinbase :
   METHOD with type input = unit and type output = Ethereum_types.address
+
+module Subscribe :
+  METHOD
+    with type input = Ethereum_types.Subscription.kind
+     and type output = Ethereum_types.Subscription.id
+
+module Unsubscribe :
+  METHOD with type input = Ethereum_types.Subscription.id and type output = bool
 
 type map_result =
   | Method :
@@ -320,3 +355,16 @@ type map_result =
 
 val map_method_name :
   restrict:Configuration.restricted_rpcs -> string -> map_result
+
+type websocket_subscription = {
+  id : Ethereum_types.Subscription.id;
+  stream : Subscription.notification Lwt_stream.t;
+  stopper : unit -> unit;
+}
+
+type websocket_response = {
+  response : JSONRPC.response;
+  subscription : websocket_subscription option;
+}
+
+type websocket_handler = JSONRPC.request -> websocket_response Lwt.t

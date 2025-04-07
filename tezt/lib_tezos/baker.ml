@@ -167,7 +167,7 @@ let create ?runner ~protocol ?path ?name ?color ?event_pipe ?(delegates = [])
     ~node_rpc_endpoint:(Node.as_rpc_endpoint node)
     ()
 
-let run ?event_level ?event_sections_levels (baker : t) =
+let run ?env ?event_level ?event_sections_levels (baker : t) =
   (match baker.status with
   | Not_running -> ()
   | Running _ -> Test.fail "baker %s is already running" baker.name) ;
@@ -189,18 +189,10 @@ let run ?event_level ?event_sections_levels (baker : t) =
     (* From Protocol Q, the flag --force-apply has been replaced by
        --force-apply-from-round, the following maintains back-compatibility with
        ParisC tests. *)
-    if
-      Protocol.number baker.persistent_state.protocol
-      > Protocol.number Protocol.ParisC
-    then
-      Cli_arg.optional_arg
-        "force-apply-from-round"
-        string_of_int
-        baker.persistent_state.force_apply_from_round
-    else
-      Cli_arg.optional_switch
-        "force-apply"
-        (Option.is_some baker.persistent_state.force_apply_from_round)
+    Cli_arg.optional_arg
+      "force-apply-from-round"
+      string_of_int
+      baker.persistent_state.force_apply_from_round
   in
   let operations_pool =
     Cli_arg.optional_arg
@@ -213,6 +205,13 @@ let run ?event_level ?event_sections_levels (baker : t) =
       "dal-node"
       Endpoint.as_string
       baker.persistent_state.dal_node_rpc_endpoint
+  in
+  let without_dal =
+    Cli_arg.optional_switch
+      "without-dal"
+      (Protocol.number baker.persistent_state.protocol
+       > Protocol.number Protocol.Quebec
+      && Option.is_none baker.persistent_state.dal_node_rpc_endpoint)
   in
   let dal_node_timeout_percentage =
     Cli_arg.optional_arg
@@ -247,7 +246,7 @@ let run ?event_level ?event_sections_levels (baker : t) =
   let arguments =
     ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
     @ run_args @ liquidity_baking_toggle_vote @ votefile
-    @ force_apply_from_round @ operations_pool @ dal_node_endpoint
+    @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
     @ dal_node_timeout_percentage @ delegates @ minimal_nanotez_per_gas_unit
     @ state_recorder @ node_version_check_bypass @ node_version_allowed
   in
@@ -258,6 +257,7 @@ let run ?event_level ?event_sections_levels (baker : t) =
     unit
   in
   run
+    ?env
     ?event_level
     ?event_sections_levels
     baker
@@ -282,12 +282,12 @@ let wait_for_ready baker =
         resolver :: baker.persistent_state.pending_ready ;
       check_event baker "Baker started." promise
 
-let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
-    ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
-    ?votefile ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
-    ?operations_pool ?dal_node ?dal_node_timeout_percentage
-    ?minimal_nanotez_per_gas_unit ?state_recorder ?node_version_check_bypass
-    ?node_version_allowed node client =
+let init ?env ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol))
+    ?name ?color ?event_level ?event_pipe ?event_sections_levels
+    ?(delegates = []) ?votefile ?liquidity_baking_toggle_vote
+    ?force_apply_from_round ?remote_mode ?operations_pool ?dal_node
+    ?dal_node_timeout_percentage ?minimal_nanotez_per_gas_unit ?state_recorder
+    ?node_version_check_bypass ?node_version_allowed node client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -312,7 +312,7 @@ let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
       node
       client
   in
-  let* () = run ?event_level ?event_sections_levels baker in
+  let* () = run ?env ?event_level ?event_sections_levels baker in
   let* () = wait_for_ready baker in
   return baker
 
@@ -437,17 +437,17 @@ let show_block json =
     let prequorum = json |-> "prequorum" in
     if is_null prequorum then "None"
     else
-      let ops = prequorum |-> "preendorsements" |> as_list in
+      let ops = prequorum |-> "preattestation" |> as_list in
       let expected_level_and_round =
         (prequorum |-> "level" |> as_int, prequorum |-> "round" |> as_int)
       in
-      let expected_kind = "preendorsement" in
+      let expected_kind = "preattestation" in
       show_operations ~loc:__LOC__ ~expected_kind ~expected_level_and_round ops
   in
   let quorum =
     match json |-> "quorum" |> as_list with
     | [] -> "[]"
-    | ops -> show_operations ~loc:__LOC__ ~expected_kind:"endorsement" ops
+    | ops -> show_operations ~loc:__LOC__ ~expected_kind:"attestation" ops
   in
   sf
     "block={hash=%s, level=%d, round=%d, prequorum=%s, quorum=%s}"

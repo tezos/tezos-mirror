@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2024 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -74,6 +75,9 @@ pub mod v1_primitives {
     /// bytes type tag
     pub const BYTES_TYPE_TAG: u8 = 105;
 
+    /// timestamp type tag
+    pub const TIMESTAMP_TYPE_TAG: u8 = 107;
+
     /// unit type tag
     pub const UNIT_TYPE_TAG: u8 = 108;
 
@@ -92,6 +96,7 @@ pub trait Michelson:
 impl Michelson for MichelsonUnit {}
 impl Michelson for MichelsonContract {}
 impl Michelson for MichelsonInt {}
+impl Michelson for MichelsonTimestamp {}
 impl Michelson for MichelsonNat {}
 impl Michelson for MichelsonString {}
 impl Michelson for MichelsonBytes {}
@@ -175,6 +180,10 @@ impl AsRef<Zarith> for MichelsonNat {
         &self.0
     }
 }
+
+/// Michelson Timestamp encoding.
+#[derive(Debug, PartialEq, Eq)]
+pub struct MichelsonTimestamp(pub Zarith);
 
 // ----------
 // CONVERSION
@@ -269,6 +278,13 @@ impl HasEncoding for MichelsonInt {
         Encoding::Custom
     }
 }
+
+impl HasEncoding for MichelsonTimestamp {
+    fn encoding() -> Encoding {
+        Encoding::Custom
+    }
+}
+
 impl HasEncoding for MichelsonNat {
     fn encoding() -> Encoding {
         Encoding::Custom
@@ -358,6 +374,21 @@ impl MichelsonTicketContent for MichelsonUnit {
             args: vec![],
             annots: Annotations(vec![]),
         }
+    }
+}
+
+impl MichelsonTicketContent for MichelsonTimestamp {
+    typed_prim!(MichelsonTimestamp, TIMESTAMP_TYPE_TAG);
+
+    fn of_node(value: Node) -> Option<Self> {
+        match value {
+            Node::Int(value) => Some(MichelsonTimestamp(value)),
+            _ => None,
+        }
+    }
+
+    fn to_node(&self) -> Node {
+        Node::Int(self.0.clone())
     }
 }
 
@@ -664,6 +695,12 @@ impl NomReader<'_> for MichelsonInt {
     }
 }
 
+impl NomReader<'_> for MichelsonTimestamp {
+    fn nom_read(input: &[u8]) -> NomResult<Self> {
+        map(nom_read_micheline_int, MichelsonTimestamp)(input)
+    }
+}
+
 impl NomReader<'_> for MichelsonNat {
     fn nom_read(input: &[u8]) -> NomResult<Self> {
         use nom::error::{ErrorKind, ParseError};
@@ -805,6 +842,13 @@ impl BinWriter for MichelsonInt {
         bin_write_micheline_int(&self.0, output)
     }
 }
+
+impl BinWriter for MichelsonTimestamp {
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        bin_write_micheline_int(&self.0, output)
+    }
+}
+
 impl BinWriter for MichelsonNat {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
         bin_write_micheline_int(&self.0, output)

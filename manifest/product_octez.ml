@@ -14,6 +14,7 @@ open Product_data_encoding
 open Product_prometheus
 open Product_resto
 open Product_cohttp
+open Product_opentelemetry
 
 include Product (struct
   let name = "octez"
@@ -36,12 +37,14 @@ include Product (struct
       "opam";
       "script-inputs";
       "scripts";
+      "sdk/";
       "irmin/";
       "brassaia/";
       "rust-toolchain";
     ]
     @ Product_data_encoding.product_source @ Product_cohttp.product_source
-    @ Product_prometheus.product_source @ Product_resto.product_source
+    @ Product_opentelemetry.product_source @ Product_prometheus.product_source
+    @ Product_resto.product_source
 end)
 
 module String_set = Set.Make (String)
@@ -135,6 +138,14 @@ let () =
     registered_octez_libs
     ~target:"!module-Resto"
     ~text:"Resto"
+
+(* Back-register the cohttp library which is currently maintained as its
+   own product but still attached to octez-libs. *)
+let () =
+  Sub_lib.add_doc_link
+    registered_octez_libs
+    ~target:"!module-OpenTelemetry_client_cohttp_lwt"
+    ~text:"Opentelemetry_client_cohttp_lwt"
 
 (* Container of the registered sublibraries of [octez-shell-libs] *)
 let registered_octez_shell_libs = Sub_lib.make_container ()
@@ -483,6 +494,46 @@ let octez_rpc =
         uri;
       ]
 
+let octez_rustzcash_deps =
+  public_lib
+    "octez-rustzcash-deps"
+    ~path:"src/rustzcash_deps"
+    ~synopsis:"Octez Rustzcash Dependencies"
+    ~foreign_archives:["octez_rustzcash_deps"]
+    ~dune:
+      Dune.
+        [
+          [
+            S "dirs";
+            S ":standard";
+            (* We need this stanza to ensure .cargo can be used as a
+               dependency via source_tree. *)
+            S ".cargo";
+            (* Do not track Cargo output directory. *)
+            [S "not"; S "target"];
+          ];
+          [
+            S "rule";
+            [
+              S "targets";
+              S "liboctez_rustzcash_deps.a";
+              S "dlloctez_rustzcash_deps.so";
+            ];
+            [
+              S "deps";
+              [S "file"; S "build.sh"];
+              [S "file"; S "Cargo.toml"];
+              [S "file"; S "Cargo.lock"];
+              [S "file"; S "../../rust-toolchain"];
+              [S "source_tree"; S ".cargo"];
+              [S "source_tree"; S "bin"];
+              [S "source_tree"; S "include"];
+              [S "source_tree"; S "src"];
+            ];
+            [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
+          ];
+        ]
+
 let octez_rust_deps =
   public_lib
     "octez-rust-deps"
@@ -517,16 +568,30 @@ let octez_rust_deps =
               [S "file"; S "Cargo.lock"];
               [S "file"; S "../../rust-toolchain"];
               [S "source_tree"; S ".cargo"];
-              [S "source_tree"; S "librustzcash"];
+              [S "source_tree"; S "../rustzcash_deps"];
               [S "source_tree"; S "wasmer-3.3.0"];
               [S "source_tree"; S "src"];
               [S "source_tree"; S "../riscv"];
               [S "source_tree"; S "../kernel_sdk"];
-              [S "file"; S "../../src/lib_wasm_runtime/Cargo.toml"];
-              [S "file"; S "../../src/lib_wasm_runtime/build.rs"];
-              [S "glob_files_rec"; S "../../src/lib_wasm_runtime/src/**.rs"];
+              [S "source_tree"; S "../../sdk/rust"];
             ];
             [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
+          ];
+        ]
+
+let bls12_381_archive =
+  public_lib
+    "bls12-381.archive"
+    ~modules:["archive"]
+    ~path:"src/lib_bls12_381"
+    ~foreign_archives:["blst"]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "archive.ml"];
+            [S "action"; [S "run"; S "touch"; S "archive.ml"]];
           ];
         ]
 
@@ -554,7 +619,6 @@ let bls12_381 =
     ~linkall:true
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
     ~deps:[integers; zarith; hex]
-    ~foreign_archives:["blst"]
     ~foreign_stubs:
       {
         language = C;
@@ -645,6 +709,8 @@ let bls12_381 =
           ];
         ]
 
+let tezt ?(deps = []) = tezt ~deps:(bls12_381_archive :: deps)
+
 let _bls12_381_tests =
   tezt
     [
@@ -683,7 +749,7 @@ let _octez_bls12_381_utils =
     ~opam:"bls12-381"
     ~bisect_ppx:No
     ~modules:names
-    ~deps:[hex; bls12_381]
+    ~deps:[hex; bls12_381_archive; bls12_381]
 
 let octez_bls12_381_signature =
   octez_lib
@@ -1017,6 +1083,7 @@ let _octez_srs_extraction_main =
     ~bisect_ppx:No
     ~deps:
       [
+        bls12_381_archive;
         octez_srs_extraction |> open_;
         cmdliner;
         unix;
@@ -1231,6 +1298,7 @@ let _octez_plonk_test_helpers_main =
     ~bisect_ppx:No
     ~deps:
       [
+        bls12_381_archive;
         octez_plonk_test_helpers;
         qcheck_alcotest;
         octez_bls12_381_polynomial |> open_;
@@ -1241,7 +1309,7 @@ let _octez_plonk_distribution_test =
     "main"
     ~path:"src/lib_distributed_plonk/distribution/test"
     ~opam:"octez-libs"
-    ~deps:[octez_plonk_aggregation; octez_plonk_test_helpers]
+    ~deps:[bls12_381_archive; octez_plonk_aggregation; octez_plonk_test_helpers]
     ~modules:["main"; "test_polynomial_commitment"]
     ~dune:(make_plonk_runtest_invocation ~package:"octez-libs")
 
@@ -1252,7 +1320,7 @@ let _octez_plonk_test_helpers_bench =
     ~opam:"octez-libs"
     ~modules:["bench"]
     ~bisect_ppx:No
-    ~deps:[octez_plonk_test_helpers]
+    ~deps:[bls12_381_archive; octez_plonk_test_helpers]
 
 let _octez_plonk_test_plompiler_afl =
   private_exe
@@ -1261,7 +1329,7 @@ let _octez_plonk_test_plompiler_afl =
     ~opam:"octez-libs"
     ~modules:["afl"]
     ~bisect_ppx:No
-    ~deps:[octez_plompiler; octez_plonk; bls12_381]
+    ~deps:[bls12_381_archive; octez_plompiler; octez_plonk; bls12_381]
 
 let _octez_plonk_test_plompiler_main =
   private_exe
@@ -1297,7 +1365,7 @@ let _octez_plonk_test_plompiler_main =
         "test_utils";
       ]
     ~bisect_ppx:No
-    ~deps:[octez_plonk_test_helpers]
+    ~deps:[bls12_381_archive; octez_plonk_test_helpers]
     ~dune:(make_plonk_runtest_invocation ~package:"octez-libs")
 
 let octez_distributed_plonk =
@@ -1336,6 +1404,7 @@ let _octez_distributed_plonk_test_main =
     ~path:"src/lib_distributed_plonk/test"
     ~deps:
       [
+        bls12_381_archive;
         octez_distributed_plonk;
         octez_plonk;
         octez_plonk_aggregation;
@@ -1352,7 +1421,7 @@ let _octez_distributed_plonk_worker_runner =
     ~path:"src/lib_distributed_plonk"
     ~opam:"octez-libs"
     ~bisect_ppx:No
-    ~deps:[octez_distributed_plonk; octez_plonk_distribution]
+    ~deps:[bls12_381_archive; octez_distributed_plonk; octez_plonk_distribution]
     ~modules:["worker_runner"]
 
 let _octez_aplonk_test_main =
@@ -1360,7 +1429,7 @@ let _octez_aplonk_test_main =
     "main"
     ~path:"src/lib_aplonk/test"
     ~opam:"octez-libs"
-    ~deps:[octez_plonk_test_helpers; octez_aplonk]
+    ~deps:[bls12_381_archive; octez_plonk_test_helpers; octez_aplonk]
     ~modules:["main"; "test_aplonk"; "test_main_protocol"]
     ~dune:(make_plonk_runtest_invocation ~package:"octez-libs")
 
@@ -1370,7 +1439,7 @@ let _octez_distributed_plonk_executable =
     ~path:"src/lib_distributed_plonk"
     ~opam:"octez-libs"
     ~bisect_ppx:No
-    ~deps:[octez_distributed_plonk |> open_]
+    ~deps:[bls12_381_archive; octez_distributed_plonk |> open_]
     ~modules:["distribution"]
 
 let _octez_distributed_plonk_executable_meta =
@@ -1379,7 +1448,7 @@ let _octez_distributed_plonk_executable_meta =
     ~path:"src/lib_distributed_plonk"
     ~opam:"octez-libs"
     ~bisect_ppx:No
-    ~deps:[octez_distributed_plonk |> open_]
+    ~deps:[bls12_381_archive; octez_distributed_plonk |> open_]
     ~modules:["distribution_meta"]
 
 let _octez_aplonk_test_helpers_bench =
@@ -1389,7 +1458,7 @@ let _octez_aplonk_test_helpers_bench =
     ~opam:"octez-libs"
     ~modules:["bench"]
     ~bisect_ppx:No
-    ~deps:[octez_plonk_test_helpers; octez_aplonk]
+    ~deps:[bls12_381_archive; octez_plonk_test_helpers; octez_aplonk]
 
 let octez_epoxy_tx =
   octez_lib
@@ -1403,7 +1472,10 @@ let _octez_epoxy_tx_tests =
     "main"
     ~path:"src/lib_epoxy_tx/test"
     ~opam:"octez-libs"
-    ~deps:[octez_epoxy_tx; octez_plonk_test_helpers; octez_aplonk]
+    ~deps:
+      [
+        bls12_381_archive; octez_epoxy_tx; octez_plonk_test_helpers; octez_aplonk;
+      ]
     ~dune:(make_plonk_runtest_invocation ~package:"octez-libs")
 
 let octez_stdlib_unix =
@@ -1424,6 +1496,7 @@ let octez_stdlib_unix =
         data_encoding |> open_;
         aches_lwt;
         lwt_unix;
+        lwt_exit;
         ipaddr_unix;
         re;
         ezjsonm;
@@ -1446,7 +1519,7 @@ let _octez_stdlib_unix_test =
     ]
     ~path:"src/lib_stdlib_unix/test/"
     ~opam:"octez-libs"
-    ~preprocess:(pps bam_ppx)
+    ~preprocess:(ppses [ppx_hash; bam_ppx])
     ~deps:
       [
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
@@ -1464,43 +1537,6 @@ let octez_dal_config =
     ~internal_name:"tezos_crypto_dal_octez_dal_config"
     ~path:"src/lib_crypto_dal/dal_config"
     ~deps:[data_encoding |> open_]
-
-let octez_crypto_dal =
-  octez_lib
-    "crypto-dal"
-    ~internal_name:"tezos_crypto_dal"
-    ~path:"src/lib_crypto_dal"
-    ~synopsis:"DAL cryptographic primitives"
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_stdlib_unix |> open_;
-        octez_error_monad |> open_;
-        data_encoding |> open_;
-        octez_dal_config |> open_;
-        octez_bls12_381_polynomial;
-        lwt_unix;
-        octez_kzg;
-      ]
-
-let _octez_crypto_dal_tests =
-  tezt
-    ["test_dal_cryptobox"]
-    ~path:"src/lib_crypto_dal/test"
-    ~opam:"octez-libs"
-    ~dep_files:["srs_zcash_g1_5"; "srs_zcash_g2_5"]
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_crypto_dal |> open_;
-        octez_dal_config |> open_;
-        octez_error_monad |> open_;
-        data_encoding |> open_;
-        alcotezt;
-        qcheck_alcotest;
-        octez_bls12_381_polynomial;
-        octez_test_helpers;
-      ]
 
 let ppx_irmin =
   octez_internal_lib
@@ -1743,7 +1779,7 @@ let _octez_version_get_git_info =
     "get_git_info"
     ~path:"src/lib_version/exe"
     ~opam:"octez-version"
-    ~deps:[dune_configurator; octez_version_parser]
+    ~deps:[bls12_381_archive; dune_configurator; octez_version_parser]
     ~modules:["get_git_info"]
     ~bisect_ppx:No
 
@@ -1762,6 +1798,14 @@ let _octez_print_version_exe =
     ~deps:[octez_version_value |> open_; octez_print_version |> open_]
     ~modules:["octez_print_version"]
     ~bisect_ppx:No
+
+let octez_profiler =
+  octez_lib
+    "octez-profiler"
+    ~internal_name:"tezos_profiler"
+    ~path:"src/lib_profiler"
+    ~synopsis:"The Octez Profiler"
+    ~deps:[data_encoding; lwt]
 
 let octez_base =
   octez_lib
@@ -1794,7 +1838,7 @@ let octez_base =
       V.(
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6112
            Should be in sync with scripts/version.sh *)
-        at_least "4.14.1" && less_than "4.15")
+        at_least "5.2.1" && less_than "5.3.0")
     ~license:"Apache-2.0"
 
 let octez_base_unix =
@@ -1817,12 +1861,16 @@ let octez_base_unix =
         octez_hacl;
         octez_stdlib |> open_;
         octez_stdlib_unix |> open_;
+        octez_profiler |> open_;
         data_encoding |> open_;
         uri;
         octez_event_logging |> open_;
         lwt_exit;
+        terminal;
       ]
     ~inline_tests:ppx_expect
+    ~inline_tests_libraries:[bls12_381_archive]
+    ~inline_tests_link_flags:["-cclib"; "-lblst"]
 
 let octez_base_p2p_identity_file =
   octez_lib
@@ -1840,6 +1888,7 @@ let _octez_base_tests =
       "test_p2p_addr";
       "test_sized";
       "test_skip_list";
+      "test_bitset";
     ]
     ~path:"src/lib_base/test"
     ~opam:"octez-libs"
@@ -1862,7 +1911,7 @@ let _octez_base_tests =
 
 let _octez_base_unix_tests =
   tezt
-    ["test_unix_error"; "test_syslog"; "test_simple_profiler"]
+    ["test_unix_error"; "test_syslog"]
     ~path:"src/lib_base/unix/test"
     ~with_macos_security_framework:true
     ~opam:"octez-libs"
@@ -1912,6 +1961,128 @@ let ppx_profiler =
 
 let ppx_profiler =
   make_ppx ~env_var:"TEZOS_PPX_PROFILER" ~preprocess:ppx_profiler
+
+let octez_profiler_unix =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+  octez_lib
+    "octez-profiler.unix"
+    ~internal_name:"tezos_profiler_unix"
+    ~path:"src/lib_profiler/unix"
+    ~synopsis:"The Octez Profiler"
+    ~preprocess
+    ~preprocessor_deps
+    ~deps:
+      [
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_stdlib |> open_;
+        octez_stdlib_unix;
+        octez_profiler |> open_;
+        data_encoding |> open_;
+        octez_event_logging;
+        octez_error_monad |> open_;
+      ]
+
+let octez_profiler_backends =
+  octez_lib
+    "octez-profiler.backends"
+    ~internal_name:"tezos_profiler_backends"
+    ~path:"src/lib_profiler/backends"
+    ~synopsis:"Backends for the Octez Profiler"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
+        octez_profiler |> open_;
+        octez_profiler_unix |> open_;
+        octez_stdlib |> open_;
+        data_encoding |> open_;
+      ]
+
+let _octez_profiler_backends_tests =
+  tezt
+    ["test_simple_profiler"]
+    ~path:"src/lib_profiler/backends/test"
+    ~with_macos_security_framework:true
+    ~opam:"octez-libs"
+    ~modes:[Native]
+    ~deps:
+      [
+        octez_base |> open_;
+        octez_base_unix |> open_;
+        octez_profiler |> open_;
+        octez_profiler_backends |> open_;
+        octez_stdlib_unix |> open_;
+        octez_error_monad |> open_;
+        data_encoding;
+        octez_test_helpers |> open_;
+        qcheck_alcotest;
+        alcotezt;
+        tezt_lib;
+      ]
+
+let octez_profiler_complex_backends =
+  octez_lib
+    "octez-profiler.complex_backends"
+    ~internal_name:"tezos_profiler_complex_backends"
+    ~path:"src/lib_profiler/backends/complex"
+    ~synopsis:
+      "Complex backends for the Octez Profiler that need more dependencies"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
+        octez_profiler |> open_;
+        octez_profiler_unix |> open_;
+        octez_profiler_backends |> open_;
+        octez_stdlib |> open_;
+        data_encoding |> open_;
+        prometheus;
+        opentelemetry;
+        ambient_context_lwt;
+        opentelemetry_client_cohttp_lwt;
+      ]
+
+let octez_crypto_dal =
+  octez_lib
+    "crypto-dal"
+    ~internal_name:"tezos_crypto_dal"
+    ~path:"src/lib_crypto_dal"
+    ~synopsis:"DAL cryptographic primitives"
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_stdlib_unix |> open_;
+        octez_error_monad |> open_;
+        data_encoding |> open_;
+        octez_dal_config |> open_;
+        octez_bls12_381_polynomial;
+        cohttp_lwt_unix;
+        octez_lwt_result_stdlib;
+        lwt_unix;
+        octez_kzg;
+        octez_event_logging;
+        octez_base;
+      ]
+
+let _octez_crypto_dal_tests =
+  tezt
+    ["test_dal_cryptobox"]
+    ~path:"src/lib_crypto_dal/test"
+    ~opam:"octez-libs"
+    ~dep_files:["srs_zcash_g1_5"; "srs_zcash_g2_5"]
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_crypto_dal |> open_;
+        octez_dal_config |> open_;
+        octez_error_monad |> open_;
+        data_encoding |> open_;
+        alcotezt;
+        qcheck_alcotest;
+        octez_bls12_381_polynomial;
+        octez_test_helpers;
+      ]
 
 let ppx_brassaia =
   octez_lib
@@ -2005,7 +2176,21 @@ let brassaia_index =
   octez_lib
     "brassaia.index"
     ~path:"brassaia/index/src/"
-    ~deps:[optint; mtime; fmt; rusage; lwt; progress; cmdliner; repr; lru]
+    ~deps:
+      [
+        optint;
+        mtime;
+        fmt;
+        fmt_cli;
+        logs;
+        logs_cli;
+        rusage;
+        lwt;
+        progress;
+        cmdliner;
+        repr;
+        lru;
+      ]
     ~preprocess:(pps ppx_repr)
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
@@ -2013,7 +2198,17 @@ let brassaia_index_unix =
   octez_lib
     "brassaia.index.unix"
     ~path:"brassaia/index/src/unix"
-    ~deps:[optint; mtime; rusage; lwt; lwt_unix; index; semaphore_compat]
+    ~deps:
+      [
+        optint;
+        mtime;
+        rusage;
+        fmt_tty;
+        lwt;
+        lwt_unix;
+        brassaia_index;
+        semaphore_compat;
+      ]
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
     ~foreign_stubs:
       {language = C; flags = []; include_dirs = []; names = ["pread"; "pwrite"]}
@@ -2109,7 +2304,7 @@ let _lazy_containers_tests =
       ]
 
 let octez_webassembly_interpreter =
-  octez_l2_lib
+  octez_lib
     "webassembly-interpreter"
     ~internal_name:"tezos_webassembly_interpreter"
     ~path:"src/lib_webassembly"
@@ -2149,6 +2344,7 @@ let _octez_webassembly_repl =
     ~dune:Dune.[[S "include"; S "dune.inc"]]
     ~deps:
       [
+        bls12_381_archive;
         octez_webassembly_interpreter |> open_;
         octez_webassembly_interpreter_extra |> open_;
         lwt_unix;
@@ -2172,6 +2368,7 @@ let _octez_evm_node_print_version_exe =
     ~opam:"octez-version"
     ~deps:
       [
+        bls12_381_archive;
         octez_version_value |> open_;
         octez_version |> open_;
         octez_base_unix;
@@ -2196,16 +2393,20 @@ let octez_p2p_services =
     ~linkall:true
 
 let octez_workers =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_lib
     "tezos-workers"
     ~path:"src/lib_workers"
     ~synopsis:"Worker library"
     ~documentation:
       Dune.[[S "package"; S "octez-libs"]; [S "mld_files"; S "tezos_workers"]]
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_stdlib_unix |> open_;
+        opentelemetry;
       ]
 
 let _octez_workers_tests =
@@ -2261,6 +2462,7 @@ let octez_shell_services =
         octez_version |> open_;
         octez_context_sigs;
         octez_merkle_proof_encoding;
+        octez_profiler |> open_;
         octez_dal_config |> open_;
       ]
     ~linkall:true
@@ -2309,14 +2511,17 @@ let tezt_performance_regression =
 
 let tezt_cloud =
   public_lib
-    "tezt-tezos.tezt-cloud"
+    "tezt-cloud"
     ~path:"tezt/lib_cloud"
-    ~opam:"tezt-tezos"
     ~bisect_ppx:No
+    ~synopsis:
+      "Automatic of Cloud deployment for complex scenarios on top of Tezt"
     ~deps:
       [
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
+        jingoo;
+        dream;
         data_encoding;
       ]
 
@@ -2400,6 +2605,7 @@ let _octez_p2p_tests =
     ~locks:"/locks/p2p"
     ~deps:
       [
+        bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_stdlib_unix |> open_;
@@ -2471,7 +2677,7 @@ let octez_wasmer =
     ~internal_name:"tezos_wasmer"
     ~path:"src/lib_wasmer"
     ~synopsis:"Wasmer bindings for SCORU WASM"
-    ~deps:[ctypes; ctypes_foreign; lwt; lwt_unix; octez_rust_deps]
+    ~deps:[ctypes; ctypes_foreign; lwt; lwt_unix]
     ~dep_globs_rec:["../rust_deps/wasmer-3.3.0/*"]
     ~preprocess:(pps ppx_deriving_show)
     ~flags:(Flags.standard ~disable_warnings:[9; 27] ())
@@ -2496,7 +2702,7 @@ let _octez_wasmer_test =
     ["test_wasmer"]
     ~path:"src/lib_wasmer/test"
     ~opam:"octez-l2-libs"
-    ~deps:[octez_wasmer; alcotezt]
+    ~deps:[octez_rust_deps; octez_wasmer; alcotezt]
 
 let octez_context_encoding =
   octez_lib
@@ -2593,7 +2799,7 @@ let octez_context_brassaia_memory =
     ~conflicts:[Conflicts.checkseum]
 
 let octez_scoru_wasm =
-  octez_l2_lib
+  octez_lib
     "scoru-wasm"
     ~internal_name:"tezos_scoru_wasm"
     ~path:"src/lib_scoru_wasm"
@@ -2647,29 +2853,6 @@ let octez_context_disk =
       ]
     ~conflicts:[Conflicts.checkseum]
 
-(* Should not be used directly in most cases, use context_ops abstraction instead *)
-let octez_context_brassaia_disk =
-  octez_lib
-    "tezos-context-brassaia.disk"
-    ~path:"src/lib_context_brassaia/disk"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        bigstringaf;
-        fmt;
-        brassaia;
-        brassaia_pack;
-        brassaia_pack_unix;
-        logs_fmt;
-        octez_stdlib_unix |> open_;
-        octez_stdlib |> open_;
-        octez_context_sigs;
-        octez_context_brassaia_helpers;
-        octez_context_brassaia_encoding;
-        octez_context_brassaia_memory |> open_;
-      ]
-    ~conflicts:[Conflicts.checkseum]
-
 let _tree_encoding_tests =
   tezt
     ["test_proofs"; "test_encoding"]
@@ -2688,20 +2871,6 @@ let _tree_encoding_tests =
         qcheck_alcotest;
         alcotezt;
       ]
-
-let octez_context =
-  octez_lib
-    "tezos-context"
-    ~path:"src/lib_context"
-    ~synopsis:"On-disk context abstraction for [octez-node]"
-    ~deps:[octez_context_disk; octez_context_memory]
-
-let octez_context_brassaia =
-  octez_lib
-    "tezos-context-brassaia"
-    ~path:"src/lib_context_brassaia"
-    ~synopsis:"On-disk context abstraction for [octez-node] (brassaia)"
-    ~deps:[octez_context_brassaia_disk; octez_context_brassaia_memory]
 
 let _octez_context_tests =
   tezt
@@ -2750,23 +2919,6 @@ let _irmin_tests =
         octez_base_unix;
         irmin_test_helpers;
         octez_context_disk;
-        octez_stdlib_unix |> open_;
-        octez_test_helpers |> open_;
-        tezt_lib |> open_ |> open_ ~m:"Base";
-      ]
-
-let _brassaia_tests =
-  tezt
-    ["tezt_brassaia"; "test_lib_brassaia_store"; "test_utils"]
-    ~path:"brassaia/test"
-    ~opam:"tezos_internal_brassaia_tests"
-    ~synopsis:"Tezos internal brassaia tests"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        brassaia_test_helpers;
-        octez_context_brassaia_disk;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
@@ -3043,14 +3195,13 @@ let octez_sapling =
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         tezos_sapling_parameters;
         octez_lwt_result_stdlib;
-        octez_rust_deps;
       ]
-    ~dep_globs_rec:["../rust_deps/librustzcash/*"]
+    ~dep_globs_rec:["../rustzcash_deps/*"]
     ~foreign_stubs:
       {
         language = C;
         flags = [S ":standard"];
-        include_dirs = ["../rust_deps/librustzcash/include"];
+        include_dirs = ["../rustzcash_deps/include"];
         names = ["rustzcash_ctypes_c_stubs"];
       }
     ~c_library_flags:["-lpthread"]
@@ -3087,6 +3238,7 @@ let _octez_sapling_tests =
     ~dep_files:["vectors.csv"; "vectors-zip32.csv"]
     ~deps:
       [
+        octez_rustzcash_deps;
         octez_sapling |> open_;
         octez_crypto;
         str;
@@ -3144,7 +3296,7 @@ let tezos_protocol_environment_sigs =
                  ];
                ])
        in
-       let latest_environment_number = 13 in
+       let latest_environment_number = 15 in
        List.init (latest_environment_number + 1) gen |> Dune.of_list)
 
 let octez_protocol_environment_structs =
@@ -3190,45 +3342,7 @@ let octez_protocol_environment =
         octez_context_brassaia_memory;
         octez_scoru_wasm;
         octez_event_logging;
-      ]
-
-(* in general this library should not be used directly, context_ops should be
-   used instead *)
-let octez_shell_context =
-  octez_shell_lib
-    "shell-context"
-    ~internal_name:"tezos_shell_context"
-    ~path:"src/lib_protocol_environment/shell_context"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_protocol_environment;
-        octez_context;
-      ]
-
-let octez_brassaia_context =
-  octez_shell_lib
-    "brassaia-context"
-    ~internal_name:"tezos_brassaia_context"
-    ~path:"src/lib_protocol_environment/brassaia_context"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_protocol_environment;
-        octez_context_brassaia;
-      ]
-
-let octez_duo_context_lib =
-  octez_shell_lib
-    "duo-context-lib"
-    ~internal_name:"tezos_duo_context_lib"
-    ~path:"src/lib_protocol_environment/duo_context_lib"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_protocol_environment;
-        octez_context_brassaia;
-        octez_context;
+        octez_profiler |> open_;
       ]
 
 let _octez_protocol_environment_tests =
@@ -3254,11 +3368,93 @@ let _octez_protocol_environment_tests =
       ]
 
 let octez_context_ops =
+  let octez_context_brassaia_disk =
+    octez_lib
+      "tezos-context-brassaia.disk"
+      ~path:"src/lib_context_brassaia/disk"
+      ~deps:
+        [
+          octez_base |> open_ ~m:"TzPervasives";
+          bigstringaf;
+          fmt;
+          brassaia;
+          brassaia_pack;
+          brassaia_pack_unix;
+          logs_fmt;
+          octez_stdlib_unix |> open_;
+          octez_stdlib |> open_;
+          octez_context_sigs;
+          octez_context_brassaia_helpers;
+          octez_context_brassaia_encoding;
+          octez_context_brassaia_memory |> open_;
+        ]
+      ~conflicts:[Conflicts.checkseum]
+  in
+  let octez_context_brassaia =
+    (* Should not be used directly in most cases, use context_ops abstraction instead *)
+    octez_lib
+      "tezos-context-brassaia"
+      ~path:"src/lib_context_brassaia"
+      ~synopsis:"On-disk context abstraction for [octez-node] (brassaia)"
+      ~deps:[octez_context_brassaia_disk; octez_context_brassaia_memory]
+  in
+  let octez_brassaia_context =
+    octez_shell_lib
+      "brassaia-context"
+      ~internal_name:"tezos_brassaia_context"
+      ~path:"src/lib_protocol_environment/brassaia_context"
+      ~deps:
+        [
+          octez_base |> open_ ~m:"TzPervasives";
+          octez_protocol_environment;
+          octez_context_brassaia;
+        ]
+  in
+  let octez_context =
+    octez_lib
+      "tezos-context"
+      ~path:"src/lib_context"
+      ~synopsis:"On-disk context abstraction for [octez-node]"
+      ~deps:[octez_context_disk; octez_context_memory]
+  in
+  (* in general this library should not be used directly, context_ops should be
+     used instead *)
+  let octez_shell_context =
+    octez_shell_lib
+      "shell-context"
+      ~internal_name:"tezos_shell_context"
+      ~path:"src/lib_protocol_environment/shell_context"
+      ~deps:
+        [
+          octez_base |> open_ ~m:"TzPervasives";
+          octez_protocol_environment;
+          octez_context;
+        ]
+  in
+  let octez_duo_context_lib =
+    let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+    octez_shell_lib
+      "duo-context-lib"
+      ~internal_name:"tezos_duo_context_lib"
+      ~path:"src/lib_protocol_environment/duo_context_lib"
+      ~preprocess
+      ~preprocessor_deps
+      ~deps:
+        [
+          octez_base |> open_ ~m:"TzPervasives";
+          octez_protocol_environment;
+          octez_context_brassaia;
+          octez_context;
+        ]
+  in
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_shell_lib
     "context-ops"
     ~internal_name:"tezos_context_ops"
     ~path:"src/lib_protocol_environment/context_ops"
     ~synopsis:"Backend-agnostic operations on contexts"
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3271,6 +3467,23 @@ let octez_context_ops =
         octez_duo_context_lib |> open_;
       ]
 
+let _brassaia_tests =
+  tezt
+    ["tezt_brassaia"; "test_lib_brassaia_store"; "test_utils"]
+    ~path:"brassaia/test"
+    ~opam:"tezos_internal_brassaia_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        brassaia_test_helpers;
+        octez_context_ops;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+
 let _octez_protocol_shell_context_tests =
   tezt
     ["test_proxy_context"]
@@ -3278,7 +3491,7 @@ let _octez_protocol_shell_context_tests =
     ~opam:"octez-shell-libs"
     ~deps:
       [
-        octez_shell_context;
+        octez_context_ops;
         alcotezt;
         octez_test_helpers |> open_;
         octez_base |> open_ ~m:"TzPervasives";
@@ -3294,40 +3507,20 @@ let octez_protocol_compiler_registerer =
       [octez_base |> open_ ~m:"TzPervasives"; tezos_protocol_environment_sigs]
     ~flags:(Flags.standard ~opaque:true ())
 
-let _octez_protocol_compiler_cmis_of_cma =
-  private_exe
-    "cmis_of_cma"
-    ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"octez-protocol-compiler"
-    ~deps:[compiler_libs_common]
-    ~modules:["cmis_of_cma"]
-
-let octez_protocol_compiler_lib =
+let octez_protocol_compiler_alternative_hashes =
   public_lib
-    "octez-protocol-compiler"
-    ~path:"src/lib_protocol_compiler"
-    ~synopsis:"Tezos: economic-protocol compiler"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix |> open_;
-        tezos_protocol_environment_sigs;
-        octez_stdlib_unix |> open_;
-        compiler_libs_common;
-        lwt_unix;
-        ocplib_ocamlres;
-        unix;
-      ]
-    ~opam_only_deps:[octez_protocol_environment]
-    ~modules:
-      [
-        "Embedded_cmis_env";
-        "Embedded_cmis_register";
-        "Packer";
-        "Compiler";
-        "Defaults";
-        "Protocol_compiler_env";
-      ]
+    "octez-protocol-compiler.alternative-hashes"
+    ~path:"src/lib_protocol_compiler/hashes"
+    ~internal_name:"octez_protocol_alternative_hashes"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"]
+
+let octez_protocol_compiler_compat =
+  public_lib
+    "octez-protocol-compiler-compat"
+    ~path:"src/lib_protocol_compiler/compat"
+    ~opam:"octez-protocol-compiler-compat"
+    ~synopsis:"Octez Protocol Compiler compatibility layer with OCaml versions"
+    ~deps:[compiler_libs_common; compiler_libs_optcomp; compiler_libs_toplevel]
     ~dune:
       Dune.
         [
@@ -3349,6 +3542,73 @@ let octez_protocol_compiler_lib =
                 S "%{target}";
               ]
             ~enabled_if:[S ">="; S "%{ocaml_version}"; S "5"];
+          target_rule
+            "compiler_libs.ml"
+            ~action:
+              [
+                S "copy"; S "compat_files/compiler_libs_ocaml4.ml"; S "%{target}";
+              ]
+            ~enabled_if:[S "<"; S "%{ocaml_version}"; S "5"];
+          target_rule
+            "compiler_libs.ml"
+            ~action:
+              [
+                S "copy"; S "compat_files/compiler_libs_ocaml5.ml"; S "%{target}";
+              ]
+            ~enabled_if:
+              [
+                S "and";
+                [S ">="; S "%{ocaml_version}"; S "5"];
+                [S "<"; S "%{ocaml_version}"; S "5.2"];
+              ];
+          target_rule
+            "compiler_libs.ml"
+            ~action:
+              [
+                S "copy";
+                S "compat_files/compiler_libs_ocaml5_2.ml";
+                S "%{target}";
+              ]
+            ~enabled_if:[S ">="; S "%{ocaml_version}"; S "5.2"];
+        ]
+
+let _octez_protocol_compiler_cmis_of_cma =
+  private_exe
+    "cmis_of_cma"
+    ~path:"src/lib_protocol_compiler/bin"
+    ~opam:"octez-protocol-compiler"
+    ~deps:[bls12_381_archive; octez_protocol_compiler_compat]
+    ~modules:["cmis_of_cma"]
+
+let octez_protocol_compiler_lib =
+  public_lib
+    "octez-protocol-compiler"
+    ~path:"src/lib_protocol_compiler"
+    ~synopsis:"Tezos: economic-protocol compiler"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix |> open_;
+        tezos_protocol_environment_sigs;
+        octez_stdlib_unix |> open_;
+        octez_protocol_compiler_compat |> open_;
+        octez_protocol_compiler_alternative_hashes |> open_;
+        lwt_unix;
+        ocplib_ocamlres;
+        unix;
+      ]
+    ~opam_only_deps:[octez_protocol_environment]
+    ~modules:
+      [
+        "Embedded_cmis_env";
+        "Embedded_cmis_register";
+        "Packer";
+        "Compiler";
+        "Defaults";
+      ]
+    ~dune:
+      Dune.
+        [
           targets_rule
             ["embedded-interfaces-env"]
             ~deps:[Dune.(H [[S "package"; S "octez-proto-libs"]])]
@@ -3420,6 +3680,7 @@ let octez_protocol_compiler_native =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_protocol_compiler_lib |> open_;
+        octez_protocol_compiler_compat |> open_;
         compiler_libs_optcomp;
       ]
     ~modules:["Native"]
@@ -3445,9 +3706,10 @@ let octez_protocol_updater =
         octez_micheline |> open_;
         octez_shell_services |> open_;
         octez_protocol_environment;
+        octez_protocol_compiler_alternative_hashes;
         octez_protocol_compiler_registerer;
         octez_protocol_compiler_native;
-        octez_context |> open_;
+        octez_context_ops |> open_;
         lwt_exit;
         dynlink;
       ]
@@ -3471,6 +3733,8 @@ let octez_validation =
         octez_shell_services |> open_;
         octez_protocol_updater |> open_;
         octez_stdlib_unix |> open_;
+        octez_profiler |> open_;
+        octez_profiler_backends |> open_;
         octez_version_value;
       ]
 
@@ -3517,6 +3781,7 @@ let octez_store_unix =
         octez_protocol_environment |> open_;
         octez_context_ops |> open_;
         octez_validation |> open_;
+        octez_profiler |> open_;
         octez_protocol_updater |> open_;
         octez_stdlib_unix |> open_;
         octez_stdlib |> open_;
@@ -3573,7 +3838,7 @@ let octez_store_unix_snapshots =
         octez_stdlib_unix |> open_;
         octez_crypto |> open_;
         octez_shell_services |> open_;
-        octez_context |> open_;
+        octez_context_ops |> open_;
         octez_validation |> open_;
         octez_store_shared |> open_;
         octez_store_unix |> open_;
@@ -3596,6 +3861,7 @@ let octez_store =
         octez_validation |> open_;
         octez_context_ops |> open_;
         octez_store_shared |> open_;
+        octez_profiler |> open_;
       ]
     ~virtual_modules:["store"]
     ~default_implementation:"octez-shell-libs.store.real"
@@ -3626,14 +3892,19 @@ let _octez_store_mocked =
     ~implements:octez_store
 
 let octez_requester =
-  octez_lib
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+  octez_shell_lib
     "requester"
     ~internal_name:"tezos_requester"
     ~path:"src/lib_requester"
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
+        octez_shell_services |> open_;
         octez_base |> open_ ~m:"TzPervasives";
         octez_stdlib_unix |> open_;
+        octez_profiler |> open_;
         lwt_watcher;
       ]
 
@@ -3641,9 +3912,11 @@ let octez_requester_tests =
   tezt
     ["requester_impl"; "test_requester"; "test_fuzzing_requester"; "shared"]
     ~path:"src/lib_requester/test"
-    ~opam:"octez-libs"
+    ~opam:"octez-requester-tests"
+    ~synopsis:"Requester tests"
     ~deps:
       [
+        octez_shell_services |> open_;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_test_helpers |> open_;
@@ -3666,6 +3939,9 @@ let octez_shell =
       Dune.
         [[S "package"; S "octez-shell-libs"]; [S "mld_files"; S "octez_shell"]]
     ~inline_tests:ppx_expect
+    ~inline_tests_libraries:[octez_rustzcash_deps; bls12_381_archive]
+    ~inline_tests_link_flags:
+      ["-cclib"; "-lblst"; "-cclib"; "-loctez_rustzcash_deps"]
     ~preprocess
     ~preprocessor_deps
     ~deps:
@@ -3684,6 +3960,9 @@ let octez_shell =
         octez_stdlib_unix |> open_;
         octez_shell_services |> open_;
         octez_p2p_services |> open_;
+        octez_profiler |> open_;
+        octez_profiler_complex_backends |> open_;
+        octez_protocol_compiler_alternative_hashes;
         octez_protocol_updater |> open_;
         octez_requester |> open_;
         octez_workers |> open_;
@@ -3703,19 +3982,23 @@ let octez_rpc_http =
     ~modules:["RPC_client_errors"; "media_type"]
 
 let octez_rpc_http_client =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_lib
     "rpc-http-client"
     ~internal_name:"tezos-rpc-http-client"
     ~path:"src/lib_rpc_http"
     ~synopsis:"Library of auto-documented RPCs (http client)"
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        octez_profiler |> open_;
         resto_cohttp_client;
         octez_rpc;
         octez_rpc_http |> open_;
       ]
-    ~modules:["RPC_client"]
+    ~modules:["RPC_client"; "RPC_profiler"]
 
 let octez_rpc_http_client_unix =
   octez_lib
@@ -3806,7 +4089,8 @@ let _octez_client_base_tests =
     ~path:"src/lib_client_base/test"
     ~opam:"octez-shell-libs"
     ~with_macos_security_framework:true
-    ~deps:[octez_base; octez_client_base |> open_; alcotezt]
+    ~deps:
+      [octez_rustzcash_deps; octez_base; octez_client_base |> open_; alcotezt]
 
 let _bip39_generator =
   private_exe
@@ -3855,6 +4139,7 @@ let _octez_signer_backends_tests =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rustzcash_deps;
         octez_base;
         octez_base_unix;
         octez_stdlib |> open_;
@@ -3903,6 +4188,7 @@ let _octez_signer_backends_unix_tests =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rustzcash_deps;
         octez_error_monad |> open_;
         octez_stdlib |> open_;
         octez_crypto;
@@ -4026,6 +4312,7 @@ let _octez_mockup_tests =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rustzcash_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_test_helpers |> open_;
         octez_test_helpers |> open_;
@@ -4120,6 +4407,7 @@ let _octez_proxy_tests =
     ~opam:"octez-shell-libs"
     ~deps:
       [
+        octez_rustzcash_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_stdlib_unix;
@@ -4171,6 +4459,7 @@ let _octez_client_base_unix_tests =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rustzcash_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_mockup_commands;
         octez_client_base_unix;
@@ -4211,6 +4500,8 @@ let octez_benchmark =
       ]
     ~inline_tests:ppx_expect
     ~inline_tests_deps:[S "%{workspace_root}/.ocamlformat"]
+    ~inline_tests_libraries:[bls12_381_archive]
+    ~inline_tests_link_flags:["-cclib"; "-lblst"]
       (* We disable tests for this package as they require Python, which is not
            installed in the image of the opam jobs. *)
     ~opam_with_test:Never
@@ -4313,6 +4604,7 @@ let _octogram_bin =
     ~opam:"octogram"
     ~deps:
       [
+        bls12_381_archive;
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         octogram;
@@ -4335,7 +4627,8 @@ let _octez_protocol_compiler_bin =
     ~opam:"octez-protocol-compiler"
     ~internal_name:"main_native"
     ~modes:[Native]
-    ~deps:[octez_protocol_compiler_native; octez_version_value]
+    ~deps:
+      [bls12_381_archive; octez_protocol_compiler_native; octez_version_value]
     ~linkall:true
     ~modules:["Main_native"]
 
@@ -4347,6 +4640,7 @@ let octez_protocol_compiler_tezos_protocol_packer =
     ~internal_name:"main_packer"
     ~deps:
       [
+        bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_stdlib_unix |> open_;
         octez_protocol_compiler_lib |> open_;
@@ -4362,6 +4656,7 @@ let _octez_embedded_protocol_packer =
     ~modes:[Native]
     ~deps:
       [
+        bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix |> open_;
         octez_stdlib_unix |> open_;
@@ -4375,8 +4670,7 @@ let octez_riscv_api =
     ~path:"src/lib_riscv/api"
     ~synopsis:"OCaml API of the RISC-V Rust components"
     ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
-    ~deps:[octez_rust_deps]
-    ~dep_globs_rec:["../riscv/*"]
+    ~dep_globs_rec:["../../riscv/*"]
     ~modules:["octez_riscv_api"]
     ~dune:Dune.[[S "copy_files"; S "../../riscv/lib/octez_riscv_api.*"]]
 
@@ -4395,6 +4689,7 @@ let _octez_riscv_pvm_test =
     ~synopsis:"Tests for RISC-V OCaml API"
     ~deps:
       [
+        octez_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_stdlib_unix |> open_;
         octez_base_test_helpers |> open_;
@@ -4420,13 +4715,48 @@ let octez_layer2_store =
         octez_context_encoding;
         octez_context_sigs;
         octez_context_helpers;
-        octez_riscv_pvm;
         camlzip;
         tar;
         tar_unix;
       ]
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
+
+let octez_layer2_irmin_context =
+  octez_l2_lib
+    "irmin_context"
+    ~internal_name:"tezos_layer2_irmin_context"
+    ~path:"src/lib_layer2_irmin_context"
+    ~synopsis:"Irmin context for the smart rollup PVMs"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        irmin_pack;
+        irmin_pack_unix;
+        irmin;
+        octez_context_encoding;
+        octez_context_sigs;
+        octez_context_helpers;
+        octez_layer2_store |> open_;
+      ]
+    ~linkall:true
+    ~conflicts:[Conflicts.checkseum]
+
+let octez_layer2_riscv_context =
+  octez_l2_lib
+    "riscv_context"
+    ~internal_name:"tezos_layer2_riscv_context"
+    ~path:"src/lib_layer2_riscv_context"
+    ~synopsis:"RiscV implementation of the context for Layer2"
+    ~deps:
+      [
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib"
+        |> open_ ~m:"Error_monad";
+        octez_lwt_result_stdlib |> open_;
+        octez_layer2_store |> open_;
+        octez_riscv_pvm;
+      ]
+    ~linkall:true
 
 let octez_sqlite =
   octez_l2_lib
@@ -4453,6 +4783,7 @@ let _octez_layer2_indexed_store_test =
     ~opam:"octez-l2-libs"
     ~deps:
       [
+        octez_rust_deps;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_layer2_store |> open_;
         qcheck_alcotest;
@@ -4474,6 +4805,37 @@ let octez_dal_node_services =
       ]
     ~linkall:true
 
+let octez_dal_node_migrations =
+  public_lib
+    "dal_node_migrations"
+    ~path:"src/bin_dal_node/migrations"
+    ~synopsis:"Tezos: SQL migrations for the DAL node store"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; caqti_lwt; crunch; re]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "migrations.ml"];
+            [S "deps"; [S "glob_files"; S "*.sql"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "sql";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S ".";
+              ];
+            ];
+          ];
+        ]
+
 let octez_dal_node_lib =
   public_lib
     "tezos-dal-node-lib"
@@ -4485,13 +4847,32 @@ let octez_dal_node_lib =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_dal_node_services;
-        octez_client_base |> open_;
+        octez_dal_node_migrations;
         octez_protocol_updater |> open_;
-        octez_client_base_unix |> open_;
+        octez_rpc_http_client_unix;
         octez_stdlib_unix |> open_;
         octez_crypto_dal |> open_;
         octez_p2p |> open_;
         octez_p2p_services |> open_;
+        octez_sqlite |> open_;
+      ]
+
+let _octez_dal_node_lib_test =
+  tezt
+    ["test_storage"]
+    ~path:"src/lib_dal_node/test/"
+    ~opam:"tezos-dal-node-lib"
+    ~preprocess:(ppses [ppx_hash; bam_ppx])
+    ~deps:
+      [
+        octez_rustzcash_deps;
+        octez_stdlib |> open_;
+        octez_stdlib_unix |> open_;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
+        octez_dal_node_lib |> open_;
+        octez_test_helpers |> open_;
+        tezt_bam;
       ]
 
 let octez_dal_node_gossipsub_lib =
@@ -4509,50 +4890,6 @@ let octez_dal_node_gossipsub_lib =
         octez_crypto |> open_;
       ]
 
-let octez_dac_lib =
-  public_lib
-    "tezos-dac-lib"
-    ~path:"src/lib_dac"
-    ~opam:"tezos-dac-lib"
-    ~synopsis:"Tezos: `tezos-dac` library"
-    ~deps:
-      [octez_base |> open_ ~m:"TzPervasives"; octez_protocol_updater |> open_]
-
-let octez_dac_client_lib =
-  public_lib
-    "tezos-dac-client-lib"
-    ~path:"src/lib_dac_client"
-    ~opam:"tezos-dac-client-lib"
-    ~synopsis:"Tezos: `tezos-dac-client` library"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        octez_client_base |> open_;
-        octez_client_base_unix |> open_;
-        octez_stdlib_unix |> open_;
-        octez_dac_lib |> open_;
-      ]
-
-let octez_dac_node_lib =
-  private_lib
-    "tezos_dac_node_lib"
-    ~path:"src/lib_dac_node"
-    ~opam:"tezos-dac-node-lib"
-    ~synopsis:"Tezos: `tezos-dac-node` library"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        octez_client_base |> open_;
-        octez_client_base_unix |> open_;
-        octez_stdlib_unix |> open_;
-        octez_layer2_store |> open_;
-        octez_rpc_http_server;
-        octez_dac_lib |> open_;
-        octez_dac_client_lib |> open_;
-      ]
-
 let octez_node_config =
   public_lib
     "octez-node-config"
@@ -4566,7 +4903,7 @@ let octez_node_config =
         octez_shell_services |> open_;
         octez_rpc_http |> open_;
         octez_rpc_http_server |> open_;
-        octez_context |> open_;
+        octez_context_ops |> open_;
         octez_store |> open_;
         octez_validation |> open_;
       ]
@@ -4631,6 +4968,19 @@ let octez_injector_lib =
         octez_crawler |> open_;
         octez_signer_backends;
       ]
+
+let performance_metrics =
+  public_lib
+    "octez-performance-metrics"
+    ~path:"src/lib_performance_metrics"
+    ~deps:
+      [
+        prometheus;
+        octez_version;
+        octez_base |> open_ ~m:"TzPervasives";
+        lwt_unix;
+      ]
+    ~synopsis:"Set of metrics to measure binary performances"
 
 let octez_smart_rollup_lib =
   octez_l2_lib
@@ -4712,6 +5062,7 @@ let octez_smart_rollup_node_store_lib =
         rollup_node_sqlite_migrations;
         octez_sqlite |> open_;
         octez_smart_rollup_lib |> open_;
+        performance_metrics;
       ]
 
 let octez_smart_rollup_node_lib =
@@ -4734,8 +5085,6 @@ let octez_smart_rollup_node_lib =
         octez_node_config;
         prometheus_app;
         octez_dal_node_lib |> open_;
-        octez_dac_lib |> open_;
-        octez_dac_client_lib |> open_;
         octez_injector_lib |> open_;
         octez_version_value |> open_;
         octez_layer2_store |> open_;
@@ -4745,12 +5094,56 @@ let octez_smart_rollup_node_lib =
         octez_smart_rollup_lib |> open_;
       ]
 
+let wasm_helpers_intf_modules = ["wasm_utils_intf"]
+
+let octez_scoru_wasm_helpers_intf =
+  octez_l2_lib
+    "scoru-wasm-helpers-intf"
+    ~internal_name:"tezos_scoru_wasm_helpers_intf"
+    ~path:"src/lib_scoru_wasm/helpers"
+    ~synopsis:
+      "Helpers for the smart rollup wasm functionality and debugger \
+       (signatures)"
+    ~modules:wasm_helpers_intf_modules
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_base_unix;
+        octez_scoru_wasm;
+        octez_webassembly_interpreter_extra |> open_;
+      ]
+    ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
+
+let wasm_helpers_functor_modules = ["wasm_utils_functor"]
+
+let octez_scoru_wasm_helpers_functor =
+  octez_l2_lib
+    "scoru-wasm-helpers-functor"
+    ~internal_name:"tezos_scoru_wasm_helpers_functor"
+    ~path:"src/lib_scoru_wasm/helpers"
+    ~synopsis:
+      "Helpers for the smart rollup wasm functionality and debugger (functor)"
+    ~modules:wasm_helpers_functor_modules
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_base_unix;
+        octez_scoru_wasm;
+        octez_webassembly_interpreter_extra |> open_;
+        octez_scoru_wasm_helpers_intf |> open_;
+      ]
+    ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
+
 let octez_scoru_wasm_helpers =
   octez_l2_lib
     "scoru-wasm-helpers"
     ~internal_name:"tezos_scoru_wasm_helpers"
     ~path:"src/lib_scoru_wasm/helpers"
     ~synopsis:"Helpers for the smart rollup wasm functionality and debugger"
+    ~all_modules_except:
+      (wasm_helpers_intf_modules @ wasm_helpers_functor_modules)
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -4758,6 +5151,8 @@ let octez_scoru_wasm_helpers =
         octez_base_unix;
         octez_scoru_wasm;
         octez_scoru_wasm_fast;
+        octez_scoru_wasm_helpers_intf |> open_;
+        octez_scoru_wasm_helpers_functor |> open_;
         octez_webassembly_interpreter_extra |> open_;
       ]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
@@ -4807,6 +5202,7 @@ let octez_scoru_wasm_benchmark =
     ~synopsis:"Smart Rollup WASM benchmark library"
     ~deps:
       [
+        bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         tezt_lib;
         octez_webassembly_interpreter;
@@ -4822,7 +5218,13 @@ let _octez_scoru_wasm_benchmark_exe =
     ~path:"src/lib_scoru_wasm/bench/executable"
     ~opam:"octez-l2-libs"
     ~preprocess:(pps ppx_deriving_show)
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_benchmark]
+    ~deps:
+      [
+        octez_rust_deps;
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_scoru_wasm_benchmark;
+      ]
 
 let _octez_scoru_wasm_tests =
   tezt
@@ -4854,6 +5256,7 @@ let _octez_scoru_wasm_tests =
     ~opam:"octez-l2-libs"
     ~deps:
       [
+        octez_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         tree_encoding;
         octez_base_unix;
@@ -4882,6 +5285,7 @@ let _octez_scoru_wasm_fast_tests =
     ~opam:"octez-l2-libs"
     ~deps:
       [
+        octez_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         tree_encoding;
         octez_base_unix;
@@ -4942,8 +5346,6 @@ module Protocol : sig
   val plugin_registerer : t -> target option
 
   val dal : t -> target option
-
-  val dac : t -> target option
 
   val parameters_exn : t -> target
 
@@ -5057,7 +5459,6 @@ end = struct
     plugin : target option;
     plugin_registerer : target option;
     dal : target option;
-    dac : target option;
     test_helpers : target option;
     parameters : target option;
     benchmarks_proto : target option;
@@ -5068,7 +5469,7 @@ end = struct
   }
 
   let make ?client ?client_commands ?client_commands_registration
-      ?baking_commands_registration ?plugin ?plugin_registerer ?dal ?dac
+      ?baking_commands_registration ?plugin ?plugin_registerer ?dal
       ?test_helpers ?parameters ?benchmarks_proto ?octez_sc_rollup
       ?octez_sc_rollup_node ?octez_injector ?baking ~status ~name ~main
       ~embedded () =
@@ -5084,7 +5485,6 @@ end = struct
       plugin;
       plugin_registerer;
       dal;
-      dac;
       test_helpers;
       parameters;
       benchmarks_proto;
@@ -5144,8 +5544,6 @@ end = struct
 
   let dal p = p.dal
 
-  let dac p = p.dac
-
   let parameters_exn p = mandatory "parameters" p p.parameters
 
   let benchmarks_proto_exn p = mandatory "benchmarks_proto" p p.benchmarks_proto
@@ -5204,34 +5602,41 @@ end = struct
       let name_dash = Name.name_dash name in
       let number = Name.number name in
       let path = Name.base_path name in
+      let modules =
+        [
+          ("test_baking", true);
+          ("test_consensus_key", true);
+          ("test_deactivation", true);
+          ("test_delegation", true);
+          ("test_double_baking", true);
+          ("test_double_attestation", N.(number >= 018));
+          ("test_double_endorsement", N.(number <= 017));
+          ("test_double_preattestation", N.(number >= 018));
+          ("test_double_preendorsement", N.(number <= 017));
+          ("test_attestation", N.(number >= 018));
+          ("test_endorsement", N.(number <= 017));
+          ("test_frozen_deposits", true);
+          ("test_helpers_rpcs", true);
+          ("test_participation", true);
+          ("test_preattestation_functor", N.(number >= 018));
+          ("test_preendorsement_functor", N.(number <= 017));
+          ("test_preattestation", N.(number >= 018));
+          ("test_preendorsement", N.(number <= 017));
+          ("test_seed", true);
+          ("test_aggregate", N.(number >= 022));
+          ("test_dal_entrapment", N.(number >= 022));
+        ]
+        |> conditional_list
+      in
       let _integration_consensus =
         tezt
-          [
-            "test_baking";
-            "test_consensus_key";
-            "test_deactivation";
-            "test_delegation";
-            "test_double_baking";
-            (if N.(number >= 018) then "test_double_attestation"
-             else "test_double_endorsement");
-            (if N.(number >= 018) then "test_double_preattestation"
-             else "test_double_preendorsement");
-            (if N.(number >= 018) then "test_attestation"
-             else "test_endorsement");
-            "test_frozen_deposits";
-            "test_helpers_rpcs";
-            "test_participation";
-            (if N.(number >= 018) then "test_preattestation_functor"
-             else "test_preendorsement_functor");
-            (if N.(number >= 018) then "test_preattestation"
-             else "test_preendorsement");
-            "test_seed";
-          ]
+          modules
           ~path:(path // "lib_protocol/test/integration/consensus")
           ~with_macos_security_framework:true
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
             [
+              octez_rustzcash_deps;
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
@@ -5250,6 +5655,7 @@ end = struct
           ~with_macos_security_framework:true
           ~deps:
             [
+              octez_rustzcash_deps;
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
@@ -5305,6 +5711,7 @@ end = struct
                ])
           ~deps:
             [
+              octez_rustzcash_deps;
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
@@ -5347,6 +5754,7 @@ end = struct
           ~dep_globs:(conditional_list [("contracts/*", N.(number >= 013))])
           ~deps:
             [
+              octez_rustzcash_deps;
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
@@ -5378,6 +5786,7 @@ end = struct
           ~with_macos_security_framework:true
           ~deps:
             [
+              octez_rustzcash_deps;
               alcotezt |> if_ N.(number <= 018);
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
@@ -5396,12 +5805,12 @@ end = struct
           [
             ("test_constants", true);
             ("test_frozen_bonds", true);
-            ("test_adaptive_issuance_launch", N.(number >= 018));
+            ("test_adaptive_issuance_launch", N.(number >= 018 && number <= 021));
             ("test_adaptive_issuance_roundtrip", N.(number == 018));
             ("test_scenario_base", N.(number >= 019));
             ("test_scenario_stake", N.(number >= 019));
             ("test_scenario_rewards", N.(number >= 019));
-            ("test_scenario_autostaking", N.(number >= 019));
+            ("test_scenario_autostaking", N.(number >= 019 && number <= 021));
             ("test_scenario_slashing", N.(number >= 019));
             ("test_scenario_slashing_stakers", N.(number >= 019));
             ("test_scenario_deactivation", N.(number >= 019));
@@ -5419,6 +5828,7 @@ end = struct
           ~with_macos_security_framework:true
           ~deps:
             [
+              octez_rustzcash_deps;
               (if N.(number >= 015) then Some tezt_lib else None) |> if_some;
               alcotezt |> if_ N.(number <= 018);
               octez_base |> open_ ~m:"TzPervasives"
@@ -5444,7 +5854,6 @@ end = struct
             ("test_script_comparison", true);
             ("test_script_roundtrip", N.(number >= 019));
             ("test_tez_repr", true);
-            ("test_bitset", N.(number >= 013));
             ("test_sc_rollup_tick_repr", N.(number >= 016));
             ("test_sc_rollup_encoding", N.(number >= 016));
             ("test_sc_rollup_inbox", N.(number >= 017));
@@ -5468,6 +5877,7 @@ end = struct
           ~with_macos_security_framework:true
           ~deps:
             [
+              octez_rustzcash_deps;
               octez_base
               |> if_ N.(number <= 14)
               |> open_ ~m:"TzPervasives"
@@ -5529,6 +5939,7 @@ end = struct
             ("test_full_staking_balance_repr", N.(number >= 019));
             ("test_slashing_percentage", N.(number >= 019));
             ("test_staking_operations", N.(number >= 021));
+            ("test_consecutive_round_zero", N.(number >= 022));
           ]
           |> conditional_list
         in
@@ -5539,6 +5950,7 @@ end = struct
           ~with_macos_security_framework:true
           ~deps:
             [
+              octez_rust_deps;
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
               octez_base_test_helpers |> open_;
@@ -5579,6 +5991,7 @@ end = struct
               ~opam:(sf "tezos-protocol-%s-tests" name_dash)
               ~deps:
                 [
+                  octez_rustzcash_deps;
                   octez_base |> open_ ~m:"TzPervasives";
                   tezt_tezos |> open_;
                   main |> open_;
@@ -6034,6 +6447,33 @@ let hash = Protocol.hash
     let {Lib_protocol.main; lifted; embedded} =
       Lib_protocol.make ~name ~status
     in
+    let dune_signatures_version_rule =
+      Dune.targets_rule
+        ["signature.ml"]
+        ~action:
+          [
+            S "write-file";
+            S "%{targets}";
+            S
+              (sf
+                 {|  module Bls_aug = Tezos_crypto.Signature.Bls_aug
+  module Ed25519 = Tezos_crypto.Signature.Ed25519
+  module P256 = Tezos_crypto.Signature.P256
+  module Secp256k1 = Tezos_crypto.Signature.Secp256k1
+  include Tezos_crypto.Signature.V1|});
+          ]
+    in
+    let dune_client_keys_version_rule =
+      Dune.(
+        targets_rule
+          ["client_keys.ml"]
+          ~action:
+            [
+              S "write-file";
+              S "%{targets}";
+              S (sf {|include Tezos_client_base.Client_keys_v1|});
+            ])
+    in
     let parameters =
       only_if (N.(number >= 011) && not_overridden) @@ fun () ->
       public_lib
@@ -6047,6 +6487,7 @@ let hash = Protocol.hash
             main |> open_;
           ]
         ~linkall:true
+        ~dune:(if N.(number >= 016) then [dune_signatures_version_rule] else [])
     in
     let _parameters_exe =
       opt_map parameters @@ fun parameters ->
@@ -6056,6 +6497,8 @@ let hash = Protocol.hash
         ~opam:(sf "tezos-protocol-%s" name_dash)
         ~deps:
           [
+            octez_rustzcash_deps;
+            bls12_381_archive;
             octez_base |> open_ ~m:"TzPervasives";
             parameters |> open_;
             main |> if_ N.(number >= 012) |> open_;
@@ -6099,6 +6542,9 @@ let hash = Protocol.hash
           "Protocol specific library of helpers for `tezos-smart-rollup`"
         ~deps:[octez_base |> open_ ~m:"TzPervasives"; main |> open_]
         ~inline_tests:ppx_expect
+        ~inline_tests_libraries:[bls12_381_archive; octez_rust_deps]
+        ~inline_tests_link_flags:
+          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"]
         ~linkall:true
     in
     let plugin =
@@ -6119,6 +6565,7 @@ let hash = Protocol.hash
           ]
         ~all_modules_except:["Plugin_registerer"]
         ~bisect_ppx:(if N.(number >= 008) then Yes else No)
+        ~dune:(if N.(number >= 016) then [dune_signatures_version_rule] else [])
     in
     let plugin_registerer =
       opt_map plugin @@ fun plugin ->
@@ -6172,7 +6619,19 @@ let hash = Protocol.hash
           ]
         ~bisect_ppx:(if N.(number >= 008) then Yes else No)
         ?inline_tests:(if N.(number >= 009) then Some ppx_expect else None)
+        ?inline_tests_libraries:
+          (if N.(number >= 009) then
+             Some [bls12_381_archive; octez_rustzcash_deps]
+           else None)
+        ?inline_tests_link_flags:
+          (if N.(number >= 009) then
+             Some ["-cclib"; "-lblst"; "-cclib"; "-loctez_rustzcash_deps"]
+           else None)
         ~linkall:true
+        ~dune:
+          (if N.(number >= 016) then
+             [dune_client_keys_version_rule; dune_signatures_version_rule]
+           else [])
     in
     let test_helpers =
       only_if active @@ fun () ->
@@ -6203,6 +6662,7 @@ let hash = Protocol.hash
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
             octez_sc_rollup |> if_some |> if_ N.(number >= 018) |> open_;
           ]
+        ~dune:[dune_signatures_version_rule]
     in
     let _plugin_tests =
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
@@ -6220,6 +6680,7 @@ let hash = Protocol.hash
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
         ~deps:
           [
+            octez_rustzcash_deps;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
             octez_base_test_helpers |> open_;
@@ -6249,6 +6710,7 @@ let hash = Protocol.hash
         ~with_macos_security_framework:true
         ~deps:
           [
+            octez_rustzcash_deps;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
             octez_micheline |> open_;
@@ -6294,6 +6756,10 @@ let hash = Protocol.hash
         ~bisect_ppx:(if N.(number >= 008) then Yes else No)
         ~linkall:true
         ~all_modules_except:["alpha_commands_registration"]
+        ~dune:
+          (if N.(number >= 016) then
+             [dune_signatures_version_rule; dune_client_keys_version_rule]
+           else [])
     in
     let client_sapling =
       only_if (N.(number >= 011) && not_overridden) @@ fun () ->
@@ -6371,15 +6837,16 @@ let hash = Protocol.hash
             plugin |> if_some |> open_;
             octez_protocol_environment;
             octez_shell_services |> open_;
+            octez_node_config;
             octez_client_base |> open_;
             client |> if_some |> open_;
             octez_client_commands |> open_;
             octez_stdlib |> open_;
             octez_stdlib_unix |> open_;
-            octez_shell_context |> if_ N.(number <= 020) |> open_;
-            octez_context |> open_;
             octez_context_memory |> if_ (N.(number >= 012) && N.(number <= 019));
+            octez_profiler |> if_ N.(number >= 021) |> open_;
             octez_rpc_http_client_unix |> if_ N.(number >= 011);
+            octez_rpc_http_client |> if_ N.(number >= 011) |> open_;
             octez_context_ops |> if_ N.(number >= 011) |> open_;
             octez_rpc;
             octez_rpc_http |> open_;
@@ -6394,6 +6861,7 @@ let hash = Protocol.hash
           (if N.(number <= 011) then
              ["Delegate_commands"; "Delegate_commands_registration"]
            else ["Baking_commands"; "Baking_commands_registration"])
+        ~dune:[dune_signatures_version_rule; dune_client_keys_version_rule]
     in
     let tenderbrute =
       only_if active @@ fun () ->
@@ -6413,6 +6881,7 @@ let hash = Protocol.hash
             client |> if_some |> open_;
           ]
         ~bisect_ppx:No
+        ~dune:[dune_signatures_version_rule]
     in
     let _tenderbrute_exe =
       only_if (active && N.(number >= 013)) @@ fun () ->
@@ -6424,6 +6893,8 @@ let hash = Protocol.hash
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
         ~deps:
           [
+            octez_rustzcash_deps;
+            bls12_381_archive;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018)
             |> open_;
@@ -6461,6 +6932,7 @@ let hash = Protocol.hash
               tezt_core_lib |> open_;
             ]
           ~bisect_ppx:No
+          ~dune:[dune_client_keys_version_rule]
       in
       tezt
         ["test_scenario"]
@@ -6469,6 +6941,7 @@ let hash = Protocol.hash
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
         ~deps:
           [
+            octez_rustzcash_deps;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
             octez_protocol_environment |> if_ N.(number <= 011);
@@ -6553,6 +7026,8 @@ let hash = Protocol.hash
         ~with_macos_security_framework:true
         ~deps:
           [
+            octez_rustzcash_deps;
+            bls12_381_archive;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
             octez_clic;
@@ -6562,6 +7037,7 @@ let hash = Protocol.hash
             baking_commands |> if_some |> open_;
             octez_stdlib_unix |> open_;
             octez_client_base_unix |> open_;
+            octez_profiler_backends |> open_;
           ]
     in
     let _baker = daemon "baker" in
@@ -6581,6 +7057,9 @@ let hash = Protocol.hash
             client |> if_some |> open_;
           ]
         ~inline_tests:ppx_expect
+        ~inline_tests_libraries:[bls12_381_archive; octez_rustzcash_deps]
+        ~inline_tests_link_flags:
+          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rustzcash_deps"]
         ~linkall:true
     in
     let dal =
@@ -6596,6 +7075,7 @@ let hash = Protocol.hash
             |> error_monad_module N.(number <= 018);
             octez_protocol_compiler_registerer |> open_;
             octez_stdlib_unix |> open_;
+            octez_shell_services |> open_;
             octez_dal_node_lib |> open_;
             client |> if_some |> open_;
             plugin |> if_some |> open_;
@@ -6604,24 +7084,22 @@ let hash = Protocol.hash
             main |> open_;
           ]
         ~inline_tests:ppx_expect
+        ~inline_tests_libraries:[bls12_381_archive; octez_rustzcash_deps]
+        ~inline_tests_link_flags:
+          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rustzcash_deps"]
         ~linkall:true
+        ~dune:[dune_signatures_version_rule]
     in
     let _dal_tests =
       only_if (active && N.(number >= 016)) @@ fun () ->
       tezt
-        (* test [test_dac_pages_encoding] was removed after 016 *)
-        (if N.(number == 016) then
-           [
-             "test_dal_slot_frame_encoding";
-             "test_dac_pages_encoding";
-             "test_helpers";
-           ]
-         else ["test_dal_slot_frame_encoding"; "test_helpers"])
+        ["test_dal_slot_frame_encoding"; "test_helpers"]
         ~path:(path // "lib_dal/test")
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
         ~with_macos_security_framework:true
         ~deps:
           [
+            octez_rustzcash_deps;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
             dal |> if_some |> open_;
@@ -6630,33 +7108,6 @@ let hash = Protocol.hash
             test_helpers |> if_some |> open_;
             alcotezt;
           ]
-    in
-    let dac =
-      (* [~link_all:true] is necessary to ensure that the dac plugin
-         registration happens when running the dal node. Removing this
-         option would cause DAL related tezts to fail because the DAC
-         plugin cannot be resolved. *)
-      only_if (active && N.(number >= 017)) @@ fun () ->
-      octez_protocol_lib
-        "dac"
-        ~internal_name:(sf "tezos_dac_%s" name_dash)
-        ~path:(path // "lib_dac_plugin")
-        ~synopsis:
-          "Protocol specific library for the Data availability Committee"
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives"
-            |> error_monad_module N.(number <= 018);
-            octez_protocol_compiler_registerer |> open_;
-            octez_stdlib_unix |> open_;
-            octez_dac_lib |> open_;
-            octez_dac_client_lib |> open_;
-            client |> if_some |> open_;
-            embedded |> open_;
-            main |> open_;
-          ]
-        ~inline_tests:ppx_expect
-        ~linkall:true
     in
     let octez_injector =
       only_if N.(active && number >= 017) @@ fun () ->
@@ -6676,6 +7127,7 @@ let hash = Protocol.hash
             plugin |> if_some |> open_;
           ]
         ~linkall:true
+        ~dune:[dune_client_keys_version_rule; dune_signatures_version_rule]
     in
     let octez_sc_rollup_layer2 =
       only_if N.(number >= 016) @@ fun () ->
@@ -6692,6 +7144,9 @@ let hash = Protocol.hash
             octez_smart_rollup_lib |> open_;
           ]
         ~inline_tests:ppx_expect
+        ~inline_tests_libraries:[bls12_381_archive; octez_rust_deps]
+        ~inline_tests_link_flags:
+          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"]
         ~linkall:true
     in
     let octez_sc_rollup_node =
@@ -6727,17 +7182,14 @@ let hash = Protocol.hash
             octez_workers |> open_;
             octez_dal_node_services;
             octez_dal_node_lib |> open_;
-            (* [dac] is needed for the DAC observer client which is not
-               available in Nairobi and earlier. *)
-            dac |> if_some |> if_ N.(number >= 018) |> open_;
-            octez_dac_lib |> open_;
-            octez_dac_client_lib |> if_ N.(number >= 018) |> open_;
             octez_shell_services |> open_;
             octez_smart_rollup_lib |> open_;
             octez_sc_rollup |> if_some |> open_;
             octez_sc_rollup_layer2 |> if_some |> open_;
             layer2_utils |> if_some |> open_;
             octez_layer2_store |> open_;
+            octez_layer2_riscv_context |> open_;
+            octez_layer2_irmin_context |> open_;
             octez_crawler |> open_;
             tree_encoding;
             data_encoding;
@@ -6755,6 +7207,7 @@ let hash = Protocol.hash
             octez_version_value;
           ]
         ~conflicts:[Conflicts.checkseum]
+        ~dune:[dune_signatures_version_rule]
     in
     let _octez_sc_rollup_node_test =
       only_if (active && N.(number >= 016)) @@ fun () ->
@@ -6766,6 +7219,7 @@ let hash = Protocol.hash
         ~with_macos_security_framework:true
         ~deps:
           [
+            octez_rust_deps;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
             main |> open_;
@@ -6801,6 +7255,8 @@ let hash = Protocol.hash
         ~with_macos_security_framework:true
         ~deps:
           [
+            octez_rustzcash_deps;
+            bls12_381_archive;
             octez_micheline |> open_;
             octez_micheline_rewriting;
             benchmark_type_inference |> if_some |> open_;
@@ -6837,6 +7293,25 @@ let hash = Protocol.hash
         ~linkall:true
         ~private_modules:["kernel"; "rules"; "state_space"]
         ~bisect_ppx:(if N.(number <= 012) then Yes else No)
+        ~dune:
+          [
+            Dune.targets_rule
+              ["crypto_samplers.mli"]
+              ~action:
+                [
+                  S "write-file";
+                  S "%{targets}";
+                  S "include module type of Tezos_benchmark.Crypto_samplers.V1";
+                ];
+            Dune.targets_rule
+              ["crypto_samplers.ml"]
+              ~action:
+                [
+                  S "write-file";
+                  S "%{targets}";
+                  S "include Tezos_benchmark.Crypto_samplers.V1";
+                ];
+          ]
     in
     let _benchmark_tests =
       opt_map (both benchmark test_helpers) @@ fun (benchmark, test_helpers) ->
@@ -6856,6 +7331,8 @@ let hash = Protocol.hash
         ~opam:(sf "tezos-benchmark-%s" name_dash)
         ~deps:
           [
+            octez_rustzcash_deps;
+            bls12_381_archive;
             octez_base |> error_monad_module N.(number <= 018);
             octez_micheline |> open_;
             octez_micheline_rewriting;
@@ -6910,6 +7387,7 @@ let hash = Protocol.hash
             octez_protocol_environment;
           ]
         ~linkall:true
+        ~dune:[dune_signatures_version_rule]
     in
     let _ =
       if active then
@@ -6956,7 +7434,6 @@ let hash = Protocol.hash
          ?plugin
          ?plugin_registerer
          ?dal
-         ?dac
          ?test_helpers
          ?parameters
          ?benchmarks_proto
@@ -7016,9 +7493,11 @@ let hash = Protocol.hash
 
   let _019_PtParisB = frozen (Name.v "PtParisB" 019)
 
-  let _020_PsParisC = active (Name.v "PsParisC" 020)
+  let _020_PsParisC = frozen (Name.v "PsParisC" 020)
 
   let _021_PsQuebec = active (Name.v "PsQuebec" 021)
+
+  let _022_PsRiotum = active (Name.v "PsRiotum" 022)
 
   let alpha = active (Name.dev "alpha")
 
@@ -7043,6 +7522,7 @@ let _octez_micheline_rewriting_tests =
     ~opam:"tezos-micheline-rewriting"
     ~deps:
       [
+        octez_rustzcash_deps;
         octez_micheline |> open_;
         octez_micheline_rewriting;
         Protocol.(main alpha);
@@ -7074,6 +7554,7 @@ let octez_store_tests =
     ~synopsis:"Store tests"
     ~deps:
       [
+        octez_rustzcash_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_crypto |> open_;
         octez_context_ops |> open_;
@@ -7160,13 +7641,12 @@ let _octez_shell_tests =
     ~synopsis:"Shell tests"
     ~deps:
       [
+        octez_rustzcash_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_test_helpers |> open_;
         octez_store |> open_;
         octez_store_shared |> open_;
-        octez_context |> open_;
         octez_context_ops |> open_;
-        octez_shell_context |> open_;
         octez_protocol_updater |> open_;
         octez_p2p |> open_;
         octez_p2p_services |> open_;
@@ -7250,6 +7730,8 @@ let _get_contracts =
     ~opam:""
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         octez_micheline |> open_;
         octez_base |> open_ ~m:"TzPervasives";
         get_contracts_lib |> open_;
@@ -7267,6 +7749,8 @@ let _proto_context_du =
     ~opam:"internal-devtools_proto-context-du"
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         octez_clic;
         octez_base |> open_ ~m:"TzPervasives";
         octez_node_config;
@@ -7334,7 +7818,7 @@ let _yes_wallet =
     ~synopsis:
       "A script extracting delegates' keys from a context into a wallet."
     ~opam:""
-    ~deps:[yes_wallet_lib |> open_]
+    ~deps:[octez_rustzcash_deps; bls12_381_archive; yes_wallet_lib |> open_]
     ~modules:["yes_wallet"]
     ~bisect_ppx:No
 
@@ -7347,6 +7831,7 @@ let _yes_wallet_test =
     ~opam:""
     ~deps:
       [
+        bls12_381_archive;
         octez_error_monad |> open_ ~m:"TzLwtreslib";
         octez_crypto;
         zarith;
@@ -7369,6 +7854,8 @@ let _testnet_experiment_tools =
     ~opam:""
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos;
         octez_client_base_unix |> open_;
@@ -7449,7 +7936,7 @@ let simulation_scenario_lib =
          octez_client_base_unix |> open_;
          octez_store |> open_;
          octez_store_shared |> open_;
-         octez_context |> open_;
+         octez_context_ops |> open_;
        ]
       @ List.flatten proto_deps)
     ~modules:("sigs" :: proto_tools)
@@ -7467,6 +7954,8 @@ let _simulation_scenario =
     ~opam:""
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         octez_stdlib_unix |> open_;
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_base_unix;
@@ -7493,6 +7982,8 @@ let _extract_data =
     ~opam:""
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_store |> open_;
@@ -7514,6 +8005,8 @@ let _safety_checker =
     ~opam:""
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_store |> open_;
         octez_clic;
@@ -7536,6 +8029,8 @@ let _get_teztale_data =
     ~opam:""
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_clic;
         caqti_lwt_unix;
@@ -7617,6 +8112,7 @@ let _octez_node =
     in
     List.map deps_for_protocol Protocol.all |> List.flatten
   in
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   public_exe
     "octez-node"
     ~path:"src/bin_node"
@@ -7624,8 +8120,12 @@ let _octez_node =
     ~synopsis:"Tezos: `octez-node` binary"
     ~release_status:Released
     ~with_macos_security_framework:true
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       ([
+         octez_rustzcash_deps;
+         bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives" |> open_;
          octez_base_unix |> open_;
          octez_version;
@@ -7637,6 +8137,9 @@ let _octez_node =
          octez_rpc_http_server |> open_;
          octez_rpc_process |> open_;
          octez_p2p |> open_;
+         octez_profiler |> open_;
+         octez_profiler_backends |> open_;
+         octez_profiler_complex_backends |> open_;
          octez_shell |> open_;
          octez_store |> open_;
          octez_store_unix_reconstruction |> open_;
@@ -7664,19 +8167,21 @@ let _octez_node =
             ~section:"bin";
         ]
 
-let _octez_agnostic_baker =
+let _octez_experimental_agnostic_baker =
   public_exe
-    "octez-agnostic-baker"
+    "octez-experimental-agnostic-baker"
     ~path:"src/bin_agnostic_baker"
     ~internal_name:"main_agnostic_baker"
-    ~synopsis:"Tezos: `octez-agnostic-baker` binary for baking"
-    ~release_status:Unreleased
+    ~synopsis:"Tezos: `octez-experimental-agnostic-baker` binary for baking"
+    ~release_status:Released
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         data_encoding |> open_;
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
         octez_validation |> open_;
         octez_client_base_unix |> open_;
         octez_client_base |> open_;
@@ -7726,6 +8231,8 @@ let _octez_client =
     ~release_status:Released
     ~deps:
       ([
+         octez_rustzcash_deps;
+         bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_base_unix;
          octez_clic;
@@ -7777,6 +8284,8 @@ let _octez_codec =
     ~with_macos_security_framework:true
     ~deps:
       ([
+         octez_rustzcash_deps;
+         bls12_381_archive;
          data_encoding |> open_;
          octez_base |> open_ ~m:"TzPervasives";
          octez_base_unix;
@@ -7788,6 +8297,7 @@ let _octez_codec =
          octez_event_logging |> open_;
          octez_signer_services;
          octez_version_value;
+         octez_dal_node_gossipsub_lib;
        ]
       @ Protocol.all_optionally
       @@ [
@@ -7811,6 +8321,8 @@ let _octez_snoop =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_stdlib_unix |> open_;
@@ -7844,6 +8356,8 @@ let _octez_injector_server =
     ~linkall:true
     ~deps:
       ([
+         octez_rustzcash_deps;
+         bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_injector_lib |> open_;
          octez_stdlib_unix |> open_;
@@ -7868,7 +8382,10 @@ let _RPC_toy =
     ~linkall:true
     ~deps:
       [
-        octez_stdlib_unix; octez_base |> open_ ~m:"TzPervasives"; cohttp_lwt_unix;
+        bls12_381_archive;
+        octez_stdlib_unix;
+        octez_base |> open_ ~m:"TzPervasives";
+        cohttp_lwt_unix;
       ]
 
 (* We use Dune's select statement and keep uTop optional. Keeping uTop
@@ -7889,6 +8406,7 @@ let _tztop =
     ~profile:"octez-dev-deps"
     ~deps:
       [
+        bls12_381_archive;
         (* The following deps come from the original dune file. *)
         octez_protocol_compiler_lib;
         octez_base;
@@ -7910,6 +8428,8 @@ let _octez_signer =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_clic;
@@ -7941,6 +8461,8 @@ let _octez_tps_evaluation =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         caqti;
         caqti_dynload;
@@ -8009,13 +8531,13 @@ let _octez_dal_node =
     ~with_macos_security_framework:true
     ~deps:
       ([
+         octez_rustzcash_deps;
+         bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_base_unix;
          octez_version;
          cmdliner;
          octez_client_base |> open_;
-         octez_client_base_unix |> open_;
-         octez_client_commands |> open_;
          octez_rpc_http |> open_;
          octez_rpc_http_server;
          octez_protocol_updater;
@@ -8035,6 +8557,8 @@ let _octez_dal_node =
          octez_crypto |> open_;
          octez_base_p2p_identity_file |> open_;
          octez_shell_services |> open_;
+         opentelemetry;
+         opentelemetry_client_cohttp_lwt;
          prometheus_app;
          prometheus;
          octez_crawler |> open_;
@@ -8042,103 +8566,6 @@ let _octez_dal_node =
        ]
       @ protocol_deps)
     ~conflicts:[Conflicts.checkseum]
-
-let _octez_dac_node =
-  let protocol_deps =
-    let deps_for_protocol protocol =
-      let is_optional =
-        match (Protocol.status protocol, Protocol.number protocol) with
-        | _, V 000 ->
-            (* The node always needs to be linked with this protocol for Mainnet. *)
-            false
-        | Active, V _ ->
-            (* Active protocols cannot be optional because of a bug
-               that results in inconsistent hashes. Once this bug is fixed,
-               this exception can be removed. *)
-            false
-        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) ->
-            (* Other protocols are optional. *)
-            true
-      in
-      let targets = List.filter_map Fun.id [Protocol.dac protocol] in
-      if is_optional then List.map optional targets else targets
-    in
-    List.map deps_for_protocol Protocol.all |> List.flatten
-  in
-  public_exe
-    "octez-dac-node"
-    ~path:"src/bin_dac_node"
-    ~internal_name:"main_dac"
-    ~synopsis:"Tezos: `octez-dac-node` binary"
-    ~release_status:Released
-    ~with_macos_security_framework:true
-    ~deps:
-      ([
-         octez_base |> open_ ~m:"TzPervasives";
-         octez_base_unix;
-         octez_clic;
-         octez_client_base |> open_;
-         octez_client_base_unix |> open_;
-         octez_client_commands |> open_;
-         octez_rpc_http |> open_;
-         octez_rpc_http_server;
-         octez_protocol_updater;
-         octez_rpc_http_client_unix;
-         octez_stdlib_unix |> open_;
-         octez_stdlib |> open_;
-         octez_dac_lib |> open_;
-         octez_dac_node_lib |> open_;
-         octez_layer2_store |> open_;
-         irmin_pack;
-         irmin_pack_unix;
-         irmin;
-       ]
-      @ protocol_deps)
-    ~conflicts:[Conflicts.checkseum]
-
-let _octez_dac_client =
-  let protocol_deps =
-    let deps_for_protocol protocol =
-      let is_optional =
-        match (Protocol.status protocol, Protocol.number protocol) with
-        | _, V 000 ->
-            (* The node always needs to be linked with this protocol for Mainnet. *)
-            false
-        | Active, V _ ->
-            (* Active protocols cannot be optional because of a bug
-               that results in inconsistent hashes. Once this bug is fixed,
-               this exception can be removed. *)
-            false
-        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) ->
-            (* Other protocols are optional. *)
-            true
-      in
-      let targets = List.filter_map Fun.id [Protocol.dac protocol] in
-      if is_optional then List.map optional targets else targets
-    in
-    List.map deps_for_protocol Protocol.all |> List.flatten
-  in
-  public_exe
-    "octez-dac-client"
-    ~path:"src/bin_dac_client"
-    ~internal_name:"main_dac_client"
-    ~synopsis:"Tezos: `octez-dac-client` binary"
-    ~release_status:Released
-    ~with_macos_security_framework:true
-    ~deps:
-      ([
-         octez_base |> open_ ~m:"TzPervasives";
-         octez_base_unix;
-         octez_clic;
-         octez_client_base |> open_;
-         octez_client_base_unix |> open_;
-         octez_client_commands |> open_;
-         octez_stdlib_unix |> open_;
-         octez_stdlib |> open_;
-         octez_dac_lib |> open_;
-         octez_dac_client_lib |> open_;
-       ]
-      @ protocol_deps)
 
 let _octez_smart_rollup_node =
   let protocol_deps =
@@ -8165,6 +8592,8 @@ let _octez_smart_rollup_node =
     ~with_macos_security_framework:true
     ~deps:
       ([
+         octez_rust_deps;
+         bls12_381_archive;
          octez_base |> open_ |> open_ ~m:"TzPervasives"
          |> open_ ~m:"TzPervasives.Error_monad";
          octez_clic;
@@ -8222,11 +8651,13 @@ let _octez_smart_rollup_node_lib_tests =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rust_deps;
         octez_base |> open_ ~m:"TzPervasives"
         |> open_ ~m:"TzPervasives.Error_monad";
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         octez_layer2_store |> open_;
+        octez_layer2_irmin_context |> open_;
         octez_smart_rollup_lib |> open_;
         octez_smart_rollup_node_store_lib |> open_;
         octez_smart_rollup_node_lib |> open_;
@@ -8259,7 +8690,7 @@ let octez_scoru_wasm_debugger_lib =
         Protocol.(client_exn alpha);
         cohttp_lwt_unix;
         octez_scoru_wasm;
-        octez_scoru_wasm_helpers |> open_;
+        octez_scoru_wasm_helpers_intf |> open_;
         octez_smart_rollup_lib;
         octez_webassembly_interpreter |> open_;
         octez_webassembly_interpreter_extra |> open_;
@@ -8278,7 +8709,13 @@ let _octez_scoru_wasm_debugger =
     ~synopsis:"Tezos: Debugger for the smart rollups’ WASM kernels"
     ~release_status:Released
     ~with_macos_security_framework:true
-    ~deps:[octez_scoru_wasm_debugger_lib |> open_]
+    ~deps:
+      [
+        octez_rust_deps;
+        bls12_381_archive;
+        octez_scoru_wasm_helpers |> open_;
+        octez_scoru_wasm_debugger_lib |> open_;
+      ]
 
 let _octez_scoru_wasm_regressions =
   tezt
@@ -8288,6 +8725,7 @@ let _octez_scoru_wasm_regressions =
     ~synopsis:"WASM PVM regressions"
     ~deps:
       [
+        octez_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_scoru_wasm |> open_;
         octez_scoru_wasm_helpers;
@@ -8328,6 +8766,8 @@ let _tezt_long_tests =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_performance_regression |> open_;
@@ -8352,6 +8792,8 @@ let _tezt_manual_tests =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_;
@@ -8365,7 +8807,12 @@ let _tezt_remote_tests =
     ~path:"tezt/remote_tests"
     ~bisect_ppx:No
     ~with_macos_security_framework:true
-    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
+    ~deps:
+      [
+        bls12_381_archive;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_;
+      ]
 
 let _tezt_snoop =
   private_exe
@@ -8374,7 +8821,12 @@ let _tezt_snoop =
     ~path:"tezt/snoop"
     ~bisect_ppx:No
     ~with_macos_security_framework:true
-    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
+    ~deps:
+      [
+        bls12_381_archive;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_;
+      ]
 
 let _tezt_vesting_contract_test =
   private_exe
@@ -8385,6 +8837,8 @@ let _tezt_vesting_contract_test =
     ~with_macos_security_framework:true
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_;
         octez_stdlib;
@@ -8404,6 +8858,8 @@ let _docs_doc_gen =
     ~release_status:Unreleased
     ~deps:
       ([
+         octez_rustzcash_deps;
+         bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_rpc;
          octez_stdlib_unix |> open_;
@@ -8428,6 +8884,8 @@ let _docs_doc_gen_errors =
     ~linkall:true
     ~deps:
       [
+        octez_rustzcash_deps;
+        bls12_381_archive;
         octez_base |> open_;
         octez_error_monad |> open_;
         data_encoding |> open_;

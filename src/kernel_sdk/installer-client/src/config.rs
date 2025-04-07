@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -19,6 +20,8 @@ pub enum ConfigurationError {
     FileNotFound(std::io::Error),
     #[error("Unable to parse config file: {0}.")]
     ParseError(serde_yaml::Error),
+    #[error("Unable to serialize yaml file: {0}.")]
+    SerializeError(serde_yaml::Error),
     #[error("Unable to convert config to a valid program: {0}.")]
     YamlConfigInvalid(#[from] ConfigConversionError),
 }
@@ -28,6 +31,29 @@ const PREPARE_KERNEL_PATH: RefPath = RefPath::assert_from(b"/installer/kernel/bo
 
 // Path of currently running kernel.
 const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
+
+fn setup_file_to_config(setup_file: &OsString) -> Result<YamlConfig, ConfigurationError> {
+    let setup_file =
+        File::open(Path::new(&setup_file)).map_err(ConfigurationError::FileNotFound)?;
+    let yaml_config: YamlConfig =
+        YamlConfig::from_reader(setup_file).map_err(ConfigurationError::ParseError)?;
+    Ok(yaml_config)
+}
+
+pub fn merge_install_configs(
+    setup_files: Vec<OsString>,
+) -> Result<String, ConfigurationError> {
+    let mut merged_yaml_instructions = vec![];
+    for setup_file in setup_files {
+        let yaml = setup_file_to_config(&setup_file)?;
+        merged_yaml_instructions.extend(yaml.instructions);
+    }
+
+    let merged_yaml_config = YamlConfig {
+        instructions: merged_yaml_instructions,
+    };
+    serde_yaml::to_string(&merged_yaml_config).map_err(ConfigurationError::SerializeError)
+}
 
 pub fn create_installer_config(
     root_hash: PreimageHash,
@@ -52,10 +78,7 @@ pub fn create_installer_config(
     let setup_program: OwnedConfigProgram = match setup_file {
         None => OwnedConfigProgram(vec![]),
         Some(setup_file) => {
-            let setup_file = File::open(Path::new(&setup_file))
-                .map_err(ConfigurationError::FileNotFound)?;
-            let yaml_config: YamlConfig = YamlConfig::from_reader(setup_file)
-                .map_err(ConfigurationError::ParseError)?;
+            let yaml_config = setup_file_to_config(&setup_file)?;
             yaml_config.to_config_program(content_to_config)?
         }
     };

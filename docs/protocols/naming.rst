@@ -43,6 +43,7 @@ sequence:
 * 017 Nairobi
 * 018 Oxford
 * 019 Paris
+* 020 Quebec
 * ...
 
 Due to the evolving nature of the in-use protocols, the above absolute protocol

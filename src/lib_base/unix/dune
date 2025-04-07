@@ -12,11 +12,17 @@
   octez-libs.hacl
   octez-libs.stdlib
   octez-libs.stdlib-unix
+  octez-libs.octez-profiler
   octez-libs.data-encoding
   uri
   octez-libs.event-logging
-  lwt-exit)
- (inline_tests (flags -verbose) (modes native))
+  lwt-exit
+  terminal)
+ (inline_tests
+  (flags -verbose)
+  (modes native)
+  (executable (link_flags -linkall -cclib -lblst))
+  (libraries bls12-381.archive))
  (preprocess (pps ppx_expect))
  (flags
   (:standard)
@@ -25,6 +31,7 @@
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
+  -open Tezos_profiler
   -open Data_encoding
   -open Tezos_event_logging)
  (foreign_stubs (language c) (flags (:standard)) (names socket)))

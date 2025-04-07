@@ -10,12 +10,18 @@ type mode =
   | Proxy
   | Sequencer
   | Relay
+      (** Relays the transactions when they are valid w.r.t. the local state. *)
   | Forward of {
-      injector : string -> (Ethereum_types.hash, string) result tzresult Lwt.t;
+      injector :
+        Ethereum_types.legacy_transaction_object ->
+        string ->
+        (Ethereum_types.hash, string) result tzresult Lwt.t;
     }
+      (** Forwards the transactions without checking the
+          transaction validity. *)
 
 type parameters = {
-  rollup_node : (module Services_backend_sig.S);  (** The backend RPC module. *)
+  backend : (module Services_backend_sig.S);  (** The backend RPC module. *)
   smart_rollup_address : string;  (** The address of the smart rollup. *)
   mode : mode;
   tx_timeout_limit : int64;  (** TTL of a transaction inside the pool. *)
@@ -40,7 +46,7 @@ val shutdown : unit -> unit tzresult Lwt.t
     The consistency between [transaction_object] and [raw_tx] is assumed by
     [add]. It is the responsibility of the caller to enforce it. *)
 val add :
-  Ethereum_types.transaction_object ->
+  Ethereum_types.legacy_transaction_object ->
   string ->
   (Ethereum_types.hash, string) result tzresult Lwt.t
 
@@ -54,11 +60,11 @@ val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
     `maximum_cumulative_size`. Returns no transactions if the pool is locked. *)
 val pop_transactions :
   maximum_cumulative_size:int ->
-  (string * Ethereum_types.transaction_object) list tzresult Lwt.t
+  (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 
 (** [pop_and_inject_transactions ()] pops the valid transactions from
     the pool using {!pop_transactions} and injects them using
-    [inject_raw_transactions] provided by {!parameters.rollup_node}. *)
+    [inject_raw_transactions] provided by {!parameters.backend}. *)
 val pop_and_inject_transactions : unit -> unit tzresult Lwt.t
 
 (** [pop_and_inject_transactions_lazy ()] same as
@@ -85,6 +91,7 @@ val get_tx_pool_content : unit -> Ethereum_types.txpool tzresult Lwt.t
     [tx_hash] exists and returns it's corresponding
     {!Ethereum_types.transaction_object}. *)
 val find :
-  Ethereum_types.hash -> Ethereum_types.transaction_object option tzresult Lwt.t
+  Ethereum_types.hash ->
+  Ethereum_types.legacy_transaction_object option tzresult Lwt.t
 
 val clear_popped_transactions : unit -> unit tzresult Lwt.t

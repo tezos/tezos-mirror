@@ -101,6 +101,14 @@ type ('a, 'ctx) arg =
       default : string;
     }
       -> ('p, 'ctx) arg
+  | ArgDefSwitch : {
+      doc : string;
+      label : label;
+      placeholder : string;
+      kind : ('p, 'ctx) parameter;
+      default : string;
+    }
+      -> ('p option, 'ctx) arg
   | Switch : {label : label; doc : string} -> (bool, 'ctx) arg
   | Constant : 'a -> ('a, 'ctx) arg
   | Map : {
@@ -220,6 +228,15 @@ let rec print_options_detailed :
         placeholder
         print_desc
         (doc ^ "\nDefaults to `" ^ default ^ "`.")
+  | ArgDefSwitch {label; placeholder; doc; default; _} ->
+      Format.fprintf
+        ppf
+        "@{<opt>%a [%s]@}: %a"
+        print_label
+        label
+        placeholder
+        print_desc
+        (doc ^ "\nDefaults to `" ^ default ^ "`.")
   | Switch {label; doc} ->
       Format.fprintf ppf "@{<opt>%a@}: %a" print_label label print_desc doc
   | Constant _ -> ()
@@ -233,9 +250,15 @@ let rec print_options_detailed :
         specb
   | Map {spec; converter = _} -> print_options_detailed ppf spec
 
+let rec has_argDefSwitch : type a ctx. (a, ctx) arg -> bool = function
+  | ArgDefSwitch _ -> true
+  | Constant _ | Arg _ | MultipleArg _ | DefArg _ | Switch _ -> false
+  | Pair (speca, specb) -> has_argDefSwitch speca || has_argDefSwitch specb
+  | Map {spec; _} -> has_argDefSwitch spec
+
 let rec has_args : type a ctx. (a, ctx) arg -> bool = function
   | Constant _ -> false
-  | Arg _ | MultipleArg _ | DefArg _ | Switch _ -> true
+  | Arg _ | MultipleArg _ | DefArg _ | ArgDefSwitch _ | Switch _ -> true
   | Pair (speca, specb) -> has_args speca || has_args specb
   | Map {spec; _} -> has_args spec
 
@@ -244,6 +267,8 @@ let rec print_options_brief :
  fun ppf -> function
   | DefArg {label; placeholder; _} ->
       Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
+  | ArgDefSwitch {label; placeholder; _} ->
+      Format.fprintf ppf "[@{<opt>%a [%s]@}]" print_label label placeholder
   | Arg {label; placeholder; _} ->
       Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
   | MultipleArg {label; placeholder; _} ->
@@ -479,6 +504,7 @@ let setup_formatter ppf format verbosity =
            | "details" -> push_level (Details, op)
            | "short" -> push_level (Short, op)
            | "terse" -> push_level (Terse, op)
+           | tag when Pretty_printing.handles tag -> ()
            | tag ->
                Stdlib.failwith
                  ("Tezos_clic: invalid semantic string tag <" ^ tag ^ ">")
@@ -504,6 +530,7 @@ let setup_formatter ppf format verbosity =
      | Format.String_tag "=short"
      | Format.String_tag "=terse" ->
          pop_level ()
+     | Format.String_tag tag when Pretty_printing.handles tag -> ()
      | Format.String_tag tag ->
          Stdlib.failwith
            ("Tezos_clic: invalid semantic string tag <" ^ tag ^ ">")
@@ -740,7 +767,12 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
     Format.pp_print_list
       ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,@,")
       (print_group (fun ppf (Ex command) ->
-           print_command ?prefix:None ~highlights ppf command))
+           print_command
+             ?prefix:
+               (Some (fun ppf () -> Format.fprintf ppf "%s " executable_name))
+             ~highlights
+             ppf
+             command))
   in
   let pp_print_global_options ppf = function
     | Constant _ -> ()
@@ -805,6 +837,9 @@ let multiple_arg ~doc ?short ~long ~placeholder kind =
 
 let default_arg ~doc ?short ~long ~placeholder ~default kind =
   DefArg {doc; placeholder; label = {long; short}; kind; default}
+
+let arg_or_switch ~doc ?short ~long ~placeholder ~default kind =
+  ArgDefSwitch {doc; placeholder; label = {long; short}; kind; default}
 
 let map_arg ~f:converter spec = Map {spec; converter}
 
@@ -1000,12 +1035,14 @@ let args25 a b c d e f g h i j k l m n o p q r s t u v w x y =
 
 let switch ~doc ?short ~long () = Switch {doc; label = {long; short}}
 
+type occurrence = Occ_empty | Occ_with_value of string
+
 (* Argument parsing *)
 let rec parse_arg :
     type a ctx.
     ?command:_ command ->
     (a, ctx) arg ->
-    string list StringMap.t ->
+    occurrence list StringMap.t ->
     ctx ->
     a tzresult Lwt.t =
  fun ?command spec args_dict ctx ->
@@ -1014,12 +1051,14 @@ let rec parse_arg :
   | Arg {label = {long; short = _}; kind = {converter; _}; _} -> (
       match StringMap.find_opt long args_dict with
       | None | Some [] -> return_none
-      | Some [s] ->
+      | Some [Occ_with_value s] ->
           let+ x =
             trace_eval (fun () -> Bad_option_argument ("--" ^ long, command))
             @@ converter ctx s
           in
           Some x
+      | Some [Occ_empty] ->
+          invalid_arg (Format.sprintf "'%s' must contain a value." long)
       | Some (_ :: _) -> tzfail (Multiple_occurrences ("--" ^ long, command)))
   | MultipleArg {label = {long; short = _}; kind = {converter; _}; _} -> (
       match StringMap.find_opt long args_dict with
@@ -1027,10 +1066,16 @@ let rec parse_arg :
       | Some l ->
           let+ x =
             List.map_es
-              (fun s ->
-                trace_eval (fun () ->
-                    Bad_option_argument ("--" ^ long, command))
-                @@ converter ctx s)
+              (function
+                | Occ_empty ->
+                    invalid_arg
+                      (Format.sprintf
+                         "'%s' must contain a value for each occurrence."
+                         long)
+                | Occ_with_value s ->
+                    trace_eval (fun () ->
+                        Bad_option_argument ("--" ^ long, command))
+                    @@ converter ctx s)
               l
           in
           Some x)
@@ -1046,13 +1091,37 @@ let rec parse_arg :
       | Ok default -> (
           match StringMap.find_opt long args_dict with
           | None | Some [] -> return default
-          | Some [s] ->
+          | Some [Occ_with_value s] ->
               trace (Bad_option_argument (long, command)) (converter ctx s)
+          | Some [Occ_empty] ->
+              invalid_arg (Format.sprintf "'%s' must contain a value." long)
+          | Some (_ :: _) -> tzfail (Multiple_occurrences (long, command))))
+  | ArgDefSwitch {label = {long; short = _}; kind = {converter; _}; default; _}
+    -> (
+      let*! r = converter ctx default in
+      match r with
+      | Error _ ->
+          invalid_arg
+            (Format.sprintf
+               "Value provided as default for '%s' could not be parsed by \
+                converter function."
+               long)
+      | Ok default -> (
+          match StringMap.find_opt long args_dict with
+          | None | Some [] -> return_none
+          | Some [Occ_empty] -> return_some default
+          | Some [Occ_with_value s] ->
+              let+ x =
+                trace_eval (fun () ->
+                    Bad_option_argument ("--" ^ long, command))
+                @@ converter ctx s
+              in
+              Some x
           | Some (_ :: _) -> tzfail (Multiple_occurrences (long, command))))
   | Switch {label = {long; short = _}; _} -> (
       match StringMap.find_opt long args_dict with
       | None | Some [] -> return_false
-      | Some [_] -> return_true
+      | Some [Occ_empty] -> return_true
       | Some (_ :: _) -> tzfail (Multiple_occurrences (long, command)))
   | Constant c -> return c
   | Pair (speca, specb) ->
@@ -1067,7 +1136,9 @@ let empty_args_dict = StringMap.empty
 
 let rec make_arities_dict :
     type a b.
-    (a, b) arg -> (int * string) StringMap.t -> (int * string) StringMap.t =
+    (a, b) arg ->
+    (int list * string) StringMap.t ->
+    (int list * string) StringMap.t =
  fun arg acc ->
   let add {long; short} num =
     (match short with
@@ -1077,10 +1148,11 @@ let rec make_arities_dict :
     |> StringMap.add ("--" ^ long) (num, long)
   in
   match arg with
-  | Arg {label; _} -> add label 1
-  | MultipleArg {label; _} -> add label 1
-  | DefArg {label; _} -> add label 1
-  | Switch {label; _} -> add label 0
+  | Arg {label; _} -> add label [1]
+  | MultipleArg {label; _} -> add label [1]
+  | DefArg {label; _} -> add label [1]
+  | ArgDefSwitch {label; _} -> add label [0; 1]
+  | Switch {label; _} -> add label [0]
   | Constant _c -> acc
   | Pair (speca, specb) ->
       let acc = make_arities_dict speca acc in
@@ -1109,9 +1181,9 @@ let add_occurrence long value acc =
     (function Some v -> Some (v @ [value]) | None -> Some [value])
     acc
 
-let make_args_dict_consume ?command spec args =
+let make_args_dict_consume_for_global_options ?command spec args =
   let open Lwt_result_syntax in
-  let rec make_args_dict completing arities acc args =
+  let rec make_args_dict arities acc args =
     let* () = check_help_flag ?command args in
     let* () = check_version_flag args in
     match args with
@@ -1122,32 +1194,26 @@ let make_args_dict_consume ?command spec args =
           | Some (arity, long) -> (
               let* () = check_help_flag ?command tl in
               match (arity, tl) with
-              | 0, tl' ->
+              | [0], tl' ->
+                  make_args_dict arities (add_occurrence long Occ_empty acc) tl'
+              | [1], value :: tl' ->
                   make_args_dict
-                    completing
                     arities
-                    (add_occurrence long "" acc)
+                    (add_occurrence long (Occ_with_value value) acc)
                     tl'
-              | 1, value :: tl' ->
-                  make_args_dict
-                    completing
-                    arities
-                    (add_occurrence long value acc)
-                    tl'
-              | 1, [] when completing -> return (acc, [])
-              | 1, [] -> tzfail (Option_expected_argument (arg, None))
+              | [1], [] -> tzfail (Option_expected_argument (arg, None))
               | _, _ ->
                   Stdlib.failwith
-                    "cli_entries: Arguments with arity not equal to 1 or 0 \
-                     unsupported")
+                    "cli_entries: Global arguments with arity not equal to [1] \
+                     or [0] unsupported. "
+              (* ArgDefSwitch is the only option with an arity
+                 different to [0; 1], which is not allowed in global
+                 argument. `make_args_dict_consume_for_global_options`
+                 is only used to produce global arg for now. *))
           | None -> tzfail (Unknown_option (arg, None))
         else return (acc, args)
   in
-  make_args_dict
-    false
-    (make_arities_dict spec StringMap.empty)
-    StringMap.empty
-    args
+  make_args_dict (make_arities_dict spec StringMap.empty) StringMap.empty args
 
 let make_args_dict_filter ?command spec args =
   let open Lwt_result_syntax in
@@ -1160,17 +1226,31 @@ let make_args_dict_filter ?command spec args =
         | Some (arity, long) -> (
             let* () = check_help_flag ?command tl in
             match (arity, tl) with
-            | 0, tl ->
+            | [0; 1], value :: _ when String.length value > 0 && value.[0] = '-'
+              ->
+                (* Using arity 0 of the argument *)
                 make_args_dict
                   arities
-                  (add_occurrence long "" dict, other_args)
+                  (add_occurrence long Occ_empty dict, other_args)
                   tl
-            | 1, value :: tl' ->
+            | [0; 1], value :: tl' ->
+                (* Using arity 1 of the argument *)
                 make_args_dict
                   arities
-                  (add_occurrence long value dict, other_args)
+                  (add_occurrence long (Occ_with_value value) dict, other_args)
                   tl'
-            | 1, [] -> tzfail (Option_expected_argument (arg, command))
+            | [0; 1], ([] as tl) (* Using arity 0 of the argument *) | [0], tl
+              ->
+                make_args_dict
+                  arities
+                  (add_occurrence long Occ_empty dict, other_args)
+                  tl
+            | [1], value :: tl' ->
+                make_args_dict
+                  arities
+                  (add_occurrence long (Occ_with_value value) dict, other_args)
+                  tl'
+            | [1], [] -> tzfail (Option_expected_argument (arg, command))
             | _, _ ->
                 Stdlib.failwith
                   "cli_entries: Arguments with arity not equal to 1 or 0 \
@@ -1340,8 +1420,11 @@ and 'ctx tree =
   | TNonTerminalSeq : 'ctx non_terminal_seq_level -> 'ctx tree
   | TEmpty : 'ctx tree
 
-let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
- fun root (Command {params; conv; _} as command) ->
+let insert_in_dispatch_tree :
+    type ctx. ?enable_argDefSwitch:bool -> ctx tree -> ctx command -> ctx tree =
+ fun ?(enable_argDefSwitch = false)
+     root
+     (Command {params; conv; options; _} as command) ->
   let rec insert_tree :
       type a ictx. (ctx -> ictx) -> ctx tree -> (a, ictx) params -> ctx tree =
    fun conv t c ->
@@ -1412,10 +1495,17 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
                print_commandline ppf ([], options, params))
              command)
   in
+  let () =
+    if (not enable_argDefSwitch) && has_argDefSwitch options then
+      Stdlib.failwith
+        "Internal error: argDefSwitch is not enabled for this binary. Please \
+         fill an issue at https://gitlab.com/tezos/tezos/-/issues"
+    else ()
+  in
   insert_tree conv root params
 
-let make_dispatch_tree commands =
-  List.fold_left insert_in_dispatch_tree TEmpty commands
+let make_dispatch_tree ?enable_argDefSwitch commands =
+  List.fold_left (insert_in_dispatch_tree ?enable_argDefSwitch) TEmpty commands
 
 let rec gather_commands ?(acc = []) tree =
   match tree with
@@ -1540,6 +1630,7 @@ let rec list_args : type a ctx. (a, ctx) arg -> string list = function
   | Arg {label; _}
   | MultipleArg {label; _}
   | DefArg {label; _}
+  | ArgDefSwitch {label; _}
   | Switch {label; _} ->
       get_arg label
   | Pair (speca, specb) -> list_args speca @ list_args specb
@@ -1560,6 +1651,7 @@ let rec remaining_spec : type a ctx. StringSet.t -> (a, ctx) arg -> string list
   | Arg {label; _}
   | MultipleArg {label; _}
   | DefArg {label; _}
+  | ArgDefSwitch {label; _}
   | Switch {label; _} ->
       if StringSet.mem label.long seen then [] else get_arg label
   | Pair (speca, specb) -> remaining_spec seen speca @ remaining_spec seen specb
@@ -1574,6 +1666,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
     function
     | Constant _ -> return_none
     | DefArg {kind = {autocomplete; _}; label; _}
+    | ArgDefSwitch {kind = {autocomplete; _}; label; _}
     | Arg {kind = {autocomplete; _}; label; _}
       when label.long = name ->
         let* p = complete_func autocomplete ctx in
@@ -1582,7 +1675,8 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
         let* p = complete_func autocomplete ctx in
         return_some p
     | Switch {label; _} when label.long = name -> return_some []
-    | Arg _ | MultipleArg _ | DefArg _ | Switch _ -> return_none
+    | Arg _ | MultipleArg _ | DefArg _ | ArgDefSwitch _ | Switch _ ->
+        return_none
     | Pair (speca, specb) -> (
         let* resa = complete_spec name speca in
         match resa with
@@ -1592,6 +1686,21 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   in
   let rec help args ind seen =
     let open Lwt_result_syntax in
+    let arity_0_help_cont ind args seen =
+      if ind = 0 then
+        let+ cont_args = continuation args 0 in
+        remaining_spec seen args_spec @ cont_args
+      else help args (ind - 1) seen
+    in
+    let arity_1_help_cont ind arg args seen =
+      if ind = 1 then
+        let* res = complete_spec arg args_spec in
+        return (Option.value ~default:[] res)
+      else
+        match args with
+        | _ :: tl -> help tl (ind - 2) seen
+        | [] -> Stdlib.failwith "cli_entries internal error, invalid arity"
+    in
     match args with
     | _ when ind = 0 ->
         let+ cont_args = continuation args 0 in
@@ -1601,15 +1710,16 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
         match StringMap.find arg arities with
         | Some (arity, long) -> (
             let seen = StringSet.add long seen in
-            match (arity, tl) with
-            | 0, args when ind = 0 ->
-                let+ cont_args = continuation args 0 in
-                remaining_spec seen args_spec @ cont_args
-            | 0, args -> help args (ind - 1) seen
-            | 1, _ when ind = 1 ->
-                let* res = complete_spec arg args_spec in
-                return (Option.value ~default:[] res)
-            | 1, _ :: tl -> help tl (ind - 2) seen
+            match arity with
+            | [0; 1] -> (
+                match List.hd tl with
+                | None -> arity_0_help_cont ind tl seen
+                | Some value ->
+                    if String.length value > 0 && value.[0] = '-' then
+                      arity_0_help_cont ind tl seen
+                    else arity_1_help_cont ind arg tl seen)
+            | [0] -> arity_0_help_cont ind tl seen
+            | [1] -> arity_1_help_cont ind arg tl seen
             | _ -> Stdlib.failwith "cli_entries internal error, invalid arity")
         | None -> continuation args ind)
   in
@@ -1714,13 +1824,25 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
 
 let parse_global_options global_options ctx args =
   let open Lwt_result_syntax in
-  let* dict, remaining = make_args_dict_consume global_options args in
-  let* nested = parse_arg global_options dict ctx in
-  return (nested, remaining)
+  if has_argDefSwitch global_options then
+    Stdlib.failwith "ArgDefSwitch is not supported for global options."
+    (* With current code and this failwith removed, an ArgDefSwitch
+       option used as the last global option before the command would
+       consume the first keyword of the command. Support for making
+       `ArgDefSwitch`, would require a rework of how global args
+       works. I think by parsing the line in full instead of parsing
+       first global argument then the rest of the command would
+       work. *)
+  else
+    let* dict, remaining =
+      make_args_dict_consume_for_global_options global_options args
+    in
+    let* nested = parse_arg global_options dict ctx in
+    return (nested, remaining)
 
-let dispatch commands ctx args =
+let dispatch ?enable_argDefSwitch commands ctx args =
   let open Lwt_result_syntax in
-  let tree = make_dispatch_tree commands in
+  let tree = make_dispatch_tree ?enable_argDefSwitch commands in
   match args with
   | []
     when match tree with

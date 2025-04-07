@@ -170,11 +170,11 @@ let extract_history ~data_dir ~output_dir =
   use_data_dir data_dir @@ fun () ->
   let* _, config = Shared_arg.resolve_data_dir_and_config_file ~data_dir () in
   let store_dir = data_dir // "store" in
-  let context_dir = data_dir // "context" in
+  let context_root_dir = data_dir in
   let* store =
     Store.init
       ~store_dir
-      ~context_dir
+      ~context_root_dir
       ~allow_testchains:false
       ~readonly:true
       config.blockchain_network.genesis
@@ -196,7 +196,7 @@ let extract_history ~data_dir ~output_dir =
       ~rolling:true
       ~block:(`Hash (Store.Block.hash snapshotted_block, 0))
       ~store_dir
-      ~context_dir
+      ~context_root_dir
       ~chain_name:config.blockchain_network.chain_name
       ~progress_display_mode:Animation.Auto
       Snapshots.Tar
@@ -318,7 +318,7 @@ let patch_block_time ~data_dir ~block_time_target ~patch_max_op_ttl =
     Store.init
       ~readonly:false
       ~store_dir:(data_dir // "store")
-      ~context_dir:(data_dir // "context")
+      ~context_root_dir:data_dir
       ~allow_testchains:false
       config.blockchain_network.genesis
   in
@@ -392,7 +392,7 @@ let commands =
           Store.init
             ~readonly:true
             ~store_dir:(data_dir // "store")
-            ~context_dir:(data_dir // "context")
+            ~context_root_dir:data_dir
             ~allow_testchains:false
             config.blockchain_network.genesis
         in

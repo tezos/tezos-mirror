@@ -31,7 +31,7 @@ let make_section_prefix ~pattern level =
   Format.sprintf "%s:%s" pattern (Internal_event.Level.opt_to_string level)
 
 let make_config_uri ?level ?daily_logs ?create_dirs ?format ?chmod ?with_pid
-    ?colors ?fresh ?(section_prefixes = []) kind =
+    ?colors ?fresh ?(section_prefixes = []) ?advertise_levels kind =
   let scheme, path =
     match kind with
     | `Stdout -> ("file-descriptor-stdout", None)
@@ -59,7 +59,8 @@ let make_config_uri ?level ?daily_logs ?create_dirs ?format ?chmod ?with_pid
       |> add "daily-logs" string_of_int daily_logs
       |> add "fresh" bool fresh |> add "colors" bool colors
       |> add "chmod" string_of_int chmod
-      |> add "with_pid" bool with_pid)
+      |> add "with_pid" bool with_pid
+      |> add "advertise-levels" bool advertise_levels)
     ()
 
 let short_stdout_uri = make_config_uri ~format:"pp-short" ~level:Notice `Stdout
@@ -71,6 +72,8 @@ let empty = {active_sinks = []}
 let is_empty {active_sinks} = active_sinks = []
 
 let make_custom active_sinks = {active_sinks}
+
+let add_uri_to_config uri {active_sinks} = {active_sinks = uri :: active_sinks}
 
 let encoding =
   let open Data_encoding in

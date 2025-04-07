@@ -4,6 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
+
 open Ethereum_types
 
 (**
@@ -49,28 +50,18 @@ type valid_filter = {
   address : address list;
 }
 
+type bloom_filter = {
+  bloom : Ethbloom.t;
+  topics : Filter.topic option list;
+  address : address list;
+}
+
 type error +=
   | Incompatible_block_params
   | Block_range_too_large of {limit : int}
   | Topic_list_too_large
-  | Receipt_not_found of Ethereum_types.hash
+  | Receipt_not_found of hash
   | Too_many_logs of {limit : int}
-
-(** [height_from_param (module Rollup_node_rpc) from to_] returns the
-    block height for params [from] and [to_] as a tuple.
-*)
-let height_from_param (module Rollup_node_rpc : Services_backend_sig.S) from to_
-    =
-  let open Lwt_result_syntax in
-  let open Block_parameter in
-  match (from, to_) with
-  | Number h1, Number h2 -> return (h1, h2)
-  | Number h1, _ ->
-      let+ h2 = Rollup_node_rpc.Block_storage.current_block_number () in
-      (h1, h2)
-  | _, _ ->
-      let+ h = Rollup_node_rpc.Block_storage.current_block_number () in
-      (h, h)
 
 let valid_range log_filter_config (Qty from) (Qty to_) =
   Z.(
@@ -87,7 +78,8 @@ let validate_range log_filter_config
     (module Rollup_node_rpc : Services_backend_sig.S) (filter : Filter.t) =
   let open Lwt_result_syntax in
   match filter with
-  | {from_block = Some _; to_block = Some _; block_hash = Some _; _} ->
+  | {block_hash = Some _; from_block = Some _; _}
+  | {block_hash = Some _; to_block = Some _; _} ->
       tzfail Incompatible_block_params
   | {block_hash = Some block_hash; _} ->
       let* block =
@@ -95,15 +87,18 @@ let validate_range log_filter_config
           ~full_transaction_object:false
           block_hash
       in
-      return (block.number, block.number)
+      return_some (block.number, block.number)
   | {from_block; to_block; _} ->
-      let from_block = Option.value ~default:Latest from_block in
-      let to_block = Option.value ~default:Latest to_block in
-      let* from_block, to_block =
-        height_from_param (module Rollup_node_rpc) from_block to_block
+      let get_block_number block_param =
+        Rollup_node_rpc.block_param_to_block_number
+          (Block_parameter
+             (Option.value ~default:Block_parameter.Latest block_param))
       in
-      if valid_range log_filter_config from_block to_block then
-        return (from_block, to_block)
+      let* from_block = get_block_number from_block in
+      let* to_block = get_block_number to_block in
+      if from_block > to_block then return_none
+      else if valid_range log_filter_config from_block to_block then
+        return_some (from_block, to_block)
       else
         tzfail (Block_range_too_large {limit = log_filter_config.max_nb_blocks})
 
@@ -129,36 +124,50 @@ let validate_topics (filter : Filter.t) =
       tzfail Topic_list_too_large
   | _ -> return_unit
 
-(* Parsing a filter into a simpler representation, this is the
-   input validation step *)
-let validate_filter log_filter_config
-    (module Rollup_node_rpc : Services_backend_sig.S) :
-    Filter.t -> valid_filter tzresult Lwt.t =
- fun filter ->
+let validate_bloom_filter (filter : Filter.t) =
   let open Lwt_result_syntax in
-  let* from_block, to_block =
-    validate_range log_filter_config (module Rollup_node_rpc) filter
-  in
   let* () = validate_topics filter in
   let bloom = make_bloom filter in
+  let topics = Option.value ~default:[] filter.topics in
   let address =
     Option.map (function Filter.Single a -> [a] | Vec l -> l) filter.address
     |> Option.value ~default:[]
   in
-  return
-    {
-      from_block;
-      to_block;
-      bloom;
-      topics = Option.value ~default:[] filter.topics;
-      address;
-    }
+  return {bloom; topics; address}
+
+(* Parsing a filter into a simpler representation, this is the
+   input validation step *)
+let validate_filter log_filter_config
+    (module Rollup_node_rpc : Services_backend_sig.S) filter =
+  let open Lwt_result_syntax in
+  let* range =
+    validate_range log_filter_config (module Rollup_node_rpc) filter
+  in
+  match range with
+  | None -> return_none
+  | Some (from_block, to_block) ->
+      let* () = validate_topics filter in
+      let bloom = make_bloom filter in
+      let address =
+        Option.map
+          (function Filter.Single a -> [a] | Vec l -> l)
+          filter.address
+        |> Option.value ~default:[]
+      in
+      return_some
+        {
+          from_block;
+          to_block;
+          bloom;
+          topics = Option.value ~default:[] filter.topics;
+          address;
+        }
 
 let hex_to_bytes h = hex_to_bytes h |> Bytes.of_string
 
 (* Checks if a filter's topics matches a log's topics, as specified in
    https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getfilterchanges *)
-let match_filter_topics (filter : valid_filter) (log_topics : hash list) : bool
+let match_filter_topics (filter : bloom_filter) (log_topics : hash list) : bool
     =
   let match_one_topic (filter_topic : Filter.topic option) (log_topic : hash) =
     match (filter_topic, log_topic) with
@@ -179,11 +188,11 @@ let match_filter_topics (filter : valid_filter) (log_topics : hash list) : bool
   go filter.topics log_topics
 
 (* Checks if a filter's address matches a log's address *)
-let match_filter_address (filter : valid_filter) (address : address) : bool =
+let match_filter_address (filter : bloom_filter) (address : address) : bool =
   List.is_empty filter.address || List.mem ~equal:( = ) address filter.address
 
 (* Apply a filter on one log *)
-let filter_one_log : valid_filter -> transaction_log -> Filter.changes option =
+let filter_one_log : bloom_filter -> transaction_log -> Filter.changes option =
  fun filter log ->
   if
     match_filter_address filter log.address
@@ -191,17 +200,19 @@ let filter_one_log : valid_filter -> transaction_log -> Filter.changes option =
   then Some (Log log)
   else None
 
+let filter_receipt (filter : bloom_filter) (receipt : Transaction_receipt.t) =
+  if Ethbloom.contains_bloom (hex_to_bytes receipt.logsBloom) filter.bloom then
+    Some (List.filter_map (filter_one_log filter) receipt.logs)
+  else None
+
 (* Apply a filter on one transaction *)
 let filter_one_tx (module Rollup_node_rpc : Services_backend_sig.S) :
-    valid_filter -> hash -> Filter.changes list option tzresult Lwt.t =
+    bloom_filter -> hash -> Filter.changes list option tzresult Lwt.t =
  fun filter tx_hash ->
   let open Lwt_result_syntax in
   let* receipt = Rollup_node_rpc.Block_storage.transaction_receipt tx_hash in
   match receipt with
-  | Some receipt ->
-      if Ethbloom.contains_bloom (hex_to_bytes receipt.logsBloom) filter.bloom
-      then return_some @@ List.filter_map (filter_one_log filter) receipt.logs
-      else return_none
+  | Some receipt -> return @@ filter_receipt filter receipt
   | None -> tzfail (Receipt_not_found tx_hash)
 
 (* Apply a filter on one block *)
@@ -221,6 +232,9 @@ let filter_one_block (module Rollup_node_rpc : Services_backend_sig.S) :
         (* Impossible:
            The block is requested without tx objects *)
         assert false
+  in
+  let filter =
+    {bloom = filter.bloom; topics = filter.topics; address = filter.address}
   in
   if Ethbloom.contains_bloom (hex_to_bytes block.logsBloom) filter.bloom then
     let+ changes =
@@ -270,32 +284,39 @@ let get_logs (log_filter_config : Configuration.log_filter_config)
   let* filter =
     validate_filter log_filter_config (module Rollup_node_rpc) filter
   in
-  let (Qty from) = filter.from_block in
-  let (Qty to_) = filter.to_block in
-  let length = Z.(to_int (to_ - from)) + 1 in
-  let block_numbers =
-    split_in_chunks ~chunk_size:log_filter_config.chunk_size ~length ~base:from
-  in
-  let* logs, _n_logs =
-    List.fold_left_es
-      (function
-        | acc_logs, n_logs ->
-            fun chunk ->
-              (* Apply the filter to the entire chunk concurrently *)
-              let* new_logs =
-                Lwt_result.map List.concat
-                @@ List.filter_map_ep
-                     (filter_one_block (module Rollup_node_rpc) filter)
-                     chunk
-              in
-              let n_new_logs = List.length new_logs in
-              if n_logs + n_new_logs > log_filter_config.max_nb_logs then
-                tzfail (Too_many_logs {limit = log_filter_config.max_nb_logs})
-              else return (acc_logs @ new_logs, n_logs + n_new_logs))
-      ([], 0)
-      block_numbers
-  in
-  return logs
+  match filter with
+  | None -> return []
+  | Some filter ->
+      let (Qty from) = filter.from_block in
+      let (Qty to_) = filter.to_block in
+      let length = Z.(to_int (to_ - from)) + 1 in
+      let block_numbers =
+        split_in_chunks
+          ~chunk_size:log_filter_config.chunk_size
+          ~length
+          ~base:from
+      in
+      let* logs, _n_logs =
+        List.fold_left_es
+          (function
+            | acc_logs, n_logs ->
+                fun chunk ->
+                  (* Apply the filter to the entire chunk concurrently *)
+                  let* new_logs =
+                    Lwt_result.map List.concat
+                    @@ List.filter_map_ep
+                         (filter_one_block (module Rollup_node_rpc) filter)
+                         chunk
+                  in
+                  let n_new_logs = List.length new_logs in
+                  if n_logs + n_new_logs > log_filter_config.max_nb_logs then
+                    tzfail
+                      (Too_many_logs {limit = log_filter_config.max_nb_logs})
+                  else return (acc_logs @ new_logs, n_logs + n_new_logs))
+          ([], 0)
+          block_numbers
+      in
+      return logs
 
 (* Errors registration *)
 
@@ -333,7 +354,7 @@ let () =
     ~id:"evm_node_dev_receipt_not_found"
     ~title:"Receipt not found"
     ~description:"Could not found requested receipt"
-    Data_encoding.(obj1 (req "receipt_not_found" Ethereum_types.hash_encoding))
+    Data_encoding.(obj1 (req "receipt_not_found" hash_encoding))
     (function Receipt_not_found hash -> Some hash | _ -> None)
     (fun hash -> Receipt_not_found hash) ;
   register_error_kind

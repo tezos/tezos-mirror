@@ -21,7 +21,7 @@ may become obsolete.
 
 The classification maintained by the prevalidator ensures a strong and usefull
 property: the mempool's validated operations are
-:ref:`co-validable<co-valid_operations>`. Any subset of these operations can
+:ref:`co-validable<co-valid_operations_alpha>`. Any subset of these operations can
 be included in the next block in any order, with confidence that they can be
 applied to the current ledger without causing errors.
 
@@ -183,4 +183,3 @@ the banned operation has already been advertised to peers, and that your local
 node advertises a new manager operation that is conflicting with the former,
 peers will classify the latest ``Branch_delayed`` if they hold the former in
 their mempool.
-

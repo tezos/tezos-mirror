@@ -5,40 +5,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let create_dir ?runner dir =
+  let* () = Process.spawn ?runner "rm" ["-rf"; dir] |> Process.check in
+  let* () = Process.spawn ?runner "mkdir" ["-p"; dir] |> Process.check in
+  Lwt.return_unit
+
 module Node = struct
   include Tezt_tezos.Node
 
   module Agent = struct
-    let create ?(arguments = []) ?data_dir
-        ?(path = Uses.path Constant.octez_node) ?name agent =
+    let create ?rpc_external ?(metadata_size_limit = true) ?(arguments = [])
+        ?data_dir ?(path = Uses.path Constant.octez_node) ?name agent =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       let rpc_port = Agent.next_available_port agent in
       let net_port = Agent.next_available_port agent in
       let metrics_port = Agent.next_available_port agent in
+      let arguments =
+        if metadata_size_limit then
+          Metadata_size_limit (Some 10_000) :: arguments
+        else arguments
+      in
       create
         ?data_dir
         ?name
         ~path
         ?runner
+        ?rpc_external
         ~rpc_port
         ~net_port
         ~metrics_port
         arguments
       |> Lwt.return
 
-    let init ?(arguments = []) ?data_dir ?(path = Uses.path Constant.octez_node)
-        ?name agent =
+    let init ?rpc_external ?(metadata_size_limit = true) ?(arguments = [])
+        ?data_dir ?(path = Uses.path Constant.octez_node) ?name agent =
       let runner = Agent.runner agent in
       let* path = Agent.copy agent ~source:path in
       let rpc_port = Agent.next_available_port agent in
       let net_port = Agent.next_available_port agent in
       let metrics_port = Agent.next_available_port agent in
+      let arguments =
+        if metadata_size_limit then
+          Metadata_size_limit (Some 10_000) :: arguments
+        else arguments
+      in
       init
         ?name
         ?data_dir
         ~path
         ?runner
+        ?rpc_external
         ~rpc_port
         ~net_port
         ~metrics_port
@@ -47,13 +64,24 @@ module Node = struct
   end
 end
 
+module Yes_wallet = struct
+  include Tezt_tezos.Yes_wallet
+
+  module Agent = struct
+    let create ?(path = Uses.path Constant.yes_wallet) ?name agent =
+      let* path = Agent.copy agent ~source:path in
+      let runner = Agent.runner agent in
+      Lwt.return (create ?runner ~path ?name ())
+  end
+end
+
 module Dal_node = struct
   include Tezt_tezos.Dal_node
 
   module Agent = struct
     let create_from_endpoint ?net_port
-        ?(path = Uses.path Constant.octez_dal_node |> Filename.basename) ?name
-        ?rpc_port ~l1_node_endpoint agent =
+        ?(path = Uses.path Constant.octez_dal_node) ?name ?rpc_port
+        ~l1_node_endpoint agent =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       let rpc_port =
@@ -88,16 +116,56 @@ module Dal_node = struct
         ~l1_node_endpoint:(Node.as_rpc_endpoint node)
         agent
 
-    let run ?(memtrace = false) ?event_level dal_node =
+    let run ?otel ?(memtrace = false) ?event_level dal_node =
       let name = name dal_node in
       let filename =
         Format.asprintf "%s/%s-trace.ctf" (Filename.get_temp_dir_name ()) name
       in
       let env =
-        if memtrace then Some (String_map.singleton "MEMTRACE" filename)
-        else None
+        let memtrace_env =
+          if memtrace then String_map.singleton "MEMTRACE" filename
+          else String_map.empty
+        in
+        let otel_env =
+          match otel with
+          | None -> String_map.empty
+          | Some endpoint ->
+              [
+                ("OTEL", "true");
+                ("OTEL_SERVICE_NAME", name);
+                ("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint);
+              ]
+              |> List.to_seq |> String_map.of_seq
+        in
+        String_map.union (fun _ _ _ -> None) otel_env memtrace_env
       in
-      run ?env ?event_level dal_node
+      run ~env ?event_level dal_node
+  end
+end
+
+module Floodgate = struct
+  include Tezt_etherlink.Floodgate
+
+  module Agent = struct
+    let run ?(path = "floodgate") ?scenario ~rpc_endpoint ~controller
+        ?relay_endpoint ?max_active_eoa ?max_transaction_batch_length
+        ?spawn_interval ?tick_interval ?base_fee_factor ?initial_balance agent =
+      let* path = Agent.copy agent ~source:path in
+      let runner = Agent.runner agent in
+      run
+        ?runner
+        ~path
+        ?scenario
+        ~rpc_endpoint
+        ~controller
+        ?relay_endpoint
+        ?max_active_eoa
+        ?max_transaction_batch_length
+        ?spawn_interval
+        ?tick_interval
+        ?base_fee_factor
+        ?initial_balance
+        ()
   end
 end
 
@@ -106,7 +174,7 @@ module Sc_rollup_node = struct
 
   module Agent = struct
     let create ?(path = Uses.path Constant.octez_smart_rollup_node) ?name
-        ?default_operator ?dal_node ~base_dir agent mode l1_node =
+        ?default_operator ?operators ?dal_node ~base_dir agent mode l1_node =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       let rpc_port = Agent.next_available_port agent in
@@ -115,6 +183,7 @@ module Sc_rollup_node = struct
       create
         ?name
         ?default_operator
+        ?operators
         ?dal_node
         ~path
         ?runner
@@ -211,11 +280,10 @@ module Client = struct
   include Client
 
   module Agent = struct
-    let create ?(path = Uses.path Constant.octez_client) ?node agent =
+    let create ?(path = Uses.path Constant.octez_client) ?name ?endpoint agent =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
-      let endpoint = Option.map (fun x -> Node x) node in
-      create ?runner ~path ?endpoint () |> Lwt.return
+      create ?runner ?name ~path ?endpoint () |> Lwt.return
   end
 end
 
@@ -223,22 +291,35 @@ module Baker = struct
   include Baker
 
   module Agent = struct
-    let init ?name ~delegate ~protocol
-        ?(path = Uses.path (Protocol.baker protocol)) ~client dal_node
+    let init ?env ?name ~delegates ~protocol
+        ?(path = Uses.path (Protocol.baker protocol)) ~client ?dal_node
         ?dal_node_timeout_percentage node agent =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       init
+        ?env
         ?name
         ~event_level:`Notice
         ?runner
         ~path
-        ~delegates:[delegate]
+        ~delegates
         ~protocol
-        ~dal_node
+        ?dal_node
         ?dal_node_timeout_percentage
         node
         client
+  end
+end
+
+module Accuser = struct
+  include Accuser
+
+  module Agent = struct
+    let init ?name ~protocol ?(path = Uses.path (Protocol.accuser protocol))
+        node agent =
+      let* path = Agent.copy agent ~source:path in
+      let runner = Agent.runner agent in
+      init ?name ~event_level:`Notice ?runner ~path ~protocol node
   end
 end
 
@@ -278,9 +359,88 @@ module Teztale = struct
       let* path = Agent.copy agent ~source:path in
       Teztale.Archiver.run ?runner ~path ?name ~node_port user feed
   end
-end
 
-let create_dir ?runner dir =
-  let* () = Process.spawn ?runner "rm" ["-rf"; dir] |> Process.check in
-  let* () = Process.spawn ?runner "mkdir" ["-p"; dir] |> Process.check in
-  Lwt.return_unit
+  type t = {
+    agent : Agent.t;
+    server : Server.t;
+    address : string;
+    mutable archivers : Archiver.t list;
+  }
+
+  let user ~agent_name ~node_name : user =
+    let login = "teztale-archiver-" ^ agent_name ^ "-" ^ node_name in
+    {login; password = login}
+
+  let run_server
+      ?(path =
+        Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server" ()))) agent
+      =
+    let public_directory = "/tmp/teztale/public" in
+    let* () = create_dir public_directory in
+    let aliases_filename =
+      Filename.concat public_directory "delegates-aliases.json"
+    in
+    write_file aliases_filename ~contents:"[]" ;
+    let* _ =
+      Agent.copy ~source:aliases_filename ~destination:aliases_filename agent
+    in
+    let* _ =
+      Agent.copy
+        ~source:"tezt/lib_cloud/teztale-visualisation/index.html"
+        ~destination:(Format.asprintf "%s/index.html" public_directory)
+        agent
+    in
+    let* _ =
+      Agent.copy
+        ~is_directory:true
+        ~source:"tezt/lib_cloud/teztale-visualisation/assets"
+        ~destination:public_directory
+        agent
+    in
+    let* server = Server.run ~path ~public_directory agent () in
+    let address =
+      match Agent.point agent with
+      | None -> "127.0.0.1"
+      | Some point -> fst point
+    in
+    Lwt.return {agent; server; address; archivers = []}
+
+  let wait_server t = Server.wait_for_readiness t.server
+
+  let add_archiver
+      ?(path =
+        Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-archiver" ()))) t
+      agent ~node_name ~node_port =
+    let user = user ~agent_name:(Agent.name agent) ~node_name in
+    let feed : interface list =
+      [{address = t.address; port = t.server.conf.interface.port}]
+    in
+    let* () =
+      Lwt_result.get_exn
+        (Server.add_user
+           ?runner:(Agent.runner agent)
+           ~public_address:t.address
+           t.server
+           user)
+    in
+    let* archiver = Archiver.run agent ~path user feed ~node_port in
+    t.archivers <- archiver :: t.archivers ;
+    Lwt.return_unit
+
+  let update_alias t ~address ~alias =
+    let dir = Option.get t.server.conf.public_directory in
+    let filename = Filename.concat dir "delegates-aliases.json" in
+    let aliases =
+      match JSON.parse_file filename |> JSON.unannotate with
+      | exception _ -> []
+      | `A aliases -> aliases
+      | _ -> assert false
+    in
+    let update = `O [("alias", `String alias); ("address", `String address)] in
+    let aliases = update :: aliases in
+    JSON.encode_to_file_u filename (`A aliases) ;
+    let* _ =
+      Agent.copy ~refresh:true ~source:filename ~destination:filename t.agent
+    in
+    Lwt.return_unit
+end

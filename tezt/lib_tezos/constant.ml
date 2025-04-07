@@ -52,6 +52,12 @@ let octez_smart_rollup_node =
 
 let octez_evm_node = Uses.make ~tag:"evm_node" ~path:"./octez-evm-node" ()
 
+let etherlink_governance_observer =
+  Uses.make
+    ~tag:"etherlink_governance_observer"
+    ~path:"./etherlink-governance-observer"
+    ()
+
 let octez_dsn_node = Uses.make ~tag:"dsn_node" ~path:"./octez-dsn-node" ()
 
 let octez_signer = Uses.make ~tag:"signer" ~path:"./octez-signer" ()
@@ -78,6 +84,15 @@ let teztale_archiver =
 
 let teztale_server =
   Uses.make ~tag:"teztale_server" ~path:"./octez-teztale-server" ()
+
+let _teztale_snitch =
+  Uses.make ~tag:"teztale_snitch" ~path:"./octez-teztale-snitch" ()
+
+let yes_wallet =
+  Uses.make
+    ~tag:"yes_wallet"
+    ~path:"./_build/default/devtools/yes_wallet/yes_wallet.exe"
+    ()
 
 module WASM = struct
   let dal_echo_kernel =
@@ -118,7 +133,7 @@ module WASM = struct
         "etherlink/kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm"
       ()
 
-  let mainnet_evm_commit = "4f4457e2527cb227a90bb1c56d3a83f39c0f78fd"
+  let mainnet_evm_commit = "7386d0bc63f3589525bdfbd3cc0544076231b813"
 
   let ghostnet_evm_kernel =
     Uses.make
@@ -127,13 +142,19 @@ module WASM = struct
         "etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm"
       ()
 
-  let ghostnet_evm_commit = "af7909023768bc4aad3120bec7bea4a64a576047"
+  let ghostnet_evm_commit = "604663095ad8d9f537a7035821bc78112c3b865b"
 
   let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm" ()
 
   let tx_kernel_dal =
     Uses.make ~tag:"tx_kernel_dal" ~path:"tx_kernel_dal.wasm" ()
 end
+
+let octez_experimental_agnostic_baker =
+  Uses.make
+    ~tag:"experimental_agnostic_baker"
+    ~path:"./octez-experimental-agnostic-baker"
+    ()
 
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?

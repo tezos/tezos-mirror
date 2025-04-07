@@ -64,6 +64,24 @@ let check_syntax kind file =
                   struct_item.pstr_loc
             | _should_be_fine ->
                 default_iterator.structure_item iterator struct_item);
+        attribute =
+          (* Starting OCaml 5.2, attributes are accumulated during parsing and
+             marked as used during typechecking. As parsing only is not
+             supported by the OCaml compiler (and especially calling the
+             compiler in different mode during the same execution), there is no
+             rule to cleanup the table of unused builtin attributes if
+             typechecking is never reached. This shouldn't be an issue to parse
+             a file twice as the attributes are registered by their location,
+             thus the first occurence would be replaced. However in the case of
+             the protocol compiler the files are repacked into a single functor,
+             which effectively changes their location. As a result, the previous
+             locations are never cleaned up and the attributes will eventually be
+             declared as unused. As such they need to be marked as used. *)
+          (fun iterator attribute ->
+            (* The result is ignored, as when `Mark_used_only` is set it should
+               return nothing. *)
+            Compiler_libs.mark_attribute_used attribute ;
+            default_iterator.attribute iterator attribute);
       }
   in
   (match kind with
@@ -104,7 +122,7 @@ let include_ml oc file =
   check_syntax `Implementation file ;
   dump_file oc file ;
   Printf.fprintf oc "end end\n" ;
-  Printf.fprintf oc "module %s = %s ()\n" unit unit
+  Printf.fprintf oc "module %s = %s (struct end)\n" unit unit
 
 let opened_modules = ["Tezos_protocol_environment"; "Pervasives"; "Error_monad"]
 

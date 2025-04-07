@@ -34,14 +34,15 @@ RUN curl https://sh.rustup.rs --silent --show-error --fail | \
 ENV PATH=/root/.cargo/bin:$PATH
 
 # install rust toolchains and compilation targets
-RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 && \
+RUN rustup update 1.66.0 1.73.0 1.76.0 1.77.2 1.78.0 1.80.1 nightly-2025-01-30 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
     rustup target add --toolchain="$tc" \
     wasm32-unknown-unknown \
     riscv64gc-unknown-none-elf \
     riscv64gc-unknown-linux-gnu \
     x86_64-unknown-linux-musl; \
-    done
+    done && \
+    rustup component add --toolchain=nightly-2025-01-30 rustfmt miri rust-src
 
 # Install Rust 1.73.0 standard library for riscv64gc-unknown-hermit
 RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.73.0/rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz" -o rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz \
@@ -57,8 +58,15 @@ RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.78
     && rust-std-1.78.0-riscv64gc-unknown-hermit/install.sh \
     && rm -r rust-std-1.78.0-riscv64gc-unknown-hermit rust-std-1.78.0-riscv64gc-unknown-hermit.tar.gz
 
+# Install Rust 1.80.1 standard library for riscv64gc-unknown-hermit
+RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.80.1/rust-std-1.80.1-riscv64gc-unknown-hermit.tar.gz" -o rust-std-1.80.1-riscv64gc-unknown-hermit.tar.gz \
+    && (echo 9fc4e10aa629c87fd3aa09ffee57349d7d354364dbe8e0a128ebd94ccb30bac7 rust-std-1.80.1-riscv64gc-unknown-hermit.tar.gz | sha256sum -c) \
+    && tar xf rust-std-1.80.1-riscv64gc-unknown-hermit.tar.gz \
+    && rust-std-1.80.1-riscv64gc-unknown-hermit/install.sh \
+    && rm -r rust-std-1.80.1-riscv64gc-unknown-hermit rust-std-1.80.1-riscv64gc-unknown-hermit.tar.gz
+
 # Install Taplo
-RUN cargo +1.78.0 install taplo-cli --version 0.8.1 && \
+RUN cargo +1.78.0 install taplo-cli --version 0.8.1 --locked && \
     taplo --version
 
 # Install cargo-audit

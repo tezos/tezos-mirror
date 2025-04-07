@@ -1,0 +1,821 @@
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "10 s",
+      "folder": "Rollup node",
+      "interval": "10s",
+      "rules": [
+        {
+          "uid": "ce0d12y5108hsf",
+          "title": "Last commitment is 1 hour old",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "LPC",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "editorMode": "code",
+                "expr": "count_over_time(octez_sc_rollup_node_lpc_level_l1{instance=\"${instance}\"}[1h])",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "LPC"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        2,
+                        0
+                      ],
+                      "type": "lt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": []
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "avg"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "name": "Expression",
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "LPC",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "10s",
+          "annotations": {},
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        },
+        {
+          "uid": "de0d2b10tan0gc",
+          "title": "Number of message inbox",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "INBOX_MESSAGES",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "editorMode": "code",
+                "expr": "octez_sc_rollup_node_inbox_external_messages_number{instance=\"${instance}\"}",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "INBOX_MESSAGES"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        40,
+                        0
+                      ],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": []
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "avg"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "name": "Expression",
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "INBOX_MESSAGES",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "0s",
+          "annotations": {
+            "summary": "Number of messages is above 40"
+          },
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        },
+        {
+          "uid": "ee0cwkawux728f",
+          "title": "CPU Change",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "CPU_PERCENTAGE_MOY",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "editorMode": "code",
+                "expr": "avg_over_time(octez_sc_rollup_node_performance_cpu_percentage{instance=\"${instance}\"}[1h])",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "CPU_PERCENTAGE_MOY"
+              }
+            },
+            {
+              "refId": "CPU_PERCENTAGE",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasourceUid}"
+                },
+                "editorMode": "code",
+                "expr": "octez_sc_rollup_node_performance_cpu_percentage{instance=\"${instance}\"}",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "CPU_PERCENTAGE"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        0,
+                        0
+                      ],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": []
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "avg"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "name": "Expression",
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "abs(${CPU_PERCENTAGE_MOY} - ${CPU_PERCENTAGE}) > 10\n",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "math"
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "0s",
+          "annotations": {},
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        },
+        {
+          "uid": "fe0unb4fgl05cb",
+          "title": "Disk Percentage",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "DISK_PERCENTAGE",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "editorMode": "code",
+                "expr": "octez_sc_rollup_node_performance_disk_percentage{instance=\"${instance}\"}",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "DISK_PERCENTAGE"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        90
+                      ],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "DISK_PERCENTAGE",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "1m",
+          "annotations": {},
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        },
+        {
+          "uid": "ce1mwe7kfpwjkc",
+          "title": "Refutation game start",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "NUM_CONFLICTS",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "editorMode": "code",
+                "expr": "octez_sc_rollup_node_number_of_conflicts{instance=\"${instance}\"}",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "NUM_CONFLICTS"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        0
+                      ],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "NUM_CONFLICTS",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "0s",
+          "annotations": {},
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        },
+        {
+          "uid": "ae2bob9q5reo0e",
+          "title": "CPU Change (warning)",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "CPU_PERCENTAGE_MOY_5m",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasourceUid}"
+                },
+                "editorMode": "code",
+                "expr": "avg_over_time(octez_sc_rollup_node_performance_cpu_percentage{instance=\"${instance}\"}[5m])",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "CPU_PERCENTAGE_MOY_5m"
+              }
+            },
+            {
+              "refId": "CPU_PERCENTAGE_DIFF",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasourceUid}"
+                },
+                "editorMode": "code",
+                "expr": "avg_over_time(octez_sc_rollup_node_performance_cpu_percentage{instance=\"${instance}\"}[5m]) - avg_over_time(octez_sc_rollup_node_performance_cpu_percentage{instance=\"${instance}\"}[1h])",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "CPU_PERCENTAGE_DIFF"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        30,
+                        0
+                      ],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "CPU_PERCENTAGE_DIFF"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  },
+                  {
+                    "evaluator": {
+                      "params": [
+                        70,
+                        0
+                      ],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "or"
+                    },
+                    "query": {
+                      "params": [
+                        "CPU_PERCENTAGE_MOY_5m"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "name": "Expression",
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "classic_conditions"
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "0s",
+          "annotations": {},
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        },
+        {
+          "uid": "fe2c4chkkh3i8c",
+          "title": "CPU Change (critical)",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "CPU_PERCENTAGE_MOY_5m",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasourceUid}"
+                },
+                "editorMode": "code",
+                "expr": "avg_over_time(octez_sc_rollup_node_performance_cpu_percentage{instance=\"${instance}\"}[5m])",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "CPU_PERCENTAGE_MOY_5m"
+              }
+            },
+            {
+              "refId": "CPU_PERCENTAGE_DIFF",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasourceUid}"
+                },
+                "editorMode": "code",
+                "expr": "avg_over_time(octez_sc_rollup_node_performance_cpu_percentage{instance=\"${instance}\"}[5m]) - avg_over_time(octez_sc_rollup_node_performance_cpu_percentage{instance=\"${instance}\"}[1h])",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "CPU_PERCENTAGE_DIFF"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        30,
+                        0
+                      ],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "CPU_PERCENTAGE_DIFF"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  },
+                  {
+                    "evaluator": {
+                      "params": [
+                        90,
+                        0
+                      ],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "or"
+                    },
+                    "query": {
+                      "params": [
+                        "CPU_PERCENTAGE_MOY_5m"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "name": "Expression",
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "classic_conditions"
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "0s",
+          "annotations": {},
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        },
+        {
+          "uid": "be38enzis2680d",
+          "title": "No L2 block since 5min",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "NUM_L2_BLOCK",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "editorMode": "code",
+                "expr": "count_over_time(octez_sc_rollup_node_inbox_level[5m])",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "NUM_L2_BLOCK"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        1
+                      ],
+                      "type": "lt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "NUM_L2_BLOCK",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "0s",
+          "annotations": {},
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        },
+        {
+          "uid": "ae3q30p2bnoqoe",
+          "title": "Signers' balance too low",
+          "condition": "Condition",
+          "data": [
+            {
+              "refId": "Balance",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "${datasourceUid}",
+              "model": {
+                "editorMode": "code",
+                "expr": "octez_injector_signer_balance",
+                "instant": true,
+                "intervalMs": 1000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "Balance"
+              }
+            },
+            {
+              "refId": "Condition",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        100
+                      ],
+                      "type": "lt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "Balance",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "Condition",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "0s",
+          "annotations": {},
+          "labels": {},
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "${receiver}"
+          }
+        }                
+      ]
+    }
+  ]
+}

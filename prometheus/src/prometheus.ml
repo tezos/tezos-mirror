@@ -189,6 +189,10 @@ module type METRIC = sig
     ?subsystem:string ->
     string ->
     t
+
+  val clear : family -> unit
+
+  val clear_specific : family -> string list -> unit
 end
 
 module type CHILD = sig
@@ -259,6 +263,11 @@ end = struct
       v_labels ~help ?registry ?namespace ?subsystem name ~label_names:[]
     in
     labels family []
+
+  let clear t = t.children <- LabelSetMap.empty
+
+  let clear_specific t labels =
+    t.children <- LabelSetMap.remove labels t.children
 end
 
 module Counter = struct
@@ -279,6 +288,10 @@ module Counter = struct
   let inc t v =
     assert (v >= 0.0) ;
     t := !t +. v
+
+  let set t v =
+    assert (v >= !t) ;
+    t := v
 end
 
 module Gauge = struct
@@ -341,9 +354,9 @@ module Summary = struct
 
   include Metric (Child)
 
-  let observe t v =
+  let observe ?(n = 1.0) t v =
     let open Child in
-    t.count <- t.count +. 1.0 ;
+    t.count <- t.count +. n ;
     t.sum <- t.sum +. v
 
   let time t gettimeofday fn =

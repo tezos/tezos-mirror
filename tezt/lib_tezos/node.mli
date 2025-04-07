@@ -55,6 +55,14 @@
     parameters). *)
 type history_mode = Archive | Full of int option | Rolling of int option
 
+(** Default values for [Full] and [Rolling] history modes *)
+
+(** The default value for the [Full] history mode *)
+val default_full : history_mode
+
+(** The default value for the [Rolling] history mode *)
+val default_rolling : history_mode
+
 (** Values that can be passed to the node's [--media-type] argument *)
 type media_type = Json | Binary | Any
 
@@ -300,6 +308,9 @@ val rpc_endpoint : ?local:bool -> t -> string
 
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
+
+(** Get the identity file of a node. *)
+val identity_file : t -> string
 
 (** Get the runner associated to a node.
 
@@ -667,8 +678,9 @@ val upgrade_storage : t -> unit Lwt.t
 (** Run [octez-node --version] and return the node's version. *)
 val get_version : t -> string Lwt.t
 
-(** Expose the RPC server address of this node as a foreign endpoint. *)
-val as_rpc_endpoint : t -> Endpoint.t
+(** Expose the RPC server address of this node as a foreign endpoint.
+    See [rpc_endpoint] for a description of the [local] argument. *)
+val as_rpc_endpoint : ?local:bool -> t -> Endpoint.t
 
 module RPC : sig
   include RPC_core.CALLERS with type uri_provider := t

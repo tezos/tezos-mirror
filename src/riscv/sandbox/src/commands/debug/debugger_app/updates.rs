@@ -7,15 +7,15 @@ use super::{DebuggerApp, Instruction, PC_CONTEXT};
 use octez_riscv::{
     bits::Bits64,
     machine_state::{
-        bus::{Address, AddressableRead},
-        csregisters::{satp::Satp, CSRegister},
         AccessType,
+        csregisters::{CSRegister, satp::Satp},
+        main_memory::Address,
     },
     parser::{instruction::Instr, parse},
     state_backend::{ManagerRead, ManagerReadWrite},
     stepper::{Stepper, StepperStatus},
 };
-use std::{collections::HashMap, ops::Range};
+use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 impl<'a, S> DebuggerApp<'a, S>
 where
@@ -131,7 +131,7 @@ where
     fn get_range_instructions(
         &self,
         range: Range<u64>,
-        symbols: &HashMap<u64, &str>,
+        symbols: &HashMap<u64, Cow<str>>,
     ) -> Vec<Instruction>
     where
         S::Manager: ManagerRead,
@@ -139,7 +139,7 @@ where
         let get_u16_at = |addr: Address| -> Option<(Address, u16)> {
             self.stepper
                 .machine_state()
-                .bus
+                .main_memory
                 .read(addr)
                 .ok()
                 .map(|bytes| (addr, bytes))
@@ -152,7 +152,7 @@ where
         let mut last_addr = None;
         let mut groups: Vec<(Address, Vec<u16>)> = vec![];
         instr_halfs.for_each(|(addr, bytes)| {
-            if Some(addr - 2) == last_addr {
+            if addr.checked_sub(2) == last_addr {
                 if let Some((_offset, halfs)) = groups.last_mut() {
                     halfs.push(bytes)
                 }
@@ -176,8 +176,8 @@ where
     where
         S::Manager: ManagerReadWrite,
     {
-        let pc = pc - pc % 4;
-        let range = pc - PC_CONTEXT * 4..pc + PC_CONTEXT * 4;
+        let pc = pc.saturating_sub(pc % 4);
+        let range = pc.saturating_sub(PC_CONTEXT * 4)..pc.saturating_add(PC_CONTEXT * 4);
         let instructions = self.get_range_instructions(range, &self.program.symbols);
         self.program.partial_update(instructions);
     }

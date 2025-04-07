@@ -29,10 +29,13 @@ impl<T> From<MutableState<T>> for ImmutableState<T> {
 }
 
 /// Simple [`ImmutableState`]. Functions that modify state can have signature `ImmutableState -> ImmutableState`
-impl<T> ImmutableState<T>
-where
-    T: Clone,
-{
+impl<T> ImmutableState<T> {
+    /// Create a mutable state from an immutable state
+    #[inline]
+    pub fn to_mut_state(&self) -> MutableState<T> {
+        MutableState::Borrowed(self.0.clone())
+    }
+
     /// Apply a read-only function `f` over the underlying state. Never clones data.
     #[inline]
     pub fn apply_ro<R>(&self, f: impl FnOnce(&T) -> R) -> R {
@@ -78,6 +81,18 @@ impl<T> From<ImmutableState<T>> for MutableState<T> {
 }
 
 impl<T> MutableState<T> {
+    /// Create an immutable state from a mutable state
+    #[inline]
+    pub fn to_imm_state(&self) -> ImmutableState<T>
+    where
+        T: Clone,
+    {
+        match self {
+            MutableState::Owned(state) => ImmutableState::new(state.clone()),
+            MutableState::Borrowed(arc_state) => ImmutableState(arc_state.clone()),
+        }
+    }
+
     /// Apply a read-only function `f` over the underlying state. Never clones data.
     #[inline]
     pub fn apply_ro<R>(&self, f: impl FnOnce(&T) -> R) -> R {
@@ -88,20 +103,23 @@ impl<T> MutableState<T> {
     }
 
     /// Apply a mutable function `f` mutating the state in place. May perform a copy if
-    /// the underlying state is [`MutableState::Borrowed()`].
+    /// the underlying state is [`MutableState::Borrowed`].
     #[inline]
     pub fn apply<R>(&mut self, f: impl FnOnce(&mut T) -> R) -> R
     where
         T: Clone,
     {
-        match self {
-            MutableState::Owned(state) => f(state),
+        let (new, res) = match self {
+            MutableState::Owned(state) => return f(state),
             MutableState::Borrowed(arc_state) => {
-                // make_mut avoids making a clone if the current Arc
-                // is the only reference to the underlying state.
-                let state = Arc::make_mut(arc_state);
-                f(state)
+                // We don't know how many references there are to the Arc state because OCaml
+                // aliases the reference without invoking "clone" on the Rust side.
+                let mut state = arc_state.as_ref().clone();
+                let res = f(&mut state);
+                (MutableState::Owned(state), res)
             }
-        }
+        };
+        *self = new;
+        res
     }
 }

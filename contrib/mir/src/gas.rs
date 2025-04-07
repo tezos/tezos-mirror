@@ -17,7 +17,7 @@ pub struct Gas {
 
 /// Out of gas error.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
-#[error("out of gas")]
+#[error("Gas_exhaustion")]
 pub struct OutOfGas;
 
 /// Default gas limit per transaction, according to
@@ -341,6 +341,7 @@ pub mod interpret_cost {
     pub const SIZE_LIST: u32 = 10;
     pub const SIZE_SET: u32 = 10;
     pub const SIZE_MAP: u32 = 10;
+    pub const EMPTY_MAP: u32 = 300;
     pub const EMPTY_BIG_MAP: u32 = 300;
     pub const CHAIN_ID: u32 = 15;
     pub const PACK: u32 = 0;

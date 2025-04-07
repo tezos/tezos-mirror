@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Bin_evm_node
-    Invocation:   dune exec etherlink/bin_node/test/main.exe -- --file test_rlp.ml
+    Invocation:   cd etherlink/bin_node/test/ ; dune exec ./test_rlp.exe
     Subject:      Tests for the RLP encoder/decoder
 *)
 
@@ -61,7 +61,7 @@ let decode_out_in_vector out =
   | None -> Test.fail "Illformed JSON test vector"
 
 let read_test_vector filename =
-  let file = read_file Filename.(concat (dirname __FILE__) filename) in
+  let file = read_file filename in
   let json = Data_encoding.Json.from_string file in
   let read_test = function
     | testname, `O [("in", rlp); ("out", `String bytes)] ->
@@ -154,3 +154,5 @@ let tests =
   ]
 
 let () = Alcotest.run ~__FILE__ "Test RLP encoding" tests
+
+let () = Test.run ()

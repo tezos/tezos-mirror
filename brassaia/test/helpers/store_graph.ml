@@ -44,7 +44,7 @@ module Make (S : Generic_key) = struct
         Lwt.return_unit
       in
       let contents ?order k =
-        let e = `Contents (k, S.Metadata.default) in
+        let e = `Contents k in
         if mem e !visited then
           Alcotest.failf "contents %a visited twice"
             (Brassaia.Type.pp B.Contents.Key.t)
@@ -114,7 +114,7 @@ module Make (S : Generic_key) = struct
       in
       let test1 () =
         let* foo = with_contents repo (fun c -> B.Contents.add c "foo") in
-        let foo_k = (foo, S.Metadata.default) in
+        let foo_k = foo in
         let* k1 =
           with_node repo (fun g -> Graph.init g [ ("b", normal foo) ])
         in
@@ -142,7 +142,7 @@ module Make (S : Generic_key) = struct
         (* Graph.iter requires a node as max, we cannot test a graph with only
            contents. *)
         let* foo = with_contents repo (fun c -> B.Contents.add c "foo") in
-        let foo_k = (foo, S.Metadata.default) in
+        let foo_k = foo in
         let* k1 =
           with_node repo (fun g -> Graph.init g [ ("b", normal foo) ])
         in
@@ -157,7 +157,7 @@ module Make (S : Generic_key) = struct
       in
       let test3 () =
         let* foo = with_contents repo (fun c -> B.Contents.add c "foo") in
-        let foo_k = (foo, S.Metadata.default) in
+        let foo_k = foo in
         let* kb1 =
           with_node repo (fun g -> Graph.init g [ ("b1", normal foo) ])
         in

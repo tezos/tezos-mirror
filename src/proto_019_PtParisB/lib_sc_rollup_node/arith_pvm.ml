@@ -91,8 +91,8 @@ module Impl : Pvm_sig.S = struct
   (* It is safe to pass the [is_reveal_enabled_predicate]:
      [eval_many] always stops at the beginning of a new Tezos block,
      so no execution of several Tezos block inboxes is possible. *)
-  let eval_many ~reveal_builtins:_ ~write_debug:_ ~is_reveal_enabled
-      ?stop_at_snapshot ~max_steps initial_state =
+  let eval_many ?check_invalid_kernel:_ ~reveal_builtins:_ ~write_debug:_
+      ~is_reveal_enabled ?stop_at_snapshot ~max_steps initial_state =
     ignore stop_at_snapshot ;
     let rec go state step =
       let open Lwt.Syntax in

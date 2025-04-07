@@ -101,7 +101,6 @@ type argument =
   | Metrics_addr of string
   | Injector_attempts of int
   | Boot_sector_file of string
-  | Dac_observer of Dac_node.t
   | Loser_mode of string
   | No_degraded
   | Gc_frequency of int
@@ -123,7 +122,6 @@ let make_argument = function
   | Metrics_addr addr -> ["--metrics-addr"; addr]
   | Injector_attempts n -> ["--injector-attempts"; string_of_int n]
   | Boot_sector_file file -> ["--boot-sector-file"; file]
-  | Dac_observer dac_node -> ["--dac-observer"; Dac_node.endpoint dac_node]
   | Loser_mode loser -> ["--loser-mode"; loser]
   | No_degraded -> ["--no-degraded"]
   | Gc_frequency freq -> ["--gc-frequency"; string_of_int freq]
@@ -145,7 +143,6 @@ let is_redundant = function
   | Log_kernel_debug_file _, Log_kernel_debug_file _
   | Injector_attempts _, Injector_attempts _
   | Boot_sector_file _, Boot_sector_file _
-  | Dac_observer _, Dac_observer _
   | Loser_mode _, Loser_mode _
   | No_degraded, No_degraded
   | Gc_frequency _, Gc_frequency _
@@ -167,7 +164,6 @@ let is_redundant = function
   | Log_kernel_debug_file _, _
   | Injector_attempts _, _
   | Boot_sector_file _, _
-  | Dac_observer _, _
   | Loser_mode _, _
   | No_degraded, _
   | Gc_frequency _, _
@@ -203,13 +199,14 @@ module Parameters = struct
   type persistent_state = {
     data_dir : string;
     base_dir : string;
+    remote_signer : Uri.t option;
     mutable operators : (purpose * string) list;
     default_operator : string option;
     metrics_addr : string option;
     metrics_port : int;
     rpc_host : string;
     rpc_port : int;
-    mode : mode;
+    mutable mode : mode;
     dal_node : Dal_node.t option;
     loser_mode : string option;
     allow_degraded : bool;
@@ -334,6 +331,10 @@ let make_command_arguments ?endpoint ?password_file node =
   in
   ["--endpoint"; endpoint; "--base-dir"; base_dir node]
   @ Cli_arg.optional_arg "password-filename" Fun.id password_file
+  @ Cli_arg.optional_arg
+      "remote-signer"
+      Uri.to_string
+      node.persistent_state.remote_signer
 
 let spawn_command sc_node args =
   Process.spawn
@@ -481,7 +482,7 @@ let wait_for_ready sc_node =
       let promise, resolver = Lwt.task () in
       sc_node.persistent_state.pending_ready <-
         resolver :: sc_node.persistent_state.pending_ready ;
-      check_event sc_node "sc_rollup_node_is_ready.v0" promise
+      check_event sc_node "smart_rollup_node_is_ready.v0" promise
 
 let update_level sc_node current_level =
   (match sc_node.status with
@@ -514,8 +515,8 @@ let wait_for_level ?timeout sc_node level =
       check_event
         ?timeout
         sc_node
-        "smart_rollup_node_daemon_new_head_processed.v0"
-        ~where:("level >= " ^ string_of_int level)
+        "smart_rollup_node_daemon_loop_process_finished.v0"
+        ~where:("to >= " ^ string_of_int level)
         promise
 
 let wait_for ?where ?(timeout = 60.) daemon name filter =
@@ -552,21 +553,22 @@ let unsafe_wait_sync ?timeout sc_node =
 let wait_sync sc_node ~timeout = unsafe_wait_sync sc_node ~timeout
 
 let handle_event sc_node {name; value; timestamp = _} =
+  (* Note: smart_rollup_node_daemon_new_head_processed.v0 also
+     contains the level, but it can occur too soon and as a result
+     makes some tests flaky when used to update the level here. *)
   match name with
   | "smart_rollup_node_is_ready.v0" -> set_ready sc_node
-  | "smart_rollup_node_daemon_new_head_processed.v0" ->
-      let level = JSON.(value |-> "level" |> as_int) in
-      update_level sc_node level
-  | "smart_rollup_node_daemon_new_heads_processed.v0" ->
+  | "smart_rollup_node_daemon_loop_process_finished.v0" ->
       let level = JSON.(value |-> "to" |> as_int) in
       update_level sc_node level
   | _ -> ()
 
 let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
-    ?event_pipe ?metrics_addr ?metrics_port ?(rpc_host = Constant.default_host)
-    ?rpc_port ?(operators = []) ?default_operator
-    ?(dal_node : Dal_node.t option) ?loser_mode ?(allow_degraded = false)
-    ?(gc_frequency = 1) ?(history_mode = Full) ?password_file mode endpoint =
+    ?remote_signer ?event_pipe ?metrics_addr ?metrics_port
+    ?(rpc_host = Constant.default_host) ?rpc_port ?(operators = [])
+    ?default_operator ?(dal_node : Dal_node.t option) ?loser_mode
+    ?(allow_degraded = false) ?(gc_frequency = 1) ?(history_mode = Full)
+    ?password_file mode endpoint =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -590,6 +592,7 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
       {
         data_dir;
         base_dir;
+        remote_signer;
         metrics_addr;
         metrics_port;
         rpc_host;
@@ -612,10 +615,10 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
   on_event sc_node (handle_event sc_node) ;
   sc_node
 
-let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
-    ?metrics_addr ?metrics_port ?rpc_host ?rpc_port ?operators ?default_operator
-    ?dal_node ?loser_mode ?allow_degraded ?gc_frequency ?history_mode
-    ?password_file mode (node : Node.t) =
+let create ?runner ?path ?name ?color ?data_dir ~base_dir ?remote_signer
+    ?event_pipe ?metrics_addr ?metrics_port ?rpc_host ?rpc_port ?operators
+    ?default_operator ?dal_node ?loser_mode ?allow_degraded ?gc_frequency
+    ?history_mode ?password_file mode (node : Node.t) =
   create_with_endpoint
     ?runner
     ?path
@@ -623,6 +626,7 @@ let create ?runner ?path ?name ?color ?data_dir ~base_dir ?event_pipe
     ?color
     ?data_dir
     ~base_dir
+    ?remote_signer
     ?event_pipe
     ?metrics_addr
     ?metrics_port
@@ -695,10 +699,7 @@ let change_node_and_restart ?event_level sc_rollup_node rollup_address node =
   run ?event_level sc_rollup_node rollup_address []
 
 let change_node_mode sc_rollup_node mode =
-  {
-    sc_rollup_node with
-    persistent_state = {sc_rollup_node.persistent_state with mode};
-  }
+  sc_rollup_node.persistent_state.mode <- mode
 
 let change_operators sc_rollup_node operators =
   sc_rollup_node.persistent_state.operators <- operators
@@ -718,6 +719,17 @@ let dump_durable_storage ~sc_rollup_node ~dump ?(block = "head") () =
     ]
   in
   let process = spawn_command sc_rollup_node cmd in
+  Process.check process
+
+let list_metrics ?runner ?(path = Uses.path Constant.octez_smart_rollup_node)
+    ?hooks ?(disable_performance_metrics = false) () =
+  let cmd =
+    ["list"; "metrics"]
+    @
+    if disable_performance_metrics then ["--disable-performance-metrics"]
+    else []
+  in
+  let process = Process.spawn ?runner ?hooks path cmd in
   Process.check process
 
 let patch_durable_storage sc_rollup_node ~key ~value =
@@ -766,7 +778,7 @@ let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
   Runnable.{value = process; run = parse}
 
 let import_snapshot ?(apply_unsafe_patches = false) ?(force = false)
-    sc_rollup_node ~snapshot_file =
+    ?(no_check = false) sc_rollup_node ~snapshot_file =
   let process =
     spawn_command
       sc_rollup_node
@@ -778,7 +790,8 @@ let import_snapshot ?(apply_unsafe_patches = false) ?(force = false)
          data_dir sc_rollup_node;
        ]
       @ (if apply_unsafe_patches then make_argument Apply_unsafe_patches else [])
-      @ Cli_arg.optional_switch "force" force)
+      @ Cli_arg.optional_switch "force" force
+      @ Cli_arg.optional_switch "no-check" no_check)
   in
   Runnable.{value = process; run = Process.check}
 
@@ -786,6 +799,9 @@ let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in
   Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+
+let operators t =
+  (t.persistent_state.default_operator, t.persistent_state.operators)
 
 module RPC = struct
   module RPC_callers : RPC_core.CALLERS with type uri_provider := t = struct

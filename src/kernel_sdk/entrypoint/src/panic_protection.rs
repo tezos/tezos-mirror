@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-#![cfg(all(target_arch = "riscv64", target_os = "hermit"))]
+#![cfg(pvm_kind = "riscv")]
 
 // This module is enabled for HermitOS targets where `std` is available.
 extern crate alloc;

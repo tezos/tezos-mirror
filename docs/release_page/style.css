@@ -1,0 +1,71 @@
+/* Global Styles */
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    padding: 0;
+    background-color: #f9f9f9;
+    color: #333;
+    line-height: 1.6;
+}
+
+/* Header Styles */
+h1 {
+    color: #1D2227;
+}
+
+h2 {
+    color: #0F61FF;
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 5px;
+    margin-top: 20px;
+}
+
+h3 {
+    color: #9F329F;
+    padding-bottom: 5px;
+    margin-top: 20px;
+}
+
+h4 {
+    color: #1D2227;
+    padding-bottom: 5px;
+    margin-top: 20px;
+}
+
+/* Unordered List Styles */
+ul {
+    list-style-type: square;
+    margin: 10px 0 20px 20px;
+    padding: 0;
+}
+
+/* List Item Styles */
+li {
+    margin-bottom: 8px;
+}
+
+/* Link Styles */
+a {
+    text-decoration: none;
+    color: #007BFF;
+}
+
+a:hover {
+    text-decoration: underline;
+    color: #0056b3;
+}
+
+/* Container for Overall Page */
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+}
+
+.sha256 {
+    font-size: 70%;
+    color: #616F82;
+}

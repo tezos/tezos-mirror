@@ -53,7 +53,12 @@ let jobs =
     job_build_static_binaries ~__POS__ ~arch:Arm64 ~rules:rules_always ()
   in
   let job_static_x86_64 =
-    job_build_static_binaries ~__POS__ ~arch:Amd64 ~rules:rules_always ()
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Amd64
+      ~cpu:Very_high
+      ~rules:rules_always
+      ()
   in
   let job_unified_coverage_default : tezos_job =
     job
@@ -137,6 +142,8 @@ let jobs =
     job_build_arm64_exp_dev_extra;
     job_docker_amd64_experimental;
     job_docker_arm64_experimental;
+    (* Stage: sanity *)
+    job_datadog_pipeline_trace;
     (* Stage: test_coverage *)
     job_unified_coverage_default;
   ]

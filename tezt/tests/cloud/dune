@@ -4,10 +4,11 @@
 (executable
  (name main)
  (libraries
+  bls12-381.archive
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
   tezt-tezos
-  tezt-tezos.tezt-cloud
+  tezt-cloud
   tezt_etherlink)
  (link_flags
   (:standard)
@@ -19,4 +20,4 @@
   -open Tezt_wrapper.Base
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
-  -open Tezt_tezos_tezt_cloud))
+  -open Tezt_cloud))

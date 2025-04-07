@@ -109,17 +109,6 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       Event.warn_dal_enabled_no_node ()
     else Lwt.return_unit
   in
-  let* dac_client =
-    Option.map_es
-      (fun observer_endpoint ->
-        Dac_observer_client.init
-          {
-            observer_endpoint;
-            reveal_data_dir = Filename.concat data_dir (Kind.to_string kind);
-            timeout_seconds = configuration.dac_timeout;
-          })
-      configuration.dac_observer_endpoint
-  in
   let*! kernel_debug_logger, kernel_debug_finaliser =
     let open Lwt_syntax in
     if configuration.log_kernel_debug then
@@ -141,20 +130,20 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     Pvm_patches.make kind rollup_address configuration.unsafe_pvm_patches
   in
   let sync = create_sync_info () in
-  Metrics.Info.set_lcc_level_l1 lcc.level ;
-  Metrics.Info.set_lcc_level_local lcc.level ;
-  Option.iter
-    (fun {Commitment.inbox_level = l; _} ->
-      Metrics.Info.set_lpc_level_l1 l ;
-      Metrics.Info.set_lpc_level_local l)
-    lpc ;
+  Metrics.wrap (fun () ->
+      Metrics.Info.set_lcc_level_l1 lcc.level ;
+      Metrics.Info.set_lcc_level_local lcc.level ;
+      Option.iter
+        (fun {Commitment.inbox_level = l; _} ->
+          Metrics.Info.set_lpc_level_l1 l ;
+          Metrics.Info.set_lpc_level_local l)
+        lpc) ;
   let node_ctxt =
     {
       config = configuration;
       cctxt :> Client_context.full;
       degraded = Reference.new_ false;
       dal_cctxt;
-      dac_client;
       data_dir;
       l1_ctxt;
       genesis_info;
@@ -243,11 +232,10 @@ module For_snapshots = struct
                loser_mode;
                apply_unsafe_patches;
                unsafe_pvm_patches = [];
+               unsafe_disable_wasm_kernel_checks = false;
                execute_outbox_messages_filter =
                  Configuration.default_execute_outbox_filter;
                dal_node_endpoint = None;
-               dac_observer_endpoint = None;
-               dac_timeout = None;
                batcher = Configuration.default_batcher;
                injector = Configuration.default_injector;
                l1_blocks_cache_size;
@@ -301,7 +289,6 @@ module For_snapshots = struct
         cctxt :> Client_context.full;
         degraded = Reference.new_ false;
         dal_cctxt = None;
-        dac_client = None;
         data_dir;
         l1_ctxt;
         genesis_info = metadata.genesis_info;
@@ -357,11 +344,10 @@ module Internal_for_tests = struct
           loser_mode;
           apply_unsafe_patches = false;
           unsafe_pvm_patches = [];
+          unsafe_disable_wasm_kernel_checks = false;
           execute_outbox_messages_filter =
             Configuration.default_execute_outbox_filter;
           dal_node_endpoint = None;
-          dac_observer_endpoint = None;
-          dac_timeout = None;
           pre_images_endpoint = None;
           batcher = Configuration.default_batcher;
           injector = Configuration.default_injector;
@@ -429,7 +415,6 @@ module Internal_for_tests = struct
         cctxt :> Client_context.full;
         degraded = Reference.new_ false;
         dal_cctxt = None;
-        dac_client = None;
         data_dir;
         l1_ctxt;
         genesis_info;
@@ -474,6 +459,7 @@ module Internal_for_tests = struct
                         dal_attested_slots_validity_lag = Int32.max_int;
                       };
                   max_number_of_stored_cemented_commitments = 0;
+                  max_active_outbox_levels = 0;
                 };
               dal =
                 {

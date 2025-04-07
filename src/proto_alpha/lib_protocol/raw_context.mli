@@ -96,8 +96,19 @@ val prepare :
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) Quebec (* Alpha predecessor *)
+  | (* Alpha predecessor *) R022 (* Alpha predecessor *)
 
+(** Prepares the context for the first block of the protocol.
+
+    Among other things, this sets the constant values that will be
+    used during the whole lifetime of the protocol. By default,
+    constant values are copied over from the previous protocol when
+    applicable, but any exceptions to this rule happen in this
+    function.
+
+    See {!Constants_parametric_repr} for instructions on how to add or
+    modify a constant.
+*)
 val prepare_first_block :
   level:int32 ->
   timestamp:Time.t ->
@@ -432,30 +443,57 @@ module Dal : sig
 
   val make : t -> (t * cryptobox) tzresult
 
-  val number_of_slots : t -> int
-
-  val number_of_shards : t -> int
-
   (** [record_number_of_attested_shards ctxt attestation number_of_shards]
       records that the [number_of_shards] shards were attested (declared
       available by some attester). *)
   val record_number_of_attested_shards : t -> Dal_attestation_repr.t -> int -> t
 
-  (** [register_slot_header ctxt slot_header] returns a new context
-     where the new candidate [slot] have been taken into
-     account. Returns [Some (ctxt,updated)] where [updated=true] if
-     the candidate is registered. [Some (ctxt,false)] if another
-     candidate was already registered previously. Returns an error if
-     the slot is invalid. *)
-  val register_slot_header : t -> Dal_slot_repr.Header.t -> t tzresult
+  (** [register_slot_header ctxt slot_header ~source] returns a new context
+      where the new candidate [slot] published by [source] has been taken into
+      account. Returns [Some (ctxt,updated)] where [updated=true] if the
+      candidate is registered. [Some (ctxt,false)] if another candidate was
+      already registered previously. Returns an error if the slot is invalid. *)
+  val register_slot_header :
+    t -> Dal_slot_repr.Header.t -> source:Contract_repr.t -> t tzresult
 
-  (** [candidates ctxt] returns the current list of slot for which
-     there is at least one candidate. *)
-  val candidates : t -> Dal_slot_repr.Header.t list
+  (** [record_attestation ctxt ~tb_slot attestation] records that the delegate
+      with Tenderbake slot [tb_slot] emitted [attestation]. *)
+  val record_attestation :
+    t -> tb_slot:Slot_repr.t -> Dal_attestation_repr.t -> t
+
+  (** [attestations] returns the recorded attestations *)
+  val attestations : t -> Dal_attestation_repr.t Slot_repr.Map.t
+
+  (** [candidates ctxt] returns the current list of slot for which there is at
+      least one candidate alongside the addresses that published them. *)
+  val candidates : t -> (Dal_slot_repr.Header.t * Contract_repr.t) list
 
   (** [is_slot_index_attested ctxt slot_index] returns [true] if the
-     [slot_index] is declared available by the protocol. [false]
-     otherwise. If the [index] is out of the interval
-     [0;number_of_slots - 1], returns [false]. *)
-  val is_slot_index_attested : t -> Dal_slot_index_repr.t -> bool
+      [slot_index] is declared available by the protocol. [false] otherwise. If
+      the [index] is out of the interval [0;number_of_slots - 1], returns
+      [false].
+
+      Whether the slot is attested by the protocol or not, the function also
+      returns the ratio of attested shards w.r.t. total shards, as a rational
+      number. *)
+  val is_slot_index_attested :
+    t ->
+    Dal_slot_index_repr.t ->
+    Dal_attestation_repr.Accountability.attestation_status
+
+  (* Check whether the DAL feature flag is set and return the error
+     {!Dal_feature_disabled} if not. *)
+  val assert_feature_enabled : t -> unit tzresult
+
+  (* [only_if_dal_feature_enabled ctxt ~default f] executes [f ctxt] if the DAL
+     feature flag is enabled and otherwise [default ctxt]. *)
+  val only_if_feature_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
+
+  (* Check whether the DAL incentives flag is set and return the error
+     {!Dal_incentives_disabled} if not. *)
+  val assert_incentives_enabled : t -> unit tzresult
+
+  (* [only_if_dal_incentives_enabled ctxt ~default f] executes [f ctxt] if the
+     DAL incentives flag is enabled and otherwise [default ctxt]. *)
+  val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 end

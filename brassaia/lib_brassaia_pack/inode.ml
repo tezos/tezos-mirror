@@ -83,20 +83,9 @@ struct
 
     let contents_key_encoding = Node.contents_key_encoding
 
-    type step = Node.step
-    [@@deriving brassaia ~compare ~to_bin_string ~of_bin_string ~short_hash]
-
-    let step_encoding = Node.step_encoding
-
-    type metadata = Node.metadata [@@deriving brassaia ~equal]
-
-    let metadata_encoding = Node.metadata_encoding
-
     type value = Node.value [@@deriving brassaia ~equal]
 
     let value_encoding = Node.value_encoding
-
-    module Metadata = Node.Metadata
 
     exception Dangling_hash = Node.Dangling_hash
 
@@ -105,11 +94,11 @@ struct
       raise (Dangling_hash { context; hash })
 
     let unsafe_keyvalue_of_hashvalue = function
-      | `Contents (h, m) -> `Contents (Key.unfindable_of_hash h, m)
+      | `Contents h -> `Contents (Key.unfindable_of_hash h)
       | `Node h -> `Node (Key.unfindable_of_hash h)
 
     let hashvalue_of_keyvalue = function
-      | `Contents (k, m) -> `Contents (Key.to_hash k, m)
+      | `Contents k -> `Contents (Key.to_hash k)
       | `Node k -> `Node (Key.to_hash k)
   end
 
@@ -117,13 +106,13 @@ struct
     Brassaia.Hash.Typed
       (H)
       (struct
-        type t = T.step
+        type t = Path.step
 
-        let t = T.step_t
-        let encoding = T.step_encoding
+        let t = Path.step_t
+        let encoding = Path.step_encoding
       end)
 
-  module Child_ordering : Child_ordering with type step := T.step = struct
+  module Child_ordering : Child_ordering = struct
     open T
 
     type key = bytes
@@ -146,7 +135,7 @@ struct
       | `Seeded_hash | `Custom _ ->
           (* Bytes.unsafe_of_string usage: possibly safe TODO justify safety, or switch to
              use the safe Bytes.of_string *)
-          fun s -> Bytes.unsafe_of_string (step_to_bin_string s)
+          fun s -> Bytes.unsafe_of_string (Path.step_to_bin_string s)
 
     (* Assume [k = cryto_hash(step)] (see {!key}) and [Conf.entry] can
        can represented with [n] bits. Then, [hash_bits ~depth k] is
@@ -200,9 +189,9 @@ struct
 
   module StepMap = struct
     include Map.Make (struct
-      type t = T.step
+      type t = Path.step
 
-      let compare = T.compare_step
+      let compare = Path.compare_step
     end)
 
     let of_list l = List.fold_left (fun acc (k, v) -> add k v acc) empty l
@@ -340,7 +329,7 @@ struct
           (fun (depth, length, entries) -> { depth; length; entries })
           (tup3 uint8 uint8 (list (with_index_encoding vref_encoding))))
 
-    type 'vref v = Values of (step * value) list | Tree of 'vref tree
+    type 'vref v = Values of (Path.step * value) list | Tree of 'vref tree
     [@@deriving brassaia ~pre_hash]
 
     let v_encoding vref_encoding =
@@ -348,7 +337,7 @@ struct
       union
         [
           case (Tag 1) ~title:"Values"
-            (list (tup2 step_encoding value_encoding))
+            (list (tup2 Path.step_encoding value_encoding))
             (function Values l -> Some l | _ -> None)
             (fun l -> Values l);
           case (Tag 2) ~title:"Tree"
@@ -392,32 +381,22 @@ struct
 
   (* Compressed binary representation *)
   module Compress = struct
-    open T
-
     type dict_key = int [@@deriving brassaia]
     type pack_offset = int63 [@@deriving brassaia]
-    type name = Indirect of dict_key | Direct of step
+    type name = Indirect of dict_key | Direct of Path.step
     type address = Offset of pack_offset | Hash of H.t [@@deriving brassaia]
     type ptr = { index : int; hash : address } [@@deriving brassaia]
 
     type tree = { depth : int; length : int; entries : ptr list }
     [@@deriving brassaia]
 
-    type value =
-      | Contents of name * address * metadata
-      | Node of name * address
-
-    let is_default = T.(equal_metadata Metadata.default)
+    type value = Contents of name * address | Node of name * address
 
     (* We distribute products over sums in the type representation of [value]
        in order to pack many possible cases into a single tag character in the
        encoded representation.
 
        - whether the referenced value is a [Node] or a [Contents] value;
-
-       - in the [Contents] case, whether the associated metadata is [default]
-         (in which case the serialised representation elides it), or if it is
-         included;
 
        - whether the [name] of the entry is provided inline [Direct], or is
          stored in the dict and refernced via a dict key [Indirect];
@@ -429,41 +408,42 @@ struct
           (* Different payload types that can appear after packed tags: *)
           let io  = [%typ: dict_key * pack_offset]
           let ih  = [%typ: dict_key * H.t]
-          let do_ = [%typ: step * pack_offset]
-          let dh  = [%typ: step * H.t]
+          let do_ = [%typ: Path.step * pack_offset]
+          let dh  = [%typ: Path.step * H.t]
           (* As above but for contents values with non-default metadata: *)
-          let x_io = [%typ: dict_key * pack_offset * metadata]
-          let x_ih = [%typ: dict_key * H.t * metadata]
-          let x_do = [%typ: step * pack_offset * metadata]
-          let x_dh = [%typ: step * H.t * metadata]
+          let x_io = [%typ: dict_key * pack_offset * unit]
+          let x_ih = [%typ: dict_key * H.t * unit]
+          let x_do = [%typ: Path.step * pack_offset * unit]
+          let x_dh = [%typ: Path.step * H.t * unit]
       end in
       let open Brassaia.Type in
       variant "Compress.value"
         (fun
           (* The ordering of these arguments determines which tags are assigned
              to the cases, so should not be changed: *)
-          contents_io contents_x_io node_io contents_ih contents_x_ih node_ih
-          contents_do contents_x_do node_do contents_dh contents_x_dh node_dh
+          contents_io _contents_x_io node_io contents_ih _contents_x_ih node_ih
+          contents_do _contents_x_do node_do contents_dh _contents_x_dh node_dh
         -> function
         | Node (Indirect n, Offset o) -> node_io (n, o)
         | Node (Indirect n, Hash h)   -> node_ih (n, h)
         | Node (Direct n,   Offset o) -> node_do (n, o)
         | Node (Direct n,   Hash h)   -> node_dh (n, h)
-        | Contents (Indirect n, Offset o, m) -> if is_default m then contents_io (n, o) else contents_x_io (n, o, m)
-        | Contents (Indirect n, Hash h,   m) -> if is_default m then contents_ih (n, h) else contents_x_ih (n, h, m)
-        | Contents (Direct n,   Offset o, m) -> if is_default m then contents_do (n, o) else contents_x_do (n, o, m)
-        | Contents (Direct n,   Hash h,   m) -> if is_default m then contents_dh (n, h) else contents_x_dh (n, h, m))
-      |~ case1 "contents-io"   Payload.io   (fun (n, o)    -> Contents (Indirect n, Offset o, Metadata.default))
-      |~ case1 "contents-x-io" Payload.x_io (fun (n, i, m) -> Contents (Indirect n, Offset i, m))
+        | Contents (Indirect n, Offset o) -> contents_io (n, o)
+        | Contents (Indirect n, Hash h)   -> contents_ih (n, h)
+        | Contents (Direct n,   Offset o) -> contents_do (n, o)
+        | Contents (Direct n,   Hash h)   -> contents_dh (n, h) )
+      |~ case1 "contents-io"   Payload.io   (fun (n, o)    -> Contents (Indirect n, Offset o))
+      |~ case1 "contents-x-io" Payload.x_io (fun (n, i, _) -> Contents (Indirect n, Offset i))
+
       |~ case1 "node-io"       Payload.io   (fun (n, i)    -> Node (Indirect n, Offset i))
-      |~ case1 "contents-ih"   Payload.ih   (fun (n, h)    -> Contents (Indirect n, Hash h, Metadata.default))
-      |~ case1 "contents-x-ih" Payload.x_ih (fun (n, h, m) -> Contents (Indirect n, Hash h, m))
+      |~ case1 "contents-ih"   Payload.ih   (fun (n, h)    -> Contents (Indirect n, Hash h))
+      |~ case1 "contents-x-ih" Payload.x_ih (fun (n, h, _) -> Contents (Indirect n, Hash h))
       |~ case1 "node-ih"       Payload.ih   (fun (n, h)    -> Node (Indirect n, Hash h))
-      |~ case1 "contents-do"   Payload.do_  (fun (n, i)    -> Contents (Direct n, Offset i, Metadata.default))
-      |~ case1 "contents-x-do" Payload.x_do (fun (n, i, m) -> Contents (Direct n, Offset i, m))
+      |~ case1 "contents-do"   Payload.do_  (fun (n, i)    -> Contents (Direct n, Offset i))
+      |~ case1 "contents-x-do" Payload.x_do (fun (n, i, _) -> Contents (Direct n, Offset i))
       |~ case1 "node-do"       Payload.do_  (fun (n, i)    -> Node (Direct n, Offset i))
-      |~ case1 "contents-dh"   Payload.dh   (fun (n, i)    -> Contents (Direct n, Hash i, Metadata.default))
-      |~ case1 "contents-x-dh" Payload.x_dh (fun (n, i, m) -> Contents (Direct n, Hash i, m))
+      |~ case1 "contents-dh"   Payload.dh   (fun (n, i)    -> Contents (Direct n, Hash i))
+      |~ case1 "contents-x-dh" Payload.x_dh (fun (n, i, _) -> Contents (Direct n, Hash i))
       |~ case1 "node-dd"       Payload.dh   (fun (n, i)    -> Node (Direct n, Hash i))
       |> sealv
 
@@ -881,7 +861,7 @@ struct
               let v =
                 match v with
                 | `Node _ as k -> (Some s, k)
-                | `Contents (k, _) -> (Some s, `Contents k)
+                | `Contents k -> (Some s, `Contents k)
               in
               v :: acc)
             l []
@@ -908,7 +888,7 @@ struct
             0 i.entries
       | Values vs -> StepMap.cardinal vs
 
-    type cont = off:int -> len:int -> (step * value) Seq.node
+    type cont = off:int -> len:int -> (Path.step * value) Seq.node
 
     let rec seq_tree layout bucket_seq ~depth ~cache : cont -> cont =
      fun k ~off ~len ->
@@ -981,25 +961,25 @@ struct
     let empty_continuation : cont = fun ~off:_ ~len:_ -> Seq.Nil
 
     let seq layout ?offset:(off = 0) ?length:(len = Int.max_int) ?(cache = true)
-        t : (step * value) Seq.t =
+        t : (Path.step * value) Seq.t =
       if off < 0 then invalid_arg "Invalid pagination offset";
       if len < 0 then invalid_arg "Invalid pagination length";
       if len = 0 then Seq.empty
       else fun () -> seq_v layout t.v ~cache empty_continuation ~off ~len
 
     let list layout ?offset:(off = 0) ?length:(len = Int.max_int)
-        ?(cache = true) t : (step * value) list =
+        ?(cache = true) t : (Path.step * value) list =
       if off < 0 then invalid_arg "Invalid pagination offset";
       if len < 0 then invalid_arg "Invalid pagination length";
       if len = 0 then []
       else list_v layout t.v ~cache empty_continuation ~off ~len
 
-    let seq_tree layout ?(cache = true) i : (step * value) Seq.t =
+    let seq_tree layout ?(cache = true) i : (Path.step * value) Seq.t =
       let off = 0 in
       let len = Int.max_int in
       fun () -> seq_v layout (Tree i) ~cache empty_continuation ~off ~len
 
-    let seq_v layout ?(cache = true) v : (step * value) Seq.t =
+    let seq_v layout ?(cache = true) v : (Path.step * value) Seq.t =
       let off = 0 in
       let len = Int.max_int in
       fun () -> seq_v layout v ~cache empty_continuation ~off ~len
@@ -1042,11 +1022,22 @@ struct
     module Concrete = struct
       type kinded_key =
         | Contents of contents_key
-        | Contents_x of metadata * contents_key
+        | Contents_x of contents_key
         | Node of node_key
-      [@@deriving brassaia]
 
-      type entry = { name : step; key : kinded_key } [@@deriving brassaia]
+      let kinded_key_t : kinded_key Repr.ty =
+        let open Repr in
+        variant "kinded_key" (fun contents contents_x node -> function
+          | Contents h -> contents h
+          | Contents_x c -> contents_x ((), c)
+          | Node h -> node h)
+        |~ case1 "contents" contents_key_t (fun ck -> Contents ck)
+        |~ case1 "contents-x" (pair unit contents_key_t) (fun ((), ck) ->
+               Contents_x ck)
+        |~ case1 "node" node_key_t (fun k -> Node k)
+        |> sealv
+
+      type entry = { name : Path.step; key : kinded_key } [@@deriving brassaia]
 
       type 'a pointer = { index : int; pointer : hash; tree : 'a }
       [@@deriving brassaia]
@@ -1059,17 +1050,14 @@ struct
 
       let to_entry (name, v) =
         match v with
-        | `Contents (contents_key, m) ->
-            if T.equal_metadata m Metadata.default then
-              { name; key = Contents contents_key }
-            else { name; key = Contents_x (m, contents_key) }
+        | `Contents contents_key -> { name; key = Contents contents_key }
         | `Node node_key -> { name; key = Node node_key }
 
       let of_entry e =
         ( e.name,
           match e.key with
-          | Contents key -> `Contents (key, Metadata.default)
-          | Contents_x (m, key) -> `Contents (key, m)
+          | Contents key -> `Contents key
+          | Contents_x key -> `Contents key
           | Node key -> `Node key )
 
       type error =
@@ -1654,12 +1642,19 @@ struct
     let is_tree t = match t.v with Tree _ -> true | Values _ -> false
 
     module Proof = struct
-      type value = [ `Contents of hash * metadata | `Node of hash ]
-      [@@deriving brassaia]
+      type value = [ `Contents of hash | `Node of hash ]
+
+      let value_t : value Repr.ty =
+        let open Repr in
+        variant "Proof.value" (fun contents node -> function
+          | `Contents h -> contents (h, ()) | `Node h -> node h)
+        |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> `Contents h)
+        |~ case1 "node" hash_t (fun h -> `Node h)
+        |> sealv
 
       type t =
         [ `Blinded of hash
-        | `Values of (step * value) list
+        | `Values of (Path.step * value) list
         | `Inode of int * (int * t) list ]
       [@@deriving brassaia]
 
@@ -1752,7 +1747,7 @@ struct
               |> Seq.map Concrete.to_entry
               |> List.of_seq
               |> List.fast_sort (fun x y ->
-                     compare_step x.Concrete.name y.Concrete.name)
+                     Path.compare_step x.Concrete.name y.Concrete.name)
             in
             Concrete.Values bindings
           else to_concrete ~force:false la t
@@ -1811,8 +1806,15 @@ struct
     module Snapshot = struct
       include T
 
-      type kinded_hash = Contents of hash * metadata | Node of hash
-      [@@deriving brassaia]
+      type kinded_hash = Contents of hash | Node of hash
+
+      let kinded_hash_t : kinded_hash Repr.ty =
+        let open Repr in
+        variant "Proof.value" (fun contents node -> function
+          | Contents h -> contents (h, ()) | Node h -> node h)
+        |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> Contents h)
+        |~ case1 "node" hash_t (fun h -> Node h)
+        |> sealv
 
       type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
 
@@ -1829,17 +1831,17 @@ struct
       type inode = { v : v; root : bool } [@@deriving brassaia]
     end
 
-    let of_entry ~index e : step * Node.value =
+    let of_entry ~index e : Path.step * Node.value =
       let step =
-        match T.step_of_bin_string e.Snapshot.step with
+        match Path.step_of_bin_string e.Snapshot.step with
         | Ok s -> s
         | Error (`Msg m) -> Fmt.failwith "step of bin error: %s" m
       in
       ( step,
         match e.hash with
-        | Snapshot.Contents (hash, m) ->
+        | Snapshot.Contents hash ->
             let key = index hash in
-            `Contents (key, m)
+            `Contents key
         | Node hash ->
             let key = index hash in
             `Node key )
@@ -1869,7 +1871,6 @@ struct
     type hash = H.t [@@deriving brassaia]
     type key = Key.t
     type t = T.key Bin.t [@@deriving brassaia]
-    type metadata = T.metadata [@@deriving brassaia]
     type Pack_value.kinded += Node of t
 
     let to_kinded t = Node t
@@ -1905,8 +1906,8 @@ struct
       Pack_value.Deferred (fun () -> repr_size_adjustment * repr_size t)
 
     let hash t = Bin.hash t
-    let step_to_bin = T.step_to_bin_string
-    let step_of_bin = T.step_of_bin_string
+    let step_to_bin = Path.step_to_bin_string
+    let step_of_bin = Path.step_of_bin_string
     let encode_compress = Brassaia.Type.(unstage (encode_bin Compress.t))
     let decode_compress = Brassaia.Type.(unstage (decode_bin Compress.t))
 
@@ -1949,11 +1950,11 @@ struct
         let hash = address_of_key n.vref in
         { index = n.index; hash }
       in
-      let value : T.step * T.value -> Compress.value = function
-        | s, `Contents (c, m) ->
+      let value : Path.step * T.value -> Compress.value = function
+        | s, `Contents c ->
             let s = step s in
             let v = address_of_key c in
-            Compress.Contents (s, v, m)
+            Compress.Contents (s, v)
         | s, `Node n ->
             let s = step s in
             let v = address_of_key n in
@@ -1979,7 +1980,7 @@ struct
      fun ~dict ~key_of_offset ~key_of_hash t pos_ref ->
       Stats.incr_inode_decode_bin ();
       let i = decode_compress t pos_ref in
-      let step : Compress.name -> T.step = function
+      let step : Compress.name -> Path.step = function
         | Direct n -> n
         | Indirect s -> (
             match dict s with
@@ -1998,11 +1999,11 @@ struct
         let vref = key n.hash in
         { index = n.index; vref }
       in
-      let value : Compress.value -> T.step * T.value = function
-        | Contents (n, h, metadata) ->
+      let value : Compress.value -> Path.step * T.value = function
+        | Contents (n, h) ->
             let name = step n in
             let hash = key h in
-            (name, `Contents (hash, metadata))
+            (name, `Contents hash)
         | Node (n, h) ->
             let name = step n in
             let hash = key h in
@@ -2045,7 +2046,7 @@ struct
       | Values ls ->
           List.map
             (function
-              | Compress.Contents (_, address, _) | Node (_, address) ->
+              | Compress.Contents (_, address) | Node (_, address) ->
                   entry_of_address address)
             ls
       | Tree { entries; _ } ->
@@ -2055,13 +2056,13 @@ struct
 
     module Snapshot = Val_impl.Snapshot
 
-    let to_entry : T.step * Node.value -> Snapshot.entry =
+    let to_entry : Path.step * Node.value -> Snapshot.entry =
      fun (name, v) ->
       let step = step_to_bin name in
       match v with
-      | `Contents (contents_key, m) ->
+      | `Contents contents_key ->
           let h = Key.to_hash contents_key in
-          { Snapshot.step; hash = Contents (h, m) }
+          { Snapshot.step; hash = Contents h }
       | `Node node_key ->
           let h = Key.to_hash node_key in
           { step; hash = Node h }
@@ -2297,7 +2298,7 @@ struct
           let elts =
             I.seq la v
             |> List.of_seq
-            |> List.fast_sort (fun (x, _) (y, _) -> compare_step x y)
+            |> List.fast_sort (fun (x, _) (y, _) -> Path.compare_step x y)
           in
           `Node elts
         else
@@ -2331,17 +2332,23 @@ struct
 
       let contents_key_encoding = hash_encoding
 
-      type value = [ `Contents of hash * metadata | `Node of hash ]
-      [@@deriving brassaia]
+      type value = [ `Contents of hash | `Node of hash ]
+
+      let value_t : value Repr.ty =
+        let open Repr in
+        variant "Proof.value" (fun contents node -> function
+          | `Contents h -> contents (h, ()) | `Node h -> node h)
+        |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> `Contents h)
+        |~ case1 "node" hash_t (fun h -> `Node h)
+        |> sealv
 
       let value_encoding =
         let open Data_encoding in
         union
           [
-            case (Tag 1) ~title:"`Contents"
-              (tup2 hash_encoding metadata_encoding)
-              (function `Contents t -> Some t | _ -> None)
-              (fun t -> `Contents t);
+            case (Tag 1) ~title:"`Contents" (tup2 hash_encoding unit)
+              (function `Contents t -> Some (t, ()) | _ -> None)
+              (fun (t, ()) -> `Contents t);
             case (Tag 2) ~title:"`Node" hash_encoding
               (function `Node h -> Some h | _ -> None)
               (fun h -> `Node h);
@@ -2363,7 +2370,7 @@ struct
         seq ?offset ?length ?cache t
         |> Seq.map (fun (k, v) -> (k, hashvalue_of_keyvalue v))
 
-      let add : t -> step -> value -> t =
+      let add : t -> Path.step -> value -> t =
        fun t s v -> add t s (unsafe_keyvalue_of_hashvalue v)
 
       let list ?offset ?length ?cache t =
@@ -2446,11 +2453,7 @@ module Make
               with type hash = H.t
                and type contents_key = Key.t
                and type node_key = Key.t)
-    (Inter : Internal
-               with type hash = H.t
-                and type key = Key.t
-                and type Snapshot.metadata = Node.metadata
-                and type Val.step = Node.step)
+    (Inter : Internal with type hash = H.t and type key = Key.t)
     (Pack : Indexable.S
               with type hash = H.t
                and type key = Key.t

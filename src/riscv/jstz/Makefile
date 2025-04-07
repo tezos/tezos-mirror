@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -6,6 +6,8 @@ NATIVE_TARGET ?= $(shell rustc -vV | grep 'host:' | awk '{print $$2}')
 ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target "$(NATIVE_TARGET)"
 endif
+
+RUST_VERSION_SUPERVISED := 1.84.1
 
 INBOX_FILE ?= $(shell mktemp)
 
@@ -19,7 +21,9 @@ print-native-target:
 .PHONY: build-deps
 build-deps:
 	@exec ../scripts/install-rust-std-hermit.sh
+	@rustup toolchain install $(RUST_VERSION_SUPERVISED)
 	@rustup component add rustfmt clippy
+	@rustup target add --toolchain $(RUST_VERSION_SUPERVISED) riscv64gc-unknown-linux-musl
 ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
@@ -39,6 +43,10 @@ build-kernel-static:
 build-kernel-native:
 	@INBOX_FILE=$(INBOX_FILE) cargo build -p jstz --release --features static-inbox $(NATIVE_OPT)
 
+.PHONY: build-kernel-linux-musl
+build-kernel-linux-musl:
+	@cargo +$(RUST_VERSION_SUPERVISED) build --target=riscv64gc-unknown-linux-musl --package jstz --release
+
 .PHONY: test
 test:
 	@cargo test --no-default-features $(NATIVE_OPT)
@@ -52,8 +60,10 @@ run:
 
 .PHONY: check
 check:
+	@exec ../scripts/format.sh --check
 	@INBOX_FILE=$(INBOX_FILE) cargo check --all-features --workspace --locked
 	@INBOX_FILE=$(INBOX_FILE) cargo clippy --all-features -- --deny warnings
+	@INBOX_FILE=$(INBOX_FILE) cargo doc --all-features --document-private-items --no-deps
 
 .PHONY: inbox-bench
 inbox-bench:

@@ -20,7 +20,7 @@ remain within the staker’s account at all times.
 
 Staked and delegated funds **have different weights** in the computation
 of delegates’ baking and voting powers: staked funds (both external
-stakes by stakers and the delegate’s own) count **twice** as much as
+stakes by stakers and the delegate’s own) count **three times** as much as
 delegated funds.
 
 Unlike delegated funds, staked funds are considered to contribute to the
@@ -35,7 +35,7 @@ delegate’s staking balance. To simplify slashing, double-baking
 penalties are now proportional to staked funds: instead of the previous
 fixed sum of 640 tez they are now set to 5% of the delegate’s stake.
 Moreover, denunciation rewards (both for double-baking and
-double-attestations) are reduced from one half to one seventh of the
+double-attestations) are reduced from one half to one eleventh of the
 slashed funds. The chosen value prevents adversarial delegates from
 abusing the slashing mechanism for profit at the expense of their
 stakers.
@@ -73,6 +73,7 @@ custodians, exchanges, and other parties to support the functionality.
 stakers. In other words, smart contracts cannot stake funds (they can
 of course still delegate them).
 
+.. _staking_policy_configuration:
 .. _staking_policy_configuration_quebec:
 
 Staking policy configuration
@@ -117,6 +118,7 @@ stake) nor its consequence on voting and baking powers. That is,
 overdelegated funds are not counted towards a delegate baking power, but
 they do increase their voting power.
 
+.. _staked_funds_management:
 .. _staked_funds_management_quebec:
 
 Staked funds management

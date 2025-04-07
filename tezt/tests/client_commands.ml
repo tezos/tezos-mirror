@@ -479,7 +479,19 @@ module Transfer = struct
       ~title:"Set delegate forbidden on tz4"
       ~tags:[team; "client"; "set_delegate"; "bls"; "tz4"]
     @@ fun protocol ->
-    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let* parameter_file =
+      if Protocol.(number protocol > number Quebec) then
+        let* parameter_file =
+          Protocol.write_parameter_file
+            ~base:(Right (protocol, None))
+            [(["allow_tz4_delegate_enable"], `Bool false)]
+        in
+        return (Some parameter_file)
+      else return None
+    in
+    let* _node, client =
+      Client.init_with_protocol `Client ?parameter_file ~protocol ()
+    in
     let* () =
       let Account.{alias; secret_key; _} = Constant.tz4_account in
       Client.import_secret_key client ~alias secret_key
@@ -495,6 +507,34 @@ module Transfer = struct
       rex "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"
     in
     Process.check_error set_delegate_process ~exit_code:1 ~msg
+
+  let allowed_set_delegate_tz4 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Set delegate allowed on tz4"
+      ~tags:[team; "client"; "set_delegate"; "bls"; "tz4"]
+      ~supports:Protocol.(From_protocol (number Quebec + 1))
+    @@ fun protocol ->
+    let* parameter_file =
+      Protocol.write_parameter_file
+        ~base:(Right (protocol, None))
+        [(["allow_tz4_delegate_enable"], `Bool true)]
+    in
+    let* _node, client =
+      Client.init_with_protocol `Client ~parameter_file ~protocol ()
+    in
+    let* () =
+      let Account.{alias; secret_key; _} = Constant.tz4_account in
+      Client.import_secret_key client ~alias secret_key
+    in
+    let* () = airdrop_and_reveal client [Constant.tz4_account] in
+    let*? set_delegate_process =
+      Client.set_delegate
+        client
+        ~src:Constant.tz4_account.public_key_hash
+        ~delegate:Constant.tz4_account.public_key_hash
+    in
+    Process.check set_delegate_process
 
   let balance_too_low =
     Protocol.register_test
@@ -652,6 +692,7 @@ module Transfer = struct
     transfer_tz4 protocols ;
     batch_transfers_tz4 protocols ;
     forbidden_set_delegate_tz4 protocols ;
+    allowed_set_delegate_tz4 protocols ;
     balance_too_low protocols ;
     transfers_bootstraps5_bootstrap1 protocols ;
     safety_guard protocols

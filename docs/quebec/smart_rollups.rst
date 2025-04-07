@@ -143,6 +143,7 @@ the Layer 1 pushes one final internal message “End of
 level”. Similarly to “Start of level“, this internal message does not
 come with any payload.
 
+.. _reveal_data_channel_smart_rollups:
 .. _reveal_data_channel_smart_rollups_quebec:
 
 Reveal data channel
@@ -207,6 +208,7 @@ implements the exact same semantics as the PVM. The PVM is only ever
 used by the rollup node when it needs to produce a proof during the
 last step of the refutation mechanism.
 
+.. _commitments:
 .. _commitments_quebec:
 
 Commitments
@@ -238,7 +240,7 @@ must be wrong.
 
 An operator publishing a commitment is called a **committer**.
 Notice that, in order to publish a commitment, the operator must freeze a
-deposit of 10,000 tez, called **frozen bonds**. For this reason, the
+deposit of 10,000 tez, called :ref:`**frozen bonds**<bonds>`. For this reason, the
 committer is sometimes called a
 (smart rollup) *staker*. However, in order to avoid confusion with the
 :doc:`staker<staking>` role in Tezos Layer 1's Proof-of-Stake mechanism, we prefer to use the term "committer" throughout this documentation.
@@ -277,6 +279,24 @@ the Layer 1 interprets as a ticket. Lastly, the outbox message can
 contain a white-list update. This message can only be executed for a
 rollup that is private since its origination (see
 :ref:`private_rollups_quebec`).
+
+Bonds
+^^^^^
+
+The committer's bond of 10,000 tez is frozen automatically when the committer makes their first commitment.
+The bond remains frozen until the committer is no longer staking on any uncemented commitment.
+
+Because nodes have the length of the refutation to challenge another node's commitment, the bond stays locked until the end of the refutation period for the last commitment that the node posted.
+Recovering the bond safely takes a few steps; in general, node operators follow these steps:
+
+#. Switch the rollup node to ``bailout`` mode, which defends existing commitments but does not post new commitments.
+
+#. Wait until the last commitment is cemented.
+   If operators shut down the node before the last commitment is cemented, they risk losing their bond if another node challenges their commitments.
+
+#. Recover the bond by running the ``recover bond`` operation, which unlocks their tez.
+   Nodes running in ``bailout`` mode attempt to run this command automatically when the last commitment is cemented.
+   For more information, see :ref:`deploying_a_rollup_node`.
 
 Refutation
 ^^^^^^^^^^
@@ -326,6 +346,7 @@ published a concurrent commitment. However, assuming the existence of
 an honest participant *H*, then *H* will start the refutation game with all
 concurrent committers to avoid the rollup getting stuck.
 
+.. _private_rollups:
 .. _private_rollups_quebec:
 
 Private rollups

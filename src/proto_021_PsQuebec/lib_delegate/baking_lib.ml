@@ -53,8 +53,13 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
   let open Lwt_result_syntax in
   let chain = cctxt#chain in
   let monitor_node_operations = monitor_node_mempool in
+  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* constants =
+    Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+  in
+
   let*! operation_worker =
-    Operation_worker.create ?monitor_node_operations cctxt
+    Operation_worker.create ?monitor_node_operations ~constants cctxt
   in
   Baking_scheduling.create_initial_state
     cctxt
@@ -63,6 +68,7 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
     config
     operation_worker
     ~current_proposal
+    ~constants
     delegates
 
 let get_current_proposal cctxt ?cache () =
@@ -365,7 +371,7 @@ let attestation_quorum state =
 let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?force_apply_from_round ?(force = false) ?(minimal_timestamp = false)
-    ?extra_operations ?context_path ?state_recorder delegates =
+    ?extra_operations ?context_root_path ?state_recorder delegates =
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let cache = Baking_cache.Block_cache.create 10 in
@@ -375,7 +381,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
-      ?context_path
+      ?context_root_path
       ?force_apply_from_round
       ~force
       ?extra_operations
@@ -410,6 +416,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
             let candidate =
               {
                 Operation_worker.hash = latest_proposal.hash;
+                level_watched = latest_proposal.shell.level;
                 round_watched = latest_proposal.round;
                 payload_hash_watched = latest_proposal.payload_hash;
               }
@@ -765,7 +772,7 @@ let rec baking_minimal_timestamp ~count state
 let bake (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?force_apply_from_round ?force ?(minimal_timestamp = false)
-    ?extra_operations ?(monitor_node_mempool = true) ?context_path
+    ?extra_operations ?(monitor_node_mempool = true) ?context_root_path
     ?dal_node_endpoint ?(count = 1) ?votes ?state_recorder delegates =
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
@@ -774,7 +781,7 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
-      ?context_path
+      ?context_root_path
       ?force_apply_from_round
       ?force
       ?extra_operations

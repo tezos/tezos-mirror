@@ -40,10 +40,16 @@ let transfer_data =
 
 let baker = Constant.bootstrap5.alias
 
-let default_overrides =
-  [(* ensure that blocks must be attested *) (["consensus_threshold"], `Int 6)]
+let default_overrides protocol =
+  (* ensure that blocks must be attested *)
+  if Protocol.(number protocol >= 022) then
+    [(["consensus_threshold_size"], `Int 6)]
+  else [(["consensus_threshold"], `Int 6)]
 
-let init ?(overrides = default_overrides) protocol =
+let init ?overrides protocol =
+  let overrides =
+    Option.value ~default:(default_overrides protocol) overrides
+  in
   let* sandbox_node = Node.init [Synchronisation_threshold 0; Private_mode] in
   let sandbox_endpoint = Client.Node sandbox_node in
   let* sandbox_client = Client.init ~endpoint:sandbox_endpoint () in
@@ -201,12 +207,16 @@ let test_manual_bake =
       ]
   @@ fun protocol ->
   let* _proto_hash, _endpoint, client, node =
+    let consensus_threshold_name =
+      if Protocol.(number protocol >= 022) then "consensus_threshold_size"
+      else "consensus_threshold"
+    in
     init
       ~overrides:
         [
           (["minimal_block_delay"], `String_of_int minimal_block_delay);
           (["delay_increment_per_round"], `String_of_int 1);
-          (["consensus_threshold"], `Int 45);
+          ([consensus_threshold_name], `Int 45);
           (["consensus_committee_size"], `Int 67);
           (* because [number_of_shards] has to be at most [consensus_committee_size] *)
           (["dal_parametric"; "number_of_shards"], `Int 32);
@@ -353,12 +363,17 @@ let test_manual_bake_null_threshold =
       ]
   @@ fun protocol ->
   let* _proto_hash, _endpoint, client, node =
+    let consensus_threshold_name =
+      if Protocol.(number protocol >= 022) then "consensus_threshold_size"
+      else "consensus_threshold"
+    in
+
     init
       ~overrides:
         [
           (["minimal_block_delay"], `String_of_int minimal_block_delay);
           (["delay_increment_per_round"], `String_of_int 1);
-          (["consensus_threshold"], `Int 0);
+          ([consensus_threshold_name], `Int 0);
           (["consensus_committee_size"], `Int 67);
           (* because [number_of_shards] has to be at most [consensus_committee_size] *)
           (["dal_parametric"; "number_of_shards"], `Int 32);

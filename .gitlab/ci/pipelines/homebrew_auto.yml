@@ -1,0 +1,79 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+workflow:
+  rules:
+  - if: $foo != "bar" || $foo == "bar"
+    when: always
+
+variables:
+  PIPELINE_TYPE: homebrew_auto
+
+stages:
+- start
+- build
+
+datadog_pipeline_trace:
+  image: datadog/ci:v2.44.0
+  stage: start
+  tags:
+  - gcp
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
+
+oc.install-homebrew:
+  image: debian:bookworm
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - oc.build-homebrew
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - apt-get update && apt-get install -y git curl
+  - ./scripts/packaging/homebrew_install.sh
+  - eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
+  script:
+  - apt-get install -y autoconf cmake g++ libev-dev libffi-dev libgmp-dev libprotobuf-dev
+    libsqlite3-dev protobuf-compiler libhidapi-dev pkg-config zlib1g-dev libpq-dev
+  - ./scripts/packaging/test_homebrew_install.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+
+oc.build-homebrew:
+  image: debian:bookworm
+  stage: build
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  script:
+  - ./scripts/ci/install-gsutil.sh
+  - apt-get update && apt-get install -y git curl
+  - ./scripts/packaging/homebrew_release.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+
+oc.install-homebrew-macosx:
+  image: macos-14-xcode-15
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - oc.build-homebrew
+  dependencies: []
+  timeout: 60 minutes
+  script:
+  - ./scripts/packaging/homebrew_install.sh
+  - eval $(/opt/homebrew/bin/brew shellenv)
+  - ./scripts/packaging/test_homebrew_install.sh
+  variables:
+    TAGS: saas-macos-medium-m1

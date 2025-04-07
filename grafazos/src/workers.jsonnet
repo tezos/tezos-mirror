@@ -127,7 +127,7 @@ local graph = base.graph;
     local unavailableProtocolQuery = prometheus('validator_peer_unavailable_protocol', legendFormat=unavailableProtocol);
     local unknownAncestorQuery = prometheus('validator_peer_unknown_ancestor', legendFormat=unknownAncestor);
     local UnknownError = prometheus('validator_peer_unknown_error', legendFormat=unknownError);
-    graph.new('Peer validators', [connectionsQuery, invalidBlocksQuery, invalidLocatorQuery, newBranchCompeletedQuery, newHeadCompletedQuery, onNoRequestQuery, newKnownValidHeadQuery, newUnknownHeadQuery, systemErrorQuery, tooShortLocatorQuery, unavailableProtocolQuery, unknownAncestorQuery, UnknownError], h, w, x, y)
+    graph.new('Peer validators', [connectionsQuery, invalidBlocksQuery, invalidLocatorQuery, newBranchCompeletedQuery, newHeadCompletedQuery, onNoRequestQuery, newBranchQuery, newKnownValidHeadQuery, newUnknownHeadQuery, systemErrorQuery, tooShortLocatorQuery, unavailableProtocolQuery, unknownAncestorQuery, UnknownError], h, w, x, y)
     + graph.withLogScale()
     + graph.withQueryColor([[connections, 'light-green'], [invalidBlocks, 'light-red'], [invalidLocator, 'light-orange'], [newBranchCompleted, 'light-blue'], [newHeadCompleted, 'blue'], [onNoRequest, 'white'], [newBranch, 'green'], [newKnownValidHead, 'light-yellow'], [newUnknownHead, 'light-orange'], [systemError, 'orange'], [tooShortLocator, 'brown'], [unavailableProtocol, 'light-red'], [unknownAncestor, 'yellow'], [unknownError, 'red']]),
 

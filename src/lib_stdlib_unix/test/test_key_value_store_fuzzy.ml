@@ -201,6 +201,7 @@ module R : S = struct
 end
 
 module Helpers = struct
+  open Ppx_hash_lib.Std.Hash.Builtin
   open Bam.Std
   open Bam.Std.Syntax
 
@@ -221,7 +222,7 @@ module Helpers = struct
 
   let make_file id = Printf.sprintf "file_%d" id
 
-  type filename = string
+  type filename = string [@@deriving hash]
 
   (* With [tezt-bam], the generator names are codified. They should
      start with [gen_] followed by the name of the type, except if the
@@ -230,7 +231,7 @@ module Helpers = struct
     let* n = int ~min:0 ~max:(number_of_files_max - 1) () in
     return (make_file n)
 
-  type key = filename * int
+  type key = filename * int [@@deriving hash]
 
   let gen_key =
     let* filename = gen_filename in
@@ -245,7 +246,7 @@ module Helpers = struct
   let gen_value = string ~size:(return 1) ()
 
   type write_payload = {key : key; override : bool; default : bool}
-  [@@deriving gen]
+  [@@deriving gen, hash]
 
   let pp_write_payload fmt {key = file, key; override; default} =
     Format.fprintf
@@ -268,7 +269,7 @@ module Helpers = struct
     | Write_value of write_payload
     | Remove_file of filename
     | Read_values of key list [@max 5]
-  [@@deriving gen]
+  [@@deriving gen, hash]
 
   let pp_action fmt = function
     | Write_value payload -> Format.fprintf fmt "W%a" pp_write_payload payload
@@ -285,7 +286,7 @@ module Helpers = struct
     | Remove_file file -> Format.fprintf fmt "REMOVE[file=%s]" file
     | Count_values file -> Format.fprintf fmt "COUNT[file=%s]" file
 
-  type bind = Sequential | Parallel [@@deriving gen]
+  type bind = Sequential | Parallel [@@deriving gen, hash]
 
   type parameters = {
     number_of_files : int;
@@ -293,9 +294,10 @@ module Helpers = struct
     read_values_seq_size : int;
     lru_size : int;
     value_size : int; (* in bytes *)
-    values : (key, value) Stdlib.Hashtbl.t;
-    overwritten : (key, value) Stdlib.Hashtbl.t;
+    values : (key, value) Stdlib.Hashtbl.t; [@hash.ignore]
+    overwritten : (key, value) Stdlib.Hashtbl.t; [@hash.ignore]
   }
+  [@@deriving hash]
 
   let gen_parameters =
     let* number_of_files =
@@ -363,7 +365,7 @@ module Helpers = struct
      the next bind waits for the previous promises running or is done
      in parallel. This datatype does not allow to bind sequentially a
      group of parallel actions though. *)
-  type scenario = action * (bind * action) list
+  type scenario = action * (bind * action) list [@@deriving hash]
 
   let gen_scenario =
     let open Bam.Std in
@@ -630,9 +632,8 @@ let sequential_test =
   in
   Pbt.register
     ~pp
-    ~expected_sampling_ratio:(-1.)
-    ~minimum_number_of_samples:0
-    ~stop_after:(`Timeout 1.)
+    ~hash:[%hash: scenario * parameters]
+    ~stop_after:(`Timeout 20.)
     ~title:"key-value store sequential writes/reads"
     ~__FILE__
     ~tags:["kvs"]

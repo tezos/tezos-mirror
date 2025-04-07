@@ -26,7 +26,7 @@ let constants =
         Default_parameters.constants_test.issuance_weights with
         base_total_issued_per_minute = Tez.zero;
       };
-    consensus_threshold = 0;
+    consensus_threshold_size = 0;
     origination_size = 0;
   }
 
@@ -64,9 +64,6 @@ let bake_set_delegate_parameters_until_activation b ~delegate =
 
 let create_delegate_and_staker ~self_delegate_staker ?amount () =
   let open Lwt_result_syntax in
-  let constants =
-    constants |> Constants_helpers.Set.Adaptive_issuance.force_activation true
-  in
   let* b, delegate = Context.init_with_constants1 constants in
   let* b, staker = originate_implicit_unrevealed_account ?amount b delegate in
   let* b = bake_set_delegate_parameters_until_activation b ~delegate in
@@ -362,8 +359,7 @@ let fee_low_spendable_balance_non_zero_finalizable_unstake ~self_delegate_staker
   let* b = Block.bake ~operation:unstake b in
   let* b =
     Block.bake_until_n_cycle_end
-      (constants.consensus_rights_delay
-     + Protocol.Constants_repr.max_slashing_period)
+      (constants.consensus_rights_delay + Constants.slashing_delay + 1)
       b
   in
   let* () =

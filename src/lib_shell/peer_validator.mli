@@ -49,6 +49,8 @@ val status : t -> Worker_types.worker_status
 
 val information : t -> Worker_types.worker_information
 
+val get_last_advertised_head : t -> Block_hash.t * Block_header.t
+
 val current_request :
   t ->
   (Time.System.t * Time.System.t * Peer_validator_worker_state.Request.view)

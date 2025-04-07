@@ -81,11 +81,6 @@ val upgrade_data_dir :
     a valid directory name. *)
 val store_dir : string -> string
 
-(** [context_dir dir] is a directory within [dir] that the node uses
-    for its context. In order for [context_dir dir] to be valid, [dir]
-    must be a valid directory name.*)
-val context_dir : string -> string
-
 (** [protocol_dir dir] is a directory within [dir] that the node uses
     for its protocol. In order for [protocol_dir dir] to be valid,
     [dir] must be a valid directory name.*)
@@ -96,4 +91,6 @@ val protocol_dir : string -> string
     valid directory name. *)
 val lock_file : string -> string
 
-val upgrade_status : string -> unit tzresult Lwt.t
+(** [upgrade_status ~data_dir] returns whether or not an upgrade is
+    available. In addition to that, it prints a user friendly log. *)
+val upgrade_status : data_dir:string -> bool tzresult Lwt.t

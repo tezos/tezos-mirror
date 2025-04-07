@@ -26,11 +26,11 @@ That can be used like this
 
 .. code-block:: OCaml
 
-   Profiler.aggregate_f "advertise mempool" @@ fun () ->
+   Profiler.aggregate_f ~verbosity:Info ("advertise mempool", []) @@ fun () ->
    advertise pv_shell advertisable_mempool;
 
    let* _res =
-     Profiler.aggregate_s "set mempool" @@ fun () ->
+     Profiler.aggregate_s ~verbosity:Info ("set mempool", []) @@ fun () ->
      set_mempool pv_shell our_mempool
    in ...
 
@@ -40,48 +40,49 @@ used by devs hence the use of a PPX that is controlled by an environment variabl
 
 .. code-block:: OCaml
 
-   TEZOS_PPX_PROFILER=<anything> make
+   TEZOS_PPX_PROFILER=<value> make
 
-Will preprocess the code before compiling (It should be noted that this is temporary and the content of this environment variable will be parsed and used in a near future to allow finer control over what PPX should be activated or not).
+Will preprocess the code before compiling. The ``value`` field is described
+:ref:`enabled-drivers`.
 
 This will allow to preprocess
 
 .. code-block:: OCaml
 
-   () [@profiler.record "merge store"] ;
+   () [@profiler.record {verbosity = Info} "merge store"] ;
 
 into
 
 .. code-block:: OCaml
 
-   Profiler.record "merge store" ;
+   Profiler.record ~verbosity:Info ("merge store", []) ;
    () ;
 
 It should be noted that a ``Profiler`` module has to be available and has to
 have the signature of :package-api:`the Profiler.GLOBAL_PROFILER module
-<octez-libs/Tezos_base/Profiler/module-type-GLOBAL_PROFILER/index.html>` that
+<octez-libs/Tezos_profiler/Profiler/module-type-GLOBAL_PROFILER/index.html>` that
 can be obtained with ``module Profiler = (val Profiler.wrap my_profiler)``.
 
 Of course you can create any module with this signature but in case you didn't
 name it ``Profiler`` (let's say you name it ``My_profiler``) you'll have to
-declare your PPX attribute with a ``profiler_module`` field:
+declare your PPX attributes with a ``profiler_module`` field:
 
 .. code-block:: OCaml
 
-   () [@profiler.record {profiler_module = My_profiler} "merge store"] ;
+   () [@profiler.record {verbosity = Info; profiler_module = My_profiler} "merge store"] ;
 
 This will be preprocessed into
 
 .. code-block:: OCaml
 
-   My_profiler.record "merge store" ;
+   My_profiler.record ~verbosity:Info ("merge store", []) ;
    () ;
 
 
 How to use this PPX?
 --------------------
 
-There are two types of functions in the Profiler library.
+There are three types of functions in the Profiler library.
 
 1. Inline functions
 ^^^^^^^^^^^^^^^^^^^
@@ -89,20 +90,18 @@ There are two types of functions in the Profiler library.
 These functions are (for details about them, look at the :doc:`./profiler_module`
 document)
 
-- ``aggregate : ?lod:lod -> string -> unit``
-- ``mark : ?lod:lod -> string list -> unit``
-- ``record : ?lod:lod -> string -> unit``
-- ``stamp : ?lod:lod -> string -> unit``
+- ``aggregate : verbosity:verbosity -> string * metadata -> unit``
+- ``mark : verbosity:verbosity -> string list * metadata -> unit``
+- ``record : verbosity:verbosity -> string * metadata -> unit``
+- ``stamp : verbosity:verbosity -> string * metadata -> unit``
 - ``stop : unit -> unit``
-- ``reset_block_section: Block_hash.t -> unit`` (a utility function that calls
-  ``stop`` and ``record`` for each new block profiled)
 
 The PPX allows to replace
 
 .. code-block:: OCaml
 
-   Profiler.reset_block_section Block_repr.hash new_head;
-   Profiler.record "merge store";
+   Profiler.stop ();
+   Profiler.record ~verbosity:Info ("merge store", []);
    ...
 
 with
@@ -110,16 +109,16 @@ with
 .. code-block:: OCaml
 
    ()
-   [@profiler.reset_block_section Block_repr.hash new_head]
-   [@profiler.record "merge store"] ;
+   [@profiler.stop]
+   [@profiler.record {verbosity = Info} "merge store"] ;
    ...
 
 You can also decompose it to be sure of the evaluation order:
 
 .. code-block:: OCaml
 
-   () [@profiler.reset_block_section Block_repr.hash new_head] ;
-   () [@profiler.record "merge store"] ;
+   () [@profiler.stop] ;
+   () [@profiler.record {verbosity = Info} "merge store"] ;
    ...
 
 2. Wrapping functions
@@ -127,26 +126,62 @@ You can also decompose it to be sure of the evaluation order:
 
 These functions are:
 
-- ``aggregate_f : ?lod:lod -> string -> (unit -> 'a) -> 'a``
-- ``aggregate_s : ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
-- ``record_f : ?lod:lod -> string -> (unit -> 'a) -> 'a``
-- ``record_s : ?lod:lod -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
-- ``span_f : ?lod:lod -> string list -> (unit -> 'a) -> 'a``
-- ``span_s : ?lod:lod -> string list -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
+- ``aggregate_f : verbosity:verbosity -> string * metadata -> (unit -> 'a) -> 'a``
+- ``aggregate_s : verbosity:verbosity -> string * metadata -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
+- ``record_f : verbosity:verbosity -> string * metadata -> (unit -> 'a) -> 'a``
+- ``record_s : verbosity:verbosity -> string * metadata -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
+- ``span_f : verbosity:verbosity -> string list * metadata -> (unit -> 'a) -> 'a``
+- ``span_s : verbosity:verbosity -> string list * metadata -> (unit -> 'a Lwt.t) -> 'a Lwt.t``
 
 The PPX allows to replace
 
 .. code-block:: OCaml
 
-   (Profiler.record_f "read_test_line" @@ fun () -> read_test_line ())
+   (Profiler.record_f ~verbosity:Info ("read_test_line", []) @@ fun () -> read_test_line ())
    ...
 
 with
 
 .. code-block:: OCaml
 
-   (read_test_line () [@profiler.record_f "read_test_line"])
+   (read_test_line () [@profiler.record_f {verbosity = Info} "read_test_line"])
    ...
+
+3. Custom values
+^^^^^^^^^^^^^^^^^^^^^
+
+This PPX library provides a special construct, which basically acts as a
+``#ifndef TEZOS_PPX_PROFILER`` / ``#else``:
+
+- ``expr_if_ppx_not_used [@profiler.overwrite expr_if_ppx_used]``
+
+This construct will be preprocessed as ``expr_if_ppx_not_used`` if you are
+not using the PPX, or ``expr_if_ppx_used`` if you are.
+
+If you want to write a custom function that will use the intial value instead
+of simply removing it from the code, there are two functions that allow you
+to use a wrapper.
+
+Both ``profiler.wrap_f`` and ``profiler.wrap_s`` (the ``Lwt.t`` variant)
+allow you to wrap a delayed version of the initial value (using
+``fun () -> ...``) with a custom function.
+
+This will rewrite
+
+.. code-block:: OCaml
+
+   let wrapper expr = do_something (); expr ()
+   let _ = expr [@profiler.wrap_f wrapper]
+   ...
+
+into
+
+.. code-block:: OCaml
+
+   let wrapper expr = do_something (); expr ()
+   let _ = wrapper (fun () -> expr)
+   ...
+
 
 Structure of an attribute
 -------------------------
@@ -197,8 +232,10 @@ The payload is made of two parts, the first one being optional:
    fields ::= field ; fields | empty
 
    field ::=
-     | level_of_detail = (Terse | Detailed | Verbose)
+     | verbosity = (Notice | Info | Debug)
      | profiler_module = module_ident
+     | metadata = <(string * string) list>
+     | driver_ids = <(Prometheus | OpenTelemetry | Text | Json) list>
 
    args ::= <string> | <string list> | <function application> | ident | empty
 
@@ -206,17 +243,34 @@ As an example:
 
 .. code-block:: OCaml
 
-   f x [@profiler.aggregate_s {level_of_detail = Detailed} g y z] ;
-   g x [@profiler.span_f {level_of_detail = Verbose; profiler_module = Prof} "label"]
+   f x [@profiler.aggregate_s {verbosity = Info} g y z] ;
+   g x [@profiler.span_f {verbosity = Debug; profiler_module = Prof} "label"]
    ...
 
 will be preprocessed as
 
 .. code-block:: OCaml
 
-   Profiler.aggregate_s ~lod:Detailed (g y z) @@ f x ;
-   Prof.span_f ~lod:Verbose "label" @@ g x
+   Profiler.aggregate_s ~verbosity:Info (g y z) @@ f x ;
+   Prof.span_f ~verbosity:Debug ("label", []) @@ g x
    ...
+
+.. _enabled-drivers:
+
+Enabled drivers
+^^^^^^^^^^^^^^^
+
+When enabling the ppx with ``TEZOS_PPX_PROFILER=<value>``, ``value`` can have
+two possible types:
+
+- A dummy one, all attributes will be preprocessed except the ones with a
+  non-empty ``driver_ids`` field
+- A list of driver ids like ``prometheus; opentelemetry`` that will allow to
+  preprocess attributes:
+
+  - with an empty ``driver_ids`` field
+  - with a ``driver_ids`` field where one of the driver ids is also present in
+    ``value``
 
 Adding functionalities
 ----------------------

@@ -6,6 +6,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
+  bls12-381.archive
+  octez-rustzcash-deps
   tezt
   octez-libs.base
   octez-protocol-021-PsQuebec-libs.client

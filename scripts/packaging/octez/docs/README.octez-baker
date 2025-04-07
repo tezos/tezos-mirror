@@ -7,10 +7,10 @@ and for the active and next protocol. For example, you can start the
 baker using
 
 ```
-$ sudo systemctl start octez-baker-active
+$ sudo systemctl start octez-baker
 ```
 
-All services are disables and inactive by default. It's up to the user
+All services are enabled but not started by default. It's up to the user
 to configure them.
 
 ## Usage with a remote signer

@@ -101,7 +101,7 @@ end) : S = struct
     | 3 ->
         (* BLS checks that signatures are on the curve so we need to generate real
            ones by signing a message. *)
-        let open Tezos_crypto.Signature.Bls in
+        let open Tezos_crypto.Signature.Bls_aug in
         let msg = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
         let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
         let _, _, sk = generate_key ~seed () in

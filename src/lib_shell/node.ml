@@ -128,7 +128,7 @@ type config = {
   data_dir : string;
   internal_events : Tezos_base.Internal_event_config.t;
   store_root : string;
-  context_root : string;
+  context_root_dir : string;
   protocol_root : string;
   patch_context :
     (Tezos_protocol_environment.Context.t ->
@@ -165,7 +165,14 @@ let store_known_protocols store =
           | None -> Node_event.(emit store_protocol_missing_files) protocol_hash
           | Some protocol -> (
               let hash = Protocol.hash protocol in
-              if not (Protocol_hash.equal hash protocol_hash) then
+              if
+                not
+                  (Octez_protocol_alternative_hashes
+                   .Protocol_hash_representative
+                   .equivalent
+                     hash
+                     protocol_hash)
+              then
                 if
                   List.mem
                     ~equal:Protocol_hash.equal
@@ -212,7 +219,7 @@ let create ?(sandboxed = false) ?sandbox_parameters
       data_dir;
       internal_events;
       store_root;
-      context_root;
+      context_root_dir;
       protocol_root;
       patch_context;
       p2p = p2p_params;
@@ -250,7 +257,7 @@ let create ?(sandboxed = false) ?sandbox_parameters
           ?patch_context
           ?history_mode
           ~store_dir:store_root
-          ~context_dir:context_root
+          ~context_root_dir
           ~allow_testchains:start_testchain
           ~readonly:false
           ~disable_context_pruning
@@ -272,7 +279,7 @@ let create ?(sandboxed = false) ?sandbox_parameters
                    data_dir;
                    readonly = false;
                    genesis;
-                   context_root;
+                   context_root_dir;
                    protocol_root;
                    sandbox_parameters;
                    user_activated_upgrades;
@@ -292,7 +299,7 @@ let create ?(sandboxed = false) ?sandbox_parameters
           ?history_mode
           ~commit_genesis
           ~store_dir:store_root
-          ~context_dir:context_root
+          ~context_root_dir
           ~allow_testchains:start_testchain
           ~readonly:false
           ~disable_context_pruning
@@ -389,6 +396,7 @@ let build_rpc_directory ~node_version node =
        node.store) ;
   merge (Version_directory.rpc_directory node_version) ;
   merge (Health_directory.build_rpc_directory ()) ;
+  merge (Tezos_profiler_unix.Profiler_directory.build_rpc_directory ()) ;
   register0 Tezos_rpc.Service.error_service (fun () () ->
       Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   !dir

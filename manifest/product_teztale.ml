@@ -37,6 +37,11 @@ let teztale_server_library =
         teztale_library_base |> open_;
       ]
 
+let link_flags =
+  [Dune.[S ":include"; S "%{workspace_root}/static-link-flags-teztale.sexp"]]
+
+let release_status = Experimental
+
 let _teztale_server =
   public_exe
     (sf "octez-teztale-server")
@@ -46,12 +51,10 @@ let _teztale_server =
     ~synopsis:"Tezos: teztale, a delegate operations monitor"
     ~with_macos_security_framework:true
     ~static:false
-    ~link_flags:
-      [
-        Dune.[S ":include"; S "%{workspace_root}/static-link-flags-teztale.sexp"];
-      ]
+    ~link_flags
     ~deps:
       [
+        bls12_381_archive;
         aches;
         caqti_postgresql;
         caqti_sqlite;
@@ -64,7 +67,7 @@ let _teztale_server =
         teztale_server_library |> open_;
         cmdliner;
       ]
-    ~release_status:Experimental
+    ~release_status
 
 let protocols =
   List.filter_map
@@ -125,18 +128,18 @@ let generated_machines =
   in
   (* The process in order to create a new protocol machine implementation is basically
      to clone the "parent" protocol of the new one and replace some module names.
-     If a new protocol is added in octez (either beta or a release candidate version
-     of beta), you should find the corresponding file automatically produced into
+     If a new protocol is added in octez (either next or a release candidate version
+     of next), you should find the corresponding file automatically produced into
      dune's build directory. Copy it in /teztale/bin_teztale_archiver and add it to git. *)
   List.fold_left
     (fun acc protocol ->
       match Protocol.number protocol with
       | V _ ->
           Dune.(
-            generate_protocol_machine "beta" (Protocol.short_hash protocol)
+            generate_protocol_machine "next" (Protocol.short_hash protocol)
             :: acc)
       | _ -> acc)
-    Dune.(generate_protocol_machine "alpha" "beta" :: generated_empty_machines)
+    Dune.(generate_protocol_machine "alpha" "next" :: generated_empty_machines)
     Protocol.active
 
 let _teztale_archiver =
@@ -157,12 +160,11 @@ let _teztale_archiver =
     ~synopsis:"Tezos: teztale, a delegate operations monitor"
     ~with_macos_security_framework:true
     ~static:false
-    ~link_flags:
-      [
-        Dune.[S ":include"; S "%{workspace_root}/static-link-flags-teztale.sexp"];
-      ]
+    ~link_flags
     ~deps:
       ([
+         octez_rust_deps (* for rustzcash *);
+         bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_stdlib_unix |> open_;
          octez_shell_services |> open_;
@@ -171,11 +173,37 @@ let _teztale_archiver =
          octez_rpc_http_client_unix |> open_;
          octez_rpc_http |> open_;
          octez_version_value;
+         tls_lwt
+         (* tls-lwt is depopt of conduit-lwt-unix, but we need conduit-lwt-unix
+            to be compiled with it in teztale *);
+         conduit_lwt_unix;
          teztale_library_base |> open_;
          x509;
        ]
       @ protocol_deps)
-    ~release_status:Experimental
+    ~release_status
     ~dune:generated_machines
+
+let _teztale_snitch =
+  public_exe
+    (sf "octez-teztale-snitch")
+    ~internal_name:(sf "teztale_snitch_main")
+    ~path:"teztale/bin_teztale_snitch"
+    ~opam:"octez-teztale"
+    ~synopsis:"Tezos: teztale, a delegate operations monitor"
+    ~with_macos_security_framework:true
+    ~static:false
+    ~link_flags
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_version_value;
+        teztale_library_base |> open_;
+        Product_cohttp.cohttp_lwt;
+        Product_cohttp.cohttp_lwt_unix;
+        cmdliner;
+      ]
+    ~release_status
 
 let () = generate_content_input ()

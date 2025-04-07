@@ -6,3 +6,4 @@
 *.deb
 *.dsc
 *.tar.*
+octez/debian/changelog

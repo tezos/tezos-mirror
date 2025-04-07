@@ -57,6 +57,25 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
     include Resto_directory.Make (Encoding)
   end
 
+  module Media : sig
+    type medias = {
+      media_types : Media_type.t list;
+      default_media_type : string * Media_type.t;
+    }
+
+    val default_media_type : Media_type.t list -> string * Media_type.t
+
+    val input_media_type :
+      ?headers:Cohttp.Header.t ->
+      medias ->
+      (Media_type.t, [> `Unsupported_media_type of string]) result
+
+    val output_content_media_type :
+      ?headers:Cohttp.Header.t ->
+      medias ->
+      (string * Media_type.t, [> `Not_acceptable]) Result.t
+  end
+
   (** A handle on the server worker. *)
   type server
 

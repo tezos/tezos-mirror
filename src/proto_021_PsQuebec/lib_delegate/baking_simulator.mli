@@ -35,7 +35,7 @@ type incremental = {
 }
 
 val load_context :
-  context_path:string -> Abstract_context_index.t tzresult Lwt.t
+  context_root_path:string -> Abstract_context_index.t tzresult Lwt.t
 
 (** Make sure that the given context is consistent by trying to read in it *)
 val check_context_consistency :

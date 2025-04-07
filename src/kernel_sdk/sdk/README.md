@@ -66,6 +66,17 @@ export CC=clang
 | `extra`         | `alloc`, `std`, `utils`             | Additional tooling not targetted at kernels       |
 | `utils`         |                                     | Interaction with other tooling outside of the SDK |
 
+## PVM Kind and Compilation Targets
+
+You can control which Smart Rollup PVM kind you target using Cargo's `--target` command-line flag
+or using its `build.target` configuration option.
+
+| Target                         | Kind    | Status                         | Description                                                                                               |
+|--------------------------------|---------|--------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `wasm32-unknown-unknown`       | `wasm`  | stable                         | Produces a kernel for the WebAssembly PVM.                                                                |
+| `riscv64gc-unknown-hermit`     | `riscv` | experimental                   | Produces a kernel for the experimental RISC-V PVM. Bundles HermitOS as a supervisor.                      |
+| `riscv64gc-unknown-linux-musl` | `riscv` | experimental, work in progress | Produces a kernel for the experimental RISC-V PVM. Utilises the PVM's Linux-like supervisor capabilities. |
+
 ## Usage
 
 The following `Cargo.toml` file can be used to set up development with the Kernel SDK:
@@ -82,8 +93,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 tezos-smart-rollup = "0.2.2"
-tezos_data_encoding = "0.5"
-tezos_crypto_rs = { version = "0.5", default-features = false }
+tezos_data_encoding = "0.6"
+tezos_crypto_rs = { version = "0.6", default-features = false }
 nom = "7.1"
 
 [dev-dependencies]

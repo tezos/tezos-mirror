@@ -19,3 +19,10 @@
   -open Tezos_protocol_alpha
   -open Tezos_client_base
   -open Tezos_client_alpha))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls_aug = Tezos_crypto.Signature.Bls_aug\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V1")))

@@ -224,7 +224,10 @@ let test_config_history_mode_RPC () =
   (* mirrors [default_offset] from src/lib_shell_services/history_mode.ml *)
   let default_additional_cycles = 1 in
   let* _, client =
-    Client.init_with_node ~nodes_args:[History_mode (Full None)] `Client ()
+    Client.init_with_node
+      ~nodes_args:[Node.(History_mode default_full)]
+      `Client
+      ()
   in
   let* history_mode = get_history_mode client in
   check_history_mode

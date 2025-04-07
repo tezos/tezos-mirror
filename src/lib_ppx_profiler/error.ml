@@ -7,25 +7,38 @@
 
 type error =
   | Invalid_action of string
-  | Invalid_payload of Parsetree.payload
+  | Invalid_payload of bool * Ppxlib.payload
   | Invalid_aggregate of Key.t
   | Invalid_mark of Key.t
   | Invalid_record of Key.t
   | Invalid_span of Key.t
   | Invalid_stop of Key.t
-  | Improper_field of (Longident.t Location.loc * Ppxlib.expression)
+  | Invalid_wrap of Key.t
+  | Invalid_list_of_driver_ids of Ppxlib.expression list
+  | Improper_field of (Ppxlib.longident_loc * Ppxlib.expression)
+  | Improper_list_field of (Ppxlib.longident_loc * Ppxlib.expression)
   | Improper_let_binding of Ppxlib.expression
-  | Improper_record of (Ppxlib.Ast.longident_loc * Parsetree.expression) list
+  | Improper_record of (Ppxlib.longident_loc * Ppxlib.expression) list
   | Malformed_attribute of Ppxlib.expression
+  | No_verbosity of Key.t
 
 let pp_field ppf (lident, expr) =
   Format.fprintf
     ppf
     "%a = %a"
-    Pprintast.longident
+    Ppxlib.Pprintast.longident
     lident.Ppxlib.txt
-    Pprintast.expression
+    Ppxlib.Pprintast.expression
     expr
+
+let pp_accepted ppf () =
+  Format.fprintf
+    ppf
+    "Accepted attributes payload are:@,\
+     - [@profiler.aggregate_* <record> <string or ident>]@,\
+     - [@profiler.mark <record> [<list of strings or ident>]]@,\
+     - [@profiler.record_* <record> <string or ident>]@,\
+     - [@profiler.span_* <record> <list of strings or ident>]"
 
 let error loc err =
   let msg, hint =
@@ -33,34 +46,47 @@ let error loc err =
     | Invalid_action action ->
         ( "Invalid action.",
           Format.asprintf
-            "@[<v 2>Accepted actions are aggregate, aggregate_s, aggregate_f, \
-             mark, record, record_f, record_s, reset_block_section, span, \
-             span_f, span_s, stamp and stop]@,\
-             Found: %s@."
+            "@[<v 2>Accepted actions are %a@,Found: %s@."
+            Format.(
+              pp_print_list
+                ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
+                (fun ppf constant ->
+                  Format.fprintf ppf "%s" (Constants.get_action constant)))
+            Constants.constants
             action )
-    | Invalid_payload payload ->
+    | Invalid_payload (missing_record, payload) ->
         ( "Invalid or empty attribute payload.",
           Format.asprintf
-            "@[<v 2>Accepted attributes payload are:@,\
-             - `[@profiler.aggregate_* <string or ident>]@,\
-             - `[@profiler.mark [<list of strings>]]@,\
-             - `[@profiler.record_* <string or ident>]@,\
-             Found: %a@."
-            Pprintast.payload
+            "@[<v 2>%a@,%aFound: @[<v 0>%a@]@]@."
+            pp_accepted
+            ()
+            (fun ppf () ->
+              if missing_record then
+                Format.fprintf
+                  ppf
+                  "@[<v 2>With <record> containing the following optional \
+                   fields:@,\
+                   - verbosity@,\
+                   - profiler_module@,\
+                   - metadata@,\
+                   - drivers_ids@]@,"
+              else ())
+            ()
+            Ppxlib.Pprintast.payload
             payload )
     | Invalid_aggregate key ->
         ( "Invalid aggregate.",
           Format.asprintf
             "@[<v 2>A [@profiler.aggregate_*] attribute must be a string or an \
              identifier.@,\
-             Found %a@."
+             Found: @[<v 0>%a@]@."
             Key.pp
             key )
     | Invalid_mark key ->
         ( "Invalid mark.",
           Format.asprintf
             "@[<v 2>A [@profiler.mark] attribute must be a string list.@,\
-             Found %a@."
+             Found: @[<v 0>%a@]@."
             Key.pp
             key )
     | Invalid_record key ->
@@ -68,32 +94,55 @@ let error loc err =
           Format.asprintf
             "@[<v 2>A [@profiler.record_*] attribute must be a string or an \
              identifier.@,\
-             Found %a@."
+             Found: @[<v 0>%a@]@."
             Key.pp
             key )
     | Invalid_span key ->
         ( "Invalid span.",
           Format.asprintf
             "@[<v 2>A [@profiler.span_*] attribute must be a string list.@,\
-             Found %a@."
+             Found: @[<v 0>%a@]@."
             Key.pp
             key )
     | Invalid_stop key ->
         ( "Invalid stop.",
           Format.asprintf
             "@[<v 2>A [@profiler.stop] should not have an attribute.@,\
-             Found %a@."
+             Found: @[<v 0>%a@]@."
             Key.pp
             key )
+    | Invalid_wrap key ->
+        ( "Invalid wrap.",
+          Format.asprintf
+            "@[<v 2>A [@profiler.wrap_*] attribute must be a function \
+             application.@,\
+             Found: @[<v 0>%a@]@."
+            Key.pp
+            key )
+    | Invalid_list_of_driver_ids expr_list ->
+        ( "Invalid list of modules.",
+          Format.asprintf
+            "@[<v 2>It looks like you tried to provide a list of opt-in \
+             drivers through the `driver_ids` field but no drivers could be \
+             parsed out of it. A list of opt-in drivers should be a list of \
+             modules or idents like [Opentelemetry; prometheus]@,\
+             Found: { @[<v 2>%a@] }@."
+            Format.(
+              pp_print_list
+                ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@,")
+                Ppxlib.Pprintast.expression)
+            expr_list )
     | Improper_record record ->
         ( "Improper record.",
           Format.asprintf
             "@[<v 2>It looks like you tried to provide some additional options \
              through the mandatory record but no option could be parsed out of \
              it. Possible options are:@,\
-             - the level_of_detail@,\
+             - the verbosity@,\
              - the profiler_module@,\
-             Found %a@."
+             - the metadata@,\
+             - the opt-in drivers_ids@,\
+             Found: { @[<v 2>%a@] }@."
             Format.(
               pp_print_list
                 ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@,")
@@ -103,25 +152,40 @@ let error loc err =
         ( "Improper field.",
           Format.asprintf
             "@[<v 2>Expecting a field specifying either:@,\
-             - the level_of_detail@,\
+             - the verbosity@,\
              - the profiler_module@,\
-             Found %a@."
+             - the metadata@,\
+             - the opt-in drivers_ids@,\
+             Found: @[<v 0>%a@]@."
+            pp_field
+            field )
+    | Improper_list_field field ->
+        ( "Improper list field.",
+          Format.asprintf
+            "@[<v 2>Expecting a list field@,Found: @[<v 0>%a@]@."
             pp_field
             field )
     | Improper_let_binding expr ->
         ( "Improper let binding expression.",
           Format.asprintf
             "@[<v 2>Expecting a let binding expression.@,Found %a@."
-            Pprintast.expression
+            Ppxlib.Pprintast.expression
             expr )
     | Malformed_attribute expr ->
         ( "Malformed attribute.",
           Format.asprintf
-            "@[<v 2>Accepted attributes payload are:@,\
-             - `[@profiling.mark [<list of strings>]]'@,\
-             - `[@profiling.aggregate_* <string or ident>]@,\
-             Found %a@.'"
-            Pprintast.expression
+            "@[<v 2>%a@,Found %a@.'"
+            pp_accepted
+            ()
+            Ppxlib.Pprintast.expression
             expr )
+    | No_verbosity key ->
+        ( "Missing mandatory verbosity field",
+          Format.asprintf
+            "@[<v 2>A [@profiler] call requires a {verbosity} field. Available \
+             options are Notice, Info and Debug.@,\
+             Found: @[<v 0>%a@]@."
+            Key.pp
+            key )
   in
   Location.raise_errorf ~loc "profiling_ppx: %s\nHint: %s" msg hint

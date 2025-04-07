@@ -6,6 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
+  bls12-381.archive
   octez-libs.error-monad
   octez-libs.stdlib-unix
   octez-libs.event-logging
@@ -13,7 +14,7 @@
   qcheck-alcotest
   octez-alcotezt
   tezt-bam)
- (preprocess (pps bam-ppx))
+ (preprocess (pps ppx_hash bam-ppx))
  (library_flags (:standard -linkall))
  (flags
   (:standard)

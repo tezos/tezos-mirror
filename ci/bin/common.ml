@@ -19,12 +19,12 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
-(* types for the debian repository pipelines.
+(* types for the repositories pipelines.
    - Release: we run all the release jobs, but no tests
    - Partial: we run only a subset of the tests jobs
    - Full: we run the complete test matrix
 *)
-type debian_repository_pipeline = Full | Partial | Release
+type repository_pipeline = Full | Partial | Release
 
 let cargo_home =
   (* Note:
@@ -33,121 +33,6 @@ let cargo_home =
      - We want [CARGO_HOME] to be hidden from dune
        (thus the dot-prefix). *)
   Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
-
-(* Define [stages:]
-
-   The "manual" stage exists to fix a UI problem that occurs when mixing
-   manual and non-manual jobs. *)
-module Stages = struct
-  let start = Stage.register "start"
-
-  (* All automatic image creation is done in the stage [images]. *)
-  let images = Stage.register "images"
-
-  let sanity = Stage.register "sanity"
-
-  let build = Stage.register "build"
-
-  let test = Stage.register "test"
-
-  let test_coverage = Stage.register "test_coverage"
-
-  let packaging = Stage.register "packaging"
-
-  let publishing = Stage.register "publishing"
-
-  let publishing_tests = Stage.register "publishing_tests"
-
-  let doc = Stage.register "doc"
-
-  let prepare_release = Stage.register "prepare_release"
-
-  let publish_release_gitlab = Stage.register "publish_release_gitlab"
-
-  let publish_release = Stage.register "publish_release"
-
-  let publish_package_gitlab = Stage.register "publish_package_gitlab"
-
-  let manual = Stage.register "manual"
-end
-
-(* Get the [alpine_version] from the environment, which is typically
-   set by sourcing [scripts/version.sh]. This is used to set the tag
-   of the image {!Images.alpine}. *)
-let alpine_version =
-  match Sys.getenv_opt "alpine_version" with
-  | None ->
-      failwith
-        "Please set the environment variable [alpine_version], by e.g. \
-         sourcing [scripts/version.sh] before running."
-  | Some v -> v
-
-(* Register external images.
-
-   Use this module to register images that are as built outside the
-   [tezos/tezos] CI. *)
-module Images_external = struct
-  let nix = Image.mk_external ~image_path:"nixos/nix:2.22.1"
-
-  (* Match GitLab executors version and directly use the Docker socket
-     The Docker daemon is already configured, experimental features are enabled
-     The following environment variables are already set:
-     - [BUILDKIT_PROGRESS]
-     - [DOCKER_DRIVER]
-     - [DOCKER_VERSION]
-     For more info, see {{:https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#use-docker-socket-binding}} here.
-
-     This image is defined in {{:https://gitlab.com/tezos/docker-images/ci-docker}tezos/docker-images/ci-docker}. *)
-  let docker =
-    Image.mk_external
-      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0"
-
-  (* The Alpine version should be kept up to date with the version
-     used for the [ci_image_name] images and specified in the
-     variable [alpine_version] in [scripts/version.sh]. This is
-     checked by the jobs [start] and [sanity_ci]. *)
-  let alpine = Image.mk_external ~image_path:("alpine:" ^ alpine_version)
-
-  let debian_bookworm = Image.mk_external ~image_path:"debian:bookworm"
-
-  let ubuntu_noble =
-    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:24.04_stable"
-
-  let ubuntu_jammy =
-    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:22.04_stable"
-
-  let fedora_37 = Image.mk_external ~image_path:"fedora:37"
-
-  let fedora_39 = Image.mk_external ~image_path:"fedora:39"
-
-  let opam_ubuntu_jammy =
-    Image.mk_external ~image_path:"ocaml/opam:ubuntu-22.04"
-
-  let opam_ubuntu_mantic =
-    Image.mk_external ~image_path:"ocaml/opam:ubuntu-23.10"
-
-  let opam_debian_bookworm =
-    Image.mk_external ~image_path:"ocaml/opam:debian-12"
-
-  let ci_release =
-    Image.mk_external
-      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0"
-
-  let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.9.3-debian"
-
-  (* We specify the semgrep image by hash to avoid flakiness. Indeed, if we took the
-     latest release, then an update in the parser or analyser could result in new
-     errors being found even if the code doesn't change. This would place the
-     burden for fixing the code on the wrong dev (the devs who happen to open an
-     MR coinciding with the semgrep update rather than the dev who wrote the
-     infringing code in the first place).
-     Update the hash in scripts/semgrep/README.md too when updating it here
-     Last update: 2022-01-03 *)
-  let semgrep_agent =
-    Image.mk_external ~image_path:"returntocorp/semgrep-agent:sha-c6cd7cf"
-end
-
-(** {2 Helpers} *)
 
 (** The default [before_script:] section.
 
@@ -175,10 +60,12 @@ end
    optional arguments. *)
 let before_script ?(take_ownership = false) ?(source_version = false)
     ?(eval_opam = false) ?(init_python_venv = false) ?(install_js_deps = false)
-    before_script =
+    ?(datadog_job_info = false) before_script =
   let toggle t x = if t then [x] else [] in
+  (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
+  toggle datadog_job_info ". ./scripts/ci/datadog_send_job_info.sh"
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2865 *)
-  toggle take_ownership "./scripts/ci/take_ownership.sh"
+  @ toggle take_ownership "./scripts/ci/take_ownership.sh"
   @ toggle source_version ". ./scripts/version.sh"
     (* TODO: this must run in the before_script of all jobs that use the opam environment.
        how to enforce? *)
@@ -267,12 +154,15 @@ let enable_kernels =
     environment dir [SCCACHE_DIR] such that sccache stores its caches
     there.
 
+    - [cache_size] sets the environment variable [SCCACHE_CACHE_SIZE]
+    that configures the maximum size of the cache.
+
     - [error_log], [idle_timeout] and [log] sets the environment
     variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
     [SCCACHE_LOG] respectively. See the sccache documentation for more
     information on these variables. *)
 let enable_sccache ?key ?error_log ?idle_timeout ?log
-    ?(path = "$CI_PROJECT_DIR/_sccache") job =
+    ?(path = "$CI_PROJECT_DIR/_sccache") ?(cache_size = "5G") job =
   let key =
     Option.value
       ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
@@ -280,7 +170,7 @@ let enable_sccache ?key ?error_log ?idle_timeout ?log
   in
   job
   |> append_variables
-       ([("SCCACHE_DIR", path)]
+       ([("SCCACHE_DIR", path); ("SCCACHE_CACHE_SIZE", cache_size)]
        @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
        @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
        @ opt_var "SCCACHE_LOG" Fun.id log)
@@ -288,6 +178,18 @@ let enable_sccache ?key ?error_log ?idle_timeout ?log
   (* Starts sccache and sets [RUSTC_WRAPPER] *)
   |> append_before_script [". ./scripts/ci/sccache-start.sh"]
   |> append_after_script ["./scripts/ci/sccache-stop.sh"]
+
+let enable_octez_rust_deps_target_dir ?key job =
+  let key =
+    Option.value
+      ~default:
+        ("rust-deps-target-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+      key
+  in
+  let path = "$CI_PROJECT_DIR/_target" in
+  job
+  |> append_variables [("OCTEZ_RUST_DEPS_TARGET_DIR", path)]
+  |> append_cache (cache ~key [path])
 
 (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
 
@@ -323,13 +225,15 @@ let enable_cargo_cache job =
     environment dir [DUNE_CACHE_ROOT] such that dune stores its caches
     there.
 
+    - [cache_size] sets the maximum size of the cache.
+
     - [copy_mode], if [true] (default is [false]) sets
     {{:https://dune.readthedocs.io/en/stable/caching.html#cache-storage-mode}Dune
     Cache Storage Mode} to [copy]. If [false], [hardlink] mode is
     used, which is typically more performant but requires that the
     build and cache folder be on the same volume. *)
 let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
-    ?(copy_mode = false) ?policy job =
+    ?(cache_size = "5GB") ?(copy_mode = false) ?policy job =
   let key =
     Option.value
       ~default:
@@ -344,6 +248,52 @@ let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
          ("DUNE_CACHE_ROOT", path);
        ]
   |> append_cache (cache ?policy ~key [path])
+  |> append_after_script
+       ["eval $(opam env)"; "dune cache trim --size=" ^ cache_size]
+
+(** {2 Child repositories pipelines} *)
+
+(** Return a tuple (ARCHITECTURES, <archs>) based on the type
+    of repository pipeline. *)
+let archs_variables pipeline =
+  let amd64 = List.map Tezos_ci.arch_to_string_alt [Amd64] in
+  let all = List.map Tezos_ci.arch_to_string_alt [Amd64; Arm64] in
+  match pipeline with
+  | Partial -> [("ARCHITECTURES", String.concat " " amd64)]
+  | Full | Release -> [("ARCHITECTURES", String.concat " " all)]
+
+let make_job_build_packages ~__POS__ ~name ~matrix ~script ~dependencies
+    ~variables ~image =
+  job
+    ~__POS__
+    ~name
+    ~image
+    ~stage:Stages.build
+    ~variables
+    ~parallel:(Matrix matrix)
+    ~dependencies
+    ~tag:Dynamic
+    ~retry:Gitlab_ci.Types.{max = 1; when_ = [Stuck_or_timeout_failure]}
+    ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    [
+      (* This is a hack to enable Cargo networking for jobs in child pipelines.
+
+         Global variables of the parent pipeline
+         are passed to the child pipeline. Inside the child
+         pipeline, variables received from the parent pipeline take
+         precedence over job-level variables. It's bit strange. So
+         to override the default [CARGO_NET_OFFLINE=true], we cannot
+         just set it in the job-level variables of this job.
+
+         [enable_sccache] adds the cache directive for [$CI_PROJECT_DIR/_sccache].
+
+         See
+         {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
+         for more info. *)
+      "export CARGO_NET_OFFLINE=false";
+      script;
+    ]
+  |> enable_sccache ~idle_timeout:"0"
 
 (** {2 Changesets} *)
 
@@ -372,6 +322,10 @@ let changeset_octez =
           "michelson_test_scripts/**/*";
           "tzt_reference_test_suite/**/*";
         ])
+
+(* Only if Etherlink has changed *)
+let changeset_etherlink =
+  Changeset.(changeset_base @ make ["etherlink/**/*"; "Makefile"])
 
 (** Only if octez source code has changed, if the images has changed or
     if kernels.mk changed. *)
@@ -426,18 +380,54 @@ let changeset_octez_docker_changes_or_master =
           "Dockerfile";
         ])
 
-let changeset_hadolint_docker_files =
-  Changeset.make ["build.Dockerfile"; "Dockerfile"]
+let changeset_docker_files = Changeset.make ["build.Dockerfile"; "Dockerfile"]
 
 let changeset_debian_packages =
   Changeset.(
     make
       [
-        "scripts/packaging/**/*";
+        "scripts/packaging/build-deb-local.sh";
+        "scripts/packaging/Release.conf";
+        "scripts/packaging/octez/debian/*";
         "debian-deps-build.Dockerfile";
         "scripts/ci/build-debian-packages_current.sh";
-        "scripts/ci/build-debian-packages-dependencies.sh";
+        "scripts/ci/build-packages-dependencies.sh";
         "scripts/ci/build-debian-packages.sh";
+        "scripts/ci/prepare-apt-repo.sh";
+        "scripts/ci/create_debian_repo.sh";
+        "docs/introduction/install-bin-deb.sh";
+        "docs/introduction/upgrade-bin-deb.sh";
+        "scripts/version.sh";
+        "manifest/**/*.ml*";
+      ])
+
+let changeset_rpm_packages =
+  Changeset.(
+    make
+      [
+        "scripts/packaging/build-deb-local.sh";
+        "scripts/packaging/octez/rpm/*";
+        "scripts/packaging/tests/rpm/*";
+        "rpm-deps-build.Dockerfile";
+        "scripts/ci/build-packages-dependencies.sh";
+        "scripts/ci/build-rpm-packages.sh";
+        "scripts/ci/prepare-apt-rpm-repo.sh";
+        "scripts/ci/create_rpm_repo.sh";
+        "scripts/version.sh";
+        "manifest/**/*.ml*";
+      ])
+
+let changeset_homebrew =
+  Changeset.(
+    make
+      [
+        "scripts/packaging/test_homebrew_install.sh";
+        "scripts/packaging/homebrew_release.sh";
+        "scripts/ci/install-gsutil.sh";
+        "scripts/packaging/homebrew_install.sh";
+        "scripts/packaging/Formula/*";
+        "scripts/version.sh";
+        "manifest/**/*.ml*";
       ])
 
 (** The set of [changes:] that select opam jobs.
@@ -560,6 +550,12 @@ let changeset_test_liquidity_baking_scripts =
           "scripts/check-liquidity-baking-scripts.sh";
         ])
 
+let changeset_test_sdk_rust =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["sdk/rust"])
+
 let changeset_test_kernels =
   Changeset.(
     changeset_base
@@ -581,7 +577,7 @@ let changeset_test_etherlink_firehose =
           "etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*";
         ])
 
-let changeset_test_riscv_kernels =
+let changeset_riscv_kernels =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
@@ -598,183 +594,17 @@ let changeset_test_evm_compatibility =
           "etherlink/kernel_evm/evm_evaluation/**/*";
         ])
 
-(** {2 Job makers} *)
+let changeset_mir =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["contrib/mir/**/*"])
 
-(** Helper to create jobs that uses the Docker daemon.
-
-    It sets the appropriate image. Furthermore, unless
-    [skip_docker_initialization] is [true], it:
-    - activates the Docker daemon as a service;
-    - sets up authentification with Docker registries
-    in the job's [before_script] section.
-
-    If [ci_docker_hub] is set to [true], then the job will
-    authenticate with Docker Hub provided the environment variable
-    [CI_DOCKER_AUTH] contains the appropriate credentials. *)
-let job_docker_authenticated ?(skip_docker_initialization = false)
-    ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies
-    ?image_dependencies ?arch ?tag ?allow_failure ?parallel ?retry ~__POS__
-    ~stage ~name script : tezos_job =
-  let docker_version = "24.0.7" in
-  job
-    ?rules
-    ?dependencies
-    ?image_dependencies
-    ?artifacts
-    ?arch
-    ?tag
-    ?allow_failure
-    ?parallel
-    ?retry
-    ~__POS__
-    ~image:Images_external.docker
-    ~variables:
-      ([("DOCKER_VERSION", docker_version)]
-      @ opt_var "CI_DOCKER_HUB" Bool.to_string ci_docker_hub
-      @ variables)
-    ~before_script:
-      (if not skip_docker_initialization then
-         ["./scripts/ci/docker_initialize.sh"]
-       else [])
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
-    ~stage
-    ~name
-    script
-
-(** A set of internally and externally built images.
-
-    Use this module to register images built in the CI of
-    [tezos/tezos] that are also used in the same pipelines.See
-    {!Images_external} for external images.
-
-    To make the distinction between internal and external images
-    transparent to job definitions, this module also includes
-    {!Images_external}.
-
-    For documentation on the [CI] images and the [rust_toolchain]
-    images, refer to [images/README.md]. *)
-module Images = struct
-  (* Include external images here for convenience. *)
-  include Images_external
-
-  (* Internal images are built in the stage {!Stages.images}. *)
-  let stage = Stages.images
-
-  let client_libs_dependencies =
-    let image_builder_amd64 =
-      job_docker_authenticated
-        ~__POS__
-        ~stage
-        ~name:"oc.docker:client-libs-dependencies"
-          (* This image is not built for external use. *)
-        ~ci_docker_hub:false
-          (* Handle docker initialization, if necessary, in [./scripts/ci/docker_client_libs_dependencies_build.sh]. *)
-        ~skip_docker_initialization:true
-        ["./scripts/ci/docker_client_libs_dependencies_build.sh"]
-        ~artifacts:
-          (artifacts
-             ~reports:
-               (reports ~dotenv:"client_libs_dependencies_image_tag.env" ())
-             [])
-    in
-    let image_path =
-      "${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}"
-    in
-    Image.mk_internal ~image_builder_amd64 ~image_path ()
-
-  (** The rust toolchain image *)
-  let rust_toolchain =
-    (* The job that builds the rust_toolchain image.
-       This job is automatically included in any pipeline that uses this image. *)
-    let image_builder arch =
-      job_docker_authenticated
-        ~__POS__
-        ~arch
-        ~skip_docker_initialization:true
-        ~stage
-        ~name:("oc.docker:rust-toolchain:" ^ arch_to_string_alt arch)
-        ~ci_docker_hub:false
-        ~artifacts:
-          (artifacts
-             ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())
-             [])
-        ["./scripts/ci/docker_rust_toolchain_build.sh"]
-    in
-    let image_path =
-      "${rust_toolchain_image_name}:${rust_toolchain_image_tag}"
-    in
-    Image.mk_internal
-      ~image_builder_amd64:(image_builder Amd64)
-      ~image_builder_arm64:(image_builder Arm64)
-      ~image_path
-      ()
-
-  (** The jsonnet image *)
-  let jsonnet =
-    let image_builder arch =
-      job_docker_authenticated
-        ~__POS__
-        ~arch
-        ~stage
-        ~name:("oc.docker:jsonnet:" ^ arch_to_string_alt arch)
-        ~ci_docker_hub:false
-        ~artifacts:
-          (artifacts ~reports:(reports ~dotenv:"jsonnet_image_tag.env" ()) [])
-        ["./scripts/ci/docker_jsonnet_build.sh"]
-    in
-    let image_path = "${jsonnet_image_name}:${jsonnet_image_tag}" in
-    Image.mk_internal ~image_builder_amd64:(image_builder Amd64) ~image_path ()
-
-  module CI = struct
-    (* The job that builds the CI images.
-       This job is automatically included in any pipeline that uses any of these images. *)
-    let job_docker_ci arch =
-      let variables = Some [("ARCH", arch_to_string_alt arch)] in
-      let retry =
-        match arch with
-        | Amd64 -> None
-        (* We're currently seeing flakiness in the arm64 jobs *)
-        | Arm64 -> Some {max = 1; when_ = [Runner_system_failure]}
-      in
-      job_docker_authenticated
-        ?variables
-        ?retry
-        ~__POS__
-        ~arch
-        ~skip_docker_initialization:true
-        ~stage
-        ~name:("oc.docker:ci:" ^ arch_to_string_alt arch)
-        ~ci_docker_hub:false
-        ~artifacts:
-          (artifacts ~reports:(reports ~dotenv:"ci_image_tag.env" ()) [])
-        ["./images/ci_create_ci_images.sh"]
-
-    let mk_ci_image ~image_path =
-      Image.mk_internal
-        ~image_builder_amd64:(job_docker_ci Amd64)
-        ~image_builder_arm64:(job_docker_ci Arm64)
-        ~image_path
-        ()
-
-    (* Reuse the same image_builder job [job_docker_ci] for all
-       the below images, since they're all produced in that same job.
-
-       Depending on any of these images ensures that the job
-       [job_docker_ci] is included exactly once in the pipeline. *)
-    let runtime =
-      mk_ci_image ~image_path:"${ci_image_name}/runtime:${ci_image_tag}"
-
-    let prebuild =
-      mk_ci_image ~image_path:"${ci_image_name}/prebuild:${ci_image_tag}"
-
-    let build = mk_ci_image ~image_path:"${ci_image_name}/build:${ci_image_tag}"
-
-    let test = mk_ci_image ~image_path:"${ci_image_name}/test:${ci_image_tag}"
-
-    let e2etest =
-      mk_ci_image ~image_path:"${ci_image_name}/e2etest:${ci_image_tag}"
-  end
-end
+let changeset_mir_tzt =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["contrib/mir/**/*"; "tzt_reference_test_suite/**/*"])
 
 (* This version of the job builds both released and experimental executables.
    It is used in the following pipelines:
@@ -786,7 +616,7 @@ end
      (no need to test that we pass the -static flag twice)
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
-let job_build_static_binaries ~__POS__ ~arch
+let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
     ?(executable_files = "script-inputs/released-executables")
     ?version_executable ?(release = false) ?rules ?dependencies () : tezos_job =
   let arch_string = arch_to_string arch in
@@ -811,6 +641,7 @@ let job_build_static_binaries ~__POS__ ~arch
     ~__POS__
     ~stage:Stages.build
     ~arch
+    ~cpu
     ~name
     ~image:Images.CI.build
     ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
@@ -819,7 +650,9 @@ let job_build_static_binaries ~__POS__ ~arch
       @ version_executable)
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
-  |> enable_cargo_cache |> enable_sccache
+  |> enable_cargo_cache
+  |> enable_sccache ~cache_size:"2G"
+  |> enable_octez_rust_deps_target_dir
 
 (** Type of Docker build jobs.
 
@@ -938,118 +771,8 @@ type bin_package_group = A | B
 
 let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
 
-let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
-    ?(stage = Stages.build) ~arch ~target ~group () : tezos_job =
-  let arch_string = arch_to_string_alt arch in
-  let target_string = match target with Rpm -> "rpm" in
-  let image = bin_package_image in
-  let parallel =
-    let distributions =
-      match target with Rpm -> ["fedora:39"; "rockylinux:9.3"]
-    in
-    Matrix [[("DISTRIBUTION", distributions)]]
-  in
-  let timeout = match target with Rpm -> Some (Minutes 75) in
-  let group_string = match group with A -> "A" | B -> "B" in
-  let artifacts =
-    artifacts
-      ~expire_in:(Duration (Days 1))
-      ~when_:On_success
-      ~name:"${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG"
-      ["packages/"]
-  in
-  let before_script =
-    before_script
-      ~source_version:true
-      (match target with
-      | Rpm -> ["./scripts/ci/bin_packages_rpm_dependencies.sh"])
-  in
-  job
-    ?timeout
-    ?rules
-    ?dependencies
-    ~__POS__
-    ~name
-    ~arch
-    ~image
-    ~stage
-    ~retry:Gitlab_ci.Types.{max = 1; when_ = [Stuck_or_timeout_failure]}
-    ~variables:
-      [
-        ("TARGET", target_string);
-        ("GROUP", group_string);
-        ("OCTEZ_PKGMAINTAINER", "nomadic-labs");
-        ("BLST_PORTABLE", "yes");
-        ("ARCH", arch_string);
-        ("CARGO_HOME", "/root/.cargo");
-      ]
-    ~artifacts
-    ~parallel
-    ~before_script
-    [
-      "wget https://sh.rustup.rs/rustup-init.sh";
-      "chmod +x rustup-init.sh";
-      "./rustup-init.sh --profile minimal --default-toolchain  \
-       $recommended_rust_version -y";
-      ". $HOME/.cargo/env";
-      "export OPAMYES=\"true\"";
-      "opam init --bare --disable-sandboxing";
-      "make build-deps";
-      "eval $(opam env)";
-      "make $TARGET-$GROUP";
-      "DISTRO=$(echo \"$DISTRIBUTION\" | cut -d':' -f1)";
-      "RELEASE=$(echo \"$DISTRIBUTION\" | cut -d':' -f2)";
-      "mkdir -p packages/$DISTRO/$RELEASE";
-      "mv octez-*.* packages/$DISTRO/$RELEASE/";
-    ]
-  |> enable_networked_cargo
-
-let job_build_rpm_amd64 : unit -> tezos_job =
-  job_build_bin_package
-    ~__POS__
-    ~name:"oc.build:rpm:amd64"
-    ~target:Rpm
-    ~group:A
-    ~arch:Amd64
-    ~dependencies:(Dependent [])
-
-let job_build_homebrew ?rules ~__POS__ ~name ?(stage = Stages.build)
-    ?dependencies () : tezos_job =
-  let image = Images.debian_bookworm in
-  job
-    ?rules
-    ~__POS__
-    ~name
-    ~arch:Amd64
-    ?dependencies
-    ~image
-    ~stage
-    ~before_script:
-      [
-        "apt update && apt install -y curl git build-essential";
-        "./scripts/packaging/homebrew_install.sh";
-        "eval \"$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\"";
-        "eval $(scripts/active_protocols.sh)";
-        "sed \"s|%%VERSION%%|0.0.0-dev| ; \
-         s|%%CI_MERGE_REQUEST_SOURCE_PROJECT_URL%%|$CI_MERGE_REQUEST_SOURCE_PROJECT_URL|; \
-         s|%%CI_COMMIT_REF_NAME%%|$CI_COMMIT_REF_NAME|; \
-         s|%%CI_PROJECT_NAMESPACE%%|$CI_PROJECT_NAMESPACE|; \
-         s|%%PROTO_CURRENT%%|$PROTO_CURRENT|; s|%%PROTO_NEXT%%|$PROTO_NEXT|\" \
-         scripts/packaging/Formula/octez.rb.template > \
-         scripts/packaging/Formula/octez.rb";
-      ]
-    [
-      (* These packages are needed on Linux. For macOS, Homebrew will
-         make those available locally. *)
-      "apt install -y autoconf cmake libev-dev libffi-dev libgmp-dev \
-       libprotobuf-dev libsqlite3-dev postgresql-dev protobuf-compiler \
-       libhidapi-dev pkg-config zlib1g-dev";
-      "brew install -v scripts/packaging/Formula/octez.rb";
-    ]
-  |> enable_networked_cargo
-
-let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
-    ?dependencies () =
+let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu
+    ?(release = false) ?dependencies () =
   let arch_string = arch_to_string arch in
   let name =
     sf
@@ -1099,6 +822,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
         "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
         "_build/default/tezt/tests/main.exe";
         "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
+        "etherlink-governance-observer";
       ]
   in
   let job =
@@ -1108,6 +832,8 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
       ~__POS__
       ~stage:Stages.build
       ~arch
+      ?retry
+      ?cpu
       ~name
       ~image:Images.CI.build
       ~before_script:
@@ -1119,7 +845,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
       ~variables
       ~artifacts
       ["./scripts/ci/build_full_unreleased.sh"]
-    |> enable_cargo_cache |> enable_sccache
+    |> enable_cargo_cache |> enable_sccache |> enable_octez_rust_deps_target_dir
   in
   (* Disable coverage for arm64 *)
   if arch = Amd64 then enable_coverage_instrumentation job else job
@@ -1143,6 +869,7 @@ let job_build_kernels ?rules () : tezos_job =
       "make -f kernels.mk build";
       "make -f etherlink.mk evm_kernel.wasm";
       "make -C src/riscv riscv-sandbox riscv-dummy.elf";
+      "make -C src/riscv riscv-sandbox riscv-dummy-sdk.elf";
       "make -C src/riscv/tests/ build";
     ]
     ~artifacts:
@@ -1159,6 +886,7 @@ let job_build_kernels ?rules () : tezos_job =
            "dal_echo_kernel.wasm";
            "src/riscv/riscv-sandbox";
            "src/riscv/riscv-dummy.elf";
+           "src/riscv/riscv-dummy-sdk.elf";
            "src/riscv/tests/inline_asm/rv64-inline-asm-tests";
          ])
   |> enable_kernels
@@ -1181,6 +909,60 @@ let job_build_dsn_node ?rules () : tezos_job =
          ["octez-dsn-node"])
   |> enable_kernels |> enable_sccache |> enable_cargo_cache
 
+let job_datadog_pipeline_trace : tezos_job =
+  job
+    ~__POS__
+    ~allow_failure:Yes
+    ~name:"datadog_pipeline_trace"
+    ~image:Images.datadog_ci
+    ~before_script:(before_script ~datadog_job_info:true [])
+    ~stage:Stages.start
+    [
+      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
+    ]
+
+(* Job that scans a Docker image *)
+let job_container_scanning ~docker_image ~dockerfile_path : tezos_job =
+  job
+    ~__POS__
+    ~name:"container_scanning"
+    ~stage:Stages.scan
+    ~template:Jobs_container_scanning
+    ~variables:
+      [
+        ("CS_IMAGE", docker_image);
+        ("SECURE_LOG_LEVEL", "debug");
+        ("CS_DOCKERFILE_PATH", dockerfile_path);
+      ]
+    ~description:(Format.sprintf "Scanning image %s" docker_image)
+    ~artifacts:(artifacts ["scan.log"])
+    ~git_strategy:Fetch
+    ["gtcs scan > scan.log"; "grep \"Vulnerability DB:\" -B2 -A4 scan.log"]
+
+let job_build_layer1_profiling ?(expire_in = Duration (Days 1)) () =
+  job
+    ~__POS__
+    ~stage:Stages.build
+    ~image:Images.CI.build
+    ~name:"build-layer1-profiling"
+    ~cpu:Very_high
+    ~artifacts:(artifacts ~expire_in ["./octez-binaries/x86_64/octez-node"])
+    ~before_script:
+      (before_script
+         ~take_ownership:true
+         ~source_version:true
+         ~eval_opam:true
+         [])
+    ~variables:[("TEZOS_PPX_PROFILER", "profiling"); ("PROFILE", "static")]
+    [
+      "make octez-layer1";
+      "mkdir -p octez-binaries/x86_64/";
+      "mv octez-node octez-binaries/x86_64/";
+    ]
+  |> enable_cargo_cache |> enable_sccache
+
 module Tezt = struct
   (** Create a tezt job.
 
@@ -1191,8 +973,13 @@ module Tezt = struct
   let job ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
       ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
       ?(tezt_parallel = 1) ?(tezt_variant = "")
-      ?(before_script = before_script ~source_version:true ~eval_opam:true [])
-      ?timeout ?job_select_tezts ~dependencies ?allow_failure () : tezos_job =
+      ?(before_script =
+        before_script
+          ~source_version:true
+          ~eval_opam:false
+          ~datadog_job_info:true
+          []) ?timeout ?job_select_tezts ~dependencies ?allow_failure () :
+      tezos_job =
     let variables =
       [
         ("JUNIT", "tezt-junit.xml");
@@ -1200,6 +987,7 @@ module Tezt = struct
         ("TESTS", Tezt_core.TSL.show tezt_tests);
         ("TEZT_RETRY", string_of_int tezt_retry);
         ("TEZT_PARALLEL", string_of_int tezt_parallel);
+        ("TEZT_NO_NPX", "true");
       ]
     in
     let artifacts =
@@ -1239,7 +1027,7 @@ module Tezt = struct
         "TEZT_VARIANT";
       ]
     in
-    let tezt_wrapper, dependencies =
+    let with_or_without_select_tezts, dependencies =
       match job_select_tezts with
       | Some job_select_tezts ->
           let dependencies =
@@ -1247,8 +1035,8 @@ module Tezt = struct
               dependencies
               job_select_tezts
           in
-          ("./scripts/ci/tezt.sh", dependencies)
-      | None -> ("_build/default/tezt/tests/main.exe", dependencies)
+          ("--with-select-tezts", dependencies)
+      | None -> ("--without-select-tezts", dependencies)
     in
     let retry = if retry = 0 then None else Some {max = retry; when_ = []} in
     job
@@ -1278,7 +1066,7 @@ module Tezt = struct
            second call that affect test selection.Note that TESTS must be quoted (here and below)
            since it will contain e.g. '&&' which we want to interpreted as TSL and not shell
            syntax. *)
-        tezt_wrapper
+        "./scripts/ci/tezt.sh " ^ with_or_without_select_tezts
         ^ " \"${TESTS}\" --from-record tezt/records --job \
            ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > \
            selected_tezts.tsv";
@@ -1294,7 +1082,8 @@ module Tezt = struct
            because if the CI timeout is reached, there are no artefacts,
            and thus no logs to investigate.
            See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818 *)
-        "./scripts/ci/exit_code.sh timeout -k 60 1860 " ^ tezt_wrapper
+        "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
+         --send-junit " ^ with_or_without_select_tezts
         ^ " \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
            --global-timeout 1800 --on-unknown-regression-files fail --junit \
            ${JUNIT} --from-record tezt/records --job \
@@ -1455,6 +1244,7 @@ module Documentation = struct
              "docs/*/octez-*.html";
              "docs/api/octez-*.txt";
              "docs/developer/metrics.csv";
+             "docs/developer/rollup_metrics.csv";
              "docs/user/node-config.json";
            ])
       ["./scripts/ci/documentation:manuals.sh"]
@@ -1514,7 +1304,7 @@ module Documentation = struct
            ~expire_in:(Duration (Weeks 1))
            (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
            ["docs/_build/"])
-      ["make -C docs -j sphinx"]
+      ["make -C docs -j sphinx"; "make -C docs -j _build/octezdoc.txt"]
 
   (** Create a [documentation:linkcheck] job. *)
   let job_linkcheck ~job_manuals ~job_docgen ~job_build_all ?dependencies ?rules

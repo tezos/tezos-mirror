@@ -442,6 +442,7 @@ val get_chain_block_operations :
   ?block:string ->
   ?version:string ->
   ?force_metadata:bool ->
+  ?metadata:bool ->
   unit ->
   JSON.t t
 
@@ -460,6 +461,7 @@ val get_chain_block_operations_validation_pass :
   ?block:string ->
   ?version:string ->
   ?force_metadata:bool ->
+  ?metadata:bool ->
   ?operation_offset:int ->
   validation_pass:int ->
   unit ->
@@ -567,6 +569,14 @@ val post_chain_block_helpers_preapply_operations :
     [block] defaults to ["head"].
 *)
 val post_chain_block_helpers_forge_operations :
+  ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
+
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/forge/consensus_operations]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val post_chain_block_helpers_forge_bls_consensus_operations :
   ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
 
 (** RPC: [POST /chains/<chain>/blocks/<block>/helpers/forge_block_header]
@@ -763,14 +773,6 @@ val get_chain_block_helper_current_level :
     [block] defaults to ["head"].
 *)
 val get_chain_block_helper_attestation_rights :
-  ?chain:string -> ?block:string -> ?delegate:string -> unit -> JSON.t t
-
-(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/endorsing_rights]
-
-    [chain] defaults to ["main"].
-    [block] defaults to ["head"].
-*)
-val get_chain_block_helper_endorsing_rights :
   ?chain:string -> ?block:string -> ?delegate:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/validators]
@@ -1157,6 +1159,13 @@ val get_chain_block_context_delegate_min_delegated_in_current_cycle :
 val get_chain_block_context_delegate_participation :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/dal_participation]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_dal_participation :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/balance]
 
     [chain] defaults to ["main"].
@@ -1246,7 +1255,7 @@ val get_chain_block_context_issuance_issuance_per_minute :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_adaptive_issuance_launch_cycle :
-  ?chain:string -> ?block:string -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> unit -> int option t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/expected_issuance]
     [chain] defaults to ["main"].

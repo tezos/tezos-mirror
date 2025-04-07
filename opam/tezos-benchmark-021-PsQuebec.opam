@@ -18,10 +18,13 @@ depends: [
   "hashcons"
   "octez-protocol-021-PsQuebec-libs" { = version }
   "prbnmcn-stats" { = "0.0.6" }
+  "octez-rustzcash-deps" { with-test & = version }
+  "bls12-381" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos/Protocol: library for writing benchmarks (protocol-specific part)"

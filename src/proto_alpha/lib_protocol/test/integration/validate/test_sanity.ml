@@ -109,6 +109,9 @@ let covalidation_sanity () =
           | Single (Preattestation _), _ -> assert false
           | Single (Attestation _), KAttestation -> return_unit
           | Single (Attestation _), _ -> assert false
+          | Single (Attestations_aggregate _), KAttestations_aggregate ->
+              return_unit
+          | Single (Attestations_aggregate _), _ -> assert false
           | Single (Seed_nonce_revelation _), KNonce -> return_unit
           | Single (Seed_nonce_revelation _), _ -> assert false
           | Single (Vdf_revelation _), KVdf -> return_unit
@@ -121,6 +124,8 @@ let covalidation_sanity () =
           | Single (Double_preattestation_evidence _), _ -> assert false
           | Single (Double_baking_evidence _), KDbl_baking -> return_unit
           | Single (Double_baking_evidence _), _ -> assert false
+          | Single (Dal_entrapment_evidence _), KEntrapment -> return_unit
+          | Single (Dal_entrapment_evidence _), _ -> assert false
           | Single (Activate_account _), KActivate -> return_unit
           | Single (Activate_account _), _ -> assert false
           | Single (Proposals _), KProposals -> return_unit

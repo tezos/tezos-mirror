@@ -51,7 +51,19 @@ let inject_operation validator ~force ?chain bytes =
   match Data_encoding.Binary.of_bytes_opt Operation.encoding bytes with
   | None -> failwith "Can't parse the operation"
   | Some op ->
-      let t = Validator.inject_operation validator ~force ?chain_id op in
+      let t =
+        (Validator.inject_operation
+           validator
+           ~force
+           ?chain_id
+           op
+         [@profiler.wrap_f
+           {driver_ids = [Opentelemetry]}
+             (Opentelemetry_profiler.trace_operation
+                (`Operation op)
+                "inject_operation")])
+      in
+
       let hash = Operation.hash op in
       return (hash, t)
 

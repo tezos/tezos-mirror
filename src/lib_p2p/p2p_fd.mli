@@ -66,7 +66,27 @@ type read_write_error =
   | `Connection_locally_closed
   | unexpected_error ]
 
-type connect_error = [`Connection_failed | unexpected_error]
+(** 
+
+   - Unreachable can be issued when we don't know how to reach to this address
+
+   - Canceled likely happens because of a timeout. This happens if a
+   firewall blocks us on the port used
+
+   - Refused can happen for similar reasons as Canceled. It depends on
+   the behaviour of the firewall: If the firewall drops packets, it
+   will be canceled because of a timeout, otherwise it can refuse the
+   connection and we get this error.
+   
+*)
+
+type connect_error =
+  [ `Connection_refused
+  | `Connection_unreachable
+  | `Network_unreachable
+    (** Likely when try to reach an ipv6 and this is not supported by the ISP. *)
+  | `Connection_canceled
+  | unexpected_error ]
 
 (** [accept_error] is used in case of error while trying to [accept] some connection.
 

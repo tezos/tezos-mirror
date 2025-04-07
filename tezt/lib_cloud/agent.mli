@@ -10,12 +10,49 @@
 (** Datatype for an agent *)
 type t
 
-(** [make ?binaries_path ~ssh_id ~point ~next_available_port ~name]
-    creates an [agent] from the given parameters. [point] is the point on
-    which the VM is reachabled. [next_available_port] should always provide
-    an available port or raise [Not_found] otherwise. [name] is the name of
-    the agent. [ssh_id] is a path to the private key that will be used for
-    the ssh connection. *)
+module Configuration : sig
+  type docker_image =
+    | Gcp of {alias : string}
+    | Octez_release of {tag : string}
+
+  type vm = private {
+    machine_type : string;
+    docker_image : docker_image;
+    max_run_duration : int option;
+    binaries_path : string;
+    os : Types.Os.t;
+  }
+
+  type t = {name : string; vm : vm}
+
+  val uri_of_docker_image : docker_image -> string Lwt.t
+
+  (** [make ?machine_type ()] is a smart-constructor to make a VM
+      configuration.
+
+    Default value for [max_run_duration] is [7200].
+
+    Default value for [machine_type] is [n1-standard-2].
+
+    Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
+    is the value provided by the environment variable [$TEZT_CLOUD].
+    *)
+  val make :
+    ?os:Types.Os.t ->
+    ?binaries_path:string ->
+    ?max_run_duration:int option ->
+    ?machine_type:string ->
+    ?docker_image:docker_image ->
+    ?name:string ->
+    unit ->
+    t
+end
+
+(** [make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name ()]
+    creates an [agent] from the given parameters. [~next_available_port] should
+    always provide an available port or raise [Not_found] otherwise.
+    [~name] is the name of the agent. [?ssh_id] and [?point] are used to potentially
+    create a [runner] for the [agent]. *)
 val make :
   ?zone:string ->
   ?ssh_id:string ->
@@ -23,44 +60,19 @@ val make :
   configuration:Configuration.t ->
   next_available_port:(unit -> int) ->
   name:string ->
+  process_monitor:Process_monitor.t option ->
   unit ->
   t
 
 (** Encode an agent configuration. *)
 val encoding : t Data_encoding.t
 
-(** [name agent] returns the name of the agent. *)
+(** [name agent] returns the name of the agent. This is the same as
+    the name provided in the agent configuration. *)
 val name : t -> string
 
-(** [vm_name agent] returns the vm name of the agent. *)
-val vm_name : t -> string
-
-(** [set_name agent name] sets the name of the agent to [name]. *)
-val set_name : t -> string -> unit
-
-(** [copy ?destination agent ~source] copies the file into the [agent] directory and
-    returned the directory where the file can be found. It is assumed
-    the [source] file does not exist on the agent machine. If the
-    parent directory does not exist, it will be created.
-
-    It returns the destination the files was copied at. If
-    [destination] is not set, the destination is given by
-    [configuration.default_binaries_path] concatenated to the
-    [source]. Otherwise, [destination] is returned.
-
-    If [configuration.docker_image] is [Octezt_latest_release], binary
-    files won't be copied and the destination will be the same as if
-    [destination] was not provided.
-
-    If [is_directory] is set, then the whole source is copied, including
-    subdirectories. *)
-val copy :
-  ?refresh:bool ->
-  ?is_directory:bool ->
-  ?destination:string ->
-  t ->
-  source:string ->
-  string Lwt.t
+(** [point agent] returns the point asociated with the agent. *)
+val point : t -> (string * int) option
 
 (** [next_available_port agent] returns the next available port for
     this agent. Raises [Not_found] if no port is available. *)
@@ -68,9 +80,6 @@ val next_available_port : t -> int
 
 (** [runner agent] returns the runner associated with the agent. *)
 val runner : t -> Runner.t option
-
-(** [point agent] returns the point asociated with the agent. *)
-val point : t -> (string * int) option
 
 (** [configuration t] the configuration of the agent. *)
 val configuration : t -> Configuration.t
@@ -81,6 +90,9 @@ val cmd_wrapper : t -> Gcloud.cmd_wrapper option
 (** Run a command on the host machine of the VM. *)
 val host_run_command : t -> string -> string list -> Process.t
 
+(** Returns the process monitor if any *)
+val process_monitor : t -> Process_monitor.t option
+
 (** Run a command on the docker image run by the agent.
 
     This command should not be used outside of the [tezt-cloud]
@@ -90,5 +102,39 @@ val host_run_command : t -> string -> string list -> Process.t
 
     The library uses it to ensure there won't be any check of the host
     when issuing for the first time an ssh connection.
+
+    [detach] Allows the command to be run in background and detaching from the
+    owning terminal and parent process. In this case, a temporary file is
+    automatically created in /tmp/tezt-$n with the name of the command as
+    prefix (warning: it can causes duplicates).
  *)
-val docker_run_command : t -> string -> string list -> Process.t
+val docker_run_command : t -> ?detach:bool -> string -> string list -> Process.t
+
+(** [copy ?refresh ?is_directory ?destination agent ~source] copies the file
+    into the [agent] directory and returns the directory where the file
+    can be found if [?refresh] is set to [true]. It is assumed the [~source]
+    file does not exist on the agent machine. If the parent directory does
+    not exist, it will be created.
+
+    If [?refresh] is [false], then the function returns the promise associated
+    to the scenario given by [agent] and [?destination] and does not copy anything.
+
+    It returns the destination the files was copied at. If
+    [?destination] is not set, the destination is given by
+    [configuration.default_binaries_path] concatenated to the
+    [~source]. Otherwise, [?destination] is returned.
+
+    If [configuration.docker_image] is an [Octez_release], binary
+    files won't be copied and the destination will be the same as if
+    [?destination] was not provided.
+
+    If [?is_directory] is set, then the whole source is copied, including
+    subdirectories. *)
+val copy :
+  ?consistency_check:bool ->
+  ?refresh:bool ->
+  ?is_directory:bool ->
+  ?destination:string ->
+  t ->
+  source:string ->
+  string Lwt.t

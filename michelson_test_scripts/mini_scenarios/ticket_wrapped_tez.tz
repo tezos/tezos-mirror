@@ -1,0 +1,59 @@
+# This script implements a ticket-based wrapped tez
+# The wrapped tez token is represented by a ticket unit
+# whose amount is the value of the ticket in mutez.
+
+# To convert a native tez into a wrapped tez, call the "wrap"
+# entrypoint. There is no limit, tickets are created on demand.
+
+# To convert back a wrapped tez previously produced by this contract,
+# call the "unwrap" entrypoint. There is no limit either; the contract
+# balance is always high enough to pay back for the ticket it emmited
+# in the past.
+
+# To store the tickets produced by this contract,
+# ticket_wallet_fungible.tz can be used.
+
+parameter (or (contract %wrap (ticket unit)) (pair %unwrap (ticket unit) (contract unit)));
+storage unit;
+code
+  {
+    CAR;
+    IF_LEFT
+      {
+        # Wrap entrypoint
+
+        # Amount that we will send back
+        PUSH mutez 0;
+
+        ## Create a ticket of the expected amount
+        PUSH mutez 1; AMOUNT; EDIV; ASSERT_SOME; CAR;
+        UNIT;
+        TICKET;
+        ASSERT_SOME;
+
+        ## send it
+        TRANSFER_TOKENS
+      }
+      {
+        # Unwrap
+
+        ## Assert that amount = 0
+        AMOUNT; PUSH mutez 0; ASSERT_CMPEQ;
+
+        UNPAIR;
+        READ_TICKET;
+        UNPAIR 3;
+
+        ## CHECK the ticketer
+        SELF_ADDRESS; ASSERT_CMPEQ;
+
+        DROP; SWAP; DROP;
+
+        PUSH mutez 1; MUL;
+
+        UNIT;
+
+        TRANSFER_TOKENS
+      };
+    NIL operation; SWAP; CONS; UNIT; SWAP; PAIR
+  }

@@ -210,7 +210,7 @@ module Make (Parameters : PARAMETERS) = struct
       emit e (signers_alias signers, state.tags, x, y, z)
   end
 
-  module Metrics = Metrics.Make (struct
+  module Metrics = Injector_metrics.Make (struct
     module Tag = Parameters.Tag
 
     let registry = Parameters.metrics_registry
@@ -248,6 +248,21 @@ module Make (Parameters : PARAMETERS) = struct
       Tezos_signer_backends.Encrypted.decrypt_list
         cctxt
         (List.map (fun k -> k.alias) signers)
+    in
+    let* () =
+      List.iter_es
+        (fun s ->
+          let* pk_uri = Client_keys.neuterize s.sk in
+          (* Fetch public key for remote signer to make sure it is reachable. *)
+          trace_eval
+            (fun () ->
+              error_of_fmt
+                "Cannot get public key for signer %s. Most likely, the remote \
+                 signer cannot be reached."
+                s.alias)
+            (let* (_ : Signature.public_key) = Client_keys.public_key pk_uri in
+             return_unit))
+        signers
     in
     let data_dir = Filename.concat data_dir "injector" in
     let*! () = Lwt_utils_unix.create_dir data_dir in
@@ -1091,6 +1106,31 @@ module Make (Parameters : PARAMETERS) = struct
         | Forget -> return_unit)
       (List.rev expired_infos)
 
+  let metrics_get_signers_balance state level =
+    dont_wait
+      (fun () ->
+        (* It isn't necessary to fetch the balance of signers at each level, to
+           avoid overloading the server with RPCs, we only do it every 5 levels *)
+        let open Lwt_result_syntax in
+        if Int32.rem level 5l = 0l then
+          let module Proto_client = (val state.proto_client) in
+          let tags = Tags.to_seq state.tags |> List.of_seq in
+          let* () =
+            List.iter_ep
+              (fun signer ->
+                let pkh = signer.pkh in
+                let key = Signature.Public_key_hash.to_b58check pkh in
+                let* balance = Proto_client.get_balance_mutez state.cctxt pkh in
+                Metrics.set_gauge_signer_balance tags key balance ;
+                return_unit)
+              state.signers
+          in
+          return_unit
+        else return_unit)
+      (fun trace ->
+        Event.metrics_error (Format.asprintf "%a" pp_print_trace trace))
+      (fun exn -> Event.metrics_error (Printexc.to_string exn))
+
   let set_metrics state =
     Metrics.wrap @@ fun () ->
     let tags = Tags.to_seq state.tags |> List.of_seq in
@@ -1110,6 +1150,7 @@ module Make (Parameters : PARAMETERS) = struct
       ({block_hash = head_hash; level = head_level} as head) =
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
+    let () = metrics_get_signers_balance state head.level in
     set_metrics state ;
     let*! reorg =
       match state.last_seen_head with
@@ -1188,11 +1229,23 @@ module Make (Parameters : PARAMETERS) = struct
     Included_in_blocks.clear state.included.included_in_blocks ;
     Op_heap.clear state.heap
 
-  let remove_operations_with_tag tag state =
-    Op_heap.remove_predicate
-      (fun op ->
-        Parameters.Tag.equal (Parameters.operation_tag op.operation) tag)
-      state.heap
+  let remove_operations removal_criteria {heap; _} =
+    let predicate_f (op : Inj_operation.t) =
+      let is_op_tag tag =
+        Parameters.Tag.equal (Parameters.operation_tag op.operation) tag
+      in
+      let is_order_below ~drop_no_order order_below =
+        Option.map (fun op_order -> Z.lt op_order order_below) op.order
+        |> Option.value ~default:drop_no_order
+      in
+      match removal_criteria with
+      | Request.Operation_tag tag -> is_op_tag tag
+      | Order_below (order_below, drop_no_order) ->
+          is_order_below ~drop_no_order order_below
+      | Tag_and_order_below (tag, order_below, drop_no_order) ->
+          is_op_tag tag && is_order_below ~drop_no_order order_below
+    in
+    Op_heap.remove_predicate predicate_f heap
 
   module Types = struct
     type nonrec state = state
@@ -1250,10 +1303,10 @@ module Make (Parameters : PARAMETERS) = struct
       (* The execution of the request handler is protected to avoid stopping the
          worker in case of an exception. *)
       | Request.Inject -> protect @@ fun () -> on_inject state
-      | Request.Clear tag -> (
+      | Request.Clear removal_criteria -> (
           protect @@ fun () ->
-          match tag with
-          | Some tag -> remove_operations_with_tag tag state
+          match removal_criteria with
+          | Some removal_criteria -> remove_operations removal_criteria state
           | None ->
               let*! () = clear state in
               return_unit)
@@ -1289,14 +1342,14 @@ module Make (Parameters : PARAMETERS) = struct
            tags
 
     let on_error (type a b) w st (r : (a, b) Request.t) (errs : b) :
-        unit tzresult Lwt.t =
+        [`Continue | `Shutdown] tzresult Lwt.t =
       let open Lwt_result_syntax in
       let state = Worker.state w in
       let request_view = Request.view r in
       let emit_and_return_errors errs =
         (* Errors do not stop the worker but emit an entry in the log. *)
         let*! () = Event.(emit3 request_failed) state request_view st errs in
-        return_unit
+        return `Continue
       in
       match r with
       | Request.Inject -> emit_and_return_errors errs
@@ -1630,24 +1683,30 @@ module Make (Parameters : PARAMETERS) = struct
   let put_request_and_wait w req =
     Worker.Dropbox.put_request_and_wait w req |> handle_request_error
 
-  let clear_all_queues () =
-    let workers = Worker.list table in
-    List.iter_ep
-      (fun (_tags, w) -> put_request_and_wait w (Request.Clear None))
-      workers
-
-  let clear_queues ?tag () =
+  let clear_queues ?(drop_no_order = false) ?order_below ?tag () =
     let open Lwt_result_syntax in
-    match tag with
-    | None -> clear_all_queues ()
-    | Some tag ->
-        let workers = Worker.list table in
-        List.iter_ep
-          (fun (tags, w) ->
-            let to_clean = Tags.mem tag tags in
-            if not to_clean then return_unit
-            else put_request_and_wait w (Request.Clear (Some tag)))
-          workers
+    let removal_criteria : Request.removal_criteria option =
+      match (tag, order_below) with
+      | Some tag, None -> Some (Operation_tag tag)
+      | None, Some order_below ->
+          Some (Order_below (order_below, drop_no_order))
+      | Some tag, Some order_below ->
+          Some (Tag_and_order_below (tag, order_below, drop_no_order))
+      | None, None -> None
+    in
+    let clear_worker_queue (tags, w) =
+      match removal_criteria with
+      | Some (Operation_tag tag) | Some (Tag_and_order_below (tag, _, _)) ->
+          (*If a tag is specified in the removal_criteria only clear
+            the worker that inject such operation tag *)
+          if Tags.mem tag tags then
+            put_request_and_wait w (Request.Clear removal_criteria)
+          else return_unit
+      | Some (Order_below _) | None ->
+          put_request_and_wait w (Request.Clear removal_criteria)
+    in
+    let workers = Worker.list table in
+    List.iter_ep clear_worker_queue workers
 
   let register_proto_client = Inj_proto.register
 end

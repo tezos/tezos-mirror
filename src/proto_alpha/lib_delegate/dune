@@ -14,13 +14,15 @@
   octez-protocol-alpha-libs.plugin
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
+  octez-node-config
   octez-shell-libs.client-base
   octez-protocol-alpha-libs.client
   octez-shell-libs.client-commands
   octez-libs.stdlib
   octez-libs.stdlib-unix
-  octez-libs.tezos-context
+  octez-libs.octez-profiler
   octez-libs.rpc-http-client-unix
+  octez-libs.rpc-http-client
   octez-shell-libs.context-ops
   octez-libs.rpc
   octez-libs.rpc-http
@@ -44,11 +46,23 @@
   -open Tezos_client_commands
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
-  -open Tezos_context
+  -open Tezos_profiler
+  -open Tezos_rpc_http_client
   -open Tezos_context_ops
   -open Tezos_rpc_http
   -open Tezos_crypto_dal)
  (modules (:standard \ Baking_commands Baking_commands_registration)))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls_aug = Tezos_crypto.Signature.Bls_aug\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V1")))
+
+(rule
+ (targets client_keys.ml)
+ (action (write-file %{targets} "include Tezos_client_base.Client_keys_v1")))
 
 (library
  (name tezos_baking_alpha_commands)

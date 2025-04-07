@@ -12,6 +12,8 @@ open Ethereum_types
 
 type path = string
 
+let reboot_counter = "/readonly/kernel/env/reboot_counter"
+
 let evm_node_flag = "/__evm_node"
 
 module EVM = struct
@@ -28,7 +30,7 @@ end
 
 let chain_id = EVM.make "/chain_id"
 
-let base_fee_per_gas = World_state.make "/fees/base_fee_per_gas"
+let minimum_base_fee_per_gas = World_state.make "/fees/minimum_base_fee_per_gas"
 
 let da_fee_per_byte = World_state.make "/fees/da_fee_per_byte"
 

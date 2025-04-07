@@ -1,4 +1,5 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -35,84 +36,142 @@
 //! );
 //! ```
 //!
-//! # [Locations] placement through a [Choreographer]
+//! # Managers
 //!
-//! Once a [Layout] has been defined, the [Choreographer] can be used to
-//! generate static offsets into the backend storage in the form of [Locations].
-//! All offsets shall be generated in a deterministic way.
+//! Different backends have different capabilities and they are described as `Manager<Capability>`.
+//! Some of these capabilities are:
+//! - [ManagerBase]
+//! - [ManagerAlloc]
+//! - [ManagerRead]
+//! - [ManagerWrite]
+//! - [ManagerReadWrite]
 //!
-//! All offsets when added to the state storage root address shall also build
-//! correctly aligned addresses as long as the state backend storage has been
-//! aligned with the requirements requested in [Placed].
+//! # Backends
 //!
-//! # Allocation of [Regions] using a [Manager]
+//! Backends are ZST implementing these traits.
+//! The main difference between them is the top-level functionality it provides
+//! and management of the underlying state memory.
 //!
-//! A [Manager], given [Locations], assigns [Regions] in the backend. Those
-//! [Regions] are then used by the state type to manipulate the backend storage
-//! where the state ultimately exists.
+//! These backends can be:
 //!
-//! [Regions]: Region
-//! [Layouts]: Layout
-//! [Locations]: Location
+//! - [Owned]
+//!     Backend which has the full state allocated in memory. It can execute one step
+//!     or multiple steps at a time faster.
+//! - [Verifier]
+//!     Backend capable of partially allocating a state and verify a given proof.
+//!     Needs to be light on memory usage since it runs in the protocol.
+//! - [ProofGen]
+//!     Backend capable of generating a proof for running one step.
+//! - [Ref]
+//!     Helper backend to wrap another backend through a reference to it.
+//!
+//! [Layouts]: layout::Layout
+//! [Owned]: owned_backend::Owned
+//! [Verifier]: verify_backend::Verifier
+//! [ProofGen]: proof_backend::ProofGen
 
-mod alloc;
+mod commitment_layout;
 mod effects;
 mod elems;
-mod enums;
 pub mod hash;
 mod layout;
-pub mod memory_backend;
 pub mod owned_backend;
+pub mod proof_backend;
+mod proof_layout;
 mod region;
+mod trans;
+pub mod verify_backend;
 
-#[cfg(test)]
-pub(crate) mod random_backend;
-
-pub use alloc::*;
+pub use commitment_layout::*;
 pub use effects::*;
 pub use elems::*;
-pub use enums::*;
 pub use layout::*;
+pub use proof_layout::*;
 pub use region::*;
+pub use trans::*;
+
+/// An enriched value may be stored in a [`ManagerBase::EnrichedCell`].
+///
+/// This allows a value to have an additional, derived, value attached - that may be expensive
+/// to derive lazily.
+///
+/// This derived value does not form part of any stored state/commitments.
+pub trait EnrichedValue: 'static {
+    type E: 'static;
+    type D<M: ManagerBase>;
+}
+
+/// Specifies that there exists a path to derive `V::D` from `&V::E`,
+/// for a given manager.
+pub trait EnrichedValueLinked<M: ManagerBase>: EnrichedValue {
+    /// Construct the derived value from the stored value, maps to
+    /// the `From` trait by default.
+    fn derive(v: &Self::E) -> Self::D<M>;
+}
+
+impl<Value, M: ManagerBase> EnrichedValueLinked<M> for Value
+where
+    Value: EnrichedValue,
+    Value::D<M>: for<'a> From<&'a Value::E>,
+{
+    fn derive(v: &Self::E) -> Self::D<M> {
+        v.into()
+    }
+}
 
 /// Manager of the state backend storage
-pub trait ManagerBase {
+pub trait ManagerBase: Sized {
     /// Region that has been allocated in the state storage
-    type Region<E: Elem, const LEN: usize>;
+    type Region<E: 'static, const LEN: usize>;
 
     /// Dynamic region represents a fixed-sized byte vector that has been allocated in the state storage
     type DynRegion<const LEN: usize>;
+
+    /// An [enriched] value may have a derived value attached.
+    ///
+    /// [enriched]: EnrichedValue
+    type EnrichedCell<V: EnrichedValue>;
+
+    /// The root manager may either be itself, or occassionally the manager that this manager
+    /// wraps.
+    ///
+    /// For example, the [`Ref`] backend is often use to wrap the [`Owned`] backend to gain access
+    /// to its regions. In this case, the root manager would be the owned backend.
+    ///
+    /// [`Owned`]: owned_backend::Owned
+    type ManagerRoot: ManagerBase;
 }
 
 /// Manager with allocation capabilities
-pub trait ManagerAlloc: ManagerBase {
+///
+/// Any `ManagerAlloc` inherently has read & write capabilities,
+/// since the manager creates the values on the first allocation.
+pub trait ManagerAlloc: 'static + ManagerReadWrite {
     /// Allocate a region in the state storage.
-    fn allocate_region<E: Elem, const LEN: usize>(
+    fn allocate_region<E, const LEN: usize>(
         &mut self,
-        loc: Location<[E; LEN]>,
+        init_value: [E; LEN],
     ) -> Self::Region<E, LEN>;
 
     /// Allocate a dynamic region in the state storage.
-    fn allocate_dyn_region<const LEN: usize>(
-        &mut self,
-        loc: Location<[u8; LEN]>,
-    ) -> Self::DynRegion<LEN>;
+    fn allocate_dyn_region<const LEN: usize>(&mut self) -> Self::DynRegion<LEN>;
+
+    /// Allocate an enriched cell.
+    fn allocate_enriched_cell<V>(&mut self, init_value: V::E) -> Self::EnrichedCell<V>
+    where
+        V: EnrichedValueLinked<Self>;
 }
 
 /// Manager with read capabilities
 pub trait ManagerRead: ManagerBase {
     /// Read an element in the region.
-    fn region_read<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E;
+    fn region_read<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E;
+
+    /// Obtain a reference to an element in the region.
+    fn region_ref<E: 'static, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> &E;
 
     /// Read all elements in the region.
-    fn region_read_all<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E>;
-
-    /// Read `buffer.len()` elements from the region, starting at `offset`.
-    fn region_read_some<E: Elem, const LEN: usize>(
-        region: &Self::Region<E, LEN>,
-        offset: usize,
-        buffer: &mut [E],
-    );
+    fn region_read_all<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E>;
 
     /// Read an element in the region. `address` is in bytes.
     fn dyn_region_read<E: Elem, const LEN: usize>(
@@ -126,26 +185,36 @@ pub trait ManagerRead: ManagerBase {
         address: usize,
         values: &mut [E],
     );
+
+    /// Read the value contained in the enriched cell.
+    fn enriched_cell_read_stored<V>(cell: &Self::EnrichedCell<V>) -> V::E
+    where
+        V: EnrichedValue,
+        V::E: Copy;
+
+    /// Read the derived value of the enriched cell.
+    fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D<Self::ManagerRoot>
+    where
+        V: EnrichedValueLinked<Self::ManagerRoot>,
+        V::D<Self::ManagerRoot>: Copy;
+
+    /// Obtain a reference to the value contained in the enriched cell.
+    fn enriched_cell_ref_stored<V>(cell: &Self::EnrichedCell<V>) -> &V::E
+    where
+        V: EnrichedValue;
 }
 
 /// Manager with write capabilities
-pub trait ManagerWrite: ManagerBase {
+pub trait ManagerWrite: ManagerBase<ManagerRoot = Self> {
     /// Update an element in the region.
-    fn region_write<E: Elem, const LEN: usize>(
+    fn region_write<E: 'static, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,
     );
 
     /// Update all elements in the region.
-    fn region_write_all<E: Elem, const LEN: usize>(region: &mut Self::Region<E, LEN>, value: &[E]);
-
-    /// Update a subset of elements in the region starting at `index`.
-    fn region_write_some<E: Elem, const LEN: usize>(
-        region: &mut Self::Region<E, LEN>,
-        index: usize,
-        buffer: &[E],
-    );
+    fn region_write_all<E: Copy, const LEN: usize>(region: &mut Self::Region<E, LEN>, value: &[E]);
 
     /// Update an element in the region. `address` is in bytes.
     fn dyn_region_write<E: Elem, const LEN: usize>(
@@ -160,12 +229,17 @@ pub trait ManagerWrite: ManagerBase {
         address: usize,
         values: &[E],
     );
+
+    /// Update the value contained in an enriched cell. The derived value will be recalculated.
+    fn enriched_cell_write<V>(cell: &mut Self::EnrichedCell<V>, value: V::E)
+    where
+        V: EnrichedValueLinked<Self>;
 }
 
 /// Manager with capabilities that require both read and write
 pub trait ManagerReadWrite: ManagerRead + ManagerWrite {
     /// Update the element in the region and return the previous value.
-    fn region_replace<E: Elem, const LEN: usize>(
+    fn region_replace<E: Copy, const LEN: usize>(
         region: &mut Self::Region<E, LEN>,
         index: usize,
         value: E,
@@ -173,9 +247,9 @@ pub trait ManagerReadWrite: ManagerRead + ManagerWrite {
 }
 
 /// Manager with the ability to serialise regions
-pub trait ManagerSerialise: ManagerBase {
+pub trait ManagerSerialise: ManagerRead {
     /// Serialise the contents of the region.
-    fn serialise_region<E: serde::Serialize + Elem, const LEN: usize, S: serde::Serializer>(
+    fn serialise_region<E: serde::Serialize, const LEN: usize, S: serde::Serializer>(
         region: &Self::Region<E, LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>;
@@ -185,6 +259,16 @@ pub trait ManagerSerialise: ManagerBase {
         region: &Self::DynRegion<LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>;
+
+    /// Serialise the contents of the enriched cell.
+    fn serialise_enriched_cell<V, S>(
+        cell: &Self::EnrichedCell<V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        V: EnrichedValue,
+        V::E: serde::Serialize,
+        S: serde::Serializer;
 }
 
 /// Manager with the ability to deserialise regions
@@ -192,7 +276,7 @@ pub trait ManagerDeserialise: ManagerBase {
     /// Deserialise a region.
     fn deserialise_region<
         'de,
-        E: serde::Deserialize<'de> + Elem,
+        E: serde::Deserialize<'de>,
         const LEN: usize,
         D: serde::Deserializer<'de>,
     >(
@@ -203,46 +287,49 @@ pub trait ManagerDeserialise: ManagerBase {
     fn deserialise_dyn_region<'de, const LEN: usize, D: serde::Deserializer<'de>>(
         deserializer: D,
     ) -> Result<Self::DynRegion<LEN>, D::Error>;
+
+    /// Deserialise an enriched cell.
+    fn deserialise_enriched_cell<'de, V, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self::EnrichedCell<V>, D::Error>
+    where
+        V: EnrichedValueLinked<Self>,
+        V::E: serde::Deserialize<'de>;
 }
 
-/// State backend with manager
-pub trait BackendManagement {
-    /// Backend manager
-    type Manager<'backend>: ManagerReadWrite;
+/// Manager with the ability to clone regions
+pub trait ManagerClone: ManagerBase {
+    /// Clone the region.
+    fn clone_region<E: Copy, const LEN: usize>(
+        region: &Self::Region<E, LEN>,
+    ) -> Self::Region<E, LEN>;
 
-    /// Backend manager for readonly operations
-    type ManagerRO<'backend>: ManagerRead;
-}
+    /// Clone the dynamic region.
+    fn clone_dyn_region<const LEN: usize>(region: &Self::DynRegion<LEN>) -> Self::DynRegion<LEN>;
 
-/// State backend storage
-pub trait Backend: BackendManagement + Sized {
-    /// Structural representation of the states that this backend supports
-    type Layout: layout::Layout;
-
-    /// Allocate regions for the given layout placement.
-    fn allocate(
-        &mut self,
-        placed: PlacedOf<Self::Layout>,
-    ) -> AllocatedOf<Self::Layout, Self::Manager<'_>>;
-
-    /// Allocate regions for the given layout placement.
-    fn allocate_ro(
-        &self,
-        placed: PlacedOf<Self::Layout>,
-    ) -> AllocatedOf<Self::Layout, Self::ManagerRO<'_>>;
+    /// Clone the enriched cell.
+    fn clone_enriched_cell<V>(cell: &Self::EnrichedCell<V>) -> Self::EnrichedCell<V>
+    where
+        V: EnrichedValue,
+        V::E: Copy,
+        V::D<Self>: Copy;
 }
 
 /// Manager wrapper around `M` whose regions are immutable references to regions of `M`
-pub struct Ref<'backend, M>(std::marker::PhantomData<&'backend M>);
+pub struct Ref<'backend, M>(std::marker::PhantomData<fn(&'backend M)>);
 
 impl<'backend, M: ManagerBase> ManagerBase for Ref<'backend, M> {
-    type Region<E: Elem, const LEN: usize> = &'backend M::Region<E, LEN>;
+    type Region<E: 'static, const LEN: usize> = &'backend M::Region<E, LEN>;
 
     type DynRegion<const LEN: usize> = &'backend M::DynRegion<LEN>;
+
+    type EnrichedCell<V: EnrichedValue> = &'backend M::EnrichedCell<V>;
+
+    type ManagerRoot = M::ManagerRoot;
 }
 
 impl<M: ManagerSerialise> ManagerSerialise for Ref<'_, M> {
-    fn serialise_region<E: serde::Serialize + Elem, const LEN: usize, S: serde::Serializer>(
+    fn serialise_region<E: serde::Serialize, const LEN: usize, S: serde::Serializer>(
         region: &Self::Region<E, LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -255,23 +342,29 @@ impl<M: ManagerSerialise> ManagerSerialise for Ref<'_, M> {
     ) -> Result<S::Ok, S::Error> {
         M::serialise_dyn_region(region, serializer)
     }
+
+    fn serialise_enriched_cell<V: EnrichedValue, S: serde::Serializer>(
+        cell: &Self::EnrichedCell<V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        V::E: serde::Serialize,
+    {
+        M::serialise_enriched_cell(cell, serializer)
+    }
 }
 
 impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
-    fn region_read<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E {
+    fn region_read<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E {
         M::region_read(region, index)
     }
 
-    fn region_read_all<E: Elem, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
-        M::region_read_all(region)
+    fn region_ref<E: 'static, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> &E {
+        M::region_ref(region, index)
     }
 
-    fn region_read_some<E: Elem, const LEN: usize>(
-        region: &Self::Region<E, LEN>,
-        offset: usize,
-        buffer: &mut [E],
-    ) {
-        M::region_read_some(region, offset, buffer)
+    fn region_read_all<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
+        M::region_read_all(region)
     }
 
     fn dyn_region_read<E: Elem, const LEN: usize>(
@@ -288,10 +381,46 @@ impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
     ) {
         M::dyn_region_read_all(region, address, values)
     }
+
+    fn enriched_cell_read_stored<V>(cell: &Self::EnrichedCell<V>) -> V::E
+    where
+        V: EnrichedValue,
+        V::E: Copy,
+    {
+        M::enriched_cell_read_stored(cell)
+    }
+
+    fn enriched_cell_ref_stored<V>(cell: &Self::EnrichedCell<V>) -> &V::E
+    where
+        V: EnrichedValue,
+    {
+        M::enriched_cell_ref_stored(cell)
+    }
+
+    fn enriched_cell_read_derived<V: EnrichedValueLinked<Self::ManagerRoot>>(
+        cell: &Self::EnrichedCell<V>,
+    ) -> V::D<Self::ManagerRoot>
+    where
+        V::D<Self::ManagerRoot>: Copy,
+    {
+        M::enriched_cell_read_derived(cell)
+    }
 }
 
-pub mod test_helpers {
-    use super::{AllocatedOf, Layout, ManagerReadWrite, ManagerSerialise, PlacedOf};
+/// Alias for the allocated structure with references to regions of
+/// the [`owned_backend::Owned`] backend
+pub type RefOwnedAlloc<'a, L> = AllocatedOf<L, Ref<'a, owned_backend::Owned>>;
+
+/// Alias for the allocated structure with references to a proof-generating backend
+pub type RefProofGenOwnedAlloc<'a, 'b, L> =
+    AllocatedOf<L, Ref<'a, proof_backend::ProofGen<Ref<'b, owned_backend::Owned>>>>;
+
+#[cfg(test)]
+pub(crate) mod test_helpers {
+    use super::{
+        AllocatedOf, Layout, ManagerClone, ManagerDeserialise, ManagerReadWrite, ManagerSerialise,
+    };
+    use crate::jit::state_access::JitStateAccess;
 
     /// Generate a test against all test backends.
     #[macro_export]
@@ -304,99 +433,74 @@ pub mod test_helpers {
                     $expr
                 }
 
-                inner::<$crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory>();
                 inner::<$crate::state_backend::owned_backend::test_helpers::OwnedTestBackendFactory>();
             }
         };
     }
 
-    /// Equivalent to [`BackendBase`] but for testing purposes
-    pub trait TestBackendBase {
-        type Manager<'backend>: ManagerReadWrite + ManagerSerialise;
-    }
-
-    /// Equivalent to [`Backend`] but for testing purposes
-    pub trait TestBackend: TestBackendBase {
-        type Layout: Layout;
-
-        fn allocate(
-            &mut self,
-            placed: PlacedOf<Self::Layout>,
-        ) -> AllocatedOf<Self::Layout, Self::Manager<'_>>;
-    }
-
     /// This lets you construct backends for any layout.
     pub trait TestBackendFactory {
-        type Backend<L: Layout>: TestBackend<Layout = L>;
+        /// Manager used in testing
+        type Manager: ManagerReadWrite
+            + ManagerSerialise
+            + ManagerDeserialise
+            + ManagerClone
+            + JitStateAccess;
 
-        /// Construct a backend for the given layout `L`.
-        fn new<L: Layout>() -> Self::Backend<L>;
+        /// Allocate using the test backend manager.
+        fn allocate<L: Layout>() -> AllocatedOf<L, Self::Manager>;
+    }
+
+    /// Copy the allocated space by serialising and deserialising it.
+    pub fn copy_via_serde<L, N, M>(refs: &AllocatedOf<L, N>) -> AllocatedOf<L, M>
+    where
+        L: Layout,
+        N: ManagerSerialise,
+        AllocatedOf<L, N>: serde::Serialize,
+        M: ManagerDeserialise,
+        AllocatedOf<L, M>: serde::de::DeserializeOwned,
+    {
+        let data = crate::storage::binary::serialise(refs).unwrap();
+        crate::storage::binary::deserialise(&data).unwrap()
+    }
+
+    /// Assert that two values are different. If they differ, offer a command to run that shows the
+    /// structural differences between the values.
+    pub fn assert_eq_struct<T>(lhs: &T, rhs: &T)
+    where
+        T: serde::Serialize + PartialEq,
+    {
+        if lhs != rhs {
+            let (file_lhs, path_lhs) = tempfile::NamedTempFile::new().unwrap().keep().unwrap();
+            serde_json::to_writer_pretty(file_lhs, lhs).unwrap();
+            eprintln!("Lhs is located at {}", path_lhs.display());
+
+            let (file_rhs, path_rhs) = tempfile::NamedTempFile::new().unwrap().keep().unwrap();
+            serde_json::to_writer_pretty(file_rhs, rhs).unwrap();
+            eprintln!("Rhs is located at {}", path_rhs.display());
+
+            eprintln!("Run the following to diff them:");
+            eprintln!("jd {} {}", path_lhs.display(), path_rhs.display());
+
+            panic!("Assertion failed: values are different");
+        }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use super::{
-        random_backend::Randomised,
-        test_helpers::{TestBackendBase, TestBackendFactory},
-        *,
-    };
+    use self::owned_backend::Owned;
+    use super::*;
     use crate::backend_test;
-    use std::{collections::hash_map::RandomState, hash::BuildHasher};
-
-    /// Construct the manager for a given backend lifetime `'a`, a test backend
-    /// factory `F` and a specific layout `L`.
-    pub type ManagerFor<'a, F, L> =
-        <<F as TestBackendFactory>::Backend<L> as TestBackendBase>::Manager<'a>;
 
     /// Run `f` twice against two different randomised backends and see if the
     /// resulting backend state is the same afterwards.
-    pub fn test_determinism<L, T>(f: T)
+    pub fn test_determinism<L, T>(_f: T)
     where
         L: Layout,
-        T: Fn(AllocatedOf<L, Randomised>),
+        T: Fn(AllocatedOf<L, Owned>),
     {
-        let hash_state = RandomState::default();
-
-        let (start1, snapshot1) = {
-            let placed = L::placed().into_location();
-            let mut manager = Randomised::default();
-
-            let space = L::allocate(&mut manager, placed);
-            let initial_checksum = hash_state.hash_one(manager.snapshot_regions());
-
-            f(space);
-
-            (initial_checksum, manager.snapshot_regions())
-        };
-
-        let snapshot2 = {
-            loop {
-                let placed = L::placed().into_location();
-                let mut manager = Randomised::default();
-                let space = L::allocate(&mut manager, placed);
-
-                // Ensure the two states start differently.
-                if hash_state.hash_one(manager.snapshot_regions()) == start1 {
-                    continue;
-                }
-
-                f(space);
-
-                break manager.snapshot_regions();
-            }
-        };
-
-        assert_eq!(snapshot1, snapshot2);
-    }
-
-    /// Given a `StateLayout` and a [`TestBackendFactory`] type,
-    /// create the backend for that layout.
-    #[macro_export]
-    macro_rules! create_backend {
-        ($StateLayout:ty, $Factory:ty) => {
-            <$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::new::<$StateLayout>()
-        };
+        // TODO: RV-46: This test will be re-introduced but customised for initialisation testing.
     }
 
     /// Given a `State<M: Manager>`, optionally its `StateLayout`,
@@ -405,37 +509,23 @@ pub mod tests {
     #[macro_export]
     macro_rules! create_state {
         // For an extra generic in the state (MachineState for example)
-        ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident $(, $ExtraGenerics:ty)*) => {
+        ($State:tt, $StateLayout:ty, $Factory:ty $(, $ExtraGenerics:ty)* $(, || $arg: expr)*) => {
             {
-                use $crate::state_backend::{test_helpers::TestBackend, Layout};
-                let loc = <$StateLayout>::placed().into_location();
                 let new_state =
                     $State::<
                         $($ExtraGenerics,)*
-                        <<$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Backend<$StateLayout> as $crate::state_backend::test_helpers::TestBackendBase>::Manager<'_>
+                        <$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Manager,
                     >::bind(
-                        $backend.allocate(loc),
+                        <$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::allocate::<$StateLayout>(),
+                        $($arg,)*
                     );
 
                 new_state
             }
         };
 
-        ($State:tt, $StateLayout:ty, $Factory:ty, $backend:ident) => {
-            {
-                use $crate::state_backend::{Backend, BackendManagement, Layout};
-                let loc = <$StateLayout>::placed().into_location();
-                let new_state =
-                    $State::<<<$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Backend<$StateLayout> as BackendManagement>::Manager<'_>>::bind(
-                        $backend.allocate(loc),
-                    );
-
-                new_state
-            }
-        };
-
-        ($State:tt, $Factory:ty, $backend:ident) => {
-            create_state!($State, paste::paste!([<$State Layout>]), $Factory, $backend)
+        ($State:tt, $Factory:ty) => {
+            create_state!($State, paste::paste!([<$State Layout>]), $Factory)
         };
     }
 
@@ -456,21 +546,10 @@ pub mod tests {
             }
         }
 
-        let mut backend = create_backend!(ExampleLayout, F);
-
-        let (first_loc, second_loc) = ExampleLayout::placed().into_location();
-        let first_loc = first_loc.as_array();
-
-        let first_offset = first_loc.offset();
-        assert_eq!(first_offset, 0);
-
-        let second_offset = second_loc.offset();
-        assert_eq!(second_offset, 8);
-
         let first_value: u64 = rand::random();
         let second_value: [u32; 4] = rand::random();
 
-        let mut instance = create_state!(Example, ExampleLayout, F, backend);
+        let mut instance = create_state!(Example, ExampleLayout, F);
 
         instance.first.write(first_value);
         assert_eq!(instance.first.read(), first_value);
@@ -479,7 +558,7 @@ pub mod tests {
         assert_eq!(instance.second.read_all(), second_value);
 
         let first_value_read = u64::from_le_bytes(
-            bincode::serialize(&instance.first.struct_ref())
+            bincode::serialize(&instance.first.struct_ref::<FnManagerIdent>())
                 .unwrap()
                 .try_into()
                 .unwrap(),
@@ -487,7 +566,7 @@ pub mod tests {
         assert_eq!(first_value_read, first_value);
 
         let second_value_read = unsafe {
-            let data = bincode::serialize(&instance.second.struct_ref()).unwrap();
+            let data = bincode::serialize(&instance.second.struct_ref::<FnManagerIdent>()).unwrap();
             data.as_ptr().cast::<[u32; 4]>().read().map(u32::from_le)
         };
         assert_eq!(second_value_read, second_value);

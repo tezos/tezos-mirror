@@ -57,7 +57,7 @@ The baking power of a delegate is defined as:
 
 .. code-block:: python
 
-  baking_power = total_staked_after_limits + 0.5 * total_delegated_after_limits
+  baking_power = total_staked_after_limits + (total_delegated_after_limits / 3)
 
 This page explains the relevant concepts and provides the detailed
 computations of ``total_staked_after_limits`` and
@@ -136,7 +136,7 @@ Delegated tez
 Non-staked tez owned by delegates and delegators are called
 **delegated tez**. They also contribute to the delegate's baking
 power, without being subject to slashing. However, delegated tez
-weigh half as much as staked tez for the purpose of computing the
+weigh a third as much as staked tez for the purpose of computing the
 baking power.
 
 Delegated tez of an account
@@ -239,7 +239,7 @@ needed for staked tez because they are inherently :ref:`frozen for at
 least four cycles<staked_funds_management_alpha>`, so short-duration
 staking is already not possible.)
 
-In the Paris protocol, the considered minimum is the minimum at any
+Since the Paris protocol, the considered minimum is the minimum at any
 point during block applications, which can be reached in the middle of
 executing a transaction.
 
@@ -295,7 +295,7 @@ delegate -- which is the baker itself, then adding ``150`` tez to the
 baker in our case. Finally, the ``70``-tez transfer just removes
 ``70`` tez from the ``total_delegated`` of the same baker again.
 
-Let's say that ``blocks_per_cycle = 128`` (as on Parisnet), so the
+Let's say that ``blocks_per_cycle = 128``, so the
 first level of the current cycle is ``129``, and let's say that
 ``total_delegated`` was ``1000`` at the beginning of the cycle.
 
@@ -401,8 +401,8 @@ staked tez the external stakers can contribute to the baking power,
 relative to the baker's own staked tez. It defaults to ``0``, meaning
 no staked contribution from external stakers at all. It can be set to
 any non-negative value (with a one millionth precision); however, the
-``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING`` constant, set to ``5``,
-ensures that external stakers may never contribute more than five time
+``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING`` constant, set to ``9``,
+ensures that external stakers may never contribute more than nine times
 as much staked tez as the baker itself, regardless of the delegate's
 own limit.
 If the amount of external staked
@@ -410,11 +410,11 @@ tez exceeds this quota, the baker is said to be **overstaked**, and we
 also call **overstaked** the excess of external staked tez over the
 allowed maximum. Any overstaked tez will count toward the baking power as
 delegated instead of staked (provided that the baker is not
-overdelegated too), so they will weigh half as much.
+overdelegated too), so they will weigh a third as much.
 
 .. code-block:: python
 
-  global_limit_of_staking_over_baking = 5
+  global_limit_of_staking_over_baking = 9
   actual_limit_of_staking_over_baking = min(limit_of_staking_over_baking, global_limit_of_staking_over_baking)
   max_allowed_external_staked = own_staked * actual_limit_of_staking_over_baking
   external_staked_after_limits = min(external_staked, max_allowed_external_staked)
@@ -427,7 +427,7 @@ The purpose of this feature is to ensure that the baker's
 ``own_staked``, that is, the part of the security deposit that belongs
 to the baker itself, always represents a sizable portion of its
 baking power. In other words, it guarantees that the baker always has
-its own skin in the game. Besides, the global limit of ``5`` ensures
+its own skin in the game. Besides, the global limit of ``9`` ensures
 that a baker can never increase its own balance by denouncing its own
 double baking or double attesting misbehavior; indeed, the reward that
 would be given to the author of a denunciation is guaranteed to be
@@ -471,7 +471,7 @@ We finally have everything we need to compute the baking power
 
 .. code-block:: python
 
-  baking_power = total_staked_after_limits + 0.5 * total_delegated_after_limits
+  baking_power = total_staked_after_limits + (total_delegated_after_limits / 3)
 
 
 .. _minimal_baking_power_alpha:

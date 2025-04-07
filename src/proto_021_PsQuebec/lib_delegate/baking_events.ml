@@ -72,15 +72,18 @@ module Commands = struct
         Data_encoding.option
           Tezos_version.Octez_node_version.commit_info_encoding )
 
-  let no_dal_node_running =
+  let no_dal_node_provided =
     declare_0
       ~section
-      ~name:"no_dal_node_running"
+      ~name:"no_dal_node_provided"
       ~level:Warning
       ~msg:
         "No DAL node endpoint has been provided.\n\
-         It will soon be required to launch a DAL node before running the \
-         baker. For instructions on running a DAL node, please visit \
+         Future protocols might integrate DAL participation into participation \
+         rewards.\n\
+         Bakers are encouraged to set up a DAL attester node instead of using \
+         the `--without-dal` option.\n\
+         For instructions on how to run a DAL node, please visit \
          https://docs.tezos.com/tutorials/join-dal-baker."
       ()
 
@@ -779,6 +782,16 @@ module Scheduling = struct
         "first baker of next level found among delegates. pre-emptively \
          forging block."
       ()
+
+  let dal_node_no_attester_profile =
+    declare_0
+      ~section
+      ~name:"dal_node_no_attester_profile"
+      ~level:Warning
+      ~msg:
+        "The DAL node has no registered attester profile. It is recommended to \
+         start the DAL node with '--attester-profiles <manager_key>'."
+      ()
 end
 
 module Lib = struct
@@ -1013,21 +1026,33 @@ module Actions = struct
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let block_injected =
-    declare_4
+    declare_5
       ~alternative_color:Internal_event.Blue
       ~section
       ~name:"block_injected"
       ~level:Notice
       ~msg:
-        "block {block} at level {level}, round {round} injected for {delegate}"
+        "block {block} at level {level}, round {round} injected for \
+         {delegate}{manager_operations_infos}"
       ~pp1:Block_hash.pp
       ~pp2:pp_int32
       ~pp3:Round.pp
       ~pp4:Baking_state.pp_consensus_key_and_delegate
+      ~pp5:
+        (Format.pp_print_option
+           (fun fmt Baking_state.{manager_operation_number; total_fees} ->
+             Format.fprintf
+               fmt
+               " with %d manager operations summing %a μtz in fees"
+               manager_operation_number
+               pp_int64
+               total_fees))
       ("block", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ( "manager_operations_infos",
+        Data_encoding.option Baking_state.manager_operations_infos_encoding )
 
   let block_injection_failed =
     declare_2
@@ -1094,7 +1119,37 @@ module Actions = struct
         Protocol.Alpha_context.Per_block_votes.adaptive_issuance_vote_encoding
       )
 
-  let no_dal_node_running = Commands.no_dal_node_running
+  let signature_timeout =
+    declare_1
+      ~section
+      ~name:"signature_timeout"
+      ~level:Error
+      ~msg:"Signature call reached a timeout of {timeout}"
+      ("timeout", Data_encoding.float)
+
+  let signature_error =
+    declare_1
+      ~section
+      ~name:"signature_error"
+      ~level:Error
+      ~msg:"Signature call failed with {errors}"
+      ~pp1:pp_print_top_error_of_trace
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+
+  let delegates_without_slots =
+    declare_2
+      ~section
+      ~name:"delegates_without_slots"
+      ~level:Notice
+      ~msg:
+        "The following delegates have no attesting rights at level {level}: \
+         {delegates}"
+      ~pp1:(Format.pp_print_list Baking_state.pp_consensus_key)
+      ("delegates", Data_encoding.list Baking_state.consensus_key_encoding)
+      ~pp2:pp_int32
+      ("level", Data_encoding.int32)
+
+  let no_dal_node_provided = Commands.no_dal_node_provided
 end
 
 module VDF = struct
@@ -1322,6 +1377,24 @@ module Nonces = struct
       ~msg:"revealed nonce for block {block_hash} is safe to delete"
       ~pp1:Block_hash.pp
       ("block_hash", Block_hash.encoding)
+
+  let deterministic_nonce_timeout =
+    declare_1
+      ~section
+      ~name:"deterministic_nonce_timeout"
+      ~level:Error
+      ~msg:
+        "Call to generate a deterministic nonce reached a timeout of {timeout}"
+      ("timeout", Data_encoding.float)
+
+  let deterministic_nonce_error =
+    declare_1
+      ~section
+      ~name:"deterministic_nonce_error"
+      ~level:Error
+      ~msg:"Call to deterministic nonce failed with {errors}"
+      ~pp1:pp_print_top_error_of_trace
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
 end
 
 module Per_block_votes = struct

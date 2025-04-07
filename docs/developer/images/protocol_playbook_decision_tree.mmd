@@ -1,0 +1,36 @@
+%% mermaid code
+
+flowchart TD
+  pa{{"Is it a proposal or an active protocol?"}} -- Active --> live{{"Issue"}}
+  live -- Liveness --> stuck{{Is the chain stuck}}
+  live -- Safety --> ny{{"Fixing implies a redesign?"}}
+  stuck -- No --> next[Fix in next protocol]
+  stuck -- Yes --> uau
+  ny -- No --> f(Fix issue)
+  f --> uau{User Activated Upgrade}
+  ny -- Yes --> ny2{{Can it be disabled?}}
+  ny2 -- Yes --> d(Disable the functionality) --> uau
+  ny2 -- No -->hell((Assess situation with stakeholders))
+  pa -- Proposal --> red{{Fixing implies a redesign?}}
+  red -- Yes --> phase{{Before 1st Half of Promotion Phase?}}
+  phase -- No --> back2(Stay on current protcol)
+  phase -- Yes --> can((Cancel organically))
+  back2 --> uaac{User Activated Activation Cancelation}
+  red -- No --> f2(Fix issue)
+  f2 --> uapo{User Activated Protocol Override}
+
+  %% Subgraph to align uau, uapo, uapob at the same level
+  subgraph " "
+     direction LR
+     uau
+     uaac
+     uapo
+     hell
+     can
+     next
+  end
+style uau stroke-width:4px,stroke-dasharray: 0,stroke:#AA00FF,fill:#FFB169
+style uapo stroke-width:4px,stroke-dasharray: 0,stroke:#AA00FF,fill:#FFB169
+style uaac stroke-width:4px,stroke-dasharray: 0,stroke:#AA00FF,fill:#FFB169
+style hell stroke-width:4px,stroke-dasharray: 0,stroke:#AA00FF,fill:#FF696C
+style can stroke-width:4px,stroke-dasharray: 0,stroke:#AA00FF,fill:#A8C77B

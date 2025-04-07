@@ -4,6 +4,11 @@
 workflow:
   name: '[$PIPELINE_TYPE] $CI_COMMIT_TITLE'
   rules:
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      == "ci-docker-latest-release"
+    variables:
+      PIPELINE_TYPE: ci_docker_release
+    when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
       && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
     variables:
@@ -74,6 +79,22 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_extended_validation_test
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "TEST_RELEASE"
+    variables:
+      PIPELINE_TYPE: schedule_master_test_release
+    when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_MASTER"
+    variables:
+      PIPELINE_TYPE: schedule_container_scanning_master
+    when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RELEASES"
+    variables:
+      PIPELINE_TYPE: schedule_container_scanning_octez_releases
+    when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_EVM_NODE_RELEASES"
+    variables:
+      PIPELINE_TYPE: schedule_container_scanning_evm_node_releases
+    when: always
 
 default:
   interruptible: true
@@ -93,6 +114,7 @@ variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   CARGO_NET_OFFLINE: "true"
   CARGO_TERM_QUIET: "true"
+  FF_TIMESTAMPS: "true"
 
 dummy_job:
   stage: .pre
@@ -103,6 +125,11 @@ dummy_job:
   - echo "This job will never execute"
 
 include:
+- local: images_base/ci-docker/.gitlab-ci.yml
+  rules:
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      == "ci-docker-latest-release"
+    when: always
 - local: .gitlab/ci/pipelines/before_merging.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -170,4 +197,20 @@ include:
 - local: .gitlab/ci/pipelines/schedule_extended_validation_test.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_VALIDATION_TESTS"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_master_test_release.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "TEST_RELEASE"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_container_scanning_master.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_MASTER"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_container_scanning_octez_releases.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RELEASES"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_container_scanning_evm_node_releases.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_EVM_NODE_RELEASES"
     when: always

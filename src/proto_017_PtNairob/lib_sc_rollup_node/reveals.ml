@@ -65,10 +65,38 @@ let path data_dir pvm_name hash =
   let hash = Protocol.Sc_rollup_reveal_hash.to_hex hash in
   Filename.(concat (concat data_dir pvm_name) hash)
 
-let proto_hash_to_dac_hash ((module Plugin) : Dac_plugin.t) proto_reveal_hash =
+let to_reveal_hash =
+  Data_encoding.Binary.of_bytes_exn Protocol.Sc_rollup_reveal_hash.encoding
+
+let of_reveal_hash =
+  Data_encoding.Binary.to_bytes_exn Protocol.Sc_rollup_reveal_hash.encoding
+
+let of_hex hex =
+  Protocol.Sc_rollup_reveal_hash.of_hex hex |> Option.map of_reveal_hash
+
+let to_hex hash = to_reveal_hash hash |> Protocol.Sc_rollup_reveal_hash.to_hex
+
+let hex_encoding =
+  let binary =
+    Data_encoding.conv
+      to_reveal_hash
+      of_reveal_hash
+      Protocol.Sc_rollup_reveal_hash.encoding
+  in
+  Data_encoding.(
+    (* Hexifies the hash when encoding in json. *)
+    splitted
+      ~binary
+      ~json:
+        (conv_with_guard
+           to_hex
+           (fun str -> Result.of_option ~error:"Not a valid hash" (of_hex str))
+           (string' Plain)))
+
+let proto_hash_to_bytes proto_reveal_hash =
   proto_reveal_hash
   |> Data_encoding.Binary.to_bytes_exn Protocol.Sc_rollup_reveal_hash.encoding
-  |> Data_encoding.Binary.of_bytes_exn Plugin.encoding
+  |> Data_encoding.Binary.of_bytes_exn hex_encoding
 
 let get_from_preimages_service ~pre_images_endpoint ~local_filename hash =
   let open Lwt_result_syntax in
@@ -151,9 +179,3 @@ let get ~pre_images_endpoint ~data_dir ~pvm_kind ~hash =
     |> return
   in
   return contents
-
-let proto_hash_to_dac_hash proto_reveal_hash =
-  let dac_plugin =
-    WithExceptions.Option.get ~loc:__LOC__ @@ Dac_plugin.get Protocol.hash
-  in
-  proto_hash_to_dac_hash dac_plugin proto_reveal_hash

@@ -23,17 +23,13 @@
 local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonnet';
 local query = grafonnet.query;
 local panel = grafonnet.panel;
-local table = panel.table;
-local timeSeries = panel.timeSeries;
 local stat = panel.stat;
 
 // Base
 local base = import './base.jsonnet';
 local namespace = base.namespace;
-local node_instance = base.node_instance;
 local prometheus = base.prometheus;
 local info = base.info;
-local infoName = base.infoName;
 local graph = base.graph;
 local table = base.table;
 

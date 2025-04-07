@@ -46,8 +46,7 @@ module Parameters = struct
     }
 end
 
-module Crypto_samplers =
-Tezos_benchmark.Crypto_samplers.Make_finite_key_pool (struct
+module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
   let size = 1000
 
   let algo = `Default

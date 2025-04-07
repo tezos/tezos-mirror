@@ -56,9 +56,7 @@ let cache_annotation_consistency =
   (* We use [context_path] to ensure the baker will not use the
      preapply RPC. Indeed, this test was introduced because of a bug
      that happens when the baker does not use the preapply RPC. *)
-  let* () =
-    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
-  in
+  let* () = Client.bake_for_and_wait ~context_path:data_dir client in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let* (`OpHash _todo) =
     Operation.inject_contract_call
@@ -70,9 +68,7 @@ let cache_annotation_consistency =
       client
   in
   let* () = wait_injection in
-  let* () =
-    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
-  in
+  let* () = Client.bake_for_and_wait ~context_path:data_dir client in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let* (`OpHash _op_hash) =
     Operation.inject_contract_call
@@ -84,7 +80,7 @@ let cache_annotation_consistency =
       client
   in
   let* () = wait_injection in
-  Client.bake_for_and_wait ~context_path:(data_dir // "context") client
+  Client.bake_for_and_wait ~context_path:data_dir client
 
 let singleprocess_reorg =
   Protocol.register_test

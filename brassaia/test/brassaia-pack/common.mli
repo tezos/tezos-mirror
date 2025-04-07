@@ -19,21 +19,15 @@ module Int63 = Optint.Int63
 module Dict : Brassaia_pack_unix.Dict.S
 module I = Brassaia_pack_unix.Index
 module Conf : Brassaia_pack.Conf.S
-
-module File_manager :
-  Brassaia_pack_unix.File_manager.S with module Io = Brassaia_pack_unix.Io.Unix
-
-module Errs :
-  Brassaia_pack_unix.Io_errors.S with module Io = Brassaia_pack_unix.Io.Unix
+module File_manager : Brassaia_pack_unix.File_manager.S
+module Io_errors = Brassaia_pack_unix.Io_errors
+module Lower = Brassaia_pack_unix.Lower
 
 module Schema :
   Brassaia.Schema.Extended
     with type Hash.t = Brassaia.Hash.SHA1.t
-     and type Path.step = string
-     and type Path.t = string list
      and type Branch.t = string
      and type Contents.t = string
-     and type Metadata.t = unit
 
 module Filename : sig
   include module type of Filename

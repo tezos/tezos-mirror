@@ -41,7 +41,7 @@ module Name = struct
 
   let encoding = Data_encoding.unit
 
-  let base = Signals_publisher_events.section
+  let base = ["evm_node_worker"; "signal_publisher"]
 
   let pp _ _ = ()
 
@@ -161,11 +161,7 @@ module Worker = struct
             ~signals
             ~smart_rollup_address:state.smart_rollup_address
         in
-        let () =
-          Prometheus.Counter.inc
-            Metrics.signals_sent
-            (Int.to_float @@ List.length signals)
-        in
+        let () = Metrics.record_signals_sent signals in
         Rollup_services.publish
           ~keep_alive:false
           ~rollup_node_endpoint:state.rollup_node_endpoint
@@ -192,8 +188,8 @@ module Handlers = struct
     Types.of_parameters parameters
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
-      unit tzresult Lwt.t =
-    Lwt_result_syntax.return_unit
+      [`Continue | `Shutdown] tzresult Lwt.t =
+    Lwt_result_syntax.return `Continue
 
   let on_completion _ _ _ _ = Lwt.return_unit
 

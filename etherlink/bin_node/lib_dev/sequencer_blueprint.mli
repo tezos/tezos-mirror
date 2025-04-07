@@ -45,3 +45,19 @@ val maximum_usable_space_in_blueprint : int -> int
 (* [maximum_chunks_per_l1_level] is the maximum number of chunks the inbox of a L1 block can
    hold at once. *)
 val maximum_chunks_per_l1_level : int
+
+type kernel_blueprint = {
+  parent_hash : Ethereum_types.block_hash;
+  delayed_transactions : Ethereum_types.hash list;
+  transactions : string list;
+  timestamp : Time.Protocol.t;
+}
+
+(** [kernel_blueprint_parent_hash_of_payload sequencer bytes]
+    partially decodes fields of a {!kernel_blueprint} and return the
+    {!kernel_blueprint.parent_hash}. Verify the signature of each
+    chunk against public key [sequencer]. *)
+val kernel_blueprint_parent_hash_of_payload :
+  Signature.public_key ->
+  Blueprint_types.payload ->
+  Ethereum_types.block_hash option

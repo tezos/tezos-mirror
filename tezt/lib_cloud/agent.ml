@@ -5,67 +5,79 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Configuration = struct
+  include Types.Agent_configuration
+
+  let uri_of_docker_image docker_image =
+    match (docker_image, Env.mode) with
+    | Types.Agent_configuration.Gcp {alias}, (`Cloud | `Host | `Orchestrator) ->
+        let* registry_uri = Env.registry_uri () in
+        Lwt.return (Format.asprintf "%s/%s" registry_uri alias)
+    | Gcp {alias}, `Localhost -> Lwt.return alias
+    | Octez_release _, (`Cloud | `Host | `Orchestrator) ->
+        let* registry_uri = Env.registry_uri () in
+        Lwt.return (Format.asprintf "%s/octez" registry_uri)
+    | Octez_release _, `Localhost -> Lwt.return "octez"
+
+  let gen_name =
+    let cpt = ref (-1) in
+    fun () ->
+      incr cpt ;
+      Format.asprintf "agent-%03d" !cpt
+
+  let make ?os ?binaries_path ?max_run_duration ?machine_type ?docker_image
+      ?(name = gen_name ()) () =
+    let os = Option.value ~default:Cli.os os in
+    let binaries_path = Option.value ~default:Cli.binaries_path binaries_path in
+    let max_run_duration =
+      let default =
+        if Cli.no_max_run_duration then None else Some Cli.max_run_duration
+      in
+      Option.value ~default max_run_duration
+    in
+    let machine_type = Option.value ~default:Cli.machine_type machine_type in
+    let docker_image =
+      Option.value ~default:(Gcp {alias = Env.dockerfile_alias}) docker_image
+    in
+    make
+      ~os
+      ~binaries_path
+      ?max_run_duration
+      ~machine_type
+      ~docker_image
+      ~name
+      ()
+end
+
 type t = {
   (* The name initially is the same as [vm_name] and can be changed dynamically by the scenario. *)
-  mutable name : string;
-  vm_name : string;
+  name : string;
   zone : string option;
   point : (string * int) option;
   runner : Runner.t option;
   next_available_port : unit -> int;
   configuration : Configuration.t;
+  process_monitor : Process_monitor.t option;
 }
 
-let ssh_id () =
-  if Env.mode = `Orchestrator then Env.ssh_private_key_filename ~home:"/root" ()
-  else Env.ssh_private_key_filename ()
+let ssh_id () = Env.ssh_private_key_filename ()
 
-let docker_image_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        ~title:"gcp"
-        Json_only
-        string
-        (function Env.Gcp {alias} -> Some alias | _ -> None)
-        (fun alias -> Gcp {alias});
-      case
-        ~title:"octez_release"
-        Json_only
-        string
-        (function Env.Octez_release {tag} -> Some tag | _ -> None)
-        (fun tag -> Octez_release {tag});
-    ]
-
-let configuration_encoding =
-  let open Data_encoding in
-  let open Configuration in
-  conv
-    (fun {machine_type; binaries_path; docker_image; max_run_duration = _; os} ->
-      (machine_type, binaries_path, docker_image, os))
-    (fun (machine_type, binaries_path, docker_image, os) ->
-      Configuration.make ~os ~machine_type ~binaries_path ~docker_image ())
-    (obj4
-       (req "machine_type" Data_encoding.string)
-       (req "binaries_path" Data_encoding.string)
-       (req "docker_image" docker_image_encoding)
-       (req "os" Data_encoding.string))
+(* Encodings *)
 
 let encoding =
   let open Data_encoding in
   conv
     (fun {
            name;
-           vm_name;
            zone;
            point;
            runner = _;
            next_available_port;
            configuration;
+           process_monitor;
          } ->
-      (name, vm_name, zone, point, next_available_port (), configuration))
-    (fun (name, vm_name, zone, point, next_available_port, configuration) ->
+      (name, zone, point, next_available_port (), configuration, process_monitor))
+    (fun (name, zone, point, next_available_port, configuration, process_monitor) ->
       let next_available_port =
         let current_port = ref (next_available_port - 1) in
         fun () ->
@@ -80,19 +92,37 @@ let encoding =
             Runner.create ~ssh_user:"root" ~ssh_id ~ssh_port ~address ()
             |> Option.some
       in
-      {name; vm_name; zone; point; runner; next_available_port; configuration})
+      {
+        name;
+        zone;
+        point;
+        runner;
+        next_available_port;
+        configuration;
+        process_monitor;
+      })
     (obj6
-       (req "name" Data_encoding.string)
-       (req "vm_name" Data_encoding.string)
-       (req "zone" (Data_encoding.option Data_encoding.string))
-       (req
-          "point"
-          (Data_encoding.option
-             (Data_encoding.tup2 Data_encoding.string Data_encoding.int31)))
-       (req "next_available_port" Data_encoding.int31)
-       (req "configuration" configuration_encoding))
+       (req "name" string)
+       (req "zone" (option string))
+       (req "point" (option (tup2 string int31)))
+       (req "next_available_port" int31)
+       (req "configuration" Configuration.encoding)
+       (opt "process_monitor" Process_monitor.encoding))
 
-let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
+(* Getters *)
+
+let name {name; _} = name
+
+let point {point; _} = point
+
+let next_available_port t = t.next_available_port ()
+
+let runner {runner; _} = runner
+
+let configuration {configuration; _} = configuration
+
+let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name
+    ~process_monitor () =
   let ssh_user = "root" in
   let runner =
     match (point, ssh_id) with
@@ -106,32 +136,26 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name () =
     point;
     runner;
     name;
-    vm_name = name;
     next_available_port;
     configuration;
     zone;
+    process_monitor;
   }
 
-let name {name; _} = name
-
-let vm_name {vm_name; _} = vm_name
-
-let point {point; _} = point
-
-let cmd_wrapper {zone; vm_name; _} =
+let cmd_wrapper {zone; name; _} =
   match zone with
   | None -> None
   | Some zone ->
       let ssh_private_key_filename =
         if Env.mode = `Orchestrator then
-          Env.ssh_private_key_filename ~home:"/root" ()
+          Env.ssh_private_key_filename ~home:"$HOME" ()
         else Env.ssh_private_key_filename ()
       in
-      Some (Gcloud.cmd_wrapper ~zone ~vm_name ~ssh_private_key_filename)
+      Some (Gcloud.cmd_wrapper ~zone ~vm_name:name ~ssh_private_key_filename)
 
-let set_name agent name = agent.name <- name
+let path_of agent binary = agent.configuration.vm.binaries_path // binary
 
-let path_of agent binary = agent.configuration.binaries_path // binary
+let process_monitor agent = agent.process_monitor
 
 let host_run_command agent cmd args =
   match cmd_wrapper agent with
@@ -139,10 +163,33 @@ let host_run_command agent cmd args =
   | Some cmd_wrapper ->
       Process.spawn cmd_wrapper.Gcloud.cmd (cmd_wrapper.args @ [cmd] @ args)
 
-let docker_run_command agent cmd args =
+let docker_run_command agent ?(detach = false) cmd args =
+  (* This function allows to run a command and detach it from the terminal
+      session and parent process. This allows to run a command in background
+      without the session (and processes group) being killed by ssh on
+      disconnection. It uses the [setsid -f] to detach the session.
+     Automatically log stdout and stderr of the command in tezt temporary dir *)
+  let run_detached ?runner cmd args =
+    let whole_cmd = String.concat " " (cmd :: args) in
+    let cmd = "sh" in
+    let args =
+      "-c"
+      :: [
+           "setsid -f " ^ whole_cmd ^ " > "
+           ^ Temp.file ?runner (cmd ^ ".log")
+           ^ " 2>&1";
+         ]
+    in
+    (cmd, args)
+  in
   match agent.runner with
-  | None -> Process.spawn cmd args
+  | None ->
+      let cmd, args = if detach then run_detached cmd args else (cmd, args) in
+      Process.spawn cmd args
   | Some runner ->
+      let cmd, args =
+        if detach then run_detached ~runner cmd args else (cmd, args)
+      in
       let cmd, args =
         Runner.wrap_with_ssh runner (Runner.Shell.cmd [] cmd args)
       in
@@ -158,7 +205,7 @@ let docker_run_command agent cmd args =
       *)
       Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
 
-let copy agent ~is_directory ~source ~destination =
+let copy agent ~consistency_check ~is_directory ~source ~destination =
   let* exists =
     let process = docker_run_command agent "ls" [destination] in
     let* status = process |> Process.wait in
@@ -168,7 +215,7 @@ let copy agent ~is_directory ~source ~destination =
           String.trim output |> String.split_on_char ' ' |> List.hd
         in
         (* If the file already exists on the remote machine, we compare the
-           hashes to be sure they are the same. *)
+           hashes to check whether they are the same. *)
         Lwt.catch
           (fun () ->
             let* destination_hash =
@@ -185,7 +232,16 @@ let copy agent ~is_directory ~source ~destination =
             | WEXITED 0 ->
                 let* output = Process.check_and_read_stdout process in
                 let source_hash = hash_of_md5_output output in
-                Lwt.return (destination_hash = source_hash)
+                let is_consistent = destination_hash = source_hash in
+                if consistency_check then Lwt.return is_consistent
+                else if is_consistent then Lwt.return_true
+                else (
+                  Log.warn
+                    "The file %s is already on agent %s but has a different \
+                     hash."
+                    source
+                    (name agent) ;
+                  Lwt.return_true)
             | _ -> Lwt.return_true)
           (fun _ -> Lwt.return_false)
     | _ -> Lwt.return_false
@@ -227,8 +283,14 @@ let copy agent ~is_directory ~source ~destination =
         in
         Lwt.return_unit
 
+(** [is_binary file] checks using the `file` Linux command if the [file] is
+    binary. The command returns an output of the form `file: <file_type> ...`;
+    the file is binary if <file_type> is "ELF". *)
 let is_binary file =
-  let* output = Process.run_and_read_stdout "file" [file] in
+  (* With '-L' it dereferences symbolic links. Useful if the file is
+     actually a symbolic link to a binary file. *)
+  let* output = Process.run_and_read_stdout "file" ["-L"; file] in
+  (* output is of the form "file: type_of_file ..." *)
   String.split_on_char ' ' output
   |> List.tl |> List.hd |> String.trim
   |> String.starts_with ~prefix:"ELF"
@@ -236,11 +298,18 @@ let is_binary file =
 
 let copy =
   (* We memoize the copy so that it is done at most once per destination per
-     scenario. This optimisation ease the writing of scenario so that copy can
+     scenario. This optimisation eases the writing of scenario so that copy can
      always be called before using the file copied. *)
   let already_copied = Hashtbl.create 11 in
-  fun ?(refresh = false) ?(is_directory = false) ?destination agent ~source ->
-    Log.info "COPY %s" source ;
+  fun ?consistency_check
+      ?(refresh = false)
+      ?(is_directory = false)
+      ?destination
+      agent
+      ~source ->
+    let consistency_check =
+      Option.value consistency_check ~default:Env.check_file_consistency
+    in
     let destination =
       Option.value ~default:(path_of agent source) destination
     in
@@ -250,7 +319,7 @@ let copy =
         (* Octez images uses alpine, so we can't copy binaries from our local setup. *)
         let* is_binary_file = is_binary source in
         let octez_release_image =
-          match agent.configuration.docker_image with
+          match agent.configuration.vm.docker_image with
           | Octez_release _ -> true
           | Gcp _ -> false
         in
@@ -265,14 +334,10 @@ let copy =
                 ["-p"; Filename.dirname destination]
               |> Process.check
             in
-            let* () = copy agent ~is_directory ~source ~destination in
+            let* () =
+              copy agent ~consistency_check ~is_directory ~source ~destination
+            in
             Lwt.return destination
           in
           Hashtbl.replace already_copied (agent, destination) p ;
           p
-
-let next_available_port t = t.next_available_port ()
-
-let runner {runner; _} = runner
-
-let configuration {configuration; _} = configuration

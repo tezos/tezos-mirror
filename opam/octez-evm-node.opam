@@ -10,16 +10,17 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-evm-node-libs" { = version }
+  "bls12-381"
   "octez-libs"
   "octez-version"
   "octez-shell-libs"
   "octez-l2-libs"
-  "octez-evm-node-libs" { = version }
-  "octez-rust-deps"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "An implementation of a subset of Ethereum JSON-RPC API for the EVM rollup"

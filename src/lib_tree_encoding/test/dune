@@ -6,13 +6,14 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
+  bls12-381.archive
   octez-libs.base
   octez-libs.tree-encoding
   octez-libs.base.unix
   octez-libs.tezos-context.disk
   octez-libs.base-test-helpers
   octez-libs.test-helpers
-  octez-l2-libs.webassembly-interpreter
+  octez-libs.webassembly-interpreter
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))

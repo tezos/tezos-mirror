@@ -321,6 +321,21 @@ module P2p_connect_handler = struct
       ~level:Debug
       ("active_connections", Data_encoding.int16)
       ("min_connections", Data_encoding.int16)
+
+  let greylist =
+    declare_4
+      ~section
+      ~name:"greylist_peer"
+      ~msg:"Peer {peer} on point {addr}:{port} has been greylisted ({motive})"
+      ~level:Notice
+      ~pp1:P2p_peer.Id.pp
+      ~pp2:P2p_addr.pp
+      ~pp3:(Format.pp_print_option Format.pp_print_int)
+      ~pp4:Format.pp_print_string
+      ("peer", P2p_peer.Id.encoding)
+      ("addr", P2p_addr.encoding)
+      ("port", Data_encoding.option Data_encoding.uint16)
+      ("motive", Data_encoding.string)
 end
 
 module P2p_conn = struct
@@ -536,6 +551,15 @@ module P2p_fd = struct
       ("connection_id", Data_encoding.int31)
       ("socket", Data_encoding.string)
 
+  let set_socket_option_tcp_keepalive_failed =
+    declare_1
+      ~section
+      ~name:"set_socket_option_tcp_keepalive_failed"
+      ~msg:"Could not set the TCP_KEEPALIVE socket option: {error}"
+      ~level:Info
+      ~pp1:Error_monad.pp_print_trace
+      ("error", Error_monad.trace_encoding)
+
   let set_socket_option_tcp_user_timeout_failed =
     declare_1
       ~section
@@ -648,20 +672,30 @@ module P2p_maintainance = struct
       ("duration", Time.System.Span.encoding)
 
   let too_few_connections =
-    declare_1
+    declare_4
       ~section
       ~name:"too_few_connections_maintenance"
-      ~msg:"too few connections ({connections})"
+      ~msg:
+        "too few connections (conn.: {connections}, min. target: {min_target}, \
+         conf: [{min_connections};{expected_connections}])"
       ~level:Notice
       ("connections", Data_encoding.int31)
+      ("min_target", Data_encoding.int31)
+      ("expected_connections", Data_encoding.int31)
+      ("min_connections", Data_encoding.int31)
 
   let too_many_connections =
-    declare_1
+    declare_4
       ~section
       ~name:"too_many_connections_maintenance"
-      ~msg:"too many connections (will kill {connections})"
+      ~msg:
+        "too many connections (will kill {connections} to reach {max_target}, \
+         conf: [{expected_connections};{max_connections}])"
       ~level:Debug
       ("connections", Data_encoding.int31)
+      ("max_target", Data_encoding.int31)
+      ("expected_connections", Data_encoding.int31)
+      ("max_connections", Data_encoding.int31)
 end
 
 module P2p_welcome = struct
@@ -755,12 +789,15 @@ module P2p_socket = struct
       ("peer", P2p_peer.Id.encoding)
 
   let read_error =
-    declare_0
+    declare_2
       ~section
       ~name:"socket_read_error"
-      ~level:Debug
-      ~msg:"[read message] incremental decoding error"
-      ()
+      ~level:Info
+      ~msg:"[read message] Error while reading messages from {peer}: {error}"
+      ~pp1:P2p_peer.Id.pp
+      ~pp2:Data_encoding.Binary.pp_read_error
+      ("peer", P2p_peer.Id.encoding)
+      ("error", Data_encoding.Binary.read_error_encoding)
 
   let write_event =
     declare_2

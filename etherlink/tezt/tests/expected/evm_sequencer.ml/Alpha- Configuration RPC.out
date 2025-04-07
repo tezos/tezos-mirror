@@ -12,17 +12,27 @@
   "verbose": "notice",
   "experimental_features": {
     "drop_duplicate_on_injection": true,
+    "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
-    "node_transaction_validation": true,
-    "block_storage_sqlite3": true,
-    "overwrite_simulation_tick_limit": false
+    "overwrite_simulation_tick_limit": false,
+    "rpc_server": "resto",
+    "enable_websocket": false,
+    "max_websocket_message_length": 4194304,
+    "monitor_websocket_heartbeat": {
+      "ping_interval": 5,
+      "ping_timeout": 30
+    },
+    "l2_chains": null
   },
   "proxy": {
     "ignore_block_param": false
   },
-  "fee_history": {},
+  "fee_history": {
+    "max_count": 1024
+  },
   "kernel_execution": {
-    "preimages": "hidden"
+    "preimages": "hidden",
+    "native_execution_policy": "never"
   },
   "public_rpc": {
     "port": "hidden-for-regression-only",
@@ -60,17 +70,27 @@
   "verbose": "notice",
   "experimental_features": {
     "drop_duplicate_on_injection": true,
+    "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
-    "node_transaction_validation": true,
-    "block_storage_sqlite3": true,
-    "overwrite_simulation_tick_limit": false
+    "overwrite_simulation_tick_limit": false,
+    "rpc_server": "resto",
+    "enable_websocket": false,
+    "max_websocket_message_length": 4194304,
+    "monitor_websocket_heartbeat": {
+      "ping_interval": 5,
+      "ping_timeout": 30
+    },
+    "l2_chains": null
   },
   "proxy": {
     "ignore_block_param": false
   },
-  "fee_history": {},
+  "fee_history": {
+    "max_count": 1024
+  },
   "kernel_execution": {
-    "preimages": "hidden"
+    "preimages": "hidden",
+    "native_execution_policy": "never"
   },
   "public_rpc": {
     "port": "hidden-for-regression-only",
@@ -101,18 +121,28 @@
   "verbose": "notice",
   "experimental_features": {
     "drop_duplicate_on_injection": true,
+    "blueprints_publisher_order_enabled": true,
     "enable_send_raw_transaction": true,
-    "node_transaction_validation": true,
-    "block_storage_sqlite3": true,
-    "overwrite_simulation_tick_limit": false
+    "overwrite_simulation_tick_limit": false,
+    "rpc_server": "resto",
+    "enable_websocket": false,
+    "max_websocket_message_length": 4194304,
+    "monitor_websocket_heartbeat": {
+      "ping_interval": 5,
+      "ping_timeout": 30
+    },
+    "l2_chains": null
   },
   "proxy": {
     "evm_node_endpoint": "hidden",
     "ignore_block_param": false
   },
-  "fee_history": {},
+  "fee_history": {
+    "max_count": 1024
+  },
   "kernel_execution": {
-    "preimages": "hidden"
+    "preimages": "hidden",
+    "native_execution_policy": "never"
   },
   "public_rpc": {
     "port": "hidden-for-regression-only",

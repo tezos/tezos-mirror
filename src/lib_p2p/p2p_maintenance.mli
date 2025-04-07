@@ -74,7 +74,6 @@ type ('msg, 'meta, 'meta_conn) t
 val create :
   ?discovery:P2p_discovery.t ->
   config ->
-  ('msg, 'meta, 'meta_conn) P2p_pool.t ->
   ('msg, 'meta, 'meta_conn) P2p_connect_handler.t ->
   P2p_trigger.t ->
   log:(P2p_connection.P2p_event.t -> unit) ->
@@ -104,7 +103,6 @@ module Internal_for_tests : sig
     ?discovery:P2p_discovery.t ->
     config ->
     ?debug_config:test_config ->
-    ('msg, 'meta, 'meta_conn) P2p_pool.t ->
     ('msg, 'meta, 'meta_conn) P2p_connect_handler.t ->
     P2p_trigger.t ->
     log:(P2p_connection.P2p_event.t -> unit) ->

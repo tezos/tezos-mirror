@@ -1,4 +1,4 @@
-all: basic logs full compact dal-basic
+all: basic logs full compact dal-basic profiling
 
 NODE_INSTANCE_LABEL ?= instance
 STORAGE_MODE ?= default
@@ -27,3 +27,5 @@ full: octez-full.jsonnet
 compact: octez-compact.jsonnet
 
 dal-basic: dal/dal-basic.jsonnet
+
+profiling: octez-profiling.jsonnet

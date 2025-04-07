@@ -10,6 +10,8 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-rust-deps"
+  "bls12-381"
   "octez-libs"
   "kaitai-of-data-encoding" { = version }
   "kaitai" { = version }
@@ -34,6 +36,7 @@ depopts: [
   "octez-protocol-019-PtParisB-libs"
   "octez-protocol-020-PsParisC-libs"
   "octez-protocol-021-PsQuebec-libs"
+  "octez-protocol-022-PsRiotum-libs"
   "octez-protocol-alpha-libs"
 ]
 build: [
@@ -41,4 +44,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos: `octez-codec-kaitai` binary to generate kaitai descriptions"

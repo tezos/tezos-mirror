@@ -77,11 +77,11 @@ let patch_context ctxt =
 let init_chain ?(history_mode = History_mode.Archive) base_dir =
   let open Lwt_syntax in
   let store_dir = base_dir // "store" in
-  let context_dir = base_dir // "context" in
+  let context_root_dir = base_dir in
   let* r =
     Store.init
       ~store_dir
-      ~context_dir
+      ~context_root_dir
       ~history_mode
       ~allow_testchains:true
       ~patch_context

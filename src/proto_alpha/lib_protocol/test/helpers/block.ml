@@ -183,6 +183,15 @@ let get_round (b : t) =
     let+ fitness = from_raw fitness in
     round fitness)
 
+let block_producer block =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = get_alpha_ctxt block in
+  let*?@ round = Fitness.round_from_raw block.header.shell.fitness in
+  let*@ _ctxt, _slot, block_producer =
+    Stake_distribution.baking_rights_owner ctxt (Level.current ctxt) ~round
+  in
+  return block_producer
+
 module Forge = struct
   type header = {
     baker : public_key_hash;
@@ -566,12 +575,13 @@ let validate_bootstrap_accounts
     (function Exit -> return_unit | exc -> Lwt.reraise exc)
 
 let prepare_initial_context_params ?consensus_committee_size
-    ?consensus_threshold ?min_proposal_quorum ?level ?cost_per_byte
+    ?consensus_threshold_size ?min_proposal_quorum ?level ?cost_per_byte
     ?issuance_weights ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
-    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance ?consensus_rights_delay () =
+    ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
+    ?nonce_revelation_threshold ?dal ?adaptive_issuance ?consensus_rights_delay
+    ?allow_tz4_delegate_enable ?aggregate_attestation () =
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
@@ -595,8 +605,10 @@ let prepare_initial_context_params ?consensus_committee_size
       ~default:constants.cycles_per_voting_period
       cycles_per_voting_period
   in
-  let consensus_threshold =
-    Option.value ~default:constants.consensus_threshold consensus_threshold
+  let consensus_threshold_size =
+    Option.value
+      ~default:constants.consensus_threshold_size
+      consensus_threshold_size
   in
   let consensus_committee_size =
     Option.value
@@ -621,6 +633,10 @@ let prepare_initial_context_params ?consensus_committee_size
   let dal_enable =
     Option.value ~default:constants.dal.feature_enable dal_enable
   in
+
+  let dal_incentives_enable =
+    Option.value ~default:constants.dal.incentives_enable dal_incentives_enable
+  in
   let zk_rollup_enable =
     Option.value ~default:constants.zk_rollup.enable zk_rollup_enable
   in
@@ -643,10 +659,18 @@ let prepare_initial_context_params ?consensus_committee_size
       ~default:constants.consensus_rights_delay
       consensus_rights_delay
   in
+  let allow_tz4_delegate_enable =
+    Option.value
+      ~default:constants.allow_tz4_delegate_enable
+      allow_tz4_delegate_enable
+  in
+  let aggregate_attestation =
+    Option.value ~default:constants.aggregate_attestation aggregate_attestation
+  in
   let cache_sampler_state_cycles =
-    consensus_rights_delay + Constants_repr.max_slashing_period + 1
+    consensus_rights_delay + Constants_repr.slashing_delay + 2
   and cache_stake_distribution_cycles =
-    consensus_rights_delay + Constants_repr.max_slashing_period + 1
+    consensus_rights_delay + Constants_repr.slashing_delay + 2
   in
   let constants =
     {
@@ -658,7 +682,7 @@ let prepare_initial_context_params ?consensus_committee_size
       min_proposal_quorum;
       cost_per_byte;
       consensus_committee_size;
-      consensus_threshold;
+      consensus_threshold_size;
       sc_rollup =
         {
           constants.sc_rollup with
@@ -666,7 +690,12 @@ let prepare_initial_context_params ?consensus_committee_size
           private_enable = sc_rollup_private_enable;
           riscv_pvm_enable = sc_rollup_riscv_pvm_enable;
         };
-      dal = {dal with feature_enable = dal_enable};
+      dal =
+        {
+          dal with
+          feature_enable = dal_enable;
+          incentives_enable = dal_incentives_enable;
+        };
       zk_rollup = {constants.zk_rollup with enable = zk_rollup_enable};
       adaptive_issuance;
       hard_gas_limit_per_block;
@@ -674,6 +703,8 @@ let prepare_initial_context_params ?consensus_committee_size
       consensus_rights_delay;
       cache_sampler_state_cycles;
       cache_stake_distribution_cycles;
+      allow_tz4_delegate_enable;
+      aggregate_attestation;
     }
   in
   let* () = check_constants_consistency constants in
@@ -701,19 +732,20 @@ let prepare_initial_context_params ?consensus_committee_size
 
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
-let genesis ?commitments ?consensus_committee_size ?consensus_threshold
+let genesis ?commitments ?consensus_committee_size ?consensus_threshold_size
     ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
     ?issuance_weights ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
-    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance (bootstrap_accounts : Parameters.bootstrap_account list)
-    =
+    ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
+    ?nonce_revelation_threshold ?dal ?adaptive_issuance
+    ?allow_tz4_delegate_enable ?aggregate_attestation
+    (bootstrap_accounts : Parameters.bootstrap_account list) =
   let open Lwt_result_syntax in
   let* constants, shell, hash =
     prepare_initial_context_params
       ?consensus_committee_size
-      ?consensus_threshold
+      ?consensus_threshold_size
       ?min_proposal_quorum
       ?level
       ?cost_per_byte
@@ -725,11 +757,14 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold
       ?sc_rollup_private_enable
       ?sc_rollup_riscv_pvm_enable
       ?dal_enable
+      ?dal_incentives_enable
       ?zk_rollup_enable
       ?hard_gas_limit_per_block
       ?nonce_revelation_threshold
       ?dal
       ?adaptive_issuance
+      ?allow_tz4_delegate_enable
+      ?aggregate_attestation
       ()
   in
   let* () =
@@ -1133,11 +1168,13 @@ let balance_updates_of_single_content :
   | Proposals_result | Ballot_result -> []
   | Preattestation_result {balance_updates; _}
   | Attestation_result {balance_updates; _}
+  | Attestations_aggregate_result {balance_updates; _}
   | Seed_nonce_revelation_result balance_updates
   | Vdf_revelation_result balance_updates
   | Double_attestation_evidence_result {balance_updates; _}
   | Double_preattestation_evidence_result {balance_updates; _}
   | Double_baking_evidence_result {balance_updates; _}
+  | Dal_entrapment_evidence_result {balance_updates; _}
   | Activate_account_result balance_updates
   | Drain_delegate_result {balance_updates; _} ->
       balance_updates
@@ -1274,6 +1311,11 @@ let current_cycle b =
   let blocks_per_cycle = b.constants.blocks_per_cycle in
   let current_level = b.header.shell.level in
   current_cycle_of_level ~blocks_per_cycle ~current_level
+
+let cycle_position b =
+  let blocks_per_cycle = b.constants.blocks_per_cycle in
+  let level = b.header.shell.level in
+  Int32.rem level blocks_per_cycle
 
 let first_level_of_cycle (constants : Constants.Parametric.t) ~level =
   let blocks_per_cycle = constants.blocks_per_cycle in

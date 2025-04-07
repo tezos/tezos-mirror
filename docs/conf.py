@@ -44,7 +44,17 @@ extensions = [
     'tezos_custom_roles',
     'michelsonlexer',
     'sphinxcontrib.jquery',
+    'sphinx_copybutton',
+    'sphinx_sitemap',
+    'sphinx_pushfeedback',
 ]
+
+# Sitemap
+sitemap_url_scheme = '{link}'
+html_baseurl = 'https://tezos.gitlab.io/'
+
+# pushfeedback.com
+pushfeedback_project = '42c4fpgh27'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -60,8 +70,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Tezos'
-copyright = '2018-2023, Nomadic Labs <contact@nomadic-labs.com>'
-author = 'Nomadic Labs <contact@nomadic-labs.com>'
+copyright = '2018-2024'
+author = 'Contributors to the Octez & Tezos protocol documentation'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -93,7 +103,7 @@ exclude_patterns = [
     'Thumbs.db',
     '.DS_Store',
     'doc_gen',
-    'paris',
+    'quebec',
 ]
 # TODO tezos/tezos#2170: exclude the active protocol 'NNN' above
 
@@ -128,6 +138,7 @@ html_theme_options = {
     'use_issues_button': True,
     'use_download_button': False,
     'use_fullscreen_button': True,
+    'use_source_button': True,
 }
 
 html_theme_options["analytics"] = {
@@ -151,13 +162,8 @@ html_js_files = [
 html_extra_path = [
     '404.html',
     '_redirects',
+    '_redirects.s3',
     # manually copy images that are only included in raw HTML directives:
-    'images/building_on_tezos_5.png',
-    'images/contributing_to_octez_6.png',
-    'images/discover_tezos_1.png',
-    'images/getting_started_2.png',
-    'images/understanding_octez_4.png',
-    'images/using_octez_3.png',
 ]
 
 # Custom sidebar templates, must be a dictionary that maps document names
@@ -246,6 +252,8 @@ linkcheck_ignore = [
     r'^https://gitlab\.com/nomadic-labs/tezos/-/merge_requests/',
     r'^http(s)?://localhost:\d+/?',
     r'^https://grafana\.nomadic-labs\.cloud/',
+    r'^https://github\.com/jsonnet-bundler/jsonnet-bundler/',
+    r'https://github\.com/thierry-martinez/stdcompat/issues/13',
     # local files, e.g. ../api/api-inline.html#*', \.\./CHANGES.html#version-*
     # (interpreted by linkcheck as external links, generating false positives)
     r'^\.\./',
@@ -253,6 +261,7 @@ linkcheck_ignore = [
     r'^https://opentezos\.com/',
     r'^https://crates\.io/crates/tezos-smart-rollup',
     r'^https://rpc\.ghostnet\.teztnets\.com/chains/main/blocks/',
+    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/2771',
 ]
 linkcheck_allowed_redirects = dict(
     [

@@ -63,7 +63,7 @@ let dal_parameters ~is_fake =
   in
   let* () = check_make "The set of parameters is invalid for the verifier" in
   let* () =
-    let* res = init_prover_dal ~find_srs_files () in
+    let* res = init_prover_dal ~find_srs_files ~fetch_trusted_setup:false () in
     match res with
     | Ok () -> unit
     | Error errs ->

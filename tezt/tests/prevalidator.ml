@@ -1593,7 +1593,7 @@ module Revamped = struct
     let max_operations = 4 in
     (* Control fees and gas limits to easily influence weight (i.e. ratio) *)
     let fee = 1000 in
-    let gas_limit = 1500 in
+    let gas_limit = 3500 in
 
     log_step 0 "Initialize and connect two nodes." ;
     let* node1 =
@@ -1765,7 +1765,7 @@ module Revamped = struct
     let max_operations = 1 in
     (* Control fees and gas limits to easily influence weight (i.e. ratio) *)
     let fee = 1000 in
-    let gas_limit = 1500 in
+    let gas_limit = 3500 in
     log_step 0 "Initialize and connect two nodes." ;
     let* node1 =
       Node.init
@@ -1917,6 +1917,7 @@ module Revamped = struct
            ~round:0
            ~block_payload_hash
            ())
+        ~protocol
         ~signer:delegate
         client
     in
@@ -1998,7 +1999,7 @@ module Revamped = struct
     let fee = 1000 in
     (* Gas limit used for all operations, so that weight (fee/gas
        limit ratio) only depends on fee. *)
-    let gas_limit = 1500 in
+    let gas_limit = 3500 in
     log_step
       0
       "Initialize a node and activate the protocol. Bake an additional block \
@@ -2429,6 +2430,7 @@ module Revamped = struct
            ~round:0
            ~block_payload_hash
            ())
+        ~protocol
         ~signer:account
         client
     in
@@ -2541,6 +2543,7 @@ module Revamped = struct
            ~round:0
            ~block_payload_hash
            ())
+        ~protocol
         ~signer:account
         client
     in
@@ -2672,6 +2675,7 @@ module Revamped = struct
            ~round:0
            ~block_payload_hash
            ())
+        ~protocol
         ~signer
         client
     in
@@ -2916,6 +2920,7 @@ module Revamped = struct
     let* _ =
       Operation.Consensus.inject
         ~force:true
+        ~protocol
         ~branch:branch_future1
         ~signer:Constant.bootstrap1
         op_future1
@@ -2924,6 +2929,7 @@ module Revamped = struct
     let* _ =
       Operation.Consensus.inject
         ~force:true
+        ~protocol
         ~branch:branch_future2
         ~signer:Constant.bootstrap1
         op_future2
@@ -3204,9 +3210,10 @@ module Revamped = struct
       bootstrap2.alias
       bootstrap4.alias ;
     let* ops = monitoring in
+    let sort_list = List.sort String.compare in
     let ophs = List.map JSON.(fun json -> json |-> "hash" |> as_string) ops in
     Check.(
-      ([oph2; oph1; oph4] = ophs)
+      (sort_list [oph1; oph2; oph4] = sort_list ophs)
         (list string)
         ~error_msg:"Expected operations %L, got %R") ;
 
@@ -4183,7 +4190,7 @@ let force_operation_injection =
     forge_operation
       ~branch
       ~fee:1000 (* Minimal fees to successfully apply the transfer *)
-      ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
+      ~gas_limit:3040 (* Minimal gas to successfully apply the transfer *)
       ~source:Constant.bootstrap2.public_key_hash
       ~destination:Constant.bootstrap1.public_key_hash
       ~counter (* Invalid counter *)

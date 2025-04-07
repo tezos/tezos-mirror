@@ -188,3 +188,11 @@ let patch_durable_storage ~data_dir ~key ~value =
     {l2_block with header = {l2_block.header with context = new_commit}}
   in
   Store.L2_blocks.store store new_l2_block
+
+let hooks ~check_invalid_kernel =
+  let open Tezos_scoru_wasm.Hooks in
+  let hooks =
+    no_hooks |> on_fast_exec_panicked Interpreter_event.fast_exec_panic
+  in
+  if check_invalid_kernel then hooks
+  else disable_fast_exec_invalid_kernel_check hooks

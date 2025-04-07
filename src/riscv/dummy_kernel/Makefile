@@ -9,15 +9,20 @@ all: build test check
 build:
 	@cargo build --release
 
+.PHONY: build-deps
+build-deps:
+	@exec ../scripts/install-rust-std-hermit.sh
+
 .PHONY: test
 test:
 	@# This executable compiles to RISC-V. It should be run in the RISC-V sandbox.
 
 .PHONY: check
 check:
+	@exec ../scripts/format.sh --check
 	@cargo check --workspace --locked
-	@cargo fmt --check
 	@cargo clippy -- --deny warnings
+	@cargo doc --all-features --document-private-items --no-deps
 
 .PHONY: clean
 clean:

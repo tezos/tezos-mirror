@@ -13,12 +13,22 @@
 *)
 let tracer_input_prefix_calltracer = '\001'
 
+type inconsistent_traces_input = {
+  block : Ethereum_types.quantity;
+  nb_txs : int;
+  nb_traces : int;
+}
+
 type error +=
   | Not_supported
   | Transaction_not_found of Ethereum_types.hash
   | Block_not_found of Ethereum_types.quantity
   | Trace_not_found
-  | Tracer_not_activated
+  | Tracer_not_activated  (** Tracer only activated after a certain level *)
+  | Tracer_not_implemented of string
+        (** Not all tracer are available for all rpcs *)
+  | Inconsistent_traces of inconsistent_traces_input
+  | Trace_decoding_error of string
 
 let () =
   register_error_kind
@@ -81,7 +91,53 @@ let () =
       Format.fprintf ppf "The tracer specified in the request is not activated")
     Data_encoding.empty
     (function Tracer_not_activated -> Some () | _ -> None)
-    (fun () -> Tracer_not_activated)
+    (fun () -> Tracer_not_activated) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_inconsistent_traces"
+    ~title:"Inconsistent traces"
+    ~description:"The tracer failed trace a block"
+    ~pp:(fun ppf (blocknumber, nb_of_hashes, nb_of_traces) ->
+      Format.fprintf
+        ppf
+        "The tracer failed to trace block %a: failed to find which transaction \
+         (among %d) was linked to which trace (among %d)"
+        Ethereum_types.pp_quantity
+        blocknumber
+        nb_of_hashes
+        nb_of_traces)
+    Data_encoding.(
+      obj3
+        (req "blocknumber" Ethereum_types.quantity_encoding)
+        (req "nb_of_hashes" Data_encoding.int31)
+        (req "nb_of_traces" Data_encoding.int31))
+    (function
+      | Inconsistent_traces {block; nb_txs; nb_traces} ->
+          Some (block, nb_txs, nb_traces)
+      | _ -> None)
+    (fun (block, nb_txs, nb_traces) ->
+      Inconsistent_traces {block; nb_txs; nb_traces}) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_tracer_not_implemented"
+    ~title:"Tracer not implemented"
+    ~description:
+      "The tracer specified in the request is not implemented for that \n\
+      \    particular request"
+    ~pp:(fun ppf s ->
+      Format.fprintf ppf "The tracer %s is not available for that request" s)
+    Data_encoding.(obj1 (req "tracer" string))
+    (function Tracer_not_implemented s -> Some s | _ -> None)
+    (fun s -> Tracer_not_implemented s) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_trace_decoding_error"
+    ~title:"The tracer encountered an error"
+    ~description:"The tracer encountered an error during decoding"
+    ~pp:(fun ppf s -> Format.fprintf ppf "The tracer failed to decode: %s" s)
+    Data_encoding.(obj1 (req "tracer" string))
+    (function Trace_decoding_error s -> Some s | _ -> None)
+    (fun s -> Trace_decoding_error s)
 
 type tracer_config = {
   (* StructLogger flags *)
@@ -251,6 +307,8 @@ let config_to_string config =
 type call_input =
   (Ethereum_types.call * Ethereum_types.Block_parameter.extended) * config
 
+type block_input = Ethereum_types.Block_parameter.t * config
+
 let input_encoding =
   Helpers.encoding_with_optional_last_param
     Ethereum_types.hash_encoding
@@ -262,6 +320,12 @@ let call_input_encoding =
     (Data_encoding.tup2
        Ethereum_types.call_encoding
        Ethereum_types.Block_parameter.extended_encoding)
+    config_encoding
+    default_config
+
+let block_input_encoding =
+  Helpers.encoding_with_optional_last_param
+    Ethereum_types.Block_parameter.encoding
     config_encoding
     default_config
 
@@ -900,36 +964,61 @@ module CallTracer = struct
          (req "topics" (list Ethereum_types.hex_encoding))
          (req "data" Ethereum_types.hex_encoding))
 
+  (* Bytes.sub, but returns an error. *)
+  let sub_bytes ?error bytes offset length =
+    let open Result_syntax in
+    if Bytes.length bytes < offset + length then
+      tzfail (Trace_decoding_error (Option.value error ~default:"Bytes.sub"))
+    else return (Bytes.sub bytes offset length)
+
+  let try_to_string bytes =
+    if Bytes.is_valid_utf_8 bytes then Bytes.unsafe_to_string bytes
+    else Hex.(of_bytes bytes |> show)
+
   (* See this documentation about how to encode dynamic types (string, bytes, ...):
      https://docs.soliditylang.org/en/latest/abi-spec.html#use-of-dynamic-types *)
   let decode_ethereum_string data =
-    let decode_word_to_int word =
+    let open Result_syntax in
+    let decode_word_to_int ?error bytes offset length =
+      let* word = sub_bytes ?error bytes offset length in
       let (Qty position) = Ethereum_types.decode_number_be word in
-      Z.to_int position
+      return @@ Z.to_int position
     in
-    let position = decode_word_to_int (Bytes.sub data 0 32) in
-    let size = decode_word_to_int (Bytes.sub data position 32) in
-    let str = Bytes.sub data (position + 32) size in
-    Bytes.to_string str
+    let* position =
+      decode_word_to_int ~error:"decode string size position" data 0 32
+    in
+    let* size =
+      decode_word_to_int ~error:"decode string size" data position 32
+    in
+    let* str = sub_bytes ~error:"extract string" data (position + 32) size in
+    return @@ try_to_string str
 
-  let try_to_string (Ethereum_types.Hex str) =
-    let bytes = Ethereum_types.hex_to_real_bytes (Hex str) in
-    if Bytes.is_valid_utf_8 bytes then Bytes.to_string bytes else str
+  let revert_reason_bytes_decoding output_b =
+    let open Result_syntax in
+    if Bytes.length output_b < 4 then
+      (* data is too short to contain the revert reason, we don't know how to
+         recover it. *)
+      return (Some "Reverted", None)
+    else
+      let* selector_output = sub_bytes ~error:"decode selector" output_b 0 4 in
+      if solidity_revert_selector = selector_output then
+        (* This is a solidity revert, we can decode the output as
+           a string to put it in revert_reason *)
+        let* revert_reason =
+          decode_ethereum_string
+            (Bytes.sub output_b 4 (Bytes.length output_b - 4))
+        in
+        (* When it's a solidity revert, the common error is
+           execution reverted *)
+        return (Some "execution reverted", Some revert_reason)
+      else
+        (* data does not correspond to a solidity revert, we don't know how to
+           recover the revert reason. *)
+        return (Some (try_to_string output_b), None)
 
   let revert_reason_decoding output =
     let output_b = Ethereum_types.hex_to_real_bytes output in
-    let selector_output = Bytes.sub output_b 0 4 in
-    if solidity_revert_selector = selector_output then
-      (* This is a solidity revert, we can decode the output as
-         a string to put it in revert_reason *)
-      let revert_reason =
-        decode_ethereum_string
-          (Bytes.sub output_b 4 (Bytes.length output_b - 4))
-      in
-      (* When it's a solidity revert, the common error is
-         execution reverted *)
-      (Some "execution reverted", Some revert_reason)
-    else (Some (try_to_string output), None)
+    revert_reason_bytes_decoding output_b
 
   let output_encoding =
     let open Data_encoding in
@@ -974,12 +1063,12 @@ module CallTracer = struct
                 (opt "to" Ethereum_types.address_encoding)
                 (req "value" uint_as_hex_encoding)
                 (opt "gas" uint_as_hex_encoding)
-                (req "gas_used" uint_as_hex_encoding))
+                (req "gasUsed" uint_as_hex_encoding))
              (obj6
                 (req "input" Ethereum_types.hex_encoding)
                 (opt "output" Ethereum_types.hex_encoding)
                 (opt "error" string)
-                (opt "revert_reason" string)
+                (opt "revertReason" string)
                 (opt "logs" (list logs_encoding))
                 (req "calls" (list enc)))))
 
@@ -1022,11 +1111,15 @@ module CallTracer = struct
         let* input = From_rlp.decode_hex input in
         let* output = Rlp.decode_option From_rlp.decode_hex output in
         let* error = Rlp.decode_option From_rlp.decode_string error in
-        let error, revert_reason =
+        let* error, revert_reason =
+          (* Best guess to recover revert reason *)
           match (output, error) with
           | Some output, Some err when err = "Reverted" ->
               revert_reason_decoding output
-          | _ -> (error, None)
+          | _, Some err when not (String.is_valid_utf_8 err) ->
+              (* We probably are propagating the error found in another call *)
+              revert_reason_bytes_decoding (Bytes.unsafe_of_string err)
+          | _ -> return (error, None)
         in
         let* logs = Rlp.decode_option (Rlp.decode_list decode_logs) logs in
         let* depth = From_rlp.decode_int depth in
@@ -1087,3 +1180,12 @@ let output_encoding =
         (function CallTracerOutput output -> Some output | _ -> None)
         (fun output -> CallTracerOutput output);
     ]
+
+type block_output = (Ethereum_types.hash * output) list
+
+let block_output_encoding =
+  Data_encoding.list
+    Data_encoding.(
+      obj2
+        (req "txHash" Ethereum_types.hash_encoding)
+        (req "result" output_encoding))

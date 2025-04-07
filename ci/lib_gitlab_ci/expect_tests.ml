@@ -61,8 +61,12 @@ let%expect_test _ =
       Types.Stages ["first"];
       Types.Include
         [
-          {local = "foo"; rules = []};
-          {local = "bar"; rules = [Util.include_rule ~changes:["src/**/*"] ()]};
+          {subkey = Local "foo"; rules = []};
+          {
+            subkey = Local "bar";
+            rules = [Util.include_rule ~changes:["src/**/*"] ()];
+          };
+          {subkey = Template Jobs_container_scanning; rules = []};
         ];
       Variables [("k1", "v"); ("k2", "vv")];
       Types.(
@@ -82,12 +86,13 @@ let%expect_test _ =
     stages:
     - first
     include:
-    - foo
+    - local: foo
     - local: bar
       rules:
       - changes:
         - src/**/*
         when: always
+    - template: Jobs/Container-Scanning.gitlab-ci.yml
     variables:
       k1: v
       k2: vv

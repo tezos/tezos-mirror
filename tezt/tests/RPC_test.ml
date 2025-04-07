@@ -1621,7 +1621,15 @@ let register protocols =
         sub_group
         protocols
     in
-    let consensus_threshold _protocol = [(["consensus_threshold"], `Int 0)] in
+    let consensus_threshold protocol =
+      [
+        ( [
+            (if Protocol.(number protocol >= 022) then "consensus_threshold_size"
+             else "consensus_threshold");
+          ],
+          `Int 0 );
+      ]
+    in
     check_rpc_regression
       "contracts"
       ~test_function:test_contracts

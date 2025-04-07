@@ -16,18 +16,25 @@
 #![no_std]
 
 // If 'std' is on, pull in the standard library.
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", pvm_kind = "riscv"))]
 extern crate std;
 
 extern crate alloc;
 
-use core::panic::PanicInfo;
+/// Argument type for the panic hook
+#[rustversion::before(1.81)]
+pub type PanicHookArg<'a> = core::panic::PanicInfo<'a>;
+
+/// Argument type for the panic hook
+// From 1.81 onwards, panic hooks take [`std::panic::PanicHookInfo`] instead.
+#[rustversion::since(1.81)]
+pub type PanicHookArg<'a> = std::panic::PanicHookInfo<'a>;
 
 /// Prints the panic info to the host's *debug log*, and then aborts.
 ///
 /// When targeting WASM, this will be the *global* panic handler.
 #[allow(unused)]
-pub fn panic_handler(info: &PanicInfo) {
+pub fn panic_handler(info: &PanicHookArg) {
     #[cfg(feature = "debug")]
     {
         let message = if let Some(message) =
@@ -39,23 +46,20 @@ pub fn panic_handler(info: &PanicInfo) {
             alloc::format!("Kernel panic {:?} at {:?}", message, info.location())
         };
 
-        #[cfg(any(target_arch = "wasm32", target_arch = "riscv64"))]
+        #[cfg(pvm_kind = "wasm")]
         unsafe {
-            tezos_smart_rollup_core::smart_rollup_core::write_debug(
+            tezos_smart_rollup_core::target_impl::write_debug(
                 message.as_ptr(),
                 message.len(),
             );
         }
 
-        #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+        #[cfg(any(feature = "std", pvm_kind = "riscv"))]
         std::eprintln!("{}", message);
     }
 
     // We don't want to abort when testing because that prevents the panic trace
     // from being printed.
-    #[cfg(all(
-        feature = "abort",
-        any(target_arch = "wasm32", target_arch = "riscv64")
-    ))]
+    #[cfg(all(feature = "abort", not(pvm_kind = "none")))]
     std::process::abort()
 }

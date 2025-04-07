@@ -64,16 +64,12 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
   let* status, smart_rollup_address_typed =
     Evm_context.start
+      ~configuration
       ?kernel_path:kernel
       ~data_dir
-      ~preimages:configuration.kernel_execution.preimages
-      ~preimages_endpoint:configuration.kernel_execution.preimages_endpoint
-      ~fail_on_missing_blueprint:true
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:`Read_write
-      ~block_storage_sqlite3:
-        configuration.experimental_features.block_storage_sqlite3
-      ?garbage_collector:configuration.experimental_features.garbage_collector
+      ~sequencer_wallet:(sequencer_config.sequencer, cctxt)
       ()
   in
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
@@ -96,12 +92,23 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           ())
       sequencer_config.blueprints_publisher_config.dal_slots
   in
+  let* ro_ctxt =
+    Evm_ro_context.load
+      ~smart_rollup_address:smart_rollup_address_typed
+      ~data_dir
+      configuration
+  in
   let* () =
     Blueprints_publisher.start
+      ~blueprints_range:(Evm_ro_context.blueprints_range ro_ctxt)
       ~rollup_node_endpoint
       ~config:sequencer_config.blueprints_publisher_config
       ~latest_level_seen:(Z.pred next_blueprint_number)
       ~keep_alive
+      ~drop_duplicate:
+        configuration.experimental_features.drop_duplicate_on_injection
+      ~order_enabled:
+        configuration.experimental_features.blueprints_publisher_order_enabled
       ()
   in
   let* () =
@@ -131,18 +138,12 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
            {chunks = genesis_chunks; inbox_payload = genesis_payload})
     else return_unit
   in
-  let* ro_ctxt =
-    Evm_ro_context.load
-      ~smart_rollup_address:smart_rollup_address_typed
-      ~data_dir
-      configuration
-  in
 
   let backend = Evm_ro_context.ro_backend ro_ctxt configuration in
   let* () =
     Tx_pool.start
       {
-        rollup_node = backend;
+        backend;
         smart_rollup_address = smart_rollup_address_b58;
         mode = Sequencer;
         tx_timeout_limit = configuration.tx_pool_timeout_limit;
@@ -191,6 +192,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~evm_services:
         Evm_ro_context.(
           evm_services_methods ro_ctxt sequencer_config.time_between_blocks)
+      ~data_dir
       configuration
       (backend, smart_rollup_address_typed)
   in

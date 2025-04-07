@@ -7,6 +7,9 @@
 
 (* Backend-agnostic operations on the context *)
 
+module Profiler =
+  Tezos_protocol_environment.Environment_profiler.Context_ops_profiler
+
 module Environment_context = Tezos_protocol_environment.Context
 module Memory_context = Tezos_protocol_environment.Memory_context
 module Brassaia = Tezos_context_brassaia.Tezos_context.Context
@@ -61,10 +64,38 @@ let err_impl_mismatch ~got =
     ~expected:"shell, memory, brassaia or brassaia_memory"
     ~got
 
-let init ~kind ?patch_context ?readonly ?index_log_size path =
+let irmin_dir = "context"
+
+let brassaia_dir = "brassaia_context"
+
+let backend_variable = "TEZOS_CONTEXT_BACKEND"
+
+let irmin_context_dir root = Filename.(concat root irmin_dir)
+
+let brassaia_context_dir root = Filename.(concat root brassaia_dir)
+
+let context_dir root =
+  match Sys.getenv backend_variable |> String.lowercase_ascii with
+  | "brassaia" -> brassaia_context_dir root
+  | "irmin" | "duo" | (exception Not_found) -> irmin_context_dir root
+  | s ->
+      Fmt.failwith
+        "You tried to initialise the context with %s, this is not a known \
+         context. Try `irmin` or `brassaia`"
+        s
+
+let do_not_use__brassaia_dir root = brassaia_context_dir root
+
+let do_not_use__is_duo () =
+  match Sys.getenv backend_variable |> String.lowercase_ascii with
+  | "duo" -> true
+  | _ | (exception Not_found) -> false
+
+let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
   let open Lwt_syntax in
+  let irmin_dir = irmin_context_dir context_root_dir in
   let init_context () =
-    let* () = Events.(emit initializing_context) ("irmin", path) in
+    let* () = Events.(emit initializing_context) ("irmin", irmin_dir) in
     let patch_context =
       Option.map
         (fun f context ->
@@ -73,11 +104,12 @@ let init ~kind ?patch_context ?readonly ?index_log_size path =
           return @@ Shell_context.unwrap_disk_context context)
         patch_context
     in
-    Context.init ?patch_context ?readonly ?index_log_size path
+    Context.init ?patch_context ?readonly ?index_log_size irmin_dir
   in
 
+  let brassaia_dir = brassaia_context_dir context_root_dir in
   let init_brassaia_context () =
-    let* () = Events.(emit initializing_context) ("brassaia", path) in
+    let* () = Events.(emit initializing_context) ("brassaia", brassaia_dir) in
     let patch_context =
       Option.map
         (fun f context ->
@@ -86,7 +118,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size path =
           return @@ Brassaia_context.unwrap_disk_context context)
         patch_context
     in
-    Brassaia.init ?patch_context ?readonly ?index_log_size path
+    Brassaia.init ?patch_context ?readonly ?index_log_size brassaia_dir
   in
 
   let open Lwt_syntax in
@@ -96,14 +128,16 @@ let init ~kind ?patch_context ?readonly ?index_log_size path =
       Disk_index index
   | `Memory ->
       let+ index =
-        Tezos_context_memory.Context.init ?readonly ?index_log_size path
+        Tezos_context_memory.Context.init ?readonly ?index_log_size irmin_dir
       in
       Memory_index index
   | `Brassaia ->
       let+ index = init_brassaia_context () in
       Brassaia_index index
   | `Brassaia_memory ->
-      let+ index = Brassaia_memory.init ?readonly ?index_log_size path in
+      let+ index =
+        Brassaia_memory.init ?readonly ?index_log_size brassaia_dir
+      in
       Brassaia_memory_index index
   | `Duo_index ->
       let* irmin_index = init_context () in
@@ -111,36 +145,49 @@ let init ~kind ?patch_context ?readonly ?index_log_size path =
       Duo_index {irmin_index; brassaia_index}
   | `Duo_index_memory ->
       let* irmin_index =
-        Tezos_context_memory.Context.init ?readonly ?index_log_size path
+        Tezos_context_memory.Context.init ?readonly ?index_log_size irmin_dir
       in
       let+ brassaia_index =
-        Brassaia_memory.init ?readonly ?index_log_size path
+        Brassaia_memory.init ?readonly ?index_log_size brassaia_dir
       in
       Duo_memory_index {irmin_index; brassaia_index}
 
 (* Wrapper over init that uses an environment variable ('TEZOS_CONTEXT_BACKEND')
    to select the backend between Memory|Brassaia_memory and Disk|Brassaia *)
-let init ~kind ?patch_context ?readonly ?index_log_size path =
+let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
   let open Lwt_syntax in
-  let backend_variable = "TEZOS_CONTEXT_BACKEND" in
-  match Sys.getenv_opt backend_variable with
-  | Some "Brassaia" -> (
+  (* Gather the initialisation profiling otherwise aggregates will behave
+     like records and create a section for each call *)
+  () [@profiler.record {verbosity = Notice} "Context init"] ;
+  match Sys.getenv backend_variable |> String.lowercase_ascii with
+  | "brassaia" -> (
       match kind with
       | `Disk ->
-          init ~kind:`Brassaia ?patch_context ?readonly ?index_log_size path
+          init
+            ~kind:`Brassaia
+            ?patch_context
+            ?readonly
+            ?index_log_size
+            context_root_dir
       | `Memory ->
           init
             ~kind:`Brassaia_memory
             ?patch_context
             ?readonly
             ?index_log_size
-            path
-      | _ -> init ~kind ?patch_context ?readonly ?index_log_size path)
-  | Some "Duo" -> (
+            context_root_dir
+      | _ ->
+          init ~kind ?patch_context ?readonly ?index_log_size context_root_dir)
+  | "duo" -> (
       match kind with
       | `Disk ->
           let* () = Events.(emit warning_experimental) () in
-          init ~kind:`Duo_index ?patch_context ?readonly ?index_log_size path
+          init
+            ~kind:`Duo_index
+            ?patch_context
+            ?readonly
+            ?index_log_size
+            context_root_dir
       | `Memory ->
           let* () = Events.(emit warning_experimental) () in
           init
@@ -148,12 +195,16 @@ let init ~kind ?patch_context ?readonly ?index_log_size path =
             ?patch_context
             ?readonly
             ?index_log_size
-            path
-      | _ -> init ~kind ?patch_context ?readonly ?index_log_size path)
-  | _ -> init ~kind ?patch_context ?readonly ?index_log_size path
+            context_root_dir
+      | _ ->
+          init ~kind ?patch_context ?readonly ?index_log_size context_root_dir)
+  | _ | (exception Not_found) ->
+      init ~kind ?patch_context ?readonly ?index_log_size context_root_dir
 
 let index (context : Environment_context.t) =
-  match context with
+  match[@profiler.span_f {verbosity = Notice} ["context_ops"; "index"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Disk_index (Context.index ctxt)
   | Context {kind = Memory_context.Context; ctxt; _} ->
@@ -169,7 +220,9 @@ let index (context : Environment_context.t) =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let mem (context : Environment_context.t) key =
-  match context with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "mem"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} -> Context.mem ctxt key
   | Context {kind = Memory_context.Context; ctxt; _} ->
       Tezos_context_memory.Context.mem ctxt key
@@ -181,7 +234,9 @@ let mem (context : Environment_context.t) key =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let mem_tree (context : Environment_context.t) key =
-  match context with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "mem_tree"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} -> Context.mem_tree ctxt key
   | Context {kind = Memory_context.Context; ctxt; _} ->
       Tezos_context_memory.Context.mem_tree ctxt key
@@ -196,7 +251,9 @@ let mem_tree (context : Environment_context.t) key =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let find (context : Environment_context.t) key =
-  match context with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "find"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} -> Context.find ctxt key
   | Context {kind = Memory_context.Context; ctxt; _} ->
       Tezos_context_memory.Context.find ctxt key
@@ -211,7 +268,9 @@ let find (context : Environment_context.t) key =
 
 let add (context : Environment_context.t) key data =
   let open Lwt_syntax in
-  match context with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "add"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       let+ ctxt = Context.add ctxt key data in
       Shell_context.wrap_disk_context ctxt
@@ -233,7 +292,9 @@ let add (context : Environment_context.t) key data =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let fold_value ?depth (context : Environment_context.t) key ~order ~init ~f =
-  match context with
+  match[@profiler.span_f {verbosity = Notice} ["context_ops"; "fold_value"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Context.fold ?depth ctxt key ~order ~init ~f:(fun k tree acc ->
           let v () = Context.Tree.to_value tree in
@@ -275,7 +336,9 @@ let fold_value ?depth (context : Environment_context.t) key ~order ~init ~f =
 
 let add_protocol (context : Environment_context.t) proto_hash =
   let open Lwt_syntax in
-  match context with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "add_protocol"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       let+ ctxt = Context.add_protocol ctxt proto_hash in
       Shell_context.wrap_disk_context ctxt
@@ -297,7 +360,9 @@ let add_protocol (context : Environment_context.t) proto_hash =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let get_protocol (context : Environment_context.t) =
-  match context with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "get_protocol"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} -> Context.get_protocol ctxt
   | Context {kind = Memory_context.Context; ctxt; _} ->
       Tezos_context_memory.Context.get_protocol ctxt
@@ -313,7 +378,11 @@ let get_protocol (context : Environment_context.t) =
 
 let add_predecessor_block_metadata_hash (context : Environment_context.t) hash =
   let open Lwt_syntax in
-  match context with
+  match[@profiler.span_s
+         {verbosity = Notice}
+           ["context_ops"; "add_predecessor_block_metadata_hash"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       let+ ctxt = Context.add_predecessor_block_metadata_hash ctxt hash in
       Shell_context.wrap_disk_context ctxt
@@ -348,7 +417,11 @@ let add_predecessor_block_metadata_hash (context : Environment_context.t) hash =
 
 let add_predecessor_ops_metadata_hash (context : Environment_context.t) hash =
   let open Lwt_syntax in
-  match context with
+  match[@profiler.span_s
+         {verbosity = Notice}
+           ["context_ops"; "add_predecessor_ops_metadata_hash"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       let+ ctxt = Context.add_predecessor_ops_metadata_hash ctxt hash in
       Shell_context.wrap_disk_context ctxt
@@ -378,7 +451,9 @@ let add_predecessor_ops_metadata_hash (context : Environment_context.t) hash =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let hash ~time ?message (context : Environment_context.t) =
-  match context with
+  match[@profiler.span_f {verbosity = Notice} ["context_ops"; "hash"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Context.hash ~time ?message ctxt
   | Context {kind = Memory_context.Context; ctxt; _} ->
@@ -394,7 +469,9 @@ let hash ~time ?message (context : Environment_context.t) =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let get_test_chain (context : Environment_context.t) =
-  match context with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "get_test_chain"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Context.get_test_chain ctxt
   | Context {kind = Memory_context.Context; _} ->
@@ -411,7 +488,9 @@ let get_test_chain (context : Environment_context.t) =
 
 let add_test_chain (context : Environment_context.t) status =
   let open Lwt_syntax in
-  match context with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "add_test_chain"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       let+ ctxt = Context.add_test_chain ctxt status in
       Shell_context.wrap_disk_context ctxt
@@ -434,7 +513,10 @@ let add_test_chain (context : Environment_context.t) status =
 
 let fork_test_chain (context : Environment_context.t) ~protocol ~expiration =
   let open Lwt_syntax in
-  match context with
+  match[@profiler.span_s
+         {verbosity = Notice} ["context_ops"; "fork_test_chain"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       let+ ctxt = Context.fork_test_chain ctxt ~protocol ~expiration in
       Shell_context.wrap_disk_context ctxt
@@ -465,7 +547,9 @@ let fork_test_chain (context : Environment_context.t) ~protocol ~expiration =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let commit ~time ?message (context : Environment_context.t) =
-  match context with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "commit"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Context.commit ~time ?message ctxt
   | Context {kind = Memory_context.Context; ctxt; _} ->
@@ -481,7 +565,9 @@ let commit ~time ?message (context : Environment_context.t) =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let gc context_index context_hash =
-  match context_index with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "gc"]]
+    context_index
+  with
   | Disk_index index -> Context.gc index context_hash
   | Memory_index index -> Tezos_context_memory.Context.gc index context_hash
   | Brassaia_index index -> Brassaia.gc index context_hash
@@ -491,7 +577,10 @@ let gc context_index context_hash =
       Context_wrapper.Memory_context.gc index context_hash
 
 let wait_gc_completion context_index =
-  match context_index with
+  match[@profiler.span_s
+         {verbosity = Notice} ["context_ops"; "wait_gc_completion"]]
+    context_index
+  with
   | Disk_index index -> Context.wait_gc_completion index
   | Memory_index index -> Tezos_context_memory.Context.wait_gc_completion index
   | Brassaia_index index -> Brassaia.wait_gc_completion index
@@ -501,7 +590,9 @@ let wait_gc_completion context_index =
       Context_wrapper.Memory_context.wait_gc_completion index
 
 let is_gc_allowed context_index =
-  match context_index with
+  match[@profiler.span_f {verbosity = Notice} ["context_ops"; "is_gc_allowed"]]
+    context_index
+  with
   | Disk_index index -> Context.is_gc_allowed index
   | Memory_index index -> Tezos_context_memory.Context.is_gc_allowed index
   | Brassaia_index index -> Brassaia.is_gc_allowed index
@@ -510,7 +601,9 @@ let is_gc_allowed context_index =
   | Duo_memory_index index -> Context_wrapper.Memory_context.is_gc_allowed index
 
 let split context_index =
-  match context_index with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "split"]]
+    context_index
+  with
   | Disk_index index -> Context.split index
   | Memory_index index -> Tezos_context_memory.Context.split index
   | Brassaia_index index -> Brassaia.split index
@@ -518,7 +611,10 @@ let split context_index =
   | Duo_index index -> Context_wrapper.Context.split index
   | Duo_memory_index index -> Context_wrapper.Memory_context.split index
 
-let sync = function
+let sync context_index =
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "sync"]]
+    context_index
+  with
   | Disk_index index -> Context.sync index
   | Memory_index index -> Tezos_context_memory.Context.sync index
   | Brassaia_index index -> Brassaia.sync index
@@ -527,7 +623,10 @@ let sync = function
   | Duo_memory_index index -> Context_wrapper.Memory_context.sync index
 
 let commit_test_chain_genesis (context : Environment_context.t) block_header =
-  match context with
+  match[@profiler.span_s
+         {verbosity = Notice} ["context_ops"; "commit_test_chain_genesis"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Context.commit_test_chain_genesis ctxt block_header
   | Context {kind = Memory_context.Context; ctxt; _} ->
@@ -543,7 +642,10 @@ let commit_test_chain_genesis (context : Environment_context.t) block_header =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let compute_testchain_genesis (context : Environment_context.t) block_hash =
-  match context with
+  match[@profiler.span_f
+         {verbosity = Notice} ["context_ops"; "compute_testchain_genesis"]]
+    context
+  with
   | Context {kind = Shell_context.Context; _} ->
       Context.compute_testchain_genesis block_hash
   | Context {kind = Memory_context.Context; _} ->
@@ -559,7 +661,9 @@ let compute_testchain_genesis (context : Environment_context.t) block_hash =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let merkle_tree (context : Environment_context.t) leaf_kind path =
-  match context with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "merkle_tree"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Context.merkle_tree ctxt leaf_kind path
   | Context {kind = Memory_context.Context; ctxt; _} ->
@@ -575,7 +679,9 @@ let merkle_tree (context : Environment_context.t) leaf_kind path =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let merkle_tree_v2 (context : Environment_context.t) leaf_kind path =
-  match context with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "merkle_tree_v2"]]
+    context
+  with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Context.merkle_tree_v2 ctxt leaf_kind path
   | Context {kind = Memory_context.Context; ctxt; _} ->
@@ -591,7 +697,9 @@ let merkle_tree_v2 (context : Environment_context.t) leaf_kind path =
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let commit_genesis context_index ~chain_id ~time ~protocol =
-  match context_index with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "commit_genesis"]]
+    context_index
+  with
   | Disk_index index -> Context.commit_genesis index ~chain_id ~time ~protocol
   | Memory_index index ->
       Tezos_context_memory.Context.commit_genesis
@@ -614,7 +722,9 @@ let commit_genesis context_index ~chain_id ~time ~protocol =
 
 let checkout context_index context_hash =
   let open Lwt_syntax in
-  match context_index with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "checkout"]]
+    context_index
+  with
   | Disk_index index ->
       let+ ctxt = Context.checkout index context_hash in
       Option.map Shell_context.wrap_disk_context ctxt
@@ -632,7 +742,9 @@ let checkout context_index context_hash =
 
 let checkout_exn context_index context_hash =
   let open Lwt_syntax in
-  match context_index with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "checkout_exn"]]
+    context_index
+  with
   | Disk_index index ->
       let+ ctxt = Context.checkout_exn index context_hash in
       Shell_context.wrap_disk_context ctxt
@@ -651,7 +763,9 @@ let checkout_exn context_index context_hash =
   | Duo_memory_index index -> Duo_memory_context.checkout_exn index context_hash
 
 let exists context_index context_hash =
-  match context_index with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "exists"]]
+    context_index
+  with
   | Disk_index index -> Context.exists index context_hash
   | Memory_index index -> Tezos_context_memory.Context.exists index context_hash
   | Brassaia_index index -> Brassaia.exists index context_hash
@@ -661,7 +775,9 @@ let exists context_index context_hash =
       Context_wrapper.Memory_context.exists index context_hash
 
 let close context_index =
-  match context_index with
+  match[@profiler.span_s {verbosity = Notice} ["context_ops"; "close"]]
+    context_index
+  with
   | Disk_index index -> Context.close index
   | Memory_index index -> Tezos_context_memory.Context.close index
   | Brassaia_index index -> Brassaia.close index
@@ -670,7 +786,10 @@ let close context_index =
   | Duo_memory_index index -> Context_wrapper.Memory_context.close index
 
 let compute_testchain_chain_id (context : Environment_context.t) block_hash =
-  match context with
+  match[@profiler.span_f
+         {verbosity = Notice} ["context_ops"; "compute_testchain_chain_id"]]
+    context
+  with
   | Context {kind = Shell_context.Context; _} ->
       Context.compute_testchain_chain_id block_hash
   | Context {kind = Memory_context.Context; _} ->
@@ -684,3 +803,62 @@ let compute_testchain_chain_id (context : Environment_context.t) block_hash =
   | Context {kind = Duo_memory_context.Context; _} ->
       Context_wrapper.Memory_context.compute_testchain_chain_id block_hash
   | Context t -> err_impl_mismatch ~got:t.impl_name
+
+let export_snapshot context_index context_hash ~path =
+  match context_index with
+  | Disk_index index -> Context.export_snapshot index context_hash ~path
+  | Memory_index index ->
+      Tezos_context_memory.Context.export_snapshot index context_hash ~path
+  | Brassaia_index index -> Brassaia.export_snapshot index context_hash ~path
+  | Brassaia_memory_index index ->
+      Brassaia_memory.export_snapshot index context_hash ~path
+  | Duo_index index ->
+      Context_wrapper.Context.export_snapshot index context_hash ~path
+  | Duo_memory_index index ->
+      Context_wrapper.Memory_context.export_snapshot index context_hash ~path
+
+let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
+  let open Lwt_syntax in
+  match context_index with
+  | Disk_index _ ->
+      Context.Checks.Pack.Integrity_check.run
+        ?ppf
+        ~root:(irmin_context_dir root)
+        ~auto_repair
+        ~always
+        ~heads
+        ()
+  | Memory_index _ ->
+      Fmt.failwith
+        "An in memory context doesn't need to be checked for integrity"
+  | Brassaia_index _ ->
+      Brassaia.Checks.Pack.Integrity_check.run
+        ?ppf
+        ~root:(brassaia_context_dir root)
+        ~auto_repair
+        ~always
+        ~heads
+        ()
+  | Brassaia_memory_index _ ->
+      Fmt.failwith
+        "An in memory context doesn't need to be checked for integrity"
+  | Duo_index _ ->
+      let* () =
+        Context.Checks.Pack.Integrity_check.run
+          ?ppf
+          ~root:(irmin_context_dir root)
+          ~auto_repair
+          ~always
+          ~heads
+          ()
+      in
+      Brassaia.Checks.Pack.Integrity_check.run
+        ?ppf
+        ~root:(brassaia_context_dir root)
+        ~auto_repair
+        ~always
+        ~heads
+        ()
+  | Duo_memory_index _ ->
+      Fmt.failwith
+        "An in memory context doesn't need to be checked for integrity"

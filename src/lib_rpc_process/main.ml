@@ -222,13 +222,6 @@ let init_rpc dynamic_store parameters head_watcher applied_blocks_watcher =
   in
   return_unit
 
-let get_init_socket_path socket_dir pid =
-  let filename = Format.sprintf "init-rpc-socket-%d" pid in
-  Filename.concat socket_dir filename
-
-(* Magic bytes used for the external RPC process handshake. *)
-let socket_magic = Bytes.of_string "TEZOS_RPC_SERVER_MAGIC_0"
-
 let create_init_socket socket_dir =
   let open Lwt_result_syntax in
   let* socket_dir =
@@ -237,11 +230,19 @@ let create_init_socket socket_dir =
     | None -> tzfail Missing_socket_dir
   in
   let pid = Unix.getpid () in
-  let init_socket_path = get_init_socket_path socket_dir pid in
+  let init_socket_path =
+    Lwt_process_watchdog.get_init_socket_path
+      ~socket_dir
+      ~socket_prefix:Rpc_process_worker.rpc_process_socket_prefix
+      ~pid
+      ()
+  in
   let* init_socket_fd = Socket.connect (Unix init_socket_path) in
   (* Unlink the socket as soon as both sides have opened it.*)
   let*! () = Lwt_unix.unlink init_socket_path in
-  let* () = Socket.handshake init_socket_fd socket_magic in
+  let* () =
+    Socket.handshake init_socket_fd Rpc_process_worker.rpc_process_socket_magic
+  in
   return init_socket_fd
 
 let run socket_dir =
@@ -284,7 +285,7 @@ let process socket_dir =
   let main_promise =
     Lwt.catch (fun () -> run socket_dir) (function exn -> fail_with_exn exn)
   in
-  Lwt_main.run
+  Tezos_base_unix.Event_loop.main_run
     (let*! r = Lwt_exit.wrap_and_exit main_promise in
      match r with
      | Ok () ->

@@ -6,6 +6,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Checks that [balance] is enough to pay up to the maximum [gas_limit]
+    the sender defined parametrized by the [gas_price]. *)
+let can_prepay ~balance ~gas_price ~gas_limit ~value:Ethereum_types.(Qty value)
+    =
+  balance >= Z.((gas_limit * gas_price) + value)
+
 module Pool = struct
   module Pkey_map = Ethereum_types.AddressMap
   module Nonce_map = Tezos_base.Sized.MakeSizedMap (Ethereum_types.NonceMap)
@@ -14,11 +20,9 @@ module Pool = struct
   type transaction = {
     index : int64; (* Global index of the transaction. *)
     raw_tx : string; (* Current transaction. *)
-    gas_price : Z.t; (* The maximum price the user can pay for fees. *)
-    gas_limit : Z.t; (* The maximum limit the user can reach in terms of gas. *)
     inclusion_timestamp : Time.Protocol.t;
     (* Time of inclusion in the transaction pool. *)
-    transaction_object : Ethereum_types.transaction_object;
+    transaction_object : Ethereum_types.legacy_transaction_object;
   }
 
   type t = {
@@ -36,12 +40,16 @@ module Pool = struct
       | None -> (Z.zero, Z.zero)
     in
     let is_transaction_pending
-        (transaction_object : Ethereum_types.transaction_object)
+        (transaction_object : Ethereum_types.legacy_transaction_object)
         (address_balance : Z.t) (address_nonce : Z.t) : bool =
       let (Qty gas_limit) = transaction_object.gas in
       let (Qty gas_price) = transaction_object.gasPrice in
       transaction_object.nonce == Ethereum_types.quantity_of_z address_nonce
-      && address_balance >= Z.(gas_limit * gas_price)
+      && can_prepay
+           ~balance:address_balance
+           ~gas_price
+           ~gas_limit
+           ~value:transaction_object.value
     in
     let add_transaction_object_to_map nonce transaction_object pending_map
         queued_map address_balance address_nonce =
@@ -81,45 +89,76 @@ module Pool = struct
       (Ethereum_types.AddressMap.empty, Ethereum_types.AddressMap.empty)
 
   (** Add a transaction to the pool. *)
-  let add {transactions; global_index} pkey raw_tx
-      (transaction_object : Ethereum_types.transaction_object) =
-    let open Result_syntax in
+  let add ~must_replace {transactions; global_index} raw_tx
+      (transaction_object : Ethereum_types.legacy_transaction_object) =
     let (Qty nonce) = transaction_object.nonce in
     let (Qty gas_price) = transaction_object.gasPrice in
-    let (Qty gas_limit) = transaction_object.gas in
     let inclusion_timestamp = Misc.now () in
+
     (* Add the transaction to the user's transaction map *)
-    let transactions =
-      let transaction =
-        {
-          index = global_index;
-          raw_tx;
-          gas_price;
-          gas_limit;
-          inclusion_timestamp;
-          transaction_object;
-        }
-      in
-      Pkey_map.update
-        pkey
-        (function
-          | None ->
-              (* User has no transactions in the pool *)
-              Some (Nonce_map.singleton nonce transaction)
-          | Some user_transactions ->
-              Some
-                (Nonce_map.update
-                   nonce
-                   (function
-                     | None -> Some transaction
-                     | Some user_transaction ->
-                         if gas_price > user_transaction.gas_price then
-                           Some transaction
-                         else Some user_transaction)
-                   user_transactions))
-        transactions
+    let transaction =
+      {index = global_index; raw_tx; inclusion_timestamp; transaction_object}
     in
-    return {transactions; global_index = Int64.(add global_index one)}
+    let add_transaction transactions =
+      let replaced = ref false in
+      let transactions =
+        Pkey_map.update
+          transaction_object.from
+          (function
+            | None ->
+                (* User has no transactions in the pool *)
+                Some (Nonce_map.singleton nonce transaction)
+            | Some user_transactions ->
+                Some
+                  (Nonce_map.update
+                     nonce
+                     (function
+                       | None -> Some transaction
+                       | Some user_transaction ->
+                           if
+                             gas_price
+                             > Ethereum_types.Qty.to_z
+                                 user_transaction.transaction_object.gasPrice
+                           then (
+                             replaced := true ;
+                             Some transaction)
+                           else Some user_transaction)
+                     user_transactions))
+          transactions
+      in
+      (transactions, !replaced)
+    in
+    match must_replace with
+    | `Replace_existing ->
+        let transactions, replaced = add_transaction transactions in
+        if replaced then
+          Ok {transactions; global_index = Int64.(add global_index one)}
+        else
+          Error
+            "Limit of transactions for a user was reached. Transaction is \
+             rejected as it did not replace an existing one."
+    | `No ->
+        let transactions, _replaced = add_transaction transactions in
+        Ok {transactions; global_index = Int64.(add global_index one)}
+    | `Replace_shift max_nonce ->
+        let transactions =
+          Pkey_map.update
+            transaction_object.from
+            (function
+              | None ->
+                  (* The list of user transactions cannot be empty,
+                     otherwise we wouldn't need to replace anything. *)
+                  assert false
+              | Some user_transactions ->
+                  (* Shift by removing the maximum nonce. *)
+                  let user_transactions =
+                    Nonce_map.remove max_nonce user_transactions
+                  in
+                  (* Add the new nonce. *)
+                  Some (Nonce_map.add nonce transaction user_transactions))
+            transactions
+        in
+        Ok {transactions; global_index = Int64.(add global_index one)}
 
   (** Returns all the addresses of the pool *)
   let addresses {transactions; _} =
@@ -188,11 +227,14 @@ type mode =
   | Sequencer
   | Relay
   | Forward of {
-      injector : string -> (Ethereum_types.hash, string) result tzresult Lwt.t;
+      injector :
+        Ethereum_types.legacy_transaction_object ->
+        string ->
+        (Ethereum_types.hash, string) result tzresult Lwt.t;
     }
 
 type parameters = {
-  rollup_node : (module Services_backend_sig.S);
+  backend : (module Services_backend_sig.S);
   smart_rollup_address : string;
   mode : mode;
   tx_timeout_limit : int64;
@@ -203,7 +245,7 @@ type parameters = {
 
 module Types = struct
   type state = {
-    rollup_node : (module Services_backend_sig.S);
+    backend : (module Services_backend_sig.S);
     smart_rollup_address : string;
     mutable pool : Pool.t;
     mutable popped_txs : Pool.transaction list;
@@ -224,7 +266,7 @@ module Name = struct
 
   let encoding = Data_encoding.unit
 
-  let base = ["evm_node"; "tx-pool"; "dev"; "worker"]
+  let base = ["evm_node_worker"; "tx-pool"]
 
   let pp _ _ = ()
 
@@ -234,11 +276,11 @@ end
 module Request = struct
   type ('a, 'b) t =
     | Add_transaction :
-        Ethereum_types.transaction_object * string
+        Ethereum_types.legacy_transaction_object * string
         -> ((Ethereum_types.hash, string) result, tztrace) t
     | Pop_transactions :
         int
-        -> ((string * Ethereum_types.transaction_object) list, tztrace) t
+        -> ((string * Ethereum_types.legacy_transaction_object) list, tztrace) t
     | Pop_and_inject_transactions : (unit, tztrace) t
     | Lock_transactions : (unit, tztrace) t
     | Unlock_transactions : (unit, tztrace) t
@@ -246,7 +288,7 @@ module Request = struct
     | Size_info : (Metrics.Tx_pool.size_info, tztrace) t
     | Find :
         Ethereum_types.hash
-        -> (Ethereum_types.transaction_object option, tztrace) t
+        -> (Ethereum_types.legacy_transaction_object option, tztrace) t
     | Clear_popped_transactions : (unit, unit) t
 
   type view = View : _ t -> view
@@ -264,7 +306,7 @@ module Request = struct
              (req "request" (constant "add_transaction"))
              (req
                 "transaction_object"
-                Ethereum_types.transaction_object_encoding)
+                Ethereum_types.legacy_transaction_object_encoding)
              (req "transaction" string))
           (function
             | View (Add_transaction (transaction, txn)) ->
@@ -310,6 +352,12 @@ module Request = struct
           (fun () -> View Is_locked);
         case
           (Tag 6)
+          ~title:"Size_info"
+          (obj1 (req "request" (constant "size_info")))
+          (function View Size_info -> Some () | _ -> None)
+          (fun () -> View Size_info);
+        case
+          (Tag 7)
           ~title:"Find"
           (obj2
              (req "request" (constant "find"))
@@ -317,7 +365,7 @@ module Request = struct
           (function View (Find tx_hash) -> Some ((), tx_hash) | _ -> None)
           (fun ((), tx_hash) -> View (Find tx_hash));
         case
-          (Tag 7)
+          (Tag 8)
           ~title:"Clear_popped_transactions"
           (obj1 (req "request" (constant "clear_popped_transactions")))
           (function View Clear_popped_transactions -> Some () | _ -> None)
@@ -372,36 +420,29 @@ let tx_data_size_limit_reached ~max_number_of_chunks ~tx_data =
 let check_address_boundaries ~pool ~address ~tx_pool_addr_limit
     ~tx_pool_tx_per_addr_limit =
   let open Lwt_result_syntax in
-  let boundaries_are_not_reached = return (false, "") in
   match Pool.Pkey_map.find address pool.Pool.transactions with
   | None ->
       if Pool.Pkey_map.cardinal pool.Pool.transactions < tx_pool_addr_limit then
-        boundaries_are_not_reached
+        return_unit
       else
         let*! () = Tx_pool_events.users_threshold_reached () in
-        return
-          ( true,
-            "The transaction pool has reached its maximum threshold for user \
-             transactions. Transaction is rejected." )
+        fail `MaxUsers
   | Some txs ->
       if Pool.Nonce_map.cardinal txs < tx_pool_tx_per_addr_limit then
-        boundaries_are_not_reached
+        return_unit
       else
         let*! () =
           Tx_pool_events.txs_per_user_threshold_reached
             ~address:(Ethereum_types.Address.to_string address)
         in
-        return
-          ( true,
-            "Limit of transaction for a user was reached. Transaction is \
-             rejected." )
+        fail (`MaxPerUser txs)
 
 let insert_valid_transaction state tx_raw
-    (transaction_object : Ethereum_types.transaction_object) =
+    (transaction_object : Ethereum_types.legacy_transaction_object) =
   let open Lwt_result_syntax in
   let open Types in
   let {
-    rollup_node = (module Rollup_node);
+    backend = (module Backend);
     pool;
     tx_pool_addr_limit;
     tx_pool_tx_per_addr_limit;
@@ -417,41 +458,58 @@ let insert_valid_transaction state tx_raw
     let*! () = Tx_pool_events.tx_data_size_limit_reached () in
     return @@ Error "Transaction data exceeded the allowed size."
   else
-    let* address_boundaries_are_reached, error_msg =
+    let add_transaction ~must_replace =
+      (* Add the transaction to the pool *)
+      match Pool.add ~must_replace pool tx_raw transaction_object with
+      | Ok pool ->
+          let*! () =
+            Tx_pool_events.add_transaction
+              ~transaction:
+                (Ethereum_types.hash_to_string transaction_object.hash)
+          in
+          state.pool <- pool ;
+          return (Ok transaction_object.hash)
+      | Error msg -> return (Error msg)
+    in
+    let*! res_boundaries =
       check_address_boundaries
         ~pool
         ~address:transaction_object.from
         ~tx_pool_addr_limit
         ~tx_pool_tx_per_addr_limit
     in
-    if address_boundaries_are_reached then return @@ Error error_msg
-    else
-      (* Add the transaction to the pool *)
-      (* Compute the hash *)
-      let hash = Ethereum_types.hash_raw_tx tx_raw in
-      (* This is a temporary fix until the hash computation is fixed on the
-         kernel side. *)
-      let transaction_object = {transaction_object with hash} in
-      let*? pool =
-        Pool.add pool transaction_object.from tx_raw transaction_object
-      in
-      let*! () =
-        Tx_pool_events.add_transaction
-          ~transaction:(Ethereum_types.hash_to_string hash)
-      in
-      state.pool <- pool ;
-      return (Ok hash)
+    match res_boundaries with
+    | Error `MaxUsers ->
+        return
+          (Error
+             "The transaction pool has reached its maximum threshold for user \
+              transactions. Transaction is rejected.")
+    | Error (`MaxPerUser transactions) ->
+        let (Qty nonce) = transaction_object.nonce in
+        let max_nonce, nonce_exists =
+          Pool.Nonce_map.fold
+            (fun nonce' _tx (max_nonce, nonce_exists) ->
+              (Z.max max_nonce nonce', nonce_exists || nonce = nonce'))
+            transactions
+            (Z.zero, false)
+        in
+        if nonce_exists then
+          (* It must replace an existing one, otherwise it'll be above
+             the limit. *)
+          add_transaction ~must_replace:`Replace_existing
+        else if nonce < max_nonce then
+          (* If the nonce is smaller than the max nonce, we must shift the
+             list and drop one transaction. *)
+          add_transaction ~must_replace:(`Replace_shift max_nonce)
+        else
+          (* Otherwise we have just reached the limit of transactions. *)
+          return
+            (Error
+               "Limit of transaction for a user was reached. Transaction is \
+                rejected.")
+    | Ok () -> add_transaction ~must_replace:`No
 
-let on_normal_transaction state transaction_object tx_raw =
-  insert_valid_transaction state tx_raw transaction_object
-
-(** Checks that [balance] is enough to pay up to the maximum [gas_limit]
-    the sender defined parametrized by the [gas_price]. *)
-let can_prepay ~balance ~gas_price ~gas_limit ~value:Ethereum_types.(Qty value)
-    =
-  balance >= Z.((gas_limit * gas_price) + value)
-
-(** Checks that the transaction can be payed given the [gas_price] that was set
+(** Checks that the transaction can be paid given the [gas_price] that was set
     and the current [base_fee_per_gas]. *)
 let can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas =
   gas_price >= base_fee_per_gas
@@ -466,7 +524,7 @@ let pop_transactions state ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   let Types.
         {
-          rollup_node = (module Rollup_node : Services_backend_sig.S);
+          backend = (module Backend : Services_backend_sig.S);
           pool;
           locked;
           tx_timeout_limit;
@@ -483,13 +541,13 @@ let pop_transactions state ~maximum_cumulative_size =
       Lwt_list.map_p
         (fun address ->
           let* nonce =
-            Rollup_node.nonce
+            Backend.nonce
               address
               Ethereum_types.Block_parameter.(Block_parameter Latest)
           in
           let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
           let* (Qty balance) =
-            Rollup_node.balance
+            Backend.balance
               address
               Ethereum_types.Block_parameter.(Block_parameter Latest)
           in
@@ -499,70 +557,68 @@ let pop_transactions state ~maximum_cumulative_size =
     let addr_with_nonces = List.filter_ok addr_with_nonces in
     (* Remove transactions with too low nonce, timed-out and the ones that
        can not be prepayed anymore. *)
-    let* (Qty base_fee_per_gas) = Rollup_node.base_fee_per_gas () in
+    let* (Qty base_fee_per_gas) = Backend.base_fee_per_gas () in
     let current_timestamp = Misc.now () in
     let pool =
-      addr_with_nonces
-      |> List.fold_left
-           (fun pool (pkey, balance, current_nonce) ->
-             Pool.remove
-               pkey
-               (fun nonce
-                    {
-                      gas_limit;
-                      gas_price;
-                      inclusion_timestamp;
-                      transaction_object;
-                      _;
-                    } ->
-                 nonce < current_nonce
-                 || (not
-                       (can_prepay
-                          ~value:transaction_object.value
-                          ~balance
-                          ~gas_price
-                          ~gas_limit))
-                 || transaction_timed_out
-                      ~current_timestamp
-                      ~inclusion_timestamp
-                      ~tx_timeout_limit)
-               pool)
-           pool
+      List.fold_left
+        (fun pool (pkey, balance, current_nonce) ->
+          Pool.remove
+            pkey
+            (fun nonce
+                 {
+                   inclusion_timestamp;
+                   transaction_object =
+                     {gasPrice = Qty gas_price; gas = Qty gas_limit; value; _};
+                   _;
+                 } ->
+              nonce < current_nonce
+              || (not (can_prepay ~value ~balance ~gas_price ~gas_limit))
+              || transaction_timed_out
+                   ~current_timestamp
+                   ~inclusion_timestamp
+                   ~tx_timeout_limit)
+            pool)
+        pool
+        addr_with_nonces
     in
     (* Select transaction with nonce equal to user's nonce, that can be prepaid
        and selects a sum of transactions that wouldn't go above the size limit
        of the blueprint.
        Also removes the transactions from the pool. *)
     let txs, pool, _ =
-      addr_with_nonces
-      |> List.fold_left
-           (fun (txs, pool, cumulative_size) (pkey, _, current_nonce) ->
-             (* This mutable counter is purely local and used only for the
-                partition. *)
-             let accumulated_size = ref cumulative_size in
-             let selected, pool =
-               Pool.partition
-                 pkey
-                 (fun nonce {gas_price; raw_tx; _} ->
-                   let check_nonce = nonce = current_nonce in
-                   let can_fit =
-                     !accumulated_size + String.length raw_tx
-                     <= maximum_cumulative_size
-                   in
-                   let can_pay =
-                     can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas
-                   in
-                   let selected = check_nonce && can_pay && can_fit in
-                   (* If the transaction is selected, this means it will fit *)
-                   if selected then
-                     accumulated_size :=
-                       !accumulated_size + String.length raw_tx ;
-                   selected)
-                 pool
-             in
-             let txs = List.append txs selected in
-             (txs, pool, !accumulated_size))
-           ([], pool, 0)
+      List.fold_left
+        (fun (txs, pool, cumulative_size) (pkey, _, current_nonce) ->
+          (* This mutable counter is purely local and used only for the
+             partition. *)
+          let accumulated_size = ref cumulative_size in
+          let selected, pool =
+            Pool.partition
+              pkey
+              (fun nonce
+                   {
+                     transaction_object = {gasPrice = Qty gas_price; _};
+                     raw_tx;
+                     _;
+                   } ->
+                let check_nonce = nonce = current_nonce in
+                let can_fit =
+                  !accumulated_size + String.length raw_tx
+                  <= maximum_cumulative_size
+                in
+                let can_pay =
+                  can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas
+                in
+                let selected = check_nonce && can_pay && can_fit in
+                (* If the transaction is selected, this means it will fit *)
+                if selected then
+                  accumulated_size := !accumulated_size + String.length raw_tx ;
+                selected)
+              pool
+          in
+          let txs = List.append txs selected in
+          (txs, pool, !accumulated_size))
+        ([], pool, 0)
+        addr_with_nonces
     in
     (* Store popped tx. *)
     let*? () =
@@ -607,9 +663,9 @@ let pop_and_inject_transactions state =
   in
   let* txs = pop_transactions state ~maximum_cumulative_size in
   if not (List.is_empty txs) then
-    let (module Rollup_node : Services_backend_sig.S) = state.rollup_node in
+    let (module Backend : Services_backend_sig.S) = state.backend in
     let*! hashes =
-      Rollup_node.inject_transactions
+      Backend.inject_transactions
       (* The timestamp is ignored in observer and proxy mode, it's just for
          compatibility with sequencer mode. *)
         ~timestamp:(Misc.now ())
@@ -682,10 +738,12 @@ module Handlers = struct
     match request with
     | Request.Add_transaction (transaction_object, txn) ->
         protect @@ fun () ->
+        Tx_watcher.notify transaction_object.hash ;
         let* res =
           match state.mode with
-          | Forward {injector} -> injector txn
-          | _ -> on_normal_transaction state transaction_object txn
+          | Forward {injector} -> injector transaction_object txn
+          | Proxy | Sequencer | Relay ->
+              insert_valid_transaction state txn transaction_object
         in
         let* () = relay_self_inject_request w in
         return res
@@ -707,7 +765,7 @@ module Handlers = struct
 
   let on_launch _w ()
       ({
-         rollup_node;
+         backend;
          smart_rollup_address;
          mode;
          tx_timeout_limit;
@@ -719,7 +777,7 @@ module Handlers = struct
     let state =
       Types.
         {
-          rollup_node;
+          backend;
           smart_rollup_address;
           pool = Pool.empty;
           popped_txs = [];
@@ -734,8 +792,8 @@ module Handlers = struct
     Lwt_result_syntax.return state
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
-      unit tzresult Lwt.t =
-    Lwt_result_syntax.return_unit
+      [`Continue | `Shutdown] tzresult Lwt.t =
+    Lwt_result_syntax.return `Continue
 
   let on_completion _ _ _ _ = Lwt.return_unit
 
@@ -802,18 +860,14 @@ let add transaction_object raw_tx =
 let nonce pkey =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
-  let Types.{rollup_node = (module Rollup_node); pool; _} = Worker.state w in
-  let* current_nonce =
-    Rollup_node.nonce
-      pkey
-      Ethereum_types.Block_parameter.(Block_parameter Latest)
+  let Types.{backend = (module Backend); pool; _} = Worker.state w in
+  let+ current_nonce =
+    Backend.nonce pkey Ethereum_types.Block_parameter.(Block_parameter Latest)
   in
-  let next_nonce =
-    match current_nonce with
-    | None -> Ethereum_types.Qty Z.zero
-    | Some current_nonce -> Pool.next_nonce pkey current_nonce pool
+  let current_nonce =
+    Option.value ~default:Ethereum_types.Qty.zero current_nonce
   in
-  return next_nonce
+  Pool.next_nonce pkey current_nonce pool
 
 let pop_transactions ~maximum_cumulative_size =
   let open Lwt_result_syntax in
@@ -880,19 +934,19 @@ let size_info () =
 let get_tx_pool_content () =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
-  let Types.{rollup_node = (module Rollup_node); pool; _} = Worker.state w in
+  let Types.{backend = (module Backend); pool; _} = Worker.state w in
   let addresses = Pool.addresses pool in
   let*! addr_with_balance_nonces =
     Lwt_list.map_p
       (fun address ->
         let* nonce =
-          Rollup_node.nonce
+          Backend.nonce
             address
             Ethereum_types.Block_parameter.(Block_parameter Latest)
         in
         let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
         let* (Qty balance) =
-          Rollup_node.balance
+          Backend.balance
             address
             Ethereum_types.Block_parameter.(Block_parameter Latest)
         in

@@ -67,7 +67,7 @@ module type FUELED_PVM = sig
     _ Node_context.t ->
     Inbox.t * string list ->
     Context.pvmstate ->
-    fuel eval_result Node_context.delayed_write tzresult Lwt.t
+    fuel eval_result tzresult Lwt.t
 
   (** [eval_messages ?reveal_map ~fuel node_ctxt ~message_counter_offset state
       inbox_level messages] evaluates the [messages] for inbox level
@@ -82,7 +82,7 @@ module type FUELED_PVM = sig
     ?reveal_map:string Utils.Reveal_hash_map.t ->
     _ Node_context.t ->
     fuel eval_state ->
-    fuel eval_result Node_context.delayed_write tzresult Lwt.t
+    fuel eval_result tzresult Lwt.t
 end
 
 module type S = sig

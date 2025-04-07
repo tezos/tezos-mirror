@@ -127,6 +127,9 @@ val init :
     and closes the key-value store. *)
 val close : ('file, 'key, 'value) t -> unit tzresult Lwt.t
 
+(** [root_dir t] returns the [root_dir] directory used to create [t]. *)
+val root_dir : ('file, 'key, 'value) t -> string
+
 (** [write_value ?(override=false) t file_layout file key value] writes a value in
     the [key] value store in [file]. If there is already a written
     value for this key, then the value will be written if and only if [override]

@@ -118,15 +118,18 @@
         /* Request the rollup node to filter messages it has already
            forwarded to the Layer 1 network. Require an unreleased version of
            the Smart Rollup node. */,
+      "blueprints_publisher_order_enabled"?:
+        boolean
+        /* Request the rollup node to prioritize messages by level when
+           publishing blueprints in the layer 1. */,
       "enable_send_raw_transaction"?:
         boolean
         /* Enable or disable the `eth_sendRawTransaction` method. DEPRECATED:
             You should use "rpc.restricted_rpcs" instead. */,
-      "node_transaction_validation"?: boolean,
-      "block_storage_sqlite3"?:
+      "node_transaction_validation"?:
         boolean
-        /* Store the blocks and transactions in a sqlite3 database and
-           removes them from the durable storage */,
+        /* DEPRECATED: You should remove this option from your configuration
+           file. */,
       "overwrite_simulation_tick_limit"?:
         boolean
         /* When enabled, the eth_call method is not subject to the tick
@@ -134,11 +137,39 @@
            injected in transactions (similarly to what the Uniswap V3
            frontend does to prepare swaps). However, it can lead to confusing
            UX for users, where eth_estimateGas fails when eth_call succeeded. */,
-      "garbage_collector"?:
-        { /* Enables garbage collector in the node. */
-          "split_frequency_in_seconds":
-            integer ∈ [-2^30, 2^30]
-            /* Frequency of irmin context split in seconds */ } },
+      "next_wasm_runtime"?:
+        boolean
+        /* Enable or disable the experimental WASM runtime that is expected
+           to replace the Smart Rollup’s Fast Exec runtime. DEPRECATED: You
+           should remove this option from your configuration file. */,
+      "rpc_server"?: "dream" | "resto",
+      "enable_websocket"?:
+        boolean
+        /* Enable or disable the experimental websocket server */,
+      "max_websocket_message_length"?:
+        integer ∈ [-2^30, 2^30]
+        /* Maximum message size accepted by the websocket server (only for
+           Resto backend) */,
+      "monitor_websocket_heartbeat"?:
+        /* Parameters to monitor websocket connections */
+        "disabled"
+        || { /* enabled */
+             "ping_interval":
+               number
+               /* Interval, in seconds, at which a ping will be sent to the
+                  client to monitor the websocket connection. */,
+             "ping_timeout":
+               number
+               /* Timeout in seconds after which the connection will be
+                  considered dead and closed. */ },
+      "l2_chains"?:
+        /* Configuration of l2_chains for multisequencing.
+                            If not set, the node will adopt a single chain
+           behaviour. */
+        [ { "chain_id": $bignum /* The id of the l2 chain */ } ... ]
+        /* Some */
+        || null
+        /* None */ },
   "proxy"?:
     { "finalized_view"?:
         boolean
@@ -150,9 +181,12 @@
       "ignore_block_param"?: boolean },
   "fee_history"?:
     { "max_count"?:
-        integer ∈ [1, 2^30]
         /* The maximum number of blocks whose fee history can be retrieved at
-           once */,
+           once */
+        "unlimited"
+        || integer ∈ [1, 2^30]
+        /* limit
+           Limit the number of block allowed to be queried. */,
       "max_past"?:
         integer ∈ [1, 2^30]
         /* The maximum number of blocks in the past where the fee history is
@@ -166,7 +200,15 @@
         $unistring
         /* Endpoint for downloading the preimages that cannot be found in the
            preimages directory. These preimages are downloaded by the node,
-           stored in the preimages directory and fed to the kernel. */ },
+           stored in the preimages directory and fed to the kernel. */,
+      "native_execution_policy"?:
+        $native_execution_policy
+        /* Policy regarding when to use the native execution for supported
+           kernels. Native execution provides better performance, but
+           increases the complexity of the software stack of the node by
+           adding an additional layer between what is executed by the EVM
+           node and the Smart Rollup nodes. Can be `never`, `rpcs_only` or
+           `always`. Default to `never`. */ },
   "public_rpc"?:
     { "port"?:
         integer ∈ [1, 2^16-1]
@@ -238,7 +280,17 @@
   "finalized_view"?:
     boolean
     /* When enabled, the node only expose blocks that are finalized, i.e.,
-       the `latest` block parameter becomes a synonym for `finalized`. */ }
+       the `latest` block parameter becomes a synonym for `finalized`. */,
+  "history"?: $history_mode /* History mode of the EVM node */ }
+$bignum:
+  /* Big number
+     Decimal representation of a big number */
+  string
+$history_mode:
+  /* Compact notation for the history mode. Can either be `archive` and
+     `rolling:N` with `N` being the number of days to use as the retention
+     period */
+  "archive" | "rolling:n"
 $int64:
   /* 64 bit integers
      Decimal representation of 64 bit integers */
@@ -251,6 +303,13 @@ $max_active_rpc_connections:
   /* limited
      The number of maximum RPC connections allowed is limited to the given
      integer's value. */
+$native_execution_policy:
+  /* native_execution_policy
+     `never` means the native execution will never be used by the node.
+     `rpcs_only` will restrict the usage of the native execution to RPC
+     calls, leaving blueprint application to the WASM runtime. `always` will
+     always use native execution for supported kernels. */
+  "rpcs_only" | "always" | "never"
 $time_between_blocks: number /* Some */ || null /* None */
 $unistring:
   /* Universal string representation

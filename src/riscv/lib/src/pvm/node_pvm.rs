@@ -1,25 +1,32 @@
-// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024-2025 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    machine_state::{bus::main_memory::M100M, mode::Mode, DefaultCacheLayouts},
+    machine_state::{
+        TestCacheLayouts,
+        block_cache::bcall::{Interpreted, InterpretedBlockBuilder},
+        main_memory::M64M,
+        mode::Mode,
+    },
     program::Program,
     pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     state_backend::{
-        self,
-        hash::RootHashable,
-        memory_backend::{InMemoryBackend, SliceManager, SliceManagerRO},
-        Backend, Layout,
+        self, AllocatedOf, CommitmentLayout, ProofLayout, ProofTree, Ref,
+        owned_backend::Owned,
+        proof_backend::{
+            ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion, proof::MerkleProof,
+        },
+        verify_backend::Verifier,
     },
     storage::{self, Hash, Repo},
 };
-use std::{ops::Bound, path::Path};
+use std::{fmt, ops::Bound, path::Path};
 use thiserror::Error;
 
 pub type StateLayout = (
-    PvmLayout<M100M, DefaultCacheLayouts>,
+    PvmLayout<M64M, TestCacheLayouts>,
     state_backend::Atom<bool>,
     state_backend::Atom<u32>,
     state_backend::Atom<u64>,
@@ -27,7 +34,7 @@ pub type StateLayout = (
 );
 
 pub struct State<M: state_backend::ManagerBase> {
-    pvm: Pvm<M100M, DefaultCacheLayouts, M>,
+    pvm: Pvm<M64M, TestCacheLayouts, Interpreted<M64M, M>, M>,
     level_is_set: state_backend::Cell<bool, M>,
     level: state_backend::Cell<u32, M>,
     message_counter: state_backend::Cell<u64, M>,
@@ -37,7 +44,7 @@ pub struct State<M: state_backend::ManagerBase> {
 impl<M: state_backend::ManagerBase> State<M> {
     pub fn bind(space: state_backend::AllocatedOf<StateLayout, M>) -> Self {
         Self {
-            pvm: Pvm::<M100M, _, M>::bind(space.0),
+            pvm: Pvm::<M64M, _, _, M>::bind(space.0, InterpretedBlockBuilder),
             level_is_set: space.1,
             level: space.2,
             message_counter: space.3,
@@ -45,26 +52,72 @@ impl<M: state_backend::ManagerBase> State<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> state_backend::AllocatedOf<StateLayout, state_backend::Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: state_backend::FnManager<state_backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> state_backend::AllocatedOf<StateLayout, F::Output> {
         (
-            self.pvm.struct_ref(),
-            self.level_is_set.struct_ref(),
-            self.level.struct_ref(),
-            self.message_counter.struct_ref(),
-            self.tick.struct_ref(),
+            self.pvm.struct_ref::<F>(),
+            self.level_is_set.struct_ref::<F>(),
+            self.level.struct_ref::<F>(),
+            self.message_counter.struct_ref::<F>(),
+            self.tick.struct_ref::<F>(),
         )
     }
 
-    pub fn reset(&mut self)
-    where
-        M: state_backend::ManagerWrite,
-    {
-        self.pvm.reset();
-        self.level_is_set.write(false);
-        self.level.write(0);
-        self.message_counter.write(0);
-        self.tick.write(0);
+    /// Generate a proof-generating version of this state.
+    pub fn start_proof(&self) -> State<ProofGen<Ref<'_, M>>> {
+        enum ProofWrapper {}
+
+        impl<M: state_backend::ManagerBase> state_backend::FnManager<M> for ProofWrapper {
+            type Output = ProofGen<M>;
+
+            fn map_region<E: 'static, const LEN: usize>(
+                input: <M as state_backend::ManagerBase>::Region<E, LEN>,
+            ) -> <ProofGen<M> as state_backend::ManagerBase>::Region<E, LEN> {
+                ProofRegion::bind(input)
+            }
+
+            fn map_dyn_region<const LEN: usize>(
+                input: <M as state_backend::ManagerBase>::DynRegion<LEN>,
+            ) -> <ProofGen<M> as state_backend::ManagerBase>::DynRegion<LEN> {
+                ProofDynRegion::bind(input)
+            }
+
+            fn map_enriched_cell<V: state_backend::EnrichedValue>(
+                input: <M as state_backend::ManagerBase>::EnrichedCell<V>,
+            ) -> <ProofGen<M> as state_backend::ManagerBase>::EnrichedCell<V> {
+                ProofEnrichedCell::bind(input)
+            }
+        }
+
+        State::bind(self.struct_ref::<ProofWrapper>())
+    }
+}
+
+impl<M: state_backend::ManagerClone> Clone for State<M> {
+    fn clone(&self) -> Self {
+        Self {
+            pvm: self.pvm.clone(),
+            level_is_set: self.level_is_set.clone(),
+            level: self.level.clone(),
+            message_counter: self.message_counter.clone(),
+            tick: self.tick.clone(),
+        }
+    }
+}
+
+impl<M: state_backend::ManagerSerialise> fmt::Debug for State<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let refs = self.struct_ref::<state_backend::FnManagerIdent>();
+        let rendered = if f.alternate() {
+            serde_json::to_string_pretty(&refs)
+        } else {
+            serde_json::to_string(&refs)
+        }
+        .expect("Could not serialize PVM state");
+        f.write_str(&rendered)
     }
 }
 
@@ -74,49 +127,97 @@ pub enum PvmError {
     SerializationError(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NodePvm {
-    backend: InMemoryBackend<StateLayout>,
+pub struct NodePvm<M: state_backend::ManagerBase = Owned> {
+    state: Box<State<M>>,
 }
 
-impl NodePvm {
+impl<M: state_backend::ManagerSerialise> fmt::Debug for NodePvm<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.state.fmt(f)
+    }
+}
+
+impl<M: state_backend::ManagerClone> Clone for NodePvm<M> {
+    fn clone(&self) -> Self {
+        Self {
+            state: self.state.clone(),
+        }
+    }
+}
+
+impl PartialEq for NodePvm {
+    fn eq(&self, other: &Self) -> bool {
+        self.state.struct_ref::<state_backend::FnManagerIdent>()
+            == other.state.struct_ref::<state_backend::FnManagerIdent>()
+    }
+}
+
+impl Eq for NodePvm {}
+
+impl NodePvm<Owned> {
+    /// Construct an empty PVM state.
+    pub fn empty() -> Self
+where {
+        let space = Owned::allocate::<StateLayout>();
+        let state = State::bind(space);
+        Self {
+            state: Box::new(state),
+        }
+    }
+
+    pub fn hash(&self) -> Hash {
+        self.with_backend(|state| {
+            let refs = state.struct_ref::<state_backend::FnManagerIdent>();
+            <StateLayout as CommitmentLayout>::state_hash(refs).unwrap()
+        })
+    }
+}
+
+impl NodePvm<Verifier> {
+    /// Construct a PVM state from a Merkle proof.
+    pub fn from_proof(proof: &MerkleProof) -> Option<Self> {
+        let space = <StateLayout as ProofLayout>::from_proof(ProofTree::Present(proof)).ok()?;
+        let state = State::bind(space);
+        let state = Self {
+            state: Box::new(state),
+        };
+        Some(state)
+    }
+}
+
+impl<M: state_backend::ManagerBase> NodePvm<M> {
     fn with_backend_mut<T, F>(&mut self, f: F) -> T
     where
-        F: FnOnce(&mut State<SliceManager>) -> T,
+        F: FnOnce(&mut State<M>) -> T,
     {
-        let placed = <StateLayout as Layout>::placed().into_location();
-        let space = self.backend.allocate(placed);
-        let mut state = State::bind(space);
-        f(&mut state)
+        f(&mut self.state)
     }
 
     fn with_backend<T, F>(&self, f: F) -> T
     where
-        F: FnOnce(&State<SliceManagerRO>) -> T,
+        F: FnOnce(&State<M>) -> T,
     {
-        let placed = <StateLayout as Layout>::placed().into_location();
-        let space = self.backend.allocate_ro(placed);
-        let state = State::bind(space);
-        f(&state)
+        f(&self.state)
     }
 
-    pub fn empty() -> Self {
-        let (mut backend, placed) = InMemoryBackend::<StateLayout>::new();
-        let space = backend.allocate(placed);
-        let mut state = State::bind(space);
-        state.reset();
-        Self { backend }
-    }
-
-    pub fn get_status(&self) -> PvmStatus {
+    pub fn get_status(&self) -> PvmStatus
+    where
+        M: state_backend::ManagerRead,
+    {
         self.with_backend(|state| state.pvm.status())
     }
 
-    pub fn get_tick(&self) -> u64 {
+    pub fn get_tick(&self) -> u64
+    where
+        M: state_backend::ManagerRead,
+    {
         self.with_backend(|state| state.tick.read())
     }
 
-    pub fn get_current_level(&self) -> Option<u32> {
+    pub fn get_current_level(&self) -> Option<u32>
+    where
+        M: state_backend::ManagerRead,
+    {
         self.with_backend(|state| {
             if state.level_is_set.read() {
                 Some(state.level.read())
@@ -126,14 +227,19 @@ impl NodePvm {
         })
     }
 
-    pub fn get_message_counter(&self) -> u64 {
+    pub fn get_message_counter(&self) -> u64
+    where
+        M: state_backend::ManagerRead,
+    {
         self.with_backend(|state| state.message_counter.read())
     }
 
-    pub fn install_boot_sector(&mut self, loader: &[u8], kernel: &[u8]) {
+    pub fn install_boot_sector(&mut self, loader: &[u8], kernel: &[u8])
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         self.with_backend_mut(|state| {
-            let program =
-                Program::<M100M>::from_elf(loader).expect("Could not parse Hermit loader");
+            let program = Program::<M64M>::from_elf(loader).expect("Could not parse Hermit loader");
             state
                 .pvm
                 .machine_state
@@ -142,14 +248,20 @@ impl NodePvm {
         })
     }
 
-    pub fn compute_step(&mut self, pvm_hooks: &mut PvmHooks) {
+    pub fn compute_step(&mut self, pvm_hooks: &mut PvmHooks)
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         self.with_backend_mut(|state| {
             state.pvm.eval_one(pvm_hooks);
             state.tick.write(state.tick.read() + 1);
         })
     }
 
-    pub fn compute_step_many(&mut self, pvm_hooks: &mut PvmHooks, max_steps: usize) -> i64 {
+    pub fn compute_step_many(&mut self, pvm_hooks: &mut PvmHooks, max_steps: usize) -> i64
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         self.with_backend_mut(|state| {
             let steps = state.pvm.eval_max(pvm_hooks, Bound::Included(max_steps));
             state.tick.write(state.tick.read() + steps as u64);
@@ -157,11 +269,10 @@ impl NodePvm {
         })
     }
 
-    pub fn hash(&self) -> Hash {
-        self.with_backend(|state| state.struct_ref().hash().unwrap())
-    }
-
-    pub fn set_input_message(&mut self, level: u32, message_counter: u64, input: Vec<u8>) {
+    pub fn set_input_message(&mut self, level: u32, message_counter: u64, input: Vec<u8>)
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         self.with_backend_mut(|state| {
             assert!(
                 state
@@ -177,7 +288,10 @@ impl NodePvm {
         })
     }
 
-    pub fn set_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32) {
+    pub fn set_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32)
+    where
+        M: state_backend::ManagerReadWrite,
+    {
         self.with_backend_mut(|state| {
             assert!(
                 state
@@ -190,22 +304,19 @@ impl NodePvm {
         })
     }
 
-    pub fn to_bytes(&self) -> &[u8] {
-        self.backend.borrow()
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PvmError> {
-        if bytes.len() != StateLayout::placed().size() {
-            Err(PvmError::SerializationError(format!(
-                "Unexpected byte buffer size (expected {}, got {})",
-                StateLayout::placed().size(),
-                bytes.len()
-            )))
-        } else {
-            let mut backend = InMemoryBackend::<StateLayout>::new().0;
-            backend.borrow_mut().copy_from_slice(bytes);
-            Ok(Self { backend })
-        }
+    /// Set reveal data reponse to pvm state
+    pub fn set_reveal_response(&mut self, reveal_data: &[u8])
+    where
+        M: state_backend::ManagerReadWrite,
+    {
+        self.with_backend_mut(|state| {
+            assert!(
+                state.pvm.provide_reveal_response(reveal_data),
+                "Cannot accept reveal in current state ({})",
+                state.pvm.status()
+            );
+            state.tick.write(state.tick.read() + 1);
+        })
     }
 }
 
@@ -235,14 +346,19 @@ impl PvmStorage {
 
     /// Create a new commit for `state` and  return the commit id.
     pub fn commit(&mut self, state: &NodePvm) -> Result<Hash, PvmStorageError> {
-        Ok(self.repo.commit(state.to_bytes())?)
+        Ok(state.with_backend(|state| {
+            let struct_ref = state.struct_ref::<state_backend::FnManagerIdent>();
+            self.repo.commit_serialised(&struct_ref)
+        })?)
     }
 
     /// Checkout the PVM state committed under `id`, if the commit exists.
     pub fn checkout(&self, id: &Hash) -> Result<NodePvm, PvmStorageError> {
-        let bytes = self.repo.checkout(id)?;
-        let state = NodePvm::from_bytes(&bytes)?;
-        Ok(state)
+        let allocated: AllocatedOf<StateLayout, Owned> = self.repo.checkout_serialised(id)?;
+        let state = State::bind(allocated);
+        Ok(NodePvm {
+            state: Box::new(state),
+        })
     }
 
     /// A snapshot is a new repo to which only `id` has been committed.

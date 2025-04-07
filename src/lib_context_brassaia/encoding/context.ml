@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Path = Brassaia.Path.String_list
-module Metadata = Brassaia.Metadata.None
 module Branch = Brassaia.Branch.String
 
 module Conf = struct
@@ -112,9 +110,7 @@ module Node
     (Contents_key : Brassaia.Key.S with type hash = Hash.t)
     (Node_key : Brassaia.Key.S with type hash = Hash.t) =
 struct
-  module M =
-    Brassaia.Node.Generic_key.Make (Hash) (Path) (Metadata) (Contents_key)
-      (Node_key)
+  module M = Brassaia.Node.Generic_key.Make (Hash) (Contents_key) (Node_key)
 
   (* [V1] is only used to compute preimage hashes. [assert false]
      statements should be unreachable.*)
@@ -135,12 +131,12 @@ struct
         (function Some _ -> some | None -> none)
 
     let metadata_of_entry (_, t) =
-      match t with `Node _ -> None | `Contents (_, m) -> Some m
+      match t with `Node _ -> None | `Contents _ -> Some ()
 
     let hash_of_entry (_, t) =
       match t with
       | `Node h -> Node_key.to_hash h
-      | `Contents (h, _) -> Contents_key.to_hash h
+      | `Contents h -> Contents_key.to_hash h
 
     (* Brassaia 1.4 uses int64 to store list lengths *)
     let entry_t : entry Brassaia.Type.t =
@@ -158,7 +154,8 @@ struct
 
     let compare_entry (x, _) (y, _) = String.compare x y
 
-    let step_to_string = Brassaia.Type.(unstage (to_bin_string Path.step_t))
+    let step_to_string =
+      Brassaia.Type.(unstage (to_bin_string Brassaia.Path.step_t))
 
     let str_key (k, v) = (step_to_string k, v)
 
@@ -208,8 +205,6 @@ module Schema = struct
   module Hash = Hash
   module Branch = Branch
   module Info = Info
-  module Metadata = Metadata
-  module Path = Path
   module Contents = Contents
   module Node = Node
   module Commit = Commit

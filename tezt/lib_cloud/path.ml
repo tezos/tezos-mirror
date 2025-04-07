@@ -26,8 +26,6 @@ let zcash_params = "_opam" // "share" // "zcash-params"
 
 let dal_trusted_setup = "_opam" // "share" // "dal-trusted-setup"
 
-let default_binaries_path () = Filename.get_temp_dir_name () // "tezt-runners"
-
 let self = Sys.argv.(0)
 
 let proxy_deployement ~tezt_cloud =
@@ -35,3 +33,16 @@ let proxy_deployement ~tezt_cloud =
   // Format.asprintf "%s-tezt-cloud-deployement" tezt_cloud
 
 let grafana_dashboards = project // "grafana" // "dashboards"
+
+let website_index = project // "website" // "index.html.jingoo"
+
+let website_style = project // "website" // "style.css"
+
+let prometheus_configuration =
+  project // "prometheus" // "prometheus.yml.jingoo"
+
+let prometheus_rules_configuration =
+  project // "prometheus" // "rules" // "tezt.rules.jingoo"
+
+let alert_manager_configuration =
+  project // "alert_manager" // "alert_manager.yml.jingoo"

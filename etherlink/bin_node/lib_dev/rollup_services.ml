@@ -121,21 +121,33 @@ let durable_state_value :
     (open_root / "global" / "block" /: Block_id.arg / "durable" / "wasm_2_0_0"
    / "value")
 
+type injection_query_arg = {drop_duplicate : bool option; order : Z.t option}
+
 let batcher_injection :
     ( [`POST],
       unit,
       unit,
-      bool option,
+      injection_query_arg,
       string trace,
       string trace )
     Service.service =
-  let query_unique : bool option Tezos_rpc.Query.t =
+  let query =
     let open Tezos_rpc.Query in
-    query Fun.id |+ opt_field "drop_duplicate" Tezos_rpc.Arg.bool Fun.id |> seal
+    let z_rpc_arg =
+      Resto.Arg.make
+        ~name:"z"
+        ~destruct:(fun s -> Ok (Z.of_string s))
+        ~construct:Z.to_string
+        ()
+    in
+    query (fun drop_duplicate order -> {drop_duplicate; order})
+    |+ opt_field "drop_duplicate" Tezos_rpc.Arg.bool (fun q -> q.drop_duplicate)
+    |+ opt_field "order" z_rpc_arg (fun q -> q.order)
+    |> seal
   in
   Tezos_rpc.Service.post_service
     ~description:"Inject messages in the batcher's queue"
-    ~query:query_unique
+    ~query
     ~input:
       Data_encoding.(
         def "messages" ~description:"Messages to inject" (list (string' Hex)))
@@ -299,11 +311,12 @@ let make_streamed_call ~rollup_node_endpoint =
 
 let publish :
     ?drop_duplicate:bool ->
+    ?order:Z.t ->
     keep_alive:bool ->
     rollup_node_endpoint:Uri.t ->
     [< `External of string] list ->
     unit tzresult Lwt.t =
- fun ?drop_duplicate ~keep_alive ~rollup_node_endpoint inputs ->
+ fun ?drop_duplicate ?order ~keep_alive ~rollup_node_endpoint inputs ->
   let open Lwt_result_syntax in
   let inputs = List.map (function `External s -> s) inputs in
   let* _answer =
@@ -312,7 +325,7 @@ let publish :
       ~base:rollup_node_endpoint
       batcher_injection
       ()
-      drop_duplicate
+      {drop_duplicate; order}
       inputs
   in
   return_unit
@@ -381,12 +394,28 @@ let durable_state_subkeys :
   Tezos_rpc.Service.get_service
     ~description:
       "Retrieve subkeys by key from PVM durable storage. PVM state is taken \
-       with respect to the specified block level. Value returned in hex \
-       format."
+       with respect to the specified block level."
     ~query:state_value_query
     ~output:Data_encoding.(option (list string))
     (open_root / "global" / "block" /: Block_id.arg / "durable" / "wasm_2_0_0"
    / "subkeys")
+
+let durable_state_values :
+    ( [`GET],
+      unit,
+      unit * Block_id.t,
+      state_value_query,
+      unit,
+      (string * bytes) list )
+    Service.service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Retrieve values directly under a given key from PVM durable storage. \
+       PVM state is taken with respect to the specified block level."
+    ~query:state_value_query
+    ~output:Data_encoding.(list (obj2 (req "key" string) (req "value" bytes)))
+    (open_root / "global" / "block" /: Block_id.arg / "durable" / "wasm_2_0_0"
+   / "values")
 
 (** [smart_rollup_address base] asks for the smart rollup node's
     address, using the endpoint [base]. *)

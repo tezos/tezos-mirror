@@ -46,6 +46,12 @@ let is_prover_profile = function
   | Types.Random_observer -> true
   | Types.Operator p -> Operator_profile.(has_observer p || has_producer p)
 
+let is_empty = function
+  | Types.Bootstrap -> false
+  | Types.Random_observer -> false
+  | Types.Operator operator_profile ->
+      Operator_profile.is_empty operator_profile
+
 let is_attester_only_profile = function
   | Types.Bootstrap -> false
   | Types.Random_observer -> false
@@ -67,7 +73,7 @@ let merge_profiles ~lower_prio ~higher_prio =
   | Random_observer, ((Operator _ | Bootstrap) as profile) -> profile
   | (Operator _ | Bootstrap), Random_observer -> Random_observer
 
-let add_and_register_operator_profile t proto_parameters gs_worker
+let add_and_register_operator_profile t ~number_of_slots gs_worker
     (operator_profile : Operator_profile.t) =
   match t with
   | Types.Bootstrap -> None
@@ -76,7 +82,7 @@ let add_and_register_operator_profile t proto_parameters gs_worker
         List.iter
           (fun slot_index ->
             Join {slot_index; pkh} |> Gossipsub.Worker.(app_input gs_worker))
-          Utils.Infix.(0 -- (proto_parameters.Dal_plugin.number_of_slots - 1))
+          Utils.Infix.(0 -- (number_of_slots - 1))
       in
       Some
         Types.(
@@ -90,30 +96,26 @@ let add_and_register_operator_profile t proto_parameters gs_worker
         "Profile_manager.add_and_register_operator_profile: random observer \
          should have a slot index assigned at this point"
 
-let register_profile t proto_parameters gs_worker =
+let resolve_random_observer_profile t ~number_of_slots =
+  match t with
+  | Types.Bootstrap | Operator _ -> t
+  | Random_observer ->
+      let slot_index = Random.int number_of_slots in
+      let operator_profile = Operator_profile.make ~observers:[slot_index] () in
+      Operator operator_profile
+
+let register_profile t ~number_of_slots gs_worker =
   match t with
   | Types.Bootstrap -> t
-  | Random_observer -> (
-      let slot_index = Random.int proto_parameters.Dal_plugin.number_of_slots in
-      let t_opt =
-        add_and_register_operator_profile
-          empty
-          proto_parameters
-          gs_worker
-          (Operator_profile.make ~observers:[slot_index] ())
-      in
-      match t_opt with
-      | Some t -> t
-      | None ->
-          (* unreachable*)
-          Stdlib.failwith
-            "Profile_manager.register_profile: unexpected profile \
-             incompatibility")
+  | Random_observer ->
+      Stdlib.failwith
+        "Profile_manager.register_profile: random observer should have a slot \
+         index assigned at this point"
   | Operator operator_profile -> (
       let t_opt =
         add_and_register_operator_profile
           empty
-          proto_parameters
+          ~number_of_slots
           gs_worker
           operator_profile
       in
@@ -155,9 +157,9 @@ let join_topics_for_operator gs_worker committee slots =
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5934
    We need a mechanism to ease the tracking of newly added/removed topics.
    Especially important for bootstrap nodes as the cross product can grow quite large. *)
-let join_topics_for_bootstrap proto_parameters gs_worker committee =
+let join_topics_for_bootstrap ~number_of_slots gs_worker committee =
   (* Join topics for all combinations of (all slots) * (all pkh in comittee) *)
-  for slot_index = 0 to proto_parameters.Dal_plugin.number_of_slots - 1 do
+  for slot_index = 0 to number_of_slots - 1 do
     Signature.Public_key_hash.Map.iter
       (fun pkh _shards ->
         let topic = Types.Topic.{slot_index; pkh} in
@@ -166,13 +168,13 @@ let join_topics_for_bootstrap proto_parameters gs_worker committee =
       committee
   done
 
-let on_new_head t proto_parameters gs_worker committee =
+let on_new_head t ~number_of_slots gs_worker committee =
   match t with
   | Types.Random_observer ->
       Stdlib.failwith
         "Profile_manager.add_operator_profiles: random observer should have a \
          slot index assigned at this point"
-  | Bootstrap -> join_topics_for_bootstrap proto_parameters gs_worker committee
+  | Bootstrap -> join_topics_for_bootstrap ~number_of_slots gs_worker committee
   | Operator op ->
       (* The topics associated to observers and producers can change
          if there new active bakers. However, for attesters, new slots
@@ -198,7 +200,7 @@ let supports_refutations t =
 (* Returns the period relevant for a refutation game. With a block time of 10
    seconds, this corresponds to about 42 days. *)
 let get_refutation_game_period proto_parameters =
-  proto_parameters.Dal_plugin.sc_rollup_challenge_window_in_blocks
+  proto_parameters.Types.sc_rollup_challenge_window_in_blocks
   + proto_parameters.commitment_period_in_blocks
   + proto_parameters.dal_attested_slots_validity_lag
 
@@ -211,27 +213,27 @@ let get_attested_data_default_store_period t proto_parameters =
   let refutation_game_period =
     2 * get_refutation_game_period proto_parameters
   in
-  let attestation_period = 2 * proto_parameters.attestation_lag in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7772
+     This period should be zero. *)
+  let bootstrap_node_period = 2 * proto_parameters.attestation_lag in
+  (* For observability purpose, we aim for a non-slot producer profile
+     to keep shards for about 10 minutes.
+     150 blocks is 10 minutes on Ghostnet, 20 minutes on Mainnet. *)
+  let default_period = 150 in
   let supports_refutations_bis, period =
     match get_profiles t with
-    (* For observer & Producer, we keep the data long enough for rollups to work
-       correctly; for attester & other profiles, we only want to keep the data
-       during attestation lag period *)
-    | Random_observer -> (true, refutation_game_period)
+    | Random_observer -> (false, default_period)
     | Operator op ->
         let has_producer = Operator_profile.(has_producer op) in
         let period =
-          if has_producer then refutation_game_period else attestation_period
+          if has_producer then refutation_game_period else default_period
         in
         (has_producer, period)
-    | Bootstrap -> (false, attestation_period)
+    | Bootstrap -> (false, bootstrap_node_period)
   in
   (* This is just to keep this function synced with {!supports_refutations}. *)
   assert (supports_refutations_bis = supports_refutations t) ;
   period
-
-let get_attested_data_default_store_period t proto_parameters =
-  get_attested_data_default_store_period t proto_parameters
 
 let profiles_filename = "profiles.json"
 

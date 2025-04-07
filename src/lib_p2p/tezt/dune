@@ -6,6 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
+  bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
   octez-libs.stdlib-unix

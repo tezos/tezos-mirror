@@ -146,6 +146,17 @@ let enc_workflow : workflow -> value = function
 
 let enc_stages stages : value = strings stages
 
+let enc_id_tokens (id_tokens : id_tokens) : value =
+  `O
+    (List.map
+       (fun (id_token_name, aud) ->
+         ( id_token_name,
+           match aud with
+           | Aud_string aud_str -> `O [("aud", `String aud_str)]
+           | Aud_list aud_list ->
+               obj_flatten [key "aud" (array string) aud_list] ))
+       id_tokens)
+
 let enc_image (Image image) = string image
 
 let enc_retry : retry -> value =
@@ -271,6 +282,7 @@ let enc_job : job -> value =
        artifacts;
        before_script;
        cache;
+       id_tokens;
        image;
        interruptible;
        needs;
@@ -305,20 +317,26 @@ let enc_job : job -> value =
       opt "services" enc_services services;
       opt "variables" enc_variables variables;
       opt "artifacts" enc_artifacts artifacts;
+      opt "id_tokens" enc_id_tokens id_tokens;
       opt "when" enc_when_job when_;
       opt "coverage" string coverage;
       opt "retry" enc_retry retry;
       opt "parallel" enc_parallel parallel;
     ]
 
+let enc_inherit : inherit_ -> value = function
+  | Variable_bool b -> `O (key "variables" bool b)
+  | Variable_list v -> `O (key "variables" (list string) v)
+
 let enc_trigger_job : trigger_job -> value =
   let enc_trigger_include trigger_include =
     `O [("include", `String trigger_include)]
   in
-  fun {name = _; stage; when_; rules; needs; trigger_include} ->
+  fun {name = _; stage; when_; inherit_; rules; needs; trigger_include} ->
     obj_flatten
       [
         opt "stage" string stage;
+        opt "inherit" enc_inherit inherit_;
         opt "rules" enc_job_rules rules;
         opt "needs" enc_needs needs;
         opt "when" enc_when_trigger_job when_;
@@ -326,17 +344,22 @@ let enc_trigger_job : trigger_job -> value =
       ]
 
 let enc_includes : include_ list -> value =
- fun includes ->
-  let enc_includes ({local; rules} : include_) =
-    match rules with
-    | [] -> `String local
-    | _ :: _ ->
-        `O [("local", `String local); ("rules", enc_include_rules rules)]
+  let enc_subkey subkey : string * value =
+    match subkey with
+    | Local path -> ("local", `String path)
+    | Template template -> ("template", `String (path_of_template template))
   in
-  match includes with
-  | [] -> failwith "empty includes"
-  | [{local; rules = []}] -> `String local
-  | inc -> array enc_includes inc
+
+  fun includes ->
+    let enc_includes ({subkey; rules} : include_) =
+      match rules with
+      | [] -> `O [enc_subkey subkey]
+      | _ :: _ -> `O [enc_subkey subkey; ("rules", enc_include_rules rules)]
+    in
+    match includes with
+    | [] -> failwith "enc_includes: empty includes"
+    | [{subkey; rules = []}] -> `O [enc_subkey subkey]
+    | inc -> array enc_includes inc
 
 let config_element : config_element -> (string * value) option = function
   | Workflow wf -> Some ("workflow", enc_workflow wf)

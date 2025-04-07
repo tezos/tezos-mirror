@@ -23,6 +23,9 @@ pub enum LexerError {
     /// except when parsing tzt.
     #[error("parsing of numeric literal {0} failed")]
     NumericLiteral(String),
+    /// Parsing of a timestamp literal failed.
+    #[error("parsing of timestamp literal {0} failed")]
+    TimestampLiteral(String),
     /// Found a forbidden character in a string literal.
     #[error("forbidden character found in string literal \"{0}\"")]
     ForbiddenCharacterIn(String),

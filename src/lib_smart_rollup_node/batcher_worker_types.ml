@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type order_request = {drop_no_order : bool; order_below : Z.t}
+
 module Request = struct
   type ('a, 'b) t =
     | Register : {
@@ -32,6 +34,8 @@ module Request = struct
       }
         -> (L2_message.id list, error trace) t
     | Produce_batches : (unit, error trace) t
+    | Clear_queues : (unit, error trace) t
+    | Remove_messages : order_request -> (unit, error trace) t
 
   type view = View : _ t -> view
 
@@ -61,6 +65,25 @@ module Request = struct
           (obj1 (req "request" (constant "produce_batches")))
           (function View Produce_batches -> Some () | _ -> None)
           (fun () -> View Produce_batches);
+        case
+          (Tag 2)
+          ~title:"Clear_queues"
+          (obj1 (req "request" (constant "clear_queues")))
+          (function View Clear_queues -> Some () | _ -> None)
+          (fun () -> View Clear_queues);
+        case
+          (Tag 3)
+          ~title:"Remove_messages"
+          (obj3
+             (req "request" (constant "remove_operations"))
+             (req "drop_no_order" bool)
+             (req "order_below" n))
+          (function
+            | View (Remove_messages {drop_no_order; order_below}) ->
+                Some ((), drop_no_order, order_below)
+            | _ -> None)
+          (fun ((), drop_no_order, order_below) ->
+            View (Remove_messages {drop_no_order; order_below}));
       ]
 
   let pp ppf (View r) =
@@ -68,11 +91,17 @@ module Request = struct
     | Register {order = _; messages; drop_duplicate} ->
         Format.fprintf
           ppf
-          "register %d new L2 message%a"
+          "register %d new L2 message%s"
           (List.length messages)
-          (fun fmt () ->
-            if drop_duplicate then Format.pp_print_string fmt ""
-            else Format.fprintf fmt ", checking if message was already injected")
-          ()
+          (if drop_duplicate then ", checking if messages were already injected"
+           else "")
     | Produce_batches -> Format.fprintf ppf "Producing messages batches."
+    | Clear_queues -> Format.fprintf ppf "Clear queues."
+    | Remove_messages {drop_no_order; order_below} ->
+        Format.fprintf
+          ppf
+          "Remove messages with order inferior to %a%s."
+          Z.pp_print
+          order_below
+          (if drop_no_order then ",and drop messages with node order" else "")
 end

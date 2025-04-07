@@ -60,7 +60,7 @@ open Cryptobox_intf
     code: we've chosen and implemented a technique to produce the proofs in
     time [O(n log n)]
     (see {{: https://eprint.iacr.org/2023/033.pdf}Fast amortized KZG proofs}).
-    
+
     More diverse details about the formalization are provided here :
     https://hackmd.io/36XUZUo7QqK5Ub6GvZmgOg *)
 
@@ -114,34 +114,11 @@ type error += Failed_to_load_trusted_setup of string
 (** [Invalid_precomputation_hash], thrown by {!load_precompute_shards_proofs}. *)
 type error += Invalid_precomputation_hash of (string, string) error_container
 
-module Verifier :
-  VERIFIER
-    with type t = t
-     and type commitment = commitment
-     and type commitment_proof = commitment_proof
-     and type page_proof = page_proof
-     and type ('a, 'b) error_container = ('a, 'b) error_container
-
-include
-  VERIFIER
-    with type t := t
-     and type parameters := Dal_config.parameters
-     and type commitment := commitment
-     and type commitment_proof := commitment_proof
-     and type page_proof := page_proof
-     and type ('a, 'b) error_container := ('a, 'b) error_container
-
 (** The primitives exposed in this modules require some
    preprocessing. This preprocessing generates data from an unknown
    secret. For the security of those primitives, it is important that
    the secret is unknown. *)
 type initialisation_parameters
-
-module Commitment : sig
-  include COMMITMENT with type t = commitment
-
-  val rpc_arg : commitment Resto.Arg.t
-end
 
 (** A slot is a byte sequence corresponding to some data. *)
 type slot = bytes
@@ -224,12 +201,44 @@ val string_of_commit_error :
 (** A portion of the data represented by a polynomial. *)
 type share
 
-(** Encoding of a share. *)
-val share_encoding : share Data_encoding.t
-
 (** A shard is share with its index (see
      {!val:shards_from_polynomial}). *)
 type shard = {index : int; share : share}
+
+(** A proof that a shard belongs to some commitment. *)
+type shard_proof
+
+module Verifier :
+  VERIFIER
+    with type t = t
+     and type commitment = commitment
+     and type commitment_proof = commitment_proof
+     and type page_proof = page_proof
+     and type ('a, 'b) error_container = ('a, 'b) error_container
+     and type share = share
+     and type shard = shard
+     and type shard_proof = shard_proof
+
+include
+  VERIFIER
+    with type t := t
+     and type parameters := Dal_config.parameters
+     and type commitment := commitment
+     and type commitment_proof := commitment_proof
+     and type page_proof := page_proof
+     and type ('a, 'b) error_container := ('a, 'b) error_container
+     and type share := share
+     and type shard := shard
+     and type shard_proof := shard_proof
+
+module Commitment : sig
+  include COMMITMENT with type t = commitment
+
+  val rpc_arg : commitment Resto.Arg.t
+end
+
+(** Encoding of a share. *)
+val share_encoding : share Data_encoding.t
 
 (** An encoding of a share. *)
 val shard_encoding : shard Data_encoding.t
@@ -277,9 +286,6 @@ val polynomial_from_shards :
     Here, [polynomial_length] and [shard_length] are parameters declared in [t].
     The shards in the returned sequence have increasing indexes. *)
 val shards_from_polynomial : t -> polynomial -> shard Seq.t
-
-(** A proof that a shard belongs to some commitment. *)
-type shard_proof
 
 (** An encoding of a shard proof. *)
 val shard_proof_encoding : shard_proof Data_encoding.t
@@ -570,14 +576,16 @@ module Internal_for_tests : sig
   val slot_as_polynomial_length : slot_size:int -> page_size:int -> int
 end
 
-(** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ()] initializes the DAL
-    in "prover" mode, given the function [find_srs_files] to find the SRS files,
-    and the optional log2 of the SRS size [srs_size_log2]. Note that the both
-    proving & verifying functions can be used with this setup. If this function
-    is not called only verifying functions are available. *)
+(** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ~fetch_trusted_setup ()]
+    initializes the DAL in "prover" mode, given the function [find_srs_files] to
+    find the SRS files, installing them if they are not found and
+    [fetch_trusted_setup] is [true] and the optional log2 of the SRS size [srs_size_log2].
+    Note that the both proving & verifying functions can be used with this setup.
+    If this function is not called only verifying functions are available. *)
 val init_prover_dal :
   find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
   ?srs_size_log2:int ->
+  fetch_trusted_setup:bool ->
   unit ->
   unit Error_monad.tzresult Lwt.t
 

@@ -47,7 +47,18 @@ let configuration admin_api_key : config =
     timeout = 2.0;
   }
 
-let provisioning_directory () =
+let default_source =
+  sf
+    {|
+- name: Prometheus
+  type: prometheus
+  access: proxy
+  url: http://localhost:%d
+  isDefault: true
+|}
+    Env.prometheus_port
+
+let provisioning_directory sources =
   let provisioning_directory =
     Filename.get_temp_dir_name () // "grafana" // "provisioning"
   in
@@ -56,16 +67,7 @@ let provisioning_directory () =
   in
   let* () = Process.run "mkdir" ["-p"; provisioning_file |> Filename.dirname] in
   let content =
-    {|
-apiVersion: 1
-
-datasources:
-  - name: Prometheus
-    type: prometheus
-    access: proxy
-    url: http://localhost:9090
-    isDefault: true
-|}
+    "apiVersion: 1\n\ndatasources:\n" ^ String.concat "\n" sources
   in
   with_open_out provisioning_file (fun oc ->
       Stdlib.seek_out oc 0 ;
@@ -87,7 +89,7 @@ let dashboards_filepaths () =
   in
   List.map (fun basename -> path // basename) basenames |> Lwt.return
 
-let run () =
+let run ?(sources = [default_source]) () =
   let cmd = "docker" in
   let* () =
     Process.run "mkdir" ["-p"; Filename.get_temp_dir_name () // "grafana"]
@@ -98,11 +100,13 @@ let run () =
   let* () =
     Process.run "mkdir" ["-p"; dashboard_directory |> Filename.dirname]
   in
-  let* provisioning_directory = provisioning_directory () in
+  let* provisioning_directory = provisioning_directory sources in
   (* We generate a password to use admin features. This is not completely
      secured but this should prevent easy attacks if the grafana port is opened. *)
   let password = generate_password () in
   Log.info "Grafana admin password: %s" password ;
+  (* This is the last version supporting api keys *)
+  let grafana_docker_tag = "grafana/grafana:11.2.3" in
   let args =
     [
       "run";
@@ -122,7 +126,7 @@ let run () =
       Format.asprintf "%s:/etc/grafana/provisioning" provisioning_directory;
       "-v";
       Format.asprintf "%s:/var/lib/grafana/dashboards" dashboard_directory;
-      "grafana/grafana";
+      grafana_docker_tag;
     ]
   in
   let* status = Process.spawn cmd args |> Process.wait in

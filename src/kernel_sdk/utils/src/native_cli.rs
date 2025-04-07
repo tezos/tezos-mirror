@@ -6,10 +6,7 @@
 //! for example, controlling whether debug logs are printed with
 //! timestamps.
 
-#![cfg(not(any(
-    target_arch = "wasm32",
-    all(target_arch = "riscv64", target_os = "hermit")
-)))]
+#![cfg(pvm_kind = "none")]
 
 use crate::console::Console;
 use clap::Parser;

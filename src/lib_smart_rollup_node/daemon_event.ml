@@ -62,6 +62,16 @@ module Simple = struct
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
 
+  let reorg =
+    declare_3
+      ~section
+      ~name:"smart_rollup_node_daemon_reorg"
+      ~msg:"Reorg of {number} blocks from level {from} to level {to}"
+      ~level:Notice
+      ("number", Data_encoding.int31)
+      ("from", Data_encoding.int32)
+      ("to", Data_encoding.int32)
+
   let processing_heads_iteration =
     declare_3
       ~section
@@ -80,6 +90,18 @@ module Simple = struct
       ~name:"smart_rollup_node_daemon_new_heads_processed"
       ~msg:
         "Finished processing {number} layer 1 heads for levels {from} to {to}"
+      ~level:Info
+      ("number", Data_encoding.int31)
+      ("from", Data_encoding.int32)
+      ("to", Data_encoding.int32)
+
+  let new_heads_side_process_finished =
+    declare_3
+      ~section
+      ~name:"smart_rollup_node_daemon_loop_process_finished"
+      ~msg:
+        "Finished main loop processing {number} layer 1 heads for levels \
+         {from} to {to}"
       ~level:Info
       ("number", Data_encoding.int31)
       ("from", Data_encoding.int32)
@@ -217,7 +239,14 @@ let new_heads_iteration event = function
 let processing_heads_iteration =
   new_heads_iteration Simple.processing_heads_iteration
 
+let reorg = function
+  | [] -> Lwt.return_unit
+  | blocks -> new_heads_iteration Simple.reorg blocks
+
 let new_heads_processed = new_heads_iteration Simple.new_heads_processed
+
+let new_heads_side_process_finished =
+  new_heads_iteration Simple.new_heads_side_process_finished
 
 let included_operation ?errors status operation =
   match status with

@@ -5,13 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let find_agent agents =
-  agents
-  |> List.find_opt (fun agent ->
-         let proxy_agent_prefix = Format.asprintf "%s-proxy" Env.tezt_cloud in
-         String.starts_with ~prefix:proxy_agent_prefix (Agent.name agent))
+let agent_name = Format.asprintf "%s-proxy" Env.tezt_cloud
 
-let get_agent agents = find_agent agents |> Option.get
+let make_config () = Agent.Configuration.make ~name:agent_name ()
+
+let get_agent agents =
+  match List.find_opt (fun agent -> Agent.name agent = agent_name) agents with
+  | None -> Test.fail ~__LOC__ "Cannot find agent %s" agent_name
+  | Some agent -> agent
 
 let copy_files proxy_agent ~scenario_files ~proxy_deployement =
   (* This file is necessary to get the agents configurations. *)
@@ -38,6 +39,36 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
       ~source:ssh_private_key_filename
       ~destination:
         ("/root" // ".ssh" // Filename.basename ssh_private_key_filename)
+  in
+  let* _ =
+    Agent.copy
+      proxy_agent
+      ~source:Path.website_index
+      ~destination:("/root" // Path.website_index)
+  in
+  let* _ =
+    Agent.copy
+      proxy_agent
+      ~source:Path.website_style
+      ~destination:("/root" // Path.website_style)
+  in
+  let* _ =
+    Agent.copy
+      proxy_agent
+      ~source:Path.prometheus_configuration
+      ~destination:("/root" // Path.prometheus_configuration)
+  in
+  let* _ =
+    Agent.copy
+      proxy_agent
+      ~source:Path.prometheus_rules_configuration
+      ~destination:("/root" // Path.prometheus_rules_configuration)
+  in
+  let* _ =
+    Agent.copy
+      proxy_agent
+      ~source:Path.alert_manager_configuration
+      ~destination:("/root" // Path.alert_manager_configuration)
   in
   (* If the Proxy agent uses grafana, it needs some dashboards. We copy them to
      the proxy VM and then import them.
@@ -69,23 +100,25 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
      This requires the docker image to contain all the binaries used by the
      proxy agent.
   *)
+  let Agent.Configuration.{vm = {binaries_path; _}; name = _} =
+    Agent.configuration proxy_agent
+  in
   let* output =
-    Process.spawn
-      ?runner:(Agent.runner proxy_agent)
-      "ls"
-      [Path.default_binaries_path ()]
+    Process.spawn ?runner:(Agent.runner proxy_agent) "ls" [binaries_path]
     |> Process.check_and_read_stdout
   in
   let files = String.trim output |> String.split_on_char '\n' in
   let* () =
-    files
-    |> List.map (fun file ->
+    (* By default the SSH server accepts at most 10 connections, this can
+       fail if there are more then 10 files. We put 5 to take into
+       account potential other connections with the proxy SSH server. *)
+    files |> Lwt_stream.of_list
+    |> Lwt_stream.iter_n ~max_concurrency:5 (fun file ->
            Process.spawn
              ?runner:(Agent.runner proxy_agent)
              "ln"
-             ["-s"; Path.default_binaries_path () // file; file; "-f"]
+             ["-s"; binaries_path // file; file; "-f"]
            |> Process.check)
-    |> Lwt.join
   in
   (* The scenario itself may need some files that exist on the host machine but
      are not present by default on the proxy machine. Since it may be difficult to

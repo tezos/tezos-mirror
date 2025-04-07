@@ -49,7 +49,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   open Encoding
 
   module Store = struct
-    module Maker = Brassaia_pack_mem.Maker (Conf)
+    module Maker = Brassaia_pack_mem.Maker (Encoding.Conf)
     include Maker.Make (Schema)
     module Schema = Tezos_context_encoding.Context.Schema
   end
@@ -73,7 +73,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
           Some
             (match h with
             | `Node hash -> `Node (Hash.to_context_hash hash)
-            | `Contents (hash, ()) -> `Value (Hash.to_context_hash hash))
+            | `Contents hash -> `Value (Hash.to_context_hash hash))
   end
 
   type index = {
@@ -255,7 +255,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let rec tree_to_raw_context tree =
     let open Lwt_syntax in
     match Store.Tree.destruct tree with
-    | `Contents (v, _) ->
+    | `Contents v ->
         let+ v = Store.Tree.Contents.force_exn v in
         Proof.Key v
     | `Node _ ->
@@ -562,8 +562,8 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
               ~title:"value"
               (Tag 1)
               bytes
-              (function `Contents (v, _) -> Some v | `Tree _ -> None)
-              (fun v -> `Contents (v, ()));
+              (function `Contents v -> Some v | `Tree _ -> None)
+              (fun v -> `Contents v);
           ])
 
   let encoding : t Data_encoding.t =

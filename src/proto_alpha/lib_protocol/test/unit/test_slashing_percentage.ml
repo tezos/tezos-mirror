@@ -35,12 +35,12 @@ let assert_not_equal_int ~loc n (pct : Percentage.t tzresult Lwt.t) =
   let pct_q = Percentage.to_q pct in
   Assert.not_equal ~loc Q.equal "Values are equal" Q.pp_print Q.(n // 100) pct_q
 
-let raw_context ~max_slashing_threshold ~max_slashing_per_block ~ns_enable () =
+let raw_context ~max_slashing_threshold ~max_slashing_per_block () =
   let open Constants_helpers in
   let constants =
     Default_parameters.constants_test
-    |> Set.Adaptive_issuance.force_activation true
-    |> Set.Adaptive_issuance.ns_enable ns_enable
+    |> Set.consensus_committee_size
+         Default_parameters.constants_mainnet.consensus_committee_size
     |> Set.max_slashing_threshold max_slashing_threshold
     |> Set.max_slashing_per_block max_slashing_per_block
   in
@@ -61,37 +61,15 @@ let make_fake_culprits_with_rights_from_int_list il =
   in
   return (map, pkh_list)
 
-let get_pct ~ns_enable ~max_slashing_threshold ~max_slashing_per_block int_list
-    =
+let get_pct ~max_slashing_threshold ~max_slashing_per_block int_list =
   let open Lwt_result_syntax in
-  let* ctxt =
-    raw_context ~max_slashing_threshold ~max_slashing_per_block ~ns_enable ()
-  in
+  let* ctxt = raw_context ~max_slashing_threshold ~max_slashing_per_block () in
   let*? map, pkh_list = make_fake_culprits_with_rights_from_int_list int_list in
   return
   @@ Protocol.Slash_percentage.Internal_for_tests.for_double_attestation
        ctxt
        map
        pkh_list
-
-(** Test the double attesting slash is always 50% with ns_enable = false *)
-let test_ns_enable_disable () =
-  let open Lwt_result_syntax in
-  let f x =
-    get_pct
-      ~ns_enable:false
-      ~max_slashing_threshold:100
-      ~max_slashing_per_block:Percentage.p100
-      [x]
-  in
-  let* () = assert_equal_int ~loc:__LOC__ 50 (f 0) in
-  let* () = assert_equal_int ~loc:__LOC__ 50 (f 1) in
-  let* () = assert_equal_int ~loc:__LOC__ 50 (f 100) in
-  let* () = assert_equal_int ~loc:__LOC__ 50 (f 10000) in
-  return_unit
-
-(** We set ns_enable = true for the following tests *)
-let get_pct = get_pct ~ns_enable:true
 
 (** Tests that the slashing amount for several delegates is the same as long
     as the sum of their rights is the same *)
@@ -100,7 +78,7 @@ let test_list_and_sum () =
   (* A max slashing threshold of 100 ensures that x -> f [x] is injective *)
   let f x =
     get_pct
-      ~max_slashing_threshold:100
+      ~max_slashing_threshold:{numerator = 100; denominator = 7000}
       ~max_slashing_per_block:Percentage.p100
       x
   in
@@ -120,7 +98,10 @@ let test_max_slashing_per_block () =
     let max_slashing_per_block =
       Percentage.of_q_bounded ~round:`Up Q.(max_slash // 100)
     in
-    get_pct ~max_slashing_threshold:100 ~max_slashing_per_block x
+    get_pct
+      ~max_slashing_threshold:{numerator = 100; denominator = 7000}
+      ~max_slashing_per_block
+      x
   in
   let* () = assert_equal_int ~loc:__LOC__ 100 (f 100 200) in
   let* () = assert_equal_int ~loc:__LOC__ 1 (f 1 200) in
@@ -138,14 +119,19 @@ let get_pct =
 (** Tests the max_slashing_threshold parameter *)
 let test_max_slashing_threshold () =
   let open Lwt_result_syntax in
-  let f max_slashing_threshold x = get_pct ~max_slashing_threshold x in
+  let f max_slashing_threshold x =
+    get_pct
+      ~max_slashing_threshold:
+        {numerator = max_slashing_threshold; denominator = 7000}
+      x
+  in
   let* () = assert_equal_int ~loc:__LOC__ 100 (f 100 20000) in
   let* () = assert_equal_int ~loc:__LOC__ 100 (f 1000 1001) in
   let* () = assert_equal_int ~loc:__LOC__ 100 (f 1000 1000) in
   let* () = assert_not_equal_int ~loc:__LOC__ 100 (f 1000 999) in
   return_unit
 
-(** We now test with max slashing threshold to 2334 (mainnet value) *)
+(** We now test with max slashing threshold to 1/3 (mainnet value) *)
 let get_pct =
   get_pct
     ~max_slashing_threshold:
@@ -182,7 +168,6 @@ let test_mainnet_values () =
 let tests =
   Tztest.
     [
-      tztest "Test ns_enable = false" `Quick test_ns_enable_disable;
       tztest "Test only sum of rights counts" `Quick test_list_and_sum;
       tztest "Test max_slashing_per_block" `Quick test_max_slashing_per_block;
       tztest "Test max_slashing_threshold" `Quick test_max_slashing_threshold;

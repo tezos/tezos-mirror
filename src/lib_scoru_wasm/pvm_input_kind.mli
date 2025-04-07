@@ -23,7 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type protocol = Nairobi | Oxford | ParisB | ParisC | Proto_alpha | Quebec
+type protocol =
+  | Nairobi
+  | Oxford
+  | ParisB
+  | ParisC
+  | Proto_alpha
+  | Quebec
+  | R022
 
 (** [internal_message_kind] represent an internal message in a inbox. *)
 type internal_message_kind =

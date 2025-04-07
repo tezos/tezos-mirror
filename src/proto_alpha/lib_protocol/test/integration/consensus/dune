@@ -6,6 +6,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
+  bls12-381.archive
+  octez-rustzcash-deps
   octez-alcotezt
   octez-libs.base
   tezos-protocol-alpha.protocol
@@ -39,7 +41,9 @@
   test_participation
   test_preattestation_functor
   test_preattestation
-  test_seed))
+  test_seed
+  test_aggregate
+  test_dal_entrapment))
 
 (executable
  (name main)

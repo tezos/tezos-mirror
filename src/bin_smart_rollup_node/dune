@@ -7,6 +7,8 @@
  (package octez-smart-rollup-node)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-rust-deps
+  bls12-381.archive
   octez-libs.base
   octez-libs.clic
   octez-shell-libs.shell-services
@@ -24,8 +26,11 @@
   (select void_for_linking-octez_smart_rollup_node_PtParisB from
    (octez_smart_rollup_node_PtParisB -> void_for_linking-octez_smart_rollup_node_PtParisB.empty)
    (-> void_for_linking-octez_smart_rollup_node_PtParisB.empty))
-  octez_smart_rollup_node_PsParisC
+  (select void_for_linking-octez_smart_rollup_node_PsParisC from
+   (octez_smart_rollup_node_PsParisC -> void_for_linking-octez_smart_rollup_node_PsParisC.empty)
+   (-> void_for_linking-octez_smart_rollup_node_PsParisC.empty))
   octez_smart_rollup_node_PsQuebec
+  octez_smart_rollup_node_PsRiotum
   (select void_for_linking-octez_smart_rollup_node_alpha from
    (octez_smart_rollup_node_alpha -> void_for_linking-octez_smart_rollup_node_alpha.empty)
    (-> void_for_linking-octez_smart_rollup_node_alpha.empty)))
@@ -52,4 +57,5 @@
    (write-file void_for_linking-octez_smart_rollup_node_PtNairob.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_Proxford.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_PtParisB.empty "")
+   (write-file void_for_linking-octez_smart_rollup_node_PsParisC.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_alpha.empty ""))))

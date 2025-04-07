@@ -70,14 +70,15 @@ In turn, delegators can freely spend their own funds in spite of the active dele
 Technically, delegation is a link between a delegator account and a delegate account, meaning that *all* the funds of the former are delegated to the latter, until the delegation is withdrawn.
 When a delegator spends their tokens, the delegated balance of their delegate decreases; conversely, when they receive tokens the delegated balance of their delegate increases.
 
-Since the activation of the :ref:`new staking mechanism <new_staking>`,
-50% of your total funds count towards your delegator's baking power (before the staking mechanism, 100% of your total funds counted towards your delegator baking power). The delegated funds still count for 100% for the voting power, just like before the activation of the new staking mechanism.
+Since the activation of the new :doc:`staking mechanism <../active/staking>`,
+33% of your total funds count towards your delegator's baking power (before the staking mechanism, 100% of your total funds counted towards your delegator baking power). The delegated funds still count for 100% for the voting power, just like before the activation of the new staking mechanism.
 
+.. _staking_coins:
 
 Staking your coins
 ------------------
 
-Since the activation of the new :ref:`staking mechanism <new_staking>`,
+Since the activation of the new :doc:`staking mechanism <../active/staking>`,
 if you don't want to deal with the complexity of running your own
 delegate, you can also take part in the protocol by staking part of your
 coins to accrue to your delegate’s staking power.
@@ -119,7 +120,7 @@ attest. A delegate is also responsible for taking part in the
 
 Rights for baking and attesting are randomly assigned
 to delegates proportionally to their :doc:`baking power <../alpha/baking_power>`,
-which usually is their own staked funds plus the funds staked by external stakers, plus half of their total delegation.
+which usually is their own staked funds plus the funds staked by external stakers, plus the third of their total delegation.
 
 A :ref:`minimal active stake<def_minimal_stake>`
 is required for participating in consensus and in governance as a delegate.
@@ -127,14 +128,14 @@ is required for participating in consensus and in governance as a delegate.
 Delegates are required to freeze some of their funds into
 a security deposit (called their own stake), at least ``MINIMAL_FROZEN_STAKE`` (see :ref:`ps_constants`).
 This can be done via the same commands used by external stakers in the previous section.
-Since the activation of the new :ref:`staking mechanism <new_staking>`,
+Since the activation of the new :doc:`staking mechanism <../active/staking>`,
 a delegate may choose to accept (or not) staked funds from external stakers.
 Both the delegate's own stake and the stake from external stakers can be
 :ref:`slashed<slashing>` (that is, partially lost), when the delegate misbehaves by double-signing.
 
 Delegates can set two parameters by configuring their :ref:`staking policy <staking_policy_configuration>`:
 
-- the maximum ratio of external stake over their own stake: a factor between 0 and 5, by default 0, which means that:
+- the maximum ratio of external stake over their own stake: a factor between 0 and 9, by default 0, which means that:
 
   + for any factor *f*, the delegate accepts *f* times its own stake from external stakers
   + by default, delegates don't allow external staking
@@ -213,7 +214,7 @@ accounts have the necessary rights.
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
-   octez-baker-<PROTO_HASH> run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
+   octez-baker-<PROTO_HASH> run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass --without-dal
 
 where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
 
@@ -222,6 +223,7 @@ the node data directory for performance reasons (to reduce the number of RPC cal
 Note also that since version 13.0, option ``--liquidity-baking-toggle-vote`` is mandatory, see :ref:`the changelog <changes_13_0_rc1_baker>`.
 Note that ``--liquidity-baking-toggle-vote`` must be placed
 **after** ``run`` on the command-line.
+Note that option ``--without-dal`` exists since version 21.3 and will be mandatory starting from 22.0.
 
 .. warning::
 
@@ -265,7 +267,7 @@ The accuser uses the same format of configuration file as the client (see :ref:`
 DAL node
 ~~~~~~~~
 
-When running a delegate, it is recommended to also run a :doc:`Data Availability Layer (DAL) node <../shell/dal_overview>` to support data transmission across the network, see :doc:`../shell/dal_run`.
+To add a Data Availability Layer (DAL) node to support data transmission across the network, see :doc:`DAL layer <../shell/dal_overview>`.
 
 Docker
 ~~~~~~
@@ -276,14 +278,14 @@ If you are running the baker Docker image, you can watch the baker logs with
     docker ps
 
 If your container is running, its name will appear in the last column.
-For instance, if the name is ``mainnet_baker-PtParisB``, you can
+For instance, if the name is ``mainnet_baker-PsQuebec``, you can
 view recent logs with::
 
-    docker logs mainnet_baker-PtParisB
+    docker logs mainnet_baker-PsQuebec
 
 If you want to keep watching logs, use ``-f``::
 
-    docker logs mainnet_baker-PtParisB -f
+    docker logs mainnet_baker-PsQuebec -f
 
 This allows you to know if you baked.
 You should see lines such as::

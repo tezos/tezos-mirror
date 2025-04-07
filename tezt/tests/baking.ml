@@ -274,7 +274,7 @@ let sample_next_transfer_for state ~fee ~branch ~account =
                 source = account.Account.public_key_hash;
                 fee = string_of_int fee;
                 counter = string_of_int @@ get_next_counter state account;
-                gas_limit = string_of_int 2000;
+                gas_limit = string_of_int 4000;
                 storage_limit = "0";
                 amount = string_of_int amount;
                 destination = receiver.Account.public_key_hash;
@@ -314,7 +314,7 @@ let bake_with_mempool ?protocol node client mempool =
   Client.bake_for_and_wait
     ?protocol
     ~force:true
-    ~context_path:(Node.data_dir node // "context")
+    ~context_path:(Node.data_dir node)
     client
 
 let get_current_head_hash state =
@@ -495,11 +495,15 @@ let wrong_branch_operation_dismissal =
   let* node = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client = Client.init ~endpoint:(Node node) () in
   let minimal_block_delay = 1 in
+  let consensus_threshold_name =
+    if Protocol.(number protocol >= 022) then "consensus_threshold_size"
+    else "consensus_threshold"
+  in
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Either.Right (protocol, None))
       [
-        (["consensus_threshold"], `Int 1);
+        ([consensus_threshold_name], `Int 1);
         (["minimal_block_delay"], `String_of_int minimal_block_delay);
         (["delay_increment_per_round"], `String "1");
       ]
@@ -557,15 +561,11 @@ let baking_operation_exception =
   (* We use [context_path] to ensure the baker will not use the
      preapply RPC. Indeed, this test was introduced because of a bug
      that happens when the baker does not use the preapply RPC. *)
-  let* () =
-    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
-  in
+  let* () = Client.bake_for_and_wait ~context_path:data_dir client in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
   let* () = wait_injection in
-  let* () =
-    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
-  in
+  let* () = Client.bake_for_and_wait ~context_path:data_dir client in
   let* _ =
     Operation.Manager.(
       inject
@@ -582,7 +582,7 @@ let baking_operation_exception =
         ]
         client)
   in
-  Client.bake_for_and_wait ~context_path:(data_dir // "context") client
+  Client.bake_for_and_wait ~context_path:data_dir client
 
 let init ?(overrides = []) protocol =
   let* sandbox_node = Node.init [Synchronisation_threshold 0; Private_mode] in

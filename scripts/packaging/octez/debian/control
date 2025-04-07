@@ -18,13 +18,15 @@ Package: octez-node
 Architecture: amd64 arm64
 Depends: adduser,
   logrotate,
-  octez-zcash-params,
+  octez-zcash-params ( = 1.0.0 ),
   ${misc:Depends},
   ${shlibs:Depends},
   debconf (>= 0.5) | debconf-2.0,
+  curl,
   systemd
+Pre-Depends: jq
 Recommends: octez-client (= ${source:Version}),
-Suggests: lz4, curl
+Suggests: lz4
 Description: L1 Octez node for the Tezos network
  This package serves as the core implementation for the Tezos blockchain node.
  It contains the fundamental components required for protocol execution,
@@ -46,20 +48,25 @@ Description: Client for interacting with the Tezos blockchain
 
 Package: octez-baker
 Architecture: amd64 arm64
-Pre-Depends: octez-client (= ${source:Version})
+Pre-Depends:
+ octez-client (= ${source:Version}),
+ debconf (>= 0.5) | debconf-2.0
 Depends:
  ${misc:Depends}, ${shlibs:Depends},
  octez-node (= ${source:Version}),
- curl, systemd,
- debconf (>= 0.5) | debconf-2.0
-Recommends: octez-signer (= ${source:Version}),
+ curl, systemd
+Recommends:
+ octez-signer (= ${source:Version}),
+ octez-dal-node (= ${source:Version})
 Description: Octez baking software for the Tezos blockchain.
  The Octez baker includes the necessary tools and functionalities for
  participating in the baking process, such as block creation, attestations, and
  protocol-specific consensus mechanisms.
  .
- This package installs the baker, the accuser and the Octez node. For key
- management it is recommended to install a remote signer of a different host.
+ This package installs the baker, the accuser and the Octez node. By default,
+ installing this package causes the recommended packages octez-signer and
+ octez-dal-node to be installed as well. For key management it is recommended
+ to install a remote signer on a different host.
 
 Package: octez-signer
 Architecture: amd64 arm64
@@ -106,7 +113,6 @@ Description: Smart Rollup node for the Tezos blockchain.
 Package: octez-dal-node
 Architecture: amd64 arm64
 Depends: ${misc:Depends}, ${shlibs:Depends},
- octez-zcash-dal-params,
  systemd
 Suggests: octez-baker (= ${source:Version})
 Description: Octez distribution Availability Layer (DAL) node

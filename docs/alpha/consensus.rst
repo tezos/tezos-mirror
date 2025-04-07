@@ -54,7 +54,7 @@ only provide a user/developer perspective.
 
 Tenderbake is executed for each new block level by a "committee" whose members
 are called *validators*, which are delegates selected at random based on their
-stake, in the same way as endorsers were selected in Emmy*. We let
+stake, in much the same way as endorsers were selected in Emmy*. We let
 ``CONSENSUS_COMMITTEE_SIZE`` be the number of validator :ref:`slots<rights_alpha>` per level.
 Furthermore, we use ``CONSENSUS_THRESHOLD`` to denote two thirds of ``CONSENSUS_COMMITTEE_SIZE``.
 
@@ -122,6 +122,8 @@ Consequently, to agree on a block, that is, on both the payload and the header, 
 confirmation, and thus guarantees
 **block finality after 2 confirmations**.
 
+.. _time_between_blocks_alpha:
+
 Time between blocks
 -------------------
 
@@ -180,7 +182,7 @@ behavior. Notable changes however are as follows:
 * At the end of a cycle ``c``, the following actions happen:
 
   - the distribution of attesting rewards,
-  - the selection of the consensus committee cycle ``c + CONSENSUS_RIGHTS_DELAY``, based on the current active stake distribution.
+  - the selection of the consensus committee cycle ``c + CONSENSUS_RIGHTS_DELAY``, based on the current distribution of baking power.
 
 
 Fees
@@ -196,7 +198,7 @@ proposer (that is, the one that signs and injects the block): that's
 always true for blocks at round 0; however, in case of re-proposals
 this is not necessarily the case (see the algorithm description above).
 
-Fees are given to the payload producer immediately, that is, they are
+Fees are allocated to the payload producer's available balance immediately, that is, they are
 already reflected in the blockchain state obtained after applying the injected
 block.
 
@@ -216,27 +218,29 @@ the included attestations represent. The bonus is also distributed
 immediately.
 
 The attesting rewards are distributed at the end of the cycle.
-The attesting reward may be received even if not all of the validator's attestations are included in a block and is proportional to the validator's active stake (in other words, to its *expected* number of validator slots, and not its actual number of slots).
+Attesting rewards may be received even if not all of the validator's attestations are included in the cycle's blocks and is proportional to the validator's baking power (in other words, to its *expected* number of validator slots, and not its actual number of slots).
 However, two conditions must be met:
 
-- the validator has revealed its nonce, and
+- the validator has revealed its nonces, and
 - the validator has been present during the cycle.
 
 Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_alpha>`
 from Emmy*.
 The second condition is new. We say that a delegate is *present* during a cycle
 if the attesting power (that is, the number of validator slots at the
-corresponding level) of all the attestations included by the delegate during the
+corresponding level) of all the delegate's attestations included during the
 cycle represents at least ``MINIMAL_PARTICIPATION_RATIO`` of the delegate's expected number of
 validator slots for the current cycle (which is ``BLOCKS_PER_CYCLE *
 CONSENSUS_COMMITTEE_SIZE * active_stake / total_active_stake``).
 
-Regarding the concrete values for rewards, before Adaptive Issuance, we first fix the total reward per
-level, call it ``total_rewards``, to ``80 / blocks_per_minute`` tez.
-Assuming ``blocks_per_minute = 7.5``, ``total_rewards`` is 10.67 tez. With Adaptive Issuance, this value changes dynamically over time but for the sake of example, we will assume that the reward value stays the same as above.
+The concrete values for rewards depend on the issuance which is dynamically adjusted by :ref:`Adaptive Issuance<adaptive_issuance_alpha>`.
+For each block it issues an amount ``total_rewards`` of rewarded tez, that varies with
+the total amount of tez at stake on the chain.
+To obtain some concrete values, we will use as an example the issuance before Adaptive Issuance,
+which was ``80`` tez per minute. With ``MINIMAL_BLOCK_DELAY = 8s``, this corresponds to a ``total_rewards`` per level of 10.67 tez.
 We define:
 
-- ``BAKING_REWARD_FIXED_PORTION := baking_reward_ratio * total_rewards``
+- ``baking_reward_fixed_portion := baking_reward_ratio * total_rewards``
 - ``bonus := (1 - baking_reward_ratio) * bonus_ratio * total_rewards`` is the max bonus
 - ``attesting_reward := (1 - baking_reward_ratio) * (1 - bonus_ratio) * total_rewards``
 
@@ -245,7 +249,7 @@ where:
 - ``baking_reward_ratio`` to ``1 / 4``,
 - ``bonus_ratio`` to ``1 / 3``.
 
-Thus, we obtain ``BAKING_REWARD_FIXED_PORTION = 2.67`` tez,
+Thus, we obtain ``baking_reward_fixed_portion = 2.67`` tez,
 (maximum) ``bonus = 2.67`` tez, and ``attesting_reward = 5.33`` tez.
 The bonus per additional attestation slot is in turn ``bonus /
 (CONSENSUS_COMMITTEE_SIZE / 3)`` (because there are at most
@@ -259,19 +263,19 @@ rewards per slot of ``5.33 / 7000 = 0.000761`` tez.
 Let's take an example. Say a block has round 1, is proposed by
 delegate B, and contains the payload from round 0 produced by delegate
 A. Also, B includes attestations with attesting power ``5251``. Then A receives
-the fees and 10 tez (the ``BAKING_REWARD_FIXED_PORTION``) as a reward for
+the fees and 10 tez (the ``baking_reward_fixed_portion``) as a reward for
 producing the block's payload. Concerning the bonus, given that
 ``CONSENSUS_COMMITTEE_SIZE = 7000``, the minimum required validator slots is ``4667``, and there are ``2333 = 7000 - 4667`` additional validator slots.
 Therefore B receives the bonus ``(5251 - 4667) * 0.001143 = 0.667512`` tez. (Note
 that B only included attestations corresponding to ``584 = 5251 - 4667`` additional validator slots, about a quarter of the
 maximum ``2333`` extra attestations it could have theoretically included.) Finally, consider some
-delegate C, whose active stake at some cycle is 1% of the total stake. Note that
+delegate C, whose baking power at some cycle is 1% of the total stake. Note that
 his expected number of validator slots for that cycle is
-``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 30720 * 7000 = 2,150,400``
+``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 10800 * 7000 = 756,000``
 slots. Assume also that the attesting power of C's attestations
-included during that cycle has been ``1,987,456`` slots. Given that this number is
-bigger than the minimum required (``2,150,400 * 2 / 3``), it receives an attesting
-reward of ``2,150,400 * 0.000761 = 1636.4544`` tez for that cycle.
+included during that cycle has been ``651,456`` slots. Given that this number is
+bigger than the minimum required (``756,000 * 2 / 3``), it receives an attesting
+reward of ``756,000 * 0.000761 = 575.316`` tez for that cycle.
 
 .. _slashing_alpha:
 
@@ -279,7 +283,7 @@ Slashing
 ^^^^^^^^
 
 Like in Emmy*, not revealing nonces and double signing are punishable. If a
-validator does not reveal its nonce by the end of the cycle, it does not receive
+validator does not reveal its nonces by the end of the cycle, it does not receive
 its attesting rewards. If a validator double signs, that is, it double bakes
 (which means signing different blocks at the same level and same round) or it
 double (pre)attests (which means voting on two different proposals at the same
@@ -289,23 +293,25 @@ for double baking is a fixed percentage of the frozen deposit
 double (pre)attestations, the formula is more complex, as it depends
 on the number of attestation slots that participated in the
 misbehavior; see :doc:`adaptive_slashing` for more details.
-The payload producer that includes the misbehavior evidence will be rewarded a
-seventh of the slashed amount, which corresponds to ``1 /
-(GLOBAL_LIMIT_OF_STAKING_OVER_BAKING + 2)``.
+The payload producer that includes the misbehavior evidence is
+rewarded ``1 / (GLOBAL_LIMIT_OF_STAKING_OVER_BAKING + 2)`` of the
+slashed amount; the rest of the slashed amount is burned.
 
 If a delegate's deposit is smaller than the slashed amount, the deposit is
 simply emptied.
 
-The evidence for double signing at a given level can be collected by any
-:ref:`accuser<def_accuser_alpha>` and included as an *accusation* operation in a block
-for a period of ``MAX_SLASHING_PERIOD``.
+The evidence for double signing at a given level can be collected by
+any :ref:`accuser<def_accuser_alpha>` and included as a *denunciation*
+operation in a block in the same cycle as the double signing or in the
+``DENUNCIATION_PERIOD`` next cycles.
 
 As soon as a delegate is denounced for any double signing, it is
 immediately :ref:`forbidden<new_forbidden_period_alpha>` from both baking
 and attesting for at least 2 cycles.
 
 The actual slashing and denunciation rewarding happen at the end of
-the last cycle of the slashing period of the misbehavior.
+cycle ``n + SLASHING_DELAY`` for a misbehavior that happened in cycle
+``n``.
 
 Note that selfish baking is not an issue in Tenderbake: say we are at round
 ``r`` and the validator which is proposer at round ``r+1`` does not (pre)attest
@@ -315,7 +321,7 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
-.. _fitness_alpha:
+.. _fitness_section_alpha:
 
 Fitness
 -------
@@ -371,16 +377,18 @@ Consensus related protocol parameters
      - 7000
    * - ``CONSENSUS_THRESHOLD``
      - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)`` = 4667
+   * - ``DENUNCIATION_PERIOD``
+     - 1 cycle
    * - ``MINIMAL_BLOCK_DELAY``
      - 8s
    * - ``BLOCKS_PER_CYCLE``
-     - 30720
+     - 10800
    * - ``DELAY_INCREMENT_PER_ROUND``
      - 4s
    * - ``CONSENSUS_RIGHTS_DELAY``
      - 2 cycles
    * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
-     - 5
+     - 9
    * - ``LIMIT_OF_DELEGATION_OVER_BAKING``
      - 9
    * - ``MINIMAL_STAKE``
@@ -389,20 +397,27 @@ Consensus related protocol parameters
      - 600 ꜩ
    * - ``MINIMAL_PARTICIPATION_RATIO``
      - 2/3
-   * - ``MAX_SLASHING_PERIOD``
-     - 2 cycles
    * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``
      - 5%
-   * - ``BAKING_REWARD_FIXED_PORTION``
-     - 2.67 tez
-   * - ``BAKING_REWARD_BONUS_PER_SLOT``
-     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.001143 tez
-   * - ``ATTESTING_REWARD_PER_SLOT``
-     - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.000761 tez
-   * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
-     - 5
+   * - ``SLASHING_DELAY``
+     - 1 cycle
+   * - ``CONSENSUS_KEY_ACTIVATION_DELAY`` [#derived_cs]_
+     - 2 cycles
+   * - ``ISSUANCE_MODIFICATION_DELAY`` [#derived_cs]_
+     - 2 cycles
+   * - ``UNSTAKE_FINALIZATION_DELAY`` [#derived_cs+sd]_
+     - 3 cycles
 
 The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
+
+.. [#derived_cs] These :ref:`derived constants
+                 <protocol_constants_alpha>` are automatically set to
+                 the same value as ``CONSENSUS_RIGHTS_DELAY``.
+
+.. [#derived_cs+sd] This :ref:`derived constant
+                    <protocol_constants_alpha>` is automatically set
+                    to ``CONSENSUS_RIGHTS_DELAY + SLASHING_DELAY``.
+
 
 Further External Resources
 --------------------------

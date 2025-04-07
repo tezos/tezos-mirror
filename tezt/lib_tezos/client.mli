@@ -133,6 +133,7 @@ val create :
   ?endpoint:endpoint ->
   ?media_type:media_type ->
   ?dal_node:Dal_node.t ->
+  ?remote_signer:Uri.t ->
   unit ->
   t
 
@@ -145,6 +146,7 @@ val create_with_mode :
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?dal_node:Dal_node.t ->
+  ?remote_signer:Uri.t ->
   mode ->
   t
 
@@ -444,6 +446,15 @@ val spawn_import_encrypted_secret_key :
   alias:string ->
   Process.t * Lwt_io.output_channel
 
+(** Run [octez-client import public key]. *)
+val import_public_key :
+  ?force:bool ->
+  ?endpoint:endpoint ->
+  t ->
+  Account.secret_key ->
+  alias:string ->
+  unit Lwt.t
+
 (** Run [octez-client import secret key]. *)
 val import_secret_key :
   ?force:bool ->
@@ -457,10 +468,10 @@ val import_secret_key :
 val import_signer_key :
   ?endpoint:endpoint ->
   ?force:bool ->
-  t ->
+  ?signer:Uri.t ->
   public_key_hash:string ->
   alias:string ->
-  Uri.t ->
+  t ->
   unit Lwt.t
 
 (** Same as [import_secret_key] for signer, but do not wait for the
@@ -468,10 +479,10 @@ val import_signer_key :
 val spawn_import_signer_key :
   ?endpoint:endpoint ->
   ?force:bool ->
-  t ->
+  ?signer:Uri.t ->
   public_key_hash:string ->
   alias:string ->
-  Uri.t ->
+  t ->
   Process.t
 
 (** Same as [import_secret_key], but do not wait for the process to exit. *)
@@ -482,6 +493,9 @@ val spawn_import_secret_key :
   Account.secret_key ->
   alias:string ->
   Process.t
+
+(** Run [octez-client forget all keys --force] *)
+val forget_all_keys : ?endpoint:endpoint -> t -> unit Lwt.t
 
 (** Run [octez-client activate protocol].
 
@@ -748,6 +762,17 @@ val propose_for :
   t ->
   unit Lwt.t
 
+(** [propose_for_and_wait] is the analogous of {!bake_for_and_wait} for
+    {!propose_for}. *)
+val propose_for_and_wait :
+  ?endpoint:endpoint ->
+  ?minimal_timestamp:bool ->
+  ?protocol:Protocol.t ->
+  ?key:string list ->
+  ?force:bool ->
+  t ->
+  unit Lwt.t
+
 (** Run [octez-client show address <alias> --show-secret] and parse
     the output into an [Account.key].
     E.g. for [~alias:"bootstrap1"] the command yields:
@@ -814,6 +839,7 @@ val transfer :
   ?wait:string ->
   ?burn_cap:Tez.t ->
   ?fee:Tez.t ->
+  ?fee_cap:Tez.t ->
   ?gas_limit:int ->
   ?safety_guard:int ->
   ?storage_limit:int ->
@@ -838,6 +864,7 @@ val spawn_transfer :
   ?wait:string ->
   ?burn_cap:Tez.t ->
   ?fee:Tez.t ->
+  ?fee_cap:Tez.t ->
   ?gas_limit:int ->
   ?safety_guard:int ->
   ?storage_limit:int ->
@@ -972,6 +999,10 @@ val spawn_withdraw_delegate :
 (** Run [octez-client get balance for]. *)
 val get_balance_for : ?endpoint:endpoint -> account:string -> t -> Tez.t Lwt.t
 
+(** Run [octez-client get full balance for]. *)
+val get_full_balance_for :
+  ?endpoint:endpoint -> account:string -> t -> Tez.t Lwt.t
+
 (** Same as [get_balance_for], but do not wait for the process to exit. *)
 val spawn_get_balance_for :
   ?endpoint:endpoint -> account:string -> t -> Process.t
@@ -1076,14 +1107,15 @@ val spawn_set_deposits_limit :
   t ->
   Process.t
 
-(** Run [octez-client unset deposits limit for <src>]. *)
-val unset_deposits_limit :
+(** Run [octez-client unset deposits limit for <src>]; do not wait for
+    the process to exit. *)
+val spawn_unset_deposits_limit :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
   ?wait:string ->
   src:string ->
   t ->
-  string Lwt.t
+  Process.t
 
 (** Run [octez-client increase the paid storage of <contract> by <amount> bytes from <payer>]. *)
 val increase_paid_storage :
@@ -1273,6 +1305,7 @@ type stresstest_contract_parameters = {
     then a new random seed is generated.
 
     Optional parameters:
+    - [env] is the environment passed when calling the stresstest command
     - [seed] is the seed used for the random number generator
     - [fee] is the custom fee to pay instead of the default one
     - [gas_limit] is the custom gas limit
@@ -1285,6 +1318,7 @@ type stresstest_contract_parameters = {
 
     [endpoint]: cf {!create} *)
 val stresstest :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?source_aliases:string list ->
   ?source_pkhs:string list ->
@@ -1299,8 +1333,25 @@ val stresstest :
   t ->
   unit Lwt.t
 
+(** Same as {!stresstest}, but use a file path instead of lists of sources
+    and do not wait for the process to exit. *)
+val spawn_stresstest_with_filename :
+  ?env:string String_map.t ->
+  ?endpoint:endpoint ->
+  ?seed:int ->
+  ?fee:Tez.t ->
+  ?gas_limit:int ->
+  ?transfers:int ->
+  ?tps:int ->
+  ?fresh_probability:float ->
+  ?smart_contract_parameters:(string * stresstest_contract_parameters) list ->
+  t ->
+  string ->
+  Process.t
+
 (** Same as {!stresstest}, but do not wait for the process to exit. *)
 val spawn_stresstest :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?source_aliases:string list ->
   ?source_pkhs:string list ->
@@ -1313,7 +1364,7 @@ val spawn_stresstest :
   ?fresh_probability:float ->
   ?smart_contract_parameters:(string * stresstest_contract_parameters) list ->
   t ->
-  Process.t
+  Process.t Lwt.t
 
 (** Run [octez-client stresstest gen keys <nb_keys>].
 
@@ -1359,6 +1410,7 @@ val stresstest_originate_smart_contracts :
 
      [endpoint]: cf {!create} *)
 val stresstest_fund_accounts_from_source :
+  ?env:string String_map.t ->
   ?endpoint:endpoint ->
   source_key_pkh:string ->
   ?batch_size:int ->
@@ -2430,7 +2482,9 @@ val init :
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?endpoint:endpoint ->
+  ?keys:Account.key list ->
   ?media_type:media_type ->
+  ?remote_signer:Uri.t ->
   unit ->
   t Lwt.t
 
@@ -2455,6 +2509,7 @@ val init_with_node :
   ?keys:Account.key list ->
   ?rpc_external:bool ->
   ?dal_node:Dal_node.t ->
+  ?remote_signer:Uri.t ->
   [`Client | `Light | `Proxy] ->
   unit ->
   (Node.t * t) Lwt.t
@@ -2491,6 +2546,7 @@ val init_with_protocol :
   ?keys:Account.key list ->
   ?rpc_external:bool ->
   ?dal_node:Dal_node.t ->
+  ?remote_signer:Uri.t ->
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->
@@ -2532,6 +2588,7 @@ val init_light :
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?nodes_args:Node.argument list ->
   ?dal_node:Dal_node.t ->
+  ?remote_signer:Uri.t ->
   unit ->
   (t * Node.t * Node.t) Lwt.t
 
@@ -3099,11 +3156,21 @@ val spawn_finalize_unstake : ?wait:string -> staker:string -> t -> Process.t
 
 (** Run [octez-client set delegate parameters for <delegate> --limit-of-staking-over-baking <limit> --edge-of-baking-over-staking <edge>]. *)
 val set_delegate_parameters :
-  delegate:string -> limit:string -> edge:string -> t -> unit Lwt.t
+  ?wait:string ->
+  delegate:string ->
+  limit:string ->
+  edge:string ->
+  t ->
+  unit Lwt.t
 
 (** Same as [set_delegate_parameters], but do not wait for the process to exit. *)
 val spawn_set_delegate_parameters :
-  delegate:string -> limit:string -> edge:string -> t -> Process.t
+  ?wait:string ->
+  delegate:string ->
+  limit:string ->
+  edge:string ->
+  t ->
+  Process.t
 
 module RPC : sig
   (** Perform RPC calls using [octez-client]. *)

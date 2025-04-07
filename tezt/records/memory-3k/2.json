@@ -1,157 +1,155 @@
 [
   {
-    "file": "tezt/tests/validate.ml",
-    "title": "Parisb: forge block with wrong payload",
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Sequencer locks production if it's too ahead (sequencer, latest, with dal)",
     "tags": [
       "admin_client",
-      "client",
-      "codec",
-      "fake_block",
-      "layer1",
-      "memory_3k",
-      "node",
-      "parisb",
-      "payload",
-      "propagation",
-      "validate"
-    ],
-    "successful_runs": {
-      "total_time": "18112163",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/validate.ml",
-    "title": "Parisc: forge block with wrong payload",
-    "tags": [
-      "admin_client",
-      "client",
-      "codec",
-      "fake_block",
-      "layer1",
-      "memory_3k",
-      "node",
-      "parisc",
-      "payload",
-      "propagation",
-      "validate"
-    ],
-    "successful_runs": {
-      "total_time": "18195563",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL L1 integration (dal basic logic)",
-    "tags": [
-      "admin_client",
+      "alpha",
       "client",
       "dal",
+      "dal_node",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "max_blueprint_ahead",
       "memory_3k",
       "node",
-      "parisc",
-      "tezos2"
+      "smart_rollup_installer",
+      "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "40946515",
+      "total_time": "46904860",
       "count": "1"
     }
   },
   {
-    "file": "tezt/tests/dal.ml",
-    "title": "Parisb: Testing DAL L1 integration (one_committee_per_level)",
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Checks the sequencer doesn't produce blueprint bigger than the given maximum number of chunks and count delayed transactions size in the blueprint (sequencer, latest, with dal)",
     "tags": [
       "admin_client",
+      "alpha",
+      "blueprint",
       "client",
       "dal",
+      "dal_node",
+      "delayed",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "limit",
       "memory_3k",
       "node",
-      "parisb",
-      "tezos2"
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "3827275",
+      "total_time": "34017590",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Parisb: Testing DAL node (dal node shard fetching and slot reconstruction)",
+    "title": "Quebeca->Alpha: test commitments history with migration",
     "tags": [
       "admin_client",
+      "alpha",
       "client",
       "dal",
       "dal_node",
       "memory_3k",
+      "migration",
       "node",
-      "parisb",
-      "tezos2"
-    ],
-    "successful_runs": {
-      "total_time": "14702447",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL node (dal node list RPCs)",
-    "tags": [
-      "regression",
-      "admin_client",
-      "client",
-      "dal",
-      "dal_node",
-      "memory_3k",
-      "node",
-      "parisc",
+      "quebeca",
       "rpc",
+      "skip_list",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "3953176",
+      "total_time": "65165513",
       "count": "1"
     }
   },
   {
-    "file": "tezt/tests/dal.ml",
-    "title": "Parisb: Testing DAL node (dal node PATCH+GET /profiles)",
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Quebeca: check synchronization state",
     "tags": [
       "admin_client",
+      "bootstrap",
       "client",
-      "dal",
-      "dal_node",
+      "flaky",
+      "layer1",
       "memory_3k",
       "node",
-      "parisb",
-      "tezos2"
+      "quebeca",
+      "sync",
+      "synchronisation_threshold"
     ],
     "successful_runs": {
-      "total_time": "4127410",
+      "total_time": "8498052",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/validate.ml",
+    "title": "Alpha: forge block with wrong payload",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "codec",
+      "fake_block",
+      "layer1",
+      "memory_3k",
+      "node",
+      "payload",
+      "propagation",
+      "validate"
+    ],
+    "successful_runs": {
+      "total_time": "19064614",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL node (dal node GET /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices)",
+    "title": "Quebeca: Testing DAL L1 integration (slots attestation operation dal committee membership check)",
     "tags": [
       "admin_client",
       "client",
       "dal",
-      "dal_node",
+      "memory_3k",
+      "node",
+      "quebeca",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "18515556",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL L1 integration (one_committee_per_level)",
+    "tags": [
+      "admin_client",
+      "client",
+      "dal",
       "memory_3k",
       "node",
       "parisc",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "3527042",
+      "total_time": "3784055",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Alpha: Testing DAL node (dal node GET /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices)",
+    "title": "Alpha: Testing DAL node (dal node slot headers tracking)",
     "tags": [
       "admin_client",
       "alpha",
@@ -163,32 +161,143 @@
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "3570093",
+      "total_time": "46164108",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Parisb: Testing DAL node (dal attester with baker daemon)",
+    "title": "Quebeca: Testing DAL node (dal node list RPCs)",
     "tags": [
+      "regression",
       "admin_client",
-      "baker_ptparisb",
       "client",
       "dal",
       "dal_node",
       "memory_3k",
       "node",
-      "parisb",
+      "quebeca",
+      "rpc",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "65811914",
+      "total_time": "4116557",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Alpha: Testing DAL node (dal attester with baker daemon)",
+    "title": "Parisc: Testing DAL node (dal node POST /slots)",
+    "tags": [
+      "admin_client",
+      "client",
+      "dal",
+      "dal_node",
+      "memory_3k",
+      "node",
+      "parisc",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "17849920",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Quebeca: Testing DAL node (dal node GET /levels/<level>/slots/<index>/content)",
+    "tags": [
+      "admin_client",
+      "client",
+      "dal",
+      "dal_node",
+      "memory_3k",
+      "node",
+      "quebeca",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "14308087",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL node (dal node GET /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "dal",
+      "dal_node",
+      "memory_3k",
+      "node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "16049712",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL node (dal attester with bake for)",
+    "tags": [
+      "admin_client",
+      "client",
+      "dal",
+      "dal_node",
+      "memory_3k",
+      "node",
+      "parisc",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "60001490",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL node (GS valid messages exchange)",
+    "tags": [
+      "admin_client",
+      "client",
+      "dal",
+      "dal_node",
+      "gossipsub",
+      "memory_3k",
+      "node",
+      "parisc",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "13861562",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL node (GS invalid messages exchange)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "dal",
+      "dal_node",
+      "gossipsub",
+      "memory_3k",
+      "node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "15616517",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL node (baker registers profiles with dal node)",
     "tags": [
       "admin_client",
       "alpha",
@@ -201,90 +310,13 @@
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "66003604",
+      "total_time": "52320118",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Alpha: Testing DAL node (dal node import snapshot)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "client",
-      "dal",
-      "dal_node",
-      "import",
-      "memory_3k",
-      "node",
-      "snapshot",
-      "tezos2"
-    ],
-    "successful_runs": {
-      "total_time": "14190160",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/dal.ml",
-    "title": "Parisb: Testing DAL node (GS invalid messages exchange)",
-    "tags": [
-      "admin_client",
-      "client",
-      "dal",
-      "dal_node",
-      "gossipsub",
-      "memory_3k",
-      "node",
-      "parisb",
-      "tezos2"
-    ],
-    "successful_runs": {
-      "total_time": "16906394",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL node (GS invalid messages exchange)",
-    "tags": [
-      "admin_client",
-      "client",
-      "dal",
-      "dal_node",
-      "gossipsub",
-      "memory_3k",
-      "node",
-      "parisc",
-      "tezos2"
-    ],
-    "successful_runs": {
-      "total_time": "16409662",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL node (baker registers profiles with dal node)",
-    "tags": [
-      "admin_client",
-      "baker_psparisc",
-      "client",
-      "dal",
-      "dal_node",
-      "memory_3k",
-      "node",
-      "parisc",
-      "tezos2"
-    ],
-    "successful_runs": {
-      "total_time": "52659607",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/dal.ml",
-    "title": "Parisb: Testing DAL node (peer discovery via bootstrap node)",
+    "title": "Quebeca: Testing DAL node (peer discovery via bootstrap node)",
     "tags": [
       "admin_client",
       "bootstrap",
@@ -293,112 +325,175 @@
       "dal_node",
       "memory_3k",
       "node",
-      "parisb",
+      "quebeca",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "31489432",
+      "total_time": "29418833",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL node (peer discovery via bootstrap node)",
+    "title": "Quebeca: Testing DAL node (GS/RPC get_connections)",
+    "tags": [
+      "admin_client",
+      "client",
+      "dal",
+      "dal_node",
+      "gossipsub",
+      "memory_3k",
+      "node",
+      "quebeca",
+      "rpc",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "14671822",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL node (trusted peers reconnection)",
     "tags": [
       "admin_client",
       "bootstrap",
       "client",
+      "connection",
       "dal",
       "dal_node",
       "memory_3k",
       "node",
       "parisc",
-      "tezos2"
+      "tezos2",
+      "trusted"
     ],
     "successful_runs": {
-      "total_time": "31496370",
+      "total_time": "27219156",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Parisb: Testing DAL node (attestation through p2p)",
+    "title": "Parisc: Testing DAL node (garbage collection of shards for producer)",
     "tags": [
-      "admin_client",
-      "attestation",
-      "client",
-      "dal",
-      "dal_node",
-      "memory_3k",
-      "node",
-      "p2p",
-      "parisb",
-      "tezos2"
-    ],
-    "successful_runs": {
-      "total_time": "18742692",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/dal.ml",
-    "title": "Parisb: Testing DAL rollup and node with L1 (rollup_node_downloads_slots)",
-    "tags": [
-      "regression",
       "admin_client",
       "client",
       "dal",
       "dal_node",
-      "memory_3k",
-      "node",
-      "parisb",
-      "smart_rollup_node",
-      "tezos2"
-    ],
-    "successful_runs": {
-      "total_time": "38492611",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL rollup and node with L1 (rollup_node_downloads_slots)",
-    "tags": [
-      "regression",
-      "admin_client",
-      "client",
-      "dal",
-      "dal_node",
+      "gc",
       "memory_3k",
       "node",
       "parisc",
-      "smart_rollup_node",
+      "simple",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "38355744",
+      "total_time": "14977164",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Alpha: Testing DAL rollup and node with L1 (test reveal_dal_page in fast exec wasm pvm)",
+    "title": "Alpha: Testing DAL node (restart DAL node (bootstrap))",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "baker_alpha",
+      "client",
+      "dal",
+      "dal_node",
+      "memory_3k",
+      "node",
+      "restart",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "47514791",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL rollup and node with L1 (rollup_node_downloads_slots)",
     "tags": [
       "regression",
       "admin_client",
       "alpha",
+      "client",
+      "dal",
+      "dal_node",
+      "memory_3k",
+      "node",
+      "smart_rollup_node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "38326895",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL rollup and node with L1 (test reveal_dal_page in fast exec wasm pvm)",
+    "tags": [
+      "regression",
+      "admin_client",
       "client",
       "dal",
       "dal_echo_kernel",
       "dal_node",
       "memory_3k",
       "node",
+      "parisc",
       "smart_rollup_installer",
       "smart_rollup_node",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "26796552",
+      "total_time": "28217031",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Test following dal and baker tutorial commands",
+    "tags": [
+      "regression",
+      "admin_client",
+      "alpha",
+      "baker",
+      "baker_alpha",
+      "client",
+      "dal",
+      "dal_node",
+      "memory_3k",
+      "node",
+      "tezos2",
+      "tutorial"
+    ],
+    "successful_runs": {
+      "total_time": "13791614",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Quebeca: Testing DAL rollup and node with L1 (Rollup injects DAL slots)",
+    "tags": [
+      "admin_client",
+      "client",
+      "dal",
+      "dal_node",
+      "memory_3k",
+      "node",
+      "quebeca",
+      "smart_rollup_node",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "20467550",
       "count": "1"
     }
   }

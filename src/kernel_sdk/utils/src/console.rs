@@ -4,10 +4,7 @@
 
 //! Options for how the debug logs from the kernel are printed.
 
-#![cfg(not(any(
-    target_arch = "wasm32",
-    all(target_arch = "riscv64", target_os = "hermit")
-)))]
+#![cfg(pvm_kind = "none")]
 
 use quanta::Instant;
 use serde::{ser::SerializeStruct, Serialize};
@@ -58,7 +55,7 @@ impl Write for Console<'_> {
 
                     if *c == b'\n' {
                         serde_json::to_writer(&mut self.lock, line)?;
-                        self.lock.write_all(&[b'\n'])?;
+                        self.lock.write_all(b"\n")?;
                         line.message.truncate(0);
                     } else {
                         line.message.push(*c);

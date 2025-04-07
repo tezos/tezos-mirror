@@ -1,0 +1,4 @@
+code { NOW } ;
+input { } ;
+output { Stack_elt timestamp 1734514761 } ;
+now "2024-12-18T09:39:21+00:00"

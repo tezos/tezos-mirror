@@ -14,6 +14,8 @@ depends: [
   "tezos-micheline-rewriting" { = version }
   "tezos-protocol-alpha" { = version }
   "hashcons"
+  "octez-rustzcash-deps" { with-test & = version }
+  "bls12-381" { with-test & = version }
   "octez-protocol-alpha-libs" { with-test & = version }
 ]
 build: [
@@ -21,4 +23,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos: type inference for partial Michelson expressions"

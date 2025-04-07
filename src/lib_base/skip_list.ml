@@ -387,7 +387,7 @@ end) : S = struct
       let ( let* ) = bind
 
       module Option = struct
-        let (return [@ocaml.inline "always"]) = fun x -> M.return (Some x)
+        let[@ocaml.inline always] return x = M.return (Some x)
 
         let ( let* ) lo f =
           M.bind lo (function None -> M.return None | Some x -> f x)
@@ -600,7 +600,7 @@ end) : S = struct
   include Make_monadic (struct
     type 'a t = 'a
 
-    let (bind [@ocaml.inline "always"]) = ( |> )
+    let bind = ( |> )
 
     let[@ocaml.inline always] return x = x
   end)

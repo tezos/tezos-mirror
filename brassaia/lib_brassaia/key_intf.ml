@@ -52,7 +52,7 @@ module type Sigs = sig
   module type Hash_like = Hash_like
 
   (** The simplest possible [Key] implementation is just a hash of the
-      corresponding value, attaching no additional metadata about the value. *)
+      corresponding value *)
   module Of_hash (H : Type.S) : Hash_like with type t = H.t and type hash = H.t
 
   module Store_spec : sig

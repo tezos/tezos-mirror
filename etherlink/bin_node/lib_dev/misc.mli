@@ -12,6 +12,14 @@ val now : unit -> Time.Protocol.t
     and advertises it with [event]. *)
 val with_timing : (Ptime.span -> unit Lwt.t) -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
+(** Same as [with_timing], but (1) [event] receives the result of [k] in
+    addition to the time necessary to compute it, and [k] is in the error
+    monad, not just the Lwt monad. *)
+val with_timing_f_e :
+  ('a -> Ptime.span -> unit Lwt.t) ->
+  (unit -> ('a, 'e) result Lwt.t) ->
+  ('a, 'e) result Lwt.t
+
 (** [unwrap_error_monad f] execute f and fails with a Failure when the
     error monad returns an error. *)
 val unwrap_error_monad : (unit -> 'a tzresult Lwt.t) -> 'a Lwt.t
@@ -27,3 +35,6 @@ val normalize_addr : string -> string
     character. [vars] is therefore a list of pair containing a character (the
     variable) and a string (its value). *)
 val interpolate : string -> (char * string) list -> string
+
+val download_file :
+  keep_alive:bool -> working_dir:string -> string -> string tzresult Lwt.t

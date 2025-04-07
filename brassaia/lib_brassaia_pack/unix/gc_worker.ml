@@ -22,9 +22,8 @@ exception Pack_error = Errors.Pack_error
 module Make (Args : Gc_args.S) = struct
   open Args
   module Io = File_manager.Io
-  module Lower = File_manager.Lower
   module Sparse = Dispatcher.File_manager.Sparse
-  module Ao = Append_only_file.Make (File_manager.Io) (Errs)
+  module Ao = Append_only_file
 
   let string_of_key = Brassaia.Type.to_string key_t
 
@@ -211,7 +210,7 @@ module Make (Args : Gc_args.S) = struct
   }
   [@@deriving brassaia]
 
-  type gc_output = (gc_results, Args.Errs.t) result [@@deriving brassaia]
+  type gc_output = (gc_results, Io_errors.t) result [@@deriving brassaia]
 
   let run ~lower_root ~generation ~new_files_path root commit_key
       new_suffix_start_offset =
@@ -228,13 +227,15 @@ module Make (Args : Gc_args.S) = struct
       report_old_file_sizes ~root ~generation:(generation - 1) stats |> ignore
     in
 
-    let file_manager = File_manager.open_ro config |> Errs.raise_if_error in
+    let file_manager =
+      File_manager.open_ro config |> Io_errors.raise_if_error
+    in
     Errors.finalise_exn (fun _outcome ->
         File_manager.close file_manager
-        |> Errs.log_if_error "GC: Close File_manager")
+        |> Io_errors.log_if_error "GC: Close File_manager")
     @@ fun () ->
-    let dict = Dict.init file_manager |> Errs.raise_if_error in
-    let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
+    let dict = Dict.init file_manager |> Io_errors.raise_if_error in
+    let dispatcher = Dispatcher.init file_manager |> Io_errors.raise_if_error in
     let node_store =
       Node_store.init ~config ~file_manager ~dict ~dispatcher ~lru:None
     in
@@ -250,7 +251,8 @@ module Make (Args : Gc_args.S) = struct
         Commit_store.unsafe_find ~check_integrity:false commit_store commit_key
       with
       | None ->
-          Errs.raise_error (`Commit_key_is_dangling (string_of_key commit_key))
+          Io_errors.raise_error
+            (`Commit_key_is_dangling (string_of_key commit_key))
       | Some commit -> commit
     in
 
@@ -276,14 +278,16 @@ module Make (Args : Gc_args.S) = struct
         Brassaia_pack.Layout.V4.prefix ~root:new_files_path ~generation
       in
       let mapping_size =
-        let prefix = Sparse.Ao.create ~mapping ~data |> Errs.raise_if_error in
+        let prefix =
+          Sparse.Ao.create ~mapping ~data |> Io_errors.raise_if_error
+        in
         (* Step 5. Transfer to the new prefix, flush and close. *)
         [%log.debug "GC: transfering to the new prefix"];
         stats := Gc_stats.Worker.finish_current_step !stats "prefix: transfer";
         Errors.finalise_exn (fun _ ->
             Sparse.Ao.flush prefix
             >>= (fun _ -> Sparse.Ao.close prefix)
-            |> Errs.log_if_error "GC: Close prefix after data copy")
+            |> Io_errors.log_if_error "GC: Close prefix after data copy")
         @@ fun () ->
         (* Step 5.1. Transfer all. *)
         Ranges.iter
@@ -301,12 +305,13 @@ module Make (Args : Gc_args.S) = struct
           Gc_stats.Worker.finish_current_step !stats
             "prefix: rewrite commit parents";
         let prefix =
-          Sparse.Wo.open_wo ~mapping_size ~mapping ~data |> Errs.raise_if_error
+          Sparse.Wo.open_wo ~mapping_size ~mapping ~data
+          |> Io_errors.raise_if_error
         in
         Errors.finalise_exn (fun _outcome ->
             Sparse.Wo.fsync prefix
             >>= (fun _ -> Sparse.Wo.close prefix)
-            |> Errs.log_if_error "GC: Close prefix after parent rewrite")
+            |> Io_errors.log_if_error "GC: Close prefix after parent rewrite")
         @@ fun () ->
         let write_exn = Sparse.Wo.write_exn prefix in
         List.iter
@@ -435,13 +440,13 @@ module Make (Args : Gc_args.S) = struct
   let run_and_output_result ~lower_root ~generation ~new_files_path root
       commit_key new_suffix_start_offset =
     let result =
-      Errs.catch (fun () ->
+      Io_errors.catch (fun () ->
           run ~lower_root ~generation ~new_files_path root commit_key
             new_suffix_start_offset)
     in
-    Errs.log_if_error "gc run" result;
+    Io_errors.log_if_error "gc run" result;
     let write_result = write_gc_output ~root ~generation result in
-    write_result |> Errs.log_if_error "writing gc output"
+    write_result |> Io_errors.log_if_error "writing gc output"
   (* No need to raise or log if [result] is [Error _], we've written it in
      the file. *)
 end

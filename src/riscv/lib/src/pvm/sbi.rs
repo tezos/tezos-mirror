@@ -1,33 +1,44 @@
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
-use super::{PvmHooks, PvmStatus};
+// When the Supervisor is enabled, most of this module is not used.
+#![cfg_attr(feature = "supervisor", allow(dead_code))]
+
+use super::{PvmHooks, PvmStatus, reveals::RevealRequest};
 use crate::{
     machine_state::{
-        bus::{main_memory::MainMemoryLayout, AddressableRead, AddressableWrite},
-        registers::{a0, a1, a2, a3, a6, a7, XValue},
         AccessType, CacheLayouts, MachineState,
+        block_cache::bcall::Block,
+        main_memory::MainMemoryLayout,
+        registers::{XValue, a0, a1, a2, a3, a6, a7},
     },
     parser::instruction::InstrUncacheable,
     state_backend::{CellRead, CellReadWrite, CellWrite, ManagerReadWrite},
     traps::EnvironException,
 };
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
+use std::cmp::min;
 use tezos_smart_rollup_constants::{
     core::MAX_INPUT_MESSAGE_SIZE,
     riscv::{
-        SbiError, SBI_CONSOLE_PUTCHAR, SBI_DBCN, SBI_DBCN_CONSOLE_WRITE_BYTE, SBI_FIRMWARE_TEZOS,
-        SBI_SHUTDOWN, SBI_SRST, SBI_SRST_SYSTEM_RESET, SBI_TEZOS_BLAKE2B_HASH256,
-        SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT,
-        SBI_TEZOS_METADATA_REVEAL,
+        REVEAL_DATA_MAX_SIZE, REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_DBCN,
+        SBI_DBCN_CONSOLE_WRITE_BYTE, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_SRST,
+        SBI_SRST_SYSTEM_RESET, SBI_TEZOS_BLAKE2B_HASH256, SBI_TEZOS_ED25519_SIGN,
+        SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_METADATA_REVEAL,
+        SBI_TEZOS_REVEAL, SbiError,
     },
 };
 
 /// Write the SBI error code as the return value.
 #[inline(always)]
-fn sbi_return_error<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>(
-    machine: &mut MachineState<ML, CL, M>,
+fn sbi_return_error<
+    ML: MainMemoryLayout,
+    CL: CacheLayouts,
+    B: Block<ML, M>,
+    M: ManagerReadWrite,
+>(
+    machine: &mut MachineState<ML, CL, B, M>,
     code: SbiError,
 ) {
     machine.core.hart.xregisters.write(a0, code as i64 as u64);
@@ -35,8 +46,8 @@ fn sbi_return_error<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
 
 /// Write an arbitrary value as single return value.
 #[inline(always)]
-fn sbi_return1<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>(
-    machine: &mut MachineState<ML, CL, M>,
+fn sbi_return1<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerReadWrite>(
+    machine: &mut MachineState<ML, CL, B, M>,
     value: XValue,
 ) {
     // The SBI caller interprets the return value as a [i64]. We don't want the value to be
@@ -50,8 +61,13 @@ fn sbi_return1<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>(
 
 /// Write an `sbiret` return struct.
 #[inline(always)]
-fn sbi_return_sbiret<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>(
-    machine: &mut MachineState<ML, CL, M>,
+fn sbi_return_sbiret<
+    ML: MainMemoryLayout,
+    CL: CacheLayouts,
+    B: Block<ML, M>,
+    M: ManagerReadWrite,
+>(
+    machine: &mut MachineState<ML, CL, B, M>,
     error: Option<SbiError>,
     value: XValue,
 ) {
@@ -65,12 +81,13 @@ fn sbi_return_sbiret<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite
 
 /// Run the given closure `inner` and write the corresponding SBI results to `machine`.
 #[inline(always)]
-fn sbi_wrap<ML, CL, M, F>(machine: &mut MachineState<ML, CL, M>, inner: F)
+fn sbi_wrap<ML, CL, B, M, F>(machine: &mut MachineState<ML, CL, B, M>, inner: F)
 where
     ML: MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
-    F: FnOnce(&mut MachineState<ML, CL, M>) -> Result<XValue, SbiError>,
+    F: FnOnce(&mut MachineState<ML, CL, B, M>) -> Result<XValue, SbiError>,
 {
     match inner(machine) {
         Ok(value) => sbi_return1(machine, value),
@@ -80,11 +97,15 @@ where
 
 /// Respond to a request for input with no input. Returns `false` in case the
 /// machine wasn't expecting any input, otherwise returns `true`.
-pub fn provide_no_input<S, ML, CL, M>(status: &mut S, machine: &mut MachineState<ML, CL, M>) -> bool
+pub fn provide_no_input<S, ML, CL, B, M>(
+    status: &mut S,
+    machine: &mut MachineState<ML, CL, B, M>,
+) -> bool
 where
     S: CellReadWrite<Value = PvmStatus>,
     CL: CacheLayouts,
     ML: MainMemoryLayout,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for input.
@@ -103,9 +124,9 @@ where
 
 /// Provide input information to the machine. Returns `false` in case the
 /// machine wasn't expecting any input, otherwise returns `true`.
-pub fn provide_input<S, ML, CL, M>(
+pub fn provide_input<S, ML, CL, B, M>(
     status: &mut S,
-    machine: &mut MachineState<ML, CL, M>,
+    machine: &mut MachineState<ML, CL, B, M>,
     level: u32,
     counter: u32,
     payload: &[u8],
@@ -114,6 +135,7 @@ where
     S: CellReadWrite<Value = PvmStatus>,
     CL: CacheLayouts,
     ML: MainMemoryLayout,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for input.
@@ -150,10 +172,10 @@ where
 
         machine
             .core
-            .bus
+            .main_memory
             .write_all(phys_buffer_addr, &payload[..max_buffer_size])?;
-        machine.core.bus.write(phys_level_addr, level)?;
-        machine.core.bus.write(phys_counter_addr, counter)?;
+        machine.core.main_memory.write(phys_level_addr, level)?;
+        machine.core.main_memory.write(phys_counter_addr, counter)?;
 
         // At the moment, this case is unlikely to occur because we cap [max_buffer_size] at
         // [MAX_INPUT_MESSAGE_SIZE].
@@ -165,9 +187,9 @@ where
 
 /// Provide metadata in response to a metadata request. Returns `false`
 /// if the machine is not expecting metadata.
-pub fn provide_metadata<S, ML, CL, M>(
+pub fn provide_metadata<S, ML, CL, B, M>(
     status: &mut S,
-    machine: &mut MachineState<ML, CL, M>,
+    machine: &mut MachineState<ML, CL, B, M>,
     rollup_address: &[u8; 20],
     origination_level: u32,
 ) -> bool
@@ -175,6 +197,7 @@ where
     S: CellReadWrite<Value = PvmStatus>,
     CL: CacheLayouts,
     ML: MainMemoryLayout,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for metadata.
@@ -196,11 +219,59 @@ where
 
         machine
             .core
-            .bus
+            .main_memory
             .write_all(phys_dest_addr, rollup_address.as_slice())?;
 
         // [origination_level] should not wrap around and become negative.
         Ok(origination_level as u64)
+    });
+
+    true
+}
+
+/// Provide reveal data in response to a reveal request. Returns `false`
+/// if the machine is not expecting reveal.
+pub fn provide_reveal_response<S, ML, CL, B, M>(
+    status: &mut S,
+    machine: &mut MachineState<ML, CL, B, M>,
+    reveal_data: &[u8],
+) -> bool
+where
+    S: CellReadWrite<Value = PvmStatus>,
+    CL: CacheLayouts,
+    ML: MainMemoryLayout,
+    B: Block<ML, M>,
+    M: ManagerReadWrite,
+{
+    // This method should only do something when we're waiting for reveal.
+    if status.read() != PvmStatus::WaitingForReveal {
+        return false;
+    }
+
+    // We're evaluating again after this.
+    status.write(PvmStatus::Evaluating);
+
+    sbi_wrap(machine, |machine| {
+        // These arguments should have been set by the previous SBI call.
+        let arg_buffer_addr = machine.core.hart.xregisters.read(a2);
+        let arg_buffer_size = machine.core.hart.xregisters.read(a3);
+
+        let memory_write_size = min(
+            REVEAL_DATA_MAX_SIZE,
+            min(arg_buffer_size as usize, reveal_data.len()),
+        );
+
+        // The argument address is a virtual address. We need to translate it to
+        // a physical address.
+        let phys_dest_addr = machine.core.translate(arg_buffer_addr, AccessType::Store)?;
+
+        // TODO: RV-425 Cross-page memory accesses are not translated correctly
+        machine
+            .core
+            .main_memory
+            .write_all(phys_dest_addr, &reveal_data[..memory_write_size])?;
+
+        Ok(memory_write_size as u64)
     });
 
     true
@@ -216,7 +287,7 @@ where
     status.write(PvmStatus::WaitingForInput);
 }
 
-/// Handle a [SBI_TEZOS_META] call.
+/// Handle a [SBI_TEZOS_METADATA_REVEAL] call.
 #[inline]
 fn handle_tezos_metadata_reveal<S>(status: &mut S)
 where
@@ -228,12 +299,13 @@ where
 
 /// Produce a Ed25519 signature.
 #[inline]
-fn handle_tezos_ed25519_sign<ML, CL, M>(
-    machine: &mut MachineState<ML, CL, M>,
+fn handle_tezos_ed25519_sign<ML, CL, B, M>(
+    machine: &mut MachineState<ML, CL, B, M>,
 ) -> Result<u64, SbiError>
 where
     ML: MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     let arg_sk_addr = machine.core.hart.xregisters.read(a0);
@@ -246,28 +318,32 @@ where
     let sig_addr = machine.core.translate(arg_sig_addr, AccessType::Store)?;
 
     let mut sk_bytes = [0u8; 32];
-    machine.core.bus.read_all(sk_addr, &mut sk_bytes)?;
+    machine.core.main_memory.read_all(sk_addr, &mut sk_bytes)?;
     let sk = SigningKey::try_from(sk_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
     sk_bytes.fill(0);
 
     let mut msg_bytes = vec![0; arg_msg_len as usize];
-    machine.core.bus.read_all(msg_addr, &mut msg_bytes)?;
+    machine
+        .core
+        .main_memory
+        .read_all(msg_addr, &mut msg_bytes)?;
 
     let sig = sk.sign(msg_bytes.as_slice());
     let sig_bytes: [u8; 64] = sig.to_bytes();
-    machine.core.bus.write_all(sig_addr, &sig_bytes)?;
+    machine.core.main_memory.write_all(sig_addr, &sig_bytes)?;
 
     Ok(sig_bytes.len() as u64)
 }
 
 /// Verify a Ed25519 signature.
 #[inline]
-fn handle_tezos_ed25519_verify<ML, CL, M>(
-    machine: &mut MachineState<ML, CL, M>,
+fn handle_tezos_ed25519_verify<ML, CL, B, M>(
+    machine: &mut MachineState<ML, CL, B, M>,
 ) -> Result<u64, SbiError>
 where
     ML: MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     let arg_pk_addr = machine.core.hart.xregisters.read(a0);
@@ -280,13 +356,19 @@ where
     let msg_addr = machine.core.translate(arg_msg_addr, AccessType::Load)?;
 
     let mut pk_bytes = [0u8; 32];
-    machine.core.bus.read_all(pk_addr, &mut pk_bytes)?;
+    machine.core.main_memory.read_all(pk_addr, &mut pk_bytes)?;
 
     let mut sig_bytes = [0u8; 64];
-    machine.core.bus.read_all(sig_addr, &mut sig_bytes)?;
+    machine
+        .core
+        .main_memory
+        .read_all(sig_addr, &mut sig_bytes)?;
 
     let mut msg_bytes = vec![0u8; arg_msg_len as usize];
-    machine.core.bus.read_all(msg_addr, &mut msg_bytes)?;
+    machine
+        .core
+        .main_memory
+        .read_all(msg_addr, &mut msg_bytes)?;
 
     let pk = VerifyingKey::try_from(pk_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
     let sig = Signature::from_slice(sig_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
@@ -297,12 +379,13 @@ where
 
 /// Compute a BLAKE2B 256-bit digest.
 #[inline]
-fn handle_tezos_blake2b_hash256<ML, CL, M>(
-    machine: &mut MachineState<ML, CL, M>,
+fn handle_tezos_blake2b_hash256<ML, CL, B, M>(
+    machine: &mut MachineState<ML, CL, B, M>,
 ) -> Result<u64, SbiError>
 where
     ML: MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     let arg_out_addr = machine.core.hart.xregisters.read(a0);
@@ -313,20 +396,63 @@ where
     let msg_addr = machine.core.translate(arg_msg_addr, AccessType::Load)?;
 
     let mut msg_bytes = vec![0u8; arg_msg_len as usize];
-    machine.core.bus.read_all(msg_addr, &mut msg_bytes)?;
+    machine
+        .core
+        .main_memory
+        .read_all(msg_addr, &mut msg_bytes)?;
 
     let hash = tezos_crypto_rs::blake2b::digest_256(msg_bytes.as_slice());
-    machine.core.bus.write_all(out_addr, hash.as_slice())?;
+    machine
+        .core
+        .main_memory
+        .write_all(out_addr, hash.as_slice())?;
 
     Ok(hash.len() as u64)
 }
 
+/// Handle a [SBI_TEZOS_REVEAL] call.
+#[inline]
+fn handle_tezos_reveal<S, ML, CL, B, M>(
+    machine: &mut MachineState<ML, CL, B, M>,
+    reveal_request: &mut RevealRequest<M>,
+    status: &mut S,
+) where
+    S: CellReadWrite<Value = PvmStatus>,
+    ML: MainMemoryLayout,
+    CL: CacheLayouts,
+    B: Block<ML, M>,
+    M: ManagerReadWrite,
+{
+    let request_address = machine.core.hart.xregisters.read(a0);
+    let request_size = machine.core.hart.xregisters.read(a1);
+
+    let mut buffer = vec![0u8; min(request_size as usize, REVEAL_REQUEST_MAX_SIZE)];
+
+    let Ok(phys_dest_addr) = machine.core.translate(request_address, AccessType::Store) else {
+        return sbi_return_error(machine, SbiError::InvalidAddress);
+    };
+    if machine
+        .core
+        .main_memory
+        .read_all(phys_dest_addr, &mut buffer)
+        .is_err()
+    {
+        return sbi_return_error(machine, SbiError::InvalidAddress);
+    }
+
+    // TODO: RV-425 Cross-page memory accesses are not translated correctly
+    reveal_request.bytes.write_all(0, &buffer);
+    reveal_request.size.write(request_size);
+    status.write(PvmStatus::WaitingForReveal);
+}
+
 /// Handle a [SBI_SHUTDOWN] call.
 #[inline(always)]
-fn handle_legacy_shutdown<ML, CL, M>(machine: &mut MachineState<ML, CL, M>)
+fn handle_legacy_shutdown<ML, CL, B, M>(machine: &mut MachineState<ML, CL, B, M>)
 where
     ML: MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     // This call always fails.
@@ -335,12 +461,13 @@ where
 
 /// Handle a [SBI_CONSOLE_PUTCHAR] call.
 #[inline(always)]
-fn handle_legacy_console_putchar<ML, CL, M>(
-    machine: &mut MachineState<ML, CL, M>,
+fn handle_legacy_console_putchar<ML, CL, B, M>(
+    machine: &mut MachineState<ML, CL, B, M>,
     hooks: &mut PvmHooks,
 ) where
     ML: MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     let char = machine.core.hart.xregisters.read(a0) as u8;
@@ -352,12 +479,13 @@ fn handle_legacy_console_putchar<ML, CL, M>(
 
 /// Handle a [SBI_DBCN_CONSOLE_WRITE_BYTE] call.
 #[inline(always)]
-fn handle_debug_console_write_byte<ML, CL, M>(
-    machine: &mut MachineState<ML, CL, M>,
+fn handle_debug_console_write_byte<ML, CL, B, M>(
+    machine: &mut MachineState<ML, CL, B, M>,
     hooks: &mut PvmHooks,
 ) where
     ML: MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     let char = machine.core.hart.xregisters.read(a0) as u8;
@@ -369,10 +497,11 @@ fn handle_debug_console_write_byte<ML, CL, M>(
 
 /// Handle a [SBI_SRST_SYSTEM_RESET] call.
 #[inline(always)]
-fn handle_system_reset<ML, CL, M>(machine: &mut MachineState<ML, CL, M>)
+fn handle_system_reset<ML, CL, B, M>(machine: &mut MachineState<ML, CL, B, M>)
 where
     ML: MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     sbi_return_sbiret(machine, Some(SbiError::NotSupported), 0);
@@ -380,10 +509,11 @@ where
 
 /// Handle unsupported SBI calls.
 #[inline(always)]
-fn handle_not_supported<ML, CL, M>(machine: &mut MachineState<ML, CL, M>)
+fn handle_not_supported<ML, CL, B, M>(machine: &mut MachineState<ML, CL, B, M>)
 where
     ML: MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     // SBI requires us to indicate that we don't support this function by returning
@@ -393,9 +523,10 @@ where
 
 /// Handle a PVM SBI call. Returns `true` if it makes sense to continue evaluation.
 #[inline]
-pub fn handle_call<S, ML, CL, M>(
+pub fn handle_call<S, ML, CL, B, M>(
     status: &mut S,
-    machine: &mut MachineState<ML, CL, M>,
+    reveal_request: &mut RevealRequest<M>,
+    machine: &mut MachineState<ML, CL, B, M>,
     hooks: &mut PvmHooks,
     env_exception: EnvironException,
 ) -> bool
@@ -403,6 +534,7 @@ where
     S: CellReadWrite<Value = PvmStatus>,
     ML: MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: ManagerReadWrite,
 {
     if let EnvironException::EnvCallFromMMode = env_exception {
@@ -413,7 +545,7 @@ where
     // No matter the outcome, we need to bump the
     // program counter because ECALL's don't update it
     // to the following instructions.
-    let pc = machine.core.hart.pc.read() + InstrUncacheable::Ecall.width();
+    let pc = machine.core.hart.pc.read() + InstrUncacheable::Ecall.width() as u64;
     machine.core.hart.pc.write(pc);
 
     // SBI extension is contained in a7.
@@ -443,6 +575,7 @@ where
                 SBI_TEZOS_ED25519_SIGN => sbi_wrap(machine, handle_tezos_ed25519_sign),
                 SBI_TEZOS_ED25519_VERIFY => sbi_wrap(machine, handle_tezos_ed25519_verify),
                 SBI_TEZOS_BLAKE2B_HASH256 => sbi_wrap(machine, handle_tezos_blake2b_hash256),
+                SBI_TEZOS_REVEAL => handle_tezos_reveal(machine, reveal_request, status),
                 _ => handle_not_supported(machine),
             }
         }

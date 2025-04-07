@@ -86,11 +86,11 @@ will run a docker image. This docker image must follow some conditions
 use your own dockerfile.
 
 To help you write such an image, a default one based on debian is
-provided in `tezt/lib_cloud/saroupille.Dockerfile`.
+provided in `tezt/lib_cloud/dockerfiles/debian.Dockerfile`.
 
 The library takes care for you to push this image on a dedicated GCP
 registry. A docker image such as the one generated from
-`saroupille.Dockerfile` may contain some binaries. Tezt cloud always
+`debian.Dockerfile` may contain some binaries. Tezt cloud always
 try to rebuild the docker image to be sure it uses the last version,
 however be sure to compile the binaries beforehand.
 
@@ -98,25 +98,46 @@ Finally, do note that with Tezt cloud you can specify for each VM
 individually the docker image to be used. The one provided by the
 dockerfile as discussed above will be the one by default. It is also
 possible to use docker images published by the Octez CI. At the
-moment, the docker image from the latest released of Octez is
+moment, the docker image from the latest release of Octez is
 supported.
+
+There is now also a docker file that can be used for macOS distributions,
+which is provided in `tezt/lib_cloud/dockerfiles/macosx.Dockerfile`. Please
+note that this image is highly experimental, and several improvements are
+to be made to it, but it should work for the time being.
 
 ## Write your own dockerfile
 
-Depending on your local setup, we recommend to copy/paste an image that is
-similar to your local setup. An example for a ubuntu/debian-like machine is
-given by `saroupille.Dockerfile`. At the moment, several assumptions are made:
+Depending on your local setup, we recommend copying and pasting an
+image that closely matches your environment. An example for an
+Ubuntu/Debian-like machine is given by `debian.Dockerfile`. The
+following assumptions apply:
 
 1. An ssh server is running on port `30000`
-2. For convenience, we recommend the image to contain the minimum necessary to
-   run Octez binaries that were compiled on your local setup. In particular, we
-   use the docker variable `ZCASH_PARAMS_PATH` to provide the place where the
-   zcash parameters are used.
+
+2. For convenience, the image should include the minimum necessary
+components to run Octez binaries compiled on your local setup. In
+particular, the Docker variables ZCASH_PARAMS_PATH and
+DAL_TRUSTED_SETUP_PATH should specify the location where the Zcash
+parameters and DAL trusted setup are used.
+
 3. Optionally, you can also put the binaries into the docker image (see
-   `saroupille.Dockerfile`).
+   `debian.Dockerfile`).
 
 To ensure you can connect to the ssh server, the library generates (if
 it does not exist) and ssh key based on the `tezt-cloud` variable.
+
+**Note**: In addition to the Dockerfile, you need to create a
+  `.dockerignore` file in the same directory. This ensures the Docker
+  context doesn't exclude some files ignored by the main Octez
+  Dockerfiles but still needed for tezt-cloud.
+
+### OS specific dockerfiles
+
+If you can't find an existing image that fits your distribution, feel
+free to create one. If you do so, remember to update the project's
+.gitignore file accordingly to ensure any changes to these files are
+committed.
 
 # One-time deployment
 
@@ -149,7 +170,7 @@ Any Tezt cloud scenario can be run on the host machine for checking
 any deployment error, this is the `localhost` mode. Hence, when
 testing any scenario we recommend to provide the `--localhost`
 parameter with a low number of machines to check whether your scenario
-works as expected. 
+works as expected.
 
 When you are ready to deploy resources, you can remove the
 `--localhost` option, or alternatively use the `--cloud` option. When
@@ -255,7 +276,7 @@ Grafana can be used to visualize prometheus metrics (activated by
 default). This can be accessed on `http://localhost:3000`. Tezt cloud
 comes with a set of dashboards so that it is ready to use. Feel free
 to update/add new dashboards in
-`tezt/lib_cloud/grafana/dasboards.json`.
+`tezt/lib_cloud/grafana/dashboards`.
 
 ## Proxy mode
 
@@ -276,10 +297,10 @@ To reattach the test, simply rerun the command. Normally, it should
 reattach back the running experiment.
 
 Killing an experiment manually requires some care. You must do it in
-two steps: 
+two steps:
 
 1. Press Ctrl+C. This will trigger the shutdown of the
-experiment. 
+experiment.
 
 2. Once you see the scenario has ended properly, you can press Ctrl+D.
 
@@ -299,7 +320,7 @@ mode to ensure the scenario behaves as expected.
 
 With the proxy mode, we recommend to use the website if you want to
 follow your experiment. The website should be provided in the logs
-once you detach from the experiment. 
+once you detach from the experiment.
 
 Otherwise, you can connect to it by looking at the external IP address
 of the `proxy` machine on GCP and use the port `8080`.
@@ -310,7 +331,7 @@ The website deployed with the proxy mode can be associated with a
 domain name if the `--dns` argument is provided (true by default).
 
 The domain associated with the website will be:
-`http://<tezt_cloud>.<gcp-project>.<domain>`. 
+`http://<tezt_cloud>.<gcp-project>.<domain>`.
 
 To make it work, any project must register a subdomain zone
 beforehand. This can be done via:
@@ -320,7 +341,7 @@ dune exec tezt/tests/cloud/main.exe -- cloud create dns zone -v --dns-domain <do
 ```
 
 The name servers associated with this domain must be added manually to
-the domain regstriy associated with `<domain>`. 
+the domain regstriy associated with `<domain>`.
 
 You can check this work as expected by running:
 
@@ -329,7 +350,6 @@ dig ns <gcp-project>.<domain>
 ```
 
 You should see the name servers you just added.
-
 
 ## Recommendation when writing experiments
 
@@ -346,7 +366,7 @@ You should see the name servers you just added.
    3. The runner that will be used (this can be given to the agent).
 
 3. Whenever it is possible, write your test without depending
-   specifically on a fixed number of machines. Whenver you want to
+   specifically on a fixed number of machines. Whenever you want to
    increase or decrease the number of machines, you can just run your
    test again and it will just work. This can be done by using a
    dispenser (via the OCaml module `Seq` for example).

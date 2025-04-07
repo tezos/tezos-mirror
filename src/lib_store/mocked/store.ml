@@ -152,11 +152,14 @@ let locked_is_acceptable_block chain_state (hash, level) =
           Lwt.return @@ Block_hash.equal hash target_hash
         else Lwt.return_true
 
+let protocol_levels chain_store =
+  Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
+      Stored_data.get protocol_levels_data)
+
 let find_protocol_info chain_store ~protocol_level =
   let open Lwt_syntax in
-  Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
-      let* protocol_levels = Stored_data.get protocol_levels_data in
-      return (Protocol_levels.find protocol_level protocol_levels))
+  let* protocol_levels = protocol_levels chain_store in
+  return (Protocol_levels.find protocol_level protocol_levels)
 
 let expect_predecessor_context_hash_exn chain_store protocol_level =
   let open Lwt_syntax in
@@ -1570,6 +1573,8 @@ module Chain = struct
         in
         return_unit)
 
+  let protocol_levels chain_store = protocol_levels chain_store
+
   let find_protocol_info chain_store ~protocol_level =
     find_protocol_info chain_store ~protocol_level
 
@@ -1819,7 +1824,10 @@ let context_dirs = ref []
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     ?block_cache_limit ?disable_context_pruning:_ ?maintenance_delay:_
-    ~store_dir ~context_dir ~allow_testchains genesis =
+    ~store_dir ~context_root_dir ~allow_testchains genesis =
+  let context_dir =
+    Tezos_context_ops.Context_ops.context_dir context_root_dir
+  in
   let open Lwt_result_syntax in
   if List.mem ~equal:String.equal context_dir !context_dirs then
     Format.kasprintf
@@ -1837,12 +1845,16 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
             ~kind:`Memory
             ~readonly:true
             ?patch_context
-            context_dir
+            context_root_dir
         in
         Lwt.return (context_index, commit_genesis)
     | None ->
         let*! context_index =
-          Context_ops.init ~kind:`Memory ~readonly ?patch_context context_dir
+          Context_ops.init
+            ~kind:`Memory
+            ~readonly
+            ?patch_context
+            context_root_dir
         in
         let commit_genesis ~chain_id =
           Context_ops.commit_genesis
@@ -1881,7 +1893,7 @@ let close_store global_store =
   Lwt_watcher.shutdown_input global_store.global_block_watcher ;
   Lwt.return_unit
 
-let may_switch_history_mode ~store_dir:_ ~context_dir:_ _genesis
+let may_switch_history_mode ~store_dir:_ ~context_root_dir:_ _genesis
     ~new_history_mode:_ =
   Stdlib.failwith "may_switch_history_mode: unimplemented"
 

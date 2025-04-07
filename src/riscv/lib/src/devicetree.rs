@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: MIT
 
 //! Additional resources on device trees:
-//!   - https://elinux.org/Device_Tree_Usage
-//!   - https://github.com/devicetree-org/devicetree-specification/releases/tag/v0.4
+//!   - <https://elinux.org/Device_Tree_Usage>
+//!   - <https://github.com/devicetree-org/devicetree-specification/releases/tag/v0.4>
 
-use crate::machine_state::bus::{self, main_memory::MainMemoryLayout};
+use crate::machine_state::main_memory;
 use vm_fdt::FdtWriter;
 
 /// Information about the initial ramdisk.
@@ -109,9 +109,8 @@ pub fn generate_custom(
 }
 
 /// Generate a Flattened Device Tree for the given hardware configuration.
-pub fn generate<ML: MainMemoryLayout>(
+pub fn generate<ML: main_memory::MainMemoryLayout>(
     initrd: Option<InitialRamDisk>,
 ) -> Result<Vec<u8>, vm_fdt::Error> {
-    let main_memory_start = bus::start_of_main_memory::<ML>();
-    generate_custom(main_memory_start, ML::BYTES as u64, initrd)
+    generate_custom(main_memory::FIRST_ADDRESS, ML::BYTES as u64, initrd)
 }

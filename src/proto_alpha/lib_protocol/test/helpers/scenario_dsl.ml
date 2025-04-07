@@ -134,6 +134,12 @@ let ( --> ) a b = concat a b
 (** Branching connector: creates two tests with different execution paths *)
 let ( |+ ) a b = branch a b
 
+(** Branching combinator: creates a test path for each element in the list. *)
+let list_map_branched l f =
+  match l with
+  | [] -> Empty
+  | h :: t -> List.fold_left (fun acc x -> acc |+ f x) (f h) t
+
 (** Ends the test. Dump the state, returns [unit] *)
 let end_test : ('a, unit) scenarios =
   let open Lwt_result_syntax in

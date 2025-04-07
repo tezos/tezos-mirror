@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -69,8 +69,9 @@ DATA_DIR=${DATA_DIR:=$(mktemp -d)}
 echo "[INFO]: generating $TX transfers"
 INBOX_FILE="${DATA_DIR}/inbox.json"
 RUN_INBOX="$INBOX_FILE"
-LOG="${DATA_DIR}/log.out"
 ./jstz/inbox-bench generate --inbox-file "$INBOX_FILE" --transfers "$TX"
+
+log_file_args=()
 
 ##########
 # RISC-V #
@@ -86,6 +87,7 @@ build_jstz_riscv() {
 }
 
 run_jstz_riscv() {
+  LOG="$DATA_DIR/log.$1.log"
   $PROFILING_WRAPPER "./$SANDBOX_BIN" run \
     --pvm \
     --input assets/hermit-loader \
@@ -93,6 +95,7 @@ run_jstz_riscv() {
     --inbox-file "$RUN_INBOX" \
     --address "$DEFAULT_ROLLUP_ADDRESS" \
     --timings > "$LOG"
+  log_file_args+=("--log-file=$LOG")
 }
 
 ##########
@@ -103,8 +106,10 @@ build_jstz_native() {
 }
 
 run_jstz_native() {
+  LOG="$DATA_DIR/log.$1.log"
   $PROFILING_WRAPPER ./jstz/target/"$NATIVE"/release/jstz \
     --timings > "$LOG" 2> /dev/null
+  log_file_args+=("--log-file=$LOG")
 }
 
 #########
@@ -124,25 +129,29 @@ fi
 # Run & Collect #
 #################
 run_jstz() {
-  echo "[INFO]: Run $1 / $ITERATIONS"
+  echo -ne "\r\033[2K[INFO]: Run $1 / $ITERATIONS"
   if [ -z "$NATIVE" ]; then
-    run_jstz_riscv
+    run_jstz_riscv "$1"
   else
-    run_jstz_native
+    run_jstz_native "$1"
   fi
-  echo "[INFO]: Samply data saved to: $SAMPLY_OUT"
+
+  if [ -n "$PROFILING_WRAPPER" ]; then
+    echo -e "\n[INFO]: Samply data saved to: $SAMPLY_OUT"
+  fi
 }
 
 collect() {
   echo -e "\033[1m"
-  ./jstz/inbox-bench results --inbox-file "$INBOX_FILE" --log-file "$LOG" --expected-transfers "$TX"
+  ./jstz/inbox-bench results --inbox-file "$INBOX_FILE" "${log_file_args[@]}" --expected-transfers "$TX"
   echo -e "\033[0m"
 }
 
 for i in $(seq "$ITERATIONS"); do
   run_jstz "$i"
-  collect
 done
+
+collect
 
 # This loads the profile of the last run
 if [ -n "$PROFILING_WRAPPER" ]; then

@@ -3,17 +3,17 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    bus::{main_memory, Address, AddressableRead, Bus, OutOfBounds},
-    csregisters::{
-        satp::{Satp, SvLength, TranslationAlgorithm},
-        CSRRepr, CSRegister,
-    },
-    mode::Mode,
     MachineCoreState,
+    csregisters::{
+        CSRRepr, CSRegister,
+        satp::{Satp, SvLength, TranslationAlgorithm},
+    },
+    main_memory::{self, Address},
+    mode::Mode,
 };
 use crate::{
     bits::Bits64,
-    machine_state::address_translation::pte::PageTableEntry,
+    machine_state::{address_translation::pte::PageTableEntry, main_memory::OutOfBounds},
     state_backend::{self as backend},
     traps::Exception,
 };
@@ -25,7 +25,7 @@ pub mod translation_cache;
 mod virtual_address;
 
 /// Offset of the `page offset` field in virtual and physical addresses.
-const PAGE_OFFSET_WIDTH: usize = 12;
+pub const PAGE_OFFSET_WIDTH: usize = 12;
 pub const PAGE_SIZE: u64 = 1 << PAGE_OFFSET_WIDTH;
 
 /// Access type that is used in the virtual address translation process.
@@ -74,7 +74,7 @@ impl SvLength {
 
 /// Implementation of the virtual address translation as explained in section 5.3.2.
 fn sv_translate_impl<ML, M>(
-    bus: &Bus<ML, M>,
+    bus: &main_memory::MainMemory<ML, M>,
     v_addr: Address,
     satp: Satp,
     sv_length: SvLength,
@@ -261,7 +261,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
         };
 
         let satp = Satp::from_bits(satp);
-        sv_translate_impl(&self.bus, virt_addr, satp, sv_length, access_type)
+        sv_translate_impl(&self.main_memory, virt_addr, satp, sv_length, access_type)
             .map_err(|_e| access_type.exception(virt_addr))
     }
 

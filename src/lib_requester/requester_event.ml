@@ -176,4 +176,12 @@ struct
       ~msg:"requester worker timout"
       ~level:Debug
       ()
+
+  let no_active_peers =
+    declare_0
+      ~section
+      ~name:(mk_name "no_active_peers")
+      ~msg:"no active peers, cannot fetch data, waiting for peers"
+      ~level:Notice
+      ()
 end

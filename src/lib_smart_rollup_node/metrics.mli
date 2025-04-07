@@ -23,8 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A description of the metrics exported by the node. *)
+val listing : disable_performance_metrics:bool -> string Lwt.t
+
 (** The collector registry for the rollup node metrics. *)
 val sc_rollup_node_registry : Prometheus.CollectorRegistry.t
+
+(** Enables the wrapper variable *)
+val active_metrics : Configuration.t -> unit
 
 (** Wrap a function to be processed if a metrics address is set up in the configuration. *)
 val wrap : (unit -> unit) -> unit
@@ -39,6 +45,23 @@ val metrics_serve : string option -> (unit, tztrace) result Lwt.t
 (** [print_csv_metrics ppf metrics] prints the [metrics] as CSV. *)
 val print_csv_metrics :
   Format.formatter -> 'a Prometheus.MetricFamilyMap.t -> unit
+
+module Refutation : sig
+  type state = OurTurn | TheirTurn | Timeout
+
+  (** Set the number of current conflict for this rollup node *)
+  val set_number_of_conflict : int -> unit
+
+  (** Set the state of a refutation game whether it's our turn
+      or the opponent *)
+  val set_state_refutation_game : ?labels:string list -> state -> unit
+
+  (** Set the number of block before the player timeout in the game *)
+  val set_block_timeout : ?labels:string list -> int -> unit
+
+  (** Clear the state of a refutation game *)
+  val clear_state_refutation_game : string list -> unit
+end
 
 (** The node info metrics *)
 module Info : sig
@@ -126,13 +149,8 @@ module GC : sig
   val set_oldest_available_level : int32 -> unit
 end
 
-module Performance : sig
-  (** Set memory and cpu statistics *)
-  val set_memory_cpu_stats : unit -> unit Lwt.t
-
-  (** Set disk usage statistics *)
-  val set_disk_usage_stats : string -> unit Lwt.t
-
-  (** Set all statistics *)
-  val set_stats : string -> unit Lwt.t
+module type PERFORMANCE = sig
+  val set_stats : data_dir:string -> unit Lwt.t
 end
+
+val performance_metrics : (module PERFORMANCE) Lazy.t

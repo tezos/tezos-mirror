@@ -679,7 +679,24 @@ let () =
 
 let () =
   Admin_directory.register0 Rollup_node_services.Admin.clear_injector_queues
-  @@ fun _node_ctxt tag () -> Injector.clear_queues ?tag ()
+  @@ fun _node_ctxt query () ->
+  Injector.clear_queues
+    ~drop_no_order:query#drop_no_order
+    ?order_below:query#order
+    ?tag:query#operation_tag
+    ()
+
+let () =
+  Admin_directory.register0 Rollup_node_services.Admin.clear_batcher_queues
+  @@ fun _node_ctxt query () ->
+  Batcher.clean_queue
+    ?order_request:
+      (Option.map
+         (fun order_below ->
+           Batcher_worker_types.
+             {drop_no_order = query#drop_no_order; order_below})
+         query#order)
+    ()
 
 let () =
   Admin_directory.register0 Rollup_node_services.Admin.cancel_gc

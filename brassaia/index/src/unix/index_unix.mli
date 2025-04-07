@@ -16,6 +16,7 @@
    all copies or substantial portions of the Software. *)
 
 open! Import
+open Brassaia_index
 
 module Make (K : Index.Key.S) (V : Index.Value.S) (C : Index.Cache.S) :
   Index.S with type key = K.t and type value = V.t
@@ -26,8 +27,8 @@ module Syscalls = Syscalls
 (** These modules should not be used. They are exposed purely for testing
     purposes. *)
 module Private : sig
-  module Platform : Index.Platform.S
-  module IO : Index.Platform.IO
+  module Platform : Brassaia_index.Platform.S
+  module IO : Brassaia_index.Platform.IO
   module Raw = Raw
 
   module Make (K : Index.Key.S) (V : Index.Value.S) (C : Index.Cache.S) :

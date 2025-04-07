@@ -15,7 +15,7 @@ use crate::ast::michelson_key_hash::KeyHash;
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
-use tezos_crypto_rs::hash::OperationListHash;
+use tezos_crypto_rs::hash::OperationHash;
 
 /// [Ctx] includes "outer context" required for typechecking and interpreting
 /// Michelson.
@@ -83,7 +83,7 @@ pub struct Ctx<'a> {
     operation_counter: u128,
 }
 
-impl Ctx<'_> {
+impl<'a> Ctx<'a> {
     /// Increment the internal operation counter and return it. Used as a nonce
     /// for operations.
     pub fn operation_counter(&mut self) -> u128 {
@@ -101,6 +101,12 @@ impl Ctx<'_> {
     pub fn set_known_contracts(&mut self, v: impl Into<HashMap<AddressHash, Entrypoints>>) {
         let map = v.into();
         self.lookup_contract = Box::new(move |ah| map.get(ah).cloned());
+    }
+
+    /// Set a resonable implementation for [Self::big_map_storage] by providing
+    /// something that implements the [LazyStorage] trait.
+    pub fn set_big_map_storage(&mut self, v: impl LazyStorage<'a> + 'a) {
+        self.big_map_storage = Box::new(v);
     }
 
     /// Set a reasonable implementation for [Self::voting_powers] and a
@@ -139,7 +145,8 @@ impl Default for Ctx<'_> {
             now: 0i32.into(),
             min_block_time: 1u32.into(),
             // the default chain id is NetXynUjJNZm7wi, which is also the default chain id of octez-client in mockup mode
-            chain_id: tezos_crypto_rs::hash::ChainId(vec![0xf3, 0xd4, 0x85, 0x54]),
+            chain_id: tezos_crypto_rs::hash::ChainId::try_from(vec![0xf3, 0xd4, 0x85, 0x54])
+                .unwrap(),
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
@@ -148,12 +155,12 @@ impl Default for Ctx<'_> {
             total_voting_power: 0u32.into(),
             big_map_storage: Box::new(InMemoryLazyStorage::new()),
             operation_counter: 0,
-            operation_group_hash: OperationListHash::from_base58_check(
+            operation_group_hash: OperationHash::from_base58_check(
                 "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
+                // "2EouXpxkPGxAvVKCpdCJnfp2wEMWR7Up5DERRZ1Yo99xCLjkCVuq",
             )
             .unwrap()
-            .0
-            .as_slice()
+            .as_ref()
             .try_into()
             .unwrap(),
             origination_counter: 0,

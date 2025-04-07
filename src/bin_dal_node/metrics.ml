@@ -52,5 +52,5 @@ let launch (addr, port) =
   in
   let t = {shutdown; server} in
   let (_ : Lwt_exit.clean_up_callback_id) = shutdown_on_exit t in
-  let* () = Event.(emit metrics_server_is_ready) (host, port) in
+  let* () = Event.emit_metrics_server_is_ready ~host ~port in
   Lwt.return t

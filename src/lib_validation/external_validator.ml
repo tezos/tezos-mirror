@@ -24,7 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Profiler = Tezos_protocol_environment.Environment_profiler
+module Profiler =
+  Tezos_protocol_environment.Environment_profiler.Environment_profiler
 
 module Events = struct
   open Internal_event.Simple
@@ -51,7 +52,8 @@ module Processing = struct
     cache : Context_ops.Environment_context.block_cache option;
     cached_result :
       (Block_validation.apply_result * Context_ops.Environment_context.t) option;
-    headless : Tezos_base.Profiler.instance;
+    headless : Tezos_profiler.Profiler.instance;
+    profiler_headless : Tezos_profiler.Profiler.instance;
   }
 
   let load_protocol proto protocol_root =
@@ -89,7 +91,7 @@ module Processing = struct
 
   let initial_state
       {
-        External_validation.context_root;
+        External_validation.context_root_dir;
         genesis;
         readonly;
         sandbox_parameters;
@@ -105,23 +107,45 @@ module Processing = struct
         ~patch_context:(fun ctxt ->
           Patch_context.patch_context genesis sandbox_parameters ctxt)
         ~readonly
-        context_root
+        context_root_dir
     in
     let headless =
-      Tezos_base.Profiler.instance
-        Tezos_base_unix.Simple_profiler.headless
-        Profiler.Detailed
+      Tezos_profiler.Profiler.instance
+        Tezos_profiler_backends.Simple_profiler.headless
+        Profiler.Info
     in
-    Tezos_base.Profiler.(plug main) headless ;
-    Tezos_protocol_environment.Environment_profiler.plug headless ;
-    return {context_index; cache = None; cached_result = None; headless}
+    let profiler_headless =
+      Tezos_profiler.Profiler.instance
+        Tezos_profiler_backends.Simple_profiler.headless
+        Profiler.Info
+    in
+
+    Tezos_profiler.Profiler.(plug main) headless ;
+    Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
+      headless ;
+    Tezos_protocol_environment.Environment_profiler.Context_ops_profiler.plug
+      profiler_headless ;
+    return
+      {
+        context_index;
+        cache = None;
+        cached_result = None;
+        headless;
+        profiler_headless;
+      }
 
   let handle_request :
       type a.
       External_validation.parameters ->
       state ->
       a External_validation.request ->
-      [ `Continue of (a * Tezos_base.Profiler.report option) tzresult * state
+      [ `Continue of
+        (a
+        * (Tezos_profiler.Profiler.report option
+          * Tezos_profiler.Profiler.report option)
+          option)
+        tzresult
+        * state
       | `Stop ]
       Lwt.t =
    fun {
@@ -132,14 +156,17 @@ module Processing = struct
          operation_metadata_size_limit;
          _;
        }
-       {context_index; cache; cached_result; headless} ->
+       {context_index; cache; cached_result; headless; profiler_headless} ->
     let open Lwt_result_syntax in
     let continue res cache cached_result report =
       let res =
         match res with Error errs -> Error errs | Ok res -> Ok (res, report)
       in
       Lwt.return
-        (`Continue (res, {context_index; cache; cached_result; headless}))
+        (`Continue
+          ( res,
+            {context_index; cache; cached_result; headless; profiler_headless}
+          ))
     in
     function
     | Commit_genesis {chain_id} ->
@@ -165,7 +192,9 @@ module Processing = struct
           should_validate;
           simulate;
         } ->
-        () [@profiler.record "apply_block"] ;
+        ()
+        [@profiler.record
+          {verbosity = Notice} "external_validator : apply_block"] ;
         let*! block_application_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
@@ -224,9 +253,16 @@ module Processing = struct
                     cache;
                   } )
         in
-        Tezos_protocol_environment.Environment_profiler.stop () ;
-        let report = Tezos_base.Profiler.report headless in
-        continue block_application_result cache None report
+        () [@profiler.stop] ;
+        let report = Tezos_profiler.Profiler.report headless in
+        let profiler_report =
+          Tezos_profiler.Profiler.report profiler_headless
+        in
+        continue
+          block_application_result
+          cache
+          None
+          (Some (report, profiler_report))
     | Preapply
         {
           chain_id;
@@ -242,7 +278,9 @@ module Processing = struct
           predecessor_resulting_context_hash;
           operations;
         } ->
-        () [@profiler.record "preapply_block"] ;
+        ()
+        [@profiler.record
+          {verbosity = Notice} "external_validator : preapply_block"] ;
         let*! block_preapplication_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
@@ -292,9 +330,12 @@ module Processing = struct
               Lwt.return (Ok res, Some last_preapplied_context)
           | Error _ as err -> Lwt.return (err, None)
         in
-        Tezos_protocol_environment.Environment_profiler.stop () ;
-        let report = Tezos_base.Profiler.report headless in
-        continue res cache cachable_result report
+        () [@profiler.stop] ;
+        let report = Tezos_profiler.Profiler.report headless in
+        let profiler_report =
+          Tezos_profiler.Profiler.report profiler_headless
+        in
+        continue res cache cachable_result (Some (report, profiler_report))
     | External_validation.Validate
         {
           chain_id;
@@ -305,7 +346,9 @@ module Processing = struct
           operations;
           _;
         } ->
-        () [@profiler.record "validate_block"] ;
+        ()
+        [@profiler.record
+          {verbosity = Notice} "external_validator : validate_block"] ;
         let*! block_validate_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
@@ -340,9 +383,16 @@ module Processing = struct
                 header
                 operations)
         in
-        Tezos_protocol_environment.Environment_profiler.stop () ;
-        let report = Tezos_base.Profiler.report headless in
-        continue block_validate_result cache cached_result report
+        () [@profiler.stop] ;
+        let report = Tezos_profiler.Profiler.report headless in
+        let profiler_report =
+          Tezos_profiler.Profiler.report profiler_headless
+        in
+        continue
+          block_validate_result
+          cache
+          cached_result
+          (Some (report, profiler_report))
     | External_validation.Fork_test_chain
         {chain_id; context_hash; forked_header} ->
         let*! context_opt = Context_ops.checkout context_index context_hash in

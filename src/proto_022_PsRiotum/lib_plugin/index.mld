@@ -1,0 +1,16 @@
+{0 Octez-protocol-022-PsRiotum-libs: octez protocol 022-PsRiotum libraries}
+
+This is a package containing some libraries related to the Tezos 022-PsRiotum protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_022_PsRiotum_test_helpers}Tezos_022_PsRiotum_test_helpers}: Protocol testing framework
+- {{!module-Tezos_baking_022_PsRiotum}Tezos_baking_022_PsRiotum}: Base library for `tezos-baker/accuser`
+- {{!module-Tezos_baking_022_PsRiotum_commands}Tezos_baking_022_PsRiotum_commands}: Protocol-specific commands for baking
+- {{!module-Tezos_client_022_PsRiotum}Tezos_client_022_PsRiotum}: Protocol specific library for `octez-client`
+- {{!module-Tezos_dal_022_PsRiotum}Tezos_dal_022_PsRiotum}: Protocol specific library for the Data availability Layer
+- {{!module-Tezos_layer2_utils_022_PsRiotum}Tezos_layer2_utils_022_PsRiotum}: Protocol specific library for Layer 2 utils
+- {{!module-Tezos_protocol_plugin_022_PsRiotum}Tezos_protocol_plugin_022_PsRiotum}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_022_PsRiotum_registerer}Tezos_protocol_plugin_022_PsRiotum_registerer}: Protocol plugin registerer
+- {{!module-Tezos_smart_rollup_022_PsRiotum}Tezos_smart_rollup_022_PsRiotum}: Protocol specific library of helpers for `tezos-smart-rollup`
+- {{!module-Tezos_smart_rollup_layer2_022_PsRiotum}Tezos_smart_rollup_layer2_022_PsRiotum}: Protocol specific library for `tezos-smart-rollup`

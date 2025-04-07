@@ -39,6 +39,13 @@ make -C src/riscv all
 | $MyMachine | X.XXX TPS | X.XXX TPS | XX.XX% |
 | Benchmark Machine | Y.YYY TPS | Y.YYY TPS | YY.YY% |
 
+# Regressions
+
+<!--
+    Explain changes to regression test captures. If there are no changes to these, delete this
+    section.
+-->
+
 # Tasks for the Author
 
 - [ ] Link all Linear issues related to this MR using magic words (e.g. part of, relates to, closes).
@@ -47,7 +54,11 @@ make -C src/riscv all
 - [ ] Make sure the documentation for updated functions, methods, and types is correct.
 - [ ] Add tests for bugs that have been fixed.
 - [ ] Put in reasonable effort to ensure that CI will pass.
+  - `make -C src/riscv`
+  - `dune build src/lib_riscv`
+  - `dune build src/rust_deps`
 - [ ] Benchmark performance and populate the table above if needed.
+- [ ] Explain changes to regression test captures when applicable.
 - [ ] Write commit messages to reflect the changes they're about.
 - [ ] Self-review your changes to ensure they are high-quality.
 - [ ] Complete all of the above before assigning this MR to reviewers.
@@ -64,14 +75,19 @@ make -C src/riscv all
 /assign @ole.kruger
 /assign @victor-dumitrescu
 /assign @felix.puscasu1
-/assign @anastasia.courtney
 /assign @emturner
+/assign @santnr
+/assign @hantang.sun
+/assign @kurtis.charnock
 
 /assign_reviewer @ole.kruger
 /assign_reviewer @victor-dumitrescu
 /assign_reviewer @felix.puscasu1
-/assign_reviewer @anastasia.courtney
 /assign_reviewer @emturner
+/assign_reviewer @santnr
+/assign_reviewer @hantang.sun
+/assign_reviewer @jobjo
+/assign_reviewer @kurtis.charnock
 
 /unassign me
 /unassign_reviewer me

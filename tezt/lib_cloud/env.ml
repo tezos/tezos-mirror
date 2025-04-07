@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type docker_image = Gcp of {alias : string} | Octez_release of {tag : string}
-
 let tezt_cloud =
   match Cli.tezt_cloud with
   | Some tezt_cloud -> tezt_cloud
@@ -21,8 +19,6 @@ let ssh_public_key_filename ?home () =
   let ssh_key = ssh_private_key_filename ?home () in
   Format.asprintf "%s.pub" ssh_key
 
-let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud
-
 let mode =
   match (Cli.localhost, Cli.proxy) with
   | true, true -> `Orchestrator
@@ -36,11 +32,15 @@ let prometheus_export = Cli.prometheus_export
 
 let prometheus_port = Cli.prometheus_port
 
-let prometheus_snapshot_filename = Cli.prometheus_snapshot_filename
+let prometheus_export_path = Cli.prometheus_export_path
+
+let prometheus_snapshots = Cli.prometheus_snapshots
 
 let prometheus_scrape_interval = Cli.prometheus_scrape_interval
 
 let grafana = Cli.grafana
+
+let grafana_legacy_source = Cli.grafana_legacy_source
 
 let website = Cli.website
 
@@ -64,34 +64,42 @@ let max_run_duration = Cli.max_run_duration
 
 let no_max_run_duration = Cli.no_max_run_duration
 
-let dns_domain = Cli.dns_domain
+let open_telemetry = Cli.open_telemetry
 
-let dns = Cli.dns
-
-let os = Cli.os
-
-let docker_image =
-  (* In localhost mode, we don't want to interact with GCP. The image is taken
-     locally. *)
-  match Cli.dockerfile_alias with
-  | None -> Gcp {alias = tezt_cloud}
-  | Some alias -> Gcp {alias}
+let alert_handlers = Cli.alert_handlers
 
 let dockerfile_alias = Option.value ~default:tezt_cloud Cli.dockerfile_alias
 
 let dockerfile = Path.dockerfile ~alias:dockerfile_alias
 
+let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud
+
+let macosx = Cli.macosx
+
+let check_file_consistency = Cli.check_file_consistency
+
+let docker_host_network = Cli.docker_host_network
+
+let push_docker = Cli.push_docker
+
+let auto_approve = Cli.auto_approve
+
 let project_id = Gcloud.project_id
+
+let faketime = Cli.faketime
+
+let binaries_path = Cli.binaries_path
+
+let process_monitoring = Cli.process_monitoring
 
 let init () =
   if tezt_cloud = "" then
     Test.fail
       "The tezt-cloud value should be set. Either via the CLI or via the \
-       environement variable 'TEZT_CLOUD'" ;
+       environment variable 'TEZT_CLOUD'" ;
   match mode with
   | `Localhost | `Orchestrator -> Lwt.return_unit
   | `Host | `Cloud ->
-      let tezt_cloud = tezt_cloud in
       let* project_id = project_id () in
       Log.info "Initializing docker registry..." ;
       let* () = Terraform.Docker_registry.init () in
@@ -100,7 +108,7 @@ let init () =
       Lwt.return_unit
 
 (* Even though we could get this information locally, it is interesting to fetch
-   it through terraform to get the correct value if a scenario was launch with
+   it through terraform to get the correct value if a scenario was launched with
    different parameters. *)
 let hostname =
   let hostname = ref "" in
@@ -127,17 +135,6 @@ let registry_uri () =
   let* project_id = project_id () in
   let uri = Format.asprintf "%s/%s/%s" hostname project_id docker_registry in
   Lwt.return uri
-
-let uri_of_docker_image docker_image =
-  match (docker_image, mode) with
-  | Gcp {alias}, (`Cloud | `Host | `Orchestrator) ->
-      let* registry_uri = registry_uri () in
-      Lwt.return (Format.asprintf "%s/%s" registry_uri alias)
-  | Gcp {alias}, `Localhost -> Lwt.return alias
-  | Octez_release _, (`Cloud | `Host | `Orchestrator) ->
-      let* registry_uri = registry_uri () in
-      Lwt.return (Format.asprintf "%s/octez" registry_uri)
-  | Octez_release _, `Localhost -> Lwt.return "octez"
 
 let rec wait_process ?(sleep = 4) ~is_ready ~run () =
   let process = run () in
@@ -166,3 +163,32 @@ let run_command ?cmd_wrapper cmd args =
   | None -> Process.spawn cmd args
   | Some cmd_wrapper ->
       Process.spawn cmd_wrapper.Gcloud.cmd (cmd_wrapper.args @ [cmd] @ args)
+
+let dns_domains () =
+  (* When we use the proxy mode, by default a domain name is
+     registered for the `tezt-cloud` zone. *)
+  let* domains =
+    if Cli.no_dns then Lwt.return_nil
+    else
+      match mode with
+      | `Host -> (
+          let* domain =
+            Gcloud.DNS.get_fqdn ~name:tezt_cloud ~zone:"tezt-cloud"
+          in
+          match domain with
+          | None -> Lwt.return Cli.dns_domains
+          | Some domain -> Lwt.return (domain :: Cli.dns_domains))
+      | `Orchestrator | `Localhost | `Cloud -> Lwt.return Cli.dns_domains
+  in
+  (* A fully-qualified domain name requires to end with a dot.
+     However, the usage tends to omit this final dot. Because having a
+     domain name ending with a dot is always valid, we add one if
+     there is none.
+
+     See http://www.dns-sd.org/trailingdotsindomainnames.html for more
+     details.
+  *)
+  domains
+  |> List.map (fun domain ->
+         if String.ends_with ~suffix:"." domain then domain else domain ^ ".")
+  |> Lwt.return

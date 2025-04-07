@@ -187,11 +187,14 @@ let locked_is_acceptable_block chain_state (hash, level) =
 
 (* Shared protocols accessors *)
 
+let protocol_levels chain_store =
+  Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
+      Stored_data.get protocol_levels_data)
+
 let find_protocol_info chain_store ~protocol_level =
   let open Lwt_syntax in
-  Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
-      let* protocol_levels = Stored_data.get protocol_levels_data in
-      return (Protocol_levels.find protocol_level protocol_levels))
+  let* protocol_levels = protocol_levels chain_store in
+  return (Protocol_levels.find protocol_level protocol_levels)
 
 let find_activation_block chain_store ~protocol_level =
   let open Lwt_syntax in
@@ -507,7 +510,7 @@ module Block = struct
     let open Lwt_result_syntax in
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
-    () [@profiler.reset_block_section hash] ;
+    () [@profiler.reset_block_section {verbosity = Notice} hash] ;
     (let {
        Block_validation.validation_store =
          {
@@ -697,7 +700,8 @@ module Block = struct
            chain_store.global_store.global_block_watcher
            (chain_store, block) ;
          return_some block)
-    [@profiler.record_s "store_block"]
+    [@profiler.record_s
+      {verbosity = Notice; metadata = [("prometheus", "")]} "store_block"]
 
   let store_validated_block chain_store ~hash ~block_header ~operations =
     let open Lwt_result_syntax in
@@ -1312,7 +1316,9 @@ module Chain = struct
                  pred = Some (last_block, last_ops);
                } ;
              return (diffed_new_live_blocks, diffed_new_live_operations))
-        [@profiler.record_s "Compute live blocks with new head"])
+        [@profiler.record_s
+          {verbosity = Debug; metadata = [("prometheus", "")]}
+            "compute live blocks with new head"])
     | Some live_data, Some _
       when Block_hash.equal
              (Block.predecessor block)
@@ -1330,7 +1336,9 @@ module Chain = struct
           live_operations
           ~new_head:block
           ~cache_expected_capacity:expected_capacity
-        [@profiler.record_s "compute live blocks with alternative head"]
+        [@profiler.record_s
+          {verbosity = Debug; metadata = [("prometheus", "")]}
+            "compute live blocks with alternative head"]
     | _ when update_cache ->
         (* The block candidate is not on top of the current head. It is
            likely to be an alternate branch. We recompute the whole live
@@ -1353,7 +1361,9 @@ module Chain = struct
                (Block_hash.Set.add bh bhs, Operation_hash.Set.union ops opss))
          in
          return (live_blocks, live_ops))
-        [@profiler.record_s "compute live blocks with alternative branch"]
+        [@profiler.record_s
+          {verbosity = Debug; metadata = [("prometheus", "")]}
+            "compute live blocks with alternative branch"]
     | _ ->
         (* The block candidate is not on top of the current head. It
            is likely to be an alternate head. We recompute the whole
@@ -1362,7 +1372,10 @@ module Chain = struct
           (Chain_traversal.live_blocks
              chain_store
              block
-             expected_capacity [@profiler.record_s "compute whole live blocks"])
+             expected_capacity
+           [@profiler.record_s
+             {verbosity = Debug; metadata = [("prometheus", "")]}
+               "compute whole live blocks"])
         in
         return new_live_blocks
 
@@ -1395,14 +1408,20 @@ module Chain = struct
            ~current_head
            live_blocks
            live_operations
-           ~pred_cache [@profiler.record_s "rollback livedata"])
+           ~pred_cache
+         [@profiler.record_s
+           {verbosity = Debug; metadata = [("prometheus", "")]}
+             "rollback livedata"])
       else
         locked_compute_live_blocks_with_cache
           ~update_cache
           chain_store
           chain_state
           block
-          metadata [@profiler.record_s "locked compute live blocks with cache"]
+          metadata
+        [@profiler.record_s
+          {verbosity = Debug; metadata = [("prometheus", "")]}
+            "locked compute live blocks with cache"]
     in
     return res
 
@@ -1419,7 +1438,9 @@ module Chain = struct
              metadata
          in
          return r)
-    [@profiler.record_s "compute live blocks"])
+    [@profiler.aggregate_s
+      {verbosity = Notice; metadata = [("prometheus", "")]}
+        "compute_live_blocks"])
 
   let is_ancestor chain_store ~head:(hash, lvl) ~ancestor:(hash', lvl') =
     let open Lwt_syntax in
@@ -1934,7 +1955,9 @@ module Chain = struct
                       ~loc:__LOC__
                       cementing_highwatermark)
                  ~disable_context_pruning:chain_store.disable_context_pruning
-               [@profiler.span_s ["start merge store"]])
+               [@profiler.mark
+                 {verbosity = Notice; metadata = [("prometheus", "")]}
+                   ["merge_stores"]])
             in
             (* The new memory highwatermark is new_head_lpbl, the disk
                value will be updated after the merge completion. *)
@@ -1970,11 +1993,17 @@ module Chain = struct
           let* () =
             (Stored_data.write
                chain_state.current_head_data
-               new_head_descr [@profiler.record_s "write_new_head"])
+               new_head_descr
+             [@profiler.record_s
+               {verbosity = Debug; metadata = [("prometheus", "")]}
+                 "write_new_head"])
           in
           (Stored_data.write
              chain_state.target_data
-             new_target [@profiler.record_s "write_new_target"]))
+             new_target
+           [@profiler.record_s
+             {verbosity = Debug; metadata = [("prometheus", "")]}
+               "write_new_target"]))
         (fun () -> unlock chain_store.stored_data_lockfile)
     in
     (* Update live_data *)
@@ -1984,7 +2013,10 @@ module Chain = struct
          chain_store
          chain_state
          new_head
-         new_head_metadata [@profiler.record_s "updating live blocks"])
+         new_head_metadata
+       [@profiler.record_s
+         {verbosity = Debug; metadata = [("prometheus", "")]}
+           "updating live blocks"])
     in
     let new_chain_state =
       {chain_state with live_blocks; live_operations; current_head = new_head}
@@ -2021,7 +2053,9 @@ module Chain = struct
                  Block.get_block_metadata chain_store pred_block
                in
                Block.get_block_metadata chain_store new_head)
-            [@profiler.record_s "get_pred_block"])
+            [@profiler.record_s
+              {verbosity = Info; metadata = [("prometheus", "")]}
+                "get_pred_block"])
          in
          let*! target = Stored_data.get chain_state.target_data in
          let new_head_lpbl =
@@ -2032,7 +2066,10 @@ module Chain = struct
               ~disable_context_pruning:chain_store.disable_context_pruning
               chain_store
               new_head_lpbl
-              previous_head [@profiler.record_s "may_split_context"])
+              previous_head
+            [@profiler.record_s
+              {verbosity = Info; metadata = [("prometheus", "")]}
+                "may_split_context"])
          in
          let* lfbl_block_opt =
            match chain_state.last_finalized_block_level with
@@ -2090,18 +2127,22 @@ module Chain = struct
                  | Some h -> Lwt.return (h, new_cementing_highwatermark))
          in
          let* new_chain_state =
-           finalize_set_head
-             chain_store
-             chain_state
-             ~checkpoint
-             ~new_checkpoint
-             ~new_head
-             ~new_head_metadata
-             ~new_head_descr
-             ~new_target
+           (finalize_set_head
+              chain_store
+              chain_state
+              ~checkpoint
+              ~new_checkpoint
+              ~new_head
+              ~new_head_metadata
+              ~new_head_descr
+              ~new_target
+            [@profiler.record_s
+              {verbosity = Info; metadata = [("prometheus", "")]}
+                "finalize_set_head"])
          in
          return (new_chain_state, previous_head))
-    [@profiler.record_s "set_head"])
+    [@profiler.record_s
+      {verbosity = Notice; metadata = [("prometheus", "")]} "set_head"])
 
   let set_target chain_store new_target =
     let open Lwt_result_syntax in
@@ -2719,6 +2760,8 @@ module Chain = struct
 
   (* Protocols *)
 
+  let protocol_levels chain_store = protocol_levels chain_store
+
   let find_protocol_info chain_store ~protocol_level =
     find_protocol_info chain_store ~protocol_level
 
@@ -3057,7 +3100,7 @@ let check_history_mode_consistency chain_dir history_mode =
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     ?block_cache_limit ?(disable_context_pruning = false)
-    ?(maintenance_delay = Storage_maintenance.Auto) ~store_dir ~context_dir
+    ?(maintenance_delay = Storage_maintenance.Auto) ~store_dir ~context_root_dir
     ~allow_testchains genesis =
   let open Lwt_result_syntax in
   let*! () =
@@ -3072,12 +3115,16 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     match commit_genesis with
     | Some commit_genesis ->
         let*! context_index =
-          Context_ops.init ~kind:`Disk ~readonly:true ?patch_context context_dir
+          Context_ops.init
+            ~kind:`Disk
+            ~readonly:true
+            ?patch_context
+            context_root_dir
         in
         Lwt.return (context_index, commit_genesis)
     | None ->
         let*! context_index =
-          Context_ops.init ~kind:`Disk ~readonly ?patch_context context_dir
+          Context_ops.init ~kind:`Disk ~readonly ?patch_context context_root_dir
         in
         let commit_genesis ~chain_id =
           Context_ops.commit_genesis
@@ -3236,7 +3283,8 @@ let close_store global_store =
   let* () = Chain.close_chain_store main_chain_store in
   Context_ops.close global_store.context_index
 
-let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
+let may_switch_history_mode ~store_dir ~context_root_dir genesis
+    ~new_history_mode =
   let open Lwt_result_syntax in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
@@ -3248,7 +3296,7 @@ let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
     return_unit
   else
     let*! context_index =
-      Context_ops.init ~kind:`Disk ~readonly:false context_dir
+      Context_ops.init ~kind:`Disk ~readonly:false context_root_dir
     in
     let* store =
       load_store
@@ -3612,7 +3660,7 @@ module Unsafe = struct
 
   let load_testchain = Chain.load_testchain
 
-  let open_for_snapshot_export ~store_dir ~context_dir genesis
+  let open_for_snapshot_export ~store_dir ~context_root_dir genesis
       ~(locked_f : chain_store -> 'a tzresult Lwt.t) =
     let open Lwt_result_syntax in
     let store_dir = Naming.store_dir ~dir_path:store_dir in
@@ -3646,7 +3694,7 @@ module Unsafe = struct
     protect
       (fun () ->
         let*! context_index =
-          Context_ops.init ~kind:`Disk ~readonly:true context_dir
+          Context_ops.init ~kind:`Disk ~readonly:true context_root_dir
         in
         let* store =
           load_store

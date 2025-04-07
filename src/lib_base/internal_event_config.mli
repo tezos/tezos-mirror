@@ -54,6 +54,7 @@ val make_config_uri :
   ?colors:bool ->
   ?fresh:bool ->
   ?section_prefixes:(string * Internal_event.level option) list ->
+  ?advertise_levels:bool ->
   [`Stdout | `Stderr | `Path of string | `Null | `Syslog of string] ->
   Uri.t
 
@@ -68,6 +69,9 @@ val is_empty : t -> bool
 
 (** Allows to make custom list of uris. *)
 val make_custom : Uri.t list -> t
+
+(** Adds a config uri to a config. *)
+val add_uri_to_config : Uri.t -> t -> t
 
 (** The serialization format. *)
 val encoding : t Data_encoding.t

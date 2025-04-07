@@ -37,10 +37,7 @@ Ledger support
 
 It is possible and advised to use a hardware wallet to securely store and manage your
 keys. The Octez client supports Ledger Nano devices provided that they have
-a Tezos app installed.
-The apps were developed by `Obsidian Systems <https://obsidian.systems>`_ and they provide a comprehensive
-`tutorial on how to install it.
-<https://github.com/obsidiansystems/ledger-app-tezos>`_
+two Tezos apps installed, `Tezos Wallet app <https://github.com/trilitech/ledger-app-tezos-wallet>`_ and `Tezos Baking app <https://github.com/trilitech/ledger-app-tezos-baking>`_ which are provided by `Trilitech Ltd <https://www.trili.tech/>`_. They can be installed from the Ledger Live store.
 
 Ledger Manager
 ~~~~~~~~~~~~~~
@@ -49,15 +46,17 @@ The preferred way to set up your Ledger is to install `Ledger
 Live
 <https://www.ledger.com/ledger-live/>`_.
 On Linux make sure you correctly set up your ``udev`` rules as explained
-`here <https://github.com/obsidiansystems/ledger-app-tezos#udev-rules-linux-only>`_.
+`here <https://github.com/trilitech/ledger-app-tezos-baking/tree/main?tab=readme-ov-file#udev-rules-linux-only>`_.
 Connect your Ledger, unlock it and go to the dashboard.
-In Ledger Live install ``Tezos Wallet`` from the applications list and open it on the
-device.
+In Ledger Live install ``Tezos Wallet`` from the applications list.
+To install the ``Tezos Baking`` app, you need to enable Developer Mode in the Ledger Live settings.
+Then you can install the app from the Manager tab in the Ledger Live.
 
 
 Tezos Wallet app
 ~~~~~~~~~~~~~~~~
 
+Connect the Ledger device and open the ``Tezos Wallet`` app on the Ledger device.
 Now on the Octez client we can import the keys (make sure the device is
 in the Tezos Wallet app)::
 
@@ -83,22 +82,17 @@ time to sign an operation.
 Tezos Baking app
 ~~~~~~~~~~~~~~~~
 
-In Ledger Live (with Developer Mode enabled), there is also a ``Tezos Baking``
-app which allows a delegate to sign automatically (i.e., there is no need
+The ``Tezos Baking`` app allows a delegate to sign automatically (i.e., there is no need
 to manually sign every block or (pre-)attestation).
 Of course, the application is restricted to only sign baking operations; it never signs a transfer, for example.
-Furthermore, the application keeps track of the last level baked and only
-allows baking for subsequent levels.
-This prevents signing blocks at levels below the latest
-block signed.
+To provide additional protection from double signing the blocks/attestations, it is recommended to use ``octez-signer`` along with the Ledger baking app.
 
-If you have tried the app on some network and want to
-use it on another network you might need to reset this level with the command::
+Setup the Ledger baking app on any Tezos network using the following command::
 
    octez-client setup ledger to bake for my_ledger
 
-More details can be found on the `Tezos Ledger app
-<https://github.com/obsidiansystems/ledger-app-tezos>`_.
+More details on setting up baking with the Ledger can be found on the `Tezos Baking app readme
+<https://github.com/trilitech/ledger-app-tezos-baking>`_.
 
 .. _signer:
 
@@ -293,11 +287,11 @@ The operation is signed by the manager key and does not require the consensus pr
 
 However the public key must be known by the client. It can be imported with the command::
 
-   octez-client import public key consensus unencrypted:edpk...
+   octez-client import public key <consensus_key> unencrypted:edpk...
 
 The command to update the consensus key is::
 
-   octez-client set consensus key for <mgr> to consensus
+   octez-client set consensus key for <manager_key> to <consensus_key>
 
 The update becomes active after ``CONSENSUS_RIGHTS_DELAY + 1`` cycles. We therefore distinguish
 the active consensus key and the pending consensus keys.
@@ -305,7 +299,7 @@ The active consensus key is by default the delegate’s manager key, which canno
 
 However, it is also possible to register as a delegate and immediately set the consensus key::
 
-   octez-client register key <mgr> as delegate with consensus key <key>
+   octez-client register key <mananger_key> as delegate with consensus key <consensus_key>
 
 There can be multiple pending updates: it is possible to have multiple pending consensus keys for multiple future cycles.
 A subsequent update within the same cycle takes precedences over the initial one.

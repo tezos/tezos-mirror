@@ -8,13 +8,15 @@
 pub mod instruction;
 
 use crate::bits::u16;
+use crate::machine_state::registers::{NonZeroXRegister, x0};
 use crate::machine_state::{
     csregisters::CSRegister,
-    registers::{parse_fregister, parse_xregister, x0, x2, FRegister, XRegister},
+    registers::{FRegister, XRegister, parse_fregister, parse_xregister},
 };
 use arbitrary_int::{u3, u5};
 use core::ops::Range;
 use instruction::*;
+use std::fmt::{self, Display, Formatter};
 
 /// Given an instruction encoded as a little-endian `u32`, extract `n` bits
 /// starting at `pos`.
@@ -178,12 +180,28 @@ macro_rules! r_instr {
             rs2: rs2($instr),
         })
     };
+
+    ($enum_variant:ident, $instr:expr, $rd:expr) => {
+        $enum_variant(instruction::NonZeroRdRTypeArgs {
+            rd: $rd,
+            rs1: rs1($instr),
+            rs2: rs2($instr),
+        })
+    };
 }
 
 macro_rules! i_instr {
     ($enum_variant:ident, $instr:expr) => {
         $enum_variant(instruction::ITypeArgs {
             rd: rd($instr),
+            rs1: rs1($instr),
+            imm: i_imm($instr),
+        })
+    };
+
+    ($enum_variant:ident, $instr:expr, $rd:expr) => {
+        $enum_variant(instruction::NonZeroRdITypeArgs {
+            rd: $rd,
             rs1: rs1($instr),
             imm: i_imm($instr),
         })
@@ -211,9 +229,9 @@ macro_rules! b_instr {
 }
 
 macro_rules! u_instr {
-    ($enum_variant:ident, $instr:expr) => {
-        $enum_variant(instruction::UJTypeArgs {
-            rd: rd($instr),
+    ($enum_variant:ident, $instr:expr, $rd:expr) => {
+        $enum_variant(instruction::NonZeroRdUJTypeArgs {
+            rd: $rd,
             imm: u_imm($instr),
         })
     };
@@ -487,72 +505,93 @@ const FM_8: u32 = 0b1000;
 pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
     use InstrCacheable::*;
     use InstrUncacheable::*;
+    // RV64I (Chapter 5.4) and RV64C (Chapter 16.7) describe the code points associated
+    // with HINT instructions. We do not implement any HINT logic, but decode all these
+    // as `Hint` or `HintCompresssed` opcodes, which we translate to NOPs in `machine_state`.
+    use XRegisterParsed::*;
     let i = match opcode(instr) {
         // R-type instructions
         OP_ARITH => match funct3(instr) {
-            F3_0 => match funct7(instr) {
-                F7_0 => r_instr!(Add, instr),
-                F7_1 => r_instr!(Mul, instr),
-                F7_20 => r_instr!(Sub, instr),
+            F3_0 => match (funct7(instr), split_x0(rd(instr))) {
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => r_instr!(Add, instr, rd),
+                (F7_1, _) => r_instr!(Mul, instr),
+                (F7_20, X0) => Hint { instr },
+                (F7_20, NonZero(rd)) => r_instr!(Sub, instr, rd),
                 _ => Unknown { instr },
             },
-            F3_4 => match funct7(instr) {
-                F7_0 => r_instr!(Xor, instr),
-                F7_1 => r_instr!(Div, instr),
+            F3_4 => match (funct7(instr), split_x0(rd(instr))) {
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => r_instr!(Xor, instr, rd),
+                (F7_1, _) => r_instr!(Div, instr),
                 _ => Unknown { instr },
             },
-            F3_6 => match funct7(instr) {
-                F7_0 => r_instr!(Or, instr),
-                F7_1 => r_instr!(Rem, instr),
+            F3_6 => match (funct7(instr), split_x0(rd(instr))) {
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => r_instr!(Or, instr, rd),
+                (F7_1, _) => r_instr!(Rem, instr),
                 _ => Unknown { instr },
             },
-            F3_7 => match funct7(instr) {
-                F7_0 => r_instr!(And, instr),
-                F7_1 => r_instr!(Remu, instr),
+            F3_7 => match (funct7(instr), split_x0(rd(instr))) {
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => r_instr!(And, instr, rd),
+                (F7_1, _) => r_instr!(Remu, instr),
                 _ => Unknown { instr },
             },
-            F3_1 => match funct7(instr) {
-                F7_0 => r_instr!(Sll, instr),
-                F7_1 => r_instr!(Mulh, instr),
+            F3_1 => match (funct7(instr), split_x0(rd(instr))) {
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => r_instr!(Sll, instr, rd),
+                (F7_1, _) => r_instr!(Mulh, instr),
                 _ => Unknown { instr },
             },
-            F3_5 => match funct7(instr) {
-                F7_0 => r_instr!(Srl, instr),
-                F7_1 => r_instr!(Divu, instr),
-                F7_20 => r_instr!(Sra, instr),
+            F3_5 => match (funct7(instr), split_x0(rd(instr))) {
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => r_instr!(Srl, instr, rd),
+                (F7_1, _) => r_instr!(Divu, instr),
+                (F7_20, X0) => Hint { instr },
+                (F7_20, NonZero(rd)) => r_instr!(Sra, instr, rd),
                 _ => Unknown { instr },
             },
 
-            F3_2 => match funct7(instr) {
-                F7_0 => r_instr!(Slt, instr),
-                F7_1 => r_instr!(Mulhsu, instr),
+            F3_2 => match (funct7(instr), split_x0(rd(instr))) {
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => r_instr!(Slt, instr, rd),
+                (F7_1, _) => r_instr!(Mulhsu, instr),
                 _ => Unknown { instr },
             },
 
-            F3_3 => match funct7(instr) {
-                F7_0 => r_instr!(Sltu, instr),
-                F7_1 => r_instr!(Mulhu, instr),
+            F3_3 => match (funct7(instr), split_x0(rd(instr))) {
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => r_instr!(Sltu, instr, rd),
+                (F7_1, _) => r_instr!(Mulhu, instr),
                 _ => Unknown { instr },
             },
 
             _ => Unknown { instr },
         },
         OP_ARITH_W => match funct3(instr) {
-            F3_0 => match funct7(instr) {
-                F7_0 => r_instr!(Addw, instr),
-                F7_1 => r_instr!(Mulw, instr),
-                F7_20 => r_instr!(Subw, instr),
+            F3_0 => match (funct7(instr), split_x0(rd(instr))) {
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => r_instr!(Addw, instr, rd),
+                (F7_1, _) => r_instr!(Mulw, instr),
+                (F7_20, X0) => Hint { instr },
+                (F7_20, NonZero(rd)) => r_instr!(Subw, instr, rd),
                 _ => Unknown { instr },
             },
-            F3_1 => r_instr!(Sllw, instr),
+            F3_1 => match split_x0(rd(instr)) {
+                X0 => Hint { instr },
+                NonZero(rd) => r_instr!(Sllw, instr, rd),
+            },
             F3_4 => match funct7(instr) {
                 F7_1 => r_instr!(Divw, instr),
                 _ => Unknown { instr },
             },
-            F3_5 => match funct7(instr) {
-                F7_0 => r_instr!(Srlw, instr),
-                F7_1 => r_instr!(Divuw, instr),
-                F7_20 => r_instr!(Sraw, instr),
+            F3_5 => match (funct7(instr), split_x0(rd(instr))) {
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => r_instr!(Srlw, instr, rd),
+                (F7_1, NonZero(_)) => r_instr!(Divuw, instr),
+                (F7_20, X0) => Hint { instr },
+                (F7_20, NonZero(rd)) => r_instr!(Sraw, instr, rd),
                 _ => Unknown { instr },
             },
 
@@ -569,24 +608,40 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         },
 
         // I-type instructions
-        OP_ARITH_I => match funct3(instr) {
-            F3_0 => i_instr!(Addi, instr),
-            F3_4 => i_instr!(Xori, instr),
-            F3_6 => i_instr!(Ori, instr),
-            F3_7 => i_instr!(Andi, instr),
-            F3_1 => match imm_11_6(instr) {
+        OP_ARITH_I => match (funct3(instr), split_x0(rd(instr))) {
+            (F3_0, X0) => match (split_x0(rs1(instr)), i_imm(instr)) {
+                (X0, _) | (_, 0) => Hint { instr },
+                (rs1, imm) => Addi(instruction::SplitITypeArgs { rd: X0, rs1, imm }),
+            },
+            (F3_0, rd) => Addi(instruction::SplitITypeArgs {
+                rd,
+                rs1: split_x0(rs1(instr)),
+                imm: i_imm(instr),
+            }),
+            (F3_4, X0) => Hint { instr },
+            (F3_4, NonZero(rd)) => i_instr!(Xori, instr, rd),
+            (F3_6, X0) => Hint { instr },
+            (F3_6, NonZero(rd)) => i_instr!(Ori, instr, rd),
+            (F3_7, X0) => Hint { instr },
+            (F3_7, NonZero(rd)) => i_instr!(Andi, instr, rd),
+            (F3_1, rd) => match (imm_11_6(instr), rd) {
                 // imm[0:5] -> shift amount
-                F7_0 => i_instr!(Slli, instr),
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => i_instr!(Slli, instr, rd),
                 _ => Unknown { instr },
             },
-            F3_5 => match imm_11_6(instr) {
+            (F3_5, rd) => match (imm_11_6(instr), rd) {
                 // imm[6:11] -> type of shift, imm[0:5] -> shift amount
-                F7_0 => i_instr!(Srli, instr),
-                F7_20 => i_instr!(Srai, instr),
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => i_instr!(Srli, instr, rd),
+                (F7_20, X0) => Hint { instr },
+                (F7_20, NonZero(rd)) => i_instr!(Srai, instr, rd),
                 _ => Unknown { instr },
             },
-            F3_2 => i_instr!(Slti, instr),
-            F3_3 => i_instr!(Sltiu, instr),
+            (F3_2, X0) => Hint { instr },
+            (F3_2, NonZero(rd)) => i_instr!(Slti, instr, rd),
+            (F3_3, X0) => Hint { instr },
+            (F3_3, NonZero(rd)) => i_instr!(Sltiu, instr, rd),
             _ => Unknown { instr },
         },
         OP_LOAD => match funct3(instr) {
@@ -599,24 +654,32 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
             F3_6 => i_instr!(Lwu, instr),
             _ => Unknown { instr },
         },
-        OP_ARITH_IW => match funct3(instr) {
-            F3_0 => i_instr!(Addiw, instr),
-            F3_1 => match imm_11_6(instr) {
+        OP_ARITH_IW => match (funct3(instr), split_x0(rd(instr))) {
+            (F3_0, X0) => Hint { instr },
+            (F3_0, NonZero(rd)) => i_instr!(Addiw, instr, rd),
+            (F3_1, rd) => match (imm_11_6(instr), rd) {
                 // imm[0:4] -> shift amount
-                F7_0 => i_instr!(Slliw, instr),
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => i_instr!(Slliw, instr, rd),
                 _ => Unknown { instr },
             },
-            F3_5 => match imm_11_6(instr) {
+            (F3_5, rd) => match (imm_11_6(instr), rd) {
                 // imm[6:11] -> type of shift, imm[0:4] -> shift amount
-                F7_0 => i_instr!(Srliw, instr),
-                F7_20 => i_instr!(Sraiw, instr),
+                (F7_0, X0) => Hint { instr },
+                (F7_0, NonZero(rd)) => i_instr!(Srliw, instr, rd),
+                (F7_20, X0) => Hint { instr },
+                (F7_20, NonZero(rd)) => i_instr!(Sraiw, instr, rd),
                 _ => Unknown { instr },
             },
             _ => Unknown { instr },
         },
         OP_SYNCH => match funct3(instr) {
             F3_0 => match fm(instr) {
-                FM_0 => return Instr::Uncacheable(fence_instr!(Fence, instr)),
+                FM_0 => match (bits(instr, 20, 4), bits(instr, 24, 4)) {
+                    (0, _) => Hint { instr },
+                    (_, 0) => Hint { instr },
+                    (_, _) => return Instr::Uncacheable(fence_instr!(Fence, instr)),
+                },
                 FM_8 => return Instr::Uncacheable(fence_instr!(FenceTso, instr)),
                 _ => Unknown { instr },
             },
@@ -634,7 +697,7 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
                     return Instr::Uncacheable(SFenceVma {
                         vaddr: rs1(instr),
                         asid: rs2(instr),
-                    })
+                    });
                 }
                 F7_8 => match (rs1_bits(instr), rs2_bits(instr)) {
                     (RS1_0, RS2_2) => return Instr::Uncacheable(Sret),
@@ -718,8 +781,14 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         },
 
         // U-type instructions
-        OP_LUI => u_instr!(Lui, instr),
-        OP_AUIPC => u_instr!(Auipc, instr),
+        OP_LUI => match split_x0(rd(instr)) {
+            X0 => Hint { instr },
+            NonZero(rd) => u_instr!(Lui, instr, rd),
+        },
+        OP_AUIPC => match split_x0(rd(instr)) {
+            X0 => Hint { instr },
+            NonZero(rd) => u_instr!(Auipc, instr, rd),
+        },
 
         // F/D-type instructions
         OP_FP => match fmt(instr) {
@@ -886,10 +955,10 @@ macro_rules! cr_instr {
 }
 
 macro_rules! cc_instr {
-    ($enum_variant:ident, $imm_f:expr, $instr:expr) => {
+    ($enum_variant:ident, $imm:expr, $instr:expr) => {
         $enum_variant(CIBTypeArgs {
             rd_rs1: c_rs1p($instr),
-            imm: $imm_f($instr),
+            imm: $imm,
         })
     };
 }
@@ -1095,9 +1164,35 @@ const C_Q1_1: u16 = 0b01;
 const C_Q1_2: u16 = 0b10;
 const C_Q1_3: u16 = 0b11;
 
+/// Wrapper for splitting x0 from other XRegisters that can
+/// be represented by [`NonZeroXRegister`].
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub(crate) enum XRegisterParsed {
+    X0,
+    NonZero(NonZeroXRegister),
+}
+
+/// Convert [`XRegister`] to [`NonZeroXRegister`] when `r != x0`.
+pub(crate) const fn split_x0(r: XRegister) -> XRegisterParsed {
+    match r {
+        x0 => XRegisterParsed::X0,
+        r => XRegisterParsed::NonZero(NonZeroXRegister::assert_from(r)),
+    }
+}
+
+impl Display for XRegisterParsed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            XRegisterParsed::X0 => write!(f, "zero"),
+            XRegisterParsed::NonZero(r) => write!(f, "{}", r),
+        }
+    }
+}
+
 #[inline]
 const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
     use InstrCacheable::*;
+    use XRegisterParsed::*;
     let i = match c_opcode(instr) {
         OP_C0 => match c_funct3(instr) {
             C_F3_1 => CFld(FLoadArgs {
@@ -1140,21 +1235,21 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
             _ => UnknownCompressed { instr },
         },
         OP_C1 => match c_funct3(instr) {
-            C_F3_0 => match (ci_imm(instr), c_rd_rs1(instr)) {
+            C_F3_0 => match (ci_imm(instr), split_x0(c_rd_rs1(instr))) {
                 // "C.ADDI is only valid when rd != x0 and nzimm != 0.
                 // The code points with rd == x0 and nzimm == 0 encode the C.NOP instruction;
                 // the remaining code points with nzimm != 0 encode HINTs."
-                (0, x0) => CNop,
-                (0, _) | (_, x0) => UnknownCompressed { instr },
-                (imm, rd_rs1) => CAddi(CIBTypeArgs { rd_rs1, imm }),
+                (0, X0) => CNop,
+                (0, _) | (_, X0) => HintCompressed { instr },
+                (imm, NonZero(rd_rs1)) => CAddi(CIBNZTypeArgs { rd_rs1, imm }),
             },
-            C_F3_1 => match (ci_imm(instr), c_rd_rs1(instr)) {
-                (_, x0) => UnknownCompressed { instr },
-                (imm, rd_rs1) => CAddiw(CIBTypeArgs { rd_rs1, imm }),
+            C_F3_1 => match (ci_imm(instr), split_x0(c_rd_rs1(instr))) {
+                (_, X0) => UnknownCompressed { instr },
+                (imm, NonZero(rd_rs1)) => CAddiw(CIBNZTypeArgs { rd_rs1, imm }),
             },
-            C_F3_2 => match c_rd_rs1(instr) {
-                x0 => UnknownCompressed { instr },
-                rd_rs1 => CLi(CIBTypeArgs {
+            C_F3_2 => match split_x0(c_rd_rs1(instr)) {
+                X0 => HintCompressed { instr },
+                NonZero(rd_rs1) => CLi(CIBNZTypeArgs {
                     rd_rs1,
                     imm: ci_imm(instr),
                 }),
@@ -1163,22 +1258,26 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 if u16::bits_subset(instr, 6, 2) == 0 && !u16::bit(instr, 12) {
                     return Instr::Cacheable(UnknownCompressed { instr });
                 };
-                match c_rd_rs1(instr) {
-                    x2 => CAddi16sp(CJTypeArgs {
+                match (split_x0(c_rd_rs1(instr)), ci_imm(instr)) {
+                    (NonZero(NonZeroXRegister::x2), _) => CAddi16sp(CJTypeArgs {
                         imm: ci_addi16sp_imm(instr),
                     }),
-                    x0 => UnknownCompressed { instr },
-                    rd_rs1 => CLui(CIBTypeArgs {
+                    (_, 0) => UnknownCompressed { instr },
+                    (X0, _) => HintCompressed { instr },
+                    (NonZero(rd_rs1), _) => CLui(CIBNZTypeArgs {
                         rd_rs1,
                         imm: ci_imm(instr) << 12,
                     }),
                 }
             }
-            C_F3_4 => match c_q1_10(instr) {
-                C_Q1_0 => cc_instr!(CSrli, cb_shamt_imm, instr),
-                C_Q1_1 => cc_instr!(CSrai, cb_shamt_imm, instr),
-                C_Q1_2 => cc_instr!(CAndi, cb_andi_imm, instr),
-                C_Q1_3 => match (u16::bit(instr, 12), c_q1_5(instr)) {
+            // RV64C declares that `shamt == 0` here is for HINTS.
+            C_F3_4 => match (c_q1_10(instr), cb_shamt_imm(instr)) {
+                (C_Q1_0, 0) => HintCompressed { instr },
+                (C_Q1_0, imm) => cc_instr!(CSrli, imm, instr),
+                (C_Q1_1, 0) => HintCompressed { instr },
+                (C_Q1_1, imm) => cc_instr!(CSrai, imm, instr),
+                (C_Q1_2, _) => cc_instr!(CAndi, cb_andi_imm(instr), instr),
+                (C_Q1_3, _) => match (u16::bit(instr, 12), c_q1_5(instr)) {
                     (false, C_Q1_0) => cr_instr!(CSub, instr),
                     (false, C_Q1_1) => cr_instr!(CXor, instr),
                     (false, C_Q1_2) => cr_instr!(COr, instr),
@@ -1190,41 +1289,47 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 _ => UnknownCompressed { instr },
             },
             C_F3_5 => CJ(CJTypeArgs { imm: cj_imm(instr) }),
-            C_F3_6 => cc_instr!(CBeqz, cb_imm, instr),
-            C_F3_7 => cc_instr!(CBnez, cb_imm, instr),
+
+            C_F3_6 => cc_instr!(CBeqz, cb_imm(instr), instr),
+            C_F3_7 => cc_instr!(CBnez, cb_imm(instr), instr),
             _ => UnknownCompressed { instr },
         },
         OP_C2 => match c_funct3(instr) {
-            C_F3_0 => match (cslli_imm(instr), c_rd_rs1(instr)) {
-                (_, x0) | (0, _) => UnknownCompressed { instr },
-                (imm, rd_rs1) => CSlli(CIBTypeArgs { rd_rs1, imm }),
+            C_F3_0 => match (cslli_imm(instr), split_x0(c_rd_rs1(instr))) {
+                (_, X0) | (0, _) => HintCompressed { instr },
+                (imm, NonZero(rd_rs1)) => CSlli(CIBNZTypeArgs { rd_rs1, imm }),
             },
             C_F3_1 => CFldsp(CIBDTypeArgs {
                 rd_rs1: c_f_rd_rs1(instr),
                 imm: ci_ldsp_imm(instr),
             }),
-            C_F3_2 => match c_rd_rs1(instr) {
-                x0 => UnknownCompressed { instr },
-                rd_rs1 => CLwsp(CIBTypeArgs {
+            C_F3_2 => match split_x0(c_rd_rs1(instr)) {
+                X0 => UnknownCompressed { instr },
+                NonZero(rd_rs1) => CLwsp(CIBNZTypeArgs {
                     rd_rs1,
                     imm: ci_lwsp_imm(instr),
                 }),
             },
-            C_F3_3 => match c_rd_rs1(instr) {
-                x0 => UnknownCompressed { instr },
-                rd_rs1 => CLdsp(CIBTypeArgs {
+            C_F3_3 => match split_x0(c_rd_rs1(instr)) {
+                X0 => UnknownCompressed { instr },
+                NonZero(rd_rs1) => CLdsp(CIBNZTypeArgs {
                     rd_rs1,
                     imm: ci_ldsp_imm(instr),
                 }),
             },
 
-            C_F3_4 => match (u16::bit(instr, 12), c_rd_rs1(instr), c_rs2(instr)) {
-                (true, x0, x0) => return Instr::Uncacheable(InstrUncacheable::CEbreak),
-                (_, x0, _) => UnknownCompressed { instr },
-                (true, rs1, x0) => CJalr(CRJTypeArgs { rs1 }),
-                (true, rs1, rs2) => CAdd(CRTypeArgs { rd_rs1: rs1, rs2 }),
-                (false, rs1, x0) => CJr(CRJTypeArgs { rs1 }),
-                (false, rs1, rs2) => CMv(CRTypeArgs { rd_rs1: rs1, rs2 }),
+            C_F3_4 => match (
+                u16::bit(instr, 12),
+                split_x0(c_rd_rs1(instr)),
+                split_x0(c_rs2(instr)),
+            ) {
+                (true, X0, X0) => return Instr::Uncacheable(InstrUncacheable::CEbreak),
+                (_, X0, X0) => UnknownCompressed { instr },
+                (_, X0, NonZero(_)) => HintCompressed { instr },
+                (true, NonZero(rs1), X0) => CJalr(CRJTypeArgs { rs1 }),
+                (true, NonZero(rd_rs1), NonZero(rs2)) => CAdd(CNZRTypeArgs { rd_rs1, rs2 }),
+                (false, NonZero(rs1), X0) => CJr(CRJTypeArgs { rs1 }),
+                (false, NonZero(rd_rs1), NonZero(rs2)) => CMv(CNZRTypeArgs { rd_rs1, rs2 }),
             },
             C_F3_5 => CFsdsp(CSSDTypeArgs {
                 rs2: c_f_rs2(instr),
@@ -1299,13 +1404,20 @@ mod tests {
     use std::collections::HashMap;
 
     use super::{
-        instruction::{CsrArgs, ITypeArgs, Instr, InstrCacheable::*, SBTypeArgs, UJTypeArgs},
+        XRegisterParsed::*,
+        instruction::{
+            CsrArgs, Instr, InstrCacheable::*, NonZeroRdITypeArgs, SBTypeArgs, UJTypeArgs,
+        },
         parse_block,
     };
     use crate::{
-        machine_state::{csregisters::CSRegister::mcause, registers::XRegister::*},
+        machine_state::{
+            csregisters::CSRegister::mcause,
+            registers::{NonZeroXRegister, XRegister::*},
+        },
         parser::{
-            instruction::{CIBTypeArgs, InstrUncacheable},
+            NonZeroRdUJTypeArgs, SplitITypeArgs,
+            instruction::{CIBNZTypeArgs, CIBTypeArgs, InstrUncacheable},
             parse_compressed_instruction, parse_compressed_instruction_inner,
         },
     };
@@ -1330,9 +1442,9 @@ mod tests {
                 rs1: x0,
                 csr: mcause,
             })),
-            Instr::Cacheable(Addi(ITypeArgs {
-                rd: x31,
-                rs1: x0,
+            Instr::Cacheable(Addi(SplitITypeArgs {
+                rd: NonZero(NonZeroXRegister::x31),
+                rs1: X0,
                 imm: 0x8,
             })),
         ];
@@ -1356,27 +1468,30 @@ mod tests {
             0x0, 0x9b, 0x83, 0x3, 0x34, 0x63, 0x10, 0x74, 0x12,
         ];
         let expected = [
-            Instr::Cacheable(Addi(ITypeArgs {
-                rd: x3,
-                rs1: x0,
+            Instr::Cacheable(Addi(SplitITypeArgs {
+                rd: NonZero(NonZeroXRegister::x3),
+                rs1: X0,
                 imm: 21,
             })),
-            Instr::Cacheable(CLui(CIBTypeArgs {
-                rd_rs1: x8,
+            Instr::Cacheable(CLui(CIBNZTypeArgs {
+                rd_rs1: NonZeroXRegister::x8,
                 imm: 0x1 << 12,
             })),
-            Instr::Cacheable(Addiw(ITypeArgs {
-                rd: x8,
+            Instr::Cacheable(Addiw(NonZeroRdITypeArgs {
+                rd: NonZeroXRegister::x8,
                 rs1: x8,
                 imm: 564,
             })),
-            Instr::Cacheable(CSlli(CIBTypeArgs { rd_rs1: x8, imm: 4 })),
-            Instr::Cacheable(Lui(UJTypeArgs {
-                rd: x7,
+            Instr::Cacheable(CSlli(CIBNZTypeArgs {
+                rd_rs1: NonZeroXRegister::x8,
+                imm: 4,
+            })),
+            Instr::Cacheable(Lui(NonZeroRdUJTypeArgs {
+                rd: NonZeroXRegister::x7,
                 imm: 0x12 << 12,
             })),
-            Instr::Cacheable(Addiw(ITypeArgs {
-                rd: x7,
+            Instr::Cacheable(Addiw(NonZeroRdITypeArgs {
+                rd: NonZeroXRegister::x7,
                 rs1: x7,
                 imm: 832,
             })),
@@ -1395,7 +1510,7 @@ mod tests {
     fn test_3() {
         let bytes: [u8; 5] = [0x1, 0x5, 0x64, 0x1b, 0x4];
         let expected = [
-            Instr::Cacheable(UnknownCompressed {
+            Instr::Cacheable(HintCompressed {
                 instr: u16::from_le_bytes([0x1, 0x5]),
             }),
             Instr::Cacheable(CAddi4spn(CIBTypeArgs {
@@ -1422,8 +1537,8 @@ mod tests {
     fn test_5() {
         let bytes: [u8; 8] = [0x13, 0x15, 0xf5, 0x01, 0x13, 0x15, 0xf5, 0x21];
         let expected = [
-            Instr::Cacheable(Slli(ITypeArgs {
-                rd: x10,
+            Instr::Cacheable(Slli(NonZeroRdITypeArgs {
+                rd: NonZeroXRegister::x10,
                 rs1: x10,
                 imm: 31,
             })),
@@ -1472,5 +1587,103 @@ mod tests {
                 parse_compressed_instruction(i)
             );
         }
+    }
+
+    // Check a HINT encoding for each uncompressed opcode.
+    #[test]
+    fn test_uncompressed_hints() {
+        let bytes: [u8; 120] = [
+            0x37, 0x80, 0x33, 0x33, // LUI X0, 3355520
+            0x17, 0x80, 0x33, 0x33, // AUIPC X0, 3355520
+            0x13, 0x00, 0xA0, 0x36, // ADDI, X0, X0, 874
+            0x13, 0xB0, 0xAC, 0x36, // ORI, X0, X25, 874
+            0x13, 0xC0, 0xAC, 0x36, // XORI, X0, X25, 874
+            0x1B, 0x80, 0x19, 0x00, // ADDIW X0, X11, 1
+            0x33, 0x80, 0x31, 0x00, // ADD X0, X3, X3
+            0x33, 0x80, 0x5A, 0x41, // SUB X0, X21, X21
+            0x33, 0xB0, 0x31, 0x00, // AND X0, X3, X3
+            0x33, 0xC0, 0x31, 0x00, // OR X0, X3, X3
+            0x33, 0xD0, 0x31, 0x00, // XOR X0, X3, X3
+            0x33, 0xE0, 0x31, 0x00, // SLL X0, X3, X3
+            0x33, 0xF0, 0x31, 0x00, // SRL X0, X3, X3
+            0x33, 0xD0, 0x5A, 0x41, // SRA X0, X21, X21
+            0x37, 0x00, 0xC6, 0x00, // ADDW X0, X6, X6
+            0x37, 0x00, 0xC6, 0x40, // SUBW X0, X6, X6
+            0x37, 0x10, 0xC6, 0x00, // SLLW X0, X6, X6
+            0x37, 0x20, 0xC6, 0x00, // SRLW X0, X6, X6
+            0x37, 0x10, 0xC6, 0x40, // SRAW X0, X6, X6
+            0x0F, 0x00, 0x00, 0x0F, // FENCE F, 0
+            0x13, 0x20, 0xA0, 0x36, // SLTI, X0, X0, 874
+            0x13, 0x30, 0xA0, 0x36, // SLTIU, X0, X0, 874
+            0x13, 0x10, 0x44, 0x01, // SLLI X0, X8, 333
+            0x13, 0x50, 0x44, 0x01, // SRLI X0, X8, 333
+            0x13, 0x50, 0x44, 0x41, // SRAI X0, X8, 333
+            0x1B, 0x90, 0x19, 0x00, // SLLIW X0, X11, 1
+            0x1B, 0xD0, 0x19, 0x00, // SRLIW X0, X11, 1
+            0x1B, 0xD0, 0x19, 0x40, // SRAIW X0, X11, 1
+            0x33, 0x90, 0x31, 0x00, // SLT X0, X3, X3
+            0x33, 0xA0, 0x31, 0x00, // SLTU X0, X3, X3
+        ];
+        let expected = [
+            Instr::Cacheable(Hint { instr: 0x33338037 }),
+            Instr::Cacheable(Hint { instr: 0x33338017 }),
+            Instr::Cacheable(Hint { instr: 0x36A00013 }),
+            Instr::Cacheable(Hint { instr: 0x36ACB013 }),
+            Instr::Cacheable(Hint { instr: 0x36ACC013 }),
+            Instr::Cacheable(Hint { instr: 0x0019801B }),
+            Instr::Cacheable(Hint { instr: 0x00318033 }),
+            Instr::Cacheable(Hint { instr: 0x415A8033 }),
+            Instr::Cacheable(Hint { instr: 0x0031B033 }),
+            Instr::Cacheable(Hint { instr: 0x0031C033 }),
+            Instr::Cacheable(Hint { instr: 0x0031D033 }),
+            Instr::Cacheable(Hint { instr: 0x0031E033 }),
+            Instr::Cacheable(Hint { instr: 0x0031F033 }),
+            Instr::Cacheable(Hint { instr: 0x415AD033 }),
+            Instr::Cacheable(Hint { instr: 0x00C60037 }),
+            Instr::Cacheable(Hint { instr: 0x40C60037 }),
+            Instr::Cacheable(Hint { instr: 0x00C61037 }),
+            Instr::Cacheable(Hint { instr: 0x00C62037 }),
+            Instr::Cacheable(Hint { instr: 0x40C61037 }),
+            Instr::Cacheable(Hint { instr: 0x0F00000F }),
+            Instr::Cacheable(Hint { instr: 0x36A02013 }),
+            Instr::Cacheable(Hint { instr: 0x36A03013 }),
+            Instr::Cacheable(Hint { instr: 0x01441013 }),
+            Instr::Cacheable(Hint { instr: 0x01445013 }),
+            Instr::Cacheable(Hint { instr: 0x41445013 }),
+            Instr::Cacheable(Hint { instr: 0x0019901B }),
+            Instr::Cacheable(Hint { instr: 0x0019D01B }),
+            Instr::Cacheable(Hint { instr: 0x4019D01B }),
+            Instr::Cacheable(Hint { instr: 0x00319033 }),
+            Instr::Cacheable(Hint { instr: 0x0031A033 }),
+        ];
+        let instructions = parse_block(&bytes);
+        assert_eq!(instructions, expected);
+    }
+
+    // Check a HINT encoding for each compressed opcode.
+    #[test]
+    fn test_compressed_hints() {
+        let bytes: [u8; 16] = [
+            0x01, 0x02, // C.ADDI x4, 0
+            0x01, 0x40, // C.LI x0, 0
+            0x51, 0x60, // C.LUI X0, 20
+            0x06, 0x80, // C.MV x0, x1
+            0x06, 0x90, // C.ADD x0, x1
+            0x02, 0x00, // C.SLLI x0 0
+            0x01, 0x81, // C.SRLI x6 0
+            0x01, 0x87, // C.SRAI x6 0
+        ];
+        let expected = [
+            Instr::Cacheable(HintCompressed { instr: 0x0201 }),
+            Instr::Cacheable(HintCompressed { instr: 0x4001 }),
+            Instr::Cacheable(HintCompressed { instr: 0x6051 }),
+            Instr::Cacheable(HintCompressed { instr: 0x8006 }),
+            Instr::Cacheable(HintCompressed { instr: 0x9006 }),
+            Instr::Cacheable(HintCompressed { instr: 0x0002 }),
+            Instr::Cacheable(HintCompressed { instr: 0x8101 }),
+            Instr::Cacheable(HintCompressed { instr: 0x8701 }),
+        ];
+        let instructions = parse_block(&bytes);
+        assert_eq!(instructions, expected);
     }
 }

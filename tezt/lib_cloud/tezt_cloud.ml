@@ -6,10 +6,31 @@
 (*****************************************************************************)
 
 module Agent = Agent
+module Types = Types
 
-module Configuration = struct
-  include Env
-  include Configuration
+module Alert = struct
+  include Alert_manager
+
+  type t = Alert_manager.alert
+
+  type severity = Prometheus.severity = Critical | Warning | Info
+
+  let make ?route ?for_ ?description ?summary ?severity ?group_name ?interval
+      ~name ~expr () =
+    let alert =
+      Prometheus.make_alert
+        ?for_
+        ?description
+        ?summary
+        ?severity
+        ?group_name
+        ?interval
+        ~name
+        ~expr
+        ()
+    in
+
+    Alert_manager.alert ?route alert
 end
 
 module Cloud = Cloud
@@ -55,11 +76,81 @@ let register_prometheus_import ~tags =
   Cloud.register
     ?vms:None
     ~__FILE__
-    ~title:"Import a snapshot into a prometheus container"
+    ~title:"Import snapshots into prometheus containers"
     ~tags:("prometheus" :: "import" :: tags)
   @@ fun _cloud ->
-  let* prometheus = Prometheus.run_with_snapshot () in
-  Prometheus.shutdown prometheus
+  let conf =
+    match Env.prometheus_snapshots with
+    | [] ->
+        Test.fail
+          "You must specify the snapshot filename via --prometheus-snapshots"
+    | snapshots ->
+        List.mapi
+          (fun i -> function
+            | path, Some port -> (path, port)
+            | path, None -> (path, Env.prometheus_port + i))
+          snapshots
+  in
+  let* prometheus =
+    Lwt_list.map_s
+      (fun (path, port) -> Prometheus.run_with_snapshot port path)
+      conf
+  in
+  let* g =
+    if Env.grafana then
+      let sources =
+        if Env.grafana_legacy_source then
+          match prometheus with
+          | [p] ->
+              (* For legacy support of the existing grafana dashboards, when
+                 using only one snapshot, we want to use the default
+                 'Prometheus' source name. *)
+              let port = Prometheus.get_port p in
+              [
+                sf
+                  {|
+- name: Prometheus
+  type: prometheus
+  access: proxy
+  url: http://localhost:%d
+  isDefault: true
+|}
+                  port;
+              ]
+          | _ ->
+              Test.fail
+                "You need to provide one and only one snapshot when using the \
+                 legacy dashboard source name"
+        else
+          (* When using multiple snapshots we assume that they are used
+             with a dashboard that do not hard code the datasource
+             name. *)
+          List.map
+            (fun p ->
+              let name = Prometheus.get_name p in
+              let port = Prometheus.get_port p in
+              sf
+                {|
+- name: %s
+  type: prometheus
+  access: proxy
+  url: http://localhost:%d
+|}
+                name
+                port)
+            prometheus
+      in
+      Grafana.run ~sources () |> Lwt.map Option.some
+    else Lwt.return_none
+  in
+  Log.info
+    "Prometheus instances are now running. Write 'stop' in order to stop and \
+     remove docker containers." ;
+  while read_line () <> "stop" do
+    ()
+  done ;
+  let* () = Lwt_list.iter_s Prometheus.shutdown prometheus in
+  Option.map Grafana.shutdown g |> Option.value ~default:Lwt.return_unit
 
 let register_clean_up_vms ~tags =
   Cloud.register
@@ -87,15 +178,21 @@ let register_create_dns_zone ~tags =
     ~title:"Create a new DNS zone"
     ~tags:("create" :: "dns" :: "zone" :: tags)
   @@ fun _cloud ->
-  let domain =
-    match Env.dns_domain with
-    | None ->
-        Test.fail "You must specify the domain to use via --dns-domain option."
-    | Some domain -> domain
-  in
-  let* () = Gcloud.DNS.create_zone ~domain ~zone:"tezt-cloud" () in
-  let* _ = Gcloud.DNS.describe ~zone:"tezt-cloud" () in
-  unit
+  let* domains = Env.dns_domains () in
+  match domains with
+  | [] ->
+      Test.fail "You must specify the domains to use via --dns-domain option."
+  | domains ->
+      Lwt_list.iter_p
+        (fun domain ->
+          let* res = Gcloud.DNS.find_zone_for_subdomain domain in
+          match res with
+          | Some (zone, _) ->
+              let* () = Gcloud.DNS.create_zone ~domain ~zone () in
+              let* _ = Gcloud.DNS.describe ~zone () in
+              unit
+          | None -> unit)
+        domains
 
 let register_describe_dns_zone ~tags =
   Cloud.register
@@ -104,8 +201,26 @@ let register_describe_dns_zone ~tags =
     ~title:"Describe a new DNS zone"
     ~tags:("describe" :: "dns" :: "zone" :: tags)
   @@ fun _cloud ->
-  let* _ = Gcloud.DNS.describe ~zone:"tezt-cloud" () in
-  unit
+  let* zones = Gcloud.DNS.list_zones () in
+  Lwt_list.iter_s
+    (fun (zone, _) ->
+      let* _ = Gcloud.DNS.describe ~zone () in
+      unit)
+    zones
+
+let register_list_dns_domains ~tags =
+  Cloud.register
+    ?vms:None
+    ~__FILE__
+    ~title:"List the DNS domains currently in use"
+    ~tags:("describe" :: "dns" :: "list" :: tags)
+  @@ fun _cloud ->
+  let* zones = Gcloud.DNS.list_zones () in
+  Lwt_list.iter_s
+    (fun (zone, _) ->
+      let* _ = Gcloud.DNS.list ~zone () in
+      unit)
+    zones
 
 let register_dns_add ~tags =
   Cloud.register
@@ -114,13 +229,27 @@ let register_dns_add ~tags =
     ~title:"Register a new DNS entry"
     ~tags:("dns" :: "add" :: tags)
   @@ fun _cloud ->
-  let tezt_cloud = Env.tezt_cloud in
-  let ip = Cli.get_string_opt "ip" in
-  match ip with
-  | None -> Test.fail "You must provide an IP address via -a ip=<ip>"
-  | Some ip ->
-      let* () = Gcloud.DNS.add ~tezt_cloud ~zone:"tezt-cloud" ~ip in
-      unit
+  let ip =
+    match Cli.get_string_opt "ip" with
+    | None -> Test.fail "You must provide an IP address via -a ip=<ip>"
+    | Some ip -> ip
+  in
+  let domain =
+    match Cli.get_string_opt "dns-domain" with
+    | None ->
+        Test.fail
+          "You must provide a domain name via -a dns-domain=<domain>. The \
+           format expected is the same one as the CLI argument '--dns-domain' \
+           of tezt-cloud. "
+    | Some domain -> domain
+  in
+  let* res = Gcloud.DNS.find_zone_for_subdomain domain in
+  let zone =
+    match res with
+    | None -> Test.fail "No suitable zone for %s" domain
+    | Some (zone, _) -> zone
+  in
+  Gcloud.DNS.add_subdomain ~zone ~name:domain ~value:ip
 
 let register_dns_remove ~tags =
   Cloud.register
@@ -129,13 +258,22 @@ let register_dns_remove ~tags =
     ~title:"Remove a DNS entry"
     ~tags:("dns" :: "remove" :: tags)
   @@ fun _cloud ->
-  let tezt_cloud = Env.tezt_cloud in
-  let* ip = Gcloud.DNS.get_ip ~tezt_cloud ~zone:"tezt-cloud" in
-  match ip with
-  | None -> Test.fail "No record found for the current domain"
-  | Some ip ->
-      let* () = Gcloud.DNS.remove ~tezt_cloud ~zone:"tezt-cloud" ~ip in
-      unit
+  let* domains = Env.dns_domains () in
+  Lwt_list.iter_s
+    (fun domain ->
+      let* res = Gcloud.DNS.find_zone_for_subdomain domain in
+      let zone =
+        match res with
+        | None -> Test.fail "No suitable zone for %s" domain
+        | Some (zone, _) -> zone
+      in
+      let* ip = Gcloud.DNS.get_value ~zone ~domain in
+      match ip with
+      | None -> Test.fail "No record found for the current domain"
+      | Some ip ->
+          let* () = Gcloud.DNS.remove_subdomain ~zone ~name:domain ~value:ip in
+          unit)
+    domains
 
 let register ~tags =
   register_docker_push ~tags ;
@@ -147,5 +285,6 @@ let register ~tags =
   register_list_vms ~tags ;
   register_create_dns_zone ~tags ;
   register_describe_dns_zone ~tags ;
+  register_list_dns_domains ~tags ;
   register_dns_add ~tags ;
   register_dns_remove ~tags

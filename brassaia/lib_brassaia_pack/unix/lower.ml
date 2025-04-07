@@ -15,22 +15,19 @@
  *)
 
 open Import
-include Lower_intf
 module Layout = Brassaia_pack.Layout.V5.Volume
 module Payload = Control_file.Payload.Volume.Latest
+module Io = Io.Unix
+module Errs = Io_errors
+module Control = Control_file.Volume
 
-module Make_volume (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
-  module Io = Io
-  module Errs = Errs
-  module Control = Control_file.Volume (Io)
-  module Sparse = Sparse_file.Make (Io)
-
+module Volume = struct
   type t =
     | Empty of { path : string }
     | Nonempty of {
         path : string;
         control : Payload.t;
-        mutable sparse : Sparse.t option;
+        mutable sparse : Sparse_file.t option;
       }
 
   type open_error =
@@ -88,7 +85,7 @@ module Make_volume (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
     let* () = Io.mkdir root in
     let* () = Io.move_file ~src ~dst:data in
     let* mapping_end_poff =
-      Sparse.Wo.create_from_data ~mapping ~dead_header_size ~size ~data
+      Sparse_file.Wo.create_from_data ~mapping ~dead_header_size ~size ~data
     in
     let payload =
       {
@@ -126,7 +123,7 @@ module Make_volume (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
             let mapping = Layout.mapping ~root in
             let data = Layout.data ~root in
             let mapping_size = Int63.to_int control.Payload.mapping_end_poff in
-            let+ sparse = Sparse.open_ro ~mapping_size ~mapping ~data in
+            let+ sparse = Sparse_file.open_ro ~mapping_size ~mapping ~data in
             t.sparse <- Some sparse)
 
   let close = function
@@ -136,7 +133,7 @@ module Make_volume (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
         | None -> Error `Double_close
         | Some s ->
             let open Result_syntax in
-            let+ () = Sparse.close s in
+            let+ () = Sparse_file.close s in
             t.sparse <- None)
 
   let identifier t = path t
@@ -148,7 +145,7 @@ module Make_volume (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
     | Nonempty { sparse; _ } -> (
         match sparse with
         | None -> Errs.raise_error (`Invalid_volume_read (`Closed, off))
-        | Some s -> Sparse.read_range_exn s ~off ~min_len ~max_len b)
+        | Some s -> Sparse_file.read_range_exn s ~off ~min_len ~max_len b)
 
   let archive_seq ~upper_root ~generation ~is_first ~to_archive ~first_off t =
     let open Result_syntax in
@@ -186,14 +183,14 @@ module Make_volume (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
       | Nonempty { control; _ } -> Ok control.mapping_end_poff
     in
     (* Append archived data *)
-    let* ao = Sparse.Ao.open_ao ~mapping_size ~mapping ~data in
+    let* ao = Sparse_file.Ao.open_ao ~mapping_size ~mapping ~data in
     List.iter
-      (fun (off, seq) -> Sparse.Ao.append_seq_exn ao ~off seq)
+      (fun (off, seq) -> Sparse_file.Ao.append_seq_exn ao ~off seq)
       to_archive;
-    let end_offset = Sparse.Ao.end_off ao in
-    let mapping_end_poff = Sparse.Ao.mapping_size ao in
-    let* () = Sparse.Ao.flush ao in
-    let* () = Sparse.Ao.close ao in
+    let end_offset = Sparse_file.Ao.end_off ao in
+    let mapping_end_poff = Sparse_file.Ao.mapping_size ao in
+    let* () = Sparse_file.Ao.flush ao in
+    let* () = Sparse_file.Ao.close ao in
     (* Prepare new control file *)
     let start_offset =
       match t with
@@ -252,167 +249,161 @@ module Make_volume (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
     path t |> Sys.readdir |> Array.to_list |> List.iter_result clean
 end
 
-module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
-  module Io = Io
-  module Errs = Errs
-  module Volume = Make_volume (Io) (Errs)
+type t = {
+  root : string;
+  mutable readonly : bool;
+  mutable volumes : Volume.t array;
+  mutable open_volume : Volume.t option;
+}
 
-  type t = {
-    root : string;
-    mutable readonly : bool;
-    mutable volumes : Volume.t array;
-    mutable open_volume : Volume.t option;
-  }
+type open_error = [ Volume.open_error | `Volume_missing of string ]
+type close_error = [ | Io.close_error ]
+type volume_identifier = string [@@deriving brassaia]
 
-  type open_error = [ Volume.open_error | `Volume_missing of string ]
-  type close_error = [ | Io.close_error ]
-  type nonrec volume_identifier = volume_identifier [@@deriving brassaia]
+type add_error =
+  [ open_error
+  | `Ro_not_allowed
+  | `Multiple_empty_volumes
+  | `File_exists of string
+  | `Invalid_parent_directory ]
 
-  type add_error =
-    [ open_error
-    | `Ro_not_allowed
-    | `Multiple_empty_volumes
-    | `File_exists of string
-    | `Invalid_parent_directory ]
+let close_open_volume t =
+  match t.open_volume with
+  | None -> Ok ()
+  | Some v ->
+      let open Result_syntax in
+      let+ _ = Volume.close v in
+      t.open_volume <- None
 
-  let close_open_volume t =
-    match t.open_volume with
+exception LoadVolumeError of open_error
+
+let load_volumes ~volume_num t =
+  let open Result_syntax in
+  let* () = close_open_volume t in
+  let* volumes =
+    let root = t.root in
+    let volume i =
+      let path = Layout.directory ~root ~idx:i in
+      match Io.classify_path path with
+      | `File | `Other | `No_such_file_or_directory ->
+          raise (LoadVolumeError (`Volume_missing path))
+      | `Directory -> (
+          match Volume.open_volume path with
+          | Error e -> raise (LoadVolumeError e)
+          | Ok v -> v)
+    in
+    try Ok (Array.init volume_num volume)
+    with LoadVolumeError err -> Error (err : open_error :> [> open_error ])
+  in
+  t.volumes <- volumes;
+  Ok t
+
+let open_volumes ~readonly ~volume_num root =
+  load_volumes ~volume_num
+    { root; readonly; volumes = [||]; open_volume = None }
+
+let reload ~volume_num t =
+  let open Result_syntax in
+  let* _ = load_volumes ~volume_num t in
+  Ok ()
+
+let set_readonly t flag = t.readonly <- flag
+let close = close_open_volume
+let volume_num t = Array.length t.volumes
+
+let appendable_volume t =
+  match volume_num t with 0 -> None | num -> Some t.volumes.(num - 1)
+
+let add_volume t =
+  let open Result_syntax in
+  let* () = if t.readonly then Error `Ro_not_allowed else Ok () in
+  let* () =
+    match appendable_volume t with
     | None -> Ok ()
     | Some v ->
-        let open Result_syntax in
-        let+ _ = Volume.close v in
-        t.open_volume <- None
+        if Volume.is_empty v then Error `Multiple_empty_volumes else Ok ()
+  in
+  let volume_path =
+    let next_idx = volume_num t in
+    Layout.directory ~root:t.root ~idx:next_idx
+  in
+  let* vol = Volume.create volume_path in
+  t.volumes <- Array.append t.volumes [| vol |];
+  Ok vol
 
-  exception LoadVolumeError of open_error
+let find_volume ~off t = Array.find_opt (Volume.contains ~off) t.volumes
 
-  let load_volumes ~volume_num t =
+let find_volume_by_offset_exn ~off t =
+  match find_volume ~off t with
+  | None ->
+      let err = Fmt.str "Looking for offset %d" (Int63.to_int off) in
+      Errs.raise_error (`Volume_not_found err)
+  | Some v -> v
+
+let find_volume_by_identifier ~id t =
+  match Array.find_opt (Volume.identifier_eq ~id) t.volumes with
+  | None ->
+      let err = Fmt.str "Looking for identifier %s" id in
+      Error (`Volume_not_found err)
+  | Some v -> Ok v
+
+let find_volume_by_identifier_exn ~id t =
+  find_volume_by_identifier ~id t |> Errs.raise_if_error
+
+let read_range_exn ~off ~min_len ~max_len ?volume t b =
+  [%log.debug
+    "read_range_exn ~off:%a ~min_len:%i ~max_len:%i" Int63.pp off min_len
+      max_len];
+  let set_open_volume t v =
+    (* Maintain one open volume at a time. *)
     let open Result_syntax in
-    let* () = close_open_volume t in
-    let* volumes =
-      let root = t.root in
-      let volume i =
-        let path = Layout.directory ~root ~idx:i in
-        match Io.classify_path path with
-        | `File | `Other | `No_such_file_or_directory ->
-            raise (LoadVolumeError (`Volume_missing path))
-        | `Directory -> (
-            match Volume.open_volume path with
-            | Error e -> raise (LoadVolumeError e)
-            | Ok v -> v)
-      in
-      try Ok (Array.init volume_num volume)
-      with LoadVolumeError err -> Error (err : open_error :> [> open_error ])
-    in
-    t.volumes <- volumes;
-    Ok t
-
-  let open_volumes ~readonly ~volume_num root =
-    load_volumes ~volume_num
-      { root; readonly; volumes = [||]; open_volume = None }
-
-  let reload ~volume_num t =
-    let open Result_syntax in
-    let* _ = load_volumes ~volume_num t in
-    Ok ()
-
-  let set_readonly t flag = t.readonly <- flag
-  let close = close_open_volume
-  let volume_num t = Array.length t.volumes
-
-  let appendable_volume t =
-    match volume_num t with 0 -> None | num -> Some t.volumes.(num - 1)
-
-  let add_volume t =
-    let open Result_syntax in
-    let* () = if t.readonly then Error `Ro_not_allowed else Ok () in
     let* () =
-      match appendable_volume t with
+      match t.open_volume with
       | None -> Ok ()
-      | Some v ->
-          if Volume.is_empty v then Error `Multiple_empty_volumes else Ok ()
+      | Some v0 -> if Volume.eq v0 v then Ok () else close_open_volume t
     in
-    let volume_path =
-      let next_idx = volume_num t in
-      Layout.directory ~root:t.root ~idx:next_idx
-    in
-    let* vol = Volume.create volume_path in
-    t.volumes <- Array.append t.volumes [| vol |];
-    Ok vol
+    let+ _ = Volume.open_ v in
+    t.open_volume <- Some v
+  in
+  let volume =
+    match volume with
+    | None -> find_volume_by_offset_exn t ~off
+    | Some id -> find_volume_by_identifier_exn t ~id
+  in
+  set_open_volume t volume |> Errs.raise_if_error;
+  let len = Volume.read_range_exn ~off ~min_len ~max_len b volume in
+  (len, Volume.identifier volume)
 
-  let find_volume ~off t = Array.find_opt (Volume.contains ~off) t.volumes
+let archive_seq_exn ~upper_root ~generation ~to_archive t =
+  Errs.raise_if_error
+    (let open Result_syntax in
+     let* () = if t.readonly then Error `Ro_not_allowed else Ok () in
+     let* v =
+       match appendable_volume t with
+       | None -> Error `Lower_has_no_volume
+       | Some v -> Ok v
+     in
+     let* () =
+       match t.open_volume with
+       | None -> Ok ()
+       | Some v0 -> if Volume.eq v0 v then close_open_volume t else Ok ()
+     in
+     let is_first = volume_num t = 1 in
+     Volume.archive_seq ~upper_root ~generation ~to_archive ~is_first v)
 
-  let find_volume_by_offset_exn ~off t =
-    match find_volume ~off t with
-    | None ->
-        let err = Fmt.str "Looking for offset %d" (Int63.to_int off) in
-        Errs.raise_error (`Volume_not_found err)
-    | Some v -> v
+let read_exn ~off ~len ?volume t b =
+  let _, volume = read_range_exn ~off ~min_len:len ~max_len:len ?volume t b in
+  volume
 
-  let find_volume_by_identifier ~id t =
-    match Array.find_opt (Volume.identifier_eq ~id) t.volumes with
-    | None ->
-        let err = Fmt.str "Looking for identifier %s" id in
-        Error (`Volume_not_found err)
-    | Some v -> Ok v
+let create_from = Volume.create_from
 
-  let find_volume_by_identifier_exn ~id t =
-    find_volume_by_identifier ~id t |> Errs.raise_if_error
+let swap ~volume ~generation ~volume_num t =
+  let open Result_syntax in
+  let* vol = find_volume_by_identifier ~id:volume t in
+  let* () = Volume.swap ~generation vol in
+  reload ~volume_num t
 
-  let read_range_exn ~off ~min_len ~max_len ?volume t b =
-    [%log.debug
-      "read_range_exn ~off:%a ~min_len:%i ~max_len:%i" Int63.pp off min_len
-        max_len];
-    let set_open_volume t v =
-      (* Maintain one open volume at a time. *)
-      let open Result_syntax in
-      let* () =
-        match t.open_volume with
-        | None -> Ok ()
-        | Some v0 -> if Volume.eq v0 v then Ok () else close_open_volume t
-      in
-      let+ _ = Volume.open_ v in
-      t.open_volume <- Some v
-    in
-    let volume =
-      match volume with
-      | None -> find_volume_by_offset_exn t ~off
-      | Some id -> find_volume_by_identifier_exn t ~id
-    in
-    set_open_volume t volume |> Errs.raise_if_error;
-    let len = Volume.read_range_exn ~off ~min_len ~max_len b volume in
-    (len, Volume.identifier volume)
-
-  let archive_seq_exn ~upper_root ~generation ~to_archive t =
-    Errs.raise_if_error
-      (let open Result_syntax in
-       let* () = if t.readonly then Error `Ro_not_allowed else Ok () in
-       let* v =
-         match appendable_volume t with
-         | None -> Error `Lower_has_no_volume
-         | Some v -> Ok v
-       in
-       let* () =
-         match t.open_volume with
-         | None -> Ok ()
-         | Some v0 -> if Volume.eq v0 v then close_open_volume t else Ok ()
-       in
-       let is_first = volume_num t = 1 in
-       Volume.archive_seq ~upper_root ~generation ~to_archive ~is_first v)
-
-  let read_exn ~off ~len ?volume t b =
-    let _, volume = read_range_exn ~off ~min_len:len ~max_len:len ?volume t b in
-    volume
-
-  let create_from = Volume.create_from
-
-  let swap ~volume ~generation ~volume_num t =
-    let open Result_syntax in
-    let* vol = find_volume_by_identifier ~id:volume t in
-    let* () = Volume.swap ~generation vol in
-    reload ~volume_num t
-
-  let cleanup ~generation t =
-    match appendable_volume t with
-    | None -> Ok [%log.warn "Attempted to cleanup but lower has no volumes"]
-    | Some v -> Volume.cleanup ~generation v
-end
+let cleanup ~generation t =
+  match appendable_volume t with
+  | None -> Ok [%log.warn "Attempted to cleanup but lower has no volumes"]
+  | Some v -> Volume.cleanup ~generation v

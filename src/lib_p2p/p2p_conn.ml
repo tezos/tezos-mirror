@@ -28,7 +28,7 @@ module Events = P2p_events.P2p_conn
 
 type ('msg, 'peer, 'conn) t = {
   canceler : Lwt_canceler.t;
-  greylister : unit -> unit;
+  greylister : motive:string -> unit Lwt.t;
   messages : (int * 'msg) Lwt_pipe.Maybe_bounded.t;
   conn : ('msg P2p_message.t, 'conn) P2p_socket.t;
   peer_info : (('msg, 'peer, 'conn) t, 'peer, 'conn) P2p_peer_state.Info.t;
@@ -105,8 +105,8 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       worker_loop t callback
   | Ok (_, Disconnect) | Error (P2p_errors.Connection_closed :: _) ->
       Error_monad.cancel_with_exceptions t.canceler
-  | Error (P2p_errors.Decoding_error _ :: _) ->
-      t.greylister () ;
+  | Error (Tezos_base.Data_encoding_wrapper.Decoding_error _ :: _) ->
+      let* () = t.greylister ~motive:"decoding error" in
       Error_monad.cancel_with_exceptions t.canceler
   | Error (Canceled :: _) -> Lwt.return_unit
   | Error err ->

@@ -136,15 +136,18 @@ types:
       type: bls_signature_prefix
       if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::signature_prefix)
       doc: The prefix of a BLS signature, i.e. the first 32 bytes.
-    - id: preattestation
-      type: preattestation
-      if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::preattestation)
     - id: attestation
       type: attestation
       if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::attestation)
     - id: attestation_with_dal
       type: attestation_with_dal
       if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::attestation_with_dal)
+    - id: preattestation
+      type: preattestation
+      if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::preattestation)
+    - id: attestations_aggregate
+      type: attestations_aggregate
+      if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::attestations_aggregate)
     - id: double_preattestation_evidence
       type: double_preattestation_evidence
       if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::double_preattestation_evidence)
@@ -160,6 +163,9 @@ types:
     - id: double_baking_evidence
       type: double_baking_evidence
       if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::double_baking_evidence)
+    - id: dal_entrapment_evidence
+      type: dal_entrapment_evidence
+      if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::dal_entrapment_evidence)
     - id: activate_account
       type: activate_account
       if: (alpha__operation__alpha__contents_or_signature_prefix_tag == alpha__operation__alpha__contents_or_signature_prefix_tag::activate_account)
@@ -277,6 +283,19 @@ types:
       type: s4be
     - id: block_payload_hash
       size: 32
+  attestation_0:
+    seq:
+    - id: alpha__inlined__attestation
+      type: alpha__inlined__attestation
+  attestation_1:
+    seq:
+    - id: len_attestation
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: attestation
+      type: attestation_0
+      size: len_attestation
   attestation_with_dal:
     seq:
     - id: slot
@@ -289,6 +308,12 @@ types:
       size: 32
     - id: dal_attestation
       type: z
+  attestations_aggregate:
+    seq:
+    - id: consensus_content
+      type: consensus_content
+    - id: committee
+      type: committee_0
   ballot:
     seq:
     - id: source
@@ -374,6 +399,32 @@ types:
       size: 32
     - id: number_of_ticks
       type: s8be
+  committee:
+    seq:
+    - id: committee_entries
+      type: committee_entries
+      repeat: eos
+  committee_0:
+    seq:
+    - id: len_committee
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: committee
+      type: committee
+      size: len_committee
+  committee_entries:
+    seq:
+    - id: committee_elt
+      type: u2be
+  consensus_content:
+    seq:
+    - id: level
+      type: s4be
+    - id: round
+      type: s4be
+    - id: block_payload_hash
+      size: 32
   contents_and_signature_prefix_entries:
     seq:
     - id: alpha__operation__alpha__contents_or_signature_prefix
@@ -384,6 +435,14 @@ types:
       type: dal_page_id
     - id: dal_proof
       type: bytes_dyn_uint30
+  dal_entrapment_evidence:
+    seq:
+    - id: attestation
+      type: attestation_1
+    - id: slot_index
+      type: u1
+    - id: shard_with_proof
+      type: shard_with_proof
   dal_page_id:
     seq:
     - id: published_level
@@ -917,6 +976,19 @@ types:
       type: private_pis_elt_field1
   proof:
     seq:
+    - id: signature__v1
+      size-eos: true
+  proof_0:
+    seq:
+    - id: len_proof
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: proof
+      type: proof
+      size: len_proof
+  proof_1:
+    seq:
     - id: pvm_step
       type: bytes_dyn_uint30
     - id: input_proof_tag
@@ -1095,6 +1167,36 @@ types:
     - id: limit
       type: alpha__mutez
       if: (limit_tag == bool::true)
+  shard:
+    seq:
+    - id: shard_field0
+      type: int31
+    - id: shard_field1
+      type: shard_field1_0
+  shard_field1:
+    seq:
+    - id: shard_field1_entries
+      type: shard_field1_entries
+      repeat: eos
+  shard_field1_0:
+    seq:
+    - id: len_shard_field1
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: shard_field1
+      type: shard_field1
+      size: len_shard_field1
+  shard_field1_entries:
+    seq:
+    - id: shard_field1_elt
+      size: 32
+  shard_with_proof:
+    seq:
+    - id: shard
+      type: shard
+    - id: proof
+      size: 48
   slot_header:
     seq:
     - id: slot_index
@@ -1290,7 +1392,7 @@ types:
       type: dissection_0
       if: (step_tag == step_tag::dissection)
     - id: proof
-      type: proof
+      type: proof_1
       if: (step_tag == step_tag::proof)
   transaction:
     seq:
@@ -1375,6 +1477,12 @@ types:
     - id: pk
       type: public_key
       doc: A Ed25519, Secp256k1, or P256 public key
+    - id: proof_tag
+      type: u1
+      enum: bool
+    - id: proof
+      type: proof_0
+      if: (proof_tag == bool::true)
   whitelist:
     seq:
     - id: whitelist_entries
@@ -1896,6 +2004,8 @@ enums:
     20: preattestation
     21: attestation
     23: attestation_with_dal
+    24: dal_entrapment_evidence
+    31: attestations_aggregate
     107: reveal
     108: transaction
     109: origination

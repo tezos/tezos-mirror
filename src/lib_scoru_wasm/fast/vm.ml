@@ -80,7 +80,7 @@ let compute_fast ~wasm_entrypoint ~hooks ~reveal_builtins ~write_debug pvm_state
 
   Lwt.return pvm_state
 
-let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
+let rec compute_step_many accum_ticks ~(hooks : Hooks.t) ?reveal_builtins
     ?(write_debug = Builtins.Noop) ?(stop_at_snapshot = false) ~wasm_entrypoint
     ~max_steps pvm_state =
   let open Lwt.Syntax in
@@ -101,11 +101,6 @@ let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
       pvm_state.buffers.output
   in
   let backup pvm_state =
-    let* () =
-      match hooks.fast_exec_panicked with
-      | Some hook -> hook ()
-      | None -> Lwt_syntax.return_unit
-    in
     let+ pvm_state, ticks =
       Wasm_vm.compute_step_many
         ~wasm_entrypoint
@@ -139,6 +134,7 @@ let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
             if may_compute_more && max_steps > 0L then
               (compute_step_many [@tailcall])
                 ~wasm_entrypoint
+                ~hooks
                 accum_ticks
                 ~reveal_builtins
                 ~write_debug
@@ -171,6 +167,7 @@ let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
         then
           (compute_step_many [@tailcall])
             ~wasm_entrypoint
+            ~hooks
             accum_ticks
             ~max_steps
             ~reveal_builtins
@@ -178,6 +175,15 @@ let rec compute_step_many accum_ticks ?reveal_builtins ?(hooks = Hooks.no_hooks)
             ~stop_at_snapshot
             pvm_state
         else Lwt.return (pvm_state, accum_ticks)
+      in
+      let go_like_the_wind () =
+        Lwt.catch go_like_the_wind (fun exn ->
+            let* () =
+              match hooks.fast_exec_panicked with
+              | Some hook -> hook exn
+              | None -> Lwt_syntax.return_unit
+            in
+            Lwt.reraise exn)
       in
       match pvm_state.tick_state with
       | Snapshot when hooks.fast_exec_fallback ->
@@ -194,4 +200,5 @@ let compute_step_many = compute_step_many 0L
 
 let get_wasm_version = Wasm_vm.get_wasm_version
 
-let compute_step_many = compute_step_many
+let compute_step_many ?reveal_builtins ?(hooks = Hooks.no_hooks) =
+  compute_step_many ?reveal_builtins ~hooks

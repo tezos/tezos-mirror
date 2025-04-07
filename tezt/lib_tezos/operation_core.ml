@@ -51,6 +51,8 @@ let make ~branch ?signer ~kind contents =
 
 let json t = `O [("branch", Ezjsonm.string t.branch); ("contents", t.contents)]
 
+let json_of_int n = Ezjsonm.int n
+
 let raw ?protocol t client =
   match t.raw with
   | None -> (
@@ -66,7 +68,7 @@ let raw ?protocol t client =
           t.raw <- Some (`Hex raw) ;
           return (`Hex raw)
       | Some p -> (
-          let name = Protocol.daemon_name p ^ ".operation.unsigned" in
+          let name = Protocol.encoding_prefix p ^ ".operation.unsigned" in
           match Data_encoding.Registration.find name with
           | None -> Test.fail "%s encoding was not found" name
           | Some registered -> (
@@ -89,35 +91,61 @@ let hex ?protocol ?signature t client =
       let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
       return (`Hex (raw ^ signature))
 
+let bls_mode_raw t client : Hex.t Lwt.t =
+  let* json =
+    Client.RPC.call client
+    @@ RPC.post_chain_block_helpers_forge_bls_consensus_operations
+         ~data:(Data (json t))
+         ()
+  in
+  let sign_bytes = JSON.(json |-> "sign" |> as_string) in
+  let inject_bytes = JSON.(json |-> "inject" |> as_string) in
+  t.raw <- Some (`Hex inject_bytes) ;
+  return (`Hex sign_bytes)
+
 let sign ?protocol ({kind; signer; _} as t) client =
+  let is_tz4 = String.starts_with ~prefix:"tz4" in
   match signer with
   | None -> return Tezos_crypto.Signature.zero
-  | Some signer ->
-      let watermark =
-        match kind with
-        | Consensus {kind; chain_id} ->
-            let chain_id =
-              Tezos_crypto.Hashed.Chain_id.to_string
-                (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
-            in
-            let prefix =
-              match kind with
-              | Preattestation -> "\x12"
-              | Attestation _ -> "\x13"
-            in
+  | Some signer -> (
+      match kind with
+      | Consensus {kind; chain_id} ->
+          let chain_id =
+            Tezos_crypto.Hashed.Chain_id.to_string
+              (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
+          in
+          let prefix =
+            match kind with Preattestation -> "\x12" | Attestation _ -> "\x13"
+          in
+          let watermark =
             Tezos_crypto.Signature.Custom
               (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
-        | Anonymous | Voting | Manager ->
-            Tezos_crypto.Signature.Generic_operation
-      in
-      let* hex = hex ?protocol t client in
-      let bytes = Hex.to_bytes hex in
-      return (Account.sign_bytes ~watermark ~signer bytes)
+          in
+          let* hex =
+            match protocol with
+            | Some p
+              when Protocol.number p >= 023 && is_tz4 signer.public_key_hash ->
+                let* constants =
+                  Client.RPC.call client
+                  @@ RPC.get_chain_block_context_constants ()
+                in
+                if JSON.(constants |-> "aggregate_attestation" |> as_bool) then
+                  bls_mode_raw t client
+                else hex ?protocol t client
+            | _ -> hex ?protocol t client
+          in
+          let bytes = Hex.to_bytes hex in
+          return (Account.sign_bytes ~watermark ~signer bytes)
+      | Anonymous | Voting | Manager ->
+          let watermark = Tezos_crypto.Signature.Generic_operation in
+          let* hex = hex ?protocol t client in
+          let bytes = Hex.to_bytes hex in
+          return (Account.sign_bytes ~watermark ~signer bytes))
 
 let signed_hex ?protocol ?signature t client =
   let* signature =
     match signature with
-    | None -> sign t client
+    | None -> sign ?protocol t client
     | Some signature -> return signature
   in
   hex ?protocol ~signature t client
@@ -332,7 +360,8 @@ module Consensus = struct
             ("block_payload_hash", Ezjsonm.string consensus.block_payload_hash);
           ]
 
-  let operation ?branch ?chain_id ~signer consensus_operation client =
+  let operation ?branch ?chain_id ?(with_dal = false) ~signer
+      consensus_operation client =
     let json = `A [json consensus_operation] in
     let* branch =
       match branch with
@@ -347,13 +376,14 @@ module Consensus = struct
     let kind =
       match consensus_operation with
       | CPreattestation _ -> Preattestation
-      | CAttestation _ -> Attestation {with_dal = false}
+      | CAttestation _ -> Attestation {with_dal}
     in
     return (make ~branch ~signer ~kind:(Consensus {kind; chain_id}) json)
 
-  let inject ?request ?force ?branch ?chain_id ?error ~signer consensus client =
+  let inject ?request ?force ?branch ?chain_id ?error ~protocol ~signer
+      consensus client =
     let* op = operation ?branch ?chain_id ~signer consensus client in
-    inject ?request ?force ?error op client
+    inject ?request ?force ?error ~protocol op client
 
   let get_slots ~level client =
     Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
@@ -393,6 +423,12 @@ module Anonymous = struct
         op1 : t * Tezos_crypto.Signature.t;
         op2 : t * Tezos_crypto.Signature.t;
       }
+    | Dal_entrapment_evidence of {
+        attestation : t * Tezos_crypto.Signature.t;
+        slot_index : int;
+        shard : Tezos_crypto_dal.Cryptobox.shard;
+        proof : Tezos_crypto_dal.Cryptobox.shard_proof;
+      }
 
   let double_consensus_evidence ~kind (({kind = op1_kind; _}, _) as op1)
       (({kind = op2_kind; _}, _) as op2) =
@@ -414,6 +450,13 @@ module Anonymous = struct
   let double_preattestation_evidence =
     double_consensus_evidence ~kind:Double_preattestation_evidence
 
+  let dal_entrapment_evidence ~attestation ~slot_index shard proof =
+    let {kind = op_kind; _}, _ = attestation in
+    match op_kind with
+    | Consensus {kind = Attestation _; _} ->
+        Dal_entrapment_evidence {attestation; slot_index; shard; proof}
+    | _ -> Test.fail "Invalid arguments to create a dal_entrapment_evidence"
+
   let kind_to_string kind =
     sf
       "double_%s_evidence"
@@ -430,6 +473,14 @@ module Anonymous = struct
         ("signature", `String (Tezos_crypto.Signature.to_b58check signature));
       ]
 
+  let json_of_shard shard =
+    Data_encoding.Json.construct Tezos_crypto_dal.Cryptobox.shard_encoding shard
+
+  let json_of_shard_proof shard_proof =
+    Data_encoding.Json.construct
+      Tezos_crypto_dal.Cryptobox.shard_proof_encoding
+      shard_proof
+
   let json = function
     | Double_consensus_evidence {kind; op1; op2} ->
         let op1 = denunced_op_json op1 in
@@ -439,6 +490,20 @@ module Anonymous = struct
             ("kind", Ezjsonm.string (kind_to_string kind));
             ("op1", op1);
             ("op2", op2);
+          ]
+    | Dal_entrapment_evidence {attestation; slot_index; shard; proof} ->
+        let attestation = denunced_op_json attestation in
+        `O
+          [
+            ("kind", Ezjsonm.string "dal_entrapment_evidence");
+            ("attestation", attestation);
+            ("slot_index", json_of_int slot_index);
+            ( "shard_with_proof",
+              `O
+                [
+                  ("shard", json_of_shard shard);
+                  ("proof", json_of_shard_proof proof);
+                ] );
           ]
 
   let operation ?branch anonymous_operation client =
@@ -550,8 +615,6 @@ module Manager = struct
   let json_of_tez n = string_of_int n |> Ezjsonm.string
 
   let json_of_int_as_string n = string_of_int n |> Ezjsonm.string
-
-  let json_of_int n = float_of_int n |> Ezjsonm.float
 
   let json_of_commitment commitment =
     Data_encoding.Json.construct
@@ -786,7 +849,7 @@ module Manager = struct
     match payload with
     | Transfer _ ->
         let fee = Option.value fee ~default:1_000 in
-        let gas_limit = Option.value gas_limit ~default:1_040 in
+        let gas_limit = Option.value gas_limit ~default:3_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
         {source; counter; fee; gas_limit; storage_limit; payload}
     | Dal_publish_commitment _ ->
@@ -884,9 +947,17 @@ let already_denounced =
   rex
     {|Delegate ([\w\d]+) at level ([\d]+) has already been denounced for a double ([\w]+).|}
 
+let already_dal_denounced =
+  rex
+    {|Delegate ([\w\d]+) at level ([\d]+) has already been denounced for a DAL entrapment.|}
+
 let outdated_denunciation =
   rex
     {|A double-([\w]+) denunciation is outdated \(last acceptable cycle: ([\d]+), given level: ([\d]+)\).|}
+
+let outdated_dal_denunciation =
+  rex
+    {|A DAL entrapment denunciation is outdated \(last acceptable cycle: ([\d]+), given level: ([\d]+)\).|}
 
 let injection_error_unknown_branch =
   rex {|Operation ([\w\d]+) is branched on either:|}

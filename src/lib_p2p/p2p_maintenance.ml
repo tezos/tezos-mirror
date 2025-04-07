@@ -53,7 +53,6 @@ type ('msg, 'meta, 'meta_conn) t = {
   config : config;
   debug_config : test_config option;
   bounds : bounds;
-  pool : ('msg, 'meta, 'meta_conn) P2p_pool.t;
   connect_handler : ('msg, 'meta, 'meta_conn) P2p_connect_handler.t;
   discovery : P2p_discovery.t option;
   just_maintained : unit Lwt_condition.t;
@@ -62,6 +61,8 @@ type ('msg, 'meta, 'meta_conn) t = {
   triggers : P2p_trigger.t;
   log : P2p_connection.P2p_event.t -> unit;
 }
+
+let pool t = P2p_connect_handler.get_pool t.connect_handler
 
 let broadcast_bootstrap_msg t =
   P2p_peer.Table.iter
@@ -72,10 +73,10 @@ let broadcast_bootstrap_msg t =
             ignore (P2p_conn.write_bootstrap conn) ;
             t.log (Bootstrap_sent {source = peer_id}))
       | _ -> ())
-    (P2p_pool.connected_peer_ids t.pool)
+    (P2p_pool.connected_peer_ids (pool t))
 
 let send_swap_request t =
-  match P2p_pool.Connection.propose_swap_request t.pool with
+  match P2p_pool.Connection.propose_swap_request (pool t) with
   | None -> ()
   | Some (proposed_point, proposed_peer_id, recipient) ->
       let recipient_peer_id = (P2p_conn.info recipient).peer_id in
@@ -135,7 +136,7 @@ let connectable t start_time expected seen_points =
   let acc = Bounded_point_info.create expected in
   let f point pi seen_points =
     match
-      classify t.pool t.config.private_mode start_time seen_points point pi
+      classify (pool t) t.config.private_mode start_time seen_points point pi
     with
     | `Ignore -> seen_points (* Ignored points can be retried again *)
     | `Candidate last ->
@@ -143,7 +144,7 @@ let connectable t start_time expected seen_points =
         P2p_point.Set.add point seen_points
     | `Seen -> P2p_point.Set.add point seen_points
   in
-  let seen_points = P2p_pool.Points.fold_known t.pool ~init:seen_points ~f in
+  let seen_points = P2p_pool.Points.fold_known (pool t) ~init:seen_points ~f in
   (List.map snd (Bounded_point_info.get acc), seen_points)
 
 (* [try_to_contact_loop t start_time ~seen_points] is the main loop
@@ -243,7 +244,7 @@ let random_connections ~rng pool n =
 let rec do_maintain ~rng t =
   let open Lwt_result_syntax in
   t.log P2p_connection.P2p_event.Maintenance_started ;
-  let n_connected = P2p_pool.active_connections t.pool in
+  let n_connected = P2p_pool.active_connections (pool t) in
   if n_connected < t.bounds.min_threshold then
     match t.debug_config with
     | Some {trigger_too_few_connections = false; _} -> return_unit
@@ -261,7 +262,13 @@ and too_few_connections ~rng t n_connected =
   let open Lwt_result_syntax in
   (* try and contact new peers *)
   t.log Too_few_connections ;
-  let*! () = Events.(emit too_few_connections) n_connected in
+  let*! () =
+    Events.(emit too_few_connections)
+      ( n_connected,
+        t.bounds.min_target,
+        t.config.expected_connections,
+        t.config.min_connections )
+  in
   let min_to_contact = t.bounds.min_target - n_connected in
   let max_to_contact = t.bounds.max_target - n_connected in
   let*! success = try_to_contact t min_to_contact max_to_contact in
@@ -273,8 +280,14 @@ and too_many_connections ~rng t n_connected =
   (* kill random connections *)
   t.log Too_many_connections ;
   let n = n_connected - t.bounds.max_target in
-  let* () = Events.(emit too_many_connections) n in
-  let connections = random_connections ~rng t.pool n in
+  let* () =
+    Events.(emit too_many_connections)
+      ( n,
+        t.bounds.max_target,
+        t.config.expected_connections,
+        t.config.max_connections )
+  in
+  let connections = random_connections ~rng (pool t) n in
   let* () =
     List.iter_p (P2p_conn.disconnect ~reason:Maintenance_too_many) connections
   in
@@ -283,7 +296,7 @@ and too_many_connections ~rng t n_connected =
 let rec worker_loop ~rng ~motive t =
   let open Lwt_result_syntax in
   let*! r =
-    let n_connected = P2p_pool.active_connections t.pool in
+    let n_connected = P2p_pool.active_connections (pool t) in
     if
       n_connected < t.bounds.min_threshold
       || t.bounds.max_threshold < n_connected
@@ -351,8 +364,7 @@ module Internal = struct
     trigger_too_many_connections : bool;
   }
 
-  let create ?discovery config ?debug_config pool connect_handler triggers ~log
-      =
+  let create ?discovery config ?debug_config connect_handler triggers ~log =
     let bounds =
       bounds
         ~min:config.min_connections
@@ -365,7 +377,6 @@ module Internal = struct
       debug_config;
       bounds;
       discovery;
-      pool;
       connect_handler;
       just_maintained = Lwt_condition.create ();
       please_maintain = Lwt_condition.create ();
@@ -384,8 +395,8 @@ module Internal = struct
     Option.iter P2p_discovery.activate t.discovery
 end
 
-let create ?discovery config pool connect_handler triggers ~log =
-  Internal.create ?discovery config pool connect_handler triggers ~log
+let create ?discovery config connect_handler triggers ~log =
+  Internal.create ?discovery config connect_handler triggers ~log
 
 let activate t = Internal.activate t
 

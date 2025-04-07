@@ -62,6 +62,13 @@ variable "os" {
   }
 }
 
+variable "prometheus_port" {
+  type        = number
+  description = "Port used by the Prometheus instance."
+  default     = 9090
+}
+
+
 # Those values should not be modified
 locals {
   artifact_registry = "europe-west1-docker.pkg.dev"
@@ -98,7 +105,7 @@ provider "google" {
 # A service account must be associated with a VM
 resource "google_service_account" "default" {
   account_id   = "${terraform.workspace}-id"
-  display_name = "${terraform.workspace} service Account"
+  display_name = "${terraform.workspace}"
 }
 
 # We want the service account to be able to fetch docker image from
@@ -148,6 +155,18 @@ module "gce-container" {
         mountPath = "/tmp/grafana"
         name      = "grafana"
         readOnly  = false
+      },
+      {
+        # Same for Alert manager
+        mountPath = "/tmp/alert_manager"
+        name      = "alert-manager"
+        readOnly  = false
+      },
+      {
+        # Same for OpenTelemetry
+        mountPath = "/tmp/otel"
+        name      = "otel"
+        readOnly  = false
       }
     ]
   }
@@ -169,6 +188,18 @@ module "gce-container" {
       name = "prometheus"
       hostPath = {
         path = "/tmp/prometheus"
+      }
+    },
+    {
+      name = "alert-manager"
+      hostPath = {
+        path = "/tmp/alert_manager"
+      }
+    },
+    {
+      name = "otel"
+      hostPath = {
+        path = "/tmp/otel"
       }
     },
     {
@@ -204,7 +235,7 @@ resource "google_compute_subnetwork" "default" {
 # are machines. We ensure to give them a unique name.
 resource "google_compute_address" "default" {
   count        = var.number_of_vms
-  name         = format("${terraform.workspace}-address-%02d", count.index)
+  name         = format("${terraform.workspace}-%02d", count.index)
   address_type = "EXTERNAL"
 
   # See https://cloud.google.com/network-tiers/docs/set-network-tier
@@ -239,6 +270,16 @@ resource "google_compute_firewall" "default" {
     ports    = ["19999"]
   }
 
+  # Enable access to Opentelemetry/Jaeger if enabled
+  # 4317 used by Otel collector to receive observability data via gRPC
+  # 55681 used by Otel collector to receive observability data via JSON
+  # 14250 used by Jaeger to accept data over  gRPC.
+  # 16686 Provides access to the Jaeger web UI for tracing visualization.
+  allow {
+    protocol = "tcp"
+    ports    = ["4317", "14250", "16686","55681"]
+  }
+
   # Rule to enable static page web access
   allow {
     protocol = "tcp"
@@ -248,7 +289,7 @@ resource "google_compute_firewall" "default" {
   # Rule to enable prometheus access
   allow {
     protocol = "tcp"
-    ports    = ["9090"]
+    ports    = ["${var.prometheus_port}"]
   }
 
   # Rule to enable grafana access
@@ -279,7 +320,7 @@ resource "google_compute_instance_template" "default" {
 
   project = var.project_id
 
-  name_prefix = "instance-template-${terraform.workspace}"
+  name_prefix = "${terraform.workspace}-template"
 
   service_account {
     # Google recommends custom service accounts that have cloud-platform scope and permissions granted via IAM Roles.
@@ -368,5 +409,5 @@ output "zone" {
 output "machine_type" {
   description = "Machine type"
   # All the instances have the same machine type
-  value = module.umig.instances_details[0].machine_type
+  value = length(module.umig.instances_details) > 0 ? module.umig.instances_details[0].machine_type : null
 }

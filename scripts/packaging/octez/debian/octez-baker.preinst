@@ -18,35 +18,53 @@ install | upgrade)
     # the configure script is called with the version of the old
     # package in case of upgrade. We display a message to the user
     # in this case
+    echo "Upgrading Octez baker from version $2 ( preinst )"
     case "$2" in
-    0.0*)
-      echo "Upgrading Octez baker from version $2"
+    1:*)
+      if [ -e /etc/default/octez-baker ]; then
+        #shellcheck disable=SC1091
+        . /etc/default/octez-baker
+        db_set octez-baker/liquidity-vote "$LQVOTE"
+        db_set octez-baker/baker-key "$BAKER_KEY"
+      fi
+      ;;
+    *)
       if [ -e /etc/octez/baker.conf ]; then
-        echo "Updating baker configuration from /etc/octez/baker.conf"
+        echo "Updating baker configuration from old /etc/octez/baker.conf"
         # the values set here in debconf are going to be used in the
         # postinst script to write the /etc/default/ files for this
         # package
         #shellcheck disable=SC1091
         . /etc/octez/baker.conf
 
-        echo "set lq_vote=$lq_vote"
         if [ -n "${lq_vote:-}" ]; then
+          echo "set lq_vote=$lq_vote"
           #shellcheck disable=SC2154
           db_set octez-baker/liquidity-vote "$lq_vote"
         fi
 
-        echo "set baking_key=$baking_key"
         if [ -n "${baking_key:-}" ]; then
+          echo "set baking_key=$baking_key"
           #shellcheck disable=SC2154
           db_set octez-baker/baker-key "$baking_key"
         fi
+
+        if [ -n "${dalurl:-}" ]; then
+          echo "set dalurl=$dalurl"
+          if [ "$dalurl" = "" ]; then
+            #shellcheck disable=SC2154
+            db_set octez-baker/dal-node false
+          else
+            db_set octez-baker/dal-node true
+            db_set octez-baker/dal-node-url "$dalurl"
+          fi
+        else
+          db_set octez-baker/dal-node true
+        fi
+
         #shellcheck disable=SC2119
         db_go
       fi
-      ;;
-    *)
-      echo "Upgrading octez-baker from version $2"
-      echo "DO NOTHING"
       ;;
     esac
   fi

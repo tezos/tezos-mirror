@@ -79,5 +79,7 @@ let green fmt = Format.kasprintf (fun msg -> printfln "@{<green>%s@}" msg) fmt
 
 let cyan fmt = Format.kasprintf (fun msg -> printfln "@{<cyan>%s@}" msg) fmt
 
+let yellow fmt = Format.kasprintf (fun msg -> printfln "@{<yellow>%s@}" msg) fmt
+
 let magenta fmt =
   Format.kasprintf (fun msg -> printfln "@{<magenta>%s@}" msg) fmt

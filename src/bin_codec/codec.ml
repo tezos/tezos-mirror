@@ -159,7 +159,7 @@ let main commands =
     | None -> Tezos_clic.dispatch commands ctxt argv
   in
   Stdlib.exit
-    (Lwt_main.run
+    (Tezos_base_unix.Event_loop.main_run
        (let*! retcode =
           let*! r =
             Lwt.catch run (function

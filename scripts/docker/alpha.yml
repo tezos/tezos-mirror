@@ -18,9 +18,9 @@ services:
 
   octez-baker:
     container_name: octez-baker-alpha
-    image: tezos/tezos:latest
+    image: tezos/tezos-bare:latest
     hostname: octez-baker
-    command: octez-baker --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE
+    command: octez-baker-alpha run with local node /var/run/tezos/node/data --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE
     environment:
       NODE_HOST: octez-node
       PROTOCOL: alpha

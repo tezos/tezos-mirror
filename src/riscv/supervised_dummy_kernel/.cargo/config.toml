@@ -1,0 +1,11 @@
+[build]
+target = "riscv64gc-unknown-linux-musl"
+
+[target.riscv64gc-unknown-linux-musl]
+linker = "riscv64-unknown-linux-musl-gcc"
+rustflags = [
+  "-C",
+  "target-feature=+crt-static",
+  "-C",
+  "default-linker-libraries",
+]

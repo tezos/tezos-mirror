@@ -119,7 +119,7 @@ let may_create_discovery_worker _limits config pool =
            ~trust_discovered_peers:config.trust_discovered_peers)
   | _, _, _ -> None
 
-let create_maintenance_worker limits pool connect_handler config triggers log =
+let create_maintenance_worker limits connect_handler config triggers log =
   let open P2p_limits in
   let open Lwt_syntax in
   match limits.maintenance_idle_time with
@@ -141,12 +141,12 @@ let create_maintenance_worker limits pool connect_handler config triggers log =
             *);
         }
       in
+      let pool = P2p_connect_handler.get_pool connect_handler in
       let discovery = may_create_discovery_worker limits config pool in
       return_some
         (P2p_maintenance.create
            ?discovery
            maintenance_config
-           pool
            connect_handler
            triggers
            ~log)
@@ -168,7 +168,6 @@ module Real = struct
     config : config;
     limits : P2p_limits.t;
     io_sched : P2p_io_scheduler.t;
-    pool : ('msg, 'peer_meta, 'conn_meta) P2p_pool.t;
     connect_handler : ('msg, 'peer_meta, 'conn_meta) P2p_connect_handler.t;
     maintenance : ('msg, 'peer_meta, 'conn_meta) P2p_maintenance.t option;
     welcome : P2p_welcome.t option;
@@ -184,6 +183,8 @@ module Real = struct
       'msg ->
       unit;
   }
+
+  let pool net = P2p_connect_handler.get_pool net.connect_handler
 
   let create ~config ~limits ?received_msg_hook ?sent_msg_hook
       ?broadcasted_msg_hook meta_cfg msg_cfg conn_meta_cfg =
@@ -230,7 +231,7 @@ module Real = struct
     in
     let connect_handler = Lazy.force connect_handler in
     let*! maintenance =
-      create_maintenance_worker limits pool connect_handler config triggers log
+      create_maintenance_worker limits connect_handler config triggers log
     in
     let* welcome = may_create_welcome_worker config limits connect_handler in
     P2p_metrics_collectors.collect pool io_sched ;
@@ -239,7 +240,6 @@ module Real = struct
         config;
         limits;
         io_sched;
-        pool;
         connect_handler;
         maintenance;
         welcome;
@@ -289,20 +289,21 @@ module Real = struct
         net.maintenance
     in
     let* () = Events.(emit shutdown_connection_pool) () in
-    let* () = P2p_pool.destroy net.pool in
+    let* () = P2p_pool.destroy (pool net) in
     let* () = Events.(emit shutdown_connection_handler) () in
     let* () = P2p_connect_handler.destroy net.connect_handler in
     let* () = Events.(emit shutdown_scheduler) () in
     P2p_io_scheduler.shutdown ~timeout:3.0 net.io_sched
 
-  let connections {pool; _} () =
-    P2p_pool.Connection.fold pool ~init:[] ~f:(fun _peer_id c acc -> c :: acc)
+  let connections net () =
+    P2p_pool.Connection.fold (pool net) ~init:[] ~f:(fun _peer_id c acc ->
+        c :: acc)
 
-  let find_connection_by_peer_id {pool; _} peer_id =
-    P2p_pool.Connection.find_by_peer_id pool peer_id
+  let find_connection_by_peer_id net peer_id =
+    P2p_pool.Connection.find_by_peer_id (pool net) peer_id
 
-  let find_connection_by_point {pool; _} point =
-    P2p_pool.Connection.find_by_point pool point
+  let find_connection_by_point net point =
+    P2p_pool.Connection.find_by_point (pool net) point
 
   let disconnect ?wait ~reason = P2p_conn.disconnect ?wait ~reason:(User reason)
 
@@ -317,11 +318,11 @@ module Real = struct
   let global_stat {connect_handler; _} () =
     P2p_connect_handler.stat connect_handler
 
-  let set_peer_metadata {pool; _} conn meta =
-    P2p_pool.Peers.set_peer_metadata pool conn meta
+  let set_peer_metadata net conn meta =
+    P2p_pool.Peers.set_peer_metadata (pool net) conn meta
 
-  let get_peer_metadata {pool; _} conn =
-    P2p_pool.Peers.get_peer_metadata pool conn
+  let get_peer_metadata net conn =
+    P2p_pool.Peers.get_peer_metadata (pool net) conn
 
   let connect ?trusted ?expected_peer_id ?timeout net point =
     P2p_connect_handler.connect
@@ -348,7 +349,7 @@ module Real = struct
   let rec recv_any net () =
     let open Lwt_syntax in
     let pipes =
-      P2p_pool.Connection.fold net.pool ~init:[] ~f:(fun _peer_id conn acc ->
+      P2p_pool.Connection.fold (pool net) ~init:[] ~f:(fun _peer_id conn acc ->
           (let* r = P2p_conn.is_readable conn in
            match r with
            | Ok () -> Lwt.return_some conn
@@ -456,11 +457,12 @@ module Real = struct
     raw_broadcast connections ?except ?alt msg ;
     net.broadcasted_msg_hook connections ?except ?alt msg
 
-  let fold_connections {pool; _} ~init ~f =
-    P2p_pool.Connection.fold pool ~init ~f
+  let fold_connections net ~init ~f =
+    P2p_pool.Connection.fold (pool net) ~init ~f
 
-  let iter_connections {pool; _} f =
-    P2p_pool.Connection.fold pool ~init:() ~f:(fun gid conn () -> f gid conn)
+  let iter_connections net f =
+    P2p_pool.Connection.fold (pool net) ~init:() ~f:(fun gid conn () ->
+        f gid conn)
 
   let on_new_connection {connect_handler; _} f =
     P2p_connect_handler.on_new_connection connect_handler f
@@ -539,7 +541,6 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
     ?alt:(('msg, 'peer_meta, 'conn_meta) connection -> bool) * 'msg ->
     'msg ->
     unit;
-  pool : ('msg, 'peer_meta, 'conn_meta) P2p_pool.t option;
   connect_handler : ('msg, 'peer_meta, 'conn_meta) P2p_connect_handler.t option;
   fold_connections :
     'a.
@@ -561,7 +562,7 @@ type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
 let announced_version net = net.announced_version
 
-let pool net = net.pool
+let pool net = Option.map P2p_connect_handler.get_pool net.connect_handler
 
 let connect_handler net = net.connect_handler
 
@@ -643,7 +644,6 @@ let create ~config ~limits ?received_msg_hook ?sent_msg_hook
       send = Real.send net;
       try_send = Real.try_send net;
       broadcast = Real.broadcast net;
-      pool = Some net.pool;
       connect_handler = Some net.connect_handler;
       fold_connections = (fun ~init ~f -> Real.fold_connections net ~init ~f);
       iter_connections = Real.iter_connections net;
@@ -697,7 +697,6 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     on_new_connection = (fun _f -> ());
     on_disconnection = (fun _f -> ());
     negotiated_version = (fun _ -> announced_version);
-    pool = None;
     connect_handler = None;
     activate = (fun _ -> ());
     watcher = Lwt_watcher.create_input ();
@@ -755,10 +754,10 @@ let on_new_connection net = net.on_new_connection
 let on_disconnection net = net.on_disconnection
 
 let greylist_addr net addr =
-  Option.iter (fun pool -> P2p_pool.greylist_addr pool addr) net.pool
+  Option.iter (fun pool -> P2p_pool.greylist_addr pool addr) (pool net)
 
 let greylist_peer net peer_id =
-  Option.iter (fun pool -> P2p_pool.greylist_peer pool peer_id) net.pool
+  Option.iter (fun pool -> P2p_pool.greylist_peer pool peer_id) (pool net)
 
 let watcher net = Lwt_watcher.create_stream net.watcher
 

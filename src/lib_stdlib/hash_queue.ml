@@ -107,4 +107,6 @@ struct
     let keys_and_values = oldest_elements q n (fun _ _ _ -> ()) in
     List.iter (fun (k, _v) -> remove q k) keys_and_values ;
     keys_and_values
+
+  let is_empty q = length q = 0
 end

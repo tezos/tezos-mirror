@@ -9,9 +9,10 @@
   optint
   mtime
   rusage
+  fmt.tty
   lwt
   lwt.unix
-  index
+  octez-libs.brassaia.index
   semaphore-compat)
  (flags
   (:standard)

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos-evm-runtime"
+name = "tezos-evm-runtime-latest"
 version = "0.1.0"
 edition = "2021"
 

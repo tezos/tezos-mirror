@@ -1,0 +1,45 @@
+From 2d225de5fd21e0abebf436ffef077eb9115217c4 Mon Sep 17 00:00:00 2001
+From: Alain Mebsout <alain.mebsout@functori.com>
+Date: Mon, 16 Dec 2024 14:29:45 +0100
+Subject: [PATCH] Ocaml-websocket: add a handler to catch asynchronous io
+ exceptions
+
+This is necessary to properly detect closed connections with Resto.
+---
+ websocket/lwt/websocket_cohttp_lwt.ml  | 3 ++-
+ websocket/lwt/websocket_cohttp_lwt.mli | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/websocket/lwt/websocket_cohttp_lwt.ml b/websocket/lwt/websocket_cohttp_lwt.ml
+index 434ae3e0130..f3b5b9ca03b 100644
+--- a/websocket/lwt/websocket_cohttp_lwt.ml
++++ b/websocket/lwt/websocket_cohttp_lwt.ml
+@@ -34,7 +34,7 @@ let read_frames ic oc handler_fn =
+   let rec inner () = read_frame () >>= Lwt.wrap1 handler_fn >>= inner in
+   inner ()
+
+-let upgrade_connection request incoming_handler =
++let upgrade_connection request incoming_handler io_error_handler =
+   let headers = Cohttp.Request.headers request in
+   (match Cohttp.Header.get headers "sec-websocket-key" with
+   | None ->
+@@ -67,4 +67,5 @@ let upgrade_connection request incoming_handler =
+         send_frames frames_out_stream oc;
+       ]
+   in
++  let f ic oc = Lwt.catch (fun () -> f ic oc) io_error_handler in
+   Lwt.return (`Expert (resp, f), frames_out_fn)
+diff --git a/websocket/lwt/websocket_cohttp_lwt.mli b/websocket/lwt/websocket_cohttp_lwt.mli
+index b05cf57a846..af333b7a48a 100644
+--- a/websocket/lwt/websocket_cohttp_lwt.mli
++++ b/websocket/lwt/websocket_cohttp_lwt.mli
+@@ -21,6 +21,7 @@ open Websocket
+ val upgrade_connection :
+   Cohttp.Request.t ->
+   (Frame.t -> unit) ->
++  (exn -> unit Lwt.t) ->
+   (Cohttp_lwt_unix.Server.response_action * (Frame.t option -> unit)) Lwt.t
+ (** [upgrade_connection req incoming_handler] takes [req], a
+     connection request, and [incoming_handler], a function that will
+--
+2.44.0

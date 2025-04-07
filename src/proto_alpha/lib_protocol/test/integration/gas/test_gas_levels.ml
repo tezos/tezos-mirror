@@ -49,7 +49,7 @@ let failed x = not (succeed x)
 
 let dummy_context () =
   let open Lwt_result_wrap_syntax in
-  let* block, _contract = Context.init1 ~consensus_threshold:0 () in
+  let* block, _contract = Context.init1 ~consensus_threshold_size:0 () in
   let*@ ctxt =
     Raw_context.prepare
       ~level:Int32.zero
@@ -299,7 +299,7 @@ let originate_contract block source script =
 
 let init_block n to_originate =
   let open Lwt_result_syntax in
-  let* block, src_list = Context.init_n n ~consensus_threshold:0 () in
+  let* block, src_list = Context.init_n n ~consensus_threshold_size:0 () in
   match src_list with
   | [] -> assert false
   | src :: _ ->
@@ -554,7 +554,7 @@ let test_block_mixed_operations () =
 let test_emptying_account_gas () =
   let open Lwt_result_syntax in
   let open Alpha_context in
-  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let {Account.pkh; pk; _} = Account.new_account () in
   let contract = Contract.Implicit pkh in

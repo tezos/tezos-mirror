@@ -177,8 +177,8 @@ type chain_store
 
 (** [init ?patch_context ?commit_genesis ?history_mode ?readonly
     ?block_cache_limit ?disable_context_pruning ?maintenance_delay
-    ~store_dir ~context_dir ~allow_testchains genesis] initializes the
-    store and a main chain store. If [store_dir] (resp. [context_dir])
+    ~store_dir ~context_root_dir ~allow_testchains genesis] initializes the
+    store and a main chain store. If [store_dir] (resp. [context_root_dir])
     does not exist, a fresh store (resp. context) is
     created. Otherwise, it loads the store (resp. context) from
     reading the adequate directory. If [allow_testchains] is passed,
@@ -232,7 +232,7 @@ val init :
   ?disable_context_pruning:bool ->
   ?maintenance_delay:Storage_maintenance.delay ->
   store_dir:string ->
-  context_dir:string ->
+  context_root_dir:string ->
   allow_testchains:bool ->
   Genesis.t ->
   store tzresult Lwt.t
@@ -257,12 +257,12 @@ val main_chain_store : store -> chain_store
     already closed, this function is idempotent. *)
 val close_store : store -> unit Lwt.t
 
-(** [may_switch_history_mode ?patch_context ~store_dir ~context_dir
+(** [may_switch_history_mode ?patch_context ~store_dir ~context_root_dir
     genesis ~new_history_mode] tries switching the store located at
     [store_dir] (if present) to [new_history_mode] when possible. *)
 val may_switch_history_mode :
   store_dir:string ->
-  context_dir:string ->
+  context_root_dir:string ->
   Genesis.t ->
   new_history_mode:History_mode.t ->
   unit tzresult Lwt.t
@@ -879,6 +879,11 @@ module Chain : sig
 
   (** {2 Chain's protocols} *)
 
+  (** [protol_levels chain_store] return all protocols with their activation
+      levels. *)
+  val protocol_levels :
+    t -> Protocol_levels.protocol_info Protocol_levels.t Lwt.t
+
   (** [find_protocol_info chain_store ~protocol_level] returns the
      protocol info associated to the given [protocol_level]. *)
   val find_protocol_info :
@@ -1114,9 +1119,9 @@ module Unsafe : sig
 
   (** Snapshots utility functions *)
 
-  (** [open_for_snapshot_export ~store_dir ~context_dir genesis
+  (** [open_for_snapshot_export ~store_dir ~context_root_dir genesis
       ~locked_f] opens the store (resp. context) located in [store_dir]
-      (resp. [context_dir]) and gives the [chain_store] whose
+      (resp. [context_root_dir]) and gives the [chain_store] whose
       [chain_id] is computed using [genesis] and gives it to
       [locked_f]. [locked_f] starts by taking a lock (using a lockfile) on
       the store to prevent merge from happening during this function.
@@ -1126,7 +1131,7 @@ module Unsafe : sig
       locked while [locked_f] is running. *)
   val open_for_snapshot_export :
     store_dir:string ->
-    context_dir:string ->
+    context_root_dir:string ->
     Genesis.t ->
     locked_f:(chain_store -> 'a tzresult Lwt.t) ->
     'a tzresult Lwt.t

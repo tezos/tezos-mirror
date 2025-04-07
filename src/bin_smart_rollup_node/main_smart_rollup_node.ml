@@ -43,7 +43,7 @@ let config_init_command =
     ~group
     ~desc:"Configure the smart rollup node."
     (merge_options
-       (args25
+       (args22
           force_switch
           data_dir_arg
           rpc_addr_arg
@@ -51,11 +51,10 @@ let config_init_command =
           acl_override_arg
           metrics_addr_arg
           enable_performance_metrics_arg
+          disable_performance_metrics_arg
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
-          dac_observer_endpoint_arg
-          dac_timeout_arg
           pre_images_endpoint_arg
           injector_retention_period_arg
           injector_attempts_arg
@@ -66,10 +65,12 @@ let config_init_command =
           boot_sector_file_arg
           no_degraded_arg
           gc_frequency_arg
-          history_mode_arg
+          history_mode_arg)
+       (args4
           cors_allowed_origins_arg
-          cors_allowed_headers_arg)
-       (args1 bail_on_disagree_switch))
+          cors_allowed_headers_arg
+          bail_on_disagree_switch
+          unsafe_disable_wasm_kernel_checks_switch))
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -82,11 +83,10 @@ let config_init_command =
              acl_override,
              metrics_addr,
              enable_performance_metrics,
+             disable_performance_metrics,
              loser_mode,
              reconnection_delay,
              dal_node_endpoint,
-             dac_observer_endpoint,
-             dac_timeout,
              pre_images_endpoint,
              injector_retention_period,
              injector_attempts,
@@ -97,26 +97,32 @@ let config_init_command =
              boot_sector_file,
              no_degraded,
              gc_frequency,
-             history_mode,
-             allowed_origins,
-             allowed_headers ),
-           bail_on_disagree )
+             history_mode ),
+           ( allowed_origins,
+             allowed_headers,
+             bail_on_disagree,
+             unsafe_disable_wasm_kernel_checks ) )
          mode
          sc_rollup_address
          operators
          cctxt ->
+      let* () =
+        when_ (enable_performance_metrics && disable_performance_metrics)
+        @@ fun () ->
+        failwith
+          "Cannot use both --enable-performance-metrics and \
+           --disable-performance-metrics"
+      in
       let* config =
         Configuration.Cli.configuration_from_args
           ~rpc_addr
           ~rpc_port
           ~acl_override
           ~metrics_addr
-          ~enable_performance_metrics
+          ~disable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
-          ~dac_observer_endpoint
-          ~dac_timeout
           ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
@@ -128,6 +134,7 @@ let config_init_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~unsafe_disable_wasm_kernel_checks
           ~no_degraded
           ~gc_frequency
           ~history_mode
@@ -152,7 +159,7 @@ let legacy_run_command =
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
     (merge_options
-       (args8
+       (args9
           data_dir_arg
           mode_arg
           sc_rollup_address_arg
@@ -160,13 +167,12 @@ let legacy_run_command =
           rpc_port_arg
           acl_override_arg
           metrics_addr_arg
-          enable_performance_metrics_arg)
-       (args21
+          enable_performance_metrics_arg
+          disable_performance_metrics_arg)
+       (args20
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
-          dac_observer_endpoint_arg
-          dac_timeout_arg
           pre_images_endpoint_arg
           injector_retention_period_arg
           injector_attempts_arg
@@ -182,7 +188,8 @@ let legacy_run_command =
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
-          bail_on_disagree_switch))
+          bail_on_disagree_switch
+          unsafe_disable_wasm_kernel_checks_switch))
     (prefixes ["run"] @@ stop)
     (fun ( ( data_dir,
              mode,
@@ -191,12 +198,11 @@ let legacy_run_command =
              rpc_port,
              acl_override,
              metrics_addr,
-             enable_performance_metrics ),
+             enable_performance_metrics,
+             disable_performance_metrics ),
            ( loser_mode,
              reconnection_delay,
              dal_node_endpoint,
-             dac_observer_endpoint,
-             dac_timeout,
              pre_images_endpoint,
              injector_retention_period,
              injector_attempts,
@@ -212,8 +218,16 @@ let legacy_run_command =
              allowed_origins,
              allowed_headers,
              apply_unsafe_patches,
-             bail_on_disagree ) )
+             bail_on_disagree,
+             unsafe_disable_wasm_kernel_checks ) )
          cctxt ->
+      let* () =
+        when_ (enable_performance_metrics && disable_performance_metrics)
+        @@ fun () ->
+        failwith
+          "Cannot use both --enable-performance-metrics and \
+           --disable-performance-metrics"
+      in
       let* configuration =
         Configuration.Cli.create_or_read_config
           ~data_dir
@@ -221,12 +235,10 @@ let legacy_run_command =
           ~rpc_port
           ~acl_override
           ~metrics_addr
-          ~enable_performance_metrics
+          ~disable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
-          ~dac_observer_endpoint
-          ~dac_timeout
           ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
@@ -238,6 +250,7 @@ let legacy_run_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~unsafe_disable_wasm_kernel_checks
           ~no_degraded
           ~gc_frequency
           ~history_mode
@@ -263,20 +276,19 @@ let run_command =
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
     (merge_options
-       (args12
+       (args11
           data_dir_arg
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
           metrics_addr_arg
           enable_performance_metrics_arg
+          disable_performance_metrics_arg
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
-          dac_observer_endpoint_arg
-          dac_timeout_arg
           pre_images_endpoint_arg)
-       (args15
+       (args16
           injector_retention_period_arg
           injector_attempts_arg
           injection_ttl_arg
@@ -291,7 +303,8 @@ let run_command =
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
-          bail_on_disagree_switch))
+          bail_on_disagree_switch
+          unsafe_disable_wasm_kernel_checks_switch))
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
@@ -302,11 +315,10 @@ let run_command =
              acl_override,
              metrics_addr,
              enable_performance_metrics,
+             disable_performance_metrics,
              loser_mode,
              reconnection_delay,
              dal_node_endpoint,
-             dac_observer_endpoint,
-             dac_timeout,
              pre_images_endpoint ),
            ( injector_retention_period,
              injector_attempts,
@@ -322,11 +334,19 @@ let run_command =
              allowed_origins,
              allowed_headers,
              apply_unsafe_patches,
-             bail_on_disagree ) )
+             bail_on_disagree,
+             unsafe_disable_wasm_kernel_checks ) )
          mode
          sc_rollup_address
          operators
          cctxt ->
+      let* () =
+        when_ (enable_performance_metrics && disable_performance_metrics)
+        @@ fun () ->
+        failwith
+          "Cannot use both --enable-performance-metrics and \
+           --disable-performance-metrics"
+      in
       let* configuration =
         Configuration.Cli.create_or_read_config
           ~data_dir
@@ -334,12 +354,10 @@ let run_command =
           ~rpc_port
           ~acl_override
           ~metrics_addr
-          ~enable_performance_metrics
+          ~disable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
-          ~dac_observer_endpoint
-          ~dac_timeout
           ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
@@ -350,6 +368,7 @@ let run_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~unsafe_disable_wasm_kernel_checks
           ~boot_sector_file
           ~no_degraded
           ~gc_frequency
@@ -637,6 +656,19 @@ let openapi_command =
       let*! () = cctxt#message "%s" openapi_json_str in
       return_unit)
 
+let list_metrics_command =
+  let open Lwt_result_syntax in
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:"List the metrics exported by the smart rollup node."
+    (args1 disable_performance_metrics_arg)
+    (prefixes ["list"; "metrics"] @@ stop)
+  @@ fun disable_performance_metrics ctxt ->
+  let*! metrics = Metrics.listing ~disable_performance_metrics in
+  let*! () = ctxt#message "%s" metrics in
+  return_unit
+
 let sc_rollup_commands () =
   [
     config_init_command;
@@ -652,6 +684,7 @@ let sc_rollup_commands () =
     import_snapshot;
     snapshot_info;
     openapi_command;
+    list_metrics_command;
   ]
   @ Repair.commands
 
@@ -698,7 +731,7 @@ module Daemon_node_config = struct
 
   let default_media_type = Daemon_config.default_media_type
 
-  let other_registrations = None
+  let other_registrations = Client_config.other_registrations
 
   let default_daily_logs_path = None
 

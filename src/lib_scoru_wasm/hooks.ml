@@ -8,7 +8,7 @@
 type t = {
   fast_exec_invalid_kernel :
     [`Check_with_hook of (unit -> unit Lwt.t) option | `No_check];
-  fast_exec_panicked : (unit -> unit Lwt.t) option;
+  fast_exec_panicked : (exn -> unit Lwt.t) option;
   fast_exec_completed : (unit -> unit Lwt.t) option;
   fast_exec_fallback : bool;
 }

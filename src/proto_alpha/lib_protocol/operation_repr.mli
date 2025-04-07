@@ -30,9 +30,11 @@
     Defines kinds of operations that can be performed on chain:
     - preattestation
     - attestation
+    - attestations_aggregate
     - double baking evidence
     - double preattestation evidence
     - double attestation evidence
+    - DAL entrapment evidence
     - seed nonce revelation
     - account activation
     - proposal (see: [Voting_repr])
@@ -66,13 +68,20 @@ module Kind : sig
 
   type attestation_consensus_kind = Attestation_consensus_kind
 
+  type attestations_aggregate_consensus_kind =
+    | Attestations_aggregate_consensus_kind
+
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Attestation_kind : attestation_consensus_kind consensus
+    | Attestations_aggregate_kind
+        : attestations_aggregate_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
   type attestation = attestation_consensus_kind consensus
+
+  type attestations_aggregate = attestations_aggregate_consensus_kind consensus
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
@@ -88,6 +97,8 @@ module Kind : sig
     preattestation_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
+
+  type dal_entrapment_evidence = Dal_entrapment_evidence_kind
 
   type activate_account = Activate_account_kind
 
@@ -173,6 +184,14 @@ end
 type 'a consensus_operation_type =
   | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
+  | Attestations_aggregate
+      : Kind.attestations_aggregate consensus_operation_type
+
+type consensus_aggregate_content = {
+  level : Raw_level_repr.t;
+  round : Round_repr.t;
+  block_payload_hash : Block_payload_hash.t;
+}
 
 type consensus_content = {
   slot : Slot_repr.t;
@@ -248,6 +267,12 @@ and _ contents =
       dal_content : dal_content option;
     }
       -> Kind.attestation contents
+  (* Aggregate of attestations without dal_content. *)
+  | Attestations_aggregate : {
+      consensus_content : consensus_aggregate_content;
+      committee : Slot_repr.t list;
+    }
+      -> Kind.attestations_aggregate contents
   (* Seed_nonce_revelation: Nonces are created by bakers and are
      combined to create pseudo-random seeds. Bakers are urged to reveal their
      nonces after a given number of cycles to keep their block rewards
@@ -289,6 +314,14 @@ and _ contents =
       bh2 : Block_header_repr.t;
     }
       -> Kind.double_baking_evidence contents
+  (* The attester failed to correctly identify a trap when attesting DAL
+     slots. *)
+  | Dal_entrapment_evidence : {
+      attestation : Kind.attestation operation;
+      slot_index : Dal_slot_index_repr.t;
+      shard_with_proof : Dal_slot_repr.Shard_with_proof.t;
+    }
+      -> Kind.dal_entrapment_evidence contents
   (* Activate_account: Account activation allows to register a public
      key hash on the blockchain. *)
   | Activate_account : {
@@ -388,19 +421,23 @@ and _ manager_operation =
       destination : Contract_hash.t;
     }
       -> Kind.increase_paid_storage manager_operation
-  (* [Update_consensus_key pk] updates the consensus key of
-     the signing delegate to [pk]. *)
-  | Update_consensus_key :
-      Signature.Public_key.t
+  (* [Update_consensus_key {public_key; proof}] updates the consensus key of the
+     signing delegate to [public_key]. To prevent rogue key attacks, a proof of
+     possession must be provided if and only if the new key is a BLS key. The
+     [proof] is a signature over the public key itself. *)
+  | Update_consensus_key : {
+      public_key : Signature.Public_key.t;
+      proof : Signature.signature option;
+    }
       -> Kind.update_consensus_key manager_operation
-      (** [Transfer_ticket] allows an implicit account (the "claimer") to
-          receive [amount] tickets, pulled out of [tx_rollup], to the
-          [entrypoint] of the smart contract [destination].
+      (** [Transfer_ticket] allows an implicit account (the "claimer") to receive
+     [amount] tickets, pulled out of [tx_rollup], to the [entrypoint] of the
+     smart contract [destination].
 
-          The ticket must have been addressed to the
-          claimer, who must be the source of this operation. It must have been
-          pulled out at [level] and from the message at [message_index]. The ticket
-          is composed of [ticketer; ty; contents]. *)
+     The ticket must have been addressed to the claimer, who must be the source
+     of this operation. It must have been pulled out at [level] and from the
+     message at [message_index]. The ticket is composed of [ticketer; ty;
+     contents]. *)
   | Transfer_ticket : {
       contents : Script_repr.lazy_expr;  (** Contents of the withdrawn ticket *)
       ty : Script_repr.lazy_expr;
@@ -535,6 +572,12 @@ val protocol_data_encoding : packed_protocol_data Data_encoding.t
 val unsigned_operation_encoding :
   (Operation.shell_header * packed_contents_list) Data_encoding.t
 
+(* Encoding to sign and verify attestations signatures with BLS keys. In this
+   encoding, the signed payload is omitting slots to enable BLS proof of
+   possession aggregation. *)
+val bls_mode_unsigned_operation_encoding :
+  (Operation.shell_header * packed_contents_list) Data_encoding.t
+
 val raw : _ operation -> raw
 
 val hash_raw : raw -> Operation_hash.t
@@ -587,11 +630,11 @@ val compare_by_passes : packed_operation -> packed_operation -> int
 
    The global order is as follows:
 
-   {!Attestation} and {!Preattestation} >
+   {!Attestations_aggregate}, {!Attestation} and {!Preattestation} >
    {!Proposals} > {!Ballot} > {!Double_preattestation_evidence} >
    {!Double_attestation_evidence} > {!Double_baking_evidence} >
-   {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
-   > {!Drain_delegate} > {!Manager_operation}.
+   {!Dal_entrapment_evidence} > {!Vdf_revelation} > {!Seed_nonce_revelation} >
+   {!Activate_account} > {!Drain_delegate} > {!Manager_operation}.
 
    {!Attestation} and {!Preattestation} are compared by the pair of their
    [level] and [round] such as the farther to the current state [level] and
@@ -602,6 +645,13 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    DAL attested slots, the more the better. When the pair is equal and comparing
    an {!Attestation} to a {!Preattestation}, the {!Attestation} is better.
 
+   {!Attestations_aggregate} are compared to {!Attestations} and
+   {!Preattestations} by the pair of their [level] and [round] as well. If the
+   pairs are equal, an {!Attestation_aggregate} is preferred over an
+   {!Attestation} or a {!Preattestation}. For equal pairs, two
+   {!Attestations_aggregate} are compared by their [committee] in lexicographic
+   order.
+
    Two voting operations are compared in the lexicographic order of
    the pair of their [period] and [source]. A {!Proposals} is better
    than a {!Ballot}.
@@ -610,6 +660,9 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    to the current state the better. For {!Double_baking_evidence}
    in the case of equality, they are compared by the hashes of their first
    denounced block_header.
+
+   Two {!Dal_entrapment_evidence} ops are compared by their level and the number
+   of slots they attest.
 
    Two {!Vdf_revelation} ops are compared by their [solution].
 
@@ -635,11 +688,25 @@ type error += Invalid_signature (* `Permanent *)
     signature. *)
 val unsigned_operation_length : _ operation -> int
 
-(** Check the signature of an operation. This function serializes the
-    operation before calling the [Signature.check] function with the
-    appropriate watermark. *)
+(** Measuring the length of an operation in bls_mode, ignoring its
+    signature. *)
+val bls_mode_unsigned_operation_length : _ operation -> int
+
+(** Check the signature of an operation. This function serializes the operation
+    using the provided encoding before calling the [Signature.check] function
+    with the appropriate watermark. *)
 val check_signature :
-  Signature.Public_key.t -> Chain_id.t -> _ operation -> unit tzresult
+  (Operation.shell_header * packed_contents_list) Data_encoding.t ->
+  Signature.Public_key.t ->
+  Chain_id.t ->
+  _ operation ->
+  unit tzresult
+
+(* Serializes the operation using the provided encoding. *)
+val serialize_unsigned_operation :
+  (Operation.shell_header * packed_contents_list) Data_encoding.t ->
+  _ operation ->
+  bytes
 
 type ('a, 'b) eq = Eq : ('a, 'a) eq
 
@@ -663,6 +730,8 @@ module Encoding : sig
 
   val attestation_with_dal_case : Kind.attestation case
 
+  val attestations_aggregate_case : Kind.attestations_aggregate case
+
   val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 
   val vdf_revelation_case : Kind.vdf_revelation case
@@ -673,6 +742,8 @@ module Encoding : sig
   val double_attestation_evidence_case : Kind.double_attestation_evidence case
 
   val double_baking_evidence_case : Kind.double_baking_evidence case
+
+  val dal_entrapment_evidence_case : Kind.dal_entrapment_evidence case
 
   val activate_account_case : Kind.activate_account case
 

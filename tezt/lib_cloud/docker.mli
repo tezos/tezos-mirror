@@ -44,6 +44,9 @@ val pull :
   unit ->
   Process.t
 
+(** [network ~command ~network_name] is an alias for [docker network command network_name]. *)
+val network : command:string -> network_name:string -> Process.t
+
 (** [run] is an alias for [docker run]. *)
 val run :
   ?rm:bool ->

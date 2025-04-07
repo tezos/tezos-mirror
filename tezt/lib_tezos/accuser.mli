@@ -35,7 +35,8 @@ type event = {name : string; value : JSON.t; timestamp : float}
 
     This function just creates the [t] value, it does not call [run].
 
-    The path to accuser binary is chosen from the [protocol].
+    [path] provides the path to the accuser binary, the default being the one
+    derived from the [protocol].
 
     The standard output and standard error output of the accuser will
     be logged with prefix [name] and color [color].
@@ -58,6 +59,7 @@ type event = {name : string; value : JSON.t; timestamp : float}
     memory*)
 val create :
   protocol:Protocol.t ->
+  ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
@@ -132,7 +134,8 @@ val log_events : ?max_length:int -> t -> unit
     does not want to wait for the node to be ready, it is necessary to
     use [create] and then [run].
 
-    The path to accuser binary is chosen from the [protocol].
+    [path] is the path to accuser binary. By default, it is chosen
+    from the [protocol] and is assumed to be at the root.
 
     The standard output and standard error output of the accuser will
     be logged with prefix [name] and color [color].
@@ -158,6 +161,7 @@ val log_events : ?max_length:int -> t -> unit
     memory *)
 val init :
   protocol:Protocol.t ->
+  ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->

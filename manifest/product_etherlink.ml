@@ -4,19 +4,23 @@
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
 open Manifest
 open Externals
 open Internals
+open Product_cohttp
 open Product_octez
 open Product_prometheus
+open Product_websocket
+open Product_efunc_core
 
 include Product (struct
   let name = "etherlink"
 
-  let source = ["etherlink"; "src"]
+  let source = ["etherlink"; "src"] @ Product_websocket.product_source
 end)
 
 let tezt_etherlink =
@@ -45,6 +49,7 @@ let _tezt_tests_cloud =
     ~bisect_ppx:No
     ~deps:
       [
+        bls12_381_archive;
         octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
@@ -64,25 +69,57 @@ let octez_evm_node_lib =
     ~container:registered_octez_evm_node_libs
     ~package:"octez-evm-node-libs"
 
-let evm_node_config =
+let evm_node_rust_deps =
   octez_evm_node_lib
-    "evm_node_config"
-    ~path:"etherlink/bin_node/config"
-    ~synopsis:"Configuration for the EVM node"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        octez_client_base |> open_;
-        octez_rpc_http |> open_;
-        octez_rpc_http_server;
-        octez_stdlib_unix |> open_;
-      ]
+    "evm_node_rust_deps"
+    ~path:"etherlink/lib_wasm_runtime"
+    ~synopsis:"WASM runtime foreign archive"
+    ~foreign_archives:["octez_evm_node_rust_deps"]
+    ~dune:
+      Dune.
+        [
+          [
+            S "dirs";
+            S ":standard";
+            (* We need this stanza to ensure .cargo can be used as a
+               dependency via source_tree. *)
+            S ".cargo";
+            (* Do not track Cargo output directory. *)
+            [S "not"; S "target"];
+          ];
+          [
+            S "rule";
+            [
+              S "targets";
+              S "liboctez_evm_node_rust_deps.a";
+              S "dlloctez_evm_node_rust_deps.so";
+            ];
+            [
+              S "deps";
+              [S "file"; S "build.sh"];
+              [S "file"; S "Cargo.toml"];
+              [S "file"; S "Cargo.lock"];
+              [S "file"; S "../../rust-toolchain"];
+              [S "source_tree"; S ".cargo"];
+              [S "source_tree"; S "../sputnikvm"];
+              [S "source_tree"; S "../kernel_bifrost"];
+              [S "source_tree"; S "../kernel_calypso"];
+              [S "source_tree"; S "../../src/rustzcash_deps"];
+              [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
+              [S "source_tree"; S "../../src/kernel_sdk"];
+              [S "source_tree"; S "../../sdk/rust"];
+              [S "source_tree"; S "src"];
+            ];
+            [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
+          ];
+        ]
+
+let tezt ?(deps = []) = tezt ~deps:(bls12_381_archive :: deps)
 
 let wasm_runtime_callbacks =
   octez_evm_node_lib
     "wasm_runtime_callbacks"
-    ~path:"src/lib_wasm_runtime_callbacks"
+    ~path:"etherlink/lib_wasm_runtime_callbacks"
     ~synopsis:
       "Callbacks implementing the I/O functions required to implement the host \
        functions of the WASM runtime"
@@ -90,13 +127,14 @@ let wasm_runtime_callbacks =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_layer2_store |> open_;
+        octez_layer2_irmin_context |> open_;
+        Product_cohttp.cohttp_lwt_unix;
       ]
 
-let wasm_runtime_callbacks_tests =
+let _wasm_runtime_callbacks_tests =
   tezt
     ["test_vector"; "test_store"]
-    ~path:"src/lib_wasm_runtime_callbacks/test"
+    ~path:"etherlink/lib_wasm_runtime_callbacks/test"
     ~opam:"octez-evm-wasm-runtime-tests"
     ~synopsis:"Tests for the WASM Runtime"
     ~with_macos_security_framework:true
@@ -110,21 +148,52 @@ let wasm_runtime_callbacks_tests =
         alcotezt;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        octez_layer2_store |> open_;
+        octez_layer2_irmin_context |> open_;
         wasm_runtime_callbacks;
       ]
 
 let wasm_runtime =
   octez_evm_node_lib
     "evm_node_wasm_runtime"
-    ~path:"src/lib_wasm_runtime/ocaml-api"
+    ~path:"etherlink/lib_wasm_runtime/ocaml-api"
     ~synopsis:"WASM runtime compatible with the WASM PVM"
-    ~deps:[octez_layer2_store |> open_; octez_rust_deps; wasm_runtime_callbacks]
+    ~deps:[octez_layer2_irmin_context |> open_; wasm_runtime_callbacks]
     ~flags:
       (Flags.standard
          ~disable_warnings:[66]
          (* We disable the warnings emitted by the files generated by [ocaml-rs]. *)
          ())
+
+let supported_installers =
+  octez_evm_node_lib
+    "evm_node_supported_installers"
+    ~path:"etherlink/bin_node/installers"
+    ~synopsis:"Collections of embedded installers binaries"
+    ~deps:[crunch]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "installers.ml"];
+            [S "deps"; [S "glob_files"; S "*.wasm"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "wasm";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S ".";
+              ];
+            ];
+          ];
+        ]
 
 let evm_node_migrations =
   octez_evm_node_lib
@@ -157,37 +226,6 @@ let evm_node_migrations =
           ];
         ]
 
-let evm_node_kernels =
-  octez_evm_node_lib
-    "evm_node_kernels"
-    ~path:"etherlink/bin_node/kernels"
-    ~synopsis:"Collections of embedded kernels binaries"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; caqti_lwt; crunch; re]
-    ~dune:
-      Dune.
-        [
-          [
-            S "rule";
-            [S "target"; S "kernels.ml"];
-            [S "deps"; [S "glob_files"; S "*.wasm"]];
-            [
-              S "action";
-              [
-                S "run";
-                S "ocaml-crunch";
-                S "-e";
-                S "wasm";
-                S "-m";
-                S "plain";
-                S "-o";
-                S "%{target}";
-                S "-s";
-                S ".";
-              ];
-            ];
-          ];
-        ]
-
 let evm_node_lib_dev_encoding =
   octez_evm_node_lib
     "evm_node_lib_dev_encoding"
@@ -200,6 +238,23 @@ let evm_node_lib_dev_encoding =
         octez_base |> open_ ~m:"TzPervasives";
         octez_scoru_wasm_debugger_plugin;
         re;
+        uuidm;
+      ]
+
+let evm_node_config =
+  octez_evm_node_lib
+    "evm_node_config"
+    ~path:"etherlink/bin_node/config"
+    ~synopsis:"Configuration for the EVM node"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_client_base |> open_;
+        octez_rpc_http |> open_;
+        octez_rpc_http_server;
+        octez_stdlib_unix |> open_;
+        evm_node_lib_dev_encoding |> open_;
       ]
 
 let evm_node_lib_dev =
@@ -214,6 +269,8 @@ let evm_node_lib_dev =
         octez_base |> open_ ~m:"TzPervasives";
         octez_rpc_http |> open_;
         octez_rpc_http_server;
+        dream;
+        websocket_cohttp_lwt;
         octez_workers |> open_;
         octez_rpc_http_client_unix;
         octez_version_value;
@@ -228,27 +285,47 @@ let evm_node_lib_dev =
         octez_context_disk;
         octez_context_encoding;
         octez_scoru_wasm;
-        octez_scoru_wasm_helpers |> open_;
+        octez_scoru_wasm_helpers_functor |> open_;
         octez_scoru_wasm_debugger_lib |> open_;
         octez_layer2_store |> open_;
+        octez_layer2_irmin_context |> open_;
         octez_smart_rollup_lib |> open_;
         octez_smart_rollup_node_store_lib;
         evm_node_migrations;
-        evm_node_kernels;
         prometheus_app;
         octez_dal_node_services;
+        supported_installers;
         wasm_runtime;
+        performance_metrics;
       ]
 
 let _octez_evm_node_tests =
-  tezt
-    ["test_rlp"; "test_ethbloom"; "test_call_tracer_algo"; "test_wasm_runtime"]
+  tests
+    [
+      "test_rlp";
+      "test_ethbloom";
+      "test_call_tracer_algo";
+      "test_wasm_runtime";
+      "test_blueprint_roundtrip";
+    ]
     ~path:"etherlink/bin_node/test"
     ~opam:"octez-evm-node-tests"
     ~synopsis:"Tests for the EVM Node"
     ~with_macos_security_framework:true
+    ~linkall:
+      (* Necessary to get proper code coverage on Alpine working. Without this,
+         calling Rust FFI segfault. *)
+      true
+    ~dep_files:
+      [
+        "rlptest.json";
+        "invalidRLPTest.json";
+        "../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm";
+      ]
     ~deps:
       [
+        bls12_381_archive;
+        evm_node_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_base_test_helpers |> open_;
@@ -256,15 +333,26 @@ let _octez_evm_node_tests =
         qcheck_alcotest;
         alcotezt;
         evm_node_lib_dev;
+        tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        octez_layer2_store |> open_;
+        tezt_etherlink |> open_;
+        octez_layer2_irmin_context |> open_;
         Protocol.(main alpha);
+        octez_client_base;
+        octez_client_base_unix;
       ]
 
 let _tezt_etherlink =
   tezt
-    ["evm_rollup"; "evm_sequencer"; "validate"; "dal_sequencer"; "eth_call"]
+    [
+      "evm_rollup";
+      "evm_sequencer";
+      "validate";
+      "dal_sequencer";
+      "eth_call";
+      "gc";
+    ]
     ~path:"etherlink/tezt/tests"
     ~opam:"tezt-etherlink"
     ~synopsis:"Tezt integration tests for Etherlink"
@@ -275,6 +363,7 @@ let _tezt_etherlink =
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
         evm_node_lib_dev_encoding;
+        octez_rustzcash_deps;
         Protocol.(main alpha);
       ]
     ~with_macos_security_framework:true
@@ -294,8 +383,14 @@ let _evm_node =
        rollup"
     ~release_status:Experimental
     ~with_macos_security_framework:true
+    ~link_flags:
+      (* Required to deal with larger stacks required to natively execute
+         kernels *)
+      [[S ":include"; S "%{workspace_root}/link-flags-evm-node.sexp"]]
     ~deps:
       [
+        evm_node_rust_deps;
+        bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_stdlib_unix |> open_;
@@ -308,7 +403,6 @@ let _evm_node =
         octez_sqlite |> open_;
         evm_node_lib_dev;
         evm_node_config |> open_;
-        octez_rust_deps;
       ]
     ~bisect_ppx:Yes
 
@@ -322,8 +416,64 @@ let _tezt_testnet_scenarios =
     ~static:false
     ~deps:
       [
+        bls12_381_archive;
         octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
+      ]
+
+let _etherlink_governance_observer =
+  public_exe
+    "etherlink-governance-observer"
+    ~internal_name:"governance_observer"
+    ~path:"etherlink/governance-metrics/src"
+    ~opam:"etherlink-governance-observer"
+    ~synopsis:
+      "A binary to observe, scrap and store Etherlink's governance contracts \
+       informations"
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_version_value;
+        octez_clic;
+        prometheus_app;
+        cohttp_lwt_unix;
+        cohttp_lwt;
+        octez_rpc_http |> open_;
+        octez_rpc_http_client_unix;
+      ]
+    ~release_status:Experimental
+    ~bisect_ppx:Yes
+
+(* Back-register the websocket library. *)
+let () =
+  Sub_lib.add_doc_link
+    registered_octez_evm_node_libs
+    ~target:"!module-Websocket_cohttp_lwt"
+    ~text:"Websocket_cohttp_lwt"
+
+let _floodgate_bin =
+  public_exe
+    "floodgate"
+    ~path:"etherlink/bin_floodgate"
+    ~internal_name:"main"
+    ~release_status:Unreleased
+    ~opam:"floodgate"
+    ~synopsis:"Tool to flood an EVM chain with transaction batches"
+    ~deps:
+      [
+        bls12_381_archive;
+        evm_node_rust_deps;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        efunc_core;
+        octez_rpc_http_client_unix;
+        octez_clic;
+        evm_node_lib_dev |> open_;
+        evm_node_lib_dev_encoding |> open_;
+        evm_node_config |> open_;
+        octez_workers;
       ]

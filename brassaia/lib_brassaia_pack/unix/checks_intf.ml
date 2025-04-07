@@ -158,7 +158,7 @@ module type Sigs = sig
       ?ppf:Format.formatter ->
       pred:
         (X.Node.value ->
-        (X.Node.Path.step option
+        (Path.step option
         * [< `Contents of XKey.t | `Inode of XKey.t | `Node of XKey.t ])
         list) ->
       iter:
@@ -198,10 +198,6 @@ module type Sigs = sig
   end
 
   module Stats (S : sig
-    type step
-
-    val step_t : step Brassaia.Type.t
-
     module Hash : Brassaia.Hash.S
   end) : sig
     type t
@@ -213,7 +209,7 @@ module type Sigs = sig
     val visit_node :
       t ->
       S.Hash.t ->
-      (S.step option
+      (Path.step option
       * [ `Contents of S.Hash.t | `Inode of S.Hash.t | `Node of S.Hash.t ])
       list ->
       nb_children:int ->

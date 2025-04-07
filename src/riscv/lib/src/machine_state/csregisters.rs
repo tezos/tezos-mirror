@@ -17,9 +17,9 @@ use self::{
     values::CSRValue,
     xstatus::{ExtensionValue, MNStatus, MStatus, SStatus},
 };
-use super::{bus::Address, hart_state::HartState, mode::TrapMode};
+use super::{hart_state::HartState, main_memory::Address, mode::TrapMode};
 use crate::{
-    bits::{ones, u64, Bits64},
+    bits::{Bits64, ones, u64},
     machine_state::mode::Mode,
     state_backend::{self as backend, ManagerRead},
     traps::{Exception, Interrupt, TrapContext, TrapKind},
@@ -52,6 +52,8 @@ pub enum Privilege {
     TryFromPrimitive,
     strum::Display,
     Hash,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 #[repr(usize)]
 pub enum CSRegister {
@@ -1630,9 +1632,12 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> backend::AllocatedOf<CSRegistersLayout, backend::Ref<'_, M>> {
-        self.registers.struct_ref()
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<CSRegistersLayout, F::Output> {
+        self.registers.struct_ref::<F>()
     }
 
     /// Reset the control and state registers.
@@ -1656,18 +1661,25 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
     }
 }
 
+impl<M: backend::ManagerClone> Clone for CSRegisters<M> {
+    fn clone(&self) -> Self {
+        Self {
+            registers: self.registers.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::identity_op)]
 mod tests {
     use crate::{
         backend_test,
         bits::Bits64,
-        create_backend, create_state,
+        create_state,
         machine_state::{
-            backend::tests::test_determinism,
             csregisters::{
-                values::CSRValue, xstatus::MStatus, CSRRepr, CSRegister, CSRegisters,
-                CSRegistersLayout, Exception,
+                CSRRepr, CSRegister, CSRegisters, CSRegistersLayout, Exception, values::CSRValue,
+                xstatus::MStatus,
             },
             mode::Mode,
         },
@@ -1677,7 +1689,7 @@ mod tests {
 
     #[test]
     fn test_privilege_access() {
-        use crate::machine_state::csregisters::{check_privilege as check, CSRegister as csreg};
+        use crate::machine_state::csregisters::{CSRegister as csreg, check_privilege as check};
 
         let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
 
@@ -1700,7 +1712,7 @@ mod tests {
     #[test]
     fn test_read_write_access() {
         use crate::machine_state::csregisters::{
-            check_write as check, CSRegister as csreg, Exception,
+            CSRegister as csreg, Exception, check_write as check,
         };
 
         let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
@@ -1886,8 +1898,7 @@ mod tests {
     }
 
     backend_test!(test_write_read, F, {
-        let mut backend = create_backend!(CSRegistersLayout, F);
-        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F, backend);
+        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F);
 
         // write to MBE, SXL, UXL, MPP, MPIE, XS, SPP (through mstatus)
         csrs.write(
@@ -1967,8 +1978,7 @@ mod tests {
     });
 
     backend_test!(test_xip_xie, F, {
-        let mut backend = create_backend!(CSRegistersLayout, F);
-        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F, backend);
+        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F);
 
         let mtip: u64 = 1 << Interrupt::MachineTimer.exception_code();
         let msip: u64 = 1 << Interrupt::MachineSoftware.exception_code();
@@ -1986,17 +1996,8 @@ mod tests {
         assert_eq!(csrs.read::<CSRRepr>(CSRegister::sie), stip | seip);
     });
 
-    #[test]
-    fn test_reset() {
-        test_determinism::<CSRegistersLayout, _>(|space| {
-            let mut csregs: CSRegisters<_> = CSRegisters::bind(space);
-            csregs.reset();
-        });
-    }
-
     backend_test!(test_fcsr, F, {
-        let mut backend = create_backend!(CSRegistersLayout, F);
-        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F, backend);
+        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F);
 
         // check starting values
         assert_eq!(0, csrs.read::<CSRRepr>(CSRegister::fcsr));

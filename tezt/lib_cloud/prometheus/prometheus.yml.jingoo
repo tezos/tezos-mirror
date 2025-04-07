@@ -1,0 +1,28 @@
+
+global:
+  scrape_interval: {{ scrape_interval }}s
+
+scrape_configs:  
+{%- for job in jobs %}
+  - job_name: {{ job.name }}
+    metrics_path: {{ job.metrics_path }}
+    params:
+      format: ['prometheus']
+    static_configs:  
+    {%- for target in job.targets %}
+    - targets: ['{{ target.point }}']
+      labels:
+        app: {{ target.app }}
+    {%- endfor %}
+{%- endfor -%}
+{%- if alert_manager %}
+alerting:
+    alertmanagers:
+      - static_configs:
+          - targets: ['localhost:9093']
+{%- endif %}
+
+{%- if alert_manager %}
+rule_files:
+  - /etc/prometheus/rules/tezt.rules
+{%- endif %}

@@ -15,6 +15,8 @@ depends: [
   "octez-shell-libs" { = version }
   "ppx_expect"
   "uri" { >= "3.1.0" }
+  "bls12-381" { with-test & = version }
+  "octez-rustzcash-deps" { with-test & = version }
   "octez-proto-libs" { = version }
 ]
 build: [
@@ -22,4 +24,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Octez protocol 012-Psithaca libraries"

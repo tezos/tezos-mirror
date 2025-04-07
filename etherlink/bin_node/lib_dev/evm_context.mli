@@ -16,41 +16,38 @@ type head = {
   pending_upgrade : Evm_events.Upgrade.t option;
 }
 
-(** [lock_data_dir ~data_dir] takes an exclusive lock on [data_dir] for the
-    duration of the process. It fails if there is already another evm node with
-    a lock. *)
-val lock_data_dir : data_dir:string -> unit tzresult Lwt.t
+type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
-type store_info = {
-  rollup_address : Address.t;
-  current_number : Ethereum_types.quantity;
-}
+(** [start] creates a new worker to manage a local EVM context where it
+    initializes the {!type-index}, and use a checkpoint mechanism to load the
+    latest {!type-store} if any. Returns a value telling if the context was
+    loaded from disk ([Loaded]) or was initialized from scratch ([Created]).
+    Returns also the smart rollup address.
 
-(** [export_store ~data_dir ~output_db_file] exports the store database with
-    data from the [data_dir] into the [output_db_file] and returns the rollup
-    address and the current level. *)
-val export_store :
-  data_dir:string -> output_db_file:string -> store_info tzresult Lwt.t
+    [kernel_path] can be provided to cover the case where the context does not
+    exist yet, and is ignored otherwise.
 
-(** [start ~data_dir ~preimages ~preimages_endpoint
-    ~smart_rollup_address ()] creates a new worker to
-    manage a local EVM context where it initializes the {!type-index},
-    and use a checkpoint mechanism to load the latest {!type-store} if
-    any.
+    [data_dir] is the path to the data-dir of the node, notably containing the
+    SQLite store and the Irmin context.
 
-    Returns a value telling if the context was loaded from disk
-    ([Loaded]) or was initialized from scratch ([Created]). Returns
-    also the smart rollup address. *)
+    [smart_rollup_address] can be provided either when starting from a
+    non-existing data-dir, or when starting a sandbox.
+
+    [store_perm] decides whether or not the worker can modify the Irmin context
+    (it is most certainly an artifact of the past, made outdated by the
+    [Evm_ro_context] module. Clearly, [~store_perm:`Read_only] menas you want
+    to use [Evm_ro_context] instead.
+
+    [snapshot_url] can be provided to automatically fetch and import the
+    snapshot if the [data_dir] was not initialized before. *)
 val start :
-  ?kernel_path:string ->
+  configuration:Configuration.t ->
+  ?kernel_path:Wasm_debugger.kernel ->
   data_dir:string ->
-  preimages:string ->
-  preimages_endpoint:Uri.t option ->
   ?smart_rollup_address:string ->
-  fail_on_missing_blueprint:bool ->
   store_perm:[`Read_only | `Read_write] ->
-  block_storage_sqlite3:bool ->
-  ?garbage_collector:Configuration.garbage_collector ->
+  ?sequencer_wallet:Client_keys.sk_uri * Client_context.wallet ->
+  ?snapshot_url:string ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 
@@ -61,19 +58,11 @@ val start :
     [omit_delayed_tx_events] dont populate the delayed tx event from
     the state into the db. *)
 val init_from_rollup_node :
+  configuration:Configuration.t ->
   omit_delayed_tx_events:bool ->
   data_dir:string ->
   rollup_node_data_dir:string ->
   unit ->
-  unit tzresult Lwt.t
-
-(** [reconstruct ~data_dir ~rollup_node_data_dir ~boot_sector] replays all
-    L1 blocks of [rollup_node_data_dir] since the genesis. Populates the
-    new [data_dir] with a full history. *)
-val reconstruct :
-  data_dir:string ->
-  rollup_node_data_dir:string ->
-  boot_sector:string ->
   unit tzresult Lwt.t
 
 (** [reset ~data_dir ~l2_level] reset the sequencer storage to
@@ -90,15 +79,13 @@ val reset :
 val apply_evm_events :
   ?finalized_level:int32 -> Evm_events.t list -> unit tzresult Lwt.t
 
-(** [last_produced_blueprint ctxt] returns the blueprint used to
-    create the current head of the chain. *)
-val last_produced_blueprint : unit -> Blueprint_types.t tzresult Lwt.t
-
-(** [apply_blueprint timestamp payload delayed_transactions] applies
-    [payload] in the freshest EVM state stored under [ctxt] at
-    timestamp [timestamp], forwards the {!Blueprint_types.with_events}.
-    It commits the result if the blueprint produces the expected block. *)
+(** [apply_blueprint ?events timestamp payload delayed_transactions]
+    applies [payload] in the freshest EVM state stored under [ctxt] at
+    timestamp [timestamp], forwards the
+    {!Blueprint_types.with_events}.  It commits the result if the
+    blueprint produces the expected block. *)
 val apply_blueprint :
+  ?events:Evm_events.t list ->
   Time.Protocol.t ->
   Blueprint_types.payload ->
   Evm_events.Delayed_transaction.t list ->
@@ -108,17 +95,7 @@ val head_info : unit -> head Lwt.t
 
 val next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t
 
-val blueprint :
-  Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t
-
-val blueprints_range :
-  Ethereum_types.quantity ->
-  Ethereum_types.quantity ->
-  (Ethereum_types.quantity * Blueprint_types.payload) list tzresult Lwt.t
-
 val last_known_l1_level : unit -> int32 option tzresult Lwt.t
-
-val new_last_known_l1_level : int32 -> unit tzresult Lwt.t
 
 val shutdown : unit -> unit tzresult Lwt.t
 
@@ -146,11 +123,32 @@ val patch_state :
   unit ->
   unit tzresult Lwt.t
 
-val block_param_to_block_number :
-  Ethereum_types.Block_parameter.extended ->
-  Ethereum_types.quantity tzresult Lwt.t
+(** [potential_observer_reorg evm_node_endpoint blueprint_with_events] checks
+    with the [evm_node_endpoint] if a reorganization happened, and return the
+    reorganization level if it exists.
 
-module State : sig
-  (** Path of EVM state store. *)
-  val store_path : data_dir:string -> string
-end
+    A reorganization can happen typically if the kernel flushed its delayed inbox
+    in a blueprint. *)
+val potential_observer_reorg :
+  Uri.t ->
+  Blueprint_types.with_events ->
+  Ethereum_types.quantity option tzresult Lwt.t
+
+(** Watcher that gets notified each time a new block is produced. *)
+val head_watcher :
+  Transaction_object.t Ethereum_types.Subscription.output Lwt_watcher.input
+
+(** Watcher that gets notified each time a new receipt is produced. *)
+val receipt_watcher : Transaction_receipt.t Lwt_watcher.input
+
+(** [check_history_mode ?switch ~store_history_mode ~history_mode ()] checks
+    that the history mode are compatible, and returns the history mode the node
+    should run in, depending on its stored mode [store_history_mode], the one
+    requested by the configuration [history_mode] and if it is allowed to
+    [switch]. *)
+val check_history_mode :
+  ?switch:bool ->
+  store_history_mode:Configuration.history_mode option ->
+  history_mode:Configuration.history_mode option ->
+  unit ->
+  Configuration.history_mode tzresult Lwt.t

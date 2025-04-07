@@ -49,7 +49,7 @@ let wait_for_n_injections n node =
 
 (** Do nothing, but emphasize that we have spawned a [process] that we
     do not expect to terminate. *)
-let non_terminating_process (_process : Process.t) = ()
+let non_terminating_process (_process : Process.t Lwt.t) = Lwt.return_unit
 
 (** Check that the mempool contains [n] validated operations. Also
     return these validated operations (which will usually be transactions
@@ -219,20 +219,23 @@ let test_stresstest_sources_format =
   let rec loop ~first_iteration ~repeat =
     let waiter = wait_for_n_injections n_bootstraps_to_use node in
     let* () =
-      if first_iteration then (
+      if first_iteration then
         (* Bake some blocks to reach required level for stresstest command. *)
         let* () = Base.repeat 2 (fun () -> Client.bake_for_and_wait client) in
-        non_terminating_process
-        @@ Client.spawn_stresstest
-             ~source_aliases
-             ~source_pkhs
-             ~source_accounts
-             ~fresh_probability:0.
-             (* Prevent the command from randomly creating fresh
-                accounts, as this would allow more operations than
-                expected in the mempool / in the baked block. *)
-             client ;
-        unit)
+        let* () =
+          non_terminating_process
+          @@ Client.spawn_stresstest
+               ~source_aliases
+               ~source_pkhs
+               ~source_accounts
+               ~gas_limit:4000
+               ~fresh_probability:0.
+               (* Prevent the command from randomly creating fresh
+                  accounts, as this would allow more operations than
+                  expected in the mempool / in the baked block. *)
+               client
+        in
+        unit
       else
         let* () = Client.bake_for_and_wait client in
         let* ops =
@@ -413,19 +416,22 @@ let test_stresstest_multiple_nodes =
   let rec loop ~first_iteration ~repeat =
     let waiter = setup_waiter () in
     let* () =
-      if first_iteration then (
-        List.iter
-          (fun (_, client, source_accounts) ->
-            non_terminating_process
-            @@ Client.spawn_stresstest
-                 ~source_accounts
-                 ~fresh_probability:0.
-                 (* Prevent the command from randomly creating fresh
-                    accounts, as this would allow more operations than
-                    expected in the mempool / in the baked block. *)
-                 client)
-          nodes_clients_accounts ;
-        unit)
+      if first_iteration then
+        let* () =
+          Lwt_list.iter_s
+            (fun (_, client, source_accounts) ->
+              non_terminating_process
+              @@ Client.spawn_stresstest
+                   ~source_accounts
+                   ~gas_limit:4000
+                   ~fresh_probability:0.
+                   (* Prevent the command from randomly creating fresh
+                      accounts, as this would allow more operations than
+                      expected in the mempool / in the baked block. *)
+                   client)
+            nodes_clients_accounts
+        in
+        unit
       else
         let* () = Client.bake_for_and_wait central_client in
         let* _ =

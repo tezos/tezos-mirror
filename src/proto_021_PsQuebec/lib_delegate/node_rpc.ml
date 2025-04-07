@@ -38,6 +38,13 @@ module Profiler = struct
     Baking_profiler.create_reset_block_section Baking_profiler.node_rpc_profiler
 end
 
+module RPC_profiler = struct
+  include (val Tezos_profiler.Profiler.wrap RPC_profiler.rpc_client_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    RPC_profiler.create_reset_block_section RPC_profiler.rpc_client_profiler
+end
+
 let inject_block cctxt ?(force = false) ~chain signed_block_header operations =
   let signed_shell_header_bytes =
     Data_encoding.Binary.to_bytes_exn Block_header.encoding signed_block_header
@@ -110,7 +117,7 @@ let info_of_header_and_ops ~in_protocol block_hash block_header operations =
         (WithExceptions.Option.get
            ~loc:__LOC__
            (Operation_pool.extract_operations_of_list_list operations)
-         [@profiler.record_f "operations classification"])
+         [@profiler.record_f {verbosity = Debug} "operations classification"])
       in
       let prequorum = Option.bind preattestations extract_prequorum in
       (payload_hash, payload_round, prequorum, quorum, payload)
@@ -153,15 +160,17 @@ let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
           in
           return packed_operations)
          [@profiler.record_s
-           "retrieve block "
-           ^ Block_hash.to_short_b58check block_hash
-           ^ " operations"]
+           {verbosity = Debug}
+             ("retrieve block "
+             ^ Block_hash.to_short_b58check block_hash
+             ^ " operations")]
      | Some operations ->
          let parse_op (raw_op : Tezos_base.Operation.t) =
            let protocol_data =
              (Data_encoding.Binary.of_bytes_exn
                 Operation.protocol_data_encoding
-                raw_op.proto [@profiler.aggregate_f "parse operation"])
+                raw_op.proto
+              [@profiler.aggregate_f {verbosity = Debug} "parse operation"])
            in
            {shell = raw_op.shell; protocol_data}
          in
@@ -175,7 +184,8 @@ let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
                       parse_op
                       l
                     [@profiler.record_f
-                      Printf.sprintf "parse operations (pass:%d)" i])
+                      {verbosity = Debug}
+                        (Printf.sprintf "parse operations (pass : %d)" i)])
               operations)
    in
    let*? block_info =
@@ -183,7 +193,8 @@ let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
    in
    return block_info)
   [@profiler.record_s
-    "compute block " ^ Block_hash.to_short_b58check block_hash ^ " info"]
+    {verbosity = Info}
+      ("compute block " ^ Block_hash.to_short_b58check block_hash ^ " info")]
 
 let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
     block_hash (block_header : Tezos_base.Block_header.t) =
@@ -198,22 +209,24 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
     | Some predecessor ->
         ()
         [@profiler.mark
-          [
-            "pred_block("
-            ^ Block_hash.to_short_b58check predecessor_hash
-            ^ "):cache_hit";
-          ]] ;
+          {verbosity = Info}
+            [
+              "pred_block("
+              ^ Block_hash.to_short_b58check predecessor_hash
+              ^ ") : cache_hit";
+            ]] ;
         return
           ( predecessor.shell.proto_level = block_header.shell.proto_level,
             predecessor )
     | None ->
         ()
         [@profiler.mark
-          [
-            "pred_block("
-            ^ Block_hash.to_short_b58check predecessor_hash
-            ^ "):cache_miss";
-          ]] ;
+          {verbosity = Info}
+            [
+              "pred_block("
+              ^ Block_hash.to_short_b58check predecessor_hash
+              ^ ") : cache_miss";
+            ]] ;
         let* {
                current_protocol = pred_current_protocol;
                next_protocol = pred_next_protocol;
@@ -222,7 +235,8 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
              cctxt
              ~chain
              ~block:pred_block
-             () [@profiler.record_s "pred block protocol RPC"])
+             ()
+           [@profiler.record_s {verbosity = Info} "pred block protocol RPC"])
         in
         let is_proposal_in_protocol =
           Protocol_hash.(pred_next_protocol = Protocol.hash)
@@ -237,7 +251,8 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
           let predecessor_header =
             (Data_encoding.Binary.of_bytes_exn
                Tezos_base.Block_header.encoding
-               raw_header_b [@profiler.record_f "parse pred block header"])
+               raw_header_b
+             [@profiler.record_f {verbosity = Info} "parse pred block header"])
           in
           compute_block_info
             cctxt
@@ -259,16 +274,22 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
     | Some pi ->
         ()
         [@profiler.mark
-          ["new_block(" ^ Block_hash.to_short_b58check pi.hash ^ "):cache_hit"]] ;
+          {verbosity = Info}
+            [
+              "new_block("
+              ^ Block_hash.to_short_b58check pi.hash
+              ^ ") : cache_hit";
+            ]] ;
         return pi
     | None ->
         ()
         [@profiler.mark
-          [
-            "new_block("
-            ^ Block_hash.to_short_b58check block_hash
-            ^ "):cache_miss";
-          ]] ;
+          {verbosity = Info}
+            [
+              "new_block("
+              ^ Block_hash.to_short_b58check block_hash
+              ^ ") : cache_miss";
+            ]] ;
         let* pi =
           compute_block_info
             cctxt
@@ -286,7 +307,7 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
 let proposal cctxt ?cache ?operations ~chain block_hash block_header =
   ( (protect @@ fun () ->
     proposal cctxt ?cache ?operations ~chain block_hash block_header)
-  [@profiler.record_s "proposal_computation"] )
+  [@profiler.record_s {verbosity = Notice} "proposal_computation"] )
 
 let monitor_valid_proposals cctxt ~chain ?cache () =
   let open Lwt_result_syntax in
@@ -296,7 +317,10 @@ let monitor_valid_proposals cctxt ~chain ?cache () =
   in
   let stream =
     let map (_chain_id, block_hash, block_header, operations) =
-      () [@profiler.reset_block_section block_hash] ;
+      () [@profiler.reset_block_section {profiler_module = Profiler} block_hash] ;
+      ()
+      [@profiler.reset_block_section
+        {profiler_module = RPC_profiler} block_hash] ;
       (let*! map_result =
          proposal cctxt ?cache ~operations ~chain block_hash block_header
        in
@@ -307,7 +331,7 @@ let monitor_valid_proposals cctxt ~chain ?cache () =
              Events.(emit error_while_monitoring_valid_proposals err)
            in
            Lwt.return_none)
-      [@profiler.record_s "received valid proposal"]
+      [@profiler.record_s {verbosity = Notice} "received valid proposal"]
     in
     Lwt_stream.filter_map_s map block_stream
   in
@@ -330,7 +354,7 @@ let monitor_heads cctxt ~chain ?cache () =
        | Error err ->
            let*! () = Events.(emit error_while_monitoring_heads err) in
            Lwt.return_none)
-      [@profiler.record_s "received new head"]
+      [@profiler.record_s {verbosity = Notice} "received new head"]
     in
     Lwt_stream.filter_map_s map block_stream
   in
@@ -356,7 +380,7 @@ let get_attestable_slots dal_node_rpc_ctxt pkh ~attested_level =
   Tezos_rpc.Context.make_call
     Tezos_dal_node_services.Services.get_attestable_slots
     dal_node_rpc_ctxt
-    (((), pkh), attested_level)
+    (((), Tezos_crypto.Signature.Of_V1.public_key_hash pkh), attested_level)
     ()
     ()
 
@@ -368,6 +392,14 @@ let dal_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
       let pkh = snd delegate_slot.consensus_key_and_delegate in
       (pkh, get_attestable_slots dal_node_rpc_ctxt pkh ~attested_level))
     delegate_slots
+
+let get_dal_profiles dal_node_rpc_ctxt =
+  Tezos_rpc.Context.make_call
+    Tezos_dal_node_services.Services.get_profiles
+    dal_node_rpc_ctxt
+    ()
+    ()
+    ()
 
 let register_dal_profiles dal_node_rpc_ctxt delegates =
   let profiles =

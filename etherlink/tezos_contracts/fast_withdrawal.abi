@@ -1,0 +1,13 @@
+[
+  {
+    "type": "function",
+    "name": "fast_withdraw_base58",
+    "constant": false,
+    "payable": true,
+    "inputs": [
+      { "type": "string", "name": "target" },
+      { "type": "string", "name": "fast_withdrawal_contract" },
+      { "type": "bytes", "name": "payload" }
+    ]
+  }
+]

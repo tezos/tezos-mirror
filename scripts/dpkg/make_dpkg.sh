@@ -13,6 +13,8 @@ myhome=${1:-scripts/dpkg}
 common=scripts/pkg-common
 dieonwarn=${dieonwarn:-1}
 
+export TIMESTAMP="${TIMESTAMP-$(date +'%Y%m%d%H%M')}"
+
 #shellcheck disable=SC1091
 . ${common}/utils.sh
 protocols=${protocols:?protocols not specified} # Not used?
@@ -127,18 +129,12 @@ for control_file in "$myhome"/*control.in; do
       "${staging_dir}/usr/share/zcash-params"
   fi
 
-  if [ "$pg" = "dal-node" ]; then
-    # call the install script to make available the
-    # zcash parameters on the build host
-    scripts/install_dal_trusted_setup.sh
-    zcashParams "${common}/${pg}-zcash" \
-      "${staging_dir}/usr/share/dal-trusted-setup" \
-      _opam/share/dal-trusted-setup
-  fi
-
   # Build the package
   #
   echo "=> Constructing package ${dpkg_fullname}"
   dpkg-deb -v --build --root-owner-group "${staging_dir}"
   mv "${staging_root}/${dpkg_fullname}" .
 done
+
+echo "Cleanup staging directories"
+rm -Rf "${staging_root}"

@@ -39,7 +39,7 @@ open Alpha_context
 
 let init_genesis ?policy () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init_n ~consensus_threshold:0 5 () in
+  let* genesis, _contracts = Context.init_n ~consensus_threshold_size:0 5 () in
   let* b = Block.bake ?policy genesis in
   return (genesis, b)
 

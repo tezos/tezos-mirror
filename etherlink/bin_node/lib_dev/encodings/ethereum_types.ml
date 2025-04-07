@@ -96,7 +96,11 @@ module Qty = struct
 
   let zero = Qty Z.zero
 
-  let ( = ) (Qty z) (Qty z') = Compare.Z.(z = z')
+  let compare (Qty a) (Qty b) = Compare.Z.compare a b
+
+  let ( < ) a b = compare a b < 0
+
+  let ( = ) a b = compare a b = 0
 end
 
 let quantity_of_z z = Qty z
@@ -110,6 +114,30 @@ let quantity_encoding =
     Data_encoding.string
 
 let pp_quantity fmt (Qty q) = Z.pp_print fmt q
+
+let decode_z_le bytes = Bytes.to_string bytes |> Z.of_bits
+
+let decode_z_be bytes =
+  Bytes.fold_left
+    (fun acc c ->
+      let open Z in
+      add (of_int (Char.code c)) (shift_left acc 8))
+    Z.zero
+    bytes
+
+type chain_id = Chain_id of Z.t [@@ocaml.unboxed]
+
+module Chain_id = struct
+  let encoding =
+    Data_encoding.conv
+      (fun (Chain_id c) -> z_to_hexa c)
+      (fun c -> Chain_id (Z.of_string c))
+      Data_encoding.string
+
+  let decode_le bytes = Chain_id (decode_z_le bytes)
+
+  let decode_be bytes = Chain_id (decode_z_be bytes)
+end
 
 type block_hash = Block_hash of hex [@@ocaml.unboxed]
 
@@ -244,16 +272,9 @@ let decode_address bytes = Address (decode_hex bytes)
 
 let encode_address (Address address) = encode_hex address
 
-let decode_number_le bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
+let decode_number_le bytes = decode_z_le bytes |> quantity_of_z
 
-let decode_number_be bytes =
-  Bytes.fold_left
-    (fun acc c ->
-      let open Z in
-      add (of_int (Char.code c)) (shift_left acc 8))
-    Z.zero
-    bytes
-  |> quantity_of_z
+let decode_number_be bytes = decode_z_be bytes |> quantity_of_z
 
 let decode_hash bytes = Hash (decode_hex bytes)
 
@@ -354,7 +375,7 @@ let transaction_log_encoding =
        (req "logIndex" (option quantity_encoding))
        (req "removed" (option bool)))
 
-type transaction_object = {
+type legacy_transaction_object = {
   blockHash : block_hash option;
   blockNumber : quantity option;
   from : address;
@@ -372,7 +393,7 @@ type transaction_object = {
   s : hash;
 }
 
-let transaction_object_from_rlp_item block_hash rlp_item =
+let legacy_transaction_object_from_rlp_item block_hash rlp_item =
   let decode_optional_number_le bytes =
     if block_hash == None then None else Some (decode_number_le bytes)
   in
@@ -430,12 +451,12 @@ let transaction_object_from_rlp_item block_hash rlp_item =
       }
   | _ -> raise (Invalid_argument "Expected a List of 13 elements")
 
-let transaction_object_from_rlp block_hash bytes =
+let legacy_transaction_object_from_rlp block_hash bytes =
   match Rlp.decode bytes with
-  | Ok rlp_item -> transaction_object_from_rlp_item block_hash rlp_item
+  | Ok rlp_item -> legacy_transaction_object_from_rlp_item block_hash rlp_item
   | _ -> raise (Invalid_argument "Expected a List of 13 elements")
 
-let transaction_object_encoding =
+let legacy_transaction_object_encoding =
   let open Data_encoding in
   conv
     (fun {
@@ -510,11 +531,11 @@ let transaction_object_encoding =
           (req "r" hash_encoding)
           (req "s" hash_encoding)))
 
-type block_transactions =
+type 'transaction_object block_transactions =
   | TxHash of hash list
-  | TxFull of transaction_object list
+  | TxFull of 'transaction_object list
 
-let block_transactions_encoding =
+let block_transactions_encoding transaction_object_encoding =
   let open Data_encoding in
   union
     [
@@ -532,7 +553,7 @@ let block_transactions_encoding =
         (fun txs -> TxFull txs);
     ]
 
-type block = {
+type 'transaction_object block = {
   number : quantity;
   hash : block_hash;
   parent : block_hash;
@@ -550,7 +571,7 @@ type block = {
   gasLimit : quantity;
   gasUsed : quantity;
   timestamp : quantity;
-  transactions : block_transactions;
+  transactions : 'transaction_object block_transactions;
   uncles : hash list;
   (* baseFeePerGas and prevRandao are set optionnal because old blocks didn't have
      them*)
@@ -767,7 +788,7 @@ let block_from_rlp bytes =
     block_from_rlp_v1 (Bytes.sub bytes 1 (length - 1))
   else block_from_rlp_v0 bytes
 
-let block_encoding =
+let block_encoding transaction_object_encoding =
   let open Data_encoding in
   conv
     (fun {
@@ -879,7 +900,9 @@ let block_encoding =
              (req "gasLimit" quantity_encoding)
              (req "gasUsed" quantity_encoding)
              (req "timestamp" quantity_encoding)
-             (req "transactions" block_transactions_encoding)
+             (req
+                "transactions"
+                (block_transactions_encoding transaction_object_encoding))
              (req "uncles" (list hash_encoding))
              (opt "baseFeePerGas" quantity_encoding)))
        (obj1 (opt "prevRandao" block_hash_encoding)))
@@ -1012,15 +1035,15 @@ end
 module AddressMap = MapMake (Address)
 
 type txpool = {
-  pending : transaction_object NonceMap.t AddressMap.t;
-  queued : transaction_object NonceMap.t AddressMap.t;
+  pending : legacy_transaction_object NonceMap.t AddressMap.t;
+  queued : legacy_transaction_object NonceMap.t AddressMap.t;
 }
 
 let txpool_encoding =
   let open Data_encoding in
   let field_encoding =
     AddressMap.associative_array_encoding
-      (NonceMap.associative_array_encoding transaction_object_encoding)
+      (NonceMap.associative_array_encoding legacy_transaction_object_encoding)
   in
   conv
     (fun {pending; queued} -> (pending, queued))
@@ -1102,22 +1125,261 @@ let state_encoding =
 
 let state_account_override_encoding =
   let open Data_encoding in
-  conv
+  let state_diff_encoding =
+    StorageMap.associative_array_encoding hex_encoding
+  in
+  conv_with_guard
     (fun {balance; nonce; code; state; state_diff} ->
-      (balance, nonce, code, state, state_diff))
-    (fun (balance, nonce, code, state, state_diff) ->
+      (balance, nonce, code, state, Some state_diff, None))
+    (fun (balance, nonce, code, state, state_diff, state_diff') ->
+      let open Result_syntax in
+      let+ state_diff =
+        match (state_diff, state_diff') with
+        | Some state_diff, None | None, Some state_diff -> Ok state_diff
+        | None, None -> Ok StorageMap.empty
+        | Some _, Some _ -> Error "Cannot provide both state_diff and stateDiff"
+      in
       {balance; nonce; code; state; state_diff})
-    (obj5
+    (obj6
        (opt "balance" quantity_encoding)
        (opt "nonce" quantity_encoding)
        (opt "code" hex_encoding)
        (dft "state" state_encoding None)
-       (dft
+       (opt "stateDiff" state_diff_encoding)
+       (opt
+          ~description:
+            "DEPRECATED. The expected name for this field is stateDiff. We \
+             keep supporting state_diff for now for avoiding potential \
+             breaking changes."
           "state_diff"
-          (StorageMap.associative_array_encoding hex_encoding)
-          StorageMap.empty))
+          state_diff_encoding))
 
 let state_override_empty = AddressMap.empty
 
 let state_override_encoding =
   AddressMap.associative_array_encoding state_account_override_encoding
+
+module Filter = struct
+  type topic = One of hash | Or of hash list
+
+  let topic_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"one"
+          (Tag 0)
+          hash_encoding
+          (function One hash -> Some hash | _ -> None)
+          (fun hash -> One hash);
+        case
+          ~title:"or"
+          (Tag 1)
+          (list hash_encoding)
+          (function Or l -> Some l | _ -> None)
+          (fun l -> Or l);
+      ]
+
+  type filter_address = Single of address | Vec of address list
+
+  let filter_address_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"single"
+          (Tag 0)
+          address_encoding
+          (function Single address -> Some address | _ -> None)
+          (fun address -> Single address);
+        case
+          ~title:"vec"
+          (Tag 1)
+          (list address_encoding)
+          (function Vec l -> Some l | _ -> None)
+          (fun l -> Vec l);
+      ]
+
+  type changes =
+    | Block_filter of block_hash
+    | Pending_transaction_filter of hash
+    | Log of transaction_log
+
+  let changes_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"block"
+          (Tag 0)
+          block_hash_encoding
+          (function Block_filter hash -> Some hash | _ -> None)
+          (fun hash -> Block_filter hash);
+        case
+          ~title:"pending_transaction"
+          (Tag 1)
+          hash_encoding
+          (function Pending_transaction_filter hash -> Some hash | _ -> None)
+          (fun hash -> Pending_transaction_filter hash);
+        case
+          ~title:"log"
+          (Tag 2)
+          transaction_log_encoding
+          (function Log f -> Some f | _ -> None)
+          (fun f -> Log f);
+      ]
+
+  type t = {
+    from_block : Block_parameter.t option;
+    to_block : Block_parameter.t option;
+    address : filter_address option;
+    topics : topic option list option;
+    block_hash : block_hash option;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {from_block; to_block; address; topics; block_hash} ->
+        (from_block, to_block, address, topics, block_hash))
+      (fun (from_block, to_block, address, topics, block_hash) ->
+        {from_block; to_block; address; topics; block_hash})
+      (obj5
+         (dft "fromBlock" (option Block_parameter.encoding) None)
+         (dft "toBlock" (option Block_parameter.encoding) None)
+         (dft "address" (option filter_address_encoding) None)
+         (dft "topics" (option (list @@ option topic_encoding)) None)
+         (dft "blockHash" (option block_hash_encoding) None))
+end
+
+module Subscription = struct
+  exception Unknown_subscription
+
+  type logs = {
+    address : Filter.filter_address option;
+    topics : Filter.topic option list option;
+  }
+
+  let logs_encoding =
+    let open Data_encoding in
+    conv
+      (fun {address; topics} -> (address, topics))
+      (fun (address, topics) -> {address; topics})
+      (obj2
+         (opt "address" Filter.filter_address_encoding)
+         (opt "topics" (list @@ option Filter.topic_encoding)))
+
+  type kind = NewHeads | Logs of logs | NewPendingTransactions | Syncing
+
+  let kind_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"params_size_two"
+          (Tag 0)
+          (tup2 string logs_encoding)
+          (function Logs logs -> Some ("logs", logs) | _ -> None)
+          (function
+            | "logs", logs -> Logs logs | _ -> raise Unknown_subscription);
+        case
+          ~title:"params_size_one"
+          (Tag 1)
+          (tup1 string)
+          (function
+            | NewHeads -> Some "newHeads"
+            | NewPendingTransactions -> Some "newPendingTransactions"
+            | Syncing -> Some "syncing"
+            | Logs _ -> Some "logs")
+          (function
+            | "newHeads" -> NewHeads
+            | "newPendingTransactions" -> NewPendingTransactions
+            | "syncing" -> Syncing
+            | "logs" -> Logs {address = None; topics = None}
+            | _ -> raise Unknown_subscription);
+      ]
+
+  type id = Id of hex [@@ocaml.unboxed]
+
+  let id_of_string s = Id (hex_of_string (String.lowercase_ascii s))
+
+  let id_to_string (Id a) = hex_to_string a
+
+  let id_encoding = Data_encoding.(conv id_to_string id_of_string string)
+
+  let id_input_encoding =
+    Data_encoding.(conv id_to_string id_of_string (tup1 string))
+
+  type sync_status = {
+    startingBlock : quantity;
+    currentBlock : quantity;
+    highestBlock : quantity;
+    pulledStates : quantity;
+    knownStates : quantity;
+  }
+
+  let sync_status_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             startingBlock;
+             currentBlock;
+             highestBlock;
+             pulledStates;
+             knownStates;
+           } ->
+        (startingBlock, currentBlock, highestBlock, pulledStates, knownStates))
+      (fun (startingBlock, currentBlock, highestBlock, pulledStates, knownStates) ->
+        {startingBlock; currentBlock; highestBlock; pulledStates; knownStates})
+      (obj5
+         (req "startingBlock" quantity_encoding)
+         (req "currentBlock" quantity_encoding)
+         (req "highestBlock" quantity_encoding)
+         (req "pulledStates" quantity_encoding)
+         (req "knownStates" quantity_encoding))
+
+  type sync_output = {syncing : bool; status : sync_status}
+
+  let sync_output_encoding =
+    let open Data_encoding in
+    conv
+      (fun {syncing; status} -> (syncing, status))
+      (fun (syncing, status) -> {syncing; status})
+      (obj2 (req "syncing" bool) (req "status" sync_status_encoding))
+
+  type 'transaction_object output =
+    | NewHeads of 'transaction_object block
+    | Logs of transaction_log
+    | NewPendingTransactions of hash
+    | Syncing of sync_output
+
+  let output_encoding transaction_object_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"newHeads"
+          (Tag 0)
+          (block_encoding transaction_object_encoding)
+          (function NewHeads b -> Some b | _ -> None)
+          (fun b -> NewHeads b);
+        case
+          ~title:"logs"
+          (Tag 1)
+          transaction_log_encoding
+          (function Logs l -> Some l | _ -> None)
+          (fun l -> Logs l);
+        case
+          ~title:"pendingTxs"
+          (Tag 2)
+          hash_encoding
+          (function NewPendingTransactions l -> Some l | _ -> None)
+          (fun l -> NewPendingTransactions l);
+        case
+          ~title:"sync"
+          (Tag 3)
+          sync_output_encoding
+          (function Syncing l -> Some l | _ -> None)
+          (fun l -> Syncing l);
+      ]
+end

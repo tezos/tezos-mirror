@@ -16,6 +16,8 @@ type t =
   | Connection_closed_by_unexpected_error of (read_write * string)
   | TCP_connection_refused
   | TCP_connection_unreachable
+  | TCP_network_unreachable
+      (** Likely when try to reach an ipv6 and this is not supported. *)
   | TCP_connection_canceled
   | TCP_connection_failed_unexpected_error of string
   | Scheduled_pop_unexpected_error of tztrace

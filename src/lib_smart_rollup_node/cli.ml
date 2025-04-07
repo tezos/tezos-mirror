@@ -202,9 +202,13 @@ struct
   let metrics_addr_arg =
     Tezos_clic.arg
       ~long:"metrics-addr"
-      ~placeholder:
-        "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9933)"
-      ~doc:(Format.sprintf "The address of the %s metrics server." binary_name)
+      ~placeholder:"ADDR:PORT|:PORT"
+      ~doc:
+        (Format.sprintf
+           "Start the %s metrics server at the specified address ADDR:PORT. \
+            Default value is localhost:%d"
+           binary_name
+           Configuration.default_metrics_port)
       string_parameter
 
   let enable_performance_metrics_arg :
@@ -212,8 +216,18 @@ struct
     Tezos_clic.switch
       ~long:"enable-performance-metrics"
       ~doc:
-        "Enable performance metrics when the metrics server is started \
-         (requires lsof, disabled by default)."
+        "Enable performance metrics when the metrics server is started and the \
+         system supports it. DEPRECATED (enabled by default when the system \
+         supports it)."
+      ()
+
+  let disable_performance_metrics_arg :
+      (bool, Client_context.full) Tezos_clic.arg =
+    Tezos_clic.switch
+      ~long:"disable-performance-metrics"
+      ~doc:
+        "Disable performance metrics when the metrics server is started \
+         (enabled by default when system supports it)."
       ()
 
   let dac_observer_endpoint_arg =
@@ -555,6 +569,15 @@ let bail_on_disagree_switch : (bool, Client_context.full) Tezos_clic.arg =
     ~doc:
       "Make an observer rollup node bail when it sees a commitment it disagree \
        with on L1."
+    ()
+
+let unsafe_disable_wasm_kernel_checks_switch :
+    (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"unsafe-disable-wasm-kernel-checks"
+    ~doc:
+      "Allow to run the kernel without checking for its validity. Only for \
+       debug, do not use in production!"
     ()
 
 let level_param next =

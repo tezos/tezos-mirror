@@ -102,9 +102,6 @@ let test_multiple_misbehaviors =
     --> make_denunciations ()
   in
   init_constants ~blocks_per_cycle:24l ~reward_per_block:0L ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> (Tag "No AI" --> activate_ai `No |+ Tag "Yes AI" --> activate_ai `Force)
-  --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"; "bootstrap3"]
   --> next_cycle
   --> (* various make misbehaviors spread over 1 or two cycles *)
@@ -116,6 +113,9 @@ let test_multiple_misbehaviors =
          --> next_cycle)
     Empty
     [1; 3]
+
+let wait_for_slashing =
+  wait_n_cycles (Protocol.Constants_repr.slashing_delay + 1)
 
 let check_is_forbidden ~loc baker =
   assert_failure
@@ -131,6 +131,60 @@ let check_is_not_forbidden baker =
       let* _ = Block.bake ~policy:(By_account baker.pkh) block in
       return input)
 
+let check_has_no_slots ~loc baker_name =
+  let open Lwt_result_syntax in
+  exec (fun ((block, state) as input) ->
+      let baker = State.find_account baker_name state in
+      let* rights =
+        Plugin.RPC.Attestation_rights.get
+          Block.rpc_ctxt
+          ~delegates:[baker.pkh]
+          block
+      in
+      match rights with
+      | [] -> return input
+      | [{level = _; delegates_rights; estimated_time = _}] -> (
+          match delegates_rights with
+          | [{delegate; consensus_key = _; first_slot = _; attestation_power}]
+            ->
+              Test.fail
+                ~__LOC__
+                "%s: delegate '%s'(%a) expected to have no attestation power, \
+                 has %i slots."
+                loc
+                baker_name
+                Signature.Public_key_hash.pp
+                delegate
+                attestation_power
+          | _ ->
+              (* Cannot happen: RPC called for only one delegate *) assert false
+          )
+      | _ ->
+          (* Cannot happen: only one level is prompted for the RPC *)
+          assert false)
+
+let check_has_slots ~loc baker_name =
+  let open Lwt_result_syntax in
+  exec (fun ((block, state) as input) ->
+      let baker = State.find_account baker_name state in
+      let* rights =
+        Plugin.RPC.Attestation_rights.get
+          Block.rpc_ctxt
+          ~delegates:[baker.pkh]
+          block
+      in
+      match rights with
+      | [] ->
+          Test.fail
+            ~__LOC__
+            "%s: delegate '%s'(%a) expected to have some attestation power, \
+             has none."
+            loc
+            baker_name
+            Signature.Public_key_hash.pp
+            baker.pkh
+      | _ -> return input)
+
 (** Tests forbidding delegates ensuring:
   - delegates are not forbidden until a denunciation is made (allowing for
     multiple misbehaviours)
@@ -141,9 +195,6 @@ let check_is_not_forbidden baker =
 let test_delegate_forbidden =
   let crd (_, state) = state.State.constants.consensus_rights_delay in
   init_constants ~blocks_per_cycle:32l ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `No
-  --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
   --> set_baker "bootstrap1"
   --> (Tag "Is not forbidden until first denunciation"
@@ -172,7 +223,7 @@ let test_delegate_forbidden =
          --> wait_n_cycles_f crd
          --> check_is_not_forbidden "delegate"
       |+ Tag "Is not forbidden after a denunciation is outdated"
-         --> double_attest "delegate" --> wait_n_cycles 2
+         --> double_attest "delegate" --> wait_for_slashing
          --> assert_failure
                ~expected_error:(fun (_block, state) errs ->
                  Error_helpers.expect_outdated_denunciation_state
@@ -198,9 +249,6 @@ let test_delegate_forbidden =
 
 let test_slash_unstake =
   init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `No
-  --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
   --> set_baker "bootstrap1" --> next_cycle --> unstake "delegate" Half
   --> next_cycle --> double_bake "delegate" --> make_denunciations ()
@@ -211,9 +259,6 @@ let test_slash_unstake =
 let test_slash_monotonous_stake =
   let scenario ~offending_op ~op ~early_d =
     init_constants ~blocks_per_cycle:16l ()
-    --> set S.Adaptive_issuance.autostaking_enable false
-    --> activate_ai `No
-    --> branch_flag S.Adaptive_issuance.ns_enable
     --> begin_test ["delegate"; "bootstrap1"]
     --> next_cycle
     --> loop
@@ -269,10 +314,7 @@ let test_slash_monotonous_stake =
 
 let test_slash_timing =
   init_constants ~blocks_per_cycle:8l ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `No
-  --> branch_flag S.Adaptive_issuance.ns_enable
-  --> begin_test ["delegate"; "bootstrap1"]
+  --> begin_test ~force_attest_all:true ["delegate"; "bootstrap1"]
   --> next_cycle
   --> (Tag "stake" --> stake "delegate" Half
       |+ Tag "unstake" --> unstake "delegate" Half)
@@ -284,7 +326,7 @@ let test_slash_timing =
   --> List.fold_left
         (fun acc i ->
           acc |+ Tag (string_of_int i ^ " cycles lag") --> wait_n_cycles i)
-        (wait_n_cycles 2)
+        wait_for_slashing
         [3; 4; 5; 6]
   --> double_bake "delegate"
   --> exclude_bakers ["delegate"]
@@ -296,13 +338,11 @@ let test_no_shortcut_for_cheaters =
     Default_parameters.constants_test.consensus_rights_delay
   in
   init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
   --> begin_test ["delegate"; "bootstrap1"]
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle --> double_bake "delegate" --> make_denunciations ()
   --> set_baker "bootstrap1" (* exclude_bakers ["delegate"] *)
-  --> next_cycle
+  --> wait_for_slashing
   --> snapshot_balances "init" ["delegate"]
   --> unstake "delegate" amount
   --> (List.fold_left
@@ -317,62 +357,318 @@ let test_no_shortcut_for_cheaters =
          --> check_snapshot_balances "init")
 
 let test_slash_correct_amount_after_stake_from_unstake =
-  let amount_to_unstake = Amount (Tez.of_mutez 200_000_000_000L) in
-  let amount_to_restake = Amount (Tez.of_mutez 100_000_000_000L) in
-  let amount_expected_in_unstake_after_slash = Tez.of_mutez 50_000_000_000L in
+  let tez_to_unstake = Tez.of_int 150_000 in
+  let tez_to_restake = Tez.of_int 120_000 in
+  assert (
+    Tez.(
+      tez_to_restake < tez_to_unstake
+      && tez_to_unstake < Account.default_initial_staked_balance)) ;
+  let unstaked_before_slash = Tez.(tez_to_unstake -! tez_to_restake) in
+  let staked_before_slash =
+    Tez.(Account.default_initial_staked_balance -! unstaked_before_slash)
+  in
+  let slashed_percentage =
+    Default_parameters.constants_test
+      .percentage_of_frozen_deposits_slashed_per_double_baking
+  in
+  let expected_unstaked_after_slash =
+    Tez.(
+      unstaked_before_slash
+      -! mul_percentage ~rounding:`Up unstaked_before_slash slashed_percentage)
+  in
+  let expected_staked_after_slash ~staked_when_computing_misbehaviour_rights =
+    Tez.(
+      staked_before_slash
+      -! mul_percentage
+           ~rounding:`Up
+           staked_when_computing_misbehaviour_rights
+           slashed_percentage)
+  in
   let consensus_rights_delay =
     Default_parameters.constants_test.consensus_rights_delay
   in
+  let check_balances ~loc ~staked ~unstaked_frozen ~unstaked_finalizable =
+    check_balance_fields
+      ~loc
+      "delegate"
+      ~liquid:Account.default_initial_spendable_balance
+      ~staked
+      ~unstaked_frozen_total:unstaked_frozen
+      ~unstaked_finalizable
+      ()
+  in
   init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
   --> begin_test ["delegate"; "bootstrap1"]
-  --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle
-  --> unstake "delegate" amount_to_unstake
-  --> stake "delegate" amount_to_restake
-  --> List.fold_left
-        (fun acc i -> acc |+ Tag (fs "wait %i cycles" i) --> wait_n_cycles i)
-        (Tag "wait 0 cycles" --> Empty)
-        (Stdlib.List.init (consensus_rights_delay - 2) (fun i -> i + 1))
-  --> double_attest "delegate" --> make_denunciations ()
-  --> exclude_bakers ["delegate"]
-  --> next_cycle
-  --> check_balance_field
-        "delegate"
-        `Unstaked_frozen_total
-        amount_expected_in_unstake_after_slash
+  --> unstake "delegate" (Amount tez_to_unstake)
+  --> stake "delegate" (Amount tez_to_restake)
+  --> list_map_branched
+        Protocol.Misc.(0 --> (consensus_rights_delay + 1))
+        (fun cycles_to_wait ->
+          Tag (sf "wait %i cycles" cycles_to_wait)
+          --> wait_n_cycles cycles_to_wait
+          --> check_balances
+                ~loc:__LOC__
+                ~staked:staked_before_slash
+                ~unstaked_frozen:unstaked_before_slash
+                ~unstaked_finalizable:Tez.zero
+          --> exclude_bakers ["delegate"]
+          --> double_bake "delegate" --> make_denunciations ()
+          --> wait_for_slashing
+          -->
+          if cycles_to_wait > consensus_rights_delay then
+            (* The misbehaviour happens at least two full cycles after
+               the unstake operation, meaning that
+               1) the unstake request is too old to be slashed and
+               2) the staked balance at the time rights for the
+                  misbehaviour block was computed was
+                  [staked_before_slash]. *)
+            let staked =
+              expected_staked_after_slash
+                ~staked_when_computing_misbehaviour_rights:staked_before_slash
+            in
+            check_balances
+              ~loc:__LOC__
+              ~staked
+              ~unstaked_frozen:Tez.zero
+              ~unstaked_finalizable:unstaked_before_slash
+          else
+            (* 1) The unstake request is slashed and
+               2) the staked balance when computing the relevant
+                  rights was the initial staked balance. *)
+            let staked =
+              expected_staked_after_slash
+                ~staked_when_computing_misbehaviour_rights:
+                  Account.default_initial_staked_balance
+            in
+            let unstaked_frozen, unstaked_finalizable =
+              if cycles_to_wait >= consensus_rights_delay then
+                (* The unstake request is finalizable. *)
+                (Tez.zero, expected_unstaked_after_slash)
+              else (expected_unstaked_after_slash, Tez.zero)
+            in
+            check_balances
+              ~loc:__LOC__
+              ~staked
+              ~unstaked_frozen
+              ~unstaked_finalizable)
 
 (* Test a non-zero request finalizes for a non-zero amount if it hasn't been slashed 100% *)
 let test_mini_slash =
   init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> (Tag "Yes AI" --> activate_ai `Force --> begin_test ["delegate"; "baker"]
-      |+ Tag "No AI" --> activate_ai `No --> begin_test ["delegate"; "baker"])
+  --> begin_test ["delegate"; "baker"]
   --> unstake "delegate" (Amount Tez.one_mutez)
   --> set_baker "baker" --> next_cycle
   --> (Tag "5% slash" --> double_bake "delegate" --> make_denunciations ()
       |+ Tag "95% slash" --> next_cycle --> double_attest "delegate"
          --> loop 9 (double_bake "delegate")
          --> make_denunciations ())
-  (* Wait two cycles because of ns_enable *)
-  --> next_cycle
-  --> next_cycle
+  (* Wait two cycles for the slashing to be applied *)
+  --> wait_n_cycles 2
   --> check_balance_field "delegate" `Unstaked_frozen_total Tez.zero
   --> wait_n_cycles_f (fun (_, state) ->
           state.constants.consensus_rights_delay + 1)
 
 let test_slash_rounding =
   init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
-  --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "baker"]
   --> set_baker "baker"
   --> unstake "delegate" (Amount (Tez.of_mutez 2L))
   --> next_cycle --> double_bake "delegate" --> double_bake "delegate"
   --> make_denunciations () --> wait_n_cycles 7
   --> finalize_unstake "delegate"
+
+let test_mega_slash =
+  init_constants ()
+  (* Setting constants and flags so that
+     - Adaptive Issuance is activated
+     - Adaptive Slashing is activated
+     - Every double attestation slashes 99% of the stake
+     - We have 8 blocks per cycle (faster tests) *)
+  --> set
+        S.max_slashing_per_block
+        (Protocol.Percentage.of_q_bounded ~round:`Down Q.(99 // 100))
+  --> set S.max_slashing_threshold {numerator = 0; denominator = 1}
+  --> set S.blocks_per_cycle 8l
+  -->
+  let delegates = ["delegate"; "baker"; "faucet"; "big_spender"] in
+  begin_test delegates ~force_attest_all:true
+  (* Unstake for all delegates, to have roughly equal rights *)
+  --> List.fold_left
+        (fun acc name ->
+          acc --> unstake name (Amount (Tez.of_mutez 190_000_000_000L)))
+        Empty
+        ("__bootstrap__" :: delegates)
+  --> set_baker "baker"
+  (* Activate staking for delegate *)
+  --> set_delegate_params
+        "delegate"
+        {
+          limit_of_staking_over_baking = Q.one;
+          edge_of_baking_over_staking = Q.zero;
+        }
+  (* Will be useful later... *)
+  --> set_delegate_params
+        "baker"
+        {
+          limit_of_staking_over_baking = Q.one;
+          edge_of_baking_over_staking = Q.zero;
+        }
+  --> wait_delegate_parameters_activation
+  (* Many (small) stakers for the delegate *)
+  -->
+  let init_costaking_amount = 500_000_000L in
+  let init_funds = Amount (Tez.of_mutez (Int64.mul 2L init_costaking_amount)) in
+  let stakers_list = ["staker1"; "staker2"; "staker3"; "staker4"] in
+  List.fold_left
+    (fun acc name ->
+      acc
+      --> add_account_with_funds name ~funder:"faucet" init_funds
+      --> set_delegate name (Some "delegate")
+      --> stake name (Amount (Tez.of_mutez init_costaking_amount)))
+    Empty
+    stakers_list
+  -->
+  (* 1-mutez staker *)
+  let tiny_staker = "tiny_staker" in
+  add_account_with_funds tiny_staker ~funder:"faucet" init_funds
+  --> set_delegate tiny_staker (Some "delegate")
+  --> stake tiny_staker (Amount Tez.one_mutez)
+  (* One big delegator, it will stake for the following amount later *)
+  -->
+  let big_staking_amount = 3_000_000_000_000L in
+  add_account_with_funds
+    "big_staker"
+    ~funder:"big_spender"
+    (Amount (Tez.of_mutez (Int64.succ big_staking_amount)))
+  --> set_delegate "big_staker" (Some "delegate")
+  --> next_cycle
+  -->
+  (* The "incident" *)
+  let incident =
+    double_attest "delegate" --> make_denunciations () --> wait_for_slashing
+    (* We check stakers can still unstake and change delegates *)
+    --> assert_success (unstake "staker1" Half)
+    --> assert_success (unstake "staker1" All)
+    --> assert_success
+          (unstake "staker1" (Amount (Tez.of_mutez init_costaking_amount)))
+    --> assert_success (unstake "staker1" Max_tez)
+    --> assert_success
+          (set_delegate "staker1" (Some "baker")
+          --> assert_failure
+                ~expected_error:(fun _ errs ->
+                  Error_helpers.check_error_constructor_name
+                    ~loc:__LOC__
+                    ~expected:
+                      Protocol.Staking
+                      .Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
+                    errs)
+                (stake "staker1" (Amount (Tez.of_mutez init_costaking_amount)))
+          --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+          --> stake "staker1" (Amount (Tez.of_mutez init_costaking_amount))
+          --> set_delegate "staker1" (Some "delegate"))
+    --> assert_success (unstake tiny_staker Half)
+    --> assert_success (unstake tiny_staker All)
+    --> assert_success (unstake tiny_staker (Amount Tez.one_mutez))
+    --> assert_success (unstake tiny_staker Max_tez)
+    --> assert_success
+          (set_delegate tiny_staker (Some "baker")
+           (* [tiny_staker] can immediately stake for its new delegate
+              because it had zero staked tez left before changing
+              delegates *)
+          --> stake tiny_staker (Amount (Tez.of_mutez init_costaking_amount))
+          --> set_delegate tiny_staker (Some "delegate"))
+    (* We check staking is still possible, with a risk of overflow *)
+    --> assert_success
+          (stake "big_staker" (Amount (Tez.of_mutez big_staking_amount)))
+    (* We wait for the delegate to have rights again *)
+    --> stake "delegate" (Amount (Tez.of_mutez 10_000_000_000L))
+    (* In consensus_rights_delay + 2 cycles, the delegate has 0 rights
+       because of the slash that happens before rights computation, which
+       puts it under the minimal frozen threshold required to bake. *)
+    --> wait_n_cycles_f (fun (_, state) ->
+            state.State.constants.consensus_rights_delay + 2)
+    --> check_has_no_slots ~loc:__LOC__ "delegate"
+    --> next_cycle
+    --> check_has_slots ~loc:__LOC__ "delegate"
+    --> check_is_not_forbidden "delegate"
+  in
+  (* Since Int64.max_int / 3Mtz ~= 3_074_457, and that each slash multiplies by 100 the
+     value of the pseudotokens, then 3 slashings won't trigger an overflow... *)
+  loop 3 incident
+  (*  but 4 will. *)
+  --> double_attest "delegate"
+  --> make_denunciations () --> wait_for_slashing
+  (* We check stakers can still unstake and finalize, despite everything *)
+  --> assert_success
+        (unstake "staker1" Half
+        --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+        --> finalize_unstake "staker1")
+  (* We check the baker itself can still unstake,... *)
+  --> assert_success
+        (unstake "delegate" Half
+        --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+        --> finalize_unstake "delegate")
+  (*  ... stake,... *)
+  --> assert_success (stake "delegate" Half)
+  (* ... change delegate parameters. *)
+  --> assert_success
+        (set_delegate_params
+           "delegate"
+           {
+             limit_of_staking_over_baking = Q.zero;
+             edge_of_baking_over_staking = Q.one;
+           }
+        --> wait_delegate_parameters_activation
+        (* Although it should overflow, the limit=0 check is done first *)
+        --> assert_failure
+              ~expected_error:(fun _ errs ->
+                Error_helpers.check_error_constructor_name
+                  ~loc:__LOC__
+                  ~expected:
+                    Protocol.Apply
+                    .Staking_to_delegate_that_refuses_external_staking
+                  errs)
+              (stake "big_staker" (Amount (Tez.of_mutez big_staking_amount))))
+  (* We check stakers can still change delegate, and stake thereafter *)
+  --> assert_success
+        (set_delegate "staker1" (Some "baker")
+        --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+        --> finalize_unstake "staker1" --> stake "staker1" Half)
+  (* We check for overflow *)
+  --> assert_failure
+        ~expected_error:(fun _ errs ->
+          let init_full_costaking =
+            Int64.(succ (mul 4L init_costaking_amount))
+            |> Protocol.Tez_repr.of_mutez_exn
+          in
+          let check_error = function
+            | [
+                Protocol.Tez_repr.Multiplication_overflow
+                  (old_costaking, new_staking);
+              ] ->
+                Protocol.Tez_repr.equal init_full_costaking old_costaking
+                && Z.equal new_staking (Z.of_int64 big_staking_amount)
+            | _ -> false
+          in
+          Assert.expect_error ~loc:__LOC__ errs check_error)
+        (stake "big_staker" (Amount (Tez.of_mutez big_staking_amount)))
+  (* Check that if everyone unstakes from delegate, then it's back to normal *)
+  --> List.fold_left
+        (fun acc name -> acc --> unstake name All)
+        Empty
+        stakers_list
+  --> assert_success
+        (stake "big_staker" (Amount (Tez.of_mutez big_staking_amount)))
+  (* Check that funds can be finalized, just in case *)
+  --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+  --> List.fold_left
+        (fun acc name -> acc --> finalize_unstake name)
+        Empty
+        stakers_list
+  (* One last time, for good measure *)
+  --> assert_success
+        (stake "big_staker" (Amount (Tez.of_mutez big_staking_amount)))
 
 (* TODO #6645: reactivate tests *)
 let tests =
@@ -391,6 +687,7 @@ let tests =
          test_slash_correct_amount_after_stake_from_unstake );
        ("Test unstake 1 mutez then slash", test_mini_slash);
        ("Test slash rounding", test_slash_rounding);
+       ("Test slash 99.999999%", test_mega_slash);
      ]
 
 let () =

@@ -43,6 +43,9 @@ let register name commands =
   Protocol_hash.Table.replace versions name (fun network_opt ->
       commands network_opt @ previous network_opt)
 
+let dont_colorize () =
+  Tezos_clic.switch ~doc:"Don't colorize the output" ~long:"no-color" ()
+
 let commands_for_version version =
   WithExceptions.Option.to_exn ~none:Version_not_found
   @@ Protocol_hash.Table.find versions version

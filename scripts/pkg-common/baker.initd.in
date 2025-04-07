@@ -37,6 +37,7 @@ rotateonstart=yes
 protocols="@PROTOCOLS@"
 waitfornode=yes
 othercliopts_baker_@PROTOCOL@=""
+dalurl=""
 
 nodesetup=local 
 
@@ -55,6 +56,8 @@ accuser="/usr/bin/octez-accuser"
 
 [ "${keepalive}" != "yes" ] && keepalive_opt=""
 
+dalcli="--without-dal"
+[ "${dalurl}" != "" ] && dalcli="--dal-node ${dalurl}"
 
 wait_for_bootstrap()
 {
@@ -117,7 +120,7 @@ start)	initial_checks
 		[ ! -x "${baker}-$p" ] && continue
 
 		othercliopts="othercliopts_baker_$p"
-		su $user -c "${baker}-$p run with local node $nodedir $baking_key --liquidity-baking-toggle-vote $lq_vote --pidfile ${PIDFILEB}-$p ${keepalive_opt} ${!othercliopts} >> ${logfile_baseb}${p}.log 2>&1 &"
+		su $user -c "${baker}-$p run with local node $nodedir $baking_key --liquidity-baking-toggle-vote $lq_vote --pidfile ${PIDFILEB}-$p ${keepalive_opt} ${!othercliopts} ${dalcli} >> ${logfile_baseb}${p}.log 2>&1 &"
 		su $user -c "${accuser}-$p run ${keepalive_opt} --pidfile ${PIDFILEA}-$p >> ${logfile_basea}${p}.log 2>&1 &"
 	done
 	;;

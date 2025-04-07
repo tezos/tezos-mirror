@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let merge_experimental_features Cli.{sqlite3_backend} configuration =
+  Configuration_file.
+    {sqlite3_backend = sqlite3_backend || configuration.sqlite3_backend}
+
 let merge
     Cli.
       {
@@ -38,6 +42,8 @@ let merge
         history_mode;
         service_name;
         service_namespace;
+        experimental_features;
+        fetch_trusted_setup;
         verbose;
       } configuration =
   let profile =
@@ -68,6 +74,14 @@ let merge
     service_name = Option.either service_name configuration.service_name;
     service_namespace =
       Option.either service_namespace configuration.service_namespace;
+    fetch_trusted_setup =
+      Option.value
+        ~default:configuration.fetch_trusted_setup
+        fetch_trusted_setup;
+    experimental_features =
+      merge_experimental_features
+        experimental_features
+        configuration.experimental_features;
     verbose = configuration.verbose || verbose;
   }
 
@@ -91,12 +105,33 @@ let run subcommand cli_options =
           cli_options.Cli.data_dir
       in
       Lwt.Exception_filter.(set handle_all_except_runtime) ;
-      Lwt_main.run @@ wrap_with_error
+      Tezos_base_unix.Event_loop.main_run @@ wrap_with_error
       @@ Daemon.run ~data_dir ~configuration_override:(merge cli_options)
   | Config_init ->
       Lwt.Exception_filter.(set handle_all_except_runtime) ;
-      Lwt_main.run @@ wrap_with_error
+      Tezos_base_unix.Event_loop.main_run @@ wrap_with_error
       @@ Configuration_file.save (merge cli_options Configuration_file.default)
+  | Config_update ->
+      Lwt.Exception_filter.(set handle_all_except_runtime) ;
+      Tezos_base_unix.Event_loop.main_run @@ wrap_with_error
+      @@
+      let open Lwt_result_syntax in
+      let data_dir =
+        Option.value
+          ~default:Configuration_file.default.data_dir
+          cli_options.data_dir
+      in
+      let* configuration = Configuration_file.load ~data_dir in
+      Configuration_file.save (merge cli_options configuration)
+  | Debug_print_store_schemas ->
+      let open Lwt_result_syntax in
+      Tezos_base_unix.Event_loop.main_run @@ wrap_with_error
+      @@ Lwt_utils_unix.with_tempdir "store"
+      @@ fun data_dir ->
+      let* schemas = Store.Skip_list_cells.schemas data_dir in
+      let output = String.concat ";\n\n" schemas in
+      Format.printf "%s\n" output ;
+      return_unit
 
 let _ =
   (* Memtrace can be activated via the environment variable MEMTRACE

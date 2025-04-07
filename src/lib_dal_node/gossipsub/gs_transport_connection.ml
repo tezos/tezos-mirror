@@ -30,16 +30,13 @@ open Gs_interface.Worker_instance
 module Events = struct
   include Internal_event.Simple
 
-  let section = ["gossipsub"; "transport"; "event"]
-
-  let prefix =
-    let prefix = String.concat "_" section in
-    fun s -> prefix ^ "-" ^ s
+  let section = ["dal"; "gs"]
 
   let no_connection_for_peer =
     declare_1
       ~section
-      ~name:(prefix "no_connection_for_peer")
+      ~prefix_name_with_section:true
+      ~name:"no_connection_for_peer"
       ~msg:"No running connection found for peer {peer}"
       ~level:Notice
       ~pp1:P2p_peer.Id.pp
@@ -48,7 +45,8 @@ module Events = struct
   let message_notified_to_app =
     declare_1
       ~section
-      ~name:(prefix "message_notified_to_app")
+      ~prefix_name_with_section:true
+      ~name:"message_notified_to_app"
       ~msg:"Successfully notified message id {message_id} to the application"
       ~level:Info
       ~pp1:Worker.GS.Message_id.pp
@@ -57,7 +55,8 @@ module Events = struct
   let app_message_callback_failed =
     declare_2
       ~section
-      ~name:(prefix "app_message_callback_failed")
+      ~prefix_name_with_section:true
+      ~name:"app_message_callback_failed"
       ~msg:"Callback failed for message id {message_id}. Failure is {failure}"
       ~level:Warning
       ~pp1:Worker.GS.Message_id.pp
@@ -68,7 +67,8 @@ module Events = struct
   let send_p2p_message_failed =
     declare_2
       ~section
-      ~name:(prefix "p2p_send_failed")
+      ~prefix_name_with_section:true
+      ~name:"p2p_send_failed"
       ~msg:"Sending P2P message to {peer} failed with error {failure}"
       ~level:Warning
       ~pp1:P2p_peer.Id.pp
@@ -79,7 +79,8 @@ module Events = struct
   let send_p2p_message =
     declare_2
       ~section
-      ~name:(prefix "p2p_send")
+      ~prefix_name_with_section:true
+      ~name:"p2p_send"
       ~msg:"Sending to {peer} P2P message {message}"
       ~level:Debug
       ~pp1:P2p_peer.Id.pp

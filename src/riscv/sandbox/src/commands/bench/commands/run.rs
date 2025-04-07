@@ -6,19 +6,17 @@ use crate::{
     cli::{BenchMode, BenchRunOptions},
     commands::{
         bench::{
+            BenchStats,
             data::{BenchData, FineBenchData, InstrGetError, InstrType, SimpleBenchData},
-            save_to_file, show_results, BenchStats,
+            save_to_file, show_results,
         },
-        run::{general_run, UseStepper},
+        run::{UseStepper, general_run},
     },
     format_status,
 };
 use enum_tag::EnumTag;
 use octez_riscv::{
-    machine_state::{
-        bus::{Address, AddressableRead},
-        AccessType,
-    },
+    machine_state::{AccessType, main_memory::Address},
     parser::{instruction::Instr, parse},
     state_backend::ManagerRead,
     stepper::{StepResult, Stepper, StepperStatus},
@@ -31,7 +29,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Helper function to look in the [`Interpreter`] to peek for the current [`Instr`]
+/// Helper function to look in the [`Stepper`] to peek for the current [`Instr`]
 /// Assumes the program counter will be a multiple of 2.
 fn get_current_instr<S: Stepper>(stepper: &S) -> Result<Instr, InstrGetError>
 where
@@ -42,7 +40,10 @@ where
         let pc = machine_state
             .translate_without_cache(raw_pc, AccessType::Instruction)
             .or(Err(InstrGetError::Translation))?;
-        machine_state.bus.read(pc).or(Err(InstrGetError::Parse))
+        machine_state
+            .main_memory
+            .read(pc)
+            .or(Err(InstrGetError::Parse))
     };
     let pc = machine_state.hart.pc.read();
     let first = get_half_instr(pc)?;
@@ -50,8 +51,8 @@ where
     parse(first, second)
 }
 
-/// Composes "in time" two [`InterpreterResult`] one after another,
-/// to obtain the equivalent final [`InterpreterResult`]
+/// Composes "in time" two [`StepperStatus`] one after another,
+/// to obtain the equivalent final [`StepperStatus`]
 fn compose(current_state: StepperStatus, following_result: StepperStatus) -> StepperStatus {
     use StepperStatus::*;
     match current_state {

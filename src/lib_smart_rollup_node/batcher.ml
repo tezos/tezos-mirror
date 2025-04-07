@@ -167,8 +167,10 @@ let produce_batches state ~only_full =
     let*! () =
       Batcher_events.(emit batched) (List.length batches, nb_messages_batched)
     in
-    let inject_timestamp = Time.System.now () in
-    Metrics.Batcher.set_inject_time @@ Ptime.diff inject_timestamp get_timestamp ;
+    Metrics.wrap (fun () ->
+        let inject_timestamp = Time.System.now () in
+        Metrics.Batcher.set_inject_time
+        @@ Ptime.diff inject_timestamp get_timestamp) ;
     return_unit
 
 let message_already_batched state msg =
@@ -241,6 +243,22 @@ let on_register ?order ~drop_duplicate state (messages : string list) =
 
 let on_new_head state = produce_batches state ~only_full:false
 
+let clear_queues {messages_heap; batched; _} =
+  Message_heap.clear messages_heap ;
+  Batched_messages.clear batched
+
+let remove_messages
+    ({drop_no_order; order_below} : Batcher_worker_types.order_request)
+    {messages_heap; _} =
+  let predicate_f message =
+    Option.map
+      (fun op_order -> Z.leq op_order order_below)
+      (L2_message.order message)
+    |> Option.value ~default:drop_no_order
+  in
+  let _ids = Message_heap.remove_predicate predicate_f messages_heap in
+  ()
+
 let init_batcher_state plugin node_ctxt =
   {
     node_ctxt;
@@ -288,6 +306,14 @@ module Handlers = struct
     | Request.Register {order; messages; drop_duplicate} ->
         protect @@ fun () -> on_register ?order ~drop_duplicate state messages
     | Request.Produce_batches -> protect @@ fun () -> on_new_head state
+    | Request.Clear_queues ->
+        protect @@ fun () ->
+        clear_queues state ;
+        Lwt_result_syntax.return_unit
+    | Request.Remove_messages order_request ->
+        protect @@ fun () ->
+        remove_messages order_request state ;
+        Lwt_result_syntax.return_unit
 
   type launch_error = error trace
 
@@ -297,22 +323,25 @@ module Handlers = struct
     return state
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
-      unit tzresult Lwt.t =
+      [`Continue | `Shutdown] tzresult Lwt.t =
     let open Lwt_result_syntax in
     let request_view = Request.view r in
     let emit_and_return_errors errs =
       let*! () =
         Batcher_events.(emit Worker.request_failed) (request_view, st, errs)
       in
-      return_unit
+      return `Continue
     in
     match r with
     | Request.Register _ -> emit_and_return_errors errs
     | Request.Produce_batches -> emit_and_return_errors errs
+    | Request.Clear_queues -> emit_and_return_errors errs
+    | Request.Remove_messages _ -> emit_and_return_errors errs
 
   let on_completion _w r _ st =
     match Request.view r with
-    | Request.View (Register _ | Produce_batches) ->
+    | Request.View
+        (Register _ | Produce_batches | Clear_queues | Remove_messages _) ->
         Batcher_events.(emit Worker.request_completed_debug) (Request.view r, st)
 
   let on_no_request _ = Lwt.return_unit
@@ -416,6 +445,20 @@ let produce_batches () =
   | Ok w ->
       Worker.Queue.push_request_and_wait w Request.Produce_batches
       |> handle_request_error
+
+let clean_queue ?order_request () =
+  let open Lwt_result_syntax in
+  let*? w = worker () in
+  let* () =
+    (match order_request with
+    | None -> Worker.Queue.push_request_and_wait w Request.Clear_queues
+    | Some order_request ->
+        Worker.Queue.push_request_and_wait
+          w
+          (Request.Remove_messages order_request))
+    |> handle_request_error
+  in
+  return_unit
 
 let shutdown () =
   match worker () with

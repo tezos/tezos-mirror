@@ -68,7 +68,7 @@ type fees_config = {
 }
 
 type validation_config =
-  | Local of {context_path : string}
+  | Local of {context_root_path : string}
   | Node
   | ContextIndex of Abstract_context_index.t
 
@@ -95,6 +95,7 @@ type t = {
   extra_operations : Operations_source.t option;
   dal_node_endpoint : Uri.t option;
   pre_emptive_forge_time : Time.System.Span.t;
+  remote_calls_timeout : float option;
 }
 
 let default_fees_config =
@@ -134,6 +135,8 @@ let default_extra_operations = None
 
 let default_pre_emptive_forge_time = Time.System.Span.of_seconds_exn 0.
 
+let default_remote_calls_timeout = None
+
 let default_config =
   {
     fees = default_fees_config;
@@ -148,26 +151,28 @@ let default_config =
     extra_operations = default_extra_operations;
     dal_node_endpoint = None;
     pre_emptive_forge_time = default_pre_emptive_forge_time;
+    remote_calls_timeout = default_remote_calls_timeout;
   }
 
 let make ?(minimal_fees = default_fees_config.minimal_fees)
     ?(minimal_nanotez_per_gas_unit =
       default_fees_config.minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_fees_config.minimal_nanotez_per_byte)
-    ?(nonce = default_nonce_config) ?context_path
+    ?(nonce = default_nonce_config) ?context_root_path
     ?(retries_on_failure = default_retries_on_failure_config)
     ?(user_activated_upgrades = default_user_activated_upgrades)
     ?(votes = default_votes_config) ?force_apply_from_round
     ?(force = default_force) ?(state_recorder = default_state_recorder_config)
     ?extra_operations ?dal_node_endpoint
-    ?(pre_emptive_forge_time = default_pre_emptive_forge_time) () =
+    ?(pre_emptive_forge_time = default_pre_emptive_forge_time)
+    ?remote_calls_timeout () =
   let fees =
     {minimal_fees; minimal_nanotez_per_gas_unit; minimal_nanotez_per_byte}
   in
   let validation =
-    match context_path with
+    match context_root_path with
     | None -> Node
-    | Some context_path -> Local {context_path}
+    | Some context_root_path -> Local {context_root_path}
   in
   let force_apply_from_round =
     match force_apply_from_round with
@@ -190,6 +195,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     extra_operations;
     dal_node_endpoint;
     pre_emptive_forge_time;
+    remote_calls_timeout;
   }
 
 let fees_config_encoding : fees_config Data_encoding.t =
@@ -216,8 +222,9 @@ let validation_config_encoding =
         ~title:"Local"
         (Tag 0)
         (obj1 (req "local" string))
-        (function Local {context_path} -> Some context_path | _ -> None)
-        (fun context_path -> Local {context_path});
+        (function
+          | Local {context_root_path} -> Some context_root_path | _ -> None)
+        (fun context_root_path -> Local {context_root_path});
       case
         ~title:"Node"
         (Tag 1)
@@ -315,6 +322,7 @@ let encoding : t Data_encoding.t =
               extra_operations;
               dal_node_endpoint;
               pre_emptive_forge_time;
+              remote_calls_timeout;
             } ->
          ( ( fees,
              validation,
@@ -326,7 +334,7 @@ let encoding : t Data_encoding.t =
              force,
              state_recorder,
              pre_emptive_forge_time ),
-           (extra_operations, dal_node_endpoint) ))
+           (extra_operations, dal_node_endpoint, remote_calls_timeout) ))
        (fun ( ( fees,
                 validation,
                 nonce,
@@ -337,7 +345,7 @@ let encoding : t Data_encoding.t =
                 force,
                 state_recorder,
                 pre_emptive_forge_time ),
-              (extra_operations, dal_node_endpoint) ) ->
+              (extra_operations, dal_node_endpoint, remote_calls_timeout) ) ->
          {
            fees;
            validation;
@@ -351,6 +359,7 @@ let encoding : t Data_encoding.t =
            extra_operations;
            dal_node_endpoint;
            pre_emptive_forge_time;
+           remote_calls_timeout;
          })
        (merge_objs
           (obj10
@@ -368,9 +377,10 @@ let encoding : t Data_encoding.t =
              (req "force" force_config_encoding)
              (req "state_recorder" state_recorder_config_encoding)
              (req "pre_emptive_forge_time" Time.System.Span.encoding))
-          (obj2
+          (obj3
              (opt "extra_operations" Operations_source.encoding)
-             (opt "dal_node_endpoint" Tezos_rpc.Encoding.uri_encoding)))
+             (opt "dal_node_endpoint" Tezos_rpc.Encoding.uri_encoding)
+             (opt "remote_calls_timeout" float)))
 
 let pp fmt t =
   let json = Data_encoding.Json.construct encoding t in

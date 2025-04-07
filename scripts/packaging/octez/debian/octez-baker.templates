@@ -15,24 +15,20 @@ Description: The baker key to associate to this baker:
  can also be added later while configuring the baker.
 Type: string
 
-Template: octez-baker/baker-active-protocol
-Description: The protocol associated to the baker:
- For production bakers this is the protocol of mainnet. Upon activation
- both the baker for the active protocol and the next protocol must be running
- at the same time.
-Type: select
-Choices: ${choices}
-
-Template: octez-baker/baker-next-protocol
-Description: The protocol associated to the baker:
- For production bakers this is the adopted mainnet protocol. Upon activation
- both the baker for the active protocol and the next protocol must be running
- at the same time. You can leave this field empty.
+Template: octez-baker/dal-node
+Type: boolean
+Default: true
+Description: Connect to the Octez DAL node ?
+ By default, the octez-dal-node package is installed alongside the octez-baker
+ package to participate to the DAL network.
  .
- After activation you can re-configure the package to stop the baker for the
- old protocol and mark the freshly activated protocol as active.
-Type: select
-Choices: ${choices}
+ Possible options: "--dal-node http://127.0.0.1:10732" or "--without-dal".
+
+Template: octez-baker/dal-node-url
+Type: string
+Default: http://127.0.0.1:10732
+Description: Specify the url of the RPC server of the Octez DAL node:
+ By default the octez-dal-node package is installed along side the octez-baker.
 
 Template: octez-baker/upgrade_note_current
 Type: note

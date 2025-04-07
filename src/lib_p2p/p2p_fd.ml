@@ -95,7 +95,12 @@ type read_write_error =
   | `Connection_locally_closed
   | unexpected_error ]
 
-type connect_error = [`Connection_failed | unexpected_error]
+type connect_error =
+  [ `Connection_refused
+  | `Connection_unreachable
+  | `Network_unreachable
+  | `Connection_canceled
+  | unexpected_error ]
 
 type accept_error =
   [`System_error of exn | `Socket_error of exn | unexpected_error]
@@ -158,29 +163,27 @@ let string_of_sockaddr addr =
 
 let id t = t.id
 
-let raw_socket () =
+let socket_setopt_user_timeout sock =
   let open Lwt_syntax in
-  let sock = Lwt_unix.socket ~cloexec:true PF_INET6 SOCK_STREAM 0 in
-  (* By setting [SO_KEEPALIVE] to [true], the socket is configured to send
-     periodic keep-alive probes to verify that the connection is still
-     active.
-
-     It reset (send TCP RST message and close) if the peer is
-     unresponsive. *)
-  Lwt_unix.(setsockopt sock SO_KEEPALIVE true) ;
   (* By setting [TCP_USER_TIMEOUT], we ensure that a dead connection is reported
      after at most [ms] milliseconds. This option allows the connection timeout
      to be much shorter than the default behavior—which can last several minutes
      (typically between 5 and 15 minutes) due to TCP retransmission timeouts (RTO).
 
-     Below, we set this value to 15 seconds. This value should not be
+     Below, we set this value to 45 seconds. This value should not be
      too low otherwise we may drop valid connection that were
      temporarily busy. The higher it is, the longer it is to detect a
-     dead connection. We believe 15 seconds is reasonable in practice
+     dead connection. We believe 45 seconds is reasonable in practice
      (especially this acknowledgement is done at the OS level and so
-     is quite independent of the Lwt scheduler). *)
+     is quite independent of the Lwt scheduler).
+
+     This value is intimatly linked to the keepalive value (see below).
+     Following Cloudflare article recommendation,
+      https://blog.cloudflare.com/when-tcp-sockets-refuse-to-die/
+     We set the value to 45s, ie "should be set to a value slightly lower than
+         TCP_KEEPIDLE + TCP_KEEPINTVL * TCP_KEEPCNT." *)
   let ms_opt =
-    let default = 15000 (* 15s *) in
+    let default = 45000 (* 45s *) in
     try
       match Sys.getenv_opt "OCTEZ_P2P_TCP_USER_TIMEOUT" with
       | None -> Some default
@@ -201,6 +204,59 @@ let raw_socket () =
               [Error_monad.error_of_exn exn]
           in
           Lwt.return sock)
+
+let socket_setopt_keepalive sock =
+  let open Lwt_syntax in
+  (* By setting [TCP_KEEPALIVE], we ensure that the connection stays alive
+     for NAT or firewalls between the node and the other peer. If no TCP
+     packet is sent after [ms] milliseconds, an empty TCP message will be
+     sent.
+
+     If not acknowledged before intv, some retries will be made (number
+     depending on OS, default 9 for linux) after [intv] seconds. The connection
+     will be dropped if no ACK is received.
+
+     See also the comment of the [socket_setopt_user_timeout] about the cloudflare
+     article, to understand the rationale for the 10s and 5s interval default
+     value, in conjunction with the user_timeout value. *)
+  let keepalive_opts =
+    let default =
+      (* after 10s of inactivity, and every 5s if no ACK *)
+      (10000, 5000)
+    in
+    match Sys.getenv_opt "OCTEZ_P2P_TCP_KEEPALIVE" with
+    | Some "0" -> None
+    | None ->
+        (* Sends a keepalive starting at 10 seconds of inactivity and every 5
+           seconds interval *)
+        Some default
+    | Some value -> (
+        match String.split ',' value with
+        | [ms] -> Some (int_of_string ms, snd default)
+        | [ms; intv] -> Some (int_of_string ms, int_of_string intv)
+        | _ -> None)
+  in
+  match keepalive_opts with
+  | None -> Lwt.return sock
+  | Some (ms, intv) -> (
+      match
+        Socket.set_tcp_keepalive (Lwt_unix.unix_file_descr sock) ~ms ~intv
+      with
+      | Ok () | Error `Unsupported -> Lwt.return sock
+      | Error (`Unix_error exn) ->
+          (* Socket option [TCP_KEEPALIVE] is not mandatory, this is why we
+             only emit an event at [Info] level. *)
+          let* () =
+            Events.(emit set_socket_option_tcp_keepalive_failed)
+              [Error_monad.error_of_exn exn]
+          in
+          Lwt.return sock)
+
+let raw_socket () =
+  let open Lwt_syntax in
+  let sock = Lwt_unix.socket ~cloexec:true PF_INET6 SOCK_STREAM 0 in
+  let* sock = socket_setopt_user_timeout sock in
+  socket_setopt_keepalive sock
 
 let socket () =
   let open Lwt_syntax in
@@ -229,6 +285,20 @@ let create_listening_socket ?(reuse_port = false) ~backlog
                {reason = err; address = addr; port})
       | exn -> Lwt.reraise exn)
 
+(* Taken from [Lwt_io] but is not exported. *)
+let close_socket fd =
+  Lwt.finalize
+    (fun () ->
+      (Lwt.catch
+         (fun () ->
+           Lwt_unix.shutdown fd Unix.SHUTDOWN_ALL ;
+           Lwt.return_unit)
+         (function
+           (* Occurs if the peer closes the connection first. *)
+           | Unix.Unix_error (Unix.ENOTCONN, _, _) -> Lwt.return_unit
+           | exn -> Lwt.reraise exn) [@ocaml.warning "-4"]))
+    (fun () -> Lwt_unix.close fd)
+
 let close ?reason t =
   let open Lwt_syntax in
   Option.iter (fun reason -> add_closing_reason ~reason t) reason ;
@@ -243,7 +313,7 @@ let close ?reason t =
   Lwt.catch
     (fun () ->
       (* Guarantee idempotency. *)
-      if Lwt_unix.state t.fd = Closed then return_unit else Lwt_unix.close t.fd)
+      if Lwt_unix.state t.fd = Closed then return_unit else close_socket t.fd)
     (function
       (* From [man 2 close] [close] can fail with [EBADF, EINTR, EIO, ENOSPC,
          EDQUOT] Unix errors.
@@ -337,13 +407,16 @@ let connect t saddr =
     (function
       | Unix.Unix_error (Unix.ECONNREFUSED, _, _) ->
           let*! () = close ~reason:TCP_connection_refused t in
-          Lwt.return_error `Connection_failed
+          Lwt.return_error `Connection_refused
       | Unix.Unix_error (Unix.EHOSTUNREACH, _, _) ->
           let*! () = close ~reason:TCP_connection_unreachable t in
-          Lwt.return_error `Connection_failed
+          Lwt.return_error `Connection_unreachable
       | Lwt.Canceled ->
           let*! () = close ~reason:TCP_connection_canceled t in
-          Lwt.return_error `Connection_failed
+          Lwt.return_error `Connection_canceled
+      | Unix.Unix_error (ENETUNREACH, _, _) ->
+          let*! () = close ~reason:TCP_network_unreachable t in
+          Lwt.return_error `Network_unreachable
       | ex ->
           let*! () =
             close

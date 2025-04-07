@@ -1,18 +1,22 @@
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
 //! Implementation of Zifencei extension for RISC-V
 
 use crate::{
-    machine_state::{bus::main_memory::MainMemoryLayout, AccessType, CacheLayouts, MachineState},
+    machine_state::{
+        AccessType, CacheLayouts, MachineState, block_cache::bcall::Block,
+        main_memory::MainMemoryLayout,
+    },
     state_backend,
 };
 
-impl<ML, CL, M> MachineState<ML, CL, M>
+impl<ML, CL, B, M> MachineState<ML, CL, B, M>
 where
     ML: MainMemoryLayout,
     CL: CacheLayouts,
+    B: Block<ML, M>,
     M: state_backend::ManagerReadWrite,
 {
     /// Execute a `fence.i` instruction.
@@ -21,6 +25,6 @@ where
         self.core
             .translation_cache
             .invalidate([AccessType::Instruction]);
-        self.instruction_cache.invalidate();
+        self.block_cache.invalidate();
     }
 }

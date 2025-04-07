@@ -20,7 +20,11 @@ module type EXTERNAL_PROCESSING = sig
     parameters ->
     state ->
     'response request ->
-    [`Continue of ('response * Profiler.report option) tzresult * state | `Stop]
+    [ `Continue of
+      ('response * (Profiler.report option * Profiler.report option) option)
+      tzresult
+      * state
+    | `Stop ]
     Lwt.t
 end
 
@@ -158,7 +162,10 @@ struct
                  Data_encoding.(
                    tup2
                      (Params.result_encoding recved)
-                     (option Profiler.report_encoding)))
+                     (option
+                        (tup2
+                           (option Profiler.report_encoding)
+                           (option Profiler.report_encoding)))))
               res
           in
           loop state

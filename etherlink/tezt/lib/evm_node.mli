@@ -39,7 +39,7 @@ type time_between_blocks =
 type mode =
   | Observer of {
       initial_kernel : string;
-      preimages_dir : string;
+      preimages_dir : string option;
       private_rpc_port : int option;  (** Port for private RPC server*)
       rollup_node_endpoint : string;
     }
@@ -121,6 +121,11 @@ type mode =
   | Proxy
   | Rpc of mode
 
+type history_mode =
+  | Archive
+  | Rolling of int  (** Rolling with retention period in days. *)
+  | Full of int  (** Full with retention period in days. *)
+
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode
 
@@ -136,12 +141,12 @@ val preimages_dir : t -> string
 
 val supports_threshold_encryption : t -> bool
 
-(** [create ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
+(** [create ?name ?runner ?mode ?history ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
-    [rpc_port]. [rpc_addr] defaults to [Constant.default_host] and a fresh port is
-    chosen if [rpc_port] is not set.
+    [rpc_port]. [rpc_addr] defaults to [Constant.default_host] and a fresh port
+    is chosen if [rpc_port] is not set.
 
     The server communicates with a rollup-node and sets its endpoint via
     [rollup_node_endpoint].
@@ -153,6 +158,7 @@ val create :
   ?name:string ->
   ?runner:Runner.t ->
   ?mode:mode ->
+  ?history:history_mode ->
   ?data_dir:string ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
@@ -171,12 +177,25 @@ val initial_kernel : t -> string
     do not wait for it to be ready. *)
 val run : ?wait:bool -> ?extra_arguments:string list -> t -> unit Lwt.t
 
+(** [wait_for_event ?timeout evm_node ~event f] waits for event [event] until
+    [timeout] on node [evm_node].
+
+    The wait is resolved if an event with name [event] is seen and [f] returns
+    [Some _].
+*)
+val wait_for_event :
+  ?timeout:float -> t -> event:string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
 (** [wait_for_ready evm_node] waits until [evm_node] is ready. *)
 val wait_for_ready : ?timeout:float -> t -> unit Lwt.t
 
 (** [wait_for_blueprint_applied ~timeout evm_node level] waits until
     [evm_node] has applied a blueprint locally for level [level]. *)
 val wait_for_blueprint_applied : ?timeout:float -> t -> int -> unit Lwt.t
+
+(** [wait_for_blueprint_invalid_applied] waits for the event
+    [blueprint_invalid_applied.v0]. *)
+val wait_for_blueprint_invalid_applied : t -> unit Lwt.t
 
 val wait_for_blueprint_finalized : ?timeout:float -> t -> int -> unit Lwt.t
 
@@ -217,10 +236,29 @@ val wait_for_block_producer_tx_injected : ?timeout:float -> t -> string Lwt.t
 
 val wait_for_retrying_connect : ?timeout:float -> t -> unit Lwt.t
 
+val wait_for_flush_delayed_inbox :
+  ?timeout:float -> ?level:int -> t -> int Lwt.t
+
 val wait_for_rollup_node_follower_connection_acquired :
   ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_rollup_node_follower_disabled : ?timeout:float -> t -> unit Lwt.t
+
+type processed_l1_level = {l1_level : int; finalized_blueprint : int}
+
+(** [wait_for_processed_l1_level ?timeout ?level evm_node] waits until
+    a (finalized) layer1 level has been processed and returns the
+    layer1 level and it's latest corresponding blueprints. If [level =
+    Some level] then it waits until that specific layer1 level is
+    processed. It returns the tuple [(layer1_level,
+    finalized_blueprint]). *)
+val wait_for_processed_l1_level :
+  ?timeout:float -> ?level:int -> t -> processed_l1_level Lwt.t
+
+val wait_for_blueprint_catchup : ?timeout:float -> t -> (int * int) Lwt.t
+
+val wait_for_blueprint_injection_failure :
+  ?timeout:float -> ?level:int -> t -> unit Lwt.t
 
 module Config_file : sig
   (** Node configuration files. *)
@@ -243,18 +281,37 @@ end
     with arguments found in the state. *)
 val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
 
-(** [patch_config_with_experimental_feature
-    ?node_transaction_validation ?drop_duplicate_when_injection
-    ~block_storage_sqlite3 json_config] patches a config to add
+(** [spawn_init_config_minimal ~data_dir ?path ?extra_arguments ()] creates a
+    minimal config with no cli argument populated as [spawn_init_config].
+
+    Unlike [spawn_init_config], does not require a [Evm_node.t] instance. *)
+val spawn_init_config_minimal :
+  data_dir:string ->
+  ?path:string ->
+  ?extra_arguments:string list ->
+  unit ->
+  Process.t
+
+type rpc_server = Resto | Dream
+
+(** [patch_config_with_experimental_feature ?drop_duplicate_when_injection
+    ?next_wasm_runtime ?rpc_server ?enable_websocket
+    ?max_websocket_message_length json_config] patches a config to add
     experimental feature. Each optional argument add the correspondent
     experimental feature. *)
 val patch_config_with_experimental_feature :
   ?drop_duplicate_when_injection:bool ->
-  ?node_transaction_validation:bool ->
-  ?block_storage_sqlite3:bool ->
+  ?blueprints_publisher_order_enabled:bool ->
+  ?next_wasm_runtime:bool ->
+  ?rpc_server:rpc_server ->
+  ?enable_websocket:bool ->
+  ?max_websocket_message_length:int ->
   unit ->
   JSON.t ->
   JSON.t
+
+(** Edit garbage collector parameters in the configuration file. *)
+val patch_config_gc : ?history_mode:history_mode -> JSON.t -> JSON.t
 
 (** [init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr
     ?rpc_port rollup_node_endpoint] creates an EVM node server with
@@ -269,6 +326,7 @@ val init :
   ?rpc_addr:string ->
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
+  ?history_mode:history_mode ->
   string ->
   t Lwt.t
 
@@ -283,6 +341,9 @@ val spawn_run : ?extra_arguments:string list -> t -> Process.t
 
     Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
 val terminate : ?timeout:float -> t -> unit Lwt.t
+
+val resolve_or_timeout :
+  ?timeout:float -> t -> name:string -> 'a Lwt.t -> 'a Lwt.t
 
 (** The same exact behavior as {!Sc_rollup_node.wait_for} but for the EVM node. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
@@ -310,6 +371,10 @@ val wait_for_evm_event :
     diverging blueprint level expected hash, and found hash. *)
 val wait_for_diverged : t -> (int * string * string) Lwt.t
 
+(** [wait_for_reset evm_node] waits for the event [evm_context_reset_at_level]
+    using {!wait_for}. It does not wait for a specific level. *)
+val wait_for_reset : t -> unit Lwt.t
+
 (** [wait_for_missing_blueprint evm_node] waits for the
     event [evm_events_follower_missing_blueprint.v0] using
     {!wait_for} and return the missing blueprint level and
@@ -332,6 +397,20 @@ val wait_for_tx_pool_add_transaction : ?timeout:float -> t -> string Lwt.t
     `None`. *)
 val wait_for_shutdown_event : ?can_terminate:bool -> t -> int option Lwt.t
 
+(** [wait_for_split ?level evm_node] waits untils the node terminates
+    splitting its irmin context at level [level] if provided. *)
+val wait_for_split : ?level:int -> t -> int Lwt.t
+
+(** [wait_for_gc_finished ?gc_level ?head_level evm_node] waits until
+    the node terminates garbage collecting its context on head
+    [head_level] at gc level [gc_level] if provided. *)
+val wait_for_gc_finished :
+  ?gc_level:int -> ?head_level:int -> t -> (int * int) Lwt.t
+
+(** [wait_for_start_history_mode ?history_mode evm_node] waits until
+    the start history mode event is emitted with [history_mode] if provided. *)
+val wait_for_start_history_mode : ?history_mode:string -> t -> string Lwt.t
+
 (** [rpc_endpoint ?local ?private_ evm_node] returns the endpoint to communicate with the
     [evm_node]. If [private_] is true, the endpoint for the private
     RPC server is returned.
@@ -348,17 +427,44 @@ val endpoint : ?private_:bool -> t -> string
 (** JSON-RPC request. *)
 type request = {method_ : string; parameters : JSON.u}
 
-(** [call_evm_rpc ?private_ evm_node ~request] sends a JSON-RPC request to
+(** [call_evm_rpc ?private_ evm_node request] sends a JSON-RPC request to
     the [evm_node], for the given [request].
     If [private_] is true, the request is sent to the private RPC
     server. *)
 val call_evm_rpc : ?private_:bool -> t -> request -> JSON.t Lwt.t
 
-(** [batch_evm_rpc ?private_ evm_node ~requests] sends multiple JSON-RPC requests
+(** [batch_evm_rpc ?private_ evm_node requests] sends multiple JSON-RPC requests
     to the [evm_node], for the given [requests].
     If [private_] is true, the requests are sent to the private RPC
     server. *)
-val batch_evm_rpc : ?private_:bool -> t -> request list -> JSON.t Lwt.t
+val batch_evm_rpc : ?private_:bool -> t -> request list -> JSON.t list Lwt.t
+
+(** Open a websocket connection with the EVM node. If [private_] is true, a
+    connection is created with the private websocket endpoint of the node. *)
+val open_websocket : ?private_:bool -> t -> Websocket.t Lwt.t
+
+(** [call_evm_websocket ws request] sends a JSON-RPC request on the websocket
+    connection [ws] and waits for the response. *)
+val call_evm_websocket : Websocket.t -> request -> JSON.t Lwt.t
+
+(** [batch_evm_websocket ws requests] sends multiple JSON-RPC requests on the
+    websocket connection [ws] without waiting for the responses, then receive
+    all responses at the end. *)
+val batch_evm_websocket : Websocket.t -> request list -> JSON.t list Lwt.t
+
+(** [jsonrpc] uses the [websocket] to make a JSON-RPC call if provided or falls
+    back to using HTTP RPC request on the EVM node otherwise. *)
+val jsonrpc :
+  ?websocket:Websocket.t -> ?private_:bool -> t -> request -> JSON.t Lwt.t
+
+(** [batch_jsonrpc] uses the [websocket] to make a JSON-RPC calls if provided or
+    falls back to using an HTTP RPC batch request on the EVM node otherwise. *)
+val batch_jsonrpc :
+  ?websocket:Websocket.t ->
+  ?private_:bool ->
+  t ->
+  request list ->
+  JSON.t list Lwt.t
 
 (** [extract_result json] expects a JSON-RPC `result` and returns the value. *)
 val extract_result : JSON.t -> JSON.t
@@ -389,12 +495,6 @@ val sequencer_upgrade_payload :
   activation_timestamp:string ->
   unit ->
   string Lwt.t
-
-(** [reconstruct_from_rollup_node_data_dir ~boot_sector evm_node
-    rollup_node] reconstructs the history of the rollup by replaying
-    all messages. *)
-val reconstruct_from_rollup_node_data_dir :
-  boot_sector:string -> t -> Sc_rollup_node.t -> unit Lwt.t
 
 (** [init_from_rollup_node_data_dir ?omit_delayed_tx_events evm_node
     rollup_node] initialises the data dir of the evm node by importing
@@ -444,11 +544,16 @@ val export_snapshot :
 val import_snapshot :
   ?force:bool -> t -> snapshot_file:string -> (Process.t, unit) runnable
 
+(** Run [snapshot info] command and return output containing information about
+    the snapshot file. *)
+val snapshot_info : snapshot_file:string -> (Process.t, string) runnable
+
 val wait_termination : t -> unit Lwt.t
 
 (** [make_kernel_installer_config ~output ()] create the config needed for the
     evm kernel used by the installer *)
 val make_kernel_installer_config :
+  ?max_delayed_inbox_blueprint_length:int ->
   ?mainnet_compat:bool ->
   ?remove_whitelist:bool ->
   ?kernel_root_hash:string ->
@@ -474,6 +579,8 @@ val make_kernel_installer_config :
   ?enable_fa_bridge:bool ->
   ?enable_dal:bool ->
   ?dal_slots:int list ->
+  ?enable_fast_withdrawal:bool ->
+  ?enable_multichain:bool ->
   output:string ->
   unit ->
   (Process.t, unit) Runnable.t
@@ -485,3 +592,16 @@ val man : ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
 
 val describe_config :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
+
+(** Returns the [mode] with a fresh private RPC port if one was present. *)
+val mode_with_new_private_rpc : mode -> mode
+
+(** A description of the metrics exported by the node. *)
+val list_metrics : ?hooks:Process_hooks.t -> unit -> unit Lwt.t
+
+(** A description of the events exported by the node. *)
+val list_events :
+  ?hooks:Process_hooks.t -> ?level:string -> ?json:bool -> unit -> unit Lwt.t
+
+(** Switch history mode of an EVM node with command switch history. *)
+val switch_history_mode : t -> history_mode -> (Process.t, unit) runnable

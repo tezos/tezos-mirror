@@ -490,7 +490,8 @@ module All_definitions = struct
           (registration_exn "invalid event name: %S contains '%c'") ;
         all := Definition (E.section, E.name, ev) :: !all
 
-  let get () = !all
+  let get ?filter () =
+    match filter with Some filter -> List.filter filter !all | None -> !all
 
   let find match_name =
     List.find (function Definition (_, n, _) -> match_name n) !all
@@ -801,8 +802,16 @@ module Simple = struct
       ~name
       (Data_encoding.With_version.first_version encoding)
 
-  let declare_0 ?alternative_color ?section ~name ~msg ?(level = Info) () =
+  let may_prefix_name ~prefix_name_with_section ~name ~section =
+    match (prefix_name_with_section, section) with
+    | false, _ | true, None -> name
+    | true, Some sections ->
+        String.concat "_" (Section.to_string_list sections @ [name])
+
+  let declare_0 ?alternative_color ?section ?(prefix_name_with_section = false)
+      ~name ~msg ?(level = Info) () =
     let section = make_section section in
+    let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg = parse_msg [] msg in
     let module Definition : EVENT_DEFINITION with type t = unit = struct
       type t = unit
@@ -829,9 +838,11 @@ module Simple = struct
       emit_at_top_level = (fun () -> Event.emit_at_top_level ());
     }
 
-  let declare_1 (type a) ?alternative_color ?section ~name ~msg ?(level = Info)
-      ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) =
+  let declare_1 (type a) ?alternative_color ?section
+      ?(prefix_name_with_section = false) ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) =
     let section = make_section section in
+    let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg = parse_msg [f1_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a = struct
       type t = a
@@ -863,10 +874,12 @@ module Simple = struct
       emit_at_top_level = (fun parameter -> Event.emit_at_top_level parameter);
     }
 
-  let declare_2 (type a b) ?alternative_color ?section ~name ~msg
-      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_2 (type a b) ?alternative_color ?section
+      ?(prefix_name_with_section = false) ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) =
     let section = make_section section in
+    let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg = parse_msg [f1_name; f2_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a * b = struct
       type t = a * b
@@ -905,11 +918,13 @@ module Simple = struct
       emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
     }
 
-  let declare_3 (type a b c) ?alternative_color ?section ~name ~msg
-      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_3 (type a b c) ?alternative_color ?section
+      ?(prefix_name_with_section = false) ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) =
     let section = make_section section in
+    let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg = parse_msg [f1_name; f2_name; f3_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a * b * c = struct
       type t = a * b * c
@@ -950,12 +965,14 @@ module Simple = struct
       emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
     }
 
-  let declare_4 (type a b c d) ?alternative_color ?section ~name ~msg
-      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_4 (type a b c d) ?alternative_color ?section
+      ?(prefix_name_with_section = false) ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) =
     let section = make_section section in
+    let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg = parse_msg [f1_name; f2_name; f3_name; f4_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a * b * c * d =
     struct
@@ -999,13 +1016,15 @@ module Simple = struct
       emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
     }
 
-  let declare_5 (type a b c d e) ?alternative_color ?section ~name ~msg
-      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_5 (type a b c d e) ?alternative_color ?section
+      ?(prefix_name_with_section = false) ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
       (f5_name, (f5_enc : e Data_encoding.t)) =
     let section = make_section section in
+    let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg =
       parse_msg [f1_name; f2_name; f3_name; f4_name; f5_name] msg
     in
@@ -1053,14 +1072,16 @@ module Simple = struct
       emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
     }
 
-  let declare_6 (type a b c d e f) ?alternative_color ?section ~name ~msg
-      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_6 (type a b c d e f) ?alternative_color ?section
+      ?(prefix_name_with_section = false) ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
       (f5_name, (f5_enc : e Data_encoding.t)) ?pp6
       (f6_name, (f6_enc : f Data_encoding.t)) =
     let section = make_section section in
+    let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg =
       parse_msg [f1_name; f2_name; f3_name; f4_name; f5_name; f6_name] msg
     in
@@ -1110,8 +1131,9 @@ module Simple = struct
       emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
     }
 
-  let declare_7 (type a b c d e f g) ?alternative_color ?section ~name ~msg
-      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_7 (type a b c d e f g) ?alternative_color ?section
+      ?(prefix_name_with_section = false) ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
@@ -1119,6 +1141,7 @@ module Simple = struct
       (f6_name, (f6_enc : f Data_encoding.t)) ?pp7
       (f7_name, (f7_enc : g Data_encoding.t)) =
     let section = make_section section in
+    let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg =
       parse_msg
         [f1_name; f2_name; f3_name; f4_name; f5_name; f6_name; f7_name]
@@ -1172,8 +1195,9 @@ module Simple = struct
       emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
     }
 
-  let declare_8 (type a b c d e f g h) ?alternative_color ?section ~name ~msg
-      ?(level = Info) ?pp1 (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+  let declare_8 (type a b c d e f g h) ?alternative_color ?section
+      ?(prefix_name_with_section = false) ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
@@ -1182,6 +1206,7 @@ module Simple = struct
       (f7_name, (f7_enc : g Data_encoding.t)) ?pp8
       (f8_name, (f8_enc : h Data_encoding.t)) =
     let section = make_section section in
+    let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg =
       parse_msg
         [f1_name; f2_name; f3_name; f4_name; f5_name; f6_name; f7_name; f8_name]

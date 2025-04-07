@@ -329,6 +329,12 @@ let surrounding_levels_encoding =
        (opt "lower" level_timestamp_encoding)
        (opt "upper" level_timestamp_encoding))
 
+type head = {level : int32}
+
+let head_encoding =
+  let open Data_encoding in
+  conv (fun {level} -> level) (fun level -> {level}) (obj1 (req "level" int32))
+
 module Archiver = struct
   (* Collected by the archiver and sent to the server *)
   type raw_block_data =

@@ -39,7 +39,7 @@ octez-injector-server
 octogram
 octez-teztale-archiver
 octez-teztale-server
-octez-agnostic-baker
+octez-experimental-agnostic-baker
 
 scripts/opam-test-all.sh.DONE
 scripts/create_genesis/src
@@ -79,6 +79,8 @@ _coverage_report
 
 # etherlink
 /etherlink/kernels-*
+etherlink-governance-observer
+floodgate
 
 # Rust
 **/target
@@ -141,3 +143,4 @@ terraform.rc
 # RISC-V
 /src/riscv/riscv-sandbox
 /src/riscv/riscv-dummy.elf
+/src/riscv/riscv-dummy-sdk.elf

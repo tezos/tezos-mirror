@@ -2,11 +2,17 @@
 /*                                                                            */
 /* SPDX-License-Identifier: MIT                                               */
 /* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
+/* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                 */
 /*                                                                            */
 /******************************************************************************/
 
+use serde_json::to_writer_pretty;
+use std::collections::BTreeMap;
 use std::env;
-use std::fs::read_to_string;
+use std::fs::{read_to_string, File};
+use std::io::{BufReader, BufWriter, Write};
+use std::path::Path;
+use std::process;
 
 use mir::parser::Parser;
 use mir::tzt::*;
@@ -18,31 +24,87 @@ fn run_test(file: &str) -> Result<(), String> {
     let tzt_test = parser
         .parse_tzt_test(&contents)
         .map_err(|e| e.to_string())?;
-
     let arena = Arena::new();
     run_tzt_test(tzt_test, &arena).map_err(|e| format!("{}", e))
 }
 
-fn main() {
-    // Read the cmd line arguments as a list of Strings.
-    // First one is the name of the file being executed
-    // and the rest are the actual arguments, so drop the first one.
-    let test_files = &env::args().collect::<Vec<String>>()[1..];
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Collect command-line arguments, skipping the first one (the executable name)
+    let args: Vec<String> = env::args().collect();
+    let test_files = &args[1..];
 
-    // Walk through all the test paths and execute each of them.
-    // Print the result for each run.
-    let mut exit_code = 0;
+    if test_files.is_empty() {
+        eprintln!("No test files provided.");
+        process::exit(1);
+    }
+
+    // Initialize counters for passed and failed tests
+    let mut failed_tests = 0;
+    let mut results: BTreeMap<String, bool> = BTreeMap::new();
+
     for test in test_files {
-        print!("Running {} : ", test);
+        let short_test = match Path::new(test).file_name() {
+            Some(name) => name.to_string_lossy().to_string(),
+            None => {
+                eprintln!("Failed to get file name for '{}'", test);
+                process::exit(1);
+            }
+        };
+
+        print!("Running {}: ", short_test);
         match run_test(test) {
-            Ok(_) => println!("Ok"),
+            Ok(_) => {
+                println!("Ok");
+                results.insert(short_test, true);
+            }
             Err(e) => {
-                exit_code = 1;
                 println!("{}", e);
+                failed_tests += 1;
+                results.insert(short_test, false);
             }
         }
     }
-    std::process::exit(exit_code)
+
+    let total_tests = test_files.len();
+    println!(
+        "Test results: Passed: {} Failed: {} Total: {}",
+        total_tests - failed_tests,
+        failed_tests,
+        total_tests
+    );
+
+    // Construct the output file path
+    let executable_path = env::args()
+        .next()
+        .ok_or("Failed to get the executable path")?;
+    let file_path_str = executable_path.replace("tzt_runner", "../../MIR- Run TZT.out");
+    let current_dir = env::current_dir()?;
+    let file_path = current_dir.join(&file_path_str);
+
+    // Read old results if the file exists
+    let old_results: BTreeMap<String, bool> = if file_path.exists() {
+        let file = File::open(&file_path)?;
+        let reader = BufReader::new(file);
+        serde_json::from_reader(reader)?
+    } else {
+        BTreeMap::new()
+    };
+
+    // Save new results to the file
+    let file = File::create(&file_path)?;
+    let mut writer = BufWriter::new(file);
+    to_writer_pretty(&mut writer, &results)?;
+    writeln!(writer)?;
+    writer.flush()?;
+
+    // Compare old and new results
+    if old_results != results {
+        eprintln!("Changes in the test results file.");
+        eprintln!("Run `cargo run --manifest-path path/to/mir/Cargo.toml --bin tzt_runner path/to/tzt_reference_test_suite/*.tzt` before comitting.");
+        process::exit(2);
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -250,7 +312,7 @@ mod tztrunner_tests {
 
     const TZT_SAMPLE_MUTEZ_OVERFLOW: &str = r#"code { ADD } ;
         input { Stack_elt mutez 9223372036854775807 ; Stack_elt mutez 1 } ;
-        output (MutezOverflow 9223372036854775807 1)"#;
+        output Overflow"#;
 
     const TZT_SAMPLE_EXP_SUCC_BUT_FAIL: &str = r#"code { ADD } ;
         input { Stack_elt mutez 9223372036854775807 ; Stack_elt mutez 1 } ;

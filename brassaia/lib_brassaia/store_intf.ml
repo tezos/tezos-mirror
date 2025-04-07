@@ -41,15 +41,6 @@ module type S_generic_key = sig
   type t
   (** The type for Brassaia stores. *)
 
-  type step = Schema.Path.step [@@deriving brassaia]
-  (** The type for {!type-key} steps. *)
-
-  type path = Schema.Path.t [@@deriving brassaia]
-  (** The type for store keys. A key is a sequence of {!step}s. *)
-
-  type metadata = Schema.Metadata.t [@@deriving brassaia]
-  (** The type for store metadata. *)
-
   type contents = Schema.Contents.t [@@deriving brassaia]
   (** The type for store contents. *)
 
@@ -423,9 +414,6 @@ module type S_generic_key = sig
     include
       Tree.S
         with type t := tree
-         and type step := step
-         and type path := path
-         and type metadata := metadata
          and type contents := contents
          and type contents_key := contents_key
          and type node := node
@@ -437,12 +425,10 @@ module type S_generic_key = sig
 
     (** {1 Import/Export} *)
 
-    type kinded_key =
-      [ `Contents of contents_key * metadata | `Node of node_key ]
+    type kinded_key = [ `Contents of contents_key | `Node of node_key ]
     [@@deriving brassaia]
     (** Keys in the Brassaia store are tagged with the type of the value they
-        reference (either {!contents} or {!node}). In the [contents] case, the
-        key is paired with corresponding {!metadata}. *)
+        reference (either {!contents} or {!node}). *)
 
     val key : tree -> kinded_key option
     (** [key t] is the key of tree [t] in the underlying repository, if it
@@ -465,7 +451,7 @@ module type S_generic_key = sig
     val hash : ?cache:bool -> tree -> hash
     (** [hash t] is the hash of tree [t]. *)
 
-    type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
+    type kinded_hash = [ `Contents of hash | `Node of hash ]
     (** Like {!kinded_key}, but with hashes as value references rather than
         keys. *)
 
@@ -573,42 +559,42 @@ module type S_generic_key = sig
 
   (** {1 Reads} *)
 
-  val kind : t -> path -> [ `Contents | `Node ] option Lwt.t
+  val kind : t -> Path.t -> [ `Contents | `Node ] option Lwt.t
   (** [kind] is {!Tree.kind} applied to [t]'s root tree. *)
 
-  val list : t -> path -> (step * tree) list Lwt.t
+  val list : t -> Path.t -> (Path.step * tree) list Lwt.t
   (** [list t] is {!Tree.list} applied to [t]'s root tree. *)
 
-  val mem : t -> path -> bool Lwt.t
+  val mem : t -> Path.t -> bool Lwt.t
   (** [mem t] is {!Tree.mem} applied to [t]'s root tree. *)
 
-  val mem_tree : t -> path -> bool Lwt.t
+  val mem_tree : t -> Path.t -> bool Lwt.t
   (** [mem_tree t] is {!Tree.mem_tree} applied to [t]'s root tree. *)
 
-  val find_all : t -> path -> (contents * metadata) option Lwt.t
+  val find_all : t -> Path.t -> contents option Lwt.t
   (** [find_all t] is {!Tree.find_all} applied to [t]'s root tree. *)
 
-  val find : t -> path -> contents option Lwt.t
+  val find : t -> Path.t -> contents option Lwt.t
   (** [find t] is {!Tree.find} applied to [t]'s root tree. *)
 
-  val get_all : t -> path -> (contents * metadata) Lwt.t
+  val get_all : t -> Path.t -> contents Lwt.t
   (** [get_all t] is {!Tree.get_all} applied on [t]'s root tree. *)
 
-  val get : t -> path -> contents Lwt.t
+  val get : t -> Path.t -> contents Lwt.t
   (** [get t] is {!Tree.get} applied to [t]'s root tree. *)
 
-  val find_tree : t -> path -> tree option Lwt.t
+  val find_tree : t -> Path.t -> tree option Lwt.t
   (** [find_tree t] is {!Tree.find_tree} applied to [t]'s root tree. *)
 
-  val get_tree : t -> path -> tree Lwt.t
+  val get_tree : t -> Path.t -> tree Lwt.t
   (** [get_tree t k] is {!Tree.get_tree} applied to [t]'s root tree. *)
 
   type kinded_key := [ `Contents of contents_key | `Node of node_key ]
 
-  val key : t -> path -> kinded_key option Lwt.t
+  val key : t -> Path.t -> kinded_key option Lwt.t
   (** [id t k] *)
 
-  val hash : t -> path -> hash option Lwt.t
+  val hash : t -> Path.t -> hash option Lwt.t
   (** [hash t k] *)
 
   (** {1 Updates} *)
@@ -631,14 +617,11 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     contents ->
     (unit, write_error) result Lwt.t
   (** [set t k ~info v] sets [k] to the value [v] in [t]. Discard any previous
       results but ensure that no operation is lost in the history.
-
-      This function always uses {!Metadata.default} as metadata. Use {!set_tree}
-      with `[Contents (c, m)] for different ones.
 
       When [clear] is set (the default), the tree cache is emptied upon the
       function's completion, mirroring the effect of invoking {!Tree.clear}.
@@ -654,7 +637,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     contents ->
     unit Lwt.t
   (** [set_exn] is like {!set} but raise [Failure _] instead of using a result
@@ -667,7 +650,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     tree ->
     (unit, write_error) result Lwt.t
   (** [set_tree] is like {!set} but for trees. *)
@@ -679,7 +662,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     tree ->
     unit Lwt.t
   (** [set_tree] is like {!set_exn} but for trees. *)
@@ -691,7 +674,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     (unit, write_error) result Lwt.t
   (** [remove t ~info k] remove any bindings to [k] in [t].
 
@@ -706,7 +689,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     unit Lwt.t
   (** [remove_exn] is like {!remove} but raise [Failure _] instead of a using
       result type. *)
@@ -718,15 +701,12 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     test:contents option ->
     set:contents option ->
     (unit, write_error) result Lwt.t
   (** [test_and_set ~test ~set] is like {!set} but it atomically checks that the
       tree is [test] before modifying it to [set].
-
-      This function always uses {!Metadata.default} as metadata. Use
-      {!test_and_set_tree} with `[Contents (c, m)] for different ones.
 
       The result is [Error (`Test t)] if the current tree is [t] instead of
       [test].
@@ -742,7 +722,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     test:contents option ->
     set:contents option ->
     unit Lwt.t
@@ -756,7 +736,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     test:tree option ->
     set:tree option ->
     (unit, write_error) result Lwt.t
@@ -769,7 +749,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     test:tree option ->
     set:tree option ->
     unit Lwt.t
@@ -782,7 +762,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:(unit -> info) ->
     t ->
-    path ->
+    Path.t ->
     test:contents option ->
     set:contents option ->
     (commit option, write_error) result Lwt.t
@@ -798,7 +778,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:(unit -> info) ->
     t ->
-    path ->
+    Path.t ->
     test:contents option ->
     set:contents option ->
     commit option Lwt.t
@@ -812,7 +792,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:(unit -> info) ->
     t ->
-    path ->
+    Path.t ->
     test:tree option ->
     set:tree option ->
     (commit option, write_error) result Lwt.t
@@ -826,7 +806,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:(unit -> info) ->
     t ->
-    path ->
+    Path.t ->
     test:tree option ->
     set:tree option ->
     commit option Lwt.t
@@ -841,14 +821,11 @@ module type S_generic_key = sig
     info:Info.f ->
     old:contents option ->
     t ->
-    path ->
+    Path.t ->
     contents option ->
     (unit, write_error) result Lwt.t
   (** [merge ~old] is like {!set} but merge the current tree and the new tree
       using [old] as ancestor in case of conflicts.
-
-      This function always uses {!Metadata.default} as metadata. Use
-      {!merge_tree} with `[Contents (c, m)] for different ones.
 
       The result is [Error (`Conflict c)] if the merge failed with the conflict
       [c].
@@ -865,7 +842,7 @@ module type S_generic_key = sig
     info:Info.f ->
     old:contents option ->
     t ->
-    path ->
+    Path.t ->
     contents option ->
     unit Lwt.t
   (** [merge_exn] is like {!val-merge} but raise [Failure _] instead of using a
@@ -879,7 +856,7 @@ module type S_generic_key = sig
     info:Info.f ->
     old:tree option ->
     t ->
-    path ->
+    Path.t ->
     tree option ->
     (unit, write_error) result Lwt.t
   (** [merge_tree] is like {!merge_tree} but for trees. *)
@@ -892,7 +869,7 @@ module type S_generic_key = sig
     info:Info.f ->
     old:tree option ->
     t ->
-    path ->
+    Path.t ->
     tree option ->
     unit Lwt.t
   (** [merge_tree] is like {!merge_tree} but for trees. *)
@@ -905,7 +882,7 @@ module type S_generic_key = sig
     ?strategy:[ `Set | `Test_and_set | `Merge ] ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     (tree option -> tree option Lwt.t) ->
     (unit, write_error) result Lwt.t
   (** [with_tree t k ~info f] replaces {i atomically} the subtree [v] under [k]
@@ -940,7 +917,7 @@ module type S_generic_key = sig
     ?strategy:[ `Set | `Test_and_set | `Merge ] ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     (tree option -> tree option Lwt.t) ->
     unit Lwt.t
   (** [with_tree_exn] is like {!with_tree} but raise [Failure _] instead of
@@ -966,7 +943,7 @@ module type S_generic_key = sig
 
   val watch_key :
     t ->
-    path ->
+    Path.t ->
     ?init:commit ->
     ((commit * tree) Diff.t -> unit Lwt.t) ->
     watch Lwt.t
@@ -1036,9 +1013,9 @@ module type S_generic_key = sig
       depth at most [depth], starting from the [t]'s head (or from [max] if the
       head is not set) and stopping at [min] if specified. *)
 
-  val last_modified : ?depth:int -> ?n:int -> t -> path -> commit list Lwt.t
+  val last_modified : ?depth:int -> ?n:int -> t -> Path.t -> commit list Lwt.t
   (** [last_modified ?number c k] is the list of the last [number] commits that
-      modified [path], in ascending order of date. [depth] is the maximum depth
+      modified [Path.t], in ascending order of date. [depth] is the maximum depth
       to be explored in the commit graph, if any. Default value for [number] is
       1. *)
 
@@ -1093,12 +1070,6 @@ module type S_generic_key = sig
     (** Base functions for branches. *)
   end
 
-  (** [Path] provides base functions for the stores's paths. *)
-  module Path : Path.S with type t = path and type step = step
-
-  module Metadata : Metadata.S with type t = metadata
-  (** [Metadata] provides base functions for node metadata. *)
-
   (** Backend functions, which might be used by the backends. *)
   module Backend :
     Backend.S
@@ -1106,7 +1077,6 @@ module type S_generic_key = sig
       with type Slice.t = slice
        and type Repo.t = repo
        and module Hash = Hash
-       and module Node.Path = Path
        and type Contents.key = contents_key
        and type Node.key = node_key
        and type Commit.key = commit_key
@@ -1196,35 +1166,24 @@ module type Json_tree = functor
   val to_concrete_tree : t -> Store.Tree.concrete
   val of_concrete_tree : Store.Tree.concrete -> t
 
-  val get_tree : Store.tree -> Store.path -> t Lwt.t
+  val get_tree : Store.tree -> Path.t -> t Lwt.t
   (** Extract a [json] value from tree at the given key. *)
 
-  val set_tree : Store.tree -> Store.path -> t -> Store.tree Lwt.t
+  val set_tree : Store.tree -> Path.t -> t -> Store.tree Lwt.t
   (** Project a [json] value onto a tree at the given key. *)
 
-  val get : Store.t -> Store.path -> t Lwt.t
+  val get : Store.t -> Path.t -> t Lwt.t
   (** Extract a [json] value from a store at the given key. *)
 
-  val set :
-    Store.t -> Store.path -> t -> info:(unit -> Store.info) -> unit Lwt.t
+  val set : Store.t -> Path.t -> t -> info:(unit -> Store.info) -> unit Lwt.t
   (** Project a [json] value onto a store at the given key. *)
 end
 
-module type KV_generic_key =
-  S_generic_key
-    with type Schema.Path.step = string
-     and type Schema.Path.t = string list
-     and type Schema.Branch.t = string
-
-module type KV =
-  S
-    with type Schema.Path.step = string
-     and type Schema.Path.t = string list
-     and type Schema.Branch.t = string
+module type KV_generic_key = S_generic_key with type Schema.Branch.t = string
+module type KV = S with type Schema.Branch.t = string
 
 module type KV_maker_generic_key = sig
   type endpoint
-  type metadata
   type hash
   type info
 
@@ -1233,7 +1192,6 @@ module type KV_maker_generic_key = sig
   module Make (C : Contents.S) :
     KV_generic_key
       with module Schema.Contents = C
-       and type Schema.Metadata.t = metadata
        and type Backend.Remote.endpoint = endpoint
        and type Schema.Hash.t = hash
        and type contents_key = (hash, C.t) contents_key

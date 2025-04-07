@@ -1,29 +1,33 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
 self=$(dirname "$0")
+repo_args=()
+ls_args=()
+
+# Are we using Jujutsu?
+if ! git rev-parse --show-toplevel 2> /dev/null && jj root 2> /dev/null > /dev/null; then
+  jj_root="$(jj root)"
+  jj_tree="$(jj log -r @ -T commit_id --no-graph)"
+
+  # shellcheck disable=SC2016
+  repo_args+=(-C "$jj_root/.jj/repo/store/git")
+  ls_args+=("--with-tree=$jj_tree")
+fi
 
 format_all() {
   # shellcheck disable=SC2016
   xargs -0 -I{} sh -c "cd $self/../\$(dirname {}) && cargo fmt --check"
 }
 
-find_files_jj() {
-  jj_root="$(jj root)"
-  jj_tree="$(jj log -r @ -T commit_id --no-graph)"
-
+find_files() {
   # shellcheck disable=SC2016
-  git -C "$jj_root/.jj/repo/store/git" ls-files --full-name --with-tree="$jj_tree" -z 'Cargo.lock' '**/Cargo.lock' ':!:contrib'
+  git "${repo_args[@]}" ls-files "${ls_args[@]}" -z --full-name \
+    'Cargo.lock' \
+    '**/Cargo.lock' \
+    ':!:contrib' \
+    ':!:src/riscv' # Uses a nightly formatter which doesn't get picked up automatically
 }
 
-find_files_git() {
-  # shellcheck disable=SC2016
-  git ls-files -z --full-name 'Cargo.lock' '**/Cargo.lock' ':!:contrib'
-}
-
-if jj root 2> /dev/null > /dev/null; then
-  find_files_jj | format_all
-else
-  find_files_git | format_all
-fi
+find_files | format_all

@@ -18,6 +18,9 @@ else
   PREFIX=
 fi
 
+# include apt-get function with retry
+. scripts/packaging/tests/tests-common.inc.sh
+
 . scripts/ci/octez-packages-version.sh
 
 case "$RELEASETYPE" in
@@ -49,25 +52,41 @@ export DEBIAN_FRONTEND=noninteractive
 set -e
 set -x
 
-# [install prerequisites]
+# these two packages are needed here, but they don't need to appear in the doc
 apt-get update
-apt-get install -y sudo gpg curl debconf-utils apt-utils
-# [add repository]
-REPO="deb https://$bucket.storage.googleapis.com/$distribution $release main"
-curl "https://$bucket.storage.googleapis.com/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
-echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez.list
-sudo apt-get update
+apt-get install -y debconf-utils apt-utils procps
+
+if [ "$RELEASETYPE" = "Master" ]; then
+  # [add repository]
+  apt-get install -y sudo gpg curl
+
+  curl -s "https://packages.nomadic-labs.com/$distribution/octez.asc" |
+    sudo gpg --dearmor -o /etc/apt/keyrings/octez.gpg
+  echo "deb [signed-by=/etc/apt/keyrings/octez.gpg] https://packages.nomadic-labs.com/$distribution $release main" |
+    sudo tee /etc/apt/sources.list.d/octez.list
+  apt-get update
+  # [end add repository]
+else
+  apt-get install -y sudo gpg curl
+  curl -s "https://$bucket.storage.googleapis.com/$distribution/octez.asc" |
+    sudo gpg --dearmor -o /etc/apt/keyrings/octez.gpg
+  REPO="deb [signed-by=/etc/apt/keyrings/octez.gpg] https://$bucket.storage.googleapis.com/$distribution $release main"
+  echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez.list
+  apt-get update
+fi
 
 # [ preeseed octez ]
-if [ -n "$PREFIX" ]; then
+if [ -z "$PREFIX" ]; then
   # preseed octez-node for debconf. Notice we set purge_warning to yes,
   # to make the `autopurge` pass and remove all the node data at the end of this
   # script.
   cat << EOF > preseed.cfg
-octez-node octez-node/configure string yes
+octez-node octez-node/configure boolean true
 octez-node octez-node/history-mode string full
 octez-node octez-node/network string mainnet
-octez-node octez-node/purge_warning string yes
+octez-node octez-node/purge_warning boolean true
+octez-node octez-node/snapshot-import boolean false
+octez-node octez-node/snapshot-no-check boolean true
 debconf debconf/frontend select Noninteractive
 EOF
   # preseed the package
@@ -78,18 +97,31 @@ EOF
 fi
 
 # [install tezos]
-sudo apt-get install -y octez-client
-sudo apt-get install -y octez-node
-sudo apt-get install -y octez-baker
-sudo apt-get install -y octez-dal-node
+apt-get install -y octez-client
+apt-get install -y octez-node
+
+# If systemd is available we test the service scripts
+if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
+  systemctl enable octez-node
+  systemctl start octez-node
+
+  sleep 5
+  systemctl status octez-node
+
+  journalctl -xeu octez-node.service
+
+fi
+
+apt-get install -y octez-baker
+apt-get install -y octez-dal-node
 
 # [install octez additional packages]
-if [ -n "$PREFIX" ]; then
+if [ -z "$PREFIX" ]; then
   # [install octez NEXT packages]
-  sudo apt-get install -y octez-smart-rollup-node
+  apt-get install -y octez-smart-rollup-node
 else
   # [install octez current packages]
-  sudo apt-get install -y octez-smartrollup
+  apt-get install -y octez-smartrollup
 fi
 
 # [test executables]
@@ -98,13 +130,18 @@ octez-node --version
 "octez-baker-$protocol" --version
 "octez-accuser-$protocol" --version
 
+# If systemd is available we test the service scripts
+if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
+  systemctl stop octez-node
+fi
+
 # [test autopurge]
-sudo apt-get autopurge -y octez-node octez-client octez-baker octez-dal-node
+apt-get autopurge -y octez-node octez-client octez-baker octez-dal-node
 
 # [check autopurge]
 set +x
 
-if [ -n "$PREFIX" ]; then
+if [ -z "$PREFIX" ]; then
   # check the package configuration
   sudo debconf-get-selections | if grep -q octez; then
     echo "Leftovers in debconf db"

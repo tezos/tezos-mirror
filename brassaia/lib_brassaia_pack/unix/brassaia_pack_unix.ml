@@ -26,9 +26,6 @@ module KV (Config : Brassaia_pack.Conf.S) = struct
 
   include Pack_key.Store_spec
   module Maker = Maker (Config)
-
-  type metadata = Brassaia.Metadata.None.t
-
   module Make (C : Brassaia.Contents.S) = Maker.Make (Brassaia.Schema.KV (C))
 end
 

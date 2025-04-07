@@ -42,6 +42,7 @@ type t = {
   client_dir : string option;
       (** Optionally can start a client using an existing client-dir,
           to retreive keys and addresses. *)
+  operator : Account.key option;
 }
 
 (** [get_testnet_config path] returns the configuration of the network

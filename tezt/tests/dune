@@ -8,6 +8,8 @@
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
   str
+  octez-rust-deps
+  bls12-381.archive
   bls12-381
   tezt-tezos
   tezt_riscv_sandbox
@@ -15,6 +17,8 @@
   octez-libs.data-encoding
   octez-libs.base
   octez-libs.base.unix
+  octez-libs.octez-profiler
+  octez-libs.octez-profiler.backends
   octez-libs.stdlib-unix
   tezos-protocol-alpha.protocol
   tezt_self_tests_tezt_lib
@@ -32,6 +36,20 @@
   src_proto_alpha_lib_delegate_test_tezt_lib
   src_proto_alpha_lib_dal_test_tezt_lib
   src_proto_alpha_lib_client_test_tezt_lib
+  src_proto_022_PsRiotum_lib_sc_rollup_node_test_tezt_lib
+  src_proto_022_PsRiotum_lib_protocol_test_unit_tezt_lib
+  src_proto_022_PsRiotum_lib_protocol_test_regression_tezt_lib
+  src_proto_022_PsRiotum_lib_protocol_test_pbt_tezt_lib
+  src_proto_022_PsRiotum_lib_protocol_test_integration_validate_tezt_lib
+  src_proto_022_PsRiotum_lib_protocol_test_integration_operations_tezt_lib
+  src_proto_022_PsRiotum_lib_protocol_test_integration_michelson_tezt_lib
+  src_proto_022_PsRiotum_lib_protocol_test_integration_gas_tezt_lib
+  src_proto_022_PsRiotum_lib_protocol_test_integration_consensus_tezt_lib
+  src_proto_022_PsRiotum_lib_protocol_test_integration_tezt_lib
+  src_proto_022_PsRiotum_lib_plugin_test_tezt_lib
+  src_proto_022_PsRiotum_lib_delegate_test_tezt_lib
+  src_proto_022_PsRiotum_lib_dal_test_tezt_lib
+  src_proto_022_PsRiotum_lib_client_test_tezt_lib
   src_proto_021_PsQuebec_lib_sc_rollup_node_test_tezt_lib
   src_proto_021_PsQuebec_lib_protocol_test_unit_tezt_lib
   src_proto_021_PsQuebec_lib_protocol_test_regression_tezt_lib
@@ -46,24 +64,9 @@
   src_proto_021_PsQuebec_lib_delegate_test_tezt_lib
   src_proto_021_PsQuebec_lib_dal_test_tezt_lib
   src_proto_021_PsQuebec_lib_client_test_tezt_lib
-  src_proto_020_PsParisC_lib_sc_rollup_node_test_tezt_lib
-  src_proto_020_PsParisC_lib_protocol_test_unit_tezt_lib
-  src_proto_020_PsParisC_lib_protocol_test_regression_tezt_lib
-  src_proto_020_PsParisC_lib_protocol_test_pbt_tezt_lib
-  src_proto_020_PsParisC_lib_protocol_test_integration_validate_tezt_lib
-  src_proto_020_PsParisC_lib_protocol_test_integration_operations_tezt_lib
-  src_proto_020_PsParisC_lib_protocol_test_integration_michelson_tezt_lib
-  src_proto_020_PsParisC_lib_protocol_test_integration_gas_tezt_lib
-  src_proto_020_PsParisC_lib_protocol_test_integration_consensus_tezt_lib
-  src_proto_020_PsParisC_lib_protocol_test_integration_tezt_lib
-  src_proto_020_PsParisC_lib_plugin_test_tezt_lib
-  src_proto_020_PsParisC_lib_delegate_test_tezt_lib
-  src_proto_020_PsParisC_lib_dal_test_tezt_lib
-  src_proto_020_PsParisC_lib_client_test_tezt_lib
   src_lib_workers_test_tezt_lib
   src_lib_webassembly_tests_tezt_lib
   src_lib_wasmer_test_tezt_lib
-  src_lib_wasm_runtime_callbacks_test_tezt_lib
   src_lib_version_test_tezt_lib
   src_lib_tree_encoding_test_tezt_lib
   src_lib_store_unix_test_tezt_lib
@@ -87,6 +90,7 @@
   src_lib_proxy_test_tezt_lib
   src_lib_protocol_environment_test_shell_context_tezt_lib
   src_lib_protocol_environment_test_tezt_lib
+  src_lib_profiler_backends_test_tezt_lib
   src_lib_polynomial_test_tezt_lib
   src_lib_p2p_tezt_tezt_lib
   src_lib_mockup_test_tezt_lib
@@ -97,6 +101,7 @@
   src_lib_hacl_test_tezt_lib
   src_lib_gossipsub_test_tezt_lib
   src_lib_error_monad_test_tezt_lib
+  src_lib_dal_node_test__tezt_lib
   src_lib_crypto_dal_test_tezt_lib
   src_lib_crypto_test_unix_tezt_lib
   src_lib_crypto_test_tezt_lib
@@ -121,7 +126,7 @@
   irmin_test_irmin_tezt_lib
   irmin_test_tezt_lib
   etherlink_tezt_tests_tezt_lib
-  etherlink_bin_node_test_tezt_lib
+  etherlink_lib_wasm_runtime_callbacks_test_tezt_lib
   brassaia_test_brassaia_generic_key_tezt_lib
   brassaia_test_brassaia_data_tezt_lib
   brassaia_test_brassaia_tezos_tezt_lib

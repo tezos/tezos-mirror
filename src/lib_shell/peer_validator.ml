@@ -28,7 +28,7 @@
 
 open Peer_validator_worker_state
 
-module Profiler = (val Profiler.wrap Shell_profiling.chain_validator_profiler)
+module Profiler = (val Profiler.wrap Shell_profiling.peer_validator_profiler)
 
 module Name = struct
   type t = Chain_id.t * P2p_peer.Id.t
@@ -75,7 +75,7 @@ module Types = struct
     parameters : parameters;
     mutable pipeline : Bootstrap_pipeline.t option;
     mutable last_validated_head : Block_header.t;
-    mutable last_advertised_head : Block_header.t;
+    mutable last_advertised_head : Block_hash.t * Block_header.t;
   }
 
   let pipeline_length = function
@@ -90,6 +90,10 @@ open Types
 type t = Worker.dropbox Worker.t
 
 let metrics = Shell_metrics.Peer_validator.init Name.base
+
+let get_last_advertised_head w =
+  let pv = Worker.state w in
+  pv.last_advertised_head
 
 let bootstrap_new_branch w unknown_prefix =
   let open Lwt_result_syntax in
@@ -156,17 +160,18 @@ let only_if_fitness_increases w distant_header hash cont =
       cont `Lower_fitness)
     else cont `Ok
 
+let profiling_new_head_prefix hash info =
+  Format.sprintf "New head : %s" (Block_hash.to_short_b58check hash) :: info
+
+let[@warning "-32"] profiling_validate_new_head_prefix hash info =
+  profiling_new_head_prefix hash ("validate_new_head" :: info)
+
 let validate_new_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
-  let pv = Worker.state w in
-  let block_received = (pv.peer_id, hash) in
-  let[@warning "-26"] sym_prefix l =
-    "peer_validator"
-    :: Block_hash.to_short_b58check hash
-    :: "validate new head" :: l
-  in
-  let*! () = Events.(emit fetching_operations_for_head) block_received in
-  (let* operations =
+  (let pv = Worker.state w in
+   let block_received = (pv.peer_id, hash) in
+   let*! () = Events.(emit fetching_operations_for_head) block_received in
+   let* operations =
      (List.map_ep
         (fun i ->
           protect ~canceler:(Worker.canceler w) (fun () ->
@@ -177,7 +182,9 @@ let validate_new_head w hash (header : Block_header.t) =
                 (hash, i)
                 header.shell.operations_hash))
         (0 -- (header.shell.validation_passes - 1))
-      [@profiler.span_s sym_prefix ["operation fetching"]])
+      [@profiler.span_s
+        {verbosity = Debug}
+          (profiling_validate_new_head_prefix hash ["operation fetching"])])
    in
    (* We redo a check for the fitness here because while waiting for the
       operations, a new head better than this block might be validated. *)
@@ -185,48 +192,65 @@ let validate_new_head w hash (header : Block_header.t) =
    | `Known_valid | `Lower_fitness ->
        (* If the block is known valid or if the fitness does not increase
           we need to clear the fetched operation of the block from the ddb *)
-       List.iter
-         (fun i ->
-           Distributed_db.Operations.clear_or_cancel
-             pv.parameters.chain_db
-             (hash, i))
-         (0 -- (header.shell.validation_passes - 1)) ;
-       return_unit
+       (List.iter
+          (fun i ->
+            Distributed_db.Operations.clear_or_cancel
+              pv.parameters.chain_db
+              (hash, i))
+          (0 -- (header.shell.validation_passes - 1)) ;
+        return_unit)
+       [@profiler.span_s
+         {verbosity = Debug}
+           (profiling_validate_new_head_prefix
+              hash
+              ["fitness does not increase"])]
    | `Ok -> (
-       let*! () = Events.(emit requesting_new_head_validation) block_received in
-       let*! v =
-         (Block_validator.validate_and_apply
-            ~notify_new_block:pv.parameters.notify_new_block
-            ~advertise_after_validation:true
-            pv.parameters.block_validator
-            pv.parameters.chain_db
-            hash
-            header
-            operations [@profiler.span_s sym_prefix ["validate"]])
-       in
-       match v with
-       | Invalid errs ->
-           (* This will convert into a kickban when treated by [on_error] --
-              or, at least, by a worker termination which will close the
-              connection. *)
-           Lwt.return_error errs
-       | Inapplicable_after_validation _errs ->
-           let*! () =
-             Events.(emit ignoring_inapplicable_block) block_received
-           in
-           (* We do not kickban the peer if the block received was
-              successfully validated but inapplicable -- this means that he
-              could have propagated a validated block before terminating
-              its application *)
-           return_unit
-       | Valid ->
-           let*! () = Events.(emit new_head_validation_end) block_received in
-           let meta =
-             Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
-           in
-           Peer_metadata.incr meta Valid_blocks ;
-           return_unit))
-  [@profiler.span_s sym_prefix ["validate new head"]]
+       (let*! () =
+          Events.(emit requesting_new_head_validation) block_received
+        in
+        let*! v =
+          (Block_validator.validate_and_apply
+             ~notify_new_block:pv.parameters.notify_new_block
+             ~advertise_after_validation:true
+             pv.parameters.block_validator
+             pv.parameters.chain_db
+             hash
+             header
+             operations
+           [@profiler.span_s
+             {verbosity = Debug}
+               (profiling_validate_new_head_prefix
+                  hash
+                  ["fitness increases"; "validate_and_apply"])])
+        in
+        match v with
+        | Invalid errs ->
+            (* This will convert into a kickban when treated by [on_error] --
+               or, at least, by a worker termination which will close the
+               connection. *)
+            Lwt.return_error errs
+        | Inapplicable_after_validation _errs ->
+            let*! () =
+              Events.(emit ignoring_inapplicable_block) block_received
+            in
+            (* We do not kickban the peer if the block received was
+               successfully validated but inapplicable -- this means that he
+               could have propagated a validated block before terminating
+               its application *)
+            return_unit
+        | Valid ->
+            let*! () = Events.(emit new_head_validation_end) block_received in
+            let meta =
+              Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
+            in
+            Peer_metadata.incr meta Valid_blocks ;
+            return_unit)
+       [@profiler.span_s
+         {verbosity = Debug}
+           (profiling_validate_new_head_prefix hash ["fitness increases"])]))
+  [@profiler.span_s
+    {verbosity = Info; metadata = [("prometheus", "validate_new_head")]}
+      (profiling_new_head_prefix hash [])]
 
 let assert_acceptable_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
@@ -241,15 +265,6 @@ let assert_acceptable_head w hash (header : Block_header.t) =
 
 let may_validate_new_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
-  let () =
-    (()
-    [@profiler.mark
-      [
-        "peer_validator";
-        Block_hash.to_short_b58check hash;
-        "may validate new head";
-      ]])
-  in
   let pv = Worker.state w in
   let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
   let*! valid_block = Store.Block.is_known_valid chain_store hash in
@@ -261,43 +276,46 @@ let may_validate_new_head w hash (header : Block_header.t) =
     Store.Block.is_known_invalid chain_store header.shell.predecessor
   in
   let block_received = (pv.peer_id, hash) in
-  if valid_block then
+  if valid_block then (
     let*! () =
       Events.(emit ignoring_previously_validated_block) block_received
     in
-    return_unit
-  else if invalid_block then
+    ()
+    [@profiler.mark
+      {verbosity = Info} (profiling_new_head_prefix hash ["valid block"])] ;
+    return_unit)
+  else if invalid_block then (
     let*! () = Events.(emit ignoring_invalid_block) block_received in
-    tzfail Validation_errors.Known_invalid
+    ()
+    [@profiler.mark
+      {verbosity = Info} (profiling_new_head_prefix hash ["invalid block"])] ;
+    tzfail Validation_errors.Known_invalid)
   else if invalid_predecessor then
     let*! () = Events.(emit ignoring_invalid_block) block_received in
-    let* _ =
-      Distributed_db.commit_invalid_block
-        pv.parameters.chain_db
-        hash
-        header
-        [Validation_errors.Known_invalid]
+    let* () =
+      (Distributed_db.commit_invalid_block
+         pv.parameters.chain_db
+         hash
+         header
+         [Validation_errors.Known_invalid]
+       [@profiler.span_s
+         {verbosity = Info}
+           (profiling_new_head_prefix hash ["commit invalid block"])])
     in
     tzfail Validation_errors.Known_invalid
   else if not valid_predecessor then (
     let*! () = Events.(emit missing_new_head_predecessor) block_received in
+    ()
+    [@profiler.mark
+      {verbosity = Info}
+        (profiling_new_head_prefix hash ["missing new head predecessor"])] ;
+
     Distributed_db.Request.current_branch pv.parameters.chain_db pv.peer_id ;
     return_unit)
   else
     only_if_fitness_increases w header hash @@ function
     | `Known_valid | `Lower_fitness -> return_unit
     | `Ok ->
-        let () =
-          (()
-          [@profiler.mark
-            [
-              "peer_validator";
-              Block_hash.to_short_b58check hash;
-              "may validate new head";
-              "validate new head";
-            ]])
-        in
-
         let* () = assert_acceptable_head w hash header in
         validate_new_head w hash header
 
@@ -310,8 +328,13 @@ let may_validate_new_branch w locator =
     locator
   in
   only_if_fitness_increases w distant_header distant_hash @@ function
-  | `Known_valid | `Lower_fitness -> return_unit
+  | `Known_valid | `Lower_fitness ->
+      ()
+      [@profiler.mark
+        {verbosity = Info} ["New branch"; "fitness does not increase"]] ;
+      return_unit
   | `Ok -> (
+      () [@profiler.mark {verbosity = Info} ["New branch"; "fitness increases"]] ;
       let* () = assert_acceptable_head w distant_hash distant_header in
       let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
       (* TODO: should we consider level as well ? Rolling could have
@@ -360,13 +383,21 @@ let on_request (type a b) w (req : (a, b) Request.t) : (a, b) result Lwt.t =
   match req with
   | Request.New_head (hash, header) ->
       let* () = Events.(emit processing_new_head) (pv.peer_id, hash) in
-      may_validate_new_head w hash header
+      (may_validate_new_head
+         w
+         hash
+         header
+       [@profiler.span_s
+         {verbosity = Notice}
+           [Format.sprintf "New head : %s" (Block_hash.to_short_b58check hash)]])
   | Request.New_branch (locator, _seed) ->
       (* TODO penalize empty locator... ?? *)
       let* () =
         Events.(emit processing_new_branch) (pv.peer_id, locator.head_hash)
       in
-      may_validate_new_branch w locator
+      (may_validate_new_branch
+         w
+         locator [@profiler.span_s {verbosity = Notice} ["New branch"]])
 
 let on_completion (type a request_error) _w (r : (a, request_error) Request.t) _
     st =
@@ -523,7 +554,8 @@ let on_launch _ name parameters : (_, launch_error) result Lwt.t =
       parameters = {parameters with notify_new_block};
       pipeline = None;
       last_validated_head = Store.Block.header genesis;
-      last_advertised_head = Store.Block.header genesis;
+      last_advertised_head =
+        (Store.Block.hash genesis, Store.Block.header genesis);
     }
   and notify_new_block ({block; _} as new_block) =
     pv.last_validated_head <- Store.Block.header block ;
@@ -533,21 +565,21 @@ let on_launch _ name parameters : (_, launch_error) result Lwt.t =
   Lwt.return (Ok pv)
 
 let table =
-  let merge w (Worker.Any_request neu) old =
+  let merge w (Worker.Any_request (neu, neu_metadata)) old =
     let pv = Worker.state w in
     match neu with
     | Request.New_branch (locator, _) ->
-        pv.last_advertised_head <- locator.Block_locator.head_header ;
-        Some (Worker.Any_request neu)
-    | Request.New_head (_, header) -> (
-        pv.last_advertised_head <- header ;
+        pv.last_advertised_head <- (locator.head_hash, locator.head_header) ;
+        Some (Worker.Any_request (neu, neu_metadata))
+    | Request.New_head (hash, header) -> (
+        pv.last_advertised_head <- (hash, header) ;
         (* TODO penalize decreasing fitness *)
         match old with
-        | Some (Worker.Any_request (Request.New_branch _) as old) ->
+        | Some (Worker.Any_request (Request.New_branch _, _) as old) ->
             Some old (* ignore *)
-        | Some (Worker.Any_request (Request.New_head _)) ->
-            Some (Any_request neu)
-        | None -> Some (Any_request neu))
+        | Some (Worker.Any_request (Request.New_head _, _)) ->
+            Some (Any_request (neu, neu_metadata))
+        | None -> Some (Any_request (neu, neu_metadata)))
   in
   Worker.create_table (Dropbox {merge})
 
@@ -570,7 +602,9 @@ let create ?(notify_new_block = fun _ -> ()) ?(notify_termination = fun _ -> ())
 
     let on_close = on_close
 
-    let on_error = on_error
+    let on_error w status req err =
+      Lwt_result.bind (on_error w status req err) (fun () ->
+          Lwt_result.return `Continue)
 
     let on_completion = on_completion
 

@@ -39,6 +39,15 @@ pub const SBI_TEZOS_ED25519_SIGN: u64 = 0x06;
 /// Function ID for `sbi_tezos_blake2b_hash256`
 pub const SBI_TEZOS_BLAKE2B_HASH256: u64 = 0x07;
 
+/// Function ID for `sbi tezos reveal`
+pub const SBI_TEZOS_REVEAL: u64 = 0x09;
+
+/// Maximum size of Reveal Request
+pub const REVEAL_REQUEST_MAX_SIZE: usize = 4096;
+
+/// Maximum size of Reveal Response Data
+pub const REVEAL_DATA_MAX_SIZE: usize = 4096;
+
 /// Standard SBI errors
 #[derive(Debug, Copy, Clone)]
 #[repr(i64)]

@@ -814,8 +814,8 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
          Signature.Ed25519.Public_key_hash.pp
          key.pkh)
   in
-  let pk = Signature.Of_V1.public_key pk in
-  let sk = Signature.Of_V1.secret_key sk in
+  let pk = Tezos_crypto.Signature.Of_V1.public_key pk in
+  let sk = Tezos_crypto.Signature.Of_V1.secret_key sk in
   let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
   let* sk_uri =
     if encrypted then

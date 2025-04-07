@@ -14,11 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-let store =
-  Brassaia_test_helpers.Brassaia_test.store
-    (module Brassaia_mem)
-    (module Brassaia.Metadata.None)
-
+let store = Brassaia_test_helpers.Brassaia_test.store (module Brassaia_mem)
 let config = Brassaia_mem.config ()
 let init ~config:_ = Lwt.return_unit
 

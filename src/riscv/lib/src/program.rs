@@ -2,11 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    kernel_loader,
-    machine_state::bus::{self, main_memory::MainMemoryLayout, Address},
-    parser::parse_block,
-};
+use crate::{kernel_loader, machine_state::main_memory, parser::parse_block};
 use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData};
 
 /// RISC-V program
@@ -14,7 +10,7 @@ pub struct Program<'a, ML> {
     _pd: PhantomData<ML>,
 
     /// Address of the program's entrypoint
-    pub entrypoint: Address,
+    pub entrypoint: main_memory::Address,
 
     /// Segments to be written to the main memory
     // Note: `[u8]` owned is `Vec<u8>`. The segment is either re-using an
@@ -23,7 +19,10 @@ pub struct Program<'a, ML> {
     // Invariant: `segments[index]` corresponds to an array
     // representing bytes at `index..index+length` and
     // all the arrays are non-overlapping
-    pub segments: BTreeMap<Address, Cow<'a, [u8]>>,
+    pub segments: BTreeMap<main_memory::Address, Cow<'a, [u8]>>,
+
+    /// Raw program headers
+    pub program_headers: Option<kernel_loader::ProgramHeaders<'a>>,
 }
 
 impl<'a, ML> kernel_loader::Memory for Program<'a, ML> {
@@ -94,32 +93,25 @@ impl<'a, ML> kernel_loader::Memory for Program<'a, ML> {
     }
 }
 
-impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
+impl<'a, ML: main_memory::MainMemoryLayout> Program<'a, ML> {
     /// Parse the given ELF executable and convert it into our program
     /// representation. The main memory layout `ML` is used to compute the
     /// correct addresses
     pub fn from_elf(elf: &'a [u8]) -> Result<Self, kernel_loader::Error> {
-        let start_if_reloc = bus::start_of_main_memory::<ML>();
+        let start_if_reloc = main_memory::FIRST_ADDRESS;
 
         let mut myself = Self {
             _pd: PhantomData,
             entrypoint: start_if_reloc,
             segments: BTreeMap::new(),
+            program_headers: None,
         };
 
-        myself.entrypoint = kernel_loader::load_elf(&mut myself, start_if_reloc, elf)?.entry;
+        let load_result = kernel_loader::load_elf(&mut myself, start_if_reloc, elf)?;
+        myself.entrypoint = load_result.entry;
+        myself.program_headers = Some(load_result.program_headers);
 
         Ok(myself)
-    }
-
-    /// Construct a program from raw RISC-V machine code.
-    pub fn from_raw(code: &'a [u8]) -> Self {
-        let entrypoint = bus::start_of_main_memory::<ML>();
-        Self {
-            _pd: PhantomData,
-            entrypoint,
-            segments: BTreeMap::from_iter([(entrypoint, Cow::Borrowed(code))]),
-        }
     }
 
     pub fn parsed(&self) -> BTreeMap<u64, String> {
@@ -129,7 +121,7 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
             let instructions = parse_block(segment.1);
             for instr in instructions {
                 parsed.insert(address, instr.to_string());
-                address += instr.width();
+                address += instr.width() as u64;
             }
         }
         parsed
@@ -140,7 +132,7 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
 mod tests {
     use crate::{
         kernel_loader::{self, Memory},
-        machine_state::bus::{main_memory::M1M, start_of_main_memory},
+        machine_state::main_memory::{self, M1M},
         program::Program,
     };
     use std::{cell::RefCell, collections::BTreeMap, fs, io::Cursor, marker::PhantomData};
@@ -151,6 +143,7 @@ mod tests {
             _pd: PhantomData,
             entrypoint: 0,
             segments: BTreeMap::new(),
+            program_headers: None,
         };
         let mut buffer = Cursor::new(vec![0; 2048]);
 
@@ -179,7 +172,7 @@ mod tests {
             fs::read(PATH).expect("Failed read dummy RISC-V kernel (try: make -C src/riscv build)");
 
         let mut buffer = Cursor::new(Vec::new());
-        kernel_loader::load_elf(&mut buffer, start_of_main_memory::<M1M>(), &contents).unwrap();
+        kernel_loader::load_elf(&mut buffer, main_memory::FIRST_ADDRESS, &contents).unwrap();
         let buffer = buffer.into_inner();
 
         let program = Program::<M1M>::from_elf(&contents).unwrap();

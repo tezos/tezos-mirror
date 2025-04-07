@@ -31,7 +31,8 @@ pub const PATH_KERNEL_BOOT: RefPath = RefPath::assert_from(b"/kernel/boot.wasm")
 /// - paths are a sequence of non-empty *steps*, separated by a single `b'/'`.
 /// - steps are a sequence of either ascii-encoded alphanumeric bytes, or `b'.'` or `b'_'` or `b'-'`.
 /// - the maximum length of a path is [PATH_MAX_SIZE].
-/// where `b'/'` is the [PATH_SEPARATOR].
+///
+/// In the above, `b'/'` is the [PATH_SEPARATOR].
 ///
 /// i.e. path encoding may be summarised by the regex `(\/[A-Za-z0-9._\-]+)+` up to a maximum
 /// [PATH_MAX_SIZE] bytes.

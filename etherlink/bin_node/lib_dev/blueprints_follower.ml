@@ -8,14 +8,15 @@
 open Ethereum_types
 
 type handler =
-  Ethereum_types.quantity ->
+  quantity ->
   Blueprint_types.with_events ->
-  (unit, tztrace) result Lwt.t
+  [`Check_for_reorg of quantity | `Continue] tzresult Lwt.t
 
 type parameters = {
   on_new_blueprint : handler;
   time_between_blocks : Configuration.time_between_blocks;
   evm_node_endpoint : Uri.t;
+  ping_tx_pool : bool;
 }
 
 type error += Timeout
@@ -46,14 +47,8 @@ let local_head_too_old ?remote_head ~evm_node_endpoint
       when is_too_old ~remote:remote_head ~next:next_blueprint_number ->
         return (Qty remote_head)
     | None | Some _ ->
-        (* The observer is designed to be resilent to downtime from its EVM
-           node endpoint. It would not make sense to break this logic here, so
-           we force [keep_alive] to true. *)
-        Services.call
-          (module Block_number)
-          ~keep_alive:true
-          ~evm_node_endpoint
-          ()
+        (* See {Note keep_alive} *)
+        Batch.call (module Block_number) ~keep_alive:true ~evm_node_endpoint ()
   in
   return
     ( is_too_old ~remote:remote_head_number ~next:next_blueprint_number,
@@ -61,7 +56,7 @@ let local_head_too_old ?remote_head ~evm_node_endpoint
 
 let quantity_succ (Qty x) = Qty Z.(succ x)
 
-let[@tailrec] rec go ?remote_head ~next_blueprint_number ~first_connection
+let[@tailrec] rec catchup ?remote_head ~next_blueprint_number ~first_connection
     params =
   let open Lwt_result_syntax in
   Metrics.start_bootstrapping () ;
@@ -74,16 +69,25 @@ let[@tailrec] rec go ?remote_head ~next_blueprint_number ~first_connection
 
   if local_head_too_old then
     let* blueprint =
+      (* See {Note keep_alive} *)
       Evm_services.get_blueprint
+        ~keep_alive:true
         ~evm_node_endpoint:params.evm_node_endpoint
         next_blueprint_number
     in
-    let* () = params.on_new_blueprint next_blueprint_number blueprint in
-    (go [@tailcall])
-      ~next_blueprint_number:(quantity_succ next_blueprint_number)
-      ~remote_head
-      ~first_connection
-      params
+    let* r = params.on_new_blueprint next_blueprint_number blueprint in
+    match r with
+    | `Continue ->
+        (catchup [@tailcall])
+          ~next_blueprint_number:(quantity_succ next_blueprint_number)
+          ~remote_head
+          ~first_connection
+          params
+    | `Check_for_reorg level ->
+        (catchup [@tailcall])
+          ~next_blueprint_number:level
+          ~first_connection
+          params
   else
     let* () =
       when_ (not first_connection) @@ fun () ->
@@ -105,7 +109,10 @@ let[@tailrec] rec go ?remote_head ~next_blueprint_number ~first_connection
     | Ok blueprints_stream ->
         (stream_loop [@tailcall]) next_blueprint_number params blueprints_stream
     | Error _ ->
-        (go [@tailcall]) ~next_blueprint_number ~first_connection:false params
+        (catchup [@tailcall])
+          ~next_blueprint_number
+          ~first_connection:false
+          params
 
 and[@tailrec] stream_loop (Qty next_blueprint_number) params stream =
   let open Lwt_result_syntax in
@@ -119,23 +126,39 @@ and[@tailrec] stream_loop (Qty next_blueprint_number) params stream =
       ]
   in
   match candidate with
-  | Ok (Some blueprint) ->
-      let* () = params.on_new_blueprint (Qty next_blueprint_number) blueprint in
-      let* () = Tx_pool.pop_and_inject_transactions () in
-      (stream_loop [@tailcall])
-        (Qty (Z.succ next_blueprint_number))
-        params
-        stream
+  | Ok (Some blueprint) -> (
+      let* r = params.on_new_blueprint (Qty next_blueprint_number) blueprint in
+      let* () =
+        when_ params.ping_tx_pool @@ fun () ->
+        Tx_pool.pop_and_inject_transactions ()
+      in
+      match r with
+      | `Continue ->
+          (stream_loop [@tailcall])
+            (Qty (Z.succ next_blueprint_number))
+            params
+            stream
+      | `Check_for_reorg level ->
+          (catchup [@tailcall])
+            ~next_blueprint_number:level
+            ~first_connection:false
+            params)
   | Ok None | Error [Timeout] ->
-      (go [@tailcall])
+      (catchup [@tailcall])
         ~next_blueprint_number:(Qty next_blueprint_number)
         ~first_connection:false
         params
   | Error err -> fail err
 
-let start ~time_between_blocks ~evm_node_endpoint ~next_blueprint_number
-    on_new_blueprint =
-  go
+let start ?(ping_tx_pool = true) ~time_between_blocks ~evm_node_endpoint
+    ~next_blueprint_number on_new_blueprint =
+  catchup
     ~next_blueprint_number
     ~first_connection:true
-    {time_between_blocks; evm_node_endpoint; on_new_blueprint}
+    {time_between_blocks; evm_node_endpoint; on_new_blueprint; ping_tx_pool}
+
+(* {Note keep_alive}
+
+   The observer is designed to be resilent to downtime from its EVM node
+   endpoint. It would not make sense to break this logic here, so we force
+   [keep_alive] to true. *)

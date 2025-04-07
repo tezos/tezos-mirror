@@ -6,6 +6,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Evm_node_lib_dev_encoding
+
+(** A list of network officially supported by the EVM node. *)
+type supported_network = Mainnet | Testnet
+
+val pp_supported_network : Format.formatter -> supported_network -> unit
+
 type log_filter_config = {
   max_nb_blocks : int;  (** Maximum block range for [get_logs]. *)
   max_nb_logs : int;  (** Maximum number of logs that [get_logs] can return. *)
@@ -23,10 +30,15 @@ type time_between_blocks =
           if there are no transactions to include, a block is produced after
            [time_between_blocks]. *)
 
+type native_execution_policy = Always | Rpcs_only | Never
+
 type kernel_execution_config = {
   preimages : string;  (** Path to the preimages directory. *)
   preimages_endpoint : Uri.t option;
       (** Endpoint where pre-images can be fetched individually when missing. *)
+  native_execution_policy : native_execution_policy;
+      (** Policy deciding when to use the native execution for supported
+          kernels. *)
 }
 
 type blueprints_publisher_config = {
@@ -49,17 +61,44 @@ type blueprints_publisher_config = {
           is not allowed to use the DAL. *)
 }
 
-type garbage_collector = {split_frequency_in_seconds : int}
+type garbage_collector_parameters = {
+  split_frequency_in_seconds : int;
+  number_of_chunks : int;
+}
+
+type history_mode =
+  | Archive  (** Keeps all blocks, operations and states. *)
+  | Rolling of garbage_collector_parameters
+      (** Keep blocks, operations and states for a period defined by
+          {!type-garbage_collector_parameters}. *)
+  | Full of garbage_collector_parameters
+      (** Keep all blocks and transactions. Keep operations and states for a period defined by
+              {!type-garbage_collector_parameters}. *)
+
+(** RPC server implementation. *)
+type rpc_server =
+  | Resto  (** Resto/Cohttp (default) *)
+  | Dream  (** Dream/httpun *)
+
+(** Parameters for monitoring websocket connection heartbeats. *)
+type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
+
+val chain_id : supported_network -> Ethereum_types.chain_id
+
+type l2_chain = {chain_id : Ethereum_types.chain_id}
 
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
 type experimental_features = {
   drop_duplicate_on_injection : bool;
+  blueprints_publisher_order_enabled : bool;
   enable_send_raw_transaction : bool;
-  node_transaction_validation : bool;
-  block_storage_sqlite3 : bool;
   overwrite_simulation_tick_limit : bool;
-  garbage_collector : garbage_collector option;
+  rpc_server : rpc_server;
+  enable_websocket : bool;
+  max_websocket_message_length : int;
+  monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
+  l2_chains : l2_chain list option;
 }
 
 type sequencer = {
@@ -100,7 +139,9 @@ type proxy = {
   ignore_block_param : bool;
 }
 
-type fee_history = {max_count : int option; max_past : int option}
+type fee_history_max_count = Unlimited | Limit of int
+
+type fee_history = {max_count : fee_history_max_count; max_past : int option}
 
 type restricted_rpcs =
   | Unrestricted
@@ -139,10 +180,25 @@ type t = {
   experimental_features : experimental_features;
   fee_history : fee_history;
   finalized_view : bool;
+  history_mode : history_mode option;
 }
 
-(** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir]. *)
-val encoding : string -> t Data_encoding.t
+val history_mode_encoding : history_mode Data_encoding.t
+
+val pp_history_mode_debug : Format.formatter -> history_mode -> unit
+
+val pp_history_mode_info : Format.formatter -> history_mode -> unit
+
+val native_execution_policy_encoding : native_execution_policy Data_encoding.t
+
+(** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir].
+
+    If [encoding] is passed, some default values are set according to the
+    selected network, for a more straightforward UX. *)
+val encoding : ?network:supported_network -> string -> t Data_encoding.t
+
+(** Encoding for {!type-rpc_server}. *)
+val rpc_server_encoding : rpc_server Data_encoding.t
 
 (** [default_data_dir] is the default value for [data_dir]. *)
 val default_data_dir : string
@@ -156,10 +212,12 @@ val config_filename : data_dir:string -> string
     are overwritten. *)
 val save : force:bool -> data_dir:string -> t -> unit tzresult Lwt.t
 
-val load_file : data_dir:string -> string -> t tzresult Lwt.t
+val load_file :
+  ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
 
 (** [load ~data_dir] loads a proxy configuration stored in [data_dir]. *)
-val load : data_dir:string -> t tzresult Lwt.t
+val load :
+  ?network:supported_network -> data_dir:string -> unit -> t tzresult Lwt.t
 
 (** [sequencer_config_exn config] returns the sequencer config of
     [config] or fails *)
@@ -214,6 +272,18 @@ val observer_config_dft :
 
 val make_pattern_restricted_rpcs : string -> restricted_rpcs
 
+val string_of_history_mode_debug : history_mode -> string
+
+val string_of_history_mode_info : history_mode -> string
+
+val history_mode_of_string_opt : string -> history_mode option
+
+(** [retention ~days] returns the GC parameters to retain [days] of history
+    when provided or the default otherwise. *)
+val gc_param_from_retention_period : days:int -> garbage_collector_parameters
+
+val default_history_mode : history_mode
+
 module Cli : sig
   val create :
     data_dir:string ->
@@ -225,12 +295,13 @@ module Cli : sig
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
-    keep_alive:bool ->
+    ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
-    verbose:bool ->
+    ?verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
+    ?native_execution_policy:native_execution_policy ->
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
@@ -246,9 +317,11 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    finalized_view:bool ->
+    ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
+    ?network:supported_network ->
+    ?history_mode:history_mode ->
     unit ->
     t
 
@@ -261,12 +334,13 @@ module Cli : sig
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
-    keep_alive:bool ->
+    ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
-    verbose:bool ->
+    ?verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
+    ?native_execution_policy:native_execution_policy ->
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
@@ -282,9 +356,10 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    finalized_view:bool ->
+    ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
-    dal_slots:int trace option ->
+    ?history_mode:history_mode ->
+    ?dal_slots:int list ->
     t ->
     t
 
@@ -298,12 +373,13 @@ module Cli : sig
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
-    keep_alive:bool ->
+    ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
-    verbose:bool ->
+    ?verbose:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
+    ?native_execution_policy:native_execution_policy ->
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
@@ -319,9 +395,11 @@ module Cli : sig
     ?log_filter_chunk_size:int ->
     ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
-    finalized_view:bool ->
+    ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
+    ?network:supported_network ->
+    ?history_mode:history_mode ->
     unit ->
     t tzresult Lwt.t
 end

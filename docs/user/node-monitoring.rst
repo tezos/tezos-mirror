@@ -115,9 +115,9 @@ For instance, the metric ``octez_distributed_db_requester_table_length`` has a l
   octez_distributed_db_requester_table_length{requester_kind="protocol"} y
   ...
 
-Metrics provide information about the node in the form of a `gauge <https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#gauge>`_ that can increase or decrease (like the number of connections),
-a `counter <https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#counter>`_ that can only increase (like the head level),
-or a `histogram <https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#histogram>`_ used to track the size of events and how long they usually take (e.g., the time taken by an RPC call).
+Metrics provide information about the node in the form of a `gauge <https://github.com/prometheus/OpenMetrics/blob/main/specification/OpenMetrics.md#gauge>`_ that can increase or decrease (like the number of connections),
+a `counter <https://github.com/prometheus/OpenMetrics/blob/main/specification/OpenMetrics.md#counter>`_ that can only increase (like the head level),
+or a `histogram <https://github.com/prometheus/OpenMetrics/blob/main/specification/OpenMetrics.md#histogram>`_ used to track the size of events and how long they usually take (e.g., the time taken by an RPC call).
 
 The label value is sometimes used to store information that can't be described by the metric value (which can only be a float). This is used for example by the ``octez_version`` metric that provides the version within the labels.
 
@@ -209,7 +209,7 @@ To install Netdata:
 
   bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 
-Add the following at the end of ``/etc/netdata/app_groups.conf``
+Add the following at the end of ``/etc/netdata/apps_groups.conf``
 
 .. code-block:: shell
 
@@ -265,7 +265,7 @@ With a correct install, you should see lines such as::
   SET '/path/to/data/dir/' = 48585735837
   END
 
-Note, if you use filecheck for storage monitoring, you need to configure your dashboards accordingly. More details in the :ref:`Grafazos configuration section <grafazos_configuration>`.
+Note, if you use filecheck for storage monitoring, you need to configure your dashboards accordingly. More details in the :doc:`Grafazos documentation <../grafazos-doc/index>`.
 
 .. _monitoring_logs:
 
@@ -329,21 +329,4 @@ You can interactively create your own dashboards to monitor your node, using the
 
 `Grafazos <https://gitlab.com/nomadic-labs/grafazos>`_ generates JSON files that you can import into the Grafana interface.
 
-This tool generates the following dashboards:
-
-- ``octez-compact``: A compact dashboard that gives a brief overview of the various node metrics on a single page.
-- ``octez-basic``: A basic dashboard with all the node metrics.
-- ``octez-with-logs``: Same as basic but also displays the node's logs. This dashboard requires to follow the instructions of :ref:`the logs part <monitoring_logs>`.
-- ``octez-full``: A full dashboard with the logs and hardware data. This dashboard should be used with `Netdata <https://www.netdata.cloud/>`_ (for supporting hardware data) in addition to Promtail.
-
-You can generate them from the sources, with your own configuration. Or you can use the JSON files, compatible with your node version found `here <https://gitlab.com/nomadic-labs/grafazos/-/packages>`_.
-
-.. _grafazos_configuration:
-
-The dashboards can be configured by setting environment variables before starting their generation (using ``make``).
-
-The available variables are:
-
-- ``BRANCH``: Used to specify the name of the branch of the node.
-- ``NODE_INSTANCE_LABEL``: Used to set the name of the node instance label in the metrics.
-- ``STORAGE_MODE``: To be set to ``filecheck`` if the :ref:`storage monitoring with filecheck <filecheck>` is enabled.
+For more details on how to use Grafazos, check the :doc:`its documentation <../grafazos-doc/index>`.

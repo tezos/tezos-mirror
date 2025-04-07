@@ -47,10 +47,11 @@ val pack_operation :
 
 val sign :
   ?watermark:Signature.watermark ->
+  Context.t ->
   Signature.secret_key ->
   Block_hash.t ->
   packed_contents_list ->
-  packed_operation
+  (packed_operation, tztrace) result Environment.Lwt.t
 
 (** Create an unpacked attestation that is expected for given [Block.t].
 
@@ -99,6 +100,26 @@ val attestation :
   ?branch:Block_hash.t ->
   Block.t ->
   Operation.packed tzresult Lwt.t
+
+(** Create a packed attestations_aggregate that is expected for a given
+    [Block.t]. Block context is expected to include at least one delegate with a
+    BLS key (or a registered consensus keys). *)
+val attestations_aggregate :
+  ?committee:public_key_hash list ->
+  ?level:Raw_level.t ->
+  ?round:Round.t ->
+  ?block_payload_hash:Block_payload_hash.t ->
+  ?branch:Block_hash.t ->
+  Block.t ->
+  Operation.packed tzresult Lwt.t
+
+(** Aggregate a list of attestations in a single Attestations_aggregate.
+    Attestations signed by non-bls delegates are ignored. Evaluates to {!None} if
+    no bls-signed attestations are found or if signature_aggregation failed
+    (due to unreadable signature representation). *)
+val aggregate :
+  Kind.attestation_consensus_kind Kind.consensus operation trace ->
+  Operation.packed option
 
 (** Create a packed preattestation that is expected for a given
     [Block.t] by packing the result of {!raw_preattestation}. *)
@@ -340,6 +361,13 @@ val double_baking :
   Context.t ->
   Block_header.block_header ->
   Block_header.block_header ->
+  Operation.packed
+
+val dal_entrapment :
+  Context.t ->
+  Kind.attestation operation ->
+  Dal.Slot_index.t ->
+  Dal.Shard_with_proof.t ->
   Operation.packed
 
 val activation :
@@ -624,12 +652,18 @@ val zk_rollup_origination :
   nb_ops:int ->
   (Operation.packed * Zk_rollup.t) tzresult Lwt.t
 
+(* [update_consensus_key ?proof_signer ctxt source public_key] tries to update
+   the consensus key of [source] to [public_key]. If a [proof_signer] is given,
+   we create a signature of the [public_key] using the [proof_signer] secret
+   key. This signature is then given as a [proof] in the update_consensus_key
+   operation. *)
 val update_consensus_key :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
+  ?proof_signer:Contract.t ->
   Context.t ->
   Contract.t ->
   public_key ->

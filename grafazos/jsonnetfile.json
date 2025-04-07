@@ -9,6 +9,15 @@
         }
       },
       "version": "main"
+    },
+    {
+      "source": {
+        "git": {
+          "remote": "https://github.com/grafana/grafonnet.git",
+          "subdir": "gen/grafonnet-v11.1.0"
+        }
+      },
+      "version": "1ce5aec"
     }
   ],
   "legacyImports": true

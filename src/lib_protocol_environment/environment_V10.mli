@@ -79,9 +79,9 @@ module type T = sig
        and type P256.Public_key.t = Tezos_crypto.Signature.P256.Public_key.t
        and type P256.t = Tezos_crypto.Signature.P256.t
        and type Bls.Public_key_hash.t =
-        Tezos_crypto.Signature.Bls.Public_key_hash.t
-       and type Bls.Public_key.t = Tezos_crypto.Signature.Bls.Public_key.t
-       and type Bls.t = Tezos_crypto.Signature.Bls.t
+        Tezos_crypto.Signature.Bls_aug.Public_key_hash.t
+       and type Bls.Public_key.t = Tezos_crypto.Signature.Bls_aug.Public_key.t
+       and type Bls.t = Tezos_crypto.Signature.Bls_aug.t
        and type Signature.public_key_hash =
         Tezos_crypto.Signature.V1.public_key_hash
        and type Signature.public_key = Tezos_crypto.Signature.V1.public_key

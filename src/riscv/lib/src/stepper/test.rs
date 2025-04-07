@@ -8,9 +8,11 @@ use super::{StepResult, Stepper, StepperStatus};
 use crate::{
     kernel_loader,
     machine_state::{
-        bus::main_memory::{MainMemoryLayout, M1G},
-        mode, CacheLayouts, MachineCoreState, MachineError, MachineState, MachineStateLayout,
+        CacheLayouts, MachineCoreState, MachineError, MachineState, MachineStateLayout,
         StepManyResult, TestCacheLayouts,
+        block_cache::bcall::{Block, Interpreted},
+        main_memory::{M1G, MainMemoryLayout},
+        mode,
     },
     program::Program,
     state_backend::owned_backend::Owned,
@@ -74,24 +76,29 @@ pub enum TestStepperError {
 pub type TestStepperLayout<ML = M1G, CL = TestCacheLayouts> =
     (PosixStateLayout, MachineStateLayout<ML, CL>);
 
-pub struct TestStepper<ML: MainMemoryLayout = M1G, CL: CacheLayouts = TestCacheLayouts> {
-    machine_state: MachineState<ML, CL, Owned>,
+pub struct TestStepper<
+    ML: MainMemoryLayout = M1G,
+    CL: CacheLayouts = TestCacheLayouts,
+    B: Block<ML, Owned> = Interpreted<ML, Owned>,
+> {
+    machine_state: MachineState<ML, CL, B, Owned>,
     posix_state: PosixState<Owned>,
 }
 
-impl<ML: MainMemoryLayout> TestStepper<ML> {
-    /// Initialise an interpreter with a given [program], starting execution in [mode].
+impl<ML: MainMemoryLayout, B: Block<ML, Owned>> TestStepper<ML, TestCacheLayouts, B> {
+    /// Initialise an interpreter with a given `program`, starting execution in [mode].
     /// An initial ramdisk can also optionally be passed.
     #[inline]
     pub fn new(
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
+        block_builder: B::BlockBuilder,
     ) -> Result<Self, TestStepperError> {
-        Ok(Self::new_with_parsed_program(program, initrd, mode)?.0)
+        Ok(Self::new_with_parsed_program(program, initrd, mode, block_builder)?.0)
     }
 
-    /// Initialise an interpreter with a given [program], starting execution in [mode].
+    /// Initialise an interpreter with a given `program`, starting execution in [mode::Mode].
     /// An initial ramdisk can also optionally be passed. Returns both the interpreter
     /// and the fully parsed program.
     #[inline]
@@ -99,10 +106,11 @@ impl<ML: MainMemoryLayout> TestStepper<ML> {
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
+        block_builder: B::BlockBuilder,
     ) -> Result<(Self, BTreeMap<u64, String>), TestStepperError> {
         let (posix_space, machine_state_space) = Owned::allocate::<TestStepperLayout<ML>>();
         let posix_state = PosixState::bind(posix_space);
-        let machine_state = MachineState::bind(machine_state_space);
+        let machine_state = MachineState::bind(machine_state_space, block_builder);
         let mut stepper = Self {
             posix_state,
             machine_state,

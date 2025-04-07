@@ -1,0 +1,307 @@
++-----------------+----------------------+----------+
+| Name            | Size                 | Contents |
++=================+======================+==========+
+| Unnamed field 0 | Determined from data | $X_11    |
++-----------------+----------------------+----------+
+
+
+X_0
+***
+
++-----------------------+----------+------------------------------------+
+| Name                  | Size     | Contents                           |
++=======================+==========+====================================+
+| # bytes in next field | 4 bytes  | unsigned 30-bit big-endian integer |
++-----------------------+----------+------------------------------------+
+| share                 | Variable | sequence of bytes                  |
++-----------------------+----------+------------------------------------+
+| shard_proof           | 48 bytes | bytes                              |
++-----------------------+----------+------------------------------------+
+
+
+public_key_hash (21 bytes, 8-bit tag)
+*************************************
+
+Ed25519 (tag 0)
+===============
+
++-------------------------+----------+------------------------+
+| Name                    | Size     | Contents               |
++=========================+==========+========================+
+| Tag                     | 1 byte   | unsigned 8-bit integer |
++-------------------------+----------+------------------------+
+| Ed25519.Public_key_hash | 20 bytes | bytes                  |
++-------------------------+----------+------------------------+
+
+
+Secp256k1 (tag 1)
+=================
+
++---------------------------+----------+------------------------+
+| Name                      | Size     | Contents               |
++===========================+==========+========================+
+| Tag                       | 1 byte   | unsigned 8-bit integer |
++---------------------------+----------+------------------------+
+| Secp256k1.Public_key_hash | 20 bytes | bytes                  |
++---------------------------+----------+------------------------+
+
+
+P256 (tag 2)
+============
+
++----------------------+----------+------------------------+
+| Name                 | Size     | Contents               |
++======================+==========+========================+
+| Tag                  | 1 byte   | unsigned 8-bit integer |
++----------------------+----------+------------------------+
+| P256.Public_key_hash | 20 bytes | bytes                  |
++----------------------+----------+------------------------+
+
+
+Bls (tag 3)
+===========
+
++---------------------------+----------+------------------------+
+| Name                      | Size     | Contents               |
++===========================+==========+========================+
+| Tag                       | 1 byte   | unsigned 8-bit integer |
++---------------------------+----------+------------------------+
+| Bls12_381.Public_key_hash | 20 bytes | bytes                  |
++---------------------------+----------+------------------------+
+
+
+X_1
+***
+
++------------+----------+------------------------+
+| Name       | Size     | Contents               |
++============+==========+========================+
+| slot_index | 1 byte   | unsigned 8-bit integer |
++------------+----------+------------------------+
+| pkh        | 21 bytes | $public_key_hash       |
++------------+----------+------------------------+
+
+
+X_2
+***
+
++-------------+----------+------------------------------------+
+| Name        | Size     | Contents                           |
++=============+==========+====================================+
+| level       | 4 bytes  | signed 32-bit big-endian integer   |
++-------------+----------+------------------------------------+
+| slot_index  | 1 byte   | unsigned 8-bit integer             |
++-------------+----------+------------------------------------+
+| commitment  | 48 bytes | bytes                              |
++-------------+----------+------------------------------------+
+| shard_index | 2 bytes  | unsigned 16-bit big-endian integer |
++-------------+----------+------------------------------------+
+| pkh         | 21 bytes | $public_key_hash                   |
++-------------+----------+------------------------------------+
+
+
+p2p_point.id
+************
+
++-----------------------+----------+------------------------------------+
+| Name                  | Size     | Contents                           |
++=======================+==========+====================================+
+| # bytes in next field | 4 bytes  | unsigned 30-bit big-endian integer |
++-----------------------+----------+------------------------------------+
+| Unnamed field 0       | Variable | bytes                              |
++-----------------------+----------+------------------------------------+
+
+
+X_9
+***
+
++-----------------------+----------------------+---------------+
+| Name                  | Size                 | Contents      |
++=======================+======================+===============+
+| maybe_reachable_point | Determined from data | $p2p_point.id |
++-----------------------+----------------------+---------------+
+| peer                  | 16 bytes             | bytes         |
++-----------------------+----------------------+---------------+
+
+
+X_11 (Determined from data, 8-bit tag)
+**************************************
+
+Graft (tag 16)
+==============
+
++-------+----------+------------------------+
+| Name  | Size     | Contents               |
++=======+==========+========================+
+| Tag   | 1 byte   | unsigned 8-bit integer |
++-------+----------+------------------------+
+| topic | 22 bytes | $X_1                   |
++-------+----------+------------------------+
+
+
+Prune (tag 17)
+==============
+
++-----------------------+----------+------------------------------------+
+| Name                  | Size     | Contents                           |
++=======================+==========+====================================+
+| Tag                   | 1 byte   | unsigned 8-bit integer             |
++-----------------------+----------+------------------------------------+
+| topic                 | 22 bytes | $X_1                               |
++-----------------------+----------+------------------------------------+
+| # bytes in next field | 4 bytes  | unsigned 30-bit big-endian integer |
++-----------------------+----------+------------------------------------+
+| px                    | Variable | sequence of $X_9                   |
++-----------------------+----------+------------------------------------+
+| backoff               | 2 bytes  | signed 16-bit big-endian integer   |
++-----------------------+----------+------------------------------------+
+
+
+IHave (tag 18)
+==============
+
++-----------------------+----------+------------------------------------+
+| Name                  | Size     | Contents                           |
++=======================+==========+====================================+
+| Tag                   | 1 byte   | unsigned 8-bit integer             |
++-----------------------+----------+------------------------------------+
+| topic                 | 22 bytes | $X_1                               |
++-----------------------+----------+------------------------------------+
+| # bytes in next field | 4 bytes  | unsigned 30-bit big-endian integer |
++-----------------------+----------+------------------------------------+
+| message_ids           | Variable | sequence of $X_2                   |
++-----------------------+----------+------------------------------------+
+
+
+IWant (tag 19)
+==============
+
++-----------------------+----------+------------------------------------+
+| Name                  | Size     | Contents                           |
++=======================+==========+====================================+
+| Tag                   | 1 byte   | unsigned 8-bit integer             |
++-----------------------+----------+------------------------------------+
+| # bytes in next field | 4 bytes  | unsigned 30-bit big-endian integer |
++-----------------------+----------+------------------------------------+
+| message_ids           | Variable | sequence of $X_2                   |
++-----------------------+----------+------------------------------------+
+
+
+Subscribe (tag 20)
+==================
+
++-------+----------+------------------------+
+| Name  | Size     | Contents               |
++=======+==========+========================+
+| Tag   | 1 byte   | unsigned 8-bit integer |
++-------+----------+------------------------+
+| topic | 22 bytes | $X_1                   |
++-------+----------+------------------------+
+
+
+Unsubscribe (tag 21)
+====================
+
++-------+----------+------------------------+
+| Name  | Size     | Contents               |
++=======+==========+========================+
+| Tag   | 1 byte   | unsigned 8-bit integer |
++-------+----------+------------------------+
+| topic | 22 bytes | $X_1                   |
++-------+----------+------------------------+
+
+
+Message_with_header (tag 22)
+============================
+
++------------+----------------------+------------------------+
+| Name       | Size                 | Contents               |
++============+======================+========================+
+| Tag        | 1 byte               | unsigned 8-bit integer |
++------------+----------------------+------------------------+
+| message    | Determined from data | $X_0                   |
++------------+----------------------+------------------------+
+| topic      | 22 bytes             | $X_1                   |
++------------+----------------------+------------------------+
+| message_id | 76 bytes             | $X_2                   |
++------------+----------------------+------------------------+
+
+
+
+/* dal-p2p-message
+   The encoding of P2P messages used for the DAL */
+{ /* Graft */
+  "kind": "graft",
+  "topic":
+    { "slot_index": integer ∈ [0, 255],
+      "pkh": $Signature.Public_key_hash } }
+|| { /* Prune */
+     "kind": "prune",
+     "topic":
+       { "slot_index": integer ∈ [0, 255],
+         "pkh": $Signature.Public_key_hash },
+     "px":
+       [ { "maybe_reachable_point": $p2p_point.id,
+           "peer": $Crypto_box.Public_key_hash } ... ],
+     "backoff": { "span": integer ∈ [-2^15, 2^15-1] } }
+|| { /* IHave */
+     "kind": "ihave",
+     "topic":
+       { "slot_index": integer ∈ [0, 255],
+         "pkh": $Signature.Public_key_hash },
+     "message_ids":
+       [ { "level": integer ∈ [-2^31-1, 2^31],
+           "slot_index": integer ∈ [0, 255],
+           "commitment": $DAL_commitment,
+           "shard_index": integer ∈ [0, 2^16-1],
+           "pkh": $Signature.Public_key_hash } ... ] }
+|| { /* IWant */
+     "kind": "iwant",
+     "message_ids":
+       [ { "level": integer ∈ [-2^31-1, 2^31],
+           "slot_index": integer ∈ [0, 255],
+           "commitment": $DAL_commitment,
+           "shard_index": integer ∈ [0, 2^16-1],
+           "pkh": $Signature.Public_key_hash } ... ] }
+|| { /* Subscribe */
+     "kind": "subscribe",
+     "topic":
+       { "slot_index": integer ∈ [0, 255],
+         "pkh": $Signature.Public_key_hash } }
+|| { /* Unsubscribe */
+     "kind": "unsubscribe",
+     "topic":
+       { "slot_index": integer ∈ [0, 255],
+         "pkh": $Signature.Public_key_hash } }
+|| { /* Message_with_header */
+     "kind": "message_with_header",
+     "message":
+       { "share": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ],
+         "shard_proof": $DAL_commitment },
+     "topic":
+       { "slot_index": integer ∈ [0, 255],
+         "pkh": $Signature.Public_key_hash },
+     "message_id":
+       { "level": integer ∈ [-2^31-1, 2^31],
+         "slot_index": integer ∈ [0, 255],
+         "commitment": $DAL_commitment,
+         "shard_index": integer ∈ [0, 2^16-1],
+         "pkh": $Signature.Public_key_hash } }
+$Crypto_box.Public_key_hash:
+  /* A Cryptobox public key ID (Base58Check-encoded) */
+  $unistring
+$DAL_commitment:
+  /* Commitment representation for the DAL (Base58Check-encoded) */
+  $unistring
+$Signature.Public_key_hash:
+  /* A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded) */
+  $unistring
+$p2p_point.id:
+  /* Identifier for a peer point */
+  $unistring
+$unistring:
+  /* Universal string representation
+     Either a plain UTF8 string, or a sequence of bytes for strings that
+     contain invalid byte sequences. */
+  string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+

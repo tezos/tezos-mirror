@@ -45,7 +45,23 @@ let set_gauge help name f =
   let m = v_gauge ~help name in
   fun x -> Gauge.set m @@ f x
 
+let v_label_gauge ~label_names ~help name =
+  Gauge.v_labels
+    ~registry:sc_rollup_node_registry
+    ~namespace
+    ~subsystem
+    ~label_names
+    ~help
+    name
+
+(** Registers a labeled gauge in [sc_rollup_node_registry] *)
+let set_labeled_gauge ~family f ?(labels = []) x =
+  Gauge.set (Gauge.labels family labels) (f x)
+
 let process_metrics = ref false
+
+let active_metrics (configuration : Configuration.t) =
+  process_metrics := Option.is_some configuration.metrics_addr
 
 let wrap f = if !process_metrics then f ()
 
@@ -134,6 +150,40 @@ let print_csv_metrics ppf metrics =
     (MetricFamilyMap.to_list metrics) ;
   Format.fprintf ppf "@]@."
 
+module Refutation = struct
+  type state = OurTurn | TheirTurn | Timeout
+
+  let state_to_float = function
+    | OurTurn -> 0.
+    | TheirTurn -> 1.
+    | Timeout -> -1.
+
+  let set_number_of_conflict =
+    set_gauge "Number of conflicts" "number_of_conflicts" Int.to_float
+
+  let family_state_of_refutation_game =
+    v_label_gauge
+      ~label_names:["opponent"; "start_level"]
+      ~help:"State of refutation game"
+      "state_of_refutation_game"
+
+  let family_set_block_timeout =
+    v_label_gauge
+      ~label_names:["opponent"; "start_level"]
+      ~help:"Number of block before player timeout"
+      "block_timeout"
+
+  let set_state_refutation_game =
+    set_labeled_gauge ~family:family_state_of_refutation_game state_to_float
+
+  let set_block_timeout =
+    set_labeled_gauge ~family:family_set_block_timeout Int.to_float
+
+  let clear_state_refutation_game labels =
+    Gauge.clear_specific family_state_of_refutation_game labels ;
+    Gauge.clear_specific family_set_block_timeout labels
+end
+
 module Info = struct
   open Tezos_version
 
@@ -164,7 +214,6 @@ module Info = struct
 
   let init_rollup_node_info (configuration : Configuration.t) ~genesis_level
       ~genesis_hash ~pvm_kind ~history_mode =
-    process_metrics := configuration.metrics_addr <> None ;
     let addr =
       Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
         configuration.sc_rollup_address
@@ -349,154 +398,54 @@ module DAL_batcher = struct
       Int.to_float
 end
 
-module Performance = struct
-  let virtual_ = v_gauge ~help:"Size Memory Stats" "performance_virtual"
+module Performance_metrics_config = struct
+  open Octez_performance_metrics
 
-  let resident = v_gauge ~help:"Resident Memory Stats" "performance_resident"
+  let registry = sc_rollup_node_registry
 
-  let memp = v_gauge ~help:"Memory Percentage" "performance_mem_percentage"
+  let subsystem = "sc_rollup_node"
 
-  let cpu = v_gauge ~help:"CPU Percentage" "performance_cpu_percentage"
-
-  let get_ps pid =
-    Lwt.catch
-      (fun () ->
-        let open Lwt_syntax in
-        let+ s =
-          Lwt_process.with_process_in
-            ~env:[|"LC_ALL=C"|]
-            ("ps", [|"ps"; "-p"; string_of_int pid; "-o"; "%cpu,%mem,vsz,rss"|])
-            (fun pc ->
-              let* s = Lwt_io.read_line_opt pc#stdout in
-              match s with
-              | None -> return_none
-              | Some _ ->
-                  (* skip header *)
-                  Lwt_io.read_line_opt pc#stdout)
-        in
-        match Option.map (String.split_no_empty ' ') s with
-        | Some [cpu; memp; virt; res] -> (
-            try
-              Some
-                ( float_of_string cpu,
-                  float_of_string memp,
-                  int_of_string virt,
-                  int_of_string res )
-            with _ -> None)
-        | _ -> None)
-      (function _exn -> Lwt.return None)
-
-  let set_memory_cpu_stats () =
-    let open Lwt_syntax in
-    let pid = Unix.getpid () in
-    let+ stats = get_ps pid in
-    Option.iter
-      (fun (cpu_percent, mem_percent, virt, res) ->
-        (* ps results are in kB, we show them as GB *)
-        Gauge.set virtual_ (float virt /. (1024. *. 1024.)) ;
-        Gauge.set resident (float res /. (1024. *. 1024.)) ;
-        Gauge.set cpu cpu_percent ;
-        Gauge.set memp mem_percent)
-      stats
-
-  let directory_size path =
-    Lwt.catch
-      (fun () ->
-        let open Lwt_syntax in
-        let+ s =
-          Lwt_process.with_process_in
-            ~env:[|"LC_ALL=C"|]
-            ("du", [|"du"; "-sk"; path|])
-            (fun pc -> Lwt_io.read_line pc#stdout)
-        in
-        match String.split_on_char '\t' s with
-        | [] -> None
-        | h :: _ -> Int64.of_string_opt h)
-      (function _exn -> Lwt.return None)
-
-  let storage = v_gauge ~help:"Storage Disk Usage" "performance_storage"
-
-  let context = v_gauge ~help:"Context Disk Usage" "performance_context"
-
-  let logs = v_gauge ~help:"Logs Disk Usage" "performance_logs"
-
-  let data = v_gauge ~help:"Data Disk Usage" "performance_data"
-
-  let wasm = v_gauge ~help:"Wasm Disk Usage" "performance_wasm"
-
-  let set_disk_usage_stats data_dir =
-    let open Lwt_syntax in
-    let* storage_size = directory_size @@ Filename.concat data_dir "storage" in
-    let* context_size = directory_size @@ Filename.concat data_dir "context" in
-    let* daily_logs_size =
-      directory_size @@ Filename.concat data_dir "daily_logs"
-    in
-    let* preimages_size =
-      directory_size @@ Filename.concat data_dir "wasm_2_0_0"
-    in
-    let total_size =
-      List.fold_left
-        (fun acc size ->
-          match size with None -> acc | Some size -> Int64.add acc size)
-        0L
-        [storage_size; context_size; daily_logs_size; preimages_size]
-    in
-    (* du results are in kB, we show them as GB *)
-    let aux gauge s =
-      Gauge.set gauge @@ (Int64.to_float s /. (1024. *. 1024.))
-    in
-    Option.iter (aux storage) storage_size ;
-    Option.iter (aux context) context_size ;
-    Option.iter (aux logs) daily_logs_size ;
-    Option.iter (aux wasm) preimages_size ;
-    aux data total_size ;
-    return_unit
-
-  let file_descriptors =
-    v_gauge ~help:"Open file descriptors" "performance_file_descriptors"
-
-  let connections = v_gauge ~help:"Open connections" "performance_connections"
-
-  let get_file_descriptors pid =
-    Lwt.catch
-      (fun () ->
-        let open Lwt_syntax in
-        let+ fd, conn =
-          Lwt_process.with_process_in
-            ~env:[|"LC_ALL=C"|]
-            ("lsof", [|"lsof"; "-wap"; string_of_int pid|])
-            (fun pc ->
-              let rec count fd conn =
-                Lwt.catch
-                  (fun () ->
-                    let* s = Lwt_io.read_line pc#stdout in
-                    let l = String.split_on_char ' ' s in
-                    let conn =
-                      if List.mem ~equal:String.equal "TCP" l then conn + 1
-                      else conn
-                    in
-                    count (fd + 1) conn)
-                  (fun _ -> return (fd, conn))
-              in
-              count 0 0)
-        in
-        Some (fd - 1, conn))
-      (function _exn -> Lwt.return None)
-
-  let set_file_descriptors () =
-    let open Lwt_syntax in
-    let pid = Unix.getpid () in
-    let+ r = get_file_descriptors pid in
-    Option.iter
-      (fun (fd, conn) ->
-        Gauge.set file_descriptors @@ Float.of_int fd ;
-        Gauge.set connections @@ Float.of_int conn)
-      r
-
-  let set_stats data_dir =
-    let open Lwt_syntax in
-    let* () = set_memory_cpu_stats ()
-    and* () = set_disk_usage_stats data_dir
-    and* () = set_file_descriptors () in
-    return_unit
+  let directories =
+    [
+      data_dir_element "storage";
+      data_dir_element "context";
+      data_dir_element ~metrics_suffix:"wasm" "wasm_2_0_0";
+      data_dir_element ~metrics_suffix:"logs" "daily_logs";
+    ]
 end
+
+module type PERFORMANCE = sig
+  val set_stats : data_dir:string -> unit Lwt.t
+end
+
+let performance_metrics : (module PERFORMANCE) Lazy.t =
+  lazy
+    (let module M = Octez_performance_metrics.Make (Performance_metrics_config) in
+    (module M : PERFORMANCE))
+
+let listing ~disable_performance_metrics =
+  let open Lwt_syntax in
+  let* () =
+    if not disable_performance_metrics then (
+      let+ supports =
+        Octez_performance_metrics.supports_performance_metrics ()
+      in
+      if supports then ignore (Lazy.force_val performance_metrics))
+    else return_unit
+  in
+  let* data_sc = CollectorRegistry.(collect sc_rollup_node_registry) in
+  let+ data_injector = CollectorRegistry.(collect Injector.registry) in
+  let data_merged =
+    MetricFamilyMap.merge
+      (fun _ v1 v2 -> match v1 with Some v1 -> Some v1 | _ -> v2)
+      data_sc
+      data_injector
+  in
+  let body =
+    Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data_merged
+  in
+  let metrics =
+    String.split_on_char '\n' body
+    |> List.filter (String.starts_with ~prefix:"#")
+  in
+  String.concat "\n" metrics

@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,6 +33,11 @@ type dal = {
   attestation_lag : int;
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
+  minimal_participation_ratio : Q.t;
+      (* the ratio of the protocol-attested slots that need to be attested by an
+         attester in order to receive rewards *)
+  rewards_ratio : Q.t; (* the ratio of DAL rewards versus total rewards *)
+  traps_fraction : Q.t; (* probability that a given shard is a trap *)
 }
 
 val dal_encoding : dal Data_encoding.t
@@ -135,24 +141,8 @@ type adaptive_issuance = {
     int;
   edge_of_staking_over_delegation :
     (* Weight of staking over delegation. *) int;
-  launch_ema_threshold : (* Threshold of the activation vote *) int32;
   adaptive_rewards_params :
     (* Parameters for the reward mechanism *) adaptive_rewards_params;
-  activation_vote_enable :
-    (* If set to true, reaching the launch_ema_threshold in the adaptive
-       issuance activation vote triggers the activation of the adaptive
-       inflation feature; otherwise the activation vote has no effect. *)
-    bool;
-  autostaking_enable :
-    (* If set to true, a stake/unstake/finalize operation will be triggered for
-       all delegate at end of cycle. *)
-    bool;
-  force_activation :
-    (* For testing purposes. If set to true, the adaptive issuance feature is
-       enabled without waiting to reach the launch_ema_threshold.*)
-    bool;
-  ns_enable : (* If set to true, enables the NS feature *)
-              bool;
 }
 
 type issuance_weights = {
@@ -168,18 +158,16 @@ type issuance_weights = {
   attesting_reward_weight : int;
   seed_nonce_revelation_tip_weight : int;
   vdf_revelation_tip_weight : int;
+  dal_rewards_weight : int;
 }
 
 type t = {
-  (* Number of cycles after which computed consensus rights are used to actually
-     participate in the consensus *)
   consensus_rights_delay : int;
   (* Number of past cycles about which the protocol hints the shell that it should
      keep them in its history. *)
   blocks_preservation_cycles : int;
-  (* Number of cycles after which submitted delegate parameters are being
-     used. *)
   delegate_parameters_activation_delay : int;
+  tolerated_inactivity_period : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;
@@ -206,14 +194,13 @@ type t = {
   minimal_participation_ratio : Ratio_repr.t;
   consensus_committee_size : int;
   (* in slots *)
-  consensus_threshold : int;
+  consensus_threshold_size : int;
   (* in slots *)
   limit_of_delegation_over_baking : int;
   (* upper bound on the (delegated tz / own frozen tz) ratio *)
   percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
-  percentage_of_frozen_deposits_slashed_per_double_attestation : Percentage.t;
   max_slashing_per_block : Percentage.t;
-  max_slashing_threshold : int;
+  max_slashing_threshold : Ratio_repr.t;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   cache_script_size : int;
@@ -227,11 +214,23 @@ type t = {
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
   direct_ticket_spending_enable : bool;
+  (* attestation aggregation feature flag *)
+  aggregate_attestation : bool;
+  allow_tz4_delegate_enable : bool;
+  all_bakers_attest_activation_level : Raw_level_repr.t option;
 }
 
 val encoding : t Data_encoding.encoding
 
-val update_sc_rollup_parameter : block_time:int -> sc_rollup -> sc_rollup
+(** [update_sc_rollup_parameter ratio_f c] updates the smart rollups constants
+    expressed in number of blocks (e.g., [commitment_period_in_blocks]) to
+    preserve their average duration with a new block time.
+
+    This function is primilarly intended to be used by the [Init_storage]
+    module. [ratio_f] is a function used to compute the new constants. For
+    instance, if the block time is multiplied by 4/5, then the constant should
+    be multiplied by 5/4. *)
+val update_sc_rollup_parameter : (int32 -> int32) -> sc_rollup -> sc_rollup
 
 module Internal_for_tests : sig
   val sc_rollup_encoding : sc_rollup Data_encoding.t

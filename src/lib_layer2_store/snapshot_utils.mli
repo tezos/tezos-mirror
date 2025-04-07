@@ -33,8 +33,6 @@ module Make (Header : sig
   type t
 
   val encoding : t Data_encoding.t
-
-  val size : int
 end) : sig
   (** [create reader writer header ~files ~dest] creates a snapshot archive with
       the header [header] with the contents of [files]. Each element of [files]
@@ -53,11 +51,16 @@ end) : sig
       snapshot archive [snapshot_file] in the directory [dest]. Existing files
       in [dest] with the same names are overwritten. The header header read
       from the snapshot is checked with [check_header] before beginning
-      extraction, and returned. *)
+      extraction, and returned. If [display_progress] is set to [true], a
+      spinner is exposed to the user to amuse them while they wait. Set
+      [cancellable] to [true] if you want to be able to use [Lwt.cancel]
+      on the promise. *)
   val extract :
     reader ->
     writer ->
     (Header.t -> 'a tzresult Lwt.t) ->
+    cancellable:bool ->
+    display_progress:bool ->
     snapshot_file:string ->
     dest:string ->
     (Header.t * 'a) tzresult Lwt.t

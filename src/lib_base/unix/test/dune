@@ -6,6 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
+  bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
   octez-libs.stdlib-unix
@@ -26,7 +27,7 @@
   -open Tezos_error_monad
   -open Tezos_test_helpers
   -open Octez_alcotezt)
- (modules test_unix_error test_syslog test_simple_profiler))
+ (modules test_unix_error test_syslog))
 
 (executable
  (name main)

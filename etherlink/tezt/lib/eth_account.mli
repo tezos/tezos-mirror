@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,6 +26,9 @@
 (*****************************************************************************)
 
 type t = {address : string; private_key : string}
+
+(** [of_json json] convert json to eth account *)
+val of_json : JSON.t -> t
 
 (** Bootstrap accounts in the EVM Kernel *)
 val bootstrap_accounts : t array

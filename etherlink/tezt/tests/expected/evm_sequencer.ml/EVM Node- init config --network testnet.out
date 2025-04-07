@@ -1,0 +1,5 @@
+{ "observer": { "evm_node_endpoint": "https://relay.ghostnet.etherlink.com" },
+  "experimental_features": { "l2_chains": [ { "chain_id": "128123" } ] },
+  "kernel_execution":
+    { "preimages_endpoint":
+        "https://snapshots.tzinit.org/etherlink-ghostnet/wasm_2_0_0" } }

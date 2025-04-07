@@ -9,7 +9,7 @@ let patch_kernel ~kernel_path evm_state =
   let open Lwt_result_syntax in
   let* content, binary = Wasm_debugger.read_kernel_from_file kernel_path in
   let*! kernel =
-    if binary then Lwt.return content else Wasm_utils.wat2wasm content
+    if binary then Lwt.return content else Wasm_utils_functor.wat2wasm content
   in
   let*! evm_state =
     Evm_state.modify ~key:"/kernel/boot.wasm" ~value:kernel evm_state
@@ -48,6 +48,11 @@ let alter_evm_state ~kernel_path ~kernel_verbosity evm_state =
 let main ?profile ?kernel_path ?kernel_verbosity ~data_dir config number =
   let open Lwt_result_syntax in
   let* ro_ctxt = Evm_ro_context.load ~data_dir config in
+  let* legacy_block_storage =
+    Evm_store.(use ro_ctxt.store Block_storage_mode.legacy)
+  in
+  if not legacy_block_storage then
+    Block_storage_setup.enable ~keep_alive:config.keep_alive ro_ctxt.store ;
   let alter_evm_state = alter_evm_state ~kernel_path ~kernel_verbosity in
   let* apply_result =
     Evm_ro_context.replay ro_ctxt ?profile ~alter_evm_state number

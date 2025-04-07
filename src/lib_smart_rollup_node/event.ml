@@ -81,6 +81,14 @@ module Simple = struct
       ~msg:"[Error]: Metrics server ended with error {stacktrace}"
       ("stacktrace", Data_encoding.string)
 
+  let metrics_error =
+    declare_1
+      ~section
+      ~name:"metrics_error"
+      ~level:Error
+      ~msg:"[Error]: Failed to complete metrics operation due to error {error}"
+      ("error", Data_encoding.string)
+
   let kernel_debug =
     declare_1
       ~section
@@ -202,6 +210,9 @@ let metrics_ended error = Simple.(emit metrics_ended) error
 
 let metrics_ended_dont_wait error =
   Simple.(emit__dont_wait__use_with_care metrics_ended) error
+
+let metrics_error error =
+  Simple.(emit__dont_wait__use_with_care metrics_error) error
 
 let kernel_debug msg = Simple.(emit kernel_debug) msg
 

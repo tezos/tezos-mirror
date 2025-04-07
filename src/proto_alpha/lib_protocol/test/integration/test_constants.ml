@@ -102,7 +102,7 @@ let () =
     [constants_mainnet; constants_sandbox; constants_test]
 
 let () =
-  register_test ~title:"max_operations_ttl" @@ fun () ->
+  register_test ~title:"max_operations_ttl is 1 hour" @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let open Protocol in
   (* We check the rationale that the value for [max_operations_time_to_live] is the following:
@@ -121,6 +121,63 @@ let () =
     Alpha_context.Period.pp
     Alpha_context.Period.one_hour
     result
+
+let check_protocol_time_correlation
+    ~(constants : Protocol.Alpha_context.Constants.Parametric.t) ~cycles ~days =
+  let open Lwt_result_wrap_syntax in
+  let open Protocol in
+  let cycles_to_period x =
+    let*?@ one_cycle_period =
+      Alpha_context.Period.mult
+        constants.blocks_per_cycle
+        constants.minimal_block_delay
+    in
+    let*?@ res = Alpha_context.Period.mult x one_cycle_period in
+    return res
+  in
+  let days_to_period x =
+    let*?@ res = Protocol.Alpha_context.Period.(mult x one_day) in
+    return res
+  in
+  let* constant = cycles_to_period cycles in
+  let* days = days_to_period days in
+  Assert.equal
+    ~loc:__LOC__
+    (fun x y -> Alpha_context.Period.compare x y = 0)
+    "constant in cycles is not equal to given days"
+    Alpha_context.Period.pp
+    constant
+    days
+
+let () =
+  register_test ~title:"one cycle is 1 day" @@ fun () ->
+  let constants = Default_parameters.constants_mainnet in
+  check_protocol_time_correlation ~constants ~cycles:1l ~days:1l
+
+let () =
+  register_test ~title:"voting period is 14 days" @@ fun () ->
+  let constants = Default_parameters.constants_mainnet in
+  check_protocol_time_correlation
+    ~constants
+    ~cycles:constants.cycles_per_voting_period
+    ~days:14l
+
+let () =
+  register_test ~title:"delegate parameters activation delay is 5 days"
+  @@ fun () ->
+  let constants = Default_parameters.constants_mainnet in
+  check_protocol_time_correlation
+    ~constants
+    ~cycles:(Int32.of_int constants.delegate_parameters_activation_delay)
+    ~days:5l
+
+let () =
+  register_test ~title:"tolerated inactivity period is 2 days" @@ fun () ->
+  let constants = Default_parameters.constants_mainnet in
+  check_protocol_time_correlation
+    ~constants
+    ~cycles:(Int32.of_int constants.tolerated_inactivity_period)
+    ~days:2l
 
 (* Check that
     [sc_rollup_challenge_window_in_blocks < sc_rollup_max_lookahead_in_blocks]
@@ -274,7 +331,17 @@ let () =
   let*? validators_rewards =
     attesting_reward_per_slot *? Int64.of_int constants.consensus_committee_size
   in
-  let*? total_rewards = baking_rewards +? validators_rewards in
+  let*?@ dal_attesting_reward_per_shard =
+    get_reward ~reward_kind:Dal_attesting_reward_per_shard
+  in
+  let*? dal_rewards =
+    if constants.dal.incentives_enable then
+      dal_attesting_reward_per_shard
+      *? Int64.of_int constants.dal.cryptobox_parameters.number_of_shards
+    else Result_syntax.return (of_int 0)
+  in
+  let*? total_tb_rewards = baking_rewards +? validators_rewards in
+  let*? total_rewards = total_tb_rewards +? dal_rewards in
   let expected_subsidy = total_rewards /! 16L in
   let*?@ liquidity_baking_subsidy =
     Protocol.Alpha_context.Delegate.Rewards.For_RPC

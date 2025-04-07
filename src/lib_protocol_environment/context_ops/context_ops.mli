@@ -14,6 +14,35 @@ type t = Environment_context.t
 (** Values of type [index] are used to [checkout] contexts specified by their hash. *)
 type index
 
+(** [do_not_use__is_duo index] returns [true] if the index is in duo mode
+
+    This function should not be used in "normal" code as it is used when the duo mode
+    is enabled. The duo mode is a debug mode used to compare Irmin and Brassaia.
+
+    Making any assumption about the internals of context_ops is a unforgivable mistake *)
+val do_not_use__is_duo : unit -> bool
+
+(** Environment variable allowing to chose the
+    context provider (Irmin/Brassaia/Duo) *)
+val backend_variable : string
+
+(** [context_dir ?envvar root] returns the context's directory concatenated to [root]
+    depending on the backend that was chosen with TEZOS_CONTEXT_BACKEND
+
+    Example:
+    - [context_dir "/tmp/"] returns ["/tmp/context"] if Irmin or Duo was chosen
+    - [context_dir "/tmp/"] returns ["/tmp/brassaia_context"] if Brassaia was chosen
+
+    This function should always be used when doing operations
+    on the context directory. *)
+val context_dir : string -> string
+
+(** [do_not_use__brassaia_dir root] will return "<root>/brassaia_context"
+
+    This function should not be used in "normal" code as it is used when importing
+    to copy the imported "context" to "brassaia_context" in duo mode *)
+val do_not_use__brassaia_dir : string -> string
+
 (** [init] uses an environment variable ('TEZOS_CONTEXT_BACKEND')
     to select the `Disk backend between `Shell and `Brassaia *)
 val init :
@@ -190,3 +219,14 @@ val exists : index -> Context_hash.t -> bool Lwt.t
 val close : index -> unit Lwt.t
 
 val compute_testchain_chain_id : t -> Block_hash.t -> Chain_id.t
+
+val export_snapshot : index -> Context_hash.t -> path:string -> unit Lwt.t
+
+val integrity_check :
+  ?ppf:Format.formatter ->
+  root:string ->
+  auto_repair:bool ->
+  always:bool ->
+  heads:string list option ->
+  index ->
+  unit Lwt.t

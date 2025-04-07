@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -10,8 +11,11 @@ mod preimages;
 use clap::Parser;
 use commands::Cli;
 use commands::Commands;
+use std::fs::write;
 use std::path::Path;
-use tezos_smart_rollup_installer::config::{create_installer_config, ConfigurationError};
+use tezos_smart_rollup_installer::config::{
+    create_installer_config, merge_install_configs, ConfigurationError,
+};
 use thiserror::Error;
 
 fn main() -> Result<(), ClientError> {
@@ -43,6 +47,15 @@ fn main() -> Result<(), ClientError> {
                 println!("ROOT_HASH: {}", root_hash_hex);
             };
         }
+        Commands::MergeSetupFiles {
+            output,
+            setup_files,
+        } => {
+            let output_path = Path::new(&output);
+            let encoded_yaml_config = merge_install_configs(setup_files)?;
+            write(output_path, encoded_yaml_config)
+                .map_err(ClientError::SaveMergedConfig)?;
+        }
     }
 
     Ok(())
@@ -56,4 +69,6 @@ enum ClientError {
     ConfigError(#[from] ConfigurationError),
     #[error("Unable to save installer kernel: {0}")]
     SaveInstaller(std::io::Error),
+    #[error("Unable to save the merged config: {0}")]
+    SaveMergedConfig(std::io::Error),
 }

@@ -27,59 +27,6 @@ let sigint =
       previous_behaviour := previous_handler ;
       promise
 
-module Input : sig
-  (** This module should be the only one that reads on [stdin]. *)
-
-  (** [next ()] returns the next line on stdin or none if stdin is closed. *)
-  val next : unit -> string option Lwt.t
-end = struct
-  type t = {
-    mutable resolvers : string option Lwt.u list;
-    mutable stdin_closed : bool;
-  }
-
-  let state = {resolvers = []; stdin_closed = false}
-
-  let next () =
-    if state.stdin_closed then Lwt.return_none
-    else
-      let t, u = Lwt.task () in
-      state.resolvers <- u :: state.resolvers ;
-      t
-
-  let rec loop () =
-    let* input = Lwt_io.read_line Lwt_io.stdin in
-    state.resolvers
-    |> List.iter (fun resolver -> Lwt.wakeup_later resolver (Some input)) ;
-    state.resolvers <- [] ;
-    loop ()
-
-  let _ =
-    Lwt.catch
-      (fun () -> loop ())
-      (fun _exn ->
-        state.resolvers
-        |> List.iter (fun resolver -> Lwt.wakeup_later resolver None) ;
-        state.stdin_closed <- true ;
-        Lwt.return_unit)
-end
-
-let eof =
-  let promise, resolver = Lwt.task () in
-  Lwt.dont_wait
-    (fun () ->
-      let rec loop () =
-        let* input = Input.next () in
-        match input with
-        | None ->
-            Lwt.wakeup resolver () ;
-            Lwt.return_unit
-        | Some _ -> loop ()
-      in
-      loop ())
-    (fun _ -> Lwt.wakeup resolver ()) ;
-  promise
-
 (* This exception is raised when the test is interrupted by Ctrl+C. *)
 exception Interrupted
 
@@ -88,6 +35,9 @@ type t = {
   website : Web.t option;
   prometheus : Prometheus.t option;
   grafana : Grafana.t option;
+  alert_manager : Alert_manager.t option;
+  otel : Otel.t option;
+  jaeger : Jaeger.t option;
   deployement : Deployement.t option;
 }
 
@@ -161,8 +111,14 @@ let shutdown ?exn t =
         Lwt.return_unit)
   in
   let* () =
+    if Option.is_some t.alert_manager then Alert_manager.shutdown ()
+    else Lwt.return_unit
+  in
+  let* () =
     Option.fold ~none:Lwt.return_unit ~some:Grafana.shutdown t.grafana
   in
+  let* () = Option.fold ~none:Lwt.return_unit ~some:Otel.shutdown t.otel in
+  let* () = Option.fold ~none:Lwt.return_unit ~some:Jaeger.shutdown t.jaeger in
   let* () =
     Option.fold
       ~none:Lwt.return_unit
@@ -178,7 +134,7 @@ let shutdown ?exn t =
 
 (* This function is used to ensure we can connect to the docker image on the VM. *)
 let wait_ssh_server_running agent =
-  if (Agent.configuration agent).os = "debian" then Lwt.return_unit
+  if (Agent.configuration agent).vm.os = Debian then Lwt.return_unit
   else
     match Agent.runner agent with
     | None -> Lwt.return_unit
@@ -195,7 +151,7 @@ let wait_ssh_server_running agent =
         let* _ = Env.wait_process ~is_ready ~run () in
         Lwt.return_unit
 
-let orchestrator deployement f =
+let orchestrator ?(alerts = []) deployement f =
   let agents = Deployement.agents deployement in
   let* website =
     if Env.website then
@@ -205,9 +161,18 @@ let orchestrator deployement f =
   in
   let* prometheus =
     if Env.prometheus then
-      let* prometheus = Prometheus.start agents in
+      (* Alerts requires to update prometheus configuration. *)
+      let alerts = List.map (fun Alert_manager.{alert; _} -> alert) alerts in
+      let* prometheus = Prometheus.start ~alerts agents in
       Lwt.return_some prometheus
     else Lwt.return_none
+  in
+  let* alert_manager =
+    match alerts with
+    | [] -> Lwt.return_none
+    | _ ->
+        let* alert_manager = Alert_manager.run alerts in
+        Lwt.return alert_manager
   in
   let* grafana =
     if Env.grafana then
@@ -215,9 +180,24 @@ let orchestrator deployement f =
       Lwt.return_some grafana
     else Lwt.return_none
   in
-  Log.info "Post prometheus" ;
+  let* otel, jaeger =
+    if Env.open_telemetry then
+      let* otel = Otel.run ~jaeger:true in
+      let* jaeger = Jaeger.run () in
+      Lwt.return (Some otel, Some jaeger)
+    else Lwt.return (None, None)
+  in
   let t =
-    {website; agents; prometheus; grafana; deployement = Some deployement}
+    {
+      website;
+      agents;
+      prometheus;
+      grafana;
+      alert_manager;
+      otel;
+      jaeger;
+      deployement = Some deployement;
+    }
   in
   let sigint = sigint () in
   let main_promise =
@@ -277,7 +257,7 @@ let attach agent =
       Process.spawn ~hooks cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
       |> Process.check
     in
-    let* _ = eof in
+    let* _ = Input.eof in
     let* () =
       let process = Process.spawn ~runner "pkill" ["screen"] in
       let* _ = Process.wait process in
@@ -298,23 +278,20 @@ let attach agent =
     Lwt.return_unit
   in
   let on_eof =
-    let* () = eof in
+    let* () = Input.eof in
     Log.info "Detach from the proxy process." ;
     if !has_sigint then on_sigint
     else
-      let* uri =
-        if Env.dns then
-          let* domain =
-            Gcloud.DNS.get_domain ~tezt_cloud:Env.tezt_cloud ~zone:"tezt-cloud"
-          in
-          Lwt.return (Format.asprintf "http://%s" domain)
-        else
-          Lwt.return
-            (Format.asprintf
-               "http://%s"
-               (Agent.point agent |> Option.get |> fst))
+      let* domain =
+        Gcloud.DNS.get_fqdn ~name:Env.tezt_cloud ~zone:"tezt-cloud"
       in
-      Log.info "Deployement website can be accessed here: %s" uri ;
+      let uri =
+        match domain with
+        | None ->
+            Format.asprintf "http://%s" (Agent.point agent |> Option.get |> fst)
+        | Some domain -> Format.asprintf "http://%s" domain
+      in
+      Log.info "Deployment website can be accessed here: %s" uri ;
       Lwt.return_unit
   in
   Log.Style.set_prefix Log.Style.Hidden ;
@@ -348,14 +325,7 @@ let try_reattach () =
       |> Deployement.of_agents
     in
     let agents = Deployement.agents deployement in
-    let proxy_agent =
-      agents
-      |> List.find (fun agent ->
-             let proxy_agent_prefix =
-               Format.asprintf "%s-proxy" Env.tezt_cloud
-             in
-             String.starts_with ~prefix:proxy_agent_prefix (Agent.name agent))
-    in
+    let proxy_agent = Proxy.get_agent agents in
     let* is_ssh_server_running =
       Lwt.pick
         [
@@ -394,17 +364,12 @@ let try_reattach () =
     else Lwt.return_false
   else Lwt.return_false
 
-let init_proxy ?(proxy_files = []) deployement =
+let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   let agents = Deployement.agents deployement in
-  let proxy_agent =
-    agents
-    |> List.find (fun agent ->
-           let proxy_agent_prefix = Format.asprintf "%s-proxy" Env.tezt_cloud in
-           String.starts_with ~prefix:proxy_agent_prefix (Agent.name agent))
-  in
+  let proxy_agent = Proxy.get_agent agents in
   let* () = wait_ssh_server_running proxy_agent in
   let destination =
-    (Agent.configuration proxy_agent).binaries_path
+    (Agent.configuration proxy_agent).vm.binaries_path
     // Filename.basename Path.self
   in
   let* self = Agent.copy ~destination proxy_agent ~source:Path.self in
@@ -443,7 +408,7 @@ let init_proxy ?(proxy_files = []) deployement =
     Agent.docker_run_command
       proxy_agent
       "screen"
-      (["-S"; "tezt-cloud"; "-X"; "exec"] @ (self :: args))
+      (["-S"; "tezt-cloud"; "-X"; "exec"] @ (self :: args) @ proxy_args)
   in
   let* () =
     Agent.docker_run_command
@@ -466,33 +431,94 @@ let init_proxy ?(proxy_files = []) deployement =
   in
   if Env.destroy then Deployement.terminate deployement else Lwt.return_unit
 
-let register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f =
+(* Set the [FAKETIME] environment variable so that all the ssh sessions have it
+   defined if [Env.faketime] is defined. *)
+let set_faketime faketime agent =
+  match Agent.runner agent with
+  | None -> Lwt.return_unit (* ? *)
+  | Some runner ->
+      let open Runner.Shell in
+      let* home =
+        (* Get the directory where you can (hopefully) find .ssh *)
+        let cmd = cmd [] "pwd" [] in
+        let cmd, args = Runner.wrap_with_ssh runner cmd in
+        Process.run_and_read_stdout cmd args
+      in
+      let env_file = Filename.concat (String.trim home) ".ssh/environment" in
+      let* () =
+        (* Avoid error if the environment file does not exist *)
+        let cmd = cmd [] "touch" [env_file] in
+        let cmd, args = Runner.wrap_with_ssh runner cmd in
+        Process.run cmd args
+      in
+      let* contents =
+        (* Read the environment file content
+           and append FAKETIME definition to the result *)
+        let process, stdin =
+          Process.spawn_with_stdin ~runner "cat" [env_file; "-"]
+        in
+        let* () = Lwt_io.write_line stdin (sf "FAKETIME=%s" faketime) in
+        let* () = Lwt_io.close stdin in
+        Process.check_and_read_stdout process
+      in
+      (* Write the final environment content *)
+      let cmd = redirect_stdout (cmd [] "echo" [contents]) env_file in
+      let cmd, args = Runner.wrap_with_ssh runner cmd in
+      Process.run cmd args
+
+let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
+    f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
   let* () = Env.init () in
   let vms =
-    (* The Cli arguments by-pass the argument given here. This enable the user
-       to always have decide precisely the number of vms to be run. *)
     match (vms, Env.vms) with
-    | None, None | None, Some 0 -> None
-    | Some _, Some 0 when Env.mode = `Localhost || Env.mode = `Cloud ->
-        (* We don't want to go here when using the proxy mode. *)
-        None
-    | None, Some i | Some _, Some i ->
-        let vms = List.init i (fun _ -> Configuration.make ()) in
-        Some vms
+    | None, None | None, Some _ -> None
+    | Some _vms, Some 0 -> (
+        Log.warn
+          "The legacy behaviour with '--vms-limit 0' may be removed in the \
+           future." ;
+        match Env.mode with
+        | `Localhost | `Cloud -> None
+        | `Host | `Orchestrator ->
+            (* In Host mode, we want to run a deployment deploying the
+               Proxy VM. In orchestrator mode, there is few
+               initialisation steps needed. By using [Some []], we
+               ensure they will be done. When the scenario asks for an
+               agent and do not find it there is fallback to a default
+               agent. This works but this is hackish and should be
+               removed in the near future (famous last words). *)
+            Some [])
+    | Some vms, Some vms_limit ->
+        let number_of_vms = List.length vms in
+        if vms_limit < number_of_vms then
+          Test.fail
+            "The number limits of VM '%d' is less than the number of VMs \
+             specified by the scenario: '%d'"
+            vms_limit
+            number_of_vms
+        else Some vms
     | Some vms, None -> Some vms
   in
   match vms with
   | None ->
       let default_agent =
+        let configuration = Agent.Configuration.make ~name:"default" () in
+        let next_available_port =
+          let cpt = ref 30_000 in
+          fun () ->
+            incr cpt ;
+            !cpt
+        in
+        let process_monitor =
+          if Env.process_monitoring then
+            Some (Process_monitor.init ~listening_port:(next_available_port ()))
+          else None
+        in
         Agent.make
-          ~configuration:(Configuration.make ())
-          ~next_available_port:
-            (let cpt = ref 30_000 in
-             fun () ->
-               incr cpt ;
-               !cpt)
-          ~name:"default agent"
+          ~configuration
+          ~next_available_port
+          ~name:configuration.name
+          ~process_monitor
           ()
       in
       f
@@ -500,109 +526,125 @@ let register ?proxy_files ?vms ~__FILE__ ~title ~tags ?seed f =
           agents = [default_agent];
           website = None;
           grafana = None;
+          otel = None;
+          jaeger = None;
           prometheus = None;
+          alert_manager = None;
           deployement = None;
         }
   | Some configurations -> (
-      let tezt_cloud = Env.tezt_cloud in
-      match Env.mode with
-      | `Orchestrator ->
-          (* The scenario is executed locally on the proxy VM. *)
-          let contents = Base.read_file (Path.proxy_deployement ~tezt_cloud) in
-          let json = Data_encoding.Json.from_string contents |> Result.get_ok in
-          let deployement =
-            Data_encoding.Json.destruct (Data_encoding.list Agent.encoding) json
-            |> Deployement.of_agents
+      let sorted_names =
+        configurations
+        |> List.map (fun Agent.Configuration.{name; _} -> name)
+        |> List.sort_uniq compare
+      in
+      if List.length sorted_names < List.length configurations then
+        Test.fail
+          "Duplicate found in the agent names used by the scenario: %s"
+          (String.concat " " sorted_names)
+      else
+        let tezt_cloud = Env.tezt_cloud in
+        let ensure_ready =
+          let wait_and_faketime =
+            match Env.faketime with
+            | None -> wait_ssh_server_running
+            | Some faketime ->
+                fun agent ->
+                  let* () = wait_ssh_server_running agent in
+                  set_faketime faketime agent
           in
-          let* () =
+          fun deployement ->
             Deployement.agents deployement
-            |> List.map wait_ssh_server_running
-            |> Lwt.join
-          in
-          orchestrator deployement f
-      | `Localhost ->
-          (* The scenario is executed locally and the VM are on the host machine. *)
-          let* () = Jobs.docker_build ~push:false () in
-          let* deployement = Deployement.deploy ~configurations in
-          let* () =
-            Deployement.agents deployement
-            |> List.map wait_ssh_server_running
-            |> Lwt.join
-          in
-          orchestrator deployement f
-      | `Cloud ->
-          (* The scenario is executed locally and the VMs are on the cloud. *)
-          let* () = Jobs.deploy_docker_registry () in
-          let* () = Jobs.docker_build ~push:true () in
-          let* deployement = Deployement.deploy ~configurations in
-          let* () =
-            Deployement.agents deployement
-            |> List.map wait_ssh_server_running
-            |> Lwt.join
-          in
-          orchestrator deployement f
-      | `Host ->
-          (* The scenario is executed remotely. *)
-          let* proxy_running = try_reattach () in
-          if not proxy_running then
-            let* () = Jobs.deploy_docker_registry () in
-            let* () = Jobs.docker_build ~push:true () in
-            let* deployement = Deployement.deploy ~configurations in
-            let* () =
-              Deployement.agents deployement
-              |> List.map wait_ssh_server_running
-              |> Lwt.join
+            |> List.map wait_and_faketime |> Lwt.join
+        in
+        match Env.mode with
+        | `Orchestrator ->
+            (* The scenario is executed locally on the proxy VM. *)
+            let contents =
+              Base.read_file (Path.proxy_deployement ~tezt_cloud)
             in
-            init_proxy ?proxy_files deployement
-          else Lwt.return_unit)
+            let json =
+              Data_encoding.Json.from_string contents |> Result.get_ok
+            in
+            let deployement =
+              Data_encoding.Json.destruct
+                (Data_encoding.list Agent.encoding)
+                json
+              |> Deployement.of_agents
+            in
+            let* () = ensure_ready deployement in
+            orchestrator ?alerts deployement f
+        | `Localhost ->
+            (* The scenario is executed locally and the VM are on the host machine. *)
+            let* () = Jobs.docker_build ~push:false () in
+            let* deployement = Deployement.deploy ~configurations in
+            let* () = ensure_ready deployement in
+            orchestrator ?alerts deployement f
+        | `Cloud ->
+            (* The scenario is executed locally and the VMs are on the cloud. *)
+            let* () = Jobs.deploy_docker_registry () in
+            let* () = Jobs.docker_build ~push:Env.push_docker () in
+            let* deployement = Deployement.deploy ~configurations in
+            let* () = ensure_ready deployement in
+            orchestrator ?alerts deployement f
+        | `Host ->
+            (* The scenario is executed remotely. *)
+            let* proxy_running = try_reattach () in
+            if not proxy_running then
+              let* () = Jobs.deploy_docker_registry () in
+              let* () = Jobs.docker_build ~push:Env.push_docker () in
+              let* deployement = Deployement.deploy ~configurations in
+              let* () = ensure_ready deployement in
+              init_proxy ?proxy_files ?proxy_args deployement
+            else Lwt.return_unit)
 
 let agents t =
   match Env.mode with
   | `Orchestrator -> (
       let proxy_agent = Proxy.get_agent t.agents in
-      let proxy_vm_name = Agent.vm_name proxy_agent in
+      let proxy_name = Agent.name proxy_agent in
       match
-        t.agents
-        |> List.filter (fun agent -> Agent.vm_name agent <> proxy_vm_name)
+        t.agents |> List.filter (fun agent -> Agent.name agent <> proxy_name)
       with
       | [] ->
+          let configuration = Proxy.make_config () in
+          let next_available_port =
+            let cpt = ref 30_000 in
+            fun () ->
+              incr cpt ;
+              !cpt
+          in
+          let process_monitor =
+            if Env.process_monitoring then
+              Some
+                (Process_monitor.init ~listening_port:(next_available_port ()))
+            else None
+          in
           let default_agent =
             Agent.make
-              ~configuration:(Configuration.make ())
-              ~next_available_port:
-                (let cpt = ref 30_000 in
-                 fun () ->
-                   incr cpt ;
-                   !cpt)
-              ~name:"default agent"
+              ~configuration
+              ~next_available_port
+              ~name:configuration.name
+              ~process_monitor
               ()
           in
           [default_agent]
       | agents -> agents)
   | `Host | `Cloud | `Localhost -> t.agents
 
-let get_configuration = Agent.configuration
-
 let write_website t =
   match t.website with
   | None -> Lwt.return_unit
   | Some website -> Web.write website ~agents:t.agents
 
-let set_agent_name t agent name =
-  Agent.set_name agent name ;
-  let* () = write_website t in
-  match t.prometheus with
-  | None -> Lwt.return_unit
-  | Some prometheus -> Prometheus.reload prometheus
-
-let push_metric t ?labels ~name value =
+let push_metric t ?help ?typ ?labels ~name value =
   match t.website with
   | None -> ()
-  | Some website -> Web.push_metric website ?labels ~name value
+  | Some website -> Web.push_metric website ?help ?typ ?labels ~name value
 
 type target = {agent : Agent.t; port : int; app_name : string}
 
-let add_prometheus_source t ?metric_path ~job_name targets =
+let add_prometheus_source t ?metrics_path ~name targets =
   match t.prometheus with
   | None -> Lwt.return_unit
   | Some prometheus ->
@@ -611,9 +653,72 @@ let add_prometheus_source t ?metric_path ~job_name targets =
         Prometheus.{address; port; app_name}
       in
       let targets = List.map prometheus_target targets in
-      Prometheus.add_source prometheus ?metric_path ~job_name targets
+      Prometheus.add_job prometheus ?metrics_path ~name targets
 
 let add_service t ~name ~url =
   match t.website with
   | None -> Lwt.return_unit
   | Some web -> Web.add_service web ~agents:t.agents {name; url}
+
+let open_telemetry_endpoint t =
+  match t.otel with
+  | None -> None
+  | Some _otel -> (
+      match Env.mode with
+      | `Orchestrator ->
+          let agent = Proxy.get_agent t.agents in
+          let address = Agent.point agent |> Option.get |> fst in
+          let port = 55681 in
+          Some (Format.asprintf "http://%s:%d" address port)
+      | _ ->
+          (* It likely won't work in [Cloud] mode. *)
+          let address = "localhost" in
+          let port = 55681 in
+          Some (Format.asprintf "http://%s:%d" address port))
+
+let get_agents = agents
+
+let register_binary cloud ?agents ?(group = "tezt-cloud") ~name () =
+  if Env.process_monitoring then
+    let agents =
+      match agents with None -> get_agents cloud | Some agents -> agents
+    in
+    Lwt_list.iter_p
+      (fun agent ->
+        match Agent.process_monitor agent with
+        | None -> Lwt.return_unit
+        | Some process_monitor ->
+            let changed =
+              Process_monitor.add_binary process_monitor ~group ~name
+            in
+            if changed then
+              let* () =
+                Process_monitor.reload process_monitor (fun ~detach cmd args ->
+                    Agent.docker_run_command agent ~detach cmd args)
+              in
+              let app_name =
+                Format.asprintf
+                  "%s-prometheus-process-exporter"
+                  (Agent.name agent)
+              in
+              let target =
+                let address = agent |> Agent.runner |> Runner.address in
+                Prometheus.
+                  {
+                    address;
+                    port = Process_monitor.get_port process_monitor;
+                    app_name;
+                  }
+              in
+              (* Reload prometheus *)
+              let* () =
+                match cloud.prometheus with
+                | None -> Lwt.return_unit
+                | Some prometheus ->
+                    Prometheus.add_job prometheus ~name:app_name [target]
+              in
+              (* Reload the website *)
+              write_website cloud
+            else Lwt.return_unit)
+      agents
+  else Lwt.return_unit

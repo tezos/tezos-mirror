@@ -1,12 +1,14 @@
 Protocol Release Checklist
 ==========================
 
-This page documents the steps needed for preparing and injecting a
+This page documents the steps needed for releasing and injecting a
 protocol proposal for Tezos. These include:
 
 - technical steps such as releasing code and launching a test network;
 - meta-technical steps such as extending the developer documentation;
 - non-technical steps such as managing public relations (PR) via appropriate communication.
+
+Protocol release is one step of the process of developing a protocol proposal, see :doc:`protocol_playbook`.
 
 Summary
 -------
@@ -35,10 +37,6 @@ new protocol.
 
 Timeline and Checklist
 ----------------------
-
-**Protocol Development:**
-
-Protocol development occurs during the months before an injection slot is available.
 
 **Protocol Name:**
 
@@ -111,6 +109,22 @@ not reviewed thoroughly enough), they should be dropped.
 -  **Release Artifacts are Created**: an MR on ``master`` is made with the result
    of the protocol snapshot (mostly automated by script :src:`scripts/snapshot_alpha_and_link.sh`) linked into the
    node and client.
+
+   The final snapshot is
+   produced from the latest version of ``proto-beta``. It is rehashed and
+   renamed. Release material (including blogposts and other communication
+   artifacts) should be made ready using the final protocol hash and
+   name.
+
+   In the merge request introducing ``proto-<proposal name>``,
+   **``proto-beta`` is deleted from the repository**. In order to avoid a
+   period of time where no testnet is easily reachable to test the new
+   proposed protocol, this change should be made (as in ‘merged into the
+   master branch of tezos/tezos repository’) only once the communication
+   and testnets are ready.
+   **Release and** **Injection of this protocol amendment proposal should
+   follow minutes/hours after.**
+
    The few additional manual steps to be done on the documentation part are listed in meta-issue :gl:`#2170` (Section "Protocol snapshot").
    The delegates must also be built in this branch. CI must be
    run on this branch and pass.
@@ -127,6 +141,8 @@ not reviewed thoroughly enough), they should be dropped.
 
 -  **Release Manager Declares Release Artifacts Final**: If previous steps all
    work, the artifacts are ready for public release.
+
+-  Blogpost and Agora post are prepared to announce <X> Protocol Proposal release.
 
 **At the time of release: Past here, preparation work is done: we are at
 the point of no return.**
@@ -150,47 +166,4 @@ the point of no return.**
    https://gitlab.com/romain.nl/howtos/-/blob/master/HOWTO-launch-a-test-network.md
 
 -  **Injection**: a baker injects the protocol using a Proposal operation.
-
-**One Month Before Potential Activation**
-
--  **Test Network End of Line**: announce the end of the previous test
-   network. More precisely, announce that the test network for protocol
-   ``n-1`` will be stopped when (if) protocol ``n+1`` activates.
-   This gives one month for users to migrate to the test network for
-   protocol ``n`` or ``n+1``.
-
-**A Couple of Days Before Activation**
-
--  **Reminder For Bakers**: post in the baking slack and in the baker newsletter
-   a reminder for them to upgrade.
-
--  **PR Team Work**: The Tezos Foundation's (TF) PR team prepares news releases
-   for the press to go out after protocol activation is known to have been fully
-   successful.
-
--  **Short Blog Post Drafted**: A short blog post is drafted to announce
-   successful activation; it will be posted around the same time that
-   news releases go out.
-
--  **Doc Update Approved**: A documentation update reflecting the new active protocol and droping the documentation of the previous protocol has to be ready. Technically, an MR instantiating meta-issue :gl:`#2170` (Section "Protocol activation") for the new protocol has to be ready and must have sufficient approvals to be triggered right after activation.
-
-**After Activation**
-
-A few hours after activation, when it is certain that everything has
-happened successfully, a blog post goes out to Agora and then company
-blogs (the same order as “At The Time Of Release", above”) and then a
-news release is sent out by the TF’s PR people.
-
-On the main `tezos/tezos <https://gitlab.com/tezos/tezos>`__ repository, on the
-master branch, the ``proto_alpha`` directory is reset to the newly activated
-protocol and its associated daemons, with the exception of vanity nonce and
-migration that should be reverted.
-
-Soon after the activation (preferably on the same or next day), the MR updating the documentation to reflect the new active protocol (see above) has to be merged. Also, part
-of the code related to the old protocol can now be dropped, see
-:doc:`../developer/howto-freeze-protocols`.
-
-One month after the activation of protocol N, we deactivate the N-1 test
-network. (For example, the Babylon net was deactivated one month after
-Carthage went live on the main network.) This deactivation has been already
-announced one month before activation (see above).
+   This must happen ideally during the first half of a Proposal period.

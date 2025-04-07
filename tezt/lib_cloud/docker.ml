@@ -9,6 +9,9 @@ let name = "docker"
 
 let color = Log.Color.FG.yellow
 
+let macos_platform_arg =
+  if Env.macosx then ["--platform"; "linux/amd64"] else []
+
 let build ?image_name ?alias ?(tag = "latest") ?dockerfile ~args () =
   let build_args =
     args
@@ -20,7 +23,9 @@ let build ?image_name ?alias ?(tag = "latest") ?dockerfile ~args () =
   let dockerfile = Option.value ~default:(Path.dockerfile ~alias) dockerfile in
   let image_name = Option.value ~default:alias image_name in
   let tag = ["-t"; Format.asprintf "%s:%s" image_name tag] in
-  let args = ["build"; "-f"; dockerfile] @ build_args @ tag @ ["."] in
+  let args =
+    ["build"; "-f"; dockerfile] @ macos_platform_arg @ build_args @ tag @ ["."]
+  in
   Process.spawn ~name ~color "docker" args
 
 let tag ?image_name ?alias ?(tag = "latest") ~registry_uri () =
@@ -47,6 +52,9 @@ let pull ?image_name ?alias ?(tag = "latest") ~registry_uri () =
   let args = ["pull"; Format.asprintf "%s/%s:%s" registry_uri image_name tag] in
   Process.spawn ~name ~color "docker" args
 
+let network ~command ~network_name =
+  Process.spawn ~color "docker" (["network"] @ [command] @ [network_name])
+
 let run ?(rm = false) ?name ?network ?publish_ports image args =
   let publish_ports =
     match publish_ports with
@@ -64,7 +72,7 @@ let run ?(rm = false) ?name ?network ?publish_ports image args =
   Process.spawn
     ~color
     "docker"
-    (["run"] @ rm @ name @ network @ publish_ports
+    (["run"] @ rm @ name @ macos_platform_arg @ network @ publish_ports
     @ [Format.asprintf "%s" image]
     @ args)
 

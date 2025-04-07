@@ -1,0 +1,112 @@
+/* General Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f7f9fc;
+    margin: 0;
+}
+
+/* Container for the Content */
+.container {
+    width: 90%;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.menu {
+    position: sticky;
+    top: 0; /* Sticks the menu to the top of the viewport */
+    z-index: 1000; /* Ensures it stays above other content */
+    background-color: #333;
+    padding: 0;
+    margin: 0;    
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.menu ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+
+.menu li {
+    padding: 14px 20px;
+    margin: 0;
+}
+
+.menu a {
+    text-decoration: none;
+    color: white;
+    display: block;
+    padding: 14px 20px;
+    transition: background-color 0.3s ease, color 0.3s ease;    
+}
+
+.menu a:hover,
+.menu a.active {
+    background-color: #575757;
+    color: #f7f9fc;
+    border-radius: 4px;    
+}
+
+section {
+    padding: 100px 20px;
+    min-height: 100vh;
+    border-bottom: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+    color: #444;
+}
+
+ul {
+    list-style: none;
+    padding-left: 20px;
+}
+
+ul li {
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+/* General Code Block Styling */
+pre code {
+    display: inline-block;
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 0.95em;
+    line-height: 1.5;
+    background-color: #2d2d2d; /* Dark theme background */
+    color: #f8f8f2; /* Light text for contrast */
+    border-radius: 5px;
+    border: 1px solid #444; /* Subtle border for clarity */
+    overflow-x: auto; /* Horizontal scroll for long lines */
+    font-family: "Fira Code", "Courier New", Courier, monospace;
+    max-width: 100%; /* Constrain to the container's width */
+    white-space: pre-wrap; /* Allow long lines to wrap */
+}

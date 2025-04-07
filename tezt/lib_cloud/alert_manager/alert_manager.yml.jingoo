@@ -1,0 +1,42 @@
+route:
+  # Default receiver if no specific route matches
+  receiver: '{{ route.fallback.receiver_name }}'
+  {%- if route.fallback.group_wait %}
+  group_wait: {{ route.fallback.group_wait }}
+  {%- endif %}
+  {%- if route.fallback.group_interval %}
+  group_interval: {{ route.fallback.group_interval }}
+  {%- endif %}
+  {%- if route.fallback.repeat_interval %}
+  group_interval: {{ route.fallback.repeat_interval }}
+  {%- endif %}
+  routes:
+    {%- for route in route.routes %}
+    - match_re:
+        alertname: '{{ route.alert_name }}'
+      {%- if route.group_wait %}
+      group_wait: {{ route.group_wait }}
+      {%- endif -%}
+      {%- if route.group_interval %}
+      group_interval: {{ route.group_interval }}
+      {%- endif -%}
+      {%- if route.repeat_interval %}
+      repeat_interval: {{ route.repeat_interval }}
+      {%- endif %}
+      receiver: '{{ route.receiver_name }}'
+    {% endfor %}
+
+receivers:
+  {%- for receiver in receivers %}
+  - name: {{ receiver.name }}
+  {%- if receiver.config && receiver.config.type == 'slack' %}
+    slack_configs:
+    - channel: '{{ receiver.config.channel }}'
+      api_url: '{{ receiver.config.api_url }}'
+
+  {% endif -%}
+{% endfor %}
+
+# Rules to prevent certain alerts from firing when others are active
+inhibit_rules:
+  []

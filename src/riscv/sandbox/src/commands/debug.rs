@@ -5,7 +5,7 @@
 
 use crate::{cli::DebugOptions, posix_exit_mode};
 use octez_riscv::{
-    machine_state::bus::main_memory::M1G,
+    machine_state::main_memory::M1G,
     stepper::{pvm::PvmStepper, test::TestStepper},
 };
 use std::{error::Error, fs};
@@ -44,6 +44,8 @@ fn debug_test(
         program,
         initrd,
         posix_exit_mode(&opts.common.posix_exit_mode),
+        opts.demangle,
+        opts.common.max_steps,
     )?)
 }
 
@@ -67,7 +69,7 @@ fn debug_pvm(
             initrd,
             inbox.build(),
             rollup_address.into_hash().as_ref().try_into().unwrap(),
-            opts.common.inbox.origination_level,
+            opts,
         )?,
     )
 }

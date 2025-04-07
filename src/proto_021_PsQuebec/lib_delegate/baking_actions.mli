@@ -69,6 +69,7 @@ type t = action
 val pp_action : Format.formatter -> action -> unit
 
 val generate_seed_nonce_hash :
+  ?timeout:float ->
   Baking_configuration.nonce_config ->
   consensus_key ->
   Level.t ->

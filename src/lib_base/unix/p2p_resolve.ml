@@ -57,7 +57,8 @@ let no_points_found =
     ("string", Data_encoding.string)
 
 let resolve_addr_with_peer_id ~default_addr ~default_port ?(passive = false)
-    peer : (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t =
+    ?(warn = true) peer :
+    (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t =
   let open Lwt_result_syntax in
   match P2p_point.Id.parse_addr_port_id peer with
   | Error err ->
@@ -73,17 +74,17 @@ let resolve_addr_with_peer_id ~default_addr ~default_port ?(passive = false)
       let node = if addr = "" || addr = "_" then default_addr else addr in
       let*! l = Lwt_utils_unix.getaddrinfo ~passive ~node ~service in
       let*! () =
-        if List.is_empty l then
+        if List.is_empty l && warn then
           Internal_event.Simple.(emit no_points_found peer)
         else Lwt.return_unit
       in
       return (List.map (fun point -> (point, peer_id)) l)
 
-let resolve_addr ~default_addr ~default_port ?passive peer :
+let resolve_addr ~default_addr ~default_port ?passive ?warn peer :
     P2p_point.Id.t list tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* l =
-    resolve_addr_with_peer_id ~default_addr ~default_port ?passive peer
+    resolve_addr_with_peer_id ~default_addr ~default_port ?passive ?warn peer
   in
   let points = List.map fst l in
   let*! () =

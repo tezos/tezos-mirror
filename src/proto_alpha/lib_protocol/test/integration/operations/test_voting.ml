@@ -270,7 +270,7 @@ let context_init_tup tup ?(blocks_per_cycle = 4l) =
     tup
     ~blocks_per_cycle
     ~cycles_per_voting_period:1l
-    ~consensus_threshold:0
+    ~consensus_threshold_size:0
     ~issuance_weights:
       {
         base_total_issued_per_minute = Tez.zero;
@@ -279,6 +279,7 @@ let context_init_tup tup ?(blocks_per_cycle = 4l) =
         baking_reward_fixed_portion_weight = 1;
         seed_nonce_revelation_tip_weight = 1;
         vdf_revelation_tip_weight = 1;
+        dal_rewards_weight = 1;
       }
     ~nonce_revelation_threshold:2l
 
@@ -936,16 +937,7 @@ let test_supermajority_in_proposal there_is_a_winner () =
       10
       ()
   in
-  let* {
-         parametric =
-           {
-             minimal_stake;
-             minimal_frozen_stake;
-             adaptive_issuance = {autostaking_enable; _};
-             _;
-           };
-         _;
-       } =
+  let* {parametric = {minimal_stake; minimal_frozen_stake; _}; _} =
     Context.get_constants (B b)
   in
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
@@ -984,18 +976,16 @@ let test_supermajority_in_proposal there_is_a_winner () =
       bal3
   in
   let* staking_ops =
-    if autostaking_enable then return_nil
-    else
-      let* op4 =
-        Adaptive_issuance_helpers.stake (B b) del1 minimal_frozen_stake
-      in
-      let* op5 =
-        Adaptive_issuance_helpers.stake (B b) del2 minimal_frozen_stake
-      in
-      let* op6 =
-        Adaptive_issuance_helpers.stake (B b) del3 minimal_frozen_stake
-      in
-      return [op4; op5; op6]
+    let* op4 =
+      Adaptive_issuance_helpers.stake (B b) del1 minimal_frozen_stake
+    in
+    let* op5 =
+      Adaptive_issuance_helpers.stake (B b) del2 minimal_frozen_stake
+    in
+    let* op6 =
+      Adaptive_issuance_helpers.stake (B b) del3 minimal_frozen_stake
+    in
+    return [op4; op5; op6]
   in
   let* b = Block.bake ~policy ~operations:([op1; op2; op3] @ staking_ops) b in
   let* b = bake_until_first_block_of_next_period ~policy b in
@@ -1023,11 +1013,7 @@ let test_quorum_in_proposal has_quorum () =
   let* b, delegates =
     context_init ~bootstrap_balances:[1L; half_tokens; half_tokens] 3 ()
   in
-  let* {
-         parametric =
-           {min_proposal_quorum; adaptive_issuance = {autostaking_enable; _}; _};
-         _;
-       } =
+  let* {parametric = {min_proposal_quorum; _}; _} =
     Context.get_constants (B b)
   in
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
@@ -1044,10 +1030,8 @@ let test_quorum_in_proposal has_quorum () =
   let* op2 = Op.transaction (B b) del2 del1 bal in
   let* b = Block.bake ~policy ~operation:op2 b in
   let* b =
-    if autostaking_enable then return b
-    else
-      let* stake = Adaptive_issuance_helpers.stake (B b) del1 bal in
-      Block.bake ~policy ~operation:stake b
+    let* stake = Adaptive_issuance_helpers.stake (B b) del1 bal in
+    Block.bake ~policy ~operation:stake b
   in
   let* b = bake_until_first_block_of_next_period b in
   (* make the proposal *)

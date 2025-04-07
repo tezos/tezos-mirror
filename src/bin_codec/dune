@@ -7,6 +7,8 @@
  (package octez-codec)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-rustzcash-deps
+  bls12-381.archive
   octez-libs.data-encoding
   octez-libs.base
   octez-libs.base.unix
@@ -18,6 +20,7 @@
   octez-libs.event-logging
   octez-shell-libs.signer-services
   octez-version.value
+  tezos-dal-node-lib.gossipsub
   (select void_for_linking-octez-protocol-005-PsBabyM1-libs-client from
    (octez-protocol-005-PsBabyM1-libs.client -> void_for_linking-octez-protocol-005-PsBabyM1-libs-client.empty)
    (-> void_for_linking-octez-protocol-005-PsBabyM1-libs-client.empty))
@@ -69,6 +72,9 @@
   (select void_for_linking-octez-protocol-021-PsQuebec-libs-client from
    (octez-protocol-021-PsQuebec-libs.client -> void_for_linking-octez-protocol-021-PsQuebec-libs-client.empty)
    (-> void_for_linking-octez-protocol-021-PsQuebec-libs-client.empty))
+  (select void_for_linking-octez-protocol-022-PsRiotum-libs-client from
+   (octez-protocol-022-PsRiotum-libs.client -> void_for_linking-octez-protocol-022-PsRiotum-libs-client.empty)
+   (-> void_for_linking-octez-protocol-022-PsRiotum-libs-client.empty))
   (select void_for_linking-octez-protocol-alpha-libs-client from
    (octez-protocol-alpha-libs.client -> void_for_linking-octez-protocol-alpha-libs-client.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-client.empty)))
@@ -106,4 +112,5 @@
    (write-file void_for_linking-octez-protocol-019-PtParisB-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-020-PsParisC-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-client.empty "")
+   (write-file void_for_linking-octez-protocol-022-PsRiotum-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-client.empty ""))))

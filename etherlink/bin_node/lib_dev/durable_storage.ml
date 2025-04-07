@@ -105,34 +105,43 @@ let current_block_number read =
 
 let un_qty (Qty z) = z
 
-let transaction_receipt read tx_hash =
+let mock_block_hash = Block_hash (Hex (String.make 64 'a'))
+
+let transaction_receipt read ?block_hash tx_hash =
   let open Lwt_result_syntax in
   (* We use a mock block hash to decode the rest of the receipt,
      so that we can get the number to query for the actual block
-     hash. *)
-  let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
+     hash (only if the block hash isn't already available). *)
+  let block = Option.value block_hash ~default:mock_block_hash in
   let* opt_receipt =
     inspect_durable_and_decode_opt
       read
       (Durable_storage_path.Transaction_receipt.receipt tx_hash)
-      (Transaction_receipt.of_rlp_bytes mock_block_hash)
+      (Transaction_receipt.of_rlp_bytes block)
   in
-  match opt_receipt with
-  | Some temp_receipt ->
-      let+ blockHash =
-        inspect_durable_and_decode
-          read
-          (Durable_storage_path.Indexes.block_by_number
-             (Nth (un_qty temp_receipt.blockNumber)))
-          decode_block_hash
-      in
-      let logs =
-        List.map
-          (fun (log : transaction_log) -> {log with blockHash = Some blockHash})
-          temp_receipt.logs
-      in
-      Some {temp_receipt with blockHash; logs}
-  | None -> return_none
+  match block_hash with
+  | Some _ ->
+      (* Correct receipt *)
+      return opt_receipt
+  | None -> (
+      (* Need to replace with correct block hash *)
+      match opt_receipt with
+      | Some temp_receipt ->
+          let+ blockHash =
+            inspect_durable_and_decode
+              read
+              (Durable_storage_path.Indexes.block_by_number
+                 (Nth (un_qty temp_receipt.blockNumber)))
+              decode_block_hash
+          in
+          let logs =
+            List.map
+              (fun (log : transaction_log) ->
+                {log with blockHash = Some blockHash})
+              temp_receipt.logs
+          in
+          Some {temp_receipt with blockHash; logs}
+      | None -> return_none)
 
 let transaction_object read tx_hash =
   let open Lwt_result_syntax in
@@ -144,7 +153,7 @@ let transaction_object read tx_hash =
     inspect_durable_and_decode_opt
       read
       (Durable_storage_path.Transaction_object.object_ tx_hash)
-      (Ethereum_types.transaction_object_from_rlp (Some mock_block_hash))
+      (Ethereum_types.legacy_transaction_object_from_rlp (Some mock_block_hash))
   in
   match opt_object with
   | Some temp_object ->
@@ -167,7 +176,7 @@ let transaction_object_with_block_hash read block_hash tx_hash =
   inspect_durable_and_decode_opt
     read
     (Durable_storage_path.Transaction_object.object_ tx_hash)
-    (Ethereum_types.transaction_object_from_rlp block_hash)
+    (Ethereum_types.legacy_transaction_object_from_rlp block_hash)
 
 let full_transactions read block_hash transactions =
   let open Lwt_result_syntax in
@@ -179,9 +188,10 @@ let full_transactions read block_hash transactions =
           hashes
       in
       TxFull objects
-  | TxFull _ -> return transactions
+  | TxFull l -> return (TxFull l)
 
-let populate_tx_objects read ~full_transaction_object block =
+let populate_tx_objects read ~full_transaction_object
+    (block : legacy_transaction_object block) =
   let open Lwt_result_syntax in
   if full_transaction_object then
     let* transactions =
@@ -200,7 +210,7 @@ let blocks_by_number read ~full_transaction_object ~number =
       decode_block_hash
   in
   match block_hash_opt with
-  | None -> failwith "Unknown block %a" Z.pp_print level
+  | None -> failwith "Block %a not found" Z.pp_print level
   | Some block_hash -> (
       let* block_opt =
         inspect_durable_and_decode_opt
@@ -237,14 +247,11 @@ let block_by_hash read ~full_transaction_object block_hash =
   | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
   | Some block -> populate_tx_objects read ~full_transaction_object block
 
-let block_receipts read n =
-  let number = Durable_storage_path.Block.(Nth n) in
-  let open Lwt_result_syntax in
-  let* block = blocks_by_number read ~full_transaction_object:false ~number in
+let block_receipts_of_block read block =
   let get_receipt_from_hash tx_hash =
     Lwt.map
       (function Ok receipt -> receipt | _ -> None)
-      (transaction_receipt read tx_hash)
+      (transaction_receipt read ~block_hash:block.hash tx_hash)
   in
   let tx_hashes : hash list =
     match block.transactions with
@@ -252,21 +259,37 @@ let block_receipts read n =
     | TxFull tx_objects ->
         (* This case should never happen, because there is no ways
            to ask for full objects when requestion block receipts. *)
-        List.map
-          (fun (tx_object : transaction_object) -> tx_object.hash)
-          tx_objects
+        List.map (fun (obj : legacy_transaction_object) -> obj.hash) tx_objects
   in
-  let*! receipts = Lwt_list.filter_map_s get_receipt_from_hash tx_hashes in
+  Lwt_list.filter_map_s get_receipt_from_hash tx_hashes
+
+let block_receipts read n =
+  let number = Durable_storage_path.Block.(Nth n) in
+  let open Lwt_result_syntax in
+  let* block = blocks_by_number read ~full_transaction_object:false ~number in
+  let*! receipts = block_receipts_of_block read block in
   Lwt.return_ok receipts
 
 let chain_id read =
-  inspect_durable_and_decode read Durable_storage_path.chain_id decode_number_le
-
-let base_fee_per_gas read =
   inspect_durable_and_decode
     read
-    Durable_storage_path.base_fee_per_gas
-    decode_number_le
+    Durable_storage_path.chain_id
+    Chain_id.decode_le
+
+let base_fee_per_gas read =
+  let open Lwt_result_syntax in
+  let* block =
+    blocks_by_number
+      read
+      ~full_transaction_object:false
+      ~number:Durable_storage_path.Block.Current
+  in
+  match block.baseFeePerGas with
+  | Some base_fee_per_gas -> return base_fee_per_gas
+  | None ->
+      Error_monad.failwith
+        "Attempted to get the base fee per gas from a block which does not \
+         have one."
 
 let kernel_version read =
   inspect_durable_and_decode
@@ -315,6 +338,28 @@ let storage_version read =
     read
     Durable_storage_path.storage_version
     (fun bytes -> decode_number_le bytes |> un_qty |> Z.to_int)
+
+let maximum_gas_per_transaction read =
+  (* In future iterations of the kernel, the default value will be
+     written to the storage. This default value will no longer need to
+     be declared here. *)
+  inspect_durable_and_decode_default
+    ~default:(Qty (Z.of_string "30_000_000"))
+    read
+    Durable_storage_path.maximum_gas_per_transaction
+    decode_number_le
+
+let da_fee_per_byte read =
+  inspect_durable_and_decode
+    read
+    Durable_storage_path.da_fee_per_byte
+    decode_number_le
+
+let sequencer read =
+  inspect_durable_and_decode
+    read
+    Durable_storage_path.sequencer_key
+    (fun bytes -> Signature.Public_key.of_b58check_exn (String.of_bytes bytes))
 
 module Make (Reader : READER) = struct
   let read = Reader.read
@@ -396,12 +441,14 @@ module Make_block_storage (Reader : READER) = struct
   let nth_block ~full_transaction_object n =
     let open Lwt_result_syntax in
     let* read = read_with_state () in
-    nth_block read ~full_transaction_object n
+    let+ block = nth_block read ~full_transaction_object n in
+    Transaction_object.block_from_legacy block
 
   let block_by_hash ~full_transaction_object block_hash =
     let open Lwt_result_syntax in
     let* read = read_with_state () in
-    block_by_hash read ~full_transaction_object block_hash
+    let+ block = block_by_hash read ~full_transaction_object block_hash in
+    Transaction_object.block_from_legacy block
 
   let block_receipts n =
     let open Lwt_result_syntax in
@@ -411,5 +458,8 @@ module Make_block_storage (Reader : READER) = struct
   let transaction_object tx_hash =
     let open Lwt_result_syntax in
     let* read = read_with_state () in
-    transaction_object read tx_hash
+    let+ transaction_object = transaction_object read tx_hash in
+    Option.map
+      Transaction_object.from_store_transaction_object
+      transaction_object
 end

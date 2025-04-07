@@ -16,7 +16,6 @@ depends: [
   "tezos-protocol-017-PtNairob" { = version }
   "tezos-dal-node-services" { = version }
   "tezos-dal-node-lib" { = version }
-  "tezos-dac-lib" { = version }
   "octez-l2-libs" { = version }
   "octez-crawler" { = version }
   "octez-internal-libs" { = version }
@@ -34,4 +33,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Protocol specific (for 017-PtNairob) library for smart rollup node"

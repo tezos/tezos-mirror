@@ -1,24 +1,27 @@
 [
   {
-    "file": "tezt/tests/p2p.ml",
-    "title": "p2p-maintenance-init-expected_connections",
+    "file": "tezt/tests/sc_rollup.ml",
+    "title": "Alpha: riscv - origination of a SCORU executes without error",
     "tags": [
+      "regression",
       "admin_client",
+      "alpha",
       "client",
-      "layer1",
-      "maintenance",
+      "etherlink",
       "memory_4k",
       "node",
-      "p2p"
+      "origination",
+      "riscv",
+      "sc_rollup"
     ],
     "successful_runs": {
-      "total_time": "11093734",
+      "total_time": "3265589",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/storage_snapshots.ml",
-    "title": "Parisb: storage snapshot export and import",
+    "title": "Quebeca: storage snapshot export and import",
     "tags": [
       "admin_client",
       "client",
@@ -27,12 +30,32 @@
       "layer1",
       "memory_4k",
       "node",
-      "parisb",
+      "quebeca",
       "snapshot",
       "storage"
     ],
     "successful_runs": {
-      "total_time": "65984596",
+      "total_time": "66904479",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Parisc: bootstrap: many nodes bootstrap",
+    "tags": [
+      "admin_client",
+      "baker_psparisc",
+      "bootstrap",
+      "client",
+      "layer1",
+      "memory_4k",
+      "node",
+      "parisc",
+      "synchronisation_threshold",
+      "threshold"
+    ],
+    "successful_runs": {
+      "total_time": "51247524",
       "count": "1"
     }
   },
@@ -52,7 +75,26 @@
       "threshold"
     ],
     "successful_runs": {
-      "total_time": "49051887",
+      "total_time": "51228463",
+      "count": "1"
+    }
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Parisc: Testing DAL node (banned attesters receive their shards thanks to amplification)",
+    "tags": [
+      "admin_client",
+      "amplification",
+      "client",
+      "dal",
+      "dal_node",
+      "memory_4k",
+      "node",
+      "parisc",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "39194893",
       "count": "1"
     }
   },
@@ -71,33 +113,13 @@
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "39227083",
+      "total_time": "37899427",
       "count": "1"
     }
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL node (garbage collection of shards for producer and attester)",
-    "tags": [
-      "admin_client",
-      "attester",
-      "client",
-      "dal",
-      "dal_node",
-      "gc",
-      "memory_4k",
-      "node",
-      "parisc",
-      "tezos2"
-    ],
-    "successful_runs": {
-      "total_time": "39180328",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/dal.ml",
-    "title": "Parisb: Testing DAL node (garbage collection of shards for all profiles)",
+    "title": "Quebeca: Testing DAL node (garbage collection of shards for all profiles)",
     "tags": [
       "admin_client",
       "client",
@@ -107,11 +129,11 @@
       "memory_4k",
       "multi",
       "node",
-      "parisb",
+      "quebeca",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "44578722",
+      "total_time": "44667391",
       "count": "1"
     }
   }

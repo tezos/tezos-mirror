@@ -12,7 +12,7 @@
       The whole point of this function is to avoid an unncessary call
       to the WASM PVM to improve the performances. *)
 val gas_for_fees :
-  ?da_fee_per_byte:Ethereum_types.quantity ->
+  da_fee_per_byte:Ethereum_types.quantity ->
   gas_price:Z.t ->
   ?access_list:Transaction.access_list_item list ->
   bytes ->

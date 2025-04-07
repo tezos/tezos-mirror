@@ -31,3 +31,14 @@
   -open Tezos_protocol_021_PsQuebec
   -open Tezos_021_PsQuebec_test_helpers)
  (private_modules kernel rules state_space))
+
+(rule
+ (targets crypto_samplers.mli)
+ (action
+  (write-file
+   %{targets}
+   "include module type of Tezos_benchmark.Crypto_samplers.V1")))
+
+(rule
+ (targets crypto_samplers.ml)
+ (action (write-file %{targets} "include Tezos_benchmark.Crypto_samplers.V1")))

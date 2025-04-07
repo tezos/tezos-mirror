@@ -13,6 +13,8 @@ type t =
   | Connection_closed_by_unexpected_error of (read_write * string)
   | TCP_connection_refused
   | TCP_connection_unreachable
+  | TCP_network_unreachable
+    (* Likely when try to reach an ipv6 and this is not supported. *)
   | TCP_connection_canceled
   | TCP_connection_failed_unexpected_error of string
   | Scheduled_pop_unexpected_error of tztrace
@@ -261,6 +263,12 @@ let encoding =
         (constant "Unknown_reason")
         (function Unknown_reason -> Some () | _ -> None)
         (fun () -> Unknown_reason);
+      case
+        (Tag 0x29)
+        ~title:"network_unreachable"
+        (constant "network_unreachable")
+        (function TCP_network_unreachable -> Some () | _ -> None)
+        (fun () -> TCP_network_unreachable);
     ]
 
 let pp fmt =
@@ -287,6 +295,8 @@ let pp fmt =
   | TCP_connection_refused -> Format.fprintf fmt "TCP connection refused"
   | TCP_connection_unreachable ->
       Format.fprintf fmt "TCP connection, peer unreachable"
+  | TCP_network_unreachable ->
+      Format.fprintf fmt "TCP connection, network unreachable"
   | TCP_connection_canceled -> Format.fprintf fmt "TCP connection cancelled"
   | TCP_connection_failed_unexpected_error ex ->
       Format.fprintf fmt "TCP connection failed with unexpected error, %s" ex

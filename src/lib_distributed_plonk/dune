@@ -24,6 +24,7 @@
 (executable
  (name worker_runner)
  (libraries
+  bls12-381.archive
   octez-libs.distributed-plonk
   octez-libs.plonk.distribution)
  (modules worker_runner))
@@ -31,6 +32,7 @@
 (executable
  (name distribution)
  (libraries
+  bls12-381.archive
   octez-libs.distributed-plonk)
  (flags
   (:standard)
@@ -40,6 +42,7 @@
 (executable
  (name distribution_meta)
  (libraries
+  bls12-381.archive
   octez-libs.distributed-plonk)
  (flags
   (:standard)

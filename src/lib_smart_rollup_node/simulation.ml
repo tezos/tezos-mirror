@@ -134,11 +134,8 @@ let simulate_messages_no_checks
       }
   in
   (* Build new state *)
-  let* eval_result =
+  let* Pvm_plugin_sig.{state = {state; _}; num_ticks; num_messages; _} =
     Pvm.Fueled.Free.eval_messages ?reveal_map node_ctxt eval_state
-  in
-  let Pvm_plugin_sig.{state = {state; _}; num_ticks; num_messages; _} =
-    Delayed_write_monad.ignore eval_result
   in
   let*! ctxt = Context.PVMState.set ctxt state in
   let nb_messages_inbox = nb_messages_inbox + num_messages in

@@ -79,4 +79,6 @@ let parisc_name = "paris_020"
 
 let proto_quebec_name = "quebec_021"
 
+let proto_r022_name = "r022_022"
+
 let proto_alpha_name = "alpha_current"

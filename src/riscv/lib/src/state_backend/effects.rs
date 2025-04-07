@@ -2,11 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::marker::PhantomData;
-
 use super::{
-    AllocatedOf, Atom, Cell, Elem, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, Ref,
+    AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
+    ManagerWrite, Ref, StaticCopy,
 };
+use crate::default::ConstDefault;
+use std::marker::PhantomData;
 
 /// XXX: Workaround trait for not having enum variants as const-generics
 pub trait EffectGetter {
@@ -19,12 +20,12 @@ pub trait EffectGetter {
 
 pub type EffectCellLayout<T> = Atom<T>;
 
-pub struct EffectCell<T: Elem, EG: EffectGetter, M: ManagerBase> {
+pub struct EffectCell<T: 'static, EG, M: ManagerBase> {
     inner: Cell<T, M>,
     _pd: PhantomData<EG>,
 }
 
-impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
+impl<T: ConstDefault + StaticCopy, EG, M: ManagerBase> EffectCell<T, EG, M> {
     pub fn bind(space: AllocatedOf<EffectCellLayout<T>, M>) -> Self {
         Self {
             inner: space,
@@ -32,11 +33,16 @@ impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<EffectCellLayout<T>, Ref<'_, M>> {
-        self.inner.struct_ref()
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<EffectCellLayout<T>, F::Output> {
+        self.inner.struct_ref::<F>()
     }
+}
 
+impl<T: Copy, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
     #[inline(always)]
     pub fn read(&self) -> T
     where
@@ -62,5 +68,14 @@ impl<T: Elem, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
         M: ManagerReadWrite,
     {
         (self.inner.replace(value), EG::EFFECT)
+    }
+}
+
+impl<T: Copy, EG, M: ManagerClone> Clone for EffectCell<T, EG, M> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            _pd: PhantomData,
+        }
     }
 }

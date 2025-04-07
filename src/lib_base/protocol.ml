@@ -46,6 +46,8 @@ and env_version =
   | V11
   | V12
   | V13
+  | V14
+  | V15
 
 let compare_version = Stdlib.compare
 
@@ -80,6 +82,8 @@ let module_name_of_env_version = function
   | V11 -> "V11"
   | V12 -> "V12"
   | V13 -> "V13"
+  | V14 -> "V14"
+  | V15 -> "V15"
 
 let env_version_encoding =
   let open Data_encoding in
@@ -99,7 +103,9 @@ let env_version_encoding =
          | V10 -> 10
          | V11 -> 11
          | V12 -> 12
-         | V13 -> 13)
+         | V13 -> 13
+         | V14 -> 14
+         | V15 -> 15)
        (function
          | 0 -> V0
          | 1 -> V1
@@ -115,6 +121,8 @@ let env_version_encoding =
          | 11 -> V11
          | 12 -> V12
          | 13 -> V13
+         | 14 -> V14
+         | 15 -> V15
          | x -> failwith (Format.sprintf "unexpected environment version: %d" x))
        uint16
 

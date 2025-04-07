@@ -967,7 +967,6 @@ let baker_process ~(delegates : Baking_state.consensus_key list) ~base_dir
     List.iter_es
       (fun ({alias; public_key; public_key_hash; secret_key_uri} :
              Baking_state.consensus_key) ->
-        let open Tezos_client_base in
         let name = alias |> WithExceptions.Option.get ~loc:__LOC__ in
         let* public_key_uri = Client_keys.neuterize secret_key_uri in
         Client_keys.register_key
@@ -1299,8 +1298,7 @@ let make_baking_delegate
 
 let run ?(config = default_config) bakers_spec =
   let open Lwt_result_syntax in
-  Tezos_client_base.Client_keys.register_signer
-    (module Tezos_signer_backends.Unencrypted) ;
+  Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
   let total_accounts =
     List.fold_left (fun acc (n, _) -> acc + n) 0 bakers_spec
   in

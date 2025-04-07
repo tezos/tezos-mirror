@@ -10,6 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "bls12-381"
   "octez-libs"
   "tezt-tezos"
   "tezt-etherlink" { = version }
@@ -19,4 +20,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Run scenarios on testnets"

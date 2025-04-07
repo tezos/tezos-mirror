@@ -42,38 +42,49 @@ let make_block_hash level messages =
 let default_constants =
   (* Same as default test constants for alpha excepted for
      commitment_period_in_block. *)
+  let open Tezos_protocol_alpha.Protocol.Alpha_context in
+  let Constants.Parametric.
+        {
+          minimal_block_delay;
+          delay_increment_per_round;
+          sc_rollup =
+            {
+              challenge_window_in_blocks;
+              reveal_activation_level;
+              max_number_of_stored_cemented_commitments;
+              max_active_outbox_levels;
+              _;
+            };
+          dal =
+            {
+              feature_enable;
+              attestation_lag;
+              number_of_slots;
+              cryptobox_parameters;
+              _;
+            };
+          _;
+        } =
+    Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+  in
   Rollup_constants.
     {
-      minimal_block_delay = 1L;
-      delay_increment_per_round = 1L;
+      minimal_block_delay = Period.to_seconds minimal_block_delay;
+      delay_increment_per_round = Period.to_seconds delay_increment_per_round;
       sc_rollup =
         {
-          challenge_window_in_blocks = 4032;
+          challenge_window_in_blocks;
           commitment_period_in_blocks = 3;
           reveal_activation_level =
             Some
-              {
-                blake2B = 0l;
-                metadata = 0l;
-                dal_page = 0l;
-                dal_parameters = 0l;
-                dal_attested_slots_validity_lag = Int32.max_int;
-              };
-          max_number_of_stored_cemented_commitments = 5;
+              (Tezos_smart_rollup_layer2_alpha.Sc_rollup_proto_types.Constants
+               .reveal_activation_level_to_octez
+                 reveal_activation_level);
+          max_number_of_stored_cemented_commitments;
+          max_active_outbox_levels = Int32.to_int max_active_outbox_levels;
         };
       dal =
-        {
-          feature_enable = false;
-          attestation_lag = 4;
-          number_of_slots = 16;
-          cryptobox_parameters =
-            {
-              redundancy_factor = 8;
-              page_size = 4096;
-              slot_size = 32768;
-              number_of_shards = 64;
-            };
-        };
+        {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
     }
 
 let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =

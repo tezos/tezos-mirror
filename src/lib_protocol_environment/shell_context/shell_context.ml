@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Tezos_protocol_environment
-open Context
 
 module C = struct
   include Tezos_context.Context
@@ -52,7 +51,7 @@ let checkout_exn index context_hash =
 let wrap_disk_context ctxt =
   Context.make ~ops ~ctxt ~kind:Context ~equality_witness ~impl_name
 
-let unwrap_disk_context : t -> Tezos_context.Context.t = function
+let unwrap_disk_context : Context.t -> Tezos_context.Context.t = function
   | Context.Context {ctxt; kind = Context; _} -> ctxt
   | Context.Context t ->
       err_implementation_mismatch ~expected:impl_name ~got:t.impl_name

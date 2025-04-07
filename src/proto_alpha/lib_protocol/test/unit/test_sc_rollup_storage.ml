@@ -2221,7 +2221,7 @@ module Stake_storage_tests = struct
     match level_and_bitset_opt with
     | Some (existing_level, bitset) when Raw_level_repr.(existing_level = level)
       ->
-        let*?@ is_set = Bitset.mem bitset message_index in
+        let*?@ is_set = Environment.Bitset.mem bitset message_index in
         Assert.equal_bool ~loc is_set true
     | _ -> Stdlib.failwith "Expected a bitset and a matching level."
 

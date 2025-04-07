@@ -1,0 +1,26 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name governance_observer)
+ (public_name etherlink-governance-observer)
+ (package etherlink-governance-observer)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  bls12-381.archive
+  octez-libs.base
+  octez-libs.base.unix
+  octez-version.value
+  octez-libs.clic
+  octez-libs.prometheus-app
+  octez-libs.cohttp-lwt-unix
+  octez-libs.cohttp-lwt
+  octez-libs.rpc-http
+  octez-libs.rpc-http-client-unix)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_rpc_http))

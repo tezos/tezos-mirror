@@ -9,12 +9,19 @@
 Welcome to the Octez and Protocol Documentation!
 ================================================
 
-To start browsing, either follow one of the guided paths below, or directly pick any topics in the documentation menu.
+This documentation describes an implementation of the `Tezos blockchain <https://tezos.com>`__ consisting of the **Octez toolsuite** and the **Tezos protocol**, for technical users of various kinds, including Tezos application developers, bakers, and Octez/protocol developers.
+
+.. note::
+
+  For documentation of the whole Tezos ecosystem, including software beyond the Octez & protocol platform, such as smart contracts languages, developer tools, or web3 libraries, see https://docs.tezos.com.
+  Training material about the Tezos ecosystem, consisting of learning modules with exercises, can be found at https://opentezos.com.
+
+To start browsing the Octez & Protocol documentation, directly pick any topics in the menu on the left, or click one of the guided paths below:
 
 .. raw:: html
 
     <details>
-    <summary><img alt="Discover Octez & the Tezos protocol" class="normal" src="discover_tezos_1.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Discover Octez & the Tezos protocol</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Never heard of Octez?** Let's get acquainted!
@@ -37,7 +44,7 @@ To learn more about how Octez & the protocol fit into Tezos and its ecosystem, s
     </div></details><br/>
 
     <details>
-    <summary><img alt="Getting started" class="normal" src="getting_started_2.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Getting started with Octez</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Newcomer to Octez?** Start participating in Tezos using Octez!
@@ -57,7 +64,7 @@ and more.
     </div></details><br/>
 
     <details>
-    <summary><img alt="Using Octez" class="normal" src="using_octez_3.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Using Octez</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Already a user?** Here is everything you need to know!
@@ -75,7 +82,7 @@ If you intend to participate to Tezos not just as a user, but rather as a baker,
     </div></details><br/>
 
     <details>
-    <summary><img alt="Understanding" class="normal" src="understanding_octez_4.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Understanding Octez & the protocol</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Want to know how it works?** It's no secret, let us explain!
@@ -88,14 +95,14 @@ If you want to know more about the *technology* underlying Octez and the Tezos p
 
 - Page ``Octez Protocol`` explains the design principles and the salient features of the Tezos protocol. In fact, these pages are versioned for several Tezos protocols, current or upcoming, such as: the :doc:`active protocol <active/protocol>`, a :doc:`protocol proposal under development <alpha/protocol>`, and possibly some protocol(s) that are currently candidate(s) for future adoption.
 
-- Other pages are related to the important Smart Rollups feature, and present tools such as the Smart rollup node and Data Availability Committees.
+- Other pages are related to the important Smart Rollups feature, and present tools such as the Smart rollup node and the Data Availability Layer.
 
 .. raw:: html
 
     </div></details><br/>
 
     <details>
-    <summary><img alt="Developer reference" class="normal" src="building_on_tezos_5.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Developer reference</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Are you a Tezos developer?** Find here some useful reference pages!
@@ -114,7 +121,7 @@ This website complements those resources with reference documentation, mostly in
     </div></details><br/>
 
     <details>
-    <summary><img alt="Contributing" class="normal" src="contributing_to_octez_6.png" style="width:min(95%,1000px); cursor: pointer;" />
+    <summary style="background-color:#019CF2"><b>Contributing to Octez & the protocol</b>
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
 **Are you a platform developer?** Here are the nuts and bolts!
@@ -140,6 +147,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
     </div></details><br/>
 
+You may also access this whole documentation as a single `text file <https://octez.tezos.com/docs/octezdoc.txt>`__.
 
 .. toctree::
    :maxdepth: 2
@@ -151,6 +159,7 @@ Platform developers are also provided reference materials for internal APIs of O
    introduction/howtouse
    introduction/howtorun
    introduction/services
+   introduction/serokell
    introduction/versioning
    BREAKING CHANGES <introduction/breaking_changes>
 
@@ -173,7 +182,6 @@ Platform developers are also provided reference materials for internal APIs of O
 
    shell/the_big_picture
    shell/shell
-   shell/data_availability_committees
    shell/dal
    shell/smart_rollup_node
    shell/p2p_api
@@ -185,8 +193,8 @@ Platform developers are also provided reference materials for internal APIs of O
    :caption: Protocol Reference Manuals
    :hidden:
 
-   Paris Protocol Reference <active/index>
-   Quebec Protocol Reference <quebec/index>
+   Quebec Protocol Reference <active/index>
+   Rio Protocol Reference <r022/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
@@ -204,7 +212,6 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    releases/releases
-   releases/version-20
    releases/version-21
    releases/history
 
@@ -214,8 +221,8 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    protocols/naming
-   protocols/020_paris
    protocols/021_quebec
+   protocols/022_r022
    protocols/alpha
    protocols/history
 
@@ -234,3 +241,10 @@ Platform developers are also provided reference materials for internal APIs of O
    developer/encodings
    developer/merkle-proof-encoding-formats
    api/api-inline
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Grafazos
+   :hidden:
+
+   grafazos-doc/index

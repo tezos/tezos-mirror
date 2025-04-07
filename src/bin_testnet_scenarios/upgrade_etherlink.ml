@@ -9,6 +9,11 @@
      Invocation :
         - dune exec src/bin_testnet_scenarios/main.exe -- -f upgrade_etherlink.ml -a network=mainnet --verbose --keep-temp -a upgrade-kernel=<NEW_KERNEL>
         - dune exec src/bin_testnet_scenarios/main.exe -- -f upgrade_etherlink.ml -a network=mainnet --verbose --keep-temp -a upgrade-kernel=<NEW_KERNEL> -a node-snapshot=<OCTEZ_NODE_ROLLING_SNAPSHOT> -a rollup-node-snapshot=<ROLLUP_NODE_FULL_SNAPSHOT>
+
+     Note :
+         - <..._SNAPSHOT> can either be a URL (the snapshot will be downloaded)
+           or the path to a file (a symlink will be created).
+         - network is either mainnet or testnet
 *)
 
 open Rpc.Syntax
@@ -16,14 +21,13 @@ open Rpc.Syntax
 let protocol_of_string s =
   match String.lowercase_ascii s with
   | "alpha" -> Protocol.Alpha
-  | "parisc" | "paris" -> Protocol.ParisC
   | "quebec" -> Protocol.Quebec
   | s -> failwith (sf "%s is an invalid protocol" s)
 
 let bake ~env rollup_node node yes_wallet () =
   let* () =
     Client.bake_for_and_wait
-      ~context_path:(Node.data_dir node // "context")
+      ~context_path:(Node.data_dir node)
       ~env
       ~keys:[]
       ~minimal_timestamp:true
@@ -94,12 +98,13 @@ let run_and_bootstrap_rollup_node ~rollup_node_snapshot ~rollup network
   in
   (* Import the snapshot. *)
   let* rollup_node_snapshot =
-    Scenario_helpers.download rollup_node_snapshot "rollup_node.snapshot"
+    Scenario_helpers.fetch rollup_node_snapshot "rollup_node.snapshot"
   in
   let*? process =
     Sc_rollup_node.import_snapshot
       rollup_node
       ~snapshot_file:rollup_node_snapshot
+      ~no_check:true
   in
   let* () = Process.check process in
   (* Bootstrap until the node level with an archive endpoint. *)
@@ -124,7 +129,7 @@ let env =
   @@ String_map.add
        "LD_PRELOAD"
        "/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1"
-  @@ String_map.add "FAKETIME" "@2025-01-01 11:15:13"
+  @@ String_map.add "FAKETIME" "@2026-01-01 11:15:13"
   @@ String_map.add "FAKETIME_DONT_RESET" "1"
   @@ String_map.empty
 
@@ -217,6 +222,7 @@ let etherlink_upgrade () =
           (* The protocol is not used to setup an octez node. *)
           data_dir = None;
           client_dir = None;
+          operator = None;
         }
       ()
   in

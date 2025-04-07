@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (* Copyright (c) 2024 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
@@ -82,7 +82,7 @@ module Slot : sig
 
   val to_int : t -> int
 
-  val of_int_do_not_use_except_for_parameters : int -> t
+  val of_int : int -> t tzresult
 
   val encoding : t Data_encoding.encoding
 
@@ -105,7 +105,7 @@ module Slot : sig
   module Set : Set.S with type elt = t
 
   module Internal_for_tests : sig
-    val of_int : int -> t tzresult
+    val of_int_unsafe_only_use_for_tests : int -> t
   end
 end
 
@@ -152,6 +152,9 @@ module Tez : sig
   val mul_exn : t -> int -> t
 
   val div_exn : t -> int -> t
+
+  (** See {!Tez_repr.mul_percentage}. *)
+  val mul_percentage : rounding:[`Down | `Up] -> t -> Percentage.t -> t
 end
 
 (** This module re-exports definitions from {!Staking_pseudotoken_repr}. *)
@@ -192,6 +195,8 @@ module Period : sig
   val one_minute : period
 
   val one_hour : period
+
+  val one_day : period
 
   val compare : period -> period -> int
 end
@@ -258,22 +263,23 @@ module Raw_level : sig
 
   val of_int32_exn : int32 -> raw_level
 
+  val add : raw_level -> int -> raw_level
+
+  val sub : raw_level -> int -> raw_level option
+
   module Set : Set.S with type elt = raw_level
 
   module Map : Map.S with type key = raw_level
 
   module Internal_for_tests : sig
-    val add : raw_level -> int -> raw_level
-
-    val sub : raw_level -> int -> raw_level option
-
     val from_repr : Raw_level_repr.t -> raw_level
 
     val to_repr : raw_level -> Raw_level_repr.t
   end
 end
 
-(** This module re-exports definitions from {!Cycle_repr}. *)
+(** This module re-exports definitions from {!Cycle_repr} and
+    {!Cycle_storage}. *)
 module Cycle : sig
   include BASIC_DATA
 
@@ -296,6 +302,12 @@ module Cycle : sig
   val ( ---> ) : cycle -> cycle -> cycle list
 
   module Map : Map.S with type key = cycle
+
+  (** See {!Cycle_storage.current}. *)
+  val current : context -> cycle
+
+  (** See {!Cycle_storage.greatest_unstake_finalizable_cycle}. *)
+  val greatest_unstake_finalizable_cycle : context -> cycle option
 end
 
 (** This module re-exports definitions from {!Round_repr}. *)
@@ -814,7 +826,9 @@ module Constants : sig
 
   val michelson_maximum_type_size : int
 
-  val max_slashing_period : int
+  val denunciation_period : int
+
+  val slashing_delay : int
 
   val sc_rollup_message_size_limit : int
 
@@ -829,9 +843,10 @@ module Constants : sig
       attestation_lag : int;
       attestation_threshold : int;
       cryptobox_parameters : Dal.parameters;
+      minimal_participation_ratio : Q.t;
+      rewards_ratio : Q.t;
+      traps_fraction : Q.t;
     }
-
-    val dal_encoding : dal Data_encoding.t
 
     type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level.t}
 
@@ -884,12 +899,7 @@ module Constants : sig
     type adaptive_issuance = {
       global_limit_of_staking_over_baking : int;
       edge_of_staking_over_delegation : int;
-      launch_ema_threshold : int32;
       adaptive_rewards_params : adaptive_rewards_params;
-      activation_vote_enable : bool;
-      autostaking_enable : bool;
-      force_activation : bool;
-      ns_enable : bool;
     }
 
     type issuance_weights = {
@@ -899,12 +909,14 @@ module Constants : sig
       attesting_reward_weight : int;
       seed_nonce_revelation_tip_weight : int;
       vdf_revelation_tip_weight : int;
+      dal_rewards_weight : int;
     }
 
     type t = {
       consensus_rights_delay : int;
       blocks_preservation_cycles : int;
       delegate_parameters_activation_delay : int;
+      tolerated_inactivity_period : int;
       blocks_per_cycle : int32;
       blocks_per_commitment : int32;
       nonce_revelation_threshold : int32;
@@ -929,13 +941,11 @@ module Constants : sig
       delay_increment_per_round : Period.t;
       minimal_participation_ratio : Ratio.t;
       consensus_committee_size : int;
-      consensus_threshold : int;
+      consensus_threshold_size : int;
       limit_of_delegation_over_baking : int;
       percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
-      percentage_of_frozen_deposits_slashed_per_double_attestation :
-        Percentage.t;
       max_slashing_per_block : Percentage.t;
-      max_slashing_threshold : int;
+      max_slashing_threshold : Ratio.t;
       testnet_dictator : public_key_hash option;
       initial_seed : State_hash.t option;
       cache_script_size : int;
@@ -946,6 +956,9 @@ module Constants : sig
       zk_rollup : zk_rollup;
       adaptive_issuance : adaptive_issuance;
       direct_ticket_spending_enable : bool;
+      aggregate_attestation : bool;
+      allow_tz4_delegate_enable : bool;
+      all_bakers_attest_activation_level : Raw_level_repr.t option;
     }
 
     val encoding : t Data_encoding.t
@@ -960,12 +973,18 @@ module Constants : sig
 
   module Generated : sig
     type t = {
-      consensus_threshold : int;
+      consensus_threshold_size : int;
       issuance_weights : Parametric.issuance_weights;
-      max_slashing_threshold : int;
     }
 
-    val generate : consensus_committee_size:int -> t
+    val generate : consensus_committee_size:int -> dal_rewards_ratio:Q.t -> t
+  end
+
+  (** See {!Constants_repr.Derived}. *)
+  module Derived : sig
+    type t
+
+    val encoding : t Data_encoding.t
   end
 
   val parametric : context -> Parametric.t
@@ -978,7 +997,12 @@ module Constants : sig
 
   val delegate_parameters_activation_delay : context -> int
 
+  val tolerated_inactivity_period : context -> int
+
   val slashable_deposits_period : context -> int
+
+  (** See {!Constants_storage.unstake_finalization_delay}. *)
+  val unstake_finalization_delay : context -> int
 
   val issuance_modification_delay : context -> int
 
@@ -1027,7 +1051,7 @@ module Constants : sig
 
   val consensus_committee_size : context -> int
 
-  val consensus_threshold : context -> int
+  val consensus_threshold_size : context -> int
 
   val minimal_participation_ratio : context -> Ratio.t
 
@@ -1036,16 +1060,17 @@ module Constants : sig
   val percentage_of_frozen_deposits_slashed_per_double_baking :
     context -> Percentage.t
 
-  val percentage_of_frozen_deposits_slashed_per_double_attestation :
-    context -> Percentage.t
-
   val testnet_dictator : context -> public_key_hash option
+
+  val dal_enable : context -> bool
+
+  val dal_number_of_slots : context -> int
+
+  val dal_number_of_shards : context -> int
 
   val sc_rollup_arith_pvm_enable : context -> bool
 
   val sc_rollup_riscv_pvm_enable : context -> bool
-
-  val dal_enable : context -> bool
 
   val sc_rollup_origination_size : context -> int
 
@@ -1078,9 +1103,20 @@ module Constants : sig
 
   val direct_ticket_spending_enable : context -> bool
 
-  (** All constants: fixed and parametric *)
-  type t = private {fixed : fixed; parametric : Parametric.t}
+  val aggregate_attestation : context -> bool
 
+  val allow_tz4_delegate_enable : context -> bool
+
+  val all_bakers_attest_activation_level : context -> Raw_level_repr.t option
+
+  (** All constants: fixed and parametric and derived. *)
+  type t = private {
+    fixed : fixed;
+    parametric : Parametric.t;
+    derived : Derived.t;
+  }
+
+  (** See {!Constants_storage.all}. *)
   val all : context -> t
 
   val encoding : t Data_encoding.t
@@ -2144,9 +2180,11 @@ module Receipt : sig
     | Attesting_rewards : Tez.t balance
     | Baking_rewards : Tez.t balance
     | Baking_bonuses : Tez.t balance
+    | Dal_attesting_rewards : Tez.t balance
     | Storage_fees : Tez.t balance
     | Double_signing_punishments : Tez.t balance
     | Lost_attesting_rewards : public_key_hash * bool * bool -> Tez.t balance
+    | Lost_dal_attesting_rewards : public_key_hash -> Tez.t balance
     | Liquidity_baking_subsidies : Tez.t balance
     | Burned : Tez.t balance
     | Commitments : Blinded_public_key_hash.t -> Tez.t balance
@@ -2205,6 +2243,8 @@ module Consensus_key : sig
     delegate : Signature.Public_key_hash.t;
     consensus_pkh : Signature.Public_key_hash.t;
   }
+
+  val encoding : t Data_encoding.t
 
   val zero : t
 
@@ -2300,6 +2340,13 @@ module Delegate : sig
     attesting_power:int ->
     context tzresult Lwt.t
 
+  val record_dal_participation :
+    context ->
+    delegate:Signature.Public_key_hash.t ->
+    number_of_slots_attested_by_delegate:int ->
+    number_of_protocol_attested_slots:int ->
+    context tzresult Lwt.t
+
   val current_frozen_deposits :
     context -> public_key_hash -> Tez.t tzresult Lwt.t
 
@@ -2345,6 +2392,8 @@ module Delegate : sig
 
     val attesting_reward_per_slot : t -> Tez.t tzresult
 
+    val dal_attesting_reward_per_shard : t -> Tez.t tzresult
+
     val liquidity_baking_subsidy : t -> Tez.t tzresult
 
     val seed_nonce_revelation_tip : t -> Tez.t tzresult
@@ -2356,6 +2405,7 @@ module Delegate : sig
         | Baking_reward_fixed_portion
         | Baking_reward_bonus_per_slot
         | Attesting_reward_per_slot
+        | Dal_attesting_reward_per_shard
         | Seed_nonce_revelation_tip
         | Vdf_revelation_tip
 
@@ -2483,8 +2533,20 @@ module Delegate : sig
       expected_attesting_rewards : Tez.t;
     }
 
+    type dal_participation_info = {
+      expected_assigned_shards_per_slot : int;
+      delegate_attested_dal_slots : int;
+      delegate_attestable_dal_slots : int;
+      expected_dal_rewards : Tez.t;
+      sufficient_dal_participation : bool;
+      denounced : bool;
+    }
+
     val participation_info :
       context -> public_key_hash -> participation_info tzresult Lwt.t
+
+    val dal_participation_info :
+      context -> public_key_hash -> dal_participation_info tzresult Lwt.t
 
     (** Returns the full 'balance' of the implicit contract associated to a
         given key, i.e. the sum of the spendable balance (given by [balance] or
@@ -2527,7 +2589,7 @@ module Staking : sig
     to [delegate]. *)
   val stake :
     context ->
-    amount:[`At_most of Tez.t | `Exactly of Tez.t] ->
+    amount:Tez.t ->
     sender:public_key_hash ->
     delegate:public_key_hash ->
     (context * Receipt.balance_updates) tzresult Lwt.t
@@ -2552,14 +2614,6 @@ module Staking : sig
     the requested stake undergone in between. *)
   val finalize_unstake :
     context -> Contract.t -> (context * Receipt.balance_updates) tzresult Lwt.t
-
-  (** Staking can be either automated or manual. If Adaptive Issuance is
-      enabled, staking must be manual. *)
-  type staking_automation = Auto_staking | Manual_staking
-
-  val staking_automation : context -> staking_automation
-
-  val check_manual_staking_allowed : context -> unit tzresult
 end
 
 (** This module re-exports definitions from {!Voting_period_repr} and
@@ -2737,9 +2791,13 @@ module Dal : sig
 
   val make : context -> (context * cryptobox) tzresult
 
-  val number_of_slots : context -> int
+  val assert_feature_enabled : t -> unit tzresult
 
-  val number_of_shards : context -> int
+  val only_if_feature_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
+
+  val assert_incentives_enabled : t -> unit tzresult
+
+  val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 
   (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
   module Slot_index : sig
@@ -2779,6 +2837,12 @@ module Dal : sig
 
     type shard_index = int
 
+    type attestation_status = {
+      total_shards : int;
+      attested_shards : int;
+      is_proto_attested : bool;
+    }
+
     module Shard_map : Map.S with type key = shard_index
 
     val encoding : t Data_encoding.t
@@ -2793,7 +2857,15 @@ module Dal : sig
 
     val expected_size_in_bits : max_index:Slot_index.t -> int
 
+    val number_of_attested_slots : t -> int
+
+    val intersection : t -> t -> t
+
     val record_number_of_attested_shards : context -> t -> int -> context
+
+    val record_attestation : context -> tb_slot:Slot.t -> t -> context
+
+    val attestations : context -> t Slot.Map.t
   end
 
   type slot_id = {published_level : Raw_level.t; index : Slot_index.t}
@@ -2866,22 +2938,34 @@ module Dal : sig
       val pp : Format.formatter -> t -> unit
 
       val equal : t -> t -> bool
+
+      val slot_id_equal : id -> id -> bool
     end
 
-    val register_slot_header : context -> Header.t -> context tzresult
+    val register_slot_header :
+      context -> Header.t -> source:Contract.t -> context tzresult
 
     val find_slot_headers :
-      context -> Raw_level.t -> Header.t list option tzresult Lwt.t
+      context ->
+      Raw_level.t ->
+      (Header.t * Contract.t) list option tzresult Lwt.t
 
     val finalize_current_slot_headers : context -> context Lwt.t
 
     val finalize_pending_slot_headers :
       context -> number_of_slots:int -> (context * Attestation.t) tzresult Lwt.t
+  end
 
-    val compute_attested_slot_headers :
-      is_slot_attested:(Header.t -> bool) ->
-      Header.t list ->
-      Header.t list * Attestation.t
+  module Shard_with_proof : sig
+    type t = {shard : Dal.shard; proof : Dal.shard_proof}
+
+    val verify : cryptobox -> Slot.Commitment.t -> t -> unit tzresult
+
+    val share_is_trap :
+      Signature.Public_key_hash.t ->
+      Dal.share ->
+      traps_fraction:Q.t ->
+      bool tzresult
   end
 
   module Operations : sig
@@ -2908,6 +2992,24 @@ module Dal : sig
   module Slots_history : sig
     type t
 
+    type cell_content = private
+      | Unpublished of Slot.Header.id
+      | Published of {
+          header : Slot.Header.t;
+          publisher : Contract.t;
+          is_proto_attested : bool;
+          attested_shards : int;
+          total_shards : int;
+        }
+
+    val content : t -> cell_content
+
+    val content_id : cell_content -> Slot.Header.id
+
+    val pp : Format.formatter -> t -> unit
+
+    val pp_content : Format.formatter -> cell_content -> unit
+
     module Pointer_hash : S.HASH
 
     type hash = Pointer_hash.t
@@ -2925,26 +3027,58 @@ module Dal : sig
     module History_cache :
       Bounded_history_repr.S with type key = hash and type value = t
 
-    val add_confirmed_slot_headers_no_cache :
+    val update_skip_list_no_cache :
       t ->
-      Raw_level.t ->
+      ?with_migration:Raw_level.t * int ->
+      published_level:Raw_level.t ->
       number_of_slots:int ->
-      Slot.Header.t list ->
+      (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
       t tzresult
 
-    val add_confirmed_slot_headers :
+    val update_skip_list :
       t ->
       History_cache.t ->
-      Raw_level.t ->
+      ?with_migration:Raw_level.t * int ->
+      published_level:Raw_level.t ->
       number_of_slots:int ->
-      Slot.Header.t list ->
+      (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
       (t * History_cache.t) tzresult
+
+    val is_commitment_attested :
+      attestation_threshold_percent:int option ->
+      restricted_commitments_publishers:Contract.t list option ->
+      cell_content ->
+      Slot.Commitment.t option
 
     type proof
   end
 
   module Slots_storage : sig
     val get_slot_headers_history : context -> Slots_history.t tzresult Lwt.t
+
+    val find_level_histories :
+      context ->
+      (Slots_history.Pointer_hash.t * Slots_history.t) list option tzresult
+      Lwt.t
+  end
+
+  (* This would normally be a part of {!Delegate}, but it is not because
+     {!Dal.Slot_index} is defined after {!Delegate}. *)
+  module Delegate : sig
+    (** See {!Dal_already_denounced_storage.add_denunciation}. *)
+    val add_denunciation :
+      context ->
+      public_key_hash ->
+      Level.t ->
+      Slot_index.t ->
+      (context * bool) Lwt.t
+
+    (** See {!Dal_already_denounced_storage.is_already_denounced}. *)
+    val is_already_denounced :
+      context -> public_key_hash -> Level.t -> Slot_index.t -> bool Lwt.t
+
+    (** See {!Dal_already_denounced_storage.is_denounced}. *)
+    val is_denounced : context -> public_key_hash -> bool Lwt.t
   end
 end
 
@@ -2955,6 +3089,7 @@ module Dal_errors : sig
      from Dal_slot_repr or Dal_attestation_repr. *)
   type error +=
     | Dal_feature_disabled
+    | Dal_incentives_disabled
     | Dal_slot_index_above_hard_limit of {given : int; limit : int}
     | Dal_publish_commitment_invalid_index of {
         given : Dal.Slot_index.t;
@@ -3247,6 +3382,11 @@ module Sc_rollup : sig
     | Reveal_raw_data of Sc_rollup_reveal_hash.t
     | Reveal_metadata
     | Request_dal_page of Dal.Page.t
+    | Request_adal_page of {
+        page_id : Dal.Page.t;
+        attestation_threshold_percent : int;
+        restricted_commitments_publishers : Contract.t list option;
+      }
     | Reveal_dal_parameters
 
   type is_reveal_enabled = current_block_level:Raw_level.t -> reveal -> bool
@@ -3489,11 +3629,9 @@ module Sc_rollup : sig
       level:Raw_level.t -> context -> t -> (context * int list) tzresult Lwt.t
   end
 
-  type output = {
-    outbox_level : Raw_level.t;
-    message_index : Z.t;
-    message : Outbox.Message.t;
-  }
+  type output_info = {outbox_level : Raw_level.t; message_index : Z.t}
+
+  type output = {output_info : output_info; message : Outbox.Message.t}
 
   val output_encoding : output Data_encoding.t
 
@@ -3547,18 +3685,26 @@ module Sc_rollup : sig
   module PVM : sig
     type boot_sector = string
 
-    module type S = sig
-      val parse_boot_sector : string -> boot_sector option
-
-      val pp_boot_sector : Format.formatter -> boot_sector -> unit
-
+    module type PROTO_ORIGINATION = sig
       type state
+
+      type hash = State_hash.t
+
+      val state_hash : state -> hash Lwt.t
+
+      val initial_state : empty:state -> state Lwt.t
+
+      val install_boot_sector : state -> string -> state Lwt.t
+    end
+
+    module type PROTO_VERIFICATION = sig
+      include PROTO_ORIGINATION
+
+      val parse_boot_sector : string -> boot_sector option
 
       val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
 
       type context
-
-      type hash = State_hash.t
 
       type proof
 
@@ -3568,44 +3714,21 @@ module Sc_rollup : sig
 
       val proof_stop_state : proof -> hash
 
-      val state_hash : state -> hash Lwt.t
-
-      val initial_state : empty:state -> state Lwt.t
-
-      val install_boot_sector : state -> string -> state Lwt.t
-
-      val is_input_state :
-        is_reveal_enabled:is_reveal_enabled -> state -> input_request Lwt.t
-
-      val set_input : input -> state -> state Lwt.t
-
-      val eval : state -> state Lwt.t
-
       val verify_proof :
         is_reveal_enabled:is_reveal_enabled ->
         input option ->
         proof ->
         input_request tzresult Lwt.t
 
-      val produce_proof :
-        context ->
-        is_reveal_enabled:is_reveal_enabled ->
-        input option ->
-        state ->
-        proof tzresult Lwt.t
-
       type output_proof
 
       val output_proof_encoding : output_proof Data_encoding.t
 
-      val output_of_output_proof : output_proof -> output
+      val output_info_of_output_proof : output_proof -> output_info
 
-      val state_of_output_proof : output_proof -> State_hash.t
+      val state_of_output_proof : output_proof -> hash
 
       val verify_output_proof : output_proof -> output tzresult Lwt.t
-
-      val produce_output_proof :
-        context -> state -> output -> (output_proof, error) result Lwt.t
 
       val check_dissection :
         default_number_of_sections:int ->
@@ -3615,14 +3738,37 @@ module Sc_rollup : sig
         unit tzresult
 
       val get_current_level : state -> Raw_level.t option Lwt.t
+    end
+
+    module type S = sig
+      include PROTO_VERIFICATION
+
+      val is_input_state :
+        is_reveal_enabled:is_reveal_enabled -> state -> input_request Lwt.t
+
+      val set_input : input -> state -> state Lwt.t
+
+      val eval : state -> state Lwt.t
+
+      val produce_proof :
+        context ->
+        is_reveal_enabled:is_reveal_enabled ->
+        input option ->
+        state ->
+        proof tzresult Lwt.t
+
+      val produce_output_proof :
+        context -> state -> output -> (output_proof, error) result Lwt.t
 
       module Internal_for_tests : sig
         val insert_failure : state -> state Lwt.t
       end
+
+      val pp_boot_sector : Format.formatter -> boot_sector -> unit
     end
 
     type ('state, 'proof, 'output) implementation =
-      (module S
+      (module PROTO_VERIFICATION
          with type state = 'state
           and type proof = 'proof
           and type output_proof = 'output)
@@ -3675,7 +3821,7 @@ module Sc_rollup : sig
     end
 
     module Protocol_implementation :
-      PVM.S
+      PVM.PROTO_VERIFICATION
         with type context = Context.t
          and type state = Context.tree
          and type proof = Context.Proof.tree Context.Proof.t
@@ -3724,7 +3870,7 @@ module Sc_rollup : sig
     end
 
     module Protocol_implementation :
-      PVM.S
+      PVM.PROTO_VERIFICATION
         with type context = Context.t
          and type state = Context.tree
          and type proof = Context.Proof.tree Context.Proof.t
@@ -3732,10 +3878,10 @@ module Sc_rollup : sig
 
   module Riscv_PVM : sig
     module Protocol_implementation :
-      PVM.S
+      PVM.PROTO_VERIFICATION
         with type context = unit
-         and type state = Sc_rollup_riscv.minimal_state
-         and type proof = Sc_rollup_riscv.void
+         and type state = Sc_rollup_riscv.state
+         and type proof = Sc_rollup_riscv.proof
   end
 
   module Number_of_ticks : sig
@@ -3883,6 +4029,7 @@ module Sc_rollup : sig
     val valid :
       pvm:('state, 'proof, 'output) PVM.implementation ->
       metadata:Metadata.t ->
+      ?protocol_activation_level:Raw_level.t ->
       Inbox.history_proof ->
       Raw_level.t ->
       Dal.Slots_history.t ->
@@ -4009,6 +4156,7 @@ module Sc_rollup : sig
     val play :
       Kind.t ->
       Dal.parameters ->
+      protocol_activation_level:Raw_level.t ->
       dal_activation_level:Raw_level.t option ->
       dal_attestation_lag:int ->
       dal_number_of_slots:int ->
@@ -4381,13 +4529,20 @@ module Kind : sig
 
   type attestation_consensus_kind = Attestation_consensus_kind
 
+  type attestations_aggregate_consensus_kind =
+    | Attestations_aggregate_consensus_kind
+
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Attestation_kind : attestation_consensus_kind consensus
+    | Attestations_aggregate_kind
+        : attestations_aggregate_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
   type attestation = attestation_consensus_kind consensus
+
+  type attestations_aggregate = attestations_aggregate_consensus_kind consensus
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
@@ -4403,6 +4558,8 @@ module Kind : sig
     preattestation_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
+
+  type dal_entrapment_evidence = Dal_entrapment_evidence_kind
 
   type activate_account = Activate_account_kind
 
@@ -4490,6 +4647,14 @@ end
 type 'a consensus_operation_type =
   | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
+  | Attestations_aggregate
+      : Kind.attestations_aggregate consensus_operation_type
+
+type consensus_aggregate_content = {
+  level : Raw_level.t;
+  round : Round.t;
+  block_payload_hash : Block_payload_hash.t;
+}
 
 type consensus_content = {
   slot : Slot.t;
@@ -4530,6 +4695,11 @@ and _ contents =
       dal_content : dal_content option;
     }
       -> Kind.attestation contents
+  | Attestations_aggregate : {
+      consensus_content : consensus_aggregate_content;
+      committee : Slot.t list;
+    }
+      -> Kind.attestations_aggregate contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;
       nonce : Nonce.t;
@@ -4554,6 +4724,12 @@ and _ contents =
       bh2 : Block_header.t;
     }
       -> Kind.double_baking_evidence contents
+  | Dal_entrapment_evidence : {
+      attestation : Kind.attestation operation;
+      slot_index : Dal.Slot_index.t;
+      shard_with_proof : Dal.Shard_with_proof.t;
+    }
+      -> Kind.dal_entrapment_evidence contents
   | Activate_account : {
       id : Ed25519.Public_key_hash.t;
       activation_code : Blinded_public_key_hash.activation_code;
@@ -4617,8 +4793,10 @@ and _ manager_operation =
       destination : Contract_hash.t;
     }
       -> Kind.increase_paid_storage manager_operation
-  | Update_consensus_key :
-      Signature.Public_key.t
+  | Update_consensus_key : {
+      public_key : Signature.Public_key.t;
+      proof : Signature.signature option;
+    }
       -> Kind.update_consensus_key manager_operation
   | Transfer_ticket : {
       contents : Script.lazy_expr;
@@ -4735,6 +4913,12 @@ module Operation : sig
   val unsigned_encoding :
     (Operation.shell_header * packed_contents_list) Data_encoding.t
 
+  (* Encoding to sign and verify attestations signatures
+     with BLS keys. In this encoding, the signed payload is omitting slots to
+     enable BLS proof of possession aggregation. *)
+  val bls_mode_unsigned_encoding :
+    (Operation.shell_header * packed_contents_list) Data_encoding.t
+
   type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
   val raw_encoding : raw Data_encoding.t
@@ -4768,7 +4952,10 @@ module Operation : sig
 
   val unsigned_operation_length : _ operation -> int
 
-  val check_signature : public_key -> Chain_id.t -> _ operation -> unit tzresult
+  val bls_mode_unsigned_operation_length : _ operation -> int
+
+  val check_signature :
+    context -> public_key -> Chain_id.t -> _ operation -> unit tzresult
 
   val pack : 'kind operation -> packed_operation
 
@@ -4780,6 +4967,11 @@ module Operation : sig
   type ('a, 'b) eq = Eq : ('a, 'a) eq
 
   val equal : 'a operation -> 'b operation -> ('a, 'b) eq option
+
+  module Internal_for_tests : sig
+    val serialize_unsigned_operation :
+      context -> Block_hash.t -> _ contents_list -> bytes
+  end
 
   module Encoding : sig
     type 'b case =
@@ -4797,6 +4989,8 @@ module Operation : sig
 
     val attestation_case : Kind.attestation case
 
+    val attestations_aggregate_case : Kind.attestations_aggregate case
+
     val attestation_with_dal_case : Kind.attestation case
 
     val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
@@ -4809,6 +5003,8 @@ module Operation : sig
     val double_attestation_evidence_case : Kind.double_attestation_evidence case
 
     val double_baking_evidence_case : Kind.double_baking_evidence case
+
+    val dal_entrapment_evidence_case : Kind.dal_entrapment_evidence case
 
     val activate_account_case : Kind.activate_account case
 
@@ -5197,6 +5393,21 @@ module First_level_of_protocol : sig
   val get : context -> Raw_level.t tzresult Lwt.t
 end
 
+(** [Consecutive_round_zero] module stores the number of consecutive
+   blocks that reached consensus at round zero.
+
+   The counter is reset at the first non-zero round encountered.
+
+   A long enough series of round zero provides some guarantee that no
+   blocks were censored. *)
+module Consecutive_round_zero : sig
+  val get : context -> Int32.t tzresult Lwt.t
+
+  val incr : context -> context tzresult Lwt.t
+
+  val reset : context -> context tzresult Lwt.t
+end
+
 (** This module re-exports definitions from {!Raw_context.Consensus}. *)
 module Consensus : sig
   include
@@ -5233,6 +5444,7 @@ module Token : sig
     | `Attesting_rewards
     | `Baking_rewards
     | `Baking_bonuses
+    | `Dal_attesting_rewards
     | `Minted
     | `Liquidity_baking_subsidies
     | `Sc_rollup_refutation_rewards
@@ -5242,6 +5454,7 @@ module Token : sig
     [ `Storage_fees
     | `Double_signing_punishments
     | `Lost_attesting_rewards of public_key_hash * bool * bool
+    | `Lost_dal_attesting_rewards of public_key_hash
     | `Burned
     | `Sc_rollup_refutation_punishments
     | container ]
@@ -5284,23 +5497,23 @@ end
 module Unstake_requests : sig
   type finalizable = (public_key_hash * Cycle.t * Tez.t) list
 
-  type stored_requests = private {
-    delegate : public_key_hash;
-    requests : (Cycle.t * Tez.t) list;
-  }
-
-  type prepared_finalize_unstake = {
-    finalizable : finalizable;
-    unfinalizable : stored_requests;
-  }
-
-  val prepared_finalize_unstake_encoding :
-    prepared_finalize_unstake Data_encoding.encoding
-
-  val prepare_finalize_unstake :
-    context -> Contract.t -> prepared_finalize_unstake option tzresult Lwt.t
-
   module For_RPC : sig
+    type stored_requests = private {
+      delegate : public_key_hash;
+      requests : (Cycle.t * Tez.t) list;
+    }
+
+    type prepared_finalize_unstake = {
+      finalizable : finalizable;
+      unfinalizable : stored_requests;
+    }
+
+    val prepared_finalize_unstake_encoding :
+      prepared_finalize_unstake Data_encoding.encoding
+
+    val prepare_finalize_unstake :
+      context -> Contract.t -> prepared_finalize_unstake option tzresult Lwt.t
+
     val apply_slash_to_unstaked_unfinalizable :
       context ->
       delegate:public_key_hash ->

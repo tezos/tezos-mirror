@@ -78,6 +78,7 @@ let get_last_published_commitment ?(allow_unstake = true)
   let cctxt =
     new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
   in
+  let*? operator = Signature.Of_V_latest.get_public_key_hash operator in
   let rollup_address = Sc_rollup_proto_types.Address.of_octez rollup_address in
   let*! res =
     Plugin.RPC.Sc_rollup.staked_on_commitment
@@ -134,6 +135,7 @@ let constants_of_parametric
             challenge_window_in_blocks;
             commitment_period_in_blocks;
             max_number_of_stored_cemented_commitments;
+            max_active_outbox_levels;
             _;
           };
         dal =
@@ -157,6 +159,7 @@ let constants_of_parametric
           commitment_period_in_blocks;
           reveal_activation_level = None;
           max_number_of_stored_cemented_commitments;
+          max_active_outbox_levels = Int32.to_int max_active_outbox_levels;
         };
       dal =
         {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
@@ -238,7 +241,7 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
       | _ -> missing_boot_sector ())
 
 let find_whitelist _cctxt ?block:_ _rollup_address :
-    Signature.public_key_hash trace option tzresult Lwt.t =
+    Tezos_crypto.Signature.public_key_hash trace option tzresult Lwt.t =
   return None
 
 let find_last_whitelist_update _cctxt _rollup_address = return_none
@@ -260,6 +263,7 @@ let get_balance_mutez cctxt ?block pkh =
   let cctxt =
     new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
   in
+  let*? pkh = Signature.Of_V_latest.get_public_key_hash pkh in
   let+ balance =
     Protocol.Contract_services.balance cctxt (cctxt#chain, block) (Implicit pkh)
   in

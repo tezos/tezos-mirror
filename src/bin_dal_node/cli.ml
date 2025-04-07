@@ -31,7 +31,22 @@ module Term = struct
     let decoder str =
       match P2p_point.Id.of_string ~default_port str with
       | Ok x -> Ok x
-      | Error msg -> Error (`Msg msg)
+      | Error msg -> (
+          (* Let's check if the user has entered a port *)
+          match String.split_on_char ':' str with
+          | [""; port] -> (
+              try
+                let port = int_of_string port in
+                let default =
+                  (fst Configuration_file.default.public_addr, port)
+                in
+                Ok default
+              with Failure _ ->
+                Error
+                  (`Msg
+                    (Format.asprintf "The port provided: '%s' is invalid" port))
+              )
+          | _ -> Error (`Msg msg))
     in
     let printer = P2p_point.Id.pp in
     Arg.conv (decoder, printer)
@@ -95,8 +110,10 @@ module Term = struct
     let doc =
       Format.asprintf
         "The TCP address and optionally the port at which this instance can be \
-         reached by other P2P nodes. The default address is 0.0.0.0. The \
-         default port is 11732."
+         reached by other P2P nodes. By default, the point is \
+         '127.0.0.1:11732'. You can override the port using the syntax \
+         ':2222'. If the IP address is detected as a special address (such as \
+         a localhost one) it won't be advertised, only the port will."
     in
     Arg.(
       value
@@ -121,7 +138,7 @@ module Term = struct
     Arg.(
       value
       & opt (some endpoint_arg) None
-      & info ~docs ~doc ~docv:"URI" ["endpoint"])
+      & info ~docs ~doc ~docv:"URI" ["endpoint"; "E"])
 
   let attester_profile_printer = Signature.Public_key_hash.pp
 
@@ -129,8 +146,16 @@ module Term = struct
 
   let attester_profile_arg =
     let open Cmdliner in
-    let decoder string =
-      match Signature.Public_key_hash.of_b58check_opt string with
+    let decoder arg =
+      let arg =
+        (* If the argument is wrapped with quotes, unwrap it. *)
+        if
+          String.starts_with ~prefix:"\"" arg
+          && String.ends_with ~suffix:"\"" arg
+        then String.sub arg 1 (String.length arg - 2)
+        else arg
+      in
+      match Signature.Public_key_hash.of_b58check_opt arg with
       | None -> Error (`Msg "Unrecognized profile")
       | Some pkh -> Ok pkh
     in
@@ -190,7 +215,7 @@ module Term = struct
           ~docs
           ~doc
           ~docv:"INDEX1,INDEX2,..."
-          ["producer-profiles"; "producer"; "operator"])
+          ["producer-profiles"; "producer"; "operator-profiles"; "operator"])
 
   let observer_profile =
     let open Cmdliner in
@@ -307,6 +332,17 @@ module Term = struct
       & opt (some service_namespace_arg) None
       & info ~docs ~doc ~env:service_namespace_env ["service-namespace"])
 
+  let fetch_trusted_setup =
+    let open Cmdliner in
+    let doc =
+      "Should the DAL node fetch the trusted setup when it needs it. By \
+       default, it does so."
+    in
+    Arg.(
+      value
+      & opt (some bool) None
+      & info ~docs ~doc ~docv:"true | false" ["fetch-trusted-setup"])
+
   let verbose =
     let open Cmdliner in
     let doc =
@@ -314,14 +350,29 @@ module Term = struct
     in
     Arg.(value & flag & info ~docs ~doc ["verbose"])
 
+  (* Experimental features. *)
+
+  let sqlite3_backend =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7527
+       Remove this command line argument in the next release. *)
+    let open Cmdliner in
+    let doc =
+      "DEPRECATED as SQLite is now the default storage backend for storing \
+       skip list cells for DAL slots."
+    in
+    Arg.(value & flag & info ~docs ~doc ["sqlite3-backend"])
+
   let term process =
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
        $ producer_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode $ service_name $ service_namespace $ verbose))
+       $ history_mode $ service_name $ service_namespace $ sqlite3_backend
+       $ fetch_trusted_setup $ verbose))
 end
+
+type t = Run | Config_init | Config_update | Debug_print_store_schemas
 
 module Run = struct
   let description =
@@ -333,7 +384,7 @@ module Run = struct
     let version = Tezos_version_value.Bin_version.octez_version_string in
     Cmdliner.Cmd.info ~doc:"Run the Octez DAL node" ~man ~version "run"
 
-  let cmd run = Cmdliner.Cmd.v info (Term.term run)
+  let cmd run = Cmdliner.Cmd.v info (Term.term (run Run))
 end
 
 module Config = struct
@@ -352,7 +403,7 @@ module Config = struct
       [
         `S "DESCRIPTION";
         `P
-          "This commands creates a configuration file with the parameters \
+          "This command creates a configuration file with the parameters \
            provided on the command-line, if no configuration file exists \
            already in the specified or default location. Otherwise, the \
            command-line parameters override the existing ones, and old \
@@ -364,7 +415,24 @@ module Config = struct
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~doc:"Configuration initialisation" ~man ~version "init"
 
-    let cmd run = Cmdliner.Cmd.v info (Term.term run)
+    let cmd run = Cmdliner.Cmd.v info (Term.term (run Config_init))
+  end
+
+  module Update = struct
+    let man =
+      [
+        `S "DESCRIPTION";
+        `P
+          "This command updates the configuration file with the parameters \
+           provided on the command-line. If no configuration file exists \
+           already, the command will fail.";
+      ]
+
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info ~doc:"Configuration update" ~man ~version "update"
+
+    let cmd run = Cmdliner.Cmd.v info (Term.term (run Config_update))
   end
 
   let cmd run =
@@ -377,8 +445,72 @@ module Config = struct
         ~version
         "config"
     in
-    Cmdliner.Cmd.group ~default info [Init.cmd run]
+    Cmdliner.Cmd.group ~default info [Init.cmd run; Update.cmd run]
 end
+
+module Debug = struct
+  let man = [`S "DEBUG DESCRIPTION"; `P "Entrypoint for the debug commands."]
+
+  module Print = struct
+    let man =
+      [`S "PRINT DESCRIPTION"; `P "Entrypoint for printing debug information."]
+
+    module Store = struct
+      let man =
+        [
+          `S "STORE DESCRIPTION";
+          `P
+            "Entrypoint for printing debug information related to the DAL node \
+             store.";
+        ]
+
+      module Schemas = struct
+        let man =
+          [
+            `S "DESCRIPTION";
+            `P
+              "Print SQL statements describing the tables created in the store.";
+          ]
+
+        let info =
+          let version = Tezos_version_value.Bin_version.octez_version_string in
+          Cmdliner.Cmd.info ~doc:"Print SQL statements" ~man ~version "schemas"
+
+        let cmd run = Cmdliner.Cmd.v info (Term.term run)
+      end
+
+      let cmd run =
+        let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
+        let info =
+          let version = Tezos_version_value.Bin_version.octez_version_string in
+          Cmdliner.Cmd.info
+            ~doc:"Print DAL node store debug information"
+            ~man
+            ~version
+            "store"
+        in
+        Cmdliner.Cmd.group ~default info [Schemas.cmd run]
+    end
+
+    let cmd run =
+      let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
+      let info =
+        let version = Tezos_version_value.Bin_version.octez_version_string in
+        Cmdliner.Cmd.info ~doc:"Print debug information" ~man ~version "print"
+      in
+      Cmdliner.Cmd.group ~default info [Store.cmd run]
+  end
+
+  let cmd run =
+    let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info ~doc:"Debug commands" ~man ~version "debug"
+    in
+    Cmdliner.Cmd.group ~default info [Print.cmd (run Debug_print_store_schemas)]
+end
+
+type experimental_features = {sqlite3_backend : bool}
 
 type options = {
   data_dir : string option;
@@ -393,15 +525,16 @@ type options = {
   history_mode : Configuration_file.history_mode option;
   service_name : string option;
   service_namespace : string option;
+  experimental_features : experimental_features;
+  fetch_trusted_setup : bool option;
   verbose : bool;
 }
-
-type t = Run | Config_init
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint metrics_addr attesters producers observers bootstrap_flag peers
-      history_mode service_name service_namespace verbose =
+      history_mode service_name service_namespace sqlite3_backend
+      fetch_trusted_setup verbose =
     let run profile =
       run
         subcommand
@@ -418,6 +551,8 @@ let make ~run =
           history_mode;
           service_name;
           service_namespace;
+          experimental_features = {sqlite3_backend};
+          fetch_trusted_setup;
           verbose;
         }
     in
@@ -444,7 +579,4 @@ let make ~run =
     let version = Tezos_version_value.Bin_version.octez_version_string in
     Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~version "octez-dal-node"
   in
-  Cmdliner.Cmd.group
-    ~default
-    info
-    [Run.cmd (run Run); Config.cmd (run Config_init)]
+  Cmdliner.Cmd.group ~default info [Run.cmd run; Config.cmd run; Debug.cmd run]

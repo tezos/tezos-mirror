@@ -7,4 +7,5 @@
 (*****************************************************************************)
 
 (** The RPCs directory of the protocol part of DAL nodes. *)
-val directory : Skip_list_cells_store.t -> unit Environment.RPC_directory.t
+val directory :
+  Dal_store_sqlite3.Skip_list_cells.t -> unit Environment.RPC_directory.t

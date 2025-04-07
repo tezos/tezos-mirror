@@ -18,9 +18,6 @@ module type SimulationBackend = sig
     bytes tzresult Lwt.t
 end
 
-(* This value is a hard maximum used by estimateGas. Set at Int64.max_int / 2 *)
-let max_gas_limit = Z.of_int64 0x3FFFFFFFFFFFFFFFL
-
 module Make (SimulationBackend : SimulationBackend) = struct
   let call_simulation ?(state_override = Ethereum_types.state_override_empty)
       ~log_file ~input_encoder ~input simulation_state =
@@ -40,11 +37,11 @@ module Make (SimulationBackend : SimulationBackend) = struct
           log_kernel_debug_file = Some log_file;
         }
 
-  let simulation_input ~simulation_version ~with_da_fees call =
+  let simulation_input ~simulation_version ~with_da_fees ~timestamp call =
     match simulation_version with
     | `V0 -> Simulation.V0 call
     | `V1 -> V1 {call; with_da_fees}
-    | `V2 -> V2 {call; with_da_fees; timestamp = Misc.now ()}
+    | `V2 -> V2 {call; with_da_fees; timestamp}
 
   (* Simulation have different versions in the kernel, the inputs change
      between the different versions.
@@ -75,6 +72,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
   let simulate_call ~overwrite_tick_limit call block_param state_override =
     let open Lwt_result_syntax in
     let* simulation_state = SimulationBackend.get_state ~block:block_param () in
+    let timestamp = Misc.now () in
     let* simulation_version = simulation_version simulation_state in
     let* simulation_state =
       if overwrite_tick_limit then
@@ -92,7 +90,12 @@ module Make (SimulationBackend : SimulationBackend) = struct
         simulation_state
         ~log_file:"simulate_call"
         ~input_encoder:Simulation.encode
-        ~input:(simulation_input ~simulation_version ~with_da_fees:true call)
+        ~input:
+          (simulation_input
+             ~timestamp
+             ~simulation_version
+             ~with_da_fees:true
+             call)
     in
     Lwt.return (Simulation.simulation_result bytes)
 
@@ -128,66 +131,68 @@ module Make (SimulationBackend : SimulationBackend) = struct
       let+ bytes = SimulationBackend.read simulation_state path in
       Option.map Ethereum_types.decode_number_le bytes
     in
-    let* da_fee_per_byte = read_qty Durable_storage_path.da_fee_per_byte in
+    let* da_fee_per_byte =
+      Durable_storage.da_fee_per_byte (SimulationBackend.read simulation_state)
+    in
     let* (Qty gas_price) =
-      let path = Durable_storage_path.base_fee_per_gas in
+      (* In future iterations of the kernel, the default value will be
+         written to the storage. This default value will no longer need to
+         be declared here. *)
+      let path = Durable_storage_path.minimum_base_fee_per_gas in
       let* gas_price_opt = read_qty path in
       match gas_price_opt with
       | None ->
-          (* Base fee per gas is supposed to be updated in the storage after
-             every block. *)
-          failwith "Internal error: base fee per gas is not found at %s" path
+          return (Ethereum_types.quantity_of_z (Z.of_string "1_000_000_000"))
       | Some gas_price -> return gas_price
     in
-    let da_fee = Fees.gas_for_fees ?da_fee_per_byte ~gas_price tx_data in
+    let da_fee = Fees.gas_for_fees ~da_fee_per_byte ~gas_price tx_data in
     return da_fee
 
-  let check_node_da_fees ~execution_gas ~node_da_fees ~simulation_version
-      simulation_state call =
-    let open Lwt_result_syntax in
-    let* kernel_da_fees =
-      let* res =
-        call_estimate_gas
-          (simulation_input ~simulation_version ~with_da_fees:true call)
-          simulation_state
-      in
-      let* (Qty total_gas) =
-        match res with
-        | Ok (Ok {gas_used = Some gas; _}) -> return gas
-        | _ -> failwith "The gas estimation simulation with DA fees failed."
-      in
-      (* DA fees computed by the kernel is the difference between total gas
-         and previous gas call. *)
-      return (Z.sub total_gas execution_gas)
-    in
-    unless (node_da_fees = kernel_da_fees) (fun () ->
-        Prometheus.Counter.inc_one
-          Metrics.metrics.simulation.inconsistent_da_fees ;
-        let*! () = Events.invalid_node_da_fees ~node_da_fees ~kernel_da_fees in
-        return_unit)
-
-  let rec confirm_gas ~simulation_version (call : Ethereum_types.call) gas
-      simulation_state =
+  let rec confirm_gas ~timestamp ~maximum_gas_per_transaction
+      ~simulation_version (call : Ethereum_types.call) gas simulation_state =
     let open Ethereum_types in
     let open Lwt_result_syntax in
     let double (Qty z) = Qty Z.(mul (of_int 2) z) in
-    let reached_max (Qty z) = z >= max_gas_limit in
+    let reached_max (Qty z) = z >= maximum_gas_per_transaction in
     let new_call = {call with gas = Some gas} in
     let* result =
       call_estimate_gas
-        (simulation_input ~simulation_version ~with_da_fees:false new_call)
+        (simulation_input
+           ~timestamp
+           ~simulation_version
+           ~with_da_fees:false
+           new_call)
         simulation_state
     in
     match result with
     | Error _ | Ok (Error _) ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6984
            All errors should not be treated the same *)
-        Prometheus.Counter.inc_one Metrics.metrics.simulation.confirm_gas_needed ;
-        let new_gas = double gas in
-        if reached_max new_gas then
-          failwith "Gas estimate reached max gas limit."
-        else confirm_gas ~simulation_version call new_gas simulation_state
-    | Ok (Ok {gas_used = Some gas_used; _}) ->
+        Metrics.inc_confirm_gas_needed () ;
+        if reached_max gas then
+          failwith
+            "Gas estimate reached max gas limit of %s"
+            (Z.to_string maximum_gas_per_transaction)
+        else
+          let new_gas = double gas in
+          if reached_max new_gas then
+            (* We try one last time with maximum gas possible. *)
+            confirm_gas
+              ~timestamp
+              ~maximum_gas_per_transaction
+              ~simulation_version
+              call
+              (Qty maximum_gas_per_transaction)
+              simulation_state
+          else
+            confirm_gas
+              ~timestamp
+              ~maximum_gas_per_transaction
+              ~simulation_version
+              call
+              new_gas
+              simulation_state
+    | Ok (Ok {gas_used = Some _; _}) ->
         (* The gas returned by confirm gas can be ignored. What we care about
            is only knowing if the gas provided in {!new_call} is enough. The
            gas used returned when confirming may remove the "safe" amount
@@ -205,41 +210,29 @@ module Make (SimulationBackend : SimulationBackend) = struct
             | None -> Bytes.empty
           in
           let* da_fees = gas_for_fees simulation_state tx_data in
-          (* As computing the DA fees in the node directly is an
-             experimental feature, we check the locally computed value
-             against the one computed by the kernel.
-
-             We aim to deloy this checks for a couple weeks, then remove
-             the kernel call. We could also keep the check if the node
-             is in a debug like mode to make sure the two implementations
-             are consistent.
-          *)
-          let* () =
-            let (Qty gas_used) = gas_used in
-            check_node_da_fees
-              ~execution_gas:gas_used
-              ~node_da_fees:da_fees
-              ~simulation_version
-              simulation_state
-              call
-          in
           let (Qty gas) = gas in
           return @@ quantity_of_z @@ Z.add gas da_fees
     | Ok (Ok {gas_used = None; _}) ->
         failwith "Internal error: gas used is missing from simulation"
 
-  let estimate_gas call =
+  let estimate_gas call block =
     let open Lwt_result_syntax in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7376
-
-       Gas estimation currently ignores the block parameter. When this is fixed,
-       we need to give the block parameter to the call to
-       {!simulation_version}. *)
-    let* simulation_state = SimulationBackend.get_state () in
+    let* simulation_state =
+      SimulationBackend.get_state ~block:(Block_parameter block) ()
+    in
+    let timestamp = Misc.now () in
+    let* (Qty maximum_gas_per_transaction) =
+      Durable_storage.maximum_gas_per_transaction
+        (SimulationBackend.read simulation_state)
+    in
     let* simulation_version = simulation_version simulation_state in
     let* res =
       call_estimate_gas
-        (simulation_input ~simulation_version ~with_da_fees:false call)
+        (simulation_input
+           ~timestamp
+           ~simulation_version
+           ~with_da_fees:false
+           call)
         simulation_state
     in
     match res with
@@ -255,20 +248,14 @@ module Make (SimulationBackend : SimulationBackend) = struct
         (* add a safety margin of 2%, sufficient to cover a 1/64th difference *)
         let safe_gas = Z.(add safe_gas (cdiv safe_gas (of_int 50))) in
         let+ gas_used =
-          confirm_gas ~simulation_version call (Qty safe_gas) simulation_state
+          confirm_gas
+            ~timestamp
+            ~maximum_gas_per_transaction
+            ~simulation_version
+            call
+            (Qty safe_gas)
+            simulation_state
         in
         Ok (Ok {Simulation.gas_used = Some gas_used; value})
     | _ -> return res
-
-  let is_tx_valid tx_raw =
-    let open Lwt_result_syntax in
-    let* simulation_state = SimulationBackend.get_state () in
-    let* bytes =
-      call_simulation
-        ~log_file:"tx_validity"
-        ~input_encoder:Simulation.encode_tx
-        ~input:tx_raw
-        simulation_state
-    in
-    Lwt.return (Simulation.is_tx_valid bytes)
 end

@@ -18,16 +18,19 @@ type compression =
           very long. *)
 
 module Header : sig
-  (** Versioning of snapshot format. Only one version for now. *)
-  type version = V0
-
-  (** Snapshot metadata for version 0. This information is written as a header
+  (** Snapshot metadata. This information is written as a header
       of the archive snapshot file. *)
-  type t = {
-    version : version;
-    rollup_address : Address.t;
-    current_level : Ethereum_types.quantity;
-  }
+  type t =
+    | V0_legacy of {
+        rollup_address : Address.t;
+        current_level : Ethereum_types.quantity;
+      }  (** Snapshots with legacy block storage *)
+    | V1 of {
+        rollup_address : Address.t;
+        current_level : Ethereum_types.quantity;
+        history_mode : Configuration.history_mode;
+        first_level : Ethereum_types.quantity;
+      }  (** Snapshots with Sqlite3 block storage *)
 
   (** Fixed size metadata encoding. *)
   val encoding : t Data_encoding.t
@@ -45,11 +48,17 @@ val export :
   unit ->
   string tzresult Lwt.t
 
-(** [import ~force ~data_dir ~snapshot_file] imports the snapshot at
-    path [snapshot_file] into the data directory [data_dir]. Import will fail
-    if [data_dir] is already populated unless [force] is set to [true]. *)
+(** [import ~display_progress ~force ~data_dir ~snapshot_file] imports the
+    snapshot at path [snapshot_file] into the data directory [data_dir]. Import
+    will fail if [data_dir] is already populated unless [force] is set to
+    [true]. Set [cancellable] if you want to be able to cancel the resulting
+    promise cleanly. *)
 val import :
-  force:bool -> data_dir:string -> snapshot_file:string -> unit tzresult Lwt.t
+  cancellable:bool ->
+  force:bool ->
+  data_dir:string ->
+  snapshot_file:string ->
+  unit tzresult Lwt.t
 
 (** [info ~snapshot_file] returns information that can be used to inspect the
     snapshot file. *)

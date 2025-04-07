@@ -46,7 +46,7 @@ module type TEZOS_CONTEXT_UNIX = sig
   module Checks : sig
     module Pack : Brassaia_pack_unix.Checks.S
 
-    module Index : Index.Checks.S
+    module Index : Brassaia_index.Index.Checks.S
   end
 end
 

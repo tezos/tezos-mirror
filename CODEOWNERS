@@ -24,17 +24,29 @@
 /src/lib_context_brassaia    @mattiasdrp
 /src/lib_context             @mattiasdrp
 
+# SDK Working Group
+#
+# These users are members of the SDK Working Group, and should review any code changes
+# in the following paths.
+#
+# @emturner = Emma Turner
+# @ole.kruger = Ole Krüger
+# @lthms = Thomas Letan
+# @rodibozman = Rodi-Can Bozman
+/src/kernel_sdk           @emturner @ole.kruger @lthms @rodibozman
+/sdk/rust                 @emturner @ole.kruger @lthms @rodibozman
+
 # Octez Merge Team
 #
 # These users are, as members of the Octez Merge Team, permitted to act as authorities on any code.
 #
 # @abate = Pietro Abate
 # @ACoquereau = Albin Coquereau
-# @andrea.cerone = Andrea Cerone
-# @arvidnl = Arvid Jakobsson
+# @onurb = Bruno Bernardo
 # @dianegalloiswong = Diane Gallois-Wong
 # @emturner = Emma Turner
 # @eugenz = Eugen Zalinescu
+# @felix.puscasu1 = Felix Puscasu
 # @iguerNL = Mohamed Iguernlala
 # @jobjo = Joel Bjornson
 # @julien.sagot.nl = Julien Sagot
@@ -52,19 +64,21 @@
 # @pe.cornilleau = Pierre-Emmanuel Cornilleau
 # @phink = Paul Lafourge
 # @picdc = Pierrick Couderc
+# @polubelova = Marina Polubelova
 # @rafoo_ = Raphaël Cauderlier
 # @rodibozman = Rodi-Can Bozman
 # @romain.nl = Romain
 # @ryan.tan3 = Ryan Tan
 # @Saroupille = François Thiré
 # @sribaroud = Sylvain R.
-# @tomjack = Tom Jack
 # @vch9 = Valentin Chaboche
 # @vect0r = Victor Allombert
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
+# @4dam = Adam Allombert-Goget
+# @gabriel.moise = Gabriel Moise
 #
-* @abate @ACoquereau @andrea.cerone @arvidnl @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @tomjack @vch9 @vect0r @victor-dumitrescu @yrg
+* @abate @ACoquereau @onurb @dianegalloiswong @emturner @eugenz @felix.puscasu1 @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @polubelova @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @vch9 @vect0r @victor-dumitrescu @yrg @4dam @gabriel.moise
 
 # CODEOWNERS Owners
 #
@@ -72,6 +86,6 @@
 #
 # Note that this stanza MUST appear LAST so that it takes precedence over prior rules.
 #
-/CODEOWNERS         @murbard @romain.nl @arvidnl
-/docs/CODEOWNERS    @murbard @romain.nl @arvidnl
-/.gitlab/CODEOWNERS @murbard @romain.nl @arvidnl
+/CODEOWNERS         @murbard @romain.nl
+/docs/CODEOWNERS    @murbard @romain.nl
+/.gitlab/CODEOWNERS @murbard @romain.nl

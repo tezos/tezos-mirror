@@ -19,14 +19,12 @@ include Dispatcher_intf
 module Payload = Control_file.Payload.Upper.Latest
 
 (* The following [with module Io = Io.Unix] forces unix *)
-module Make (File_manager : File_manager.S with module Io = Io.Unix) :
+module Make (File_manager : File_manager.S) :
   S with module File_manager = File_manager = struct
   module File_manager = File_manager
   module Io = File_manager.Io
   module Suffix = File_manager.Suffix
   module Sparse = File_manager.Sparse
-  module Lower = File_manager.Lower
-  module Errs = File_manager.Errs
   module Control = File_manager.Control
 
   type t = { file_manager : File_manager.t }

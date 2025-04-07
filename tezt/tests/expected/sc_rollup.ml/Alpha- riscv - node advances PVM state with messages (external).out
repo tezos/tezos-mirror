@@ -130,7 +130,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"967807"
+"966091"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -138,7 +138,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"967807"
+"966091"
 
 
 ./octez-client --wait none send smart rollup message '["2 8 + value"]' from bootstrap2
@@ -197,7 +197,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1000231"
+"998515"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -205,7 +205,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1000231"
+"998515"
 
 
 ./octez-client --wait none send smart rollup message '["3 10 + value"]' from bootstrap2
@@ -265,7 +265,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1033788"
+"1032072"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -273,7 +273,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1033788"
+"1032072"
 
 
 ./octez-client --wait none send smart rollup message '["4 12 + value"]' from bootstrap2
@@ -333,7 +333,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1067345"
+"1065629"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -341,7 +341,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1067345"
+"1065629"
 
 
 ./octez-client --wait none send smart rollup message '["5 14 + value"]' from bootstrap2
@@ -401,7 +401,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1100902"
+"1099186"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -409,7 +409,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1100902"
+"1099186"
 
 
 ./octez-client --wait none send smart rollup message '["6 16 + value"]' from bootstrap2
@@ -469,7 +469,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1134459"
+"1132743"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -477,7 +477,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1134459"
+"1132743"
 
 
 ./octez-client --wait none send smart rollup message '["7 18 + value"]' from bootstrap2
@@ -537,7 +537,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1168016"
+"1166300"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -545,7 +545,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1168016"
+"1166300"
 
 
 ./octez-client --wait none send smart rollup message '["8 20 + value"]' from bootstrap2
@@ -605,7 +605,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1201573"
+"1199857"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -613,7 +613,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1201573"
+"1199857"
 
 
 ./octez-client --wait none send smart rollup message '["9 22 + value"]' from bootstrap2
@@ -673,7 +673,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1235130"
+"1233414"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -681,7 +681,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1235130"
+"1233414"
 
 
 ./octez-client --wait none send smart rollup message '["10 24 + value"]' from bootstrap2
@@ -742,5 +742,5 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1269820"
+"1268104"
 

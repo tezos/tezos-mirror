@@ -217,9 +217,7 @@ module type S = sig
   (** {1 Snapshots} *)
 
   module Snapshot : sig
-    type kinded_hash = Contents of hash * metadata | Node of hash
-    [@@deriving brassaia]
-
+    type kinded_hash = Contents of hash | Node of hash [@@deriving brassaia]
     type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
 
     type inode_tree = {
@@ -296,14 +294,8 @@ module type S = sig
         to implement or test inodes. *)
 
     module Io = Io.Unix
-    module Errs : Io_errors.S with module Io = Io
     module Index : Pack_index.S with type key = hash
-
-    module File_manager :
-      File_manager.S
-        with module Io = Io
-         and module Errs = Errs
-         and module Index = Index
+    module File_manager : File_manager.S with module Index = Index
 
     val file_manager : repo -> File_manager.t
 
@@ -341,9 +333,6 @@ module type Maker = sig
        TODO: extract these extensions as a separate functor argument instead. *)
       with type Schema.Hash.t = Schema.Hash.t
        and type Schema.Branch.t = Schema.Branch.t
-       and type Schema.Metadata.t = Schema.Metadata.t
-       and type Schema.Path.t = Schema.Path.t
-       and type Schema.Path.step = Schema.Path.step
        and type Schema.Contents.t = Schema.Contents.t
        and type Schema.Info.t = Schema.Info.t
        and type contents_key = (Schema.Hash.t, Schema.Contents.t) contents_key
@@ -361,19 +350,14 @@ module type KV = sig
 
   include Pack_key.Store_spec
 
-  type metadata = Brassaia.Metadata.None.t
-
   module Make (C : Brassaia.Contents.S) :
     S
       with module Schema.Contents = C
-       and type Schema.Metadata.t = metadata
        and type Backend.Remote.endpoint = endpoint
        and type Schema.Hash.t = hash
        and type contents_key = (hash, C.t) contents_key
        and type node_key = hash node_key
        and type commit_key = hash commit_key
-       and type Schema.Path.step = string
-       and type Schema.Path.t = string list
        and type Schema.Branch.t = string
 end
 

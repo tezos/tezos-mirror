@@ -10,4 +10,5 @@ let () =
   Tezt_cloud.register ~tags:[Tag.cloud] ;
   Basic.register () ;
   Dal.register () ;
+  Layer1.register () ;
   Test.run ()

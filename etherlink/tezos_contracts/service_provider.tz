@@ -1,0 +1,85 @@
+{ parameter
+    (or (ticket %payout (pair nat (option bytes)))
+        (pair %payout_proxy
+           (address %fast_withdrawal_contract)
+           (address %exchanger)
+           (nat %withdrawal_id)
+           (address %target)
+           (timestamp %timestamp)
+           (address %service_provider)
+           (bytes %payload)
+           (bytes %l2_caller))) ;
+  storage
+    (pair (address %fast_withdrawal_contract)
+          (address %exchanger)
+          (nat %withdrawal_id)
+          (address %target)
+          (timestamp %timestamp)
+          (address %service_provider)
+          (bytes %payload)
+          (bytes %l2_caller)) ;
+  code { UNPAIR ;
+         IF_LEFT
+           { SWAP ;
+             UNPAIR 8 ;
+             DUP ;
+             CONTRACT %payout_withdrawal
+               (pair nat (ticket (pair nat (option bytes))) address timestamp address bytes bytes) ;
+             IF_NONE
+               { DROP 9 ; PUSH string "Invalid entrypoint" ; FAILWITH }
+               { DUP 9 ;
+                 DUP 9 ;
+                 DUP 9 ;
+                 DUP 9 ;
+                 DUP 9 ;
+                 DUP 9 ;
+                 DIG 8 ;
+                 DIG 8 ;
+                 PAIR 8 ;
+                 NIL operation ;
+                 DIG 2 ;
+                 PUSH mutez 0 ;
+                 DIG 9 ;
+                 DIG 9 ;
+                 PAIR ;
+                 DIG 8 ;
+                 PAIR ;
+                 DIG 7 ;
+                 PAIR ;
+                 DIG 6 ;
+                 PAIR ;
+                 DIG 6 ;
+                 PAIR ;
+                 DIG 5 ;
+                 PAIR ;
+                 TRANSFER_TOKENS ;
+                 CONS ;
+                 PAIR } }
+           { SWAP ;
+             DROP ;
+             UNPAIR 8 ;
+             PUSH nat 20 ;
+             DUP 9 ;
+             SIZE ;
+             COMPARE ;
+             EQ ;
+             NOT ;
+             IF { DROP 8 ;
+                  PUSH string "L2 caller's address size should be 20 bytes long" ;
+                  FAILWITH }
+                { AMOUNT ;
+                  SELF %payout ;
+                  ADDRESS ;
+                  DUP 4 ;
+                  CONTRACT %mint address ;
+                  IF_NONE
+                    { DROP 10 ; PUSH string "Invalid tez ticket contract" ; FAILWITH }
+                    { DUG 2 ;
+                      TRANSFER_TOKENS ;
+                      DUG 8 ;
+                      PAIR 8 ;
+                      NIL operation ;
+                      DIG 2 ;
+                      CONS ;
+                      PAIR } } } } }
+

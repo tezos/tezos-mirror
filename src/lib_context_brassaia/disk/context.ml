@@ -45,7 +45,7 @@ module type TEZOS_CONTEXT_UNIX = sig
   module Checks : sig
     module Pack : Brassaia_pack_unix.Checks.S
 
-    module Index : Index.Checks.S
+    module Index : Brassaia_index.Index.Checks.S
   end
 end
 
@@ -451,7 +451,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let rec tree_to_raw_context tree =
     let open Lwt_syntax in
     match Store.Tree.destruct tree with
-    | `Contents (v, _) ->
+    | `Contents v ->
         let+ v = Store.Tree.Contents.force_exn v in
         Proof.Key v
     | `Node _ ->

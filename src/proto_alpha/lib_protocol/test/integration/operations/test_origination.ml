@@ -86,7 +86,7 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) () =
       ~loc:__LOC__
       (B b)
       source
-      Account.default_initial_balance
+      Account.default_initial_full_balance
       total_fee_plus_deposits
   in
   (* check the balance of the originate contract is equal to credit *)
@@ -116,7 +116,7 @@ let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
       ~loc:__LOC__
       (B b)
       source
-      Account.default_initial_balance
+      Account.default_initial_full_balance
       total_fee_plus_deposits
   in
   (* originated contract has been credited *)
@@ -163,7 +163,9 @@ let test_pay_fee () =
     enough tez to pay for the fee. *)
 let test_not_tez_in_contract_to_pay_fee () =
   let open Lwt_result_syntax in
-  let* b, (contract_1, contract_2) = Context.init2 ~consensus_threshold:0 () in
+  let* b, (contract_1, contract_2) =
+    Context.init2 ~consensus_threshold_size:0 ()
+  in
   (* transfer everything but one tez from 1 to 2 and check balance of 1 *)
   let* balance = Context.Contract.balance (B b) contract_1 in
   let*? amount = balance -? Tez.one in
@@ -215,7 +217,7 @@ let test_multiple_originations () =
 (** Cannot originate two contracts with the same context's counter. *)
 let test_counter () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~consensus_threshold:0 () in
+  let* b, contract = Context.init1 ~consensus_threshold_size:0 () in
   let* op1, _ =
     Op.contract_origination
       (B b)
@@ -240,7 +242,7 @@ let test_counter () =
 
 let test_unparsable_script () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 ~consensus_threshold:0 () in
+  let* b, contract = Context.init1 ~consensus_threshold_size:0 () in
   let open Alpha_context in
   (* Craft an ill-typed origination's contract. *)
   let pkh =
@@ -275,11 +277,11 @@ let test_unparsable_script () =
     |> Bytes.to_string
   in
   let* account = Account.find pkh in
-  let ill_typed_op =
+  let* ill_typed_op =
     Data_encoding.Binary.of_string_exn
       Operation.contents_list_encoding
       encoded_op
-    |> Op.sign account.sk (Context.branch (B b))
+    |> Op.sign (B b) account.sk (Context.branch (B b))
   in
   (* Ensure that the application fails with [Ill_typed_contract]. *)
   let* i = Incremental.begin_construction b in
@@ -308,7 +310,7 @@ let test_unparsable_script () =
   let unparsable_dummy_expr =
     Hex.to_bytes_exn (`Hex "00000003ffffff") |> Bytes.to_string
   in
-  let unparsable_operation =
+  let* unparsable_operation =
     let encoded_bad_op =
       Re.(
         replace_string
@@ -320,7 +322,7 @@ let test_unparsable_script () =
     Data_encoding.Binary.of_string_exn
       Operation.contents_list_encoding
       encoded_bad_op
-    |> Op.sign account.sk (Context.branch (B b))
+    |> Op.sign (B b) account.sk (Context.branch (B b))
   in
   (* Ensure that the operation is valid but the application fails with
      [Lazy_script_decode]. *)

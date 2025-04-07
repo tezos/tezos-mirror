@@ -7,6 +7,8 @@
  (package tezos-tps-evaluation)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-rustzcash-deps
+  bls12-381.archive
   octez-libs.base
   caqti
   caqti-dynload

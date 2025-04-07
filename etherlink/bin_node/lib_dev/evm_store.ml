@@ -15,6 +15,16 @@ type levels = {
   finalized : Ethereum_types.quantity;
 }
 
+type pending_kernel_upgrade = {
+  kernel_upgrade : Evm_events.Upgrade.t;
+  injected_before : Ethereum_types.quantity;
+}
+
+type metadata = {
+  smart_rollup_address : Address.t;
+  history_mode : Configuration.history_mode;
+}
+
 module Q = struct
   open Caqti_request.Infix
   open Caqti_type.Std
@@ -101,12 +111,12 @@ module Q = struct
       ~encode:(fun payload ->
         Ok
           (Data_encoding.Binary.to_string_exn
-             Ethereum_types.block_encoding
+             Ethereum_types.(block_encoding legacy_transaction_object_encoding)
              payload))
       ~decode:(fun bytes ->
         Option.to_result ~none:"Not a valid block payload"
         @@ Data_encoding.Binary.of_string_opt
-             Ethereum_types.block_encoding
+             Ethereum_types.(block_encoding legacy_transaction_object_encoding)
              bytes)
       string
 
@@ -149,6 +159,15 @@ module Q = struct
         @@ Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_opt bytes)
       string
 
+  let history_mode =
+    custom
+      ~encode:(fun mode -> Ok (Configuration.string_of_history_mode_debug mode))
+      ~decode:(fun str ->
+        Option.to_result
+          ~none:(Format.sprintf "Cannot decode %S" str)
+          Configuration.(history_mode_of_string_opt str))
+      string
+
   let levels =
     custom
       ~encode:(fun {current_number; l1_level; finalized} ->
@@ -156,6 +175,14 @@ module Q = struct
       ~decode:(fun (current_number, l1_level, finalized) ->
         Ok {current_number; l1_level; finalized})
       (t3 level l1_level level)
+
+  let pending_kernel_upgrade =
+    product (fun injected_before hash timestamp ->
+        {injected_before; kernel_upgrade = Evm_events.Upgrade.{hash; timestamp}})
+    @@ proj level (fun k -> k.injected_before)
+    @@ proj root_hash (fun k -> k.kernel_upgrade.hash)
+    @@ proj timestamp (fun k -> k.kernel_upgrade.timestamp)
+    @@ proj_end
 
   let table_exists =
     (string ->! bool)
@@ -198,16 +225,16 @@ module Q = struct
           (with leading 0s) followed by the name of the migration (e.g.
           [005_create_blueprints_table.sql])
         - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
+        - Increment [version]
         - Regenerate the schemas, using [[
               dune exec -- etherlink/tezt/tests/main.exe --file evm_sequencer.ml \
                 evm store schemas regression --reset-regressions
           ]]
-        - Increment [version]
 
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 12
+    let version = 19
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -230,6 +257,9 @@ module Q = struct
 
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM blueprints WHERE id > ?|}
+
+    let clear_before =
+      (level ->. unit) @@ {|DELETE FROM blueprints WHERE id < ?|}
   end
 
   module Context_hashes = struct
@@ -253,14 +283,8 @@ module Q = struct
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id > ?|}
 
-    let get_finalized =
-      (unit ->? t2 level context_hash)
-      @@ {|SELECT id, context_hash FROM context_hashes
-           WHERE id = (
-             SELECT finalized_l2_level FROM l1_l2_levels_relationships
-             ORDER BY latest_l2_level DESC LIMIT 1
-           )|}
-    (* Using [latest_l2_level] because it is an index *)
+    let clear_before =
+      (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id < ?|}
   end
 
   module Kernel_upgrades = struct
@@ -277,17 +301,24 @@ module Q = struct
     |}
 
     let get_latest_unapplied =
-      (unit ->? upgrade)
-      @@ {|SELECT root_hash, activation_timestamp
+      (unit ->? pending_kernel_upgrade)
+      @@ {|SELECT injected_before, root_hash, activation_timestamp
            FROM kernel_upgrades WHERE applied_before IS NULL
-           ORDER BY applied_before DESC
+           ORDER BY injected_before DESC
            LIMIT 1
     |}
 
-    let find_applied_before =
+    let find_injected_before =
       (level ->? upgrade)
       @@ {|SELECT root_hash, activation_timestamp
-           FROM kernel_upgrades WHERE applied_before = ?|}
+           FROM kernel_upgrades WHERE injected_before = ?|}
+
+    let find_latest_injected_after =
+      (level ->? upgrade)
+      @@ {|SELECT root_hash, activation_timestamp
+           FROM kernel_upgrades WHERE injected_before > ?
+           ORDER BY injected_before DESC
+           LIMIT 1|}
 
     let record_apply =
       (level ->. unit)
@@ -298,6 +329,14 @@ module Q = struct
     let clear_after =
       (level ->. unit)
       @@ {|DELETE FROM kernel_upgrades WHERE injected_before > ?|}
+
+    let nullify_after =
+      (level ->. unit)
+      @@ {|UPDATE kernel_upgrades SET applied_before = NULL WHERE applied_before > ?|}
+
+    let clear_before =
+      (level ->. unit)
+      @@ {|DELETE FROM kernel_upgrades WHERE injected_before < ?|}
   end
 
   module Delayed_transactions = struct
@@ -316,6 +355,10 @@ module Q = struct
     let clear_after =
       (level ->. unit)
       @@ {|DELETE FROM delayed_transactions WHERE injected_before > ?|}
+
+    let clear_before =
+      (level ->. unit)
+      @@ {|DELETE FROM delayed_transactions WHERE injected_before < ?|}
   end
 
   module L1_l2_levels_relationships = struct
@@ -325,21 +368,41 @@ module Q = struct
 
     let get =
       (unit ->! levels)
-      @@ {|SELECT latest_l2_level, l1_level, finalized_l2_level  FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
+      @@ {|SELECT latest_l2_level, l1_level, finalized_l2_level FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
 
     let clear_after =
       (level ->. unit)
       @@ {|DELETE FROM l1_l2_levels_relationships WHERE latest_l2_level > ?|}
+
+    let clear_before =
+      (level ->. unit)
+      @@ {|DELETE FROM l1_l2_levels_relationships WHERE latest_l2_level < ?|}
   end
 
   module Metadata = struct
-    let insert =
+    let insert_smart_rollup_address =
       (smart_rollup_address ->. unit)
-      @@ {|INSERT INTO metadata (smart_rollup_address) VALUES (?)|}
+      @@ {|
+INSERT INTO metadata (key, value) VALUES ('smart_rollup_address', ?)
+ON CONFLICT(key)
+DO UPDATE SET value = excluded.value
+|}
 
-    let get =
+    let get_smart_rollup_address =
       (unit ->! smart_rollup_address)
-      @@ {|SELECT smart_rollup_address from metadata|}
+      @@ {|SELECT value from metadata WHERE key = 'smart_rollup_address'|}
+
+    let insert_history_mode =
+      (history_mode ->. unit)
+      @@ {|
+INSERT INTO metadata (key, value) VALUES ('history_mode', ?)
+ON CONFLICT(key)
+DO UPDATE SET value = excluded.value
+|}
+
+    let get_history_mode =
+      (unit ->! history_mode)
+      @@ {|SELECT value from metadata WHERE key = 'history_mode'|}
   end
 
   module Transactions = struct
@@ -425,6 +488,18 @@ module Q = struct
 
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number > ?|}
+
+    let clear_before =
+      (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number < ?|}
+  end
+
+  module Block_storage_mode = struct
+    let legacy =
+      (unit ->! Caqti_type.Std.bool)
+      @@ {|SELECT legacy FROM block_storage_mode|}
+
+    let force_legacy =
+      (unit ->. unit) @@ {|UPDATE block_storage_mode SET legacy = 1|}
   end
 
   module Blocks = struct
@@ -448,28 +523,53 @@ module Q = struct
       @@ {eos|SELECT level FROM blocks WHERE hash = ?|eos}
 
     let clear_after = (level ->. unit) @@ {|DELETE FROM blocks WHERE level > ?|}
+
+    let clear_before =
+      (level ->. unit) @@ {|DELETE FROM blocks WHERE level < ?|}
   end
 
   let context_hash_of_block_hash =
     (block_hash ->? context_hash)
     @@ {eos|SELECT c.context_hash from Context_hashes c JOIN Blocks b on c.id = b.level WHERE hash = ?|eos}
 
-  module GC = struct
-    let select_last_gc =
-      (unit ->? t2 level timestamp)
-      @@ {|SELECT last_gc_level, last_gc_timestamp FROM gc|}
-
-    let update_last_gc =
+  module Irmin_chunks = struct
+    let insert =
       (t2 level timestamp ->. unit)
-      @@ {eos|INSERT INTO gc (id, last_gc_level, last_gc_timestamp) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET last_gc_level = excluded.last_gc_level, last_gc_timestamp = excluded.last_gc_timestamp|eos}
+      @@ {|INSERT INTO irmin_chunks (level, timestamp) VALUES (?, ?)|}
 
-    let select_last_split =
+    let nth =
+      (int ->? t2 level timestamp)
+      @@ {|SELECT level, timestamp from irmin_chunks ORDER BY level DESC LIMIT 1 OFFSET ?|}
+
+    let latest =
       (unit ->? t2 level timestamp)
-      @@ {|SELECT last_split_level, last_split_timestamp FROM gc|}
+      @@ {|SELECT level, timestamp from irmin_chunks ORDER BY level DESC LIMIT 1|}
 
-    let update_last_split =
-      (t2 level timestamp ->. unit)
-      @@ {eos|INSERT INTO gc (id, last_split_level, last_split_timestamp) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET last_split_level = excluded.last_split_level, last_split_timestamp = excluded.last_split_timestamp|eos}
+    let clear = (unit ->. unit) @@ {|DELETE FROM irmin_chunks|}
+
+    let clear_after =
+      (level ->. unit) @@ {|DELETE FROM irmin_chunks WHERE level > ?|}
+
+    let clear_before_included =
+      (level ->. unit) @@ {|DELETE FROM irmin_chunks WHERE level <= ?|}
+  end
+
+  module Pending_confirmations = struct
+    let insert =
+      (t2 level block_hash ->. unit)
+      @@ {|INSERT INTO pending_confirmations (level, hash) VALUES (?, ?)|}
+
+    let select_with_level =
+      (level ->? block_hash)
+      @@ {|SELECT hash FROM pending_confirmations WHERE level = ?|}
+
+    let delete_with_level =
+      (level ->. unit) @@ {|DELETE FROM pending_confirmations WHERE level = ?|}
+
+    let clear = (unit ->. unit) @@ {|DELETE FROM pending_confirmations|}
+
+    let count =
+      (unit ->! level) @@ {|SELECT COUNT(*) FROM pending_confirmations|}
   end
 end
 
@@ -583,13 +683,32 @@ module Context_hashes = struct
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Context_hashes.get_earliest ()
 
+  let get_earliest store =
+    let open Lwt_result_syntax in
+    let* candidate = find_earliest store in
+    match candidate with
+    | Some c -> return c
+    | None -> failwith "Could not fetch earliest context hash from store"
+
   let find_finalized store =
+    let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Context_hashes.get_finalized ()
+    let* l1_l2_levels = Db.find_opt conn Q.L1_l2_levels_relationships.get () in
+    match l1_l2_levels with
+    | None -> return_none
+    | Some {current_number = Qty current_number; finalized = Qty finalized; _}
+      ->
+        let min = Ethereum_types.Qty (Z.min current_number finalized) in
+        let+ hash = Db.find_opt conn Q.Context_hashes.select min in
+        Option.map (fun hash -> (min, hash)) hash
 
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Context_hashes.clear_after l2_level
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Context_hashes.clear_before l2_level
 end
 
 module Kernel_upgrades = struct
@@ -604,17 +723,27 @@ module Kernel_upgrades = struct
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Kernel_upgrades.get_latest_unapplied ()
 
-  let find_applied_before store level =
+  let find_injected_before store level =
     with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Kernel_upgrades.find_applied_before level
+    Db.find_opt conn Q.Kernel_upgrades.find_injected_before level
+
+  let find_latest_injected_after store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Kernel_upgrades.find_latest_injected_after level
 
   let record_apply store level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Kernel_upgrades.record_apply level
 
   let clear_after store l2_level =
+    let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    Db.exec conn Q.Kernel_upgrades.clear_after l2_level
+    let* () = Db.exec conn Q.Kernel_upgrades.clear_after l2_level in
+    Db.exec conn Q.Kernel_upgrades.nullify_after l2_level
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Kernel_upgrades.clear_before l2_level
 
   let activation_levels store =
     with_connection store @@ fun conn ->
@@ -641,6 +770,10 @@ module Delayed_transactions = struct
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Delayed_transactions.clear_after l2_level
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Delayed_transactions.clear_before l2_level
 end
 
 module Blueprints = struct
@@ -663,7 +796,7 @@ module Blueprints = struct
   let find_with_events conn level =
     let open Lwt_result_syntax in
     let* blueprint = find conn level in
-    let* kernel_upgrade = Kernel_upgrades.find_applied_before conn level in
+    let* kernel_upgrade = Kernel_upgrades.find_injected_before conn level in
     match blueprint with
     | None -> return None
     | Some blueprint ->
@@ -689,6 +822,10 @@ module Blueprints = struct
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Blueprints.clear_after l2_level
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Blueprints.clear_before l2_level
 end
 
 module L1_l2_levels_relationships = struct
@@ -712,18 +849,53 @@ module L1_l2_levels_relationships = struct
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.L1_l2_levels_relationships.clear_after l2_level
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.L1_l2_levels_relationships.clear_before l2_level
 end
 
 module Metadata = struct
-  let store store smart_rollup_address =
+  let store store {smart_rollup_address; history_mode} =
+    let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    Db.exec conn Q.Metadata.insert smart_rollup_address
+    let* () =
+      Db.exec conn Q.Metadata.insert_smart_rollup_address smart_rollup_address
+    in
+    Db.exec conn Q.Metadata.insert_history_mode history_mode
 
   let get store =
-    with_connection store @@ fun conn -> Db.find conn Q.Metadata.get ()
+    with_connection store @@ fun conn ->
+    let open Lwt_result_syntax in
+    let* smart_rollup_address =
+      Db.find conn Q.Metadata.get_smart_rollup_address ()
+    in
+    let* history_mode = Db.find conn Q.Metadata.get_history_mode () in
+    return {smart_rollup_address; history_mode}
 
   let find store =
-    with_connection store @@ fun conn -> Db.find_opt conn Q.Metadata.get ()
+    with_connection store @@ fun conn ->
+    let open Lwt_result_syntax in
+    let* smart_rollup_address =
+      Db.find_opt conn Q.Metadata.get_smart_rollup_address ()
+    in
+    let* history_mode = Db.find_opt conn Q.Metadata.get_history_mode () in
+    match (smart_rollup_address, history_mode) with
+    | Some smart_rollup_address, Some history_mode ->
+        return_some {smart_rollup_address; history_mode}
+    | _ -> return_none
+
+  let store_history_mode store history_mode =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Metadata.insert_history_mode history_mode
+
+  let find_history_mode store =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Metadata.get_history_mode ()
+
+  let get_history_mode store =
+    with_connection store @@ fun conn ->
+    Db.find conn Q.Metadata.get_history_mode ()
 end
 
 module Transactions = struct
@@ -840,65 +1012,98 @@ module Transactions = struct
 
   let find_object store hash =
     let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let+ object_ = Db.find_opt conn Q.Transactions.select_object hash in
-    Option.map
-      (fun ( block_hash,
-             block_number,
-             index,
-             hash,
-             from,
-             to_,
-             Transaction_info.{gas; gas_price; input; nonce; value; v; r; s} ) ->
-        Ethereum_types.
-          {
-            blockHash = Some block_hash;
-            blockNumber = Some block_number;
-            from;
-            gas;
-            gasPrice = gas_price;
-            hash;
-            input;
-            nonce;
-            to_;
-            transactionIndex = Some index;
-            value;
-            v;
-            r;
-            s;
-          })
-      object_
+    let* object_ =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Transactions.select_object hash
+    in
+    let legacy_object =
+      Option.map
+        (fun ( block_hash,
+               block_number,
+               index,
+               hash,
+               from,
+               to_,
+               Transaction_info.{gas; gas_price; input; nonce; value; v; r; s}
+             ) ->
+          Ethereum_types.
+            {
+              blockHash = Some block_hash;
+              blockNumber = Some block_number;
+              from;
+              gas;
+              gasPrice = gas_price;
+              hash;
+              input;
+              nonce;
+              to_;
+              transactionIndex = Some index;
+              value;
+              v;
+              r;
+              s;
+            })
+        object_
+    in
+    match legacy_object with
+    | Some ({blockNumber = Some number; _} as obj) -> (
+        let* blueprint = Blueprints.find store number in
+        match blueprint with
+        | Some blueprint ->
+            let*? obj = Transaction_object.reconstruct blueprint.payload obj in
+            return_some obj
+        | None ->
+            return_some (Transaction_object.from_store_transaction_object obj))
+    | Some _ ->
+        (* We should not end up in this branch, per the function used in above
+           [Option.map]. We do not store transactions which have not been
+           included in a block already. *)
+        assert false
+    | None -> return_none
 
   let clear_after store level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Transactions.clear_after level
+
+  let clear_before store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Transactions.clear_before level
 end
 
-module GC = struct
-  let last_gc store =
-    with_connection store @@ fun conn -> Db.find_opt conn Q.GC.select_last_gc ()
+module Irmin_chunks = struct
+  let insert conn level timestamp =
+    with_connection conn @@ fun conn ->
+    Db.exec conn Q.Irmin_chunks.insert (level, timestamp)
 
-  let update_last_gc store level timestamp =
-    with_connection store @@ fun conn ->
-    Db.exec conn Q.GC.update_last_gc (level, timestamp)
+  let nth conn n =
+    with_connection conn @@ fun conn -> Db.find_opt conn Q.Irmin_chunks.nth n
 
-  let last_split store =
-    with_connection store @@ fun conn ->
-    Db.find_opt conn Q.GC.select_last_split ()
+  let latest conn =
+    with_connection conn @@ fun conn ->
+    Db.find_opt conn Q.Irmin_chunks.latest ()
 
-  let update_last_split store level timestamp =
+  let clear store =
+    with_connection store @@ fun conn -> Db.exec conn Q.Irmin_chunks.clear ()
+
+  let clear_after store level =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.GC.update_last_split (level, timestamp)
+    Db.exec conn Q.Irmin_chunks.clear_after level
+
+  let clear_before_included store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Irmin_chunks.clear_before_included level
 end
 
 module Blocks = struct
-  let store store (block : Ethereum_types.block) =
+  let store store
+      (block : Ethereum_types.legacy_transaction_object Ethereum_types.block) =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Blocks.insert (block.number, block.hash, block)
 
-  let block_with_objects conn block =
+  let block_with_objects store block =
     let open Lwt_result_syntax in
-    let+ rows =
+    let* rows =
+      with_connection store @@ fun conn ->
       Db.collect_list
         conn
         Q.Transactions.select_objects_from_block_number
@@ -931,23 +1136,35 @@ module Blocks = struct
             })
         rows
     in
-    {block with transactions = TxFull objects_}
+    let block = {block with transactions = TxFull objects_} in
+    let* blueprint = Blueprints.find store block.number in
+    let*? res =
+      match blueprint with
+      | Some blueprint ->
+          Transaction_object.reconstruct_block blueprint.payload block
+      | None -> Ok (Transaction_object.block_from_legacy block)
+    in
+    return res
 
   let find_with_level ~full_transaction_object store level =
     let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let* block_opt = Db.find_opt conn Q.Blocks.select_with_level level in
+    let* block_opt =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Blocks.select_with_level level
+    in
     if full_transaction_object then
-      Option.map_es (block_with_objects conn) block_opt
-    else return block_opt
+      Option.map_es (block_with_objects store) block_opt
+    else return (Option.map Transaction_object.block_from_legacy block_opt)
 
   let find_with_hash ~full_transaction_object store hash =
     let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let* block_opt = Db.find_opt conn Q.Blocks.select_with_hash hash in
+    let* block_opt =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Blocks.select_with_hash hash
+    in
     if full_transaction_object then
-      Option.map_es (block_with_objects conn) block_opt
-    else return block_opt
+      Option.map_es (block_with_objects store) block_opt
+    else return (Option.map Transaction_object.block_from_legacy block_opt)
 
   let find_hash_of_number store level =
     with_connection store @@ fun conn ->
@@ -959,13 +1176,51 @@ module Blocks = struct
 
   let clear_after store level =
     with_connection store @@ fun conn -> Db.exec conn Q.Blocks.clear_after level
+
+  let clear_before store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Blocks.clear_before level
+end
+
+module Block_storage_mode = struct
+  let legacy store =
+    with_connection store @@ fun conn ->
+    Db.find conn Q.Block_storage_mode.legacy ()
+
+  let force_legacy store =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Block_storage_mode.force_legacy ()
+end
+
+module Pending_confirmations = struct
+  let insert store level hash =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Pending_confirmations.insert (level, hash)
+
+  let find_with_level store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Pending_confirmations.select_with_level level
+
+  let delete_with_level store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Pending_confirmations.delete_with_level level
+
+  let clear store =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Pending_confirmations.clear ()
+
+  let is_empty store =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let* (Qty count) = Db.find conn Q.Pending_confirmations.count () in
+    return Z.(equal zero count)
 end
 
 let context_hash_of_block_hash store hash =
   with_connection store @@ fun conn ->
   Db.find_opt conn Q.context_hash_of_block_hash hash
 
-let reset store ~l2_level =
+let reset_after store ~l2_level =
   let open Lwt_result_syntax in
   let* () = Blueprints.clear_after store l2_level in
   let* () = Context_hashes.clear_after store l2_level in
@@ -974,4 +1229,34 @@ let reset store ~l2_level =
   let* () = Delayed_transactions.clear_after store l2_level in
   let* () = Blocks.clear_after store l2_level in
   let* () = Transactions.clear_after store l2_level in
+  (* Blocks in [Pending_confirmations] are always after the current head. *)
+  let* () = Pending_confirmations.clear store in
+  (* If splits were produced on the resetted branch, they will be garbage
+     collected by the GC anyway later. *)
+  let* () = Irmin_chunks.clear_after store l2_level in
+  return_unit
+
+let reset_before store ~l2_level ~history_mode =
+  let open Lwt_result_syntax in
+  let* () = Context_hashes.clear_before store l2_level in
+  let* () = L1_l2_levels_relationships.clear_before store l2_level in
+  let* () =
+    match history_mode with
+    | Configuration.Rolling _ ->
+        let* () = Blueprints.clear_before store l2_level in
+        let* () = Blocks.clear_before store l2_level in
+        let* () = Transactions.clear_before store l2_level in
+        let* () = Kernel_upgrades.clear_before store l2_level in
+        let* () = Delayed_transactions.clear_before store l2_level in
+        return_unit
+    | _ -> return_unit
+  in
+
+  (* {!reset_before} is called when garbage collector is trigerred.
+     Garbage collector is trigerred when the maximum number of splits is
+     reached, [l2_level] was the pointer to the first split to remove.
+
+     If it wasn't included, the garbage collector would keep the maximum
+     number of splits plus an additional one. *)
+  let* () = Irmin_chunks.clear_before_included store l2_level in
   return_unit

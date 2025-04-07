@@ -75,5 +75,5 @@ val get :
   hash:Protocol.Sc_rollup_reveal_hash.t ->
   string tzresult Lwt.t
 
-(** Conversion from protocol reveal hash to protocol agnostic DAC hash. *)
-val proto_hash_to_dac_hash : Protocol.Sc_rollup_reveal_hash.t -> Dac_plugin.hash
+(** Conversion from protocol reveal hash to protocol agnostic hash. *)
+val proto_hash_to_bytes : Protocol.Sc_rollup_reveal_hash.t -> bytes

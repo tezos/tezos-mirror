@@ -44,8 +44,9 @@ let () =
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/3410
 
    This function should be factored out with the one of sapling. *)
-let find_trusted_setup_files ?(getenv_opt = Sys.getenv_opt)
-    ?(getcwd = Sys.getcwd) ?(file_exists = Sys.file_exists) () =
+
+let trusted_setup_candidate_directories ?(getenv_opt = Sys.getenv_opt)
+    ?(getcwd = Sys.getcwd) () =
   let ( // ) = Filename.concat in
   let env ?split name path =
     match getenv_opt name with
@@ -57,17 +58,25 @@ let find_trusted_setup_files ?(getenv_opt = Sys.getenv_opt)
             List.map (fun dir -> dir // path) (String.split_on_char char value))
   in
   let cwd path = try [getcwd () // path] with Sys_error _ -> [] in
+  env "DAL_TRUSTED_SETUP" ""
+  @ env "XDG_DATA_HOME" ".local/share/dal-trusted-setup"
+  @ env ~split:':' "XDG_DATA_DIRS" "dal-trusted-setup"
+  @ env "OPAM_SWITCH_PREFIX" "share/dal-trusted-setup"
+  @ env "PWD" "_opam/share/dal-trusted-setup"
+  @ cwd "_opam/share/dal-trusted-setup"
+  @ env "HOME" ".dal-trusted-setup"
+  @ env "HOME" ".local/share/dal-trusted-setup"
+  @ env "HOMEBREW_PREFIX" "share/dal-trusted-setup"
+  @ ["/usr/local/share/dal-trusted-setup"; "/usr/share/dal-trusted-setup"]
+
+let trusted_setup_preferred_directory ?getenv_opt ?getcwd () =
+  Stdlib.List.hd (trusted_setup_candidate_directories ?getenv_opt ?getcwd ())
+
+let find_trusted_setup_files ?(getenv_opt = Sys.getenv_opt)
+    ?(getcwd = Sys.getcwd) ?(file_exists = Sys.file_exists) () =
+  let ( // ) = Filename.concat in
   let candidate_directories =
-    env "XDG_DATA_HOME" ".local/share/dal-trusted-setup"
-    @ env ~split:':' "XDG_DATA_DIRS" "dal-trusted-setup"
-    @ env "OPAM_SWITCH_PREFIX" "share/dal-trusted-setup"
-    @ env "PWD" "_opam/share/dal-trusted-setup"
-    @ cwd "_opam/share/dal-trusted-setup"
-    @ env "HOME" ".dal-trusted-setup"
-    @ env "HOME" ".local/share/dal-trusted-setup"
-    @ env "DAL_TRUSTED_SETUP" ""
-    @ env "HOMEBREW_PREFIX" "share/dal-trusted-setup"
-    @ ["/usr/local/share/dal-trusted-setup"; "/usr/share/dal-trusted-setup"]
+    trusted_setup_candidate_directories ~getenv_opt ~getcwd ()
   in
   (* Files we are looking for. *)
   let g1_file = "srsu_zcash_g1" in

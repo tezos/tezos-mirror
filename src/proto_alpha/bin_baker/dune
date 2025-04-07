@@ -7,6 +7,8 @@
  (package octez-baker-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-rustzcash-deps
+  bls12-381.archive
   octez-libs.base
   octez-libs.clic
   tezos-protocol-alpha.protocol
@@ -14,7 +16,8 @@
   octez-shell-libs.client-commands
   octez-protocol-alpha-libs.baking-commands
   octez-libs.stdlib-unix
-  octez-shell-libs.client-base-unix)
+  octez-shell-libs.client-base-unix
+  octez-libs.octez-profiler.backends)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -27,4 +30,5 @@
   -open Tezos_client_commands
   -open Tezos_baking_alpha_commands
   -open Tezos_stdlib_unix
-  -open Tezos_client_base_unix))
+  -open Tezos_client_base_unix
+  -open Tezos_profiler_backends))

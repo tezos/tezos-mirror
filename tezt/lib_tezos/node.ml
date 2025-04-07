@@ -9,6 +9,10 @@ open Cli_arg
 
 type history_mode = Archive | Full of int option | Rolling of int option
 
+let default_full = Full None
+
+let default_rolling = Rolling None
+
 type media_type = Json | Binary | Any
 
 let string_of_media_type = function
@@ -234,6 +238,8 @@ let metrics_port node = node.persistent_state.metrics_port
 
 let data_dir node = node.persistent_state.data_dir
 
+let identity_file node = Filename.concat (data_dir node) "identity.json"
+
 let runner node = node.persistent_state.runner
 
 let spawn_command node =
@@ -337,13 +343,10 @@ module Config_file = struct
     match node.persistent_state.runner with
     | None -> Lwt.return (JSON.encode_to_file (filename node) config)
     | Some runner ->
-        let content = JSON.encode config in
-        let cmd =
-          Runner.Shell.(
-            redirect_stdout (cmd [] "echo" [content]) (filename node))
-        in
-        let cmd, args = Runner.wrap_with_ssh runner cmd in
-        Process.run cmd args
+        Helpers.write_file
+          ~runner
+          ~contents:(JSON.encode config)
+          (filename node)
 
   let update node update =
     let* config = read node in
@@ -1091,10 +1094,14 @@ let get_version node =
   in
   return @@ String.trim output
 
-let as_rpc_endpoint (t : t) =
+let as_rpc_endpoint ?(local = false) (t : t) =
   let state = t.persistent_state in
   let scheme = if Option.is_some state.rpc_tls then "https" else "http" in
-  Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+  let host =
+    if local || Option.is_none t.persistent_state.runner then state.rpc_host
+    else Runner.address t.persistent_state.runner
+  in
+  Endpoint.{scheme; host; port = state.rpc_port}
 
 module RPC = struct
   module RPC_callers : RPC_core.CALLERS with type uri_provider := t = struct

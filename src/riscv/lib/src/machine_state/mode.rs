@@ -2,18 +2,24 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    machine_state::csregisters::Privilege,
-    state_backend::{EnumCell, EnumCellLayout},
-};
+use crate::{default::ConstDefault, machine_state::csregisters::Privilege};
 
 /// Modes the hardware state can be in when running code
-#[derive(Debug, PartialEq, PartialOrd, Eq, Copy, Clone, strum::EnumIter)]
-#[repr(u8)]
+#[derive(
+    Debug,
+    PartialEq,
+    PartialOrd,
+    Eq,
+    Copy,
+    Clone,
+    strum::EnumIter,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum Mode {
-    User = 0b000,
-    Supervisor = 0b001,
-    Machine = 0b011,
+    User,
+    Supervisor,
+    Machine,
 }
 
 impl Mode {
@@ -27,22 +33,8 @@ impl Mode {
     }
 }
 
-impl From<u8> for Mode {
-    #[inline]
-    fn from(value: u8) -> Self {
-        match value {
-            0 => Mode::User,
-            1 => Mode::Supervisor,
-            _ => Mode::Machine,
-        }
-    }
-}
-
-impl Default for Mode {
-    #[inline]
-    fn default() -> Self {
-        Self::Machine
-    }
+impl ConstDefault for Mode {
+    const DEFAULT: Self = Self::Machine;
 }
 
 impl From<Mode> for u8 {
@@ -52,18 +44,11 @@ impl From<Mode> for u8 {
     }
 }
 
-/// Hart mode cell
-pub type ModeCell<M> = EnumCell<Mode, u8, M>;
-
-/// Layout for [Mode]
-pub type ModeLayout = EnumCellLayout<u8>;
-
 /// Modes the hardware state can trap into, a sub-enum of [`Mode`]
 #[derive(Debug, PartialEq, PartialOrd, Eq, Copy, Clone, strum::EnumIter)]
-#[repr(u8)]
 pub enum TrapMode {
-    Supervisor = Mode::Supervisor as u8,
-    Machine = Mode::Machine as u8,
+    Supervisor,
+    Machine,
 }
 
 impl TrapMode {
@@ -74,42 +59,4 @@ impl TrapMode {
             Self::Machine => Mode::Machine,
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        backend_test, create_backend, create_state,
-        machine_state::{
-            backend::tests::test_determinism,
-            mode::{Mode, ModeCell, ModeLayout},
-        },
-    };
-    use strum::IntoEnumIterator;
-
-    #[test]
-    fn test_mode_reset() {
-        test_determinism::<ModeLayout, _>(|space| {
-            let mut mode1 = ModeCell::bind(space);
-            mode1.reset();
-        });
-    }
-
-    backend_test!(test_mode_read_write, F, {
-        let mut backend = create_backend!(ModeLayout, F);
-
-        Mode::iter().for_each(|mode| {
-            let first_value = mode;
-
-            let mut inst = create_state!(ModeCell, ModeLayout, F, backend);
-
-            inst.write(first_value);
-            assert_eq!(inst.read(), first_value);
-
-            let value_read = bincode::serialize(&inst.struct_ref()).unwrap()[0];
-            assert_eq!(Mode::from(value_read), first_value);
-        });
-
-        assert_eq!(Mode::from(42), Mode::default());
-    });
 }

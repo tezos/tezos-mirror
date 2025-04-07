@@ -126,6 +126,27 @@ val get_slot_status :
   ; query : unit >
   service
 
+(** Returns the last (finalized) L1 level which was processed by the DAL \
+    node. *)
+val get_last_processed_level :
+  < meth : [`GET]
+  ; input : unit
+  ; output : int32
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service
+
+(** Returns the protocol parameters as known by the DAL node. *)
+val get_protocol_parameters :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.proto_parameters
+  ; prefix : unit
+  ; params : unit
+  ; query : int32 option >
+  service
+
 (** Update the list of profiles tracked by the DAL node.
     Note that it does not take the bootstrap profile as it
     is incompatible with other profiles. *)
@@ -148,7 +169,8 @@ val get_profiles :
   ; query : unit >
   service
 
-(** Return the shard indexes assigned to the given public key hash at the given level. *)
+(** Return the shard indexes assigned to the given delegate (identified by its
+    delegate key address) at the given level. *)
 val get_assigned_shard_indices :
   < meth : [`GET]
   ; input : unit
@@ -160,8 +182,8 @@ val get_assigned_shard_indices :
 
 (** Return the set of currently attestable slots. A slot is attestable at level
     [l] if it is published at level [l - attestation_lag] and *all* the shards
-    assigned at level [l] to the given public key hash are available in the DAL
-    node's store. *)
+    assigned at level [l] to the given delegate (identified by its delegate key
+    address) are available in the DAL node's store. *)
 val get_attestable_slots :
   < meth : [`GET]
   ; input : unit
@@ -169,6 +191,18 @@ val get_attestable_slots :
   ; prefix : unit
   ; params : (unit * Signature.public_key_hash) * Types.level
   ; query : unit >
+  service
+
+(** For a given published level, return all the traps known by the node. *)
+val get_traps :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.trap list
+  ; prefix : unit
+  ; params : unit * Types.level
+  ; query :
+      < delegate : Signature.public_key_hash option
+      ; slot_index : Types.slot_index option > >
   service
 
 (** Return the shard associated to the given index. *)
@@ -311,7 +345,7 @@ module P2P : sig
       ; output : (Types.Topic.t * Types.Peer.t list) list
       ; prefix : unit
       ; params : unit
-      ; query : < subscribed : bool > >
+      ; query : < all : bool > >
       service
 
     val get_fanout :
@@ -329,7 +363,7 @@ module P2P : sig
       ; output : (Types.slot_index * Types.Peer.t list) list
       ; prefix : unit
       ; params : unit
-      ; query : < subscribed : bool > >
+      ; query : < all : bool > >
       service
 
     val get_pkhs_peers :
@@ -338,7 +372,7 @@ module P2P : sig
       ; output : (Signature.public_key_hash * Types.Peer.t list) list
       ; prefix : unit
       ; params : unit
-      ; query : < subscribed : bool > >
+      ; query : < all : bool > >
       service
 
     val get_connections :

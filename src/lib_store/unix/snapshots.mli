@@ -163,8 +163,8 @@ val read_snapshot_header :
   snapshot_path:string -> Snapshot_header.t tzresult Lwt.t
 
 (** [export ?snapshot_path snapshot_format ?rolling ~block ~store_dir
-    ~context_dir ~chain_name genesis ~progress_display_mode] reads
-    from the [store_dir] and [context_dir] the current state of the
+    ~context_root_dir ~chain_name genesis ~progress_display_mode] reads
+    from the [store_dir] and [context_root_dir] the current state of the
     node and produces a snapshot, of the given [snapshot_format], in
     [snapshot_file] if it is provided. Otherwise, a snapshot file name
     is automatically generated using the target block as hint. If
@@ -175,17 +175,17 @@ val export :
   ?rolling:bool ->
   block:Block_services.block ->
   store_dir:string ->
-  context_dir:string ->
+  context_root_dir:string ->
   chain_name:Distributed_db_version.Name.t ->
   progress_display_mode:Animation.progress_display_mode ->
   Genesis.t ->
   unit tzresult Lwt.t
 
 (** [import ~snapshot_path ?patch_context ?block ?check_consistency
-    ~dst_store_dir ~dst_context_dir chain_name
+    ~dst_store_dir ~dst_context_root_dir chain_name
     ~user_activated_upgrades ~user_activated_protocol_overrides
     ~ops_metadata_size_limit genesis] populates [dst_store_dir] and
-    [dst_context_dir] with the data contained in the
+    [dst_context_root_dir] with the data contained in the
     [snapshot_file]. If [check_consistency] is unset, less security
     checks will be made and the import process will be more
     efficient. If [block] is set, the import process will make sure
@@ -202,7 +202,7 @@ val import :
   ?block:Block_hash.t ->
   ?check_consistency:bool ->
   dst_store_dir:string ->
-  dst_context_dir:string ->
+  dst_context_root_dir:string ->
   chain_name:Distributed_db_version.Name.t ->
   configured_history_mode:History_mode.t option ->
   user_activated_upgrades:User_activated.upgrades ->

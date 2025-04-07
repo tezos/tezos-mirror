@@ -88,6 +88,7 @@ let wait_eof_or_closed conn ic sleep_fn =
   let wait_for_cancel () = fst (Lwt.task ()) in
   match (conn : Conduit_lwt_unix.flow) with
   | Vchan _ -> wait_for_cancel ()
+  | Tunnel _ -> wait_for_cancel ()
   | TCP {fd; _} | Domain_socket {fd; _} ->
       let peek_buffer = Bytes.create 1 in
       let has_recv_eof fd =

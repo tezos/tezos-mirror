@@ -10,3 +10,4 @@ both Octez and the current protocol reference manuals.
    :maxdepth: 2
 
    baker
+   rpc_architecture

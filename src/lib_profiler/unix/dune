@@ -1,0 +1,26 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_profiler_unix)
+ (public_name octez-libs.octez-profiler.unix)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib
+  octez-libs.stdlib-unix
+  octez-libs.octez-profiler
+  octez-libs.data-encoding
+  octez-libs.event-logging
+  octez-libs.error-monad)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib
+  -open Tezos_profiler
+  -open Data_encoding
+  -open Tezos_error_monad))

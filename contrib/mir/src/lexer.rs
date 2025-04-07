@@ -145,6 +145,13 @@ defprim! {
     Underscore,
     other_contracts,
     Contract,
+    #[token("Gas_exhaustion")]
+    OutOfGas,
+    now,
+    source,
+    sender,
+    big_maps,
+    Big_map,
 }
 
 /// Either a Micheline primitive, TZT primitive, or a macro lexeme.

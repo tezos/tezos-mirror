@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 5a1ca8269e88d6e28cf6eae6a80d563c77f81d2567f363ae1a080e38bc7f4260 # shrinks to typed = TypedValueAndType { ty: Or((Or((Timestamp, Address)), List(KeyHash))), val: Or(Right(List(MichelsonList([KeyHash(Tz1(ContractTz1Hash("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw"))), KeyHash(Tz1(ContractTz1Hash("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw")))])))) }

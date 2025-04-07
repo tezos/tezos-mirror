@@ -999,6 +999,8 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
         return PS.(Needs_reveal Reveal_metadata)
     | Waiting_for_reveal (Request_dal_page page) ->
         return PS.(Needs_reveal (Request_dal_page page))
+    | Waiting_for_reveal (Request_adal_page arg) ->
+        return PS.(Needs_reveal (Request_adal_page arg))
     | Waiting_for_reveal Reveal_dal_parameters ->
         return PS.(Needs_reveal Reveal_dal_parameters)
     | Halted | Parsing | Evaluating -> return PS.No_input_required
@@ -1020,7 +1022,8 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
     let+ entries = result_of ~default:[] Output.entries state in
     List.filter_map
       (fun (_, msg) ->
-        if Raw_level_repr.(msg.PS.outbox_level = outbox_level) then Some msg
+        if Raw_level_repr.(msg.PS.output_info.outbox_level = outbox_level) then
+          Some msg
         else None)
       entries
 
@@ -1134,8 +1137,11 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
         | None, Some (Request_dal_page page_id) ->
             (* We are in the same level, fetch the next page. *)
             next_dal_page dal_params ~target:(`Page_after page_id)
-        | _, Some Reveal_metadata | _, Some Reveal_dal_parameters ->
+        | _, Some Reveal_metadata
+        | _, Some Reveal_dal_parameters
+        | _, Some (Request_adal_page _) ->
             (* Should not happen. *)
+            (* These cases are not supported by the "toy" Arith PVM. *)
             assert false
         | _, Some (Reveal_raw_data _) ->
             (* Note that, providing a DAC input via a DAL page will interrupt
@@ -1424,7 +1430,8 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
     let message = Atomic_transaction_batch {transactions = [transaction]} in
     let* outbox_level = Current_level.get in
     let output =
-      Sc_rollup_PVM_sig.{outbox_level; message_index = counter; message}
+      Sc_rollup_PVM_sig.
+        {output_info = {outbox_level; message_index = counter}; message}
     in
     Output.set (Z.to_string counter) output
 
@@ -1609,7 +1616,11 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
           error
             "Invalid set_input: expecting a dal page reveal, got an inbox \
              message or a raw data reveal."
+      | PS.Needs_reveal (PS.Request_adal_page _), _ ->
+          error
+            "Invalid set_input: Flexible DAL is not supported in the arith PVM."
     in
+
     return (state, request)
 
   type error += Arith_proof_verification_failed
@@ -1655,7 +1666,7 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
          (req "output_proof_state" State_hash.encoding)
          (req "output_proof_output" PS.output_encoding))
 
-  let output_of_output_proof s = s.output_proof_output
+  let output_info_of_output_proof s = s.output_proof_output.output_info
 
   let state_of_output_proof s = s.output_proof_state
 
@@ -1670,9 +1681,8 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
         output
         (fun
           {
-            outbox_level = found_outbox_level;
+            output_info = {outbox_level = found_outbox_level; message_index = _};
             message = found_message;
-            message_index = _;
           }
         ->
           (* We can safely ignore the [message_index] since it is the key
@@ -1697,21 +1707,25 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
 
   let verify_output_proof p =
     let open Lwt_result_syntax in
-    let outbox_level = p.output_proof_output.outbox_level in
-    let message_index = p.output_proof_output.message_index in
-    let message = p.output_proof_output.message in
+    let Sc_rollup_PVM_sig.{output_info = {outbox_level; message_index}; message}
+        =
+      p.output_proof_output
+    in
     let transition = get_output ~outbox_level ~message_index ~message in
     let*! result = Context.verify_proof p.output_proof transition in
     match result with
     | Some (_state, Some message) ->
-        return Sc_rollup_PVM_sig.{outbox_level; message_index; message}
+        return
+          Sc_rollup_PVM_sig.
+            {output_info = {outbox_level; message_index}; message}
     | _ -> tzfail Arith_output_proof_production_failed
 
   let produce_output_proof context state output_proof_output =
     let open Lwt_result_syntax in
-    let outbox_level = output_proof_output.Sc_rollup_PVM_sig.outbox_level in
-    let message_index = output_proof_output.message_index in
-    let message = output_proof_output.message in
+    let Sc_rollup_PVM_sig.{output_info = {outbox_level; message_index}; message}
+        =
+      output_proof_output
+    in
     let*! result =
       Context.produce_proof context state
       @@ get_output ~outbox_level ~message_index ~message
@@ -1723,7 +1737,8 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
           {
             output_proof;
             output_proof_state;
-            output_proof_output = {outbox_level; message_index; message};
+            output_proof_output =
+              {output_info = {outbox_level; message_index}; message};
           }
     | _ -> fail Arith_output_proof_production_failed
 

@@ -6,12 +6,14 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
+  bls12-381.archive
+  octez-rust-deps
   octez-libs.base
   octez-libs.tree-encoding
   octez-libs.base.unix
   octez-libs.base-test-helpers
   octez-libs.test-helpers
-  octez-l2-libs.scoru-wasm
+  octez-libs.scoru-wasm
   qcheck-alcotest
   octez-alcotezt
   octez-l2-libs.scoru-wasm-helpers

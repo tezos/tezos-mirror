@@ -32,13 +32,14 @@ let ( // ) = Filename.concat
 
 let has_error = ref false
 
-let info fmt = Format.eprintf fmt
+let info fmt = Format.ksprintf prerr_endline fmt
 
 let error fmt =
   Format.ksprintf
     (fun s ->
       has_error := true ;
-      Format.eprintf "Error: %s" s)
+      prerr_string "Error: " ;
+      prerr_endline s)
     fmt
 
 let pp_do_not_edit ~comment_start fmt () =
@@ -222,13 +223,15 @@ module Dune = struct
   let executable_or_library kind ?(public_names = Stdlib.List.[]) ?package
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
       ?library_flags ?link_flags ?(inline_tests = false)
-      ?(inline_tests_deps = Stdlib.List.[]) ?(optional = false) ?ppx_kind
+      ?(inline_tests_deps = Stdlib.List.[])
+      ?(inline_tests_link_flags = Stdlib.List.[])
+      ?(inline_tests_libraries = Stdlib.List.[]) ?(optional = false) ?ppx_kind
       ?(ppx_runtime_libraries = []) ?preprocess
       ?(preprocessor_deps = Stdlib.List.[]) ?(virtual_modules = Stdlib.List.[])
       ?default_implementation ?implements ?modules
       ?modules_without_implementation ?modes
       ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags
-      ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?wrapped
+      ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?wrapped ?enabled_if
       (names : string list) =
     [
       V
@@ -281,6 +284,17 @@ module Dune = struct
                (match inline_tests_deps with
                | [] -> E
                | deps -> S "deps" :: of_list deps);
+               (match inline_tests_link_flags with
+               | [] -> E
+               | flags ->
+                   [
+                     S "executable";
+                     S "link_flags" :: S "-linkall"
+                     :: of_list (List.map (fun x -> S x) flags);
+                   ]);
+               (match inline_tests_libraries with
+               | [] -> E
+               | libs -> S "libraries" :: of_list (List.map (fun x -> S x) libs));
              ]
            else E);
           (match ppx_kind with
@@ -324,6 +338,7 @@ module Dune = struct
             ] );
           (opt c_library_flags @@ fun x -> [S "c_library_flags"; of_atom_list x]);
           ctypes;
+          (opt enabled_if @@ fun enabled_if -> [S "enabled_if"; enabled_if]);
         ];
     ]
 
@@ -829,7 +844,8 @@ module Opam = struct
             |> List.flatten
             |> deduplicate_list (fun s -> s)
       in
-      condition_of_available available
+      (* Packages should never be available for Windows OS. *)
+      "os-family != \"windows\"" :: condition_of_available available
     in
     let pp_condition fmt = function
       | [] -> ()
@@ -1200,6 +1216,8 @@ module Target = struct
     implements : t option;
     inline_tests : bool;
     inline_tests_deps : Dune.s_expr list option;
+    inline_tests_link_flags : string list option;
+    inline_tests_libraries : t option list option;
     wrapped : bool option;
     documentation : Dune.s_expr option;
     kind : kind;
@@ -1241,6 +1259,7 @@ module Target = struct
     dep_files : string list;
     dep_globs : string list;
     dep_globs_rec : string list;
+    enabled_if : Dune.s_expr option;
   }
 
   and preprocessor =
@@ -1415,6 +1434,8 @@ module Target = struct
     ?implements:t option ->
     ?inline_tests:inline_tests ->
     ?inline_tests_deps:Dune.s_expr list ->
+    ?inline_tests_link_flags:string list ->
+    ?inline_tests_libraries:t option list ->
     ?wrapped:bool ->
     ?documentation:Dune.s_expr ->
     ?link_flags:Dune.s_expr list ->
@@ -1466,6 +1487,7 @@ module Target = struct
     ?extra_authors:string list ->
     ?with_macos_security_framework:bool ->
     path:string ->
+    ?enabled_if:Dune.s_expr ->
     'a ->
     t option
 
@@ -1473,8 +1495,9 @@ module Target = struct
       ?c_library_flags ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
       ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
       ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
-      ?inline_tests_deps ?wrapped ?documentation ?(link_flags = [])
-      ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
+      ?inline_tests_deps ?inline_tests_link_flags ?inline_tests_libraries
+      ?wrapped ?documentation ?(link_flags = []) ?(linkall = false) ?modes
+      ?modules ?(modules_without_implementation = [])
       ?(ocaml = default_ocaml_dependency) ?opam ?opam_bug_reports ?opam_doc
       ?opam_homepage ?(opam_with_test = Always) ?opam_version
       ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
@@ -1483,7 +1506,8 @@ module Target = struct
       ?synopsis ?description ?(time_measurement_ppx = false)
       ?(available : available = Always) ?(virtual_modules = [])
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
-      ?(with_macos_security_framework = false) ?(source = []) ~path names =
+      ?(with_macos_security_framework = false) ?(source = []) ~path ?enabled_if
+      names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1506,13 +1530,21 @@ module Target = struct
     in
     let kind = make_kind names in
     let preprocess, inline_tests =
-      match (inline_tests, inline_tests_deps) with
-      | None, None -> (preprocess, false)
-      | None, Some _ ->
+      match
+        ( inline_tests,
+          inline_tests_deps,
+          inline_tests_link_flags,
+          inline_tests_libraries )
+      with
+      | None, None, None, None -> (preprocess, false)
+      | None, Some _, _, _ | None, _, Some _, _ | None, _, _, Some _ ->
           invalid_arg
-            "Target.internal: cannot specify `inline_tests_deps` without \
-             inline_tests"
-      | Some (Inline_tests_backend target), (Some _ | None) -> (
+            "Target.internal: cannot configure `inline_tests` without \
+             `inline_tests` being set"
+      | ( Some (Inline_tests_backend target),
+          (Some _ | None),
+          (Some _ | None),
+          (Some _ | None) ) -> (
           match kind with
           | Public_library _ | Private_library _ -> (
               match preprocess with
@@ -1568,7 +1600,7 @@ module Target = struct
                 | first :: _ ->
                     if first <> opam then
                       error
-                        "Mismatch between public_name %S and opam package %S\n"
+                        "Mismatch between public_name %S and opam package %S"
                         public_name
                         opam)
             | _ -> ()) ;
@@ -1820,6 +1852,8 @@ module Target = struct
         implements;
         inline_tests;
         inline_tests_deps;
+        inline_tests_link_flags;
+        inline_tests_libraries;
         wrapped;
         documentation;
         kind;
@@ -1862,6 +1896,7 @@ module Target = struct
         dep_files;
         dep_globs;
         dep_globs_rec;
+        enabled_if;
       }
 
   let public_lib ?internal_name =
@@ -2075,6 +2110,11 @@ module Target = struct
     in
     extract_targets internal.preprocess
     @ internal.deps @ internal.opam_only_deps @ internal.ppx_runtime_libraries
+
+  let tests_deps internal =
+    List.filter_map
+      Fun.id
+      (Option.value ~default:[] internal.inline_tests_libraries)
 end
 
 type target = Target.t option
@@ -2362,6 +2402,8 @@ module Sub_lib = struct
        ?implements
        ?inline_tests
        ?inline_tests_deps
+       ?inline_tests_link_flags
+       ?inline_tests_libraries
        ?wrapped
        ?documentation
        ?link_flags
@@ -2397,6 +2439,7 @@ module Sub_lib = struct
        ?extra_authors
        ?with_macos_security_framework
        ~path
+       ?enabled_if
        public_name ->
     let product = container.product in
     if Option.is_some opam then
@@ -2450,6 +2493,8 @@ module Sub_lib = struct
       ?implements
       ?inline_tests
       ?inline_tests_deps
+      ?inline_tests_link_flags
+      ?inline_tests_libraries
       ?wrapped
       ?documentation
       ?link_flags
@@ -2483,6 +2528,7 @@ module Sub_lib = struct
       ?extra_authors
       ?with_macos_security_framework
       ?source
+      ?enabled_if
 end
 
 (*****************************************************************************)
@@ -2515,16 +2561,6 @@ let write_raw filename f =
       close_out outch ;
       x
 
-(* Write a file relatively to the root directory of the repository. *)
-let write filename f =
-  if !checks_done then
-    failwith ("trying to generate " ^ filename ^ " after [check] was run") ;
-  if String_set.mem filename !generated_files then
-    failwith
-      (filename ^ " is generated twice; did you declare the same library twice?") ;
-  generated_files := String_set.add filename !generated_files ;
-  write_raw filename f
-
 (* Copied from [tezt/lib_wrapper/tezt_wrapper.ml] and adapted to remove ".." as well. *)
 let canonicalize_path path =
   let rec simplify_parents acc = function
@@ -2541,6 +2577,17 @@ let canonicalize_path path =
   String.split_on_char '/' path
   |> List.filter (function "" | "." -> false | _ -> true)
   |> simplify_parents [] |> String.concat "/"
+
+(* Write a file relatively to the root directory of the repository. *)
+let write filename f =
+  if !checks_done then
+    failwith ("trying to generate " ^ filename ^ " after [check] was run") ;
+  if String_set.mem filename !generated_files then
+    failwith
+      (filename ^ " is generated twice; did you declare the same library twice?") ;
+  generated_files :=
+    String_set.add (canonicalize_path filename) !generated_files ;
+  write_raw filename f
 
 let generate_content_input ~product ~source =
   let filename = Format.sprintf "script-inputs/%s-source-content" product in
@@ -2804,6 +2851,20 @@ let generate_dune (internal : Target.internal) =
     | Some docs -> Dune.(S "documentation" :: docs)
   in
   let ctypes = Option.map Ctypes.to_dune internal.ctypes in
+  let inline_tests_libraries =
+    Option.map
+      (fun targets ->
+        List.map
+          (fun target ->
+            match Target.library_name_for_dune target with
+            | Ok name -> name
+            | Error name ->
+                invalid_arg
+                  ("unsupported: ~inline_tests_libraries input that is not a \
+                    library (" ^ name ^ ")"))
+          (List.filter_map Fun.id targets))
+      internal.inline_tests_libraries
+  in
   Dune.(
     executable_or_library
       kind
@@ -2817,6 +2878,8 @@ let generate_dune (internal : Target.internal) =
       ?flags
       ~inline_tests:internal.inline_tests
       ?inline_tests_deps:internal.inline_tests_deps
+      ?inline_tests_link_flags:internal.inline_tests_link_flags
+      ?inline_tests_libraries
       ~optional:internal.optional
       ?ppx_kind:internal.ppx_kind
       ~ppx_runtime_libraries
@@ -2834,6 +2897,7 @@ let generate_dune (internal : Target.internal) =
       ?ctypes
       ~private_modules:internal.private_modules
       ?wrapped:internal.wrapped
+      ?enabled_if:internal.enabled_if
     :: documentation :: create_empty_files :: internal.dune)
 
 (* [Explicitly_unreleased i]: this opam package was explicitly specified not to be released
@@ -2891,7 +2955,7 @@ let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
             error
               "In %s, %S has release status %s, and in %s, %S has release \
                status %s; those two targets cannot be in the same opam package \
-               %S.\n"
+               %S."
               a.path
               (Target.kind_name_for_errors a.kind)
               (Target.show_release_status a.release_status)
@@ -2919,7 +2983,11 @@ let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
         in
         let add_internal_dependency acc internal =
           let tests_deps =
-            List.fold_left add_tests_dependency acc internal.Target.tests_deps
+            List.fold_left
+              add_tests_dependency
+              acc
+              (internal.Target.tests_deps
+              @ Option.value ~default:[] internal.inline_tests_libraries)
           in
           String_set.union
             (List.fold_left
@@ -2986,7 +3054,7 @@ let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
                 Printf.eprintf "Package %S is not released\n" dependency_name ;
                 output_reason dependency_node.release_status ;
                 error
-                  "Released package %S cannot depend on unreleased package %S.\n"
+                  "Released package %S cannot depend on unreleased package %S."
                   parent_name
                   dependency_name ;
                 exit 1
@@ -3151,6 +3219,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
       match internal.kind with Test_executable _ -> Always | _ -> Never
     in
     let deps = Target.all_internal_deps internal in
+    let tests_deps = Target.tests_deps internal in
     let x_opam_monorepo_opam_provided =
       List.filter_map as_opam_monorepo_opam_provided deps
     in
@@ -3165,7 +3234,18 @@ let generate_opam ?release for_package (internals : Target.internal list) :
            ~optional:internal.optional)
         deps
     in
-    (deps, x_opam_monorepo_opam_provided)
+    let tests_deps =
+      List.concat_map
+        (as_opam_dependency
+           ~product
+           ~for_release
+           ~for_conflicts:false
+           ~for_package
+           ~with_test:Always
+           ~optional:internal.optional)
+        tests_deps
+    in
+    (deps @ tests_deps, x_opam_monorepo_opam_provided)
   in
   let depends = List.flatten depends in
   let x_opam_monorepo_opam_provided =
@@ -3267,7 +3347,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     | [value] -> Some value
     | value :: _ :: _ as list ->
         error
-          "Package %s was declared with multiple different values for %s: %s\n"
+          "Package %s was declared with multiple different values for %s: %s"
           for_package
           name
           (String.concat ", " (List.map (Format.sprintf "%S") list)) ;
@@ -3281,13 +3361,13 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     | [] -> (
         match default with
         | None ->
-            error "No %s declared for package %s\n" name for_package ;
+            error "No %s declared for package %s" name for_package ;
             ""
         | Some value -> value)
     | [value] -> value
     | value :: _ :: _ as list ->
         error
-          "Package %s was declared with multiple different values for %s: %s\n"
+          "Package %s was declared with multiple different values for %s: %s"
           for_package
           name
           (String.concat ", " (List.map (Format.sprintf "%S") list)) ;
@@ -3558,7 +3638,7 @@ let find_opam_and_dune_files =
         || Filename.extension filename = ".opam"
         || filename = "dune-project"
         || filename = "dune-workspace"
-      then String_set.add full_filename acc
+      then String_set.add (canonicalize_path full_filename) acc
       else if filename.[0] = '.' || filename.[0] = '_' then acc
       else if
         try Sys.is_directory (root // dir // filename)
@@ -3581,7 +3661,7 @@ let check_for_non_generated_files ~remove_extra_files
     String_set.filter exclude !generated_files
   in
   String_set.iter
-    (error "%s: generated but is excluded\n%!")
+    (error "%s: generated but is excluded")
     error_generated_and_excluded ;
   let error_not_generated =
     String_set.diff all_non_excluded_files !generated_files
@@ -3589,9 +3669,9 @@ let check_for_non_generated_files ~remove_extra_files
   String_set.iter
     (fun file ->
       if remove_extra_files then (
-        info "%s: exists but was not generated, removing it.\n%!" file ;
+        info "%s: exists but was not generated, removing it." file ;
         Sys.remove file)
-      else error "%s: exists but was not generated\n%!" file)
+      else error "%s: exists but was not generated" file)
     error_not_generated ;
   if
     not
@@ -3620,9 +3700,9 @@ let check_circular_opam_deps () =
   let error_header = ref true in
   let report_circular_dep pkg (paths : Target.internal list) =
     if !error_header then (
-      error "Circular opam dependency for %s:\n" this_package ;
+      error "Circular opam dependency for %s:" this_package ;
       error_header := false) ;
-    info "- %s\n" (String.concat " -> " (List.map name (pkg :: paths)))
+    info "- %s" (String.concat " -> " (List.map name (pkg :: paths)))
   in
   list_iter internals @@ fun internal_from_this_package ->
   let to_visit : Target.internal Queue.t = Queue.create () in
@@ -3681,14 +3761,21 @@ let check_opam_with_test_consistency () =
       | Some bad ->
           error
             "Opam package %s contains targets with different values for \
-             ~opam_with_test: %s and %s.\n"
+             ~opam_with_test: %s and %s."
             this_package
             (show_with_test expected)
             (show_with_test bad))
 
 let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
 
-let packages_dir, release, remove_extra_files, manifezt =
+let ( packages_dir,
+      release,
+      remove_extra_files,
+      manifezt,
+      dep_graph,
+      dep_graph_source,
+      dep_graph_without,
+      opam_dep_graph ) =
   let packages_dir = ref "packages" in
   let url = ref "" in
   let sha256 = ref "" in
@@ -3696,6 +3783,10 @@ let packages_dir, release, remove_extra_files, manifezt =
   let remove_extra_files = ref false in
   let version = ref "" in
   let manifezt = ref false in
+  let dep_graph = ref None in
+  let opam_dep_graph = ref None in
+  let dep_graph_source = ref [] in
+  let dep_graph_without = ref [] in
   let anonymous_args = ref [] in
   let anon_fun arg = anonymous_args := arg :: !anonymous_args in
   let spec =
@@ -3719,6 +3810,27 @@ let packages_dir, release, remove_extra_files, manifezt =
           " Expect a list of modified files on the command-line. Output a TSL \
            expression to select Tezt tests that are impacted by those changes, \
            then exit without generating any file." );
+        ( "--dep-graph",
+          Arg.String (fun file -> dep_graph := Some file),
+          "<FILE> Output the dune library dependency graph in FILE using dot \
+           syntax." );
+        ( "--opam-dep-graph",
+          Arg.String (fun file -> opam_dep_graph := Some file),
+          "<FILE> Output the Opam package dependency graph in FILE using dot \
+           syntax." );
+        ( "--dep-graph-source",
+          Arg.String
+            (fun pattern -> dep_graph_source := pattern :: !dep_graph_source),
+          "<PATTERN> Restrict the --dep-graph and --opam-dep-graph to nodes \
+           that are dependencies of the unique node whose identifier contains \
+           PATTERN. If this argument is repeated, the result is the union of \
+           each subgraph thus selected." );
+        ( "--dep-graph-without",
+          Arg.String
+            (fun pattern -> dep_graph_without := pattern :: !dep_graph_without),
+          "<PATTERN> Restrict the --dep-graph and --opam-dep-graph to nodes \
+           whose identifier contains PATTERN. This argument can be repeated to \
+           restrict the graph further." );
         ( "--",
           Arg.Rest anon_fun,
           " Assume the remaining arguments are anonymous arguments." );
@@ -3756,7 +3868,14 @@ let packages_dir, release, remove_extra_files, manifezt =
         exit 1
     | true, files -> Some files
   in
-  (!packages_dir, release, !remove_extra_files, manifezt)
+  ( !packages_dir,
+    release,
+    !remove_extra_files,
+    manifezt,
+    !dep_graph,
+    !dep_graph_source,
+    !dep_graph_without,
+    !opam_dep_graph )
 
 let generate_opam_ci_input opam_release_graph =
   (* We only need to test released packages, since those are the only one
@@ -4277,6 +4396,237 @@ let precheck () =
   check_opam_with_test_consistency () ;
   if !has_error then exit 1
 
+let string_contains sub str =
+  (* Not the most efficient implementation but oh well. *)
+  let sub_len = String.length sub in
+  let str_len = String.length str in
+  let rec find ofs =
+    if str_len < ofs + sub_len then false
+    else if String.equal sub (String.sub str ofs sub_len) then true
+    else find (ofs + 1)
+  in
+  find 0
+
+let generate_dependency_graph ?(source = []) ?(without = []) filename =
+  let module Node = struct
+    type t = {target : Target.internal; size : int}
+
+    let make (target : Target.internal) =
+      let size =
+        let all () =
+          (* As a first approximation we ignore modules with only an .mli for now. *)
+          Sys.readdir target.path |> Array.to_list
+          |> List.filter (fun f ->
+                 match Filename.extension f with
+                 | ".ml" | ".mli" | ".mll" | ".mly" -> true
+                 | _ -> false)
+          |> List.length
+        in
+        match target.modules with
+        | All -> all ()
+        | Modules list -> List.length list
+        | All_modules_except list -> all () - List.length list
+      in
+      {target; size}
+
+    let id (node : t) =
+      node.target.path ^ " " ^ Target.name_for_errors (Internal node.target)
+
+    let cluster (node : t) =
+      match
+        node.target.path |> String.split_on_char '/' |> List.filter (( <> ) "")
+      with
+      | "src" :: subdir :: _ ->
+          if String.starts_with ~prefix:"proto_" subdir then Some subdir
+          else None
+      | dir :: _ -> Some dir
+      | [] -> None
+
+    let compare a b = String.compare (id a) (id b)
+
+    (* Can't store node metadata inside [t] itself because we sometimes create the
+       same node multiple times. *)
+    type metadata = {mutable recompile_percent : int option}
+
+    module Map = Map.Make (struct
+      type nonrec t = t
+
+      let compare = compare
+    end)
+
+    let metadata_map : metadata Map.t ref = ref Map.empty
+
+    let metadata node =
+      match Map.find_opt node !metadata_map with
+      | None ->
+          let metadata = {recompile_percent = None} in
+          metadata_map := Map.add node metadata !metadata_map ;
+          metadata
+      | Some metadata -> metadata
+
+    let label (node : t) =
+      node.target.path ^ "\\n"
+      ^ Target.name_for_errors (Internal node.target)
+      ^ "\\n" ^ string_of_int node.size ^ " OCaml file"
+      ^ (if node.size = 1 then "" else "s")
+      ^
+      match (metadata node).recompile_percent with
+      | None -> ""
+      | Some percent -> "\\nrecompile " ^ string_of_int percent ^ "%"
+
+    let id_matches pattern node = string_contains pattern (id node)
+
+    let attributes (node : t) =
+      ("label", label node)
+      ::
+      (match (metadata node).recompile_percent with
+      | None -> []
+      | Some percent ->
+          (* Reach 100% red when [percent >= cap]. *)
+          let cap = 75 in
+          let rgb =
+            Printf.sprintf "#%02x0000" (min 255 (max 0 (percent * 255 / cap)))
+          in
+          [("color", rgb); ("fontcolor", rgb)])
+      @
+      match node.target.kind with
+      | Public_library _ | Private_library _ -> [("shape", "box")]
+      | Public_executable _ | Private_executable _ | Test_executable _ -> []
+  end in
+  let module G = Dgraph.Make (Node) in
+  (* Make the direct dependency graph. *)
+  let graph = ref G.empty in
+  ( Target.iter_internal_by_path @@ fun _ internals ->
+    Fun.flip List.iter internals @@ fun internal ->
+    Fun.flip List.iter (Target.all_internal_deps internal) @@ fun dep ->
+    match Target.get_internal dep with
+    | None ->
+        (* Not an internal dependency, exclude from the graph. *)
+        ()
+    | Some internal_dep ->
+        graph := G.add (Node.make internal) (Node.make internal_dep) !graph ) ;
+  let graph = !graph in
+  (* Restrict it to dependencies of [source]. *)
+  let graph =
+    match source with
+    | [] -> graph
+    | _ :: _ ->
+        let matching_nodes =
+          G.nodes graph
+          |> G.Nodes.filter (fun node ->
+                 List.exists
+                   (fun pattern -> Node.id_matches pattern node)
+                   source)
+        in
+        G.sourced_at matching_nodes graph
+  in
+  (* Remove unwanted nodes. *)
+  let graph =
+    let remove graph pattern =
+      let graph =
+        G.filter graph @@ fun node _ -> not (Node.id_matches pattern node)
+      in
+      G.map graph @@ fun _ edges ->
+      Fun.flip G.Nodes.filter edges @@ fun edge ->
+      not (Node.id_matches pattern edge)
+    in
+    List.fold_left remove graph without
+  in
+  (* Remove redundant edges. *)
+  let graph = G.simplify graph in
+  (* Annotate nodes with their recompile percentage. *)
+  (let total_size = G.fold graph 0 @@ fun node _ acc -> acc + node.size in
+   let rev_dep_size_map =
+     G.map_nodes (G.transitive_closure (G.reverse graph)) @@ fun _ rev_deps ->
+     G.Nodes.fold (fun node acc -> acc + node.size) rev_deps 0
+   in
+   Fun.flip G.Node_map.iter rev_dep_size_map @@ fun node rev_dep_size ->
+   (Node.metadata node).recompile_percent <-
+     Some (rev_dep_size * 100 / total_size)) ;
+  write_raw filename @@ fun fmt -> G.output_dot_file fmt graph
+
+let generate_opam_dependency_graph ?(source = []) ?(without = [])
+    (opam_release_graph : opam_dependency_graph_node String_map.t) filename =
+  (* Apply the [Dgraph.Make] functor. First, define its argument [Node]. *)
+  let module Node = struct
+    type t = {
+      package : string;
+      opam_dependency_graph_node : opam_dependency_graph_node;
+    }
+
+    let make package =
+      match String_map.find_opt package opam_release_graph with
+      | None ->
+          failwith ("no package with name " ^ package ^ " in dependency graph")
+      | Some opam_dependency_graph_node -> {package; opam_dependency_graph_node}
+
+    let id node = node.package
+
+    let compare a b = String.compare (id a) (id b)
+
+    let label node = node.package
+
+    let id_matches pattern node = string_contains pattern (id node)
+
+    let attributes node =
+      ("label", label node)
+      ::
+      (let color rgb = [("color", rgb); ("fontcolor", rgb)] in
+       match node.opam_dependency_graph_node.release_status with
+       | Explicitly_unreleased _ | Auto -> color "#aaaaaa"
+       | Explicitly_released _ -> color "#000080"
+       | Transitively_released _ -> [])
+      @
+      if node.opam_dependency_graph_node.contain_executables then
+        [("penwidth", "2")]
+      else []
+
+    let cluster _node = None
+  end in
+  let module G = Dgraph.Make (Node) in
+  (* Convert [opam_release_graph] into a [G.t]. *)
+  let graph = ref G.empty in
+  ( Fun.flip String_map.iter opam_release_graph
+  @@ fun package opam_dependency_graph_node ->
+    let source = Node.make package in
+    let targets =
+      String_set.elements opam_dependency_graph_node.dependencies
+      |> List.map Node.make
+    in
+    Fun.flip List.iter targets @@ fun target ->
+    graph := G.add source target !graph ) ;
+  let graph = !graph in
+  (* Restrict it to dependencies of [source]. *)
+  let graph =
+    match source with
+    | [] -> graph
+    | _ :: _ ->
+        let matching_nodes =
+          G.nodes graph
+          |> G.Nodes.filter (fun node ->
+                 List.exists
+                   (fun pattern -> Node.id_matches pattern node)
+                   source)
+        in
+        G.sourced_at matching_nodes graph
+  in
+  (* Remove unwanted nodes. *)
+  let graph =
+    let remove graph pattern =
+      let graph =
+        G.filter graph @@ fun node _ -> not (Node.id_matches pattern node)
+      in
+      G.map graph @@ fun _ edges ->
+      Fun.flip G.Nodes.filter edges @@ fun edge ->
+      not (Node.id_matches pattern edge)
+    in
+    List.fold_left remove graph without
+  in
+  (* Remove redundant edges. *)
+  let graph = G.simplify graph in
+  (* Output the DOT file. *)
+  write_raw filename @@ fun fmt -> G.output_dot_file fmt graph
+
 let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     =
   Printexc.record_backtrace true ;
@@ -4288,11 +4638,22 @@ let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     | Some changes ->
         list_tests_to_run_after_changes ~tezt_exe ~tezt_exe_deps changes ;
         exit 0) ;
+    Option.iter
+      (generate_dependency_graph
+         ~source:dep_graph_source
+         ~without:dep_graph_without)
+      dep_graph ;
     Target.can_register := false ;
     generate_dune_files () ;
     generate_opam_files () ;
     generate_dune_project_files () ;
     let opam_release_graph = compute_opam_release_graph () in
+    Option.iter
+      (generate_opam_dependency_graph
+         ~source:dep_graph_source
+         ~without:dep_graph_without
+         opam_release_graph)
+      opam_dep_graph ;
     generate_opam_ci_input opam_release_graph ;
     generate_executable_list "script-inputs/released-executables" Released ;
     generate_executable_list

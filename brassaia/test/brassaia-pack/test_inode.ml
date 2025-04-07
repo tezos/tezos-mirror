@@ -36,13 +36,7 @@ module Inode_modules
     end) =
 struct
   module Key = Brassaia_pack_unix.Pack_key.Make (Schema.Hash)
-
-  module Node =
-    Brassaia.Node.Generic_key.Make_v2 (Schema.Hash) (Schema.Path)
-      (Schema.Metadata)
-      (Key)
-      (Key)
-
+  module Node = Brassaia.Node.Generic_key.Make_v2 (Schema.Hash) (Key) (Key)
   module Index = Brassaia_pack_unix.Index.Make (Schema.Hash)
 
   module Inter =
@@ -59,8 +53,8 @@ struct
   end
 
   module Io = Brassaia_pack_unix.Io.Unix
-  module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
-  module File_manager = Brassaia_pack_unix.File_manager.Make (Io) (Index) (Errs)
+  module Io_errors = Brassaia_pack_unix.Io_errors
+  module File_manager = Brassaia_pack_unix.File_manager.Make (Index)
   module Dict = Brassaia_pack_unix.Dict.Make (File_manager)
   module Dispatcher = Brassaia_pack_unix.Dispatcher.Make (File_manager)
 
@@ -68,13 +62,11 @@ struct
     Brassaia_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
       (Schema.Hash)
       (Inter.Raw)
-      (Errs)
 
   module Pack_mock =
     Brassaia_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
       (Schema.Hash)
       (Inter_mock.Raw)
-      (Errs)
 
   module Inode =
     Brassaia_pack_unix.Inode.Make_persistent (Schema.Hash) (Node) (Inter) (Pack)
@@ -91,7 +83,6 @@ struct
     Brassaia_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
       (Schema.Hash)
       (Contents_value)
-      (Errs)
 
   module Context_make
       (Inode : Brassaia_pack_unix.Inode.Persistent
@@ -120,7 +111,7 @@ struct
     let get_file_manager config =
       let readonly = Brassaia_pack.Conf.readonly config in
 
-      if readonly then File_manager.open_ro config |> Errs.raise_if_error
+      if readonly then File_manager.open_ro config |> Io_errors.raise_if_error
       else
         let fresh = Brassaia_pack.Conf.fresh config in
         let root = Brassaia_pack.Conf.root config in
@@ -133,20 +124,23 @@ struct
         match (Io.classify_path root, fresh) with
         | `No_such_file_or_directory, _ ->
             File_manager.create_rw ~overwrite:false config
-            |> Errs.raise_if_error
+            |> Io_errors.raise_if_error
         | `Directory, true ->
-            File_manager.create_rw ~overwrite:true config |> Errs.raise_if_error
+            File_manager.create_rw ~overwrite:true config
+            |> Io_errors.raise_if_error
         | `Directory, false ->
-            File_manager.open_rw config |> Errs.raise_if_error
-        | (`File | `Other), _ -> Errs.raise_error (`Not_a_directory root)
+            File_manager.open_rw config |> Io_errors.raise_if_error
+        | (`File | `Other), _ -> Io_errors.raise_error (`Not_a_directory root)
 
     let get_store ~indexing_strategy () =
       [%log.app "Constructing a fresh context for use by the test"];
       rm_dir root;
       let config = config ~indexing_strategy ~readonly:false ~fresh:true root in
       let file_manager = get_file_manager config in
-      let dict = Dict.init file_manager |> Errs.raise_if_error in
-      let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
+      let dict = Dict.init file_manager |> Io_errors.raise_if_error in
+      let dispatcher =
+        Dispatcher.init file_manager |> Io_errors.raise_if_error
+      in
       let lru = Some (Brassaia_pack_unix.Lru.create config) in
       let store = Inode.init ~config ~file_manager ~dict ~dispatcher ~lru in
       let store_contents =
@@ -162,7 +156,7 @@ struct
       { store; store_contents; file_manager; foo; bar }
 
     let close t =
-      File_manager.close t.file_manager |> Errs.raise_if_error;
+      File_manager.close t.file_manager |> Io_errors.raise_if_error;
       (* closes dict, inodes and contents store. *)
       Lwt.return_unit
   end
@@ -195,7 +189,7 @@ let pp_pred = Brassaia.Type.pp pred_t
 
 module H_contents = Brassaia.Hash.Typed (Hash) (Schema.Contents)
 
-let normal x = `Contents (x, Metadata.default)
+let normal x = `Contents x
 let node x = `Node x
 let check_hash = Alcotest.check_repr Inode.Val.hash_t
 let check_values = Alcotest.check_repr Inode.Val.t
@@ -205,12 +199,11 @@ let check_int _pos ?(msg = "") ~expected actual =
 
 (* Exhaustive inode structure generator *)
 module Inode_permutations_generator = struct
-  type step = string
   type content = Inode.Val.value
   type inode = Inode.value
 
   module StepMap = Map.Make (struct
-    type t = step
+    type t = Path.step
 
     let compare = compare
   end)
@@ -228,7 +221,7 @@ module Inode_permutations_generator = struct
   end)
 
   type t = {
-    steps : step list;
+    steps : Path.step list;
     content_per_step : content StepMap.t;
     steps_per_tree : StepSet.t list;
     trees : inode list;
@@ -237,18 +230,13 @@ module Inode_permutations_generator = struct
 
   (** [gen_step Inter index_list] uses brute force to generate a step such that
       [Inter.Val.index ~depth:i] maps to the ith index in the [index_list]. *)
-  let gen_step :
-      (module Brassaia_pack.Inode.Internal with type Val.step = Path.step) ->
-      int list ->
-      Path.step =
+  let gen_step : (module Brassaia_pack.Inode.Internal) -> int list -> Path.step
+      =
     let tbl = Hashtbl.create 10 in
     let max_brute_force_iterations = 100 in
     let letters_per_step = (max_brute_force_iterations + 25) / 26 in
     fun inter indices ->
-      let module Inter =
-        (val inter
-            : Brassaia_pack.Inode.Internal with type Val.step = Path.step)
-      in
+      let module Inter = (val inter : Brassaia_pack.Inode.Internal) in
       let rec aux i =
         if i > max_brute_force_iterations then
           failwith "Could not quickly generate a step"
@@ -269,7 +257,7 @@ module Inode_permutations_generator = struct
           s
 
   (** List all the steps that would fill a tree of depth [maxdepth_of_test]. *)
-  let gen_steps entries maxdepth_of_test : step list =
+  let gen_steps entries maxdepth_of_test : Path.step list =
     let ( ** ) a b = float_of_int a ** float_of_int b |> int_of_float in
     List.init (entries ** maxdepth_of_test) (fun i ->
         List.init maxdepth_of_test (fun j ->
@@ -319,9 +307,9 @@ module Inode_permutations_generator = struct
   (** [steps t] is a list of length [entries ^ maxdepth_of_test] (8) containing
       the necessary steps to fill a tree of depth equal to [maxdepth_of_test]
       (3). *)
-  let steps : t -> step list = fun { steps; _ } -> steps
+  let steps : t -> Path.step list = fun { steps; _ } -> steps
 
-  let content_of_step : t -> step -> content =
+  let content_of_step : t -> Path.step -> content =
    fun { content_per_step; _ } s -> StepMap.find s content_per_step
 
   (** [trees t] is a list of length [2 ^ (entries ^ maxdepth_of_test)] (256)
@@ -868,7 +856,7 @@ module Child_ordering = struct
       by the user). *)
 
   module Step = struct
-    type t = Schema.Path.step [@@deriving brassaia ~short_hash]
+    type t = Path.step [@@deriving brassaia ~short_hash]
 
     module Hash =
       Brassaia.Hash.Typed
@@ -877,7 +865,7 @@ module Child_ordering = struct
           type nonrec t = t
 
           let t = t
-          let encoding = Schema.Path.step_encoding
+          let encoding = Path.step_encoding
         end)
 
     type nonrec hash = Hash.t [@@deriving brassaia ~to_bin_string]
@@ -885,7 +873,7 @@ module Child_ordering = struct
     let hash : t -> string = fun s -> hash_to_bin_string (Hash.hash s)
   end
 
-  module type S = Brassaia_pack.Inode.Child_ordering with type step := Step.t
+  module type S = Brassaia_pack.Inode.Child_ordering
 
   let make ?entries:(entries' = Brassaia_tezos.Conf.nb_entries)
       (t : Brassaia_pack.Conf.inode_child_order) : (module S) =

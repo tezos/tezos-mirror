@@ -83,6 +83,9 @@ git = "https://github.com/hermit-os/hermit-rs.git"
 rev = "01df75880c9be03fe935c3faabd191082d8916a2"
 default-features = false
 
+[build-dependencies.tezos-smart-rollup-build-utils]
+path = "../build-utils"
+
 [features]
 default = [
     "std",
@@ -92,7 +95,6 @@ default = [
     "data-encoding",
     "storage",
     "bls",
-    "testing",
 ]
 crypto = ["dep:tezos_crypto_rs"]
 bls = ["tezos-smart-rollup-encoding/bls"]

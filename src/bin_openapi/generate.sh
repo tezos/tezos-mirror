@@ -58,7 +58,8 @@ $tezos_node config init --data-dir $data_dir \
   --expected-pow 0 \
   --rpc-addr localhost:$rpc_port \
   --synchronisation-threshold 0 \
-  --connections 0
+  --connections 0 \
+  --history-mode rolling:19
 $tezos_node identity generate --data-dir $data_dir
 $tezos_node run --data-dir $data_dir --connections 0 --synchronisation-threshold 0 &
 node_pid="$!"

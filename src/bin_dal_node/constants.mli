@@ -81,3 +81,11 @@ val crawler_re_processing_delay : float
 
 (* Sleep delay between refreshing the ips associated to bootstrap dns names *)
 val bootstrap_dns_refresh_delay : float
+
+(** This size is being used for the store's traps cache. While
+    [proto_parameters.Dal_plugin.attestation_lag] should define the
+    minimum number of levels for which traps must be retained, we
+    maintain a larger cache capacity of 50 levels. This extended size
+    is acceptable since the cache is sparsely populated due to
+    [proto_parameters.traps_fraction]. *)
+val traps_cache_size : int

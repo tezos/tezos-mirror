@@ -36,6 +36,39 @@ type invalid_block = {hash : Block_hash.t; level : Int32.t; errors : error list}
 
 type prefix = unit * chain
 
+type protocol_info = {
+  protocol : Protocol_hash.t;
+  proto_level : int;
+      (* Level of protocol in the sequence of protocol activations. *)
+  activation_block : Block_hash.t * int32;
+      (* The activation block for a protocol is the migration block, i.e. the
+         last level of the previous protocol. *)
+}
+
+(* Information regarding the last advertised head of a given peer. *)
+type active_peers_info = {
+  peer_id : P2p_peer.Id.t;
+  block_hash : Block_hash.t;
+  block_level : Int32.t;
+}
+
+type delegators_contribution = {
+  own_delegated : int64;
+  delegators_contributions : (string * int64) list;
+  former_delegators_unstake_requests : int64;
+  overstaked : int64;
+  total_delegated_including_overdelegated : int64;
+  total_delegated_after_limits : int64;
+  overdelegated : int64;
+}
+
+module Delegators_contribution_errors : sig
+  type error +=
+    | Cycle_too_far_in_future
+    | Cycle_too_far_in_past
+    | Protocol_not_supported of {protocol_hash : Protocol_hash.t}
+end
+
 val path : (unit, prefix) Tezos_rpc.Path.path
 
 open Tezos_rpc.Context
@@ -90,6 +123,14 @@ module Invalid_blocks : sig
   val delete : #simple -> ?chain:chain -> Block_hash.t -> unit tzresult Lwt.t
 end
 
+module Protocols : sig
+  val list :
+    #simple -> ?chain:chain -> unit -> protocol_info list tzresult Lwt.t
+
+  val get :
+    #simple -> ?chain:chain -> Protocol_hash.t -> protocol_info tzresult Lwt.t
+end
+
 module S : sig
   val chain_id :
     ([`GET], prefix, prefix, unit, unit, Chain_id.t) Tezos_rpc.Service.t
@@ -105,6 +146,24 @@ module S : sig
 
   val force_bootstrapped :
     ([`PATCH], prefix, prefix, unit, bool, unit) Tezos_rpc.Service.t
+
+  val active_peers_heads :
+    ( [`GET],
+      prefix,
+      prefix,
+      unit,
+      unit,
+      active_peers_info list )
+    Tezos_rpc.Service.t
+
+  val delegators_contribution :
+    ( [`GET],
+      prefix,
+      (prefix * int32) * Signature.public_key_hash,
+      unit,
+      unit,
+      delegators_contribution )
+    Tezos_rpc.Service.t
 
   module Levels : sig
     val checkpoint :
@@ -176,6 +235,26 @@ module S : sig
         unit,
         unit,
         unit )
+      Tezos_rpc.Service.t
+  end
+
+  module Protocols : sig
+    val list :
+      ( [`GET],
+        prefix,
+        prefix,
+        unit,
+        unit,
+        protocol_info list )
+      Tezos_rpc.Service.t
+
+    val get :
+      ( [`GET],
+        prefix,
+        prefix * Protocol_hash.t,
+        unit,
+        unit,
+        protocol_info )
       Tezos_rpc.Service.t
   end
 end

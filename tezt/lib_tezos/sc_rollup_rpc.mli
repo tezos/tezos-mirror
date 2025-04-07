@@ -38,9 +38,21 @@ val get_global_block_outbox :
     address of the node. *)
 val get_global_smart_rollup_address : unit -> string RPC_core.t
 
+type outbox = Transactions of JSON.t list
+
+(** Rollup node block type. Incomplete type, to be completed when
+    needs arise. *)
+type block = {
+  block_hash : string;
+  previous_commitment_hash : string;
+  level : int;
+  inbox : RPC.smart_rollup_inbox;
+  messages : string list;
+  outbox : outbox list;
+}
+
 (** RPC: [GET global/block/<block>?outbox]. *)
-val get_global_block :
-  ?block:string -> ?outbox:bool -> unit -> JSON.t RPC_core.t
+val get_global_block : ?block:string -> ?outbox:bool -> unit -> block RPC_core.t
 
 (** RPC: [GET global/block/<block>/inbox]. *)
 val get_global_block_inbox :
@@ -208,3 +220,23 @@ val get_local_outbox_pending_executable :
 (** RPC: [GET /local/outbox/pending/unexecutable] *)
 val get_local_outbox_pending_unexecutable :
   unit -> (int * outbox_msg list) list RPC_core.t
+
+(** RPC: [DELETE /admin/batcher/queue] *)
+val delete_admin_batcher_queue :
+  ?order_below:int -> ?drop_no_order:bool -> unit -> unit RPC_core.t
+
+(** RPC: [GET /admin/injector/queues] *)
+val get_admin_injector_queues :
+  ?tag:string -> unit -> (string list * JSON.t list) list RPC_core.t
+
+(** RPC: [GET /admin/injector/queues/total] *)
+val get_admin_injector_queues_total :
+  ?tag:string -> unit -> ((string list * int) list * int) RPC_core.t
+
+(** RPC: [DELETE /admin/injector/queues] *)
+val delete_admin_injector_queues :
+  ?operation_tag:string ->
+  ?order_below:int ->
+  ?drop_no_order:bool ->
+  unit ->
+  unit RPC_core.t

@@ -4,6 +4,7 @@ images/ci_create_ci_images.sh
 pyproject.toml
 poetry.lock
 opam/virtual/octez-deps.opam.locked
+opam/virtual/stdcompat.opam.locked
 images/common/install-nvm.sh
 scripts/install_dal_trusted_setup.sh
 scripts/version.sh

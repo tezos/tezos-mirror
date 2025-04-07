@@ -189,7 +189,7 @@ let do_connect ?(count = 0) l1_ctxt =
   let previous_status = l1_ctxt.status in
   let cond = Lwt_condition.create () in
   l1_ctxt.status <- Connecting cond ;
-  let stopper_event =
+  let* () =
     match previous_status with
     | Connected {stopper; _} ->
         stopper () ;
@@ -197,7 +197,6 @@ let do_connect ?(count = 0) l1_ctxt =
     | _ -> return_unit
   in
   let* conn = do_connect ~count ~previous_status l1_ctxt in
-  let* () = stopper_event in
   let* () = Layer1_event.connected ~name:l1_ctxt.name in
   Lwt_condition.broadcast cond conn ;
   return conn
@@ -244,9 +243,10 @@ let reconnect ~name l1_ctxt =
       (* NOTE: same as calling [connect] but one less indirection *)
       let* () = Layer1_event.reconnect_disconnected ~name in
       do_connect ~count:1 l1_ctxt
-  | Connected _ ->
+  | Connected {stopper; _} ->
       (* force reconnection: call [do_connect] instead of [connect] *)
       let* () = Layer1_event.reconnect_connected ~name in
+      stopper () ;
       do_connect ~count:1 l1_ctxt
 
 let disconnect l1_ctxt =
@@ -286,10 +286,7 @@ type 'a lwt_stream_get_result =
   | Get_timeout of float
   | Get_elt of 'a
 
-type lwt_stream_iter_with_timeout_ended =
-  | Closed
-  | Timeout of float
-  | Connection_error of tztrace
+type lwt_stream_iter_with_timeout_ended = Closed | Timeout of float
 
 let timeout_factor = 10.
 
@@ -323,8 +320,6 @@ let lwt_stream_iter_with_timeout ~min_timeout ~init_timeout f stream =
         let* res = protect @@ fun () -> f e in
         match res with
         | Ok () -> (loop [@ocaml.tailcall]) timeout
-        | Error trace when is_connection_error trace ->
-            return_ok (Connection_error trace)
         | Error trace -> return_error trace)
   in
   loop init_timeout
@@ -351,7 +346,6 @@ let iter_heads ?name l1_ctxt f =
       match stopping_reason with
       | Closed -> Layer1_event.connection_lost ~name
       | Timeout timeout -> Layer1_event.connection_timeout ~name ~timeout
-      | Connection_error trace -> Layer1_event.connection_error ~name trace
     in
     let*! conn = reconnect ~name l1_ctxt in
     loop conn

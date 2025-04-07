@@ -9,7 +9,7 @@ include module type of Tezt_tezos_tezt_performance_regression.Grafana
 
 type t
 
-val run : unit -> t Lwt.t
+val run : ?sources:string list -> unit -> t Lwt.t
 
 val shutdown : t -> unit Lwt.t
 

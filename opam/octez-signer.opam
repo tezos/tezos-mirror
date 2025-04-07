@@ -10,6 +10,8 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-rustzcash-deps" { = version }
+  "bls12-381" { = version }
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
 ]
@@ -18,4 +20,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos: `octez-signer` binary"

@@ -89,7 +89,7 @@ let partitioni f l =
   let remove_i l = snd (List.split l) in
   (remove_i l1, remove_i l2)
 
-let rec connect ~timeout connect_handler pool point =
+let rec connect ~timeout connect_handler point =
   let open Lwt_syntax in
   let* () =
     Event.(emit maintenance_debug)
@@ -98,6 +98,7 @@ let rec connect ~timeout connect_handler pool point =
   let* r = P2p_connect_handler.connect connect_handler point ~timeout in
   match r with
   | Error (Tezos_p2p_services.P2p_errors.Connected :: _) -> (
+      let pool = P2p_connect_handler.get_pool connect_handler in
       match P2p_pool.Connection.find_by_point pool point with
       | Some conn -> return_ok conn
       | None ->
@@ -150,7 +151,7 @@ let rec connect ~timeout connect_handler pool point =
              head_err)
       in
       let* () = Lwt_unix.sleep (0.5 +. Random.float 2.) in
-      connect ~timeout connect_handler pool point
+      connect ~timeout connect_handler point
   | (Ok _ | Error _) as res -> Lwt.return res
 
 module Triggers = struct
@@ -196,7 +197,6 @@ module Triggers = struct
         in
         P2p_maintenance.create
           maintenance_config
-          node.pool
           node.connect_handler
           node.trigger
           ~log:(Lwt_watcher.notify maintenance_watcher)
@@ -216,7 +216,8 @@ module Triggers = struct
           ~arg:maintenance_log
           ()
       in
-      let active_connections = P2p_pool.active_connections node.pool in
+      let pool = P2p_connect_handler.get_pool node.connect_handler in
+      let active_connections = P2p_pool.active_connections pool in
       let*! () = Event.(emit maintenance_stop) () in
       let*! () = Event.(emit x_active_connections) active_connections in
       (* Establish new client connection to get to max_connections - 1. *)
@@ -236,11 +237,10 @@ module Triggers = struct
             connect
               ~timeout:(Time.System.Span.of_seconds_exn 10.)
               node.connect_handler
-              node.pool
               point)
           (filteri (fun i _ -> i <= nb_connections_to_add) overconnect_points)
       in
-      let active_connections = P2p_pool.active_connections node.pool in
+      let active_connections = P2p_pool.active_connections pool in
       (*assert (active_connections = max_connections - 1) ;*)
       let*! () = Event.(emit x_active_connections) active_connections in
       (* We have max_connections - 1. Now we try to connect one mode client,
@@ -286,7 +286,7 @@ module Triggers = struct
       (* End of the test *)
       let* () = Node.sync node in
       (* the number of connection is not back to max_connections - 1 *)
-      let active_connections = P2p_pool.active_connections node.pool in
+      let active_connections = P2p_pool.active_connections pool in
       (*assert (active_connections = max_connections - 1) ;*)
       let*! () = Event.(emit x_active_connections) active_connections in
       Lwt_watcher.shutdown maintenance_stopper ;
@@ -309,7 +309,6 @@ module Triggers = struct
               connect
                 ~timeout:(Time.System.Span.of_seconds_exn 10.)
                 node.connect_handler
-                node.pool
                 point
             in
             match res with
@@ -407,7 +406,6 @@ module Triggers = struct
         in
         P2p_maintenance.create
           maintenance_config
-          node.pool
           node.connect_handler
           node.trigger
           ~log:(Lwt_watcher.notify maintenance_watcher)
@@ -426,7 +424,8 @@ module Triggers = struct
           ~arg:maintenance_log
           ()
       in
-      let active_connections = P2p_pool.active_connections node.pool in
+      let pool = P2p_connect_handler.get_pool node.connect_handler in
+      let active_connections = P2p_pool.active_connections pool in
       let*! () = Event.(emit x_active_connections) active_connections in
       (* Close connections to reach min_connections. *)
       let nb_connections_to_close = active_connections - min_connections + 1 in
@@ -439,9 +438,9 @@ module Triggers = struct
                 ~reason:(User "close connection to reach min_connections")
                 conn
             else Lwt.return_unit)
-          (P2p_pool.Connection.list node.pool)
+          (P2p_pool.Connection.list pool)
       in
-      let active_connections = P2p_pool.active_connections node.pool in
+      let active_connections = P2p_pool.active_connections pool in
       let*! () = Event.(emit x_active_connections) active_connections in
       (* Check that the maintenance has been triggered. *)
       let* () =

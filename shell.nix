@@ -13,7 +13,7 @@
       pkgs.wabt
 
       # Cross-compilation for RISC-V
-      sources.riscv64Pkgs.clangStdenv.cc
+      sources.pkgs.pkgsCross.riscv64.pkgsStatic.stdenv.cc
 
       # Formatter/LSP for Cargo manifests (and TOML in general)
       pkgs.taplo
@@ -30,7 +30,7 @@
     src = null;
   });
 
-  devPackageSet = pkgs.opamPackages.overrideScope' (
+  devPackageSet = pkgs.opamPackages.overrideScope (
     pkgs.lib.composeManyExtensions [
       # Set the opam-repository which has the package descriptions.
       (final: prev: {
@@ -43,6 +43,11 @@
       (final: prev:
         prev.repository.select {
           opams = [
+            {
+              name = "stdcompat";
+              opam = ./opam/virtual/stdcompat.opam.locked;
+              version = "19";
+            }
             {
               name = "octez-deps";
               opam = ./opam/virtual/octez-deps.opam.locked;
@@ -69,28 +74,11 @@
       )
     ]
   );
-
-  clangNoArch =
-    if pkgs.stdenv.isDarwin
-    then
-      pkgs.clang.overrideAttrs (old: {
-        postFixup = ''
-          ${old.postFixup or ""}
-
-          # On macOS this contains '-march' and '-mcpu' flags. These flags
-          # would be used for any invocation of Clang.
-          # Removing those makes the resulting Clang wrapper usable when
-          # cross-compiling where passing '-march' and '-mcpu' would not
-          # make sense.
-          echo > $out/nix-support/cc-cflags-before
-        '';
-      })
-    else pkgs.clang;
 in
   pkgs.mkShell {
     name = "tezos-shell";
 
-    hardeningDisable = ["stackprotector"];
+    hardeningDisable = ["stackprotector" "zerocallusedregs"];
 
     inherit (mainPackage) NIX_LDFLAGS NIX_CFLAGS_COMPILE TEZOS_WITHOUT_OPAM OPAM_SWITCH_PREFIX;
 
@@ -122,11 +110,4 @@ in
           inotify-tools
         ]
       );
-
-    # This tells the 'cc' Rust crate to build using this C compiler when
-    # targeting other architectures.
-    CC_wasm32_unknown_unknown = "${clangNoArch}/bin/clang";
-    CC_riscv64gc_unknown_linux_gnu = "${clangNoArch}/bin/clang";
-    CC_riscv64gc_unknown_none_elf = "${clangNoArch}/bin/clang";
-    CC_riscv64gc_unknown_hermit = "${clangNoArch}/bin/clang";
   }

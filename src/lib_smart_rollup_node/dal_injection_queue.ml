@@ -297,12 +297,26 @@ let inject_slot state ~slot_index ~slot_content =
   in
   let*! () = Events.(emit injected) (commitment, slot_index, l1_hash) in
   Recent_dal_injections.replace state.recent_dal_injections l1_hash () ;
-  Metrics.DAL_batcher.set_dal_injections_queue_length
-    (Recent_dal_injections.length state.recent_dal_injections) ;
+  Metrics.wrap (fun () ->
+      Metrics.DAL_batcher.set_dal_injections_queue_length
+        (Recent_dal_injections.length state.recent_dal_injections)) ;
   return_unit
 
 let on_register state ~message : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
+  let* () =
+    if Slot_index_queue.is_empty state.dal_slot_indices then
+      (* When there is no DAL slot index on which the worker can
+         publish, we reject all requests to register new messages. *)
+      let*! () = Events.(emit no_dal_slot_indices_set) () in
+      tzfail
+      @@ error_of_fmt
+           "DAL message registration rejected because the rollup cannot \
+            publish on the DAL. Please use the POST /local/dal/slot/indices \
+            RPC to set the slot indices on which the rollup node should \
+            publish."
+    else return_unit
+  in
   let slot_size =
     (Reference.get state.node_ctxt.current_protocol).constants.dal
       .cryptobox_parameters
@@ -316,8 +330,9 @@ let on_register state ~message : unit tzresult Lwt.t =
     tzfail @@ Rollup_node_errors.Dal_message_too_big {slot_size; message_size}
   else (
     Pending_messages.replace state.pending_messages state.count_messages message ;
-    Metrics.DAL_batcher.set_dal_batcher_queue_length
-      (Pending_messages.length state.pending_messages) ;
+    Metrics.wrap (fun () ->
+        Metrics.DAL_batcher.set_dal_batcher_queue_length
+          (Pending_messages.length state.pending_messages)) ;
     (* We don't care about overflows here. *)
     state.count_messages <- state.count_messages + 1 ;
     let*! () = Events.(emit dal_message_received) () in
@@ -347,8 +362,9 @@ let fill_slot state ~slot_size =
         else
           (* Pop the element to remove it. *)
           let () = ignore @@ Pending_messages.take state.pending_messages in
-          Metrics.DAL_batcher.set_dal_batcher_queue_length
-            (Pending_messages.length state.pending_messages) ;
+          Metrics.wrap (fun () ->
+              Metrics.DAL_batcher.set_dal_batcher_queue_length
+                (Pending_messages.length state.pending_messages)) ;
           fill_slot_aux (message :: accu) ~remaining_size
   in
   fill_slot_aux [] ~remaining_size:slot_size
@@ -382,7 +398,8 @@ let fill_slots state ~slot_size ~num_slots =
    their commitments to L1. *)
 let on_produce_dal_slots state ~level =
   let open Lwt_result_syntax in
-  if Slot_index_queue.is_empty state.dal_slot_indices then
+  if Pending_messages.is_empty state.pending_messages then return_unit
+  else if Slot_index_queue.is_empty state.dal_slot_indices then
     (* No provided slot indices, no injection *)
     let*! () = Events.(emit no_dal_slot_indices_set) () in
     return_unit
@@ -484,18 +501,18 @@ module Handlers = struct
     init_dal_worker_state node_ctxt dal_node_ctxt
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
-      unit tzresult Lwt.t =
+      [`Continue | `Shutdown] tzresult Lwt.t =
     let open Lwt_result_syntax in
     match r with
     | Request.Register _ ->
         let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
-        return_unit
+        return `Continue
     | Request.Produce_dal_slots _ ->
         let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
-        return_unit
+        return `Continue
     | Request.Set_dal_slot_indices _ ->
         let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
-        return_unit
+        return `Continue
 
   let on_completion _w r _ st =
     match Request.view r with
@@ -602,5 +619,6 @@ let forget_injection_id id =
   let+ w = worker () in
   let state = Worker.state w in
   let () = Recent_dal_injections.remove state.recent_dal_injections id in
-  Metrics.DAL_batcher.set_dal_injections_queue_length
-    (Recent_dal_injections.length state.recent_dal_injections)
+  Metrics.wrap (fun () ->
+      Metrics.DAL_batcher.set_dal_injections_queue_length
+        (Recent_dal_injections.length state.recent_dal_injections))

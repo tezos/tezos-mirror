@@ -1,0 +1,76 @@
+#
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+#
+
+# This is a Homebrew formula for installing Octez.
+class Octez < Formula
+  @all_bins = []
+
+  class << self
+    attr_accessor :all_bins
+  end
+  homepage "https://gitlab.com/tezos/tezos"
+  url "%%CI_MERGE_REQUEST_SOURCE_PROJECT_URL%%.git", :tag => "%%CI_COMMIT_REF_NAME%%", :shallow => false
+  version "%%VERSION%%"
+  license "MIT"
+
+  build_dependencies = %w[pkg-config coreutils autoconf rsync wget opam protobuf cmake]
+  build_dependencies.each do |dependency|
+    depends_on dependency => :build
+  end
+
+  dependencies = %w[gmp hidapi libev libffi libpq]
+  dependencies.each do |dependency|
+    depends_on dependency
+  end
+
+  def make_deps
+    ENV.deparallelize
+    ENV["CARGO_HOME"]="./.cargo"
+    ENV["OPAMROOT"]="./.opam"
+    ENV["OPAMYES"]="true"
+    ENV["BLST_PORTABLE"]="yes"
+    ENV["LDFLAGS"] = "-L#{HOMEBREW_PREFIX}/lib"
+
+
+    (buildpath/"script.sh").write <<~EOS
+      #!/bin/sh
+
+      set +x
+
+      . ./scripts/version.sh
+      wget https://sh.rustup.rs/rustup-init.sh
+      chmod +x rustup-init.sh
+      ./rustup-init.sh --profile minimal --default-toolchain $recommended_rust_version -y
+      opam init --bare --disable-sandboxing
+
+      . $CARGO_HOME/env
+      make build-deps
+
+      eval $(opam env)
+      make
+    EOS
+
+    chmod 0755, buildpath/"script.sh"
+    system "./script.sh"
+  end
+
+  def install_template(name)
+    bin.mkpath
+    self.class.all_bins << name
+    bin.install name
+  end
+
+  def install
+    make_deps
+    install_template "octez-node"
+    install_template "octez-client"
+    install_template "octez-signer"
+    install_template "octez-accuser-%%PROTO_CURRENT%%"
+    install_template "octez-baker-%%PROTO_CURRENT%%"
+    install_template "octez-accuser-%%PROTO_NEXT%%"
+    install_template "octez-baker-%%PROTO_NEXT%%"
+  end
+
+end

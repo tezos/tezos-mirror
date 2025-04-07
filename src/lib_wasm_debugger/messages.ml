@@ -72,9 +72,15 @@ let input_encoding default_sender default_source default_destination :
           | `Inbox_message
               Sc_rollup.Inbox_message.(
                 Internal (Transfer {payload; sender; source; destination})) ->
+              let source =
+                Tezos_crypto.Signature.Of_V1.public_key_hash source
+              in
               Some (payload, sender, source, destination)
           | _ -> None)
         (fun (payload, sender, source, destination) ->
+          let source =
+            Signature.V1.Of_V_latest.get_public_key_hash_exn source
+          in
           `Inbox_message
             (Internal (Transfer {payload; sender; source; destination})));
       case

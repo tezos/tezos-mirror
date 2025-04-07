@@ -366,7 +366,9 @@ module V2_0_0 = struct
                    output produced by the kernel. *)
                 (aux [@ocaml.tailcall]) outbox (Z.succ message_index)
             | Ok message ->
-                let output = PS.{outbox_level; message_index; message} in
+                let output =
+                  PS.{output_info = {outbox_level; message_index}; message}
+                in
                 (aux [@ocaml.tailcall])
                   (output :: outbox)
                   (Z.succ message_index))
@@ -491,13 +493,13 @@ module V2_0_0 = struct
            (req "output_proof" Context.proof_encoding)
            (req "output_proof_output" PS.output_encoding))
 
-    let output_of_output_proof s = s.output_proof_output
+    let output_info_of_output_proof s = s.output_proof_output.output_info
 
     let state_of_output_proof s = proof_start_state s.output_proof
 
     let get_output : PS.output -> Sc_rollup_outbox_message_repr.t option Monad.t
         =
-     fun {outbox_level; message_index; message} ->
+     fun {output_info = {outbox_level; message_index}; message} ->
       let open Monad.Syntax in
       let* s = get in
       let* result =
@@ -527,11 +529,7 @@ module V2_0_0 = struct
       | Some (_state, Some message) ->
           return
             Sc_rollup_PVM_sig.
-              {
-                outbox_level = p.output_proof_output.outbox_level;
-                message_index = p.output_proof_output.message_index;
-                message;
-              }
+              {output_info = p.output_proof_output.output_info; message}
       | _ -> tzfail WASM_output_proof_verification_failed
 
     let produce_output_proof context state output_proof_output =
@@ -547,11 +545,7 @@ module V2_0_0 = struct
             {
               output_proof;
               output_proof_output =
-                {
-                  outbox_level = output_proof_output.outbox_level;
-                  message_index = output_proof_output.message_index;
-                  message;
-                };
+                {output_info = output_proof_output.output_info; message};
             }
       | _ -> fail WASM_output_proof_production_failed
 

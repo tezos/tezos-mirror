@@ -72,8 +72,10 @@ let double_attestation_init
       ?key:string list ->
       ?force:bool ->
       Client.t ->
-      unit Lwt.t) consensus_name protocol () =
-  let* node, client = Client.init_with_protocol ~protocol `Client () in
+      unit Lwt.t) ?parameter_file consensus_name protocol () =
+  let* node, client =
+    Client.init_with_protocol ?parameter_file ~protocol `Client ()
+  in
   let* accuser = Accuser.init ~event_level:`Debug ~protocol node in
   let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
   Log.info "Recover available slots for %s." Constant.bootstrap1.alias ;
@@ -120,7 +122,12 @@ let double_consensus_wrong_slot
   in
   let waiter = consensus_waiter accuser in
   let* _ =
-    Operation.Consensus.inject ~branch ~signer:Constant.bootstrap1 op client
+    Operation.Consensus.inject
+      ~protocol
+      ~branch
+      ~signer:Constant.bootstrap1
+      op
+      client
   in
   let* () = waiter in
   Log.info
@@ -134,9 +141,49 @@ let double_consensus_wrong_slot
     double_consensus_already_denounced_waiter accuser oph
   in
   let* _ =
-    Operation.Consensus.inject ~branch ~signer:Constant.bootstrap1 op client
+    Operation.Consensus.inject
+      ~protocol
+      ~branch
+      ~signer:Constant.bootstrap1
+      op
+      client
   in
   let* () = waiter_already_denounced in
+  unit
+
+(** Adaptation of [double_consensus_wrong_slot] under [aggregate_attestations]
+   feature flag *)
+let double_consensus_wrong_slot_feature_flag
+    (consensus_for, mk_consensus, _, consensus_name) protocol =
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      [(["aggregate_attestation"], `Bool true)]
+  in
+  let* (client, accuser), (branch, level, round, slots, block_payload_hash) =
+    double_attestation_init
+      ~parameter_file
+      consensus_for
+      consensus_name
+      protocol
+      ()
+  in
+  Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
+  let op =
+    mk_consensus ~slot:(List.nth slots 1) ~level ~round ~block_payload_hash
+  in
+  let waiter =
+    Accuser.wait_for accuser "double_attestation_ignored.v0" (fun _ -> Some ())
+  in
+  let* _ =
+    Operation.Consensus.inject
+      ~protocol
+      ~branch
+      ~signer:Constant.bootstrap1
+      op
+      client
+  in
+  let* () = waiter in
   unit
 
 let attest_utils =
@@ -168,6 +215,16 @@ let double_preattestation_wrong_slot =
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_slot preattest_utils protocol
 
+let double_attestation_wrong_slot_feature_flag =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"double attestation using wrong slot under feature flag"
+    ~tags:[Tag.layer1; "double"; "attestation"; "accuser"; "slot"; "node"]
+    ~supports:(Protocol.From_protocol 023)
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
+  @@ fun protocol ->
+  double_consensus_wrong_slot_feature_flag attest_utils protocol
+
 let double_consensus_wrong_block_payload_hash
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
   let* (client, accuser), (branch, level, round, slots, _block_payload_hash) =
@@ -185,6 +242,7 @@ let double_consensus_wrong_block_payload_hash
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
@@ -208,6 +266,7 @@ let double_consensus_wrong_block_payload_hash
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
@@ -264,6 +323,7 @@ let double_consensus_wrong_branch
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
@@ -284,6 +344,7 @@ let double_consensus_wrong_branch
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
@@ -361,6 +422,7 @@ let operation_too_old =
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
@@ -438,6 +500,7 @@ let operation_too_far_in_future =
   let* _ =
     Operation.Consensus.inject
       ~force:true
+      ~protocol
       ~branch
       ~signer:Constant.bootstrap1
       op
@@ -449,6 +512,7 @@ let operation_too_far_in_future =
 let register ~protocols =
   double_attestation_wrong_slot protocols ;
   double_preattestation_wrong_slot protocols ;
+  double_attestation_wrong_slot_feature_flag protocols ;
   double_attestation_wrong_block_payload_hash protocols ;
   double_preattestation_wrong_block_payload_hash protocols ;
   double_attestation_wrong_branch protocols ;

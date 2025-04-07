@@ -24,8 +24,6 @@ module Maker (Config : Conf.S) = struct
 
   module Make (Schema : Brassaia.Schema.Extended) = struct
     open struct
-      module P = Schema.Path
-      module M = Schema.Metadata
       module C = Schema.Contents
       module B = Schema.Branch
     end
@@ -33,8 +31,7 @@ module Maker (Config : Conf.S) = struct
     module H = Schema.Hash
     module Io = Io.Unix
     module Index = Pack_index.Make (H)
-    module Errs = Io_errors.Make (Io)
-    module File_manager = File_manager.Make (Io) (Index) (Errs)
+    module File_manager = File_manager.Make (Index)
     module Dict = Dict.Make (File_manager)
     module Dispatcher = Dispatcher.Make (File_manager)
     module XKey = Pack_key.Make (H)
@@ -50,7 +47,6 @@ module Maker (Config : Conf.S) = struct
 
         module CA =
           Pack_store.Make (File_manager) (Dict) (Dispatcher) (H) (Pack_value)
-            (Errs)
 
         include Brassaia.Contents.Store_indexable (CA) (H) (C)
       end
@@ -64,13 +60,11 @@ module Maker (Config : Conf.S) = struct
 
           module Pack' =
             Pack_store.Make (File_manager) (Dict) (Dispatcher) (H) (Inter.Raw)
-              (Errs)
 
           include Inode.Make_persistent (H) (Value) (Inter) (Pack')
         end
 
-        include
-          Brassaia.Node.Generic_key.Store (Contents) (CA) (H) (CA.Val) (M) (P)
+        include Brassaia.Node.Generic_key.Store (Contents) (CA) (H) (CA.Val)
       end
 
       module Node_portable = Node.CA.Val.Portable
@@ -92,7 +86,6 @@ module Maker (Config : Conf.S) = struct
 
         module CA =
           Pack_store.Make (File_manager) (Dict) (Dispatcher) (H) (Pack_value)
-            (Errs)
 
         include
           Brassaia.Commit.Generic_key.Store (Schema.Info) (Node) (CA) (H)
@@ -131,7 +124,6 @@ module Maker (Config : Conf.S) = struct
       module Gc = Gc.Make (struct
         module Async = Async.Unix
         module File_manager = File_manager
-        module Errs = Errs
         module Dict = Dict
         module Dispatcher = Dispatcher
         module Hash = Schema.Hash
@@ -174,22 +166,24 @@ module Maker (Config : Conf.S) = struct
           let fresh = Brassaia_pack.Conf.fresh config in
           let file_manager =
             let readonly = Brassaia_pack.Conf.readonly config in
-            if readonly then File_manager.open_ro config |> Errs.raise_if_error
+            if readonly then
+              File_manager.open_ro config |> Io_errors.raise_if_error
             else
               match (Io.classify_path root, fresh) with
               | `No_such_file_or_directory, _ ->
                   File_manager.create_rw ~overwrite:false config
-                  |> Errs.raise_if_error
+                  |> Io_errors.raise_if_error
               | `Directory, true ->
                   File_manager.create_rw ~overwrite:true config
-                  |> Errs.raise_if_error
+                  |> Io_errors.raise_if_error
               | `Directory, false ->
-                  File_manager.open_rw config |> Errs.raise_if_error
-              | (`File | `Other), _ -> Errs.raise_error (`Not_a_directory root)
+                  File_manager.open_rw config |> Io_errors.raise_if_error
+              | (`File | `Other), _ ->
+                  Io_errors.raise_error (`Not_a_directory root)
           in
-          let dict = Dict.init file_manager |> Errs.raise_if_error in
+          let dict = Dict.init file_manager |> Io_errors.raise_if_error in
           let dispatcher =
-            Dispatcher.init file_manager |> Errs.raise_if_error
+            Dispatcher.init file_manager |> Io_errors.raise_if_error
           in
           let lru = Lru.create config in
           let contents =
@@ -227,10 +221,14 @@ module Maker (Config : Conf.S) = struct
           }
 
         let flush t =
-          File_manager.flush ?hook:None t.file_manager |> Errs.raise_if_error
+          File_manager.flush ?hook:None t.file_manager
+          |> Io_errors.raise_if_error
 
-        let fsync t = File_manager.fsync t.file_manager |> Errs.raise_if_error
-        let reload t = File_manager.reload t.file_manager |> Errs.raise_if_error
+        let fsync t =
+          File_manager.fsync t.file_manager |> Io_errors.raise_if_error
+
+        let reload t =
+          File_manager.reload t.file_manager |> Io_errors.raise_if_error
 
         module Gc = struct
           let is_allowed { file_manager; _ } =
@@ -296,7 +294,7 @@ module Maker (Config : Conf.S) = struct
                 in
                 match result with
                 | Ok _ -> Lwt.return true
-                | Error e -> Errs.raise_error e)
+                | Error e -> Io_errors.raise_error e)
 
           let finalise_exn ?(wait = false) t =
             let* result =
@@ -314,7 +312,7 @@ module Maker (Config : Conf.S) = struct
             | Ok waited -> Lwt.return waited
             | Error e ->
                 t.running_gc <- None;
-                Errs.raise_error e
+                Io_errors.raise_error e
 
           let is_finished t = Option.is_none t.running_gc
 
@@ -362,11 +360,11 @@ module Maker (Config : Conf.S) = struct
               match Io.classify_path path with
               | `Directory -> ()
               | `No_such_file_or_directory ->
-                  Io.mkdir path |> Errs.raise_if_error
-              | _ -> Errs.raise_error `Invalid_layout
+                  Io.mkdir path |> Io_errors.raise_if_error
+              | _ -> Io_errors.raise_error `Invalid_layout
             in
             let commit_key =
-              direct_commit_key t commit_key |> Errs.raise_if_error
+              direct_commit_key t commit_key |> Io_errors.raise_if_error
             in
             (* The GC action here does not matter, since we'll not fully
                finalise it *)
@@ -375,7 +373,7 @@ module Maker (Config : Conf.S) = struct
                 commit_key
             in
             let () =
-              if not launched then Errs.raise_error `Forbidden_during_gc
+              if not launched then Io_errors.raise_error `Forbidden_during_gc
             in
             let* gced =
               match t.running_gc with
@@ -388,7 +386,7 @@ module Maker (Config : Conf.S) = struct
             let () =
               File_manager.create_one_commit_store t.file_manager config gced
                 commit_key
-              |> Errs.raise_if_error
+              |> Io_errors.raise_if_error
             in
             let branch_path = Brassaia_pack.Layout.V4.branch ~root:path in
             let* branch_store =
@@ -413,21 +411,21 @@ module Maker (Config : Conf.S) = struct
           in
           File_manager.split t.file_manager
 
-        let split_exn repo = split repo |> Errs.raise_if_error
+        let split_exn repo = split repo |> Io_errors.raise_if_error
 
         let add_volume_exn t =
           let () =
             if Brassaia_pack.Conf.readonly t.config then
-              Errs.raise_error `Ro_not_allowed;
+              Io_errors.raise_error `Ro_not_allowed;
             if Gc.is_finished t = false then
-              Errs.raise_error `Add_volume_forbidden_during_gc
+              Io_errors.raise_error `Add_volume_forbidden_during_gc
           in
-          File_manager.add_volume t.file_manager |> Errs.raise_if_error
+          File_manager.add_volume t.file_manager |> Io_errors.raise_if_error
 
         let batch t f =
           [%log.debug "[pack] batch start"];
           let readonly = Brassaia_pack.Conf.readonly t.config in
-          if readonly then Errs.raise_error `Ro_not_allowed
+          if readonly then Io_errors.raise_error `Ro_not_allowed
           else
             let c0 = Mtime_clock.counter () in
             let try_finalise () = Gc.try_auto_finalise_exn t in
@@ -443,7 +441,7 @@ module Maker (Config : Conf.S) = struct
               let s = Mtime_clock.count c0 |> Mtime.span_to_s in
               [%log.info "[pack] batch completed in %.6fs" s];
               t.during_batch <- false;
-              File_manager.flush t.file_manager |> Errs.raise_if_error;
+              File_manager.flush t.file_manager |> Io_errors.raise_if_error;
               let* _ = try_finalise () in
               Lwt.return res
             in
@@ -459,7 +457,8 @@ module Maker (Config : Conf.S) = struct
                     [%log.err
                       "[pack] batch failed and flush failed. Silencing flush \
                        fail. (%a)"
-                      (Brassaia.Type.pp Errs.t) err]
+                        (Brassaia.Type.pp Io_errors.t)
+                        err]
               in
               (* Kill gc process in at_exit. *)
               raise exn
@@ -470,7 +469,9 @@ module Maker (Config : Conf.S) = struct
           (* Step 1 - Kill the gc process if it is running *)
           let _ = Gc.cancel t in
           (* Step 2 - Close the files *)
-          let () = File_manager.close t.file_manager |> Errs.raise_if_error in
+          let () =
+            File_manager.close t.file_manager |> Io_errors.raise_if_error
+          in
           Branch.close t.branch >>= fun () ->
           (* Step 3 - Close the in-memory abstractions *)
           Dict.close t.dict;
@@ -544,10 +545,6 @@ module Maker (Config : Conf.S) = struct
 
       let traverse_inodes ~dump_blob_paths_to commit repo =
         let module Stats = Checks.Stats (struct
-          type nonrec step = step
-
-          let step_t = step_t
-
           module Hash = Hash
         end) in
         let t = Stats.create () in
@@ -633,9 +630,10 @@ module Maker (Config : Conf.S) = struct
         let error_msg = Fmt.str "[%s] resulted in error: %s" context err in
         Lwt.return_error (`Msg error_msg)
 
-      let map_errors context (error : Errs.t) =
+      let map_errors context (error : Io_errors.t) =
         let err_msg =
-          Fmt.str "[%s] resulted in error: %a" context (Brassaia.Type.pp Errs.t)
+          Fmt.str "[%s] resulted in error: %a" context
+            (Brassaia.Type.pp Io_errors.t)
             error
         in
         `Msg err_msg
@@ -731,7 +729,7 @@ module Maker (Config : Conf.S) = struct
                 Export.run ?on_disk export f_contents f_nodes
                   (key, Pack_value.Kind.Inode_v2_root)
               in
-              Export.close export |> Errs.raise_if_error;
+              Export.close export |> Io_errors.raise_if_error;
               Lwt.return total
       end
 
@@ -759,10 +757,9 @@ module Maker (Config : Conf.S) = struct
     end
 
     module Internal = struct
-      module Io = Io
-      module Errs = Errs
-      module Index = Index
       module File_manager = File_manager
+      module Io = Io
+      module Index = Index
 
       let file_manager (repo : X.Repo.t) = repo.file_manager
 

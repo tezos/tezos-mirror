@@ -34,16 +34,20 @@
 
 let team = Tag.layer1
 
-let hooks = Tezos_regression.hooks
+let hooks =
+  let replacements =
+    ("edsig\\w{94}", "[SIGNATURE]")
+    :: ("BLsig\\w{137}", "[BLS_SIGNATURE]")
+    :: Tezos_regression.replacements
+  in
+  Tezos_regression.hooks_custom
+    ~replace_variables:(fun s ->
+      Tezos_regression.replace_variables ~replacements s)
+    ()
 
 let blocks_per_cycle = 4
 
 let consensus_rights_delay = 1
-
-let manual_staking (_ : Protocol.t) =
-  (* Currently all protocols use autostaking by default; this will
-     probably change if and when AI gets activated on mainnet. *)
-  false
 
 module Helpers = struct
   let level_type : RPC.level Check.typ =
@@ -89,12 +93,11 @@ open Helpers
    tests succeeding for wrong reasons. *)
 
 let test_update_consensus_key =
-  Protocol.register_test
+  Protocol.register_regression_test
     ~__FILE__
     ~title:"update consensus key"
     ~tags:[team; "consensus_key"]
   @@ fun protocol ->
-  let manual_staking = manual_staking protocol in
   let parameters =
     (* we update paramaters for faster testing: no need to wait
        5 cycles for the consensus key to activate. *)
@@ -105,6 +108,10 @@ let test_update_consensus_key =
       (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
       (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
     ]
+    @
+    if Protocol.(number protocol > number Quebec) then
+      [(["allow_tz4_delegate_enable"], `Bool true)]
+    else [(["adaptive_issuance_force_activation"], `Bool true)]
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
@@ -112,11 +119,13 @@ let test_update_consensus_key =
   let* _, client =
     Client.init_with_protocol ~parameter_file ~protocol `Client ()
   in
-  let* key_a = Client.gen_and_show_keys client in
-  let* key_b = Client.gen_and_show_keys client in
-  let* key_c = Client.gen_and_show_keys client in
-  let* key_bls = Client.gen_and_show_keys ~sig_alg:"bls" client in
-  let* destination = Client.gen_and_show_keys client in
+  let* key_a = Client.gen_and_show_keys ~alias:"tezt_1" client in
+  let* key_b = Client.gen_and_show_keys ~alias:"tezt_2" client in
+  let* key_c = Client.gen_and_show_keys ~alias:"tezt_3" client in
+  let* key_bls =
+    Client.gen_and_show_keys ~alias:"tezt_4" ~sig_alg:"bls" client
+  in
+  let* destination = Client.gen_and_show_keys client ~alias:"tezt_5" in
 
   let* () =
     Client.transfer
@@ -171,18 +180,28 @@ let test_update_consensus_key =
       ~pk:Constant.bootstrap1.alias
       client
   in
-  Log.info "Invalid update: changing the consensus key to a BLS key." ;
   let* () =
-    Client.update_consensus_key
-      ~expect_failure:true
-      ~src:Constant.bootstrap1.alias
-      ~pk:key_bls.alias
-      client
+    if Protocol.(number protocol > number Quebec) then (
+      Log.info "Valid update: changing the consensus key to a BLS key." ;
+      Client.update_consensus_key
+        ~hooks
+        ~expect_failure:false
+        ~src:Constant.bootstrap5.alias
+        ~pk:key_bls.alias
+        client)
+    else (
+      Log.info "Invalid update: changing the consensus key to a BLS key." ;
+      Client.update_consensus_key
+        ~expect_failure:true
+        ~src:Constant.bootstrap1.alias
+        ~pk:key_bls.alias
+        client)
   in
 
   Log.info "Trying a valid consensus key update." ;
   let* () =
     Client.update_consensus_key
+      ~hooks
       ~src:Constant.bootstrap1.alias
       ~pk:key_a.alias
       client
@@ -204,17 +223,15 @@ let test_update_consensus_key =
   let* () = Client.register_key ~consensus:key_c.alias key_b.alias client in
   let* () = Client.bake_for_and_wait client in
 
+  Log.info "Add stake for `key_b` so that `key_c` can bake later on." ;
   let* () =
-    if manual_staking then (
-      Log.info "Add stake for `key_b` so that `key_c` can bake later on." ;
-      Client.transfer
-        ~entrypoint:"stake"
-        ~burn_cap:Tez.one
-        ~amount:(Tez.of_int 500_000)
-        ~giver:key_b.alias
-        ~receiver:key_b.alias
-        client)
-    else return ()
+    Client.transfer
+      ~entrypoint:"stake"
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 500_000)
+      ~giver:key_b.alias
+      ~receiver:key_b.alias
+      client
   in
 
   Log.info "Bake until the end of the next cycle with bootstrap1..." ;
@@ -233,12 +250,8 @@ let test_update_consensus_key =
       client
   in
 
-  let* () =
-    if manual_staking then (
-      Log.info "`key_c` cannot bake yet." ;
-      Client.bake_for ~expect_failure:true ~keys:[key_c.alias] client)
-    else return ()
-  in
+  Log.info "`key_c` cannot bake yet." ;
+  let* () = Client.bake_for ~expect_failure:true ~keys:[key_c.alias] client in
 
   Log.info "... while `key_a` is able to bake." ;
   let* () = Client.bake_for_and_wait ~keys:[key_a.alias] client in
@@ -257,6 +270,7 @@ let test_update_consensus_key =
   Log.info "Switch back to the initial consensus key." ;
   let* () =
     Client.update_consensus_key
+      ~hooks
       ~src:Constant.bootstrap1.alias
       ~pk:Constant.bootstrap1.alias
       client
@@ -283,12 +297,14 @@ let test_update_consensus_key =
      `key_c`, respectively..." ;
   let* () =
     Client.update_consensus_key
+      ~hooks
       ~src:Constant.bootstrap3.alias
       ~pk:key_a.alias
       client
   in
   let* () =
     Client.update_consensus_key
+      ~hooks
       ~src:Constant.bootstrap4.alias
       ~pk:key_c.alias
       client
@@ -366,6 +382,7 @@ let test_update_consensus_key =
   Log.info "Inject a valid drain..." ;
   let* () =
     Client.drain_delegate
+      ~hooks
       ~delegate:Constant.bootstrap4.alias
       ~consensus_key:key_c.alias
       ~destination:destination.alias
@@ -410,6 +427,7 @@ let test_update_consensus_key =
   in
   let* () =
     Client.drain_delegate
+      ~hooks
       ~delegate:Constant.bootstrap3.alias
       ~consensus_key:key_a.alias
       ~destination:destination.alias
@@ -564,7 +582,7 @@ let check_consensus_key ~__LOC__ delegate ?(expected_active = delegate)
 
 let register_key_as_delegate ?(expect_failure = false)
     ?(baker = Constant.bootstrap1.alias) ~(owner : Account.key)
-    ~(consensus_key : Account.key) ~manual_staking client =
+    ~(consensus_key : Account.key) client =
   let* _ =
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract ~id:consensus_key.public_key_hash ()
@@ -587,25 +605,19 @@ let register_key_as_delegate ?(expect_failure = false)
     @@ RPC.get_chain_block_context_contract ~id:consensus_key.public_key_hash ()
   in
 
-  (* To get rights at the same time in manual staking and auto staking
-     cases, we call the stake manual pseudo-operation at cycle switch,
-     which is (as close as possible to) the level at which autostaking
-     would do it. *)
-  let* () = bake_n_cycles 1 client in
+  Log.info "Add stake for `owner` so that `consensus_key` can bake later on." ;
   let* () =
-    if manual_staking then
-      Client.transfer
-        ~entrypoint:"stake"
-        ~burn_cap:Tez.one
-        ~amount:(Tez.of_int 500_000)
-        ~giver:owner.alias
-        ~receiver:owner.alias
-        client
-    else unit
+    Client.transfer
+      ~entrypoint:"stake"
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 500_000)
+      ~giver:owner.alias
+      ~receiver:owner.alias
+      client
   in
 
   (* Wait for consensus key to be active *)
-  let* () = bake_n_cycles consensus_rights_delay client in
+  let* () = bake_n_cycles (consensus_rights_delay + 1) client in
   let* _ =
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate owner.public_key_hash
@@ -645,6 +657,10 @@ let register ?(regression = true) title test =
       (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
     ]
   in
+  let parameters =
+    if Protocol.(number protocol > number Quebec) then parameters
+    else (["adaptive_issuance_force_activation"], `Bool true) :: parameters
+  in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
   in
@@ -655,12 +671,11 @@ let register ?(regression = true) title test =
   let baker_1 = Constant.bootstrap2 in
   let* account_0 = Client.gen_and_show_keys ~alias:"dummy_account_0" client in
   let* account_1 = Client.gen_and_show_keys ~alias:"dummy_account_1" client in
-  let manual_staking = manual_staking protocol in
-  test ~manual_staking client baker_0 baker_1 account_0 account_1
+  test client baker_0 baker_1 account_0 account_1
 
-let test_register_delegate_with_consensus_key ~manual_staking
-    ?(expect_failure = false) ?(baker = Constant.bootstrap1.alias)
-    ~(new_delegate : Account.key) ~(new_consensus_key : Account.key) client =
+let test_register_delegate_with_consensus_key ?(expect_failure = false)
+    ?(baker = Constant.bootstrap1.alias) ~(new_delegate : Account.key)
+    ~(new_consensus_key : Account.key) client =
   let* () =
     transfer
       ~source:baker
@@ -675,29 +690,7 @@ let test_register_delegate_with_consensus_key ~manual_staking
       ~owner:new_delegate
       ~consensus_key:new_consensus_key
       ~baker
-      ~manual_staking
       client
-  in
-  let* () = Client.bake_for_and_wait client in
-
-  let* () =
-    if manual_staking then (
-      Log.info
-        "Add stake for `new_delegate` so that `new_consensus_key` can bake \
-         later on." ;
-      let* () =
-        Client.transfer
-          ~entrypoint:"stake"
-          ~burn_cap:Tez.one
-          ~amount:(Tez.of_int 500_000)
-          ~giver:new_delegate.alias
-          ~receiver:new_delegate.alias
-          client
-      in
-
-      Log.info "Bake until the end of the next cycle with `baker`..." ;
-      bake_n_cycles (consensus_rights_delay + 1) ~keys:[baker] client)
-    else return ()
   in
 
   (* Check that one can bake with the consensus key *)
@@ -710,8 +703,7 @@ let test_register_delegate_with_consensus_key ~manual_staking
    does not store a regression trace. Instead, it [Check]s that the new
    consensus key is as expected. *)
 let register_key_as_delegate_no_reg ?(baker = Constant.bootstrap1.alias)
-    ~(owner : Account.key) ~(consensus_key : Account.key) ~manual_staking client
-    =
+    ~(owner : Account.key) ~(consensus_key : Account.key) client =
   let* () =
     Client.register_key ~consensus:consensus_key.alias owner.alias client
   in
@@ -726,30 +718,22 @@ let register_key_as_delegate_no_reg ?(baker = Constant.bootstrap1.alias)
       client
   in
 
-  (* To get rights at the same time in manual staking and auto staking
-     cases, we call the stake manual pseudo-operation at cycle switch,
-     which is (as close as possible to) the level at which autostaking
-     would do it. *)
-  let* () = bake_n_cycles 1 client in
+  Log.info "Add stake for `owner` so that `consensus_key` can bake later on." ;
   let* () =
-    if manual_staking then
-      Client.transfer
-        ~entrypoint:"stake"
-        ~burn_cap:Tez.one
-        ~amount:(Tez.of_int 500_000)
-        ~giver:owner.alias
-        ~receiver:owner.alias
-        client
-    else unit
+    Client.transfer
+      ~entrypoint:"stake"
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 500_000)
+      ~giver:owner.alias
+      ~receiver:owner.alias
+      client
   in
 
   (* Wait for consensus key to be active *)
-  let* () = bake_n_cycles consensus_rights_delay client in
+  let* () = bake_n_cycles (consensus_rights_delay + 1) client in
   let* () =
     check_consensus_key ~__LOC__ owner ~expected_active:consensus_key client
   in
-  (* Wait for consensus key to have rights *)
-  let* () = bake_n_cycles 1 client in
   unit
 
 (* Like [update_consensus_key] this function updates the consensus key
@@ -781,9 +765,8 @@ let update_consensus_key_no_reg ?(baker = Constant.bootstrap1.alias)
     ~expected_active:consensus_key
     client
 
-let test_revert_to_unique_consensus_key ~manual_staking
-    ?(baker = Constant.bootstrap1.alias) ~(new_delegate : Account.key)
-    ~(new_consensus_key : Account.key) client =
+let test_revert_to_unique_consensus_key ?(baker = Constant.bootstrap1.alias)
+    ~(new_delegate : Account.key) ~(new_consensus_key : Account.key) client =
   (* Set a new consensus key *)
   Log.info "Transfer 1_000_000 tez from baker to new_delegate" ;
   let* () =
@@ -800,7 +783,6 @@ let test_revert_to_unique_consensus_key ~manual_staking
       ~owner:new_delegate
       ~consensus_key:new_consensus_key
       ~baker
-      ~manual_staking
       client
   in
   let* () = Client.bake_for_and_wait client in
@@ -890,7 +872,7 @@ let register ~protocols =
   let () =
     register
       "Test set consensus key - baker is not delegate"
-      (fun ~manual_staking:_ client baker_0 baker_1 account_0 _account_1 ->
+      (fun client baker_0 baker_1 account_0 _account_1 ->
         let baker_0_consensus_key = account_0 in
         let* () =
           test_consensus_key_update
@@ -905,7 +887,7 @@ let register ~protocols =
   let () =
     register
       "Test set consensus key - baker is delegate"
-      (fun ~manual_staking:_ client baker_0 _baker_1 account_0 _account_1 ->
+      (fun client baker_0 _baker_1 account_0 _account_1 ->
         let baker_0_consensus_key = account_0 in
         let* () =
           test_consensus_key_update
@@ -920,11 +902,10 @@ let register ~protocols =
   let () =
     register
       "Test register with consensus key"
-      (fun ~manual_staking client baker_0 _baker_1 account_0 account_1 ->
+      (fun client baker_0 _baker_1 account_0 account_1 ->
         let new_delegate = account_0 in
         let new_consensus_key = account_1 in
         test_register_delegate_with_consensus_key
-          ~manual_staking
           ~baker:baker_0.alias
           ~new_delegate
           ~new_consensus_key
@@ -935,11 +916,10 @@ let register ~protocols =
     register
       "Test revert to unique consensus key"
       ~regression:false
-      (fun ~manual_staking client baker_0 _baker_1 account_0 account_1 ->
+      (fun client baker_0 _baker_1 account_0 account_1 ->
         let new_delegate = account_0 in
         let new_consensus_key = account_1 in
         test_revert_to_unique_consensus_key
-          ~manual_staking
           ~baker:baker_0.alias
           ~new_delegate
           ~new_consensus_key
@@ -949,7 +929,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker = delegate & consensus = destination)"
-      (fun ~manual_staking:_ client baker_0 _baker_1 account_0 _account_1 ->
+      (fun client baker_0 _baker_1 account_0 _account_1 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_0 in
@@ -964,7 +944,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker = delegate & consensus <> destination)"
-      (fun ~manual_staking:_ client baker_0 _baker_1 account_0 account_1 ->
+      (fun client baker_0 _baker_1 account_0 account_1 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_1 in
@@ -979,7 +959,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker <> delegate & consensus = destination)"
-      (fun ~manual_staking:_ client baker_0 baker_1 account_0 _account_1 ->
+      (fun client baker_0 baker_1 account_0 _account_1 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_0 in
@@ -994,7 +974,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker <> delegate & consensus <> destination)"
-      (fun ~manual_staking:_ client baker_0 baker_1 account_0 account_1 ->
+      (fun client baker_0 baker_1 account_0 account_1 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_1 in

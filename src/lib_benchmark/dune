@@ -21,7 +21,9 @@
  (inline_tests
   (flags -verbose)
   (modes native)
-  (deps %{workspace_root}/.ocamlformat))
+  (deps %{workspace_root}/.ocamlformat)
+  (executable (link_flags -linkall -cclib -lblst))
+  (libraries bls12-381.archive))
  (preprocess (pps ppx_expect))
  (flags
   (:standard)

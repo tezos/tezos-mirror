@@ -471,7 +471,7 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
     ~operation_metadata_size_limit (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
   let store_root = Data_version.store_dir config.data_dir in
-  let context_root = Data_version.context_dir config.data_dir in
+  let context_root_dir = config.data_dir in
   let protocol_root = Data_version.protocol_dir config.data_dir in
   let genesis = config.blockchain_network.genesis in
   let (validator_env : Block_validator_process.validator_environment) =
@@ -488,7 +488,7 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
       let* store =
         Store.init
           ~store_dir:store_root
-          ~context_dir:context_root
+          ~context_root_dir
           ~allow_testchains:false
           ~readonly
           genesis
@@ -509,7 +509,7 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
                    data_dir = config.data_dir;
                    readonly;
                    genesis;
-                   context_root;
+                   context_root_dir = config.data_dir;
                    protocol_root;
                    sandbox_parameters = None;
                    user_activated_upgrades =
@@ -528,7 +528,7 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
       let* store =
         Store.init
           ~store_dir:store_root
-          ~context_dir:context_root
+          ~context_root_dir
           ~allow_testchains:false
           ~readonly
           ~commit_genesis
@@ -606,6 +606,19 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
       let*! () = Block_validator_process.close validator_process in
       Store.close_store store)
 
+let[@warning "-32"] may_start_profiler data_dir =
+  match Tezos_profiler_unix.Profiler_instance.selected_backend () with
+  | Some {instance_maker; _} -> (
+      let profiler_maker = instance_maker ~directory:data_dir in
+      Shell_profiling.activate_all ~profiler_maker ;
+      match profiler_maker ~name:"context" with
+      | Some instance ->
+          Tezos_protocol_environment.Environment_profiler.Context_ops_profiler
+          .plug
+            instance
+      | None -> ())
+  | None -> ()
+
 let run ?verbosity ~singleprocess ~strict ~repeat ~stats_output
     ~operation_metadata_size_limit (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
@@ -629,19 +642,7 @@ let run ?verbosity ~singleprocess ~strict ~repeat ~stats_output
   let*! () =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
-  (match Option.map String.lowercase_ascii @@ Sys.getenv_opt "PROFILING" with
-  | Some (("true" | "on" | "yes" | "terse" | "detailed" | "verbose") as mode) ->
-      let max_lod =
-        match mode with
-        | "detailed" -> Profiler.Detailed
-        | "verbose" -> Profiler.Verbose
-        | _ -> Profiler.Terse
-      in
-      let profiler_maker =
-        Tezos_shell.Profiler_directory.profiler_maker config.data_dir max_lod
-      in
-      Shell_profiling.activate_all ~profiler_maker
-  | _ -> ()) ;
+  () [@profiler.overwrite may_start_profiler config.data_dir] ;
   Updater.init (Data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(
     wrap_and_exit
@@ -705,7 +706,7 @@ let process verbosity singleprocess strict repeat blocks stats_output data_dir
       blocks
   in
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  match Lwt_main.run run with
+  match Tezos_base_unix.Event_loop.main_run run with
   | Ok () -> `Ok ()
   | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)
 

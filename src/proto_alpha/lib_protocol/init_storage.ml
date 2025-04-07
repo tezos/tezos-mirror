@@ -109,6 +109,25 @@ let patch_script ctxt (address, hash, patched_code) =
         address ;
       return ctxt
 
+let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
+  let open Lwt_result_syntax in
+  let* ctxt =
+    Raw_context.prepare
+      ~level
+      ~predecessor_timestamp
+      ~timestamp
+      ~adaptive_issuance_enable:false
+      ctxt
+  in
+  let* ctxt = Adaptive_issuance_storage.set_adaptive_issuance_enable ctxt in
+  Storage.Pending_migration.remove ctxt
+
+(* Start of code to remove at r022 automatic protocol snapshot *)
+
+(* Please add here any code that should be removed at the r022 automatic protocol snapshot *)
+
+(* End of code to remove at r022 automatic protocol snapshot *)
+
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   let open Lwt_result_syntax in
@@ -146,6 +165,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt = Forbidden_delegates_storage.init_for_genesis ctxt in
         let*! ctxt = Storage.Contract.Total_supply.add ctxt Tez_repr.zero in
         let* ctxt = Storage.Block_round.init ctxt Round_repr.zero in
+        let* ctxt = Storage.Consecutive_round_zero.init ctxt 0l in
         let init_commitment (ctxt, balance_updates)
             Commitment_repr.{blinded_public_key_hash; amount} =
           let* ctxt, new_balance_updates =
@@ -193,7 +213,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
             operation_results
         in
         let* ctxt = Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt in
-        let* ctxt = Adaptive_issuance_storage.init ctxt in
+        let* ctxt = Adaptive_issuance_storage.init_from_genesis ctxt in
         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
         (* Start of Alpha stitching. Comment used for automatic snapshot *)
     | Alpha ->
@@ -204,10 +224,14 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
+           When the predecessor will be R, then delete the code in validate.ml
+           dealing with the accusations around migration (the same todo can be
+           found there). *)
         return (ctxt, [])
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | Quebec ->
+    | R022 ->
         let* ctxt =
           Storage.Tenderbake.First_level_of_protocol.update ctxt level
         in
@@ -215,6 +239,10 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
+           When the predecessor will be R, then delete the code in validate.ml
+           dealing with the accusations around migration (the same todo can be
+           found there). *)
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in
@@ -225,24 +253,4 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
   let*! ctxt =
     Storage.Pending_migration.Balance_updates.add ctxt balance_updates
   in
-  if Constants_storage.adaptive_issuance_force_activation ctxt then
-    let ctxt = Raw_context.set_adaptive_issuance_enable ctxt in
-    let* ctxt =
-      let current_cycle = (Level_storage.current ctxt).cycle in
-      Storage.Adaptive_issuance.Activation.update ctxt (Some current_cycle)
-    in
-    return ctxt
-  else return ctxt
-
-let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
-  let open Lwt_result_syntax in
-  let* ctxt =
-    Raw_context.prepare
-      ~level
-      ~predecessor_timestamp
-      ~timestamp
-      ~adaptive_issuance_enable:false
-      ctxt
-  in
-  let* ctxt = Adaptive_issuance_storage.set_adaptive_issuance_enable ctxt in
-  Storage.Pending_migration.remove ctxt
+  return ctxt

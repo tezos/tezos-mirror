@@ -64,6 +64,7 @@ val job :
   ?artifacts:artifacts ->
   ?before_script:string list ->
   ?cache:cache list ->
+  ?id_tokens:id_tokens ->
   ?image:image ->
   ?interruptible:bool ->
   ?needs:need list ->
@@ -86,6 +87,7 @@ val job :
 (** [trigger_job child_pipeline_path] constructs a {!trigger_job} job. *)
 val trigger_job :
   ?needs:need list ->
+  ?inherit_:inherit_ ->
   ?rules:job_rule list ->
   ?stage:string ->
   ?when_:when_trigger_job ->

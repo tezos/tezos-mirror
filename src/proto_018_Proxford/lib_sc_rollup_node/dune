@@ -22,14 +22,14 @@
   octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
-  tezos-dac-lib
-  tezos-dac-client-lib
   octez-shell-libs.shell-services
   octez-l2-libs.smart-rollup
   octez-protocol-018-Proxford-libs.smart-rollup
   octez-protocol-018-Proxford-libs.smart-rollup-layer2
   octez-protocol-018-Proxford-libs.layer2-utils
   octez-l2-libs.layer2_store
+  octez-l2-libs.riscv_context
+  octez-l2-libs.irmin_context
   octez-crawler
   octez-libs.tree-encoding
   octez-libs.data-encoding
@@ -40,7 +40,7 @@
   aches-lwt
   octez-injector
   octez-smart-rollup-node-lib
-  octez-l2-libs.scoru-wasm
+  octez-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-fast
   octez-libs.crypto-dal
   octez-version.value)
@@ -59,15 +59,22 @@
   -open Tezos_protocol_018_Proxford_parameters
   -open Tezos_workers
   -open Tezos_dal_node_lib
-  -open Tezos_dac_lib
-  -open Tezos_dac_client_lib
   -open Tezos_shell_services
   -open Octez_smart_rollup
   -open Tezos_smart_rollup_018_Proxford
   -open Tezos_smart_rollup_layer2_018_Proxford
   -open Tezos_layer2_utils_018_Proxford
   -open Tezos_layer2_store
+  -open Tezos_layer2_riscv_context
+  -open Tezos_layer2_irmin_context
   -open Octez_crawler
   -open Octez_injector
   -open Octez_smart_rollup_node
   -open Tezos_crypto_dal))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls_aug = Tezos_crypto.Signature.Bls_aug\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V1")))

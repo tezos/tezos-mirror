@@ -34,11 +34,12 @@ fn posix_exit_mode(exit_mode: &ExitMode) -> Mode {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    use commands::{bench, debug, run};
+    use commands::{bench, debug, gdb_server, run};
     let cli = cli::parse();
     match cli.command {
         cli::Mode::Run(opts) => run(opts),
         cli::Mode::Debug(opts) => debug(opts),
         cli::Mode::Bench(opts) => bench(opts),
+        cli::Mode::GdbServer(opts) => gdb_server(opts),
     }
 }

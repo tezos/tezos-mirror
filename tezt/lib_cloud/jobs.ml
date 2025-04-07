@@ -12,7 +12,9 @@ module Cli = C
 
 let docker_build =
   let cache = Hashtbl.create 11 in
-  fun ?(docker_image = Env.Gcp {alias = Env.dockerfile_alias}) ~push () ->
+  fun ?(docker_image = Agent.Configuration.Gcp {alias = Env.dockerfile_alias})
+      ~push
+      () ->
     if Hashtbl.mem cache docker_image then (
       Log.info "Docker image is already built. Nothing to do" ;
       Lwt.return_unit)
@@ -57,6 +59,13 @@ let docker_build =
           "Could not find the dal_trusted_setup in %s. See README for more \
            information why such files are necessary."
           Path.dal_trusted_setup ;
+      (* For some docker images such as the one for Mac OS/X, it may
+         be useful to get access to the commit of the current
+         branch. *)
+      let* commit =
+        let* output = Process.run_and_read_stdout "git" ["rev-parse"; "HEAD"] in
+        Lwt.return (String.trim output)
+      in
       let args =
         match docker_image with
         | Gcp _ ->
@@ -64,7 +73,8 @@ let docker_build =
               ("SSH_PUBLIC_KEY", ssh_public_key);
               ("ZCASH_PARAMS_PATH", Path.zcash_params);
               ("DAL_TRUSTED_SETUP_PATH", Path.dal_trusted_setup);
-              ("BINARIES_DESTINATION_PATH", Path.default_binaries_path ());
+              ("BINARIES_DESTINATION_PATH", Env.binaries_path);
+              ("COMMIT", commit);
             ]
         | Octez_release {tag} ->
             [("SSH_PUBLIC_KEY", ssh_public_key); ("RELEASE_TAG", tag)]
@@ -124,20 +134,27 @@ let clean_up_vms () =
                     String.split_on_char '\n' output
                     |> List.filter (fun str -> str <> "")
                   in
-                  let main_image, other_images =
-                    List.partition
-                      (fun str ->
-                        str <> "netdata" && str <> "grafana"
-                        && str <> "prometheus")
-                      images_name
+                  let is_main_image image_name =
+                    (* The main image created by Terraform at the
+                       moment contains "--" in its name. This enables
+                       to identify this image uniquely. While this is
+                       not very robust, it should work for now. *)
+                    let re = Str.regexp_string "--" in
+                    try
+                      ignore (Str.search_forward re image_name 0) ;
+                      true
+                    with Not_found -> false
                   in
-                  if List.length main_image <> 1 then
+                  let main_images, other_images =
+                    List.partition is_main_image images_name
+                  in
+                  if List.length main_images <> 1 then
                     Test.fail
                       "Unexpected setting. All the docker images found: %s. \
-                       There should only be one image which is not 'netdata' \
-                       in this list"
+                       There should only be one image which contains '--' in \
+                       the list"
                       (String.concat ";" images_name) ;
-                  let main_image = List.hd main_image in
+                  let main_image = List.hd main_images in
                   let* _ =
                     Gcloud.compute_ssh
                       ~zone

@@ -176,7 +176,7 @@ pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> anyhow::Result<
 }
 
 // Used to store a blueprint made out of forced delayed transactions.
-pub fn store_immediate_blueprint<Host: Runtime>(
+pub fn store_forced_blueprint<Host: Runtime>(
     host: &mut Host,
     blueprint: Blueprint,
     number: U256,
@@ -423,11 +423,11 @@ fn read_all_chunks_and_validate<Host: Runtime>(
     }
 }
 
-pub fn read_next_blueprint<Host: Runtime>(
+pub fn read_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
+    number: U256,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
-    let number = read_next_blueprint_number(host)?;
     let blueprint_path = blueprint_path(number)?;
     let exists = host.store_has(&blueprint_path)?.is_some();
     if exists {
@@ -468,12 +468,21 @@ pub fn read_next_blueprint<Host: Runtime>(
     }
 }
 
+#[cfg(test)]
+pub fn read_next_blueprint<Host: Runtime>(
+    host: &mut Host,
+    config: &mut Configuration,
+) -> anyhow::Result<(Option<Blueprint>, usize)> {
+    let number = read_next_blueprint_number(host)?;
+    read_blueprint(host, config, number)
+}
+
 pub fn drop_blueprint<Host: Runtime>(host: &mut Host, number: U256) -> Result<(), Error> {
     let path = blueprint_path(number)?;
     host.store_delete(&path).map_err(Error::from)
 }
 
-pub fn clear_all_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+pub fn clear_all_blueprints<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     if host.store_has(&EVM_BLUEPRINTS)?.is_some() {
         Ok(host.store_delete(&EVM_BLUEPRINTS)?)
     } else {
@@ -488,7 +497,6 @@ mod tests {
     use crate::configuration::{DalConfiguration, Limits, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::storage::store_last_info_per_level_timestamp;
-    use crate::Timestamp;
     use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
@@ -526,6 +534,7 @@ mod tests {
             },
             limits: Limits::default(),
             enable_fa_bridge: false,
+            garbage_collect_blocks: false,
         };
 
         let dummy_tx_hash = Hash([0u8; TRANSACTION_HASH_SIZE]);
@@ -551,6 +560,7 @@ mod tests {
             number: U256::from(0),
             nb_chunks: 1u16,
             chunk_index: 0u16,
+            chain_id: None,
         };
 
         store_last_info_per_level_timestamp(&mut host, Timestamp::from(40)).unwrap();
@@ -612,6 +622,7 @@ mod tests {
             number: U256::from(0),
             nb_chunks: 1u16,
             chunk_index: 0u16,
+            chain_id: None,
         };
 
         let mut delayed_inbox =

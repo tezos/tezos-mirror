@@ -73,11 +73,15 @@ For instance:
 ::
 
     $ octez-client rpc get /chains/main/blocks/head/metadata
-      "next_protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
+      { "protocol": "PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i",
+        "next_protocol": "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im",
+        ... }
     $ octez-activate-alpha
       Injected BMV9KnSPE1yw
     $ octez-client rpc get /chains/main/blocks/head/metadata
-      "protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
+      { "protocol": "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im",
+        "next_protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
+        ... }
 
 We now have the possibility to send transactions to the sandboxed network.
 As the genesis block used to initialize the sandboxed network differs from the
@@ -121,6 +125,26 @@ Note that the ``bake for`` command of the client is exclusively for
 testing purposes, all baking should be done using the ``octez-baker``
 binary.
 
+We can now observe the transaction with:
+
+::
+
+   $ octez-client rpc get /chains/main/blocks/head
+     { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
+       ...
+       "header":
+         { "level": 2,
+           ... },
+       "operations":
+         [ ...
+           [ { ...
+               "contents":
+                 [ { "kind": "transaction",
+                     "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+                     "fee": "268", "counter": "2", "gas_limit": "169",
+                     "storage_limit": "0", "amount": "42000000",
+                     "destination": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+                     ... } ] } ] ]
 
 Tune protocol Alpha parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

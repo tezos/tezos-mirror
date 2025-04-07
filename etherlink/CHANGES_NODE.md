@@ -4,9 +4,590 @@
 
 ### Features
 
+- RPC node uses a private injector to bypass the excessive validations of
+  going through the public endpoint. Reads `--evm-node-private-endpoint` if
+  specified or the RW config private rpc if not. (!16664)
+- Supports native execution for the Calypso kernel. (!16728 !16729 !16734)
+
 ### Bug fixes
 
+- `eth_getLogs` now accepts `null` as a valid value for all its filter
+  parameters. (!16808)
+- Fixes switching to a history mode with a smaller retention period.
+  Previously, the command would succeed, but the node would keep using the
+  previous retention period. (!16798)
+
 ### Internals
+
+## Version 0.17 (2025-02-14)
+
+This release addresses several bugs reported by partners, notably around the
+transaction objects returned by the RPCs, notably for EIP-1559 transactions.
+
+The node will apply one migration to its internal store (version 19), meaning
+it is not possible to downgrade to the previous version.
+
+### Features
+
+- Adds `full` history mode, where the EVM node keeps all the blocks and transactions,
+  but still prunes state data. (!16584)
+
+### Bug Fixes
+
+- Advertises the correct history mode on start-up when it is not explicitely
+  set in the configuration file. (!16633)
+- Fixes a performance regression in the RPCs of the new block storage backend.
+  (!16659)
+- Fixes transaction objects returned by the RPCs for non-legacy transactions
+  (!16653 !16654 !16703 !16707)
+- Improves call traces of `DELEGATECALL` and `CALLCODE` for Bifrost (requires
+  native execution enabled with `--native-execution-policy rpcs_only` for
+  instance). (!16588)
+
+## Version 0.16 (2025-02-06)
+
+This release notably stabilizes the new storage for blocks (which
+significantly reduces the size of data directories), and the `rolling` history
+mode (which enables deployment where only the most recent states are kept).
+
+The node now uses this block storage by default for new deployments. Data
+directories created before this release will keep using the deprecated, legacy
+block storage. Migrating to the new block storage requires importing a
+snapshot. To give an example, Etherlink Mainnet archive nodes using the legacy
+storage require more than 250GBytes of disk, while the new block storage
+requires around 180GBytes.
+
+The `rolling` history mode can be enabled on new data directories by running
+`octez-evm-node config init --history-mode rolling:N`, where `N` is the number
+of days to keep, _before_ starting the node for the first time. For existing
+data directories, it is required to run the command `octez-evm-node switch
+history to rolling:N` when the node is stopped. At the time of releasing this
+version, a data directory of a node configured to use the `rolling:14` history
+mode requires around 13GBytes.
+
+The node will apply two migrations to its internal store (version 18), meaning
+it is not possible to downgrade to the previous version.
+
+### Features
+
+- Defaults to the new block storage, which significantly reduces the size of
+- New command `switch history to` which is now the only way to change history
+  mode for and already populated EVM node. (!16533)
+- CLI command `list events`, allows listing events relative to the EVM node. (!16446)
+- Reworks logs to be more compact and to respect other Octez logs format.
+  (!16265 !16508 !16518 !16521)
+- Added `elapsed_time` to the performance metrics, which exposes in seconds the
+  time since the node started. (!16551)
+
+### Bug fixes
+
+#### RPCs
+
+- `eth_estimateGas` now correctly interprets the block parameter. (!16423)
+- `eth_getLogs` now properly supports the [EIP-234]
+  introducing the `blockHash` parameter. (!16460)
+- `eth_getLogs` now returns an empty array instead of an error when `fromBlock`
+  is greater than `toBlock`.
+- Improves reliability of `debug_traceTransaction` when dealing with non
+  standard revert reasons. (!16415)
+- Fixes the encoding of state overrides for `eth_call` to correctly parse
+  `stateDiff`. Keeps the support for `state_diff` for now. (!16581)
+
+[EIP-234]: https://eips.ethereum.org/EIPS/eip-234
+
+#### UX
+
+- Disables the performance metrics if `ps` does not support the necessary CLI
+  arguments (typically, `ps` from BusyBox does not). (!16474)
+- Hides the logs of `du` on failure (typically when a directory does not
+  exist). (!16609)
+
+### Internal
+
+- Snapshot headers now include history mode to check they match on import and
+  and the node now refuses to import archive snapshots with less
+  history. (!16458)
+
+## Version 0.15 (2025-01-28)
+
+This release brings a number of quality of life improvements, including the
+support of the [`debug_traceBlockByNumber`] RPC for the `callTracer` tracer,
+the introducion of performance metrics which can be used to monitor the load
+induced by a node to its host system, improved performance for the Bifröst
+kernel when executed natively, as well as a number of bug fixes.
+
+[`debug_traceBlockByNumber`]: https://www.quicknode.com/docs/ethereum/debug_traceBlockByNumber
+
+This release will not apply any migration to the node’s store (version 16),
+meaning it is possible to downgrade to the previous version.
+
+### Features
+
+#### RPCs
+
+- Implements the RPC endpoint `debug_traceBlockByNumber`, with only the
+  `callTracer` at the moment. (!16164)
+- Improve performances of the kernel execution when the native execution is
+  enabled (*e.g.*, `--native-execution-policy rpcs_only`). As a reminder, to
+  this day only the [Bifröst kernel] can be executed natively by the EVM node.
+  (!16335)
+
+[Bifröst kernel]: https://medium.com/etherlink/announcing-bifr%C3%B6st-a-2nd-upgrade-proposal-for-etherlink-mainnet-ef1a7cf9715f
+
+#### Metrics
+
+- When the host running the node provides `ps`, `du` and `lsof`, the node will
+  now exports performance metrics. (!16367)
+
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Websocket connections with clients are monitored by default by sending regular
+  heartbeats. This feature can be disabled or tweaked by changing
+  `experimental_features.monitor_websocket_heartbeat` in the
+  configuration. (!16197)
+
+- The observer mode option `--init-from-snapshot` can now take an
+  snapshot provider url. the EVM node in will download and import a
+  recent snapshot from it instead of the trusted source for fresh data
+  directories. (!16138)
+
+### Bug fixes
+
+#### CLI
+
+- Fix the initial kernel used by default for Etherlink Mainnet (`--network
+  mainnet` on a newly created data directory). (!16409)
+
+#### RPCs
+
+- `eth_getLogs` now accepts `null` as a valid value for the `topics` parameter.
+  (!16357)
+- `eth_getLogs` now correctly interprets block numbers like `earliest`,
+  `finalized`, etc. They were all defaulting to `latest` before. (!16372)
+
+- New snapshot header for Sqlite3 block storage. Snapshots in the previous
+  format are called legacy as reported by the `snapshot info` command. (!16435)
+
+## Version 0.14 (2025-01-21)
+
+This version contains UX improvements for displaying progress regarding snapshot
+download/import with `--init-from-snapshot`, and fixes an issue where the `logs`
+events of the JSON-RPC method `eth_subscribe` on WebSockets (whose support by
+the EVM node remains experimental at this point) would not be notified.
+
+This release will not apply any migration to the node’s store (version 16),
+meaning it is possible to downgrade to the previous version.
+
+### Features
+
+- Periodically (every minute) reports the remaining number of bytes to download
+  for snapshots. (!16198)
+- Periodically (every minute) reports progress on the snapshot archive
+  decompression and extraction. (!16288)
+
+### Bug fixes
+
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Notify logs with `eth_subscribe` independently of block storage
+  backend. (!16258)
+
+## Version 0.13 (2025-01-09)
+
+This new version notably reduces the complexity to set up a new node for
+Etherlink Mainnet Beta and Etherlink Testnet. To give a concrete example, to
+start a new node on a fresh data dir for the Testnet is now as simple as:
+
+```
+octez-evm-node run observer --network testnet \
+    --dont-track-rollup-node \
+    --init-from-snapshot \
+    --data-dir foobar
+```
+
+If `foobar` does not exist, the Octez EVM Node will automatically download and
+import a snapshot, before starting to track the chain through the public
+endpoint. **For production deployment, you most likely need to configure
+with more care**.
+
+Additionally, the Octez EVM Node can now expose an **experimental** websocket
+endpoint. Not only does this endpoint support the same methods the HTTP
+endpoint, but it also implements the [`eth_subscribe`][eth-subscribe] method.
+
+[eth-subscribe]: https://docs.alchemy.com/reference/eth-subscribe
+
+To enable this feature, you need to modify the `config.json` file in the data
+directory of your node to enable `experimental_features.enable_websocket`. For
+instance, the following minimal `config.json` file can be used in conjunction
+with the minimal command-line example to start a node for the Testnet.
+
+```json
+{ "experimental_features": { "enable_websocket": true } }
+```
+
+The node should advertises the availibility of the websocket endpoint on
+startup.
+
+```
+Jan 08 17:33:39.911: the EVM node RPC server (resto) is listening to 127.0.0.1:8545
+Jan 08 17:33:39.911:   (websockets enabled)
+```
+
+We plan to stabilize the feature in a near future release.
+
+This release will apply one migration to the node’s store (version 16), meaning
+it is not possible to downgrade to the previous version.
+
+### Breaking Changes
+
+- Add a default value (1024) for the RPC `eth_feeHistory` `block_count`
+  parameters. Configuration can be `unlimited` if no maximum is wanted.
+  (!16150)
+
+### Features
+
+- The event `evm_context_processed_l1_level` now contains the latest finalized
+  blueprint in the event. (!15877)
+- It is now possible to specify the network an EVM node in observer mode is
+  expected to join (with the `--network` CLI argument)
+    - If `--network` is set, new sanity checks are done at startup to ensure
+      its data directory and upstream EVM node are consistent with the selected
+      network. (!16073)
+    - If `--network` is set, the EVM node will use default values for the upstream
+      EVM node and the preimages endpoint if they have not been set either through
+      the configuration file or a CLI argument (with `init config` and `run
+      observer` commands). (!16074 !16075)
+    - If `--network mainnet` is set, the EVM node no longer requires the initial
+      kernel used to originate Etherlink on Tezos mainnet to initialize the
+      data-dir of an observer node, though an initial kernel can still be provided.
+      (!16076)
+    - If both `--network` and `--init-from-snapshot` are set, the EVM node in
+      observer mode will download and import a recent snapshot from a trusted
+      source for fresh data directories. (!16093)
+- The `snapshot import` command can now download a snapshot if provided with a
+  URL instead of a path. (!16112)
+
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Experimental support for websockets on endpoints (`/ws` and `/private/ws`) for
+  JSON-RPC requests with feature flag `experimental_features.enable_websocket =
+  true`. (!15566, !16015)
+    - Added support for the WebSocket event `newHeads`, allowing clients to
+      receive real-time notifications of new blocks. (!15899)
+    - Added support for the WebSocket event `newPendingTransactions`, enabling
+      clients to receive real-time notifications of incoming pending
+      transactions. (!15991)
+    - Added support for the WebSocket event `logs`, enabling clients to receive
+      real-time notifications for contract events filtered by address and
+      topics. (!16011)
+    - Configurable maximum websocket message length (defaults to 4MB). (!16070)
+- History mode can now be selected with the parameter `history_mode`, `archive`
+  and `rolling`. If the mode is `rolling` it will use the field
+  `garbage_collect_parameters` to prune blocks, operations and states. (!16044)
+- Experimental support of ordering blueprints by they level for the
+  smart rollup node batcher. Activates the feature with the flag
+  `exprimental_features.blueprints_publisher_order_enabled`.
+  **Requires Octez Smart Rollup Node built from master.**. The
+  necessary feature on the Octez Smart Rollup node is not yet
+  released. (!15877)
+
+### Bug fixes
+
+- Observers will comply with the `keep_alive` configuration option when trying
+  to fetch the rollup address from their upstream EVM node. Before, it
+  would exit with an error even if `keep_alive` was set to `true`. (!16094)
+- Fixes invalid pending nonce for fresh accounts with pending transactions
+  in the transaction pool. (!16099)
+- Fixes invalid error on RPC `eth_coinbase` when `"params": []` was provided. (!16109)
+
+### Internals
+
+- Removes an internal check about DA fees in the node, improving the
+  performances of gas estimations. (!16055)
+
+## Version 0.12 (2024-12-17)
+
+This release notably addresses a bug introduced in the previous release,
+leading the data directory of the node to grow in size more than necessary.
+
+This release will apply one migration to the node’s store (version 15), meaning
+it is not possible to downgrade to the previous version.
+
+### Features
+
+#### UX
+
+- The sequencer can now handle when the delayed inbox is flushed to create
+  blueprints containing overdue items, for kernels advertizing it **(which is
+  not the case for Bifrost, currently activated on Etherlink Mainnet and
+  Testnet)**. It clears all blocks produced on its invalidated branch, then
+  starts a new one. (!15676)
+- If an observer detects a divergence between its local state and the branch
+  computed by the Rollup node it is connected to, it will reset its local state
+  to its latest finalized block instead of exiting. (!15751)
+- The node will no longer exit on invalid blueprint provided by its upstream
+  EVM node endpoint, and will instead keep waiting for a valid blueprint to be
+  provided. (!15751)
+
+#### Performances
+
+- The transaction's validation is now performed in native OCaml instead of
+  using the kernel's simulation, which makes the validation of transactions
+  on `eth_sendRawTransaction` faster. (!15958)
+
+### Bug fixes
+
+- Fixes the `store_move` host function implementation of the WASM Runtime host
+  function, that would copy only instead of moving a subtree. The main impact
+  of this bug was to needlessly increase the size of the node data directory.
+  (!16009)
+
+### Internals
+
+- Private RPCs stateValue and stateSubkeys can now take the block parameter,
+  e.g. `"params": ["/evm/chain_id", "finalized"]`. (!16010)
+
+## Version 0.11 (2024-12-11)
+
+In addition to several bug fixes and internal changes, this release introduces
+several exciting new features, notably including support for executing the
+Bifrost kernel natively, and an experimental alternative backend for the RPC
+server which shows promising results in terms of raw performances.
+
+This release will apply one migration to the node’s store (version 15), meaning
+it is not possible to downgrade to the previous version.
+
+### Features
+
+#### Performances
+
+- It is now possible to execute Bifrost (the kernel currently activated on
+  Etherlink Mainnet and Testnet) natively, which leads to improved
+  performances. For now, this features is disabled by default, but can be
+  enabled by setting the `kernel_execution.native_execution_policy` in your
+  configuration file, or with the `--native-execution-policy` CLI argument
+  (*e.g.*, in `run observer`). For now, we recommend against using
+  `--native-execution-policy always` in production. (!15736)
+
+#### UX
+
+- Gas estimation requires multiple kernel simulation. Every time a simulation
+  was performed we would pick a new simulation timestamp, which could
+  technically lead to a different execution. Changes the behavior to pick
+  a single timestamp per simulation. (!15889)
+- Internal error in the EVM context emits an event instead of silently
+  failing. (!15824)
+
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- The sequencer will use the `drop_duplicate` feature of the Rollup node when
+  publishing blueprints if it is configured to do so (with
+  `experimental_features.drop_duplicate_on_injection` is set to `true`).
+  **Requires a Rollup Node from version 21.0 or higher.** (!15867)
+- Experimental support for alternative RPC server backend
+  [Dream](https://aantron.github.io/dream) with feature flag
+  `experimental_features.rpc_server = "dream"`. (!15560)
+
+### Bug fixes
+
+#### RPCs
+
+- Fix the RPC mode having an outdated view of the latest finalized block of the
+  chain. (!15884)
+
+#### Structured logs
+
+- The `blueprint_applied` event now advertizes the correct processing time. It
+  was significantly underestimated before. (!15948)
+
+### Internals
+
+- Gas estimation requires multiple kernel simulation. Every time a simulation
+  was performed we would pick a new simulation timestamp, which could
+  technically lead to a different execution. Changes the behavior to pick
+  a single timestamp per simulation. (!15889)
+- Internal error in the EVM context emits an event instead of silently
+  failing. (!15824)
+- Garbage collector experimental feature keeps a number of chunks
+  rather than keeping "number of seconds" of history. For example, if
+  `split_frequency_in_seconds` is set to 86_400 (1 day) and `number_of_chunks`
+  is set to 7, the node will keep 7 days of history. (!15928)
+
+## Verson 0.10 (2024-12-02)
+
+This is a bug fixes release, fixing the memory leak of the node and improving
+the interoperability with MetaMask and other wallets setting arbitrary high gas
+limit on `eth_estimateGas` requests.
+
+This release will not apply any migration to the node’s store (version 14),
+meaning it is possible to downgrade to the previous version.
+
+### Bug fixes
+
+- Fix the memory leak observed in the EVM node, and improves performances for
+  blocks application and RPC requests requiring to execute the kernel. This is
+  achieved by switching to a dedicated WASM runtime, instead of using the one
+  developed for the rollup node. (!15389)
+- Do not fail on `eth_estimateGas` when the submitted gas is greater than 30M
+  gas, to support some wallets setting a very high gas limit to estimate gas.
+
+## Version 0.9 (2024-11-28)
+
+This is a bug fixes release, notably improving the tracking of rollup node
+events.
+
+This release will apply one migration to the node’s store (version 14), meaning
+it is not possible to downgrade to the previous version.
+
+### Bug fixes
+
+- Default rollup node port is 8932, not 8937. (!15701)
+- Make the rollup node follower more resilient. (!15745)
+
+### Internals
+
+- Use a single RPC (if the rollup node supports it) when fetching EVM events.
+  (!15629, !15703)
+- Private RPC `produceBlock` can produce a block without delayed transactions,
+  useful for testing purposes. (!15681)
+- Keep a buffer of finalized states if the rollup node is in advance. When
+  observer catches up, it checks provided blueprint against these finalized
+  states. (!15748)
+
+## Version 0.8 (2024-11-15)
+
+This is a bug fixes release, notably improving verbosity of the evm-node on
+communication errors with the rollup node.
+
+This release will not apply any migration to the node’s store (version 13),
+meaning it is possible to downgrade to the previous version.
+
+### Features
+
+#### Metrics
+
+- Adds `l1_level` to expose the last processed L1 block. If the node is connected
+  to a rollup node it should be close to the most recent finalized L1 block
+  on the network. (!15623)
+
+### Bug fixes
+
+- Fixes a race condition where rollup node follower would process start
+  processing a block before finishing the processing of its predecessor. (!15620)
+
+### Internals
+
+- Adds the duration of the blueprint application to the
+  `blueprint_applied` event. (!15505)
+- Adds the last processed L1 block in a new event `evm_context_processed_l1_level`. (!15623)
+- The gas estimation exits earlier if the simulation needs more than the
+  gas limit per transaction. It also supports custom maximum gas limit. (!15468)
+- Modify the blueprints publisher worker to log error when it crash
+  and make the node crash when it fails to add a blueprints into its
+  queue. (!15600)
+- Adds events for errors in evm events and rollup node
+  followers. (!15622)
+
+## Version 0.7 (2024-10-28)
+
+This is a bug fixes release, notably improving how the observer mode deals with
+many transactions coming from the same source when the finalized view is
+enabled.
+
+This release will not apply any migration to the node’s store (version 13),
+meaning it is possible to downgrade to the previous version.
+
+### Bug fixes
+
+#### RPCs
+
+- Forward transactions to the upstream EVM node without delay when running in
+  observer mode with the finalized view option enabled. This improves the UX of
+  the users of said node without sacrificing the security provided by the
+  finalized view. (!15453)
+- Fixes the `callTracer`’s output containing invalid UTF8 string on reverted
+  calls. (!15421)
+- The transaction pool has a limit of transactions per user, if the
+  limit is reached, the submitted must replace an existing transaction, that is
+  either a transaction with the same nonce, or replace the "largest" nonce
+  found in the transaction pool. It fixes the issue where the limit is reached
+  and the user cannot unlock the situation by itself as the node refuses
+  all transactions. (!15465)
+
+### Internals
+
+- Adds more information to the `blueprint_applied` event, including block
+  timestamp, number of transactions and gas used. (!15402)
+
+## Version 0.6 (2024-10-21)
+
+This release introduces a new, still experimental runtime to execute Etherlink
+kernel. It will eventually replace the general-purpose WASM runtime initially
+implemented for the Octez Rollup Node. This release also introduces a few
+metrics, to help with monitoring.
+
+The node will apply two migrations to its internal store (version 13), meaning
+it is not possible to downgrade to the previous version.
+
+### Features
+
+- The sequencer forwards the kernel upgrade event as soon as possible so
+  observers can download in advance the kernel. (!15276)
+
+#### RPCs
+
+- The experimental feature `node_transaction_validation` that enables validating
+  transactions in the node instead of invoking the kernel is now activated by
+  default. It does not change the notion of transaction validation but should
+  provide faster validation. (!15062)
+
+#### Metrics
+
+- Adds `time_waiting` to expose the time spent by client waiting for their
+  requests’ execution to start. (!15241)
+- Adds `queue_size` to expose the number of clients waiting for their turn in
+  the execution queue. (!15241)
+- Add `gas_price` to expose the gas price of the latest block. (!15239)
+
+#### Experimental
+
+- The new WASM Runtime can be enabled by setting
+  `experimental_features.next_wasm_runtime` to `true` in the  configuration
+  file. It brings better performances (especially for short calls to the
+  kernel), and fixes the memory leak that was affecting the node since its
+  beginnings. (!15025 !15039 !15017 !15272 !15269)
+
+### Bug fixes
+
+- The node will no longer crash when catching-up if it cannot fetch a blueprint
+  from its upstream EVM node. Instead, it will retry as many time as necessary.
+  This is aligned with the behavior of the node when it is up-to-date with its
+  upstream node. (!15232)
+- The node will now create its daily logs file with Unix read permission
+  granted to the group owning them. This makes them easier to collect by
+  an external process like `promtail`. (!15227)
+- Fix file descriptor leak in resto for connections with the rollup
+  node. (!15322)
 
 ## Version 0.5 (2024-09-27)
 

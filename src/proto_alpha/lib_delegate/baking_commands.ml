@@ -305,12 +305,11 @@ let get_delegates (cctxt : Protocol_client_context.full)
     (pkhs : Signature.public_key_hash list) =
   let open Lwt_result_syntax in
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
-    {
-      Baking_state.alias = Some alias;
-      public_key_hash;
-      public_key;
-      secret_key_uri;
-    }
+    Baking_state.Consensus_key.make
+      ~alias:(Some alias)
+      ~public_key_hash
+      ~public_key
+      ~secret_key_uri
   in
   let* delegates =
     if pkhs = [] then
@@ -329,7 +328,8 @@ let get_delegates (cctxt : Protocol_client_context.full)
       cctxt
       (List.filter_map
          (function
-           | {Baking_state.alias = Some alias; _} -> Some alias | _ -> None)
+           | {Baking_state.Consensus_key.alias = Some alias; _} -> Some alias
+           | _ -> None)
          delegates)
   in
   let delegates_no_duplicates = List.sort_uniq compare delegates in
@@ -350,13 +350,21 @@ let sources_param =
          "name of the delegate owning the attestation/baking right or name of \
           the consensus key signing on the delegate's behalf")
 
-let endpoint_arg =
+let dal_node_endpoint_arg =
   let open Lwt_result_syntax in
   Tezos_clic.arg
     ~long:"dal-node"
     ~placeholder:"uri"
     ~doc:"endpoint of the DAL node, e.g. 'http://localhost:8933'"
     (Tezos_clic.parameter (fun _ s -> return @@ Uri.of_string s))
+
+let without_dal_arg =
+  Tezos_clic.switch
+    ~long:"without-dal"
+    ~doc:
+      "If without-dal flag is set, the daemon will not try to connect to a DAL \
+       node."
+    ()
 
 let block_count_arg =
   Tezos_clic.default_arg
@@ -515,7 +523,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          context_path_arg
          adaptive_issuance_vote_arg
          do_not_monitor_node_mempool_arg
-         endpoint_arg
+         dal_node_endpoint_arg
          block_count_arg
          state_recorder_switch_arg)
       (prefixes ["bake"; "for"] @@ sources_param)
@@ -661,6 +669,19 @@ let pre_emptive_forge_time_arg =
          try return (Q.of_string s)
          with _ -> failwith "pre-emptive-forge-time expected int or float."))
 
+let remote_calls_timeout_arg =
+  let open Lwt_result_syntax in
+  Tezos_clic.arg
+    ~long:"remote-calls-timeout"
+    ~placeholder:"seconds"
+    ~doc:
+      "Sets a timeout for client calls such as signing block header or \
+       attestation and for the creation of deterministic nonce. Use only if \
+       your remote signer can handle concurrent requests."
+    (Tezos_clic.parameter (fun _ s ->
+         try return (Q.of_string s)
+         with _ -> failwith "remote-calls-timeout expected int or float."))
+
 let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
   let open Lwt_syntax in
   let default_filename = Per_block_vote_file.default_vote_json_filename in
@@ -677,10 +698,46 @@ let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
   let base_dir_file = Filename.Infix.(cctxt#get_base_dir // default_filename) in
   when_s file_exists base_dir_file @@ fun () -> return_none
 
+(* This function checks that a DAL node endpoint was given,
+   and that the specified DAL node is "healthy",
+   (the DAL's nodes 'health' RPC is used for that). *)
+let check_dal_node =
+  let last_check_successful = ref false in
+  fun without_dal dal_node_rpc_ctxt ->
+    let open Lwt_result_syntax in
+    let result_emit f x =
+      let*! () = Events.emit f x in
+      return_unit
+    in
+    match (dal_node_rpc_ctxt, without_dal) with
+    | None, true ->
+        (* The user is aware that no DAL node is running, since they explicitly
+           used the [--without-dal] option. However, we do not want to reduce the
+           exposition of bakers to warnings about DAL, so we keep it. *)
+        result_emit Events.no_dal_node_provided ()
+    | None, false -> tzfail No_dal_node_endpoint
+    | Some _, true -> tzfail Incompatible_dal_options
+    | Some ctxt, false -> (
+        let*! health = Node_rpc.get_dal_health ctxt in
+        match health with
+        | Ok health -> (
+            match health.status with
+            | Tezos_dal_node_services.Types.Health.Up ->
+                if !last_check_successful then return_unit
+                else (
+                  last_check_successful := true ;
+                  result_emit Events.healthy_dal_node ())
+            | _ ->
+                last_check_successful := false ;
+                result_emit Events.unhealthy_dal_node (ctxt#base, health))
+        | Error _ ->
+            last_check_successful := false ;
+            result_emit Events.unreachable_dal_node ctxt#base)
+
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args15
+  Tezos_clic.args17
     pidfile_arg
     node_version_check_bypass_arg
     node_version_allowed_arg
@@ -693,9 +750,11 @@ let baker_args =
     adaptive_issuance_vote_arg
     per_block_vote_file_arg
     operations_arg
-    endpoint_arg
+    dal_node_endpoint_arg
+    without_dal_arg
     state_recorder_switch_arg
     pre_emptive_forge_time_arg
+    remote_calls_timeout_arg
 
 let run_baker
     ( pidfile,
@@ -711,8 +770,10 @@ let run_baker
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint,
+      without_dal,
       state_recorder,
-      pre_emptive_forge_time ) baking_mode sources cctxt =
+      pre_emptive_forge_time,
+      remote_calls_timeout ) baking_mode sources cctxt =
   let open Lwt_result_syntax in
   may_lock_pidfile pidfile @@ fun () ->
   let* () =
@@ -737,11 +798,11 @@ let run_baker
   let dal_node_rpc_ctxt =
     Option.map create_dal_node_rpc_ctxt dal_node_endpoint
   in
+  let* () = check_dal_node without_dal dal_node_rpc_ctxt in
   let* delegates = get_delegates cctxt sources in
   let context_path =
     match baking_mode with
-    | Local {local_data_dir_path} ->
-        Some Filename.Infix.(local_data_dir_path // "context")
+    | Local {local_data_dir_path} -> Some local_data_dir_path
     | Remote -> None
   in
   Client_daemon.Baker.run
@@ -754,6 +815,7 @@ let run_baker
     ?extra_operations
     ?pre_emptive_forge_time
     ?force_apply_from_round
+    ?remote_calls_timeout
     ~chain:cctxt#chain
     ?context_path
     ~keep_alive

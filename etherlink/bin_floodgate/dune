@@ -1,0 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (public_name floodgate)
+ (package floodgate)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  bls12-381.archive
+  octez-evm-node-libs.evm_node_rust_deps
+  octez-libs.base
+  octez-libs.base.unix
+  efunc_core
+  octez-libs.rpc-http-client-unix
+  octez-libs.clic
+  octez-evm-node-libs.evm_node_lib_dev
+  octez-evm-node-libs.evm_node_lib_dev_encoding
+  octez-evm-node-libs.evm_node_config
+  octez-libs.tezos-workers)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Evm_node_lib_dev
+  -open Evm_node_lib_dev_encoding
+  -open Evm_node_config))

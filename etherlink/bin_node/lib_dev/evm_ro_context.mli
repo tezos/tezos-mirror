@@ -8,6 +8,7 @@
 type t = {
   preimages : string;
   preimages_endpoint : Uri.t option;
+  native_execution_policy : Configuration.native_execution_policy;
   data_dir : string;
   store : Evm_store.t;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
@@ -21,8 +22,12 @@ type t = {
     over as many processes.
 
     If [smart_rollup_address] is omitted, the argument is fetched from the
-    store. *)
+    store.
+
+    If [network] is set, the function performs additional sanity checks to
+    ensure its local context is consistent with the expected network. *)
 val load :
+  ?network:Configuration.supported_network ->
   ?smart_rollup_address:Address.t ->
   data_dir:string ->
   Configuration.t ->
@@ -56,3 +61,5 @@ val replay :
 
 val evm_services_methods :
   t -> Configuration.time_between_blocks -> Rpc_server.evm_services_methods
+
+val blueprints_range : t -> Blueprints_publisher.blueprints_range

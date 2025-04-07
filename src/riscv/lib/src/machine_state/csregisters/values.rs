@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -6,17 +7,24 @@ mod mstatus;
 mod xip;
 
 use super::{
-    effects::{handle_csr_effect, NoEffect},
-    root::RootCSRegister,
     CSRegisters,
+    effects::{NoEffect, handle_csr_effect},
+    root::RootCSRegister,
 };
+use crate::state_backend::proof_backend::merkle::{AccessInfo, AccessInfoAggregatable};
 use crate::{
     bits::Bits64,
     state_backend::{
-        hash::{Hash, HashError, RootHashable},
-        AllocatedOf, Choreographer, EffectCell, EffectCellLayout, Layout, ManagerAlloc,
-        ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite, PlacedOf, Ref,
+        AllocatedOf, Cell, CommitmentLayout, EffectCell, EffectCellLayout, FnManager,
+        FromProofResult, Layout, ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite,
+        ManagerSerialise, ManagerWrite, ProofLayout, ProofPart, ProofTree, Ref,
+        RefProofGenOwnedAlloc,
+        hash::{Hash, HashError},
+        owned_backend::Owned,
+        proof_backend::merkle::MerkleTree,
+        verify_backend,
     },
+    storage::binary,
 };
 use mstatus::MStatusLayout;
 pub(super) use mstatus::MStatusValue;
@@ -71,12 +79,15 @@ impl<M: ManagerBase> CSRValues<M> {
         space.map(MStatusValue::bind, XipCell::bind::<M>, EffectCell::bind)
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<CSRValuesLayout, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<CSRValuesLayout, F::Output> {
         self.as_ref().map(
-            |mstatus| mstatus.struct_ref(),
+            |mstatus| mstatus.struct_ref::<F>(),
             |xip| xip.struct_ref(),
-            |raw| raw.struct_ref(),
+            |raw| raw.struct_ref::<F>(),
         )
     }
 }
@@ -131,34 +142,97 @@ impl<M: ManagerBase> CSRegisters<M> {
 pub struct CSRValuesLayout;
 
 impl Layout for CSRValuesLayout {
-    type Placed = CSRValuesF<
-        PlacedOf<EffectCellLayout<CSRRepr>>,
-        PlacedOf<MStatusLayout>,
-        PlacedOf<XipCellLayout>,
-    >;
-
     type Allocated<M: ManagerBase> = CSRValuesF<
         AllocatedOf<EffectCellLayout<CSRRepr>, M>,
         AllocatedOf<MStatusLayout, M>,
         AllocatedOf<XipCellLayout, M>,
     >;
 
-    fn place_with(alloc: &mut Choreographer) -> Self::Placed {
-        let alloc = std::cell::RefCell::new(alloc);
-        Self::Placed::new(
-            || MStatusLayout::place_with(&mut alloc.borrow_mut()),
-            || XipCellLayout::place_with(&mut alloc.borrow_mut()),
-            || EffectCellLayout::<CSRRepr>::place_with(&mut alloc.borrow_mut()),
+    fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
+        let backend = std::cell::RefCell::new(backend);
+        Self::Allocated::new(
+            || MStatusLayout::allocate(*backend.borrow_mut()),
+            || XipCellLayout::allocate(*backend.borrow_mut()),
+            || EffectCellLayout::<CSRRepr>::allocate(*backend.borrow_mut()),
         )
     }
+}
 
-    fn allocate<M: ManagerAlloc>(backend: &mut M, placed: Self::Placed) -> Self::Allocated<M> {
-        let backend = std::cell::RefCell::new(backend);
-        placed.map(
-            |placed| MStatusLayout::allocate(*backend.borrow_mut(), placed),
-            |placed| XipCellLayout::allocate(*backend.borrow_mut(), placed),
-            |placed| EffectCellLayout::<CSRRepr>::allocate(*backend.borrow_mut(), placed),
-        )
+impl CommitmentLayout for CSRValuesLayout {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
+        Hash::blake2b_hash(state)
+    }
+}
+
+impl ProofLayout for CSRValuesLayout {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+        let serialised = binary::serialise(&state)?;
+        MerkleTree::make_merkle_leaf(serialised, state.aggregate_access_info())
+    }
+
+    fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
+        fn make_absent() -> AllocatedOf<CSRValuesLayout, verify_backend::Verifier> {
+            CSRValuesF::new(
+                || mstatus::MStatusLayoutF {
+                    sie: Cell::absent(),
+                    mie: Cell::absent(),
+                    spie: Cell::absent(),
+                    ube: Cell::absent(),
+                    mpie: Cell::absent(),
+                    spp: Cell::absent(),
+                    mpp: Cell::absent(),
+                    fs: Cell::absent(),
+                    xs: Cell::absent(),
+                    mprv: Cell::absent(),
+                    sum: Cell::absent(),
+                    mxr: Cell::absent(),
+                    tvm: Cell::absent(),
+                    tw: Cell::absent(),
+                    tsr: Cell::absent(),
+                    uxl: Cell::absent(),
+                    sxl: Cell::absent(),
+                    sbe: Cell::absent(),
+                    mbe: Cell::absent(),
+                },
+                || (),
+                || Cell::bind(verify_backend::Region::Absent),
+            )
+        }
+
+        let leaf = proof.into_leaf()?;
+        let cell = match leaf {
+            ProofPart::Absent => make_absent(),
+            ProofPart::Present(data) => {
+                let values: AllocatedOf<CSRValuesLayout, Owned> = binary::deserialise(data)?;
+                values.map(
+                    |mstatus| mstatus::MStatusLayoutF {
+                        sie: Cell::from_owned(mstatus.sie),
+                        mie: Cell::from_owned(mstatus.mie),
+                        spie: Cell::from_owned(mstatus.spie),
+                        ube: Cell::from_owned(mstatus.ube),
+                        mpie: Cell::from_owned(mstatus.mpie),
+                        spp: Cell::from_owned(mstatus.spp),
+                        mpp: Cell::from_owned(mstatus.mpp),
+                        fs: Cell::from_owned(mstatus.fs),
+                        xs: Cell::from_owned(mstatus.xs),
+                        mprv: Cell::from_owned(mstatus.mprv),
+                        sum: Cell::from_owned(mstatus.sum),
+                        mxr: Cell::from_owned(mstatus.mxr),
+                        tvm: Cell::from_owned(mstatus.tvm),
+                        tw: Cell::from_owned(mstatus.tw),
+                        tsr: Cell::from_owned(mstatus.tsr),
+                        uxl: Cell::from_owned(mstatus.uxl),
+                        sxl: Cell::from_owned(mstatus.sxl),
+                        sbe: Cell::from_owned(mstatus.sbe),
+                        mbe: Cell::from_owned(mstatus.mbe),
+                    },
+                    |()| (),
+                    Cell::from_owned,
+                )
+            }
+        };
+
+        Ok(cell)
     }
 }
 
@@ -1394,11 +1468,250 @@ impl<Raw, MStatus, MIP> CSRValuesF<Raw, MStatus, MIP> {
     }
 }
 
-impl<Raw: serde::Serialize, MStatus: serde::Serialize, MIP: serde::Serialize> RootHashable
-    for CSRValuesF<Raw, MStatus, MIP>
+impl<Raw, MStatus, MIP> AccessInfoAggregatable for CSRValuesF<Raw, MStatus, MIP>
+where
+    Raw: AccessInfoAggregatable + serde::Serialize,
+    MStatus: AccessInfoAggregatable + serde::Serialize,
+    MIP: AccessInfoAggregatable + serde::Serialize,
 {
-    fn hash(&self) -> Result<Hash, HashError> {
-        Hash::blake2b_hash(self)
+    fn aggregate_access_info(&self) -> AccessInfo {
+        let children = [
+            self.mstatus.aggregate_access_info(),
+            self.mip.aggregate_access_info(),
+            self.mnscratch.aggregate_access_info(),
+            self.mnepc.aggregate_access_info(),
+            self.mncause.aggregate_access_info(),
+            self.mnstatus.aggregate_access_info(),
+            self.cycle.aggregate_access_info(),
+            self.time.aggregate_access_info(),
+            self.instret.aggregate_access_info(),
+            self.mcycle.aggregate_access_info(),
+            self.minstret.aggregate_access_info(),
+            self.hpmcounter3.aggregate_access_info(),
+            self.hpmcounter4.aggregate_access_info(),
+            self.hpmcounter5.aggregate_access_info(),
+            self.hpmcounter6.aggregate_access_info(),
+            self.hpmcounter7.aggregate_access_info(),
+            self.hpmcounter8.aggregate_access_info(),
+            self.hpmcounter9.aggregate_access_info(),
+            self.hpmcounter10.aggregate_access_info(),
+            self.hpmcounter11.aggregate_access_info(),
+            self.hpmcounter12.aggregate_access_info(),
+            self.hpmcounter13.aggregate_access_info(),
+            self.hpmcounter14.aggregate_access_info(),
+            self.hpmcounter15.aggregate_access_info(),
+            self.hpmcounter16.aggregate_access_info(),
+            self.hpmcounter17.aggregate_access_info(),
+            self.hpmcounter18.aggregate_access_info(),
+            self.hpmcounter19.aggregate_access_info(),
+            self.hpmcounter20.aggregate_access_info(),
+            self.hpmcounter21.aggregate_access_info(),
+            self.hpmcounter22.aggregate_access_info(),
+            self.hpmcounter23.aggregate_access_info(),
+            self.hpmcounter24.aggregate_access_info(),
+            self.hpmcounter25.aggregate_access_info(),
+            self.hpmcounter26.aggregate_access_info(),
+            self.hpmcounter27.aggregate_access_info(),
+            self.hpmcounter28.aggregate_access_info(),
+            self.hpmcounter29.aggregate_access_info(),
+            self.hpmcounter30.aggregate_access_info(),
+            self.hpmcounter31.aggregate_access_info(),
+            self.mhpmcounter3.aggregate_access_info(),
+            self.mhpmcounter4.aggregate_access_info(),
+            self.mhpmcounter5.aggregate_access_info(),
+            self.mhpmcounter6.aggregate_access_info(),
+            self.mhpmcounter7.aggregate_access_info(),
+            self.mhpmcounter8.aggregate_access_info(),
+            self.mhpmcounter9.aggregate_access_info(),
+            self.mhpmcounter10.aggregate_access_info(),
+            self.mhpmcounter11.aggregate_access_info(),
+            self.mhpmcounter12.aggregate_access_info(),
+            self.mhpmcounter13.aggregate_access_info(),
+            self.mhpmcounter14.aggregate_access_info(),
+            self.mhpmcounter15.aggregate_access_info(),
+            self.mhpmcounter16.aggregate_access_info(),
+            self.mhpmcounter17.aggregate_access_info(),
+            self.mhpmcounter18.aggregate_access_info(),
+            self.mhpmcounter19.aggregate_access_info(),
+            self.mhpmcounter20.aggregate_access_info(),
+            self.mhpmcounter21.aggregate_access_info(),
+            self.mhpmcounter22.aggregate_access_info(),
+            self.mhpmcounter23.aggregate_access_info(),
+            self.mhpmcounter24.aggregate_access_info(),
+            self.mhpmcounter25.aggregate_access_info(),
+            self.mhpmcounter26.aggregate_access_info(),
+            self.mhpmcounter27.aggregate_access_info(),
+            self.mhpmcounter28.aggregate_access_info(),
+            self.mhpmcounter29.aggregate_access_info(),
+            self.mhpmcounter30.aggregate_access_info(),
+            self.mhpmcounter31.aggregate_access_info(),
+            self.mhpmevent3.aggregate_access_info(),
+            self.mhpmevent4.aggregate_access_info(),
+            self.mhpmevent5.aggregate_access_info(),
+            self.mhpmevent6.aggregate_access_info(),
+            self.mhpmevent7.aggregate_access_info(),
+            self.mhpmevent8.aggregate_access_info(),
+            self.mhpmevent9.aggregate_access_info(),
+            self.mhpmevent10.aggregate_access_info(),
+            self.mhpmevent11.aggregate_access_info(),
+            self.mhpmevent12.aggregate_access_info(),
+            self.mhpmevent13.aggregate_access_info(),
+            self.mhpmevent14.aggregate_access_info(),
+            self.mhpmevent15.aggregate_access_info(),
+            self.mhpmevent16.aggregate_access_info(),
+            self.mhpmevent17.aggregate_access_info(),
+            self.mhpmevent18.aggregate_access_info(),
+            self.mhpmevent19.aggregate_access_info(),
+            self.mhpmevent20.aggregate_access_info(),
+            self.mhpmevent21.aggregate_access_info(),
+            self.mhpmevent22.aggregate_access_info(),
+            self.mhpmevent23.aggregate_access_info(),
+            self.mhpmevent24.aggregate_access_info(),
+            self.mhpmevent25.aggregate_access_info(),
+            self.mhpmevent26.aggregate_access_info(),
+            self.mhpmevent27.aggregate_access_info(),
+            self.mhpmevent28.aggregate_access_info(),
+            self.mhpmevent29.aggregate_access_info(),
+            self.mhpmevent30.aggregate_access_info(),
+            self.mhpmevent31.aggregate_access_info(),
+            self.mcountinhibit.aggregate_access_info(),
+            self.scounteren.aggregate_access_info(),
+            self.mcounteren.aggregate_access_info(),
+            self.fcsr.aggregate_access_info(),
+            self.pmpcfg0.aggregate_access_info(),
+            self.pmpcfg2.aggregate_access_info(),
+            self.pmpcfg4.aggregate_access_info(),
+            self.pmpcfg6.aggregate_access_info(),
+            self.pmpcfg8.aggregate_access_info(),
+            self.pmpcfg10.aggregate_access_info(),
+            self.pmpcfg12.aggregate_access_info(),
+            self.pmpcfg14.aggregate_access_info(),
+            self.pmpaddr0.aggregate_access_info(),
+            self.pmpaddr1.aggregate_access_info(),
+            self.pmpaddr2.aggregate_access_info(),
+            self.pmpaddr3.aggregate_access_info(),
+            self.pmpaddr4.aggregate_access_info(),
+            self.pmpaddr5.aggregate_access_info(),
+            self.pmpaddr6.aggregate_access_info(),
+            self.pmpaddr7.aggregate_access_info(),
+            self.pmpaddr8.aggregate_access_info(),
+            self.pmpaddr9.aggregate_access_info(),
+            self.pmpaddr10.aggregate_access_info(),
+            self.pmpaddr11.aggregate_access_info(),
+            self.pmpaddr12.aggregate_access_info(),
+            self.pmpaddr13.aggregate_access_info(),
+            self.pmpaddr14.aggregate_access_info(),
+            self.pmpaddr15.aggregate_access_info(),
+            self.pmpaddr16.aggregate_access_info(),
+            self.pmpaddr17.aggregate_access_info(),
+            self.pmpaddr18.aggregate_access_info(),
+            self.pmpaddr19.aggregate_access_info(),
+            self.pmpaddr20.aggregate_access_info(),
+            self.pmpaddr21.aggregate_access_info(),
+            self.pmpaddr22.aggregate_access_info(),
+            self.pmpaddr23.aggregate_access_info(),
+            self.pmpaddr24.aggregate_access_info(),
+            self.pmpaddr25.aggregate_access_info(),
+            self.pmpaddr26.aggregate_access_info(),
+            self.pmpaddr27.aggregate_access_info(),
+            self.pmpaddr28.aggregate_access_info(),
+            self.pmpaddr29.aggregate_access_info(),
+            self.pmpaddr30.aggregate_access_info(),
+            self.pmpaddr31.aggregate_access_info(),
+            self.pmpaddr32.aggregate_access_info(),
+            self.pmpaddr33.aggregate_access_info(),
+            self.pmpaddr34.aggregate_access_info(),
+            self.pmpaddr35.aggregate_access_info(),
+            self.pmpaddr36.aggregate_access_info(),
+            self.pmpaddr37.aggregate_access_info(),
+            self.pmpaddr38.aggregate_access_info(),
+            self.pmpaddr39.aggregate_access_info(),
+            self.pmpaddr40.aggregate_access_info(),
+            self.pmpaddr41.aggregate_access_info(),
+            self.pmpaddr42.aggregate_access_info(),
+            self.pmpaddr43.aggregate_access_info(),
+            self.pmpaddr44.aggregate_access_info(),
+            self.pmpaddr45.aggregate_access_info(),
+            self.pmpaddr46.aggregate_access_info(),
+            self.pmpaddr47.aggregate_access_info(),
+            self.pmpaddr48.aggregate_access_info(),
+            self.pmpaddr49.aggregate_access_info(),
+            self.pmpaddr50.aggregate_access_info(),
+            self.pmpaddr51.aggregate_access_info(),
+            self.pmpaddr52.aggregate_access_info(),
+            self.pmpaddr53.aggregate_access_info(),
+            self.pmpaddr54.aggregate_access_info(),
+            self.pmpaddr55.aggregate_access_info(),
+            self.pmpaddr56.aggregate_access_info(),
+            self.pmpaddr57.aggregate_access_info(),
+            self.pmpaddr58.aggregate_access_info(),
+            self.pmpaddr59.aggregate_access_info(),
+            self.pmpaddr60.aggregate_access_info(),
+            self.pmpaddr61.aggregate_access_info(),
+            self.pmpaddr62.aggregate_access_info(),
+            self.pmpaddr63.aggregate_access_info(),
+            self.mhartid.aggregate_access_info(),
+            self.mvendorid.aggregate_access_info(),
+            self.marchid.aggregate_access_info(),
+            self.mimpid.aggregate_access_info(),
+            self.misa.aggregate_access_info(),
+            self.mscratch.aggregate_access_info(),
+            self.sscratch.aggregate_access_info(),
+            self.stvec.aggregate_access_info(),
+            self.mtvec.aggregate_access_info(),
+            self.mie.aggregate_access_info(),
+            self.satp.aggregate_access_info(),
+            self.scause.aggregate_access_info(),
+            self.mcause.aggregate_access_info(),
+            self.sepc.aggregate_access_info(),
+            self.mepc.aggregate_access_info(),
+            self.stval.aggregate_access_info(),
+            self.mtval.aggregate_access_info(),
+            self.mtval2.aggregate_access_info(),
+            self.mtinst.aggregate_access_info(),
+            self.senvcfg.aggregate_access_info(),
+            self.menvcfg.aggregate_access_info(),
+            self.mconfigptr.aggregate_access_info(),
+            self.medeleg.aggregate_access_info(),
+            self.mideleg.aggregate_access_info(),
+            self.mseccfg.aggregate_access_info(),
+            self.scontext.aggregate_access_info(),
+            self.hstatus.aggregate_access_info(),
+            self.hedeleg.aggregate_access_info(),
+            self.hideleg.aggregate_access_info(),
+            self.hie.aggregate_access_info(),
+            self.hcounteren.aggregate_access_info(),
+            self.hgeie.aggregate_access_info(),
+            self.htval.aggregate_access_info(),
+            self.hip.aggregate_access_info(),
+            self.hvip.aggregate_access_info(),
+            self.htinst.aggregate_access_info(),
+            self.hgeip.aggregate_access_info(),
+            self.henvcfg.aggregate_access_info(),
+            self.hgatp.aggregate_access_info(),
+            self.hcontext.aggregate_access_info(),
+            self.htimedelta.aggregate_access_info(),
+            self.vsstatus.aggregate_access_info(),
+            self.vsie.aggregate_access_info(),
+            self.vstvec.aggregate_access_info(),
+            self.vsscratch.aggregate_access_info(),
+            self.vsepc.aggregate_access_info(),
+            self.vscause.aggregate_access_info(),
+            self.vstval.aggregate_access_info(),
+            self.vsip.aggregate_access_info(),
+            self.vsatp.aggregate_access_info(),
+            self.tselect.aggregate_access_info(),
+            self.tdata1.aggregate_access_info(),
+            self.tdata2.aggregate_access_info(),
+            self.tdata3.aggregate_access_info(),
+            self.tcontrol.aggregate_access_info(),
+            self.mcontext.aggregate_access_info(),
+            self.dcsr.aggregate_access_info(),
+            self.dpc.aggregate_access_info(),
+            self.dscratch0.aggregate_access_info(),
+            self.dscratch1.aggregate_access_info(),
+        ];
+        AccessInfo::fold(&children)
     }
 }
 

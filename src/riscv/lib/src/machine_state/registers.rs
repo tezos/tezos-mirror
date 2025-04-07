@@ -6,14 +6,26 @@
 // specification.
 #![allow(non_upper_case_globals)]
 
-use crate::machine_state::backend;
+use crate::{default::ConstDefault, machine_state::backend};
 use arbitrary_int::u5;
 use std::fmt;
 
 /// Integer register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    strum::EnumIter,
+)]
 pub enum XRegister {
     // The `usize` representation of these constructors shall be used as an
     // index into the 31-element array holding the registers.
@@ -148,6 +160,15 @@ impl XRegister {
     }
 }
 
+impl From<NonZeroXRegister> for XRegister {
+    fn from(r: NonZeroXRegister) -> Self {
+        // SAFETY: XRegister is a superset of NonZeroXRegister,
+        // so any value of NonZeroXRegister is known to be
+        // a valid value of XRegister.
+        unsafe { std::mem::transmute(r) }
+    }
+}
+
 /// Integer register value
 pub type XValue = u64;
 
@@ -165,9 +186,12 @@ impl<M: backend::ManagerBase> XRegisters<M> {
         XRegisters { registers: space }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> backend::AllocatedOf<XRegistersLayout, backend::Ref<'_, M>> {
-        self.registers.struct_ref()
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<XRegistersLayout, F::Output> {
+        self.registers.struct_ref::<F>()
     }
 
     /// Read an integer from the registers.
@@ -196,6 +220,24 @@ impl<M: backend::ManagerBase> XRegisters<M> {
         self.registers.write(reg as usize, val)
     }
 
+    /// Read an integer from the registers without checking if it is 0 first.
+    #[inline]
+    pub fn read_nz(&self, reg: NonZeroXRegister) -> XValue
+    where
+        M: backend::ManagerRead,
+    {
+        self.registers.read(reg as usize)
+    }
+
+    /// Write an integer to the registers without checking if it is 0 first.
+    #[inline]
+    pub fn write_nz(&mut self, reg: NonZeroXRegister, val: XValue)
+    where
+        M: backend::ManagerWrite,
+    {
+        self.registers.write(reg as usize, val)
+    }
+
     /// Reset the integer registers.
     pub fn reset(&mut self)
     where
@@ -207,10 +249,143 @@ impl<M: backend::ManagerBase> XRegisters<M> {
     }
 }
 
+impl<M: backend::ManagerClone> Clone for XRegisters<M> {
+    fn clone(&self) -> Self {
+        Self {
+            registers: self.registers.clone(),
+        }
+    }
+}
+
+/// Register index for integer registers known from the opcode to be `!=x0`.
+#[allow(non_camel_case_types)] // To make names consistent with specification
+#[repr(u8)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    strum::EnumIter,
+)]
+pub enum NonZeroXRegister {
+    // This enum represents XRegisters known from the opcode to be `!=x0`, hence omitting
+    // x0 from the list.
+    // The `usize` representation of these constructors shall be used as an
+    // index into the 31-element array holding the XRegisters.
+    x1 = 0,
+    x2,
+    x3,
+    x4,
+    x5,
+    x6,
+    x7,
+    x8,
+    x9,
+    x10,
+    x11,
+    x12,
+    x13,
+    x14,
+    x15,
+    x16,
+    x17,
+    x18,
+    x19,
+    x20,
+    x21,
+    x22,
+    x23,
+    x24,
+    x25,
+    x26,
+    x27,
+    x28,
+    x29,
+    x30,
+    x31,
+}
+
+impl fmt::Display for NonZeroXRegister {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", XRegister::from(*self))
+    }
+}
+
+impl NonZeroXRegister {
+    /// Convert an `XRegister` to a `NonZeroXRegister`, provided `r != x0`.
+    ///
+    /// # Panics
+    /// Panics if `r == x0`.
+    pub const fn assert_from(r: XRegister) -> Self {
+        match r {
+            x0 => panic!("x0 is not a non-zero register"),
+            // SAFETY: Excluding x0, XRegister is a
+            // direct map to NonZeroXRegister, so safe to convert.
+            r => unsafe { std::mem::transmute(r) },
+        }
+    }
+}
+
+/// ABI register names for NonZeroXRegister types used in backend tests.
+pub mod nz {
+    use super::NonZeroXRegister;
+
+    pub const ra: NonZeroXRegister = NonZeroXRegister::x1;
+    pub const sp: NonZeroXRegister = NonZeroXRegister::x2;
+    pub const gp: NonZeroXRegister = NonZeroXRegister::x3;
+    pub const tp: NonZeroXRegister = NonZeroXRegister::x4;
+    pub const t0: NonZeroXRegister = NonZeroXRegister::x5;
+    pub const t1: NonZeroXRegister = NonZeroXRegister::x6;
+    pub const t2: NonZeroXRegister = NonZeroXRegister::x7;
+    pub const s0: NonZeroXRegister = NonZeroXRegister::x8;
+    pub const fp: NonZeroXRegister = NonZeroXRegister::x8;
+    pub const s1: NonZeroXRegister = NonZeroXRegister::x9;
+    pub const a0: NonZeroXRegister = NonZeroXRegister::x10;
+    pub const a1: NonZeroXRegister = NonZeroXRegister::x11;
+    pub const a2: NonZeroXRegister = NonZeroXRegister::x12;
+    pub const a3: NonZeroXRegister = NonZeroXRegister::x13;
+    pub const a4: NonZeroXRegister = NonZeroXRegister::x14;
+    pub const a5: NonZeroXRegister = NonZeroXRegister::x15;
+    pub const a6: NonZeroXRegister = NonZeroXRegister::x16;
+    pub const a7: NonZeroXRegister = NonZeroXRegister::x17;
+    pub const s2: NonZeroXRegister = NonZeroXRegister::x18;
+    pub const s3: NonZeroXRegister = NonZeroXRegister::x19;
+    pub const s4: NonZeroXRegister = NonZeroXRegister::x20;
+    pub const s5: NonZeroXRegister = NonZeroXRegister::x21;
+    pub const s6: NonZeroXRegister = NonZeroXRegister::x22;
+    pub const s7: NonZeroXRegister = NonZeroXRegister::x23;
+    pub const s8: NonZeroXRegister = NonZeroXRegister::x24;
+    pub const s9: NonZeroXRegister = NonZeroXRegister::x25;
+    pub const s10: NonZeroXRegister = NonZeroXRegister::x26;
+    pub const s11: NonZeroXRegister = NonZeroXRegister::x27;
+    pub const t3: NonZeroXRegister = NonZeroXRegister::x28;
+    pub const t4: NonZeroXRegister = NonZeroXRegister::x29;
+    pub const t5: NonZeroXRegister = NonZeroXRegister::x30;
+    pub const t6: NonZeroXRegister = NonZeroXRegister::x31;
+}
+
 /// Floating-point number register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
-#[repr(usize)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter, Hash)]
+#[repr(u8)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    strum::EnumIter,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum FRegister {
     f0 = 0,
     f1,
@@ -248,7 +423,7 @@ pub enum FRegister {
 
 #[inline(always)]
 pub const fn parse_fregister(r: u5) -> FRegister {
-    let r = r.value() as usize;
+    let r = r.value();
 
     // SAFETY: the possible values of u5 are known to correspond to
     // the possible values of the underlying representation of FRegister.
@@ -338,7 +513,9 @@ impl fmt::Display for FRegister {
     Clone,
     Copy,
     PartialEq,
+    Eq,
     PartialOrd,
+    Ord,
     Default,
     Debug,
     derive_more::From,
@@ -347,6 +524,10 @@ impl fmt::Display for FRegister {
     serde::Deserialize,
 )]
 pub struct FValue(u64);
+
+impl ConstDefault for FValue {
+    const DEFAULT: Self = Self(0);
+}
 
 impl backend::Elem for FValue {
     #[inline(always)]
@@ -380,9 +561,12 @@ impl<M: backend::ManagerBase> FRegisters<M> {
         FRegisters { registers: space }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> backend::AllocatedOf<FRegistersLayout, backend::Ref<'_, M>> {
-        self.registers.struct_ref()
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<FRegistersLayout, F::Output> {
+        self.registers.struct_ref::<F>()
     }
 
     /// Reset the floating-point registers.
@@ -414,18 +598,23 @@ impl<M: backend::ManagerBase> FRegisters<M> {
     }
 }
 
+impl<M: backend::ManagerClone> Clone for FRegisters<M> {
+    fn clone(&self) -> Self {
+        Self {
+            registers: self.registers.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        backend_test, create_backend, create_state, machine_state::backend::tests::test_determinism,
-    };
+    use crate::{backend_test, create_state};
     use arbitrary_int::Number;
     use strum::IntoEnumIterator;
 
     backend_test!(test_zero, F, {
-        let mut backend = create_backend!(XRegistersLayout, F);
-        let mut registers = create_state!(XRegisters, XRegistersLayout, F, backend);
+        let mut registers = create_state!(XRegisters, XRegistersLayout, F);
 
         // x0 should always read 0.
         assert_eq!(registers.read(x0), 0);
@@ -441,8 +630,7 @@ mod tests {
     ];
 
     backend_test!(test_arbitrary_register, F, {
-        let mut backend = create_backend!(XRegistersLayout, F);
-        let mut registers = create_state!(XRegisters, XRegistersLayout, F, backend);
+        let mut registers = create_state!(XRegisters, XRegistersLayout, F);
 
         // Initialise the registers with something.
         for reg in NONZERO_REGISTERS {
@@ -466,22 +654,6 @@ mod tests {
             assert_eq!(after, expected);
         }
     });
-
-    #[test]
-    fn test_xregs_reset() {
-        test_determinism::<XRegistersLayout, _>(|space| {
-            let mut registers: XRegisters<_> = XRegisters::bind(space);
-            registers.reset();
-        });
-    }
-
-    #[test]
-    fn test_fregs_reset() {
-        test_determinism::<FRegistersLayout, _>(|space| {
-            let mut registers: FRegisters<_> = FRegisters::bind(space);
-            registers.reset();
-        });
-    }
 
     #[test]
     fn parse_xregister_zero_to_x0() {
@@ -512,5 +684,16 @@ mod tests {
     fn fregister_bounds() {
         assert_eq!(FRegister::f0 as usize, u5::new(0).value() as usize);
         assert_eq!(FRegister::f31 as usize, u5::MAX.value() as usize);
+    }
+
+    #[test]
+    fn test_nonzeroxregister_to_xregister_conversion() {
+        let nzreg = NonZeroXRegister::iter().collect::<Vec<_>>();
+        let reg = XRegister::iter().filter(|r| r != &x0).collect::<Vec<_>>();
+
+        assert_eq!(nzreg.len(), reg.len());
+        for i in 0..nzreg.len() {
+            assert_eq!(nzreg[i] as u8, reg[i] as u8)
+        }
     }
 }

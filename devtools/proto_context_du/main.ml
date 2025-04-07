@@ -256,7 +256,7 @@ module Commands = struct
     let* store =
       Tezos_store.Store.init
         ~store_dir:(Filename.concat data_dir "store")
-        ~context_dir:(Filename.concat data_dir "context")
+        ~context_root_dir:data_dir
         ~allow_testchains:true
         ~readonly:true
         genesis

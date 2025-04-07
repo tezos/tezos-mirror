@@ -138,9 +138,9 @@ let rmse_score ~output ~prediction =
   let output = Scikit_matrix.to_numpy output in
   Py.Module.get_function_with_keywords
     (Pyinit.sklearn_metrics ())
-    "mean_squared_error"
+    "root_mean_squared_error"
     [|output; prediction|]
-    [("squared", Py.Bool.f)]
+    []
   |> Py.Float.to_float
 
 let benchmark_score ~input ~output =

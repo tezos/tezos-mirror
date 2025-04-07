@@ -26,6 +26,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Individual constants should be documented here so that the
+   documentation is right next to its mainnet value. However, note
+   that some constants are currently documented in
+   {!Protocol.Constants_parametric_repr} instead.
+
+   See {!Protocol.Constants_parametric_repr} for documentation on
+   constant management in general, and instructions on how to
+   add/modify a constant.
+*)
+
 open Protocol.Alpha_context
 
 let seconds_in_a_day = 60 * 60 * 24
@@ -134,17 +144,41 @@ let default_cryptobox_parameters =
     slot_size = 126_944;
     redundancy_factor = 8;
     number_of_shards = 512;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+       Changing these values will be tricky. (The issue suggests a way to deal
+       with such changes.) *)
   }
 
 let default_dal =
   Constants.Parametric.
     {
       feature_enable = true;
-      incentives_enable = false;
+      incentives_enable = true;
       number_of_slots = 32;
       attestation_lag = 8;
       attestation_threshold = 66;
       cryptobox_parameters = default_cryptobox_parameters;
+      minimal_participation_ratio = Q.(64 // 100);
+      (* Note that other values may make tests in tezt/tests/mockup.ml
+         fail. Indeed, some tests modify the constants' values a bit and then
+         perform some checks on the modified values. In case of [Q.t] values,
+         the numerator and the denominator are increased by 1. For instance,
+         when minimal_attestation_ratio is 60%, we have that the new value is
+         2/3 = 4/6 = (3+1)/(5+1). However, the test fails because it does not
+         realize that 2/3 = 4/6...
+         That is why a value x of [minimal_participation_ratio] was chosen such
+         that we have x = a/b with a and b smallest such that they are relatively
+         prime, and (a+1, b+1) are relatively prime as well. The value x = 63%
+         works as well. *)
+      rewards_ratio = Q.(1 // 10);
+      (* This value determines the value of
+         [issuance_weights.dal_rewards_weight]. When computing the actual
+         rewards, [dal_rewards_weight] is ignored when [incentives_enable =
+         false]. *)
+      traps_fraction = Q.(5 // 10000);
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+         Further changes (both in the protocol and in the DAL node) need to be
+         made if this value changes. *)
     }
 
 let constants_mainnet : Constants.Parametric.t =
@@ -152,7 +186,7 @@ let constants_mainnet : Constants.Parametric.t =
   let consensus_committee_size = 7000 in
   let Constants.Generated.
         {
-          consensus_threshold;
+          consensus_threshold_size;
           issuance_weights =
             {
               base_total_issued_per_minute;
@@ -161,10 +195,12 @@ let constants_mainnet : Constants.Parametric.t =
               attesting_reward_weight;
               seed_nonce_revelation_tip_weight;
               vdf_revelation_tip_weight;
+              dal_rewards_weight;
             };
-          max_slashing_threshold;
         } =
-    Constants.Generated.generate ~consensus_committee_size
+    Constants.Generated.generate
+      ~consensus_committee_size
+      ~dal_rewards_ratio:default_dal.rewards_ratio
   in
   let dal_activation_level =
     if default_dal.feature_enable then Raw_level.succ Raw_level.root
@@ -192,13 +228,66 @@ let constants_mainnet : Constants.Parametric.t =
       block_time
   in
   {
+    (* [consensus_rights_delay] is the number of cycles between the
+       computation of consensus rights and their actual use for baking
+       and attesting. That is, at the end of cycle [n] (dawn of cycle
+       [n+1]), the consensus rights for cycle
+       [n+1+consensus_rights_delay] are sampled based on the current
+       baking power of bakers.
+
+       Last updated in protocol P. *)
     consensus_rights_delay = 2;
     blocks_preservation_cycles = 1;
+    (* [delegate_parameters_activation_delay] is the number of full
+       cycles after which submitted delegate parameters are actually
+       used. That is, parameters updated during cycle [n] take effect
+       at the end of cycle [n + delegate_parameters_activation_delay]
+       and beginning of cycle [n +
+       delegate_parameters_activation_delay + 1].
+
+       This should translate into a sufficient duration in days for
+       delegators to manually react to a notification that their
+       delegate's parameters are going to be modified. This should
+       also be longer than the delay for unstake requests to become
+       finalizable, to make possible for delegators to finish
+       unstaking before the new parameters take effect if they are
+       unhappy with the change. *)
     delegate_parameters_activation_delay = 5;
-    blocks_per_cycle = 30720l;
+    (* At the end of a cycle, a delegate gets deactivated if the chain
+       has witnessed no consensus activity (baking, attesting) from it
+       during the past [tolerated_inactivity_period] cycles, including
+       the currently ending cycle.
+
+       [tolerated_inactivity_period = 1] means that if a delegate does
+       not participate in consensus at all during a full cycle, then
+       it gets deactivated at the end of that cycle.
+
+       Note that there is an extra grace period of
+       [consensus_rights_delay] cycles when a delegate has just
+       registered or has just been reactivated. This accounts for the
+       fact that it will not receive consensus rights yet during the
+       first [consensus_rights_delay] cycles, so of course the chain
+       will not witness any activity from it then.
+
+       Last updated in protocol R. *)
+    tolerated_inactivity_period = 2;
+    (* [blocks_per_cycle] is the duration of a cycle in number of
+       blocks. Multiply it by [minimal_block_delay] to get the minimal
+       duration of a cycle in seconds.
+
+       [blocks_per_cycle = 10800l] has been chosen so that cycles last
+       one day (24h) (plus drift from non-zero rounds) on mainnet
+       where [minimal_block_delay] is 8s, and half a day (12h) on
+       ghostnet where [minimal_block_delay] is 4s.
+
+       Last updated in protocol R. *)
+    blocks_per_cycle = 10800l;
     blocks_per_commitment = 240l;
     nonce_revelation_threshold = 960l;
-    cycles_per_voting_period = 5l;
+    (* [cycles_per_voting_period] is the duration of any voting period.
+
+       Last updated in protocol R. *)
+    cycles_per_voting_period = 14l;
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
     hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 1_386_666);
     (* When reducing blocks time, consider adapting this constant so
@@ -229,6 +318,8 @@ let constants_mainnet : Constants.Parametric.t =
         (* 1/20480 of block rewards *)
         vdf_revelation_tip_weight;
         (* 1/20480 of block rewards *)
+        dal_rewards_weight;
+        (* 2275; it depends on the value of [dal.rewards_ratio] *)
       };
     hard_storage_limit_per_operation = Z.of_int 60_000;
     cost_per_byte = Tez.of_mutez_exn 250L;
@@ -247,19 +338,23 @@ let constants_mainnet : Constants.Parametric.t =
        The unit for this value is a block.
     *)
     max_operations_time_to_live = 450;
+    (* Round [k] lasts [minimal_block_delay + k * delay_increment_per_round]. *)
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
     delay_increment_per_round = Period.of_seconds_exn 4L;
     consensus_committee_size;
-    consensus_threshold;
+    consensus_threshold_size;
     (* 4667 slots *)
     minimal_participation_ratio = {numerator = 2; denominator = 3};
     limit_of_delegation_over_baking = 9;
     percentage_of_frozen_deposits_slashed_per_double_baking =
       Protocol.Percentage.p5;
-    percentage_of_frozen_deposits_slashed_per_double_attestation =
-      Protocol.Percentage.p50;
     max_slashing_per_block = Protocol.Percentage.p100;
-    max_slashing_threshold;
+    (* When slashing happens, if the power of the misbehaving consensus
+       exceeds this threshold (as a ratio of the total power), then the maximum value
+       for slashing (defined in the previous line) is applied.
+       It corresponds to 2334 slots on mainnet.
+       It must correspond to (1 - minimal_participation_ratio) *)
+    max_slashing_threshold = {numerator = 1; denominator = 3};
     (* The `testnet_dictator` should absolutely be None on mainnet *)
     testnet_dictator = None;
     initial_seed = None;
@@ -287,7 +382,6 @@ let constants_mainnet : Constants.Parametric.t =
       {
         global_limit_of_staking_over_baking = 9;
         edge_of_staking_over_delegation = 3;
-        launch_ema_threshold = 0l;
         adaptive_rewards_params =
           {
             issuance_ratio_final_min = Q.(0_25 // 100_00);
@@ -304,24 +398,27 @@ let constants_mainnet : Constants.Parametric.t =
             center_dz = Q.(1 // 2);
             radius_dz = Q.(1 // 50);
           };
-        activation_vote_enable = true;
-        autostaking_enable = true;
-        force_activation = false;
-        ns_enable = true;
       };
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6668
        Enable once at least the following is done:
        - Split [allow_forged] into [allow_tickets] and [allow_lazy_storage_id]: #2964
        - Introduce a new Ticket constructor in Michelson: #6643 *)
     direct_ticket_spending_enable = false;
+    (* attestation aggregation feature flag *)
+    aggregate_attestation = false;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7553
+       Enable once we built performance confidance *)
+    allow_tz4_delegate_enable = false;
+    all_bakers_attest_activation_level = None;
   }
 
 let constants_sandbox =
   let consensus_committee_size = 301 in
   let block_time = 1 in
-  let Constants.Generated.
-        {max_slashing_threshold; consensus_threshold = _; issuance_weights} =
-    Constants.Generated.generate ~consensus_committee_size
+  let Constants.Generated.{consensus_threshold_size = _; issuance_weights} =
+    Constants.Generated.generate
+      ~consensus_committee_size
+      ~dal_rewards_ratio:default_dal.rewards_ratio
   in
   {
     constants_mainnet with
@@ -346,17 +443,18 @@ let constants_sandbox =
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
     delay_increment_per_round = Period.one_second;
     consensus_committee_size = 256;
-    consensus_threshold = 0;
-    max_slashing_threshold;
+    consensus_threshold_size = 0;
     limit_of_delegation_over_baking = 19;
     max_operations_time_to_live = 8;
+    allow_tz4_delegate_enable = true;
   }
 
 let constants_test =
   let consensus_committee_size = 67 in
-  let Constants.Generated.
-        {max_slashing_threshold = _; consensus_threshold; issuance_weights} =
-    Constants.Generated.generate ~consensus_committee_size
+  let Constants.Generated.{consensus_threshold_size; issuance_weights} =
+    Constants.Generated.generate
+      ~consensus_committee_size
+      ~dal_rewards_ratio:default_dal.rewards_ratio
   in
   {
     constants_mainnet with
@@ -384,7 +482,7 @@ let constants_test =
       Int64.(sub (shift_left 1L 62) 1L) (* 1/4 of nonces are accepted *);
     vdf_difficulty = 50_000L;
     consensus_committee_size;
-    consensus_threshold (* 17 slots *);
+    consensus_threshold_size (* 17 slots *);
     limit_of_delegation_over_baking =
       19
       (* Not 9 so that multiplication by a percentage and
@@ -481,5 +579,7 @@ let json_of_parameters ?chain_id parameters =
     Protocol_parameters_overrides.{parameters; chain_id}
 
 module Internal_for_tests = struct
+  let bootstrap_balance = bootstrap_balance
+
   let make_sc_rollup_parameter = make_sc_rollup_parameter
 end

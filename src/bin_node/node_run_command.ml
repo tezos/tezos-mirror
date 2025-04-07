@@ -13,6 +13,9 @@ type error += RPC_Port_already_in_use of P2p_point.Id.t list
 
 type error += Invalid_sandbox_file of string
 
+(** Profiler for RPC server. *)
+module Profiler = (val Profiler.wrap Shell_profiling.rpc_server_profiler)
+
 let () =
   register_error_kind
     `Permanent
@@ -168,18 +171,13 @@ module Event = struct
       ("stacktrace", Data_encoding.string)
 
   let incorrect_history_mode =
-    declare_2
+    declare_1
       ~section
       ~name:"incorrect_history_mode"
-      ~msg:
-        "The given history mode {given_history_mode} does not correspond to \
-         the stored history mode {stored_history_mode}. If you wish to force \
-         the switch, use the flag '--force-history-mode-switch'."
+      ~msg:"{switch_error}"
       ~level:Error
-      ~pp1:History_mode.pp
-      ("given_history_mode", History_mode.encoding)
-      ~pp2:History_mode.pp
-      ("stored_history_mode", History_mode.encoding)
+      ~pp1:Error_monad.pp
+      ("switch_error", Error_monad.error_encoding)
 
   let enable_http_cache_headers_for_local =
     declare_0
@@ -326,7 +324,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
       data_dir = config.data_dir;
       internal_events;
       store_root = Data_version.store_dir config.data_dir;
-      context_root = Data_version.context_dir config.data_dir;
+      context_root_dir = config.data_dir;
       protocol_root = Data_version.protocol_dir config.data_dir;
       p2p = p2p_config;
       target;
@@ -340,7 +338,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
     | Some history_mode when force_history_mode_switch ->
         Store.may_switch_history_mode
           ~store_dir:node_config.store_root
-          ~context_dir:node_config.context_root
+          ~context_root_dir:config.data_dir
           genesis
           ~new_history_mode:history_mode
     | _ -> return_unit
@@ -452,7 +450,14 @@ let launch_rpc_server ?middleware (config : Config_file.t) dir rpc_server_kind
     if path = "/metrics" then
       let*! response = Metrics_server.callback conn req body in
       Lwt.return (`Response response)
-    else Tezos_rpc_http_server.RPC_server.resto_callback server conn req body
+    else
+      (* Every call on endpoints which is not in [/metrics]
+         path will be logged inside the RPC report. *)
+      Tezos_rpc_http_server.RPC_server.resto_callback
+        server
+        conn
+        req
+        body [@profiler.span_s {verbosity = Notice} [path]]
   in
   let update_metrics uri meth =
     Prometheus.Summary.(time (labels rpc_metrics [uri; meth]) Sys.time)
@@ -508,7 +513,7 @@ let launch_rpc_server ?middleware (config : Config_file.t) dir rpc_server_kind
    - No_server: the node is not responding to any RPC. *)
 type rpc_server_kind =
   | Local_rpc_server of RPC_server.server list
-  | External_rpc_server of (RPC_server.server * Rpc_process_worker.t) list
+  | External_rpc_server of (RPC_server.server * Rpc_process_worker.process) list
   | No_server
 
 (* Initializes an RPC server handled by the node main process. *)
@@ -704,6 +709,19 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
   in
   return (local_rpc_server :: [rpc_server])
 
+let[@warning "-32"] may_start_profiler data_dir =
+  match Tezos_profiler_unix.Profiler_instance.selected_backend () with
+  | Some {instance_maker; _} -> (
+      let profiler_maker = instance_maker ~directory:data_dir in
+      Shell_profiling.activate_all ~profiler_maker ;
+      match profiler_maker ~name:"context" with
+      | Some instance ->
+          Tezos_protocol_environment.Environment_profiler.Context_ops_profiler
+          .plug
+            instance
+      | None -> ())
+  | None -> ()
+
 let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch
     (config : Config_file.t) =
@@ -723,22 +741,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
-  let () =
-    match Option.map String.lowercase_ascii @@ Sys.getenv_opt "PROFILING" with
-    | Some (("true" | "on" | "yes" | "terse" | "detailed" | "verbose") as mode)
-      ->
-        let max_lod =
-          match mode with
-          | "detailed" -> Profiler.Detailed
-          | "verbose" -> Profiler.Verbose
-          | _ -> Profiler.Terse
-        in
-        let profiler_maker =
-          Tezos_shell.Profiler_directory.profiler_maker config.data_dir max_lod
-        in
-        Shell_profiling.activate_all ~profiler_maker
-    | _ -> ()
-  in
+  () [@profiler.overwrite may_start_profiler config.data_dir] ;
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
   in
@@ -750,6 +753,12 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   in
   let* () = Config_validation.check ?ignore_testchain_warning config in
   let* identity = init_identity_file config in
+  ()
+  [@profiler.overwrite
+    {driver_ids = [Opentelemetry]}
+      (Opentelemetry_profiler.initialize
+         ~unique_identifier:(P2p_peer.Id.to_b58check identity.peer_id)
+         "octez-node")] ;
   Updater.init (Data_version.protocol_dir config.data_dir) ;
   let*! () =
     Event.(emit starting_node)
@@ -771,9 +780,8 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Result.iter_error_s
       (function
-        | Store_errors.Cannot_switch_history_mode {previous_mode; next_mode}
-          :: _ ->
-            Event.(emit incorrect_history_mode) (previous_mode, next_mode)
+        | (Store_errors.Cannot_switch_history_mode _ as err) :: _ ->
+            Event.(emit incorrect_history_mode) err
         | _ -> Lwt.return_unit)
       node
   in
@@ -909,7 +917,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
       (function exn -> fail_with_exn exn)
   in
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Lwt_main.run
+  Tezos_base_unix.Event_loop.main_run
     (let*! r = Lwt_exit.wrap_and_exit main_promise in
      match r with
      | Ok () ->

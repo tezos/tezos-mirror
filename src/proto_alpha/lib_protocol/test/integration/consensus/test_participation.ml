@@ -69,7 +69,16 @@ let bake_and_attest_once (_b_pred, b_cur) baker attester =
 let test_participation ~sufficient_participation () =
   let open Lwt_result_wrap_syntax in
   let n_accounts = 2 in
-  let* b0, accounts = Context.init_n ~consensus_threshold:1 n_accounts () in
+  let constants =
+    let c = Default_parameters.constants_test in
+    {
+      c with
+      dal = {c.dal with rewards_ratio = Q.(0 // 100)};
+      issuance_weights = {c.issuance_weights with dal_rewards_weight = 0};
+      consensus_threshold_size = 1;
+    }
+  in
+  let* b0, accounts = Context.init_with_constants_n constants n_accounts in
   let* csts = Context.get_constants (B b0) in
   let blocks_per_cycle = Int32.to_int csts.parametric.blocks_per_cycle in
   let mpr = csts.parametric.minimal_participation_ratio in
@@ -148,13 +157,50 @@ let test_participation ~sufficient_participation () =
   in
   Assert.equal_int64 ~loc:__LOC__ bal2_at_b expected_bal2_at_b
 
+let check_no_dal_participation
+    (dal_info : Delegate.For_RPC.dal_participation_info) =
+  let open Lwt_result_wrap_syntax in
+  let* () =
+    (* Some shards are assigned to the delegate. *)
+    Assert.not_equal_int
+      ~loc:__LOC__
+      dal_info.expected_assigned_shards_per_slot
+      0
+  in
+  let* () =
+    (* No slot is attested globally, so no slot is attestable. *)
+    Assert.equal_int ~loc:__LOC__ dal_info.delegate_attestable_dal_slots 0
+  in
+  let* () =
+    (* No attested slot is also attested by this delegate. *)
+    Assert.equal_int ~loc:__LOC__ dal_info.delegate_attested_dal_slots 0
+  in
+  let* () =
+    (* The delegate sufficiently participated in DAL (are there is no slot
+       attested globally). *)
+    Assert.equal_bool ~loc:__LOC__ dal_info.sufficient_dal_participation true
+  in
+  let* () =
+    (* No Tez are provisioned for DAL rewards when [dal_rewards_weight = 0]. *)
+    Assert.equal_tez ~loc:__LOC__ dal_info.expected_dal_rewards Tez.zero
+  in
+  return_unit
+
 (* We bake and attest with 1 out of 2 accounts; we monitor the result
    returned by the '../delegates/<pkh>/participation' RPC for the
    non-participating account. *)
 let test_participation_rpc () =
   let open Lwt_result_wrap_syntax in
   let n_accounts = 2 in
-  let* b0, (account1, account2) = Context.init2 ~consensus_threshold:1 () in
+  let constants =
+    let c = Default_parameters.constants_test in
+    {
+      c with
+      issuance_weights = {c.issuance_weights with dal_rewards_weight = 0};
+      consensus_threshold_size = 1;
+    }
+  in
+  let* b0, (account1, account2) = Context.init_with_constants2 constants in
   let del1 = Context.Contract.pkh account1 in
   let del2 = Context.Contract.pkh account2 in
   let* csts = Context.get_constants (B b0) in
@@ -182,6 +228,12 @@ let test_participation_rpc () =
   let* _, _, _ =
     List.fold_left_es
       (fun (b_pred, b_crt, total_attesting_power) level_int ->
+        let* () =
+          if csts.Constants.parametric.dal.incentives_enable then
+            let* dal_info = Context.Delegate.dal_participation (B b_crt) del2 in
+            check_no_dal_participation dal_info
+          else return_unit
+        in
         let* info = Context.Delegate.participation (B b_crt) del2 in
         let* () =
           Assert.equal_int

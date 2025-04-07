@@ -65,6 +65,7 @@ let proto_name : Tezos_scoru_wasm.Pvm_input_kind.protocol -> string = function
   | ParisB -> "ParisB"
   | ParisC -> "ParisC"
   | Quebec -> "Quebec"
+  | R022 -> "R022"
   | Proto_alpha -> "Proto_alpha"
 
 let tests =
@@ -86,7 +87,8 @@ let tests =
            ~to_version
            ~after_protocol_activation:protocol))
     [
-      (V4, V5, Proto_alpha);
+      (V5, V5, Proto_alpha);
+      (V5, V5, R022);
       (V4, V5, Quebec);
       (V2, V4, ParisB);
       (V2, V4, ParisC);

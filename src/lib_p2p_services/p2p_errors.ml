@@ -71,8 +71,6 @@ type error +=
 
 type error += Rejected_no_common_protocol of {announced : Network_version.t}
 
-type error += Decoding_error of Data_encoding.Binary.read_error
-
 type error += Myself of P2p_connection.Id.t
 
 type error += Not_enough_proof_of_work of P2p_peer.Id.t
@@ -172,21 +170,6 @@ let () =
     (function
       | Rejected_no_common_protocol {announced} -> Some announced | _ -> None)
     (fun announced -> Rejected_no_common_protocol {announced}) ;
-  (* Decoding error *)
-  register_error_kind
-    `Permanent
-    ~id:"node.p2p_socket.decoding_error"
-    ~title:"Decoding error"
-    ~description:"An error occurred while decoding."
-    ~pp:(fun ppf re ->
-      Format.fprintf
-        ppf
-        "An error occurred while decoding: %a."
-        Data_encoding.Binary.pp_read_error
-        re)
-    Data_encoding.(obj1 @@ req "read_error" Binary.read_error_encoding)
-    (function Decoding_error re -> Some re | _ -> None)
-    (fun re -> Decoding_error re) ;
   (* Myself *)
   register_error_kind
     `Permanent
@@ -331,7 +314,7 @@ let () =
     ~title:"TCP connection failed"
     ~description:"TCP connection failed (refused or no route to host)."
     ~pp:(fun ppf () ->
-      Format.fprintf ppf "TCP connection failed (refused or no route to host.")
+      Format.fprintf ppf "TCP connection failed (refused or no route to host).")
     Data_encoding.empty
     (function Connection_failed -> Some () | _ -> None)
     (fun () -> Connection_failed) ;

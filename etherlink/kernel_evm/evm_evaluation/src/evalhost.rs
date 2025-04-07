@@ -6,6 +6,7 @@ use std::{cell::RefCell, io::Write};
 
 use tezos_evm_logging::Verbosity;
 use tezos_evm_runtime::{
+    extensions::WithGas,
     internal_runtime::{ExtendedRuntime, InternalRuntime},
     runtime::MockKernelHost,
 };
@@ -223,4 +224,10 @@ impl Verbosity for EvalHost {
     fn verbosity(&self) -> tezos_evm_logging::Level {
         self.host.verbosity()
     }
+}
+
+impl WithGas for EvalHost {
+    // This is a blank implementation on purpose, as this is not useful for the
+    // evaluation
+    fn add_execution_gas(&mut self, _gas: u64) {}
 }

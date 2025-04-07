@@ -3078,7 +3078,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         log loc stack_ty aft ;
         ()
   in
-  let typed_no_lwt ctxt loc instr aft =
+  let typed_no_lwt ctxt loc instr aft : ((a, s) judgement * context) tzresult =
     log_stack ctxt loc stack_ty aft >|? fun () ->
     let j = Typed {loc; instr; bef = stack_ty; aft} in
     (j, ctxt)

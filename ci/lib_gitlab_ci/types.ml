@@ -80,7 +80,7 @@ type workflow_rule = {
       workflow:rules:auto_cancel} for more info. *)
 }
 
-(** Represents an include rule. *)
+(** Represents an include rule. See {{:https://docs.gitlab.com/ee/ci/yaml/#includerules}include:rules} for more info. *)
 type include_rule = {
   changes : string list option;
   if_ : If.t option;
@@ -194,6 +194,51 @@ type matrix = (string * string list) list list
     YAML keyword reference for more information. *)
 type parallel = Vector of int | Matrix of matrix
 
+(** Represents an inherit rule.
+
+    See https://docs.gitlab.com/ee/ci/yaml/index.html#inherit *)
+type inherit_ = Variable_list of string list | Variable_bool of bool
+
+(** Represents audience(s) used in id_tokens.
+
+    The aud sub-keyword is used to configure the aud claim for the JWT
+    in id_tokens.
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#id_tokens}id_tokens} in
+    the GitLab YAML keyword reference for more information. *)
+type aud = Aud_string of string | Aud_list of string list
+
+(** Represents an id_tokens.
+
+    Use id_tokens to create JSON web tokens (JWT) to authenticate with third
+    party services. All JWTs created this way support OIDC authentication.
+    For example, a value of
+
+    [[
+      ("ID_TOKEN_1", Gitlab_ci.Types.Aud_string "https://vault.example.com");
+      ("ID_TOKEN_2", Gitlab_ci.Types.Aud_list [
+          "https://gcp.com";
+          "https://aws.com";
+        ])
+    ]]
+
+    can be used to generate the following GitLab YAML:
+
+    {{
+    id_tokens:
+      ID_TOKEN_1:
+        aud: https://vault.example.com
+      ID_TOKEN_2:
+        aud:
+          - https://gcp.com
+          - https://aws.com
+    }}
+
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#id_tokens}id_tokens} in
+    the GitLab YAML keyword reference for more information. *)
+type id_tokens = (string * aud) list
+
 type job = {
   name : string;
       (** Note that [name] does not translate to a field in a job, but
@@ -203,6 +248,7 @@ type job = {
   artifacts : artifacts option;
   before_script : string list option;
   cache : cache list option;
+  id_tokens : id_tokens option;
   image : image option;
   interruptible : bool option;
   needs : need list option;
@@ -252,6 +298,7 @@ type job = {
     - [extends].
     - [needs], but not [needs:project].
     - [only] and [except].
+    - [inherit]
     - [rules].
     - [stage].
     - [trigger].
@@ -268,6 +315,7 @@ type trigger_job = {
   name : string;
   stage : string option;
   when_ : when_trigger_job option;
+  inherit_ : inherit_ option;
   rules : job_rule list option;
   needs : need list option;
   trigger_include : string;
@@ -290,7 +338,32 @@ type workflow = {
       See {{:https://docs.gitlab.com/ee/ci/yaml/#workflowauto_cancelon_new_commit} workflow:auto_cancel} for more info. *)
 }
 
-type include_ = {local : string; rules : include_rule list}
+(** GitLab templates provided for vulnerability scanners.  For more
+    information, see
+    {{:https://docs.gitlab.com/ee/user/application_security/#vulnerability-scanner-maintenance}Vulnerability
+    scanners}. *)
+type template =
+  | Jobs_container_scanning
+      (** See {{:https://docs.gitlab.com/ee/user/application_security/container_scanning/index.html}Container Scanning} *)
+
+let path_of_template template =
+  match template with
+  | Jobs_container_scanning -> "Jobs/Container-Scanning.gitlab-ci.yml"
+
+(* We only use the Container Scanning tool at the moment but more
+   scanners should be added in the future. *)
+
+(** Represents an include configuration. Only [include:local] [include:template] are supported, as other subkeys are not used in our CI.
+
+    See
+    - {{:https://docs.gitlab.com/ee/ci/yaml/#include}include},
+    - {{:https://docs.gitlab.com/ee/ci/yaml/#includelocal}include:local}
+    - and {{:https://docs.gitlab.com/ee/ci/yaml/#includetemplate}include:template}
+    for more info. *)
+
+type include_subkey = Local of string | Template of template
+
+type include_ = {subkey : include_subkey; rules : include_rule list}
 
 type config_element =
   | Workflow of workflow  (** Corresponds to a [workflow:] key. *)

@@ -3,51 +3,83 @@
 //
 // SPDX-License-Identifier: MIT
 
+use super::XRegisterParsed;
 use crate::{
+    default::ConstDefault,
     interpreter::float::RoundingMode,
     machine_state::{
         csregisters::CSRegister,
-        registers::{FRegister, XRegister},
+        registers::{FRegister, NonZeroXRegister, XRegister},
     },
 };
 use enum_tag::EnumTag;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct RTypeArgs {
     pub rd: XRegister,
     pub rs1: XRegister,
     pub rs2: XRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+/// Intermediate representation of Args for R-type instructions with guaranteed `rd` != `x0`.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct NonZeroRdRTypeArgs {
+    pub rd: NonZeroXRegister,
+    pub rs1: XRegister,
+    pub rs2: XRegister,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ITypeArgs {
     pub rd: XRegister,
     pub rs1: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+/// Intermediate representation of Args for I-type instructions with parsed split of registers.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct SplitITypeArgs {
+    pub(crate) rd: XRegisterParsed,
+    pub(crate) rs1: XRegisterParsed,
+    pub imm: i64,
+}
+/// Intermediate representation of Args for I-type instructions with guaranteed `rd` != `x0`.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct NonZeroRdITypeArgs {
+    pub rd: NonZeroXRegister,
+    pub rs1: XRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct SBTypeArgs {
     pub rs1: XRegister,
     pub rs2: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct UJTypeArgs {
     pub rd: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct NonZeroRdUJTypeArgs {
+    pub rd: NonZeroXRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CsrArgs {
     pub rd: XRegister,
     pub rs1: XRegister,
     pub csr: CSRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CsriArgs {
     pub rd: XRegister,
     pub imm: i64,
@@ -68,40 +100,40 @@ pub struct FenceArgs {
     pub succ: FenceSet,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FRegToXRegArgs {
     pub rd: XRegister,
     pub rs1: FRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct XRegToFRegArgs {
     pub rd: FRegister,
     pub rs1: XRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct XRegToFRegArgsWithRounding {
     pub rd: FRegister,
     pub rs1: XRegister,
     pub rm: InstrRoundingMode,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FRegToXRegArgsWithRounding {
     pub rd: XRegister,
     pub rs1: FRegister,
     pub rm: InstrRoundingMode,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FCmpArgs {
     pub rs1: FRegister,
     pub rs2: FRegister,
     pub rd: XRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FRArgs {
     pub rs1: FRegister,
     pub rs2: FRegister,
@@ -109,7 +141,7 @@ pub struct FRArgs {
 }
 
 /// There are 6 supported rounding modes that an instruction may use.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub enum InstrRoundingMode {
     Dynamic,
     Static(RoundingMode),
@@ -131,7 +163,7 @@ impl InstrRoundingMode {
 
 /// Floating-point R-type instruction, containing
 /// rounding mode, and one input argument.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FR1ArgWithRounding {
     pub rs1: FRegister,
     pub rm: InstrRoundingMode,
@@ -140,7 +172,7 @@ pub struct FR1ArgWithRounding {
 
 /// Floating-point R-type instruction, containing
 /// rounding mode, and two input arguments.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FR2ArgsWithRounding {
     pub rs1: FRegister,
     pub rs2: FRegister,
@@ -150,7 +182,7 @@ pub struct FR2ArgsWithRounding {
 
 /// Floating-point R-type instruction, containing
 /// rounding mode, and three input arguments.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FR3ArgsWithRounding {
     pub rs1: FRegister,
     pub rs2: FRegister,
@@ -159,14 +191,14 @@ pub struct FR3ArgsWithRounding {
     pub rd: FRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FStoreArgs {
     pub rs1: XRegister,
     pub rs2: FRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FLoadArgs {
     pub rs1: XRegister,
     pub rd: FRegister,
@@ -175,7 +207,7 @@ pub struct FLoadArgs {
 
 // R-type instructions with 2 additional bits which specify memory ordering
 // constraints as viewed by other RISC-V harts
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct AmoArgs {
     pub rd: XRegister,
     pub rs1: XRegister,
@@ -186,41 +218,53 @@ pub struct AmoArgs {
 
 // Compressed instruction types
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CRTypeArgs {
     pub rd_rs1: XRegister,
     pub rs2: XRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct CRJTypeArgs {
-    pub rs1: XRegister,
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct CNZRTypeArgs {
+    pub rd_rs1: NonZeroXRegister,
+    pub rs2: NonZeroXRegister,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct CRJTypeArgs {
+    pub rs1: NonZeroXRegister,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CJTypeArgs {
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CIBTypeArgs {
     pub rd_rs1: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct CIBNZTypeArgs {
+    pub rd_rs1: NonZeroXRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CIBDTypeArgs {
     pub rd_rs1: FRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CSSTypeArgs {
     pub rs2: XRegister,
     pub imm: i64,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CSSDTypeArgs {
     pub rs2: FRegister,
     pub imm: i64,
@@ -229,39 +273,66 @@ pub struct CSSDTypeArgs {
 /// RISC-V parsed instructions. Along with legal instructions, potentially
 /// illegal instructions are parsed as `Unknown` or `UnknownCompressed`.
 /// These instructions are successfully parsed, but must not be interpreted.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, EnumTag, Hash)]
+#[derive(
+    Debug, PartialEq, Eq, Clone, Copy, EnumTag, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum InstrCacheable {
     // RV64I R-type instructions
-    Add(RTypeArgs),
-    Sub(RTypeArgs),
-    Xor(RTypeArgs),
-    Or(RTypeArgs),
-    And(RTypeArgs),
-    Sll(RTypeArgs),
-    Srl(RTypeArgs),
-    Sra(RTypeArgs),
-    Slt(RTypeArgs),
-    Sltu(RTypeArgs),
-    Addw(RTypeArgs),
-    Subw(RTypeArgs),
-    Sllw(RTypeArgs),
-    Srlw(RTypeArgs),
-    Sraw(RTypeArgs),
+    /// `ADD` - Perform `val(rs1) + val(rs2)` and store the result in `rd`
+    Add(NonZeroRdRTypeArgs),
+    /// `SUB` - Perform `val(rs1) - val(rs2)` and store the result in `rd`
+    Sub(NonZeroRdRTypeArgs),
+    /// `XOR` - Saves in `rd` the bitwise XOR between the value in `rs1` and `rs2`.
+    Xor(NonZeroRdRTypeArgs),
+    /// `OR` R-type instruction - Saves in `rd` the bitwise OR between
+    /// the value in `rs1` and `rs2`.
+    Or(NonZeroRdRTypeArgs),
+    /// `AND` - Saves in `rd` the bitwise AND between the value in `rs1` and `rs2`
+    And(NonZeroRdRTypeArgs),
+    /// `SLL` - Shift left logically bits in rs1 by `shift_amount = val(rs2)[5:0]`
+    /// saving the result in rd. (zeros are shifted in the lower bits)
+    Sll(NonZeroRdRTypeArgs),
+    /// `SRL` - Shift right logically bits in rs1 by `shift_amount = val(rs2)[5:0]`
+    /// saving the result in rd (zeros are shifted in the upper bits)
+    Srl(NonZeroRdRTypeArgs),
+    /// `SRA` - Shift right arithmeticallly bits in rs1 by `shift_amount = val(rs2)[5:0]`
+    /// saving the result in rd (sign-bits are shifted in the upper bits)
+    Sra(NonZeroRdRTypeArgs),
+    Slt(NonZeroRdRTypeArgs),
+    Sltu(NonZeroRdRTypeArgs),
+    Addw(NonZeroRdRTypeArgs),
+    Subw(NonZeroRdRTypeArgs),
+    Sllw(NonZeroRdRTypeArgs),
+    Srlw(NonZeroRdRTypeArgs),
+    Sraw(NonZeroRdRTypeArgs),
 
     // RV64I I-type instructions
-    Addi(ITypeArgs),
-    Addiw(ITypeArgs),
-    Xori(ITypeArgs),
-    Ori(ITypeArgs),
-    Andi(ITypeArgs),
-    Slli(ITypeArgs),
-    Srli(ITypeArgs),
-    Srai(ITypeArgs),
-    Slliw(ITypeArgs),
-    Srliw(ITypeArgs),
-    Sraiw(ITypeArgs),
-    Slti(ITypeArgs),
-    Sltiu(ITypeArgs),
+    /// `ADDI` - Add `imm` to val(rs1) and store the result in `rd`.
+    Addi(SplitITypeArgs),
+    Addiw(NonZeroRdITypeArgs),
+    /// `XORI` - Saves in `rd` the bitwise XOR between the value in `rs1` and `imm`
+    Xori(NonZeroRdITypeArgs),
+    /// `ORI` - Saves in `rd` the bitwise OR between the value in `rs1` and `imm`
+    Ori(NonZeroRdITypeArgs),
+    /// `ANDI` - Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
+    Andi(NonZeroRdITypeArgs),
+    /// `SLLI` - Shift left logically (zeros are shifted in the lower bits)
+    ///
+    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SLLI
+    Slli(NonZeroRdITypeArgs),
+    /// `SRLI`- Shift right logically (zeros are shifted in the upper bits)
+    ///
+    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SRLI
+    Srli(NonZeroRdITypeArgs),
+    /// `SRAI` - Shift right arithmetically (sign-bits are shifted in the upper bits)
+    ///
+    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SRAI
+    Srai(NonZeroRdITypeArgs),
+    Slliw(NonZeroRdITypeArgs),
+    Srliw(NonZeroRdITypeArgs),
+    Sraiw(NonZeroRdITypeArgs),
+    Slti(NonZeroRdITypeArgs),
+    Sltiu(NonZeroRdITypeArgs),
     Lb(ITypeArgs),
     Lh(ITypeArgs),
     Lw(ITypeArgs),
@@ -277,7 +348,11 @@ pub enum InstrCacheable {
     Sd(SBTypeArgs),
 
     // RV64I B-type instructions
+    /// `BEQ` - Sets the target address if registers contain the same value,
+    /// otherwise proceeds to the next instruction address.
     Beq(SBTypeArgs),
+    /// `BNE` - Sets the target address if registers contain different values,
+    /// otherwise proceeds to the next instruction address.
     Bne(SBTypeArgs),
     Blt(SBTypeArgs),
     Bge(SBTypeArgs),
@@ -285,10 +360,14 @@ pub enum InstrCacheable {
     Bgeu(SBTypeArgs),
 
     // RV64I U-type instructions
-    Lui(UJTypeArgs),
-    Auipc(UJTypeArgs),
+    Lui(NonZeroRdUJTypeArgs),
+    Auipc(NonZeroRdUJTypeArgs),
 
     // RV64I jump instructions
+    /// `JAL` (note: uncompressed variant) - Instruction mis-aligned will
+    /// never be thrown because we allow C extension
+    ///
+    /// Always returns the target address (current program counter + imm)
     Jal(UJTypeArgs),
     Jalr(ITypeArgs),
 
@@ -407,39 +486,80 @@ pub enum InstrCacheable {
 
     // RV32C compressed instructions
     CLw(ITypeArgs),
-    CLwsp(CIBTypeArgs),
+    CLwsp(CIBNZTypeArgs),
     CSw(SBTypeArgs),
     CSwsp(CSSTypeArgs),
+    /// `C.J` - Performs an unconditional control transfer. The immediate is added to
+    /// the pc to form the jump target address.
     CJ(CJTypeArgs),
     CJr(CRJTypeArgs),
     CJalr(CRJTypeArgs),
+    /// `C.BEQZ` - Performs a conditional ( `val(rs1) == 0` ) control transfer.
+    /// The offset is sign-extended and added to the pc to form the branch
+    /// target address.
     CBeqz(CIBTypeArgs),
+    /// `C.BNEZ` -  Performs a conditional ( `val(rs1) != 0`) control transfer.
+    /// The offset is sign-extended and added to the pc to form the branch
+    /// target address.
     CBnez(CIBTypeArgs),
-    CLi(CIBTypeArgs),
-    CLui(CIBTypeArgs),
-    CAddi(CIBTypeArgs),
+    /// `C.LI` - Loads the sign-extended 6-bit immediate into register `rd_rs1`.
+    CLi(CIBNZTypeArgs),
+    CLui(CIBNZTypeArgs),
+    /// `C.ADDI` - Adds the non-zero sign-extended 6-bit `imm`
+    /// to the value in `rd_rs1` then writes the result to `rd_rs1`.
+    CAddi(CIBNZTypeArgs),
+    /// `C.ADDI16SP` - Adds the non-zero immediate to the value in the stack pointer.
+    /// The immediate is obtained by sign-extending and scaling by 16 the value
+    /// encoded in the instruction (see U:C-16.5).
     CAddi16sp(CJTypeArgs),
+    /// `C.ADDI4SPN`- Adds the non-zero immediate to the stack pointer and writes the result
+    /// to `rd`. The immediate is obtained by zero-extending and scaling by 4 the value
+    /// encoded in the instruction (see U:C-16.5).
     CAddi4spn(CIBTypeArgs),
-    CSlli(CIBTypeArgs),
+    /// `C.SLLI` - Performs a logical left shift of the value in register `rd_rs1`
+    /// by `imm` bits (referred to as `shamt` or `shift-amount`), then writes the result
+    /// back to `rd_rs1`.
+    CSlli(CIBNZTypeArgs),
+    /// `C.SRLI` -  Performs a logical right shift of the value in register `rd_rs1`
+    /// by `imm` bits (referred to as `shamt` or `shift-amount`), then writes the result
+    /// back to `rd_rs1`.
     CSrli(CIBTypeArgs),
+    /// `C.SRAI` - Performs an arithmetic right shift of the value in register `rd_rs1`
+    /// by `imm` bits (referred to as `shamt` or `shift-amount`), then writes the result
+    /// back to `rd_rs1`.
     CSrai(CIBTypeArgs),
+    /// `C.ANDI` - Computes the bitwise AND of the value in register `rd_rs1` and
+    /// the sign-extended 6-bit immediate, then writes the result back to `rd_rs1`.
     CAndi(CIBTypeArgs),
-    CMv(CRTypeArgs),
-    CAdd(CRTypeArgs),
+    /// `C.MV` - Copies the value in register `rs2` into register `rd_rs1`.
+    CMv(CNZRTypeArgs),
+    /// `C.ADD` - Adds the values in registers `rd_rs1` and `rs2` and writes the result
+    /// back to register `rd_rs1`.
+    CAdd(CNZRTypeArgs),
+    /// `C.AND` - Computes the bitwise AND of the values in registers `rd_rs1` and `rs2`,
+    /// then writes the result back to register rd `rd_rs1`.
     CAnd(CRTypeArgs),
+    /// `C.OR` - Computes the bitwise OR of the values in registers `rd_rs1` and `rs2`,
+    /// then writes the result back to register `rd_rs1`.
     COr(CRTypeArgs),
+    /// `C.XOR` - Computes the bitwise XOR of the values in registers `rd_rs1` and `rs2`,
+    /// then writes the result back to register rd `rd_rs1`.
     CXor(CRTypeArgs),
+    /// `C.SUB` - Subtracts the value in register `rs2` from the value in register `rd_rs1`,
+    /// then writes the result to register `rd_rs1`.
     CSub(CRTypeArgs),
     CAddw(CRTypeArgs),
     CSubw(CRTypeArgs),
+    /// `C.NOP` - Does not change any user-visible state, except for advancing the pc and
+    /// incrementing any applicable performance counters. Equivalent to `NOP`.
     CNop,
 
     // RV64C compressed instructions
     CLd(ITypeArgs),
-    CLdsp(CIBTypeArgs),
+    CLdsp(CIBNZTypeArgs),
     CSd(SBTypeArgs),
     CSdsp(CSSTypeArgs),
-    CAddiw(CIBTypeArgs),
+    CAddiw(CIBNZTypeArgs),
 
     // RV64DC compressed instructions
     CFld(FLoadArgs),
@@ -447,8 +567,23 @@ pub enum InstrCacheable {
     CFsd(FStoreArgs),
     CFsdsp(CSSDTypeArgs),
 
-    Unknown { instr: u32 },
-    UnknownCompressed { instr: u16 },
+    Unknown {
+        instr: u32,
+    },
+    UnknownCompressed {
+        instr: u16,
+    },
+
+    Hint {
+        instr: u32,
+    },
+    HintCompressed {
+        instr: u16,
+    },
+}
+
+impl ConstDefault for InstrCacheable {
+    const DEFAULT: Self = Self::Unknown { instr: 0 };
 }
 
 /// Uncacheable instructions are those that may result in a
@@ -462,6 +597,8 @@ pub enum InstrCacheable {
 /// Any of these can result in breaking the 'default flow of execution',
 /// invalidating the assumptions that are required for the [`BlockCache`] to
 /// function.
+///
+/// [`BlockCache`]: crate::machine_state::block_cache::BlockCache
 #[derive(Debug, PartialEq, Eq, Clone, Copy, EnumTag, Hash)]
 pub enum InstrUncacheable {
     Fence(FenceArgs),
@@ -500,9 +637,20 @@ pub enum Instr {
     Uncacheable(InstrUncacheable),
 }
 
+/// RISC-V instruction width.
+///
+/// This is either 4 bytes, in the case of an uncompressed instruction,
+/// or 2 bytes, in the case of a compressed instruction.
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize, Hash)]
+pub enum InstrWidth {
+    Compressed = 2,
+    Uncompressed = 4,
+}
+
 impl InstrCacheable {
     /// Return the width of the instruction in bytes.
-    pub const fn width(&self) -> u64 {
+    #[inline(always)]
+    pub const fn width(&self) -> InstrWidth {
         use InstrCacheable::*;
         match self {
             // 4 bytes instructions
@@ -658,7 +806,8 @@ impl InstrCacheable {
             | Csrrwi(_)
             | Csrrsi(_)
             | Csrrci(_)
-            | Unknown { instr: _ } => 4,
+            | Unknown { instr: _ }
+            | Hint { instr: _ } => InstrWidth::Uncompressed,
 
             // 2 bytes instructions (compressed instructions)
             CLw(_)
@@ -697,14 +846,16 @@ impl InstrCacheable {
             | CFldsp(_)
             | CFsd(_)
             | CFsdsp(_)
-            | UnknownCompressed { instr: _ } => 2,
+            | UnknownCompressed { instr: _ }
+            | HintCompressed { instr: _ } => InstrWidth::Compressed,
         }
     }
 }
 
 impl InstrUncacheable {
     /// Return the width of the instruction in bytes.
-    pub const fn width(&self) -> u64 {
+    #[inline(always)]
+    pub const fn width(&self) -> InstrWidth {
         use InstrUncacheable::*;
         match self {
             FenceI
@@ -716,16 +867,17 @@ impl InstrUncacheable {
             | Sret
             | Mnret
             | Wfi
-            | SFenceVma { .. } => 4,
+            | SFenceVma { .. } => InstrWidth::Uncompressed,
 
-            CEbreak => 2,
+            CEbreak => InstrWidth::Compressed,
         }
     }
 }
 
 impl Instr {
     /// Return the width of the instruction in bytes.
-    pub const fn width(&self) -> u64 {
+    #[inline(always)]
+    pub const fn width(&self) -> InstrWidth {
         use Instr::*;
         match self {
             Cacheable(c) => c.width(),
@@ -938,26 +1090,18 @@ impl fmt::Display for InstrCacheable {
             Srli(args) => i_instr_hex!(f, "srli", args),
             // For consistency with objdump, only the shift amount is printed
             Srai(args) => {
-                i_instr_hex!(
-                    f,
-                    "srai",
-                    ITypeArgs {
-                        imm: args.imm & !(1 << 10),
-                        ..*args
-                    }
-                )
+                i_instr_hex!(f, "srai", NonZeroRdITypeArgs {
+                    imm: args.imm & !(1 << 10),
+                    ..*args
+                })
             }
             Slliw(args) => i_instr_hex!(f, "slliw", args),
             Srliw(args) => i_instr_hex!(f, "srliw", args),
             Sraiw(args) => {
-                i_instr_hex!(
-                    f,
-                    "sraiw",
-                    ITypeArgs {
-                        imm: args.imm & !(1 << 10),
-                        ..*args
-                    }
-                )
+                i_instr_hex!(f, "sraiw", NonZeroRdITypeArgs {
+                    imm: args.imm & !(1 << 10),
+                    ..*args
+                })
             }
             Slti(args) => i_instr!(f, "slti", args),
             Sltiu(args) => i_instr!(f, "sltiu", args),
@@ -985,22 +1129,14 @@ impl fmt::Display for InstrCacheable {
 
             // RV64I U-type instructions
             // For consistency with objdump, upper immediates are shifted down
-            Lui(args) => j_instr!(
-                f,
-                "lui",
-                UJTypeArgs {
-                    rd: args.rd,
-                    imm: (args.imm >> 12) & ((0b1 << 20) - 1),
-                }
-            ),
-            Auipc(args) => j_instr!(
-                f,
-                "auipc",
-                UJTypeArgs {
-                    rd: args.rd,
-                    imm: (args.imm >> 12) & ((0b1 << 20) - 1),
-                }
-            ),
+            Lui(args) => j_instr!(f, "lui", NonZeroRdUJTypeArgs {
+                rd: args.rd,
+                imm: (args.imm >> 12) & ((0b1 << 20) - 1),
+            }),
+            Auipc(args) => j_instr!(f, "auipc", NonZeroRdUJTypeArgs {
+                rd: args.rd,
+                imm: (args.imm >> 12) & ((0b1 << 20) - 1),
+            }),
 
             // RV64I jump instructions
             Jal(args) => u_instr!(f, "jal", args),
@@ -1169,6 +1305,9 @@ impl fmt::Display for InstrCacheable {
 
             Unknown { instr } => write!(f, "unknown {:x}", instr),
             UnknownCompressed { instr } => write!(f, "unknown.c {:x}", instr),
+
+            Hint { instr } => write!(f, "hint {:x}", instr),
+            HintCompressed { instr } => write!(f, "hint.c {:x}", instr),
         }
     }
 }

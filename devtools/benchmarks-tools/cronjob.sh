@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 #############################################################################
 #                                                                           #
@@ -40,10 +40,10 @@ TODAY=$(date +"%Y%m%d_%H%M")
 # messages using the gas-benchmarks-reports Slack application.
 # The file can only be read by mclaren, its owner. This is to prevent anybody to
 # use the application to send messages.
-# C04HZHR11DW is the identifier for the #gas-benchmarks-reports channel (it can
+# C088AUBEB6Y is the identifier for the #core-layer1-gas-benchmarks-reports channel (it can
 # be found in its URL).
 slack() {
-  curl -X POST -H 'Authorization: Bearer '"$(cat /data/tezos-benchmarks/slack_token)" -H 'Content-type: application/json; charset=utf-8' --data "{\"channel\":\"C04HZHR11DW\",\"text\":\"$1\"}" https://tezos-dev.slack.com/api/chat.postMessage
+  curl -X POST -H 'Authorization: Bearer '"$(cat /data/tezos-benchmarks/slack_token)" -H 'Content-type: application/json; charset=utf-8' --data "{\"channel\":\"C088AUBEB6Y\",\"text\":\"$1\"}" https://tezos.slack.com/api/chat.postMessage
 }
 
 anomaly() {

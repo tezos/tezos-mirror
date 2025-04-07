@@ -147,3 +147,16 @@ As a consequence, `inspecting this Ghostnet contract <https://rpc.ghostnet.teztn
         },
         ...
     ]
+
+Upcoming changes
+================
+
+Baker: Explicit choice on using DAL or not via the CLI
+------------------------------------------------------
+
+Octez ``v21.3`` introduces the new ``--without-dal`` option for the baker daemon.
+In Octez ``v21.3``, this option is not mandatory and will only trigger a warning.
+
+Starting from Octez ``v22``, launching a baker daemon requires an explicit mention of the DAL.
+The recommended approach is to run a DAL node and start the baker using the ``--dal-node <uri>`` option.
+If you do not wish to use a DAL node, you can opt-out by using the ``--without-dal`` option.

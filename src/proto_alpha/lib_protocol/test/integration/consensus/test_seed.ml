@@ -86,7 +86,7 @@ let test_seed_no_commitment () =
   let* b, _delegates =
     Context.init3
       ~blocks_per_cycle:8l
-      ~consensus_threshold:0
+      ~consensus_threshold_size:0
       ~nonce_revelation_threshold:2l
       ()
   in
@@ -98,7 +98,7 @@ let test_seed_no_commitment () =
     commitment fails with an "Invalid commitment in block header" error. *)
 let test_no_commitment () =
   let open Lwt_result_syntax in
-  let* b, _contracts = Context.init_n ~consensus_threshold:0 5 () in
+  let* b, _contracts = Context.init_n ~consensus_threshold_size:0 5 () in
   let* {parametric = {blocks_per_commitment; _}; _} =
     Context.get_constants (B b)
   in
@@ -124,7 +124,7 @@ let test_no_commitment () =
 let test_revelation_early_wrong_right_twice () =
   let open Lwt_result_syntax in
   let open Assert in
-  let* b, _contracts = Context.init_n ~consensus_threshold:0 5 () in
+  let* b, _contracts = Context.init_n ~consensus_threshold_size:0 5 () in
   let* csts = Context.get_constants (B b) in
   let* tip = Context.get_seed_nonce_revelation_tip (B b) in
   let blocks_per_commitment =
@@ -250,7 +250,7 @@ let test_revelation_missing_and_late () =
   let open Lwt_result_syntax in
   let open Context in
   let open Assert in
-  let* b, _contracts = Context.init_n ~consensus_threshold:0 5 () in
+  let* b, _contracts = Context.init_n ~consensus_threshold_size:0 5 () in
   let* csts = get_constants (B b) in
   let blocks_per_commitment =
     Int32.to_int csts.parametric.blocks_per_commitment
@@ -312,8 +312,9 @@ let test_unrevealed () =
           baking_reward_fixed_portion_weight = 0;
           seed_nonce_revelation_tip_weight = 0;
           vdf_revelation_tip_weight = 0;
+          dal_rewards_weight = 0;
         };
-      consensus_threshold = 0;
+      consensus_threshold_size = 0;
       minimal_participation_ratio = Ratio.{numerator = 0; denominator = 1};
     }
   in
@@ -357,7 +358,7 @@ let test_unrevealed () =
 
 let test_vdf_status () =
   let open Lwt_result_syntax in
-  let* b, _ = Context.init3 ~consensus_threshold:0 () in
+  let* b, _ = Context.init3 ~consensus_threshold_size:0 () in
   let* b = Block.bake b in
   let* status = Context.get_seed_computation (B b) in
   assert (status = Alpha_context.Seed.Nonce_revelation_stage) ;
@@ -386,7 +387,7 @@ let test_vdf_status () =
 let test_early_incorrect_unverified_correct_already_vdf () =
   let open Lwt_result_syntax in
   let open Assert in
-  let* b, _ = Context.init3 ~consensus_threshold:0 () in
+  let* b, _ = Context.init3 ~consensus_threshold_size:0 () in
   let* csts = Context.get_constants (B b) in
   let blocks_per_commitment =
     Int32.to_int csts.parametric.blocks_per_commitment
@@ -596,9 +597,9 @@ let test_early_incorrect_unverified_correct_already_vdf () =
 (* We check that bounds used in [Seed_storage.for_cycle] are as expected. *)
 let test_cycle_bounds () =
   let open Lwt_result_syntax in
-  let* b, _accounts = Context.init1 ~consensus_threshold:0 () in
+  let* b, _accounts = Context.init1 ~consensus_threshold_size:0 () in
   let* csts = Context.get_constants (B b) in
-  let past_offset = Constants_repr.max_slashing_period - 1 in
+  let past_offset = Constants_repr.slashing_delay in
   let future_offset = csts.parametric.consensus_rights_delay in
   let open Alpha_context.Cycle in
   let expected_error_message direction current_cycle =

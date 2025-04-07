@@ -34,6 +34,10 @@ type history_mode =
           profile. *)
   | Full  (** [Full] keeps the shards forever *)
 
+(** Configuration settings for experimental features, with no backward
+    compatibility guarantees. *)
+type experimental_features = {sqlite3_backend : bool}
+
 type t = {
   data_dir : string;  (** The path to the DAL node data directory. *)
   rpc_addr : P2p_point.Id.t;
@@ -60,7 +64,10 @@ type t = {
   version : int;  (** The version of the configuration. *)
   service_name : string option;
       (** Name of the service provided by this node. *)
-  service_namespace : string option;  (** Namespace for the service *)
+  service_namespace : string option;  (** Namespace for the service. *)
+  experimental_features : experimental_features;  (** Experimental features.  *)
+  fetch_trusted_setup : bool;
+      (** Should the trusted setup be downloaded if not found or has invalid hash. *)
   verbose : bool;
       (** Whether to emit detailed events for frequently received control
           messages from remote peers. *)
@@ -78,13 +85,13 @@ val store_path : t -> string
 (** [save config] writes config file in [config.data_dir] *)
 val save : t -> unit tzresult Lwt.t
 
-val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
+val load : data_dir:string -> t tzresult Lwt.t
 
-(** [identity_file t] returns the absolute path to the "identity.json"
-    file of the DAL node, based on the configuration [t]. *)
+(** [identity_file config] returns the absolute path to the
+    "identity.json" file of the DAL node, based on the configuration
+    [config]. *)
 val identity_file : t -> string
 
-(** [peers_file data_dir] returns the absolute path to the
-    "peers.json" file of the DAL node, based on the configuration
-    [t]. *)
+(** [peers_file config] returns the absolute path to the "peers.json"
+    file of the DAL node, based on the configuration [config]. *)
 val peers_file : t -> string

@@ -51,9 +51,9 @@ module State = struct
   type t = Accepted | Running | Disconnected
 
   let pp_digram ppf = function
-    | Accepted -> Format.fprintf ppf "⚎"
-    | Running -> Format.fprintf ppf "⚌"
-    | Disconnected -> Format.fprintf ppf "⚏"
+    | Accepted -> Format.fprintf ppf "@{<fg_yellow>⚎@}"
+    | Running -> Format.fprintf ppf "@{<fg_green>⚌@}"
+    | Disconnected -> Format.fprintf ppf "@{<fg_red>⚏@}"
 
   let encoding =
     let open Data_encoding in

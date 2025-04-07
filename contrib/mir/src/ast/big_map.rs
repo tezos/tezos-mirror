@@ -210,14 +210,29 @@ impl<'a, T: LazyStorage<'a> + ?Sized> LazyStorageBulkUpdate<'a> for T {}
 
 /// A `big_map` representation with metadata, used in [InMemoryLazyStorage].
 #[derive(Clone, PartialEq, Eq, Debug)]
-struct MapInfo<'a> {
+pub(crate) struct MapInfo<'a> {
     map: BTreeMap<TypedValue<'a>, TypedValue<'a>>,
     key_type: Type,
     value_type: Type,
 }
 
+impl<'a> MapInfo<'a> {
+    /// Construct a new, empty, in-memory storage.
+    pub fn new(
+        map: BTreeMap<TypedValue<'a>, TypedValue<'a>>,
+        key_type: Type,
+        value_type: Type,
+    ) -> Self {
+        MapInfo {
+            map,
+            key_type,
+            value_type,
+        }
+    }
+}
+
 /// Simple implementation for [LazyStorage].
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InMemoryLazyStorage<'a> {
     next_id: BigInt,
     big_maps: BTreeMap<BigMapId, MapInfo<'a>>,
@@ -230,6 +245,16 @@ impl<'a> InMemoryLazyStorage<'a> {
             next_id: 0.into(),
             big_maps: BTreeMap::new(),
         }
+    }
+
+    /// Construct in tzt with given big maps.
+    pub(crate) fn with_big_maps(big_maps: BTreeMap<BigMapId, MapInfo<'a>>) -> Self {
+        let next_id = big_maps
+            .keys()
+            .max()
+            .map(|id| id.0.clone() + 1)
+            .unwrap_or_else(|| 0.into());
+        InMemoryLazyStorage { next_id, big_maps }
     }
 
     fn get_next_id(&mut self) -> BigMapId {

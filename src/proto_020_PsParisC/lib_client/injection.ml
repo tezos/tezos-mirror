@@ -618,7 +618,7 @@ let signature_size_of_algo : Signature.algo -> int = function
   | Bls ->
       (* BLS signatures in operations are encoded with 2 extra bytes: a [ff]
          prefix and a tag [03]. *)
-      Signature.Bls.size + 2
+      Signature.Bls_aug.size + 2
 
 (* This value is used as a safety guard for gas limit. *)
 let default_safety_guard = Gas.Arith.(integral_of_int_exn 100)

@@ -254,6 +254,8 @@ module Game = struct
 
   type t = Sc_rollup.Game.t
 
+  type timeout = Sc_rollup.Game.timeout
+
   type conflict = Sc_rollup.Refutation_storage.conflict
 
   let dissection_chunk_of_octez Octez_smart_rollup.Game.{state_hash; tick} :
@@ -329,10 +331,14 @@ module Game = struct
         Move {choice = Sc_rollup.Tick.to_z choice; step = step_to_octez step}
 
   let index_of_octez Octez_smart_rollup.Game.{alice; bob} =
-    Sc_rollup.Game.Index.make alice bob
+    Sc_rollup.Game.Index.make
+      (Signature.V1.Of_V_latest.get_public_key_hash_exn alice)
+      (Signature.V1.Of_V_latest.get_public_key_hash_exn bob)
 
   let index_to_octez Sc_rollup.Game.Index.{alice; bob} =
-    Octez_smart_rollup.Game.make_index alice bob
+    Octez_smart_rollup.Game.make_index
+      (Signature.V_latest.Of_V1.public_key_hash alice)
+      (Signature.V_latest.Of_V1.public_key_hash bob)
 
   let player_of_octez : Octez_smart_rollup.Game.player -> player = function
     | Alice -> Alice
@@ -410,12 +416,29 @@ module Game = struct
       game_state = game_state_to_octez game_state;
     }
 
+  let timeout_of_octez
+      Octez_smart_rollup.Game.{alice_timeout; bob_timeout; last_turn_level} :
+      Sc_rollup.Game.timeout =
+    {
+      alice = alice_timeout;
+      bob = bob_timeout;
+      last_turn_level = Raw_level.of_int32_exn last_turn_level;
+    }
+
+  let timeout_to_octez Sc_rollup.Game.{alice; bob; last_turn_level} :
+      Octez_smart_rollup.Game.timeout =
+    {
+      alice_timeout = alice;
+      bob_timeout = bob;
+      last_turn_level = Raw_level.to_int32 last_turn_level;
+    }
+
   let conflict_of_octez
       Octez_smart_rollup.Game.
         {other; their_commitment; our_commitment; parent_commitment} : conflict
       =
     {
-      other;
+      other = Signature.V1.Of_V_latest.get_public_key_hash_exn other;
       their_commitment = Commitment.of_octez their_commitment;
       our_commitment = Commitment.of_octez our_commitment;
       parent_commitment;
@@ -426,7 +449,7 @@ module Game = struct
         {other; their_commitment; our_commitment; parent_commitment} :
       Octez_smart_rollup.Game.conflict =
     {
-      other;
+      other = Signature.Of_V1.public_key_hash other;
       their_commitment = Commitment.to_octez their_commitment;
       our_commitment = Commitment.to_octez our_commitment;
       parent_commitment;

@@ -24,6 +24,9 @@ optional = true
 [dependencies.tezos-smart-rollup-constants]
 path = "../constants"
 
+[build-dependencies.tezos-smart-rollup-build-utils]
+path = "../build-utils"
+
 [features]
-"testing" = ["mockall"]
+"mock-core-trait" = ["dep:mockall"]
 "proto-alpha" = []

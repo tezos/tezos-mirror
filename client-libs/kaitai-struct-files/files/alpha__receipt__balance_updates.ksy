@@ -117,6 +117,12 @@ types:
     - id: staking_delegate_denominator
       type: staking_delegate_denominator
       if: (alpha__operation_metadata__alpha__balance_and_update_tag == alpha__operation_metadata__alpha__balance_and_update_tag::staking_delegate_denominator)
+    - id: dal_attesting_rewards
+      type: alpha__operation_metadata__alpha__tez_balance_update
+      if: (alpha__operation_metadata__alpha__balance_and_update_tag == alpha__operation_metadata__alpha__balance_and_update_tag::dal_attesting_rewards)
+    - id: lost_dal_attesting_rewards
+      type: lost_dal_attesting_rewards
+      if: (alpha__operation_metadata__alpha__balance_and_update_tag == alpha__operation_metadata__alpha__balance_and_update_tag::lost_dal_attesting_rewards)
   alpha__operation_metadata__alpha__balance_updates:
     seq:
     - id: alpha__operation_metadata__alpha__balance_updates_entries
@@ -211,6 +217,13 @@ types:
     - id: revelation
       type: u1
       enum: bool
+    - id: alpha__operation_metadata__alpha__tez_balance_update
+      type: alpha__operation_metadata__alpha__tez_balance_update
+  lost_dal_attesting_rewards:
+    seq:
+    - id: delegate
+      type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: alpha__operation_metadata__alpha__tez_balance_update
       type: alpha__operation_metadata__alpha__tez_balance_update
   originated:
@@ -310,6 +323,8 @@ enums:
     26: unstaked_deposits
     27: staking_delegator_numerator
     28: staking_delegate_denominator
+    29: dal_attesting_rewards
+    30: lost_dal_attesting_rewards
   alpha__operation_metadata__alpha__update_origin_tag:
     0: block_application
     1: protocol_migration

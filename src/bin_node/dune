@@ -7,6 +7,8 @@
  (package octez-node)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-rustzcash-deps
+  bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
   octez-libs.version
@@ -18,6 +20,9 @@
   octez-libs.rpc-http-server
   octez-rpc-process
   octez-shell-libs.p2p
+  octez-libs.octez-profiler
+  octez-libs.octez-profiler.backends
+  octez-libs.octez-profiler.complex_backends
   octez-shell-libs.shell
   octez-shell-libs.store
   octez-shell-libs.store.unix-reconstruction
@@ -145,16 +150,24 @@
   (select void_for_linking-octez-protocol-019-PtParisB-libs-plugin-registerer from
    (octez-protocol-019-PtParisB-libs.plugin-registerer -> void_for_linking-octez-protocol-019-PtParisB-libs-plugin-registerer.empty)
    (-> void_for_linking-octez-protocol-019-PtParisB-libs-plugin-registerer.empty))
-  tezos-protocol-020-PsParisC.embedded-protocol
-  octez-protocol-020-PsParisC-libs.plugin-registerer
+  (select void_for_linking-tezos-protocol-020-PsParisC-embedded-protocol from
+   (tezos-protocol-020-PsParisC.embedded-protocol -> void_for_linking-tezos-protocol-020-PsParisC-embedded-protocol.empty)
+   (-> void_for_linking-tezos-protocol-020-PsParisC-embedded-protocol.empty))
+  (select void_for_linking-octez-protocol-020-PsParisC-libs-plugin-registerer from
+   (octez-protocol-020-PsParisC-libs.plugin-registerer -> void_for_linking-octez-protocol-020-PsParisC-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-020-PsParisC-libs-plugin-registerer.empty))
   tezos-protocol-021-PsQuebec.embedded-protocol
   octez-protocol-021-PsQuebec-libs.plugin-registerer
+  tezos-protocol-022-PsRiotum.embedded-protocol
+  octez-protocol-022-PsRiotum-libs.plugin-registerer
   (select void_for_linking-tezos-protocol-alpha-embedded-protocol from
    (tezos-protocol-alpha.embedded-protocol -> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty))
   (select void_for_linking-octez-protocol-alpha-libs-plugin-registerer from
    (octez-protocol-alpha-libs.plugin-registerer -> void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty)))
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -172,6 +185,9 @@
   -open Tezos_rpc_http_server
   -open Octez_rpc_process
   -open Tezos_p2p
+  -open Tezos_profiler
+  -open Tezos_profiler_backends
+  -open Tezos_profiler_complex_backends
   -open Tezos_shell
   -open Tezos_store
   -open Tezos_store_unix_reconstruction
@@ -221,6 +237,8 @@
    (write-file void_for_linking-octez-protocol-018-Proxford-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-019-PtParisB-embedded-protocol.empty "")
    (write-file void_for_linking-octez-protocol-019-PtParisB-libs-plugin-registerer.empty "")
+   (write-file void_for_linking-tezos-protocol-020-PsParisC-embedded-protocol.empty "")
+   (write-file void_for_linking-octez-protocol-020-PsParisC-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-alpha-embedded-protocol.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty ""))))
 

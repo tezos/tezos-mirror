@@ -4,19 +4,102 @@
 
 ### Features
 
+### Bug fixes
+
+- Improves call trace of `DELEGATECALL` and `CALLCODE`. (!16588)
+
+### Internal
+
+- Rework block production to simplify data flow and remove unnecessary
+  IO. (!16661 !16684 !16685 !16618)
+
+## Next proposal
+
+This is a release candidate for a kernel upgrade proposal.
+
+Its storage version is 26.
+
+### Features
+
+- Once this kernel activates, only the latest block of the chain will
+  be available in the rollup context, compared to the full history
+  with previous version. This should sensibly reduces the disk
+  consumption of full Rollup Node. The full history will remain
+  available via Octez EVM Node deployments. (!15490)
+- The VM is now relying on cache to make r/w access to storage indexes
+  which improves time performances on the execution side. (!15812)
+- The kernel uses events to make the sequencer aware of delayed transaction
+  flush. This significantly reduces the risk of sequencer downtime due to
+  unforseen flush event. (!15621 !15841)
+- Updates the Layer 1 governance contracts to take into account Quebec new time
+  between blocks. (!16592)
+    - [`KT1FPG4NApqTJjwvmhWvqA14m5PJxu9qgpBK` for the regular upgrade governance][kgov]
+    - [`KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2` for the security upgrade governance][sgov]
+    - [`KT1UvCsnXpLAssgeJmrbQ6qr3eFkYXxsTG9U` for the sequencer governance][sqgov]
+- A fast withdrawal entrypoint was added to the withdrawal precompiled contract
+  under a feature flag. (!16417)
+- Fast withdrawal entrypoint activation. (!16617)
+
+[kgov]: https://better-call.dev/mainnet/KT1FPG4NApqTJjwvmhWvqA14m5PJxu9qgpBK/operations
+[sgov]: https://better-call.dev/mainnet/KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2/operations
+[sqgov]: https://better-call.dev/mainnet/KT1UvCsnXpLAssgeJmrbQ6qr3eFkYXxsTG9U/operations
+
+### Bug fixes
+
+- Standard withdrawals from the withdrawal precompiled contract now emit events
+  from the appropriate address. (!16417)
+- Fixed an issue in the FA bridge where withdrawals events were not
+  being emitted from the appropriate address. (!16666)
+
+### Internal
+
+- Maximum gas per transaction is stored in the durable storage. (!15468 !15925)
+- Minimum base fee per gas is stored in the durable storage. (!15475)
+- Blueprints from the past are refused on parsing. (!15636)
+- Clear blueprints on migration (!15637)
+- Support for legacy untagged format for delayed transactions has been dropped. (!15366)
+- Avoid writing gas price twice per block by adding it to block-in-progress. (!15574)
+- Transaction validation support in simulation is dropped, the
+  validation must be done outside of the kernel. (!15958)
+- Parsing a DAL slot is now resumed after invalid inputs. (!15926)
+- Current block's gas price is not stored on its own anymore but the
+  information is still available as part of the current
+  block. (!15609)
+- The kernel always reboots between the application of
+  blocks. (!16274)
+- Use the timestamp provided by the `Info_per_level` internal message instead
+  of trying to predict the current timestamp (notably in the context of the
+  delayed inbox). It has been demonstrated that the prediction is
+  over-approximated after a Layer 1 downtime, which is the most likely scenario
+  triggering a flush of the delayed inbox. (!16425)
+- An optional chain_id field has been added to the blueprints chunks
+  sent by the sequencer. (!16366)
+- The option to limit the block production to at most one block per
+  Tezos level, which was added in version
+  ec7c3b349624896b269e179384d0a45cf39e1145, has been removed. (!16302)
+- Deposits can now specify a chain id, but it is currently ignored. (!16153)
+- All blueprints in storage are deleted after a flush event. (!15673)
+
+## Bifrost (7386d0b)
+
+This kernel has been activated on Etherlink Testnet on block
+[10,758,937][7386-activation-testnet], and on Etherlink Mainnet on
+block [4,162,673][7386-activation-mainnet].
+
+Its storage version is 22.
+
+[7386-activation-testnet]: https://testnet.explorer.etherlink.com/block/0x4ecefba952e877f9bc159f30d12544358abcceaabb0f4a721ab1044cae8ee09d
+[7386-activation-mainnet]: https://explorer.etherlink.com/block/0xe29ef8db2227f495808fdc04d92b8ea7edcad32d1270fdddc9c5baed1542ccd9
+
+### Features
+
 #### Stable
 
 - The kernel is able to trace calls for the `callTracer` configuration. (!14290)
 - Gas cost of XTZ withdrawals is increased to prevent abuses. (!14016)
-
-#### Experimental
-
-##### FA Bridge
-
-The FA Bridge complements the native bridge already available on both Mainnet
-Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
-
 - Gas cost of FA withdrawals is increased to prevent abuses. (!14016)
+- Support of larger delayed transactions (was limited at 4KBytes before). (!14467 !15353)
+- Enable the FA bridge on Mainnet (!15355)
 
 ### Internal
 
@@ -25,7 +108,6 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
   It will allow to remove old transactions from the durable storage. (!14688)
 - Tick model is updated with regards to FA deposits and withdrawals. (!14016)
 - L1 proxy address is added as a field to the FA withdrawal event. (!14260)
-- Preliminary support of larger delayed transactions. (!14467)
 - Move block storage related functions to another file to improve the readability
   (!14685)
 - EVM Execution no longer require an additional storage for block number to
@@ -36,12 +118,16 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
   hash. (!14369)
 - Enable LTO (Link Time Optimization) during compilation to reduce tick consumption
   and improve execution speed. (!14933)
+- The nonce of the zero account (0x00..00) is incremented, to avoid being cleaned
+  by EIP-161 empty account rule. (!15197)
+- Keep a null balance for the withdrawal precompiled address (i.e. 0xff00000000000000000000000000000000000001).
 
 ### Bug fixes
 
 - Fix gas cost of contract creation by fixing the implementation of init code
   cost recording. (!14892)
 - Fix call trace reporting of error messages. (!15000)
+- Fix performance regression due to struct logger. (!15319)
 
 ## Version af7909023768bc4aad3120bec7bea4a64a576047
 
@@ -96,6 +182,7 @@ L1 blocks, without sacrificing decentralization, and with reduced costs.
   account. Execution forbid this. (!14317)
 - Tick model is updated with regards to FA deposits and withdrawals. (!14016)
 - Gas cost of XTZ/FA withdrawals is increased to prevent abuses. (!14016)
+- FA deposits disallowed to invoke XTZ/FA withdrawal precompiles. (!14545)
 
 ## Version 4f4457e2527cb227a90bb1c56d3a83f39c0f78fd
 
@@ -151,6 +238,26 @@ repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
 - Add FA withdrawal structure and helper methods for parsing and encoding. (!13843)
 - Rework the semantics of migrations in order to allow a network to skip frozen
   versions. (!13895)
+- Circular calls to impure precompiles are forbidden. (!14390)
+
+### Security Upgrades
+
+#### Version ffb8a65697b6bf4fc4231667f4680c71acc32a9b
+
+**Note:** This commit is not part of the `master` branch of the Octez
+repository, but is part of [`etherlink-security-upgrades`][su-2] instead.
+
+[su-2]: https://gitlab.com/tezos/tezos/-/tree/etherlink-security-upgrade-2
+
+This security upgrade addresses security vulnerabilities found in the underlying
+implementation of a double linked list used for the delayed inbox. The security
+vulnerability was not exploited on Mainnet before the activation of the kernel
+on block 3,400,942.
+
+The internal pointers of the double linked list were not updated correctly, which
+could lead in weird scenarios to the application of a deposit without being
+actually removed from the delayed inbox.
+
 
 ## Version ec7c3b349624896b269e179384d0a45cf39e1145
 

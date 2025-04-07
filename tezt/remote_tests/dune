@@ -4,6 +4,7 @@
 (executable
  (name main)
  (libraries
+  bls12-381.archive
   tezt
   tezt-tezos)
  (link_flags

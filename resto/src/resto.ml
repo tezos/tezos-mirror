@@ -760,6 +760,10 @@ module MakeService (Encoding : ENCODING) = struct
   let query : type pr p i q o e. (_, pr, p, q, i, o, e) service -> q Query.t =
    fun {types; _} -> types.query
 
+  let path : type pr p i q o e. (_, pr, p, q, i, o, e) service -> (pr, p) Path.t
+      =
+   fun {path; _} -> path
+
   let input_encoding :
       type pr p i q o e. (_, pr, p, q, i, o, e) service -> i input =
    fun {types; _} -> types.input

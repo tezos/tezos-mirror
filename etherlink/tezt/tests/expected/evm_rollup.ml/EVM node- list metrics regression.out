@@ -1,0 +1,62 @@
+
+./octez-evm-node list metrics
+#HELP octez_evm_node_block_process_time_histogram The time the EVM node spent processing a block
+#TYPE octez_evm_node_block_process_time_histogram histogram
+#HELP octez_evm_node_blueprint_chunks_sent_on_dal Number of blueprint chunks sent on the DAL
+#TYPE octez_evm_node_blueprint_chunks_sent_on_dal counter
+#HELP octez_evm_node_blueprint_chunks_sent_on_inbox Number of blueprint chunks sent on the shared inbox
+#TYPE octez_evm_node_blueprint_chunks_sent_on_inbox counter
+#HELP octez_evm_node_bootstrapping 1.0 if the EVM node is catching up with its upstream EVM node
+#TYPE octez_evm_node_bootstrapping gauge
+#HELP octez_evm_node_calls RPC endpoint call counts and sum of execution times.
+#TYPE octez_evm_node_calls summary
+#HELP octez_evm_node_calls_method Method call counts
+#TYPE octez_evm_node_calls_method counter
+#HELP octez_evm_node_confirm_gas_needed Initially provided gas was not enough, confirmation was needed
+#TYPE octez_evm_node_confirm_gas_needed counter
+#HELP octez_evm_node_confirmed_head Confirmed level (smart rollup node's head)
+#TYPE octez_evm_node_confirmed_head gauge
+#HELP octez_evm_node_gas_price Gas price
+#TYPE octez_evm_node_gas_price gauge
+#HELP octez_evm_node_head Level of the node's head
+#TYPE octez_evm_node_head gauge
+#HELP octez_evm_node_inconsistent_da_fees Node DA fees are inconsistent with kernel ones
+#TYPE octez_evm_node_inconsistent_da_fees counter
+#HELP octez_evm_node_l1_level Last processed L1 block level
+#TYPE octez_evm_node_l1_level gauge
+#HELP octez_evm_node_performance_connections Open connections
+#TYPE octez_evm_node_performance_connections gauge
+#HELP octez_evm_node_performance_cpu_percentage CPU Percentage
+#TYPE octez_evm_node_performance_cpu_percentage gauge
+#HELP octez_evm_node_performance_data Disk Usage
+#TYPE octez_evm_node_performance_data gauge
+#HELP octez_evm_node_performance_disk_percentage Disk Usage Percentage
+#TYPE octez_evm_node_performance_disk_percentage gauge
+#HELP octez_evm_node_performance_elapsed_time Number of seconds since the node is running
+#TYPE octez_evm_node_performance_elapsed_time counter
+#HELP octez_evm_node_performance_file_descriptors Open file descriptors
+#TYPE octez_evm_node_performance_file_descriptors gauge
+#HELP octez_evm_node_performance_logs Disk usage: daily_logs
+#TYPE octez_evm_node_performance_logs gauge
+#HELP octez_evm_node_performance_mem_percentage Memory Percentage
+#TYPE octez_evm_node_performance_mem_percentage gauge
+#HELP octez_evm_node_performance_resident Resident Memory Stats
+#TYPE octez_evm_node_performance_resident gauge
+#HELP octez_evm_node_performance_store_irmin Disk usage: store
+#TYPE octez_evm_node_performance_store_irmin gauge
+#HELP octez_evm_node_performance_store_sqlite Disk usage: store.sqlite
+#TYPE octez_evm_node_performance_store_sqlite gauge
+#HELP octez_evm_node_performance_virtual Size Memory Stats
+#TYPE octez_evm_node_performance_virtual gauge
+#HELP octez_evm_node_performance_wasm Disk usage: wasm_2_0_0
+#TYPE octez_evm_node_performance_wasm gauge
+#HELP octez_evm_node_queue_size Size of the execution queue of simulations
+#TYPE octez_evm_node_queue_size gauge
+#HELP octez_evm_node_signals_sent Number of DAL import signals sent on the inbox
+#TYPE octez_evm_node_signals_sent counter
+#HELP octez_evm_node_time_processed Time to process the blocks
+#TYPE octez_evm_node_time_processed counter
+#HELP octez_evm_node_time_waiting Time spent by a request waiting for a worker (in picosecond).
+#TYPE octez_evm_node_time_waiting counter
+#HELP octez_evm_node_transactions Number of transactions in the blocks
+#TYPE octez_evm_node_transactions counter

@@ -7,7 +7,7 @@ history can be deleted as they are not required anymore.
 
 Three history modes are provided:
 
-- **Full** (default mode with 1 :ref:`additional cycle <History_mode_additional_cycles>`)
+- **Full**
 
   The node stores the minimal data since the genesis required to reconstruct
   (or 'replay') the complete chain's ledger state.
@@ -32,7 +32,7 @@ Three history modes are provided:
 
   See how to :ref:`set up a full node<Set_up_a_full_node>`.
 
-- **Rolling**
+- **Rolling** (default mode with 1 :ref:`additional cycle <History_mode_additional_cycles>`)
 
   This is the lightest mode as it only maintains a minimal rolling fragment of the
   chain data so the node can still validate new blocks and synchronize with the head.
@@ -118,8 +118,6 @@ or use your configuration file as described in :doc:`here <node-configuration>`:
        "history_mode": "full"
    }}
 
-Note that, since the full mode is the default one, this configuration is optional.
-
 You can then verify that your history mode is set to full by using the following RPC.
 
 .. code-block:: console
@@ -152,6 +150,8 @@ or use your configuration file as described in :doc:`here <node-configuration>`:
    { "shell": {
        "history_mode": "rolling"
    }}
+
+Note that, since the rolling mode is the default one, this configuration is optional.
 
 In ``rolling`` mode, the caboose is the genesis at its early state,
 and then, it is updated to the last known block of the rolling

@@ -1129,7 +1129,8 @@ module Make (C : AUTOMATON_CONFIG) :
       let open Monad.Syntax in
       match Message_id.valid message_id with
       | `Valid -> unit
-      | `Unknown | `Outdated -> fail Unknown_validity
+      | `Outdated -> fail Outdated
+      | `Unknown -> fail Unknown_validity
       | `Invalid ->
           let* () =
             update_score sender (fun stats ->

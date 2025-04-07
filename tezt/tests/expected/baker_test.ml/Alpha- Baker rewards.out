@@ -15,7 +15,7 @@
   "voting_period_info":
     { "voting_period":
         { "index": 0, "kind": "proposal", "start_position": 0 },
-      "position": 1, "remaining": 153598 }, "nonce_hash": null,
+      "position": 1, "remaining": 151198 }, "nonce_hash": null,
   "deactivated": [],
   "balance_updates":
     [ { "kind": "minted", "category": "bootstrap",
@@ -55,19 +55,19 @@
       { "kind": "contract",
         "contract": "[PUBLIC_KEY_HASH]",
         "change": "3600000000000", "origin": "migration" },
-      { "kind": "minted", "category": "baking rewards", "change": "-266667",
+      { "kind": "minted", "category": "baking rewards", "change": "-240009",
         "origin": "block" },
       { "kind": "freezer", "category": "deposits",
         "staker":
           { "baker_own_stake": "[PUBLIC_KEY_HASH]" },
-        "change": "266667", "origin": "block" },
-      { "kind": "minted", "category": "baking rewards", "change": "-2399999",
+        "change": "240009", "origin": "block" },
+      { "kind": "minted", "category": "baking rewards", "change": "-2160073",
         "origin": "block" },
       { "kind": "contract",
         "contract": "[PUBLIC_KEY_HASH]",
-        "change": "2399999", "origin": "block" } ],
+        "change": "2160073", "origin": "block" } ],
   "liquidity_baking_toggle_ema": 0, "adaptive_issuance_vote_ema": 0,
-  "adaptive_issuance_activation_cycle": 5,
+  "adaptive_issuance_activation_cycle": 0,
   "implicit_operations_results":
     [ { "kind": "origination",
         "balance_updates":

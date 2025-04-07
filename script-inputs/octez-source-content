@@ -9,10 +9,12 @@ LICENSES
 opam
 script-inputs
 scripts
+sdk
 irmin
 brassaia
 rust-toolchain
 data-encoding
 cohttp
+opentelemetry
 prometheus
 resto

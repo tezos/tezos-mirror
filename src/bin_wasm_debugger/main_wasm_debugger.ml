@@ -23,4 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Wasm_debugger = Wasm_debugger.Make (Wasm_utils)
+
 let () = Wasm_debugger.main ()

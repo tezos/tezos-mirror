@@ -27,9 +27,10 @@
 
 open Rpc_encodings
 
-type t = Data_encoding.json JSONRPC.error
+type t = JSONRPC.error
 
-let parse_error = JSONRPC.{code = -32700; message = "Parse error"; data = None}
+let parse_error msg =
+  JSONRPC.{code = -32700; message = "Parse error: " ^ msg; data = None}
 
 let invalid_request reason =
   JSONRPC.{code = -32600; message = reason; data = None}
@@ -50,8 +51,13 @@ let invalid_input =
 let resource_not_found reason =
   JSONRPC.{code = -32001; message = reason; data = None}
 
-let resource_unavailable reason =
-  JSONRPC.{code = -32002; message = reason; data = None}
+let resource_unavailable ?data reason =
+  JSONRPC.
+    {
+      code = -32002;
+      message = reason;
+      data = Option.map (fun s -> `String s) data;
+    }
 
 let transaction_rejected reason hash =
   JSONRPC.
@@ -102,3 +108,8 @@ let trace_block_not_found block_number =
        block_number)
 
 let trace_not_found = internal_error "Trace not available"
+
+let tracer_not_implemented s =
+  resource_unavailable
+    ~data:s
+    (Format.asprintf "Tracer is not available for the endpoint")

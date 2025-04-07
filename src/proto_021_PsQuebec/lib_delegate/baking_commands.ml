@@ -185,7 +185,7 @@ let operations_arg =
              Operations_source.(Local {filename = Uri.to_string uri}))
        uri_parameter)
 
-let context_path_arg =
+let context_root_path_arg =
   Tezos_clic.arg
     ~long:"context"
     ~placeholder:"path"
@@ -510,7 +510,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          force_apply_from_round_arg
          force_switch
          operations_arg
-         context_path_arg
+         context_root_path_arg
          adaptive_issuance_vote_arg
          do_not_monitor_node_mempool_arg
          endpoint_arg
@@ -524,7 +524,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              force_apply_from_round,
              force,
              extra_operations,
-             context_path,
+             context_root_path,
              adaptive_issuance_vote,
              do_not_monitor_node_mempool,
              dal_node_endpoint,
@@ -543,7 +543,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ~force
           ~monitor_node_mempool:(not do_not_monitor_node_mempool)
           ?extra_operations
-          ?context_path
+          ?context_root_path
           ?dal_node_endpoint
           ~count:block_count
           ?votes:
@@ -583,7 +583,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          force_apply_from_round_arg
          force_switch
          operations_arg
-         context_path_arg
+         context_root_path_arg
          state_recorder_switch_arg)
       (prefixes ["propose"; "for"] @@ sources_param)
       (fun ( minimal_fees,
@@ -593,7 +593,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              force_apply_from_round,
              force,
              extra_operations,
-             context_path,
+             context_root_path,
              state_recorder )
            sources
            cctxt ->
@@ -607,7 +607,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ?force_apply_from_round
           ~force
           ?extra_operations
-          ?context_path
+          ?context_root_path
           ~state_recorder
           delegates);
   ]
@@ -656,6 +656,19 @@ let pre_emptive_forge_time_arg =
          try return (Q.of_string s)
          with _ -> failwith "pre-emptive-forge-time expected int or float."))
 
+let remote_calls_timeout_arg =
+  let open Lwt_result_syntax in
+  Tezos_clic.arg
+    ~long:"remote-calls-timeout"
+    ~placeholder:"seconds"
+    ~doc:
+      "Sets a timeout for client calls such as signing block header or \
+       attestation and for the creation of deterministic nonce. Use only if \
+       your remote signer can handle concurrent requests."
+    (Tezos_clic.parameter (fun _ s ->
+         try return (Q.of_string s)
+         with _ -> failwith "remote-calls-timeout expected int or float."))
+
 let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
   let open Lwt_syntax in
   let default_filename = Per_block_vote_file.default_vote_json_filename in
@@ -686,7 +699,7 @@ let check_dal_node without_dal dal_node_rpc_ctxt =
       (* The user is aware that no DAL node is running, since they explicitly
          used the [--without-dal] option. However, we do not want to reduce the
          exposition of bakers to warnings about DAL, so we keep it. *)
-      result_emit Events.no_dal_node_running ()
+      result_emit Events.no_dal_node_provided ()
   | None, false -> result_emit Events.no_dal_deprecation ()
   | Some _, true -> tzfail Incompatible_dal_options
   | Some ctxt, false -> (
@@ -701,7 +714,7 @@ let check_dal_node without_dal dal_node_rpc_ctxt =
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args16
+  Tezos_clic.args17
     pidfile_arg
     node_version_check_bypass_arg
     node_version_allowed_arg
@@ -718,6 +731,7 @@ let baker_args =
     without_dal_arg
     state_recorder_switch_arg
     pre_emptive_forge_time_arg
+    remote_calls_timeout_arg
 
 let run_baker
     ( pidfile,
@@ -735,7 +749,8 @@ let run_baker
       dal_node_endpoint,
       without_dal,
       state_recorder,
-      pre_emptive_forge_time ) baking_mode sources cctxt =
+      pre_emptive_forge_time,
+      remote_calls_timeout ) baking_mode sources cctxt =
   let open Lwt_result_syntax in
   may_lock_pidfile pidfile @@ fun () ->
   let* () =
@@ -762,10 +777,9 @@ let run_baker
   in
   let* () = check_dal_node without_dal dal_node_rpc_ctxt in
   let* delegates = get_delegates cctxt sources in
-  let context_path =
+  let context_root_path =
     match baking_mode with
-    | Local {local_data_dir_path} ->
-        Some Filename.Infix.(local_data_dir_path // "context")
+    | Local {local_data_dir_path} -> Some local_data_dir_path
     | Remote -> None
   in
   Client_daemon.Baker.run
@@ -778,8 +792,9 @@ let run_baker
     ?dal_node_endpoint
     ?pre_emptive_forge_time
     ?force_apply_from_round
+    ?remote_calls_timeout
     ~chain:cctxt#chain
-    ?context_path
+    ?context_root_path
     ~keep_alive
     ~state_recorder
     delegates

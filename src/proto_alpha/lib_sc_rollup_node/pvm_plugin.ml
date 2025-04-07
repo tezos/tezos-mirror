@@ -155,7 +155,10 @@ let outbox_message_summary (output : Sc_rollup.output) =
   let summary =
     match output with
     | {message = Whitelist_update pkhs; _} ->
-        Outbox_message.Whitelist_update pkhs
+        Outbox_message.Whitelist_update
+          (Option.map
+             (List.map Tezos_crypto.Signature.Of_V1.public_key_hash)
+             pkhs)
     | {message = Atomic_transaction_batch {transactions}; _} ->
         let transactions = List.map outbox_transaction_summary transactions in
         Transaction_batch transactions
@@ -165,7 +168,7 @@ let outbox_message_summary (output : Sc_rollup.output) =
         in
         Transaction_batch transactions
   in
-  (Z.to_int output.message_index, summary)
+  (Z.to_int output.output_info.message_index, summary)
 
 let get_outbox_messages node_ctxt state ~outbox_level =
   let open Lwt_syntax in
@@ -183,7 +186,13 @@ let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
   let*! outbox = PVM.get_outbox outbox_level state in
   let output = List.nth outbox message_index in
   match output with
-  | None -> invalid_arg "invalid index"
+  | None ->
+      failwith
+        "No message at index %d in outbox at level %a registered in cemented \
+         state"
+        message_index
+        Raw_level.pp
+        outbox_level
   | Some output -> (
       let*! proof =
         PVM.produce_output_proof

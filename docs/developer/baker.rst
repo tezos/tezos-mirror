@@ -15,9 +15,9 @@ side-effects.
 It relies on two workers running alongside the main scheduling loop to manage
 auxiliary tasks:
 
-- the operation worker monitors consensus operations from the node via the ``/mempool/monitor_operations`` RPC, reporting ``Prequorum_reached`` and ``Quorum_reached`` events to the main scheduler.
+- The operation worker maintains a pool of fresh operations by listening to the node's mempool. It is responsible for tracking consensus and reports ``Prequorum_reached`` and ``Quorum_reached`` events to the main scheduler.
 
-- the forge worker is responsible for crafting blocks and operations. It receives crafting requests from the scheduler and notifies completion with ``New_forge_event (Block_ready block)``, ``New_forge_event (Preattestation_ready op)``, or ``New_forge_event (Attestation_ready op)`` events.
+- The forge worker is responsible for crafting blocks and operations. It receives crafting requests from the scheduler and notifies completion with ``New_forge_event (Block_ready block)``, ``New_forge_event (Preattestation_ready op)``, or ``New_forge_event (Attestation_ready op)`` events.
 
 .. _baker_scheduling:
 
@@ -67,7 +67,22 @@ Actions
 Operation worker
 ----------------
 
-:package-api:`Documentation<octez-protocol-alpha-libs/Tezos_baking_alpha/Operation_worker/index.html>`
+The :package-api:`operation
+worker<octez-protocol-alpha-libs/Tezos_baking_alpha/Operation_worker/index.html>`
+maintains an operations pool by listening for new operations incoming from the
+node via the ``/mempool/monitor_operations`` streaming RPC. Every time the node
+changes head, the worker flushes the operation pool, opens a new monitoring stream
+and starts listening again for new incoming operations.
+
+It carries a unique local proposal for which it monitors consensus. Said
+proposal is set/overridden using ``monitor_preattestation_quorum`` and
+``monitor_attestation_quorum`` functions. In practice, such functions are called
+when the scheduler perfoms the actions ``Watch_prequorum`` and ``Watch_quorum``
+respectively.
+
+Once the consensus operations within the operation pool accumulate more voting
+power than the proposal threshold, the operation worker informs the scheduler by
+escalating ``Prequorum_reached`` or ``Quorum_reached`` events.
 
 .. _baker_forge_worker:
 

@@ -28,7 +28,6 @@ type t = {
   config : Configuration_file.t;
   cryptobox : Cryptobox.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  proto_parameters : Dal_plugin.proto_parameters;
   mutable proto_plugins : Proto_plugins.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
   mutable slots_under_reconstruction :
@@ -40,10 +39,13 @@ type t = {
   gs_worker : Gossipsub.Worker.t;
   transport_layer : Gossipsub.Transport_layer.t;
   mutable profile_ctxt : Profile_manager.t;
+  mutable last_finalized_level : int32;
+      (* the highest finalized level the DAL node is aware of (except at start-up, where
+         it is the highest level the node is aware of) *)
 }
 
 let init config profile_ctxt cryptobox shards_proofs_precomputation
-    proto_parameters proto_plugins store gs_worker transport_layer cctxt =
+    proto_plugins store gs_worker transport_layer cctxt ~last_finalized_level =
   let neighbors_cctxts =
     List.map
       (fun Configuration_file.{addr; port} ->
@@ -57,7 +59,6 @@ let init config profile_ctxt cryptobox shards_proofs_precomputation
     config;
     cryptobox;
     shards_proofs_precomputation;
-    proto_parameters;
     proto_plugins;
     ongoing_amplifications = Types.Slot_id.Set.empty;
     slots_under_reconstruction = Types.Slot_id.Map.empty;
@@ -69,7 +70,10 @@ let init config profile_ctxt cryptobox shards_proofs_precomputation
     gs_worker;
     transport_layer;
     profile_ctxt;
+    last_finalized_level;
   }
+
+let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let may_reconstruct ~reconstruct slot_id t =
   let open Lwt_result_syntax in
@@ -101,12 +105,27 @@ let may_add_plugin ctxt cctxt ~block_level ~proto_level =
   ctxt.proto_plugins <- proto_plugins ;
   return_unit
 
+let get_plugin_and_parameters_for_level ctxt ~level =
+  Proto_plugins.get_plugin_and_parameters_for_level ctxt.proto_plugins ~level
+
 let get_plugin_for_level ctxt ~level =
-  Proto_plugins.get_plugin_for_level ctxt.proto_plugins ~level
+  let open Result_syntax in
+  let* plugin, _parameters = get_plugin_and_parameters_for_level ctxt ~level in
+  return plugin
 
 let get_all_plugins ctxt = Proto_plugins.to_list ctxt.proto_plugins
 
 let set_proto_plugins ctxt proto_plugins = ctxt.proto_plugins <- proto_plugins
+
+let get_proto_parameters ~level ctxt =
+  let open Result_syntax in
+  let level =
+    match level with
+    | `Last_proto -> ctxt.last_finalized_level
+    | `Level level -> level
+  in
+  let* _plugin, parameters = get_plugin_and_parameters_for_level ctxt ~level in
+  return parameters
 
 let storage_period ctxt proto_parameters =
   match ctxt.config.history_mode with
@@ -135,8 +154,8 @@ let load_profile_ctxt ctxt =
   let* res = Profile_manager.load_profile_ctxt ~base_dir in
   match res with
   | Ok pctxt -> return_some pctxt
-  | Error err ->
-      let* () = Event.(emit loading_profiles_failed err) in
+  | Error error ->
+      let* () = Event.emit_loading_profiles_failed ~error in
       return_none
 
 let set_profile_ctxt ctxt ?(save = true) pctxt =
@@ -147,22 +166,22 @@ let set_profile_ctxt ctxt ?(save = true) pctxt =
     let* res = Profile_manager.save_profile_ctxt ctxt.profile_ctxt ~base_dir in
     match res with
     | Ok () -> return_unit
-    | Error err -> Event.(emit saving_profiles_failed err)
+    | Error error -> Event.emit_saving_profiles_failed ~error
   else return_unit
 
 let get_config ctxt = ctxt.config
 
 let get_cryptobox ctxt = ctxt.cryptobox
 
-let get_proto_parameters ctxt = ctxt.proto_parameters
+let set_last_finalized_level ctxt level = ctxt.last_finalized_level <- level
+
+let get_last_finalized_level ctxt = ctxt.last_finalized_level
 
 let get_shards_proofs_precomputation ctxt = ctxt.shards_proofs_precomputation
 
 let get_store ctxt = ctxt.store
 
 let get_gs_worker ctxt = ctxt.gs_worker
-
-let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let get_neighbors_cctxts ctxt = ctxt.neighbors_cctxts
 
@@ -177,9 +196,7 @@ let fetch_committee ctxt ~level =
   match Committee_cache.find cache ~level with
   | Some committee -> return committee
   | None ->
-      let*? (module Plugin) =
-        Proto_plugins.get_plugin_for_level ctxt.proto_plugins ~level
-      in
+      let*? (module Plugin) = get_plugin_for_level ctxt ~level in
       let+ committee = Plugin.get_committee cctxt ~level in
       Committee_cache.add cache ~level ~committee ;
       committee
@@ -201,6 +218,23 @@ let get_fetched_assigned_shard_indices ctxt ~level ~pkh =
 let version {config; _} =
   let network_name = config.Configuration_file.network_name in
   Types.Version.make ~network_version:(Gossipsub.version ~network_name)
+
+let warn_if_attesters_not_delegates ctxt operator_profiles =
+  let open Lwt_result_syntax in
+  let pkh_set = Operator_profile.attesters operator_profiles in
+  if Signature.Public_key_hash.Set.is_empty pkh_set then return_unit
+  else
+    let level = get_last_finalized_level ctxt in
+    let cctxt = get_tezos_node_cctxt ctxt in
+    let*? (module Plugin) = get_plugin_for_level ctxt ~level in
+    Signature.Public_key_hash.Set.iter_es
+      (fun pkh ->
+        let* is_delegate = Plugin.is_delegate cctxt ~pkh in
+        if not is_delegate then
+          let*! () = Event.emit_registered_pkh_not_a_delegate ~pkh in
+          return_unit
+        else return_unit)
+      pkh_set
 
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =

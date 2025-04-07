@@ -7,65 +7,90 @@
 
 type target = {address : string; port : int; app_name : string}
 
-type source = {job_name : string; metric_path : string; targets : target list}
+let target_jingoo_template target =
+  let open Jingoo.Jg_types in
+  Tobj
+    [
+      ("point", Tstr (Format.asprintf "%s:%d" target.address target.port));
+      ("app", Tstr target.app_name);
+    ]
+
+type job = {name : string; metrics_path : string; targets : target list}
+
+let job_jingoo_template job =
+  let open Jingoo.Jg_types in
+  Tobj
+    [
+      ("name", Tstr job.name);
+      ("metrics_path", Tstr job.metrics_path);
+      ("targets", Tlist (List.map target_jingoo_template job.targets));
+    ]
+
+type record = {name : string; query : string}
+
+type severity = Critical | Warning | Info
+
+let string_of_severity = function
+  | Critical -> "critical"
+  | Warning -> "warning"
+  | Info -> "info"
+
+type alert = {
+  name : string;
+  expr : string;
+  group_name : string option;
+  interval : string option;
+  severity : severity option;
+  for_ : string option;
+  description : string option;
+  summary : string option;
+}
+
+type rule = Record of record | Alert of alert
+
+type group = {name : string; interval : string option; rules : rule list}
+
+type groups = (string, group) Hashtbl.t
 
 type t = {
+  name : string;
   configuration_file : string;
-  mutable sources : source list;
+  rules_file : string;
+  mutable jobs : job list;
   scrape_interval : int;
   snapshot_filename : string option;
   port : int;
+  groups : groups;
 }
 
+let get_name (t : t) = t.name
+
+let get_port (t : t) = t.port
+
 let netdata_source_of_agents agents =
-  let job_name = "netdata" in
-  let metric_path = "/api/v1/allmetrics?format=prometheus&help=yes" in
+  let name = "netdata" in
+  let metrics_path = "/api/v1/allmetrics?format=prometheus&help=yes" in
   let target agent =
     let app_name = Agent.name agent in
     let address = agent |> Agent.runner |> Runner.address in
     {address; port = 19999; app_name}
   in
   let targets = List.map target agents in
-  {job_name; metric_path; targets}
+  {name; metrics_path; targets}
 
-let prefix ~scrape_interval () =
-  Format.asprintf
-    {|
-global:
-  scrape_interval: %ds
-scrape_configs:  
-|}
-    scrape_interval
-
-let str_of_target {address; port; app_name} =
-  Format.asprintf
-    {|
-    - targets: ['%s:%d']
-      labels:
-        app: '%s'
-    |}
-    address
-    port
-    app_name
-
-let str_of_source {job_name; metric_path; targets} =
-  Format.asprintf
-    {|
-  - job_name: %s
-    metrics_path: %s
-    params:
-      format: ['prometheus'] 
-    static_configs:      
-%s      
-|}
-    job_name
-    metric_path
-    (targets |> List.map str_of_target |> String.concat "")
+let opentelemetry_source =
+  let name = "open-telemetry" in
+  let metrics_path = "/metrics" in
+  let address = "localhost" in
+  let port = 8888 in
+  let app_name = "otel-collector" in
+  let targets = [{address; port; app_name}] in
+  {name; metrics_path; targets}
 
 let tezt_source =
   {
-    job_name = "tezt_metrics";
-    metric_path = "/metrics.txt";
+    name = "tezt_metrics";
+    metrics_path = "/metrics";
     targets =
       [
         {
@@ -76,47 +101,203 @@ let tezt_source =
       ];
   }
 
-let config ~scrape_interval sources =
-  let sources = List.map str_of_source sources |> String.concat "" in
-  prefix ~scrape_interval () ^ sources
+let jingoo_configuration_template t =
+  let is_alert = function Alert _ -> true | _ -> false in
+  let exists_in_hashtbl f table =
+    let exception Found in
+    try
+      Hashtbl.iter (fun x y -> if f x y then raise Found) table ;
+      false
+    with Found -> true
+  in
+  let alert_on =
+    exists_in_hashtbl (fun _ group -> List.exists is_alert group.rules) t.groups
+  in
+  let open Jingoo.Jg_types in
+  [
+    ("scrape_interval", Tint t.scrape_interval);
+    ("jobs", Tlist (List.map job_jingoo_template t.jobs));
+    ("alert_manager", Tbool alert_on);
+  ]
 
-let write_configuration_file {scrape_interval; configuration_file; sources; _} =
-  let config = config ~scrape_interval sources in
-  with_open_out configuration_file (fun oc ->
+let write_configuration_file t =
+  let content =
+    Jingoo.Jg_template.from_file
+      Path.prometheus_configuration
+      ~models:(jingoo_configuration_template t)
+  in
+  with_open_out t.configuration_file (fun oc ->
       Stdlib.seek_out oc 0 ;
-      output_string oc config)
+      output_string oc content)
+
+let record_template (record : record) =
+  let open Jingoo.Jg_types in
+  let payload = [("record", Tstr record.name); ("query", Tstr record.query)] in
+  Tobj payload
+
+let alert_template (alert : alert) =
+  let open Jingoo.Jg_types in
+  let payload =
+    [
+      ("name", Tstr alert.name);
+      ("expr", Tstr alert.expr);
+      ( "severity",
+        Tstr (Option.fold ~none:"none" ~some:string_of_severity alert.severity)
+      );
+    ]
+    @ Option.fold
+        ~none:[]
+        ~some:(fun v -> [("description", Tstr v)])
+        alert.description
+    @ Option.fold ~none:[] ~some:(fun v -> [("for", Tstr v)]) alert.for_
+    @ Option.fold ~none:[] ~some:(fun v -> [("summary", Tstr v)]) alert.summary
+  in
+  Tobj payload
+
+let rule_template rule =
+  let open Jingoo.Jg_types in
+  let payload =
+    match rule with
+    | Alert alert -> [("alert", alert_template alert)]
+    | Record record -> [("record", record_template record)]
+  in
+  Tobj payload
+
+let group_template (group : group) =
+  let open Jingoo.Jg_types in
+  let payload =
+    [
+      ("name", Tstr group.name);
+      ("rules", Tlist (List.map rule_template group.rules));
+    ]
+    @ Option.fold
+        ~none:[]
+        ~some:(fun time -> [("interval", Tstr time)])
+        group.interval
+  in
+  Tobj payload
+
+let groups_template t =
+  let open Jingoo.Jg_types in
+  let groups = t.groups |> Hashtbl.to_seq_values |> List.of_seq in
+  [("groups", Tlist (List.map group_template groups))]
+
+let write_rules_file t =
+  let content =
+    Jingoo.Jg_template.from_file
+      ~env:{Jingoo.Jg_types.std_env with autoescape = false}
+      Path.prometheus_rules_configuration
+      ~models:(groups_template t)
+  in
+  with_open_out t.rules_file (fun oc ->
+      Stdlib.seek_out oc 0 ;
+      output_string oc content)
 
 (* Prometheus can reload its configuration by first sending the POST RPC and
    then the signal SIGHUP. *)
-let reload _t =
-  let* () = Process.run "curl" ["-XPOST"; "http://localhost:9090/-/reload"] in
-  Process.run "docker" ["kill"; "--signal"; "SIGHUP"; "prometheus"]
+let reload t =
+  let* () =
+    Process.run "curl" ["-XPOST"; sf "http://localhost:%d/-/reload" t.port]
+  in
+  Process.run "docker" ["kill"; "--signal"; "SIGHUP"; t.name]
 
-let add_source t ?(metric_path = "/metrics") ~job_name targets =
-  let source = {job_name; metric_path; targets} in
-  t.sources <- source :: t.sources ;
-  write_configuration_file t ;
+let add_job (t : t) ?(metrics_path = "/metrics") ~name targets =
+  let source = {name; metrics_path; targets} in
+  if List.exists (fun (job : job) -> job.name = source.name) t.jobs then (
+    Log.warn "Prometheus: trying to add duplicate job : %s. Ignoring." name ;
+    Lwt.return_unit)
+  else (
+    t.jobs <- source :: t.jobs ;
+    write_configuration_file t ;
+    reload t)
+
+let update_groups t (group : group) =
+  match Hashtbl.find_opt t.groups group.name with
+  | None -> Hashtbl.replace t.groups group.name group
+  | Some _group' ->
+      Test.fail "There is already a group registered with that name"
+
+let make_alert ?for_ ?description ?summary ?severity ?group_name ?interval ~name
+    ~expr () =
+  {name; expr; severity; for_; description; summary; group_name; interval}
+
+let make_record ~name ~query = {name; query}
+
+let rule_of_alert x = Alert x
+
+let rule_of_record x = Record x
+
+let name_of_alert ({name; _} : alert) = name
+
+let default_group_name = "tezt"
+
+let register_rules ?(group_name = default_group_name) ?interval rules t =
+  let group = {name = group_name; interval; rules} in
+  update_groups t group ;
+  write_rules_file t ;
   reload t
 
-let start agents =
-  let sources =
+let start ~alerts agents =
+  (* We do not use the Temp.dir so that the base directory is predictable and
+     can be mounted by the proxy VM if [--proxy] is used. *)
+  let dir = Filename.get_temp_dir_name () // "prometheus" in
+  (* Group alerts by group name. *)
+  let groups =
+    let groups = Hashtbl.create 10 in
+    let add_rule alert =
+      let name = Option.value ~default:default_group_name alert.group_name in
+      let interval = alert.interval in
+      match Hashtbl.find_opt groups name with
+      | None -> Hashtbl.add groups name {name; interval; rules = [Alert alert]}
+      | Some group ->
+          let min_of left right =
+            match (left, right) with
+            | None, right -> right
+            | left, None -> left
+            | Some left, Some right ->
+                if Duration.(compare (of_string left) (of_string right)) > 0
+                then Some right
+                else Some left
+          in
+          Hashtbl.replace
+            groups
+            name
+            {
+              name;
+              interval = min_of interval group.interval;
+              rules = Alert alert :: group.rules;
+            }
+    in
+    List.iter add_rule alerts ;
+    groups
+  in
+  let jobs =
     if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
   in
-  let* () =
-    Process.run "mkdir" ["-p"; Filename.get_temp_dir_name () // "prometheus"]
+  let jobs =
+    if Env.open_telemetry then opentelemetry_source :: jobs else jobs
   in
-  (* We do not use the Temp.dir so that the base directory is predictable and
-     can be mounted by the proxy VM if [--proxy] is used. *)
-  let configuration_file =
-    Filename.get_temp_dir_name () // "prometheus" // "prometheus.yml"
-  in
-  let snapshot_filename = Env.prometheus_snapshot_filename in
+  let* () = Process.run "mkdir" ["-p"; dir // "rules"] in
+  let configuration_file = dir // "prometheus.yml" in
+  let rules_file = dir // "rules" // "tezt.rules" in
+  let snapshot_filename = Env.prometheus_export_path in
   let port = Env.prometheus_port in
+  let name = sf "prometheus-%d" port in
   let scrape_interval = Env.prometheus_scrape_interval in
   let t =
-    {configuration_file; sources; scrape_interval; snapshot_filename; port}
+    {
+      name;
+      configuration_file;
+      rules_file;
+      jobs;
+      scrape_interval;
+      snapshot_filename;
+      port;
+      groups;
+    }
   in
+  write_rules_file t ;
   write_configuration_file t ;
   let process =
     Process.spawn
@@ -126,13 +307,15 @@ let start agents =
         "--rm";
         "-d";
         "--name";
-        "prometheus";
+        name;
         "--network";
         "host";
         (* We use the host mode so that in [localhost], prometheus can see the
            metrics endpoint run by other docker containers. *)
         "-v";
-        Format.asprintf "%s:/etc/prometheus/prometheus.yml" configuration_file;
+        Format.asprintf
+          "%s:/etc/prometheus"
+          (Filename.dirname configuration_file);
         "prom/prometheus";
         "--config.file=/etc/prometheus/prometheus.yml";
         "--web.enable-admin-api";
@@ -166,7 +349,7 @@ let start agents =
         "/dev/null";
         "-w";
         "%{http_code}";
-        "http://localhost:9090/-/ready";
+        sf "http://localhost:%d/-/ready" port;
       ]
   in
   let* _ = Env.wait_process ~is_ready ~run () in
@@ -174,12 +357,12 @@ let start agents =
 
 let snapshots_path = "/prometheus" // "data" // "snapshots"
 
-let export_snapshot {snapshot_filename; _} =
+let export_snapshot {snapshot_filename; name; port; _} =
   Log.info "Exporting snapshot..." ;
   let* stdout =
     Process.run_and_read_stdout
       "curl"
-      ["-XPOST"; "http://localhost:9090/api/v1/admin/tsdb/snapshot"]
+      ["-XPOST"; sf "http://localhost:%d/api/v1/admin/tsdb/snapshot" port]
   in
   let json = JSON.parse ~origin:"Prometheus.export" stdout in
   let snapshot_name = JSON.(json |-> "data" |-> "name" |> as_string) in
@@ -190,7 +373,7 @@ let export_snapshot {snapshot_filename; _} =
   in
   let* () =
     Docker.cp
-      "prometheus"
+      name
       ~kind:`To_host
       ~source:(snapshots_path // snapshot_name)
       ~destination
@@ -199,31 +382,18 @@ let export_snapshot {snapshot_filename; _} =
   Log.info "You can find the prometheus snapshot at %s" destination ;
   Lwt.return_unit
 
-let shutdown {configuration_file = _; _} =
-  let* () = Docker.kill "prometheus" |> Process.check in
-  Lwt.return_unit
+let shutdown (t : t) = Docker.kill t.name |> Process.check
 
-let run_with_snapshot () =
-  (* No need for a configuration file here. *)
-  let configuration_file = "" in
-  let port = Env.prometheus_port in
-  let snapshot_filename =
-    match Env.prometheus_snapshot_filename with
-    | None ->
-        Test.fail
-          "You must specify the snapshot filename via \
-           --prometheus-snapshot-filename"
-    | Some file -> file
-  in
-  Log.info
-    "You can find the prometheus instance at http://localhost:%d"
-    Env.prometheus_port ;
-  Log.info "Use Ctrl+C to end the scenario and kill the prometheus instance." ;
-  let* () =
-    Process.run
+let run_with_snapshot port snapshot_filename =
+  let name = sf "prometheus-%d" port in
+  let _ =
+    Process.spawn
       "docker"
       [
         "run";
+        "--rm";
+        "--name";
+        name;
         "-uroot";
         "-v";
         Format.asprintf "%s:/prometheus" snapshot_filename;
@@ -234,11 +404,15 @@ let run_with_snapshot () =
         "--storage.tsdb.path=/prometheus";
       ]
   in
+  Log.info "You can find the prometheus instance at http://localhost:%d" port ;
   Lwt.return
     {
-      configuration_file;
-      sources = [];
+      name;
+      configuration_file = "";
+      rules_file = "";
+      jobs = [];
       scrape_interval = 0;
       snapshot_filename = Some snapshot_filename;
       port;
+      groups = Hashtbl.create 0;
     }

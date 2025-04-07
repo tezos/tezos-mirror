@@ -35,25 +35,26 @@ type t = state
     file from [nonces_location] *)
 type nonces
 
-(** [load wallet location] loads the file corresponding to [location] and 
+(** [load wallet location] loads the file corresponding to [location] and
     returns a data structure containing the stored information. *)
 val load :
   #Client_context.wallet ->
   stateful_location:[`Stateful_nonce] Baking_files.location ->
   nonces tzresult Lwt.t
 
-(** [generate_seed_nonce nonce_config delegate level] computes a nonce via a 
+(** [generate_seed_nonce nonce_config delegate level] computes a nonce via a
     [Deterministic] or [Random] approach, depending on the [nonce_config]
     argument; the deterministic case uses as parameters [delegate] and [level]. *)
 val generate_seed_nonce :
+  ?timeout:float ->
   Baking_configuration.nonce_config ->
   Baking_state.consensus_key ->
   Raw_level.t ->
   (Nonce_hash.t * Nonce.t) tzresult Lwt.t
 
-(** [register_nonce cctxt ~chain_id block_hash nonce ~cycle ~level ~round] updates 
-    the contents from the nonces file located using [cctxt] and [~chain_id] by 
-    adding a new entry or replacing an existing one of the form 
+(** [register_nonce cctxt ~chain_id block_hash nonce ~cycle ~level ~round] updates
+    the contents from the nonces file located using [cctxt] and [~chain_id] by
+    adding a new entry or replacing an existing one of the form
     [block_hash] : [nonce] * [~cycle] * [~level] * [~round]. *)
 val register_nonce :
   #Protocol_client_context.full ->
@@ -65,9 +66,9 @@ val register_nonce :
   round:Round.t ->
   unit tzresult Lwt.t
 
-(** [start_revelation_worker cctxt config chain_id constants block_stream] 
+(** [start_revelation_worker cctxt config chain_id constants block_stream]
     represents the continuous process of receiving new proposal from [block_stream]
-    and applying them to the internal state created from [cctxt], [config], 
+    and applying them to the internal state created from [cctxt], [config],
     [chain_id] and [constants]; each new proposal can produce a nonce, to be stored
     in a nonce file location, facilitating the nonce revelation process. *)
 val start_revelation_worker :

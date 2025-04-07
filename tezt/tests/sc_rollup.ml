@@ -42,10 +42,7 @@ open Sc_rollup_helpers
 
 *)
 
-let default_wasm_pvm_revision = function
-  | Protocol.Alpha -> "2.0.0-r5"
-  | Protocol.Quebec -> "2.0.0-r5"
-  | ParisC -> "2.0.0-r4"
+let default_wasm_pvm_revision = function _ -> "2.0.0-r5"
 
 let max_nb_ticks = 50_000_000_000_000
 
@@ -153,7 +150,7 @@ let gen_keys_then_transfer_tez ?(giver = Constant.bootstrap1.alias)
 
 let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     ?whitelist_enable ?whitelist ?commitment_period ?challenge_window ?timeout
-    ?(src = Constant.bootstrap1.alias) ?rpc_external ?uses
+    ?(src = Constant.bootstrap1.alias) ?rpc_external ?uses ?dal_rewards_weight
     {variant; tags; description} scenario =
   let tags = kind :: tags in
   register_test
@@ -169,6 +166,7 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     setup_l1
       ?commitment_period
       ?challenge_window
+      ?dal_rewards_weight
       ?timeout
       ?whitelist_enable
       ?rpc_external
@@ -478,6 +476,22 @@ let send_messages_batcher ?rpc_hooks ?batch_size n client sc_node =
   let* () = Client.bake_for_and_wait client in
   return (List.rev rids)
 
+let test_list_metrics_command_regression ~disable_performance_metrics () =
+  Regression.register
+    ~__FILE__
+    ~tags:["metrics"; "smart_rollup_node"]
+    ~uses:[Constant.octez_smart_rollup_node]
+    ~title:
+      Format.(
+        sprintf
+          "Smart rollup node: list metrics regression (%s performance metrics)"
+          (if disable_performance_metrics then "without" else "with"))
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  Sc_rollup_node.list_metrics ~hooks ~disable_performance_metrics ()
+
 (** Regression test to ensure rollup node store schema does not change without a
     migration. *)
 let test_store_schema_regression =
@@ -485,7 +499,14 @@ let test_store_schema_regression =
     ~regression:true
     {
       variant = None;
-      tags = ["store"; "schema"];
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7760
+
+            sqlite3 has been removed from the e2e image in
+            https://gitlab.com/tezos/tezos/-/merge_requests/16769, breaking this test.
+
+            It is therefore disabled in CI
+      *)
+      tags = [Tag.ci_disabled; "store"; "schema"];
       description = "Rollup node: regression on store schema";
     }
     ~kind:"wasm_2_0_0"
@@ -613,6 +634,54 @@ let sc_rollup_node_disconnects_scenario sc_rollup_node sc_rollup node client =
       (let* () = Lwt_unix.sleep 10. in
        Test.fail "Refutation loop did not process after reconnection");
     ]
+
+let setup_double_reorg node client =
+  let nodes_args =
+    Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
+  in
+  let* node2, client2 = Client.init_with_node ~nodes_args `Client ()
+  and* node3, client3 = Client.init_with_node ~nodes_args `Client () in
+  let* () = Client.Admin.trust_address client ~peer:node2
+  and* () = Client.Admin.trust_address client2 ~peer:node
+  and* () = Client.Admin.trust_address client ~peer:node3
+  and* () = Client.Admin.trust_address client3 ~peer:node
+  and* () = Client.Admin.trust_address client2 ~peer:node3
+  and* () = Client.Admin.trust_address client3 ~peer:node2 in
+  let* () = Client.Admin.connect_address client ~peer:node2
+  and* () = Client.Admin.connect_address client ~peer:node3
+  and* () = Client.Admin.connect_address client2 ~peer:node3 in
+  let divergence ~branch1 ~branch2 =
+    let* identity2 = Node.wait_for_identity node2
+    and* identity3 = Node.wait_for_identity node3 in
+    let* () = Client.Admin.kick_peer client ~peer:identity2
+    and* () = Client.Admin.kick_peer client2 ~peer:identity3 in
+    let* () = branch1 client in
+    let* level = Node.get_level node in
+    let* _ = Node.wait_for_level node3 level in
+    Log.info "Nodes 1 and 3 have branch1." ;
+    let* () = Client.Admin.kick_peer client ~peer:identity3 in
+    let* () = branch2 client2 in
+    (* One extra block in branch2 *)
+    let* () = Client.bake_for_and_wait client2 in
+    Log.info "Nodes 1 and 2 are following distinct branches." ;
+    (* Two extra blocks in node3 *)
+    let* () = Client.bake_for_and_wait client3 in
+    let* () = Client.bake_for_and_wait client3 in
+    Log.info "Nodes 1 and 2 and 3 are following distinct branches." ;
+    unit
+  in
+  let trigger_reorg () =
+    let* level2 = Node.get_level node2 in
+    let* level3 = Node.get_level node3 in
+    let* () = Client.Admin.connect_address client ~peer:node2 in
+    let* _ = Node.wait_for_level node level2 in
+    Log.info "Node 1 has switched to second branch." ;
+    let* () = Client.Admin.connect_address client ~peer:node3 in
+    let* _ = Node.wait_for_level node level3 in
+    Log.info "Node 1 has switched back to its first branch (with extra blocks)." ;
+    unit
+  in
+  return (divergence, trigger_reorg)
 
 let sc_rollup_node_handles_chain_reorg sc_rollup_node sc_rollup node client =
   let num_messages = 1 in
@@ -1046,10 +1115,11 @@ let test_gc variant ?(tags = []) ~challenge_window ~commitment_period
     |> List.rev |> List.hd
   in
   let nb_suffix = int_of_string last_suffix in
+  let split_period = max (challenge_window / 5) 1 in
   let max_nb_split =
     match history_mode with
     | Archive -> 0
-    | _ -> (level - origination_level + challenge_window - 1) / challenge_window
+    | _ -> (level - first_available_level + 1) / split_period
   in
   Check.((nb_suffix <= max_nb_split) int)
     ~error_msg:"Expected at most %R context suffix files, instead got %L" ;
@@ -3392,6 +3462,7 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
   let commitment_period = 5 in
   let challenge_window = 5 in
   test_full_scenario
+    ~operator
     ~kind
     {
       variant = None;
@@ -3419,7 +3490,7 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
     @@ Sc_rollup_rpc.get_local_last_published_commitment ()
   in
   Log.info "Terminate the node" ;
-  let* () = Sc_rollup_node.kill sc_rollup_node in
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
   Log.info "Bake until refutation period is over" ;
   let* () = bake_levels challenge_window tezos_client in
   (* manually cement the commitment *)
@@ -3473,13 +3544,16 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:operator
+      ~operators:[(Recovering, Constant.bootstrap2.public_key_hash)]
+      ~data_dir:(Sc_rollup_node.data_dir sc_rollup_node)
   in
-  let* () = Sc_rollup_node.run sc_rollup_node' sc_rollup []
-  and* () =
+  let wait_for_bailout_exit =
     let event_name = "smart_rollup_node_daemon_exit_bailout_mode.v0" in
     bake_until_event tezos_client ~event_name
     @@ Sc_rollup_node.wait_for sc_rollup_node' event_name (Fun.const (Some ()))
   in
+  let* () = Sc_rollup_node.run ~event_level:`Debug sc_rollup_node' sc_rollup []
+  and* () = wait_for_bailout_exit in
   Log.info "Check that the bond have been recovered by the rollup node" ;
   let* frozen_balance =
     Client.RPC.call tezos_client
@@ -3906,6 +3980,138 @@ let test_interrupt_rollup_node =
   let* _ = Sc_rollup_node.wait_for_level ~timeout:20. sc_rollup_node 18 in
   unit
 
+let remote_signer_uri signer ~yes =
+  if yes then Some (Signer.uri signer) else None
+
+let test_remote_signer ~hardcoded_remote_signer =
+  let default_operator = Constant.bootstrap2 in
+  let operators =
+    [
+      (Sc_rollup_node.Operating, Constant.bootstrap3);
+      (Cementing, Constant.bootstrap4);
+      (Batching, Constant.bootstrap5);
+    ]
+  in
+  test_full_scenario
+    {
+      tags = ["remote"; "signer"];
+      variant = None;
+      description =
+        sf
+          "rollup node can sign operations with %s remote signer"
+          (if hardcoded_remote_signer then "hardcoded" else "relocatable");
+    }
+    ~uses:(fun _ -> [Constant.octez_signer])
+    ~commitment_period:3
+    ~challenge_window:5
+    ~mode:Operator
+    ~operator:default_operator.public_key_hash
+    ~operators:
+      (List.map (fun (p, k) -> (p, k.Account.public_key_hash)) operators)
+  @@ fun _protocol sc_rollup_node sc_rollup node _client ->
+  let keys = default_operator :: List.map snd operators in
+  Log.info "Starting remote signer" ;
+  let* signer = Signer.init ~keys () in
+  let client_remote_signer =
+    remote_signer_uri signer ~yes:(not hardcoded_remote_signer)
+  in
+  let base_dir = Sc_rollup_node.base_dir sc_rollup_node in
+  let* client =
+    Client.init
+      ~base_dir
+      ~endpoint:(Node node)
+      ?remote_signer:client_remote_signer
+      ()
+  in
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      ~default_operator:default_operator.public_key_hash
+      ~operators:
+        (List.map (fun (p, k) -> (p, k.Account.public_key_hash)) operators)
+      ?remote_signer:client_remote_signer
+      ~base_dir
+      Operator
+      node
+  in
+  Log.info "Registering keys as remote in client" ;
+  let import (k : Account.key) =
+    Client.import_signer_key
+      client
+      ~force:true
+      ~public_key_hash:k.public_key_hash
+      ~alias:k.alias
+      ?signer:(remote_signer_uri signer ~yes:hardcoded_remote_signer)
+  in
+  let* () = Lwt_list.iter_s import keys in
+  let sks =
+    JSON.parse_file (Filename.concat (Client.base_dir client) "secret_keys")
+    |> JSON.as_list
+  in
+  Log.info "Check configuration uses remote signer" ;
+  let check_config_key (k : Account.key) =
+    let open JSON in
+    let entry = List.find (fun e -> e |-> "name" |> as_string = k.alias) sks in
+    let sk = entry |-> "value" |> as_string in
+    if
+      not
+      @@ (String.starts_with ~prefix:"http://" sk
+         || String.starts_with ~prefix:"remote:" sk)
+    then Test.fail ~__LOC__ "Key %s not using remote signer" k.alias
+  in
+  List.iter check_config_key keys ;
+  Log.info "Create wallet just for baking" ;
+  let baking_client =
+    Client.create ~name:"baking_client" ~endpoint:(Node node) ()
+  in
+  let* () =
+    Client.import_secret_key
+      baking_client
+      Constant.bootstrap1.secret_key
+      ~alias:Constant.bootstrap1.alias
+  in
+  Log.info "Stopping signer" ;
+  let* () = Signer.terminate signer in
+  let* () = Sc_rollup_node.run ~wait_ready:false sc_rollup_node sc_rollup []
+  and* () =
+    Lwt.choose
+      [
+        (let* () = Lwt_unix.sleep 30. in
+         Test.fail
+           "Rollup node did not detect the remote signer was unreachable");
+        Sc_rollup_node.check_error
+          ~exit_code:1
+          ~msg:(rex "Cannot get public key for signer")
+          sc_rollup_node;
+      ]
+  in
+  Log.info "Restart signer" ;
+  let* () = Signer.restart signer in
+  Log.info "Starting rollup node" ;
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
+  let signer_has_signed =
+    Lwt.pick
+      [
+        Signer.wait_for signer "signing_data.v0" (fun _ ->
+            Log.info ~color:Log.Color.BG.green "Remote signer signed!" ;
+            Some ());
+        (let* () = Lwt_unix.sleep 120. in
+         Test.fail "Remote signer did not sign");
+      ]
+  in
+  Log.info "Progressing until rollup node publishes and cements" ;
+  let* _ =
+    bake_until_lcc_updated
+      ~at_least:5
+      ~timeout:120.
+      ~level:3
+      baking_client
+      sc_rollup_node
+  in
+  let* () = signer_has_signed in
+  unit
+
 let test_refutation_reward_and_punishment ~kind =
   let timeout_period = 3 in
   let commitment_period = 2 in
@@ -3913,6 +4119,9 @@ let test_refutation_reward_and_punishment ~kind =
     ~kind
     ~timeout:timeout_period
     ~commitment_period
+    ~dal_rewards_weight:0
+      (* Set the DAL rewards to zero, to not interfere with this test. See details
+         here: https://gitlab.com/tezos/tezos/-/issues/7696#note_2307123115. *)
     ~regression:true
     ~hooks
     {
@@ -4062,8 +4271,8 @@ let test_refutation_reward_and_punishment ~kind =
 *)
 let test_outbox_message_generic ?supports ?regression ?expected_error
     ?expected_l1_error ~earliness ?entrypoint ~init_storage ~storage_ty
-    ?outbox_parameters_ty ?boot_sector ~input_message ~expected_storage ~kind
-    ~message_kind ~auto_execute_outbox =
+    ?outbox_parameters_ty ?boot_sector ?(reorg = false) ~input_message
+    ~expected_storage ~kind ~message_kind ~auto_execute_outbox () =
   let commitment_period = 2 and challenge_window = 5 in
   let _outbox_level = 5 in
   let message_index = 0 in
@@ -4075,6 +4284,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     Option.value ~default:"no_parameters_ty" outbox_parameters_ty
   in
   let auto_s = if auto_execute_outbox then ", auto_execute_outbox" else "" in
+  let reorg_s = if reorg then ", reorg" else "" in
   test_full_scenario
     ?supports
     ?regression
@@ -4085,21 +4295,30 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     ~commitment_period
     ~challenge_window
     {
-      tags = ["outbox"; message_kind_s; entrypoint_s; outbox_parameters_ty_s];
+      tags =
+        (["outbox"; message_kind_s; entrypoint_s; outbox_parameters_ty_s]
+        @ if reorg then ["reorg"] else []);
       variant =
         Some
           (Format.sprintf
-             "%s, entrypoint: %%%s, eager: %d, %s, %s%s"
+             "%s, entrypoint: %%%s, eager: %d, %s, %s%s%s"
              init_storage
              entrypoint_s
              earliness
              message_kind_s
              outbox_parameters_ty_s
-             auto_s);
+             auto_s
+             reorg_s);
       description = "output exec";
     }
     ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol rollup_node sc_rollup node client ->
+  let* reorg =
+    if reorg then
+      let* actions = setup_double_reorg node client in
+      return (Some actions)
+    else return None
+  in
   let src = Constant.bootstrap1.public_key_hash in
   let src2 = Constant.bootstrap2.public_key_hash in
   let* () =
@@ -4172,7 +4391,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
            string
            ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
   in
-  let check_outbox_execution outbox_level status =
+  let check_outbox_execution outbox_level indexes status =
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     let* executable_outboxes =
       Sc_rollup_node.RPC.call rollup_node
@@ -4182,60 +4401,87 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
       Sc_rollup_node.RPC.call rollup_node
       @@ Sc_rollup_rpc.get_local_outbox_pending_unexecutable ()
     in
-    let get_nb l =
+    let get_indexes l =
       match List.assoc_opt outbox_level l with
-      | None -> 0
-      | Some l -> List.length l
+      | None -> []
+      | Some l -> List.map (fun x -> x.Sc_rollup_rpc.message_index) l
     in
-    let executable = get_nb executable_outboxes in
-    let unexecutable = get_nb unexecutable_outboxes in
+    let executable = get_indexes executable_outboxes in
+    let unexecutable = get_indexes unexecutable_outboxes in
     match (status, executable, unexecutable) with
-    | `Executable, 1, 0 -> unit
-    | `Unexecutable, 0, 1 -> unit
+    | `Executable, e, [] when e = indexes -> unit
+    | `Unexecutable, [], e when e = indexes -> unit
     | _ ->
         Test.fail
-          "Outbox level should be %s but there is %d executable, %d \
+          "Outbox level should be [%a] %s but there is [%a] executable, [%a] \
            unexecutable."
+          (Format.pp_print_list Format.pp_print_int)
+          indexes
           (match status with
           | `Executable -> "executable"
           | `Unexecutable -> "unexecutable")
+          (Format.pp_print_list Format.pp_print_int)
           executable
+          (Format.pp_print_list Format.pp_print_int)
           unexecutable
   in
   let perform_rollup_execution_and_cement source_address target_address =
     Log.info "Perform rollup execution and cement" ;
-    let* payload = input_message protocol target_address in
+    let trigger_output_message ?(extra_empty_messages = 0) client =
+      let* payload = input_message protocol target_address in
+      let* () =
+        match payload with
+        | `External payload ->
+            let extra = List.init extra_empty_messages (fun _ -> "") in
+            send_text_messages ~hooks ~format:`Hex client (extra @ [payload])
+        | `Internal payload ->
+            let payload = "0x" ^ payload in
+            let* () =
+              Client.transfer
+                ~amount:Tez.(of_int 100)
+                ~burn_cap:Tez.(of_int 100)
+                ~storage_limit:100000
+                ~giver:Constant.bootstrap1.alias
+                ~receiver:source_address
+                ~arg:(sf "Pair %s %S" payload sc_rollup)
+                client
+            in
+            Client.bake_for_and_wait client
+      in
+      let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+      unit
+    in
     let* () =
-      match payload with
-      | `External payload ->
-          send_text_messages ~hooks ~format:`Hex client [payload]
-      | `Internal payload ->
-          let payload = "0x" ^ payload in
-          let* () =
-            Client.transfer
-              ~amount:Tez.(of_int 100)
-              ~burn_cap:Tez.(of_int 100)
-              ~storage_limit:100000
-              ~giver:Constant.bootstrap1.alias
-              ~receiver:source_address
-              ~arg:(sf "Pair %s %S" payload sc_rollup)
-              client
-          in
-          Client.bake_for_and_wait client
+      match reorg with
+      | None -> trigger_output_message client
+      | Some (divergence, _) ->
+          divergence
+            ~branch1:trigger_output_message
+            ~branch2:(trigger_output_message ~extra_empty_messages:2)
     in
     let* outbox_level = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
-    let* outbox_l2_block =
+    let* () =
+      match reorg with
+      | None -> unit
+      | Some (_, trigger_reorg) ->
+          let* () = trigger_reorg () in
+          let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+          unit
+    in
+    let* {outbox; _} =
       Sc_rollup_node.RPC.call rollup_node
-      @@ Sc_rollup_rpc.get_global_block ~outbox:true ()
+      @@ Sc_rollup_rpc.get_global_block
+           ~block:(string_of_int outbox_level)
+           ~outbox:true
+           ()
     in
     let nb_outbox_transactions_in_block =
-      let open JSON in
-      outbox_l2_block |-> "outbox" |> as_list
-      |> List.map @@ fun x -> x |-> "transactions" |> as_list |> List.length
+      outbox
+      |> List.map @@ fun (Sc_rollup_rpc.Transactions trs) -> List.length trs
     in
     Check.((nb_outbox_transactions_in_block = [1]) (list int))
       ~error_msg:"Block has %L outbox transactions but expected %R" ;
-    let* () = check_outbox_execution outbox_level `Unexecutable in
+    let* () = check_outbox_execution outbox_level [0] `Unexecutable in
     let* _ =
       bake_until_lcc_updated
         ~timeout:100.
@@ -4301,7 +4547,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     in
     if Option.is_some expected_error then unit
     else
-      let* () = check_outbox_execution outbox_level `Executable in
+      let* () = check_outbox_execution outbox_level [0] `Executable in
       if auto_execute_outbox then
         bake_until_execute_outbox_message
           ~at_least:1
@@ -4315,7 +4561,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
         | Some {commitment_hash; proof} -> (
             match expected_l1_error with
             | None ->
-                let* () = check_outbox_execution outbox_level `Executable in
+                let* () = check_outbox_execution outbox_level [0] `Executable in
                 let*! () =
                   Client.Sc_rollup.execute_outbox_message
                     ~hooks
@@ -4389,7 +4635,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
 
 let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
     ~earliness ?entrypoint ?(init_storage = "0") ?(storage_ty = "int")
-    ?(outbox_parameters = "37") ?outbox_parameters_ty ~kind ~message_kind
+    ?(outbox_parameters = "37") ?outbox_parameters_ty ?reorg ~kind ~message_kind
     ~auto_execute_outbox =
   let wrap payload =
     match message_kind with
@@ -4453,6 +4699,7 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
     ?entrypoint
     ?outbox_parameters_ty
     ?boot_sector
+    ?reorg
     ~init_storage
     ~storage_ty
     ~input_message
@@ -4460,6 +4707,16 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
     ~message_kind
     ~kind
     ~auto_execute_outbox
+    ()
+
+let test_outbox_message_reorg protocols ~kind =
+  test_outbox_message
+    ~earliness:0
+    ~message_kind:`External
+    ~kind
+    ~auto_execute_outbox:true
+    ~reorg:true
+    protocols
 
 let test_outbox_message protocols ~kind =
   let test
@@ -4772,10 +5029,9 @@ let test_rpcs ~kind
     Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_tezos_level ()
   in
-  let* l2_block =
+  let* {block_hash = l2_block_hash'; _} =
     Sc_rollup_node.RPC.call sc_rollup_node @@ Sc_rollup_rpc.get_global_block ()
   in
-  let l2_block_hash' = JSON.(l2_block |-> "block_hash" |> as_string) in
   Check.((l2_block_hash' = l2_block_hash) string)
     ~error_msg:"L2 head is from full block is %L but should be %R" ;
   if Protocol.number protocol >= 018 then (
@@ -5921,6 +6177,33 @@ let test_batcher_order_msgs ~kind =
     unit
   in
 
+  let check_injector_queues ~__LOC__ ~expected_add_message_op =
+    let* injector_queues =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.get_admin_injector_queues ()
+    in
+    match injector_queues with
+    | [(injector_tag, injector_op_queue)] ->
+        Check.(list_mem string "add_messages" injector_tag ~__LOC__)
+          ~error_msg:"Injector queue %L operation tag does not contains tags %R" ;
+        let map_assert_only_add_messages op =
+          let kind = JSON.(op |-> "kind" |> as_string) in
+          Check.(("add_messages" = kind) string ~__LOC__)
+            ~error_msg:"Injector queue %L operation tag is not %R" ;
+          JSON.(
+            op |-> "message" |> as_list |> List.map JSON.as_string
+            |> List.map (fun s -> int_of_string @@ Hex.to_string (`Hex s)))
+        in
+        let add_messages_op =
+          List.map map_assert_only_add_messages injector_op_queue
+        in
+        Check.(
+          (add_messages_op = expected_add_message_op) (list (list int)) ~__LOC__)
+          ~error_msg:
+            "Injector queues add_messages %L was found but %R was expected" ;
+        unit
+    | _ -> failwith "invalid number of injector queues, only one expected"
+  in
   let bake_then_check_included_msgs ~__LOC__ ~expected_messages =
     let* level = Node.get_level node in
     let wait_for_injected =
@@ -5948,7 +6231,14 @@ let test_batcher_order_msgs ~kind =
   in
 
   let* level = Node.get_level node in
-  let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node rollup_addr [] in
+  let* () =
+    Sc_rollup_node.run
+      ~event_level:`Debug
+      rollup_node
+      rollup_addr
+      [Injector_retention_period 0]
+    (*so injector included queued messages is not entraiving us *)
+  in
   let* _ = Sc_rollup_node.wait_for_level rollup_node level in
 
   (* To make sure we are all bootstrapped, might be unused *)
@@ -6041,6 +6331,123 @@ let test_batcher_order_msgs ~kind =
     [messages_order_1; messages_order_2; messages_no_order]
   in
   let* () = bake_then_check_included_msgs ~__LOC__ ~expected_messages in
+  Log.info "Testing the batcher clear RPCs." ;
+
+  Log.info "Clearing messages with order <= 2 in the batcher queue." ;
+  let* hash_1 = inject_int_of_string ~order:1 ~drop_duplicate:true [1] in
+  let* hash_2 = inject_int_of_string ~order:2 ~drop_duplicate:true [2] in
+  let* hash_3 = inject_int_of_string ~order:3 ~drop_duplicate:true [3] in
+  let expected_queued_hashes = hash_1 @ hash_2 @ hash_3 in
+  let expected_messages = [1; 2; 3] in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_batcher_queue
+         ~drop_no_order:false
+         ~order_below:2
+         ()
+  in
+  let expected_queued_hashes = hash_3 in
+  let expected_messages = [3] in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+
+  Log.info
+    "Clearing messages with order <= 2 in the batcher queue or no order \
+     specified." ;
+  let* hash_1 = inject_int_of_string ~order:1 ~drop_duplicate:true [1] in
+  let* hash_2 = inject_int_of_string ~order:2 ~drop_duplicate:true [2] in
+  (* [3] is still in the batcher *)
+  let* hash_4 = inject_int_of_string (* no order *) ~drop_duplicate:true [4] in
+  let expected_queued_hashes = hash_1 @ hash_2 @ hash_3 @ hash_4 in
+  let expected_messages = [1; 2; 3; 4] in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_batcher_queue
+         ~drop_no_order:true
+         ~order_below:2
+         ()
+  in
+  let expected_queued_hashes = hash_3 in
+  let expected_messages = [3] in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+
+  Log.info "Clearing all the messages in the batcher queue." ;
+  let* hashes =
+    inject_int_of_string ~order:1 ~drop_duplicate:true
+    @@ List.init half_min_batch Fun.id
+  in
+  let expected_queued_hashes = hashes in
+  let expected_messages = List.init half_min_batch Fun.id in
+  let* () = check_queue ~__LOC__ ~expected_queued_hashes ~expected_messages in
+
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_batcher_queue ()
+  in
+  let* () =
+    check_queue ~__LOC__ ~expected_queued_hashes:[] ~expected_messages:[]
+  in
+
+  Log.info "Testing the injector clear RPCs." ;
+
+  Log.info "Clearing all operations in the injector queue." ;
+  (*enough messages to create an operations *)
+  let messages = List.init min_batch_elements Fun.id in
+  let* _hashes_1 = inject_int_of_string messages in
+
+  (*nothing left in the batcher*)
+  let* () =
+    check_queue ~__LOC__ ~expected_queued_hashes:[] ~expected_messages:[]
+  in
+  let expected_add_message_op = [messages] in
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op in
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_injector_queues ()
+  in
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op:[] in
+
+  Log.info "Clearing operations with order <= 1 ." ;
+  let messages_1 = messages in
+  let messages_2 =
+    List.init min_batch_elements (fun i -> min_batch_elements + i)
+  in
+  let messages_3 =
+    List.init min_batch_elements (fun i -> (2 * min_batch_elements) + i)
+  in
+
+  let* _hashes = inject_int_of_string ~order:0 messages_1 in
+  let* _hashes = inject_int_of_string ~order:1 messages_2 in
+  let* _hashes = inject_int_of_string ~order:2 messages_3 in
+
+  let expected_add_message_op = [messages_1; messages_2; messages_3] in
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op in
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_injector_queues ~order_below:1 ()
+  in
+  let expected_add_message_op =
+    (* strictly below order messages are cleared *) [messages_2; messages_3]
+  in
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op in
+
+  Log.info "Clearing operations with order <= 1 and no order specified ." ;
+  let messages_no_order = messages in
+  let* _hashes_1 = inject_int_of_string @@ messages_no_order in
+
+  let expected_add_message_op = [messages_2; messages_3; messages_no_order] in
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op in
+  let* () =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.delete_admin_injector_queues
+         ~order_below:2
+         ~drop_no_order:true
+         ()
+  in
+  let expected_add_message_op = [messages_3] in
+
+  let* () = check_injector_queues ~__LOC__ ~expected_add_message_op in
   unit
 
 let test_injector_order_operations_by_kind ~kind =
@@ -6790,6 +7197,8 @@ let register ~protocols =
 
 let register_protocol_independent () =
   let protocols = Protocol.[Alpha] in
+  test_list_metrics_command_regression ~disable_performance_metrics:true () ;
+  test_list_metrics_command_regression ~disable_performance_metrics:false () ;
   test_store_schema_regression protocols ;
   let with_kind kind =
     test_rollup_node_running ~kind protocols ;
@@ -6839,13 +7248,13 @@ let register_protocol_independent () =
     sc_rollup_node_batcher
     protocols ;
   test_rollup_node_inbox ~kind ~variant:"basic" basic_scenario protocols ;
+  test_outbox_message_reorg ~kind protocols ;
   test_gc
     "many_gc"
     ~kind
     ~challenge_window:5
     ~commitment_period:2
     ~history_mode:Full
-    ~tags:[Tag.flaky]
     protocols ;
   test_gc
     "sparse_gc"
@@ -6853,7 +7262,6 @@ let register_protocol_independent () =
     ~challenge_window:10
     ~commitment_period:5
     ~history_mode:Full
-    ~tags:[Tag.flaky]
     protocols ;
   test_gc
     "no_gc"
@@ -6903,4 +7311,6 @@ let register_protocol_independent () =
   bailout_mode_not_publish ~kind protocols ;
   bailout_mode_fail_to_start_without_operator ~kind protocols ;
   bailout_mode_fail_operator_no_stake ~kind protocols ;
-  bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols
+  bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols ;
+  test_remote_signer ~hardcoded_remote_signer:true ~kind protocols ;
+  test_remote_signer ~hardcoded_remote_signer:false ~kind protocols

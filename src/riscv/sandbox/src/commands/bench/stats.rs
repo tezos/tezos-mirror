@@ -110,7 +110,8 @@ impl BenchStats {
         Ok(instr_stats)
     }
 
-    /// Fails with [`Err`] if for an instruction the corresponding [`InstructionStats`] can not be created.
+    /// Fails with [`Err`] if for an instruction the corresponding
+    /// instruction's [`NamedStats`] can not be created.
     pub(super) fn from_data(data: BenchData) -> Result<Self, String> {
         let instr_stats = Self::compute_instr_stats(data.instr_count.into_iter())?;
         let bench_duration_stats =
@@ -124,7 +125,8 @@ impl BenchStats {
         })
     }
 
-    /// Fails with [`Err`] if for an instruction the corresponding [`InstructionStats`] can not be created.
+    /// Fails with [`Err`] if for an instruction the corresponding
+    /// instruction's [`NamedStats`] can not be created.
     pub(super) fn from_data_list(data: Vec<BenchData>) -> Result<Self, String> {
         let bench_times = data.iter().map(|bench| bench.duration).collect::<Vec<_>>();
         let bench_duration_stats =
@@ -210,7 +212,9 @@ impl fmt::Display for BenchStats {
                 let bench_overhead = self.bench_duration_stats.total - instr_duration;
                 let per_instr_overhead = bench_overhead.div_f64(self.total_steps as f64);
                 let instr_duration_f = format!("Instr Duration:        {instr_duration:?}");
-                let overhead_f =       format!("Overhead:              {bench_overhead:?} (total) / {per_instr_overhead:?} (per instr.)");
+                let overhead_f = format!(
+                    "Overhead:              {bench_overhead:?} (total) / {per_instr_overhead:?} (per instr.)"
+                );
 
                 let instr_data = counts
                     .iter()

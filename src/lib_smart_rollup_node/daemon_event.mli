@@ -47,9 +47,17 @@ val new_head_degraded : Block_hash.t -> int32 -> unit Lwt.t
     going to be processed. *)
 val processing_heads_iteration : Layer1.head list -> unit Lwt.t
 
+(** [reorg blocks] emits the event that the [blocks] are part of a
+    reorganization. *)
+val reorg : Layer1.head list -> unit Lwt.t
+
 (** [new_heads_processed heads] emits the event that the [heads] were
     processed. *)
 val new_heads_processed : Layer1.head list -> unit Lwt.t
+
+(** [new_heads_side_process_finished heads] emits the event that the
+    [heads] side process (e.g. batcher worker) were processed. *)
+val new_heads_side_process_finished : Layer1.head list -> unit Lwt.t
 
 (** [included_operation op result] emits an event that an operation
     for the rollup was included in a block. *)

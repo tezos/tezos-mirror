@@ -315,7 +315,10 @@ let connect ?(proof_of_work_target = proof_of_work_target) sched addr port id =
   let open Lwt_result_syntax in
   let*! r = raw_connect sched addr port in
   match r with
-  | Error (`Connection_failed | `Unexpected_error _) -> Lwt.fail Cant_connect
+  | Error
+      ( `Network_unreachable | `Connection_unreachable | `Connection_refused
+      | `Connection_canceled | `Unexpected_error _ ) ->
+      Lwt.fail Cant_connect
   | Ok fd ->
       P2p_socket.authenticate
         ~canceler

@@ -27,11 +27,12 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["lib_crawler"; "layer_1"]
+  let section = ["l1_crawler"]
 
   let declare_0 ~name ~msg ?level () =
     declare_1
       ~section
+      ~prefix_name_with_section:true
       ~name
       ~msg:("[{name}] " ^ msg)
       ?level
@@ -41,6 +42,7 @@ module Simple = struct
   let declare_1 ~name ~msg ?level ?pp1 enc1 =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name
       ~msg:("[{name}] " ^ msg)
       ?level
@@ -52,6 +54,7 @@ module Simple = struct
   let declare_2 ~name ~msg ?level ?pp1 ?pp2 enc1 enc2 =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name
       ~msg:("[{name}] " ^ msg)
       ?level
@@ -63,46 +66,30 @@ module Simple = struct
       ?pp3:pp2
 
   let starting =
-    declare_0
-      ~name:"lib_crawler_layer_1_starting"
-      ~msg:"Starting layer 1 tracker"
-      ~level:Notice
-      ()
+    declare_0 ~name:"starting" ~msg:"Starting layer 1 tracker" ~level:Notice ()
 
   let stopping =
-    declare_0
-      ~name:"lib_crawler_layer_1_stopping"
-      ~msg:"Stopping layer 1 tracker"
-      ~level:Notice
-      ()
+    declare_0 ~name:"stopping" ~msg:"Stopping layer 1 tracker" ~level:Notice ()
 
   let connection_lost =
     declare_0
-      ~name:"lib_crawler_connection_lost"
+      ~name:"connection_lost"
       ~msg:"connection to the node has been lost"
       ~level:Warning
       ()
 
   let connection_timeout =
     declare_1
-      ~name:"lib_crawler_connection_timeout"
+      ~name:"connection_timeout"
       ~msg:
         "Connection to the node has timeout after {timeout}s waiting for a new \
          head"
       ~level:Warning
       ("timeout", Data_encoding.float)
 
-  let connection_error =
-    declare_1
-      ~name:"lib_crawler_connection_error"
-      ~msg:"Connection error: {error}"
-      ~level:Warning
-      ("error", trace_encoding)
-      ~pp1:pp_print_trace
-
   let cannot_connect =
     declare_2
-      ~name:"lib_crawler_cannot_connect"
+      ~name:"cannot_connect"
       ~msg:"cannot connect to Tezos node ({count}) {error}"
       ~level:Warning
       ("count", Data_encoding.int31)
@@ -111,57 +98,53 @@ module Simple = struct
 
   let wait_reconnect =
     declare_1
-      ~name:"lib_crawler_wait_reconnect"
+      ~name:"wait_reconnect"
       ~msg:"Retrying to connect in {delay}s"
       ~level:Warning
       ("delay", Data_encoding.float)
 
   let switched_new_head =
     declare_2
-      ~name:"lib_crawler_layer_1_new_head"
-      ~msg:"Layer 1 node has switched to head {hash} at level {level}"
+      ~name:"new_head"
+      ~msg:"L1 node switched to head {hash} at level {level}"
       ~level:Info
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
 
   let connected =
-    declare_0
-      ~name:"lib_crawler_connected"
-      ~msg:"Connected to L1 node"
-      ~level:Debug
-      ()
+    declare_0 ~name:"connected" ~msg:"Connected to L1 node" ~level:Debug ()
 
   let stopping_old_connection =
     declare_0
-      ~name:"lib_crawler_stopping_old_connection"
+      ~name:"stopping_old_connection"
       ~msg:"Stopping previous L1 connection before reconnecting"
       ~level:Debug
       ()
 
   let reconnect_connecting =
     declare_0
-      ~name:"lib_crawler_reconnect_connecting"
+      ~name:"reconnect_connecting"
       ~msg:"Reconnect, already pending reconnection, wait"
       ~level:Debug
       ()
 
   let reconnect_notified =
     declare_0
-      ~name:"lib_crawler_reconnect_notified"
+      ~name:"reconnect_notified"
       ~msg:"Notified of reconnection"
       ~level:Debug
       ()
 
   let reconnect_disconnected =
     declare_0
-      ~name:"lib_crawler_reconnect_disconnected"
+      ~name:"reconnect_disconnected"
       ~msg:"Reconnect on disconnected, connect"
       ~level:Debug
       ()
 
   let reconnect_connected =
     declare_0
-      ~name:"lib_crawler_reconnect_connected"
+      ~name:"reconnect_connected"
       ~msg:"Reconnect on connected, force reconnection"
       ~level:Debug
       ()
@@ -175,8 +158,6 @@ let connection_lost ~name = Simple.(emit connection_lost) name
 
 let connection_timeout ~name ~timeout =
   Simple.(emit connection_timeout) (name, timeout)
-
-let connection_error ~name error = Simple.(emit connection_error) (name, error)
 
 let cannot_connect ~name ~count error =
   Simple.(emit cannot_connect) (name, count, error)

@@ -42,21 +42,18 @@ let main {transaction; evm_rollup} store : return =
     let chunks = chunk_bytes transaction in
     let n_chunks : nat = List.length chunks in
     let operations =
-      if n_chunks = 1n then
-        [Tezos.transaction (Other transaction) 0mutez evm_rollup]
-      else
-        // First message to announce the chunk bytes
-        let new_chunk_payload = Bytes.concat 0x00 (bytes n_chunks) in
-        let announce =
-          Tezos.transaction (Other new_chunk_payload) 0mutez evm_rollup
-        in
-        let chunks =
-          List.fold_left (fun (acc, chunk) ->
+      // First message to announce the chunk bytes
+      let new_chunk_payload = Bytes.concat 0x00 (bytes n_chunks) in
+      let announce =
+        Tezos.transaction (Other new_chunk_payload) 0mutez evm_rollup
+      in
+      let chunks =
+        List.fold_left (fun (acc, chunk) ->
             let chunk_payload = Bytes.concat 0x01 chunk in
             Tezos.transaction (Other chunk_payload) 0mutez evm_rollup :: acc)
-            [] chunks
-        in
-        announce :: chunks
+          [] chunks
+      in
+      announce :: chunks
     in
     // Burn the tez
     let burn_contract =

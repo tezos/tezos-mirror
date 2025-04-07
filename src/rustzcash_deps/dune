@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_rustzcash_deps)
+ (public_name octez-rustzcash-deps)
+ (instrumentation (backend bisect_ppx))
+ (foreign_archives octez_rustzcash_deps))
+
+(dirs :standard .cargo (not target))
+
+(rule
+ (targets liboctez_rustzcash_deps.a dlloctez_rustzcash_deps.so)
+ (deps
+  (file build.sh)
+  (file Cargo.toml)
+  (file Cargo.lock)
+  (file ../../rust-toolchain)
+  (source_tree .cargo)
+  (source_tree bin)
+  (source_tree include)
+  (source_tree src))
+ (action (no-infer (bash ./build.sh))))

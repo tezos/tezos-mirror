@@ -12,10 +12,13 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "tezt-tezos"
+  "tezt-cloud"
   "ppx_import" {with-test}
   "ppx_deriving" {with-test}
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
+  "bls12-381" {with-test}
   "octez-evm-node-libs" { with-test & = version }
+  "octez-rustzcash-deps" {with-test}
   "tezos-protocol-alpha" {with-test}
 ]
 build: [
@@ -23,4 +26,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezt integration tests for Etherlink"

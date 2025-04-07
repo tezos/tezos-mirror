@@ -67,9 +67,9 @@ operations included in newly received blocks, whose validation is
 triggered by the :ref:`block validator<block_validator>`, in order to
 localize validation rules as needed. The resulting concrete API is
 specified by the :package-api:`Protocol
-<octez-proto-libs/Tezos_protocol_environment/V13/module-type-T/Updater/module-type-PROTOCOL/index.html>`
+<octez-proto-libs/Tezos_protocol_environment/V15/module-type-T/Updater/module-type-PROTOCOL/index.html>`
 module in the :doc:`protocol
-environment<../shell/protocol_environment>` ``V13``, and it is
+environment<../shell/protocol_environment>` ``V15``, and it is
 implemented by this protocol in the
 :package-api:`Main<tezos-protocol-alpha/Tezos_raw_protocol_alpha/Main/index.html>`
 module.
@@ -365,7 +365,7 @@ defined as the conjunction of the following conditions:
   solvent to pay the announced fees for all the operations in the
   batch.
 
-.. _co-valid_operations:
+.. _co-valid_operations_alpha:
 
 Co-valid operations
 ^^^^^^^^^^^^^^^^^^^

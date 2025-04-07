@@ -7,6 +7,8 @@
  (package octez-teztale)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-rust-deps
+  bls12-381.archive
   octez-libs.base
   octez-libs.stdlib-unix
   octez-shell-libs.shell-services
@@ -15,6 +17,8 @@
   octez-libs.rpc-http-client-unix
   octez-libs.rpc-http
   octez-version.value
+  tls-lwt
+  conduit-lwt-unix
   lib_teztale_base
   x509
   (select PtCJ7pwo_machine.ml from
@@ -80,6 +84,9 @@
   (select PsQuebec_machine.ml from
    (octez-protocol-021-PsQuebec-libs.client -> PsQuebec_machine.real.ml)
    (-> PsQuebec_machine.no.ml))
+  (select PsRiotum_machine.ml from
+   (octez-protocol-022-PsRiotum-libs.client -> PsRiotum_machine.real.ml)
+   (-> PsRiotum_machine.no.ml))
   (select alpha_machine.ml from
    (octez-protocol-alpha-libs.client -> alpha_machine.real.ml)
    (-> alpha_machine.no.ml)))
@@ -99,48 +106,50 @@
   -open Lib_teztale_base))
 
 (rule
- (target PsQuebec_machine.real.ml)
+ (target PsRiotum_machine.real.ml)
  (mode fallback)
- (deps beta_machine.real.ml)
+ (deps next_machine.real.ml)
  (action
   (progn
-   (copy beta_machine.real.ml PsQuebec_machine.real.ml)
+   (copy next_machine.real.ml PsRiotum_machine.real.ml)
    (run
     sed
-    -i.bak -e s/Tezos_client_beta/Tezos_client_PsQuebec/g -e
-    s/Tezos_protocol_beta/Tezos_protocol_PsQuebec/g -e
-    s/Tezos_protocol_plugin_beta/Tezos_protocol_plugin_PsQuebec/g
+    -i.bak -e s/Tezos_client_next/Tezos_client_PsRiotum/g -e
+    s/Tezos_protocol_next/Tezos_protocol_PsRiotum/g -e
+    s/Tezos_protocol_plugin_next/Tezos_protocol_plugin_PsRiotum/g
+    PsRiotum_machine.real.ml))))
+
+(rule
+ (target PsQuebec_machine.real.ml)
+ (mode fallback)
+ (deps next_machine.real.ml)
+ (action
+  (progn
+   (copy next_machine.real.ml PsQuebec_machine.real.ml)
+   (run
+    sed
+    -i.bak -e s/Tezos_client_next/Tezos_client_PsQuebec/g -e
+    s/Tezos_protocol_next/Tezos_protocol_PsQuebec/g -e
+    s/Tezos_protocol_plugin_next/Tezos_protocol_plugin_PsQuebec/g
     PsQuebec_machine.real.ml))))
 
 (rule
- (target PsParisC_machine.real.ml)
- (mode fallback)
- (deps beta_machine.real.ml)
- (action
-  (progn
-   (copy beta_machine.real.ml PsParisC_machine.real.ml)
-   (run
-    sed
-    -i.bak -e s/Tezos_client_beta/Tezos_client_PsParisC/g -e
-    s/Tezos_protocol_beta/Tezos_protocol_PsParisC/g -e
-    s/Tezos_protocol_plugin_beta/Tezos_protocol_plugin_PsParisC/g
-    PsParisC_machine.real.ml))))
-
-(rule
- (target beta_machine.real.ml)
+ (target next_machine.real.ml)
  (mode fallback)
  (deps alpha_machine.real.ml)
  (action
   (progn
-   (copy alpha_machine.real.ml beta_machine.real.ml)
+   (copy alpha_machine.real.ml next_machine.real.ml)
    (run
     sed
-    -i.bak -e s/Tezos_client_alpha/Tezos_client_beta/g -e
-    s/Tezos_protocol_alpha/Tezos_protocol_beta/g -e
-    s/Tezos_protocol_plugin_alpha/Tezos_protocol_plugin_beta/g
-    beta_machine.real.ml))))
+    -i.bak -e s/Tezos_client_alpha/Tezos_client_next/g -e
+    s/Tezos_protocol_alpha/Tezos_protocol_next/g -e
+    s/Tezos_protocol_plugin_alpha/Tezos_protocol_plugin_next/g
+    next_machine.real.ml))))
 
 (rule (action (write-file alpha_machine.no.ml "module M = struct end")))
+
+(rule (action (write-file PsRiotum_machine.no.ml "module M = struct end")))
 
 (rule (action (write-file PsQuebec_machine.no.ml "module M = struct end")))
 

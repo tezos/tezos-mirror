@@ -16,9 +16,13 @@ Where <action> can be:
 * --check-rust-toolchain: check the contents of rust-toolchain files
 * --check-licenses-git-new: check license headers of added OCaml .ml(i) files.
 * --check-jsonnet-format: checks that the jsonnet files are formatted.
+* --check-jsonnet-lint: checks that the jsonnet files are compliant with linting rules..
+* --check-quebec-plugin-ghostnet-fix: checks that the quebec plugin ghostnet fix exists.
 * --help: display this and return 0.
 EOF
 }
+
+shopt -s extglob
 
 ## Testing for dependencies
 if ! type find > /dev/null 2>&-; then
@@ -44,8 +48,8 @@ license_check_exclude=$(
 src/lib_protocol_environment/sigs/.*
 src/riscv/lib/octez_riscv_api.ml
 src/riscv/lib/octez_riscv_api.mli
-src/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.ml
-src/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.mli
+etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.ml
+etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.mli
 EOF
 )
 
@@ -162,7 +166,7 @@ check_scripts() {
 }
 
 check_redirects() {
-  if [[ ! -f docs/_build/_redirects ]]; then
+  if [[ ! -f docs/_build/_redirects.s3 ]]; then
     say "check-redirects should be run after building the full documentation,"
     say "i.e. by running 'make all && make -C docs all'"
     exit 1
@@ -170,22 +174,26 @@ check_redirects() {
 
   exit_code=0
   while read -r old new code; do
+    re='^#'
+    if [[ $old =~ $re ]]; then continue; fi
     re='^[0-9]+$'
     if ! [[ $code =~ $re && $code -ge 300 ]]; then
       say "in docs/_redirects: redirect $old -> $new has erroneous status code \"$code\""
       exit_code=1
     fi
+    re='^https?://'
+    re2=':splat'
     dest_local=docs/_build${new}
-    if [[ ! -f $dest_local ]]; then
+    if [[ ! $new =~ $re && ! $new =~ $re2 && ! -f $dest_local ]]; then
       say "in docs/_redirects: redirect $old -> $new, $dest_local does not exist"
       exit_code=1
     fi
-  done < docs/_build/_redirects
+  done < docs/_build/_redirects.s3
   exit $exit_code
 }
 
 check_rust_toolchain_files() {
-  authorized_version=("1.66.0" "1.73.0" "1.76.0" "1.78.0")
+  authorized_version=("1.66.0" "1.73.0" "1.76.0" "1.77.2" "1.78.0")
 
   declare -a rust_toolchain_files
   mapfile -t rust_toolchain_files <<< "$(find src/ -name rust-toolchain)"
@@ -247,7 +255,7 @@ check_licenses_git_new() {
 check_jsonnet_format() {
 
   function jsonnetfmt_script() {
-    jsonnetfmt --test grafazos/src/*.jsonnet
+    jsonnetfmt --test grafazos/src/**/*.jsonnet
   }
 
   if jsonnetfmt_script; then
@@ -258,6 +266,68 @@ check_jsonnet_format() {
     exit 1
   fi
 
+}
+
+# Check the linting for Jsonnet files
+# We check file by file to prevent a known jsonnet-lint bug
+# when checking several files at once.
+check_jsonnet_lint() {
+
+  all_files_ok=true
+
+  lint_file() {
+
+    set +e
+
+    local file=$1
+
+    RET=0
+    function jsonnetlint_script() {
+      jsonnet-lint -J grafazos/vendor/ "$file"
+      RET="$?"
+    }
+
+    jsonnetlint_script &> /dev/null
+    lint_output=$(jsonnetlint_script 2>&1)
+
+    if [ "$RET" == "0" ]; then
+      echo "$file is correctly linted ✅"
+    else
+      echo "Error in $file ❌"
+      echo "Error details:"
+      echo "$lint_output"
+      all_files_ok=false
+    fi
+  }
+
+  files=(grafazos/**/*.jsonnet)
+
+  for file in "${files[@]}"; do
+    echo "checking $file..."
+    lint_file "$file"
+  done
+
+  set -e
+
+  if "$all_files_ok"; then
+    echo "All files are correctly linted! ✅"
+    exit 0
+  else
+    echo "Some jsonnet files have linting errors. ❌"
+    exit 1
+  fi
+}
+
+# Mempool in lib_plugin is usually removed when the associated protocol is frozen.
+# However to replay Ghostnet's history, it is necessary to keep a fix in the
+# mempool's validation.
+check_quebec_plugin_ghostnet_fix() {
+  count=$(grep -ho "fix_ghostnet_state" src/proto_021_PsQuebec/lib_plugin/ghostnet_fix.ml src/proto_021_PsQuebec/lib_plugin/plugin_registerer.ml | wc -l)
+  if [[ "$count" -ne 2 ]]; then
+    echo "Missing 'fix_ghostnet_state' in Quebec plugin."
+    exit 1
+  fi
+  exit 0
 }
 
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
@@ -298,6 +368,12 @@ case "$action" in
   ;;
 "--check-jsonnet-format")
   action=check_jsonnet_format
+  ;;
+"--check-jsonnet-lint")
+  action=check_jsonnet_lint
+  ;;
+"--check-quebec-plugin-ghostnet-fix")
+  action=check_quebec_plugin_ghostnet_fix
   ;;
 "help" | "-help" | "--help" | "-h")
   usage

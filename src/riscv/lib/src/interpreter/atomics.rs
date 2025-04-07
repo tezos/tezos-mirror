@@ -5,7 +5,7 @@
 //! Core logic for atomic instructions
 
 use crate::{
-    machine_state::{bus::main_memory::MainMemoryLayout, registers::XRegister, MachineCoreState},
+    machine_state::{MachineCoreState, main_memory::MainMemoryLayout, registers::XRegister},
     state_backend as backend,
     traps::Exception,
 };

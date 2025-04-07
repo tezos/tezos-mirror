@@ -7,6 +7,9 @@
  (package octez-smart-rollup-wasm-debugger)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-rust-deps
+  bls12-381.archive
+  octez-l2-libs.scoru-wasm-helpers
   octez-smart-rollup-wasm-debugger-lib)
  (link_flags
   (:standard)
@@ -14,4 +17,5 @@
   (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
+  -open Tezos_scoru_wasm_helpers
   -open Octez_smart_rollup_wasm_debugger_lib))

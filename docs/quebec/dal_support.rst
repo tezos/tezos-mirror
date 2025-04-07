@@ -1,11 +1,11 @@
-===========
-DAL support
-===========
+===============
+DAL integration
+===============
 
-The support for the :doc:`DAL <../shell/dal>` within the economic protocol relies on two operations:
+The :doc:`DAL <../shell/dal>`'s integration within the economic protocol relies on two operations:
 
 #. ``DAL_publish_commitment``: a manager operation, allowing anyone to publish a DAL commitment
-#. ``attestation``: the existing :ref:`consensus operation <consensus_operations>`, allowing bakers to attach a DAL payload attesting the data seen on the DAL P2P network
+#. ``attestation``: the existing :ref:`consensus operation <consensus_operations_quebec>`, allowing bakers to attach a DAL payload attesting the data seen on the DAL P2P network
 
 DAL publish commitment
 ======================
@@ -50,7 +50,7 @@ When a commitment is published at a certain level, say level ``PL``, the corresp
 Block metadata
 --------------
 
-In the block’s metadata, there is a specific field for the DAL. This field reflects the availability of slots based on the DAL payloads received. It is a bitfield with one bit per slot (its format is the same as the attestation payload of the ``attestation`` operation). The bit is set to 1 if the slot is declared available. The smallest slot index corresponds to the least significant bit. To consider a slot as available, there must be a minimum number of shards, as defined by the ``availability_threshold`` parameter, marked as available by the attesters for that slot (e.g. if the number of shards is 2048 and the availability threshold is 50%, then 1024 shards are required).
+In the block’s metadata, there is a specific field for the DAL, called ``"dal_attestation"``. This field reflects the availability of slots based on the DAL payloads received. It is a bitfield with one bit per slot (its format is the same as the attestation payload of the ``attestation`` operation). The bit is set to 1 if the slot is declared available. The smallest slot index corresponds to the least significant bit. To consider a slot as available, there must be a minimum number of shards, as defined by the ``availability_threshold`` parameter, marked as available by the attesters for that slot (e.g. if the number of shards is 2048 and the availability threshold is 50%, then 1024 shards are required).
 
 Therefore, for data committed (published) at level ``L``, the slot's availability is determined by the metadata of the block at level ``L + attestation_lag``. Consequently, a smart rollup can only utilize this data from level ``L + attestation_lag + 1`` onward.
 
@@ -67,6 +67,7 @@ If the kernel requests a page that does not satisfy the mentioned conditions, th
 
 Moreover, the rollup kernel has access to the protocol constants so that the same kernel code can be used on different test networks.
 
+.. _dal_constants:
 .. _dal_constants_quebec:
 
 DAL-related protocol constants

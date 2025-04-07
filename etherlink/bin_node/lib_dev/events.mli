@@ -10,6 +10,12 @@
 (** Default section for events. *)
 val section : string list
 
+(** Error encoding specific to the EVM node that wraps the default error encoding for event.
+
+    Use it to prevent the command `list events` to show all existing octez error.
+ *)
+val trace_encoding : tztrace Data_encoding.t
+
 (** [received_upgrade payload] advertises that the sequencer received an
     upgrade of payload [payload]. *)
 val received_upgrade : string -> unit Lwt.t
@@ -38,13 +44,29 @@ val ignored_kernel_arg : unit -> unit Lwt.t
     node from L1 level [from] to [to_]. *)
 val catching_up_evm_event : from:int32 -> to_:int32 -> unit Lwt.t
 
-(** [is_ready ~rpc_addr ~rpc_port] advertises that the sequencer is
-    ready and listens to [rpc_addr]:[rpc_port]. *)
-val is_ready : rpc_addr:string -> rpc_port:int -> unit Lwt.t
+(** [is_ready ~rpc_addr ~rpc_port ~websockets ~backend] advertises that the
+    sequencer is ready and listens to [rpc_addr]:[rpc_port]. *)
+val is_ready :
+  rpc_addr:string ->
+  rpc_port:int ->
+  websockets:bool ->
+  backend:Configuration.rpc_server ->
+  unit Lwt.t
 
-(** [private_server_is_ready ~rpc_addr ~rpc_port] advertises that the
-    private rpc server is ready and listens to [rpc_addr]:[rpc_port]. *)
-val private_server_is_ready : rpc_addr:string -> rpc_port:int -> unit Lwt.t
+(** [legacy_mode ()] advertises the EVM node is using the legacy block storage. *)
+val legacy_mode : unit -> unit Lwt.t
+
+(** [private_server_is_ready ~rpc_addr ~rpc_port ~websockets ~backend]
+    advertises that the private rpc server is ready and listens to
+    [rpc_addr]:[rpc_port]. *)
+val private_server_is_ready :
+  rpc_addr:string ->
+  rpc_port:int ->
+  websockets:bool ->
+  backend:Configuration.rpc_server ->
+  unit Lwt.t
+
+val rpc_server_error : exn -> unit
 
 (** [shutdown_rpc_server ~private_ ()] advertises that the RPC server
     was shut down, [private_] tells whether it is the private server
@@ -86,6 +108,48 @@ val sandbox_started : Z.t -> unit Lwt.t
 val cannot_fetch_time_between_blocks :
   Configuration.time_between_blocks -> tztrace -> unit Lwt.t
 
-val invalid_node_da_fees : node_da_fees:Z.t -> kernel_da_fees:Z.t -> unit Lwt.t
+val invalid_node_da_fees :
+  node_da_fees:Z.t ->
+  kernel_da_fees:Z.t ->
+  block_number:Ethereum_types.quantity option ->
+  call:Data_encoding.json ->
+  unit Lwt.t
 
 val deprecation_note : string -> unit Lwt.t
+
+(** [wasm_pvm_fallback ()] advertises that the node has to fallback to the PVM
+    to execute a block, which is slow. *)
+val wasm_pvm_fallback : unit -> unit Lwt.t
+
+(** [missing_chain_id ()] advertises that the node could not check the
+    consistency of the stored chain id with the selected network. *)
+val missing_chain_id : unit -> unit Lwt.t
+
+(** [downloading_file ?size url] advertises that the node is downloading
+    the file at [url], and explicitly mentions its [size] if provided. *)
+val downloading_file : ?size:int -> string -> unit Lwt.t
+
+(** [download_in_progress ~size ~remaining_size ~elapsed_time url] advertises
+    that the node is downloading the file at [url], and explicitly mentions the
+    percentage and remaining bytes to download, as well as the time elapsed
+    since the download started. *)
+val download_in_progress :
+  size:int option ->
+  remaining_size:int option ->
+  elapsed_time:Ptime.span ->
+  string ->
+  unit Lwt.t
+
+type download_error = Http_error of Cohttp.Code.status_code | Exn of exn
+
+(** [download_failed url status] advertises that the download of [url] failed
+    with the given [status] code. *)
+val download_failed : string -> download_error -> unit Lwt.t
+
+val importing_snapshot : unit -> unit Lwt.t
+
+(** [extract_snapshot_archive_in_progress ~archive_name ~elapsed_time] advertises that the node is
+    extracting the snapshot archive named [archive_name], and explicitly mentions the time elapsed
+    since the extraction started. *)
+val extract_snapshot_archive_in_progress :
+  archive_name:string -> elapsed_time:Time.System.Span.t -> unit Lwt.t

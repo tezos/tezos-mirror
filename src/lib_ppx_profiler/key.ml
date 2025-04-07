@@ -10,13 +10,15 @@ type content =
   | Ident of string
   | String of string
   | List of Ppxlib.expression list
-  | Apply of Ppxlib.expression * Parsetree.expression list
+  | Apply of Ppxlib.expression * (Ppxlib.arg_label * Ppxlib.expression) list
   | Other of Ppxlib.expression
 
 type t = {
-  level_of_detail : string option;
+  verbosity : string option;
   profiler_module : string option;
+  metadata : Ppxlib.expression option;
   content : content;
+  driver_ids : Handled_drivers.t;
 }
 
 let[@inline] content {content; _} = content
@@ -26,26 +28,19 @@ let rec embed_list loc = function
   | [e] -> [%expr [[%e e]]]
   | a :: q -> [%expr [%e a] :: [%e embed_list loc q]]
 
-let get_level_of_detail loc {level_of_detail; _} =
-  match level_of_detail with
+let get_verbosity loc {verbosity; _} =
+  match verbosity with
   | Some name ->
-      Ppxlib.Ast_builder.Default.(
-        econstruct
-          (constructor_declaration
-             ~loc
-             ~name:(Located.mk ~loc name)
-             ~args:(Ppxlib_ast.Ast.Pcstr_tuple [])
-             ~res:None))
-        None
-  | None ->
-      Ppxlib.Ast_builder.Default.(
-        econstruct
-          (constructor_declaration
-             ~loc
-             ~name:(Located.mk ~loc "Terse")
-             ~args:(Ppxlib_ast.Ast.Pcstr_tuple [])
-             ~res:None))
-        None
+      Some
+        (Ppxlib.Ast_builder.Default.(
+           econstruct
+             (constructor_declaration
+                ~loc
+                ~name:(Located.mk ~loc name)
+                ~args:(Ppxlib_ast.Ast.Pcstr_tuple [])
+                ~res:None))
+           None)
+  | None -> None
 
 (* This could return a module_expr instead but right now it works
    and that's all we're asking *)
@@ -60,12 +55,27 @@ let to_expression loc {content; _} =
   | Ident expr -> Ppxlib.Ast_builder.Default.(eapply ~loc (evar ~loc expr) [])
   | String string -> Ppxlib.Ast_builder.Default.estring ~loc string
   | Apply (expr, expr_list) ->
-      Ppxlib.Ast_builder.Default.(eapply ~loc expr expr_list)
+      Ppxlib.Ast_builder.Default.(pexp_apply ~loc expr expr_list)
   | List expr_list -> embed_list loc expr_list
   | Other expr -> expr
 
 let pp_expr_list ppf expr_list =
-  (Format.pp_print_list Pprintast.expression) ppf expr_list
+  (Format.pp_print_list Ppxlib.Pprintast.expression) ppf expr_list
+
+let pp_labeled_expr_list ppf expr_list =
+  Format.pp_print_list
+    (fun ppf (label, expr) ->
+      Format.fprintf
+        ppf
+        "%s%a"
+        (match label with
+        | Ppxlib.Nolabel -> ""
+        | Labelled name -> "~" ^ name
+        | Optional name -> "?" ^ name)
+        Ppxlib.Pprintast.expression
+        expr)
+    ppf
+    expr_list
 
 let pp_content ppf {content; _} =
   match content with
@@ -77,17 +87,17 @@ let pp_content ppf {content; _} =
       Format.fprintf
         ppf
         "Apply %a %a"
-        Pprintast.expression
+        Ppxlib.Pprintast.expression
         expr
-        pp_expr_list
+        pp_labeled_expr_list
         expr_list
-  | Other expr -> Format.fprintf ppf "Other %a" Pprintast.expression expr
+  | Other expr -> Format.fprintf ppf "Other %a" Ppxlib.Pprintast.expression expr
 
 let pp ppf t =
   Format.fprintf
     ppf
-    "%s %s %a"
-    (Option.value ~default:"No lvl of detail" t.level_of_detail)
-    (Option.value ~default:"No Profiler module" t.profiler_module)
+    "@[<v 0>verbosity: %s;@,profiler_module: %s;@,content: %a@]"
+    (Option.value ~default:"No verbosity" t.verbosity)
+    (Option.value ~default:"No profiler module" t.profiler_module)
     pp_content
     t

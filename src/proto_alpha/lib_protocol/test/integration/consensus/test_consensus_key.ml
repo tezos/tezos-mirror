@@ -42,7 +42,7 @@ let constants =
         Default_parameters.constants_test.issuance_weights with
         base_total_issued_per_minute = Tez.zero;
       };
-    consensus_threshold = 0;
+    consensus_threshold_size = 0;
     origination_size = 0;
   }
 
@@ -208,10 +208,12 @@ let test_drain_empty_delegate ~exclude_ck () =
         "Drain delegate without enough balance for allocation burn or drain \
          fees")
 
-let test_tz4_consensus_key () =
+let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init_with_constants1 constants in
-  let account1_pkh = Context.Contract.pkh contracts in
+  let* genesis, contract =
+    Context.init_with_constants1 {constants with allow_tz4_delegate_enable}
+  in
+  let account1_pkh = Context.Contract.pkh contract in
   let consensus_account = Account.new_account ~algo:Bls () in
   let delegate = account1_pkh in
   let consensus_pk = consensus_account.pk in
@@ -223,29 +225,133 @@ let test_tz4_consensus_key () =
     Op.update_consensus_key (B blk') (Contract.Implicit delegate) consensus_pk
   in
   let tz4_pk = match consensus_pk with Bls pk -> pk | _ -> assert false in
+  let* inc = Incremental.begin_construction blk' in
+  if allow_tz4_delegate_enable then
+    let expect_failure = function
+      | [
+          Environment.Ecoproto_error
+            (Validate_errors.Manager.Update_consensus_key_with_tz4_without_proof
+              {source; public_key});
+        ]
+        when Signature.Public_key.(public_key = consensus_pk)
+             && source = delegate ->
+          return_unit
+      | err ->
+          failwith
+            "Error trace:@,\
+            \ %a does not match the \
+             [Validate_errors.Manager.Update_consensus_key_with_tz4_without_proof] \
+             error"
+            Error_monad.pp_print_trace
+            err
+    in
+    let* (_i : Incremental.t) =
+      Incremental.validate_operation ~expect_failure inc operation
+    in
+    let* operation_with_incorrect_proof =
+      Op.update_consensus_key
+        ~proof_signer:contract
+        (B blk')
+        (Contract.Implicit delegate)
+        consensus_pk
+    in
+    let expect_failure = function
+      | [
+          Environment.Ecoproto_error
+            (Validate_errors.Manager.Update_consensus_key_with_incorrect_proof
+              {public_key; proof = _});
+        ]
+        when Signature.Public_key.(public_key = consensus_pk) ->
+          return_unit
+      | err ->
+          failwith
+            "Error trace:@,\
+            \ %a does not match the \
+             [Validate_errors.Manager.Update_consensus_key_with_incorrect_proof] \
+             error"
+            Error_monad.pp_print_trace
+            err
+    in
+    let* (_i : Incremental.t) =
+      Incremental.validate_operation
+        ~expect_failure
+        inc
+        operation_with_incorrect_proof
+    in
+    let* operation_with_correct_proof =
+      Op.update_consensus_key
+        ~proof_signer:(Contract.Implicit consensus_account.pkh)
+        (B blk')
+        (Contract.Implicit delegate)
+        consensus_pk
+    in
+    let* (_i : Incremental.t) =
+      Incremental.add_operation inc operation_with_correct_proof
+    in
+    return_unit
+  else
+    let expect_failure = function
+      | [
+          Environment.Ecoproto_error
+            (Delegate_consensus_key.Invalid_consensus_key_update_tz4 pk);
+        ]
+        when Signature.Bls_aug.Public_key.(pk = tz4_pk) ->
+          return_unit
+      | err ->
+          failwith
+            "Error trace:@,\
+            \ %a does not match the \
+             [Delegate_consensus_key.Invalid_consensus_key_update_tz4] error"
+            Error_monad.pp_print_trace
+            err
+    in
+    let* inc = Incremental.begin_construction blk' in
+    let* (_i : Incremental.t) =
+      Incremental.validate_operation ~expect_failure inc operation
+    in
+    return_unit
+
+let test_consensus_key_with_unused_proof () =
+  let open Lwt_result_syntax in
+  let* genesis, contract = Context.init_with_constants1 constants in
+  let account1_pkh = Context.Contract.pkh contract in
+  let consensus_account = Account.new_account () in
+  let delegate = account1_pkh in
+  let consensus_pk = consensus_account.pk in
+  let consensus_pkh = consensus_account.pkh in
+  let* blk' =
+    transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
+  in
+  let* operation =
+    Op.update_consensus_key
+      ~proof_signer:(Contract.Implicit consensus_account.pkh)
+      (B blk')
+      (Contract.Implicit delegate)
+      consensus_pk
+  in
+  let* inc = Incremental.begin_construction blk' in
   let expect_failure = function
     | [
         Environment.Ecoproto_error
-          (Delegate_consensus_key.Invalid_consensus_key_update_tz4 pk);
-      ]
-      when Signature.Bls.Public_key.(pk = tz4_pk) ->
+          (Validate_errors.Manager.Update_consensus_key_with_unused_proof _);
+      ] ->
         return_unit
     | err ->
         failwith
           "Error trace:@,\
           \ %a does not match the \
-           [Delegate_consensus_key.Invalid_consensus_key_update_tz4] error"
+           [Validate_errors.Manager.Update_consensus_key_with_unused_proof] \
+           error"
           Error_monad.pp_print_trace
           err
   in
-  let* inc = Incremental.begin_construction blk' in
   let* (_i : Incremental.t) =
     Incremental.validate_operation ~expect_failure inc operation
   in
   return_unit
 
 let test_attestation_with_consensus_key () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* genesis, contracts = Context.init_with_constants1 constants in
   let account1_pkh = Context.Contract.pkh contracts in
   let consensus_account = Account.new_account () in
@@ -257,7 +363,7 @@ let test_attestation_with_consensus_key () =
   in
   let* b_pre = update_consensus_key blk' delegate consensus_pk in
   let* b = Block.bake b_pre in
-  let slot = Slot.of_int_do_not_use_except_for_parameters 0 in
+  let*?@ slot = Slot.of_int 0 in
   let* attestation = Op.attestation ~delegate:account1_pkh ~slot b in
   let*! res = Block.bake ~operation:attestation b in
   let* () =
@@ -336,7 +442,18 @@ let tests =
         "empty drain delegate with ck"
         `Quick
         (test_drain_empty_delegate ~exclude_ck:false);
-      tztest "tz4 consensus key" `Quick test_tz4_consensus_key;
+      tztest
+        "tz4 consensus key (allow_tz4_delegate_enable:false)"
+        `Quick
+        (test_tz4_consensus_key ~allow_tz4_delegate_enable:false);
+      tztest
+        "tz4 consensus key (allow_tz4_delegate_enable:true)"
+        `Quick
+        (test_tz4_consensus_key ~allow_tz4_delegate_enable:true);
+      tztest
+        "consensus key update with unused proof"
+        `Quick
+        test_consensus_key_with_unused_proof;
       tztest "attestation with ck" `Quick test_attestation_with_consensus_key;
     ]
 

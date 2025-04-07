@@ -30,15 +30,21 @@ let sf = Printf.sprintf
 
 (* EXTERNAL LIBS *)
 
+let rope = external_lib "rope" V.(at_least "0.6.2")
+
 let alcotest = external_lib "alcotest" V.(at_least "1.5.0")
 
 let alcotest_lwt = external_lib "alcotest-lwt" V.(at_least "1.5.0")
+
+let ambient_context_lwt = external_lib "ambient-context-lwt" V.(exactly "0.1.0")
 
 let asetmap = external_lib "asetmap" V.(at_least "0.8.1")
 
 let astring = external_lib "astring" V.True
 
-let bam_ppx = external_lib "bam-ppx" V.True
+let bam_ppx = external_lib "bam-ppx" V.(at_least "0.3")
+
+let base64 = external_lib "base64" V.(at_least "3.3.0")
 
 let bheap = external_lib "bheap" V.(at_least "2.0.0")
 
@@ -73,13 +79,17 @@ let checkseum = external_lib "checkseum" (V.different_from "0.5.0")
 
 let checkseum_ocaml = external_sublib checkseum "checkseum.ocaml"
 
+let clap = external_lib "clap" V.(at_least "0.3.0")
+
 let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
 let cohttp = external_lib "cohttp" V.(at_least "5.3.1")
 
-let conduit_lwt = external_lib "conduit-lwt" V.(exactly "6.2.2")
+let conduit = external_lib "conduit-lwt" V.(at_least "7.1.0")
 
-let conduit_lwt_unix = external_lib "conduit-lwt-unix" V.(exactly "6.2.2")
+let conduit_lwt = external_lib "conduit-lwt" V.(at_least "7.1.0")
+
+let conduit_lwt_unix = external_lib "conduit-lwt-unix" V.(at_least "7.1.0")
 
 let compiler_libs_common = external_lib "compiler-libs.common" V.True ~opam:""
 
@@ -102,6 +112,8 @@ let ctypes_foreign =
 let ctypes_stubs = external_sublib ctypes "ctypes.stubs"
 
 let digestif = external_lib "digestif" V.(at_least "0.9.0")
+
+let dream = external_lib "dream" V.(at_least "1.0.0~alpha7")
 
 let dune_configurator = external_lib "dune-configurator" V.True
 
@@ -145,16 +157,21 @@ let logs = external_lib "logs" V.True
 
 let logs_fmt = external_sublib logs "logs.fmt"
 
+let logs_cli = external_sublib fmt "logs.cli"
+
 let logs_lwt = external_sublib logs "logs.lwt"
 
 let lru = external_lib "lru" V.(at_least "0.3.0")
 
-let lwt = external_lib "lwt" V.(at_least "5.7.0")
+(* 5.9.0 deprecates Lwt_stream.junk_old, which we use *)
+let lwt = external_lib "lwt" V.(at_least "5.7.0" && less_than "5.9.0")
 
 let lwt_canceler =
   external_lib "lwt-canceler" V.(at_least "0.3" && less_than "0.4")
 
 let lwt_exit = external_lib "lwt-exit" V.True
+
+let lwt_ppx = external_lib "lwt_ppx" V.True
 
 let lwt_unix = external_sublib lwt "lwt.unix"
 
@@ -163,6 +180,8 @@ let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.2")
 let magic_mime = external_lib "magic-mime" V.(at_least "1.3.1")
 
 let memtrace = external_lib "memtrace" V.True
+
+let mirage_crypto_rng = external_lib "mirage-crypto-rng" V.(at_least "1.0.0")
 
 let mtime = external_lib "mtime" V.(at_least "2.0.0")
 
@@ -183,11 +202,15 @@ let ocplib_endian_bigstring =
 let ocplib_ocamlres =
   external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
 
+let opentelemetry = external_lib "opentelemetry" V.True
+
+let opentelemetry_lwt = external_lib "opentelemetry-lwt" V.True
+
 let optint = external_lib "optint" V.True
 
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
 
-let ppxlib = external_lib "ppxlib" V.True
+let ppxlib = external_lib "ppxlib" V.(at_least "0.34.0")
 
 let ppxlib_metaquot = external_sublib ppxlib "ppxlib.metaquot"
 
@@ -255,10 +278,14 @@ let tar = external_lib "tar" V.True
 
 let tar_unix = external_lib "tar-unix" V.(at_least "2.0.1" && less_than "3.0.0")
 
+let terminal = external_lib "terminal" V.True
+
 let tezos_sapling_parameters =
   opam_only ~can_vendor:false "tezos-sapling-parameters" V.(at_least "1.1.0")
 
-let tls_lwt = external_lib "tls-lwt" V.(at_least "0.16.0")
+let tls_lwt = external_lib "tls-lwt" V.(at_least "1.0.4")
+
+let trace = external_lib "trace" V.True
 
 let unix = external_lib ~opam:"base-unix" "unix" V.True
 
@@ -267,6 +294,8 @@ let uri = external_lib "uri" V.(at_least "3.1.0")
 let lambda_term = external_lib "lambda-term" V.(at_least "3.3.1")
 
 let utop = external_lib "utop" V.(at_least "2.8")
+
+let uuidm = external_lib "uuidm" V.(at_least "0.9.9")
 
 let uutf = external_lib "uutf" V.True
 
@@ -283,13 +312,13 @@ let dmap = external_lib "dmap" V.True
 (* The signature of the [Z] module has changed in 1.12. *)
 let zarith = external_lib "zarith" V.(at_least "1.13" && less_than "1.14")
 
-let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.4.0")
+let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.4.1")
 
 let crowbar = external_lib "crowbar" V.(at_least "0.2")
 
 let ppx_hash = external_lib "ppx_hash" V.True
 
-let tezt_bam = external_lib "tezt-bam" V.True
+let tezt_bam = external_lib "tezt-bam" V.(at_least "0.3")
 
 let tezt_lib =
   external_lib
@@ -300,7 +329,7 @@ let tezt_lib =
 let tezt_core_lib =
   external_sublib tezt_lib "tezt.core" ~main_module:"Tezt_core"
 
-let x509 = external_lib "x509" V.(less_than "1.0.0")
+let x509 = external_lib "x509" V.(at_least "1.0.0")
 
 let tezt_json_lib = external_sublib tezt_lib "tezt.json" ~main_module:"JSON"
 
@@ -321,11 +350,11 @@ let () =
   List.iter
     (add_dep_to_profile "octez-dev-deps")
     [
-      external_lib "merlin" V.(at_least "4.14");
+      external_lib "merlin" V.(at_least "4.18");
+      external_lib "ocaml-lsp-server" V.(at_least "1.20.1");
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7085
          remove constraint on odoc version when odoc bug is solved *)
       external_lib "odoc" V.(at_least "2.4.2");
       external_lib "ocp-indent" V.True;
-      external_lib "ocaml-lsp-server" V.(at_least "1.18.0");
       external_lib "merge-fmt" V.True;
     ]

@@ -64,6 +64,10 @@ let variables : variables =
     ("CARGO_NET_OFFLINE", "true");
     (* Reduce the verbosity of Cargo. *)
     ("CARGO_TERM_QUIET", "true");
+    (* Enable timestamps for each line in job logs.
+
+       https://docs.gitlab.com/ee/ci/yaml/ci_job_log_timestamps.html *)
+    ("FF_TIMESTAMPS", "true");
   ]
 
 (** {2 Pipeline types} *)
@@ -288,16 +292,63 @@ let () =
       "Scheduled run of all tezt tests with single-process validation, weekly \
        on 'master'.\n\n\
        This scheduled pipeline exercices the full tezt tests suites, but with \
-       Octez nodes configured to use single-process validation."
+       Octez nodes configured to use single-process validation." ;
+  register
+    "schedule_master_test_release"
+    schedule_test_release
+    ~jobs:(Release_tag.octez_jobs ~test:true Schedule_test)
+    ~description:
+      "Scheduled pipeline that runs a test release pipeline for master. The \
+       jobs are the same as a release pipeline but run in dry-mode." ;
+  register
+    "schedule_container_scanning_master"
+    schedule_container_scanning_master
+    ~jobs:
+      [
+        Common.job_datadog_pipeline_trace;
+        Common.job_container_scanning
+          ~docker_image:"tezos/tezos:master"
+          ~dockerfile_path:"build.Dockerfile";
+      ]
+    ~description:
+      "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:master \
+       Docker image" ;
+  register
+    "schedule_container_scanning_octez_releases"
+    schedule_container_scanning_octez_releases
+    ~jobs:
+      [
+        Common.job_datadog_pipeline_trace;
+        Common.job_container_scanning
+          ~docker_image:"tezos/tezos:latest"
+          ~dockerfile_path:"build.Dockerfile";
+      ]
+    ~description:
+      "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:latest \
+       Docker image" ;
+  register
+    "schedule_container_scanning_evm_node_releases"
+    schedule_container_scanning_evm_node_releases
+    ~jobs:
+      [
+        Common.job_datadog_pipeline_trace;
+        Common.job_container_scanning
+          ~docker_image:"tezos/tezos:octez-evm-node-v0.17"
+          ~dockerfile_path:"build.Dockerfile";
+      ]
+    ~description:
+      "Scheduled pipeline for scanning vulnerabilities in latest \
+       tezos/tezos:octez-evm-node-vX.Y Docker image"
 
 (** {2 Entry point of the generator binary} *)
 
 let () =
   (* If argument --verbose is set, then log generation info.
      If argument --inline-source, then print generation info in yml files. *)
-  let filename = ".gitlab-ci.yml" in
   match Cli.config.action with
   | Write ->
-      Pipeline.write ~default ~variables ~filename () ;
+      Pipeline.write ~default ~variables ~filename:".gitlab-ci.yml" () ;
       Tezos_ci.check_files ~remove_extra_files:Cli.config.remove_extra_files ()
   | List_pipelines -> Pipeline.list_pipelines ()
+  | Overview_pipelines -> Pipeline.overview_pipelines ()
+  | Describe_pipeline {name} -> Pipeline.describe_pipeline name

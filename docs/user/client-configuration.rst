@@ -5,12 +5,12 @@ The Octez client can be configured in flexible ways to control various
 aspects of its behavior, such as running in different running modes (:doc:`./sandbox`, :doc:`./mockup`, ...), connecting to a public Tezos node, selecting the directory for storing data, and so on.
 
 All these aspects
-can be customized by supplying **options** on the command line when running the client. Refer to :ref`the client manual <client_manual>` for details.
+can be customized by supplying **options** on the command line when running the client. Refer to :ref:`the client manual <client_manual>` for details.
 
 A subset of these aspects can be customized by specifying parameters in a **configuration file** for the client.
 These include, for example:
 
-- the address and port of a Tezos node to connect to, as an RPC endpoint (by default, the local node; but it can be another node, see `a list of public RPC nodes <https://docs.tezos.com/architecture/rpc#public-and-private-rpc-nodes>`__)
+- the address and port of a Tezos node to connect to, as an RPC endpoint (by default, the local node; but it can be another node, see `a list of public RPC nodes <https://docs.tezos.com/architecture/nodes#public-and-private-rpc-nodes>`__)
 - the directory where the client stores data
 - the number of confirmation blocks needed before an operation is considered included
 - the files defining bootstrap accounts and protocol constants, when running in :doc:`mockup mode <./mockup>`.

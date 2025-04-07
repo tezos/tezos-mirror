@@ -35,6 +35,16 @@ end
 
 module Decode = struct
   let mutez json = json |> JSON.as_int |> Tez.of_mutez_int
+
+  (* - Returns [Some <n>] if the input is an integer.
+     - Returns [None] if the input is [`Null].
+     - Raises an exception in all other cases.
+
+     The difference with {!JSON.as_int_opt} is that {!JSON.as_int_opt}
+     never fails, but instead returns [None] whenever the input is
+     anything else than an integer. *)
+  let int_option json =
+    if JSON.is_null json then None else Some (JSON.as_int json)
 end
 
 type 'result t = 'result RPC_core.t
@@ -449,16 +459,18 @@ let get_chain_block_header_protocol_data ?(chain = "main") ?(block = "head")
     Fun.id
 
 let get_chain_block_operations ?(chain = "main") ?(block = "head") ?version
-    ?(force_metadata = false) () =
+    ?(force_metadata = false) ?(metadata = true) () =
   let query_string =
     Query_arg.opt "version" Fun.id version
-    @ if force_metadata then [("force_metadata", "")] else []
+    @
+    if force_metadata then [("force_metadata", "")]
+    else [] @ if metadata then [] else [("metadata", "never")]
   in
   make ~query_string GET ["chains"; chain; "blocks"; block; "operations"] Fun.id
 
 let get_chain_block_operations_validation_pass ?(chain = "main")
-    ?(block = "head") ?version ?(force_metadata = false) ?operation_offset
-    ~validation_pass () =
+    ?(block = "head") ?version ?(force_metadata = false) ?(metadata = true)
+    ?operation_offset ~validation_pass () =
   let path =
     [
       "chains";
@@ -472,7 +484,9 @@ let get_chain_block_operations_validation_pass ?(chain = "main")
   in
   let query_string =
     Query_arg.opt "version" Fun.id version
-    @ if force_metadata then [("force_metadata", "")] else []
+    @
+    if force_metadata then [("force_metadata", "")]
+    else [] @ if metadata then [] else [("metadata", "never")]
   in
   make ~query_string GET path Fun.id
 
@@ -575,6 +589,22 @@ let post_chain_block_helpers_forge_operations ?(chain = "main")
     ~data
     POST
     ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
+    Fun.id
+
+let post_chain_block_helpers_forge_bls_consensus_operations ?(chain = "main")
+    ?(block = "head") ~data () =
+  make
+    ~data
+    POST
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "helpers";
+      "forge";
+      "bls_consensus_operations";
+    ]
     Fun.id
 
 let post_chain_block_helpers_forge_block_header ?(chain = "main")
@@ -830,15 +860,6 @@ let get_chain_block_helper_attestation_rights ?(chain = "main")
     ~query_string
     GET
     ["chains"; chain; "blocks"; block; "helpers"; "attestation_rights"]
-    Fun.id
-
-let get_chain_block_helper_endorsing_rights ?(chain = "main") ?(block = "head")
-    ?delegate () =
-  let query_string = Query_arg.opt "delegate" Fun.id delegate in
-  make
-    ~query_string
-    GET
-    ["chains"; chain; "blocks"; block; "helpers"; "endorsing_rights"]
     Fun.id
 
 let get_chain_block_helper_validators ?(chain = "main") ?(block = "head")
@@ -1457,6 +1478,22 @@ let get_chain_block_context_delegate_participation ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_delegate_dal_participation ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "dal_participation";
+    ]
+    Fun.id
+
 let get_chain_block_context_delegate_frozen_balance ?(chain = "main")
     ?(block = "head") pkh =
   make
@@ -1650,7 +1687,7 @@ let get_chain_block_context_adaptive_issuance_launch_cycle ?(chain = "main")
       "context";
       "adaptive_issuance_launch_cycle";
     ]
-    Fun.id
+    Decode.int_option
 
 let get_chain_block_context_issuance_expected_issuance ?(chain = "main")
     ?(block = "head") () =

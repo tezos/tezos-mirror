@@ -1,0 +1,13 @@
+^active/cli-commands.txt
+^active/rpc.txt
+^api/api-inline.txt
+^api/errors.txt
+^developer/openmetrics.txt
+^developer/rollup_metrics.txt
+^shell/p2p_api.txt
+^.*/cli-commands.txt
+^shell/rpc.txt
+^alpha/
+^releases/
+^protocols/
+^developer/merkle-proof-formats/

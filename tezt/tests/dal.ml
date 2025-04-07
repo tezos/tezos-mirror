@@ -60,6 +60,14 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
+let init_logger () =
+  let counter = ref 1 in
+  fun msg ->
+    let color = Log.Color.(bold ++ FG.blue) in
+    let prefix = "step-" ^ string_of_int !counter in
+    Log.info ~color ~prefix msg ;
+    incr counter
+
 let read_dir dir =
   let* dir = Lwt_unix.opendir dir in
   let rec read_files acc =
@@ -77,35 +85,71 @@ let read_dir dir =
   in
   read_files []
 
-(* This function checks that in the skip list store of the given [dal_node]
-   (1) the list of files in the 'hashes' sub-directory coincides with
-   [expected_levels] (up to ordering) and (2) as many files in the 'cells'
-   sub-directory as the [(List.length expected_levels) * number_of_slots]. *)
+(* This function checks that in the skip list store of the given
+   [dal_node]:
+   (1) the 'hashes' coincides with [expected_levels] (up to ordering)
+   and,
+   (2) as many 'cells' as the [(List.length expected_levels) *
+   number_of_slots]. *)
 let check_skip_list_store dal_node ~number_of_slots ~expected_levels =
-  let store_dir = sf "%s/store/skip_list_store/" (Dal_node.data_dir dal_node) in
-  let* hashes = read_dir (store_dir ^ "hashes") in
+  let path =
+    sf "%s/store/skip_list_store/store.sqlite" (Dal_node.data_dir dal_node)
+  in
+  let db = Sqlite3.db_open path in
+  let attested_levels = ref [] in
+  let query = "SELECT attested_level FROM skip_list_slots;" in
+  let res =
+    Sqlite3.exec_not_null_no_headers
+      ~cb:(fun row ->
+        let attested_level = row.(0) in
+        attested_levels := attested_level :: !attested_levels)
+      db
+      query
+  in
+  let () =
+    match res with
+    | Sqlite3.Rc.OK -> ()
+    | err ->
+        Test.fail
+          "Failure fetching the attested levels from the sqlite db: %s"
+          (Sqlite3.Rc.to_string err)
+  in
   Check.(
-    List.sort String.compare hashes = List.sort String.compare expected_levels)
+    List.sort_uniq String.compare !attested_levels
+    = List.sort String.compare expected_levels)
     ~__LOC__
     Check.(list string)
     ~error_msg:"Expected hashes directory content: %R. Got: %L" ;
-  let* cells = read_dir (store_dir ^ "cells") in
-  Check.(List.length cells = number_of_slots * List.length expected_levels)
+  let count = ref 0 in
+  let query = "SELECT hash FROM skip_list_cells;" in
+  let res =
+    Sqlite3.exec_not_null_no_headers ~cb:(fun _ -> incr count) db query
+  in
+  let () =
+    match res with
+    | Sqlite3.Rc.OK -> ()
+    | err ->
+        Test.fail
+          "Failure fetching the number of cells from the sqlite db: %s"
+          (Sqlite3.Rc.to_string err)
+  in
+  Check.(!count = number_of_slots * List.length expected_levels)
     ~__LOC__
     Check.int
     ~error_msg:"Expected %R cells, got %L" ;
+  let _ = Sqlite3.db_close db in
   unit
 
 (* Wait for 'new_head' event. Note that the DAL node processes a new head with a
    delay of one level. Also, this event is emitted before block processing. *)
 let wait_for_layer1_head dal_node level =
-  Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
+  Dal_node.wait_for dal_node "dal_new_L1_head_block.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
 (* Wait for 'new_final_block' event. This event is emitted after processing a
    final block. *)
 let wait_for_layer1_final_block dal_node level =
-  Dal_node.wait_for dal_node "dal_node_layer_1_new_final_block.v0" (fun e ->
+  Dal_node.wait_for dal_node "dal_new_L1_final_block.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
 (* We use a custom [bake_for], which by default bakes with all delegates, unlike
@@ -114,7 +158,7 @@ let wait_for_layer1_final_block dal_node level =
    round used when injecting DAL attestation operations. Note that it is
    normally not necessary to bake with a particular delegate, therefore there is
    no downside to set the case [`All] as the default. *)
-let bake_for ?(delegates = `All) ?count client =
+let bake_for ?(delegates = `All) ?count ?dal_node_endpoint client =
   let keys =
     match delegates with
     | `All ->
@@ -122,7 +166,7 @@ let bake_for ?(delegates = `All) ?count client =
         []
     | `For keys -> keys
   in
-  Client.bake_for_and_wait client ~keys ?count
+  Client.bake_for_and_wait client ~keys ?count ?dal_node_endpoint
 
 (* Bake until a block at some given [level] has been finalized and
    processed by the given [dal_nodes]. The head level after this is
@@ -187,7 +231,7 @@ let wait_for_stored_slot ?shard_index dal_node ~published_level ~slot_index =
     | None -> true
     | Some shard_index -> JSON.(e |-> "shard_index" |> as_int) = shard_index
   in
-  Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
+  Dal_node.wait_for dal_node "dal_stored_slot_shard.v0" (fun e ->
       if check_slot_id e && check_shard_index e then Some () else None)
 
 (* Wait until the given [dal_node] receives all the shards whose
@@ -233,6 +277,18 @@ let make_string_parameter name = function
   | None -> []
   | Some value -> [(name, `String value)]
 
+let make_q_parameter name = function
+  | None -> []
+  | Some q ->
+      [
+        ( name,
+          `O
+            [
+              ("numerator", `String (Q.num q |> Z.to_int |> string_of_int));
+              ("denominator", `String (Q.den q |> Z.to_int |> string_of_int));
+            ] );
+      ]
+
 let test ~__FILE__ ?(regression = false) ?(tags = []) ?uses
     ?(supports = Protocol.From_protocol 19) title f =
   let tags = Tag.tezos2 :: "dal" :: tags in
@@ -244,6 +300,9 @@ let test ~__FILE__ ?(regression = false) ?(tags = []) ?uses
 
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
+
+let incentives_enable_param enable =
+  make_bool_parameter ["dal_parametric"; "incentives_enable"] enable
 
 let sc_rollup_activation_dal_params dal_enable =
   if Option.value dal_enable ~default:false then
@@ -438,10 +497,11 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
     ?attestation_lag ?slot_size ?number_of_slots ?page_size
     ?attestation_threshold ?number_of_shards ?redundancy_factor
-    ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
-    ?node_arguments ?activation_timestamp ?dal_bootstrap_peers
-    ?(parameters = []) ?(prover = true) ?smart_rollup_timeout_period_in_blocks
-    ?l1_history_mode f ~protocol =
+    ?commitment_period ?challenge_window ?dal_enable ?incentives_enable
+    ?dal_rewards_weight ?traps_fraction ?event_sections_levels ?node_arguments
+    ?activation_timestamp ?dal_bootstrap_peers ?(parameters = [])
+    ?(prover = true) ?smart_rollup_timeout_period_in_blocks ?l1_history_mode
+    ?blocks_per_cycle f ~protocol =
   let parameter_overrides =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
@@ -457,6 +517,10 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     @ make_int_parameter
         ["dal_parametric"; "attestation_threshold"]
         attestation_threshold
+    @ make_q_parameter ["dal_parametric"; "traps_fraction"] traps_fraction
+    @ make_int_parameter
+        ["issuance_weights"; "dal_rewards_weight"]
+        dal_rewards_weight
     @ make_int_parameter
         ["smart_rollup_commitment_period_in_blocks"]
         commitment_period
@@ -466,6 +530,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     (* this will produce the empty list if dal_enable is not passed to the function invocation,
        hence the value from the protocol constants will be used. *)
     @ dal_enable_param dal_enable
+    @ incentives_enable_param incentives_enable
     @ sc_rollup_activation_dal_params dal_enable
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
     @ make_int_parameter ["consensus_committee_size"] consensus_committee_size
@@ -476,6 +541,12 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     @ make_int_parameter
         ["smart_rollup_timeout_period_in_blocks"]
         smart_rollup_timeout_period_in_blocks
+    (* AI is already active on mainnet, so it should be active
+       immediately in tests *)
+    @ (if Protocol.(number protocol <= number Quebec) then
+         make_bool_parameter ["adaptive_issuance_force_activation"] (Some true)
+       else [])
+    @ make_int_parameter ["blocks_per_cycle"] blocks_per_cycle
     @ parameters
   in
 
@@ -492,22 +563,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ~protocol
       ()
   in
-  let* () =
-    let* init =
-      if prover then
-        Cryptobox.init_prover_dal
-          ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
-          ()
-      else Lwt.return (Ok ())
-    in
-    match init with
-    | Error e ->
-        Test.fail
-          "Dal.with_layer1: init_prover_dal failed: %a@."
-          Tezos_error_monad.Error_monad.pp_print_trace
-          e
-    | Ok () -> unit
-  in
+  let* () = if prover then Helpers.init_prover ~__LOC__ () else unit in
   let* cryptobox = Helpers.make_cryptobox dal_parameters.cryptobox in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key
@@ -566,12 +622,13 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?regression ?(tags = [])
+let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
     ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
     ?number_of_slots ?custom_constants ?commitment_period ?challenge_window
-    ?(dal_enable = true) ?event_sections_levels ?node_arguments
-    ?activation_timestamp ?consensus_committee_size ?minimal_block_delay
-    ?delay_increment_per_round variant scenario =
+    ?(dal_enable = true) ?incentives_enable ?traps_fraction ?dal_rewards_weight
+    ?event_sections_levels ?node_arguments ?activation_timestamp
+    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
+    ?blocks_per_cycle variant scenario =
   let description = "Testing DAL L1 integration" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -585,6 +642,8 @@ let scenario_with_layer1_node ?regression ?(tags = [])
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
+        ?blocks_per_cycle
+        ?attestation_threshold
         ~custom_constants
         ?additional_bootstrap_accounts
         ?consensus_committee_size
@@ -593,6 +652,9 @@ let scenario_with_layer1_node ?regression ?(tags = [])
         ?attestation_lag
         ?number_of_shards
         ?number_of_slots
+        ?incentives_enable
+        ?traps_fraction
+        ?dal_rewards_weight
         ?commitment_period
         ?challenge_window
         ?event_sections_levels
@@ -606,10 +668,11 @@ let scenario_with_layer1_node ?regression ?(tags = [])
 let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
     ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
-    ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
-    ?challenge_window ?(dal_enable = true) ?activation_timestamp
-    ?bootstrap_profile ?producer_profiles ?history_mode ?prover ?l1_history_mode
-    variant scenario =
+    ?number_of_slots ?attestation_lag ?attestation_threshold ?traps_fraction
+    ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
+    ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
+    ?event_sections_levels ?producer_profiles ?history_mode ?prover
+    ?l1_history_mode variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -639,9 +702,13 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?number_of_shards
         ?attestation_lag
         ?attestation_threshold
+        ?traps_fraction
+        ?incentives_enable
+        ?dal_rewards_weight
         ?commitment_period
         ?challenge_window
         ?activation_timestamp
+        ?event_sections_levels
         ?prover
         ~l1_history_mode
         ~protocol
@@ -654,11 +721,12 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
 let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?consensus_committee_size ?slot_size ?page_size ?number_of_shards
     ?redundancy_factor ?attestation_lag ?(tags = []) ?(uses = fun _ -> [])
-    ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
-    ?challenge_window ?minimal_block_delay ?delay_increment_per_round
-    ?activation_timestamp ?bootstrap_profile ?producer_profiles
-    ?smart_rollup_timeout_period_in_blocks ?(regression = true) ?prover
-    ?attestation_threshold ?l1_history_mode variant scenario =
+    ?(pvm_name = "arith") ?(dal_enable = true) ?incentives_enable
+    ?dal_rewards_weight ?commitment_period ?challenge_window
+    ?minimal_block_delay ?delay_increment_per_round ?activation_timestamp
+    ?bootstrap_profile ?producer_profiles ?smart_rollup_timeout_period_in_blocks
+    ?(regression = true) ?prover ?attestation_threshold ?l1_history_mode variant
+    scenario =
   let description = "Testing DAL rollup and node with L1" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -689,6 +757,8 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         ?number_of_shards
         ?redundancy_factor
         ?attestation_lag
+        ?incentives_enable
+        ?dal_rewards_weight
         ?commitment_period
         ?challenge_window
         ?minimal_block_delay
@@ -769,17 +839,21 @@ let different_delegates pkh =
 
 (* We support two formats for specifying the attested slots: either a
    list of slot ids or a bitset. *)
-type attestation_availability = Slots of int list | Bitset of bool array
+type attestation_availability =
+  | Slots of int list
+  | Bitset of bool array
+  | No_dal_attestation
 
-let inject_dal_attestation ?level ?(round = 0) ?payload_level ?force ?error
-    ?request ~signer ~nb_slots availability client =
+let craft_dal_attestation ?level ?round ?payload_level ~signer ~nb_slots
+    availability client =
   let dal_attestation =
     match availability with
-    | Bitset bitset -> bitset
+    | Bitset bitset -> Some bitset
     | Slots availability ->
         let dal_attestation = Array.make nb_slots false in
         List.iter (fun i -> dal_attestation.(i) <- true) availability ;
-        dal_attestation
+        Some dal_attestation
+    | No_dal_attestation -> None
   in
   let* level =
     match level with Some level -> return level | None -> Client.level client
@@ -795,27 +869,49 @@ let inject_dal_attestation ?level ?(round = 0) ?payload_level ?force ?error
     JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
     |> List.hd |> JSON.as_int
   in
-  let* block_payload_hash =
+  let* block_payload_hash, round =
     let block =
       (match payload_level with None -> level | Some l -> l) |> string_of_int
     in
-    Operation.Consensus.get_block_payload_hash ~block client
+    let* block_payload_hash =
+      Operation.Consensus.get_block_payload_hash ~block client
+    in
+    let* round =
+      match round with
+      | None ->
+          Client.RPC.call client @@ RPC.get_chain_block_helper_round ~block ()
+      | Some round -> return round
+    in
+    return (block_payload_hash, round)
   in
-  Operation.Consensus.inject
-    ?force
-    ?error
-    ?request
+  Operation.Consensus.operation
+    ~with_dal:true
     ~signer
     (Operation.Consensus.attestation
        ~level
        ~round
-       ~dal_attestation
+       ?dal_attestation
        ~slot
        ~block_payload_hash
        ())
     client
 
-let inject_dal_attestations ?payload_level ?level ?round ?force
+let inject_dal_attestation ?level ?round ?payload_level ?force ?error ?request
+    ~signer ~nb_slots availability client =
+  let* op =
+    craft_dal_attestation
+      ?level
+      ?round
+      ?payload_level
+      ~signer
+      ~nb_slots
+      availability
+      client
+  in
+  let* oph = Operation.inject ?force ?error ?request op client in
+  return (op, oph)
+
+let inject_dal_attestations ?payload_level ?level ?round ?force ?request
     ?(signers = Array.to_list Account.Bootstrap.keys) ~nb_slots availability
     client =
   Lwt_list.map_s
@@ -825,6 +921,7 @@ let inject_dal_attestations ?payload_level ?level ?round ?force
         ?level
         ?round
         ?force
+        ?request
         ~signer
         ~nb_slots
         availability
@@ -837,7 +934,7 @@ let inject_dal_attestations_and_bake node client ~number_of_slots indexes =
     baker_for_round_zero node ~level:(level + 1)
   in
   let signers = different_delegates baker in
-  let* _op_hashes =
+  let* _op_and_op_hash_list =
     inject_dal_attestations ~signers ~nb_slots:number_of_slots indexes client
   in
   bake_for ~delegates:(`For [baker]) client
@@ -880,10 +977,13 @@ let get_validated_dal_attestations_in_mempool node for_level =
       let level = JSON.(contents |-> "level" |> as_int) in
       level = for_level
       && JSON.(contents |-> "kind" |> as_string) |> fun kind ->
-         String.equal kind "attestation_with_dal"
-         || String.equal kind "endorsement_with_dal")
+         String.equal kind "attestation_with_dal")
     validated
   |> return
+
+let wait_for_classified oph node =
+  let filter json = if JSON.as_string json = oph then Some () else None in
+  Node.wait_for node "operation_classified.v0" filter
 
 let test_one_committee_per_level _protocol _parameters _cryptobox node _client
     _bootstrap_key =
@@ -955,6 +1055,50 @@ let publish_commitment ?dont_wait ?counter ?force ~source ?(fee = 1200) ~index
     ~commitment
     ~proof
     client
+
+(* Produce a slot, store it in the DAL node, and then (try to) publish the same
+   commitment for each level between [from] and [into]. *)
+let simple_slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node
+    l1_client =
+  (* This is the account used to sign injected slot headers on L1. *)
+  let source = Constant.bootstrap2 in
+  let slot =
+    Helpers.generate_slot ~slot_size
+    |> Bytes.to_string
+    |> Helpers.make_slot ~slot_size
+  in
+  let* commitment, proof = Helpers.store_slot ~slot_index dal_node slot in
+  let rec loop current_level =
+    if current_level > into then unit
+    else
+      let* level = Node.wait_for_level l1_node current_level in
+      (* Warn when we don't advance level by level, because this means we
+         couldn't publish at each level. Also, we force the injection because
+         when a level is missed then probably there will be two injection
+         attempts at the same level later. *)
+      if current_level < level then
+        Log.warn
+          "[slot_producer] missed some levels (expected level is %d, got %d)"
+          current_level
+          level ;
+      Log.info
+        "[slot_producer] publish at slot index %d at level %d"
+        slot_index
+        level ;
+      let* _op_hash =
+        publish_commitment
+          ~force:true
+          ~source
+          ~index:slot_index
+          ~commitment
+          ~proof
+          l1_client
+      in
+      loop (level + 1)
+  in
+  let* () = loop from in
+  Log.info "[slot_producer] will terminate" ;
+  unit
 
 type status = Applied | Failed of {error_id : string}
 
@@ -1181,14 +1325,17 @@ let test_slots_attestation_operation_behavior _protocol parameters _cryptobox
   let lag = parameters.attestation_lag in
   assert (lag > 1) ;
   let attest ?payload_level ?(signer = Constant.bootstrap2) ~level () =
-    inject_dal_attestation
-      ?payload_level
-      ~force:true
-      ~nb_slots
-      ~level
-      ~signer
-      (Slots [0])
-      client
+    let* _op, op_hash =
+      inject_dal_attestation
+        ?payload_level
+        ~force:true
+        ~nb_slots
+        ~level
+        ~signer
+        (Slots [0])
+        client
+    in
+    return op_hash
   in
   let mempool_is ~__LOC__ expected_mempool =
     let* mempool = Mempool.get_mempool client in
@@ -1367,7 +1514,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   Log.info "number_of_shards = %d" number_of_shards ;
   let* () = bake_for client in
   let* level = Client.level client in
-  let* (`OpHash _oph) =
+  let* _op, `OpHash _oph =
     inject_dal_attestation
       ~nb_slots
       ~level
@@ -1391,12 +1538,13 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
      shards on average. We should encounter relatively quickly a level where it
      is assigned to no shard. *)
   let stake = Tez.of_mutez_int (Protocol.default_bootstrap_balance / 64) in
+  let amount = Tez.(stake + of_int 10) in
   let* new_account = Client.gen_and_show_keys client in
   let* () =
     Client.transfer
       ~giver:Constant.bootstrap1.alias
       ~receiver:new_account.alias
-      ~amount:Tez.(stake + of_int 10)
+      ~amount
       ~burn_cap:Tez.one
       client
   in
@@ -1405,6 +1553,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   let* () = bake_for client in
   let* () = Client.register_key new_account.alias client in
   let* () = bake_for client in
+  let* () = Client.stake ~staker:new_account.alias Tez.(amount /! 2L) client in
   let num_cycles = 2 + consensus_rights_delay in
   Log.info
     "Bake for %d cycles for %s to be a baker"
@@ -1431,7 +1580,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
       let* () =
         check_in_TB_committee ~__LOC__ node new_account.public_key_hash ~level
       in
-      let* (`OpHash _oph) =
+      let* _op, `OpHash _oph =
         inject_dal_attestation
           ~error:Operation.dal_data_availibility_attester_not_in_committee
           ~nb_slots
@@ -1525,7 +1674,7 @@ let () =
    the level at which it was published. *)
 let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
     slot_producer_dal_node source ~index ~wait_slot
-    ~number_of_extra_blocks_to_bake content =
+    ~number_of_extra_blocks_to_bake ?delegates content =
   let* commitment, proof =
     Helpers.store_slot slot_producer_dal_node ~slot_index:index content
   in
@@ -1544,7 +1693,7 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
       client
   in
   (* Bake a first block to include the operation. *)
-  let* () = bake_for client in
+  let* () = bake_for ?delegates client in
   (* Check that the operation is included. *)
   let* included_manager_operations =
     let manager_operation_pass = 3 in
@@ -1562,7 +1711,11 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
       ~error_msg:"DAL commitment publishment operation not found in head block."
   in
   (* Bake some more blocks to finalize the block containing the publication. *)
-  let* () = bake_for ~count:number_of_extra_blocks_to_bake client in
+  let* () =
+    if number_of_extra_blocks_to_bake > 0 then
+      bake_for ~count:number_of_extra_blocks_to_bake ?delegates client
+    else unit
+  in
   (* Wait for the shards to be received *)
   let* res = p in
   return (published_level, commitment, res)
@@ -2091,7 +2244,7 @@ let test_dal_node_startup =
     ~title:"dal node startup"
     ~tags:[Tag.tezos2; "dal"]
     ~uses:(fun _protocol -> [Constant.octez_dal_node])
-    ~supports:(Protocol.From_protocol 21)
+    ~supports:(Protocol.From_protocol 22)
   @@ fun protocol ->
   let run_dal = Dal_node.run ~wait_ready:false in
   let nodes_args = Node.[Synchronisation_threshold 0] in
@@ -2126,8 +2279,7 @@ let test_dal_node_startup =
   let* () =
     Lwt.join
       [
-        Dal_node.wait_for dal_node "dal_node_plugin_resolved.v0" (fun _ ->
-            Some ());
+        Dal_node.wait_for dal_node "dal_plugin_resolved.v0" (fun _ -> Some ());
         bake_for client;
       ]
   in
@@ -2523,7 +2675,7 @@ let check_profiles ~__LOC__ dal_node ~expected =
         ~error_msg:
           (__LOC__ ^ " : Unexpected profiles (Actual: %L <> Expected: %R)"))
 
-let check_topics_peers ~__LOC__ ~subscribed dal_node ~expected =
+let check_topics_peers ~__LOC__ dal_node ~expected =
   let normalize_peers l = List.sort String.compare l in
   let compare_topics {Dal.RPC.topic_slot_index = s1; topic_pkh = p1}
       {Dal.RPC.topic_slot_index = s2; topic_pkh = p2} =
@@ -2535,7 +2687,7 @@ let check_topics_peers ~__LOC__ ~subscribed dal_node ~expected =
     |> List.map (fun (topic, peers) -> (topic, normalize_peers peers))
     |> List.sort (fun (t1, _p1) (t2, _p2) -> compare_topics t1 t2)
   in
-  let* topic_peers = Dal_RPC.(call dal_node @@ get_topics_peers ~subscribed) in
+  let* topic_peers = Dal_RPC.(call dal_node @@ get_topics_peers ()) in
   return
     Check.(
       (normalize_topics_peers topic_peers = normalize_topics_peers expected)
@@ -3436,18 +3588,9 @@ let register_end_to_end_tests ~protocols =
         protocols)
     e2e_tests
 
-let wait_for_gossipsub_worker_event ~name dal_node lambda =
-  Dal_node.wait_for dal_node (sf "gossipsub_worker_event-%s.v0" name) lambda
-
 let check_expected expected found = if expected <> found then None else Some ()
 
 let ( let*?? ) a b = Option.bind a b
-
-let check_disconnection_event dal_node ~peer_id =
-  wait_for_gossipsub_worker_event
-    ~name:"disconnection"
-    dal_node
-    (fun peer_event -> check_expected peer_id JSON.(peer_event |> as_string))
 
 type peer_id = string
 
@@ -3510,7 +3653,7 @@ let check_events_with_topic ~event_with_topic dal_node ~num_slots
     in
     Some JSON.(topic |-> "slot_index" |> as_int)
   in
-  wait_for_gossipsub_worker_event
+  Dal_common.Helpers.wait_for_gossipsub_worker_event
     dal_node
     ~name:(event_with_topic_to_string event_with_topic)
     (fun event ->
@@ -3573,7 +3716,7 @@ let check_events_with_message ~event_with_message dal_node ~number_of_shards
     seen |> Array.to_seqi
     |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
   in
-  wait_for_gossipsub_worker_event
+  Dal_common.Helpers.wait_for_gossipsub_worker_event
     dal_node
     ~name:(event_with_message_to_string event_with_message)
     (fun event ->
@@ -3634,7 +3777,7 @@ let check_events_with_message_id ~event_with_message_id dal_node
     seen |> Array.to_seqi
     |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
   in
-  wait_for_gossipsub_worker_event
+  Dal_common.Helpers.wait_for_gossipsub_worker_event
     ~name:(event_with_message_id_to_string event_with_message_id)
     dal_node
     (fun event ->
@@ -3680,10 +3823,7 @@ let check_message_notified_to_app_event dal_node ~number_of_shards
     seen |> Array.to_seqi
     |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
   in
-  Dal_node.wait_for
-    dal_node
-    "gossipsub_transport_event-message_notified_to_app.v0"
-    (fun event ->
+  Dal_node.wait_for dal_node "dal_gs_message_notified_to_app.v0" (fun event ->
       let*?? shard_index = get_shard_index_opt event in
       Check.(
         (seen.(shard_index) = false)
@@ -3812,7 +3952,9 @@ let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
   in
   let* peer_id = Dal_node.read_identity dal_node2 in
   (* kill dal_node2 and check "disconnection" event in node1. *)
-  let disconn_ev_in_node1 = check_disconnection_event dal_node1 ~peer_id in
+  let disconn_ev_in_node1 =
+    Dal_common.Helpers.check_disconnection_event dal_node1 ~peer_id
+  in
   let* () = Dal_node.kill dal_node2 in
   disconn_ev_in_node1
 
@@ -3847,7 +3989,7 @@ let test_dal_node_join_topic _protocol parameters _cryptobox _node _client
 *)
 let generic_gs_messages_exchange protocol parameters _cryptobox node client
     dal_node1 ~mk_dal_node2 ~expect_app_notification ~is_first_slot_attestable =
-  let* dal_node2 = mk_dal_node2 protocol parameters in
+  let* node2, dal_node2 = mk_dal_node2 protocol parameters in
 
   let* () =
     Dal_common.Helpers.connect_nodes_via_p2p
@@ -3929,6 +4071,16 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
   and* () = waiter_receive_shards
   and* () = waiter_app_notifs in
 
+  let* () =
+    match node2 with
+    | None -> unit
+    | Some node2 ->
+        (* We need that this node reaches level 2; otherwise, the RPC call to
+           [get_attestable_slots] may fail. *)
+        let* _level = Node.wait_for_level node2 2 in
+        unit
+  in
+
   (* Check that dal_node2 has the shards needed by attester account1/pkh1 to
      attest the slot with index 0. *)
   let* res =
@@ -3958,13 +4110,14 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
     client
     dal_node1
     ~mk_dal_node2:(fun _protocol _parameters ->
-      Dal_node.create ~node () |> return)
+      let dal_node2 = Dal_node.create ~node () in
+      (None, dal_node2) |> return)
     ~expect_app_notification:true
     ~is_first_slot_attestable:true
 
 (* Create a DAL node whose DAL parameters are not compatible with those in
    [parameters]. For that, the redundancy_factor field is multiplied by 2. *)
-let make_invalid_dal_node protocol parameters =
+let make_invalid_dal_node node1 protocol parameters =
   (* Create another L1 node with different DAL parameters. *)
   let* node2, _client2, _xdal_parameters2 =
     let crypto_params = parameters.Dal.Parameters.cryptobox in
@@ -3975,10 +4128,13 @@ let make_invalid_dal_node protocol parameters =
     in
     setup_node ~protocol ~parameter_overrides ()
   in
+  Node.add_peer node2 node1 ;
+  let* () = Node.terminate node2 in
+  let* () = Node.run node2 [] in
   (* Create a second DAL node with node2 and client2 as argument (so different
      DAL parameters compared to dal_node1. *)
   let dal_node2 = Dal_node.create ~node:node2 () in
-  return dal_node2
+  return (Some node2, dal_node2)
 
 let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     node client dal_node1 =
@@ -3995,7 +4151,7 @@ let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     node
     client
     dal_node1
-    ~mk_dal_node2:make_invalid_dal_node
+    ~mk_dal_node2:(make_invalid_dal_node node)
     ~expect_app_notification
     ~is_first_slot_attestable
 
@@ -4037,7 +4193,7 @@ let test_gs_prune_and_ihave protocol parameters _cryptobox node client dal_node1
   in
 
   (* Create another (invalid) DAL node *)
-  let* dal_node2 = make_invalid_dal_node protocol parameters in
+  let* _, dal_node2 = make_invalid_dal_node node protocol parameters in
 
   (* Connect the nodes *)
   let* () =
@@ -4255,13 +4411,13 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 
   (* Prepare disconnection events to observe. *)
   let disconn_ev_in_node1_2 =
-    check_disconnection_event dal_node1 ~peer_id:id_dal_node2
+    Dal_common.Helpers.check_disconnection_event dal_node1 ~peer_id:id_dal_node2
   in
   let disconn_ev_in_node1_3 =
-    check_disconnection_event dal_node1 ~peer_id:id_dal_node3
+    Dal_common.Helpers.check_disconnection_event dal_node1 ~peer_id:id_dal_node3
   in
   let disconn_ev_in_node2_3 =
-    check_disconnection_event dal_node2 ~peer_id:id_dal_node3
+    Dal_common.Helpers.check_disconnection_event dal_node2 ~peer_id:id_dal_node3
   in
 
   (* Prepare reconnection events checks between node1 and node2 (resp. 3). *)
@@ -4320,10 +4476,12 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
   unit
 
 (* Adapted from sc_rollup.ml *)
-let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
-    ~migration_level ~scenario ~description ?producer_profiles ?attestation_lag
-    ?number_of_slots ?number_of_shards ?slot_size ?page_size ?redundancy_factor
-    ?consensus_committee_size () =
+let test_l1_migration_scenario ?(tags = []) ?(uses = []) ~migrate_from
+    ~migrate_to ~migration_level ~scenario ~description ?producer_profiles
+    ?attestation_lag ?attestation_threshold ?number_of_slots ?number_of_shards
+    ?slot_size ?page_size ?redundancy_factor ?traps_fraction
+    ?consensus_committee_size ?blocks_per_cycle ?minimal_block_delay
+    ?activation_timestamp () =
   let tags =
     Tag.tezos2 :: "dal" :: Protocol.tag migrate_from :: Protocol.tag migrate_to
     :: "migration" :: tags
@@ -4331,7 +4489,7 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
   Test.register
     ~__FILE__
     ~tags
-    ~uses:[Constant.octez_dal_node]
+    ~uses:(Constant.octez_dal_node :: uses)
     ~title:
       (sf
          "%s->%s: %s"
@@ -4341,7 +4499,12 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
   @@ fun () ->
   let parameter_overrides =
     make_int_parameter ["consensus_committee_size"] consensus_committee_size
+    @ make_int_parameter ["blocks_per_cycle"] blocks_per_cycle
+    @ make_string_parameter ["minimal_block_delay"] minimal_block_delay
     @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
+    @ make_int_parameter
+        ["dal_parametric"; "attestation_threshold"]
+        attestation_threshold
     @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
     @ make_int_parameter
@@ -4349,12 +4512,14 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
         redundancy_factor
     @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
     @ make_int_parameter ["dal_parametric"; "page_size"] page_size
+    @ make_q_parameter ["dal_parametric"; "traps_fraction"] traps_fraction
   in
   let* node, client, dal_parameters =
     setup_node
       ~parameter_overrides
       ~protocol:migrate_from
       ~l1_history_mode:Default_with_refutation
+      ?activation_timestamp
       ()
   in
 
@@ -4389,7 +4554,7 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     let blocks_till_migration = migration_level - current_level in
 
     let wait_for_plugin =
-      Dal_node.wait_for dal_node "dal_node_plugin_resolved.v0" (fun json ->
+      Dal_node.wait_for dal_node "dal_plugin_resolved.v0" (fun json ->
           let proto_hash = JSON.(json |> as_string) in
           if String.equal proto_hash (Protocol.hash migrate_to) then Some ()
           else None)
@@ -4412,6 +4577,112 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     ~description
     ()
 
+(* This test checks the following scenario (that occurred on `nextnet--20250203`):
+   - start a DAL node attester in protocol [migrate_from]
+   - then start a DAL node accuser in protocol [migrate_to]
+   - check that no baker is denounced
+
+   This issue was that bakers were denounced, because the DAL node attester was
+   started when the DAL incentives were not enabled, so they did not check for
+   traps, and the DAL node did not used the new protocol parameters after
+   migrating to the new protocol, so they also did not check for traps when the
+   DAL incentives were enabled.
+*)
+let test_migration_accuser_issue ~migrate_from ~migrate_to =
+  let slot_index = 0 in
+  let tags = ["accuser"; "migration"] in
+  let description = "test accuser" in
+  let scenario ~migration_level dal_parameters client node dal_node =
+    let* proto_params =
+      Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+    in
+    let blocks_per_cycle =
+      JSON.(proto_params |-> "blocks_per_cycle" |> as_int)
+    in
+    assert (migration_level < blocks_per_cycle) ;
+    let* level = Client.level client in
+    let first_level = level + 1 in
+    let last_level = blocks_per_cycle in
+    Log.info
+      "Publish slots from first_level = %d to last_level = %d"
+      first_level
+      last_level ;
+    let _promise =
+      simple_slot_producer
+        ~slot_size:dal_parameters.Dal.Parameters.cryptobox.slot_size
+        ~slot_index
+        ~from:(migration_level - 1)
+        ~into:last_level
+        dal_node
+        node
+        client
+    in
+    Log.info "Start bakers for the current and the next protocols" ;
+    let baker_from =
+      Baker.create ~dal_node ~protocol:migrate_from node client
+    in
+    let baker_to = Baker.create ~dal_node ~protocol:migrate_to node client in
+
+    let* () = Baker.run baker_from in
+    let* () = Baker.run baker_to in
+
+    let* _level = Node.wait_for_level node migration_level in
+    Log.info "migrated to next protocol, starting a second DAL node accuser" ;
+    let dal_node_p2p_endpoint = Dal_node.listen_addr dal_node in
+    let accuser = Dal_node.create ~node () in
+    let* () =
+      Dal_node.init_config
+        ~peers:[dal_node_p2p_endpoint]
+        ~producer_profiles:[slot_index]
+        accuser
+    in
+    let* () = Dal_node.run accuser ~wait_ready:true in
+
+    let* _level = Node.wait_for_level node last_level in
+    let* () = Baker.terminate baker_from in
+    let* () = Baker.terminate baker_to in
+
+    Lwt_list.iter_s
+      (fun delegate ->
+        let* dal_participation =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_context_delegate_dal_participation
+               ~block:(string_of_int (last_level - 1))
+               delegate.Account.public_key_hash
+        in
+        let is_denounced =
+          JSON.(dal_participation |-> "denounced" |> as_bool)
+        in
+        Check.is_false
+          is_denounced
+          ~__LOC__
+          ~error_msg:"Expected the delegate to not be denounced" ;
+        unit)
+      (Array.to_list Account.Bootstrap.keys)
+  in
+  test_l1_migration_scenario
+    ~scenario
+    ~tags
+    ~description
+    ~uses:[Protocol.baker migrate_from; Protocol.baker migrate_to]
+    ~activation_timestamp:Now
+    ~producer_profiles:[slot_index]
+    ~minimal_block_delay:
+      (* to be sure there is enough time to published slots *)
+      "2"
+    ~blocks_per_cycle:32
+    ~consensus_committee_size:512
+      (* Use more blocks per cycle and more shards so that we're sure that we
+         encounter traps: there are 32 (blocks per cycle) - 4 (migration level)
+         - 8 (attestation lag) = 20 attestable levels; so 20 * 512 = 10240
+         shards. Since [traps_fraction = 1 / 2000], the probability to not
+         encounter at least one trap in these many shards is (1 - 1/2000)^10240
+         = 0.6%. *)
+    ~number_of_shards:512
+    ~migrate_from
+    ~migrate_to
+    ()
+
 let test_producer_profile _protocol _dal_parameters _cryptobox _node _client
     dal_node =
   let index = 0 in
@@ -4427,10 +4698,11 @@ let test_producer_profile _protocol _dal_parameters _cryptobox _node _client
 let monitor_finalized_levels_events ~__LOC__ ~last_notified_level ~target_level
     dal_node =
   let next_finalized_level = ref (last_notified_level + 1) in
-  Dal_node.wait_for dal_node "dal_node_layer_1_new_final_block.v0" (fun e ->
+  Dal_node.wait_for dal_node "dal_new_L1_final_block.v0" (fun e ->
       let finalized_level = JSON.(e |-> "level" |> as_int) in
       Check.(
         (finalized_level = !next_finalized_level)
+          ~__LOC__
           int
           ~error_msg:"Expected next finalized level to be %R (got %L)") ;
       incr next_finalized_level ;
@@ -4516,9 +4788,9 @@ let test_dal_node_crawler_reconnects_to_l1 _protocol _dal_parameters _cryptobox
 
   let* head_level = Client.level client in
   (* before the crawler is started, the bootstrap phase advances the
-     [last_processed_level] (so [last_notified_level] to the following
+     [last_processed_level] (so [last_notified_level]) to the following
      value: *)
-  let last_notified_level = head_level - 2 in
+  let last_notified_level = head_level - 3 in
 
   (* Restart the DAL node, the finalized events watcher promise, and wait until
      the node is ready. We wait for the node to be ready after spawning an
@@ -4747,7 +5019,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
       |> List.of_seq
     in
     let expected = List.concat (List.map expected all_pkhs) in
-    check_topics_peers ~__LOC__ attester ~subscribed:true ~expected
+    check_topics_peers ~__LOC__ attester ~expected
   in
 
   (* The slot producer should be connected to:
@@ -4760,7 +5032,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
              ( {Dal_RPC.topic_slot_index = index; topic_pkh},
                [bootstrap_peer_id; attester_peer_id] ))
     in
-    check_topics_peers ~__LOC__ producer ~subscribed:true ~expected
+    check_topics_peers ~__LOC__ producer ~expected
   in
 
   (* Produce and publish a slot *)
@@ -4814,24 +5086,54 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   unit
 
 module History_rpcs = struct
-  let scenario ~slot_index ~first_cell_level ~first_dal_level
-      ~last_confirmed_published_level ~initial_blocks_to_bake protocol
-      dal_parameters client node dal_node =
+  (* In the following function, no migration is performed (expect from genesis
+     to alpha) when [migration_level] is equal to or smaller than 1. *)
+  let scenario ?(migration_level = 1) ~slot_index ~first_cell_level
+      ~first_dal_level ~last_confirmed_published_level protocol dal_parameters
+      client node dal_node =
+    let module Map_int = Map.Make (Int) in
     Log.info "slot_index = %d" slot_index ;
     let client = Client.with_dal_node client ~dal_node in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let* starting_level = Client.level client in
 
-    (* [bake_for ~count] doesn't work across the migration block, so we bake in
-       two steps *)
-    let* () =
-      if initial_blocks_to_bake > 0 then
-        bake_for ~count:initial_blocks_to_bake client
-      else unit
+    let rec publish ~max_level level commitments =
+      (* Try to publish a slot at each level *)
+      if level > max_level then return commitments
+      else
+        let published_level = level + 1 in
+        let wait_mempool_injection =
+          Node.wait_for node "operation_injected.v0" (fun _ -> Some ())
+        in
+        let* commitment =
+          Helpers.publish_and_store_slot
+            client
+            dal_node
+            Constant.bootstrap1
+            ~index:slot_index
+            ~force:true
+          @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
+        in
+        let* () = wait_mempool_injection in
+        Log.info
+          "Publish commitment %s at published_level %d@."
+          commitment
+          published_level ;
+        let* () = bake_for client in
+        let* _level = Node.wait_for_level node (level + 1) in
+        publish
+          ~max_level
+          (level + 1)
+          (Map_int.add published_level commitment commitments)
     in
-    let* () = bake_for client in
+    Log.info "Publishing some commitments in the previous protocol@." ;
+    let* commitments =
+      publish ~max_level:migration_level starting_level Map_int.empty
+    in
 
     let* dal_parameters = Dal.Parameters.from_client client in
     let lag = dal_parameters.attestation_lag in
+
     let number_of_slots = dal_parameters.number_of_slots in
     Log.info "attestation_lag = %d, number_of_slots = %d" lag number_of_slots ;
 
@@ -4844,28 +5146,9 @@ module History_rpcs = struct
       wait_for_layer1_final_block dal_node last_attested_level
     in
 
-    let* first_level = Client.level client in
-    Log.info "No slot published at level %d" first_level ;
-    Log.info "Publishing slots and baking up to level %d" max_level ;
-    let rec publish level commitments =
-      (* Try to publish a slot at each level *)
-      if level > max_level then return @@ List.rev commitments
-      else
-        let* commitment =
-          Helpers.publish_and_store_slot
-            client
-            dal_node
-            Constant.bootstrap1
-            ~index:slot_index
-            ~force:true
-          @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
-        in
-        let* () = bake_for client in
-        let* _level = Node.wait_for_level node (level + 1) in
-        publish (level + 1) (commitment :: commitments)
-    in
-    let* commitments = publish first_level [] in
-    let commitments = Array.of_list commitments in
+    let* first_level_new_proto = Client.level client in
+    Log.info "Publishing some commitments in the new protocol@." ;
+    let* commitments = publish ~max_level first_level_new_proto commitments in
 
     let module SeenIndexes = Set.Make (struct
       type t = int
@@ -4926,21 +5209,50 @@ module History_rpcs = struct
                int
                ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
         let cell_kind = JSON.(content |-> "kind" |> as_string) in
+        (* ADAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7554
+
+           Remove the legacy cases below once migration from Q to R is done. See
+           issue above for more details. *)
+        let content_is_legacy =
+          cell_kind = "attested" || cell_kind = "unattested"
+        in
+        let published_or_attested cell_level =
+          (*
+             - Cond 1 : we publish at [slot_index]
+
+             - Cond 2: the (published) [cell_level] is greater than
+             [starting_level]
+
+             - Cond 3: either the cell is published in the new protocol
+             ([>=first_level_new_proto]) or in the previous protocol, but
+             [attestation_lag] before the activation of the new one. In fact,
+             for the migration, we invalidate all publications in the previous
+             protocol that would be attested in the new one.
+
+             ADAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/7554
+
+             The second part of Cond 3 needs to be adapted when the migration
+             test is from protocol R to Alpha. *)
+          cell_slot_index = slot_index
+          && cell_level > starting_level
+          && (cell_level >= first_level_new_proto
+             || cell_level < first_level_new_proto - lag)
+        in
         let expected_kind =
-          if cell_level <= first_level || cell_slot_index != slot_index then
-            "unattested"
+          if not (published_or_attested cell_level) then
+            if content_is_legacy then "unattested" else "unpublished"
           else (
             at_least_one_attested_status := true ;
-            "attested")
+            if content_is_legacy then "attested" else "published")
         in
         Check.(
           (cell_kind = expected_kind)
             string
             ~error_msg:"Unexpected cell kind: got %L, expected %R") ;
-        (if cell_kind = "attested" then
+        (if cell_kind = "published" || cell_kind = "attested" then
            let commitment = JSON.(content |-> "commitment" |> as_string) in
            Check.(
-             (commitment = commitments.(cell_level - (first_level + 1)))
+             (commitment = Map_int.find cell_level commitments)
                string
                ~error_msg:"Unexpected commitment: got %L, expected %R")) ;
         let back_pointers =
@@ -4987,23 +5299,32 @@ module History_rpcs = struct
         ~error_msg:"No cell with the 'attested' status has been visited") ;
     unit
 
-  let test_commitments_history_rpcs protocol dal_parameters _cryptobox node
-      client dal_node =
-    scenario
-      ~slot_index:3
-      ~first_cell_level:0
-      ~first_dal_level:1
-      ~last_confirmed_published_level:3
-      ~initial_blocks_to_bake:0
-      protocol
-      dal_parameters
-      client
-      node
-      dal_node
+  let test_commitments_history_rpcs protocols =
+    let scenario protocol dal_parameters _ client node dal_node =
+      scenario
+        ~slot_index:3
+        ~first_cell_level:0
+        ~first_dal_level:1
+        ~last_confirmed_published_level:3
+        protocol
+        dal_parameters
+        node
+        client
+        dal_node
+    in
+    let tags = ["rpc"; "skip_list"] in
+    let description = "commitments history RPCs" in
+    scenario_with_layer1_and_dal_nodes
+      ~tags
+      ~producer_profiles:[3; 15]
+      description
+      scenario
+      protocols
 
-  let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to =
-    let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
-    let description = "test commitments history with migration" in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7754
+     The test currently fails, so it is disabled. *)
+  let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to
+      ~migration_level =
     let slot_index = 3 in
     let scenario ~migrate_to ~migration_level dal_parameters =
       let lag = dal_parameters.Dal.Parameters.attestation_lag in
@@ -5017,21 +5338,23 @@ module History_rpcs = struct
          doesn't have the DAL activated. *)
       (* We'll have 3 levels with a published and attested slot. *)
       let last_confirmed_published_level = migration_level + 3 in
-      let initial_blocks_to_bake = migration_level - 1 in
       scenario
         ~slot_index
         ~first_cell_level:0
         ~first_dal_level:1
         ~last_confirmed_published_level
-        ~initial_blocks_to_bake
+        ~migration_level
         migrate_to
         dal_parameters
     in
+
+    let description = "test commitments history with migration" in
+    let tags = ["rpc"; "skip_list"; Tag.memory_3k; Tag.ci_disabled] in
     test_l1_migration_scenario
       ~migrate_from
       ~migrate_to
-      ~scenario:(fun ~migration_level dal_parameters ->
-        scenario ~migrate_to ~migration_level dal_parameters)
+      ~migration_level
+      ~scenario:(fun ~migration_level -> scenario ~migrate_to ~migration_level)
       ~tags
       ~description
       ~producer_profiles:[slot_index] (* use the same parameters as Alpha *)
@@ -5246,7 +5569,7 @@ module Amplification = struct
     (* Create and configure all nodes: a slot producer, an observer,
        and one attester per bootstrap baker. *)
     let make_attester index (account : Account.key) : attester Lwt.t =
-      let name = Printf.sprintf "attester%d" (index + 1) in
+      let name = Printf.sprintf "attester-%d" (index + 1) in
       let pkh = account.public_key_hash in
       let dal_node = Dal_node.create ~name ~node () in
       let* () = Dal_node.init_config ~attester_profiles:[pkh] ~peers dal_node in
@@ -5678,7 +6001,10 @@ module Amplification = struct
     let wait_slot ~published_level:_ ~slot_index:_ =
       Log.info "Waiting for first reconstruction event" ;
       let* () =
-        Dal_node.wait_for observer "reconstruct_starting_in.v0" (fun event ->
+        Dal_node.wait_for
+          observer
+          "dal_reconstruct_starting_in.v0"
+          (fun event ->
             if
               JSON.(
                 event |-> "level" |> as_int = publication_level
@@ -5692,7 +6018,7 @@ module Amplification = struct
       let promise_reconstruction_cancelled =
         Dal_node.wait_for
           observer
-          "reconstruct_no_missing_shard.v0"
+          "dal_reconstruct_no_missing_shard.v0"
           (fun event ->
             if
               JSON.(
@@ -5702,7 +6028,7 @@ module Amplification = struct
             else None)
       in
       let promise_reconstruction_finished =
-        Dal_node.wait_for observer "reconstruct_finished.v0" (fun event ->
+        Dal_node.wait_for observer "dal_reconstruct_finished.v0" (fun event ->
             if
               JSON.(
                 event |-> "level" |> as_int = publication_level
@@ -5741,7 +6067,7 @@ module Garbage_collection = struct
      receiving the shards, each node deletes them from its storage. *)
 
   let wait_remove_shards ~published_level ~slot_index node =
-    Dal_node.wait_for node "removed_slot_shards.v0" (fun event ->
+    Dal_node.wait_for node "dal_removed_slot_shards.v0" (fun event ->
         if
           (published_level = JSON.(event |-> "published_level" |> as_int))
           && slot_index = JSON.(event |-> "slot_index" |> as_int)
@@ -5749,7 +6075,7 @@ module Garbage_collection = struct
         else None)
 
   let wait_for_first_shard ~published_level ~slot_index node =
-    Dal_node.wait_for node "stored_slot_shard.v0" (fun event ->
+    Dal_node.wait_for node "dal_stored_slot_shard.v0" (fun event ->
         let actual_published_level =
           JSON.(event |-> "published_level" |> as_int)
         in
@@ -6029,7 +6355,7 @@ module Garbage_collection = struct
         let* () = Lwt.join wait_block_p in
         bake_loop (n - 1)
     in
-    let* () = bake_loop 25 in
+    let* () = bake_loop 180 in
     Log.info "Blocks baked !" ;
 
     Log.info "Checking that the slot was attested" ;
@@ -6291,7 +6617,7 @@ module Garbage_collection = struct
         let* () = Lwt.join wait_block_p in
         bake_loop (n - 1)
     in
-    let* () = bake_loop 25 in
+    let* () = bake_loop 180 in
     Log.info "Blocks baked !" ;
 
     Log.info "Checking that the slot was attested" ;
@@ -6341,11 +6667,13 @@ module Garbage_collection = struct
     unit
 
   let test_gc_skip_list_cells ~protocols =
+    let title = "garbage collection of skip list cells" in
+    let tags = Tag.[tezos2; memory_3k; "dal"; "gc"; "skip_list"] in
     Protocol.register_test
       ~__FILE__
-      ~tags:[Tag.tezos2; Tag.memory_3k; "dal"; "gc"; "skip_list"]
+      ~tags
       ~uses:(fun _protocol -> [Constant.octez_dal_node])
-      ~title:"garbage collection of skip list cells"
+      ~title
       ~supports:(Protocol.From_protocol 19)
       (fun protocol ->
         (* We choose some arbitrary, small values *)
@@ -6749,7 +7077,7 @@ module Tx_kernel_e2e = struct
           Test.fail "%s" message
 end
 
-module Profiler = Tezos_base.Profiler
+module Profiler = Tezos_profiler.Profiler
 
 (* A simpler test whith a bootstrap, a producer and an observer. The goal is to
    check regression on [get_connections] RPC response. *)
@@ -6937,13 +7265,15 @@ let dal_crypto_benchmark () =
     ~tags:["dal"; "benchmark"; "crypto"; Tag.slow; team]
   @@ fun () ->
   let open Dal.Cryptobox in
-  let driver = Tezos_base_unix.Simple_profiler.auto_write_to_txt_file in
+  let driver =
+    Tezos_profiler_backends.Simple_profiler.auto_write_as_txt_to_file
+  in
   let file =
     match Cli.Logs.level with
     | Info | Debug -> "/dev/stdout"
-    | _ -> Temp.file "/dev/null"
+    | _ -> Temp.file "profiler-output"
   in
-  let instance = Profiler.instance driver (file, Verbose) in
+  let instance = Profiler.instance driver (file, Debug) in
   Profiler.plug Profiler.main instance ;
   let ( let*? ) x f =
     match x with
@@ -6958,11 +7288,6 @@ let dal_crypto_benchmark () =
   let slot_size = Cli.get_int ~default:126_944 "slot_size" in
   let redundancy_factor = Cli.get_int ~default:8 "redundancy" in
   let page_size = Cli.get_int ~default:3967 "page_size" in
-  let generate_slot ~slot_size =
-    Bytes.init slot_size (fun _ ->
-        let x = Random.int 26 in
-        Char.chr (x + Char.code 'a'))
-  in
   let* () =
     let parameters =
       {number_of_shards; redundancy_factor; page_size; slot_size}
@@ -6976,11 +7301,12 @@ let dal_crypto_benchmark () =
         page_size
     in
     let* () =
-      Profiler.record_f Profiler.main "SRS" @@ fun () ->
+      Profiler.record_f Profiler.main Debug ("SRS", []) @@ fun () ->
       Log.info "Loading SRS..." ;
       let* result =
         init_prover_dal
           ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+          ~fetch_trusted_setup:false
           ()
       in
       Log.info "SRS loaded." ;
@@ -6996,58 +7322,62 @@ let dal_crypto_benchmark () =
       in
       Lwt.return config
     in
-    Profiler.record_f Profiler.main message @@ fun () ->
+    Profiler.record_f Profiler.main Debug (message, []) @@ fun () ->
     match make parameters with
     | Error (`Fail msg) ->
         let message = Format.asprintf "Fail: %s" msg in
-        Profiler.record_f Profiler.main message @@ fun () -> Lwt.return_unit
+        Profiler.record_f Profiler.main Debug (message, []) @@ fun () ->
+        Lwt.return_unit
     | Ok _ ->
         let*? dal =
-          Profiler.record_f Profiler.main "make" @@ fun () -> make parameters
+          Profiler.record_f Profiler.main Debug ("make", []) @@ fun () ->
+          make parameters
         in
         let*? precomputation =
-          Profiler.record_f Profiler.main "shard precomputation" @@ fun () ->
-          precompute_shards_proofs dal
+          Profiler.record_f Profiler.main Debug ("shard precomputation", [])
+          @@ fun () -> precompute_shards_proofs dal
         in
         let slot =
-          Profiler.record_f Profiler.main "slot generation" @@ fun () ->
-          generate_slot ~slot_size
+          Profiler.record_f Profiler.main Debug ("slot generation", [])
+          @@ fun () -> Helpers.generate_slot ~slot_size
         in
         let*? polynomial =
-          Profiler.record_f Profiler.main "polynomial from slot" @@ fun () ->
-          polynomial_from_slot dal slot
+          Profiler.record_f Profiler.main Debug ("polynomial from slot", [])
+          @@ fun () -> polynomial_from_slot dal slot
         in
         let*? commitment =
-          Profiler.record_f Profiler.main "commit" @@ fun () ->
+          Profiler.record_f Profiler.main Debug ("commit", []) @@ fun () ->
           commit dal polynomial
         in
         let*? commitment_proof =
-          Profiler.record_f Profiler.main "prove commitment" @@ fun () ->
-          prove_commitment dal polynomial
+          Profiler.record_f Profiler.main Debug ("prove commitment", [])
+          @@ fun () -> prove_commitment dal polynomial
         in
         let shards =
-          Profiler.record_f Profiler.main "shards from polynomial" @@ fun () ->
-          shards_from_polynomial dal polynomial
+          Profiler.record_f Profiler.main Debug ("shards from polynomial", [])
+          @@ fun () -> shards_from_polynomial dal polynomial
         in
         let shard_proofs =
-          Profiler.record_f Profiler.main "prove shards" @@ fun () ->
+          Profiler.record_f Profiler.main Debug ("prove shards", [])
+          @@ fun () ->
           prove_shards dal ~precomputation ~polynomial |> Array.to_seq
         in
         let _polynomial =
-          Profiler.record_f Profiler.main "Reconstruct polynomial" @@ fun () ->
-          polynomial_from_shards dal shards
+          Profiler.record_f Profiler.main Debug ("Reconstruct polynomial", [])
+          @@ fun () -> polynomial_from_shards dal shards
         in
         let nb_pages = slot_size / page_size in
         let page_proofs =
           Seq.ints 0 |> Seq.take 1
           |> Seq.map (fun i ->
-                 Profiler.record_f Profiler.main "prove page" @@ fun () ->
+                 Profiler.record_f Profiler.main Debug ("prove page", [])
+                 @@ fun () ->
                  let*? page_proof = prove_page dal polynomial i in
                  page_proof)
         in
         let is_valid =
-          Profiler.record_f Profiler.main "verify commitment" @@ fun () ->
-          verify_commitment dal commitment commitment_proof
+          Profiler.record_f Profiler.main Debug ("verify commitment", [])
+          @@ fun () -> verify_commitment dal commitment commitment_proof
         in
         assert is_valid ;
         let () =
@@ -7062,7 +7392,8 @@ let dal_crypto_benchmark () =
                            share_encoding
                            shard.share))
                  in
-                 Profiler.record_f Profiler.main message @@ fun () ->
+                 Profiler.record_f Profiler.main Debug (message, [])
+                 @@ fun () ->
                  let*? () = verify_shard dal commitment shard shard_proof in
                  ())
         in
@@ -7078,7 +7409,7 @@ let dal_crypto_benchmark () =
                     (List.hd shard_list).share))
               (List.length shard_list)
           in
-          Profiler.record_f Profiler.main message @@ fun () ->
+          Profiler.record_f Profiler.main Debug (message, []) @@ fun () ->
           let*? () =
             verify_shard_multi dal commitment shard_list shard_proof_list
           in
@@ -7097,7 +7428,8 @@ let dal_crypto_benchmark () =
           Seq.zip (Seq.ints 0 |> Seq.take nb_pages) (Seq.zip pages page_proofs)
           |> Seq.take 1
           |> Seq.iter (fun (page_index, (page, page_proof)) ->
-                 Profiler.record_f Profiler.main "verify page" @@ fun () ->
+                 Profiler.record_f Profiler.main Debug ("verify page", [])
+                 @@ fun () ->
                  let*? () =
                    verify_page dal commitment ~page_index page page_proof
                  in
@@ -7133,15 +7465,7 @@ let scenario_tutorial_dal_baker =
        * in this test
        *)
       Log.info "Step 2: Running octez node with adaptive issuance" ;
-      with_layer1
-        ~parameters:
-          [
-            (* Force activation of adaptive issuance *)
-            (["adaptive_issuance_force_activation"], `Bool true);
-            (["adaptive_issuance_activation_vote_enable"], `Bool false);
-          ]
-        ~event_sections_levels:[("prevalidator", `Debug)]
-        ~protocol
+      with_layer1 ~event_sections_levels:[("prevalidator", `Debug)] ~protocol
       @@ fun _parameters _cryptobox node client _key ->
       Log.info "Step 3: setup a baker account" ;
       (* Generate the "my_baker" user *)
@@ -7167,7 +7491,7 @@ let scenario_tutorial_dal_baker =
         @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
       in
       Check.(
-        (JSON.as_int adaptive_issuance_launch_cycle = 0)
+        (Option.get adaptive_issuance_launch_cycle = 0)
           ~__LOC__
           Check.int
           ~error_msg:
@@ -7247,8 +7571,7 @@ let scenario_tutorial_dal_baker =
           ~error_msg:"Expecting a empty list of topics") ;
 
       let wait_join_event_promise =
-        Dal_node.wait_for dal_node "gossipsub_worker_event-join.v0" (fun _ ->
-            Some ())
+        Dal_node.wait_for dal_node "dal_gs_join.v0" (fun _ -> Some ())
       in
 
       let all_delegates =
@@ -7485,6 +7808,24 @@ module Refutations = struct
       faulty_sc_rollup_node
       ~exit_code:1
       ~msg:(rex "lost the refutation game")
+
+  let register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
+      ~refute_operations_priority name protocols =
+    let scenario =
+      scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
+    in
+    scenario_with_all_nodes
+      name
+      ~regression:false
+      ~uses:(fun _protocol ->
+        [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
+      ~pvm_name:"wasm_2_0_0"
+      ~commitment_period:5
+      ~smart_rollup_timeout_period_in_blocks:20
+      ~l1_history_mode:Default_with_refutation
+      ~tags:[Tag.slow]
+      (scenario ~refute_operations_priority)
+      protocols
 end
 
 (** This test injects a DAL slot to (DAL and L1) network(s) via the rollup node
@@ -7765,38 +8106,6 @@ let rollup_batches_and_publishes_optimal_dal_slots _protocol parameters dal_node
   check_packs published_slots annotated_messages ;
   unit
 
-let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
-    =
-  let loop ~from ~into ~task =
-    Seq.ints from
-    |> Seq.take (into - from + 1)
-    |> Seq.map task |> List.of_seq |> Lwt.join
-  in
-  (* This is the account used to sign injected slot headers on L1. *)
-  let source = Constant.bootstrap2 in
-  let task current_level =
-    let* level = Node.wait_for_level l1_node current_level in
-    (* We expected to advance level by level, otherwise, the test should fail. *)
-    Check.(
-      (current_level = level) int ~error_msg:"Expected level is %L (got %R)") ;
-    let (publish_level as payload) = level in
-    Log.info
-      "[slot_producer] publish slot %d for level %d with payload %d at level %d"
-      slot_index
-      publish_level
-      payload
-      level ;
-    let* _ =
-      Helpers.publish_and_store_slot l1_client dal_node source ~index:slot_index
-      @@ Helpers.make_slot ~slot_size (sf " %d " payload)
-    in
-    let* () = bake_for l1_client in
-    unit
-  in
-  let* () = loop ~from ~into ~task in
-  Log.info "[slot_producer] will terminate" ;
-  unit
-
 (* We have a bootstrap node, a producer node and an attester node for a new
    attester. We check that as soon as the attester is in the DAL committee it
    attests. *)
@@ -7836,12 +8145,13 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
   let* balance =
     Client.get_balance_for ~account:Constant.bootstrap1.alias client
   in
+  let amount = Tez.(balance - one) in
   let* new_account = Client.gen_and_show_keys client in
   let* () =
     Client.transfer
       ~giver:Constant.bootstrap1.alias
       ~receiver:new_account.alias
-      ~amount:Tez.(balance - one)
+      ~amount
       ~burn_cap:Tez.one
       client
   in
@@ -7850,6 +8160,7 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
   let* () = bake_for client in
   let* () = Client.register_key new_account.alias client in
   let* () = bake_for client in
+  let* () = Client.stake ~staker:new_account.alias Tez.(amount /! 2L) client in
 
   let attester = Dal_node.create ~name:"attester" ~node () in
   let* () =
@@ -8046,6 +8357,1659 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
          expected %R") ;
   unit
 
+let pair_up ~error_msg =
+  let rec pair_up = function
+    | [] -> []
+    | [_] -> Test.fail ~__LOC__ error_msg
+    | x :: y :: rest -> (x, y) :: pair_up rest
+  in
+  pair_up
+
+let extract_dal_balance_updates balance_updates =
+  List.filter_map
+    (fun (json1, json2) ->
+      let change1 = JSON.(json1 |-> "change" |> as_int) in
+      let change2 = JSON.(json2 |-> "change" |> as_int) in
+      Check.(
+        (-change1 = change2)
+          ~__LOC__
+          int
+          ~error_msg:"Expected 'change' to match; got %L and %R") ;
+      let kind = JSON.(json1 |-> "kind" |> as_string) in
+      if
+        (not (String.equal kind "minted"))
+        && not (String.equal kind "accumulator")
+      then
+        Test.fail
+          ~__LOC__
+          "Expected a 'minted' or 'accumulator' kind, got '%s'"
+          kind ;
+      let category1 = JSON.(json1 |-> "category" |> as_string) in
+      if String.equal category1 "DAL attesting rewards" then
+        let kind2 = JSON.(json2 |-> "kind" |> as_string) in
+        match kind2 with
+        | "burned" ->
+            let category2 = JSON.(json2 |-> "category" |> as_string) in
+            Check.(
+              (category2 = "lost DAL attesting rewards")
+                ~__LOC__
+                string
+                ~error_msg:
+                  "Expected a 'lost DAL attesting rewards' category, got %L") ;
+            let delegate = JSON.(json2 |-> "delegate" |> as_string) in
+            Some (`Lost (delegate, change2, json2))
+        | "freezer" ->
+            let delegate =
+              JSON.(json2 |-> "staker" |-> "baker_own_stake" |> as_string)
+            in
+            Some (`Got (delegate, change2, json2))
+        | "contract" ->
+            let delegate = JSON.(json2 |-> "contract" |> as_string) in
+            Some (`Got (delegate, change2, json2))
+        | _ -> Test.fail ~__LOC__ "Unexpected balance update kind %s" kind2
+      else None)
+    balance_updates
+
+(* This function checks the fields of the [dal_participation] RPC result. It is
+   supposed to be used only by the test scenario below, as it assumes
+   [expected_attested_shards] is either 0 or [expected_attestable_shards],
+   [denounced] is [false], and there are only two kinds of transfers, both to
+   the delegate itself, as there are no co-stakers in the scenario below.. *)
+let check_participation_and_rewards participation ~expected_assigned_shards
+    ~expected_attestable_slots ~attesting_reward_per_shard dal_balance_updates
+    delegate ~sufficient_participation =
+  let json = participation in
+  let denounced = JSON.(json |-> "denounced" |> as_bool) in
+  Check.(
+    (denounced = false)
+      ~__LOC__
+      bool
+      ~error_msg:"The delegate was unexpectedly denounced") ;
+  let expected_assigned_shards_per_slot =
+    JSON.(json |-> "expected_assigned_shards_per_slot" |> as_int)
+  in
+  Check.(
+    (expected_assigned_shards_per_slot = expected_assigned_shards)
+      ~__LOC__
+      int
+      ~error_msg:"Unexpected number of assigned shards. Expected %R, got %L") ;
+  let delegate_attested_dal_slots =
+    JSON.(json |-> "delegate_attested_dal_slots" |> as_int)
+  in
+  let expected_attested_slots =
+    if sufficient_participation then expected_attestable_slots else 0
+  in
+  Check.(
+    (delegate_attested_dal_slots = expected_attested_slots)
+      ~__LOC__
+      int
+      ~error_msg:"Expected that the delegate has attested %L slots, got %R") ;
+  let delegate_attestable_dal_slots =
+    JSON.(json |-> "delegate_attestable_dal_slots" |> as_int)
+  in
+  Check.(
+    (delegate_attestable_dal_slots = expected_attestable_slots)
+      ~__LOC__
+      int
+      ~error_msg:"Expected that there are %L attestable slots, got %R") ;
+  let sufficient_dal_participation =
+    JSON.(json |-> "sufficient_dal_participation" |> as_bool)
+  in
+  Check.(
+    (sufficient_dal_participation = sufficient_participation)
+      ~__LOC__
+      bool
+      ~error_msg:"Expected sufficient_dal_participation to be %R, got %L") ;
+  let expected_dal_rewards = JSON.(json |-> "expected_dal_rewards" |> as_int) in
+  let dal_rewards = expected_assigned_shards * attesting_reward_per_shard in
+  Check.(
+    (expected_dal_rewards = dal_rewards)
+      ~__LOC__
+      int
+      ~error_msg:
+        ("Unexpected rewards for delegate " ^ delegate ^ ": expected %L, got %R")) ;
+  let get_delegate = function
+    | `Got (delegate, _amount, _json) | `Lost (delegate, _amount, _json) ->
+        delegate
+  in
+  let dal_rewards =
+    List.filter_map
+      (fun item ->
+        let item_delegate = get_delegate item in
+        if String.equal item_delegate delegate then Some item else None)
+      dal_balance_updates
+  in
+  let get_json_list =
+    List.map (function `Got (_, _, json) | `Lost (_, _, json) ->
+        JSON.encode json)
+  in
+  let rewards =
+    if sufficient_participation then
+      match dal_rewards with
+      | [`Got (_, amount1, _); `Got (_, amount2, _)] ->
+          (* one corresponds to the liquid rewards and one to the frozen ones (but
+             we do not care here) *)
+          amount1 + amount2
+      | _ ->
+          Test.fail
+            ~__LOC__
+            "Unexpected balance updates for the delegate %s: %a"
+            delegate
+            Format.(pp_print_list pp_print_string)
+            (get_json_list dal_rewards)
+    else
+      match dal_rewards with
+      | [`Lost (_, amount, _)] -> amount
+      | _ ->
+          Test.fail
+            ~__LOC__
+            "Unexpected balance updates for the delegate %s: %a"
+            delegate
+            Format.(pp_print_list pp_print_string)
+            (get_json_list dal_rewards)
+  in
+  Check.(
+    (expected_dal_rewards = rewards)
+      ~__LOC__
+      int
+      ~error_msg:
+        ("Unexpected rewards for delegate " ^ delegate ^ ": expected %L, got %R"))
+
+let check_participation_and_rewards node ~expected_assigned_shards
+    ~expected_attestable_slots =
+  let* metadata = Node.RPC.call node @@ RPC.get_chain_block_metadata_raw () in
+  let balance_updates = JSON.(metadata |-> "balance_updates" |> as_list) in
+  let balance_updates =
+    pair_up
+      balance_updates
+      ~error_msg:"The list of balance updates has an odd number of elements"
+  in
+  let dal_balance_updates =
+    extract_dal_balance_updates balance_updates
+    |> (* sort them for proper regression output *)
+    List.sort (fun e1 e2 ->
+        match (e1, e2) with
+        | `Got (d1, a1, _), `Got (d2, a2, _)
+        | `Lost (d1, a1, _), `Lost (d2, a2, _) ->
+            let c = String.compare d1 d2 in
+            if c = 0 then a1 - a2 else c
+        | `Got _, `Lost _ -> 1
+        | `Lost _, `Got _ -> -1)
+  in
+  List.iter
+    (function
+      | `Got (_, _, json) | `Lost (_, _, json) ->
+          Regression.capture @@ JSON.encode json)
+    dal_balance_updates ;
+  let* attesting_reward_per_shard =
+    let* json =
+      Node.RPC.call ~rpc_hooks node
+      @@ RPC.get_chain_block_context_issuance_expected_issuance ()
+    in
+    return @@ JSON.(json |=> 0 |-> "dal_attesting_reward_per_shard" |> as_int)
+  in
+  return @@ fun delegate ~sufficient_participation ->
+  (* Note that at the last level in the cycle we lose information about the
+     total_dal_attested_slots *)
+  let* participation =
+    Node.RPC.call ~rpc_hooks node
+    @@ RPC.get_chain_block_context_delegate_dal_participation
+         ~block:"head~1"
+         delegate
+  in
+  return
+  @@ check_participation_and_rewards
+       participation
+       ~expected_assigned_shards
+       ~expected_attestable_slots
+       ~attesting_reward_per_shard
+       dal_balance_updates
+       delegate
+       ~sufficient_participation
+
+(* We have one DAL attester node. During the second cycle, one of the bakers
+   does not DAL attest sufficiently. We check that the attesters receive or not
+   the DAL rewards depending on their participation. *)
+let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
+    client dal_node =
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  (* This constraint makes the test simpler; it could be lifted. *)
+  assert (blocks_per_cycle = dal_parameters.Dal.Parameters.attestation_lag) ;
+  let expected_assigned_shards =
+    let number_of_shards = dal_parameters.cryptobox.number_of_shards in
+    let num_delegates = Array.length Account.Bootstrap.keys in
+    number_of_shards * blocks_per_cycle / num_delegates
+  in
+  let all_delegates =
+    Account.Bootstrap.keys |> Array.to_list
+    |> List.map (fun key -> key.Account.public_key_hash)
+  in
+  let delegate_without_dal = List.hd all_delegates in
+  let rest_delegates = List.tl all_delegates in
+  let delegate_with_dal = List.hd rest_delegates in
+  Log.info
+    "delegate not running DAL: %s, delegate running DAL: %s"
+    delegate_without_dal
+    delegate_with_dal ;
+  let* level =
+    let* first_level = Node.get_level node in
+    let block = string_of_int first_level in
+    Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ~block ()
+  in
+  let blocks_to_bake = blocks_per_cycle - 1 - level.cycle_position in
+  Log.info "Publish a slot for %d levels, up to the end of cycle" blocks_to_bake ;
+  let* () =
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    repeat blocks_to_bake (fun () ->
+        let wait_slot ~published_level:_ ~slot_index:_ = unit in
+        let* _res =
+          publish_store_and_wait_slot
+            node
+            client
+            dal_node
+            Constant.bootstrap1
+            ~index:0
+            ~wait_slot
+            ~number_of_extra_blocks_to_bake:0
+          @@ Helpers.make_slot ~slot_size "content"
+        in
+        unit)
+  in
+  let* level =
+    Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ()
+  in
+  assert (level.cycle_position = blocks_per_cycle - 1) ;
+
+  let* check =
+    let expected_attestable_slots = 0 in
+    check_participation_and_rewards
+      node
+      ~expected_assigned_shards
+      ~expected_attestable_slots
+  in
+  let* () = check delegate_without_dal ~sufficient_participation:true in
+
+  Log.info "Bake for one more cycle" ;
+  let dal_node_endpoint =
+    Dal_node.as_rpc_endpoint dal_node |> Endpoint.as_string
+  in
+  let* () =
+    bake_for
+      ~delegates:(`For rest_delegates)
+      ~count:blocks_per_cycle
+      ~dal_node_endpoint
+      client
+  in
+
+  let* check =
+    (* [-1] because the participation is obtained one level before the cycle end;
+       and another [-1] because the slot for the first level in the cycle was not
+       published *)
+    let expected_attestable_slots = blocks_per_cycle - 2 in
+    check_participation_and_rewards
+      node
+      ~expected_assigned_shards
+      ~expected_attestable_slots
+  in
+  let* () = check delegate_without_dal ~sufficient_participation:false in
+  let* () = check delegate_with_dal ~sufficient_participation:true in
+  unit
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
+   In the following accusation tests, we bake two blocks because we
+   need the accusation to be introduced at level at least 10 (2 = 10 -
+   attestation_lag). In protocol S we will not need this
+   restriction. *)
+
+let test_inject_accusation _protocol dal_parameters cryptobox node client
+    _bootstrap_key =
+  let slot_index = 0 in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let number_of_slots = dal_parameters.number_of_slots in
+  let lag = dal_parameters.attestation_lag in
+  let slot = Helpers.generate_slot ~slot_size in
+  let commitment, proof, shards_with_proofs =
+    Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
+  in
+  Log.info "Bake two blocks" ;
+  let* () = bake_for ~count:2 client in
+  let* _op_hash =
+    Helpers.publish_commitment
+      ~source:Constant.bootstrap2
+      ~index:slot_index
+      ~commitment
+      ~proof
+      client
+  in
+  (* We need to bake exactly [lag] blocks so that we can inject an attestation
+     at the right level (that attests the published slot). *)
+  let* () = bake_for ~count:lag client in
+  Log.info "Inject an attestation" ;
+  let availability = Slots [slot_index] in
+  let signer = Constant.bootstrap2 in
+  let* attestation, _op_hash =
+    inject_dal_attestation ~signer ~nb_slots:number_of_slots availability client
+  in
+  let* signature = Operation.sign attestation client in
+  let attestation = (attestation, signature) in
+  let* shard_assignments =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_dal_shards
+         ~delegates:[signer.public_key_hash]
+         ()
+  in
+  let shard_index =
+    JSON.(
+      shard_assignments |> as_list |> List.hd |-> "indexes" |> as_list
+      |> List.hd |> as_int)
+  in
+  Log.info "First shard index of the attester is %d" shard_index ;
+  let shard, proof =
+    Seq.find
+      (fun (Cryptobox.{index; _}, _proof) -> index = shard_index)
+      shards_with_proofs
+    |> Option.get
+  in
+  let accusation =
+    Operation.Anonymous.dal_entrapment_evidence
+      ~attestation
+      ~slot_index
+      shard
+      proof
+  in
+  Log.info "Inject an accusation" ;
+  let* _op_hash = Operation.Anonymous.inject accusation client in
+  let* () = bake_for client in
+  let* ops =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~block:"head"
+         ~validation_pass:2
+         ()
+  in
+  Check.(List.length (JSON.as_list ops) = 1)
+    ~__LOC__
+    Check.(int)
+    ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
+  unit
+
+(* Publishing and attesting should work.
+   A producer DAL node publishes "Hello world!" (produced with key [bootstrap1]) on a slot.
+   An attestation, which attests the block is emitted with key [bootstrap2].
+   The published commitment is attested.*)
+let test_producer_attester (_protocol : Protocol.t)
+    (dal_params : Dal_common.Parameters.t) (_cryptobox : Cryptobox.t)
+    (node : Node.t) (client : Client.t) (_dal_node : Dal_node.t) : unit Lwt.t =
+  let log_step = init_logger () in
+  let index = 3 in
+  let slot_size = dal_params.cryptobox.slot_size in
+  log_step "Declaration of a producer" ;
+  let producer_node = Dal_node.create ~name:"producer" ~node () in
+  let* () = Dal_node.init_config ~producer_profiles:[index] producer_node in
+  let* () = Dal_node.run ~wait_ready:true producer_node in
+  log_step "Two blocks are baked, because why not" ;
+  let* () = bake_for ~count:2 client in
+  log_step "The producer crafts a commitment and publish it" ;
+  let message = Helpers.make_slot ~slot_size "Hello world!" in
+  let* _pid =
+    Helpers.publish_and_store_slot
+      client
+      producer_node
+      Constant.bootstrap1
+      ~index
+      message
+  in
+  let* lvl_publish = Client.level client in
+  let lag = dal_params.attestation_lag in
+  Log.info "We are at level %d and the lag is %d" lvl_publish lag ;
+  (* We bake [lag] blocks, one which will include the publication of the commitment
+     and [lag-1] just to wait. *)
+  log_step "Let's wait for the attestation lag while baking" ;
+  let* () = bake_for ~count:lag client in
+  log_step "It is now time to attest" ;
+  (* We want the attestation to be included in the block [lag] after the one containing the shards,
+     so we have to inject them now. *)
+  let* _ =
+    inject_dal_attestations
+      ~nb_slots:dal_params.number_of_slots
+        (* Since the attestation threshold of the test is set to 1%,
+           having only [bootstrap2] signing is sufficient. *)
+      ~signers:[Constant.bootstrap2]
+      (Slots [index])
+      client
+  in
+  let* lvl_attest = Client.level client in
+  Check.(
+    (lvl_publish + lag = lvl_attest)
+      int
+      ~error_msg:"Current level of the client is unexpected") ;
+  log_step "Bake a block containing this attestation" ;
+  let map_alias = List.map (fun x -> x.Account.alias) in
+  (* Since the function [bake_for] crafts the attestation for delegates,
+     we do not want it to craft a concurrent attestation for [bootstrap2].
+     One which attests a DAL slot has already been injected. *)
+  let* () =
+    bake_for
+      ~delegates:
+        (`For
+          (map_alias Constant.[bootstrap1; bootstrap3; bootstrap4; bootstrap5]))
+      client
+  in
+  log_step "Bake a few more blocks before calling RPC" ;
+  let final_block_promise =
+    wait_for_layer1_final_block producer_node (lvl_attest + 2)
+  in
+  let* () = bake_for ~count:3 client in
+  let* () = final_block_promise in
+  log_step "Call to the RPC of the DAL node to check that the slot is attested." ;
+  let* status =
+    Dal_RPC.(
+      call producer_node
+      (* The level the commitment is included in a block is the first one crafted after publication. *)
+      @@ get_level_slot_status ~slot_level:(lvl_publish + 1) ~slot_index:index)
+  in
+  Log.info "Status is %a" Format.pp_print_string status ;
+  log_step "Final check." ;
+  Check.(
+    (status = "attested")
+      string
+      ~error_msg:"Published slot was supposed to be attested.") ;
+  unit
+
+(* Check if the [attester_did_not_attest] warning is correctly emitted.
+   This test is a variation of [test_producer_attester] where an attestation
+   not attesting the published DAL slot is injected. *)
+let test_attester_did_not_attest (_protocol : Protocol.t)
+    (dal_params : Dal_common.Parameters.t) (_cryptobox : Cryptobox.t)
+    (node : Node.t) (client : Client.t) (_dal_node : Dal_node.t) : unit Lwt.t =
+  let log_step = init_logger () in
+  let index = 3 in
+  let slot_size = dal_params.cryptobox.slot_size in
+  log_step "Declaration of a producer" ;
+  let producer_node = Dal_node.create ~name:"producer" ~node () in
+  let* () = Dal_node.init_config ~producer_profiles:[index] producer_node in
+  let* () = Dal_node.run ~wait_ready:true producer_node in
+  log_step "Declaration of an attester" ;
+  let attester_node = Dal_node.create ~name:"attester" ~node () in
+  let* () =
+    Dal_node.init_config
+      ~peers:[Dal_node.listen_addr producer_node]
+      ~attester_profiles:[Constant.bootstrap2.public_key_hash]
+      attester_node
+  in
+  let* () = Dal_node.run ~wait_ready:true attester_node in
+  log_step
+    "We promise the attester_did_not_attest_slot will be emitted by the \
+     [attester node]" ;
+  let not_attested_by_bootstrap2_promise =
+    Dal_node.wait_for attester_node "dal_attester_did_not_attest.v0" (fun _ ->
+        Some ())
+  in
+  log_step "The producer crafts a commitment and publish it" ;
+  let message = Helpers.make_slot ~slot_size "Hello world!" in
+  let* _pid =
+    Helpers.publish_and_store_slot
+      client
+      producer_node
+      Constant.bootstrap1
+      ~index
+      message
+  in
+  let* lvl_publish = Client.level client in
+  let lag = dal_params.attestation_lag in
+  Log.info "We are at level %d and the lag is %d" lvl_publish lag ;
+  (* If one wants to see all the node events, they should use [Node.log_events node] *)
+  (* We bake [lag] blocks, one which will include the publication of the commitment
+     and [lag-1] just to wait. *)
+  log_step "Let's wait for the attestation lag while baking" ;
+  let* () = bake_for ~count:lag client in
+  log_step
+    "Crafting attestation for [bootstrap3] (with expected DAL attestation)." ;
+  let* op1 =
+    craft_dal_attestation
+      ~nb_slots:dal_params.number_of_slots
+      ~signer:Constant.bootstrap3
+      (Slots [index])
+      client
+  in
+  let* (`OpHash oph1) = Operation.hash op1 client in
+  let op1_promise = wait_for_classified oph1 node in
+  log_step "Crafting attestation for [bootstrap2] (with empty DAL attestation)." ;
+  let* op2 =
+    craft_dal_attestation
+      ~nb_slots:dal_params.number_of_slots
+      ~signer:Constant.bootstrap2
+      (Slots [])
+      client
+  in
+  let* (`OpHash oph2) = Operation.hash op2 client in
+  let op2_promise = wait_for_classified oph2 node in
+  log_step "Injecting the attestations" ;
+  let* _ = Operation.inject op1 client in
+  let* _ = Operation.inject op2 client in
+  log_step "Waiting for the attestations to be classified." ;
+  let* () = Lwt.join [op1_promise; op2_promise] in
+  let* lvl_attest = Node.get_level node in
+  log_step
+    "Attestations should be injected in the validated field of the mempool" ;
+  let is_operation_in_validated_mempool mempool oph =
+    let open JSON in
+    let applied_list = as_list (mempool |-> "validated") in
+    List.exists (fun e -> e |-> "hash" |> as_string = oph) applied_list
+  in
+  let* mempool =
+    Node.RPC.(call node @@ get_chain_mempool_pending_operations ())
+  in
+  Check.is_true
+    (List.for_all (is_operation_in_validated_mempool mempool) [oph1; oph2])
+    ~error_msg:
+      "After injection of the attestations, no operations should remain in the \
+       mempool." ;
+  log_step "Bake a block containing this attestation" ;
+  let map_alias = List.map (fun x -> x.Account.alias) in
+  (* Since the function [bake_for] crafts the attestation for delegates,
+     we do not want it to craft a concurrent attestation for [bootstrap2].
+     One which attests a DAL slot has already been injected. *)
+  let* () =
+    bake_for
+      ~delegates:
+        (`For (map_alias Constant.[bootstrap1; bootstrap4; bootstrap5]))
+      client
+  in
+  log_step "Attestation should be included in the head block." ;
+  let* meta =
+    Node.RPC.(call node @@ get_chain_block_metadata ~block:"head" ())
+  in
+  let attestation_is_in_block =
+    match meta.dal_attestation with
+    | Some dal_attests -> dal_attests.(index)
+    | None -> false
+  in
+  Check.is_true
+    attestation_is_in_block
+    ~error_msg:"Attestation is not included in the head block." ;
+  log_step "Mempool should now be empty" ;
+  let validated_mempool_is_empty mempool =
+    let open JSON in
+    let validated_list = as_list (mempool |-> "validated") in
+    List.length validated_list = 0
+  in
+  let* mempool =
+    Node.RPC.(call node @@ get_chain_mempool_pending_operations ())
+  in
+  Check.is_true
+    (validated_mempool_is_empty mempool)
+    ~error_msg:
+      "After injection of the attestations, no operations should remain in the \
+       mempool." ;
+  log_step "Bake a few more blocks before calling RPC." ;
+  let final_block_promise =
+    wait_for_layer1_final_block producer_node (lvl_attest + 2)
+  in
+  let* () = bake_for ~count:3 client in
+  let* () = final_block_promise in
+  log_step "Call to the RPC of the DAL node to check that the slot is attested." ;
+  let* status =
+    Dal_RPC.(
+      call producer_node
+      (* The level the commitment is included in a block is the first one crafted
+         after publication. *)
+      @@ get_level_slot_status ~slot_level:(lvl_publish + 1) ~slot_index:index)
+  in
+  Log.info "Status is %a" Format.pp_print_string status ;
+  log_step "Final checks." ;
+  Check.(
+    (status = "attested")
+      string
+      ~error_msg:"Published slot was supposed to be attested.") ;
+  (* If the [not_attested_by_bootstrap2_promise] is not fulfilled yet, it means that
+     the [attester_did_not_attest_slot] warning has never been emitted. *)
+  let not_attested_by_bootstrap2 =
+    match Lwt.state not_attested_by_bootstrap2_promise with
+    | Sleep -> false
+    | Return () -> true
+    | Fail exn ->
+        Test.fail "Unexpected exception: '%s'" (Printexc.to_string exn)
+  in
+  Check.is_true
+    ~error_msg:
+      "We expected the slot to be protocol attested, but not by this attester \
+       node."
+    not_attested_by_bootstrap2 ;
+  unit
+
+(* [test_duplicate_denunciations] publishes a commitment for slot [0].
+   The test then injects a DAL trapped attestation at level [2] and
+   after baking [attestation_lag] blocks, it attempts to:
+
+   - inject a first denunciation that is expected to succeed,
+
+   - inject a second denunciation built using a different shard that
+     is a trap as well, but using the same slot and the same l1 level,
+     where each try is expected to fail. The injection temptatives are
+     done:
+     1. at the next block level (expecting delegate already denounced)
+     2. at the next cycle (expecting delegate already denounced)
+     3. at the next-next cycle (expecting outdated evidence)
+*)
+let test_duplicate_denunciations _protocol dal_parameters cryptobox node client
+    _bootstrap_key =
+  let slot_index = 0 in
+  Log.info "Bake two blocks" ;
+  let* () = bake_for ~count:2 client in
+  let accused = Constant.bootstrap2 in
+  let* current_level = Node.get_level node in
+  let* shards_with_proofs =
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let slot = Helpers.generate_slot ~slot_size in
+    let commitment, proof, shards_with_proofs =
+      Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
+    in
+    Log.info "Publish commitment at level %d" current_level ;
+    let* _op_hash_0 =
+      Helpers.publish_commitment
+        ~source:accused
+        ~index:slot_index
+        ~commitment
+        ~proof
+        client
+    in
+    return shards_with_proofs
+  in
+  let* () = bake_for ~count:dal_parameters.attestation_lag client in
+  let* current_level = Node.get_level node in
+  Log.info "Injecting an attestation at level %d" current_level ;
+  let availability = Slots [slot_index] in
+  let signer = Constant.bootstrap2 in
+  let* attestation, _op_hash =
+    inject_dal_attestation
+      ~signer
+      ~nb_slots:dal_parameters.number_of_slots
+      availability
+      client
+  in
+  let* signature = Operation.sign attestation client in
+  let attestation = (attestation, signature) in
+  let* shard_assignments =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_dal_shards
+         ~delegates:[accused.public_key_hash]
+         ()
+  in
+  let shard_indexes =
+    JSON.(shard_assignments |> as_list |> List.hd |-> "indexes" |> as_list)
+  in
+  let[@ocaml.warning "-8"] (shard_index_1 :: shard_index_2 :: _) =
+    List.map JSON.as_int shard_indexes
+  in
+  let accusation =
+    let shard1, proof1 =
+      Seq.find
+        (fun (Cryptobox.{index; _}, _proof) -> index = shard_index_1)
+        shards_with_proofs
+      |> Option.get
+    in
+    Operation.Anonymous.dal_entrapment_evidence
+      ~attestation
+      ~slot_index
+      shard1
+      proof1
+  in
+  let accusation_dup =
+    let shard2, proof2 =
+      Seq.find
+        (fun (Cryptobox.{index; _}, _proof) -> index = shard_index_2)
+        shards_with_proofs
+      |> Option.get
+    in
+    Operation.Anonymous.dal_entrapment_evidence
+      ~attestation
+      ~slot_index
+      shard2
+      proof2
+  in
+  let* level_accusation = Node.get_level node in
+  Log.info
+    "Injecting a first accusation (level %d) expected to succeed"
+    level_accusation ;
+  let* (`OpHash _) = Operation.Anonymous.inject accusation client in
+  let* () = bake_for client in
+  let* current_level = Node.get_level node in
+  Log.info
+    "Injecting the second accusation at the next level (level %d), expected to \
+     fail because the faulty delegate is already denounced"
+    current_level ;
+  let* (`OpHash _) =
+    Operation.Anonymous.inject
+      accusation_dup
+      client
+      ~error:Operation_core.already_dal_denounced
+  in
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let* () = bake_for ~count:blocks_per_cycle client in
+  let* current_level = Node.get_level node in
+  Log.info
+    "Injecting at the next cycle (level %d), expected to fail because the \
+     delegate is already denounced for this level"
+    current_level ;
+  let* (`OpHash _) =
+    Operation.Anonymous.inject
+      accusation_dup
+      client
+      ~error:Operation_core.already_dal_denounced
+  in
+  let* () = bake_for ~count:blocks_per_cycle client in
+  let* current_level = Node.get_level node in
+  Log.info
+    "Injecting at the next cycle (level %d), expected to fail because the DAL \
+     denunciation is outdated"
+    current_level ;
+  let* (`OpHash _) =
+    Operation.Anonymous.inject
+      accusation_dup
+      client
+      ~error:Operation_core.outdated_dal_denunciation
+  in
+  unit
+
+(* [test_denunciation_next_cycle] injects two trapped attestations and
+   inject an accusation for the first one at cycle `c` and another at
+   for the second one at cycle `c + 1`, both injections are expected
+   to succeed. *)
+let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
+    _bootstrap_key =
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let slot_index = 0 in
+  let accused = Constant.bootstrap2 in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let* () = bake_for ~count:2 client in
+  let* shards_with_proofs1 =
+    let* current_level = Node.get_level node in
+    Log.info "Publish first commitment at level %d" current_level ;
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let slot = Helpers.generate_slot ~slot_size in
+    let commitment, proof, shards_with_proofs =
+      Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
+    in
+    let* _op_hash_0 =
+      Helpers.publish_commitment
+        ~source:accused
+        ~index:slot_index
+        ~commitment
+        ~proof
+        client
+    in
+    return shards_with_proofs
+  in
+  let* () = bake_for ~count:1 client in
+  let* shards_with_proofs2 =
+    let* current_level = Node.get_level node in
+    Log.info "Publish second commitment at level %d" current_level ;
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let slot = Helpers.generate_slot ~slot_size in
+    let commitment, proof, shards_with_proofs =
+      Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
+    in
+    let* _op_hash_0 =
+      Helpers.publish_commitment
+        ~source:accused
+        ~index:slot_index
+        ~commitment
+        ~proof
+        client
+    in
+    return shards_with_proofs
+  in
+  let* () = bake_for ~count:(dal_parameters.attestation_lag - 1) client in
+  let* attestation =
+    let* current_level = Node.get_level node in
+    Log.info "Injecting a first attestation at level %d" current_level ;
+    let availability = Slots [slot_index] in
+    let* attestation, _op_hash =
+      inject_dal_attestation
+        ~signer:Constant.bootstrap2
+        ~nb_slots:dal_parameters.number_of_slots
+        availability
+        client
+    in
+    let* signature = Operation.sign attestation client in
+    return (attestation, signature)
+  in
+  let* () =
+    let* shard_assignments =
+      Node.RPC.call node
+      @@ RPC.get_chain_block_context_dal_shards
+           ~delegates:[accused.public_key_hash]
+           ()
+    in
+    let shard_indexes =
+      JSON.(shard_assignments |> as_list |> List.hd |-> "indexes" |> as_list)
+    in
+    let[@ocaml.warning "-8"] (shard_index :: _) =
+      List.map JSON.as_int shard_indexes
+    in
+    let shard, proof =
+      Seq.find
+        (fun (Cryptobox.{index; _}, _proof) -> index = shard_index)
+        shards_with_proofs1
+      |> Option.get
+    in
+    let accusation =
+      Operation.Anonymous.dal_entrapment_evidence
+        ~attestation
+        ~slot_index
+        shard
+        proof
+    in
+    let* level_accusation = Node.get_level node in
+    Log.info
+      "Injecting a first accusation (level %d) expected to succeed"
+      level_accusation ;
+    let* (`OpHash _) = Operation.Anonymous.inject accusation client in
+    unit
+  in
+  let* () = bake_for ~count:1 client in
+  let* attestation =
+    let* current_level = Node.get_level node in
+    Log.info "Injecting a second attestation at level %d" current_level ;
+    let availability = Slots [slot_index] in
+    let signer = Constant.bootstrap2 in
+    let* attestation, _op_hash =
+      inject_dal_attestation
+        ~signer
+        ~nb_slots:dal_parameters.number_of_slots
+        availability
+        client
+    in
+    let* signature = Operation.sign attestation client in
+    return (attestation, signature)
+  in
+  let* () =
+    let* shard_assignments =
+      Node.RPC.call node
+      @@ RPC.get_chain_block_context_dal_shards
+           ~delegates:[accused.public_key_hash]
+           ()
+    in
+    let shard_indexes =
+      JSON.(shard_assignments |> as_list |> List.hd |-> "indexes" |> as_list)
+    in
+    let[@ocaml.warning "-8"] (shard_index :: _) =
+      List.map JSON.as_int shard_indexes
+    in
+    let shard, proof =
+      Seq.find
+        (fun (Cryptobox.{index; _}, _proof) -> index = shard_index)
+        shards_with_proofs2
+      |> Option.get
+    in
+    let accusation =
+      Operation.Anonymous.dal_entrapment_evidence
+        ~attestation
+        ~slot_index
+        shard
+        proof
+    in
+    let* () = bake_for ~count:blocks_per_cycle client in
+    let* level = Node.get_level node in
+    Log.info
+      "Injecting the second accusation (level %d) expected to succeed"
+      level ;
+    let* (`OpHash _) = Operation.Anonymous.inject accusation client in
+    unit
+  in
+  unit
+
+(**  [test_e2e_trap_faulty_dal_node] verifies a scenario where a
+     [faulty_delegate] misbehaves. Specifically, it:
+
+     - Creates a DAL node [proxy] whose role is to mimick the honest
+     [dal_node] by forwarding to the honest DAL node each RPC call
+     except for [/profiles/<tz>/attested_levels/<n>/attestable_slots],
+     where [<tz>] is the [faulty_delegate] and [<n>] is the level [2 *
+     blocks_per_cycle + 1]. For this RPC path, it will declare for the
+     [faulty_delegate] each slot attestable by replacing the honest
+     DAL node answer field ['attestable_slots_set'] to an array of
+     ['true'] values.
+
+     The test proceeds as follows:
+
+     1. Bakes [blocks_per_cycle] blocks to avoid the period in which
+     the DAL node is not able to inject an accusation because of the
+     accusation delay introduced by the migration.
+
+     2. Bakes [blocks_per_cycle] blocks while publishing on slot index
+     [0] and checks that [faulty_delegate] is not denounced at the end.
+
+     3. Bakes again [blocks_per_cycle] blocks to finally reach [3 *
+     blocks_per_cycle] blocks.
+
+     - Finally, the test
+
+        - a) retrieves the balance updates for the last block of
+             the third cycle and verifies that:
+           - Multiple DAL attesting rewards were minted
+           - Exactly one delegate (the [faulty_delegate]) lost DAL
+             attesting rewards
+
+        - b) retrieves the [faulty_delegate] DAL participation at the
+             end of the third cycle, minus one block (i.e "head~1")
+             because DAL participation are reset at the end of a block
+             preceding a new cycle, and checks that:
+
+             - it has a sufficient DAL participation to get rewards,
+             - it is denounced,
+             - its expected DAL rewards are [0].
+*)
+let test_e2e_trap_faulty_dal_node _protocol dal_parameters _cryptobox node
+    client dal_node =
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  (* This constraint makes the test simpler; it could be lifted. *)
+  assert (blocks_per_cycle = dal_parameters.Dal.Parameters.attestation_lag) ;
+  let target_attested_level = (2 * blocks_per_cycle) + 1 in
+  let faulty_delegate = Constant.bootstrap1.Account.public_key_hash in
+  let proxy =
+    let routes =
+      [
+        (let path =
+           Re.Str.regexp
+           @@ Format.sprintf
+                "/profiles/%s/attested_levels/%d/attestable_slots"
+                faulty_delegate
+                target_attested_level
+         in
+         Dal_node.Proxy.route ~path ~callback:(fun ~path:_ ~fetch_answer ->
+             let open Ezjsonm in
+             let* dal_node_answer = fetch_answer () in
+             let v = value dal_node_answer in
+             let kind = find v ["kind"] |> get_string in
+             let new_v =
+               if String.equal kind "attestable_slots_set" then
+                 let attestable_slots_set =
+                   (* Declare each slot attestable. *)
+                   find v ["attestable_slots_set"]
+                   |> get_list get_bool
+                   |> List.map (fun _ -> true)
+                   |> list bool
+                 in
+                 update v ["attestable_slots_set"] (Some attestable_slots_set)
+               else v
+             in
+             return (Some (`Response (value_to_string new_v)))));
+      ]
+    in
+    Dal_node.Proxy.make ~name:"proxy-dal-node" ~routes
+  in
+  let faulty_dal_node =
+    Dal_node.create
+      ~name:"faulty-dal-node"
+      ~listen_addr:(Dal_node.listen_addr dal_node)
+      ~node
+      ()
+  in
+  let () =
+    Dal_node.Proxy.run ~honest_dal_node:dal_node ~faulty_dal_node proxy
+  in
+  let dal_node_endpoint =
+    Dal_node.as_rpc_endpoint faulty_dal_node |> Endpoint.as_string
+  in
+  let* level =
+    let* first_level = Node.get_level node in
+    let block = string_of_int first_level in
+    Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ~block ()
+  in
+  let* () =
+    bake_for
+      ~count:(blocks_per_cycle - 1 - level.cycle_position)
+      ~dal_node_endpoint
+      client
+  in
+  let* _ = Node.wait_for_level node blocks_per_cycle in
+  let* () =
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    repeat blocks_per_cycle (fun () ->
+        let wait_slot ~published_level ~slot_index:_ =
+          wait_for_layer1_final_block dal_node (published_level - 2)
+        in
+        let* _res =
+          publish_store_and_wait_slot
+            node
+            client
+            dal_node
+            Constant.bootstrap2
+            ~index:0
+            ~wait_slot
+            ~number_of_extra_blocks_to_bake:0
+          @@ Helpers.make_slot ~slot_size "content"
+        in
+        unit)
+  in
+  let level = ref (2 * blocks_per_cycle) in
+  let* _ = Node.wait_for_level node !level in
+  let* faulty_delegate_dal_participation =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_delegate_dal_participation
+         ~block:"head~1"
+         faulty_delegate
+  in
+  let is_denounced =
+    JSON.(faulty_delegate_dal_participation |-> "denounced" |> as_bool)
+  in
+  Check.is_false
+    is_denounced
+    ~__LOC__
+    ~error_msg:"Expected the faulty delegate to not be denounced" ;
+  let wait_for_trap_injection =
+    Dal_node.wait_for dal_node "dal_trap_injection.v0" (fun e ->
+        let open JSON in
+        let delegate = e |-> "delegate" |> as_string in
+        let attested_level = e |-> "attested_level" |> as_int in
+        if delegate = faulty_delegate && attested_level = target_attested_level
+        then Some ()
+        else None)
+  in
+  let* () =
+    repeat blocks_per_cycle (fun () ->
+        let wait = wait_for_layer1_final_block dal_node (!level - 1) in
+        let* () = bake_for ~dal_node_endpoint client in
+        incr level ;
+        let* () = wait in
+        unit)
+  in
+  let* () = wait_for_trap_injection in
+  let* _ = Node.wait_for_level node (3 * blocks_per_cycle) in
+  let* metadata = Node.RPC.call node @@ RPC.get_chain_block_metadata_raw () in
+  let balance_updates = JSON.(metadata |-> "balance_updates" |> as_list) in
+  let dal_rewards =
+    List.filter
+      (fun json ->
+        JSON.(json |-> "kind" |> as_string) |> String.equal "minted"
+        && JSON.(json |-> "category" |> as_string)
+           |> String.equal "DAL attesting rewards")
+      balance_updates
+  in
+  Check.(List.length dal_rewards > 1)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Expected %R minted DAL-related balance updates, got %L" ;
+  let lost_dal_rewards =
+    List.filter
+      (fun json ->
+        JSON.(json |-> "kind" |> as_string) |> String.equal "burned"
+        && JSON.(json |-> "category" |> as_string)
+           |> String.equal "lost DAL attesting rewards")
+      balance_updates
+  in
+  Check.(List.length lost_dal_rewards = 1)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Expected %R lost DAL reward, got %L" ;
+  let json = List.hd lost_dal_rewards in
+  let losing_delegate = JSON.(json |-> "delegate" |> as_string) in
+  Check.(faulty_delegate = losing_delegate)
+    ~__LOC__
+    Check.string
+    ~error_msg:"Unexpected delegate to lose DAL rewards (got %R expected %L)" ;
+  let* faulty_delegate_dal_participation =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_delegate_dal_participation
+         ~block:"head~1"
+         faulty_delegate
+  in
+  let is_denounced =
+    JSON.(faulty_delegate_dal_participation |-> "denounced" |> as_bool)
+  in
+  Check.is_true
+    is_denounced
+    ~__LOC__
+    ~error_msg:"Expected the faulty delegate to be denounced" ;
+  let sufficient_dal_participation =
+    JSON.(
+      faulty_delegate_dal_participation |-> "sufficient_dal_participation"
+      |> as_bool)
+  in
+  Check.is_true
+    sufficient_dal_participation
+    ~__LOC__
+    ~error_msg:"Expected sufficiant participation for the faulty delegate" ;
+  let expected_dal_rewards =
+    JSON.(
+      faulty_delegate_dal_participation |-> "expected_dal_rewards" |> as_int)
+  in
+  Check.(expected_dal_rewards = 0)
+    ~__LOC__
+    Check.int
+    ~error_msg:
+      "Expected DAL rewards for for the faulty delegate expected to be %R, but \
+       got %L" ;
+  unit
+
+type dal_participation = {
+  expected_assigned_shards_per_slot : int;
+  delegate_attested_dal_slots : int;
+  delegate_attestable_dal_slots : int;
+  expected_dal_rewards : Tez.t;
+  sufficient_dal_participation : bool;
+  denounced : bool;
+}
+
+let get_dal_participation l1_node public_key_hash =
+  let open JSON in
+  let* json =
+    Node.RPC.(
+      call l1_node
+      @@ get_chain_block_context_delegate_dal_participation public_key_hash)
+  in
+  let expected_assigned_shards_per_slot =
+    json |-> "expected_assigned_shards_per_slot" |> as_int
+  in
+  let delegate_attested_dal_slots =
+    json |-> "delegate_attested_dal_slots" |> as_int
+  in
+  let delegate_attestable_dal_slots =
+    json |-> "delegate_attestable_dal_slots" |> as_int
+  in
+  let expected_dal_rewards =
+    json |-> "expected_dal_rewards" |> as_int64 |> Tez.of_mutez_int64
+  in
+  let sufficient_dal_participation =
+    json |-> "sufficient_dal_participation" |> as_bool
+  in
+  let denounced = json |-> "denounced" |> as_bool in
+  return
+    {
+      expected_assigned_shards_per_slot;
+      delegate_attested_dal_slots;
+      delegate_attestable_dal_slots;
+      expected_dal_rewards;
+      sufficient_dal_participation;
+      denounced;
+    }
+
+let get_tb_expected_attesting_rewards l1_node public_key_hash =
+  let open JSON in
+  let* json =
+    Node.RPC.(
+      call l1_node
+      @@ get_chain_block_context_delegate_participation public_key_hash)
+  in
+  return (json |-> "expected_attesting_rewards" |> as_int)
+
+(** [test_dal_rewards_distribution _protocol dal_parameters cryptobox node
+    client _dal_node] verifies the correct distribution of DAL rewards among
+    delegates based on their participation in DAL attestations activity.
+
+    The main steps of the test are:
+
+    1. Initialize delegates: we assign five bootstrap accounts to specific roles:
+    - **Baker:** Always attests both TenderBake (TB) and all DAL slots.
+    - **Attesting DAL Slot 10:** Always attests TB and specifically DAL slot 10.
+    - **Not Attesting at All:** Does not attest either TB or DAL slots.
+    - **Not Attesting DAL:** Does not attest DAL slots, either by not sending
+    any DAL attestation or by sending an empty bitset.
+    - **Not Sufficiently Attesting DAL Slot 10:** Attests DAL slot 10 only 25%
+    of the time.
+
+    2. Initial balances snapshot: we capture the initial balances of all
+    delegates to compare against post-test balances.
+
+    3. Publish DAL slots and inject DAL attestations: we define a helper
+    function to inject DAL attestations based on each delegate's role:
+    - we publish a dummy DAL slot at index 10.
+    - we inject attestations from each delegate according to their assigned
+    behavior.
+
+    4. Blocks production until ~end of cycle: we bake blocks up to the last
+    block of the current cycle, ensuring DAL slot publications and attestations
+    are appropriately injected. Each time a new block is produced, we check the
+    value of the "dal_attestation" bitset in the block's metadata and count the
+    number of times the DAL slot at index 10 is attested.
+
+    5. Second balances snapshot: this is done before TB and DAL rewards are
+    distributed at the next block, which marks the end of the current cycle.
+
+    6. Bake the final block of the cycle to trigger the distribution of DAL and
+    TB rewards.
+
+    7. Final snapshot of delegates' balances to assess the impact of rewards
+    distribution.
+
+    8. Balance Checks:
+    - Ensure that delegates who did not attest at all (for both TB & DAL) have
+    unchanged balances.
+    - Verify that delegates with sufficient DAL participation received the
+    expected DAL and TB rewards.
+    - Confirm that delegates with insufficient or no DAL participation received
+    only the expected TB rewards.
+
+    9. Some extra checks related to /dal_participation RPC:
+    - DAL participation status of each delegate matches the expected outcome
+    based on their attestation behavior.
+    - No delegates are denounced (there is no accuser running actually).
+    - The attestable slots field of /dal_participation's result is equal to the
+    number of attested slots counted in blocks metadata. *)
+let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
+    _dal_node =
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  assert (blocks_per_cycle >= dal_parameters.Dal.Parameters.attestation_lag) ;
+  let* () = bake_for client in
+  let* level = Node.get_level node in
+  assert (level < blocks_per_cycle) ;
+  let level = ref level in
+  let nb_slots = dal_parameters.Dal.Parameters.number_of_slots in
+  let all_slots = List.init nb_slots Fun.id in
+
+  (* We get our available delegates (up to 5) and assign them different roles
+     they'll play during the test. *)
+  let ( accounts_list,
+        ( baker,
+          attesting_dal_slot_10,
+          not_attesting_at_all,
+          not_attesting_dal,
+          not_sufficiently_attesting_dal_slot_10 ) ) =
+    match Account.Bootstrap.keys with
+    | [|d1; d2; d3; d4; d5|] ->
+        ( [
+            (d1, "baker");
+            (d2, "attesting_dal_slot_10");
+            (d3, "not_attesting_at_all");
+            (d4, "not_attesting_dal");
+            (d5, "not_sufficiently_attesting_dal_slot_10");
+          ],
+          (d1, d2, d3, d4, d5) )
+    | _ -> Test.fail "Expected exactly 5 bootstrap accounts."
+  in
+
+  (* A helper function to get balances of the delegates above. *)
+  let snapshot_full_balances_helper () =
+    let bal account =
+      let* b =
+        Client.get_full_balance_for client ~account:account.Account.alias
+      in
+      return (Tez.mutez_int64 b)
+    in
+    let* l =
+      Lwt.all
+        [
+          bal baker;
+          bal attesting_dal_slot_10;
+          bal not_attesting_at_all;
+          bal not_attesting_dal;
+          bal not_sufficiently_attesting_dal_slot_10;
+        ]
+    in
+    match l with
+    | [b1; b2; b3; b4; b5] -> return (b1, b2, b3, b4, b5)
+    | _ -> Test.fail "Not reachable."
+  in
+
+  (* Snapshot the balances of the accounts at startup. *)
+  let* ( _baker_bal0,
+         attesting_dal_slot_10_bal0,
+         not_attesting_at_all_bal0,
+         not_attesting_dal_bal0,
+         not_sufficiently_attesting_dal_slot_10_bal0 ) =
+    snapshot_full_balances_helper ()
+  in
+
+  (* This is the main helper function which injects (DAL) attestations for
+     delegates depending on their profiles. *)
+  let inject_attestations () =
+    let* level = Node.get_level node in
+    let count_dal_attesting_bakers = ref 0 in
+    (* 1. Baker always attests TB and all DAL slots *)
+    let* (_ : (Operation_core.t * [`OpHash of peer_id]) list) =
+      (* The baker delegate will miss 1/10 of its DAL attestations and will send
+         [No_dal_attestation] in this case. *)
+      let baker_attestation =
+        if level mod 10 = 0 then No_dal_attestation
+        else (
+          incr count_dal_attesting_bakers ;
+          Slots all_slots)
+      in
+      inject_dal_attestations
+        ~signers:[baker]
+        ~nb_slots
+        baker_attestation
+        client
+    in
+    (* 2. attesting_dal_slot_10 always attests TB and DAL slot 10 *)
+    let* (_ : (Operation_core.t * [`OpHash of peer_id]) list) =
+      (* The attesting_dal_slot_10 delegate misses 1/11th of its DAL
+         attestations and will send Slots [], but it should be fine for its
+         rewards. *)
+      let attestation =
+        if level mod 11 = 0 then Slots []
+        else (
+          incr count_dal_attesting_bakers ;
+          Slots [10])
+      in
+      inject_dal_attestations
+        ~signers:[attesting_dal_slot_10]
+        ~nb_slots
+        attestation
+        client
+    in
+    (* 3. not_attesting_at_all is not attesting neither TB nor DAL slots *)
+    (* 4. not_attesting_dal either sends no DAL content or sends bitset 0 *)
+    let* (_ : (Operation_core.t * [`OpHash of peer_id]) list) =
+      let dal_attestation =
+        if level mod 2 = 0 then No_dal_attestation else Slots []
+      in
+      inject_dal_attestations
+        ~signers:[not_attesting_dal]
+        ~nb_slots
+        dal_attestation
+        client
+    in
+    (* 5. not_sufficiently_attesting_dal_slot_10: is attesting DAL slot 10, but only 25%
+       of the time. *)
+    let* (_ : (Operation_core.t * [`OpHash of peer_id]) list) =
+      let* level = Node.get_level node in
+      let slots_to_attest =
+        if level mod 4 = 0 then (
+          incr count_dal_attesting_bakers ;
+          Slots [10])
+        else No_dal_attestation
+      in
+      inject_dal_attestations
+        ~signers:[not_sufficiently_attesting_dal_slot_10]
+        ~nb_slots
+        slots_to_attest
+        client
+    in
+    Log.info
+      "At level %d, there are %d bakers that DAL attested"
+      level
+      !count_dal_attesting_bakers ;
+    unit
+  in
+
+  (* We'll count the number of times we see that slot 10 is attested in blocks
+     metadata. We'll then check the final value against the
+     delegate_attestable_dal_slots field of /dal_participation for each
+     delegate. *)
+  let count_set_dal_attestation_bitset = ref 0 in
+
+  let count_slot_10_if_attested () =
+    let* block_json = Node.RPC.(call node @@ get_chain_block_metadata_raw ()) in
+    let block_dal_attestation_bitset =
+      JSON.(block_json |-> "dal_attestation" |> as_int)
+    in
+    Log.info
+      "At level %d, dal_attestation = %d"
+      !level
+      block_dal_attestation_bitset ;
+    (* count when slot 10 is attested *)
+    if block_dal_attestation_bitset = 1024 then
+      incr count_set_dal_attestation_bitset ;
+    unit
+  in
+
+  (* This is the main entry of the test: we start by baking a number of blocks
+     in which we inject DAL slots publications at slot index 10 and TB/DAL
+     attestations. We stop before baking the last block of the current cycle,
+     where DAL rewards are distributed. *)
+  let* () =
+    repeat
+      (blocks_per_cycle - !level - 1)
+      (fun () ->
+        let* () = count_slot_10_if_attested () in
+        let* (`OpHash _oph1) =
+          publish_dummy_slot
+            ~source:baker
+            ~index:10
+            ~message:"hi!"
+            cryptobox
+            client
+        in
+        let* () = inject_attestations () in
+        let* () =
+          (* Do not use [bake_for] because it also injects an attestation
+             operation for [baker]. *)
+          Client.propose_for_and_wait
+            ~key:[baker.Account.public_key_hash]
+            client
+        in
+        incr level ;
+        let* manager_ops =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_operations_validation_pass
+               ~validation_pass:3
+               ()
+        in
+        Check.(
+          (List.length @@ JSON.as_list manager_ops = 1)
+            int
+            ~__LOC__
+            ~error_msg:"expected 1 manager operation in block, got %L") ;
+        let* attestations =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_operations_validation_pass
+               ~validation_pass:0
+               ()
+        in
+        Check.(
+          (List.length @@ JSON.as_list attestations = 4)
+            int
+            ~__LOC__
+            ~error_msg:"expected 4 attestations in block, got %L") ;
+        unit)
+  in
+
+  (* After this first round of blocks, we snapshot the balances of our delegates
+     again. *)
+  let* ( _baker_bal1,
+         attesting_dal_slot_10_bal1,
+         not_attesting_at_all_bal1,
+         not_attesting_dal_bal1,
+         not_sufficiently_attesting_dal_slot_10_bal1 ) =
+    snapshot_full_balances_helper ()
+  in
+
+  let* () = count_slot_10_if_attested () in
+
+  let* bootstrap_accounts_participation =
+    Lwt_list.map_s
+      (fun (account, _account_role) ->
+        let* dal_participation =
+          get_dal_participation node account.Account.public_key_hash
+        in
+        return (account, dal_participation))
+      accounts_list
+  in
+
+  (* We now bake the last block of the cycle, which should trigger TB and DAL
+     rewards distribution. TB rewards are actually set to 0. *)
+  let* () = bake_for ~delegates:(`For [baker.Account.public_key_hash]) client in
+  incr level ;
+
+  (* We snapshot the balances of the delegates at the end of the cycle. *)
+  let* ( _baker_bal2,
+         attesting_dal_slot_10_bal2,
+         not_attesting_at_all_bal2,
+         not_attesting_dal_bal2,
+         not_sufficiently_attesting_dal_slot_10_bal2 ) =
+    snapshot_full_balances_helper ()
+  in
+
+  (* We're now ready to do some checks, both on balances and on
+     dal_participation RPC's result. *)
+  (* First, we define a function to check expected balances of delegates. *)
+  let check_bal_incr ~__LOC__ account bal_before bal_after ~delta =
+    let error_msg =
+      if delta = 0 then
+        "account " ^ account.Account.public_key_hash
+        ^ ", expected balance to be unchanged. Got %R, expecting %L"
+      else
+        "account " ^ account.Account.public_key_hash
+        ^ ", unexpected balance: got %R, expecting %L = "
+        ^ Int64.to_string bal_before ^ " + " ^ string_of_int delta
+    in
+    Check.(Int64.(add bal_before (of_int delta)) = bal_after)
+      ~__LOC__
+      Check.int64
+      ~error_msg
+  in
+
+  (* Except for the baker, we don't expect the balances of the delegates to
+     change before baking the last block of the current cycle. *)
+  List.iter
+    (fun (account, bal0, bal1) ->
+      check_bal_incr ~__LOC__ account bal0 bal1 ~delta:0)
+    [
+      ( attesting_dal_slot_10,
+        attesting_dal_slot_10_bal0,
+        attesting_dal_slot_10_bal1 );
+      ( not_attesting_at_all,
+        not_attesting_at_all_bal0,
+        not_attesting_at_all_bal1 );
+      (not_attesting_dal, not_attesting_dal_bal0, not_attesting_dal_bal1);
+      ( not_sufficiently_attesting_dal_slot_10,
+        not_sufficiently_attesting_dal_slot_10_bal0,
+        not_sufficiently_attesting_dal_slot_10_bal1 );
+    ] ;
+
+  (* As the delegates have the same stake distribution, they're expected to have
+     the same number of the assigned shards, to have shards at the same level,
+     to have the same rewards allocated, ... *)
+  let expected_full_dal_rewards =
+    match bootstrap_accounts_participation with
+    | [] -> Test.fail "Not reachable."
+    | (_account, dal_part) :: rest ->
+        List.iter
+          (fun (_account, dal_participation) ->
+            Check.(
+              dal_part.expected_assigned_shards_per_slot
+              = dal_participation.expected_assigned_shards_per_slot)
+              ~__LOC__
+              Check.int
+              ~error_msg:"expected_assigned_shards_per_slot mismatch" ;
+            Check.(
+              dal_part.delegate_attestable_dal_slots
+              = dal_participation.delegate_attestable_dal_slots)
+              ~__LOC__
+              Check.int
+              ~error_msg:"delegate_attestable_dal_slots mismatch" ;
+            Check.(
+              Tez.to_mutez dal_part.expected_dal_rewards
+              = Tez.to_mutez dal_participation.expected_dal_rewards)
+              ~__LOC__
+              Check.int
+              ~error_msg:"expected_dal_rewards mismatch")
+          rest ;
+        Tez.to_mutez dal_part.expected_dal_rewards
+  in
+
+  (* We use /participation RPC to get the expect Tenderbake rewards of delegate
+     who TB-attested sufficiently. *)
+  let* expected_full_tb_rewards =
+    get_tb_expected_attesting_rewards node baker.public_key_hash
+  in
+
+  (* After baking the last block of the cycle, we check that:
+
+     - the balances of the delegates who didn't attest at all didn't change.
+
+     - the participation RPC's result is aligned with the first check. *)
+  List.iter
+    (fun (account, bal1, bal2) ->
+      check_bal_incr ~__LOC__ account bal1 bal2 ~delta:0 ;
+      let dal_participation =
+        List.assoc account bootstrap_accounts_participation
+      in
+      Check.is_false
+        dal_participation.sufficient_dal_participation
+        ~__LOC__
+        ~error_msg:
+          ("account " ^ account.Account.public_key_hash
+         ^ ", expected to have insufficient DAL participation."))
+    [
+      ( not_attesting_at_all,
+        not_attesting_at_all_bal1,
+        not_attesting_at_all_bal2 );
+    ] ;
+
+  (* After baking the last block of the cycle, we check that:
+
+     - the balances of the delegates who didn't attest DAL sufficiently or
+     didn't attest DAL at all only increased by a delta equal to the expected
+     Tenderbake attestation rewards.
+
+     - the participation RPC's result is aligned with the first check. *)
+  List.iter
+    (fun (account, bal1, bal2) ->
+      check_bal_incr ~__LOC__ account bal1 bal2 ~delta:expected_full_tb_rewards ;
+      let dal_participation =
+        List.assoc account bootstrap_accounts_participation
+      in
+      Check.is_false
+        dal_participation.sufficient_dal_participation
+        ~__LOC__
+        ~error_msg:
+          ("account " ^ account.Account.public_key_hash
+         ^ ", expected to have insufficnent DAL participation."))
+    [
+      (not_attesting_dal, not_attesting_dal_bal1, not_attesting_dal_bal2);
+      ( not_sufficiently_attesting_dal_slot_10,
+        not_sufficiently_attesting_dal_slot_10_bal1,
+        not_sufficiently_attesting_dal_slot_10_bal2 );
+    ] ;
+
+  (* Below, we check that the only delegate who attested slot 10 correctly got
+     its (Tenderbake and) DAL rewards. *)
+  check_bal_incr
+    ~__LOC__
+    attesting_dal_slot_10
+    attesting_dal_slot_10_bal1
+    attesting_dal_slot_10_bal2
+    ~delta:(expected_full_tb_rewards + expected_full_dal_rewards) ;
+  let dal_participation =
+    List.assoc attesting_dal_slot_10 bootstrap_accounts_participation
+  in
+  Check.is_true
+    dal_participation.sufficient_dal_participation
+    ~__LOC__
+    ~error_msg:
+      ("account " ^ attesting_dal_slot_10.Account.public_key_hash
+     ^ ", expected balance to have sufficient DAL participation.") ;
+
+  (* As a final check, we verify that no delegate is denounced and that we
+     report the correct number of attested slots. *)
+  List.iter
+    (fun (account, dal_participation) ->
+      Check.is_false
+        dal_participation.denounced
+        ~__LOC__
+        ~error_msg:
+          ("account " ^ account.Account.public_key_hash
+         ^ ", not expected to be denounced.") ;
+
+      Check.(
+        dal_participation.delegate_attestable_dal_slots
+        = !count_set_dal_attestation_bitset)
+        ~__LOC__
+        Check.int
+        ~error_msg:
+          "Expecting %L attestable DAL slots, but %R were reported in blocks \
+           metadata")
+    bootstrap_accounts_participation ;
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -8053,6 +10017,15 @@ let register ~protocols =
     "dal basic logic"
     test_slot_management_logic
     protocols ;
+  scenario_with_layer1_node
+    "attesters receive expected DAL rewards depending on participation"
+    test_dal_rewards_distribution
+    (List.filter (fun p -> Protocol.number p >= 022) protocols)
+    (* We set attestation threshold to 30% because we'll have 2 regular bakers
+       who attest sufficiently. *)
+    ~attestation_threshold:30
+    ~attestation_lag:2
+    ~blocks_per_cycle:16 ;
   scenario_with_layer1_node
     ~attestation_lag:5
     "slots attestation operation behavior"
@@ -8082,8 +10055,29 @@ let register ~protocols =
     "one_committee_per_level"
     test_one_committee_per_level
     protocols ;
-
+  scenario_with_layer1_node
+    ~traps_fraction:Q.one
+    "inject accusation"
+    test_inject_accusation
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
+  scenario_with_layer1_node
+    ~traps_fraction:Q.one
+    "inject a duplicated denunciation at different steps"
+    test_duplicate_denunciations
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
+  scenario_with_layer1_node
+    ~traps_fraction:Q.one
+    "inject a denunciation at the next cycle"
+    test_denunciation_next_cycle
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   (* Tests with layer1 and dal nodes *)
+  scenario_with_layer1_and_dal_nodes
+    ~number_of_slots:1
+    ~producer_profiles:[0]
+    ~traps_fraction:Q.one
+    "faulty DAL node entrapment"
+    test_e2e_trap_faulty_dal_node
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   test_dal_node_startup protocols ;
   scenario_with_layer1_and_dal_nodes
     ~producer_profiles:[0]
@@ -8191,6 +10185,19 @@ let register ~protocols =
     test_gs_prune_and_ihave
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~attestation_threshold:1
+    ~l1_history_mode:Default_with_refutation
+    "Attester attests produced slot"
+    test_producer_attester
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~attestation_threshold:1
+    ~l1_history_mode:Default_with_refutation
+    ~event_sections_levels:[("prevalidator", `Debug)]
+    "attester_did_not_attest warning is emitted"
+    test_attester_did_not_attest
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
     "baker registers profiles with dal node"
     ~uses:(fun protocol -> [Protocol.baker protocol])
     ~activation_timestamp:Now
@@ -8235,12 +10242,7 @@ let register ~protocols =
     "attestation through p2p"
     test_attestation_through_p2p
     protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~tags:["rpc"; "skip_list"]
-    ~producer_profiles:[3; 15]
-    "commitments history RPCs"
-    History_rpcs.test_commitments_history_rpcs
-    protocols ;
+  History_rpcs.test_commitments_history_rpcs protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["amplification"; Tag.memory_4k]
     ~bootstrap_profile:true
@@ -8286,11 +10288,19 @@ let register ~protocols =
     "garbage collection of shards for all profiles"
     Garbage_collection.test_gc_with_all_profiles
     protocols ;
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7561
+     Adapt the test for the SQLite3 backend. *)
   Garbage_collection.test_gc_skip_list_cells ~protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["crawler"; "reconnection"]
-    "DAL node crawler reconnects to L1 without crashing"
+    "DAL node crawler reconnects to L1 without crashing (non-producer case)"
     ~prover:false
+    test_dal_node_crawler_reconnects_to_l1
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["crawler"; "reconnection"]
+    "DAL node crawler reconnects to L1 without crashing (producer case)"
+    ~producer_profiles:[0]
     test_dal_node_crawler_reconnects_to_l1
     protocols ;
   scenario_with_layer1_and_dal_nodes
@@ -8300,6 +10310,13 @@ let register ~protocols =
     "new attester attests"
     test_new_attester_attests
     protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~number_of_slots:1
+    ~producer_profiles:[0]
+    ~regression:true
+    "attesters receive DAL rewards"
+    test_attesters_receive_dal_rewards
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   scenario_with_layer1_and_dal_nodes
     ~uses:(fun protocol -> [Protocol.baker protocol])
     ~tags:["restart"]
@@ -8370,32 +10387,16 @@ let register ~protocols =
   (* Register tutorial test *)
   scenario_tutorial_dal_baker protocols ;
 
-  scenario_with_all_nodes
+  Refutations
+  .register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
     "Refutation where the faulty node timeouts"
-    ~regression:false
-    ~uses:(fun _protocol ->
-      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
-    ~pvm_name:"wasm_2_0_0"
-    ~commitment_period:5
-    (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
-       ~refute_operations_priority:`Faulty_first)
-    ~smart_rollup_timeout_period_in_blocks:20
-    ~l1_history_mode:Default_with_refutation
-    ~tags:[Tag.slow]
+    ~refute_operations_priority:`Faulty_first
     protocols ;
 
-  scenario_with_all_nodes
+  Refutations
+  .register_scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
     "Refutation where the honest node makes final move"
-    ~regression:false
-    ~uses:(fun _protocol ->
-      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
-    ~pvm_name:"wasm_2_0_0"
-    ~commitment_period:5
-    (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
-       ~refute_operations_priority:`Honest_first)
-    ~smart_rollup_timeout_period_in_blocks:20
-    ~l1_history_mode:Default_with_refutation
-    ~tags:[Tag.slow]
+    ~refute_operations_priority:`Honest_first
     protocols ;
 
   scenario_with_all_nodes
@@ -8448,4 +10449,34 @@ let register_migration ~migrate_from ~migrate_to =
     ~migration_level:10
     ~migrate_from
     ~migrate_to ;
-  tests_start_dal_node_around_migration ~migrate_from ~migrate_to
+  tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
+  test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to
+
+let () =
+  Regression.register
+    ~__FILE__
+    ~title:"DAL Node: debug print store schemas"
+    ~tags:["dal"; "store"; "schemas"]
+    ~uses:[Constant.octez_dal_node]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let hooks = Tezos_regression.hooks in
+  Dal_node.debug_print_store_schemas ~hooks ()
+
+let () =
+  Regression.register
+    ~__FILE__
+    ~title:"DAL Node: P2P message encoding"
+    ~tags:["dal"; "gossipsub"; "p2p"]
+    ~uses:[Constant.octez_codec]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let* output = Codec.describe_binary_schema ~id:"dal_p2p_message" () in
+  Regression.capture output ;
+  let* output = Codec.describe_json_schema ~id:"dal_p2p_message" () in
+  Regression.capture output ;
+  unit

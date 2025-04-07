@@ -5,20 +5,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type blueprints_range =
+  from:Ethereum_types.quantity ->
+  to_:Ethereum_types.quantity ->
+  (Ethereum_types.quantity * Blueprint_types.payload) list tzresult Lwt.t
+
 type parameters = {
+  blueprints_range : blueprints_range;
   rollup_node_endpoint : Uri.t;
   latest_level_seen : Z.t;
   config : Configuration.blueprints_publisher_config;
   keep_alive : bool;
+  drop_duplicate : bool;
+  order_enabled : bool;
 }
 
 type state = {
+  blueprints_range : blueprints_range;
   rollup_node_endpoint : Uri.t;
+  drop_duplicate : bool;
   max_blueprints_lag : Z.t;
   max_blueprints_ahead : Z.t;
   max_blueprints_catchup : Z.t;
   catchup_cooldown : int;
   keep_alive : bool;
+  order_enabled : bool;
   mutable latest_level_confirmed : Z.t;
       (** The current head of the EVM chain as seen by the rollup node *)
   mutable latest_level_seen : Z.t;
@@ -40,7 +51,7 @@ module Name = struct
 
   let encoding = Data_encoding.unit
 
-  let base = Blueprint_events.section
+  let base = ["evm_node_worker"; "blueprints"; "publisher"]
 
   let pp _fmt () = ()
 
@@ -101,12 +112,10 @@ module Worker = struct
     let open Lwt_result_syntax in
     let payload = Blueprints_publisher_types.Request.inbox_payload payload in
     let*! () = Blueprint_events.blueprint_injected_on_inbox level in
-    let () =
-      Prometheus.Counter.inc
-        Metrics.BlueprintChunkSent.on_inbox
-        (Float.of_int (List.length payload))
-    in
+    Metrics.record_blueprint_chunks_sent_on_inbox payload ;
     Rollup_services.publish
+      ~drop_duplicate:state.drop_duplicate
+      ?order:(if state.order_enabled then Some level else None)
       ~keep_alive:false
       ~rollup_node_endpoint:state.rollup_node_endpoint
       payload
@@ -116,9 +125,7 @@ module Worker = struct
     let payloads = Sequencer_blueprint.create_dal_payloads chunks in
     let nb_chunks = List.length chunks in
     let*! () = Blueprint_events.blueprint_injected_on_DAL ~level ~nb_chunks in
-    Prometheus.Counter.inc
-      Metrics.BlueprintChunkSent.on_dal
-      (Float.of_int nb_chunks) ;
+    Metrics.record_blueprint_chunks_sent_on_dal chunks ;
     Rollup_services.publish_on_dal
       ~rollup_node_endpoint:state.rollup_node_endpoint
       ~messages:payloads
@@ -169,7 +176,9 @@ module Worker = struct
     let*! () = Blueprint_events.catching_up lower_bound upper_bound in
 
     let* blueprints =
-      Evm_context.blueprints_range (Qty lower_bound) (Qty upper_bound)
+      (state worker).blueprints_range
+        ~from:(Qty lower_bound)
+        ~to_:(Qty upper_bound)
     in
 
     let expected_count = Z.(to_int (sub upper_bound lower_bound)) + 1 in
@@ -231,6 +240,7 @@ module Handlers = struct
 
   let on_launch _self ()
       ({
+         blueprints_range;
          rollup_node_endpoint;
          config =
            {
@@ -242,6 +252,8 @@ module Handlers = struct
            };
          latest_level_seen;
          keep_alive;
+         drop_duplicate;
+         order_enabled;
        } :
         Types.parameters) =
     let open Lwt_result_syntax in
@@ -255,6 +267,7 @@ module Handlers = struct
     in
     return
       {
+        blueprints_range;
         latest_level_confirmed =
           (* Will be set at the correct value once the next L2 block is
              received from the rollup node *)
@@ -262,12 +275,14 @@ module Handlers = struct
         latest_level_seen;
         cooldown = 0;
         rollup_node_endpoint;
+        drop_duplicate;
         max_blueprints_lag = Z.of_int max_blueprints_lag;
         max_blueprints_ahead = Z.of_int max_blueprints_ahead;
         max_blueprints_catchup = Z.of_int max_blueprints_catchup;
         catchup_cooldown;
         keep_alive;
         enable_dal = Option.is_some dal_slots;
+        order_enabled;
       }
 
   let on_request :
@@ -277,9 +292,11 @@ module Handlers = struct
     let open Lwt_result_syntax in
     match request with
     | Publish {level; payload} ->
+        protect @@ fun () ->
         let* () = Worker.publish self payload level ~use_dal_if_enabled:true in
         return_unit
     | New_rollup_node_block rollup_block_lvl -> (
+        protect @@ fun () ->
         let* () =
           Worker.retrieve_and_set_latest_level_confirmed self rollup_block_lvl
         in
@@ -305,22 +322,39 @@ module Handlers = struct
 
   let on_close _self = Lwt.return_unit
 
-  let on_error (type a b) _self _st (_r : (a, b) Request.t) (_errs : b) :
-      unit tzresult Lwt.t =
-    Lwt_result_syntax.return_unit
+  let on_error (type a b) _w _st (r : (a, b) Request.t) (errs : b) :
+      [`Continue | `Shutdown] tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let request_view = Request.view r in
+    let emit_and_return_errors errs =
+      let*! () = Blueprint_events.worker_request_failed request_view errs in
+      fail errs
+    in
+    match r with
+    | Request.Publish _ -> emit_and_return_errors errs
+    | Request.New_rollup_node_block _ -> emit_and_return_errors errs
 end
 
 let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive () =
+let start ~blueprints_range ~rollup_node_endpoint ~config ~latest_level_seen
+    ~keep_alive ~drop_duplicate ~order_enabled () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
       table
       ()
-      {rollup_node_endpoint; config; latest_level_seen; keep_alive}
+      {
+        blueprints_range;
+        rollup_node_endpoint;
+        config;
+        latest_level_seen;
+        keep_alive;
+        drop_duplicate;
+        order_enabled;
+      }
       (module Handlers)
   in
   let*! () = Blueprint_events.publisher_is_ready () in
@@ -329,16 +363,15 @@ let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive () =
 
 type error += No_worker
 
-let worker =
-  lazy
-    (match Lwt.state worker_promise with
-    | Lwt.Return worker -> Ok worker
-    | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
-    | Lwt.Sleep -> Result_syntax.tzfail No_worker)
+let worker () =
+  match Lwt.state worker_promise with
+  | Lwt.Return worker -> Ok worker
+  | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
+  | Lwt.Sleep -> Result_syntax.tzfail No_worker
 
 let bind_worker f =
   let open Lwt_result_syntax in
-  let res = Lazy.force worker in
+  let res = worker () in
   match res with
   | Error [No_worker] ->
       (* There is no worker, nothing to do *)
@@ -346,11 +379,24 @@ let bind_worker f =
   | Error errs -> fail errs
   | Ok w -> f w
 
+type error += Worker_queue_is_closed
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"blueprint_publisher_queue_is_closed"
+    ~title:"Blueprint_publisher_queue_is_closed"
+    ~description:
+      "Tried to publish a new blueprint but the publisher queue is closed"
+    Data_encoding.unit
+    (function Worker_queue_is_closed -> Some () | _ -> None)
+    (fun () -> Worker_queue_is_closed)
+
 let worker_add_request ~request =
   let open Lwt_result_syntax in
   bind_worker @@ fun w ->
-  let*! (_pushed : bool) = Worker.Queue.push_request w request in
-  return_unit
+  let*! (pushed : bool) = Worker.Queue.push_request w request in
+  if pushed then return_unit else tzfail Worker_queue_is_closed
 
 let publish level payload =
   worker_add_request ~request:(Publish {level; payload})

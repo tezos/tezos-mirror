@@ -38,6 +38,10 @@ val is_bootstrap_profile : t -> bool
     proofs. *)
 val is_prover_profile : t -> bool
 
+(** [is_empty profile] returns [true] if it is an [Operator] profile
+    which is empty. *)
+val is_empty : t -> bool
+
 (** [is_attester_only_profile profile] returns [true] if the node has an
     operator profile, with at least one attester role and no producer nor
     observer roles. *)
@@ -65,7 +69,7 @@ val operator : Operator_profile.t -> t
    priority. *)
 val merge_profiles : lower_prio:t -> higher_prio:t -> t
 
-(** [add_and_register_operator_profile t proto_parameters gs_worker
+(** [add_and_register_operator_profile t ~number_of_slots gs_worker
     operator_profile] adds the new [operator_profile] to [t]. It registers any
     new attester profile within [operator_profile] with gossipsub, that is, it
     instructs the [gs_worker] to join the corresponding topics.
@@ -76,12 +80,12 @@ val merge_profiles : lower_prio:t -> higher_prio:t -> t
     It assumes the current profile is not a random observer. *)
 val add_and_register_operator_profile :
   t ->
-  Dal_plugin.proto_parameters ->
+  number_of_slots:int ->
   Gossipsub.Worker.t ->
   Operator_profile.t ->
   t option
 
-(** [register_profile t proto_parameters gs_worker] does the following:
+(** [register_profile t ~number_of_slots gs_worker] does the following:
 
     - It registers the attester profiles within [t] with gossipsub, that is, it
     instructs the [gs_worker] to join the corresponding topics.
@@ -91,8 +95,7 @@ val add_and_register_operator_profile :
     slot index.
 
     The function returns the updated profile. *)
-val register_profile :
-  t -> Dal_plugin.proto_parameters -> Gossipsub.Worker.t -> t
+val register_profile : t -> number_of_slots:int -> Gossipsub.Worker.t -> t
 
 (** Checks that each producer profile only refers to slot indexes strictly
     smaller than [number_of_slots]. This may not be the case when the profile
@@ -100,11 +103,11 @@ val register_profile :
     slots. Returns an [Invalid_slot_index] error if the check fails. *)
 val validate_slot_indexes : t -> number_of_slots:int -> unit tzresult
 
-(** [on_new_head t proto_parameters gs_worker committee] performs profile-related
+(** [on_new_head t ~number_of_slots gs_worker committee] performs profile-related
     actions that depend on the current head, more precisely on the current committee. *)
 val on_new_head :
   t ->
-  Dal_plugin.proto_parameters ->
+  number_of_slots:int ->
   Gossipsub.Worker.t ->
   Committee_cache.committee ->
   unit
@@ -115,8 +118,17 @@ val get_profiles : t -> Types.profile
 (** Returns the number of previous blocks for which the node should keep the
     shards in the storage, depending on the profile of the node (3 months for
     observer & slot producer, twice attestation lag for attester) *)
-val get_attested_data_default_store_period :
-  t -> Dal_plugin.proto_parameters -> int
+val get_attested_data_default_store_period : t -> Types.proto_parameters -> int
+
+(** Resolves a profile by either returning it unchanged (for bootstrap
+    and operator profiles) or generating a new observer profile for
+    random observer profile. The random slot is selected within the
+    DAL slots range defined by the protocol parameters.
+
+    This function is called when generating an observer profile from a
+    random profile before launching a DAL node, as implemented in the
+    daemon. *)
+val resolve_random_observer_profile : t -> number_of_slots:int -> t
 
 (** Returns [true] iff the node should support refutation games. *)
 val supports_refutations : t -> bool

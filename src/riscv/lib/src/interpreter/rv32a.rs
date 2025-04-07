@@ -8,7 +8,7 @@
 //! Chapter 8 - Unprivileged spec
 
 use crate::{
-    machine_state::{bus::main_memory::MainMemoryLayout, registers::XRegister, MachineCoreState},
+    machine_state::{MachineCoreState, main_memory::MainMemoryLayout, registers::XRegister},
     state_backend as backend,
     traps::Exception,
 };
@@ -219,12 +219,12 @@ where
 #[cfg(test)]
 mod test {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         interpreter::atomics::{SC_FAILURE, SC_SUCCESS},
         machine_state::{
-            bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
-            registers::{a0, a1, a2},
             MachineCoreState, MachineCoreStateLayout,
+            main_memory::tests::T1K,
+            registers::{a0, a1, a2},
         },
     };
     use proptest::prelude::*;
@@ -234,12 +234,12 @@ mod test {
     macro_rules! test_lrsc {
         ($name:ident, $lr: ident, $sc: ident, $align: expr, $t: ident) => {
             backend_test!($name, F, {
-                let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-                let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, backend, T1K);
+                use $crate::machine_state::registers::nz;
+                let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(
-                    r1_addr in (DEVICES_ADDRESS_SPACE_LENGTH/$align..(DEVICES_ADDRESS_SPACE_LENGTH+1023_u64)/$align).prop_map(|x| x * $align),
+                    r1_addr in (0..1023_u64/$align).prop_map(|x| x * $align),
                     r1_val in any::<u64>(),
                     imm in any::<i64>(),
                 )| {
@@ -257,7 +257,7 @@ mod test {
                     // Correct sequence of LR.x / SC.y instructions
                     // SC.x succeeds and stores the expected value
                     state.$lr(a0, a1, a2, false, false)?;
-                    state.hart.xregisters.run_addi(imm, a2, a1);
+                    state.hart.xregisters.run_addi(imm, nz::a2, nz::a1);
                     state.$sc(a0, a1, a2, false, false)?;
                     let res = state.hart.xregisters.read(a2);
                     let val: $t = state.read_from_address(r1_addr)?;
@@ -277,12 +277,11 @@ mod test {
     macro_rules! test_amo {
         ($instr: ident, $f: expr, $align: expr, $t: ident) => {
             backend_test!($instr, F, {
-                let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-                let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, backend, T1K);
+                let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(
-                    r1_addr in (DEVICES_ADDRESS_SPACE_LENGTH/$align..(DEVICES_ADDRESS_SPACE_LENGTH+1023_u64)/$align).prop_map(|x| x * $align),
+                    r1_addr in (0..1023_u64/$align).prop_map(|x| x * $align),
                     r1_val in any::<u64>(),
                     r2_val in any::<u64>(),
                 )| {

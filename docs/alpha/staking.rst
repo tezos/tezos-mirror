@@ -20,7 +20,7 @@ remain within the staker’s account at all times.
 
 Staked and delegated funds **have different weights** in the computation
 of delegates’ baking and voting powers: staked funds (both external
-stakes by stakers and the delegate’s own) count **twice** as much as
+stakes by stakers and the delegate’s own) count **three times** as much as
 delegated funds.
 
 Unlike delegated funds, staked funds are considered to contribute to the
@@ -35,7 +35,7 @@ delegate’s staking balance. To simplify slashing, double-baking
 penalties are now proportional to staked funds: instead of the previous
 fixed sum of 640 tez they are now set to 5% of the delegate’s stake.
 Moreover, denunciation rewards (both for double-baking and
-double-attestations) are reduced from one half to one seventh of the
+double-attestations) are reduced from one half to one eleventh of the
 slashed funds. The chosen value prevents adversarial delegates from
 abusing the slashing mechanism for profit at the expense of their
 stakers.
@@ -58,7 +58,10 @@ Freezing and unfreezing of staked funds is controlled directly by delegates and
 stakers.
 This entails that staked funds are frozen until manually
 unfrozen by stakers. This is a two step process which spans for at least
-4 cycles (cf. :ref:`Staked funds management <staked_funds_management_alpha>`).
+``UNSTAKE_FINALIZATION_DELAY`` cycles (cf. :ref:`Staked funds
+management <staked_funds_management_alpha>`).
+
+.. _pseudo_operations_alpha:
 
 A user interface is provided for delegates and stakers to interact
 with the mechanism. It is based on four *pseudo-operations*: ``stake``,
@@ -85,7 +88,7 @@ parameters:
    default value is 1. This parameter determines the fraction of the
    rewards that accrue to the delegate's frozen deposit – the
    remainder is shared among its stakers.
-- ``limit_of_staking_over_baking``: a non-negative number, denoting
+-  ``limit_of_staking_over_baking``: a non-negative number, denoting
    the maximum portion of external stake by stakers over the
    delegate’s own staked funds. It defaults to 0 – which entails that
    delegates do not accept external stakes by default. It is moreover
@@ -147,6 +150,11 @@ or more conveniently::
 
    octez-client stake <amount> for <staker>
 
+The staked amount and remaining spendable funds can then be checked respectively with::
+
+   octez-client get staked balance for <staker>
+   octez-client get balance for <staker>
+
 To *unstake* funds, a staker first submits an unstake request with the
 ``unstake`` pseudo-operation. This is implemented by transferring the
 chosen amount in tez to their ``unstake`` entry-point::
@@ -159,8 +167,12 @@ or more conveniently::
 
 The requested amount will be **unstaked** but will remain **frozen**,
 a.k.a. **unfinalizable**.
-After 4 cycles, unstaked frozen tokens are no longer considered at stake
-nor slashable. They are said then to be both **unstaked** and
+
+After ``UNSTAKE_FINALIZATION_DELAY + 1`` cycles (more precisely, after
+the cycle in which the unstake was requested has ended and then
+another :ref:`UNSTAKE_FINALIZATION_DELAY<cs_constants_alpha>` full
+cycles have passed), unstaked frozen tokens are no longer considered
+at stake nor slashable. They are said then to be both **unstaked** and
 **finalizable**.
 
 A staker can retrieve all unstaked and finalizable tokens at any time,

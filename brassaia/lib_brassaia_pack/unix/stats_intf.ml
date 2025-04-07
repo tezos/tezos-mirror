@@ -15,6 +15,7 @@
  *)
 
 open Import
+open Brassaia_index
 
 module Pack_store = struct
   type field =

@@ -1,0 +1,29 @@
+[package]
+name = "octez-evm-node-wasm-runtime"
+version = "0.0.0-dev"
+authors = [ "Etherlink Core Engineers <contact@tezos.com>" ]
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+ocaml-build = { version = "1.*", features = ["dune"] }
+
+[dependencies]
+hex = "*"
+ocaml = { version = "1.1.0" }
+wasmer = { path = "../../src/rust_deps/wasmer-3.3.0/lib/api", default-features = false, features = ["cranelift", "jit"] }
+wasmer-compiler-cranelift = { path = "../../src/rust_deps/wasmer-3.3.0/lib/compiler-cranelift" }
+tezos_crypto_rs = { version = "0.6", path = "../../sdk/rust/crypto", default-features = false }
+log = "0.4"
+env_logger = "0.11"
+librustzcash = { path = "../../src/rustzcash_deps" }
+tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core" }
+tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }
+# Bifrost kernel
+kernel-bifrost = { package = "evm_kernel_bifrost", path = "../kernel_bifrost/kernel", default-features = false }
+runtime-bifrost = { package = "tezos-evm-runtime-bifrost", path = "../kernel_bifrost/runtime", default-features = false }
+# Calypso
+kernel-calypso = { package = "evm_kernel_calypso", path = "../kernel_calypso/kernel", default-features = false }
+runtime-calypso = { package = "tezos-evm-runtime-calypso", path = "../kernel_calypso/runtime", default-features = false }

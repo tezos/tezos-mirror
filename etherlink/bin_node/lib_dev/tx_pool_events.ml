@@ -14,7 +14,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"tx_pool_started"
-      ~msg:"Tx-pool has been started"
+      ~msg:"tx-pool has been started"
       ~level:Notice
       ()
 
@@ -22,7 +22,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"tx_pool_add_transaction"
-      ~msg:"Add transaction {transaction} to the tx-pool"
+      ~msg:"add transaction {transaction} to the tx-pool"
       ~level:Info
       ("transaction", Data_encoding.string)
       ~pp1:Format.pp_print_string
@@ -31,7 +31,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"tx_pool_invalid_transaction"
-      ~msg:"Transaction {transaction} is not valid"
+      ~msg:"transaction {transaction} is not valid"
       ~level:Info
       ("transaction", Data_encoding.string)
       ~pp1:Format.pp_print_string
@@ -41,7 +41,7 @@ module Event = struct
       ~section
       ~name:"tx_pool_users_threshold_reached"
       ~msg:
-        "The transaction pool has reached its maximum threshold for user \
+        "the transaction pool has reached its maximum threshold for user \
          transactions"
       ~level:Info
       ()
@@ -50,7 +50,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"txs_per_user_threshold_reached"
-      ~msg:"User {address} has reached the maximum threshold for transactions"
+      ~msg:"user {address} has reached the maximum threshold for transactions"
       ~level:Info
       ("address", Data_encoding.string)
       ~pp1:Format.pp_print_string
@@ -59,7 +59,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"tx_data_size_limit_reached"
-      ~msg:"The transaction data size is beyond the allowed threshold."
+      ~msg:"the transaction data size is beyond the allowed threshold"
       ~level:Info
       ()
 
@@ -67,7 +67,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"tx_pool_transaction_injected"
-      ~msg:"Transaction {transaction} has been injected"
+      ~msg:"transaction {transaction} has been injected"
       ~level:Info
       ("transaction", Ethereum_types.hash_encoding)
       ~pp1:Ethereum_types.pp_hash
@@ -76,15 +76,15 @@ module Event = struct
     declare_1
       ~section
       ~name:"tx_pool_transaction_injection_failed"
-      ~msg:"Injection of transactions failed"
+      ~msg:"injection of transactions failed"
       ~level:Error
-      ("trace", trace_encoding)
+      ("trace", Events.trace_encoding)
 
   let connection_lost =
     declare_0
       ~section
       ~name:"tx_pool_connection_lost"
-      ~msg:"Connection with the rollup node has been lost, retrying..."
+      ~msg:"connection with the rollup node has been lost, retrying..."
       ~level:Error
       ()
 
@@ -92,7 +92,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"tx_pool_stopped"
-      ~msg:"Tx-pool has been stopped"
+      ~msg:"tx-pool has been stopped"
       ~level:Notice
       ()
 
@@ -100,7 +100,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"shutting_down_tx_pool"
-      ~msg:"Stopping the tx-pool"
+      ~msg:"stopping the tx-pool"
       ~level:Notice
       ()
 end

@@ -108,6 +108,10 @@ val create :
   answerer:'msg P2p_answerer.t Lazy.t ->
   ('msg, 'peer, 'conn) t
 
+(** [get_pool t] is the [P2p_pool.t] pool of peers and connections passed to
+    [t] at creation. *)
+val get_pool : ('a, 'b, 'c) t -> ('a, 'b, 'c) P2p_pool.t
+
 (** [config t] is the [config] argument passed to [t] at
     creation. *)
 val config : _ t -> config

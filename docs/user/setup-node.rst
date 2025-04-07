@@ -1,7 +1,9 @@
 Setting up the node
 ===================
 
-A node in the Tezos network provides different configuration possibilities:
+For running a node in the Tezos network with a basic setup, see the introductory :ref:`section on running the node <start_node>`.
+
+This section describes different configuration possibilities provided by the Octez node:
 
 - tune various parameters of the node using flexible combinations of: a configuration file, command-line options, and environment variables
 - specify the Tezos network to connect to, which can be the Mainnet or different test networks.

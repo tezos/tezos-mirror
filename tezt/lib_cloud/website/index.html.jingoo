@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurations</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Highlight.js Stylesheet -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/solarized-dark.min.css">
+
+    <!-- Highlight.js Script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+
+    <!-- Initialize Highlight.js -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            hljs.highlightAll();
+        });
+    </script>
+</head>
+<body>
+    <!-- Sticky Navigation Menu -->
+    <nav class="menu">
+        <ul>
+            <li><a href="#configurations">Configurations</a></li>
+            <li><a href="#monitoring">Monitoring</a></li>
+            <li><a href="#debugging">Debugging</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+    <!-- Configurations Section -->
+    <section id="configurations">
+        <h1>Configurations</h1>
+        <ul>
+            {%- for agent in agents %}
+            <li>
+                <strong>{{ agent.name }}</strong>
+                <ul>
+                    <li><strong>Machine type: </strong>{{ agent.machine_type }}</li>
+                    <li><strong>Docker image: </strong>{{ agent.docker_image }}</li>
+                    <li><strong>Max run duration: </strong>{{ agent.max_run_duration }}</li>
+                    <li><strong>Binaries path: </strong>{{ agent.binaries_path }}</li>
+                    <li><strong>Registered binaries: </strong>
+                        <ul>
+                        {%- for (group, name) in agent.monitored_binaries %}
+                            <li><strong>Group:{{ group }}</strong> Executable name: {{ name }}</li>
+                        {%- endfor %}
+                        </ul>
+                    </li>
+                    <li><strong>OS: </strong>{{ agent.os }}</li>
+                </ul>
+            </li>
+            {%- endfor %}
+        </ul>
+    </section>
+
+    <!-- Monitoring Section -->
+    <section id="monitoring">
+        <h1>Monitoring</h1>
+        <ul>
+            {%- if grafana.activated %}
+            <li><a href="{{ grafana.uri }}">Grafana dashboard</a></li>
+            {%- else %}
+            <li><em>Grafana disabled. Use <code>--grafana</code> to activate it.</em></li>
+            {%- endif %}
+
+            {%- if prometheus.activated %}
+            <li><a href="{{ prometheus.uri }}">Prometheus dashboard</a></li>
+            {%- else %}
+            <li><em>Prometheus disabled. Use <code>--prometheus</code> to activate it.</em></li>
+            {%- endif %}
+
+            {%- if monitoring %}
+            <li>NetData</li>
+            <ul>
+                {%- for agent in monitoring %}
+                <li><a href="{{ agent.uri }}">{{ agent.name }}</a></li>
+                {%- endfor %}
+            </ul>
+            {%- else %}
+            <li><em>NetData monitoring disabled. Use <code>--monitoring</code> to activate it.</em></li>
+            {%- endif %}
+
+            {%- for service in services %}
+            <li><a href="{{ service.uri }}">{{ service.title }}</a></li>
+            {%- endfor %}
+        </ul>
+    </section>
+
+    <!-- Debugging Section -->
+    <section id="debugging">
+        <h1>Debugging</h1>
+        <ul>
+            {%- for agent in agents %}
+            <li>
+                <strong>{{ agent.name }}</strong>
+                <ul>
+                    <li>
+                        Connect on the VM:
+                        <pre><code class="language-bash">{{ agent.vm_command }}</code></pre>
+                    </li>
+                    <li>
+                        Connect on the Docker:
+                        <pre><code class="language-bash">{{ agent.docker_command }}</code></pre>
+                    </li>
+                </ul>
+            </li>
+            {%- endfor %}
+        </ul>
+    </section>
+    </div>
+</body>
+</html>

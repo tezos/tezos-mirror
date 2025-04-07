@@ -132,7 +132,7 @@ let get_slot_content_from_shards cryptobox store slot_id =
         (Errors.other
            [Missing_shards {provided; required = minimal_number_of_shards}])
     else
-      let*! res = Store.Shards.read store.Store.shards slot_id shard_id in
+      let*! res = Store.Shards.read (Store.shards store) slot_id shard_id in
       match res with
       | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
       | Error _ -> loop acc (shard_id + 1) remaining
@@ -141,8 +141,12 @@ let get_slot_content_from_shards cryptobox store slot_id =
   let* polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   (* Store the slot so that next calls don't require a reconstruction. *)
-  let* () = Store.Slots.add_slot store.Store.slots ~slot_size slot slot_id in
-  let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
+  let* () = Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id in
+  let*! () =
+    Event.emit_fetched_slot
+      ~size:(Bytes.length slot)
+      ~shards:(Seq.length shards)
+  in
   return slot
 
 let get_slot_content ~reconstruct_if_missing ctxt slot_id =
@@ -152,7 +156,7 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   let cryptobox = Node_context.get_cryptobox ctxt in
   let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
   let*! res_slot_store =
-    Store.Slots.find_slot store.Store.slots ~slot_size slot_id
+    Store.Slots.find_slot (Store.slots store) ~slot_size slot_id
   in
   match res_slot_store with
   | Ok slot -> return slot
@@ -194,6 +198,35 @@ let commit cryptobox polynomial =
   | Error `Prover_SRS_not_loaded -> Error (Errors.other [No_prover_SRS])
 
 (* Main functions *)
+
+let maybe_register_trap traps_store ~traps_fraction message_id message =
+  let delegate = message_id.Types.Message_id.pkh in
+  let Types.Message.{share; shard_proof} = message in
+  let Types.Message_id.{slot_index; level; shard_index; _} = message_id in
+  let trap_res = Trap.share_is_trap ~traps_fraction delegate share in
+  match trap_res with
+  | Ok true ->
+      let slot_id = Types.Slot_id.{slot_index; slot_level = level} in
+      let () =
+        Event.emit_dont_wait__register_trap
+          ~delegate
+          ~published_level:slot_id.slot_level
+          ~slot_index:slot_id.slot_index
+          ~shard_index
+      in
+      Store.Traps.add
+        traps_store
+        ~slot_id
+        ~shard_index
+        ~delegate
+        ~share
+        ~shard_proof
+  | Ok false -> ()
+  | Error _ ->
+      Event.emit_dont_wait__trap_registration_fail
+        ~delegate
+        ~slot_index
+        ~shard_index
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment slot polynomial =
@@ -241,17 +274,15 @@ let shards_to_attesters committee =
   fun index -> get_opt committee index
 
 (** This function publishes the shards of a commitment that is waiting
-    for attestion on L1 if this node has those shards and their proofs
+    for attestation on L1 if this node has those shards and their proofs
     in memory. *)
-let publish_proved_shards (slot_id : Types.slot_id) ~level_committee
+let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
     proto_parameters commitment shards shard_proofs gs_worker =
   let open Lwt_result_syntax in
   let attestation_level =
     Int32.(
       pred
-      @@ add
-           slot_id.slot_level
-           (of_int proto_parameters.Dal_plugin.attestation_lag))
+      @@ add slot_id.slot_level (of_int proto_parameters.Types.attestation_lag))
   in
   let* committee = level_committee ~level:attestation_level in
   let attester_of_shard = shards_to_attesters committee in
@@ -283,6 +314,20 @@ let publish_proved_shards (slot_id : Types.slot_id) ~level_committee
                    pkh;
                  }
              in
+             let store = Node_context.get_store ctxt in
+             let traps_store = Store.traps store in
+             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+                The [proto_parameters] are those for the last known finalized
+                level, which may differ from those of the slot level. This will
+                be an issue when the value of the [traps_fraction] changes.*)
+             let traps_fraction = proto_parameters.traps_fraction in
+             let () =
+               maybe_register_trap
+                 traps_store
+                 ~traps_fraction
+                 message_id
+                 message
+             in
              Gossipsub.Worker.(
                Publish_message {message; topic; message_id}
                |> app_input gs_worker) ;
@@ -291,10 +336,12 @@ let publish_proved_shards (slot_id : Types.slot_id) ~level_committee
 (** This function publishes the shards of a commitment that is waiting
     for attestion on L1 if this node has those shards and their proofs
     in memory. *)
-let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
-    gs_worker proto_parameters commitment slot_id =
+let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
+    proto_parameters commitment slot_id =
   let open Lwt_result_syntax in
-  match Store.Commitment_indexed_cache.find_opt node_store.cache commitment with
+  let node_store = Node_context.get_store ctxt in
+  let cache = Store.cache node_store in
+  match Store.Commitment_indexed_cache.find_opt cache commitment with
   | None ->
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5676
 
@@ -314,14 +361,15 @@ let publish_slot_data ~level_committee (node_store : Store.t) ~slot_size
         |> Seq.mapi (fun index share -> Cryptobox.{index; share})
       in
       let* () =
-        Store.(Shards.write_all node_store.shards slot_id shards)
+        Store.Shards.write_all (Store.shards node_store) slot_id shards
         |> Errors.to_tzresult
       in
       let* () =
-        Store.Slots.add_slot ~slot_size node_store.slots slot slot_id
+        Store.Slots.add_slot ~slot_size (Store.slots node_store) slot slot_id
         |> Errors.to_tzresult
       in
       publish_proved_shards
+        ctxt
         slot_id
         ~level_committee
         proto_parameters
@@ -335,23 +383,30 @@ let store_slot_headers ~number_of_slots ~block_level slot_headers node_store =
 
 let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots node_store =
-  Store.(
-    Statuses.update_selected_slot_headers_statuses
-      ~block_level
-      ~attestation_lag
-      ~number_of_slots
-      attested_slots
-      node_store.slot_header_statuses)
+  let slot_header_statuses_store = Store.slot_header_statuses node_store in
+  Store.Statuses.update_selected_slot_headers_statuses
+    ~block_level
+    ~attestation_lag
+    ~number_of_slots
+    attested_slots
+    slot_header_statuses_store
 
 let get_slot_status ~slot_id node_store =
-  Store.(Statuses.get_slot_status ~slot_id node_store.slot_header_statuses)
+  let slot_header_statuses_store = Store.slot_header_statuses node_store in
+  Store.Statuses.get_slot_status ~slot_id slot_header_statuses_store
 
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
-  Store.Shards.read store.shards slot_id shard_index
+  Store.Shards.read (Store.shards store) slot_id shard_index
 
 let get_slot_pages ~reconstruct_if_missing node_context slot_id =
   let open Lwt_result_syntax in
-  let proto_parameters = Node_context.get_proto_parameters node_context in
+  let* proto_parameters =
+    Node_context.get_proto_parameters
+      node_context
+      ~level:(`Level slot_id.Types.Slot_id.slot_level)
+    |> Lwt.return
+    |> lwt_map_error (fun e -> `Other e)
+  in
   let page_size = proto_parameters.cryptobox_parameters.page_size in
   let* slot = get_slot_content ~reconstruct_if_missing node_context slot_id in
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.

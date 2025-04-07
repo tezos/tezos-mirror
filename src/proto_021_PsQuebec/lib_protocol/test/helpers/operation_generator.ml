@@ -167,8 +167,8 @@ let random_tz3 =
 
 let random_tz4 =
   let open QCheck2.Gen in
-  let+ str = string_size (pure Signature.Bls.Public_key_hash.size) in
-  (Bls (Signature.Bls.Public_key_hash.of_string_exn str) : public_key_hash)
+  let+ str = string_size (pure Signature.Bls_aug.Public_key_hash.size) in
+  (Bls (Signature.Bls_aug.Public_key_hash.of_string_exn str) : public_key_hash)
 
 let random_pkh =
   let open QCheck2.Gen in
@@ -214,7 +214,7 @@ let random_signature =
         of_ed25519 Signature.Ed25519.zero;
         of_secp256k1 Signature.Secp256k1.zero;
         of_p256 Signature.P256.zero;
-        of_bls Signature.Bls.zero;
+        of_bls Signature.Bls_aug.zero;
         Unknown (Bytes.make 64 '\000');
       ]
     ()

@@ -1,0 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_layer2_riscv_context)
+ (public_name octez-l2-libs.riscv_context)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.error-monad
+  octez-libs.lwt-result-stdlib
+  octez-l2-libs.layer2_store
+  octez-riscv-pvm)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_error_monad.Error_monad
+  -open Tezos_lwt_result_stdlib
+  -open Tezos_layer2_store))

@@ -192,7 +192,7 @@ val get_context :
 val sources_from_operation :
   ctxt ->
   Protocol.Alpha_context.packed_operation ->
-  Signature.public_key_hash list Lwt.t
+  Tezos_crypto.Signature.public_key_hash list Lwt.t
 
 module Internal_for_tests : sig
   open Protocol.Alpha_context

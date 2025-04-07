@@ -46,7 +46,7 @@ module C = struct
     Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
         let open Lwt_syntax in
         let open Filename.Infix in
-        let root = base_dir // "context" in
+        let root = base_dir // "brassaia_context" in
         let* idx = init root in
         let* r =
           commit_genesis

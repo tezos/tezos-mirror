@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use core::panic;
 use lazy_static::lazy_static;
 use octez_riscv::parser::{instruction::Instr, parse_block};
 use std::{fs::DirEntry, process::Command};
@@ -73,7 +74,7 @@ fn transform_objdump_instr<'a>(address: &'a str, instr: &'a str, args: &'a str) 
 lazy_static! {
     static ref OBJDUMP_EXE: &'static str = {
         // Iterate through the known executable names to find a suitable objdump.
-        for exe in ["riscv64-unknown-linux-gnu-objdump", "riscv64-linux-gnu-objdump", "riscv64-elf-objdump", "objdump"] {
+        for exe in ["riscv64-unknown-linux-musl-objdump", "riscv64-unknown-linux-gnu-objdump", "riscv64-linux-gnu-objdump", "riscv64-unknown-elf-objdump", "riscv64-elf-objdump", "objdump"] {
             let Some(output) = Command::new(exe).arg("--version").output().ok() else {
                 continue;
             };
@@ -142,8 +143,34 @@ fn parse_encoded(encoded: &str) -> Instr {
     parse_block(&bytes)[0]
 }
 
+/// List of uncompressed instructions that have a HINT encoding associated. Compressed instructions
+/// are not included as there are no HINT encodings for them in the objdump.
+const HINT_INSTR_LIST: [&str; 35] = [
+    "lui", "auipc", "addi", "andi", "ori", "xori", "add", "sub", "and", "or", "xor", "sll", "srl",
+    "sra", "slti", "sltiu", "slli", "srli", "srai", "slt", "sltu", "addiw", "addw", "subw", "sllw",
+    "srlw", "sraw", "slti", "sltiu", "slli", "srli", "srai", "slliw", "srliw", "sraiw",
+];
+
+fn check_hint_instr(objdump_instr: String) {
+    // objdump will decode a HINT instruction as `<opcode> zero, ...`. In order to check that it is
+    // a valid HINT, we ensure the opcode is one containing HINTs and that the first argument (rd)
+    // is zero.
+    let mut opcode_rd = objdump_instr.split(',').next().unwrap().split(' ');
+    let opcode = opcode_rd.next().unwrap();
+    let rd = opcode_rd.next().unwrap();
+    if HINT_INSTR_LIST.contains(&opcode) && rd == "zero" {
+        return;
+    }
+    panic!("Instruction incorrectly parsed as HINT: {}", objdump_instr);
+}
+
 fn check_instructions(fname: &str, instructions: Vec<(String, Instr, String)>) {
+    use octez_riscv::parser::instruction::InstrCacheable;
     for (address, parsed_instr, objdump_instr) in instructions {
+        if let Instr::Cacheable(InstrCacheable::Hint { instr: _ }) = parsed_instr {
+            check_hint_instr(objdump_instr);
+            continue;
+        }
         let printed_instr = parsed_instr.to_string();
         if objdump_instr.starts_with('.') || objdump_instr == "unimp" || objdump_instr == "c.unimp"
         {

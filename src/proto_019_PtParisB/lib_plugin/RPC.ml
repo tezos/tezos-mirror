@@ -3136,6 +3136,17 @@ module Sc_rollup = struct
       ()
       ()
 
+  let timeout ctxt block sc_rollup_address staker1 staker2 =
+    RPC_context.make_call3
+      S.timeout
+      ctxt
+      block
+      sc_rollup_address
+      staker1
+      staker2
+      ()
+      ()
+
   let can_be_cemented ctxt block sc_rollup_address commitment_hash =
     RPC_context.make_call2
       S.can_be_cemented

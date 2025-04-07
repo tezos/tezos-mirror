@@ -1,0 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_profiler_complex_backends)
+ (public_name octez-libs.octez-profiler.complex_backends)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.octez-profiler
+  octez-libs.octez-profiler.unix
+  octez-libs.octez-profiler.backends
+  octez-libs.stdlib
+  octez-libs.data-encoding
+  octez-libs.prometheus
+  opentelemetry
+  ambient-context-lwt
+  octez-libs.opentelemetry-client-cohttp-lwt)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_base_unix
+  -open Tezos_profiler
+  -open Tezos_profiler_unix
+  -open Tezos_profiler_backends
+  -open Tezos_stdlib
+  -open Data_encoding))

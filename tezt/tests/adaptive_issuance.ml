@@ -137,16 +137,25 @@ let wait_for_denunciation_injection node client accuser =
   if List.mem oph mempool.validated then return oph
   else Test.fail "the denunciation operation was rejected by the mempool"
 
-let default_overrides =
-  [
-    (* Shorter cycles *)
-    (["blocks_per_cycle"], `Int blocks_per_cycle);
-    (["nonce_revelation_threshold"], `Int nonce_revelation_threshold);
-    (* Activate adaptive issuance feature vote *)
-    (["adaptive_issuance_activation_vote_enable"], `Bool true);
-    (* Make adaptive issuance activation faster *)
-    (["adaptive_issuance_launch_ema_threshold"], `Int 1);
-  ]
+let default_overrides ~protocol =
+  let common =
+    [
+      (* Shorter cycles *)
+      (["blocks_per_cycle"], `Int blocks_per_cycle);
+      (["nonce_revelation_threshold"], `Int nonce_revelation_threshold);
+    ]
+  in
+  if Protocol.(number protocol <= number Quebec) then
+    [
+      (* Activate adaptive issuance feature vote *)
+      (["adaptive_issuance_activation_vote_enable"], `Bool true);
+      (* Make adaptive issuance activation faster *)
+      (["adaptive_issuance_launch_ema_threshold"], `Int 1);
+      (["adaptive_issuance_force_activation"], `Bool true);
+    ]
+    @ common
+  else (* AI activation feature flags have been removed in protocol R. *)
+    common
 
 let launch_ema_threshold client =
   let* json =
@@ -167,7 +176,7 @@ let init ?(overrides = default_overrides) protocol =
   let* sandbox_client = Client.init ~endpoint:sandbox_endpoint () in
   let* parameter_file =
     let base = Either.Right (protocol, None) in
-    Protocol.write_parameter_file ~base overrides
+    Protocol.write_parameter_file ~base (overrides ~protocol)
   in
   let* () = Client.activate_protocol ~protocol sandbox_client ~parameter_file in
   Log.info "Activated protocol." ;
@@ -185,7 +194,7 @@ let activate_ai protocol sandbox_client sandbox_endpoint =
     Client.RPC.call sandbox_client
     @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
   in
-  assert (JSON.is_null launch_cycle) ;
+  Assert.is_none ~loc:__LOC__ ~pp:Format.pp_print_int launch_cycle ;
   (* Make delegate vote for AI activation*)
   let bake ?keys client =
     Helpers.bake ~ai_vote:On ~endpoint:sandbox_endpoint ~protocol ?keys client
@@ -204,14 +213,14 @@ let activate_ai protocol sandbox_client sandbox_endpoint =
     Client.RPC.call sandbox_client
     @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
   in
-  Log.info "AI will activate in cycle %d" (JSON.as_int launch_cycle) ;
+  Log.info "AI will activate in cycle %d" (Option.get launch_cycle) ;
 
   (* Wait for <launch_cycle> to have AI fully activated *)
   let* current_level = Helpers.get_current_level sandbox_client in
 
   Helpers.bake_n_cycles
     bake
-    (JSON.as_int launch_cycle - current_level.cycle)
+    (Option.get launch_cycle - current_level.cycle)
     sandbox_client
 
 (** This test starts from a protocol with AI feature flag enabled. It
@@ -220,11 +229,20 @@ let activate_ai protocol sandbox_client sandbox_endpoint =
 let test_AI_activation =
   Protocol.register_test
     ~__FILE__
-    ~supports:Protocol.(From_protocol (number ParisC))
+      (* In protocols R+, AI is always immediately active; there is no
+         feature vote. *)
+    ~supports:Protocol.(Until_protocol (number Quebec))
     ~title:"AI Activation - test AI activation after feature vote"
     ~tags:["adaptive_issuance"; "staking"]
   @@ fun protocol ->
-  let* _proto_hash, endpoint, client, _node = init protocol in
+  let overrides ~protocol =
+    (* Remove AI force activation *)
+    List.filter
+      (function
+        | ["adaptive_issuance_force_activation"], _ -> false | _ -> true)
+      (default_overrides ~protocol)
+  in
+  let* _proto_hash, endpoint, client, _node = init ~overrides protocol in
 
   let* staking_parameters =
     Client.RPC.call client
@@ -276,10 +294,10 @@ let test_AI_activation =
 
   assert (limit_after = 5000000 && edge_after = 500000000) ;
   log_step 3 "Check staking is not allowed before AI activation" ;
-  let stake =
-    Client.spawn_stake ~wait:"1" (Tez.of_int 1) ~staker:"bootstrap2" client
-  in
   let* () =
+    let stake =
+      Client.spawn_stake ~wait:"1" (Tez.of_int 1) ~staker:"bootstrap2" client
+    in
     Process.check_error
       ~msg:
         (rex
@@ -309,25 +327,21 @@ let test_AI_activation =
 let test_AI_activation_bypass_vote =
   Protocol.register_test
     ~__FILE__
-    ~supports:Protocol.(From_protocol (number ParisC))
+      (* The "adaptive_issuance_force_activation" feature flag no longer
+         exists in protocols R+ *)
+    ~supports:Protocol.(Until_protocol (number Quebec))
     ~title:
       "AI Activation - test AI activation with feature flag force_activation \
        set"
     ~tags:["adaptive_issuance"; "staking"]
   @@ fun protocol ->
-  let* _proto_hash, endpoint, client, _node =
-    init
-      ~overrides:
-        ((["adaptive_issuance_force_activation"], `Bool true)
-        :: default_overrides)
-      protocol
-  in
+  let* _proto_hash, endpoint, client, _node = init protocol in
 
-  let* ai_activated =
+  let* launch_cycle =
     Client.RPC.call client
     @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
   in
-  assert (JSON.as_int ai_activated = 0) ;
+  assert (Option.get launch_cycle = 0) ;
 
   let* staking_parameters =
     Client.RPC.call client
@@ -479,7 +493,6 @@ let test_staking =
     ~__FILE__
     ~title:
       "Staking - test staking with delegate and staker in a simple scenario"
-    ~supports:Protocol.(From_protocol (number ParisC))
     ~tags:
       [
         "adaptive_issuance";
@@ -493,19 +506,31 @@ let test_staking =
       ]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
-  let* _proto_hash, endpoint, client_1, node_1 =
-    init
-      ~overrides:
-        ((["adaptive_issuance_force_activation"], `Bool true)
-        :: default_overrides)
-      protocol
+  let overrides ~protocol =
+    let overrides = default_overrides ~protocol in
+    if Protocol.(number protocol > number Quebec) then
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7576 use a
+         default value for [tolerated_inactivity_period] *)
+      (["tolerated_inactivity_period"], `Int 3)
+      :: (["issuance_weights"; "dal_rewards_weight"], `Int 0)
+      :: overrides
+    else overrides
   in
+
+  let* _proto_hash, endpoint, client_1, node_1 = init ~overrides protocol in
 
   let* eosod = edge_of_staking_over_delegation client_1 in
 
   log_step 1 "Prepare second node for double baking" ;
   Log.info "Starting second node" ;
-  let* node_2 = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let* node_2 =
+    Node.init
+      [
+        Synchronisation_threshold 0;
+        Private_mode;
+        Node.(History_mode default_full);
+      ]
+  in
   let* () = Node.wait_for_ready node_2 in
   let* client_2 = Client.init ~endpoint:(Node node_2) () in
 
@@ -1448,17 +1473,10 @@ let check_rpc_ok client rpc =
 let test_fix_delegated_balance =
   Protocol.register_test
     ~__FILE__
-    ~supports:Protocol.(From_protocol (number ParisC))
     ~title:"Test protocol fix for delegated balance rpc"
     ~tags:["rpc"; "delegated_balance"]
   @@ fun protocol ->
-  let* _proto_hash, endpoint, client, _node =
-    init
-      ~overrides:
-        ((["adaptive_issuance_force_activation"], `Bool true)
-        :: default_overrides)
-      protocol
-  in
+  let* _proto_hash, endpoint, client, _node = init protocol in
   let stake_amount = Tez.of_int 6_000 in
   let delegate = "bootstrap1" in
   log_step 1 "Preparing delegator accounts" ;

@@ -47,6 +47,7 @@ let injector_operation_to_manager :
       let refutation =
         Sc_rollup_proto_types.Game.refutation_of_octez refutation
       in
+      let opponent = Signature.Of_V_latest.get_public_key_hash_exn opponent in
       Manager (Sc_rollup_refute {rollup; opponent; refutation})
   | Timeout {rollup; stakers} ->
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
@@ -54,6 +55,7 @@ let injector_operation_to_manager :
       Manager (Sc_rollup_timeout {rollup; stakers})
   | Recover_bond {rollup; staker} ->
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      let staker = Signature.Of_V_latest.get_public_key_hash_exn staker in
       Manager (Sc_rollup_recover_bond {sc_rollup = rollup; staker})
   | Execute_outbox_message {rollup; cemented_commitment; output_proof} ->
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
@@ -102,6 +104,7 @@ let injector_operation_of_manager :
       let refutation =
         Sc_rollup_proto_types.Game.refutation_to_octez refutation
       in
+      let opponent = Tezos_crypto.Signature.Of_V1.public_key_hash opponent in
       Some (Refute {rollup; opponent; refutation})
   | Sc_rollup_timeout {rollup; stakers} ->
       let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
@@ -282,7 +285,7 @@ module Proto_client = struct
   let dummy_sk_uri =
     WithExceptions.Result.get_ok ~loc:__LOC__
     @@ Tezos_signer_backends.Unencrypted.make_sk
-    @@ Signature.Secret_key.of_b58check_exn
+    @@ Tezos_crypto.Signature.Secret_key.of_b58check_exn
          "edsk3UqeiQWXX7NFEY1wUs6J1t2ez5aQ3hEWdqX5Jr5edZiGLW8nZr"
 
   let simulate_operations cctxt ~force ~source ~src_pk ~successor_level
@@ -320,6 +323,8 @@ module Proto_client = struct
     in
     let safety_guard = Option.map Gas.Arith.integral_of_int_exn safety_guard in
     let*! simulation_result =
+      let*? source = Signature.Of_V_latest.get_public_key_hash source in
+      let*? src_pk = Signature.Of_V_latest.get_public_key src_pk in
       Injection.inject_manager_operation
         cctxt
         ~simulation:true (* Only simulation here *)
@@ -489,6 +494,21 @@ module Proto_client = struct
     Operation_kind.Map.iter_e check fee_parameters
 
   let checks state = check_fee_parameters state
+
+  let get_balance_mutez cctxt ?block pkh =
+    let open Lwt_result_syntax in
+    let block = match block with Some b -> `Hash (b, 0) | None -> `Head 0 in
+    let cctxt =
+      new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
+    in
+    let*? pkh = Signature.Of_V_latest.get_public_key_hash pkh in
+    let+ balance =
+      Plugin.Alpha_services.Contract.balance
+        cctxt
+        (cctxt#chain, block)
+        (Implicit pkh)
+    in
+    Protocol.Alpha_context.Tez.to_mutez balance
 end
 
 let () = Injector.register_proto_client Protocol.hash (module Proto_client)

@@ -60,7 +60,7 @@ local logs = panel.logs;
         else q;
         stat.new(title)
         + stat.panelOptions.withGridPos(h, w, x, y)
-        + stat.queryOptions.withTargets(q)
+        + stat.queryOptions.withTargets(q0)
         + stat.options.withGraphMode('none')
         + stat.options.withColorMode('none'),
 

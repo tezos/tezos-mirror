@@ -84,8 +84,6 @@ type t = {
   unsafe_pvm_patches : Pvm_patches.unsafe_patch list;
   execute_outbox_messages_filter : outbox_message_filter list;
   dal_node_endpoint : Uri.t option;
-  dac_observer_endpoint : Uri.t option;
-  dac_timeout : Z.t option;
   pre_images_endpoint : Uri.t option;
   batcher : batcher;
   injector : injector;
@@ -97,6 +95,7 @@ type t = {
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
+  unsafe_disable_wasm_kernel_checks : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
   history_mode : history_mode option;
@@ -521,8 +520,6 @@ let encoding default_display : t Data_encoding.t =
            execute_outbox_messages_filter;
            unsafe_pvm_patches;
            dal_node_endpoint;
-           dac_observer_endpoint;
-           dac_timeout;
            pre_images_endpoint;
            batcher;
            injector;
@@ -534,6 +531,7 @@ let encoding default_display : t Data_encoding.t =
            index_buffer_size;
            irmin_cache_size;
            log_kernel_debug;
+           unsafe_disable_wasm_kernel_checks;
            no_degraded;
            gc_parameters;
            history_mode;
@@ -555,24 +553,20 @@ let encoding default_display : t Data_encoding.t =
             unsafe_pvm_patches,
             execute_outbox_messages_filter ) ),
         ( ( dal_node_endpoint,
-            dac_observer_endpoint,
-            dac_timeout,
             pre_images_endpoint,
             batcher,
             injector,
             l1_blocks_cache_size,
             l2_blocks_cache_size,
             prefetch_blocks ),
-          ( l1_rpc_timeout,
-            loop_retry_delay,
-            index_buffer_size,
-            irmin_cache_size,
-            log_kernel_debug,
-            no_degraded,
-            gc_parameters,
-            history_mode,
-            cors,
-            bail_on_disagree ) ) ))
+          ( ( l1_rpc_timeout,
+              loop_retry_delay,
+              index_buffer_size,
+              irmin_cache_size,
+              log_kernel_debug,
+              unsafe_disable_wasm_kernel_checks ),
+            (no_degraded, gc_parameters, history_mode, cors, bail_on_disagree)
+          ) ) ))
     (fun ( ( ( sc_rollup_address,
                boot_sector_file,
                operators,
@@ -588,24 +582,20 @@ let encoding default_display : t Data_encoding.t =
                unsafe_pvm_patches,
                execute_outbox_messages_filter ) ),
            ( ( dal_node_endpoint,
-               dac_observer_endpoint,
-               dac_timeout,
                pre_images_endpoint,
                batcher,
                injector,
                l1_blocks_cache_size,
                l2_blocks_cache_size,
                prefetch_blocks ),
-             ( l1_rpc_timeout,
-               loop_retry_delay,
-               index_buffer_size,
-               irmin_cache_size,
-               log_kernel_debug,
-               no_degraded,
-               gc_parameters,
-               history_mode,
-               cors,
-               bail_on_disagree ) ) ) ->
+             ( ( l1_rpc_timeout,
+                 loop_retry_delay,
+                 index_buffer_size,
+                 irmin_cache_size,
+                 log_kernel_debug,
+                 unsafe_disable_wasm_kernel_checks ),
+               (no_degraded, gc_parameters, history_mode, cors, bail_on_disagree)
+             ) ) ) ->
       {
         sc_rollup_address;
         boot_sector_file;
@@ -626,8 +616,6 @@ let encoding default_display : t Data_encoding.t =
         unsafe_pvm_patches;
         execute_outbox_messages_filter;
         dal_node_endpoint;
-        dac_observer_endpoint;
-        dac_timeout;
         pre_images_endpoint;
         batcher;
         injector;
@@ -639,6 +627,7 @@ let encoding default_display : t Data_encoding.t =
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
+        unsafe_disable_wasm_kernel_checks;
         no_degraded;
         gc_parameters;
         history_mode;
@@ -669,7 +658,7 @@ let encoding default_display : t Data_encoding.t =
                 default_acl))
           (obj8
              (opt "metrics-addr" ~description:"Metrics address" string)
-             (dft "performance-metrics" bool false)
+             (dft "performance-metrics" bool true)
              (dft
                 "reconnection_delay"
                 ~description:
@@ -710,30 +699,40 @@ let encoding default_display : t Data_encoding.t =
                 execute_outbox_messages_filter_encoding
                 default_execute_outbox_filter)))
        (merge_objs
-          (obj9
+          (obj7
              (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
-             (opt "dac-observer-client" Tezos_rpc.Encoding.uri_encoding)
-             (opt "dac-timeout" Data_encoding.z)
              (opt "pre-images-endpoint" Tezos_rpc.Encoding.uri_encoding)
              (dft "batcher" batcher_encoding default_batcher)
              (dft "injector" injector_encoding default_injector)
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31))
-          (obj10
-             (dft "l1_rpc_timeout" Data_encoding.float default_l1_rpc_timeout)
-             (dft
-                "loop_retry_delay"
-                Data_encoding.float
-                default_loop_retry_delay)
-             (opt "index_buffer_size" int31 ~description:"Deprecated")
-             (opt "irmin_cache_size" int31)
-             (dft "log-kernel-debug" Data_encoding.bool false)
-             (dft "no-degraded" Data_encoding.bool false)
-             (dft "gc-parameters" gc_parameters_encoding default_gc_parameters)
-             (opt "history-mode" history_mode_encoding)
-             (dft "cors" cors_encoding Resto_cohttp.Cors.default)
-             (dft "bail-on-disagree" bool false))))
+          (merge_objs
+             (obj6
+                (dft
+                   "l1_rpc_timeout"
+                   Data_encoding.float
+                   default_l1_rpc_timeout)
+                (dft
+                   "loop_retry_delay"
+                   Data_encoding.float
+                   default_loop_retry_delay)
+                (opt "index_buffer_size" int31 ~description:"Deprecated")
+                (opt "irmin_cache_size" int31)
+                (dft "log-kernel-debug" Data_encoding.bool false)
+                (dft
+                   "unsafe-disable-wasm-kernel-checks"
+                   Data_encoding.bool
+                   false))
+             (obj5
+                (dft "no-degraded" Data_encoding.bool false)
+                (dft
+                   "gc-parameters"
+                   gc_parameters_encoding
+                   default_gc_parameters)
+                (opt "history-mode" history_mode_encoding)
+                (dft "cors" cors_encoding Resto_cohttp.Cors.default)
+                (dft "bail-on-disagree" bool false)))))
 
 let encoding_no_default = encoding `Show
 
@@ -844,13 +843,13 @@ module Cli = struct
       operators
 
   let configuration_from_args ~rpc_addr ~rpc_port ~acl_override ~metrics_addr
-      ~enable_performance_metrics ~loser_mode ~reconnection_delay
-      ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
-      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
-      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
-      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
-      ~apply_unsafe_patches ~bail_on_disagree =
+      ~disable_performance_metrics ~loser_mode ~reconnection_delay
+      ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
+      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
+      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
+      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
+      ~allowed_origins ~allowed_headers ~apply_unsafe_patches
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
     let open Lwt_result_syntax in
     let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
@@ -876,11 +875,9 @@ module Cli = struct
         reconnection_delay =
           Option.value ~default:default_reconnection_delay reconnection_delay;
         dal_node_endpoint;
-        dac_observer_endpoint;
-        dac_timeout;
         pre_images_endpoint;
         metrics_addr;
-        performance_metrics = enable_performance_metrics;
+        performance_metrics = not disable_performance_metrics;
         fee_parameters = Operation_kind.Map.empty;
         mode;
         loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
@@ -907,6 +904,7 @@ module Cli = struct
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
+        unsafe_disable_wasm_kernel_checks;
         no_degraded;
         gc_parameters =
           {frequency_in_blocks = gc_frequency; context_splitting_period = None};
@@ -923,13 +921,13 @@ module Cli = struct
       }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
-      ~acl_override ~metrics_addr ~enable_performance_metrics ~loser_mode
-      ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
-      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
-      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
-      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
-      ~apply_unsafe_patches ~bail_on_disagree =
+      ~acl_override ~metrics_addr ~disable_performance_metrics ~loser_mode
+      ~reconnection_delay ~dal_node_endpoint ~pre_images_endpoint
+      ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
+      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
+      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
+      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -962,11 +960,6 @@ module Cli = struct
         acl;
         dal_node_endpoint =
           Option.either dal_node_endpoint configuration.dal_node_endpoint;
-        dac_observer_endpoint =
-          Option.either
-            dac_observer_endpoint
-            configuration.dac_observer_endpoint;
-        dac_timeout = Option.either dac_timeout configuration.dac_timeout;
         pre_images_endpoint =
           Option.either pre_images_endpoint configuration.pre_images_endpoint;
         reconnection_delay =
@@ -977,23 +970,30 @@ module Cli = struct
           {
             retention_period =
               Option.value
-                ~default:default_injector.retention_period
+                ~default:configuration.injector.retention_period
                 injector_retention_period;
             attempts =
-              Option.value ~default:default_injector.attempts injector_attempts;
+              Option.value
+                ~default:configuration.injector.attempts
+                injector_attempts;
             injection_ttl =
-              Option.value ~default:default_injector.injection_ttl injection_ttl;
+              Option.value
+                ~default:configuration.injector.injection_ttl
+                injection_ttl;
           };
         loser_mode = Option.value ~default:configuration.loser_mode loser_mode;
         apply_unsafe_patches;
         metrics_addr = Option.either metrics_addr configuration.metrics_addr;
         performance_metrics =
-          enable_performance_metrics || configuration.performance_metrics;
+          (not disable_performance_metrics) && configuration.performance_metrics;
         index_buffer_size =
           Option.either index_buffer_size configuration.index_buffer_size;
         irmin_cache_size =
           Option.either irmin_cache_size configuration.irmin_cache_size;
         log_kernel_debug = log_kernel_debug || configuration.log_kernel_debug;
+        unsafe_disable_wasm_kernel_checks =
+          unsafe_disable_wasm_kernel_checks
+          || configuration.unsafe_disable_wasm_kernel_checks;
         no_degraded = no_degraded || configuration.no_degraded;
         gc_parameters =
           {
@@ -1021,13 +1021,13 @@ module Cli = struct
       }
 
   let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~acl_override
-      ~metrics_addr ~enable_performance_metrics ~loser_mode ~reconnection_delay
-      ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
-      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
-      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
-      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
-      ~apply_unsafe_patches ~bail_on_disagree =
+      ~metrics_addr ~disable_performance_metrics ~loser_mode ~reconnection_delay
+      ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
+      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
+      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
+      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
+      ~allowed_origins ~allowed_headers ~apply_unsafe_patches
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -1054,12 +1054,10 @@ module Cli = struct
           ~rpc_port
           ~acl_override
           ~metrics_addr
-          ~enable_performance_metrics
+          ~disable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
-          ~dac_observer_endpoint
-          ~dac_timeout
           ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
@@ -1077,6 +1075,7 @@ module Cli = struct
           ~allowed_origins
           ~allowed_headers
           ~apply_unsafe_patches
+          ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
       in
       return configuration
@@ -1106,12 +1105,10 @@ module Cli = struct
           ~rpc_port
           ~acl_override
           ~metrics_addr
-          ~enable_performance_metrics
+          ~disable_performance_metrics
           ~loser_mode
           ~reconnection_delay
           ~dal_node_endpoint
-          ~dac_observer_endpoint
-          ~dac_timeout
           ~pre_images_endpoint
           ~injector_retention_period
           ~injector_attempts
@@ -1129,6 +1126,7 @@ module Cli = struct
           ~allowed_headers
           ~allowed_origins
           ~apply_unsafe_patches
+          ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
       in
       return config

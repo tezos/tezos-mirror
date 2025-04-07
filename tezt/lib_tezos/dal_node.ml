@@ -100,48 +100,73 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(producer_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
     dal_node =
-  spawn_command dal_node @@ List.filter_map Fun.id
+  spawn_command dal_node
   @@ [
-       Some "config";
-       Some "init";
-       Some "--data-dir";
-       Some (data_dir dal_node);
-       Some "--rpc-addr";
-       Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
-       Some "--net-addr";
-       Some (listen_addr dal_node);
-       Some "--metrics-addr";
-       Some (metrics_addr dal_node);
-       Some "--expected-pow";
-       Some (string_of_float expected_pow);
+       "config";
+       "init";
+       "--data-dir";
+       data_dir dal_node;
+       "--rpc-addr";
+       Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node);
+       "--net-addr";
+       listen_addr dal_node;
+       "--metrics-addr";
+       metrics_addr dal_node;
+       "--expected-pow";
+       string_of_float expected_pow;
      ]
   @ (match public_addr dal_node with
     | None -> []
-    | Some addr -> [Some "--public-addr"; Some addr])
-  @ (if peers = [] then [None]
-     else [Some "--peers"; Some (String.concat "," peers)])
-  @ (if attester_profiles = [] then [None]
-     else
-       [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
-  @ (if observer_profiles = [] then [None]
+    | Some addr -> ["--public-addr"; addr])
+  @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
+  @ (if attester_profiles = [] then []
+     else ["--attester-profiles"; String.concat "," attester_profiles])
+  @ (if observer_profiles = [] then []
      else
        [
-         Some "--observer-profiles";
-         Some (String.concat "," (List.map string_of_int observer_profiles));
+         "--observer-profiles";
+         String.concat "," (List.map string_of_int observer_profiles);
        ])
-  @ (if producer_profiles = [] then [None]
+  @ (if producer_profiles = [] then []
      else
        [
-         Some "--producer-profiles";
-         Some (String.concat "," (List.map string_of_int producer_profiles));
+         "--producer-profiles";
+         String.concat "," (List.map string_of_int producer_profiles);
        ])
-  @ (if bootstrap_profile then [Some "--bootstrap-profile"] else [None])
+  @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
   @
   match history_mode with
   | None -> []
-  | Some Full -> [Some "--history-mode"; Some "full"]
-  | Some Auto -> [Some "--history-mode"; Some "auto"]
-  | Some (Custom i) -> [Some "--history-mode"; Some (string_of_int i)]
+  | Some Full -> ["--history-mode"; "full"]
+  | Some Auto -> ["--history-mode"; "auto"]
+  | Some (Custom i) -> ["--history-mode"; string_of_int i]
+
+let spawn_config_update ?(peers = []) ?(attester_profiles = [])
+    ?(producer_profiles = []) ?(observer_profiles = [])
+    ?(bootstrap_profile = false) ?history_mode dal_node =
+  spawn_command dal_node @@ ["config"; "update"]
+  @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
+  @ (if attester_profiles = [] then []
+     else ["--attester-profiles"; String.concat "," attester_profiles])
+  @ (if observer_profiles = [] then []
+     else
+       [
+         "--observer-profiles";
+         String.concat "," (List.map string_of_int observer_profiles);
+       ])
+  @ (if producer_profiles = [] then []
+     else
+       [
+         "--producer-profiles";
+         String.concat "," (List.map string_of_int producer_profiles);
+       ])
+  @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
+  @
+  match history_mode with
+  | None -> []
+  | Some Full -> ["--history-mode"; "full"]
+  | Some Auto -> ["--history-mode"; "auto"]
+  | Some (Custom i) -> ["--history-mode"; string_of_int i]
 
 module Config_file = struct
   let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
@@ -168,8 +193,24 @@ let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
   in
   Process.check process
 
+let update_config ?peers ?attester_profiles ?producer_profiles
+    ?observer_profiles ?bootstrap_profile ?history_mode dal_node =
+  let process =
+    spawn_config_update
+      ?peers
+      ?attester_profiles
+      ?producer_profiles
+      ?observer_profiles
+      ?bootstrap_profile
+      ?history_mode
+      dal_node
+  in
+  Process.check process
+
+let identity_file dal_node = Filename.concat (data_dir dal_node) "identity.json"
+
 let read_identity dal_node =
-  let filename = sf "%s/identity.json" @@ data_dir dal_node in
+  let filename = identity_file dal_node in
   match dal_node.persistent_state.runner with
   | None -> Lwt.return JSON.(parse_file filename |-> "peer_id" |> as_string)
   | Some runner ->
@@ -217,7 +258,7 @@ let wait_for_ready dal_node =
       let promise, resolver = Lwt.task () in
       dal_node.persistent_state.pending_ready <-
         resolver :: dal_node.persistent_state.pending_ready ;
-      check_event dal_node "dal_node_is_ready.v0" promise
+      check_event dal_node "dal_is_ready.v0" promise
 
 let wait_for_connections node connections =
   let counter = ref 0 in
@@ -236,7 +277,7 @@ let wait_for_disconnection node ~peer_id =
       if JSON.(event |-> "peer" |> as_string) = peer_id then Some () else None)
 
 let handle_event dal_node {name; value = _; timestamp = _} =
-  match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
+  match name with "dal_is_ready.v0" -> set_ready dal_node | _ -> ()
 
 let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
     ?name ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host)
@@ -399,3 +440,103 @@ let load_last_finalized_processed_level dal_node =
   in
   let* v_res = aux () in
   match v_res with Ok v -> Lwt.return_some v | Error _ -> Lwt.return_none
+
+let debug_print_store_schemas ?(path = Uses.path Constant.octez_dal_node) ?hooks
+    () =
+  let args = ["debug"; "print"; "store"; "schemas"] in
+  let process = Process.spawn ?hooks path @@ args in
+  Process.check process
+
+module Proxy = struct
+  type answer = [`Response of string]
+
+  type route = {
+    path : Re.Str.regexp;
+    callback :
+      path:string ->
+      fetch_answer:(unit -> Ezjsonm.t Lwt.t) ->
+      answer option Lwt.t;
+  }
+
+  type proxy = {
+    name : string;
+    routes : route list;
+    shutdown : unit Lwt.t;
+    trigger_shutdown : unit Lwt.u;
+  }
+
+  let make ~name ~routes =
+    let shutdown, trigger_shutdown = Lwt.task () in
+    {name; routes; shutdown; trigger_shutdown}
+
+  let route ~path ~callback = {path; callback}
+
+  let find_mocked_action t ~path =
+    List.find_opt (fun act -> Re.Str.string_match act.path path 0) t.routes
+
+  let run t ~honest_dal_node ~faulty_dal_node =
+    let dal_uri uri =
+      Uri.make
+        ~scheme:"http"
+        ~host:(rpc_host honest_dal_node)
+        ~port:(rpc_port honest_dal_node)
+        ~path:(Uri.path uri)
+        ~query:(Uri.query uri)
+        ()
+    in
+    let callback _conn req body =
+      let uri = Cohttp.Request.uri req in
+      let uri_str = Uri.to_string uri in
+      let method_ = Cohttp.Request.meth req in
+      let path = Uri.path uri in
+      match find_mocked_action t ~path with
+      | Some action -> (
+          Log.info "[%s] mocking data for request: '%s'" t.name uri_str ;
+          let* res =
+            action.callback ~path ~fetch_answer:(fun () ->
+                let headers = Cohttp.Request.headers req in
+                let* _resp, body =
+                  Cohttp_lwt_unix.Client.call
+                    ~headers
+                    ~body
+                    method_
+                    (dal_uri uri)
+                in
+                let* body_str = Cohttp_lwt.Body.to_string body in
+                return (Ezjsonm.from_string body_str))
+          in
+          match res with
+          | None -> Cohttp_lwt_unix.Server.respond_not_found ()
+          | Some (`Response body) ->
+              Log.info "[%s] mocking with custom answer '%s'" t.name body ;
+              Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ())
+      | None ->
+          Log.info
+            "[%s] forwarding the following request to the honest dal node: '%s'"
+            t.name
+            uri_str ;
+          let headers = Cohttp.Request.headers req in
+          let* resp, body =
+            Cohttp_lwt_unix.Client.call ~headers ~body method_ (dal_uri uri)
+          in
+          let* body_str = Cohttp_lwt.Body.to_string body in
+          Log.info
+            "[%s] mocking with honest dal node answer: '%s'"
+            t.name
+            body_str ;
+          Cohttp_lwt_unix.Server.respond_string
+            ~status:(Cohttp.Response.status resp)
+            ~headers:(Cohttp.Response.headers resp)
+            ~body:body_str
+            ()
+    in
+    let start () =
+      Cohttp_lwt_unix.Server.create
+        ~mode:(`TCP (`Port (rpc_port faulty_dal_node)))
+        ~stop:t.shutdown
+        (Cohttp_lwt_unix.Server.make ~callback ())
+    in
+    Lwt.async start
+
+  let stop t = Lwt.wakeup t.trigger_shutdown ()
+end

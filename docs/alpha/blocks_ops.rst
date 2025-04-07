@@ -13,7 +13,7 @@ Protocol-specific block header
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :ref:`Recall<shell_proto_interact_alpha>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
-Namely, these two notions are the protocol-specific header and the :ref:`fitness <fitness_alpha>`.
+Namely, these two notions are the protocol-specific header and the :ref:`fitness <fitness_section_alpha>`.
 
 As in Emmy*, the protocol-specific header contains the fields:
 
@@ -188,14 +188,13 @@ manager operations are the only fee-paying and
 - The ``Reveal`` operation reveals the public key of the sending
   manager. Knowing this public key is indeed necessary to check the signature
   of future operations signed by this manager.
-- The ``Transaction`` operation allows users to either transfer tez
-  between accounts and/or to invoke a smart contract.
-- The ``Delegation`` operation allows users to :ref:`delegate their
-  stake <delegating_coins>` to a :ref:`delegate<def_delegate_alpha>` (a
-  *baker*), or to register themselves as delegates.
-- The ``Update_consensus_key`` operation allows users to delegate the
-  responsibility of signing blocks and consensus-related operations to
-  another account. Note that consensus keys cannot be BLS public keys.
+- The ``Transaction`` operation allows users to transfer tez
+  between accounts, to invoke a smart contract, or to invoke :ref:`pseudo-operations <pseudo_operations_alpha>` on user accounts.
+- The ``Delegation`` operation allows users to designate a :ref:`delegate<def_delegate_alpha>` (a
+  *baker*) for :ref:`delegating <delegating_coins>` or :ref:`staking <delegating_coins>` their coins, or to register themselves as delegates.
+- The ``Update_consensus_key`` operation allows users to register a
+  :ref:`consensus key<consensus_key_alpha>`, which is a dedicated key
+  for signing blocks and consensus-related operations.
 - The ``Origination`` operation is used to
   :ref:`originate<def_origination_alpha>`, that is to deploy, smart contracts
   in the Tezos blockchain.

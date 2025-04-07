@@ -39,7 +39,7 @@ let nb_protocols = 5
 let register_protocol ~hash ~sources =
   let module M = struct
     include
-      Registered_protocol.Register_embedded_V13
+      Registered_protocol.Register_embedded_V15
         (Tezos_protocol_environment_demo_noops)
         (Tezos_protocol_demo_noops.Protocol)
         (struct
@@ -135,7 +135,7 @@ let init_protocols store history_mode =
   return all_proto_levels
 
 let test_protocol_level_consistency_drop_one history_mode nth
-    (store_dir, context_dir) store =
+    (store_dir, context_root_dir) store =
   let open Lwt_result_syntax in
   assert (nth < 5) ;
   let* _ = init_protocols store history_mode in
@@ -164,7 +164,7 @@ let test_protocol_level_consistency_drop_one history_mode nth
       ~patch_context:dummy_patch_context
       ~history_mode
       ~store_dir
-      ~context_dir
+      ~context_root_dir
       ~allow_testchains:true
       genesis
   in
@@ -221,7 +221,7 @@ let check_protocol_levels_availability chain_store ~expected_protocols
   return_unit
 
 let test_protocol_level_consistency_remove_file history_mode
-    (store_dir, context_dir) store =
+    (store_dir, context_root_dir) store =
   let open Lwt_result_syntax in
   let* expected_protocols = init_protocols store history_mode in
   let open Store_types in
@@ -244,7 +244,7 @@ let test_protocol_level_consistency_remove_file history_mode
       ~patch_context:dummy_patch_context
       ~history_mode
       ~store_dir
-      ~context_dir
+      ~context_root_dir
       ~allow_testchains:true
       genesis
   in

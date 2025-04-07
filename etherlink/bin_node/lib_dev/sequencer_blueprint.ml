@@ -45,8 +45,15 @@ let encode_transaction raw =
   let open Rlp in
   Value (Bytes.of_string raw)
 
-let make_blueprint_chunks ~timestamp ~transactions
-    ~(delayed_transactions : Ethereum_types.hash list) ~parent_hash =
+type kernel_blueprint = {
+  parent_hash : block_hash;
+  delayed_transactions : hash list;
+  transactions : string list;
+  timestamp : Time.Protocol.t;
+}
+
+let kernel_blueprint_to_rlp
+    {parent_hash; delayed_transactions; transactions; timestamp} =
   let open Rlp in
   let delayed_transactions =
     List
@@ -62,9 +69,19 @@ let make_blueprint_chunks ~timestamp ~transactions
   let parent_hash =
     Value (block_hash_to_bytes parent_hash |> Bytes.of_string)
   in
-  let blueprint =
-    List [parent_hash; delayed_transactions; messages; timestamp] |> encode
-  in
+  List [parent_hash; delayed_transactions; messages; timestamp]
+
+let kernel_blueprint_parent_hash_of_rlp s =
+  match Rlp.decode s with
+  | Ok
+      Rlp.(
+        List [Value parent_hash; _delayed_transactions; _messages; _timestamp])
+    ->
+      Some (decode_block_hash parent_hash)
+  | _ -> None
+
+let make_blueprint_chunks kernel_blueprint =
+  let blueprint = Rlp.encode @@ kernel_blueprint_to_rlp kernel_blueprint in
   match String.chunk_bytes max_chunk_size blueprint with
   | Ok chunks -> chunks
   | _ ->
@@ -77,6 +94,8 @@ let encode_u16_le i =
   let bytes = Bytes.make 2 '\000' in
   Bytes.set_uint16_le bytes 0 i ;
   bytes
+
+let decode_u16_le bytes = Bytes.get_uint16_le bytes 0
 
 type unsigned_chunk =
   | Unsigned_chunk of {
@@ -137,16 +156,38 @@ let chunk_to_rlp
         Value (Signature.to_bytes signature);
       ])
 
+let chunk_of_rlp s =
+  match Rlp.decode s with
+  | Ok
+      Rlp.(
+        List
+          [
+            Value value;
+            Value number;
+            Value nb_chunks;
+            Value chunk_index;
+            Value signature;
+          ]) ->
+      let number = decode_number_le number in
+      let nb_chunks = decode_u16_le nb_chunks in
+      let chunk_index = decode_u16_le chunk_index in
+      Option.map
+        (fun signature ->
+          {
+            unsigned_chunk =
+              Unsigned_chunk {value; number; nb_chunks; chunk_index};
+            signature;
+          })
+        (Signature.of_bytes_opt signature)
+  | _ -> None
+
 let prepare ~cctxt ~sequencer_key ~timestamp ~number ~parent_hash
     ~(delayed_transactions : Ethereum_types.hash list) ~transactions =
   let open Lwt_result_syntax in
   let open Rlp in
   let chunks =
     make_blueprint_chunks
-      ~timestamp
-      ~transactions
-      ~delayed_transactions
-      ~parent_hash
+      {parent_hash; delayed_transactions; transactions; timestamp}
   in
   let nb_chunks = List.length chunks in
   let message_from_chunk nb_chunks chunk_index chunk =
@@ -179,6 +220,35 @@ let create_inbox_payload ~smart_rollup_address ~chunks : Blueprint_types.payload
       |> prepare_message smart_rollup_address Message_format.Blueprint_chunk)
     chunks
 
+let decode_inbox_payload sequencer (payload : Blueprint_types.payload) =
+  List.filter_map
+    (fun (`External chunk) ->
+      let open Option_syntax in
+      let len = String.length chunk in
+      if len <= Message_format.header_size then fail
+      else
+        let chunk_bytes =
+          String.(
+            sub
+              chunk
+              Message_format.header_size
+              (length chunk - Message_format.header_size))
+        in
+        let* chunk = chunk_of_rlp (Bytes.unsafe_of_string chunk_bytes) in
+        let unsigned_chunk_bytes =
+          Rlp.encode (unsigned_chunk_to_rlp chunk.unsigned_chunk)
+        in
+        let correctly_signed =
+          Signature.check sequencer chunk.signature unsigned_chunk_bytes
+        in
+        if correctly_signed then return chunk else fail)
+    payload
+  |> List.sort
+       (fun
+         {unsigned_chunk = Unsigned_chunk {chunk_index = x; _}; _}
+         {unsigned_chunk = Unsigned_chunk {chunk_index = y; _}; _}
+       -> compare x y)
+
 let create_dal_payloads chunks =
   List.map
     (fun {unsigned_chunk; signature = _} ->
@@ -186,3 +256,14 @@ let create_dal_payloads chunks =
       |> Rlp.encode |> Bytes.to_string
       |> Message_format.frame_dal_message Blueprint_chunk)
     chunks
+
+let kernel_blueprint_parent_hash_of_payload sequencer payload =
+  let chunks = decode_inbox_payload sequencer payload in
+  let bytes =
+    List.fold_left
+      (fun buffer {unsigned_chunk = Unsigned_chunk {value; _}; _} ->
+        Bytes.cat buffer value)
+      Bytes.empty
+      chunks
+  in
+  kernel_blueprint_parent_hash_of_rlp bytes

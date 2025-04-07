@@ -5,7 +5,7 @@ After=network.target
 
 [Service]
 EnvironmentFile=-/etc/default/octez-dal-node
-WorkingDirectory=/var/tezos
+WorkingDirectory=~
 Restart=on-failure
 User=tezos
 ExecStart=/usr/bin/octez-dal-node run $RUNTIME_OPTS

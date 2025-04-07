@@ -6,10 +6,11 @@
  (public_name octez-l2-libs.smart_rollup_wasm_benchmark_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
+  bls12-381.archive
   octez-libs.base
   tezt
-  octez-l2-libs.webassembly-interpreter
-  octez-l2-libs.scoru-wasm
+  octez-libs.webassembly-interpreter
+  octez-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-helpers
   lwt.unix)
  (preprocess (pps ppx_deriving.show))

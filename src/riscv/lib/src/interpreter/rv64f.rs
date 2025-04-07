@@ -9,16 +9,16 @@
 use super::float::FloatExt;
 use crate::{
     machine_state::{
-        bus::main_memory::MainMemoryLayout,
-        hart_state::HartState,
-        registers::{FRegister, FValue, XRegister},
         MachineCoreState,
+        hart_state::HartState,
+        main_memory::MainMemoryLayout,
+        registers::{FRegister, FValue, XRegister},
     },
     parser::instruction::InstrRoundingMode,
     state_backend as backend,
     traps::Exception,
 };
-use rustc_apfloat::{ieee::Single, Float, Status, StatusAnd};
+use rustc_apfloat::{Float, Status, StatusAnd, ieee::Single};
 
 impl From<Single> for FValue {
     fn from(f: Single) -> Self {
@@ -289,7 +289,7 @@ where
 
     /// `FCVT.S.W` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_s_w(
         &mut self,
         rs1: XRegister,
@@ -303,7 +303,7 @@ where
 
     /// `FCVT.S.WU` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_s_wu(
         &mut self,
         rs1: XRegister,
@@ -317,7 +317,7 @@ where
 
     /// `FCVT.S.W` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_s_l(
         &mut self,
         rs1: XRegister,
@@ -331,7 +331,7 @@ where
 
     /// `FCVT.S.WU` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_s_lu(
         &mut self,
         rs1: XRegister,
@@ -555,16 +555,16 @@ mod tests {
     use crate::{
         backend_test,
         bits::Bits64,
-        create_backend, create_state,
+        create_state,
         machine_state::{
-            bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
+            MachineCoreState, MachineCoreStateLayout,
             csregisters::{
-                xstatus::{ExtensionValue, MStatus},
                 CSRegister,
+                xstatus::{ExtensionValue, MStatus},
             },
             hart_state::{HartState, HartStateLayout},
+            main_memory::tests::T1K,
             registers::{fa1, fa4, parse_fregister, parse_xregister, t0},
-            MachineCoreState, MachineCoreStateLayout,
         },
         traps::Exception,
     };
@@ -572,7 +572,7 @@ mod tests {
     use arbitrary_int::u5;
     use proptest::prelude::*;
 
-    use rustc_apfloat::{ieee::Double, ieee::Single, Float};
+    use rustc_apfloat::{Float, ieee::Double, ieee::Single};
 
     backend_test!(test_fmv_f, F, {
         proptest!(|(
@@ -581,8 +581,7 @@ mod tests {
             rs1_f in (1_u8..31).prop_map(u5::new).prop_map(parse_fregister),
             rs2 in (1_u8..31).prop_map(u5::new).prop_map(parse_xregister),
         )| {
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, HartStateLayout, F, backend);
+            let mut state = create_state!(HartState, HartStateLayout, F);
 
             // Turn fs on
             let mstatus = MStatus::from_bits(0u64).with_fs(ExtensionValue::Dirty);
@@ -613,14 +612,7 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -650,9 +642,9 @@ mod tests {
                 Ok(())
             };
 
-            let invalid_offset = DEVICES_ADDRESS_SPACE_LENGTH - 1024;
-            let aligned_offset = DEVICES_ADDRESS_SPACE_LENGTH + 512;
-            let misaligned_offset = DEVICES_ADDRESS_SPACE_LENGTH + 513;
+            let invalid_offset = 0u64.wrapping_sub(1024);
+            let aligned_offset = 512;
+            let misaligned_offset = 513;
 
             // Out of bounds loads / stores
             prop_assert!(perform_test(invalid_offset).is_err_and(|e|

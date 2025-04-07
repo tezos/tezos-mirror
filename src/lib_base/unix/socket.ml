@@ -240,3 +240,11 @@ let set_tcp_user_timeout fd ~ms =
   try Ok (set_tcp_user_timeout fd ms) with
   | Unix.Unix_error _ as exn -> Error (`Unix_error exn)
   | Failure _ -> Error `Unsupported
+
+external set_tcp_keepalive : Unix.file_descr -> int -> int -> unit
+  = "ocaml_set_tcp_keepalive"
+
+let set_tcp_keepalive fd ~ms ~intv =
+  try Ok (set_tcp_keepalive fd ms intv) with
+  | Unix.Unix_error _ as exn -> Error (`Unix_error exn)
+  | Failure _ -> Error `Unsupported

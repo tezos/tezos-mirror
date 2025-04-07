@@ -10,18 +10,20 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-rustzcash-deps" { = version }
+  "bls12-381" { = version }
   "octez-libs" { = version }
   "octez-injector" { = version }
   "octez-shell-libs" { = version }
 ]
 depopts: [
-  "tezos-injector-020-PsParisC"
   "tezos-injector-021-PsQuebec"
+  "tezos-injector-022-PsRiotum"
   "tezos-injector-alpha"
 ]
 conflicts: [
-  "tezos-injector-020-PsParisC" { != version }
   "tezos-injector-021-PsQuebec" { != version }
+  "tezos-injector-022-PsRiotum" { != version }
   "tezos-injector-alpha" { != version }
 ]
 build: [
@@ -29,4 +31,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Octez injector"

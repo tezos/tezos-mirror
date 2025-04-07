@@ -122,9 +122,9 @@ module MakeEncoder (H : sig
   val raw_encoding : t Data_encoding.t
 end) =
 struct
-  let pp ppf t = Format.pp_print_string ppf (H.to_b58check t)
+  let pp ppf t = Format.fprintf ppf "@{<bold>%s@}" (H.to_b58check t)
 
-  let pp_short ppf t = Format.pp_print_string ppf (H.to_short_b58check t)
+  let pp_short ppf t = Format.fprintf ppf "@{<bold>%s@}" (H.to_short_b58check t)
 
   let encoding =
     let open Data_encoding in

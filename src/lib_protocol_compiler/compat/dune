@@ -1,0 +1,36 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_protocol_compiler_compat)
+ (public_name octez-protocol-compiler-compat)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  compiler-libs.common
+  compiler-libs.optcomp
+  compiler-libs.toplevel))
+
+(rule
+ (target protocol_compiler_env.ml)
+ (action (copy compat_files/protocol_compiler_env_ocaml4.ml %{target}))
+ (enabled_if (< %{ocaml_version} 5)))
+
+(rule
+ (target protocol_compiler_env.ml)
+ (action (copy compat_files/protocol_compiler_env_ocaml5.ml %{target}))
+ (enabled_if (>= %{ocaml_version} 5)))
+
+(rule
+ (target compiler_libs.ml)
+ (action (copy compat_files/compiler_libs_ocaml4.ml %{target}))
+ (enabled_if (< %{ocaml_version} 5)))
+
+(rule
+ (target compiler_libs.ml)
+ (action (copy compat_files/compiler_libs_ocaml5.ml %{target}))
+ (enabled_if (and (>= %{ocaml_version} 5) (< %{ocaml_version} 5.2))))
+
+(rule
+ (target compiler_libs.ml)
+ (action (copy compat_files/compiler_libs_ocaml5_2.ml %{target}))
+ (enabled_if (>= %{ocaml_version} 5.2)))

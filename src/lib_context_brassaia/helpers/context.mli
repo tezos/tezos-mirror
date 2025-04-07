@@ -35,7 +35,7 @@ module Make_tree (Conf : Conf) (DB : DB) : sig
   include
     Tezos_context_sigs.Context.TREE
       with type t := DB.t
-       and type key := DB.path
+       and type key := Brassaia.Path.t
        and type value := DB.contents
        and type tree := DB.tree
 

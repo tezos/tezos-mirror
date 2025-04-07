@@ -2383,6 +2383,31 @@ module Big_map = struct
       unparsing_mode
 end
 
+module Protocol = struct
+  module S = struct
+    let path : RPC_context.t RPC_path.context =
+      RPC_path.(open_root / "context" / "protocol")
+
+    let first_level =
+      let output = Raw_level.encoding in
+      RPC_service.get_service
+        ~description:
+          "Returns the level at which the current protocol was activated."
+        ~query:RPC_query.empty
+        ~output
+        RPC_path.(path / "first_level")
+  end
+
+  let register_first_level () =
+    Registration.register0 ~chunked:false S.first_level (fun context () () ->
+        Alpha_context.First_level_of_protocol.get context)
+
+  let register () = register_first_level ()
+
+  let first_level ctxt block =
+    RPC_context.make_call0 S.first_level ctxt block () ()
+end
+
 module Sc_rollup = struct
   open Data_encoding
 
@@ -2929,6 +2954,17 @@ module Sc_rollup = struct
       ()
       ()
 
+  let timeout ctxt block sc_rollup_address staker1 staker2 =
+    RPC_context.make_call3
+      S.timeout
+      ctxt
+      block
+      sc_rollup_address
+      staker1
+      staker2
+      ()
+      ()
+
   let can_be_cemented ctxt block sc_rollup_address commitment_hash =
     RPC_context.make_call2
       S.can_be_cemented
@@ -3032,6 +3068,25 @@ module Dal = struct
         ~query:level_query
         ~output
         RPC_path.(path / "published_slot_headers")
+
+    let skip_list_cells_of_level =
+      let output =
+        Data_encoding.(
+          list
+            (tup2
+               Dal.Slots_history.Pointer_hash.encoding
+               Dal.Slots_history.encoding))
+      in
+      RPC_service.get_service
+        ~description:
+          "Returns the cells of the DAL skip list constructed during this \
+           targeted block and stored in the context. The cells ordering in the \
+           list is not specified (not relevant). The list is expected to be \
+           empty if the entry is not initialized in the context (yet), or to \
+           have a size that coincides with the number of DAL slots otherwise."
+        ~query:RPC_query.empty
+        ~output
+        RPC_path.(path / "skip_list_cells_of_level")
   end
 
   let register_dal_commitments_history () =
@@ -3077,6 +3132,9 @@ module Dal = struct
   let dal_published_slot_headers ctxt block ?level () =
     RPC_context.make_call0 S.published_slot_headers ctxt block level ()
 
+  let skip_list_cells_of_level ctxt block () =
+    RPC_context.make_call0 S.skip_list_cells_of_level ctxt block () ()
+
   let register_published_slot_headers () =
     let open Lwt_result_syntax in
     Registration.register0 ~chunked:true S.published_slot_headers
@@ -3084,15 +3142,23 @@ module Dal = struct
     let level = Option.value level ~default:(Level.current ctxt).level in
     let* result = Dal.Slot.find_slot_headers ctxt level in
     match result with
-    | Some l -> return l
+    | Some l -> return @@ List.map fst l
     | None ->
         Environment.Error_monad.tzfail
         @@ Published_slot_headers_not_initialized level
 
+  let register_skip_list_cells_of_level () =
+    let open Lwt_result_syntax in
+    Registration.register0 ~chunked:true S.skip_list_cells_of_level
+    @@ fun ctxt () () ->
+    let* result = Dal.Slots_storage.find_level_histories ctxt in
+    match result with Some l -> return l | None -> return []
+
   let register () =
     register_dal_commitments_history () ;
     register_shards () ;
-    register_published_slot_headers ()
+    register_published_slot_headers () ;
+    register_skip_list_cells_of_level ()
 end
 
 module Forge = struct
@@ -3137,6 +3203,14 @@ module Forge = struct
                  }))
         ~output:(obj1 (req "protocol_data" (bytes Hex)))
         RPC_path.(path / "protocol_data")
+
+    let consensus_operations =
+      RPC_service.post_service
+        ~description:"Forge a consensus operation in BLS mode"
+        ~query:RPC_query.empty
+        ~input:Operation.unsigned_encoding
+        ~output:(obj2 (req "sign" (bytes Hex)) (req "inject" (bytes Hex)))
+        RPC_path.(path / "bls_consensus_operations")
   end
 
   let register () =
@@ -3149,6 +3223,14 @@ module Forge = struct
           (Data_encoding.Binary.to_bytes_exn
              Operation.unsigned_encoding
              operation)) ;
+    Registration.register0_noctxt
+      ~chunked:true
+      S.consensus_operations
+      (fun () operation ->
+        return
+          Data_encoding.Binary.
+            ( to_bytes_exn Operation.bls_mode_unsigned_encoding operation,
+              to_bytes_exn Operation.unsigned_encoding operation )) ;
     Registration.register0_noctxt
       ~chunked:true
       S.protocol_data
@@ -3300,6 +3382,14 @@ module Forge = struct
 
   let double_preattestation_evidence ctxt block ~branch ~op1 ~op2 () =
     operation ctxt block ~branch (Double_preattestation_evidence {op1; op2})
+
+  let dal_entrapment_evidence ctxt block ~branch ~attestation ~slot_index
+      ~shard_with_proof =
+    operation
+      ctxt
+      block
+      ~branch
+      (Dal_entrapment_evidence {attestation; slot_index; shard_with_proof})
 
   let empty_proof_of_work_nonce =
     Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
@@ -3996,6 +4086,14 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Round.encoding
       RPC_path.(path / "round")
+
+  let consecutive_round_zero =
+    RPC_service.get_service
+      ~description:
+        "Returns the number of blocks consecutively baked at round zero."
+      ~query:RPC_query.empty
+      ~output:int32
+      RPC_path.(path / "consecutive_round_zero")
 end
 
 type Environment.Error_monad.error += Negative_level_offset
@@ -4025,6 +4123,7 @@ let register () =
   Baking_rights.register () ;
   Attestation_rights.register () ;
   Validators.register () ;
+  Protocol.register () ;
   Sc_rollup.register () ;
   Dal.register () ;
   Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
@@ -4048,13 +4147,20 @@ let register () =
           let first = List.last default_first rest in
           return_some (first.level, last.level)) ;
   Registration.register0 ~chunked:false S.round (fun ctxt () () ->
-      Round.get ctxt)
+      Round.get ctxt) ;
+  Registration.register0
+    ~chunked:false
+    S.consecutive_round_zero
+    (fun ctxt () () -> Consecutive_round_zero.get ctxt)
 
 let current_level ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.current_level ctxt block {offset} ()
 
 let levels_in_current_cycle ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.levels_in_current_cycle ctxt block {offset} ()
+
+let consecutive_round_zero ctxt block =
+  RPC_context.make_call0 S.consecutive_round_zero ctxt block () ()
 
 let rpc_services =
   register () ;

@@ -17,7 +17,7 @@ ARG BUILD_IMAGE
 LABEL org.opencontainers.image.base.name="${BUILD_IMAGE}"
 
 # Use alpine /bin/ash and set shell options
-# See https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
+# See https://docs.docker.com/build/building/best-practices/#using-pipes
 SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 
 # Open Container Initiative
@@ -59,21 +59,12 @@ RUN apk update \
     libc-dev \
     libev \
     libffi \
-    # Used by 'scripts/install_dal_trusted_setup.sh' below
-    curl \
     sudo \
     sqlite-libs \
     # Used by teztale
     openssl-libs-static \
     sqlite-dev \
     postgresql-dev
-
-# Install dal SRS setup (need curl)
-COPY scripts/install_dal_trusted_setup.sh scripts/version.sh /tmp/
-RUN mkdir -p /usr/share/dal-trusted-setup && \
-    DAL_TRUSTED_SETUP=/usr/share/dal-trusted-setup \
-    sh /tmp/install_dal_trusted_setup.sh && \
-    rm /tmp/install_dal_trusted_setup.sh /tmp/version.sh
 
 USER tezos
 ENV USER=tezos
@@ -164,10 +155,14 @@ WORKDIR /home/tezos
 # Create an opam-repository directory that is a clone of the public opam repository
 # filtered to only keep packages which we actually need.
 COPY --chown=tezos:tezos scripts/create_opam_repo.sh scripts/version.sh octez-deps.opam.locked ./
+
+COPY --chown=tezos:tezos stdcompat.opam.locked ./
+
 # Run the script, then clean up; we only need the result of the script (the opam repository).
 RUN ./create_opam_repo.sh \
   && rm create_opam_repo.sh \
   && rm octez-deps.opam.locked \
+  && rm stdcompat.opam.locked \
   && rm version.sh
 
 # Needed by 'opam admin cache' below
@@ -334,14 +329,33 @@ ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 # We need curl since a bunch of tezt tests use curl.
 # Same, some tests use [file].
 
+# Use alpine /bin/ash and set shell options
+# See https://docs.docker.com/build/building/best-practices/#using-pipes
+SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
+
+# [sqlite-libs] from [alpine:3.20] installed in [runtime] image
+# we need [sqlite-libs] from [alpine:3.21] installed in [e2etest]
+RUN apk del sqlite-dev sqlite-libs
 # hadolint ignore=DL3018,DL3019
 RUN apk update \
- && apk add --no-cache curl npm git file make jq \
+ && apk add --no-cache curl \
+ ## Add npm from 3.21 main repository instead of 3.20 to get a newer version of nodejs.
+ ## Should solve related hanging problems  cf. https://github.com/npm/cli/issues/4028
+ ## Notes: npm is in community, node in main. npm version is currently identical in 3.20 and 3.21
+ && apk add npm --repository=https://dl-cdn.alpinelinux.org/alpine/v3.21/main \
+ && apk add git file make jq websocat \
  gcc clang lld ca-certificates build-base musl-dev libusb-dev linux-headers \
+    procps-ng \
+ # We need datadog-ci to send JUnit files to Datadog in tezt
+ # jobs. Cf. [scripts/ci/tezt.sh].
+ # Version number should be kept in sync with the one of the
+ # datadog/ci image used for the [datadog_ci] image
+ # (cf. ci/bin/common.ml)
+ && npm --ddd install -g "@datadog/datadog-ci@2.44.0" \
  # We need eth since e2e tests. This requires git as well.
- && npm install -g eth-cli@2.0.2 \
+ && npm --ddd install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts
- && npm install -g solc@0.8.26 \
+ && npm --ddd install -g solc@0.8.26 \
  && PATH="/root/.cargo/bin:${PATH}" \
  && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y \
  && RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld" cargo install \
@@ -352,6 +366,13 @@ RUN apk update \
  && cp /root/.cargo/bin/cast /bin \
  # Clean up
  && rm -rf /tmp/* && rm -rf /root/.cargo
+
+# Install dal SRS setup (need curl)
+COPY scripts/install_dal_trusted_setup.sh scripts/version.sh /tmp/
+RUN mkdir -p /usr/share/dal-trusted-setup && \
+    DAL_TRUSTED_SETUP=/usr/share/dal-trusted-setup \
+    sh /tmp/install_dal_trusted_setup.sh && \
+    rm /tmp/install_dal_trusted_setup.sh /tmp/version.sh
 
 USER tezos
 WORKDIR /home/tezos

@@ -27,6 +27,8 @@ open Protocol
 open Alpha_context
 open Baking_errors
 
+module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
+
 (** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
 type consensus_key = {
@@ -224,6 +226,11 @@ module Delegate_slots = struct
 
   let own_slot_owner slots ~slot = SlotMap.find slot slots.own_delegate_slots
 
+  let find_first_slot_from slots ~slot =
+    SlotMap.find_first (fun s -> Slot.(s >= slot)) slots.own_delegate_slots
+
+  let min_slot slots = SlotMap.min_binding slots.own_delegate_slots
+
   let voting_power slots ~slot =
     SlotMap.find slot slots.all_delegate_voting_power
 end
@@ -276,11 +283,17 @@ type elected_block = {
   attestation_qc : Kind.attestation Operation.t list;
 }
 
+type manager_operations_infos = {
+  manager_operation_number : int;
+  total_fees : Int64.t;
+}
+
 type prepared_block = {
   signed_block_header : block_header;
   round : Round.t;
   delegate : consensus_key_and_delegate;
   operations : Tezos_base.Operation.t list list;
+  manager_operations_infos : manager_operations_infos option;
   baking_votes : Per_block_votes_repr.per_block_votes;
 }
 
@@ -718,21 +731,55 @@ let signed_consensus_vote_encoding =
        (req "unsigned_consensus_vote" unsigned_consensus_vote_encoding)
        (req "signed_operation" (dynamic_size Operation.encoding)))
 
+let manager_operations_infos_encoding =
+  let open Data_encoding in
+  conv
+    (fun {manager_operation_number; total_fees} ->
+      (manager_operation_number, total_fees))
+    (fun (manager_operation_number, total_fees) ->
+      {manager_operation_number; total_fees})
+    (obj2 (req "manager_operation_number" int31) (req "total_fees" int64))
+
 let forge_event_encoding =
   let open Data_encoding in
   let prepared_block_encoding =
     conv
-      (fun {signed_block_header; round; delegate; operations; baking_votes} ->
-        (signed_block_header, round, delegate, operations, baking_votes))
-      (fun (signed_block_header, round, delegate, operations, baking_votes) ->
-        {signed_block_header; round; delegate; operations; baking_votes})
-      (obj5
+      (fun {
+             signed_block_header;
+             round;
+             delegate;
+             operations;
+             manager_operations_infos;
+             baking_votes;
+           } ->
+        ( signed_block_header,
+          round,
+          delegate,
+          operations,
+          manager_operations_infos,
+          baking_votes ))
+      (fun ( signed_block_header,
+             round,
+             delegate,
+             operations,
+             manager_operations_infos,
+             baking_votes ) ->
+        {
+          signed_block_header;
+          round;
+          delegate;
+          operations;
+          manager_operations_infos;
+          baking_votes;
+        })
+      (obj6
          (req "header" (dynamic_size Block_header.encoding))
          (req "round" Round.encoding)
          (req "delegate" consensus_key_and_delegate_encoding)
          (req
             "operations"
             (list (list (dynamic_size Tezos_base.Operation.encoding))))
+         (opt "operations_infos" manager_operations_infos_encoding)
          (req "baking_votes" Per_block_votes.per_block_votes_encoding))
   in
   union
@@ -1002,9 +1049,18 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
   let open Lwt_result_syntax in
   let*? level = Environment.wrap_tzresult (Raw_level.of_int32 level) in
   let* attesting_rights =
-    Plugin.RPC.Validators.get cctxt (chain, block) ~levels:[level]
+    (Plugin.RPC.Validators.get
+       cctxt
+       (chain, block)
+       ~levels:[level]
+     [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
   in
-  delegate_slots attesting_rights delegates |> return
+  let delegate_slots =
+    (delegate_slots
+       attesting_rights
+       delegates [@profiler.record_f {verbosity = Debug} "delegate_slots"])
+  in
+  return delegate_slots
 
 let round_proposer state ~level round =
   let slots =
@@ -1394,3 +1450,18 @@ let pp_event fmt = function
       Format.fprintf fmt "new forge event: %a" pp_forge_event forge_event
   | Timeout kind ->
       Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind
+
+let pp_short_event fmt =
+  let open Format in
+  function
+  | New_valid_proposal _ -> fprintf fmt "new valid proposal"
+  | New_head_proposal _ -> fprintf fmt "new head proposal"
+  | Prequorum_reached (_, _) -> fprintf fmt "prequorum reached"
+  | Quorum_reached (_, _) -> fprintf fmt "quorum reached"
+  | Timeout (End_of_round _) -> fprintf fmt "end of round timeout"
+  | Timeout (Time_to_prepare_next_level_block _) ->
+      fprintf fmt "time to prepare next level block"
+  | New_forge_event (Block_ready _) -> fprintf fmt "block ready"
+  | New_forge_event (Preattestation_ready _) ->
+      fprintf fmt "preattestation ready"
+  | New_forge_event (Attestation_ready _) -> fprintf fmt "attestation ready"

@@ -86,7 +86,8 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
   in
   state.plugin <- new_plugin ;
   Reference.set state.node_ctxt.current_protocol new_protocol ;
-  Metrics.Info.set_proto_info new_protocol.hash constants ;
+  Metrics.wrap (fun () ->
+      Metrics.Info.set_proto_info new_protocol.hash constants) ;
   let*! () =
     Daemon_event.switched_protocol
       new_protocol.hash
@@ -263,7 +264,16 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
            the predecessor. In this case, we don't update the head or notify the
            block. *)
         return_unit
-      else Node_context.set_l2_head node_ctxt l2_block
+      else
+        (* Reorg (reproposal) of a block already handled *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7731
+           This just overwrites the outbox messages with the correct ones for
+           the level but we need to properly handle reorgs in the storage. *)
+        let* ctxt = Node_context.checkout_context node_ctxt head.hash in
+        let* () =
+          register_outbox_messages state.plugin node_ctxt ctxt head.level
+        in
+        Node_context.set_l2_head node_ctxt l2_block
   | `New l2_block ->
       let* () = Node_context.set_l2_head node_ctxt l2_block in
       let stop_timestamp = Time.System.now () in
@@ -341,6 +351,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
     Node_context.get_tezos_reorg_for_new_head node_ctxt old_head stripped_head
   in
   let*? reorg = report_missing_data reorg in
+  let*! () = Daemon_event.reorg reorg.old_chain in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
      Rollback state information on reorganization, i.e. for
      reorg.old_chain. *)
@@ -369,11 +380,12 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   notify_synchronization node_ctxt head.level ;
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
-  let* () = Publisher.execute_outbox () in
+  let* () = Outbox_execution.publish_executable_messages node_ctxt in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Batcher.produce_batches () in
   let* () = Dal_injection_queue.produce_dal_slots ~level:head.level in
   let*! () = Injector.inject ~header:head.header () in
+  let*! () = Daemon_event.new_heads_side_process_finished reorg.new_chain in
   Reference.set node_ctxt.degraded false ;
   return_unit
 
@@ -572,14 +584,20 @@ let make_signers_for_injector operators =
          in
          (operators, strategy, operation_kinds))
 
-let performance_metrics state =
+let maybe_performance_metrics state =
   let open Lwt_syntax in
-  let rec collect () =
-    let* () = Metrics.Performance.set_stats state.node_ctxt.data_dir in
-    let* () = Lwt_unix.sleep 10. in
-    collect ()
+  let+ activate =
+    if not state.configuration.performance_metrics then return_false
+    else Octez_performance_metrics.supports_performance_metrics ()
   in
-  Metrics.wrap @@ fun () -> Lwt.dont_wait collect ignore
+  if activate then
+    let (module Performance) = Lazy.force_val Metrics.performance_metrics in
+    let rec collect () =
+      let* () = Performance.set_stats ~data_dir:state.node_ctxt.data_dir in
+      let* () = Lwt_unix.sleep 10. in
+      collect ()
+    in
+    Metrics.wrap @@ fun () -> Lwt.dont_wait collect ignore
 
 let rec process_daemon ({node_ctxt; _} as state) =
   let open Lwt_result_syntax in
@@ -645,16 +663,27 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   let module Plugin = (val state.plugin) in
   let current_protocol = Reference.get node_ctxt.current_protocol in
   let* history_mode = Node_context.get_history_mode node_ctxt in
-  Metrics.Info.init_rollup_node_info
-    configuration
-    ~genesis_level:node_ctxt.genesis_info.level
-    ~genesis_hash:node_ctxt.genesis_info.commitment_hash
-    ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind)
-    ~history_mode ;
-  Metrics.Info.set_proto_info current_protocol.hash current_protocol.constants ;
-  let* first_available_level = Node_context.first_available_level node_ctxt in
-  Metrics.GC.set_oldest_available_level first_available_level ;
-  if configuration.performance_metrics then performance_metrics state ;
+  (* Do not wrap active_metrics *)
+  Metrics.active_metrics configuration ;
+  Metrics.wrap (fun () ->
+      Metrics.Info.init_rollup_node_info
+        configuration
+        ~genesis_level:node_ctxt.genesis_info.level
+        ~genesis_hash:node_ctxt.genesis_info.commitment_hash
+        ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind)
+        ~history_mode ;
+      Metrics.Info.set_proto_info
+        current_protocol.hash
+        current_protocol.constants) ;
+  let* () =
+    Metrics.wrap_lwt (fun () ->
+        let* first_available_level =
+          Node_context.first_available_level node_ctxt
+        in
+        Metrics.GC.set_oldest_available_level first_available_level ;
+        return_unit)
+  in
+  let*! () = maybe_performance_metrics state in
   let signers = make_signers_for_injector node_ctxt.config.operators in
   let* () =
     unless (signers = []) @@ fun () ->
@@ -854,10 +883,11 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
       cctxt
       configuration.sc_rollup_address
   in
-  Metrics.Info.set_lcc_level_l1 lcc.level ;
-  Option.iter
-    (fun Commitment.{inbox_level = l; _} -> Metrics.Info.set_lpc_level_l1 l)
-    lpc ;
+  Metrics.wrap (fun () ->
+      Metrics.Info.set_lcc_level_l1 lcc.level ;
+      Option.iter
+        (fun Commitment.{inbox_level = l; _} -> Metrics.Info.set_lpc_level_l1 l)
+        lpc) ;
   let current_protocol =
     {
       Node_context.hash = protocol;
@@ -892,5 +922,6 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
   in
   let state = {node_ctxt; rpc_server; configuration; plugin} in
   let* () = check_operator_balance state in
+  let* () = Node_context.save_protocols_from_l1 node_ctxt in
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer state in
   run state

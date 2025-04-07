@@ -34,19 +34,19 @@ let default_warn_error = "-a+8"
 let preloaded_cmis : Persistent_env.Persistent_signature.t String.Hashtbl.t =
   String.Hashtbl.create ~random:true 42
 
-let default_load = !Persistent_env.Persistent_signature.load
-
 (* Set hook *)
 let () =
-  Persistent_env.Persistent_signature.load :=
-    fun ~unit_name ->
-      String.Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name)
+  Compiler_libs.override_persistent_signature_loader
+  @@ fun ~allow_hidden:_ ~unit_name ->
+  String.Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name)
 
 let load_cmi_from_file file =
   String.Hashtbl.add
     preloaded_cmis
     (String.capitalize_ascii Filename.(basename (chop_extension file)))
-    {filename = file; cmi = Cmi_format.read_cmi file}
+    (Compiler_libs.make_persistent_signature
+       ~filename:file
+       ~cmi:(Cmi_format.read_cmi file))
 
 let load_embedded_cmi (unit_name, content) =
   let content = Bytes.of_string content in
@@ -67,10 +67,9 @@ let load_embedded_cmi (unit_name, content) =
   String.Hashtbl.add
     preloaded_cmis
     (String.capitalize_ascii unit_name)
-    {
-      filename = unit_name ^ ".cmi";
-      cmi = {cmi_name; cmi_sign; cmi_crcs; cmi_flags};
-    }
+    (Compiler_libs.make_persistent_signature
+       ~filename:(unit_name ^ ".cmi")
+       ~cmi:{cmi_name; cmi_sign; cmi_crcs; cmi_flags})
 
 let load_embedded_cmis cmis = List.iter load_embedded_cmi cmis
 
@@ -137,6 +136,18 @@ type driver = {
 
 let parse_options errflag s =
   Option.iter Location.(prerr_alert none) (Warnings.parse_options errflag s)
+
+let pp_protocol_hash_result ppf (computed_hash, stored_hash_opt) =
+  match stored_hash_opt with
+  | Some stored_hash when not (Protocol_hash.equal stored_hash computed_hash) ->
+      Format.fprintf
+        ppf
+        "%a as %a"
+        Protocol_hash.pp
+        stored_hash
+        Protocol_hash.pp
+        computed_hash
+  | None | Some _ -> Protocol_hash.pp ppf computed_hash
 
 let main {compile_ml; pack_objects; link_shared} version =
   Random.self_init () ;
@@ -218,7 +229,10 @@ let main {compile_ml; pack_objects; link_shared} version =
     | None -> computed_hash
     | Some stored_hash
       when !check_protocol_hash
-           && not (Protocol_hash.equal computed_hash stored_hash) ->
+           && not
+                (Protocol_hash_representative.equivalent
+                   computed_hash
+                   stored_hash) ->
         Format.eprintf
           "Inconsistent hash for protocol in TEZOS_PROTOCOL.@\n\
            Computed hash: %a@\n\
@@ -308,4 +322,7 @@ let main {compile_ml; pack_objects; link_shared} version =
     Format.printf "let src_digest = %S ;;\n" (Digest.to_hex dsrc) ;
     Format.printf "let impl_digest = %S ;;\n" (Digest.to_hex dimpl) ;
     Format.printf "let intf_digest = %S ;;\n" (Digest.to_hex dintf)) ;
-  Format.printf "Success: %a.@." Protocol_hash.pp hash
+  Format.printf
+    "Success: %a.@."
+    pp_protocol_hash_result
+    (computed_hash, stored_hash_opt)

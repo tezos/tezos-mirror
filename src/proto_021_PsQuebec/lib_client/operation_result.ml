@@ -146,11 +146,18 @@ let pp_manager_operation_content (type kind) source ppf
   (* For now, try to keep formatting in sync with [pp_internal_operation]. *)
   match operation with
   | Transaction {destination; amount; parameters; entrypoint} ->
+      (* As the protocol always unstakes `min amount staked`, the client allows
+         to use "everything" as an unstake amount. This triggers a
+         max_int-amount transfer. To be consistent, we catch max_int amounts
+         for unstake entrypoints and replace the output. *)
+      let amount =
+        if entrypoint = Entrypoint.unstake && amount = Tez.max_mutez then
+          "everything"
+        else Format.asprintf "%s%a" tez_sym Tez.pp amount
+      in
       Format.fprintf
         ppf
-        "Transaction:@,Amount: %s%a@,From: %a@,To: %a"
-        tez_sym
-        Tez.pp
+        "Transaction:@,Amount: %s@,From: %a@,To: %a"
         amount
         Contract.pp
         source

@@ -4,16 +4,16 @@
 
 use crate::{
     machine_state::{
-        bus::{main_memory::MainMemoryLayout, Address},
+        AccessType, MachineCoreState,
         csregisters::{
+            CSRegister,
             effects::handle_csr_effect,
             xstatus::{MPPValue, SPPValue},
-            CSRegister,
         },
         hart_state::HartState,
+        main_memory::{Address, MainMemoryLayout},
         mode::Mode,
         registers::XRegister,
-        AccessType, MachineCoreState,
     },
     state_backend::{self as backend},
     traps::Exception,
@@ -137,21 +137,20 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         machine_state::{
-            bus::main_memory::tests::T1K,
-            csregisters::{xstatus, CSRRepr, CSRegister},
+            MachineCoreState, MachineCoreStateLayout,
+            csregisters::{CSRRepr, CSRegister, xstatus},
+            main_memory::tests::T1K,
             mode::Mode,
             registers::{a0, t0},
-            MachineCoreState, MachineCoreStateLayout,
         },
         traps::Exception,
     };
 
     backend_test!(test_sfence, F, {
         type L = MachineCoreStateLayout<T1K>;
-        let mut backend = create_backend!(L, F);
-        let mut state = create_state!(MachineCoreState, L, F, backend, T1K);
+        let mut state = create_state!(MachineCoreState, L, F, T1K);
 
         let run_test = |state: &mut MachineCoreState<_, _>,
                         mode: Mode,

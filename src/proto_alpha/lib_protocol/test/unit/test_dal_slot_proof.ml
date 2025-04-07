@@ -51,25 +51,26 @@ struct
       Dal_helpers.mk_cryptobox Parameters.dal_parameters.cryptobox_parameters
   end)
 
+  let mk_attested =
+    Dal_attestation_repr.Accountability.
+      {total_shards = 1; attested_shards = 1; is_proto_attested = true}
+
   (* Tests to check insertion of slots in a dal skip list. *)
 
   (** Check insertion of a new slot in the given skip list. *)
   let skip_list_ordering skip_list ~mk_level ~mk_slot_index ~check_result =
     let open Lwt_result_wrap_syntax in
-    let id =
-      Hist.Internal_for_tests.content skip_list |> Dal_helpers.content_slot_id
-    in
+    let id = Hist.content skip_list |> Dal_helpers.content_slot_id in
     let level = mk_level id in
     let index = mk_slot_index id in
     let* _data, _poly, slot = mk_slot ~level ~index () in
     let@ result =
-      Hist.add_confirmed_slot_headers_no_cache
+      Hist.update_skip_list_no_cache
         skip_list
-        level
-        [slot]
+        ~published_level:level
+        [(slot, Contract_repr.zero, mk_attested)]
         ~number_of_slots:Parameters.dal_parameters.number_of_slots
     in
-
     check_result result
 
   (** This test attempts to add a slot on top of genesis cell zero which would
@@ -145,8 +146,7 @@ struct
       genesis skip list. Proof production is expected to succeed. *)
   let unconfirmed_page_on_genesis () =
     let Dal_slot_repr.Header.{published_level; index} =
-      Hist.Internal_for_tests.content genesis_history
-      |> Dal_helpers.content_slot_id
+      Hist.content genesis_history |> Dal_helpers.content_slot_id
     in
     let page_id = mk_page_id published_level index P.Index.zero in
     produce_and_verify_proof
@@ -164,8 +164,7 @@ struct
       history cache. *)
   let unconfirmed_page_on_genesis_bad_cache () =
     let Dal_slot_repr.Header.{published_level; index} =
-      Hist.Internal_for_tests.content genesis_history
-      |> Dal_helpers.content_slot_id
+      Hist.content genesis_history |> Dal_helpers.content_slot_id
     in
     let level, sindex =
       if false then (Raw_level_repr.succ published_level, index)
@@ -188,12 +187,12 @@ struct
     let open Lwt_result_wrap_syntax in
     let* _slot_data, polynomial, slot = mk_slot ~level ?index () in
     let*?@ skip_list, cache =
-      Hist.add_confirmed_slot_headers
+      Hist.update_skip_list
         ~number_of_slots:Parameters.dal_parameters.number_of_slots
         genesis_history
         genesis_history_cache
-        level
-        [slot]
+        ~published_level:level
+        [(slot, Contract_repr.zero, mk_attested)]
     in
     let* page_info, page_id = mk_page_info slot polynomial in
     produce_and_verify_proof
@@ -239,7 +238,7 @@ struct
         (failing_check_produce_result
            ~__LOC__
            ~expected_error:
-             (Hist.Dal_proof_error
+             (Hist.Dal_page_proof_error
                 "Wrong page content for the given page index and slot \
                  commitment (page id=(published_level: 1, slot_index: 0, \
                  page_index: 2))."))
@@ -261,7 +260,7 @@ struct
         (failing_check_produce_result
            ~__LOC__
            ~expected_error:
-             (Hist.Dal_proof_error
+             (Hist.Dal_page_proof_error
                 "Wrong page content for the given page index and slot \
                  commitment (page id=(published_level: 1, slot_index: 0, \
                  page_index: 0))."))

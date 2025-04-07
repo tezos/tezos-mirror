@@ -51,4 +51,4 @@ val decode_eip2930 : bytes -> (transaction, string) result
 val to_transaction_object :
   hash:Ethereum_types.hash ->
   transaction ->
-  (Ethereum_types.transaction_object, string) result
+  (Ethereum_types.legacy_transaction_object, string) result

@@ -124,13 +124,16 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
   let reveal_map =
     match reveal_pages with
     | Some pages ->
-        let (module DAC_plugin) =
-          WithExceptions.Option.get ~loc:__LOC__ @@ Dac_plugin.get Protocol.hash
-        in
         let map =
           List.fold_left
             (fun map page ->
-              let hash = DAC_plugin.hash_string ~scheme:Blake2B [page] in
+              let hash =
+                Protocol.Sc_rollup_reveal_hash.hash_string
+                  ~scheme:Blake2B
+                  [page]
+                |> Data_encoding.Binary.to_bytes_exn
+                     Protocol.Sc_rollup_reveal_hash.encoding
+              in
               Utils.Reveal_hash_map.add hash page map)
             Utils.Reveal_hash_map.empty
             pages
@@ -312,7 +315,7 @@ let () =
   let+ commitment, proof =
     Outbox.proof_of_output_simple node_ctxt ~outbox_level ~message_index
   in
-  (Sc_rollup_proto_types.Commitment_hash.of_octez commitment, proof)
+  (commitment, proof)
 
 let () =
   Block_directory.register0 Sc_rollup_services.Block.simulate

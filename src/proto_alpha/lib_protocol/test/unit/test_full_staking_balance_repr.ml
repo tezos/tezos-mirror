@@ -355,7 +355,7 @@ let constants =
         Default_parameters.constants_test.issuance_weights with
         base_total_issued_per_minute = Tez.zero;
       };
-    consensus_threshold = 0;
+    consensus_threshold_size = 0;
     origination_size = 0;
   }
 
@@ -586,9 +586,6 @@ let check_staking_balance_level ~check_invariant ~current_level
 
 let test_min_delegated_in_cycle () =
   let open Lwt_result_wrap_syntax in
-  let constants =
-    constants |> Constants_helpers.Set.Adaptive_issuance.force_activation true
-  in
   let blocks_per_cycle = constants.blocks_per_cycle in
   let expected_staking_balance ~delegated ~last_modified_level
       ~previous_min_value ~previous_min_level =
@@ -770,9 +767,6 @@ let test_min_delegated_in_cycle () =
    the next cycle *)
 let test_min_delegated_rpc_for_last_and_first_blocks () =
   let open Lwt_result_wrap_syntax in
-  let constants =
-    constants |> Constants_helpers.Set.Adaptive_issuance.force_activation true
-  in
   let get_staking_balance b ~delegate =
     let* () = print_min_delegated_in_cycle_rpc b ~delegate in
     let* staking_balance = get_staking_balance b ~delegate in

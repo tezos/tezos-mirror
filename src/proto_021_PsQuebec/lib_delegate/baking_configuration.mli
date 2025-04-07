@@ -43,7 +43,7 @@ type fees_config = {
 }
 
 type validation_config =
-  | Local of {context_path : string}
+  | Local of {context_root_path : string}
   | Node
   | ContextIndex of Abstract_context_index.t
 
@@ -70,6 +70,7 @@ type t = {
   extra_operations : Operations_source.t option;
   dal_node_endpoint : Uri.t option;
   pre_emptive_forge_time : Time.System.Span.t;
+  remote_calls_timeout : float option;
 }
 
 val default_fees_config : fees_config
@@ -94,6 +95,8 @@ val default_extra_operations : Operations_source.t option
 
 val default_pre_emptive_forge_time : Time.System.Span.t
 
+val default_remote_calls_timeout : float option
+
 val default_config : t
 
 val make :
@@ -101,7 +104,7 @@ val make :
   ?minimal_nanotez_per_gas_unit:Q.t ->
   ?minimal_nanotez_per_byte:Q.t ->
   ?nonce:nonce_config ->
-  ?context_path:string ->
+  ?context_root_path:string ->
   ?retries_on_failure:int ->
   ?user_activated_upgrades:(int32 * Protocol_hash.t) list ->
   ?votes:per_block_votes_config ->
@@ -111,6 +114,7 @@ val make :
   ?extra_operations:Operations_source.t ->
   ?dal_node_endpoint:Uri.t ->
   ?pre_emptive_forge_time:Time.System.Span.t ->
+  ?remote_calls_timeout:float ->
   unit ->
   t
 

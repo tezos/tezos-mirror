@@ -1,13 +1,14 @@
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
 use crate::{
     machine_state::{
-        bus::main_memory::MainMemoryLayout,
-        mode::{Mode, ModeCell, ModeLayout},
-        registers::{a0, a7},
         CacheLayouts, MachineState,
+        block_cache::bcall::Block,
+        main_memory::MainMemoryLayout,
+        mode::Mode,
+        registers::{a0, a7},
     },
     state_backend::{
         AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite,
@@ -16,13 +17,13 @@ use crate::{
 };
 
 /// Layout for [`PosixState`]
-pub type PosixStateLayout = (Atom<u64>, Atom<u8>, ModeLayout);
+pub type PosixStateLayout = (Atom<u64>, Atom<u8>, Atom<Mode>);
 
 /// Posix execution environment state
 pub struct PosixState<M: ManagerBase> {
     code: Cell<u64, M>,
     exited: Cell<u8, M>,
-    exit_mode: ModeCell<M>,
+    exit_mode: Cell<Mode, M>,
 }
 
 impl<M: ManagerBase> PosixState<M> {
@@ -31,7 +32,7 @@ impl<M: ManagerBase> PosixState<M> {
         Self {
             code: space.0,
             exited: space.1,
-            exit_mode: ModeCell::bind(space.2),
+            exit_mode: space.2,
         }
     }
 
@@ -61,9 +62,9 @@ impl<M: ManagerBase> PosixState<M> {
     }
 
     /// Handle a POSIX system call. Returns `Ok(true)` if it makes sense to continue execution.
-    pub fn handle_call<ML: MainMemoryLayout, CL: CacheLayouts>(
+    pub fn handle_call<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>>(
         &mut self,
-        machine: &mut MachineState<ML, CL, M>,
+        machine: &mut MachineState<ML, CL, B, M>,
         env_exception: EnvironException,
     ) -> Result<bool, String>
     where

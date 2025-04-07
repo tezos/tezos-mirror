@@ -73,7 +73,7 @@ let check_flags descr store expected_head =
     (snd caboose) ;
   return_unit
 
-let test_from_bootstrapped ~descr (store_dir, context_dir) store
+let test_from_bootstrapped ~descr (store_dir, context_root_dir) store
     ~nb_blocks_to_bake ~patch_context =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
@@ -91,7 +91,7 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
           Reconstruction.reconstruct
             ~patch_context
             ~store_dir
-            ~context_dir
+            ~context_root_dir
             genesis
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
@@ -130,7 +130,7 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
       Store.init
         ~patch_context
         ~store_dir
-        ~context_dir
+        ~context_root_dir
         ~allow_testchains:false
         genesis
     in
@@ -189,7 +189,7 @@ let make_tests_bootstrapped speed patch_context =
               ~patch_context ))
     permutations
 
-let test_from_snapshot ~descr:_ (store_dir, context_dir) store
+let test_from_snapshot ~descr:_ (store_dir, context_root_dir) store
     ~nb_blocks_to_bake ~patch_context =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
@@ -208,7 +208,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
   let open Filename.Infix in
   let dir = store_dir // "imported_store" in
   let dst_store_dir = dir // "store" in
-  let dst_context_dir = dir // "context" in
+  let dst_context_root_dir = dir in
   let* expected_to_fail =
     Error_monad.protect
       (fun () ->
@@ -221,7 +221,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~rolling:false
             ~block:(`Hash (last_hash, 0))
             ~store_dir
-            ~context_dir
+            ~context_root_dir
             ~chain_name
             ~snapshot_path
             ~progress_display_mode:Animation.Auto
@@ -233,7 +233,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~block:last_hash
             ~snapshot_path
             ~dst_store_dir
-            ~dst_context_dir
+            ~dst_context_root_dir
             ~chain_name
             ~configured_history_mode:None
             ~user_activated_upgrades:[]
@@ -246,7 +246,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
           Reconstruction.reconstruct
             ~patch_context
             ~store_dir:dst_store_dir
-            ~context_dir:dst_context_dir
+            ~context_root_dir:dst_context_root_dir
             genesis
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
@@ -284,7 +284,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
     let* store' =
       Store.init
         ~store_dir:dst_store_dir
-        ~context_dir:dst_context_dir
+        ~context_root_dir:dst_context_root_dir
         ~allow_testchains:false
         genesis
     in

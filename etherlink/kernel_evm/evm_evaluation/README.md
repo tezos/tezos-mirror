@@ -11,6 +11,8 @@ To prevent that run the following command:
 $ ulimit -s 20000
 ```
 
+**NB:** The suite must be run on **[tag: v13]** `428f218d7d6f4a52544e12684afbfe6e2882ffbf` as we only support tests up to **Shanghai**.
+
 ## Execute the assessor
 
 The EVM evaluation assessor can be launch by simply running:

@@ -78,7 +78,9 @@ end = struct
       ?(mk_evidence = fun ctxt p1 p2 -> Op.double_preattestation ctxt p1 p2)
       ~loc () =
     let open Lwt_result_syntax in
-    let* genesis, _contracts = Context.init_n ~consensus_threshold:0 10 () in
+    let* genesis, _contracts =
+      Context.init_n ~consensus_threshold_size:0 10 ()
+    in
     let* b1 = bake genesis in
     let* b2_A = bake ~policy:(By_round 0) b1 in
     let* e = Op.attestation b1 in
@@ -92,12 +94,11 @@ end = struct
 
   let max_slashing_period () =
     let open Lwt_result_syntax in
-    let* genesis, _contract = Context.init1 ~consensus_threshold:0 () in
-    let max_slashing_period = Constants.max_slashing_period in
+    let* genesis, _contract = Context.init1 ~consensus_threshold_size:0 () in
     let* {parametric = {blocks_per_cycle; _}; _} =
       Context.get_constants (B genesis)
     in
-    return (max_slashing_period * Int32.to_int blocks_per_cycle)
+    return ((Constants.slashing_delay + 1) * Int32.to_int blocks_per_cycle)
 
   let already_denounced loc res =
     Assert.proto_error ~loc res (function
@@ -127,15 +128,11 @@ end = struct
   let unexpected_success loc _ _ _ _ _ =
     Alcotest.fail (loc ^ ": Test should not succeed")
 
-  let expected_success _loc baker pred bbad d1 d2 =
+  let expected_success _loc baker pred bbad d1 d2 ~duplicate_op =
     let open Lwt_result_syntax in
     (* same preattesters in case denunciation succeeds*)
     let* () = Assert.equal_pkh ~loc:__LOC__ d1 d2 in
     let* constants = Context.get_constants (B pred) in
-    let p =
-      constants.parametric
-        .percentage_of_frozen_deposits_slashed_per_double_attestation
-    in
     (* let's bake the block on top of pred without denunciating d1 *)
     let* bgood = bake ~policy:(By_account baker) pred in
     (* Slashing hasn't happened yet. *)
@@ -154,6 +151,13 @@ end = struct
     (* the diff of the two balances in normal and in denunciation cases *)
     let diff_end_bal = Tez_helpers.(bal_good -! bal_bad) in
     (* amount lost due to denunciation *)
+    let* p =
+      Slashing_helpers.slashing_percentage
+        (Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+           duplicate_op)
+        ~block_before_slash:pred
+        ~all_culprits:[d1]
+    in
     let Q.{num; den} = Percentage.to_q p in
     let lost_deposit =
       Tez_helpers.(frozen_deposit *! Z.to_int64 num /! Z.to_int64 den)
@@ -202,12 +206,6 @@ end = struct
     else if c < 0 then (op2, op1)
     else (op1, op2)
 
-  let adaptive_issuance =
-    {
-      Default_parameters.constants_test.adaptive_issuance with
-      autostaking_enable = false;
-    }
-
   let issuance_weights =
     {
       Default_parameters.constants_test.issuance_weights with
@@ -216,9 +214,7 @@ end = struct
 
   (** Helper function for denunciations inclusion *)
   let generic_double_preattestation_denunciation ~nb_blocks_before_double
-      ~nb_blocks_before_denunciation
-      ?(test_expected_ok =
-        fun _loc _baker _pred _bbad _d1 _d2 -> Lwt_result_syntax.return_unit)
+      ~nb_blocks_before_denunciation ~test_expected_ok
       ?(test_expected_ko = fun _loc _res -> Lwt_result_syntax.return_unit)
       ?(pick_attesters =
         let open Lwt_result_syntax in
@@ -229,8 +225,7 @@ end = struct
     let* genesis, contracts =
       Context.init_n
         ~issuance_weights
-        ~adaptive_issuance
-        ~consensus_threshold:0
+        ~consensus_threshold_size:0
         ~consensus_committee_size:64
         10
         ()
@@ -256,7 +251,9 @@ end = struct
     let*! head_opt = bake ~policy:(By_account baker) blk ~operations:[op] in
     match head_opt with
     | Ok new_head ->
-        let* () = test_expected_ok loc baker blk new_head d1 d2 in
+        let* () =
+          test_expected_ok loc baker blk new_head d1 d2 ~duplicate_op:op1
+        in
         let op : Operation.packed =
           Op.double_preattestation (B new_head) op2 op1
         in
@@ -367,15 +364,13 @@ end = struct
   let test_two_double_preattestation_evidences_leads_to_duplicate_denunciation
       () =
     let open Lwt_result_syntax in
-    let* genesis, _contracts =
-      Context.init2 ~adaptive_issuance ~consensus_threshold:0 ()
-    in
+    let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
     let* blk_1, blk_2 = block_fork genesis in
     let* blk_a = Block.bake blk_1 in
     let* blk_b = Block.bake blk_2 in
     let* delegate, _ = Context.get_attester (B blk_a) in
-    let* preattestation_a = Op.raw_preattestation blk_a in
-    let* preattestation_b = Op.raw_preattestation blk_b in
+    let* preattestation_a = Op.raw_preattestation ~delegate blk_a in
+    let* preattestation_b = Op.raw_preattestation ~delegate blk_b in
     let operation =
       double_preattestation (B genesis) preattestation_a preattestation_b
     in

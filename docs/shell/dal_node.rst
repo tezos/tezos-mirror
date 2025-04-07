@@ -3,42 +3,146 @@ The DAL node
 
 A DAL node is an executable (called ``octez-dal-node``) whose main roles are to publish, store, and exchange data for the :doc:`DAL layer <./dal_overview>`. Interacting with a DAL node is done through the command-line interface (CLI) and through RPCs. In what follows, we describe the main components and features of a DAL node, and then present some operational aspects on configuring and running a DAL node.
 
+For system requirements for the DAL node, see `Hardware and bandwidth requirements for the Tezos DAL <https://forum.tezosagora.org/t/hardware-and-bandwidth-requirements-for-the-tezos-dal/6230>`_.
+
 Concepts and features
 ---------------------
 
 DAL P2P network
 ^^^^^^^^^^^^^^^
 
-The ``octez-dal-node`` executable runs a node in the DAL’s P2P network. Recall that :ref:`the DAL's P2P protocol <dal_p2p>` is based on a gossip algorithm for distributing shards, running on top of a networking layer using the same p2p library as L1 nodes.
+The ``octez-dal-node`` executable runs a node in the DAL’s P2P network. Recall that :ref:`the DAL's P2P protocol <dal_p2p>` is based on a gossipsub algorithm for distributing shards, running on top of a networking layer using the same P2P library as L1 nodes.
 
-Actors with various roles may need to run a DAL node, they need different views of the network depending on their role:
+Actors with various roles run DAL nodes, but they need different views of the network depending on their role:
 
-- operators of smart rollups care about the slots published on some slot indices (those used by the rollup they operate), they don't care about the slots used by other rollups;
-- bakers however care about what happens on all slot indices but they only care about a few shard indices (those assigned to the address of the baker);
-- finally bootstrap nodes have a global view of the DAL P2P network but they don't care about the content of the messages that transit on the network.
+- Operators of Smart Rollups care about data on the slots that their Smart Rollups use, but not about the slots used by other rollups.
+- Bakers only care about the shards that they are assigned to attest to, but they must watch all slots because the assigned shards can be in any slot.
+- Bootstrap node operators care about other nodes connecting to peers that are interested in the same messages via the P2P network but don't care about the content of the messages on the network or any specific slot or shard more than any other.
 
-Bootstrap DAL nodes represent DAL network entry points. Their only role is to provide a way for other DAL nodes to become part of the DAL P2P network. A bootstrap node remains connected to a large number of peers, and is subscribed to all topics. It can thus provide another node with a list of peers to connect to for each of the topics that node is interested in.
-
-Non-bootstrap DAL nodes distinguish themselves only in the topics they subscribe to, for instance:
+Non-bootstrap DAL nodes distinguish themselves only in the topics they subscribe to:
 
 - Operators subscribe to all topics containing some specified slot indexes.
 - Bakers subscribe to all topics containing the attester identities they run for (for all possible slot indexes).
 
-.. _dal_profiles:
+Bootstrap nodes are DAL network entry points that are used for network discovery.
+A bootstrap node remains connected to a large number of peers and is subscribed to all topics.
+When a DAL node starts, it gets the URLs of the bootstrap nodes from its layer 1 node and uses these bootstrap nodes to connect to peers.
+When a DAL node does not have the necessary connections to the P2P network, bootstrap nodes provide connection points with the relevant topics.
 
+Modes
+~~~~~
+
+The DAL node has two modes:
+
+- **Controller mode** is appropriate for most nodes; it is for nodes that post, share, or attest data.
+  Nodes in this mode run in one or more profiles to determine what data they post, share, or attest, as described below.
+
+- **Bootstrap mode** is for nodes that help other nodes connect to peers.
+  Bootstrap nodes are already running on most Tezos networks, so in most cases, you don't need to run a node in bootstrap mode unless you are starting a new Tezos network.
+
+  To run a DAL node in bootstrap mode, pass the ``--bootstrap-profile`` argument, as in this example:
+
+  .. code-block:: shell
+
+    octez-dal-node run --endpoint http://127.0.0.1:8732 --bootstrap-profile --data-dir $DATA_DIR
+
+  The configuration file for a DAL node running in bootstrap mode shows only the base information about the node, as in this example:
+
+  .. code-block:: json
+
+    {
+      "data-dir": "dal-node/",
+      "endpoint": "http://127.0.0.1:8732",
+      "profiles": {
+        "kind": "bootstrap"
+      }
+    }
+
+.. _dal_profiles:
 
 Profiles
 ~~~~~~~~
 
-These differences in the behavior of a DAL node are specified using **profiles**. There are therefore three profiles: bootstrap, operator, and attester profiles. These can be given in the node’s configuration file, or as CLI arguments to the node’s commands, or via RPCs.
-The attester and operator profiles can be combined, the node will then subscribe to the union of the corresponding topics, while the bootstrap profile is incompatible with the other profiles.
+As described above, different actors are interested in different roles when running DAL nodes.
+Some want to produce data, others want to share data, and others want to attest data.
+For this reason, DAL controller nodes run in different profiles; these profiles control which data the nodes post, share, and attest.
+You can set these profiles in the node's configuration file, as CLI arguments to the node's commands, or via RPC calls.
+
+Currently, a DAL node in controller mode can use any combination of profiles.
+However, for future-proofing and for production installations, run a DAL controller node in a single profile.
+
+A DAL node in controller mode can run in these profiles:
+
+- The ``operator`` profile (formerly the ``producer`` profile) is for users who are running a Smart Rollup as an operator and want to post data. To run a DAL node with the ``operator`` profile, pass the ``--operator-profiles`` argument with the indexes of the slots to accept data for, as in this example:
+
+   .. code-block:: shell
+
+      octez-dal-node run --endpoint http://127.0.0.1:8732 --operator-profiles=0,1 --data-dir $DATA_DIR
+
+- The ``attester`` profile is for bakers who want to attest to data. DAL nodes in this profile must pass the ``--attester-profiles`` argument with the public key hashes of the bakers to attest data for (their delegate or manager keys, not their :ref:`consensus keys<consensus_key>`), as in this example:
+
+   .. code-block:: shell
+
+      octez-dal-node run --endpoint http://127.0.0.1:8732 --attester-profiles=tz1QCVQinE8iVj1H2fckqx6oiM85CNJSK9Sx --data-dir $DATA_DIR
+
+- The ``observer`` profile contributes to the resilience of network by helping distribute data in the specified slots. To run a DAL node with the ``observer`` profile, pass the ``--observer-profiles`` argument with the indexes of the slots to monitor or an empty string (as in ``--observer-profiles ''``) to use a random index, as in this example:
+
+   .. code-block:: shell
+
+      octez-dal-node run --endpoint http://127.0.0.1:8732 --observer-profiles=0,1 --data-dir $DATA_DIR
+
+The configuration file for a DAL controller node shows its active profiles.
+For example, this configuration file shows that it is running in the ``operator`` profile and accepting data for slots 0 and 1:
+
+   .. code-block:: json
+
+      {
+        "data-dir": "dal-node/",
+        "endpoint": "http://127.0.0.1:8732",
+        "profiles": {
+          "kind": "controller",
+          "controller_profiles": {
+            "operators": [ 0, 1 ],
+            "observers": [],
+            "attesters": []
+          }
+        }
+      }
+
+The configuration file for a DAL node running with the ``attester`` profile shows the public key hashes of the associated bakers, as in this example:
+
+   .. code-block:: json
+
+      {
+        "data-dir": "dal-node/",
+        "endpoint": "http://127.0.0.1:8732",
+        "profiles": {
+          "kind": "controller",
+          "controller_profiles": {
+            "operators": [],
+            "observers": [],
+            "attesters": [ "tz1QCVQinE8iVj1H2fckqx6oiM85CNJSK9Sx" ]
+          }
+        }
+      }
+
+By default, the DAL node runs in controller mode without any profile.
+
+When a baker starts with the ``--dal-node`` argument, it checks the DAL node's configuration.
+If the DAL node is not in bootstrap mode and not already set up with the ``attester`` profile, the baker configures the DAL node to use the attester profile associated with the keys that it is using.
 
 Storage
 ^^^^^^^
 
 The DAL node essentially stores slots and shards. Slots are injected into the node through an RPC (see details at :ref:`slots_lifetime`), at which moment the corresponding commitment is computed and stored. Shards and their proofs are computed and stored via another RPC. It is important to also compute the shards’ proofs, because shards can be exchanged over the P2P network only if they are accompanied by their proof. Shards received over the P2P network are also stored. The node also tracks and stores the status of commitments by monitoring the L1 chain, connecting to this end to an L1 node specified at startup.
 
-The size of the node’s storage depends on its profile. A bootstrap node uses negligible storage. A DAL node with an operator profile stores in the order of tens MiB per slot, per level. Note that this translates to at least 100GiB per day per slot. A DAL node with an attester profile with the attester having a stake fraction of 1% stores an order of magnitude less data per level.
+The amount of storage space a DAL node needs depends on how long it keeps the data, and different profiles keep the data for different amounts of time:
+
+- Bootstrap nodes store no DAL data and therefore require negligible storage.
+- Attester and observer nodes store data in memory for a few blocks after the attestation delay by default.
+- Operator nodes store data on disk for the slots registered with this profile for 3 months by default because the data may be needed for the Smart Rollup refutation game.
+
+You can set how long the node stores data with the ``--history-mode`` option.
 
 L1 monitoring
 ^^^^^^^^^^^^^
@@ -71,7 +175,7 @@ DAL node commands
 
 The DAL node has two commands ``config init`` and ``run``.
 
-The ``config init`` command creates a new configuration file in the specified data directory or in the default location (ie ``~/.tezos-dal-node``) with the parameters provided on the command-line by the corresponding arguments, in case no configuration file exists already. If such a file already exists, it overrides it with the provided parameters (old parameters are lost).
+The command ``init config`` creates a new configuration file in the specified data directory or in the default location (ie ``~/.tezos-dal-node``) with the parameters provided on the command-line by the corresponding arguments, in case no configuration file exists already. If such a file already exists, it overrides it with the provided parameters (old parameters are lost).
 
 The command ``run`` runs the DAL node. The CLI arguments take precedence over the configuration file arguments, except for the list of bootstrap peers and of profiles, which are considered in addition to the ones from the configuration file. The configuration file is however not overridden with the new values of the node’s parameters. However, at the end of the execution, the node’s profiles, which may have been given as arguments or set via RPCs, are written to the configuration file.
 
@@ -84,14 +188,11 @@ Both commands have the same arguments, which can be seen by executing, e.g., ``o
 See the :ref:`DAL node manual <dal_node_manual>` for more details.
 
 The concrete operational steps for participating in the DAL network are described in page :doc:`./dal_run`.
-In order to run a DAL node with an operator profile, one first needs to
-install some cryptographic parameters, see the section on :ref:`Install DAL
-trusted setup<setup_dal_crypto_params>`.
 
 DAL configuration of the L1 node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-All DAL nodes should use the same initialization parameters of the cryptographic primitives used by the DAL. These parameters are provided by running the script :src:`scripts/install_dal_trusted_setup.sh`, which downloads and installs them, and which should be run once by any DAL node operator. However, for simplicity, on some test networks the initialization parameters are mocked-up and built-in.
+All operator and observer DAL nodes should use the same initialization parameters of the cryptographic primitives used by the DAL, see section :ref:`setup_dal_crypto_params` (**NB:** just that section, not the rest of the page such as compiling sources, etc.).
 
 Also, in order for the nodes to be able to join the P2P network, a set of bootstrap nodes can be provided using the ``network.dal_config.bootstrap_peers`` configuration parameter of the L1 node (thus using the same mechanism as for L1 nodes, see :doc:`../user/multinetwork` and :ref:`configure_p2p`).
 

@@ -25,6 +25,7 @@ pub mod overloads;
 
 pub use micheline::Micheline;
 use num_bigint::{BigInt, BigUint};
+use std::collections::HashMap;
 use std::{
     collections::{BTreeMap, BTreeSet},
     rc::Rc,
@@ -50,6 +51,8 @@ pub use michelson_operation::{
 };
 pub use michelson_signature::Signature;
 pub use or::Or;
+
+use self::entrypoint::Direction;
 
 /// Representation for values of the Michelson `ticket` type.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -569,6 +572,7 @@ pub enum Instruction<'a> {
     Amount,
     Nil,
     EmptySet,
+    EmptyMap,
     EmptyBigMap(Type, Type),
     Mem(overloads::Mem),
     Get(overloads::Get),
@@ -649,6 +653,8 @@ pub struct ContractScript<'a> {
     pub storage: Type,
     /// Script code. Corresponds to the script's `code` field.
     pub code: Instruction<'a>,
+    /// Script entrypoints.
+    pub annotations: HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
 }
 
 #[cfg(test)]

@@ -1,0 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name evm_node_wasm_runtime)
+ (public_name octez-evm-node-libs.evm_node_wasm_runtime)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-l2-libs.irmin_context
+  octez-evm-node-libs.wasm_runtime_callbacks)
+ (flags
+  (:standard)
+  -w -66
+  -open Tezos_layer2_irmin_context))

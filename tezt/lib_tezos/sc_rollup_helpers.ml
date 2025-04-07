@@ -127,15 +127,19 @@ type installer_result = {
    it by using the 'reveal_installer' kernel. This leverages the reveal
    preimage+DAC mechanism to install the tx kernel.
 *)
-let prepare_installer_kernel_with_arbitrary_file ?smart_rollup_installer_path
-    ?runner ?(boot_sector = `Content) ~preimages_dir ?config installee =
+let prepare_installer_kernel_with_arbitrary_file ?output
+    ?smart_rollup_installer_path ?runner ?(boot_sector = `Content)
+    ~preimages_dir ?config installee =
   let open Tezt.Base in
   let open Lwt.Syntax in
-  let installer =
-    installee |> Filename.basename |> Filename.remove_extension |> fun base ->
-    base ^ "-installer.hex"
+  let output =
+    match output with
+    | None ->
+        Temp.file
+          ( installee |> Filename.basename |> Filename.remove_extension
+          |> fun base -> base ^ "-installer.hex" )
+    | Some v -> v
   in
-  let output = Temp.file installer in
   let setup_file_args =
     match config with
     | Some config ->
@@ -172,7 +176,7 @@ let prepare_installer_kernel_with_arbitrary_file ?smart_rollup_installer_path
     in
     Process.spawn
       ?runner
-      ~name:installer
+      ~name:output
       smart_rollup_installer_path
       ([
          "get-reveal-installer";
@@ -205,8 +209,9 @@ let prepare_installer_kernel_with_arbitrary_file ?smart_rollup_installer_path
     root_hash;
   }
 
-let prepare_installer_kernel ?runner ~preimages_dir ?config installee =
+let prepare_installer_kernel ?output ?runner ~preimages_dir ?config installee =
   prepare_installer_kernel_with_arbitrary_file
+    ?output
     ?runner
     ~preimages_dir
     ?config
@@ -224,9 +229,17 @@ let make_parameter name = function
   | None -> []
   | Some value -> [([name], `Int value)]
 
+let make_int_parameter name = function
+  | None -> []
+  | Some value -> [(name, `Int value)]
+
 let make_bool_parameter name = function
   | None -> []
   | Some value -> [([name], `Bool value)]
+
+let make_bool_parameter_l path = function
+  | None -> []
+  | Some value -> [(path, `Bool value)]
 
 let make_string_parameter name = function
   | None -> []
@@ -234,7 +247,8 @@ let make_string_parameter name = function
 
 let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
     ?commitment_period ?challenge_window ?timeout ?whitelist_enable
-    ?rpc_external ?(riscv_pvm_enable = false) ?minimal_block_delay protocol =
+    ?rpc_external ?(riscv_pvm_enable = false) ?minimal_block_delay
+    ?dal_incentives ?dal_rewards_weight protocol =
   let parameters =
     make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
@@ -249,6 +263,14 @@ let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
          make_bool_parameter "smart_rollup_private_enable" whitelist_enable
        else [])
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
+    @ make_bool_parameter_l
+        ["dal_parametric"; "incentives_enable"]
+        dal_incentives
+    @ (if Protocol.(number protocol > number Quebec) then
+         make_int_parameter
+           ["issuance_weights"; "dal_rewards_weight"]
+           dal_rewards_weight
+       else [])
     @
     if riscv_pvm_enable then [(["smart_rollup_riscv_pvm_enable"], `Bool true)]
     else []
@@ -1014,11 +1036,9 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
             (current_level + delay)
         in
         let* () = Sc_rollup_node.terminate sc_rollup_node in
-        let sc_rollup_node =
-          match restart_mode with
-          | Some mode -> Sc_rollup_node.change_node_mode sc_rollup_node mode
-          | None -> sc_rollup_node
-        in
+        (match restart_mode with
+        | Some mode -> Sc_rollup_node.change_node_mode sc_rollup_node mode
+        | None -> ()) ;
         let* _ = run_honest_node sc_rollup_node in
         unit)
       reset_honest_on

@@ -27,12 +27,23 @@ let spawn_command_and_read_string ?expect_failure arguments =
 let version () = spawn_command_and_read_string ["--version"]
 
 let cast_transaction ?expect_failure ~source_private_key ?endpoint ?chain_id
-    ?nonce ?value ?gas ?gas_price ?priority_fee tx =
+    ?nonce ?value ?gas ?gas_price ?priority_fee ?access_list tx =
   let arguments =
     match tx with
     | CallTo {signature; arguments; address} ->
         address :: (Option.to_list signature @ arguments)
     | Create {data} -> ["--create"; data]
+  in
+  let access_list_to_json l : Ezjsonm.value =
+    `A
+      (List.map
+         (fun (address, keys) ->
+           `O
+             [
+               ("address", `String address);
+               ("storageKeys", `A (List.map Ezjsonm.string keys));
+             ])
+         l)
   in
   let options =
     ["--private-key"; source_private_key]
@@ -44,12 +55,17 @@ let cast_transaction ?expect_failure ~source_private_key ?endpoint ?chain_id
     @ Cli_arg.optional_arg "gas-limit" Int.to_string gas
     @ Cli_arg.optional_arg "priority-gas-price" Int.to_string priority_fee
     @ Cli_arg.optional_arg "gas-price" Int.to_string gas_price
+    @ Cli_arg.optional_arg
+        "access-list"
+        (fun al ->
+          Ezjsonm.value_to_string ~minify:true (access_list_to_json al))
+        access_list
     @ arguments
   in
   spawn_command_and_read_string ?expect_failure ("mktx" :: options)
 
 let craft_tx ~source_private_key ~chain_id ~nonce ~value ~gas ~gas_price
-    ?(legacy = true) ~address ?signature ?(arguments = []) () =
+    ?(legacy = true) ?access_list ~address ?signature ?(arguments = []) () =
   let priority_fee = if legacy then None else Some 1 in
   let tx = CallTo {signature; arguments; address} in
   let* encoded_tx =
@@ -61,12 +77,13 @@ let craft_tx ~source_private_key ~chain_id ~nonce ~value ~gas ~gas_price
       ~gas
       ~gas_price
       ?priority_fee
+      ?access_list
       tx
   in
   return (String.sub encoded_tx 2 (String.length encoded_tx - 2))
 
 let craft_deploy_tx ~source_private_key ~chain_id ~nonce ?value ~gas ~gas_price
-    ?(legacy = true) ~data () =
+    ?(legacy = true) ?access_list ~data () =
   let priority_fee = if legacy then None else Some 1 in
   let tx = Create {data} in
   let* encoded_tx =
@@ -78,6 +95,7 @@ let craft_deploy_tx ~source_private_key ~chain_id ~nonce ?value ~gas ~gas_price
       ~gas
       ~gas_price
       ?priority_fee
+      ?access_list
       tx
   in
   return (String.sub encoded_tx 2 (String.length encoded_tx - 2))

@@ -469,7 +469,10 @@ module Make (P : External_process_parameters.S) = struct
                      Data_encoding.(
                        tup2
                          (P.result_encoding request)
-                         (option Profiler.report_encoding))
+                         (option
+                            (tup2
+                               (option Profiler.report_encoding)
+                               (option Profiler.report_encoding))))
                  in
                  let timespan =
                    let then_ = Time.System.now () in

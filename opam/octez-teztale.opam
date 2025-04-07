@@ -10,6 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "bls12-381"
   "aches" { >= "1.1.0" }
   "caqti-driver-postgresql" { >= "2.0.1" }
   "caqti-driver-sqlite3" { >= "2.0.1" }
@@ -18,10 +19,13 @@ depends: [
   "ezgzip"
   "safepass"
   "octez-version"
-  "lwt" { >= "5.7.0" }
+  "lwt" { >= "5.7.0" & < "5.9.0" }
   "cmdliner" { >= "1.1.0" }
+  "octez-rust-deps"
   "octez-shell-libs"
-  "x509" { < "1.0.0" }
+  "tls-lwt" { >= "1.0.4" }
+  "conduit-lwt-unix" { >= "7.1.0" }
+  "x509" { >= "1.0.0" }
 ]
 depopts: [
   "octez-protocol-001-PtCJ7pwo-libs"
@@ -45,6 +49,7 @@ depopts: [
   "octez-protocol-019-PtParisB-libs"
   "octez-protocol-020-PsParisC-libs"
   "octez-protocol-021-PsQuebec-libs"
+  "octez-protocol-022-PsRiotum-libs"
   "octez-protocol-alpha-libs"
 ]
 build: [
@@ -52,4 +57,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos: teztale, a delegate operations monitor"

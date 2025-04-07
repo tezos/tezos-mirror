@@ -5,50 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type Block_storage = sig
-  (** [current_block_number ()] returns the most recent processed and
-      stored block number. *)
-  val current_block_number : unit -> Ethereum_types.quantity tzresult Lwt.t
-
-  (** [nth_block ~full_transaction_object n] returns the [n]th
-      processed and stored block.
-
-      If [full_transaction_object] is [true], returns the transaction objects,
-      the transactions hashes otherwise.
-    *)
-  val nth_block :
-    full_transaction_object:bool -> Z.t -> Ethereum_types.block tzresult Lwt.t
-
-  (** [block_by_hash ~full_transaction_object hash] returns the block with the
-      given [hash].
-
-      If [full_transaction_object] is [true], returns the transaction objects,
-      the transactions hashes otherwise.
-    *)
-  val block_by_hash :
-    full_transaction_object:bool ->
-    Ethereum_types.block_hash ->
-    Ethereum_types.block tzresult Lwt.t
-
-  (** [block_receipts n] returns the receipts of the [n]th
-      processed and stored block.
-    *)
-  val block_receipts : Z.t -> Transaction_receipt.t list tzresult Lwt.t
-
-  (** [transaction_receipt tx_hash] returns the receipt of [tx_hash]. *)
-  val transaction_receipt :
-    Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t
-
-  (** [transaction_object tx_hash] returns the informations of [tx_hash]. *)
-  val transaction_object :
-    Ethereum_types.hash ->
-    Ethereum_types.transaction_object option tzresult Lwt.t
-end
-
 module type S = sig
   module Reader : Durable_storage.READER
 
-  module Block_storage : Block_storage
+  module Block_storage : Block_storage_sig.S
 
   (** [balance address block_param] returns the [address]'s balance at block
       [block_param]. *)
@@ -78,7 +38,7 @@ module type S = sig
   val inject_transactions :
     timestamp:Time.Protocol.t ->
     smart_rollup_address:string ->
-    transactions:(string * Ethereum_types.transaction_object) list ->
+    transactions:(string * Ethereum_types.legacy_transaction_object) list ->
     Ethereum_types.hash list tzresult Lwt.t
 
   val block_param_to_block_number :
@@ -86,7 +46,7 @@ module type S = sig
     Ethereum_types.quantity tzresult Lwt.t
 
   (** [chain_id ()] returns chain id defined by the rollup. *)
-  val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
+  val chain_id : unit -> Ethereum_types.chain_id tzresult Lwt.t
 
   (** [base_fee_per_gas ()] returns base fee defined by the rollup. *)
   val base_fee_per_gas : unit -> Ethereum_types.quantity tzresult Lwt.t
@@ -113,14 +73,8 @@ module type S = sig
       returns the gas used to execute the call. *)
   val estimate_gas :
     Ethereum_types.call ->
+    Ethereum_types.Block_parameter.t ->
     Simulation.call_result Simulation.simulation_result tzresult Lwt.t
-
-  (** [is_tx_valid tx_raw] checks if the transaction is valid. Checks
-      if the nonce is correct and returns the associated public key of
-      transaction. *)
-  val is_tx_valid :
-    string ->
-    Simulation.validation_result Simulation.simulation_result tzresult Lwt.t
 
   (** [storage_at address pos block_param] returns the value at index
       [pos] of the account [address]'s storage on block
@@ -133,25 +87,15 @@ module type S = sig
 
   val smart_rollup_address : string
 
-  val replay : Ethereum_types.quantity -> Ethereum_types.block tzresult Lwt.t
-
-  (** [trace_transaction hash tracer] replays the block containing the
-      transaction [hash], and traces this transaction with the specified
-      [tracer]. *)
-  val trace_transaction :
-    Ethereum_types.hash ->
-    Tracer_types.config ->
-    Tracer_types.output tzresult Lwt.t
+  val replay :
+    Ethereum_types.quantity ->
+    Ethereum_types.legacy_transaction_object Ethereum_types.block tzresult Lwt.t
 
   (** [coinbase ()] returns the sequencer pool address if it exists,
       or the zero address. *)
   val coinbase : unit -> Ethereum_types.address tzresult Lwt.t
 
-  val trace_call :
-    Ethereum_types.call ->
-    Ethereum_types.Block_parameter.extended ->
-    Tracer_types.config ->
-    Tracer_types.output tzresult Lwt.t
+  include Tracer_sig.S
 end
 
 module type Backend = sig
@@ -183,13 +127,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
 
   let block_param_to_block_number = Backend.block_param_to_block_number
 
-  include
-    Tracer_sig.Make
-      (Executor)
-      (struct
-        let transaction_receipt = Block_storage.transaction_receipt
-      end)
-      (Backend.Tracer)
+  include Tracer_sig.Make (Executor) (Block_storage) (Backend.Tracer)
 
   let replay number =
     let open Lwt_result_syntax in

@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let parse_module code =
+  let def = Parse.string_to_module code in
+  match def.it with
+  | Script.Textual m -> m
+  | _ -> Stdlib.failwith "Failed to parse WebAssembly module"
+
 (* [error loc category msg] fails with the location of an error and a message,
    returned by either the parser of the typechecker of the WASM reference
    interpreter. *)
@@ -49,7 +55,6 @@ let trap_exn f =
       | Import.Unknown (at, msg) -> error at "link failure" msg
       | Eval.Link (at, msg) -> error at "link failure" msg
       | Eval.Trap (at, msg) -> error at "runtime trap" msg
-      | Tezos_wasmer.Trap msg -> error Source.no_region "runtime trap" msg
       | Eval.Exhaustion (at, msg) -> error at "resource exhaustion" msg
       | Eval.Crash (at, msg) -> error at "runtime crash" msg
       | Encode.Code (at, msg) -> error at "encoding error" msg

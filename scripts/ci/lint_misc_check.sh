@@ -8,6 +8,11 @@ make check-opam-linting
 scripts/lint.sh --check-scripts
 scripts/lint.sh --check-rust-toolchain
 
+# Mempool in lib_plugin is usually removed when the associated protocol is frozen.
+# However to replay Ghostnet's history, it is necessary to keep a fix in the
+# mempool's validation.
+scripts/lint.sh --check-quebec-plugin-ghostnet-fix
+
 # Ensure that all unit tests are restricted to their opam package
 make lint-tests-pkg
 

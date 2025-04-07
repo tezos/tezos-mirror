@@ -118,7 +118,7 @@ let reveal_dictator_key node client dictator =
     Operation.inject_transfer
       ~source:Constant.bootstrap1
       ~dest:dictator
-      ~gas_limit:1500
+      ~gas_limit:3500
       ~fee:0
       ~amount:1
       ~async:true

@@ -14,6 +14,8 @@ pub enum Mode {
     Debug(DebugOptions),
     /// Benchmark a program
     Bench(BenchOptions),
+    /// Launch a gdb server, for debugging the given program.
+    GdbServer(GdbServerOptions),
 }
 
 #[derive(Clone, ValueEnum, Debug)]
@@ -59,6 +61,29 @@ pub struct DebugOptions {
     /// Path to the initrd
     #[arg(long)]
     pub initrd: Option<Box<Path>>,
+
+    /// Demangle function symbols (True by default unless `--no-demangle` is passed)
+    #[arg(
+        long = "no-demangle",
+        default_value_t = true,
+        action(clap::ArgAction::SetFalse)
+    )]
+    pub demangle: bool,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct GdbServerOptions {
+    /// Path to the input ELF executable
+    #[arg(long, short)]
+    pub input: Box<Path>,
+
+    /// Path to the initrd
+    #[arg(long)]
+    pub initrd: Option<Box<Path>>,
+
+    /// Port to listen on for gdb client (on `localhost:<PORT>`).
+    #[arg(long, short)]
+    pub port: u16,
 }
 
 #[derive(Clone, ValueEnum, Debug)]

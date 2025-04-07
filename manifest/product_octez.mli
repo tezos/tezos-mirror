@@ -9,6 +9,8 @@
 
 val alcotezt : Manifest.target
 
+val bls12_381_archive : Manifest.target
+
 val bls12_381 : Manifest.target
 
 val lazy_containers : Manifest.target
@@ -18,6 +20,10 @@ val octez_base : Manifest.target
 val octez_base_test_helpers : Manifest.target
 
 val octez_base_unix : Manifest.target
+
+val octez_profiler : Manifest.target
+
+val octez_profiler_backends : Manifest.target
 
 val octez_clic : Manifest.target
 
@@ -39,6 +45,10 @@ val octez_event_logging : Manifest.target
 
 val octez_layer2_store : Manifest.target
 
+val octez_layer2_irmin_context : Manifest.target
+
+val octez_layer2_riscv_context : Manifest.target
+
 val octez_sqlite : Manifest.target
 
 val octez_rpc_http_client_unix : Manifest.target
@@ -49,17 +59,21 @@ val octez_rpc_http_server : Manifest.target
 
 val octez_rust_deps : Manifest.target
 
+val octez_rustzcash_deps : Manifest.target
+
 val octez_scoru_wasm_debugger_lib : Manifest.target
 
 val octez_scoru_wasm_debugger_plugin : Manifest.target
 
-val octez_scoru_wasm_helpers : Manifest.target
+val octez_scoru_wasm_helpers_functor : Manifest.target
 
 val octez_scoru_wasm : Manifest.target
 
 val octez_shell_services : Manifest.target
 
 val octez_signer_services : Manifest.target
+
+val performance_metrics : Manifest.target
 
 val octez_smart_rollup_lib : Manifest.target
 

@@ -10,30 +10,31 @@ license: "Apache-2.0"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "ppx_deriving"
   "octez-libs" { = version }
-  "zarith" { >= "1.13" & < "1.14" }
-  "lwt" { >= "5.7.0" }
+  "lwt" { >= "5.7.0" & < "5.9.0" }
+  "ppx_deriving"
   "ctypes" { >= "0.18.0" }
   "ctypes-foreign" { >= "0.18.0" }
-  "octez-rust-deps" { = version }
   "index" { >= "1.6.0" & < "1.7.0" }
   "octez-internal-libs" { = version }
   "aches-lwt" { >= "1.1.0" }
-  "octez-riscv-pvm" { = version }
   "camlzip" { >= "1.12" & < "1.13" }
   "tar"
   "tar-unix" { >= "2.0.1" & < "3.0.0" }
+  "octez-riscv-pvm" { = version }
   "caqti"
   "caqti-lwt" { >= "2.0.1" }
   "caqti-driver-sqlite3" { >= "2.0.1" }
   "yaml" { >= "3.1.0" }
   "crunch" { >= "3.3.0" }
   "re" { >= "1.10.0" }
+  "octez-performance-metrics" { = version }
   "ppx_import"
   "qcheck-alcotest" { >= "0.20" }
   "octez-alcotezt" { = version }
+  "bls12-381" { = version }
   "tezt" { >= "4.1.0" & < "5.0.0" }
+  "octez-rust-deps" { = version }
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }
@@ -43,4 +44,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Octez layer2 libraries"

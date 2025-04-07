@@ -12,6 +12,8 @@ module type READER = sig
 
   val really_input : in_channel -> bytes -> int -> int -> unit
 
+  val input_char : in_channel -> char
+
   val input : in_channel -> bytes -> int -> int -> int
 
   val close_in : in_channel -> unit
@@ -89,8 +91,6 @@ module Make (Header : sig
   type t
 
   val encoding : t Data_encoding.t
-
-  val size : int
 end) =
 struct
   let write_snapshot_header (module Writer : WRITER_OUTPUT) header =
@@ -100,9 +100,21 @@ struct
     Writer.output Writer.out_chan header_bytes 0 (Bytes.length header_bytes)
 
   let read_snapshot_header (module Reader : READER_INPUT) =
-    let header_bytes = Bytes.create Header.size in
-    Reader.really_input Reader.in_chan header_bytes 0 Header.size ;
-    Data_encoding.Binary.of_bytes_exn Header.encoding header_bytes
+    let read_char () =
+      let c = Reader.input_char Reader.in_chan in
+      Bytes.init 1 (fun _ -> c)
+    in
+    let rec loop = function
+      | Data_encoding.Binary.Success {result; size = _; stream = _} -> result
+      | Await k -> loop (k (read_char ()))
+      | Error e ->
+          Format.kasprintf
+            Stdlib.failwith
+            "Error reading snapshot header: %a"
+            Data_encoding.Binary.pp_read_error
+            e
+    in
+    loop (Data_encoding.Binary.read_stream Header.encoding)
 
   let create (module Reader : READER) (module Writer : WRITER) header ~files
       ~dest =
@@ -176,7 +188,7 @@ struct
       raise e
 
   let extract (module Reader : READER) (module Writer : WRITER) header_check
-      ~snapshot_file ~dest =
+      ~cancellable ~display_progress ~snapshot_file ~dest =
     let open Lwt_result_syntax in
     let module Writer = struct
       include Writer
@@ -204,14 +216,35 @@ struct
         let in_chan = in_chan
       end)
     in
+    let maybe_progress k =
+      if display_progress then (
+        let spinner = Progress_bar.spinner ~message:"Extracting snapshot" in
+        Progress_bar.with_reporter spinner @@ fun count_progress ->
+        Writer.count_progress := count_progress ;
+        k ())
+      else k ()
+    in
+    let run k =
+      if cancellable then
+        (* [Lwt_preemptive] does not yet provide a way to cancel a detached
+           computation.
+
+           As a temporary fix, we use [Lwt.wrap_in_cancelable]. The promise
+           created by [detach] is cancelled. The detached computation keeps
+           running, which is less than ideal, but it is reasonable because
+           our use case for cancellation leads to the program exiting. *)
+        Lwt.wrap_in_cancelable (Lwt_preemptive.detach k ())
+      else Lwt.return (k ())
+    in
     Lwt.finalize
       (fun () ->
         let header = read_snapshot_header reader_input in
         let* check_result = header_check header in
-        let spinner = Progress_bar.spinner ~message:"Extracting snapshot" in
-        Progress_bar.with_reporter spinner @@ fun count_progress ->
-        Writer.count_progress := count_progress ;
-        Archive_reader.Archive.extract_gen out_channel_of_header in_chan ;
+        maybe_progress @@ fun () ->
+        let*! () =
+          run (fun () ->
+              Archive_reader.Archive.extract_gen out_channel_of_header in_chan)
+        in
         return (header, check_result))
       (fun () ->
         Reader.close_in in_chan ;

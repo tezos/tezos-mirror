@@ -574,7 +574,7 @@ let commands =
           Store.init
             ~readonly:true
             ~store_dir:(data_dir // "store")
-            ~context_dir:(data_dir // "context")
+            ~context_root_dir:data_dir
             ~allow_testchains:false
             config.blockchain_network.genesis
         in

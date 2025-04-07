@@ -59,7 +59,7 @@ let test_proto_files = ["main.ml"; "main.mli"]
 let test_proto_TEZOS_PROTOCOL =
   {|{
     "modules": ["Main"],
-    "expected_env_version": 13
+    "expected_env_version": 15
 }
 |}
 
@@ -295,11 +295,21 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
       (["cycles_per_voting_period"], `Int 1);
     ]
   in
+  let parameters =
+    if Protocol.number from_protocol > Protocol.number Protocol.Quebec then
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7576 use a
+         default value for [tolerated_inactivity_period] *)
+      (["tolerated_inactivity_period"], `Int 3) :: parameters
+    else parameters
+  in
+
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (from_protocol, None)) parameters
   in
   (* Start a node and activate [from_protocol]. *)
-  let* node = Node.init [Synchronisation_threshold 0] in
+  let* node =
+    Node.init [Synchronisation_threshold 0; Node.(History_mode default_full)]
+  in
   let* client = Client.init ~endpoint:(Node node) () in
   let* () =
     Client.activate_protocol ~protocol:from_protocol ~parameter_file client

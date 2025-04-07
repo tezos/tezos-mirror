@@ -6,29 +6,32 @@
 [workspace]
 resolver = "2"
 members = [
-  # Kernel Dev
-  "constants",
-  "core",
-  "host",
-  "debug",
-  "mock",
-  "encoding",
-  "storage",
-  "panic-hook",
-  "entrypoint",
-  "macros",
-  "utils",
-  "sdk",
-  # UX
-  "installer-kernel",
-  "installer-client",
-  "installer-config",
+	# Kernel Dev
+	"constants",
+	"core",
+	"host",
+	"debug",
+	"mock",
+	"encoding",
+	"storage",
+	"panic-hook",
+	"entrypoint",
+	"macros",
+	"utils",
+	"build-utils",
+	"sdk",
+	# UX
+	"installer-kernel",
+	"installer-client",
+	"installer-config",
 ]
 
 [workspace.dependencies.tezos_crypto_rs]
 version = "0.6.0"
+path = "../../sdk/rust/crypto"
 default-features = false
 
 [workspace.dependencies.tezos_data_encoding]
 version = "0.6.0"
+path = "../../sdk/rust/encoding"
 default-features = false

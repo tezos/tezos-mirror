@@ -32,13 +32,20 @@ module Kind = struct
 
   type attestation_consensus_kind = Attestation_consensus_kind
 
+  type attestations_aggregate_consensus_kind =
+    | Attestations_aggregate_consensus_kind
+
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Attestation_kind : attestation_consensus_kind consensus
+    | Attestations_aggregate_kind
+        : attestations_aggregate_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
   type attestation = attestation_consensus_kind consensus
+
+  type attestations_aggregate = attestations_aggregate_consensus_kind consensus
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
@@ -54,6 +61,8 @@ module Kind = struct
     preattestation_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
+
+  type dal_entrapment_evidence = Dal_entrapment_evidence_kind
 
   type activate_account = Activate_account_kind
 
@@ -139,6 +148,14 @@ end
 type 'a consensus_operation_type =
   | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
+  | Attestations_aggregate
+      : Kind.attestations_aggregate consensus_operation_type
+
+type consensus_aggregate_content = {
+  level : Raw_level_repr.t;
+  round : Round_repr.t;
+  block_payload_hash : Block_payload_hash.t;
+}
 
 type consensus_content = {
   slot : Slot_repr.t;
@@ -156,18 +173,28 @@ type consensus_content = {
 
 type dal_content = {attestation : Dal_attestation_repr.t}
 
+let consensus_aggregate_content_encoding =
+  let open Data_encoding in
+  conv
+    (fun ({level; round; block_payload_hash} : consensus_aggregate_content) ->
+      (level, round, block_payload_hash))
+    (fun (level, round, block_payload_hash) : consensus_aggregate_content ->
+      {level; round; block_payload_hash})
+    (obj3
+       (req "level" Raw_level_repr.encoding)
+       (req "round" Round_repr.encoding)
+       (req "block_payload_hash" Block_payload_hash.encoding))
+
 let consensus_content_encoding =
   let open Data_encoding in
   conv
     (fun {slot; level; round; block_payload_hash} ->
-      (slot, level, round, block_payload_hash))
-    (fun (slot, level, round, block_payload_hash) ->
+      (slot, {level; round; block_payload_hash}))
+    (fun (slot, {level; round; block_payload_hash}) ->
       {slot; level; round; block_payload_hash})
-    (obj4
-       (req "slot" Slot_repr.encoding)
-       (req "level" Raw_level_repr.encoding)
-       (req "round" Round_repr.encoding)
-       (req "block_payload_hash" Block_payload_hash.encoding))
+    (merge_objs
+       (obj1 (req "slot" Slot_repr.encoding))
+       consensus_aggregate_content_encoding)
 
 let pp_consensus_content ppf content =
   Format.fprintf
@@ -236,6 +263,11 @@ and _ contents =
       dal_content : dal_content option;
     }
       -> Kind.attestation contents
+  | Attestations_aggregate : {
+      consensus_content : consensus_aggregate_content;
+      committee : Slot_repr.t list;
+    }
+      -> Kind.attestations_aggregate contents
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
       nonce : Seed_repr.nonce;
@@ -260,6 +292,12 @@ and _ contents =
       bh2 : Block_header_repr.t;
     }
       -> Kind.double_baking_evidence contents
+  | Dal_entrapment_evidence : {
+      attestation : Kind.attestation operation;
+      slot_index : Dal_slot_index_repr.t;
+      shard_with_proof : Dal_slot_repr.Shard_with_proof.t;
+    }
+      -> Kind.dal_entrapment_evidence contents
   | Activate_account : {
       id : Ed25519.Public_key_hash.t;
       activation_code : Blinded_public_key_hash.activation_code;
@@ -325,8 +363,10 @@ and _ manager_operation =
       destination : Contract_hash.t;
     }
       -> Kind.increase_paid_storage manager_operation
-  | Update_consensus_key :
-      Signature.Public_key.t
+  | Update_consensus_key : {
+      public_key : Signature.Public_key.t;
+      proof : Signature.signature option;
+    }
       -> Kind.update_consensus_key manager_operation
   | Transfer_ticket : {
       contents : Script_repr.lazy_expr;
@@ -717,12 +757,19 @@ module Encoding = struct
         {
           tag = update_consensus_key_tag;
           name = "update_consensus_key";
-          encoding = obj1 (req "pk" Signature.Public_key.encoding);
+          encoding =
+            obj2
+              (req "pk" Signature.Public_key.encoding)
+              (opt "proof" (dynamic_size Signature.encoding));
           select =
             (function
             | Manager (Update_consensus_key _ as op) -> Some op | _ -> None);
-          proj = (function Update_consensus_key consensus_pk -> consensus_pk);
-          inj = (fun consensus_pk -> Update_consensus_key consensus_pk);
+          proj =
+            (fun (Update_consensus_key {public_key; proof}) ->
+              (public_key, proof));
+          inj =
+            (fun (public_key, proof) ->
+              Update_consensus_key {public_key; proof});
         }
 
     let transfer_ticket_case =
@@ -1044,13 +1091,6 @@ module Encoding = struct
                   @@ union [make preattestation_case]))
                (varopt "signature" Signature.encoding)))
 
-  let consensus_content_encoding =
-    obj4
-      (req "slot" Slot_repr.encoding)
-      (req "level" Raw_level_repr.encoding)
-      (req "round" Round_repr.encoding)
-      (req "block_payload_hash" Block_payload_hash.encoding)
-
   let dal_content_encoding =
     obj1 (req "dal_attestation" Dal_attestation_repr.encoding)
 
@@ -1060,37 +1100,20 @@ module Encoding = struct
   (* Precondition: [dal_content = None]. *)
   let attestation_encoding_proj
       (Attestation {consensus_content; dal_content = _}) =
-    ( consensus_content.slot,
-      consensus_content.level,
-      consensus_content.round,
-      consensus_content.block_payload_hash )
+    consensus_content
 
-  let attestation_encoding_inj (slot, level, round, block_payload_hash) =
-    Attestation
-      {
-        consensus_content = {slot; level; round; block_payload_hash};
-        dal_content = None;
-      }
+  let attestation_encoding_inj consensus_content =
+    Attestation {consensus_content; dal_content = None}
 
   (* Precondition: [dal_content <> None]. Check usage! *)
   let attestation_with_dal_encoding_proj
       (Attestation {consensus_content; dal_content}) =
     match dal_content with
     | None -> assert false
-    | Some dal_content ->
-        ( ( consensus_content.slot,
-            consensus_content.level,
-            consensus_content.round,
-            consensus_content.block_payload_hash ),
-          dal_content.attestation )
+    | Some dal_content -> (consensus_content, dal_content.attestation)
 
-  let attestation_with_dal_encoding_inj
-      ((slot, level, round, block_payload_hash), attestation) =
-    Attestation
-      {
-        consensus_content = {slot; level; round; block_payload_hash};
-        dal_content = Some {attestation};
-      }
+  let attestation_with_dal_encoding_inj (consensus_content, attestation) =
+    Attestation {consensus_content; dal_content = Some {attestation}}
 
   let attestation_case =
     Case
@@ -1157,6 +1180,28 @@ module Encoding = struct
                          make `With_dal attestation_with_dal_case;
                        ]))
                (varopt "signature" Signature.encoding)))
+
+  let attestations_aggregate_encoding =
+    obj2
+      (req "consensus_content" consensus_aggregate_content_encoding)
+      (req "committee" (list Slot_repr.encoding))
+
+  let attestations_aggregate_case =
+    Case
+      {
+        tag = 31;
+        name = "attestations_aggregate";
+        encoding = attestations_aggregate_encoding;
+        select =
+          (function
+          | Contents (Attestations_aggregate _ as op) -> Some op | _ -> None);
+        proj =
+          (fun (Attestations_aggregate {consensus_content; committee}) ->
+            (consensus_content, committee));
+        inj =
+          (fun (consensus_content, committee) ->
+            Attestations_aggregate {consensus_content; committee});
+      }
 
   let seed_nonce_revelation_case =
     Case
@@ -1334,6 +1379,28 @@ module Encoding = struct
         inj = (function message -> Failing_noop message);
       }
 
+  let dal_entrapment_evidence_case : Kind.dal_entrapment_evidence case =
+    Case
+      {
+        tag = 24;
+        name = "dal_entrapment_evidence";
+        encoding =
+          obj3
+            (req "attestation" (dynamic_size attestation_encoding))
+            (req "slot_index" Dal_slot_index_repr.encoding)
+            (req "shard_with_proof" Dal_slot_repr.Shard_with_proof.encoding);
+        select =
+          (function
+          | Contents (Dal_entrapment_evidence _ as op) -> Some op | _ -> None);
+        proj =
+          (fun (Dal_entrapment_evidence
+                 {attestation; slot_index; shard_with_proof}) ->
+            (attestation, slot_index, shard_with_proof));
+        inj =
+          (fun (attestation, slot_index, shard_with_proof) ->
+            Dal_entrapment_evidence {attestation; slot_index; shard_with_proof});
+      }
+
   let manager_encoding =
     obj5
       (req "source" Signature.Public_key_hash.encoding)
@@ -1461,16 +1528,16 @@ module Encoding = struct
 
   type packed_case = PCase : 'b case -> packed_case
 
-  let contents_cases =
+  let contents_cases_common =
     [
       PCase preattestation_case;
-      PCase attestation_case;
-      PCase attestation_with_dal_case;
+      PCase attestations_aggregate_case;
       PCase double_preattestation_evidence_case;
       PCase double_attestation_evidence_case;
       PCase seed_nonce_revelation_case;
       PCase vdf_revelation_case;
       PCase double_baking_evidence_case;
+      PCase dal_entrapment_evidence_case;
       PCase activate_account_case;
       PCase proposals_case;
       PCase ballot_case;
@@ -1498,6 +1565,10 @@ module Encoding = struct
       PCase zk_rollup_publish_case;
       PCase zk_rollup_update_case;
     ]
+
+  let contents_cases =
+    PCase attestation_case :: PCase attestation_with_dal_case
+    :: contents_cases_common
 
   let contents_encoding =
     let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
@@ -1682,6 +1753,71 @@ module Encoding = struct
     @@ merge_objs
          Operation.shell_header_encoding
          (obj1 (req "contents" contents_list_encoding))
+
+  (* Encoding to sign and verify attestations and preattestations signatures
+     with BLS keys. In this encoding, the signed payload is omitting slots to
+     enable BLS proof of possession aggregation. *)
+  module Bls_mode = struct
+    let attestation_case =
+      Case
+        {
+          tag = 41;
+          name = "bls_mode_attestation";
+          encoding =
+            merge_objs
+              consensus_aggregate_content_encoding
+              (obj1 (opt "dal" dal_content_encoding));
+          select =
+            (function Contents (Attestation _ as op) -> Some op | _ -> None);
+          proj =
+            (fun (Attestation {consensus_content; dal_content}) ->
+              ( {
+                  level = consensus_content.level;
+                  round = consensus_content.round;
+                  block_payload_hash = consensus_content.block_payload_hash;
+                },
+                Option.map
+                  (fun dal_content -> dal_content.attestation)
+                  dal_content ));
+          inj =
+            (fun ({level; round; block_payload_hash}, dal_content) ->
+              Attestation
+                {
+                  consensus_content =
+                    {slot = Slot_repr.zero; level; round; block_payload_hash};
+                  dal_content =
+                    Option.map (fun attestation -> {attestation}) dal_content;
+                });
+        }
+
+    let contents_cases =
+      (* attestations without slots *)
+      PCase attestation_case :: contents_cases_common
+
+    let contents_encoding =
+      let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
+        assert (not @@ reserved_tag tag) ;
+        case
+          (Tag tag)
+          name
+          encoding
+          (fun o ->
+            match select o with None -> None | Some o -> Some (proj o))
+          (fun x -> Contents (inj x))
+      in
+      def "operation.alpha.bls_mode_contents"
+      @@ union (List.map make contents_cases)
+
+    let contents_list_encoding =
+      conv_with_guard to_list of_list_internal (Variable.list contents_encoding)
+
+    let encoding =
+      let open Data_encoding in
+      def "operation.alpha.bls_mode_unsigned_operation"
+      @@ merge_objs
+           Operation.shell_header_encoding
+           (obj1 (req "contents" contents_list_encoding))
+  end
 end
 
 let encoding = Encoding.operation_encoding
@@ -1693,6 +1829,8 @@ let contents_list_encoding = Encoding.contents_list_encoding
 let protocol_data_encoding = Encoding.protocol_data_encoding
 
 let unsigned_operation_encoding = Encoding.unsigned_operation_encoding
+
+let bls_mode_unsigned_operation_encoding = Encoding.Bls_mode.encoding
 
 let raw ({shell; protocol_data} : _ operation) =
   let proto =
@@ -1721,6 +1859,7 @@ let acceptable_pass (op : packed_operation) =
   | Single (Failing_noop _) -> None
   | Single (Preattestation _) -> Some consensus_pass
   | Single (Attestation _) -> Some consensus_pass
+  | Single (Attestations_aggregate _) -> Some consensus_pass
   | Single (Proposals _) -> Some voting_pass
   | Single (Ballot _) -> Some voting_pass
   | Single (Seed_nonce_revelation _) -> Some anonymous_pass
@@ -1728,6 +1867,7 @@ let acceptable_pass (op : packed_operation) =
   | Single (Double_attestation_evidence _) -> Some anonymous_pass
   | Single (Double_preattestation_evidence _) -> Some anonymous_pass
   | Single (Double_baking_evidence _) -> Some anonymous_pass
+  | Single (Dal_entrapment_evidence _) -> Some anonymous_pass
   | Single (Activate_account _) -> Some anonymous_pass
   | Single (Drain_delegate _) -> Some anonymous_pass
   | Single (Manager_operation _) -> Some manager_pass
@@ -1785,10 +1925,10 @@ let () =
     (function Contents_list_error s -> Some s | _ -> None)
     (fun s -> Contents_list_error s)
 
-let serialize_unsigned_operation (type kind)
+let serialize_unsigned_operation (type kind) encoding
     ({shell; protocol_data} : kind operation) : bytes =
   Data_encoding.Binary.to_bytes_exn
-    unsigned_operation_encoding
+    encoding
     (shell, Contents_list protocol_data.contents)
 
 let unsigned_operation_length (type kind)
@@ -1797,9 +1937,15 @@ let unsigned_operation_length (type kind)
     unsigned_operation_encoding
     (shell, Contents_list protocol_data.contents)
 
-let check_signature (type kind) key chain_id (op : kind operation) =
+let bls_mode_unsigned_operation_length (type kind)
+    ({shell; protocol_data} : kind operation) : int =
+  Data_encoding.Binary.length
+    bls_mode_unsigned_operation_encoding
+    (shell, Contents_list protocol_data.contents)
+
+let check_signature (type kind) encoding key chain_id (op : kind operation) =
   let open Result_syntax in
-  let serialized_operation = serialize_unsigned_operation op in
+  let serialized_operation = serialize_unsigned_operation encoding op in
   let check ~watermark signature =
     if Signature.check ~watermark key signature serialized_operation then
       return_unit
@@ -1816,7 +1962,8 @@ let check_signature (type kind) key chain_id (op : kind operation) =
             ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
             | Vdf_revelation _ | Double_attestation_evidence _
             | Double_preattestation_evidence _ | Double_baking_evidence _
-            | Activate_account _ | Drain_delegate _ | Manager_operation _ ) ->
+            | Dal_entrapment_evidence _ | Activate_account _ | Drain_delegate _
+            | Manager_operation _ | Attestations_aggregate _ ) ->
             Generic_operation
         | Cons (Manager_operation _, _ops) -> Generic_operation
       in
@@ -1896,6 +2043,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Preattestation _, _ -> None
   | Attestation _, Attestation _ -> Some Eq
   | Attestation _, _ -> None
+  | Attestations_aggregate _, Attestations_aggregate _ -> Some Eq
+  | Attestations_aggregate _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation _ -> Some Eq
@@ -1907,6 +2056,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Double_preattestation_evidence _, _ -> None
   | Double_baking_evidence _, Double_baking_evidence _ -> Some Eq
   | Double_baking_evidence _, _ -> None
+  | Dal_entrapment_evidence _, Dal_entrapment_evidence _ -> Some Eq
+  | Dal_entrapment_evidence _, _ -> None
   | Activate_account _, Activate_account _ -> Some Eq
   | Activate_account _, _ -> None
   | Proposals _, Proposals _ -> Some Eq
@@ -2002,6 +2153,10 @@ type round_infos = {level : int32; round : int}
    convert into an {!int}. *)
 type preattestation_infos = {round : round_infos; slot : int}
 
+(** [aggregate_infos] is the pair of a {!round_infos} and a [committee] that is
+    a list of slots converted into a {!int list}. *)
+type aggregate_infos = {round : round_infos; committee : int list}
+
 (** [attestation_infos] is the tuple consisting of a {!round_infos} value, a
     [slot], and the number of DAL slots in the DAL attestation. *)
 type attestation_infos = {
@@ -2065,6 +2220,24 @@ let attestation_infos_from_content (c : consensus_content)
         d;
   }
 
+(** Compute an {!aggregate_info} value from {!consensus_aggregate_content} 
+    and {!Slot_repr.t list} values. It is used to compute the weight of an
+    {!Aggregate_attestation}.
+
+    Precondition: [aggregate_consensus_content] and [committee] come from a
+    valid operation.  *)
+let aggregate_infos_from_content (proposal : consensus_aggregate_content)
+    (committee : Slot_repr.t list) =
+  let level = Raw_level_repr.to_int32 proposal.level in
+  let round =
+    match Round_repr.to_int proposal.round with
+    | Ok round -> round
+    | Error _ -> -1
+  in
+  let round_infos = {level; round} in
+  let committee = List.map Slot_repr.to_int committee in
+  {round = round_infos; committee}
+
 (** Compute a {!double_baking_infos} and a {!Block_header_repr.hash}
    from a {!Block_header_repr.t}. It is used to compute the weight of
    a {!Double_baking_evidence}.
@@ -2087,6 +2260,8 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
     | Error _ -> {level; round = -1}
   in
   {round; bh_hash}
+
+type dal_entrapment_info = {level : int32; number_of_attested_slots : int}
 
 (** The weight of an operation.
 
@@ -2115,6 +2290,9 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    and [hash] of its first denounciated block_header. the [level] and
    [round] are wrapped in a {!double_baking_infos}.
 
+    The [weight] of a {!Dal_entrapment_evidence} is the level and the number of
+    DAL attested slots of the included attestation.
+
     The [weight] of an {!Activate_account} depends on its public key
    hash.
 
@@ -2126,6 +2304,9 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
 type _ weight =
   | Weight_attestation : attestation_infos -> consensus_pass_type weight
   | Weight_preattestation : preattestation_infos -> consensus_pass_type weight
+  | Weight_attestations_aggregate :
+      aggregate_infos
+      -> consensus_pass_type weight
   | Weight_proposals :
       int32 * Signature.Public_key_hash.t
       -> voting_pass_type weight
@@ -2137,6 +2318,9 @@ type _ weight =
   | Weight_double_preattestation : round_infos -> anonymous_pass_type weight
   | Weight_double_attestation : round_infos -> anonymous_pass_type weight
   | Weight_double_baking : double_baking_infos -> anonymous_pass_type weight
+  | Weight_dal_entrapment_evidence :
+      dal_entrapment_info
+      -> anonymous_pass_type weight
   | Weight_activate_account :
       Ed25519.Public_key_hash.t
       -> anonymous_pass_type weight
@@ -2224,6 +2408,11 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_attestation
             (attestation_infos_from_content consensus_content dal_content) )
+  | Single (Attestations_aggregate {consensus_content; committee}) ->
+      let aggregate_infos =
+        aggregate_infos_from_content consensus_content committee
+      in
+      W (Consensus, Weight_attestations_aggregate aggregate_infos)
   | Single (Proposals {period; source; _}) ->
       W (Voting, Weight_proposals (period, source))
   | Single (Ballot {period; source; _}) ->
@@ -2251,6 +2440,21 @@ let weight_of : packed_operation -> operation_weight =
         consensus_infos_and_hash_from_block_header bh1
       in
       W (Anonymous, Weight_double_baking double_baking_infos)
+  | Single (Dal_entrapment_evidence {attestation; _}) -> (
+      match attestation.protocol_data.contents with
+      | Single (Attestation {consensus_content; dal_content}) ->
+          let info =
+            {
+              level = Raw_level_repr.to_int32 consensus_content.level;
+              number_of_attested_slots =
+                Option.fold
+                  ~none:0
+                  ~some:(fun d ->
+                    Dal_attestation_repr.number_of_attested_slots d.attestation)
+                  dal_content;
+            }
+          in
+          W (Anonymous, Weight_dal_entrapment_evidence info))
   | Single (Activate_account {id; _}) ->
       W (Anonymous, Weight_activate_account id)
   | Single (Drain_delegate {delegate; _}) ->
@@ -2337,6 +2541,25 @@ let compare_attestation_infos
     ((infos1, slot1), n1)
     ((infos2, slot2), n2)
 
+let compare_dal_entrapment_infos infos1 infos2 =
+  compare_pair_in_lexico_order
+    ~cmp_fst:Compare.Int32.compare
+    ~cmp_snd:Compare.Int.compare
+    (infos1.level, infos1.number_of_attested_slots)
+    (infos2.level, infos2.number_of_attested_slots)
+
+(** Two {!Attestations_aggregate} are compared by their {!aggregate_infos}. When their
+    {!round_infos} are equal, they are compared according to their [committee]
+    by lexicographic order. *)
+let compare_attestations_aggregate_infos
+    {round = infos1; committee = committee1}
+    {round = infos2; committee = committee2} =
+  compare_pair_in_lexico_order
+    ~cmp_fst:compare_round_infos
+    ~cmp_snd:(List.compare Compare.Int.compare)
+    (infos1, committee1)
+    (infos2, committee2)
+
 (** {4 Comparison of valid operations of the same validation pass} *)
 
 (** {5 Comparison of valid consensus operations} *)
@@ -2363,6 +2586,21 @@ let compare_consensus_weight w1 w2 =
       if Compare.Int.(cmp <> 0) then cmp else 1
   | ( Weight_preattestation {round = round_infos1; _},
       Weight_attestation {round_infos = round_infos2; _} ) ->
+      let cmp = compare_round_infos round_infos1 round_infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else -1
+  | Weight_attestations_aggregate infos1, Weight_attestations_aggregate infos2
+    ->
+      compare_attestations_aggregate_infos infos1 infos2
+  | ( Weight_attestations_aggregate {round = round_infos1; _},
+      Weight_preattestation {round = round_infos2; _} )
+  | ( Weight_attestations_aggregate {round = round_infos1; _},
+      Weight_attestation {round_infos = round_infos2; _} ) ->
+      let cmp = compare_round_infos round_infos1 round_infos2 in
+      if Compare.Int.(cmp <> 0) then cmp else 1
+  | ( Weight_preattestation {round = round_infos1; _},
+      Weight_attestations_aggregate {round = round_infos2; _} )
+  | ( Weight_attestation {round_infos = round_infos1; _},
+      Weight_attestations_aggregate {round = round_infos2; _} ) ->
       let cmp = compare_round_infos round_infos1 round_infos2 in
       if Compare.Int.(cmp <> 0) then cmp else -1
 
@@ -2394,9 +2632,12 @@ let compare_vote_weight w1 w2 =
    is comparing their {!round_infos}, see {!compare_round_infos} for
    more details.
 
-    Comparing two {!Double_baking_evidence} is comparing as their
+   Comparing two {!Double_baking_evidence} is comparing as their
    {!double_baking_infos}, see {!compare_double_baking_infos} for more
    details.
+
+   Two {!Dal_entrapment_evidence} ops are compared by their level and the number of
+   slots they attest.
 
    Two {!Seed_nonce_revelation} are compared by their [level].
 
@@ -2404,11 +2645,10 @@ let compare_vote_weight w1 w2 =
 
    Two {!Activate_account} are compared as their [id].
 
-   When comparing different kind of anonymous operations, the order is
-   as follows: {!Double_preattestation_evidence} >
-   {!Double_attestation_evidence} > {!Double_baking_evidence} >
-   {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}.
-   *)
+   When comparing different kind of anonymous operations, the order is as
+   follows: {!Double_preattestation_evidence} > {!Double_attestation_evidence} >
+   {!Double_baking_evidence} > {!Dal_entrapment_evidence} > {!Vdf_revelation} >
+   {!Seed_nonce_revelation} > {!Activate_account}.  *)
 let compare_anonymous_weight w1 w2 =
   match (w1, w2) with
   | Weight_double_preattestation infos1, Weight_double_preattestation infos2 ->
@@ -2421,23 +2661,36 @@ let compare_anonymous_weight w1 w2 =
       if Compare.Int.(cmp <> 0) then cmp else -1
   | Weight_double_attestation infos1, Weight_double_attestation infos2 ->
       compare_round_infos infos1 infos2
-  | ( ( Weight_double_baking _ | Weight_seed_nonce_revelation _
-      | Weight_vdf_revelation _ | Weight_activate_account _
-      | Weight_drain_delegate _ ),
+  | ( ( Weight_double_baking _ | Weight_dal_entrapment_evidence _
+      | Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
+      | Weight_activate_account _ | Weight_drain_delegate _ ),
       (Weight_double_preattestation _ | Weight_double_attestation _) ) ->
       -1
   | ( (Weight_double_preattestation _ | Weight_double_attestation _),
-      ( Weight_double_baking _ | Weight_seed_nonce_revelation _
-      | Weight_vdf_revelation _ | Weight_activate_account _
-      | Weight_drain_delegate _ ) ) ->
+      ( Weight_double_baking _ | Weight_dal_entrapment_evidence _
+      | Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
+      | Weight_activate_account _ | Weight_drain_delegate _ ) ) ->
       1
   | Weight_double_baking infos1, Weight_double_baking infos2 ->
       compare_baking_infos infos1 infos2
-  | ( ( Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
-      | Weight_activate_account _ | Weight_drain_delegate _ ),
+  | ( ( Weight_dal_entrapment_evidence _ | Weight_seed_nonce_revelation _
+      | Weight_vdf_revelation _ | Weight_activate_account _
+      | Weight_drain_delegate _ ),
       Weight_double_baking _ ) ->
       -1
   | ( Weight_double_baking _,
+      ( Weight_dal_entrapment_evidence _ | Weight_seed_nonce_revelation _
+      | Weight_vdf_revelation _ | Weight_activate_account _
+      | Weight_drain_delegate _ ) ) ->
+      1
+  | Weight_dal_entrapment_evidence info1, Weight_dal_entrapment_evidence info2
+    ->
+      compare_dal_entrapment_infos info1 info2
+  | ( ( Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
+      | Weight_activate_account _ | Weight_drain_delegate _ ),
+      Weight_dal_entrapment_evidence _ ) ->
+      -1
+  | ( Weight_dal_entrapment_evidence _,
       ( Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
       | Weight_activate_account _ | Weight_drain_delegate _ ) ) ->
       1
@@ -2512,5 +2765,6 @@ let compare (oph1, op1) (oph2, op2) =
     if Compare.Int.(cmp = 0) then cmp_h else cmp
 
 module Internal_for_benchmarking = struct
-  let serialize_unsigned_operation = serialize_unsigned_operation
+  let serialize_unsigned_operation (type kind) (op : kind operation) : bytes =
+    serialize_unsigned_operation unsigned_operation_encoding op
 end

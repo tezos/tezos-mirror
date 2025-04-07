@@ -85,7 +85,7 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module TxEncoder = struct
-    type transactions = (string * Ethereum_types.transaction_object) list
+    type transactions = (string * Ethereum_types.legacy_transaction_object) list
 
     type messages = string list
 
@@ -119,10 +119,15 @@ end) : Services_backend_sig.Backend = struct
           ~base:Base.base
           batcher_injection
           ()
-          (* to be retro-compatible with rollup node version that does
-             not have yet the query in the injection rpc, don't add
-             the flag if the `drop_duplicate_on_injection` is false.*)
-          (if Base.drop_duplicate_on_injection then Some true else None)
+          {
+            (* to be retro-compatible with rollup node version that does
+               not have yet the query in the injection rpc, don't add
+               the flag if the `drop_duplicate_on_injection` is false.*)
+            drop_duplicate =
+              (if Base.drop_duplicate_on_injection then Some true else None);
+            order = None;
+            (* No uses for it here. *)
+          }
           messages
       in
       return_unit
@@ -183,7 +188,15 @@ end) : Services_backend_sig.Backend = struct
               Ethereum_types.pp_block_hash
               hash)
     | Block_parameter Latest -> read_from_block_parameter Latest
-    | Block_parameter Finalized -> read_from_block_parameter Finalized
+    | Block_parameter Finalized ->
+        (* It is no longer supported because the shared implementaton takes
+           the finalized block number using an RPC where the block id is finalized.
+           However, when we fetch the content of the block, it's done on latest state,
+           not on the finalized one. This needs to be changed if we want to support
+           this parameter. *)
+        failwith
+          "Finalized block parameter is no longer supported on the EVM node in \
+           proxy mode"
     | Block_parameter Pending ->
         failwith "Pending block parameter is not supported"
     | Block_parameter Earliest ->
@@ -194,6 +207,9 @@ end) : Services_backend_sig.Backend = struct
       Lwt_result_syntax.tzfail Tracer_types.Not_supported
 
     let trace_call _ ~call:_ ~block:_ ~config:_ =
+      Lwt_result_syntax.tzfail Tracer_types.Not_supported
+
+    let trace_block _ _ ~block_number:_ ~config:_ =
       Lwt_result_syntax.tzfail Tracer_types.Not_supported
   end
 

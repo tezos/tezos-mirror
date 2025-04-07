@@ -4,6 +4,8 @@ This directory contains images to be used in `docs/developer` folder.
 
 ### Updating the images
 
+For images in Mermaid, you may edit the sources online at https://mermaid.live
+
 The following images were created with Excalidraw:
 
 - `docs/developer/images/ext_rpc_intro.png`

@@ -1,0 +1,5 @@
+{ "observer": { "evm_node_endpoint": "https://relay.mainnet.etherlink.com" },
+  "experimental_features": { "l2_chains": [ { "chain_id": "42793" } ] },
+  "kernel_execution":
+    { "preimages_endpoint":
+        "https://snapshots.tzinit.org/etherlink-mainnet/wasm_2_0_0" } }

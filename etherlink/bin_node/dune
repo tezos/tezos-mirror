@@ -7,6 +7,8 @@
  (package octez-evm-node)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-evm-node-libs.evm_node_rust_deps
+  bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
   octez-libs.stdlib-unix
@@ -18,12 +20,12 @@
   octez-shell-libs.client-base-unix
   octez-l2-libs.sqlite
   octez-evm-node-libs.evm_node_lib_dev
-  octez-evm-node-libs.evm_node_config
-  octez-rust-deps)
+  octez-evm-node-libs.evm_node_config)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
-  (:include %{workspace_root}/macos-link-flags.sexp))
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (:include %{workspace_root}/link-flags-evm-node.sexp))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

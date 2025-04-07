@@ -9,9 +9,9 @@
 
 use crate::{
     machine_state::{
-        bus::main_memory::MainMemoryLayout,
-        registers::{sp, FRegister, XRegister},
         MachineCoreState,
+        main_memory::MainMemoryLayout,
+        registers::{FRegister, XRegister, sp},
     },
     state_backend as backend,
     traps::Exception,
@@ -76,15 +76,15 @@ mod test {
     use crate::{
         backend_test,
         bits::Bits64,
-        create_backend, create_state,
+        create_state,
         machine_state::{
-            bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
-            csregisters::{
-                xstatus::{ExtensionValue, MStatus},
-                CSRegister,
-            },
-            registers::{fa2, fa3, parse_xregister, sp},
             MachineCoreState, MachineCoreStateLayout,
+            csregisters::{
+                CSRegister,
+                xstatus::{ExtensionValue, MStatus},
+            },
+            main_memory::tests::T1K,
+            registers::{fa2, fa3, parse_xregister, sp},
         },
         traps::Exception,
     };
@@ -95,18 +95,11 @@ mod test {
     const OUT_OF_BOUNDS_OFFSET: i64 = 1024;
 
     backend_test!(test_cfsd_cfld, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
-            base_addr in (DEVICES_ADDRESS_SPACE_LENGTH..(DEVICES_ADDRESS_SPACE_LENGTH+504_u64)),
+            base_addr in (0..504_u64),
             base_imm in (0..=64i64).prop_map(|x| x * 8), // multiples of 8 in the 0..512 range
             val in any::<f64>().prop_map(f64::to_bits),
             rs1 in (1_u8..31).prop_map(u5::new).prop_map(parse_xregister),
@@ -141,18 +134,11 @@ mod test {
     });
 
     backend_test!(test_cfsdsp_cfldsp, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
-            base_addr in (DEVICES_ADDRESS_SPACE_LENGTH..(DEVICES_ADDRESS_SPACE_LENGTH+504_u64)),
+            base_addr in (0..504_u64),
             base_imm in (0..=64i64).prop_map(|x| x * 8), // multiples of 8 in the 0..512 range
             val in any::<f64>().prop_map(f64::to_bits),
         )| {

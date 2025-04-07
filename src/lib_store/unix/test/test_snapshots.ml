@@ -105,7 +105,7 @@ let check_import_invariants ~test_descr ~rolling
       return_unit)
 
 let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
-    ~rolling ~export_mode (store_dir, context_dir) chain_store =
+    ~rolling ~export_mode (store_dir, context_root_dir) chain_store =
   let open Lwt_result_syntax in
   let* () = check_invariants chain_store in
   let open Filename.Infix in
@@ -123,20 +123,20 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
       ~rolling
       ~block:exported_block
       ~store_dir
-      ~context_dir
+      ~context_root_dir
       ~chain_name
       ~progress_display_mode:Animation.Auto
       genesis
   in
   let dir = store_dir // "imported_store" in
   let dst_store_dir = dir // "store" in
-  let dst_context_dir = dir // "context" in
+  let dst_context_root_dir = dir in
   let* () =
     Snapshots.import
       ?block:exported_block_hash
       ~snapshot_path
       ~dst_store_dir
-      ~dst_context_dir
+      ~dst_context_root_dir
       ~chain_name
       ~configured_history_mode:None
       ~user_activated_upgrades:[]
@@ -148,7 +148,7 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
   let* store' =
     Store.init
       ~store_dir:dst_store_dir
-      ~context_dir:dst_context_dir
+      ~context_root_dir:dst_context_root_dir
       ~allow_testchains:true
       genesis
   in
@@ -500,7 +500,7 @@ let make_tests_export_import speed genesis_parameters =
 
 let test_rolling speed export_mode =
   let patch_context ctxt = Alpha_utils.default_patch_context ctxt in
-  let test (store_dir, context_dir) store =
+  let test (store_dir, context_root_dir) store =
     let open Lwt_result_syntax in
     let chain_store = Store.main_chain_store store in
     let*! genesis_block = Store.Chain.genesis_block chain_store in
@@ -518,7 +518,7 @@ let test_rolling speed export_mode =
     let chain_name = Distributed_db_version.Name.of_string "test" in
     let dst_dir = store_dir // "imported_store" in
     let dst_store_dir = dst_dir // "store" in
-    let dst_context_dir = dst_dir // "context" in
+    let dst_context_root_dir = dst_dir in
     let* () =
       Snapshots.export
         ~snapshot_path
@@ -526,7 +526,7 @@ let test_rolling speed export_mode =
         ~rolling:true
         ~block:(`Head 0)
         ~store_dir
-        ~context_dir
+        ~context_root_dir
         ~chain_name
         ~progress_display_mode:Animation.Auto
         genesis
@@ -535,7 +535,7 @@ let test_rolling speed export_mode =
       Snapshots.import
         ~snapshot_path
         ~dst_store_dir
-        ~dst_context_dir
+        ~dst_context_root_dir
         ~chain_name
         ~configured_history_mode:None
         ~user_activated_upgrades:[]
@@ -550,7 +550,7 @@ let test_rolling speed export_mode =
         ~history_mode:History_mode.default_rolling
         ~readonly:false
         ~store_dir:dst_store_dir
-        ~context_dir:dst_context_dir
+        ~context_root_dir:dst_context_root_dir
         ~allow_testchains:true
         genesis
     in
@@ -607,7 +607,7 @@ let test_drag_after_import speed export_mode =
         constants_test with
         blocks_per_cycle = 256l;
         cycles_per_voting_period = 1l;
-        consensus_threshold = 0;
+        consensus_threshold_size = 0;
         proof_of_work_threshold = -1L;
       }
   in
@@ -623,7 +623,7 @@ let test_drag_after_import speed export_mode =
       ctxt
       ~json:(Default_parameters.json_of_parameters test_parameters)
   in
-  let test (store_dir, context_dir) store =
+  let test (store_dir, context_root_dir) store =
     let chain_store = Store.main_chain_store store in
     let*! genesis_block = Store.Chain.genesis_block chain_store in
     let nb_cycles_to_bake = 2 in
@@ -640,7 +640,7 @@ let test_drag_after_import speed export_mode =
     let chain_name = Distributed_db_version.Name.of_string "test" in
     let dst_dir = store_dir // "imported_store" in
     let dst_store_dir = dst_dir // "store" in
-    let dst_context_dir = dst_dir // "context" in
+    let dst_context_root_dir = dst_dir in
     (* export distance is higer than the 120 max_op_tt*)
     let export_distance = 130 in
     let* export_block =
@@ -657,7 +657,7 @@ let test_drag_after_import speed export_mode =
         ~rolling:true
         ~block:(`Hash (export_block_hash, 0))
         ~store_dir
-        ~context_dir
+        ~context_root_dir
         ~chain_name
         ~progress_display_mode:Animation.Auto
         genesis
@@ -666,7 +666,7 @@ let test_drag_after_import speed export_mode =
       Snapshots.import
         ~snapshot_path
         ~dst_store_dir
-        ~dst_context_dir
+        ~dst_context_root_dir
         ~chain_name
         ~configured_history_mode:None
         ~user_activated_upgrades:[]
@@ -681,7 +681,7 @@ let test_drag_after_import speed export_mode =
         ~patch_context
         ~readonly:false
         ~store_dir:dst_store_dir
-        ~context_dir:dst_context_dir
+        ~context_root_dir:dst_context_root_dir
         ~allow_testchains:true
         genesis
     in
@@ -761,7 +761,7 @@ let tests speed =
         speed
         Tezos_protocol_alpha_parameters.Default_parameters.(
           parameters_of_constants
-            {constants_sandbox with consensus_threshold = 0})
+            {constants_sandbox with consensus_threshold_size = 0})
     in
     let tests_rolling = make_tests_rolling speed in
     let tests_drag_after_import = make_tests_drag_after_import speed in

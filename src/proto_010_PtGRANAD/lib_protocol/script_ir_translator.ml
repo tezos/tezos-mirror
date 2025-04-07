@@ -3596,7 +3596,7 @@ and parse_instr :
     Lwt.return
     @@ return_no_lwt ctxt number_of_generated_growing_types judgement
   in
-  let typed_no_lwt ctxt number_of_generated_growing_types loc instr aft =
+  let typed_no_lwt ctxt number_of_generated_growing_types loc instr aft : ((a, s) judgement * context) tzresult =
     log_stack ctxt loc stack_ty aft
     >>? fun () ->
     let j = Typed {loc; instr; bef = stack_ty; aft} in

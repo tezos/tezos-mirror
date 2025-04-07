@@ -31,13 +31,11 @@ override_dh_installdocs:
 	dh_installdocs -p octez-signer docs/README.octez-signer
 
 override_dh_installsystemd:
-	dh_installsystemd -p octez-node --no-enable --no-start
-	dh_installsystemd -p octez-smart-rollup-node --no-enable --no-start
-	dh_installsystemd -p octez-dal-node --no-enable --no-start
-	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-baker-next
-	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-baker-active
-	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser-next
-	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser-active
+	dh_installsystemd -p octez-node --no-start
+	dh_installsystemd -p octez-dal-node --no-start
+	dh_installsystemd -p octez-smart-rollup-node --no-start
+	dh_installsystemd -p octez-baker --no-start
+	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser@
 
 override_dh_installlogrotate:
 	dh_installlogrotate --package=octez-node
@@ -45,20 +43,12 @@ override_dh_installlogrotate:
 
 override_dh_install:
 	dh_install
-	# Include debconf configuration
 	mkdir -p debian/octez-baker/etc/default/
-	cp debian/octez-baker.octez-accuser-next.default debian/octez-baker/etc/default/octez-accuser-next
-	cp debian/octez-baker.octez-accuser-active.default debian/octez-baker/etc/default/octez-accuser-active
-	cp debian/octez-baker.octez-baker-next.default debian/octez-baker/etc/default/octez-baker-next
-	cp debian/octez-baker.octez-baker-active.default debian/octez-baker/etc/default/octez-baker-active
+	cp debian/octez-baker.octez-accuser.default debian/octez-baker/etc/default/octez-accuser
 	dh_installdebconf
 
 override_dh_fixperms:
 		dh_fixperms
-		chmod 644  debian/octez-baker/etc/default/octez-accuser-next
-		chmod 644  debian/octez-baker/etc/default/octez-accuser-active
-		chmod 644  debian/octez-baker/etc/default/octez-baker-active
-		chmod 644  debian/octez-baker/etc/default/octez-baker-next
 
 # avoid creating debug symbols
 override_dh_dwz:

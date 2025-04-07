@@ -55,8 +55,18 @@ let of_eth_string eth =
   | [eth] -> of_string (eth ^ wei_pow)
   | [eth; decimal] ->
       let decimal = decimal ^ String.make (shift - String.length decimal) '0' in
-      Z.add (of_string eth) (of_string decimal)
+      Z.add (of_string (eth ^ wei_pow)) (of_string decimal)
   | _ -> Test.fail "Invalid ETH amount: %s" eth
+
+let to_eth_string wei =
+  let open Z in
+  let ten_pow_18 = pow (of_int 10) shift in
+  let wei = wei in
+  let eth = to_string (wei / ten_pow_18) in
+  let rst = to_string (wei mod ten_pow_18) in
+  let open Stdlib in
+  let rst = String.make (18 - String.length rst) '0' ^ rst in
+  Format.sprintf "%s.%s" eth rst
 
 let of_gwei_string gwei =
   let shift = 9 in

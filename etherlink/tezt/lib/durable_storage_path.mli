@@ -107,6 +107,12 @@ val reveal_config : path
 (** [enable_fa_bridge] is the path to the feature flag to activate the FA bridge. *)
 val enable_fa_bridge : path
 
+(** [enable_multichain] is the path to the feature flag to activate multichain functions *)
+val enable_multichain : path
+
+(** [enable_fast_withdrawal] is the path to the feature flag to activate fast withdrawals. *)
+val enable_fast_withdrawal : path
+
 module Ticket_table : sig
   (** [balance ~ticket_hash ~account] returns the path where the balance of
       [account] of ticket [ticket_hash] is. *)

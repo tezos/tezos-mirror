@@ -6,7 +6,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-shell-libs.shell-context
+  bls12-381.archive
+  octez-shell-libs.context-ops
   octez-alcotezt
   octez-libs.test-helpers
   octez-libs.base

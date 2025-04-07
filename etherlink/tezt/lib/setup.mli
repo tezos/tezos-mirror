@@ -28,14 +28,16 @@ type sequencer_setup = {
   boot_sector : string;
   kernel : Uses.t;
   enable_dal : bool;
+  enable_multichain : bool;
 }
 
 (** [uses protocol] returns the list of dependencies for the tests. *)
 val uses : Protocol.t -> Uses.t list
 
-(** [setup_l1_contracts ~dictator client] setups the necessary contracts for the
-    rollup. *)
-val setup_l1_contracts : ?dictator:Account.key -> Client.t -> l1_contracts Lwt.t
+(** [setup_l1_contracts ~dictator ~kernel client] setups the necessary
+    contracts for the rollup. *)
+val setup_l1_contracts :
+  ?dictator:Account.key -> kernel:Kernel.t -> Client.t -> l1_contracts Lwt.t
 
 (** [run_new_rpc_endpoint node] starts a new rpc node following the setup. *)
 val run_new_rpc_endpoint : Evm_node.t -> Evm_node.t Lwt.t
@@ -43,8 +45,12 @@ val run_new_rpc_endpoint : Evm_node.t -> Evm_node.t Lwt.t
 (**[run_new_rpc_endpoint ~sc_rollup_node node] starts a new observer following
    the setup. *)
 val run_new_observer_node :
+  ?finalized_view:bool ->
   ?patch_config:(Tezt_wrapper.JSON.t -> Tezt_wrapper.JSON.t) ->
   sc_rollup_node:Sc_rollup_node.t ->
+  ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
+  ?history_mode:Evm_node.history_mode ->
   Evm_node.t ->
   Evm_node.t Lwt.t
 
@@ -53,7 +59,7 @@ val run_new_observer_node :
     [Evm_node]. *)
 val register_test :
   __FILE__:string ->
-  ?block_storage_sqlite3:bool ->
+  ?max_delayed_inbox_blueprint_length:int ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
   ?genesis_timestamp:Client.timestamp ->
@@ -76,14 +82,19 @@ val register_test :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
+  ?enable_fast_withdrawal:bool ->
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?threshold_encryption:bool ->
   ?uses:(Protocol.t -> Uses.t list) ->
   ?additional_uses:Uses.t list ->
-  ?history_mode:Sc_rollup_node.history_mode ->
+  ?rollup_history_mode:Sc_rollup_node.history_mode ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
+  enable_multichain:bool ->
+  ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
+  ?history_mode:Evm_node.history_mode ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
@@ -95,7 +106,7 @@ val register_test :
     [Evm_node]. The test is registered for each kernel. *)
 val register_test_for_kernels :
   __FILE__:string ->
-  ?block_storage_sqlite3:bool ->
+  ?max_delayed_inbox_blueprint_length:int ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
   ?genesis_timestamp:Client.timestamp ->
@@ -118,13 +129,18 @@ val register_test_for_kernels :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  ?history_mode:Sc_rollup_node.history_mode ->
+  ?rollup_history_mode:Sc_rollup_node.history_mode ->
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?additional_uses:Tezt_wrapper.Uses.t list ->
   threshold_encryption:bool ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
+  enable_multichain:bool ->
+  ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
+  ?enable_fast_withdrawal:bool ->
+  ?history_mode:Evm_node.history_mode ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
@@ -132,7 +148,8 @@ val register_test_for_kernels :
   unit
 
 val setup_sequencer :
-  ?block_storage_sqlite3:bool ->
+  ?max_delayed_inbox_blueprint_length:int ->
+  ?next_wasm_runtime:bool ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
   mainnet_compat:bool ->
@@ -158,10 +175,16 @@ val setup_sequencer :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
+  ?enable_fast_withdrawal:bool ->
   ?threshold_encryption:bool ->
   ?drop_duplicate_when_injection:bool ->
-  ?history_mode:Sc_rollup_node.history_mode ->
+  ?blueprints_publisher_order_enabled:bool ->
+  ?rollup_history_mode:Sc_rollup_node.history_mode ->
   enable_dal:bool ->
   ?dal_slots:int list ->
+  enable_multichain:bool ->
+  ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
+  ?history_mode:Evm_node.history_mode ->
   Protocol.t ->
   sequencer_setup Lwt.t

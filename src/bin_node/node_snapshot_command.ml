@@ -131,7 +131,7 @@ module Term = struct
         node_config.blockchain_network
       in
       let* () = Data_version.ensure_data_dir genesis data_dir in
-      let context_dir = Data_version.context_dir data_dir in
+      let context_root_dir = data_dir in
       let store_dir = Data_version.store_dir data_dir in
       let* block =
         match block with
@@ -148,7 +148,7 @@ module Term = struct
         (Option.value export_format ~default:Snapshots.Tar)
         ~rolling
         ~store_dir
-        ~context_dir
+        ~context_root_dir
         ~chain_name
         ~block
         ~progress_display_mode
@@ -178,7 +178,8 @@ module Term = struct
             let*! () =
               Lwt_utils_unix.remove_dir (Data_version.store_dir data_dir)
             in
-            Lwt_utils_unix.remove_dir (Data_version.context_dir data_dir)
+            Lwt_utils_unix.remove_dir
+              (Tezos_context_ops.Context_ops.context_dir data_dir)
           else Lwt_utils_unix.remove_dir data_dir
         in
         let lock_file = Data_version.lock_file data_dir in
@@ -206,7 +207,7 @@ module Term = struct
                 tzfail (Node_run_command.Invalid_sandbox_file filename)
             | Ok json -> return_some ("sandbox_parameter", json))
       in
-      let context_root = Data_version.context_dir data_dir in
+      let context_root = data_dir in
       let store_root = Data_version.store_dir data_dir in
       let patch_context =
         Patch_context.patch_context genesis sandbox_parameters
@@ -233,7 +234,7 @@ module Term = struct
               ?block
               ~check_consistency
               ~dst_store_dir:store_root
-              ~dst_context_dir:context_root
+              ~dst_context_root_dir:context_root
               ~chain_name:node_config.blockchain_network.chain_name
               ~configured_history_mode
               ~user_activated_upgrades:
@@ -257,7 +258,7 @@ module Term = struct
         Reconstruction.reconstruct
           ~patch_context
           ~store_dir:store_root
-          ~context_dir:context_root
+          ~context_root_dir:context_root
           genesis
           ~user_activated_upgrades:
             node_config.blockchain_network.user_activated_upgrades

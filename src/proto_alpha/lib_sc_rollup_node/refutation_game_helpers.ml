@@ -193,7 +193,6 @@ let generate_proof (node_ctxt : _ Node_context.t)
       let open Lwt_syntax in
       let* res =
         Reveals.get
-          ~dac_client:node_ctxt.dac_client
           ~pre_images_endpoint:node_ctxt.config.pre_images_endpoint
           ~data_dir:node_ctxt.data_dir
           ~pvm_kind:(Sc_rollup_proto_types.Kind.to_octez PVM.kind)
@@ -291,8 +290,15 @@ let generate_proof (node_ctxt : _ Node_context.t)
     |> Environment.wrap_tzresult
   in
   let unserialized_proof = {proof with pvm_step} in
+  let Node_context.{cctxt; _} = node_ctxt in
+  let* protocol_activation_level =
+    Plugin.RPC.Protocol.first_level
+      (new Protocol_client_context.wrap_full cctxt)
+      (cctxt#chain, `Head 0)
+  in
   let*! result =
     Sc_rollup.Proof.valid
+      ~protocol_activation_level
       ~metadata
       snapshot
       (Raw_level.of_int32_exn game.inbox_level)
@@ -351,6 +357,8 @@ let make_dissection plugin (node_ctxt : _ Node_context.t) state_cache
 let timeout_reached node_ctxt ~self ~opponent =
   let open Lwt_result_syntax in
   let Node_context.{config; cctxt; _} = node_ctxt in
+  let*? self = Signature.Of_V_latest.get_public_key_hash self in
+  let*? opponent = Signature.Of_V_latest.get_public_key_hash opponent in
   let+ game_result =
     Plugin.RPC.Sc_rollup.timeout_reached
       (new Protocol_client_context.wrap_full cctxt)
@@ -362,13 +370,29 @@ let timeout_reached node_ctxt ~self ~opponent =
   let open Sc_rollup.Game in
   match game_result with
   | Some (Loser {loser; _}) ->
-      let is_it_me = Signature.Public_key_hash.(self = loser) in
+      let is_it_me = Environment.Signature.Public_key_hash.(self = loser) in
       not is_it_me
   | _ -> false
+
+let timeout node_ctxt ~self ~opponent =
+  let open Lwt_result_syntax in
+  let Node_context.{config; cctxt; _} = node_ctxt in
+  let*? self = Signature.Of_V_latest.get_public_key_hash self in
+  let*? opponent = Signature.Of_V_latest.get_public_key_hash opponent in
+  let+ timeout =
+    Plugin.RPC.Sc_rollup.timeout
+      (new Protocol_client_context.wrap_full cctxt)
+      (cctxt#chain, `Head 0)
+      config.sc_rollup_address
+      self
+      opponent
+  in
+  Option.map Sc_rollup_proto_types.Game.timeout_to_octez timeout
 
 let get_conflicts cctxt rollup staker =
   let open Lwt_result_syntax in
   let cctxt = new Protocol_client_context.wrap_full cctxt in
+  let*? staker = Signature.Of_V_latest.get_public_key_hash staker in
   let+ conflicts =
     Plugin.RPC.Sc_rollup.conflicts cctxt (cctxt#chain, `Head 0) rollup staker
   in
@@ -377,6 +401,7 @@ let get_conflicts cctxt rollup staker =
 let get_ongoing_games cctxt rollup staker =
   let open Lwt_result_syntax in
   let cctxt = new Protocol_client_context.wrap_full cctxt in
+  let*? staker = Signature.Of_V_latest.get_public_key_hash staker in
   let+ games =
     Plugin.RPC.Sc_rollup.ongoing_refutation_games
       cctxt
@@ -386,5 +411,7 @@ let get_ongoing_games cctxt rollup staker =
   in
   List.map
     (fun (game, staker1, staker2) ->
-      (Sc_rollup_proto_types.Game.to_octez game, staker1, staker2))
+      ( Sc_rollup_proto_types.Game.to_octez game,
+        Tezos_crypto.Signature.Of_V1.public_key_hash staker1,
+        Tezos_crypto.Signature.Of_V1.public_key_hash staker2 ))
     games

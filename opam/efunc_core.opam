@@ -1,0 +1,27 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.11.1" }
+  "ocaml" { >= "4.14" }
+  "zarith" { >= "1.13" & < "1.14" }
+  "octez-libs"
+  "lwt" { >= "5.7.0" & < "5.9.0" }
+  "rope" { >= "0.6.2" }
+  "secp256k1-internal" { >= "0.4.0" }
+  "digestif" { >= "0.9.0" }
+  "fmt" { >= "0.8.7" }
+]
+build: [
+  ["rm" "-r" "vendors" "contrib"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+available: os-family != "windows"
+synopsis: "Efunc is a lib for crafting EVM compatible transactions and more"

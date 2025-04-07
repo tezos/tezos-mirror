@@ -15,7 +15,7 @@ type evm_services_methods = {
 
 type finalizer = unit -> unit Lwt.t
 
-type block_production = [`Single_node | `Threshold_encryption | `Disabled]
+type block_production = [`Single_node | `Disabled]
 
 (** [start_private_server ~block_production config ctxt] starts the private RPC
     server with low-level, internal services which should not be exposed to the
@@ -23,12 +23,11 @@ type block_production = [`Single_node | `Threshold_encryption | `Disabled]
     private RPC server, then [start_private_server] is a no-op.
 
     [block_production] is used to tailor the private RPC server to the
-    particular need of the EVM node mode at use, more particularly which
-    methods are available wrt. block production. [`Single_node] starts the
-    default private RPC server, as used in the single node sequencer setup,
-    while [`Threshold_encryption] tweaks the private RPC server to be usable in
-    a multi-node sequencer setup. [`Disabled] means no block production method
-    is available. *)
+    particular need of the EVM node mode at use, more particularly
+    which methods are available wrt. block production. [`Single_node]
+    starts the default private RPC server, as used in the single node
+    sequencer setup, [`Disabled] means no block production method is
+    available. *)
 val start_private_server :
   ?block_production:block_production ->
   Configuration.t ->
@@ -39,10 +38,14 @@ val start_private_server :
     in [config].
 
     The optional argument [evm_services_methods] can be used to install
-    the EVM services. *)
+    the EVM services.
+
+    If [data_dir] is provided and the host provides the necessary binaries,
+    performance metrics are enabled. *)
 val start_public_server :
   ?delegate_health_check_to:Uri.t ->
   ?evm_services:evm_services_methods ->
+  ?data_dir:string ->
   Configuration.t ->
   (module Services_backend_sig.S) * 'a ->
   finalizer tzresult Lwt.t

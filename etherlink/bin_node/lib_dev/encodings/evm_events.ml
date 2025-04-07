@@ -9,6 +9,41 @@
 
 open Ethereum_types
 
+module Event = struct
+  open Internal_event.Simple
+
+  let section = ["evm_node"; "dev"]
+
+  let fail_decode_evm_event event =
+    declare_1
+      ~section
+      ~name:(Format.sprintf "fail_decode_%s" event)
+      ~msg:(Format.sprintf "Fail to decode %s {tag}" event)
+      ~level:Error
+      ("tag", Data_encoding.string)
+end
+
+let fail_decode_event tag =
+  match tag with
+  | "\x01" ->
+      let event = "kernel_upgrade" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+  | "\x02" ->
+      let event = "sequencer_upgrade" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+  | "\x03" ->
+      let event = "blueprint_applied" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+  | "\x04" ->
+      let event = "new_delayed_transaction" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+  | "\x05" ->
+      let event = "flush_delayed_inbox" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+  | _ ->
+      let event = "unknown" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+
 module Delayed_transaction = struct
   type kind = Transaction | Deposit | Fa_deposit
 
@@ -103,9 +138,6 @@ module Delayed_transaction = struct
 
   let pp fmt {raw; kind; _} =
     Format.fprintf fmt "%a: %a" pp_kind kind Hex.pp (Hex.of_string raw)
-
-  let pp_short fmt {kind; hash; _} =
-    Format.fprintf fmt "%a: %a" pp_kind kind pp_hash hash
 end
 
 module Upgrade = struct
@@ -197,42 +229,105 @@ module Blueprint_applied = struct
       (tup2 z string)
 end
 
+module Flushed_blueprint = struct
+  type t = {
+    transactions : Delayed_transaction.t list;
+    timestamp : Time.Protocol.t;
+    level : quantity;
+  }
+
+  let of_rlp rlp =
+    match rlp with
+    | Rlp.List [List transactions; Value timestamp; Value level] ->
+        let transactions =
+          Helpers.fold_left_option
+            (fun acc -> function
+              | Rlp.List [Rlp.Value hash; transaction_content] -> (
+                  let hash = decode_hash hash in
+                  match
+                    Delayed_transaction.of_rlp_content hash transaction_content
+                  with
+                  | Some tx -> Some (tx :: acc)
+                  | None -> None)
+              | _ -> None)
+            []
+            transactions
+        in
+        Option.map
+          (fun transactions ->
+            {
+              transactions = List.rev transactions;
+              timestamp = timestamp_of_bytes timestamp;
+              level = decode_number_le level;
+            })
+          transactions
+    | _ -> None
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {transactions; timestamp; level = Qty level} ->
+        (transactions, timestamp, level))
+      (fun (transactions, timestamp, level) ->
+        {transactions; timestamp; level = Qty level})
+      (tup3
+         (Data_encoding.list Delayed_transaction.encoding)
+         Time.Protocol.encoding
+         n)
+end
+
 type t =
   | Upgrade_event of Upgrade.t
   | Sequencer_upgrade_event of Sequencer_upgrade.t
   | Blueprint_applied of Blueprint_applied.t
   | New_delayed_transaction of Delayed_transaction.t
+  | Flush_delayed_inbox of Flushed_blueprint.t
 
 let of_bytes bytes =
+  let open Lwt_syntax in
   match bytes |> Rlp.decode with
-  | Ok (Rlp.List [Value tag; rlp_content]) -> (
-      match Bytes.to_string tag with
-      | "\x01" ->
-          let upgrade = Upgrade.of_rlp rlp_content in
-          Option.map (fun u -> Upgrade_event u) upgrade
-      | "\x02" ->
-          let sequencer_upgrade = Sequencer_upgrade.of_rlp rlp_content in
-          Option.map (fun u -> Sequencer_upgrade_event u) sequencer_upgrade
-      | "\x03" ->
-          let blueprint_applied = Blueprint_applied.of_rlp rlp_content in
-          Option.map (fun u -> Blueprint_applied u) blueprint_applied
-      | "\x04" -> (
-          match rlp_content with
-          | List [Value hash; transaction_content] ->
-              let hash = decode_hash hash in
-              let transaction =
-                Delayed_transaction.of_rlp_content hash transaction_content
-              in
-              Option.map (fun u -> New_delayed_transaction u) transaction
-          | _ -> None)
-      | _ -> None)
-  | _ -> None
+  | Ok (Rlp.List [Value tag; rlp_content]) ->
+      let string_tag = Bytes.to_string tag in
+      let event =
+        match string_tag with
+        | "\x01" ->
+            let upgrade = Upgrade.of_rlp rlp_content in
+            Option.map (fun u -> Upgrade_event u) upgrade
+        | "\x02" ->
+            let sequencer_upgrade = Sequencer_upgrade.of_rlp rlp_content in
+
+            Option.map (fun u -> Sequencer_upgrade_event u) sequencer_upgrade
+        | "\x03" ->
+            let blueprint_applied = Blueprint_applied.of_rlp rlp_content in
+
+            Option.map (fun u -> Blueprint_applied u) blueprint_applied
+        | "\x04" -> (
+            match rlp_content with
+            | List [Value hash; transaction_content] ->
+                let hash = decode_hash hash in
+                let transaction =
+                  Delayed_transaction.of_rlp_content hash transaction_content
+                in
+                Option.map (fun u -> New_delayed_transaction u) transaction
+            | _ -> None)
+        | "\x05" ->
+            let flushed_blueprint = Flushed_blueprint.of_rlp rlp_content in
+            Option.map (fun u -> Flush_delayed_inbox u) flushed_blueprint
+        | _ -> None
+      in
+
+      let* () =
+        if Option.is_none event then fail_decode_event string_tag
+        else return_unit
+      in
+      return event
+  | _ -> return_none
 
 let pp fmt = function
   | Upgrade_event {hash; timestamp} ->
       Format.fprintf
         fmt
-        "Upgrade:@ hash %a,@ timestamp: %a"
+        "Kernel will upgrade to %a at %a"
         pp_hash
         hash
         Time.Protocol.pp_hum
@@ -241,25 +336,36 @@ let pp fmt = function
       {sequencer; pool_address = Address (Hex address); timestamp} ->
       Format.fprintf
         fmt
-        "Sequencer upgrade:@ sequencer:@ %a,pool_address %s,@ timestamp: %a"
+        "Sequencer address will upgrade to %a at %a with pool address %s"
         Signature.Public_key.pp
         sequencer
-        address
         Time.Protocol.pp_hum
         timestamp
-  | Blueprint_applied {number = Qty number; hash = Block_hash (Hex hash)} ->
+        address
+  | Blueprint_applied {number = Qty number; hash} ->
       Format.fprintf
         fmt
-        "Blueprint applied:@,number:%a@ hash: %s"
+        "Block %a (%a) applied"
         Z.pp_print
         number
+        pp_block_hash
         hash
-  | New_delayed_transaction delayed_transaction ->
+  | New_delayed_transaction {kind; hash; raw = _} ->
       Format.fprintf
         fmt
-        "New delayed transaction:@ %a"
-        Delayed_transaction.pp_short
-        delayed_transaction
+        "New %a (%a)"
+        Delayed_transaction.pp_kind
+        kind
+        pp_hash
+        hash
+  | Flush_delayed_inbox {transactions = _; timestamp; level = Qty level} ->
+      Format.fprintf
+        fmt
+        "Flushed delayed inbox at level %a at %a"
+        Z.pp_print
+        level
+        Time.Protocol.pp_hum
+        timestamp
 
 let encoding =
   let open Data_encoding in
@@ -302,4 +408,19 @@ let encoding =
           | _ -> None)
         ~inj:(fun delayed_transaction ->
           New_delayed_transaction delayed_transaction);
+      case
+        ~kind:"flush_delayed_inbox"
+        ~tag:4
+        ~event_encoding:Flushed_blueprint.encoding
+        ~proj:(function
+          | Flush_delayed_inbox blueprint -> Some blueprint | _ -> None)
+        ~inj:(fun blueprint -> Flush_delayed_inbox blueprint);
     ]
+
+let of_parts delayed_transactions kernel_upgrade =
+  let delayed_transactions =
+    List.map (fun txs -> New_delayed_transaction txs) delayed_transactions
+  in
+  match kernel_upgrade with
+  | Some u -> Upgrade_event u :: delayed_transactions
+  | None -> delayed_transactions

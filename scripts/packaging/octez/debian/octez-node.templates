@@ -1,26 +1,28 @@
 Template: octez-node/history-mode
-Description: Select a mode for the node:
- The node can run in the following history modes:
+Description: Mode for the node
+ The node can operate in one of the following history modes:
  .
- Rolling: Store only a rolling fragment of blockchain data so the node can
- validate new blocks and stay in sync with the blockchain head. This mode
- initializes the fastest and requires the least disk space.
+ Rolling: Store only a rolling fragment of blockchain data so the
+ node can validate new blocks and stay in sync with the blockchain head. This
+ mode initializes the fastest and requires the least disk space.
  .
- Full (default): Store the minimum data to reconstruct the current state of the
+ Full: Store the minimum data to reconstruct the current state of the
  blockchain's ledger plus the full data for one previous cycle. This mode is
  appropriate for most uses including bakers and dApp developers who need a
  private node.
  .
- Archive: Store the data from every block since genesis. This mode is
- appropriate to support tools that need historical data, such as indexers and
- block explorers. This mode requires the most disk space.
+ Archive: Stores data for every block since genesis. This mode is suitable for
+ supporting tools that require historical data, such as indexers and block
+ explorers. It requires the most disk space.
  .
- Documentation: https://tezos.gitlab.io/user/history_modes.html
+ More information is available at:
+ https://tezos.gitlab.io/user/history_modes.html
 Type: select
 Choices: rolling, full, archive
+Default: rolling
 
 Template: octez-node/network
-Description: Select a network:
+Description: Network configuration for the node
  The node can connect to the following networks:
  .
  Mainnet: The primary Tezos network where real transactions run and contracts run
@@ -36,50 +38,29 @@ Description: Select a network:
  Documentation: https://tezos.gitlab.io/user/multinetwork.html
 Type: select
 Choices: mainnet, ghostnet
-
-Template: octez-node/snapshot_warning
-Type: note
-Description: Important: Download and import a snapshot before starting the node
- Before starting the node, you must import a recent snapshot of the current
- blockchain state. If you start the node without importing a snapshot, it must
- process every block since the blockchain genesis, which takes a very long
- time.
- .
- You can download the latest snapshot from a trusted source (some suggestions in
- snapshots doc linked below) and import it using the following command:
-   sudo su tezos -c "octez-node snapshot import <snapshot_file>"
- .
- After importing the snapshot, you can start the node using the following
- command:
-   sudo systemctl start octez-node
- .
- - https://tezos.gitlab.io/user/snapshots.html
- .
- - https://tezos.gitlab.io/introduction/services.html
+Default: mainnet
 
 Template: octez-node/purge_warning
-Description: Do you really want to remove all data:
- This operation will remove all node data, the node
- configuration and all associated files. Otherwise,
- the node data will be left untouched, and only the
- packages will be removed.
- .
- Enter "yes" to confirm.
-Type: select
-Choices: no, yes
+Type: boolean
+Default: false
+Description: Remove all node data
+ This operation will remove all node data, including the configuration and
+ associated files. If you choose not to proceed, the node data will remain
+ intact, and only the packages will be removed.
 
 Template: octez-node/configure
-Description: Skipping node init:
- If you skip the node initialization, you will need to configure the node
+Type: boolean
+Default: false
+Description: Skip node initialization
+ If you choose to skip the node initialization, you must configure the node
  manually before starting the service. No default configuration will be
- performed.
+ applied.
  .
- For example using the command:
-    sudo su tezos -c "octez-node config init ..."
+ For example, you can initialize the configuration manually using the
+ following command:
+   sudo su tezos -c "octez-node config init ..."
  .
  And setting the desidered storage mode and network.
-Type: select
-Choices: no, yes
 
 Template: octez-node/upgrade_note_current
 Type: note
@@ -88,8 +69,34 @@ Description: Important upgrade information
  some changes have been made that may affect your usage of the
  package.
  .
- In particular this new version now use systemd to manage the octez-node
+ In particular this new version now uses systemd to manage the Octez Node
  life-cycle instead of a plain system V init script. Also the default values
  in /etc/default/octez-node have been revised and updated.
  .
  Please review the release notes for more information.
+
+Template: octez-node/snapshot-import
+Type: boolean
+Default: true
+Description: Import the snapshot from snapshots.tzinit.org
+ This operation will download a recent snapshot from snapshots.tzinit.org when
+ starting the Octez Node from the network and import it using 'octez-node
+ snapshot import'.
+ .
+ If you choose not to proceed, you can run the import script later using the
+ following command:
+ .
+   sudo su tezos -c /usr/share/octez-node/snapshot-import.sh
+ .
+ The download and import time depends on the network speed and the available
+ system resources.
+ .
+ The snapshot size varies by network: Mainnet ~10GB, Ghostnet ~2GB.
+ .
+ Starting the node without a snapshot will bootstrap the node from genesis.
+
+Template: octez-node/snapshot-no-check
+Type: boolean
+Default: false
+Description: Import the snapshot without checking
+ This option adds the '--no-check' flag to the snapshot import command.

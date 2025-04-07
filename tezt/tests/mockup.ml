@@ -1083,10 +1083,16 @@ let test_create_mockup_config_show_init_roundtrip protocols =
       | None -> (
           match JSON.(schema |-> "$ref" |> as_string_opt) with
           | Some r -> r
-          | None ->
-              Test.fail
-                "Schema %s is missing both [type] and [$ref] field"
-                (JSON.encode schema))
+          | None -> (
+              match
+                JSON.(schema |-> "oneOf" |=> 0 |-> "type" |> as_string_opt)
+              with
+              | Some r -> r
+              | None ->
+                  Test.fail
+                    "Schema %s doesn't have either a [type], [$ref], or \
+                     [oneOf] field"
+                    (JSON.encode schema)))
     in
     let numerical_of_string ~typ value =
       JSON.(
@@ -1187,7 +1193,10 @@ let test_create_mockup_config_show_init_roundtrip protocols =
       JSON.annotate ~origin:"constant_parametric_constants"
       @@ `O
            ((* DO NOT EDIT the value consensus_threshold this is actually a constant, not a parameter *)
-            ("consensus_threshold", `Float 0.0)
+            ( (if Protocol.(number protocol >= 022) then
+                 "consensus_threshold_size"
+               else "consensus_threshold"),
+              `Float 0.0 )
            ::
            (if Protocol.number protocol >= 019 then
               [

@@ -60,8 +60,11 @@ let compile_contract ~source ~label ~contract ~evm_version =
   let input_json =
     generate_json_string ~label ~contract ~path:source ~evm_version
   in
-  let command = "npx" in
-  let args = ["--yes"; "solc"; "--standard-json"] in
+  let command, args =
+    if Option.is_some (Sys.getenv_opt "TEZT_NO_NPX") then
+      ("/usr/local/lib/node_modules/solc/solc.js", ["--standard-json"])
+    else ("npx", ["--yes"; "solc"; "--standard-json"])
+  in
 
   (* Spawn the process with the JSON input as stdin *)
   let* process, stdin_channel =
@@ -118,6 +121,14 @@ let simple_storage () =
 
 let simple_storage_code =
   "0x6080604052348015600f57600080fd5b5060043610603c5760003560e01c80634e70b1dc14604157806360fe47b114605b5780636d4ce63c14606d575b600080fd5b604960005481565b60405190815260200160405180910390f35b606b60663660046074565b600055565b005b6000546049565b600060208284031215608557600080fd5b503591905056fea2646970667358221220c8bccd31314e5f73f97adfeb24c3a1836e3b134cdee11da72c6b9608ee0bad5464736f6c634300081a0033"
+
+(* The info for the "even_block_gas_consumer.sol" contract. *)
+let even_block_gas_consumer () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/even_block_gas_consumer.sol")
+    ~label:"even_block_gas_consumer"
+    ~contract:"EvenBlockGasConsumer"
+    ~evm_version:"london"
 
 (** The info for the "erc20tok.sol" contract. *)
 let erc20 () =
@@ -360,6 +371,13 @@ let call_tracer_revert () =
     ~contract:"ErrorContract"
     ~evm_version:"shanghai"
 
+let call_revert () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_revert.sol")
+    ~label:"call_revert"
+    ~contract:"CallRevert"
+    ~evm_version:"shanghai"
+
 let precompiles () =
   compile_contract
     ~source:(solidity_contracts_path ^ "/precompiles.sol")
@@ -379,4 +397,40 @@ let state_override_tester_readable () =
     ~source:(solidity_contracts_path ^ "/state_override_tester_readable.sol")
     ~label:"state_override_tester_readable"
     ~contract:"StateOverrideTester"
+    ~evm_version:"shanghai"
+
+let batcher () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/batcher.sol")
+    ~label:"batcher"
+    ~contract:"Batcher"
+    ~evm_version:"shanghai"
+
+let reentrancy_test () =
+  compile_contract
+    ~source:
+      "etherlink/kernel_evm/evm_execution/tests/contracts/src/ReentrancyTester.sol"
+    ~label:"reentrancy_tester"
+    ~contract:"ReentrancyTester"
+    ~evm_version:"shanghai"
+
+let slot_filler () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/slot_filler.sol")
+    ~label:"slot_filler"
+    ~contract:"SlotFiller"
+    ~evm_version:"shanghai"
+
+let delegatecall_delegator () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/delegatecall.sol")
+    ~label:"delegatecall_delegator"
+    ~contract:"Delegator"
+    ~evm_version:"shanghai"
+
+let delegatecall_delegated () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/delegatecall.sol")
+    ~label:"delegatecall_delegated"
+    ~contract:"Delegated"
     ~evm_version:"shanghai"

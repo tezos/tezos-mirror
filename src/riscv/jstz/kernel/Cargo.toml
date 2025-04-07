@@ -7,10 +7,12 @@ edition = "2021"
 bincode.workspace = true
 hex.workspace = true
 jstz_kernel.workspace = true
+jstz_crypto.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tezos_crypto_rs.workspace = true
 tezos-smart-rollup.workspace = true
+boa_gc.workspace = true
 
 [features]
 default = []

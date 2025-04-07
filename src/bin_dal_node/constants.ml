@@ -26,16 +26,13 @@
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4458
 
    Better handling of this limitation. *)
-let shards_store_lru_size =
-  (* The size of the LRU is determined by the number of slots we remember in the
-     cache. Each entry in the cache maintains two open file descriptors (one via
-     regular file opening and one via mmap on the bitset region). Note that setting
-     a too high value causes a "Too many open files" error. *)
-  let irmin_internals_entries_per_toplevel_entry = 3 in
-  let number_of_slots = 256 in
-  let number_of_remembered_levels = 1 in
-  irmin_internals_entries_per_toplevel_entry * number_of_slots
-  * number_of_remembered_levels
+
+(* Each entry in the cache maintains two open file descriptors (one via
+   regular file opening and one via mmap on the bitset region).
+   So the selected value should be bigger than twice the number of slots per level,
+   since there are 32 slots, the selected value is 64.
+   Note that setting a too high value causes a "Too many open files" error. *)
+let shards_store_lru_size = 64
 
 (* There is no real rationale for the slot and status parts of the
    store; we just put low-enough values to avoid consuming too many
@@ -92,3 +89,11 @@ let crawler_re_processing_delay = 5.
 
 (* Sleep delay between refreshing the ips associated to bootstrap dns names *)
 let bootstrap_dns_refresh_delay = 300.
+
+(* This size is being used for the node store's traps cache. While
+   [proto_parameters.Dal_plugin.attestation_lag] defines the minimum
+   number of levels for which traps must be retained, we maintain a
+   larger cache capacity of 50 levels. This extended size is
+   acceptable since the cache is sparsely populated due to
+   [proto_parameters.traps_fraction]. *)
+let traps_cache_size = 50

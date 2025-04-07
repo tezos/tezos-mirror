@@ -40,7 +40,10 @@ let compile ?path ?hooks ?(hash_only = false) proto_dir =
   in
   if hash_only then return (String.trim output)
   else
-    match output =~* rex "Success: ([a-zA-Z0-9]+)" with
-    | Some hash -> return hash
-    | None ->
+    match
+      ( output =~* rex "Success: ([a-zA-Z0-9]+)",
+        output =~** rex "Success: ([a-zA-Z0-9]+) as ([a-zA-Z0-9]+)" )
+    with
+    | Some hash, _ | _, Some (hash, _) -> return hash
+    | None, None ->
         Test.fail "Couldn't parse output from compiling %s: %s" proto_dir output

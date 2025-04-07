@@ -24,6 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler = (val Profiler.wrap Shell_profiling.requester_profiler)
+
+let profiler_init = ref false
+
 module type REQUESTER = sig
   type t
 
@@ -191,6 +195,17 @@ module Make_request_scheduler
     (Request : REQUEST with type key := Hash.t) : sig
   include SCHEDULER with type key := Hash.t and type param := Request.param
 end = struct
+  module Request = struct
+    include Request
+
+    let send p peer keys =
+      List.iter
+        (fun _k ->
+          (() [@profiler.aggregate_f {verbosity = Info} "p2p requests sent"]))
+        keys ;
+      send p peer keys
+  end
+
   module Events = Requester_event.Make (Hash)
 
   type key = Hash.t
@@ -374,102 +389,112 @@ end = struct
                 min_next_request
               else Some next_request
         in
-        let actions, min_next_request, requests =
-          Table.fold
-            (fun key
-                 {unrequested_peers; requested_peers; next_request; delay}
-                 (actions, min_next_request, acc) ->
-              if Ptime.is_later next_request ~than:now then
-                ( actions,
-                  compute_new_min_next_request min_next_request next_request,
-                  acc )
-              else
-                (* Removing deactivated peers from sets of peers. *)
-                let remaining_unrequested_peers =
-                  P2p_peer.Set.inter unrequested_peers active_peers
-                in
-                let remaining_requested_peers =
-                  P2p_peer.Set.inter requested_peers active_peers
-                in
-                if
-                  (P2p_peer.Set.is_empty remaining_unrequested_peers
-                  && P2p_peer.Set.is_empty remaining_requested_peers)
-                  && not
-                       (P2p_peer.Set.is_empty unrequested_peers
-                       && P2p_peer.Set.is_empty requested_peers)
-                then (Remove {key} :: actions, min_next_request, acc)
-                else
-                  let ( requested_peer,
-                        remaining_unrequested_peers,
-                        remaining_requested_peers ) =
-                    match
-                      ( P2p_peer.Set.is_empty remaining_unrequested_peers,
-                        P2p_peer.Set.is_empty remaining_requested_peers )
-                    with
-                    | true, true ->
-                        (* If there is no specific peer to request, one of the
-                           active peers is randomly selected. *)
-                        ( P2p_peer.Id.Set.random_elt active_peers,
-                          remaining_unrequested_peers,
-                          remaining_requested_peers )
-                    | true, false ->
-                        (* If all requestable peers have already been
-                           requested, one of the already requested peers is
-                           randomly selected. *)
-                        ( P2p_peer.Id.Set.random_elt remaining_requested_peers,
-                          remaining_unrequested_peers,
-                          remaining_requested_peers )
-                    | false, _ ->
-                        (* If there are unrequested peers, one is randomly
-                           selected and moved to the set of requested peers. *)
-                        let peer =
-                          P2p_peer.Id.Set.random_elt remaining_unrequested_peers
-                        in
-                        ( peer,
-                          P2p_peer.Set.remove peer remaining_unrequested_peers,
-                          P2p_peer.Set.add peer remaining_requested_peers )
-                  in
-                  let next_request =
-                    Option.value ~default:Ptime.max (Ptime.add_span now delay)
-                  in
-                  let next =
-                    {
-                      unrequested_peers = remaining_unrequested_peers;
-                      requested_peers = remaining_requested_peers;
-                      next_request;
-                      delay = Time.System.Span.multiply_exn 1.5 delay;
-                    }
-                  in
-                  let new_acc =
-                    P2p_peer.Map.update
-                      requested_peer
-                      (function
-                        | None -> Some [key] | Some l -> Some (key :: l))
-                      acc
-                  in
-                  ( Replace {key; status = next} :: actions,
+        if
+          P2p_peer.Set.is_empty active_peers
+          && not (Table.length state.pending = 0)
+        then
+          (* When there is no active peer but there is already pending
+             requests, we wait a few seconds. *)
+          let* () = Events.(emit no_active_peers) () in
+          Lwt_unix.sleep 5.
+        else
+          let actions, min_next_request, requests =
+            Table.fold
+              (fun key
+                   {unrequested_peers; requested_peers; next_request; delay}
+                   (actions, min_next_request, acc) ->
+                if Ptime.is_later next_request ~than:now then
+                  ( actions,
                     compute_new_min_next_request min_next_request next_request,
-                    new_acc ))
-            state.pending
-            ([], None, P2p_peer.Map.empty)
-        in
-        (* Update pending table *)
-        List.iter
-          (function
-            | Remove {key} -> Table.remove state.pending key
-            | Replace {key; status} -> Table.replace state.pending key status)
-          actions ;
-        state.min_next_request <- min_next_request ;
-        P2p_peer.Map.iter (Request.send state.param) requests ;
-        let* () =
-          P2p_peer.Map.iter_s
-            (fun peer request ->
-              List.iter_s
-                (fun (key : key) -> Events.(emit requested) (key, peer))
-                request)
-            requests
-        in
-        loop state
+                    acc )
+                else
+                  (* Removing deactivated peers from sets of peers. *)
+                  let remaining_unrequested_peers =
+                    P2p_peer.Set.inter unrequested_peers active_peers
+                  in
+                  let remaining_requested_peers =
+                    P2p_peer.Set.inter requested_peers active_peers
+                  in
+                  if
+                    (P2p_peer.Set.is_empty remaining_unrequested_peers
+                    && P2p_peer.Set.is_empty remaining_requested_peers)
+                    && not
+                         (P2p_peer.Set.is_empty unrequested_peers
+                         && P2p_peer.Set.is_empty requested_peers)
+                  then (Remove {key} :: actions, min_next_request, acc)
+                  else
+                    let ( requested_peer,
+                          remaining_unrequested_peers,
+                          remaining_requested_peers ) =
+                      match
+                        ( P2p_peer.Set.is_empty remaining_unrequested_peers,
+                          P2p_peer.Set.is_empty remaining_requested_peers )
+                      with
+                      | true, true ->
+                          (* If there is no specific peer to request, one of the
+                             active peers is randomly selected. *)
+                          ( P2p_peer.Id.Set.random_elt active_peers,
+                            remaining_unrequested_peers,
+                            remaining_requested_peers )
+                      | true, false ->
+                          (* If all requestable peers have already been
+                             requested, one of the already requested peers is
+                             randomly selected. *)
+                          ( P2p_peer.Id.Set.random_elt remaining_requested_peers,
+                            remaining_unrequested_peers,
+                            remaining_requested_peers )
+                      | false, _ ->
+                          (* If there are unrequested peers, one is randomly
+                             selected and moved to the set of requested peers. *)
+                          let peer =
+                            P2p_peer.Id.Set.random_elt
+                              remaining_unrequested_peers
+                          in
+                          ( peer,
+                            P2p_peer.Set.remove peer remaining_unrequested_peers,
+                            P2p_peer.Set.add peer remaining_requested_peers )
+                    in
+                    let next_request =
+                      Option.value ~default:Ptime.max (Ptime.add_span now delay)
+                    in
+                    let next =
+                      {
+                        unrequested_peers = remaining_unrequested_peers;
+                        requested_peers = remaining_requested_peers;
+                        next_request;
+                        delay = Time.System.Span.multiply_exn 1.5 delay;
+                      }
+                    in
+                    let new_acc =
+                      P2p_peer.Map.update
+                        requested_peer
+                        (function
+                          | None -> Some [key] | Some l -> Some (key :: l))
+                        acc
+                    in
+                    ( Replace {key; status = next} :: actions,
+                      compute_new_min_next_request min_next_request next_request,
+                      new_acc ))
+              state.pending
+              ([], None, P2p_peer.Map.empty)
+          in
+          (* Update pending table *)
+          List.iter
+            (function
+              | Remove {key} -> Table.remove state.pending key
+              | Replace {key; status} -> Table.replace state.pending key status)
+            actions ;
+          state.min_next_request <- min_next_request ;
+          P2p_peer.Map.iter (Request.send state.param) requests ;
+          let* () =
+            P2p_peer.Map.iter_s
+              (fun peer request ->
+                List.iter_s
+                  (fun (key : key) -> Events.(emit requested) (key, peer))
+                  request)
+              requests
+          in
+          loop state
     in
     loop state
 
@@ -626,34 +651,85 @@ module Make
 
   let fetch s ?peer ?timeout k param =
     let open Lwt_syntax in
-    match Memory_table.find s.memory k with
+    let[@warning "-26"] debug_p2p_message =
+      (match peer with
+      | None -> []
+      | Some peer -> [Format.asprintf "Peer : %a" P2p_peer.Id.pp peer])
+      @ [Format.asprintf "Hash : %a" Hash.pp k]
+    in
+    match[@profiler.span_s {verbosity = Notice} ["fetch"]]
+      Memory_table.find s.memory k
+    with
     | None -> (
-        let* o = Disk_table.read_opt s.disk k in
-        match o with
-        | Some v -> return_ok v
-        | None -> (
-            (* It is necessary to check the memory-table again in case another
-               promise has altered it whilst this one was waiting for the
-               disk-table query. *)
-            match Memory_table.find s.memory k with
-            | None ->
-                let waiter, wakener = Lwt.wait () in
-                Memory_table.add
-                  s.memory
-                  k
-                  (Pending {waiter; wakener; waiters = 1; param}) ;
-                Scheduler.request s.scheduler peer k ;
-                wrap s k ?timeout waiter
-            | Some (Pending data) ->
-                Scheduler.request s.scheduler peer k ;
-                data.waiters <- data.waiters + 1 ;
-                wrap s k ?timeout data.waiter
-            | Some (Found v) -> return_ok v))
-    | Some (Pending data) ->
-        Scheduler.request s.scheduler peer k ;
-        data.waiters <- data.waiters + 1 ;
-        wrap s k ?timeout data.waiter
-    | Some (Found v) -> return_ok v
+        (let* o = Disk_table.read_opt s.disk k in
+         match o with
+         | Some v ->
+             return_ok
+               v
+             [@profiler.span_s
+               {verbosity = Info} ["fetch"; "cache miss"; "disk hit"]]
+         | None -> (
+             let[@warning "-26"] profiling_prefix info =
+               ["fetch"; "cache miss"; "disk miss"] @ info
+             in
+             match(* It is necessary to check the memory-table again in case another
+                     promise has altered it whilst this one was waiting for the
+                     disk-table query. *)
+                  [@profiler.span_s
+                    {verbosity = Info} ["fetch"; "cache miss"; "disk miss"]]
+               Memory_table.find s.memory k
+             with
+             | None ->
+                 (let waiter, wakener = Lwt.wait () in
+                  Memory_table.add
+                    s.memory
+                    k
+                    (Pending {waiter; wakener; waiters = 1; param}) ;
+                  Scheduler.request s.scheduler peer k ;
+                  wrap s k ?timeout waiter)
+                 [@profiler.span_s
+                   {verbosity = Debug}
+                     (profiling_prefix
+                        (["cache miss : request creation"] @ debug_p2p_message))]
+             | Some status -> (
+                 match[@profiler.span_s
+                        {verbosity = Info} (profiling_prefix ["cache hit"])]
+                   status
+                 with
+                 | Pending data ->
+                     (Scheduler.request s.scheduler peer k ;
+                      data.waiters <- data.waiters + 1 ;
+                      wrap s k ?timeout data.waiter)
+                     [@profiler.span_s
+                       {verbosity = Debug}
+                         (profiling_prefix
+                            (["cache hit"; "pending : add peer"]
+                            @ debug_p2p_message))]
+                 | Found v ->
+                     return_ok
+                       v
+                     [@profiler.span_s
+                       {verbosity = Info}
+                         (profiling_prefix ["cache hit"; "found"])])))
+        [@profiler.span_s {verbosity = Notice} ["fetch"; "cache miss"]])
+    | Some status -> (
+        match[@profiler.span_s {verbosity = Notice} ["fetch"; "cache hit"]]
+          status
+        with
+        | Pending data ->
+            (Scheduler.request s.scheduler peer k ;
+             data.waiters <- data.waiters + 1 ;
+             wrap s k ?timeout data.waiter)
+            [@profiler.span_s
+              {verbosity = Debug}
+                (["fetch"; "cache hit"; "pending : add peer"]
+                @ debug_p2p_message)]
+        | Found v ->
+            return_ok
+              v
+            [@profiler.span_s
+              {verbosity = Debug}
+                (["fetch"; "cache hit"; "found"] @ debug_p2p_message)])
 
   let notify_when_pending s p k w param v =
     let open Lwt_syntax in
@@ -708,19 +784,42 @@ module Make
     | Some (Pending _) | Some (Found _) -> Lwt.return_false
 
   let clear_or_cancel s k =
-    match Memory_table.find s.memory k with
-    | None -> ()
+    match[@profiler.span_f {verbosity = Notice} ["clear_or_cancel"]]
+      Memory_table.find s.memory k
+    with
+    | None ->
+        ()
+        [@profiler.span_f {verbosity = Notice} ["clear_or_cancel"; "no data"]]
     | Some (Pending status) ->
-        if status.waiters <= 1 then (
-          Scheduler.notify_cancellation s.scheduler k ;
-          Memory_table.remove s.memory k ;
-          Lwt.wakeup_later status.wakener (Result_syntax.tzfail (Canceled k)))
-        else status.waiters <- status.waiters - 1
-    | Some (Found _) -> Memory_table.remove s.memory k
+        (if status.waiters <= 1 then (
+           (Scheduler.notify_cancellation s.scheduler k ;
+            Memory_table.remove s.memory k ;
+            Lwt.wakeup_later status.wakener (Result_syntax.tzfail (Canceled k)))
+           [@profiler.span_f
+             {verbosity = Info}
+               ["clear_or_cancel"; "pending"; "no more waiters"]])
+         else
+           status.waiters <-
+             (status.waiters - 1)
+             [@profiler.span_f
+               {verbosity = Info}
+                 ["clear_or_cancel"; "pending"; "existing waiters"]])
+        [@profiler.span_f {verbosity = Notice} ["clear_or_cancel"; "pending"]]
+    | Some (Found _) ->
+        Memory_table.remove
+          s.memory
+          k
+        [@profiler.span_f {verbosity = Notice} ["clear_or_cancel"; "completed"]]
 
   let watch s = Lwt_watcher.create_stream s.input
 
+  let[@warning "-32"] init_profiler () =
+    if not !profiler_init then (
+      () [@profiler.record {verbosity = Notice} "start"] ;
+      profiler_init := true)
+
   let create ?random_table:random ?global_input request_param disk =
+    () [@profiler.overwrite init_profiler ()] ;
     let scheduler = Scheduler.create request_param in
     let memory = Memory_table.create ~entry_type:"entries" ?random 17 in
     let input = Lwt_watcher.create_input () in

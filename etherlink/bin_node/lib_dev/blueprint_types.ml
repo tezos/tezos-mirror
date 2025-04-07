@@ -52,3 +52,15 @@ let with_events_encoding =
           (list Evm_events.Delayed_transaction.encoding))
        (opt "kernel_upgrade" Evm_events.Upgrade.encoding)
        (req "blueprint" encoding))
+
+let with_events_equal x y =
+  let hash_bytes v =
+    Data_encoding.Binary.to_bytes_exn with_events_encoding v
+    |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+  in
+  hash_bytes x = hash_bytes y
+
+let events_of_blueprint_with_events with_events =
+  Evm_events.of_parts
+    with_events.delayed_transactions
+    with_events.kernel_upgrade

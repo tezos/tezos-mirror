@@ -125,7 +125,8 @@ let test_one t ~(ro_reload_at : phase_flush) =
         in
         let () =
           Store.S.Internal.(
-            File_manager.flush ~hook (file_manager rw) |> Errs.raise_if_error)
+            File_manager.flush ~hook (file_manager rw)
+            |> Io_errors.raise_if_error)
         in
         let () = aux S4_after_flush in
         Lwt.return_unit)
@@ -207,7 +208,8 @@ let test_one t ~(rw_flush_at : phase_reload) =
         in
         let () =
           Store.S.Internal.(
-            File_manager.reload ~hook (file_manager ro) |> Errs.raise_if_error)
+            File_manager.reload ~hook (file_manager ro)
+            |> Io_errors.raise_if_error)
         in
         let () = aux S5_after_reload in
         Lwt.return_unit)

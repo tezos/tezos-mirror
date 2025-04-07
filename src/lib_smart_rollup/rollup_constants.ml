@@ -45,6 +45,7 @@ type sc_rollup_constants = {
   commitment_period_in_blocks : int;
   reveal_activation_level : reveal_activation_level option;
   max_number_of_stored_cemented_commitments : int;
+  max_active_outbox_levels : int;
 }
 
 type protocol_constants = {
@@ -100,6 +101,7 @@ let encoding =
                commitment_period_in_blocks;
                reveal_activation_level;
                max_number_of_stored_cemented_commitments;
+               max_active_outbox_levels;
              };
            dal =
              {
@@ -114,7 +116,8 @@ let encoding =
         ( challenge_window_in_blocks,
           commitment_period_in_blocks,
           reveal_activation_level,
-          max_number_of_stored_cemented_commitments ),
+          max_number_of_stored_cemented_commitments,
+          max_active_outbox_levels ),
         (feature_enable, attestation_lag, number_of_slots, cryptobox_parameters)
       ))
     (fun ( minimal_block_delay,
@@ -122,7 +125,8 @@ let encoding =
            ( challenge_window_in_blocks,
              commitment_period_in_blocks,
              reveal_activation_level,
-             max_number_of_stored_cemented_commitments ),
+             max_number_of_stored_cemented_commitments,
+             max_active_outbox_levels ),
            ( feature_enable,
              attestation_lag,
              number_of_slots,
@@ -136,6 +140,7 @@ let encoding =
             commitment_period_in_blocks;
             reveal_activation_level;
             max_number_of_stored_cemented_commitments;
+            max_active_outbox_levels;
           };
         dal =
           {
@@ -150,11 +155,12 @@ let encoding =
        (req "delay_increment_per_round" int64)
        (req
           "sc_rollup"
-          (obj4
+          (obj5
              (req "challenge_window_in_blocks" int31)
              (req "commitment_period_in_blocks" int31)
              (opt "reveal_activation_level" reveal_activation_level_encoding)
-             (req "max_number_of_stored_cemented_commitments" int31)))
+             (req "max_number_of_stored_cemented_commitments" int31)
+             (req "max_active_outbox_levels" int31)))
        (req
           "dal"
           (obj4

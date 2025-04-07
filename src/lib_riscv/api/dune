@@ -5,8 +5,6 @@
  (name octez_riscv_api)
  (public_name octez-riscv-api)
  (instrumentation (backend bisect_ppx))
- (libraries
-  octez-rust-deps)
  (flags
   (:standard)
   -w -9-27-66)

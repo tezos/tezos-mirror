@@ -39,6 +39,22 @@ type release_tag_pipeline_type =
   | Release_tag
   | Beta_release_tag
   | Non_release_tag
+  | Schedule_test
+
+let monitoring_child_pipeline =
+  Pipeline.register_child
+    "octez_monitoring"
+    ~description:"Octez monitoring jobs"
+    ~inherit_:
+      (Gitlab_ci.Types.Variable_list ["ci_image_name"; "jsonnet_image_name"])
+    ~jobs:
+      [
+        job_datadog_pipeline_trace;
+        Grafazos_ci.job_build_grafazos ();
+        job_build_layer1_profiling ~expire_in:Never ();
+        Teztale.job_build ~expire_in:Never ~arch:Arm64 ();
+        Teztale.job_build ~expire_in:Never ~arch:Amd64 ();
+      ]
 
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
@@ -48,6 +64,11 @@ type release_tag_pipeline_type =
 
     On release pipelines these jobs can start immediately *)
 let octez_jobs ?(test = false) release_tag_pipeline_type =
+  let variables =
+    match release_tag_pipeline_type with
+    | Schedule_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
+    | _ -> None
+  in
   let job_docker_amd64 =
     job_docker_build
       ~dependencies:(Dependent [])
@@ -84,8 +105,33 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~dependencies:(Dependent [])
       ~__POS__
       ~arch:Amd64
+      ~cpu:Very_high
       ~release:true
       ()
+  in
+  let job_build_homebrew_release =
+    let artifacts =
+      Gitlab_ci.Util.artifacts
+        ~expire_in:(Duration (Days 1))
+        ~name:"build-$CI_COMMIT_REF_SLUG"
+        ~when_:On_success
+        ["public/homebrew/*"]
+    in
+    job
+      ~__POS__
+      ~name:"oc.install-release-homebrew"
+      ~arch:Amd64
+      ~dependencies:(Dependent [])
+      ~image:Images.debian_bookworm
+      ~stage:Stages.build
+      ~artifacts
+      [
+        "./scripts/ci/install-gsutil.sh";
+        "apt install -y git build-essential";
+        "./scripts/packaging/homebrew_install.sh";
+        "eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)";
+        "./scripts/packaging/homebrew_release.sh";
+      ]
   in
   let job_gitlab_release ~dependencies : Tezos_ci.tezos_job =
     job
@@ -95,52 +141,86 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~interruptible:false
       ~dependencies
       ~name:"gitlab:release"
+      ?variables
       [
         "./scripts/ci/restrict_export_to_octez_source.sh";
         "./scripts/ci/gitlab-release.sh";
       ]
   in
-  let job_gitlab_publish ~dependencies : Tezos_ci.tezos_job =
+  let job_gitlab_publish ~dependencies () : Tezos_ci.tezos_job =
+    let before_script =
+      match release_tag_pipeline_type with
+      | Schedule_test -> Some ["git tag octez-v0.0"]
+      | _ -> None
+    in
     job
       ~__POS__
       ~image:Images.ci_release
       ~stage:Stages.publish_package_gitlab
       ~interruptible:false
       ~dependencies
+      ?before_script
+      ?variables
       ~name:"gitlab:publish"
-      ["${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"]
+      [
+        ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
+        ^
+        match release_tag_pipeline_type with
+        | Schedule_test -> " --dry-run"
+        | _ -> "");
+      ]
   in
-  let job_build_rpm_amd64 = job_build_rpm_amd64 () in
-  let ( jobs_debian_repository,
-        job_build_ubuntu_package_current_a,
-        job_build_debian_package_current_a,
-        job_build_ubuntu_package_current_b,
-        job_build_debian_package_current_b ) =
-    Debian_repository.jobs Release
-  in
+  let jobs_dnf_repository = Rpm_repository.jobs Release in
+  let jobs_debian_repository, _, _, _, _ = Debian_repository.jobs Release in
   let job_gitlab_release_or_publish =
     let dependencies =
       Dependent
         [
           Artifacts job_static_x86_64_release;
           Artifacts job_static_arm64_release;
-          Artifacts job_build_rpm_amd64;
-          Artifacts job_build_ubuntu_package_current_a;
-          Artifacts job_build_debian_package_current_a;
-          Artifacts job_build_ubuntu_package_current_b;
-          Artifacts job_build_debian_package_current_b;
+          Artifacts job_build_homebrew_release;
         ]
     in
     match release_tag_pipeline_type with
-    | Non_release_tag -> job_gitlab_publish ~dependencies
+    | Non_release_tag | Schedule_test -> job_gitlab_publish ~dependencies ()
     | _ -> job_gitlab_release ~dependencies
+  in
+  let job_release_page_test =
+    job
+      ~__POS__
+      ~image:Images.CI.test
+      ~stage:Stages.publish_release
+      ~description:
+        "A manual job in the test release tag pipeline to update the Octez \
+         test release page. The release assets are pushed in the \
+         [release-page-test.nomadic-labs.com] bucket. Then its [index.html] is \
+         updated accordingly."
+      ~name:"publish:release-page"
+      ~allow_failure:Yes
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+      ~dependencies:
+        (Dependent
+           [
+             Artifacts job_static_x86_64_release;
+             Artifacts job_static_arm64_release;
+           ])
+      ~variables:[("S3_BUCKET", "release-page-test.nomadic-labs.com")]
+      ["./scripts/releases/publish_release_page.sh"]
   in
   let job_opam_release ?(dry_run = false) () : Tezos_ci.tezos_job =
     job
       ~__POS__
       ~image:Images.CI.prebuild
       ~stage:Stages.publish_release
+      ~description:
+        "Update opam package descriptions on tezos/tezos opam-repository fork.\n\n\
+         This job does preliminary work for releasing Octez opam packages on \
+         opam repository, by pushing a branch with updated package \
+         descriptions (.opam files) to \
+         https://github.com/tezos/opam-repository. It _does not_ automatically \
+         create a corresponding pull request on the official opam repository."
       ~interruptible:false
+      ?variables
       ~name:"opam:release"
       [("./scripts/ci/opam-release.sh" ^ if dry_run then " --dry-run" else "")]
   in
@@ -150,16 +230,27 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~dependencies:(Dependent [Job job_docker_merge])
       ()
   in
+  let job_trigger_monitoring =
+    trigger_job
+      ~__POS__
+      ~dependencies:(Dependent [])
+      ~stage:Stages.build
+      monitoring_child_pipeline
+  in
   [
+    (* Stage: start *)
+    job_datadog_pipeline_trace;
+    (* Stage: build *)
     job_static_x86_64_release;
     job_static_arm64_release;
     job_docker_amd64;
     job_docker_arm64;
-    job_build_rpm_amd64;
+    job_build_homebrew_release;
     job_docker_merge;
     job_gitlab_release_or_publish;
+    job_trigger_monitoring;
   ]
-  @ jobs_debian_repository
+  @ jobs_debian_repository @ jobs_dnf_repository
   @
   match (test, release_tag_pipeline_type) with
   (* for the moment the apt repository are not official, so we do not add to the release
@@ -174,6 +265,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
            (indeed, the second `latest_release_test` pipeline is rarely tested). *)
         job_promote_to_latest_test;
         job_opam_release ~dry_run:true ();
+        job_release_page_test;
       ]
   | _ -> []
 
@@ -202,6 +294,7 @@ let octez_evm_node_jobs ?(test = false) () =
     job_build_static_binaries
       ~__POS__
       ~arch:Amd64
+      ~cpu:Very_high
       ~executable_files:"script-inputs/octez-evm-node-executable"
       ~release:true
       ~version_executable:"octez-evm-node"
@@ -231,9 +324,13 @@ let octez_evm_node_jobs ?(test = false) () =
       ~interruptible:false
       ~dependencies
       ~name:"gitlab:octez-evm-node-release"
+      ~description:"Create a GitLab release for Etherlink"
       ["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
   in
   [
+    (* Stage: start *)
+    job_datadog_pipeline_trace;
+    (* Stage: build *)
     job_static_arm64_release;
     job_static_x86_64_release;
     job_docker_amd64;

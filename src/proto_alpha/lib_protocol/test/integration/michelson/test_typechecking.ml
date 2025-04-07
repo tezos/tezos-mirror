@@ -40,7 +40,7 @@ let context_init_with_sc_rollup_arith_enabled tup =
     tup
     {
       Context.default_test_constants with
-      consensus_threshold = 0;
+      consensus_threshold_size = 0;
       sc_rollup =
         {Context.default_test_constants.sc_rollup with arith_pvm_enable = true};
     }
@@ -88,7 +88,7 @@ let test_unparse_view () =
 
 let test_context () =
   let open Lwt_result_syntax in
-  let* b, _cs = Context.init3 ~consensus_threshold:0 () in
+  let* b, _cs = Context.init3 ~consensus_threshold_size:0 () in
   let* v = Incremental.begin_construction b in
   return (Incremental.alpha_ctxt v)
 

@@ -231,3 +231,5 @@ val with_open_in :
   string ->
   (Lwt_unix.file_descr -> 'a Lwt.t) ->
   ('a, [> `Open | `Close] io_error) result Lwt.t
+
+val safe_cancel_on_exit : (unit -> 'a Lwt.t) -> 'a Lwt.t

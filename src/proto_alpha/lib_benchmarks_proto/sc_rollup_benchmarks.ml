@@ -272,7 +272,8 @@ module Pvm_state_generator = struct
     in
     (* Produce an output proof for the picked message, and return the proof
        and its length. *)
-    return Sc_rollup_PVM_sig.{outbox_level; message_index; message}
+    return
+      Sc_rollup_PVM_sig.{output_info = {outbox_level; message_index}; message}
 end
 
 (** This benchmark estimates the cost of verifying an output proof for the

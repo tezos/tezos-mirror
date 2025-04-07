@@ -1,0 +1,38 @@
+cargo-features = ["named-profiles"]
+
+[workspace]
+resolver = "2"
+members = [
+    "crypto",
+    "encoding",
+    "encoding-derive",
+]
+
+[workspace.dependencies.tezos_data_encoding]
+version = "0.6.0"
+path = "./encoding"
+default-features = false
+
+[workspace.dependencies.tezos_data_encoding_derive]
+version = "0.6.0"
+path = "./encoding-derive"
+default-features = false
+
+[workspace.dependencies.tezos_crypto_rs]
+version = "0.6.0"
+path = "./crypto"
+default-features = false
+
+[workspace.dependencies.nom]
+version = "7.1"
+
+[profile.fuzz]
+inherits = "release"
+opt-level = 3
+debug = 2
+debug-assertions = true  # TODO: test and disable if too slow
+overflow-checks = true
+lto = false
+panic = "abort"
+incremental = false
+codegen-units = 1

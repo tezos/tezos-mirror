@@ -25,9 +25,9 @@ exception RO_not_allowed
 
 let current_version = "00000001"
 
-module Stats = Index.Stats
+module Stats = Brassaia_index.Index.Stats
 
-module IO : Index.Platform.IO = struct
+module IO : Brassaia_index.Index.Platform.IO = struct
   let ( ++ ) = Int63.add
   let ( -- ) = Int63.sub
 
@@ -421,8 +421,8 @@ module Platform = struct
   module Fmt_tty = Fmt_tty
 end
 
-module Make (K : Index.Key.S) (V : Index.Value.S) =
-  Index.Make (K) (V) (Platform)
+module Make (K : Brassaia_index.Index.Key.S) (V : Brassaia_index.Index.Value.S) =
+  Brassaia_index.Index.Make (K) (V) (Platform)
 
 module Syscalls = Syscalls
 
@@ -431,6 +431,8 @@ module Private = struct
   module IO = IO
   module Raw = Raw
 
-  module Make (K : Index.Key.S) (V : Index.Value.S) =
-    Index.Private.Make (K) (V) (Platform)
+  module Make
+      (K : Brassaia_index.Index.Key.S)
+      (V : Brassaia_index.Index.Value.S) =
+    Brassaia_index.Index.Private.Make (K) (V) (Platform)
 end

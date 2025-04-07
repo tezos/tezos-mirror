@@ -27,13 +27,13 @@
    Remove this module and use `Signature` module instead.
 *)
 
-type public_key_hash = Bls12_381 of Bls.Public_key_hash.t
+type public_key_hash = Bls12_381 of Bls_aug.Public_key_hash.t
 
-type public_key = Bls12_381 of Bls.Public_key.t
+type public_key = Bls12_381 of Bls_aug.Public_key.t
 
-type secret_key = Bls12_381 of Bls.Secret_key.t
+type secret_key = Bls12_381 of Bls_aug.Secret_key.t
 
-type signature = Bls12_381 of Bls.t | Unknown of Bytes.t
+type signature = Bls12_381 of Bls_aug.t | Unknown of Bytes.t
 
 include
   S.AGGREGATE_SIGNATURE

@@ -9,7 +9,7 @@
 (** Testing
     -------
     Component:    bin_node
-    Invocation:   dune exec etherlink/bin_node/test/main.exe -- --file test_call_tracer_algo.ml
+    Invocation:   dune exec etherlink/bin_node/test/test_call_tracer_algo.exe
     Subject:      Tests for implementation of call tracer algorithm
     *)
 
@@ -134,27 +134,40 @@ let test_rake =
       let* res = build_calltrace Mock.end_call (Mock.get_next storage) in
       Mock.check res expected "Should have been equal")
 
+let complex_example =
+  {
+    value = "A";
+    calls =
+      [
+        {
+          value = "B";
+          calls = [{value = "C1"; calls = []}; {value = "C2"; calls = []}];
+        };
+        {value = "D"; calls = []};
+      ];
+  }
+
+let complex_example2 =
+  {
+    value = "E";
+    calls =
+      [
+        {
+          value = "F";
+          calls = [{value = "G1"; calls = []}; {value = "G2"; calls = []}];
+        };
+        {value = "H"; calls = []};
+      ];
+  }
+
 let test_complex =
   register_unit_test
     ~title:"CallTracer: Test more complex tree"
     ~tags:["call_tracer"; "debug"; "top_call"]
     (fun _protocol ->
-      let expected =
-        {
-          value = "A";
-          calls =
-            [
-              {
-                value = "B";
-                calls = [{value = "C1"; calls = []}; {value = "C2"; calls = []}];
-              };
-              {value = "D"; calls = []};
-            ];
-        }
-      in
       let storage = [("C1", 2); ("C2", 2); ("B", 1); ("D", 1); ("A", 0)] in
       let* res = build_calltrace Mock.end_call (Mock.get_next storage) in
-      Mock.check res expected "Should have been equal")
+      Mock.check res complex_example "Should have been equal")
 
 let test_fail_too_many_top_call =
   register_unit_test
@@ -164,6 +177,23 @@ let test_fail_too_many_top_call =
       let storage = [("A", 0); ("A", 0)] in
       let* res = build_calltrace Mock.end_call (Mock.get_next storage) in
       Mock.check_failed res "Should have failed")
+
+let test_succeed_trace_block =
+  register_unit_test
+    ~title:"CallTracer: Test trace block"
+    ~tags:["call_tracer"; "debug"; "block"; "top_call"]
+    (fun _protocol ->
+      let trace1 = [("C1", 2); ("C2", 2); ("B", 1); ("D", 1); ("A", 0)] in
+      let trace2 = [("G1", 2); ("G2", 2); ("F", 1); ("H", 1); ("E", 0)] in
+      let storage = trace1 @ trace2 in
+      let* res = build_calltraces Mock.end_call (Mock.get_next storage) in
+      match res with
+      | Ok [res1; res2] ->
+          let* () =
+            Mock.check (Ok res1) complex_example "Couldn't rebuild first trace"
+          in
+          Mock.check (Ok res2) complex_example2 "Couldn't rebuild second trace"
+      | _ -> Test.fail "Could not trace block")
 
 let test_fail_wrong_start_depth =
   register_unit_test
@@ -285,7 +315,7 @@ let test_decoding_rlp =
                  (CallTracer.to_string call)) ;
           Lwt.return_unit)
 
-let test_decoding_rlp_min =
+let _test_decoding_rlp_min =
   register_unit_test
     ~title:"CallTracer: Test decoding call with few values"
     ~tags:["call_tracer"; "debug"; "encoding"; "rlp"]
@@ -445,9 +475,12 @@ let () =
   test_rake protocols ;
   test_complex protocols ;
   test_fail_too_many_top_call protocols ;
+  test_succeed_trace_block protocols ;
   test_fail_wrong_start_depth protocols ;
   test_fail_wrong_depth protocols ;
   test_fail_wrong_depth_2 protocols ;
   test_decoding_rlp protocols ;
   test_decoding_rlp_revert_reason protocols ;
   ()
+
+let () = Test.run ()

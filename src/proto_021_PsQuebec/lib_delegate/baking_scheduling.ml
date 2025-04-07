@@ -27,6 +27,28 @@ open Protocol.Alpha_context
 module Events = Baking_events.Scheduling
 open Baking_state
 
+module Profiler = struct
+  include (val Profiler.wrap Baking_profiler.baker_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    (* The section_maker must be created here and not inside the pattern
+       matching because it instantiates a reference that needs to live the
+       whole lifetime of the profiler and will be used to test if the
+       section should be closed and re-opened or not. *)
+    let section =
+      Tezos_profiler.Profiler.section_maker
+        ~verbosity:Notice
+        ( = )
+        Block_hash.to_b58check
+        Baking_profiler.baker_profiler
+    in
+    function
+    | Baking_state.New_head_proposal proposal, metadata
+    | Baking_state.New_valid_proposal proposal, metadata ->
+        section (proposal.block.hash, metadata)
+    | _ -> ()
+end
+
 type loop_state = {
   heads_stream : Baking_state.proposal Lwt_stream.t;
   get_valid_blocks_stream : Baking_state.proposal Lwt_stream.t Lwt.t;
@@ -264,46 +286,33 @@ let rec wait_next_event ~timeout loop_state =
       return_some (New_forge_event event)
   | `Timeout e -> return_some (Timeout e)
 
-let rec first_own_round_in_range delegate_slots ~committee_size ~included_min
-    ~excluded_max =
-  if included_min >= excluded_max then None
-  else
-    match Round.of_int included_min with
-    | Error _ ->
-        (* Should not happen because in practice, [included_min] is
-           non-negative and not big enough to overflow as an Int32. *)
-        None
-    | Ok round -> (
-        match Round.to_slot round ~committee_size with
-        | Error _ ->
-            (* Impossible because [Round.of_int] builds a sound round. *) None
-        | Ok slot -> (
-            match Delegate_slots.own_slot_owner delegate_slots ~slot with
-            | Some {consensus_key_and_delegate; _} ->
-                Some (round, consensus_key_and_delegate)
-            | None ->
-                first_own_round_in_range
-                  delegate_slots
-                  ~committee_size
-                  ~included_min:(included_min + 1)
-                  ~excluded_max))
-
 let first_potential_round_at_next_level state ~earliest_round =
-  match Round.to_int earliest_round with
-  | Error _ -> None
-  | Ok earliest_round ->
-      let committee_size =
-        state.global_state.constants.parametric.consensus_committee_size
+  let open Option_syntax in
+  let ( let*? ) res f = match res with Error _ -> None | Ok x -> f x in
+  let committee_size =
+    state.global_state.constants.Constants.parametric.consensus_committee_size
+  in
+  let owned_slots = state.level_state.next_level_delegate_slots in
+  (* Rounds attribution cycles with a period of [committee_size].
+     To find the next owned round, we translate [earliest_round] into a slot
+     within the range [0 ... committee_size], look for the first subsequent slot
+     we own, and finally translate it back to a round by restoring the original
+     offset. *)
+  let*? earliest_slot = Round.to_slot ~committee_size earliest_round in
+  let*? earliest_round = Round.to_int earliest_round in
+  let period_offset = earliest_round / committee_size in
+  match Delegate_slots.find_first_slot_from owned_slots ~slot:earliest_slot with
+  | Some (slot, delegate) ->
+      let slot = Slot.to_int slot in
+      let*? round = Round.of_int (slot + (committee_size * period_offset)) in
+      Some (round, delegate.consensus_key_and_delegate)
+  | None ->
+      let* slot, delegate = Delegate_slots.min_slot owned_slots in
+      let slot = Slot.to_int slot in
+      let*? round =
+        Round.of_int (slot + (committee_size * (1 + period_offset)))
       in
-      first_own_round_in_range
-        state.level_state.next_level_delegate_slots
-        ~committee_size
-        ~included_min:earliest_round
-        ~excluded_max:(earliest_round + committee_size)
-(* If no own round is found between [earliest_round] included and
-   [earliest_round + committee_size] excluded, then we can stop
-   searching, because baking slots repeat themselves modulo the
-   [committee_size]. *)
+      Some (round, delegate.consensus_key_and_delegate)
 
 (** [current_round_at_next_level] converts the current system timestamp
     into the first non-expired round at the next level *)
@@ -623,8 +632,8 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
     Baking_state.(
       match config.Baking_configuration.validation with
       | Node -> return Node
-      | Local {context_path} ->
-          let* index = Baking_simulator.load_context ~context_path in
+      | Local {context_root_path} ->
+          let* index = Baking_simulator.load_context ~context_root_path in
           return (Local index)
       | ContextIndex index -> return (Local index))
   in
@@ -780,38 +789,66 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
         Baking_state.may_record_new_state ~previous_state:state ~new_state
     | Baking_configuration.Memory -> return_unit
   in
-  let*! state', action = State_transitions.step state event in
-  let* state'' =
-    let*! state_res =
-      let* state'' = Baking_actions.perform_action state' action in
-      let* () = may_record_new_state ~previous_state:state ~new_state:state'' in
-      return state''
-    in
-    match state_res with
-    | Ok state'' -> return state''
-    | Error error ->
-        let* () = on_error error in
-        (* Still try to record the intermediate state; ignore potential
-           errors. *)
-        let*! _ = state_recorder ~new_state:state' in
-        return state'
-  in
-  let* next_timeout = compute_next_timeout state'' in
-  let* event_opt =
-    wait_next_event
-      ~timeout:
-        (let*! e = next_timeout in
-         Lwt.return (`Timeout e))
-      loop_state
-  in
-  match event_opt with
-  | None ->
-      (* Termination *)
-      return_none
-  | Some event ->
-      if stop_on_event event then return_some event
-      else
-        automaton_loop ~stop_on_event ~config ~on_error loop_state state'' event
+  () [@profiler.reset_block_section event] ;
+  (let*! state', action =
+     (State_transitions.step
+        state
+        event
+      [@profiler.record_s
+        {verbosity = Notice} (Format.asprintf "Step : %a" pp_short_event event)])
+   in
+   let* state'' =
+     let*! state_res =
+       let* state'' =
+         (Baking_actions.perform_action
+            state'
+            action
+          [@profiler.record_s
+            {verbosity = Notice}
+              (Format.asprintf "Action : %a" Baking_actions.pp_action action)])
+       in
+       let* () =
+         may_record_new_state ~previous_state:state ~new_state:state''
+       in
+       return state''
+     in
+     match state_res with
+     | Ok state'' -> return state''
+     | Error error ->
+         let* () = on_error error in
+         (* Still try to record the intermediate state; ignore potential
+            errors. *)
+         let*! _ = state_recorder ~new_state:state' in
+         return state'
+   in
+   let* next_timeout =
+     (compute_next_timeout
+        state''
+      [@profiler.record_s {verbosity = Notice} "Timeout : compute next timeout"])
+   in
+   let* event_opt =
+     (wait_next_event
+        ~timeout:
+          (let*! e = next_timeout in
+           Lwt.return (`Timeout e))
+        loop_state [@profiler.record_s {verbosity = Notice} "Wait : next event"])
+   in
+   () [@profiler.stop] ;
+   match event_opt with
+   | None ->
+       (* Termination *)
+       return_none
+   | Some event ->
+       if stop_on_event event then return_some event
+       else
+         automaton_loop
+           ~stop_on_event
+           ~config
+           ~on_error
+           loop_state
+           state''
+           event)
+  [@profiler.record_s {verbosity = Notice} "Scheduler loop"]
 
 let perform_sanity_check cctxt ~chain_id =
   let open Lwt_result_syntax in
@@ -926,6 +963,24 @@ let try_resolve_consensus_keys cctxt key =
 let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
   let open Lwt_result_syntax in
   let*! delegates = List.map_s (try_resolve_consensus_keys cctxt) delegates in
+  let register dal_ctxt =
+    let* profiles = Node_rpc.get_dal_profiles dal_ctxt in
+    let warn =
+      Events.emit Baking_events.Scheduling.dal_node_no_attester_profile
+    in
+    let*! () =
+      match profiles with
+      | Tezos_dal_node_services.Types.Bootstrap | Random_observer -> warn ()
+      | Operator operator_profile ->
+          let attesters =
+            Tezos_dal_node_services.Operator_profile.attesters operator_profile
+          in
+          if Tezos_crypto.Signature.Public_key_hash.Set.is_empty attesters then
+            warn ()
+          else Lwt.return_unit
+    in
+    Node_rpc.register_dal_profiles dal_ctxt delegates
+  in
   Option.iter_es
     (fun dal_ctxt ->
       retry
@@ -935,7 +990,7 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
         ~factor:2.
         ~tries:max_int
         ~msg:"Failed to register profiles, DAL node is not reachable. "
-        (fun () -> Node_rpc.register_dal_profiles dal_ctxt delegates)
+        (fun () -> register dal_ctxt)
         ())
     dal_node_rpc_ctxt
 
@@ -945,6 +1000,12 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* constants =
+    match constants with
+    | Some c -> return c
+    | None ->
+        Protocol.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+  in
   let* () = perform_sanity_check cctxt ~chain_id in
   let cache = Baking_cache.Block_cache.create 10 in
   let* heads_stream, _block_stream_stopper =
@@ -956,7 +1017,7 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     | Some current_head -> return current_head
     | None -> failwith "head stream unexpectedly ended"
   in
-  let*! operation_worker = Operation_worker.create cctxt in
+  let*! operation_worker = Operation_worker.create ~constants cctxt in
   Option.iter
     (fun canceler ->
       Lwt_canceler.on_cancel canceler (fun () ->
@@ -970,7 +1031,7 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
       config
       operation_worker
       ~current_proposal
-      ?constants
+      ~constants
       delegates
   in
   let _promise =
@@ -1022,6 +1083,10 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     on_error err
   in
   let*? initial_event = compute_bootstrap_event initial_state in
+  (* profiler_section is defined here because ocamlformat and ppx mix badly here *)
+  let[@warning "-26"] profiler_section = New_valid_proposal current_proposal in
+  () [@profiler.stop] ;
+  () [@profiler.reset_block_section profiler_section] ;
   protect
     ~on_error:(fun err ->
       let*! _ = Option.iter_es Lwt_canceler.cancel canceler in

@@ -75,6 +75,9 @@ val get_next_baker :
 
 val get_round : block -> Round.t Environment.Error_monad.tzresult
 
+(** Returns the consensus key that was used to bake the block. *)
+val block_producer : block -> Consensus_key.pk tzresult Lwt.t
+
 module Forge : sig
   val contents :
     ?proof_of_work_threshold:Int64.t ->
@@ -131,7 +134,7 @@ val check_constants_consistency : Constants.Parametric.t -> unit tzresult Lwt.t
 val genesis :
   ?commitments:Commitment.t list ->
   ?consensus_committee_size:int ->
-  ?consensus_threshold:int ->
+  ?consensus_threshold_size:int ->
   ?min_proposal_quorum:int32 ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   ?level:int32 ->
@@ -144,11 +147,14 @@ val genesis :
   ?sc_rollup_private_enable:bool ->
   ?sc_rollup_riscv_pvm_enable:bool ->
   ?dal_enable:bool ->
+  ?dal_incentives_enable:bool ->
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
+  ?allow_tz4_delegate_enable:bool ->
+  ?aggregate_attestation:bool ->
   Parameters.bootstrap_account list ->
   block tzresult Lwt.t
 
@@ -360,6 +366,8 @@ val current_level : block -> int32
 
 val current_cycle : block -> Cycle.t
 
+val cycle_position : block -> int32
+
 val first_level_of_cycle : Constants.Parametric.t -> level:int32 -> bool
 
 val first_block_of_cycle : block -> bool
@@ -411,7 +419,7 @@ val bake_until_cycle :
 (** Common util function to create parameters for [initial_context] function *)
 val prepare_initial_context_params :
   ?consensus_committee_size:int ->
-  ?consensus_threshold:int ->
+  ?consensus_threshold_size:int ->
   ?min_proposal_quorum:int32 ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
@@ -423,12 +431,15 @@ val prepare_initial_context_params :
   ?sc_rollup_private_enable:bool ->
   ?sc_rollup_riscv_pvm_enable:bool ->
   ?dal_enable:bool ->
+  ?dal_incentives_enable:bool ->
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   ?consensus_rights_delay:int ->
+  ?allow_tz4_delegate_enable:bool ->
+  ?aggregate_attestation:bool ->
   unit ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )

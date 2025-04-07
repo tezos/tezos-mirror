@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Welcome message for ipc between main process and crypto process *)
 let welcome = Bytes.of_string "0 Ready"
 
 (* A Lwt worker maintening a queue of calculation jobs to send to the crypto process *)
@@ -12,7 +13,7 @@ type query =
   | Query of {
       slot_id : Types.slot_id;
       commitment : Cryptobox.commitment;
-      proto_parameters : Dal_plugin.proto_parameters;
+      proto_parameters : Types.proto_parameters;
           (* Used, but not really necessary as long as parameters don't change. *)
       reconstruction_start_time : float;
     }
@@ -186,7 +187,7 @@ module Reconstruction_process_worker = struct
     (* Read init message from parent with parameters required to initialize
        cryptobox *)
     let* () = read_init_message_from_parent ic in
-    let*! () = Event.(emit crypto_process_started (Unix.getpid ())) in
+    let*! () = Event.emit_crypto_process_started ~pid:(Unix.getpid ()) in
     let rec loop () =
       let*! query_id = Lwt_io.read_int ic in
       (* Read query from main dal process *)
@@ -207,7 +208,7 @@ module Reconstruction_process_worker = struct
         |> List.to_seq
       in
 
-      let*! () = Event.(emit crypto_process_received_query query_id) in
+      let*! () = Event.emit_crypto_process_received_query ~query_id in
 
       (* crypto computation *)
       let* proved_shards_encoded =
@@ -215,7 +216,7 @@ module Reconstruction_process_worker = struct
       in
 
       (* Sends back the proved_shards_encoded to the main dal process *)
-      let*! () = Event.(emit crypto_process_sending_reply query_id) in
+      let*! () = Event.emit_crypto_process_sending_reply ~query_id in
       let len = Bytes.length proved_shards_encoded in
       let*! () = Lwt_io.write_int oc query_id in
       let*! () = Lwt_io.write_int oc len in
@@ -241,7 +242,7 @@ let query_sender_job {query_pipe; process; _} =
       Lwt_pipe.Unbounded.pop query_pipe
     in
     let oc = Process_worker.output_channel process in
-    let*! () = Event.(emit main_process_sending_query query_id) in
+    let*! () = Event.emit_main_process_sending_query ~query_id in
     (* Serialization: query_id, then shards *)
     let*! () = Lwt_io.write_int oc query_id in
     let* () =
@@ -292,17 +293,18 @@ let reply_receiver_job {process; query_store; _} node_context =
             ]
       | `Message msg -> return msg
     in
-    let*! () = Event.(emit main_process_received_reply id) in
+    let*! () = Event.emit_main_process_received_reply ~query_id:id in
     let shards, shard_proofs =
       Data_encoding.Binary.of_bytes_exn proved_shards_encoding msg
     in
     let shards = List.to_seq shards in
     let* () =
-      Store.(Shards.write_all node_store.shards slot_id shards)
+      Store.Shards.write_all (Store.shards node_store) slot_id shards
       |> Errors.to_tzresult
     in
     let* () =
       Slot_manager.publish_proved_shards
+        node_context
         slot_id
         ~level_committee:(Node_context.fetch_committee node_context)
         proto_parameters
@@ -312,7 +314,9 @@ let reply_receiver_job {process; query_store; _} node_context =
         gs_worker
     in
     let*! () =
-      Event.(emit reconstruct_finished (slot_id.slot_level, slot_id.slot_index))
+      Event.emit_reconstruct_finished
+        ~level:slot_id.slot_level
+        ~slot_index:slot_id.slot_index
     in
     let duration = Unix.gettimeofday () -. reconstruction_start_time in
     Dal_metrics.update_amplification_complete_duration duration ;
@@ -422,7 +426,7 @@ let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
   in
   let length = Query_store.length amplificator.query_store in
   let () = Dal_metrics.update_amplification_queue_length length in
-  let*! () = Event.(emit main_process_enqueue_query query_id) in
+  let*! () = Event.emit_main_process_enqueue_query ~query_id in
   let () =
     Lwt_pipe.Unbounded.push
       amplificator.query_pipe
@@ -434,20 +438,17 @@ let amplify node_store commitment (slot_id : Types.slot_id)
     ~number_of_already_stored_shards ~number_of_shards ~number_of_needed_shards
     proto_parameters amplificator =
   let open Lwt_result_syntax in
-  Dal_metrics.reconstruction_started () ;
   let reconstruction_start_time = Unix.gettimeofday () in
   Dal_metrics.reconstruction_started () ;
   let*! () =
-    Event.(
-      emit
-        reconstruct_started
-        ( slot_id.slot_level,
-          slot_id.slot_index,
-          number_of_already_stored_shards,
-          number_of_shards ))
+    Event.emit_reconstruct_started
+      ~level:slot_id.slot_level
+      ~slot_index:slot_id.slot_index
+      ~number_of_received_shards:number_of_already_stored_shards
+      ~number_of_shards
   in
   let shards =
-    Store.(Shards.read_all node_store.shards slot_id ~number_of_shards)
+    Store.Shards.read_all (Store.shards node_store) slot_id ~number_of_shards
     |> Seq_s.filter_map (function
            | _, index, Ok share -> Some Cryptobox.{index; share}
            | _ -> None)
@@ -470,11 +471,15 @@ let amplify node_store commitment (slot_id : Types.slot_id)
   in
   return_unit
 
-let try_amplification commitment (slot_id : Types.slot_id) amplificator =
+let try_amplification commitment slot_metrics slot_id amplificator =
   let open Lwt_result_syntax in
   let node_ctxt = amplificator.node_ctxt in
   let node_store = Node_context.get_store node_ctxt in
-  let proto_parameters = Node_context.get_proto_parameters node_ctxt in
+  let*? proto_parameters =
+    Node_context.get_proto_parameters
+      node_ctxt
+      ~level:(`Level slot_id.Types.Slot_id.slot_level)
+  in
   let number_of_shards =
     proto_parameters.cryptobox_parameters.number_of_shards
   in
@@ -483,7 +488,7 @@ let try_amplification commitment (slot_id : Types.slot_id) amplificator =
   in
   let number_of_needed_shards = number_of_shards / redundancy_factor in
   let* number_of_already_stored_shards =
-    Store.Shards.count_values node_store.shards slot_id
+    Store.Shards.count_values (Store.shards node_store) slot_id
   in
   (* There are two situations where we don't want to reconstruct:
      if we don't have enough shards or if we already have all the
@@ -494,13 +499,11 @@ let try_amplification commitment (slot_id : Types.slot_id) amplificator =
   then return_unit
   else
     (* We have enough shards to reconstruct the whole slot. *)
-    with_amplification_lock
-      node_ctxt
-      slot_id
-      ~on_error:
-        Event.(
-          fun err ->
-            emit reconstruct_error (slot_id.slot_level, slot_id.slot_index, err))
+    with_amplification_lock node_ctxt slot_id ~on_error:(fun error ->
+        Event.emit_reconstruct_error
+          ~level:slot_id.slot_level
+          ~slot_index:slot_id.slot_index
+          ~error)
     @@ fun () ->
     (* Wait a random delay between 1 and 2 seconds before starting
        the reconstruction; this is to give some slack to receive
@@ -513,29 +516,32 @@ let try_amplification commitment (slot_id : Types.slot_id) amplificator =
              (amplification_random_delay_max -. amplification_random_delay_min))
     in
     let*! () =
-      Event.(
-        emit
-          reconstruct_starting_in
-          (slot_id.slot_level, slot_id.slot_index, random_delay))
+      Event.emit_reconstruct_starting_in
+        ~level:slot_id.slot_level
+        ~slot_index:slot_id.slot_index
+        ~delay:random_delay
     in
     let*! () = Lwt_unix.sleep random_delay in
     (* Count again the stored shards because we may have received
        more shards during the random delay. *)
     let* number_of_already_stored_shards =
-      Store.Shards.count_values node_store.shards slot_id
+      Store.Shards.count_values (Store.shards node_store) slot_id
     in
+    let t = Unix.gettimeofday () in
+    let duration = t -. slot_metrics.Dal_metrics.time_first_shard in
     (* If we have received all the shards while waiting the random
        delay, there is no point in reconstructing anymore *)
     if number_of_already_stored_shards = number_of_shards then (
+      Dal_metrics.update_amplification_abort_reconstruction_duration duration ;
       let*! () =
-        Event.(
-          emit
-            reconstruct_no_missing_shard
-            (slot_id.slot_level, slot_id.slot_index))
+        Event.emit_reconstruct_no_missing_shard
+          ~level:slot_id.slot_level
+          ~slot_index:slot_id.slot_index
       in
       Dal_metrics.reconstruction_aborted () ;
       return_unit)
-    else
+    else (
+      Dal_metrics.update_amplification_start_reconstruction_duration duration ;
       amplify
         node_store
         commitment
@@ -544,4 +550,4 @@ let try_amplification commitment (slot_id : Types.slot_id) amplificator =
         ~number_of_shards
         ~number_of_needed_shards
         proto_parameters
-        amplificator
+        amplificator)

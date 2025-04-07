@@ -77,7 +77,7 @@ module Helpers : sig
      are smaller than the expected size of a slot. *)
   type slot
 
-  (** [make_slot ?paddming ~slot_size content] produces a slot. If [padding=true]
+  (** [make_slot ?padding ~slot_size content] produces a slot. If [padding=true]
       (which is the default), then the content is padded to reach the expected
       size given by [slot_size] (which is usually obtained from
       {!type:Cryptobox.parameters}). *)
@@ -96,6 +96,21 @@ module Helpers : sig
     ?on_error:(string -> Cryptobox.t Lwt.t) ->
     Cryptobox.parameters ->
     Cryptobox.t Lwt.t
+
+  (* Calls {!Cryptobox.init_prover_dal} to initialize the DAL crypto in "prover"
+     mode. *)
+  val init_prover : ?__LOC__:string -> unit -> unit Lwt.t
+
+  (** Generates a random string (with chars from 'a' to 'z') of size
+      [slot_size]. *)
+  val generate_slot : slot_size:int -> bytes
+
+  val get_commitment_and_shards_with_proofs :
+    Cryptobox.t ->
+    slot:bytes ->
+    Cryptobox.commitment
+    * Cryptobox.commitment_proof
+    * (Cryptobox.shard * Cryptobox.shard_proof) Seq.t
 
   val publish_commitment :
     ?dont_wait:bool ->
@@ -149,6 +164,10 @@ module Helpers : sig
     | `Invalid_shard ] ->
     unit
 
+  (* A helper function to wait for an event emitted by gs_logging.ml *)
+  val wait_for_gossipsub_worker_event :
+    name:string -> Dal_node.t -> (JSON.t -> 'a option) -> 'a Lwt.t
+
   (** Wait for a connection event between [main_node] and
     [other_node]. The optional argument [other_peer_id] can be used to
     ignore the connection events which are not between these two
@@ -162,6 +181,9 @@ module Helpers : sig
     is_trusted:bool ->
     unit ->
     unit Lwt.t
+
+  (** Wait for a disconnection from the given peer id. *)
+  val check_disconnection_event : Dal_node.t -> peer_id:string -> unit Lwt.t
 
   (** Connect [dal_node1] and [dal_node2] using the bootstrap peer mechanism.
     [dal_node2] will use [dal_node1] as a bootstrap peer.
@@ -284,19 +306,24 @@ module RPC : sig
   (** Call RPC "GET /p2p/gossipsub/topics" to list the topics *)
   val get_topics : unit -> topic list RPC_core.t
 
-  (** Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on
-     each (subscribed) topic. *)
+  (** Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on each
+      subscribed topic. If [all] is [true] (the default is [false]) then list
+      the peers on each known topic (not only the subscribed ones). *)
   val get_topics_peers :
-    subscribed:bool -> (topic * string list) list RPC_core.t
+    ?all:bool -> unit -> (topic * string list) list RPC_core.t
 
-  (** Call RPC "GET /p2p/gossipsub/slot_indexes/peers" to list the peers on
-      each slot index part of a (subscribed) topic. *)
+  (** Call RPC "GET /p2p/gossipsub/slot_indexes/peers" to list the peers on each
+      slot index part of a subscribed topic. If [all] is [true] (the default is
+      [false]) then list the peers on each known topic (not only the subscribed
+      ones). *)
   val get_slot_indexes_peers :
-    subscribed:bool -> (int * string list) list RPC_core.t
+    ?all:bool -> unit -> (int * string list) list RPC_core.t
 
   (** Call RPC "GET /p2p/gossipsub/pkhs/peers" to list the peers on
-     each pkh part of a (subscribed) topic. *)
-  val get_pkhs_peers : subscribed:bool -> (string * string list) list RPC_core.t
+     each pkh part of a (all) topic. If [all] is [true] (the default is [false]) then list
+      the peers on each known topic (not only the subscribed ones). *)
+  val get_pkhs_peers :
+    ?all:bool -> unit -> (string * string list) list RPC_core.t
 
   val get_gossipsub_connections : unit -> JSON.t RPC_core.t
 

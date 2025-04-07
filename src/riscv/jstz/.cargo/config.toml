@@ -4,3 +4,12 @@ target = "riscv64gc-unknown-hermit"
 [profile.profiling]
 inherits = "release"
 debug = true
+
+[target.riscv64gc-unknown-linux-musl]
+linker = "riscv64-unknown-linux-musl-gcc"
+rustflags = [
+  "-C",
+  "target-feature=+crt-static",
+  "-C",
+  "default-linker-libraries",
+]

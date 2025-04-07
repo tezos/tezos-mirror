@@ -41,6 +41,10 @@ let leftPad32 s =
 
 let add_0x s = "0x" ^ s
 
+let remove_0x s =
+  if String.starts_with ~prefix:"0x" s then String.sub s 2 (String.length s - 2)
+  else s
+
 let mapping_position index map_position =
   Tezos_crypto.Hacl.Hash.Keccak_256.digest
     (Hex.to_bytes
@@ -50,6 +54,14 @@ let mapping_position index map_position =
 let hex_string_to_int x = `Hex x |> Hex.to_string |> Z.of_bits |> Z.to_int
 
 let hex_256_of_int n = Printf.sprintf "%064x" n
+
+let hex_256_of_address acc =
+  let s = acc.Eth_account.address in
+  (* strip 0x and convert to lowercase *)
+  let n = String.length s in
+  let s = String.lowercase_ascii @@ String.sub s 2 (n - 2) in
+  (* prepend 24 leading zeros *)
+  String.("0x" ^ make 24 '0' ^ s)
 
 let next_rollup_node_level ~sc_rollup_node ~client =
   let* () = Client.bake_for_and_wait ~keys:[] client in
@@ -246,12 +258,14 @@ let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node ~proxy
 (** [wait_for_transaction_receipt ~evm_node ~transaction_hash] takes an
     transaction_hash and returns only when the receipt is non null, or [count]
     blocks have passed and the receipt is still not available. *)
-let wait_for_transaction_receipt ?(count = 3) ~evm_node ~transaction_hash () =
+let wait_for_transaction_receipt ?websocket ?(count = 3) ~evm_node
+    ~transaction_hash () =
   let rec loop count =
     let* () = Lwt_unix.sleep 5. in
     let* receipt =
       Evm_node.(
-        call_evm_rpc
+        jsonrpc
+          ?websocket
           evm_node
           {
             method_ = "eth_getTransactionReceipt";
@@ -286,7 +300,7 @@ let wait_for_application ~produce_block apply =
   in
   Lwt.pick [application_result; loop 0]
 
-let batch_n_transactions ~evm_node txs =
+let batch_n_transactions ?websocket ~evm_node txs =
   let requests =
     List.map
       (fun tx ->
@@ -294,16 +308,17 @@ let batch_n_transactions ~evm_node txs =
           {method_ = "eth_sendRawTransaction"; parameters = `A [`String tx]})
       txs
   in
-  let* hashes = Evm_node.batch_evm_rpc evm_node requests in
+  let* hashes = Evm_node.batch_jsonrpc ?websocket evm_node requests in
   let hashes =
-    hashes |> JSON.as_list
+    hashes
     |> List.map (fun json -> Evm_node.extract_result json |> JSON.as_string)
   in
   return (requests, hashes)
 
 (* sending more than ~300 tx could fail, because or curl *)
-let send_n_transactions ~produce_block ~evm_node ?wait_for_blocks txs =
-  let* requests, hashes = batch_n_transactions ~evm_node txs in
+let send_n_transactions ?websocket ~produce_block ~evm_node ?wait_for_blocks txs
+    =
+  let* requests, hashes = batch_n_transactions ?websocket ~evm_node txs in
   let first_hash = List.hd hashes in
   (* Let's wait until one of the transactions is injected into a block, and
       test this block contains the `n` transactions as expected. *)
@@ -311,6 +326,7 @@ let send_n_transactions ~produce_block ~evm_node ?wait_for_blocks txs =
     wait_for_application
       ~produce_block
       (wait_for_transaction_receipt
+         ?websocket
          ?count:wait_for_blocks
          ~evm_node
          ~transaction_hash:first_hash)
@@ -395,8 +411,10 @@ let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
   in
   return withdrawal_level
 
-let init_sequencer_sandbox ?set_account_code ?da_fee_per_byte
-    ?minimum_base_fee_per_gas ?patch_config ?(kernel = Constant.WASM.evm_kernel)
+let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
+    ?tx_pool_tx_per_addr_limit ?set_account_code ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ?history_mode ?patch_config
+    ?(kernel = Constant.WASM.evm_kernel)
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -407,6 +425,7 @@ let init_sequencer_sandbox ?set_account_code ?da_fee_per_byte
 
   let*! () =
     Evm_node.make_kernel_installer_config
+      ?maximum_gas_per_transaction
       ?set_account_code
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
@@ -428,15 +447,19 @@ let init_sequencer_sandbox ?set_account_code ?da_fee_per_byte
         preimage_dir = Some preimages_dir;
         private_rpc_port = Some (Port.fresh ());
         time_between_blocks = Some Nothing;
-        genesis_timestamp = None;
+        genesis_timestamp;
         max_number_of_chunks = None;
         wallet_dir = Some wallet_dir;
         tx_pool_timeout_limit = None;
         tx_pool_addr_limit = None;
-        tx_pool_tx_per_addr_limit = None;
+        tx_pool_tx_per_addr_limit;
       }
   in
-  Evm_node.init ?patch_config ~mode:sequencer_mode Uri.(empty |> to_string)
+  Evm_node.init
+    ?history_mode
+    ?patch_config
+    ~mode:sequencer_mode
+    Uri.(empty |> to_string)
 
 (* Send the transaction but doesn't wait to be mined and does not
    produce a block after sending the transaction. *)
@@ -472,3 +495,29 @@ let send_transaction_to_sequencer (transaction : unit -> 'a Lwt.t) sequencer =
   let*@ _ = produce_block sequencer in
   (* Resolve the transaction sends to make sure they were included. *)
   transaction
+
+let deposit ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
+    ?safety_guard ?storage_limit ?counter ?simulation ?force ?expect_failure
+    ~amount ~giver ~sr_address ~bridge ~l2_address client =
+  let arg = Printf.sprintf "(Pair \"%s\" %s)" sr_address l2_address in
+  Client.spawn_transfer
+    ?env
+    ?log_output
+    ?endpoint
+    ?hooks
+    ?wait
+    ?burn_cap
+    ?fee
+    ?gas_limit
+    ?safety_guard
+    ?storage_limit
+    ?counter
+    ?simulation
+    ?force
+    ~entrypoint:"deposit"
+    ~arg
+    ~amount
+    ~giver
+    ~receiver:bridge
+    client
+  |> Process.check ?expect_failure

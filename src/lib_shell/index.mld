@@ -19,6 +19,7 @@ It contains the following libraries:
 - {{!module-Tezos_p2p_test_common}Tezos_p2p_test_common}
 - {{!module-Tezos_protocol_updater}Tezos_protocol_updater}: Economic-protocol dynamic loading for `octez-node`
 - {{!module-Tezos_proxy}Tezos_proxy}: Tezos: proxy
+- {{!module-Tezos_requester}Tezos_requester}
 - {{!page-tezos_shell}Tezos_shell}: Core of `octez-node` (gossip, validation scheduling, mempool, ...)
 - {{!module-Tezos_shell_benchmarks}Tezos_shell_benchmarks}: Tezos: shell benchmarks
 - {{!module-Tezos_shell_context}Tezos_shell_context}

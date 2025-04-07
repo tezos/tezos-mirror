@@ -5,9 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_rpc
-
 val get_smart_rollup_address :
+  keep_alive:bool ->
   evm_node_endpoint:Uri.t ->
   Tezos_crypto.Hashed.Smart_rollup_address.t tzresult Lwt.t
 
@@ -18,6 +17,7 @@ val get_time_between_blocks :
   Configuration.time_between_blocks tzresult Lwt.t
 
 val get_blueprint :
+  keep_alive:bool ->
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
   Blueprint_types.with_events tzresult Lwt.t
@@ -27,8 +27,8 @@ val register :
   (Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t) ->
   Tezos_crypto.Hashed.Smart_rollup_address.t ->
   Configuration.time_between_blocks ->
-  unit Directory.t ->
-  unit Directory.t
+  Evm_directory.t ->
+  Evm_directory.t
 
 val monitor_blueprints :
   evm_node_endpoint:Uri.t ->

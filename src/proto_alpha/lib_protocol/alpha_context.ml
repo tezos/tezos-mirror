@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
+(* Copyright (c) 2021-2024 Trili Tech <contact@trili.tech>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -142,6 +142,7 @@ module Dal = struct
   end
 
   module Attestation = struct
+    include Dal_attestation_repr.Accountability
     include Dal_attestation_repr
     include Raw_context.Dal
   end
@@ -167,6 +168,7 @@ module Dal = struct
 
   module Slots_history = Dal_slot_repr.History
   module Slots_storage = Dal_slot_storage
+  module Delegate = Dal_already_denounced_storage
 end
 
 module Dal_errors = Dal_errors_repr
@@ -187,6 +189,21 @@ module Entrypoint = Entrypoint_repr
 module Manager_counter = Manager_counter_repr
 include Operation_repr
 
+module Constants = struct
+  include Constants_repr
+  include Constants_storage
+
+  module Parametric = struct
+    include Constants_parametric_repr
+
+    module Internal_for_tests = struct
+      include Internal_for_tests
+
+      let update_sc_rollup_parameter = update_sc_rollup_parameter
+    end
+  end
+end
+
 module Operation = struct
   type 'kind t = 'kind operation = {
     shell : Operation.shell_header;
@@ -197,7 +214,29 @@ module Operation = struct
 
   let unsigned_encoding = unsigned_operation_encoding
 
+  let bls_mode_unsigned_encoding = bls_mode_unsigned_operation_encoding
+
   include Operation_repr
+
+  let check_signature (type kind) ctxt (key : Signature.Public_key.t) chain_id
+      (op : kind operation) =
+    let encoding =
+      if Constants.aggregate_attestation ctxt then
+        (* attestations signed by BLS keys uses a dedicated serialization encoding *)
+        match (op.protocol_data.contents, key) with
+        | Single (Attestation _), Bls _ -> bls_mode_unsigned_encoding
+        | _ -> unsigned_encoding
+      else unsigned_encoding
+    in
+    check_signature encoding key chain_id op
+
+  module Internal_for_tests = struct
+    let serialize_unsigned_operation _ctxt branch contents =
+      let op : _ operation =
+        {shell = {branch}; protocol_data = {contents; signature = None}}
+      in
+      serialize_unsigned_operation unsigned_encoding op
+  end
 end
 
 module Block_header = Block_header_repr
@@ -215,23 +254,37 @@ module First_level_of_protocol = struct
   let get = Storage.Tenderbake.First_level_of_protocol.get
 end
 
+module Consecutive_round_zero = struct
+  let get = Storage.Consecutive_round_zero.get
+
+  let incr ctxt =
+    let open Lwt_result_syntax in
+    let* acc = get ctxt in
+    let acc =
+      if Int32.(equal max_int acc) then Int32.max_int else Int32.succ acc
+    in
+    Storage.Consecutive_round_zero.update ctxt acc
+
+  let reset ctxt = Storage.Consecutive_round_zero.update ctxt 0l
+end
+
 module Ratio = Ratio_repr
 
 module Raw_level = struct
   include Raw_level_repr
 
   module Internal_for_tests = struct
-    let add = add
-
-    let sub = sub
-
     let from_repr (level : raw_level) = level
 
     let to_repr (level : raw_level) = level
   end
 end
 
-module Cycle = Cycle_repr
+module Cycle = struct
+  include Cycle_repr
+  include Cycle_storage
+end
+
 module Fees = Fees_storage
 
 type public_key = Signature.Public_key.t
@@ -239,25 +292,6 @@ type public_key = Signature.Public_key.t
 type public_key_hash = Signature.Public_key_hash.t
 
 type signature = Signature.t
-
-module Constants = struct
-  include Constants_repr
-  include Constants_storage
-
-  module Parametric = struct
-    include Constants_parametric_repr
-
-    module Internal_for_tests = struct
-      include Internal_for_tests
-
-      let update_sc_rollup_parameter = update_sc_rollup_parameter
-    end
-  end
-
-  let round_durations ctxt = Raw_context.round_durations ctxt
-
-  let all ctxt = all_of_parametric (parametric ctxt)
-end
 
 module Voting_period = struct
   include Voting_period_repr
@@ -616,18 +650,7 @@ module Stake_distribution = struct
   end
 end
 
-module Staking = struct
-  include Staking
-
-  let stake = stake ~for_next_cycle_use_only_after_slashing:false
-
-  let request_unstake =
-    request_unstake ~for_next_cycle_use_only_after_slashing:false
-
-  let finalize_unstake =
-    finalize_unstake ~for_next_cycle_use_only_after_slashing:false
-end
-
+module Staking = Staking
 module Nonce = Nonce_storage
 
 module Seed = struct
@@ -743,10 +766,9 @@ module Cache = Cache_repr
 module Unstake_requests = struct
   include Unstake_requests_storage
 
-  let prepare_finalize_unstake =
-    prepare_finalize_unstake ~for_next_cycle_use_only_after_slashing:false
-
   module For_RPC = struct
+    include Unstake_requests_storage.For_RPC
+
     let apply_slash_to_unstaked_unfinalizable ctxt ~delegate ~requests =
       Unstake_requests_storage.For_RPC.apply_slash_to_unstaked_unfinalizable
         ctxt

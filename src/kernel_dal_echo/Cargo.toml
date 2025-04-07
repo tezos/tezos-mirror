@@ -26,8 +26,3 @@ tezos-smart-rollup-encoding = { path = "../kernel_sdk/encoding", default-feature
 tezos-smart-rollup-mock = { path = "../kernel_sdk/mock", features = [
   "proto-alpha",
 ] }
-
-[patch.crates-io]
-tezos_crypto_rs = { git = "https://github.com/trilitech/tezedge.git", rev = "0468da39f3133dbe6355fa8d443d3aeee10e3c0b" }
-tezos_data_encoding = { git = "https://github.com/trilitech/tezedge.git", rev = "0468da39f3133dbe6355fa8d443d3aeee10e3c0b" }
-tezos_data_encoding_derive = { git = "https://github.com/trilitech/tezedge.git", rev = "0468da39f3133dbe6355fa8d443d3aeee10e3c0b" }

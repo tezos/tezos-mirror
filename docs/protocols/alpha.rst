@@ -2,9 +2,9 @@ Protocol Alpha
 ==============
 
 This page documents the changes brought by protocol Alpha with respect
-to Quebec (see :ref:`naming_convention`).
+to Rio (see :ref:`naming_convention`).
 
-For changes brought by Paris with respect to Oxford, see :doc:`../protocols/020_paris`.
+For changes brought by Rio with respect to Quebec, see :doc:`../protocols/022_r022`.
 
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
 branch of Octez.
@@ -12,14 +12,10 @@ branch of Octez.
 Environment Version
 -------------------
 
-
+This protocol requires an updated protocol environment version (V15) from R version (V14).
 
 Smart Rollups
 -------------
-
-
-Zero Knowledge Rollups (ongoing)
---------------------------------
 
 Data Availability Layer
 -----------------------

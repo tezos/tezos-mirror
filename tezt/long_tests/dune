@@ -4,6 +4,8 @@
 (executable
  (name main)
  (libraries
+  octez-rustzcash-deps
+  bls12-381.archive
   tezt
   tezt-tezos
   tezt-tezos.tezt-performance-regression

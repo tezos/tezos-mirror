@@ -124,8 +124,6 @@ type t = {
   *)
   execute_outbox_messages_filter : outbox_message_filter list;
   dal_node_endpoint : Uri.t option;
-  dac_observer_endpoint : Uri.t option;
-  dac_timeout : Z.t option;
   pre_images_endpoint : Uri.t option;
   batcher : batcher;
   injector : injector;
@@ -139,6 +137,7 @@ type t = {
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
+  unsafe_disable_wasm_kernel_checks : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
   history_mode : history_mode option;
@@ -293,12 +292,10 @@ module Cli : sig
     rpc_port:int option ->
     acl_override:[`Allow_all | `Secure] option ->
     metrics_addr:string option ->
-    enable_performance_metrics:bool ->
+    disable_performance_metrics:bool ->
     loser_mode:Loser_mode.t option ->
     reconnection_delay:float option ->
     dal_node_endpoint:Uri.t option ->
-    dac_observer_endpoint:Uri.t option ->
-    dac_timeout:Z.t option ->
     pre_images_endpoint:Uri.t option ->
     injector_retention_period:int option ->
     injector_attempts:int option ->
@@ -319,6 +316,7 @@ module Cli : sig
     allowed_origins:string list option ->
     allowed_headers:string list option ->
     apply_unsafe_patches:bool ->
+    unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
     t tzresult Lwt.t
 
@@ -328,12 +326,10 @@ module Cli : sig
     rpc_port:int option ->
     acl_override:[`Allow_all | `Secure] option ->
     metrics_addr:string option ->
-    enable_performance_metrics:bool ->
+    disable_performance_metrics:bool ->
     loser_mode:Loser_mode.t option ->
     reconnection_delay:float option ->
     dal_node_endpoint:Uri.t option ->
-    dac_observer_endpoint:Uri.t option ->
-    dac_timeout:Z.t option ->
     pre_images_endpoint:Uri.t option ->
     injector_retention_period:int option ->
     injector_attempts:int option ->
@@ -354,6 +350,7 @@ module Cli : sig
     allowed_origins:string list option ->
     allowed_headers:string list option ->
     apply_unsafe_patches:bool ->
+    unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
     t tzresult Lwt.t
 end

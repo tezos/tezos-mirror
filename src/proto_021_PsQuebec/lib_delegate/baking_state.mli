@@ -123,6 +123,15 @@ module Delegate_slots : sig
   (** Returns the voting power of the delegate whose first slot is the given
       slot. Returns [None] if the slot is not the first slot of any delegate. *)
   val voting_power : t -> slot:Slot.t -> int option
+
+  (** Finds the first slot greater than or equal to [slot]. Returns the
+     corresponding (slot, delegate) pair if found, or [None] if no such slot
+     exist. *)
+  val find_first_slot_from : t -> slot:Slot.t -> (Slot.t * delegate_slot) option
+
+  (** Returns the slot with the smallest index, along with its associated
+      delegate. Returns [None] if the map is empty. *)
+  val min_slot : t -> (Slot.t * delegate_slot) option
 end
 
 type delegate_slots = Delegate_slots.t
@@ -153,11 +162,21 @@ type elected_block = {
   attestation_qc : Kind.attestation operation list;
 }
 
+(** [manager_operations_infos] contains information about the number of manager
+    operations in the forged block and the summing fees from these operations *)
+type manager_operations_infos = {
+  manager_operation_number : int;
+  total_fees : Int64.t;
+}
+
+val manager_operations_infos_encoding : manager_operations_infos Data_encoding.t
+
 type prepared_block = {
   signed_block_header : block_header;
   round : Round.t;
   delegate : consensus_key_and_delegate;
   operations : Tezos_base.Operation.t list list;
+  manager_operations_infos : manager_operations_infos option;
   baking_votes : Per_block_votes_repr.per_block_votes;
 }
 
@@ -419,3 +438,5 @@ val pp_timeout_kind : Format.formatter -> timeout_kind -> unit
 val pp_event : Format.formatter -> event -> unit
 
 val pp_forge_event : Format.formatter -> forge_event -> unit
+
+val pp_short_event : Format.formatter -> event -> unit

@@ -56,29 +56,20 @@ let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
   in
   Node_rpc.await_protocol_activation cctxt ~chain ()
 
-let may_start_profiler baking_dir =
-  match Option.map String.lowercase_ascii @@ Sys.getenv_opt "PROFILING" with
-  | Some (("true" | "on" | "yes" | "terse" | "detailed" | "verbose") as mode) ->
-      let max_lod =
-        match mode with
-        | "detailed" -> Profiler.Detailed
-        | "verbose" -> Profiler.Verbose
-        | _ -> Profiler.Terse
-      in
-      let profiler_maker ~name =
-        Profiler.instance
-          Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
-          Filename.Infix.((baking_dir // name) ^ "_profiling.txt", max_lod)
-      in
-      Baking_profiler.init profiler_maker
-  | _ -> ()
+let[@warning "-32"] may_start_profiler baking_dir =
+  match Tezos_profiler_unix.Profiler_instance.selected_backend () with
+  | Some {instance_maker; _} ->
+      let profiler_maker = instance_maker ~directory:baking_dir in
+      Baking_profiler.activate_all ~profiler_maker ;
+      RPC_profiler.init profiler_maker
+  | None -> ()
 
 module Baker = struct
   let run (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?votes
       ?extra_operations ?dal_node_endpoint ?pre_emptive_forge_time
-      ?force_apply_from_round ?context_path ?state_recorder ~chain ~keep_alive
-      delegates =
+      ?force_apply_from_round ?remote_calls_timeout ?context_root_path
+      ?state_recorder ~chain ~keep_alive delegates =
     let open Lwt_result_syntax in
     let process () =
       let* user_activated_upgrades =
@@ -119,6 +110,7 @@ module Baker = struct
       let pre_emptive_forge_time =
         Time.System.Span.of_seconds_exn pre_emptive_forge_time
       in
+      let remote_calls_timeout = Option.map Q.to_float remote_calls_timeout in
       let config =
         Baking_configuration.make
           ?minimal_fees
@@ -129,7 +121,8 @@ module Baker = struct
           ?dal_node_endpoint
           ~pre_emptive_forge_time
           ?force_apply_from_round
-          ?context_path
+          ?remote_calls_timeout
+          ?context_root_path
           ~user_activated_upgrades
           ?state_recorder
           ()
@@ -150,7 +143,7 @@ module Baker = struct
             let*! _ = Lwt_canceler.cancel canceler in
             Lwt.return_unit)
       in
-      let () = may_start_profiler cctxt#get_base_dir in
+      () [@profiler.overwrite may_start_profiler cctxt#get_base_dir] ;
       let consumer = Protocol_logging.make_log_message_consumer () in
       Lifted_protocol.set_log_message_consumer consumer ;
       Baking_scheduling.run cctxt ~canceler ~chain ~constants config delegates

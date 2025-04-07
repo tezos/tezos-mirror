@@ -17,11 +17,7 @@ pub extern "C" fn _start() -> ! {
     unsafe {
         asm!("addi {0}, {0}, 42", inout(reg) acc);
     }
-    if acc != 42 {
-        exit(1)
-    } else {
-        exit(0)
-    }
+    if acc != 42 { exit(1) } else { exit(0) }
 }
 
 #[panic_handler]

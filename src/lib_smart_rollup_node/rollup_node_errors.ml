@@ -109,6 +109,9 @@ type error +=
       their_commitment : Octez_smart_rollup.Commitment.t;
     }
 
+type error +=
+  | Outbox_level_not_cemented of {outbox_level : int32; lcc_level : int32}
+
 let () =
   register_error_kind
     `Permanent
@@ -660,4 +663,23 @@ let () =
       | PVM_eval_too_many_ticks {max_given; executed} ->
           Some (max_given, executed)
       | _ -> None)
-    (fun (max_given, executed) -> PVM_eval_too_many_ticks {max_given; executed})
+    (fun (max_given, executed) -> PVM_eval_too_many_ticks {max_given; executed}) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.outbox_level_not_cemented"
+    ~title:"Outbox level not cemented"
+    ~description:"The outbox level is not yet cemented."
+    ~pp:(fun ppf (outbox_level, lcc_level) ->
+      Format.fprintf
+        ppf
+        "The outbox level %ld is not cemented yet (LCC is %ld)."
+        outbox_level
+        lcc_level)
+    `Temporary
+    Data_encoding.(obj2 (req "outbox_level" int32) (req "lcc_level" int32))
+    (function
+      | Outbox_level_not_cemented {outbox_level; lcc_level} ->
+          Some (outbox_level, lcc_level)
+      | _ -> None)
+    (fun (outbox_level, lcc_level) ->
+      Outbox_level_not_cemented {outbox_level; lcc_level})

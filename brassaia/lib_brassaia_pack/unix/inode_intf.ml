@@ -52,8 +52,7 @@ module type Persistent = sig
        and type hash := hash
        and type key := hash Pack_key.t
 
-  module Snapshot :
-    Snapshot with type hash = hash and type metadata = Val.metadata
+  module Snapshot : Snapshot with type hash = hash
 
   val to_snapshot : Raw.t -> Snapshot.inode
   val of_snapshot : 'a t -> index:(hash -> key) -> Snapshot.inode -> value
@@ -74,11 +73,7 @@ module type Sigs = sig
                 with type hash = H.t
                  and type contents_key = H.t Pack_key.t
                  and type node_key = H.t Pack_key.t)
-      (Inter : Internal
-                 with type hash = H.t
-                  and type key = H.t Pack_key.t
-                  and type Snapshot.metadata = Node.metadata
-                  and type Val.step = Node.step)
+      (Inter : Internal with type hash = H.t and type key = H.t Pack_key.t)
       (Pack : Pack_store.S
                 with type hash = H.t
                  and type key = H.t Pack_key.t
@@ -86,8 +81,6 @@ module type Sigs = sig
     Persistent
       with type key = H.t Pack_key.t
        and type hash = H.t
-       and type Val.metadata = Node.metadata
-       and type Val.step = Node.step
        and type file_manager = Pack.file_manager
        and type dict = Pack.dict
        and type dispatcher = Pack.dispatcher

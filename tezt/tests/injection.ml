@@ -207,6 +207,76 @@ let test_activation () : unit =
 
   unit
 
+let test_alternative_protocol_hash =
+  Test.register
+    ~__FILE__
+    ~title:"Protocol is compiled with another expected hash"
+    ~tags:[team; "protocol"; "compilation"; "hash"]
+    ~uses:[Constant.octez_protocol_compiler]
+  @@ fun () ->
+  (* First, prepare a new protocol. *)
+  let protocol_desc_file = "TEZOS_PROTOCOL" in
+  let protocol_desc =
+    `O [("modules", `A [`String "Main"]); ("expected_env_version", `Float 13.)]
+    |> JSON.annotate ~origin:""
+  in
+  let protocol_main_file = "main.ml" in
+  let protocol_main = "(* This is a dummy protocol *)" in
+
+  (* And write it in a temporary folder. *)
+  let protocol = Tezt.Temp.dir "protocol" in
+  JSON.encode_to_file
+    (Filename.concat protocol protocol_desc_file)
+    protocol_desc ;
+  Base.write_file
+    (Filename.concat protocol protocol_main_file)
+    ~contents:protocol_main ;
+
+  (* Let's hash the protocol to fill the `TEZOS_PROTOCOL` file. *)
+  let* protocol_hash = Protocol_compiler.compile ~hash_only:true protocol in
+  let protocol_desc_patched =
+    JSON.(
+      put ("hash", annotate ~origin:"" (`String protocol_hash)) protocol_desc)
+  in
+  JSON.encode_to_file
+    (Filename.concat protocol protocol_desc_file)
+    protocol_desc_patched ;
+
+  (* Now we can start patching the files so that we produce different hashes. *)
+  (* This one should be rejected by the protocol compiler, as the hash it will
+     produce is not registered. *)
+  let patched_protocol_main =
+    protocol_main ^ "(* This hash will be rejected. *)"
+  in
+  Base.write_file
+    (Filename.concat protocol protocol_main_file)
+    ~contents:patched_protocol_main ;
+
+  (* Then compile it and see it fail as the hash is inconsistent. *)
+  let failing_compilation_process = Protocol_compiler.spawn_compile protocol in
+  let* () = Process.check ~expect_failure:true failing_compilation_process in
+
+  (* This time, let's patch it so that it produces a hash we are aware of:
+     `Pry4stD6qN1ZagUX6YCHvMxA1xvSjARkdt8bhs86j74JGLoLDKN`. See
+     `src/lib_protocol_compiler/hashes/protocol_hash_representatives.ml`. *)
+  let patched_protocol_main =
+    protocol_main
+    ^ "(* This is a harmless comment that will change the protocol hash. *)"
+  in
+  Base.write_file
+    (Filename.concat protocol protocol_main_file)
+    ~contents:patched_protocol_main ;
+
+  (* This time, the compilation will succeed and the resulting hash will be the
+     one declared in `TEZOS_PROTOCOL`. *)
+  let* hash = Protocol_compiler.compile protocol in
+  Check.(
+    (hash = protocol_hash)
+      string
+      ~error_msg:"Protocol hash expected was %R, but got %L") ;
+  unit
+
 let register_protocol_independent () =
   test_injection_and_activation () ;
-  test_activation ()
+  test_activation () ;
+  test_alternative_protocol_hash

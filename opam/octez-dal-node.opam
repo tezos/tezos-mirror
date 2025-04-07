@@ -10,16 +10,19 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-rustzcash-deps" { = version }
+  "bls12-381" { = version }
   "octez-libs" { = version }
   "cmdliner" { >= "1.1.0" }
   "octez-shell-libs" { = version }
   "tezos-dal-node-lib" { = version }
   "tezos-dal-node-services" { = version }
   "octez-l2-libs" { = version }
+  "opentelemetry"
   "octez-crawler" { = version }
   "memtrace"
-  "octez-protocol-020-PsParisC-libs" { = version }
   "octez-protocol-021-PsQuebec-libs" { = version }
+  "octez-protocol-022-PsRiotum-libs" { = version }
 ]
 depopts: [
   "octez-protocol-alpha-libs"
@@ -33,4 +36,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos: `octez-dal-node` binary"

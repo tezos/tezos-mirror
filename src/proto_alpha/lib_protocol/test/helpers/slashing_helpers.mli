@@ -7,6 +7,25 @@
 
 (** Helpers related to denunciations and slashing. *)
 
+(** Returns the slashing percentage to apply for the given
+    misbehaviour.
+
+    Preconditions:
+
+    - [all_culprits] is the list of all delegates that have been
+      denounced for the given misbehaviour.
+
+    - [block_before_slash] is any block from cycle
+      [misbehaviour_cycle - consensus_rights_delay] up to the last block
+      **before** the slashing gets applied. Indeed, the block that
+      applies the slashing also moves on to the next cycle and discards
+      the seed for the misbehaviour level rights from the context. *)
+val slashing_percentage :
+  block_before_slash:Block.t ->
+  Protocol.Misbehaviour_repr.t ->
+  all_culprits:Signature.public_key_hash list ->
+  Protocol.Percentage.t tzresult Lwt.t
+
 (** Helpers related to {!Protocol.Misbehaviour_repr}. *)
 module Misbehaviour_repr : sig
   val pp : Format.formatter -> Protocol.Misbehaviour_repr.t -> unit
@@ -48,6 +67,22 @@ module Full_denunciation : sig
       same multiplicity in both lists. *)
   val check_same_lists_any_order :
     loc:string -> t list -> t list -> unit tzresult Lwt.t
+
+  (** Same as {!slashing_percentage} (top-level function), but takes
+      directly a list of full denunciations as an argument.
+
+      The list of full denunciation must contain at least all the
+      denunciations for [misbehaviour] known to the chain. Note that it
+      may additionally contain denunciations for other misbehaviours,
+      which will be ignored.
+
+      See {!slashing_percentage} for the precondition on
+      [block_before_slash]. *)
+  val slashing_percentage :
+    block_before_slash:Block.t ->
+    Protocol.Misbehaviour_repr.t ->
+    t list ->
+    Protocol.Percentage.t tzresult Lwt.t
 end
 
 (** Applies all slashes at cycle end in the state *)

@@ -121,7 +121,7 @@ let liquidity_baking_cpmm_address () =
 (* Test that after [n] blocks, the liquidity baking CPMM contract is credited [n] times the subsidy amount. *)
 let liquidity_baking_subsidies n () =
   let open Lwt_result_syntax in
-  let* blk, _contract = Context.init1 ~consensus_threshold:0 () in
+  let* blk, _contract = Context.init1 ~consensus_threshold_size:0 () in
   let* liquidity_baking = Context.get_liquidity_baking_cpmm_address (B blk) in
   let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
   let* old_balance = Context.Contract.balance (B blk) liquidity_baking in
@@ -146,7 +146,7 @@ let liquidity_baking_subsidies n () =
 let liquidity_baking_toggle ~n_vote_on ~n_vote_off ~n_vote_pass expected_level
     bake_after () =
   let open Lwt_result_syntax in
-  let* blk, _contract = Context.init1 ~consensus_threshold:0 () in
+  let* blk, _contract = Context.init1 ~consensus_threshold_size:0 () in
   let* liquidity_baking = Context.get_liquidity_baking_cpmm_address (B blk) in
   let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
   let* old_balance = Context.Contract.balance (B blk) liquidity_baking in
@@ -215,7 +215,7 @@ let liquidity_baking_toggle_60 n () =
    Bakes until 100 blocks after the test sunset level of 4096 used in previous protocols. *)
 let liquidity_baking_toggle_50 () =
   let open Lwt_result_syntax in
-  let* blk, _contract = Context.init1 ~consensus_threshold:0 () in
+  let* blk, _contract = Context.init1 ~consensus_threshold_size:0 () in
   let* liquidity_baking = Context.get_liquidity_baking_cpmm_address (B blk) in
   let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
   let* old_balance = Context.Contract.balance (B blk) liquidity_baking in
@@ -255,7 +255,7 @@ let liquidity_baking_toggle_50 () =
 *)
 let liquidity_baking_restart n_votes n () =
   let open Lwt_result_syntax in
-  let* blk, _contract = Context.init1 ~consensus_threshold:0 () in
+  let* blk, _contract = Context.init1 ~consensus_threshold_size:0 () in
   let* liquidity_baking = Context.get_liquidity_baking_cpmm_address (B blk) in
   let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
   let* blk =
@@ -297,7 +297,7 @@ let liquidity_baking_restart n_votes n () =
 let liquidity_baking_toggle_ema n_vote_on n_vote_off level bake_after
     expected_toggle_ema () =
   let open Lwt_result_syntax in
-  let* blk, _contract = Context.init1 ~consensus_threshold:0 () in
+  let* blk, _contract = Context.init1 ~consensus_threshold_size:0 () in
   let rec bake_escaping blk i =
     if i < level then
       let* blk =
@@ -340,7 +340,7 @@ let liquidity_baking_toggle_ema_threshold () =
 
 let liquidity_baking_storage n () =
   let open Lwt_result_syntax in
-  let* blk, _contract = Context.init1 ~consensus_threshold:0 () in
+  let* blk, _contract = Context.init1 ~consensus_threshold_size:0 () in
   let* liquidity_baking = Context.get_liquidity_baking_cpmm_address (B blk) in
   let* subsidy = Context.get_liquidity_baking_subsidy (B blk) in
   let expected_storage =
@@ -371,7 +371,7 @@ let liquidity_baking_storage n () =
 
 let liquidity_baking_balance_update () =
   let open Lwt_result_syntax in
-  let* blk, _contract = Context.init1 ~consensus_threshold:0 () in
+  let* blk, _contract = Context.init1 ~consensus_threshold_size:0 () in
   let* liquidity_baking = Context.get_liquidity_baking_cpmm_address (B blk) in
   let* subsidy = Context.get_liquidity_baking_subsidy (B blk) in
   let* _blk, balance_updates = Block.bake_n_with_all_balance_updates 128 blk in
@@ -529,7 +529,7 @@ let liquidity_baking_origination_test_migration () =
 let liquidity_baking_origination_no_tzBTC_mainnet_migration () =
   let open Lwt_result_syntax in
   let* blk, _contract =
-    Context.init1 ~consensus_threshold:0 ~level:1_437_862l ()
+    Context.init1 ~consensus_threshold_size:0 ~level:1_437_862l ()
   in
   (* By baking a bit we also check that the subsidy application with no CPMM present does nothing rather than stopping the chain.*)
   let* _blk, origination_results =

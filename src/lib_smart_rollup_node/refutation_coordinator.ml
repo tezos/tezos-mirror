@@ -90,6 +90,9 @@ let on_process Layer1.{level; _} state =
               config.sc_rollup_address
               self
           in
+          Metrics.wrap (fun () ->
+              Metrics.Refutation.set_number_of_conflict
+                (List.length ongoing_games)) ;
           (* Map between opponents and their corresponding games *)
           let ongoing_game_map = make_game_map self ongoing_games in
           (* Launch new players for new conflicts, and play one step *)
@@ -165,14 +168,14 @@ module Handlers = struct
     Lwt_result.return {node_ctxt; pending_opponents = Pkh_table.create 5}
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
-      unit tzresult Lwt.t =
+      [`Continue | `Shutdown] tzresult Lwt.t =
     let open Lwt_result_syntax in
     let request_view = Request.view r in
     let emit_and_return_errors errs =
       let*! () =
         Refutation_game_event.Coordinator.request_failed request_view st errs
       in
-      return_unit
+      return `Continue
     in
     match r with Request.Process _ -> emit_and_return_errors errs
 

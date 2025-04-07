@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -553,7 +553,6 @@ pub fn main() {
         summary: !(opt.result || diff),
         log: !(opt.report_only || opt.result || diff),
         result: opt.result,
-        diff,
     };
 
     if output.log {

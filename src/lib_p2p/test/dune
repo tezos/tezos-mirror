@@ -13,6 +13,7 @@
   test_p2p_maintenance)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
   octez-libs.stdlib-unix

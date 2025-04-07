@@ -34,6 +34,13 @@ module JSONRPC = struct
       (which is represented by the option type). *)
   type id_repr = Id_string of string | Id_float of float
 
+  let random_id =
+    let state = Random.get_state () in
+    fun ?seed () ->
+      let seed = Option.value seed ~default:state in
+      let uuid = Uuidm.v4_gen seed () in
+      Id_string Uuidm.(to_string ~upper:false uuid)
+
   let id_repr_encoding =
     let open Data_encoding in
     union
@@ -69,11 +76,11 @@ module JSONRPC = struct
            (req "jsonrpc" (constant version))
            (req "method" string)
            (opt "params" Data_encoding.json)
-           (opt "id" id_repr_encoding)))
+           (dft "id" (option id_repr_encoding) None)))
 
-  type 'data error = {code : int; message : string; data : 'data option}
+  type error = {code : int; message : string; data : Data_encoding.json option}
 
-  let error_encoding data_encoding =
+  let error_encoding =
     Data_encoding.(
       conv
         (fun {code; message; data} -> (code, message, data))
@@ -81,9 +88,9 @@ module JSONRPC = struct
         (obj3
            (req "code" int31)
            (req "message" string)
-           (opt "data" data_encoding)))
+           (opt "data" Data_encoding.json)))
 
-  type value = (Data_encoding.json, Data_encoding.json error) result
+  type value = (Data_encoding.json, error) result
 
   type response = {value : value; id : id}
 
@@ -108,17 +115,41 @@ module JSONRPC = struct
         (obj4
            (req "jsonrpc" (constant version))
            (opt "result" Data_encoding.json)
-           (opt "error" (error_encoding Data_encoding.json))
+           (opt "error" error_encoding)
            (req "id" (option id_repr_encoding))))
 end
 
-module Error = struct
-  type t = unit
+module Subscription = struct
+  let version = JSONRPC.version
 
-  let encoding = Data_encoding.unit
+  let method_ = "eth_subscription"
+
+  type result = {
+    result : Data_encoding.json;
+    subscription : Ethereum_types.Subscription.id;
+  }
+
+  let result_encoding =
+    Data_encoding.(
+      conv
+        (fun {result; subscription} -> (result, subscription))
+        (fun (result, subscription) -> {result; subscription})
+        (obj2
+           (req "result" Data_encoding.json)
+           (req "subscription" Ethereum_types.Subscription.id_encoding)))
+
+  type notification = {params : result}
+
+  let notification_encoding =
+    Data_encoding.(
+      conv
+        (fun {params} -> ((), (), params))
+        (fun ((), (), params) -> {params})
+        (obj3
+           (req "jsonrpc" (constant version))
+           (req "method" (constant method_))
+           (req "params" result_encoding)))
 end
-
-type 'result rpc_result = ('result, Error.t JSONRPC.error) result
 
 type ('input, 'output) method_ = ..
 
@@ -193,11 +224,11 @@ end
 module Chain_id = struct
   type input = unit
 
-  type output = Ethereum_types.quantity
+  type output = Ethereum_types.chain_id
 
   let input_encoding = Data_encoding.unit
 
-  let output_encoding = Ethereum_types.quantity_encoding
+  let output_encoding = Ethereum_types.Chain_id.encoding
 
   let method_ = "eth_chainId"
 
@@ -280,12 +311,12 @@ module Get_block_by_number = struct
 
   type input = Block_parameter.t * bool
 
-  type output = block
+  type output = Transaction_object.t block
 
   let input_encoding =
     Data_encoding.tup2 Block_parameter.encoding Data_encoding.bool
 
-  let output_encoding = block_encoding
+  let output_encoding = block_encoding Transaction_object.encoding
 
   let method_ = "eth_getBlockByNumber"
 
@@ -297,11 +328,11 @@ module Get_block_by_hash = struct
 
   type input = block_hash * bool
 
-  type output = block
+  type output = Transaction_object.t block
 
   let input_encoding = Data_encoding.tup2 block_hash_encoding Data_encoding.bool
 
-  let output_encoding = block_encoding
+  let output_encoding = block_encoding Transaction_object.encoding
 
   let method_ = "eth_getBlockByHash"
 
@@ -459,11 +490,11 @@ module Get_transaction_by_hash = struct
 
   type input = hash
 
-  type output = transaction_object option
+  type output = Transaction_object.t option
 
   let input_encoding = Data_encoding.tup1 hash_encoding
 
-  let output_encoding = Data_encoding.option transaction_object_encoding
+  let output_encoding = Data_encoding.option Transaction_object.encoding
 
   let method_ = "eth_getTransactionByHash"
 
@@ -475,11 +506,11 @@ module Get_transaction_by_block_hash_and_index = struct
 
   type input = block_hash * quantity
 
-  type output = transaction_object option
+  type output = Transaction_object.t option
 
   let input_encoding = Data_encoding.tup2 block_hash_encoding quantity_encoding
 
-  let output_encoding = Data_encoding.option transaction_object_encoding
+  let output_encoding = Data_encoding.option Transaction_object.encoding
 
   let method_ = "eth_getTransactionByBlockHashAndIndex"
 
@@ -491,12 +522,12 @@ module Get_transaction_by_block_number_and_index = struct
 
   type input = Block_parameter.t * quantity
 
-  type output = transaction_object option
+  type output = Transaction_object.t option
 
   let input_encoding =
     Data_encoding.tup2 Block_parameter.encoding quantity_encoding
 
-  let output_encoding = Data_encoding.option transaction_object_encoding
+  let output_encoding = Data_encoding.option Transaction_object.encoding
 
   let method_ = "eth_getTransactionByBlockNumberAndIndex"
 
@@ -508,11 +539,12 @@ module Get_uncle_by_block_hash_and_index = struct
 
   type input = block_hash * quantity
 
-  type output = block option
+  type output = Transaction_object.t block option
 
   let input_encoding = Data_encoding.tup2 block_hash_encoding quantity_encoding
 
-  let output_encoding = Data_encoding.option block_encoding
+  let output_encoding =
+    Data_encoding.option (block_encoding Transaction_object.encoding)
 
   let method_ = "eth_getUncleByBlockHashAndIndex"
 
@@ -524,12 +556,13 @@ module Get_uncle_by_block_number_and_index = struct
 
   type input = Block_parameter.t * quantity
 
-  type output = block option
+  type output = Transaction_object.t block option
 
   let input_encoding =
     Data_encoding.tup2 Block_parameter.encoding quantity_encoding
 
-  let output_encoding = Data_encoding.option block_encoding
+  let output_encoding =
+    Data_encoding.option (block_encoding Transaction_object.encoding)
 
   let method_ = "eth_getUncleByBlockNumberAndIndex"
 
@@ -666,25 +699,40 @@ module Web3_sha3 = struct
 end
 
 module Get_logs = struct
-  type input = Filter.t
+  type input = Ethereum_types.Filter.t
 
-  type output = Filter.changes list
+  type output = Ethereum_types.Filter.changes list
 
-  let input_encoding = Data_encoding.tup1 Filter.encoding
+  let input_encoding = Data_encoding.tup1 Ethereum_types.Filter.encoding
 
-  let output_encoding = Data_encoding.list Filter.changes_encoding
+  let output_encoding =
+    Data_encoding.list Ethereum_types.Filter.changes_encoding
 
   let method_ = "eth_getLogs"
 
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+type produce_block_input = {
+  timestamp : Time.Protocol.t option;
+  with_delayed_transactions : bool;
+}
+
 module Produce_block = struct
-  type input = Time.Protocol.t
+  type input = produce_block_input
 
   type output = Ethereum_types.quantity
 
-  let input_encoding = Time.Protocol.encoding
+  let input_encoding =
+    let open Data_encoding in
+    conv
+      (fun {timestamp; with_delayed_transactions} ->
+        (timestamp, with_delayed_transactions))
+      (fun (timestamp, with_delayed_transactions) ->
+        {timestamp; with_delayed_transactions})
+      (obj2
+         (opt "timestamp" Time.Protocol.encoding)
+         (dft "with_delayed_transactions" bool true))
 
   let output_encoding = Ethereum_types.quantity_encoding
 
@@ -708,14 +756,17 @@ module Produce_proposal = struct
 end
 
 module Inject_transaction = struct
-  type input = Ethereum_types.transaction_object * string
+  open Ethereum_types
 
-  type output = unit
+  type input = Ethereum_types.legacy_transaction_object * string
+
+  type output = hash
 
   let input_encoding =
-    Data_encoding.(tup2 Ethereum_types.transaction_object_encoding string)
+    Data_encoding.(
+      tup2 Ethereum_types.legacy_transaction_object_encoding string)
 
-  let output_encoding = Data_encoding.unit
+  let output_encoding = hash_encoding
 
   let method_ = "injectTransaction"
 
@@ -723,11 +774,16 @@ module Inject_transaction = struct
 end
 
 module Durable_state_value = struct
-  type input = Durable_storage_path.path
+  type input =
+    Durable_storage_path.path * Ethereum_types.Block_parameter.extended
 
   type output = Bytes.t option
 
-  let input_encoding = Data_encoding.string
+  let input_encoding =
+    Helpers.encoding_with_optional_last_param
+      Data_encoding.string
+      Ethereum_types.Block_parameter.extended_encoding
+      Ethereum_types.Block_parameter.(Block_parameter Latest)
 
   let output_encoding = Data_encoding.(option bytes)
 
@@ -737,11 +793,16 @@ module Durable_state_value = struct
 end
 
 module Durable_state_subkeys = struct
-  type input = Durable_storage_path.path
+  type input =
+    Durable_storage_path.path * Ethereum_types.Block_parameter.extended
 
   type output = string list
 
-  let input_encoding = Data_encoding.string
+  let input_encoding =
+    Helpers.encoding_with_optional_last_param
+      Data_encoding.string
+      Ethereum_types.Block_parameter.extended_encoding
+      Ethereum_types.Block_parameter.(Block_parameter Latest)
 
   let output_encoding = Data_encoding.(list string)
 
@@ -771,11 +832,16 @@ module Replay_block = struct
 
   type input = Ethereum_types.quantity
 
-  type output = block
+  type output =
+    (* Replay block is a debugging RPC, not used in production. We could
+       migrate it to use [Transaction_object.t] instead of
+       [legacy_transaction_object], but simply showing what the kernel is
+       producing is not harmful. *)
+    legacy_transaction_object block
 
   let input_encoding = quantity_encoding
 
-  let output_encoding = block_encoding
+  let output_encoding = block_encoding legacy_transaction_object_encoding
 
   let method_ = "tez_replayBlock"
 
@@ -810,6 +876,20 @@ module Trace_call = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Trace_block = struct
+  type input = Tracer_types.block_input
+
+  type output = Tracer_types.block_output
+
+  let input_encoding = Tracer_types.block_input_encoding
+
+  let output_encoding = Tracer_types.block_output_encoding
+
+  let method_ = "debug_traceBlockByNumber"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Eth_fee_history = struct
   open Ethereum_types
 
@@ -835,11 +915,43 @@ module Coinbase = struct
 
   type output = Ethereum_types.address
 
-  let input_encoding = Data_encoding.null
+  let input_encoding = Data_encoding.unit
 
   let output_encoding = Ethereum_types.address_encoding
 
   let method_ = "eth_coinbase"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Subscribe = struct
+  open Ethereum_types
+
+  type input = Subscription.kind
+
+  type output = Subscription.id
+
+  let input_encoding = Subscription.kind_encoding
+
+  let output_encoding = Subscription.id_encoding
+
+  let method_ = "eth_subscribe"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Unsubscribe = struct
+  open Ethereum_types
+
+  type input = Subscription.id
+
+  type output = bool
+
+  let input_encoding = Subscription.id_input_encoding
+
+  let output_encoding = Data_encoding.bool
+
+  let method_ = "eth_unsubscribe"
 
   type ('input, 'output) method_ += Method : (input, output) method_
 end
@@ -897,6 +1009,9 @@ let supported_methods : (module METHOD) list =
     (module Eth_fee_history);
     (module Coinbase);
     (module Trace_call);
+    (module Subscribe);
+    (module Unsubscribe);
+    (module Trace_block);
   ]
 
 let unsupported_methods : string list =
@@ -921,6 +1036,8 @@ let unsupported_methods : string list =
     "eth_newPendingTransactionFilter";
     "eth_uninstallFilter";
     "eth_sendTransaction";
+    "eth_subscribe";
+    "eth_unsubscribe";
     (* debug *)
     "debug_getBadBlocks";
     "debug_getRawBlock";
@@ -966,3 +1083,16 @@ let map_method_name ~restrict method_name =
         if List.mem ~equal:( = ) method_name unsupported_methods then
           Unsupported
         else Unknown
+
+type websocket_subscription = {
+  id : Ethereum_types.Subscription.id;
+  stream : Subscription.notification Lwt_stream.t;
+  stopper : unit -> unit;
+}
+
+type websocket_response = {
+  response : JSONRPC.response;
+  subscription : websocket_subscription option;
+}
+
+type websocket_handler = JSONRPC.request -> websocket_response Lwt.t

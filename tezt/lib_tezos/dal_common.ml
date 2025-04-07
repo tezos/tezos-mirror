@@ -120,25 +120,19 @@ module Parameters = struct
     let blocks_per_cycle =
       JSON.(proto_parameters |-> "blocks_per_cycle" |> as_int)
     in
-    let attestation_lag =
-      JSON.(
-        proto_parameters |-> "dal_parametric" |-> "attestation_lag" |> as_int)
-    in
-    let blocks = (3 * attestation_lag) + 1 in
-    if blocks mod blocks_per_cycle = 0 then blocks / blocks_per_cycle
-    else 1 + (blocks / blocks_per_cycle)
+    let default_block_storage = 150 in
+    if default_block_storage mod blocks_per_cycle = 0 then
+      default_block_storage / blocks_per_cycle
+    else 1 + (default_block_storage / blocks_per_cycle)
 
   let storage_period_without_refutation_in_cycles ~proto_parameters =
     let blocks_per_cycle =
       JSON.(proto_parameters |-> "blocks_per_cycle" |> as_int)
     in
-    let attestation_lag =
-      JSON.(
-        proto_parameters |-> "dal_parametric" |-> "attestation_lag" |> as_int)
-    in
-    let blocks = 2 * attestation_lag in
-    if blocks mod blocks_per_cycle = 0 then blocks / blocks_per_cycle
-    else 1 + (blocks / blocks_per_cycle)
+    let default_block_storage = 150 in
+    if default_block_storage mod blocks_per_cycle = 0 then
+      default_block_storage / blocks_per_cycle
+    else 1 + (default_block_storage / blocks_per_cycle)
 end
 
 module Committee = struct
@@ -420,9 +414,9 @@ module Dal_RPC = struct
     make ~query_string:[] GET ["p2p"; "gossipsub"; "topics"] (fun json ->
         JSON.(json |> as_list |> List.map as_topic))
 
-  let get_topics_peers ~subscribed =
+  let get_topics_peers ?(all = false) () =
     let open JSON in
-    let query_string = if subscribed then [("subscribed", "true")] else [] in
+    let query_string = if all then [("all", "true")] else [] in
     let as_topic json =
       let topic_slot_index = get "slot_index" json |> as_int in
       let topic_pkh = get "pkh" json |> as_string in
@@ -439,9 +433,9 @@ module Dal_RPC = struct
     make ~query_string GET ["p2p"; "gossipsub"; "topics"; "peers"] (fun json ->
         JSON.(json |> as_list |> List.map as_topic_and_peers))
 
-  let get_slot_indexes_peers ~subscribed =
+  let get_slot_indexes_peers ?(all = false) () =
     let open JSON in
-    let query_string = if subscribed then [("subscribed", "true")] else [] in
+    let query_string = if all then [("all", "true")] else [] in
     let as_slot_indexes_and_peers json =
       let topic = get "slot_index" json |> as_int in
       let peers = get "peers" json |> as_list |> List.map as_string in
@@ -453,9 +447,9 @@ module Dal_RPC = struct
       ["p2p"; "gossipsub"; "slot_indexes"; "peers"]
       (fun json -> JSON.(json |> as_list |> List.map as_slot_indexes_and_peers))
 
-  let get_pkhs_peers ~subscribed =
+  let get_pkhs_peers ?(all = false) () =
     let open JSON in
-    let query_string = if subscribed then [("subscribed", "true")] else [] in
+    let query_string = if all then [("all", "true")] else [] in
     let as_pkhs_and_peers json =
       let topic = get "pkh" json |> as_string in
       let peers = get "peers" json |> as_list |> List.map as_string in
@@ -674,6 +668,51 @@ module Helpers = struct
              Data_encoding.Json.pp
              parameters_json
 
+  let init_prover ?__LOC__ () =
+    let* init =
+      Cryptobox.init_prover_dal
+        ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+        ~fetch_trusted_setup:false
+        ()
+    in
+    match init with
+    | Error e ->
+        Test.fail
+          ?__LOC__
+          "init_prover failed: %a@."
+          Tezos_error_monad.Error_monad.pp_print_trace
+          e
+    | Ok () -> unit
+
+  let generate_slot ~slot_size =
+    Bytes.init slot_size (fun _ ->
+        let x = Random.int 26 in
+        Char.chr (x + Char.code 'a'))
+
+  let get_commitment_and_shards_with_proofs cryptobox ~slot =
+    let open Cryptobox in
+    let ( let*? ) x f =
+      match x with
+      | Error err -> Test.fail "Unexpected error:@.%a@." pp_cryptobox_error err
+      | Ok x -> f x
+    in
+    let*? precomputation = precompute_shards_proofs cryptobox in
+    let*? polynomial = polynomial_from_slot cryptobox slot in
+    let shards = shards_from_polynomial cryptobox polynomial in
+    let shard_proofs =
+      prove_shards cryptobox ~precomputation ~polynomial |> Array.to_seq
+    in
+    let*? commitment = commit cryptobox polynomial in
+    let*? commitment_proof = prove_commitment cryptobox polynomial in
+    let shards =
+      Seq.fold_left2
+        (fun seq shard proof -> Seq.cons (shard, proof) seq)
+        Seq.empty
+        shards
+        shard_proofs
+    in
+    (commitment, commitment_proof, shards)
+
   let publish_commitment ?dont_wait ?counter ?force ?source ?fee ?error ~index
       ~commitment ~proof client =
     (* We scale the fees to match the actual gas cost of publishing a slot header.
@@ -739,20 +778,29 @@ module Helpers = struct
     return commitment_string
 
   let wait_for_gossipsub_worker_event ~name dal_node lambda =
-    Dal_node.wait_for dal_node (sf "gossipsub_worker_event-%s.v0" name) lambda
+    Dal_node.wait_for dal_node (sf "dal_gs_%s.v0" name) lambda
+
+  let check_expected expected found =
+    if expected <> found then None else Some ()
+
+  let check_disconnection_event dal_node ~peer_id =
+    wait_for_gossipsub_worker_event
+      ~name:"disconnection"
+      dal_node
+      (fun peer_event ->
+        check_expected peer_id JSON.(peer_event |-> "peer_id" |> as_string))
 
   let check_new_connection_event ~main_node ?other_peer_id ~other_node
       ~is_trusted () =
     let ( let*?? ) a b = Option.bind a b in
-    let check_expected expected found =
-      if expected <> found then None else Some ()
-    in
     let* peer_id =
       wait_for_gossipsub_worker_event
         ~name:"new_connection"
         main_node
         (fun event ->
-          let*?? peer_id = JSON.(event |-> "peer" |> as_string_opt) in
+          let*?? peer_id =
+            JSON.(event |-> "peer" |-> "peer_id" |> as_string_opt)
+          in
           let*?? () =
             check_expected is_trusted JSON.(event |-> "trusted" |> as_bool)
           in

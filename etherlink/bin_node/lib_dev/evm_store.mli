@@ -14,10 +14,6 @@ include module type of Sqlite
     created. Also returns if the store was created ([true]) or was already
     existing ([false]).
 
-    If [sqlite_journal_mode] is [`Force mode], then the journal mode of the
-    SQLite database is updated if necessary to match the requested
-    configuration. With [`Identity], the journal mode is left untouched.
-
     If [perm] is [`Read_only], then SQL requests requiring write access will
     fail. With [`Read_write], they will succeed as expected. *)
 val init :
@@ -73,11 +69,19 @@ module Context_hashes : sig
   val find_earliest :
     conn -> (Ethereum_types.quantity * Irmin_context.hash) option tzresult Lwt.t
 
+  val get_earliest :
+    conn -> (Ethereum_types.quantity * Irmin_context.hash) tzresult Lwt.t
+
   val find_finalized :
     conn -> (Ethereum_types.quantity * Irmin_context.hash) option tzresult Lwt.t
 
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
+
+type pending_kernel_upgrade = {
+  kernel_upgrade : Evm_events.Upgrade.t;
+  injected_before : Ethereum_types.quantity;
+}
 
 module Kernel_upgrades : sig
   val store :
@@ -88,16 +92,18 @@ module Kernel_upgrades : sig
 
   val activation_levels : conn -> Ethereum_types.quantity list tzresult Lwt.t
 
-  val find_latest_pending : conn -> Evm_events.Upgrade.t option tzresult Lwt.t
-
-  val find_applied_before :
-    conn ->
-    Ethereum_types.quantity ->
-    Evm_events.Upgrade.t option tzresult Lwt.t
+  val find_latest_pending : conn -> pending_kernel_upgrade option tzresult Lwt.t
 
   val record_apply : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  (** [find_latest_injecter_after n] returns the latest upgrade injected after
+   the blueprint [n] was applied. *)
+  val find_latest_injected_after :
+    conn ->
+    Ethereum_types.quantity ->
+    Evm_events.Upgrade.t option tzresult Lwt.t
 end
 
 module Delayed_transactions : sig
@@ -121,7 +127,10 @@ module Delayed_transactions : sig
 end
 
 module Blocks : sig
-  val store : conn -> Ethereum_types.block -> unit tzresult Lwt.t
+  val store :
+    conn ->
+    Ethereum_types.legacy_transaction_object Ethereum_types.block ->
+    unit tzresult Lwt.t
 
   (** [find_with_level ~full_transaction_object conn level] returns the block
       if it's present in the storage. If [full_transaction_object] is set to true,
@@ -130,7 +139,7 @@ module Blocks : sig
     full_transaction_object:bool ->
     conn ->
     Ethereum_types.quantity ->
-    Ethereum_types.block option tzresult Lwt.t
+    Transaction_object.t Ethereum_types.block option tzresult Lwt.t
 
   (** Same as {!find_with_level} but finds with the block hash instead of block
       number. *)
@@ -138,7 +147,7 @@ module Blocks : sig
     full_transaction_object:bool ->
     conn ->
     Ethereum_types.block_hash ->
-    Ethereum_types.block option tzresult Lwt.t
+    Transaction_object.t Ethereum_types.block option tzresult Lwt.t
 
   val find_hash_of_number :
     conn ->
@@ -153,6 +162,17 @@ module Blocks : sig
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
+module Block_storage_mode : sig
+  (** [legacy conn] returns [true] if the EVM node storage uses the legacy
+      block storage (i.e., Irmin). *)
+  val legacy : conn -> bool tzresult Lwt.t
+
+  (** [force_legacy conn] forces the node to use the legacy block storage. It
+      is a requirement for the [init from rollup node] command, and should not
+      be used in other context. *)
+  val force_legacy : conn -> unit tzresult Lwt.t
+end
+
 val context_hash_of_block_hash :
   conn -> Ethereum_types.block_hash -> Irmin_context.hash option tzresult Lwt.t
 
@@ -163,9 +183,7 @@ module Transactions : sig
     conn -> Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t
 
   val find_object :
-    conn ->
-    Ethereum_types.hash ->
-    Ethereum_types.transaction_object option tzresult Lwt.t
+    conn -> Ethereum_types.hash -> Transaction_object.t option tzresult Lwt.t
 
   (** [receipts_of_block_number conn block_number] returns all the receipts found
       from level [block_number]. The function does not check if the block exists. *)
@@ -173,18 +191,39 @@ module Transactions : sig
     conn -> Ethereum_types.quantity -> Transaction_receipt.t list tzresult Lwt.t
 end
 
-module GC : sig
-  val last_gc :
+module Irmin_chunks : sig
+  val insert :
+    conn ->
+    Ethereum_types.quantity ->
+    Time.Protocol.t ->
+    unit Error_monad.tzresult Lwt.t
+
+  val nth :
+    conn ->
+    int ->
+    (Ethereum_types.quantity * Time.Protocol.t) option tzresult Lwt.t
+
+  val latest :
     conn -> (Ethereum_types.quantity * Time.Protocol.t) option tzresult Lwt.t
 
-  val update_last_gc :
-    conn -> Ethereum_types.quantity -> Time.Protocol.t -> unit tzresult Lwt.t
+  val clear : conn -> unit tzresult Lwt.t
+end
 
-  val last_split :
-    conn -> (Ethereum_types.quantity * Time.Protocol.t) option tzresult Lwt.t
+module Pending_confirmations : sig
+  val insert :
+    conn ->
+    Ethereum_types.quantity ->
+    Ethereum_types.block_hash ->
+    unit tzresult Lwt.t
 
-  val update_last_split :
-    conn -> Ethereum_types.quantity -> Time.Protocol.t -> unit tzresult Lwt.t
+  val find_with_level :
+    conn ->
+    Ethereum_types.quantity ->
+    Ethereum_types.block_hash option tzresult Lwt.t
+
+  val delete_with_level : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  val is_empty : conn -> bool tzresult Lwt.t
 end
 
 module L1_l2_levels_relationships : sig
@@ -206,16 +245,36 @@ module L1_l2_levels_relationships : sig
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
+type metadata = {
+  smart_rollup_address : Address.t;
+  history_mode : Configuration.history_mode;
+}
+
 module Metadata : sig
-  val store :
-    conn -> Tezos_crypto.Hashed.Smart_rollup_address.t -> unit tzresult Lwt.t
+  val store : conn -> metadata -> unit tzresult Lwt.t
 
-  val get : conn -> Tezos_crypto.Hashed.Smart_rollup_address.t tzresult Lwt.t
+  val get : conn -> metadata tzresult Lwt.t
 
-  val find :
-    conn -> Tezos_crypto.Hashed.Smart_rollup_address.t option tzresult Lwt.t
+  val find : conn -> metadata option tzresult Lwt.t
+
+  val store_history_mode :
+    conn -> Configuration.history_mode -> unit tzresult Lwt.t
+
+  val find_history_mode :
+    conn -> Configuration.history_mode option tzresult Lwt.t
+
+  val get_history_mode : conn -> Configuration.history_mode tzresult Lwt.t
 end
 
-(** [reset conn ~l2_level] clear the table that has information related to l2
-    level that after [l2_level] *)
-val reset : conn -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t
+(** [reset_after conn ~l2_level] clear the table that has information related to l2
+    level after [l2_level] *)
+val reset_after :
+  conn -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t
+
+(** [reset_before conn ~l2_level] clear the table that has information related to l2
+    level before [l2_level], if [history_mode] is set to [Full] keep block-related information and clear the rest *)
+val reset_before :
+  conn ->
+  l2_level:Ethereum_types.quantity ->
+  history_mode:Configuration.history_mode ->
+  unit tzresult Lwt.t

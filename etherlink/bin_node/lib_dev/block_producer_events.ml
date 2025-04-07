@@ -14,7 +14,7 @@ module Event = struct
     declare_1
       ~section
       ~name:"block_producer_transaction_injected"
-      ~msg:"Transaction {transaction} has been selected for a block"
+      ~msg:"transaction {transaction} has been selected for a block"
       ~level:Info
       ("transaction", Ethereum_types.hash_encoding)
       ~pp1:Ethereum_types.pp_hash
@@ -23,7 +23,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"block_producer_started"
-      ~msg:"Block producer has been started"
+      ~msg:"block producer has been started"
       ~level:Notice
       ()
 
@@ -31,7 +31,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"shutting_down_block_producer"
-      ~msg:"Stopping the block producer follower"
+      ~msg:"stopping the block producer follower"
       ~level:Notice
       ()
 
@@ -39,9 +39,7 @@ module Event = struct
     declare_0
       ~section
       ~name:"block_producer_locked"
-      ~msg:
-        "Transaction pool is locked, block production as well. The sequencer \
-         is progressing too far in advance in comparison to the rollup node."
+      ~msg:"transaction pool and block production are locked"
       ~level:Error
       ()
 end

@@ -13,7 +13,41 @@ open Prometheus
    solution is to create a new registry and implement the callback
    that serves this new registry specifically. *)
 
+module Counter = struct
+  include Counter
+
+  type t = Counter.t
+
+  let event_assertion_warning =
+    Internal_event.Simple.declare_2
+      ~section:["evm_node"; "dev"; "metrics"]
+      ~name:"counter_inc_assertion_warning"
+      ~msg:
+        "assertion failed while updating a Counter metric: the increment \
+         ({increment} occuring at {label}) is negative; the value will not be \
+         updated"
+      ~level:Warning
+      ("increment", Data_encoding.float)
+      ("label", Data_encoding.string)
+
+  let inc t v label =
+    if v >= 0.0 then inc t v
+    else
+      Lwt.dont_wait
+        (fun () ->
+          Internal_event.Simple.emit event_assertion_warning (v, label))
+        (Fun.const ())
+end
+
 let registry = CollectorRegistry.create ()
+
+type metrics_body = {body : string; content_type : string}
+
+let get_metrics () =
+  let open Lwt_syntax in
+  let+ data = CollectorRegistry.collect registry in
+  let body = Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data in
+  {body; content_type = "text/plain; version=0.0.4"}
 
 module Cohttp (Server : Cohttp_lwt.S.Server) = struct
   let callback _conn req _body =
@@ -22,13 +56,8 @@ module Cohttp (Server : Cohttp_lwt.S.Server) = struct
     let uri = Request.uri req in
     match (Request.meth req, Uri.path uri) with
     | `GET, "/metrics" ->
-        let* data = CollectorRegistry.collect registry in
-        let body =
-          Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data
-        in
-        let headers =
-          Header.init_with "Content-Type" "text/plain; version=0.0.4"
-        in
+        let* {body; content_type} = get_metrics () in
+        let headers = Header.init_with "Content-Type" content_type in
         Server.respond_string ~status:`OK ~headers ~body ()
     | _ -> Server.respond_error ~status:`Bad_request ~body:"Bad request" ()
 end
@@ -57,7 +86,7 @@ module Health = struct
 end
 
 module Chain = struct
-  type t = {head : Gauge.t; confirmed_head : Gauge.t}
+  type t = {head : Gauge.t; confirmed_head : Gauge.t; gas_price : Gauge.t}
 
   let init name =
     let head =
@@ -80,7 +109,17 @@ module Chain = struct
         "confirmed_head"
         name
     in
-    {head; confirmed_head}
+    let gas_price =
+      Gauge.v_label
+        ~registry
+        ~label_name:"gas_price"
+        ~help:"Gas price"
+        ~namespace
+        ~subsystem
+        "gas_price"
+        name
+    in
+    {head; confirmed_head; gas_price}
 end
 
 module Info = struct
@@ -152,7 +191,7 @@ end
 
 module Rpc = struct
   let metrics =
-    Prometheus.Summary.v_labels
+    Summary.v_labels
       ~registry
       ~label_names:["endpoint"; "method"]
       ~help:"RPC endpoint call counts and sum of execution times."
@@ -161,13 +200,16 @@ module Rpc = struct
       "calls"
 
   let method_ =
-    Prometheus.Counter.v_label
+    Counter.v_label
       ~registry
       ~label_name:"method"
       ~help:"Method call counts"
       ~namespace
       ~subsystem
       "calls_method"
+
+  let update_metrics uri meth =
+    Summary.(time (labels metrics [uri; meth]) Sys.time)
 end
 
 module Tx_pool = struct
@@ -196,15 +238,19 @@ module Tx_pool = struct
         in
         LabelSetMap.of_list
           [
-            ( ["number_of_addresses"],
-              [Prometheus.Sample_set.sample number_of_addresses] );
+            (["number_of_addresses"], [Sample_set.sample number_of_addresses]);
             ( ["number_of_transactions"],
-              [Prometheus.Sample_set.sample number_of_transactions] );
+              [Sample_set.sample number_of_transactions] );
           ])
 end
 
 module Simulation = struct
-  type t = {inconsistent_da_fees : Counter.t; confirm_gas_needed : Counter.t}
+  type t = {
+    inconsistent_da_fees : Counter.t;
+    confirm_gas_needed : Counter.t;
+    time_waiting : Counter.t;
+    queue_size : Gauge.t;
+  }
 
   let init name =
     let inconsistent_da_fees =
@@ -227,7 +273,27 @@ module Simulation = struct
         "confirm_gas_needed"
         name
     in
-    {inconsistent_da_fees; confirm_gas_needed}
+    let time_waiting =
+      Counter.v_label
+        ~registry
+        ~label_name:"time_waiting"
+        ~help:"Time spent by a request waiting for a worker (in picosecond)."
+        ~namespace
+        ~subsystem
+        "time_waiting"
+        name
+    in
+    let queue_size =
+      Gauge.v_label
+        ~registry
+        ~label_name:"queue_size"
+        ~help:"Size of the execution queue of simulations"
+        ~namespace
+        ~subsystem
+        "queue_size"
+        name
+    in
+    {inconsistent_da_fees; confirm_gas_needed; time_waiting; queue_size}
 end
 
 type t = {
@@ -235,9 +301,10 @@ type t = {
   block : Block.t;
   simulation : Simulation.t;
   health : Health.t;
+  l1_level : Gauge.t;
 }
 
-module BlueprintChunkSent = struct
+module Blueprint_chunk_sent = struct
   let on_inbox =
     Counter.v
       ~registry
@@ -255,13 +322,15 @@ module BlueprintChunkSent = struct
       "blueprint_chunks_sent_on_dal"
 end
 
-let signals_sent =
-  Counter.v
-    ~registry
-    ~help:"Number of DAL import signals sent on the inbox"
-    ~namespace
-    ~subsystem
-    "signals_sent"
+module Dal = struct
+  let signals_sent =
+    Counter.v
+      ~registry
+      ~help:"Number of DAL import signals sent on the inbox"
+      ~namespace
+      ~subsystem
+      "signals_sent"
+end
 
 let metrics =
   let name = "Etherlink" in
@@ -269,7 +338,17 @@ let metrics =
   let block = Block.init name in
   let simulation = Simulation.init name in
   let health = Health.init name in
-  {chain; block; simulation; health}
+  let l1_level =
+    Gauge.v_label
+      ~registry
+      ~label_name:"l1_level"
+      ~help:"Last processed L1 block level"
+      ~namespace
+      ~subsystem
+      "l1_level"
+      name
+  in
+  {chain; block; simulation; health; l1_level}
 
 let init ~mode ~tx_pool_size_info ~smart_rollup_address =
   Info.init ~mode ~smart_rollup_address ;
@@ -277,12 +356,26 @@ let init ~mode ~tx_pool_size_info ~smart_rollup_address =
 
 let set_level ~level = Gauge.set metrics.chain.head (Z.to_float level)
 
+let set_gas_price price = Gauge.set metrics.chain.gas_price (Z.to_float price)
+
 let set_confirmed_level ~level =
   Gauge.set metrics.chain.confirmed_head (Z.to_float level)
+
+let set_l1_level ~level = Gauge.set metrics.l1_level (Int32.to_float level)
 
 let start_bootstrapping () = Gauge.set metrics.health.bootstrapping 1.
 
 let stop_bootstrapping () = Gauge.set metrics.health.bootstrapping 0.
+
+let inc_time_waiting span =
+  let _, time = Ptime.Span.to_d_ps span in
+  Counter.inc
+    metrics.simulation.time_waiting
+    (Int64.to_float time)
+    "inc_time_waiting"
+
+let set_simulation_queue_size size =
+  Gauge.set metrics.simulation.queue_size (Int.to_float size)
 
 let is_bootstrapping () =
   (* [bootstrapping] is set to 1.0 when bootstrapping, and 0.0 otherwise. To
@@ -292,5 +385,70 @@ let is_bootstrapping () =
 let set_block ~time_processed ~transactions =
   let pt = Ptime.Span.to_float_s time_processed in
   Block.(Process_time_histogram.(observe process_time_histogram pt)) ;
-  Counter.inc metrics.block.time_processed pt ;
-  Counter.inc metrics.block.transactions (Int.to_float transactions)
+  Counter.inc metrics.block.time_processed pt "set_block:inc_time_processed" ;
+  Counter.inc
+    metrics.block.transactions
+    (Int.to_float transactions)
+    "set_block:inc_transactions"
+
+let record_signals_sent signals =
+  Counter.inc
+    Dal.signals_sent
+    (Int.to_float @@ List.length signals)
+    "record_signals_sent"
+
+let inc_confirm_gas_needed () =
+  Counter.inc_one metrics.simulation.confirm_gas_needed
+
+let record_blueprint_chunks_sent_on_dal chunks =
+  Counter.inc
+    Blueprint_chunk_sent.on_dal
+    (Float.of_int (List.length chunks))
+    "record_blueprint_chunks_sent_on_dal"
+
+let record_blueprint_chunks_sent_on_inbox chunks =
+  Counter.inc
+    Blueprint_chunk_sent.on_inbox
+    (Float.of_int (List.length chunks))
+    "record_blueprint_chunks_sent_on_inbox"
+
+let inc_rpc_method ~name = Counter.inc_one (Rpc.method_ name)
+
+module Performance_metrics_config = struct
+  open Octez_performance_metrics
+
+  let registry = registry
+
+  let subsystem = "evm_node"
+
+  let directories =
+    [
+      data_dir_element ~metrics_suffix:"store_sqlite" "store.sqlite";
+      data_dir_element ~metrics_suffix:"store_irmin" "store";
+      data_dir_element ~metrics_suffix:"wasm" "wasm_2_0_0";
+      data_dir_element ~metrics_suffix:"logs" "daily_logs";
+    ]
+end
+
+module type PERFORMANCE = sig
+  val set_stats : data_dir:string -> unit Lwt.t
+end
+
+let performance_metrics : (module PERFORMANCE) Lazy.t =
+  lazy
+    (let module M = Octez_performance_metrics.Make (Performance_metrics_config) in
+    (module M : PERFORMANCE))
+
+let listing () =
+  let open Lwt_syntax in
+  let* support = Octez_performance_metrics.supports_performance_metrics () in
+  (* If the host provides the necessary utils, we get performance metrics.
+     To list them, we need to force the evaluation of the Performance module. *)
+  if support then ignore (Lazy.force performance_metrics) ;
+  let+ data = CollectorRegistry.(collect registry) in
+  let body = Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data in
+  let metrics =
+    String.split_on_char '\n' body
+    |> List.filter (String.starts_with ~prefix:"#")
+  in
+  String.concat "\n" metrics

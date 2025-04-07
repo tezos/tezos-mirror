@@ -5,6 +5,9 @@
  (name main)
  (libraries
   gitlab_ci
+  tezos_ci
+  grafazos_ci
+  teztale
   yaml
   unix
   tezt.core)

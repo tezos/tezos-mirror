@@ -26,5 +26,5 @@
 (** [optional_switch "flag" b] is [["--flag"]] if [b] is true, otherwise [[]] *)
 val optional_switch : string -> bool -> string list
 
-(** [optional_arg "arg" f opt_v] is [["--arg"; f x]] if [opt_v] is [Some v], otherwise [[]] *)
+(** [optional_arg "arg" f opt_v] is [["--arg"; f x]] if [opt_v] is [Some x], otherwise [[]] *)
 val optional_arg : string -> ('a -> string) -> 'a option -> string list

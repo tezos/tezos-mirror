@@ -14,6 +14,8 @@ build:
 
 .PHONY: check
 check:
+	@exec ../../scripts/format.sh --check
+	@cargo doc --all-features --document-private-items --no-deps
 
 .PHONY: clean
 clean:

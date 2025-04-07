@@ -155,23 +155,148 @@ let stop_or_keep_going ~config ~node =
     unit
   else unit
 
-let deploy_evm_rollup ~configuration_path ~(testnet : unit -> Testnet.t) () =
+let deploy_evm_rollup ~configuration_path ~testnet =
+  Test.register ~__FILE__ ~title:"Deploy an EVM rollup" ~tags:["deploy"]
+  @@ fun () ->
   let config = get_config (JSON.parse_file configuration_path) in
   let testnet = testnet () in
   let* client, node = Scenario_helpers.setup_octez_node ~testnet () in
   let* operator = Client.gen_and_show_keys client in
+  let* () =
+    Scenario_helpers.faucet
+      ~network_string:testnet.network
+      operator.public_key_hash
+  in
   let* () = check_operator_balance ~node ~client ~mode:config.mode ~operator in
   let* _rollup_address, _rollup_node, _evm_node =
     setup_evm_infra ~config ~operator node client
   in
   stop_or_keep_going ~config ~node
 
+let rps_perf ~configuration_path ~testnet =
+  Test.register ~__FILE__ ~title:"Performance RPS EVM" ~tags:["perf"; "rps"]
+  @@ fun () ->
+  let config = get_config (JSON.parse_file configuration_path) in
+  let testnet = testnet () in
+  let* client, node = Scenario_helpers.setup_octez_node ~testnet () in
+
+  let* operator =
+    match testnet.operator with
+    | Some operator ->
+        let* () =
+          Client.import_secret_key
+            client
+            operator.secret_key
+            ~alias:operator.alias
+        in
+        return operator
+    | None ->
+        let* operator = Client.gen_and_show_keys client in
+        let* () =
+          Scenario_helpers.faucet
+            ~network_string:testnet.network
+            operator.public_key_hash
+        in
+        return operator
+  in
+
+  let* () = check_operator_balance ~node ~client ~mode:config.mode ~operator in
+  let* _rollup_address, _sc_rollup_node, evm_node =
+    setup_evm_infra ~config ~operator node client
+  in
+
+  let endpoint = Evm_node.endpoint evm_node in
+  let* contract = Solidity_contracts.loop () in
+  let data = read_file contract.bin in
+  let* chain_id_result = Rpc.get_chain_id evm_node in
+  let chain_id =
+    match chain_id_result with
+    | Ok chain_id -> chain_id
+    | _ -> failwith "Rpc eth_chainId fail"
+  in
+  let nonce = 0 in
+  let gas_price = 1_000_000_000 in
+  let gas = 30_000_000 in
+
+  let* raw_tx =
+    Cast.craft_deploy_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id
+      ~nonce
+      ~gas_price
+      ~gas
+      ~data
+      ()
+  in
+
+  let* raw_tx_to_send =
+    Cast.craft_deploy_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+      ~chain_id
+      ~nonce
+      ~gas_price
+      ~gas
+      ~data
+      ()
+  in
+
+  let* transaction_hash_result = Rpc.send_raw_transaction ~raw_tx evm_node in
+  let tx_hash =
+    match transaction_hash_result with
+    | Ok tx_hash -> tx_hash
+    | Error _ -> failwith "Rpc eth_sendRawTransaction fail"
+  in
+
+  let* receipt =
+    Helpers.wait_for_transaction_receipt ~evm_node ~transaction_hash:tx_hash ()
+  in
+
+  let contract_address =
+    match receipt.contractAddress with
+    | Some address -> address
+    | None -> failwith "Contract address needed"
+  in
+
+  let* block_number = Rpc.block_number evm_node in
+  let block_number =
+    match block_number with
+    | Ok number -> number
+    | Error _ -> failwith "Rpc block_number fail"
+  in
+
+  let block_id = Int32.to_string block_number in
+
+  let account_address = Eth_account.bootstrap_accounts.(0).address in
+
+  let* block = Eth_cli.get_block ~block_id ~endpoint () in
+  let block_num = Int32.to_string block.number in
+  let block_hash = block.hash in
+
+  let config_locust : Locust.config =
+    {
+      account_address;
+      block_num;
+      block_hash;
+      tx_hash;
+      contract_address;
+      raw_tx = raw_tx_to_send;
+      rpc = [];
+    }
+  in
+
+  let* () = Locust.write_config_file config_locust in
+
+  let* output = Locust.run ~spawn_rate:10000 ~users:100 endpoint ~time:"20s" in
+
+  let rps = Locust.read_csv output in
+
+  Format.printf "=========== %s RPS ===========@." rps ;
+
+  stop_or_keep_going ~config ~node
+
 let register ~testnet =
   let configuration_path =
     Cli.get_string ~default:"evm_configuration.json" "evm_configuration"
   in
-  Test.register
-    ~__FILE__
-    ~title:"Deploy an EVM rollup"
-    ~tags:["deploy"]
-    (deploy_evm_rollup ~configuration_path ~testnet)
+  deploy_evm_rollup ~configuration_path ~testnet ;
+  rps_perf ~configuration_path ~testnet

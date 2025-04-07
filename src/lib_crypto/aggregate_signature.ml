@@ -25,14 +25,14 @@
 
 open Error_monad
 
-type public_key_hash = Bls12_381 of Bls.Public_key_hash.t
+type public_key_hash = Bls12_381 of Bls_aug.Public_key_hash.t
 
-type public_key = Bls12_381 of Bls.Public_key.t
+type public_key = Bls12_381 of Bls_aug.Public_key.t
 
-type secret_key = Bls12_381 of Bls.Secret_key.t
+type secret_key = Bls12_381 of Bls_aug.Secret_key.t
 
 module Public_key_hash = struct
-  type t = public_key_hash = Bls12_381 of Bls.Public_key_hash.t
+  type t = public_key_hash = Bls12_381 of Bls_aug.Public_key_hash.t
 
   let name = "Aggregate_signature.Public_key_hash"
 
@@ -56,7 +56,7 @@ module Public_key_hash = struct
          [
            case
              (Tag 0)
-             Bls.Public_key_hash.encoding
+             Bls_aug.Public_key_hash.encoding
              ~title:"Bls12_381"
              (function Bls12_381 x -> Some x)
              (function x -> Bls12_381 x);
@@ -70,9 +70,9 @@ module Public_key_hash = struct
 
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
-  let size = 1 + Bls.Public_key_hash.size
+  let size = 1 + Bls_aug.Public_key_hash.size
 
-  let zero = Bls12_381 Bls.Public_key_hash.zero
+  let zero = Bls12_381 Bls_aug.Public_key_hash.zero
 
   include Helpers.MakeRaw (struct
     type nonrec t = t
@@ -88,7 +88,7 @@ module Public_key_hash = struct
 
   let of_b58check_opt s =
     match Base58.decode s with
-    | Some (Bls.Public_key_hash.Data pkh) -> Some (Bls12_381 pkh)
+    | Some (Bls_aug.Public_key_hash.Data pkh) -> Some (Bls12_381 pkh)
     | _ -> None
 
   let of_b58check_exn s =
@@ -103,25 +103,26 @@ module Public_key_hash = struct
         error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check = function
-    | Bls12_381 pkh -> Bls.Public_key_hash.to_b58check pkh
+    | Bls12_381 pkh -> Bls_aug.Public_key_hash.to_b58check pkh
 
   let to_short_b58check = function
-    | Bls12_381 pkh -> Bls.Public_key_hash.to_short_b58check pkh
+    | Bls12_381 pkh -> Bls_aug.Public_key_hash.to_short_b58check pkh
 
   let to_path key l =
     match key with
-    | Bls12_381 h -> "bls12_381" :: Bls.Public_key_hash.to_path h l
+    | Bls12_381 h -> "bls12_381" :: Bls_aug.Public_key_hash.to_path h l
 
   let of_path = function
     | "bls12_381" :: q ->
-        Bls.Public_key_hash.of_path q |> Option.map (fun pkh -> Bls12_381 pkh)
+        Bls_aug.Public_key_hash.of_path q
+        |> Option.map (fun pkh -> Bls12_381 pkh)
     | _ -> assert false
 
   let of_path_exn = function
-    | "bls12_381" :: q -> Bls12_381 (Bls.Public_key_hash.of_path_exn q)
+    | "bls12_381" :: q -> Bls12_381 (Bls_aug.Public_key_hash.of_path_exn q)
     | _ -> assert false
 
-  let path_length = 1 + Bls.Public_key_hash.path_length
+  let path_length = 1 + Bls_aug.Public_key_hash.path_length
 
   let prefix_path _ = assert false (* unused *)
 
@@ -134,7 +135,7 @@ module Public_key_hash = struct
 
     let compare a b =
       match (a, b) with
-      | Bls12_381 x, Bls12_381 y -> Bls.Public_key_hash.compare x y
+      | Bls12_381 x, Bls12_381 y -> Bls_aug.Public_key_hash.compare x y
   end)
 
   include Helpers.MakeEncoder (struct
@@ -183,7 +184,7 @@ module Public_key_hash = struct
 end
 
 module Public_key = struct
-  type t = public_key = Bls12_381 of Bls.Public_key.t
+  type t = public_key = Bls12_381 of Bls_aug.Public_key.t
 
   let name = "Aggregate_signature.Public_key"
 
@@ -191,13 +192,14 @@ module Public_key = struct
 
   let hash pk =
     match pk with
-    | Bls12_381 pk -> Public_key_hash.Bls12_381 (Bls.Public_key.hash pk)
+    | Bls12_381 pk -> Public_key_hash.Bls12_381 (Bls_aug.Public_key.hash pk)
 
   include Compare.Make (struct
     type nonrec t = t
 
     let compare a b =
-      match (a, b) with Bls12_381 x, Bls12_381 y -> Bls.Public_key.compare x y
+      match (a, b) with
+      | Bls12_381 x, Bls12_381 y -> Bls_aug.Public_key.compare x y
   end)
 
   type Base58.data += Data of t (* unused *)
@@ -213,7 +215,7 @@ module Public_key = struct
 
   let of_b58check_opt s =
     match Base58.decode s with
-    | Some (Bls.Public_key.Data public_key) -> Some (Bls12_381 public_key)
+    | Some (Bls_aug.Public_key.Data public_key) -> Some (Bls12_381 public_key)
     | _ -> None
 
   let of_b58check_exn s =
@@ -227,18 +229,19 @@ module Public_key = struct
     | None ->
         error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
-  let to_b58check = function Bls12_381 pk -> Bls.Public_key.to_b58check pk
+  let to_b58check = function Bls12_381 pk -> Bls_aug.Public_key.to_b58check pk
 
   let to_short_b58check = function
-    | Bls12_381 pk -> Bls.Public_key.to_short_b58check pk
+    | Bls12_381 pk -> Bls_aug.Public_key.to_short_b58check pk
 
   let of_bytes_without_validation b =
     let tag = Bytes.(get_int8 b 0) in
     let b = Bytes.(sub b 1 (length b - 1)) in
     match tag with
     | 0 ->
-        Option.bind (Bls.Public_key.of_bytes_without_validation b) (fun pk ->
-            Some (Bls12_381 pk))
+        Option.bind
+          (Bls_aug.Public_key.of_bytes_without_validation b)
+          (fun pk -> Some (Bls12_381 pk))
     | _ -> None
 
   include Helpers.MakeEncoder (struct
@@ -255,7 +258,7 @@ module Public_key = struct
            [
              case
                (Tag 0)
-               Bls.Public_key.encoding
+               Bls_aug.Public_key.encoding
                ~title:"Bls12_381"
                (function Bls12_381 x -> Some x)
                (function x -> Bls12_381 x);
@@ -278,20 +281,21 @@ module Public_key = struct
 end
 
 module Secret_key = struct
-  type t = secret_key = Bls12_381 of Bls.Secret_key.t
+  type t = secret_key = Bls12_381 of Bls_aug.Secret_key.t
 
   let name = "Aggregate_signature.Secret_key"
 
   let title = "A Bls12_381 secret key"
 
   let to_public_key = function
-    | Bls12_381 sk -> Public_key.Bls12_381 (Bls.Secret_key.to_public_key sk)
+    | Bls12_381 sk -> Public_key.Bls12_381 (Bls_aug.Secret_key.to_public_key sk)
 
   include Compare.Make (struct
     type nonrec t = t
 
     let compare a b =
-      match (a, b) with Bls12_381 x, Bls12_381 y -> Bls.Secret_key.compare x y
+      match (a, b) with
+      | Bls12_381 x, Bls12_381 y -> Bls_aug.Secret_key.compare x y
   end)
 
   type Base58.data += Data of t (* unused *)
@@ -307,7 +311,7 @@ module Secret_key = struct
 
   let of_b58check_opt b =
     match Base58.decode b with
-    | Some (Bls.Secret_key.Data sk) -> Some (Bls12_381 sk)
+    | Some (Bls_aug.Secret_key.Data sk) -> Some (Bls12_381 sk)
     | _ -> None
 
   let of_b58check_exn s =
@@ -321,10 +325,10 @@ module Secret_key = struct
     | None ->
         error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
-  let to_b58check = function Bls12_381 sk -> Bls.Secret_key.to_b58check sk
+  let to_b58check = function Bls12_381 sk -> Bls_aug.Secret_key.to_b58check sk
 
   let to_short_b58check = function
-    | Bls12_381 sk -> Bls.Secret_key.to_short_b58check sk
+    | Bls12_381 sk -> Bls_aug.Secret_key.to_short_b58check sk
 
   include Helpers.MakeEncoder (struct
     type nonrec t = t
@@ -340,7 +344,7 @@ module Secret_key = struct
            [
              case
                (Tag 0)
-               Bls.Secret_key.encoding
+               Bls_aug.Secret_key.encoding
                ~title:"Bls12_381"
                (function Bls12_381 x -> Some x)
                (function x -> Bls12_381 x);
@@ -360,7 +364,7 @@ module Secret_key = struct
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 end
 
-type signature = Bls12_381 of Bls.t | Unknown of Bytes.t
+type signature = Bls12_381 of Bls_aug.t | Unknown of Bytes.t
 
 type t = signature
 
@@ -370,9 +374,9 @@ let name = "Aggregate signature"
 
 let title = "A Bls12_381 signature"
 
-let size = Bls.size
+let size = Bls_aug.size
 
-let to_bytes = function Bls12_381 b -> Bls.to_bytes b | Unknown b -> b
+let to_bytes = function Bls12_381 b -> Bls_aug.to_bytes b | Unknown b -> b
 
 let of_bytes_opt s = if Bytes.length s = size then Some (Unknown s) else None
 
@@ -413,8 +417,8 @@ include Compare.Make (struct
 end)
 
 let of_b58check_opt s =
-  if TzString.has_prefix ~prefix:Bls.b58check_encoding.encoded_prefix s then
-    Option.map (fun x -> Bls12_381 x) (Bls.of_b58check_opt s)
+  if TzString.has_prefix ~prefix:Bls_aug.b58check_encoding.encoded_prefix s then
+    Option.map (fun x -> Bls12_381 x) (Bls_aug.of_b58check_opt s)
   else Base58.simple_decode b58check_encoding s
 
 let of_b58check_exn s =
@@ -428,11 +432,11 @@ let of_b58check s =
   | None -> error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
 let to_b58check = function
-  | Bls12_381 b -> Bls.to_b58check b
+  | Bls12_381 b -> Bls_aug.to_b58check b
   | Unknown b -> Base58.simple_encode b58check_encoding (Unknown b)
 
 let to_short_b58check = function
-  | Bls12_381 b -> Bls.to_short_b58check b
+  | Bls12_381 b -> Bls_aug.to_short_b58check b
   | Unknown b -> Base58.simple_encode b58check_encoding (Unknown b)
 
 include Helpers.MakeEncoder (struct
@@ -458,31 +462,32 @@ end)
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let zero = Bls12_381 Bls.zero
+let zero = Bls12_381 Bls_aug.zero
 
 let sign ?watermark (Secret_key.Bls12_381 sk) bytes =
-  Bls12_381 (Bls.sign ?watermark sk bytes)
+  Bls12_381 (Bls_aug.sign ?watermark sk bytes)
 
 let check ?watermark pk signature message =
   match (pk, signature) with
   | Public_key.Bls12_381 pk, Unknown signature ->
-      Bls.of_bytes_opt signature
-      |> Option.map (fun signature -> Bls.check ?watermark pk signature message)
+      Bls_aug.of_bytes_opt signature
+      |> Option.map (fun signature ->
+             Bls_aug.check ?watermark pk signature message)
       |> Option.value ~default:false
   | Public_key.Bls12_381 pk, Bls12_381 signature ->
-      Bls.check ?watermark pk signature message
+      Bls_aug.check ?watermark pk signature message
 
 let generate_key ?seed () =
-  let pkh, pk, sk = Bls.generate_key ?seed () in
+  let pkh, pk, sk = Bls_aug.generate_key ?seed () in
   ( Public_key_hash.Bls12_381 pkh,
     Public_key.Bls12_381 pk,
     Secret_key.Bls12_381 sk )
 
 let deterministic_nonce (Secret_key.Bls12_381 sk) msg =
-  Bls.deterministic_nonce sk msg
+  Bls_aug.deterministic_nonce sk msg
 
 let deterministic_nonce_hash (Secret_key.Bls12_381 sk) msg =
-  Bls.deterministic_nonce_hash sk msg
+  Bls_aug.deterministic_nonce_hash sk msg
 
 let aggregate_check pks signature =
   let pks =
@@ -492,10 +497,10 @@ let aggregate_check pks signature =
       pks
   in
   match signature with
-  | Bls12_381 signature -> Bls.aggregate_check pks signature
+  | Bls12_381 signature -> Bls_aug.aggregate_check pks signature
   | Unknown signature ->
-      Bls.of_bytes_opt signature
-      |> Option.map (Bls.aggregate_check pks)
+      Bls_aug.of_bytes_opt signature
+      |> Option.map (Bls_aug.aggregate_check pks)
       |> Option.value ~default:false
 
 let aggregate_signature_opt signatures =
@@ -504,11 +509,11 @@ let aggregate_signature_opt signatures =
     match s with
     | Bls12_381 s -> return @@ (s :: acc)
     | Unknown s ->
-        let* s = Bls.of_bytes s in
+        let* s = Bls_aug.of_bytes s in
         return (s :: acc)
   in
   match List.fold_left_e aux [] signatures with
   | Ok signatures ->
-      Bls.aggregate_signature_opt signatures
+      Bls_aug.aggregate_signature_opt signatures
       |> Option.map (fun s -> Bls12_381 s)
   | Error _ -> None

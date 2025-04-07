@@ -16,16 +16,21 @@ use super::bits::NormaliseFields;
 use crate::{
     bits::{Bits64, ConstantBits},
     csr,
+    default::ConstDefault,
     machine_state::mode::Mode,
 };
 
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum MPPValue {
     User = 0b00,
     #[default]
     Supervisor = 0b01,
     Machine = 0b11,
+}
+
+impl ConstDefault for MPPValue {
+    const DEFAULT: Self = MPPValue::Supervisor;
 }
 
 impl From<MPPValue> for Mode {
@@ -68,12 +73,16 @@ impl Bits64 for MPPValue {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum SPPValue {
     User = 0b0,
     #[default]
     Supervisor = 0b1,
+}
+
+impl ConstDefault for SPPValue {
+    const DEFAULT: Self = SPPValue::Supervisor;
 }
 
 impl From<u8> for SPPValue {
@@ -104,11 +113,15 @@ impl Bits64 for SPPValue {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[repr(u64)]
 pub enum XLenValue {
     #[default]
     MXL64 = 0b10,
+}
+
+impl ConstDefault for XLenValue {
+    const DEFAULT: Self = XLenValue::MXL64;
 }
 
 impl From<XLenValue> for u8 {
@@ -137,12 +150,16 @@ impl Bits64 for XLenValue {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[repr(u64)]
 pub enum ExtensionValue {
     Off = 0b00,
     #[default]
     Dirty = 0b11,
+}
+
+impl ConstDefault for ExtensionValue {
+    const DEFAULT: Self = ExtensionValue::Dirty;
 }
 
 impl From<ExtensionValue> for u8 {

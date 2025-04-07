@@ -36,9 +36,41 @@ let get_global_smart_rollup_address () =
 let get_global_block_aux ?(block = "head") ?(path = []) ?query_string () =
   make ?query_string GET (["global"; "block"; block] @ path) Fun.id
 
+type outbox = Transactions of JSON.t list
+
+(* Incomplete type, to be completed when needs arise. *)
+type block = {
+  block_hash : string;
+  previous_commitment_hash : string;
+  level : int;
+  inbox : RPC.smart_rollup_inbox;
+  messages : string list;
+  outbox : outbox list;
+}
+
 let get_global_block ?block ?(outbox = false) () =
   let query_string = if outbox then Some [("outbox", "true")] else None in
-  get_global_block_aux ?block ~path:[] ?query_string ()
+  let rpc = get_global_block_aux ?block ~path:[] ?query_string () in
+  let decode json =
+    let open JSON in
+    let block_hash = json |-> "block_hash" |> as_string in
+    let previous_commitment_hash =
+      json |-> "previous_commitment_hash" |> as_string
+    in
+    let level = json |-> "level" |> as_int in
+    let inbox = json |-> "inbox" |> RPC.smart_rollup_inbox_from_json in
+    let messages =
+      json |-> "messages" |> as_list |> List.map (fun j -> j |> as_string)
+    in
+    let outbox =
+      json |-> "outbox" |> as_list
+      |> List.map (fun j ->
+             j |-> "transactions" |> as_list |> fun txs -> Transactions txs)
+    in
+
+    {block_hash; previous_commitment_hash; level; inbox; messages; outbox}
+  in
+  {rpc with decode}
 
 let get_global_block_inbox ?(block = "head") () =
   make GET ["global"; "block"; block; "inbox"] RPC.smart_rollup_inbox_from_json
@@ -351,3 +383,80 @@ let get_local_outbox_pending_executable () =
 
 let get_local_outbox_pending_unexecutable () =
   make GET ["local"; "outbox"; "pending"; "unexecutable"] outbox_list_of_json
+
+let delete_admin_batcher_queue ?order_below ?drop_no_order () =
+  let query_string =
+    let order_below_query =
+      match order_below with
+      | Some order_below -> [("order_below", string_of_int order_below)]
+      | None -> []
+    in
+    let drop_no_order_query =
+      match drop_no_order with
+      | Some drop_no_order -> [("drop_no_order", string_of_bool drop_no_order)]
+      | None -> []
+    in
+    order_below_query @ drop_no_order_query
+  in
+  make ~query_string DELETE ["admin"; "batcher"; "queue"] (fun json ->
+      let empty_list = JSON.as_object json in
+      if List.length empty_list = 0 then ()
+      else
+        failwith
+          (sf "invalid json %s, expected empty json \"{}\"." (JSON.encode json)))
+
+let injectors_queue_json json =
+  let open JSON in
+  let queue_json json =
+    let tags = json |-> "tags" |> as_list |> List.map as_string in
+    let queue = json |-> "queue" |> as_list in
+    (tags, queue)
+  in
+  json |> as_list |> List.map queue_json
+
+let get_admin_injector_queues ?tag () =
+  let query_string = Option.map (fun tag -> [("tag", tag)]) tag in
+  make GET ?query_string ["admin"; "injector"; "queues"] injectors_queue_json
+
+let total_injector_json json =
+  let open JSON in
+  let queue_json json =
+    let tags = json |-> "tags" |> as_list |> List.map as_string in
+    let size = json |-> "queue_size" |> as_int in
+    (tags, size)
+  in
+  let queues = json |-> "injectors" |> as_list |> List.map queue_json in
+  let total = json |-> "total" |> as_int in
+  (queues, total)
+
+let get_admin_injector_queues_total ?tag () =
+  let query_string = Option.map (fun tag -> [("tag", tag)]) tag in
+  make
+    GET
+    ?query_string
+    ["admin"; "injector"; "queues"; "total"]
+    total_injector_json
+
+let delete_admin_injector_queues ?operation_tag ?order_below ?drop_no_order () =
+  let query_string =
+    let order_below_query =
+      match order_below with
+      | Some order_below -> [("order_below", string_of_int order_below)]
+      | None -> []
+    in
+    let drop_no_order_query =
+      match drop_no_order with
+      | Some drop_no_order -> [("drop_no_order", string_of_bool drop_no_order)]
+      | None -> []
+    in
+    let operation_tag =
+      match operation_tag with Some tag -> [("tag", tag)] | None -> []
+    in
+    order_below_query @ drop_no_order_query @ operation_tag
+  in
+  make ~query_string DELETE ["admin"; "injector"; "queues"] (fun json ->
+      let empty_list = JSON.as_object json in
+      if List.length empty_list = 0 then ()
+      else
+        failwith
+          (sf "invalid json %s, expected empty json \"{}\"." (JSON.encode json)))

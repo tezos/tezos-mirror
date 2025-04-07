@@ -6,3 +6,5 @@
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (*****************************************************************************)
+
+val registered_octez_evm_node_libs : Manifest.Sub_lib.container

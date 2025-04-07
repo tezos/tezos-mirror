@@ -149,6 +149,13 @@ module type METRIC = sig
     ?subsystem:string ->
     string ->
     t
+
+  (** [clear] will clean every metric that was sent. *)
+  val clear : family -> unit
+
+  (** [clear_specific t labels] will clear a specific metric [t] that matches the given
+      [labels]. *)
+  val clear_specific : family -> string list -> unit
 end
 
 (** A counter is a cumulative metric that represents a single numerical value that only ever goes up. *)
@@ -159,6 +166,9 @@ module Counter : sig
 
   (** [inc t v] increases [t] by [v], which must be non-negative. *)
   val inc : t -> float -> unit
+
+  (** [set t v] sets the current value of the counter to [v]. *)
+  val set : t -> float -> unit
 end
 
 (** A gauge is a metric that represents a single numerical value that can arbitrarily go up and down. *)
@@ -194,8 +204,8 @@ end
 module Summary : sig
   include METRIC
 
-  (** [observe t v] increases the total by [v] and the count by one. *)
-  val observe : t -> float -> unit
+  (** [observe ?n t v] increases the total by [v] and the count by [n] (default: by one). *)
+  val observe : ?n:float -> t -> float -> unit
 
   (** [time t gettime f] calls [gettime ()] before and after executing [f ()] and
       observes the difference. *)

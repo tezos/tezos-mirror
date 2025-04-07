@@ -11,20 +11,20 @@
 ## `lib.protocol-compiler/octez-protocol-compiler.opam`
 ##
 ## This script is also sourced in the Makefile, as such it should be compatible
-## with both the make and sh syntax
+## with both make and sh syntaxes
 
-export ocaml_version=4.14.2
+export ocaml_version=5.2.1
 # Used for sanity check in Makefile.
 export opam_version_major=2
 # The recommended rust version should equal the version set in the
 # root rust-toolchain file, such that:
 # rust-toolchain == recommended_rust_version
-export recommended_rust_version=1.78.0
+export recommended_rust_version=1.77.2
 export recommended_node_version=18.18.2
 
 ## opam_repository is a commit hash of the public opam repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export opam_repository_tag=0f4d0ee5b69b496a4e26f305891c31400f0b4b5f
+export opam_repository_tag=aa131f3eda80ed7121debe7582faaf50448bc105
 
 # SHA-256 hashes of the DAL SRSs, as used in 'scripts/install_dal_trusted_setup.sh' to verify
 # integrity of downloaded SRS.
@@ -47,16 +47,16 @@ export dal_srs_g2_sha=97d76e266e657cc3c859c3359c717136f55cfe4c0256ea418f907406cb
 export alpine_version='3.20'
 
 # Installed via apk rust
-export rust_version='1.78.0'
+export rust_version='1.77.2'
 
 # Installed via apk cargo
-export cargo_version='1.78.0'
+export cargo_version='1.77.2'
 
 # Installed via apk opam
 export opam_version='2.3.0'
 
 # Installed via apk python3-dev
-export python_version='3.12.8'
+export python_version='3.12.9'
 
 # Installed via apk
 export poetry_version='1.8.3'

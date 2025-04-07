@@ -25,6 +25,14 @@ types:
       type: center_dz
     - id: radius_dz
       type: radius_dz
+  all_bakers_attest_activation_level:
+    seq:
+    - id: all_bakers_attest_activation_level_tag
+      type: u1
+      enum: all_bakers_attest_activation_level_tag
+    - id: some
+      type: s4be
+      if: (all_bakers_attest_activation_level_tag == all_bakers_attest_activation_level_tag::some)
   alpha__mutez:
     seq:
     - id: alpha__mutez
@@ -49,6 +57,12 @@ types:
       type: u1
     - id: attestation_threshold
       type: u1
+    - id: minimal_participation_ratio
+      type: minimal_participation_ratio_0
+    - id: rewards_ratio
+      type: rewards_ratio
+    - id: traps_fraction
+      type: traps_fraction
     - id: redundancy_factor
       type: u1
     - id: page_size
@@ -108,12 +122,26 @@ types:
       type: int31
     - id: vdf_revelation_tip_weight
       type: int31
+    - id: dal_rewards_weight
+      type: int31
+  max_slashing_threshold:
+    seq:
+    - id: numerator
+      type: u2be
+    - id: denominator
+      type: u2be
   minimal_participation_ratio:
     seq:
     - id: numerator
       type: u2be
     - id: denominator
       type: u2be
+  minimal_participation_ratio_0:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
   n:
     seq:
     - id: n
@@ -149,6 +177,12 @@ types:
       type: z
     - id: denominator
       type: z
+  rewards_ratio:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
   smart_rollup_reveal_activation_level:
     seq:
     - id: raw_data
@@ -161,6 +195,12 @@ types:
       type: s4be
     - id: dal_attested_slots_validity_lag
       type: int31
+  traps_fraction:
+    seq:
+    - id: numerator
+      type: z
+    - id: denominator
+      type: z
   z:
     seq:
     - id: has_tail
@@ -175,6 +215,9 @@ types:
       repeat-until: not (_.has_more).as<bool>
       if: has_tail.as<bool>
 enums:
+  all_bakers_attest_activation_level_tag:
+    0: none
+    1: some
   bool:
     0: false
     255: true
@@ -204,7 +247,9 @@ seq:
   type: u1
 - id: michelson_maximum_type_size
   type: u2be
-- id: max_slashing_period
+- id: denunciation_period
+  type: u1
+- id: slashing_delay
   type: u1
 - id: smart_rollup_max_wrapped_proof_binary_size
   type: int31
@@ -217,6 +262,8 @@ seq:
 - id: blocks_preservation_cycles
   type: u1
 - id: delegate_parameters_activation_delay
+  type: u1
+- id: tolerated_inactivity_period
   type: u1
 - id: blocks_per_cycle
   type: s4be
@@ -264,7 +311,7 @@ seq:
   type: s8be
 - id: consensus_committee_size
   type: int31
-- id: consensus_threshold
+- id: consensus_threshold_size
   type: int31
 - id: minimal_participation_ratio
   type: minimal_participation_ratio
@@ -272,12 +319,10 @@ seq:
   type: u1
 - id: percentage_of_frozen_deposits_slashed_per_double_baking
   type: u2be
-- id: percentage_of_frozen_deposits_slashed_per_double_attestation
-  type: u2be
 - id: max_slashing_per_block
   type: u2be
 - id: max_slashing_threshold
-  type: int31
+  type: max_slashing_threshold
 - id: testnet_dictator_tag
   type: u1
   enum: bool
@@ -345,22 +390,22 @@ seq:
   type: u1
 - id: edge_of_staking_over_delegation
   type: u1
-- id: adaptive_issuance_launch_ema_threshold
-  type: s4be
 - id: adaptive_rewards_params
   type: adaptive_rewards_params
-- id: adaptive_issuance_activation_vote_enable
-  type: u1
-  enum: bool
-- id: autostaking_enable
-  type: u1
-  enum: bool
-- id: adaptive_issuance_force_activation
-  type: u1
-  enum: bool
-- id: ns_enable
-  type: u1
-  enum: bool
 - id: direct_ticket_spending_enable
   type: u1
   enum: bool
+- id: aggregate_attestation
+  type: u1
+  enum: bool
+- id: allow_tz4_delegate_enable
+  type: u1
+  enum: bool
+- id: all_bakers_attest_activation_level
+  type: all_bakers_attest_activation_level
+- id: issuance_modification_delay
+  type: u1
+- id: consensus_key_activation_delay
+  type: u1
+- id: unstake_finalization_delay
+  type: u1

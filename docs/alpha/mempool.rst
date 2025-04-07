@@ -11,7 +11,7 @@ It ensures that :
 
 - Every operation contained are :ref:`valid<operation_validity_alpha>`;
 
-- every operation are :ref:`co-valid<co-valid_operations>`: they can be
+- every operation are :ref:`co-valid<co-valid_operations_alpha>`: they can be
   safely included in a block in any arbitrary order, meaning operations commute;
 
 - the merging of two mempools also maintains the aforementioned

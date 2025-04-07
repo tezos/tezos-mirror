@@ -46,6 +46,17 @@ module Make
       ("error", trace_encoding)
       ~pp1:pp_print_trace
 
+  let metrics_error =
+    declare_1
+      ~section
+      ~name:"metrics_error"
+      ~level:Error
+      ~msg:"[Error] Failed to complete metrics operation due to error {error}"
+      ("error", Data_encoding.string)
+
+  let metrics_error error =
+    Internal_event.Simple.(emit__dont_wait__use_with_care metrics_error) error
+
   let pp_key_alias =
     Format.(
       pp_print_list

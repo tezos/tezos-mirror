@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: MIT
 
 use std::sync::Once;
-use tezos_crypto_rs::hash::ContractKt1Hash;
+
+use jstz_crypto::{hash::Hash, smart_function_hash::SmartFunctionHash};
+use jstz_kernel::TICKETER;
+use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::prelude::Runtime;
-use tezos_smart_rollup::{entrypoint, storage::path::RefPath};
 
 #[entrypoint::main]
 #[cfg_attr(
@@ -18,15 +20,26 @@ pub fn entry(host: &mut impl Runtime) {
         static ONCE: Once = Once::new();
 
         ONCE.call_once(|| {
-            let ticketer =
-                ContractKt1Hash::from_base58_check("KT1HbQepzV1nVGg8QVznG7z4RcHseD5kwqBn").unwrap();
+            let config = bincode::config::legacy();
 
-            const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
-            host.store_write(&TICKETER, &bincode::serialize(&ticketer).unwrap(), 0)
-                .unwrap();
+            let ticketer =
+                SmartFunctionHash::from_base58("KT1HbQepzV1nVGg8QVznG7z4RcHseD5kwqBn").unwrap();
+
+            host.store_write(
+                &TICKETER,
+                bincode::encode_to_vec(ticketer, config).unwrap().as_slice(),
+                0,
+            )
+            .unwrap();
         });
     }
 
     // Delegate to Jstz kernel
     jstz_kernel::entry(host);
+
+    // Forcibly reset the garbage collector, to prevent the slowdown over time.
+    //
+    // It's safe to do so at this point, as jstz does not maintain references to any part of boa
+    // between runs.
+    boa_gc::gc_reset();
 }

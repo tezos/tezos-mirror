@@ -24,6 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Ensure that the prometheus profiler is linked. *)
+let () = (() [@profiler.overwrite ignore Prometheus_profiler.prometheus])
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025
    Remove backwards compatible Tezos symlinks. *)
 let warn_if_argv0_name_not_octez () =
@@ -169,7 +172,7 @@ module Node_metrics_command = struct
     Format.printf "@]@." ;
     return_unit
 
-  let dump_metrics () = Lwt_main.run (dump_metrics ())
+  let dump_metrics () = Tezos_base_unix.Event_loop.main_run (dump_metrics ())
 
   module Term = struct
     let process _ = `Ok (dump_metrics ())

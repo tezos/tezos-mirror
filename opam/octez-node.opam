@@ -11,20 +11,22 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
+  "octez-rustzcash-deps" { = version }
+  "bls12-381" { = version }
   "octez-version" { = version }
   "octez-node-config" { = version }
   "octez-shell-libs" { = version }
   "octez-rpc-process" { = version }
   "cmdliner" { >= "1.1.0" }
   "fmt" { >= "0.8.7" }
-  "tls-lwt" { >= "0.16.0" }
+  "tls-lwt" { >= "1.0.4" }
   "lwt-exit"
   "uri" { >= "3.1.0" }
   "tezos-protocol-000-Ps9mPmXa" { = version }
-  "tezos-protocol-020-PsParisC" { = version }
-  "octez-protocol-020-PsParisC-libs" { = version }
   "tezos-protocol-021-PsQuebec" { = version }
   "octez-protocol-021-PsQuebec-libs" { = version }
+  "tezos-protocol-022-PsRiotum" { = version }
+  "octez-protocol-022-PsRiotum-libs" { = version }
 ]
 depopts: [
   "tezos-protocol-genesis"
@@ -64,6 +66,8 @@ depopts: [
   "octez-protocol-018-Proxford-libs"
   "tezos-protocol-019-PtParisB"
   "octez-protocol-019-PtParisB-libs"
+  "tezos-protocol-020-PsParisC"
+  "octez-protocol-020-PsParisC-libs"
   "tezos-protocol-alpha"
   "octez-protocol-alpha-libs"
 ]
@@ -105,6 +109,8 @@ conflicts: [
   "octez-protocol-018-Proxford-libs" { != version }
   "tezos-protocol-019-PtParisB" { != version }
   "octez-protocol-019-PtParisB-libs" { != version }
+  "tezos-protocol-020-PsParisC" { != version }
+  "octez-protocol-020-PsParisC-libs" { != version }
   "tezos-protocol-alpha" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
@@ -113,4 +119,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos: `octez-node` binary"

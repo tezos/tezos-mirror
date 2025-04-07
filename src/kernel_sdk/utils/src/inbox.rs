@@ -180,6 +180,7 @@ impl Default for InboxBuilder {
 }
 
 /// Inbox
+#[derive(Clone)]
 pub struct Inbox {
     current_level: u32,
     current_id: u32,

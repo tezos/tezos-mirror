@@ -31,3 +31,7 @@
   -open Tezos_protocol_alpha_parameters
   -open Tenderbrute_alpha
   -open Tezt_core))
+
+(rule
+ (targets client_keys.ml)
+ (action (write-file %{targets} "include Tezos_client_base.Client_keys_v1")))

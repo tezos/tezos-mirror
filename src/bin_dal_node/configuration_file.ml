@@ -32,6 +32,8 @@ type neighbor = {addr : string; port : int}
 
 type history_mode = Rolling of {blocks : [`Auto | `Some of int]} | Full
 
+type experimental_features = {sqlite3_backend : bool}
+
 let history_mode_encoding =
   let open Data_encoding in
   union
@@ -77,6 +79,8 @@ type t = {
   version : int;
   service_name : string option;
   service_namespace : string option;
+  experimental_features : experimental_features;
+  fetch_trusted_setup : bool;
   verbose : bool;
 }
 
@@ -91,6 +95,10 @@ let default_listen_addr =
   let default_net_host = P2p_addr.to_string listening_addr in
   let default_net_port = listening_port in
   P2p_point.Id.of_string_exn ~default_port:default_net_port default_net_host
+
+let default_public_addr =
+  let open Gossipsub.Transport_layer.Default_parameters.P2p_config in
+  P2p_point.Id.of_string_exn ~default_port:listening_port "127.0.0.1"
 
 let default_neighbors = []
 
@@ -111,13 +119,19 @@ let default_metrics_addr =
 
 let default_history_mode = Rolling {blocks = `Auto}
 
+let default_experimental_features =
+  let default_sqlite3_backend = false in
+  {sqlite3_backend = default_sqlite3_backend}
+
+let default_fetch_trusted_setup = true
+
 let default =
   {
     data_dir = default_data_dir;
     rpc_addr = default_rpc_addr;
     neighbors = default_neighbors;
     listen_addr = default_listen_addr;
-    public_addr = default_listen_addr;
+    public_addr = default_public_addr;
     peers = default_peers;
     expected_pow = default_expected_pow;
     network_name = default_network_name;
@@ -128,6 +142,8 @@ let default =
     version = current_version;
     service_name = None;
     service_namespace = None;
+    experimental_features = default_experimental_features;
+    fetch_trusted_setup = default_fetch_trusted_setup;
     verbose = false;
   }
 
@@ -152,6 +168,20 @@ let endpoint_encoding : Uri.t Data_encoding.t =
         |> Result.error)
     string
 
+let experimental_features_encoding : experimental_features Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {sqlite3_backend} -> sqlite3_backend)
+    (fun sqlite3_backend -> {sqlite3_backend})
+    (obj1
+       (dft
+          "sqlite3-backend"
+          ~description:
+            "DEPRECATED as SQLite is now the default storage backend for \
+             storing skip list cells for DAL slots."
+          bool
+          default_experimental_features.sqlite3_backend))
+
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
@@ -171,6 +201,8 @@ let encoding : t Data_encoding.t =
            version;
            service_name;
            service_namespace;
+           experimental_features;
+           fetch_trusted_setup;
            verbose;
          } ->
       ( ( data_dir,
@@ -188,6 +220,8 @@ let encoding : t Data_encoding.t =
           version,
           service_name,
           service_namespace,
+          experimental_features,
+          fetch_trusted_setup,
           verbose ) ))
     (fun ( ( data_dir,
              rpc_addr,
@@ -204,6 +238,8 @@ let encoding : t Data_encoding.t =
              version,
              service_name,
              service_namespace,
+             experimental_features,
+             fetch_trusted_setup,
              verbose ) ) ->
       {
         data_dir;
@@ -221,6 +257,8 @@ let encoding : t Data_encoding.t =
         version;
         service_name;
         service_namespace;
+        experimental_features;
+        fetch_trusted_setup;
         verbose;
       })
     (merge_objs
@@ -275,7 +313,7 @@ let encoding : t Data_encoding.t =
              ~description:"The point for the DAL node metrics server"
              (Encoding.option P2p_point.Id.encoding)
              None))
-       (obj6
+       (obj8
           (dft
              "history_mode"
              ~description:"The history mode for the DAL node"
@@ -297,6 +335,16 @@ let encoding : t Data_encoding.t =
              ~description:"Namespace for the service"
              (Data_encoding.option Data_encoding.string)
              None)
+          (dft
+             "experimental_features"
+             ~description:"Experimental features"
+             experimental_features_encoding
+             default_experimental_features)
+          (dft
+             "fetch_trusted_setup"
+             ~description:"Install trusted setup"
+             bool
+             true)
           (dft
              "verbose"
              ~description:
@@ -455,6 +503,8 @@ let from_v0 v0 =
     version = current_version;
     service_name = None;
     service_namespace = None;
+    experimental_features = default_experimental_features;
+    fetch_trusted_setup = true;
     verbose = false;
   }
 

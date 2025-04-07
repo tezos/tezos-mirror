@@ -61,15 +61,15 @@ set -x
 
 # [install prerequisites]
 apt-get update
-apt-get install -y sudo gpg curl apt-utils debconf-utils
+apt-get install -y sudo gpg curl apt-utils debconf-utils jq
 
 # [preseed debconf]
 echo "debconf debconf/frontend select Noninteractive" | sudo debconf-set-selections
 
 # [add current repository]
-sudo curl "https://$bucket.storage.googleapis.com/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+sudo curl "https://$bucket.storage.googleapis.com/old/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
 
-REPO="deb https://$bucket.storage.googleapis.com/$distribution $release main"
+REPO="deb https://$bucket.storage.googleapis.com/old/$distribution $release main"
 echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez-current.list
 sudo apt-get update
 
@@ -92,7 +92,7 @@ echo "baking_key=$BAKER_KEY" >> /etc/octez/baker.conf
 echo "lq_vote=yes" >> /etc/octez/baker.conf
 
 # [add next repository]
-REPO="deb https://$bucket.storage.googleapis.com/next/$distribution $release main"
+REPO="deb https://$bucket.storage.googleapis.com/$distribution $release main"
 echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez-next.list
 sudo apt-get update
 

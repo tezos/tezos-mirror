@@ -16,7 +16,12 @@
   octez-protocol-009-PsFLoren-libs.plugin
   octez-libs.rpc
   uri)
- (inline_tests (flags -verbose) (modes native))
+ (inline_tests
+  (flags -verbose)
+  (modes native)
+  (executable
+   (link_flags -linkall -cclib -lblst -cclib -loctez_rustzcash_deps))
+  (libraries bls12-381.archive octez-rustzcash-deps))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags

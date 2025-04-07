@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name evm_node_supported_installers)
+ (public_name octez-evm-node-libs.evm_node_supported_installers)
+ (instrumentation (backend bisect_ppx))
+ (libraries))
+
+(rule
+ (target installers.ml)
+ (deps (glob_files *.wasm))
+ (action (run ocaml-crunch -e wasm -m plain -o %{target} -s .)))

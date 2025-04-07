@@ -35,11 +35,11 @@ val constants_test : Constants.Parametric.t
 val test_commitments : Commitment.t list lazy_t
 
 val make_bootstrap_account :
-  Tezos_crypto.Signature.public_key_hash
-  * Tezos_crypto.Signature.public_key
+  Signature.public_key_hash
+  * Signature.public_key
   * Tez.t
-  * Tezos_crypto.Signature.public_key_hash option
-  * Tezos_crypto.Signature.public_key option ->
+  * Signature.public_key_hash option
+  * Signature.public_key option ->
   Parameters.bootstrap_account
 
 val parameters_of_constants :

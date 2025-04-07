@@ -9,18 +9,18 @@
 use super::float::FloatExt;
 use crate::{
     machine_state::{
-        bus::main_memory::MainMemoryLayout,
-        hart_state::HartState,
-        registers::{FRegister, FValue, XRegister},
         MachineCoreState,
+        hart_state::HartState,
+        main_memory::MainMemoryLayout,
+        registers::{FRegister, FValue, XRegister},
     },
     parser::instruction::InstrRoundingMode,
     state_backend as backend,
     traps::Exception,
 };
 use rustc_apfloat::{
-    ieee::{Double, Single},
     Float, Status, StatusAnd,
+    ieee::{Double, Single},
 };
 
 impl From<Double> for FValue {
@@ -283,7 +283,7 @@ where
 
     /// `FCVT.D.W` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_d_w(
         &mut self,
         rs1: XRegister,
@@ -297,7 +297,7 @@ where
 
     /// `FCVT.D.WU` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_d_wu(
         &mut self,
         rs1: XRegister,
@@ -311,7 +311,7 @@ where
 
     /// `FCVT.D.W` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_d_l(
         &mut self,
         rs1: XRegister,
@@ -325,7 +325,7 @@ where
 
     /// `FCVT.D.WU` R-type instruction.
     ///
-    /// See [Self::fcvt_int_fmt].
+    /// See [Self::run_fcvt_int_fmt].
     pub fn run_fcvt_d_lu(
         &mut self,
         rs1: XRegister,
@@ -549,16 +549,16 @@ mod tests {
     use crate::{
         backend_test,
         bits::Bits64,
-        create_backend, create_state,
+        create_state,
         machine_state::{
-            bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
+            MachineCoreState, MachineCoreStateLayout,
             csregisters::{
-                xstatus::{ExtensionValue, MStatus},
                 CSRegister,
+                xstatus::{ExtensionValue, MStatus},
             },
             hart_state::{HartState, HartStateLayout},
+            main_memory::tests::T1K,
             registers::{fa2, fa3, parse_fregister, parse_xregister, t0},
-            MachineCoreState, MachineCoreStateLayout,
         },
         traps::Exception,
     };
@@ -566,8 +566,7 @@ mod tests {
     use proptest::prelude::*;
 
     backend_test!(test_fmv_d, F, {
-        let mut backend = create_backend!(HartStateLayout, F);
-        let state = create_state!(HartState, HartStateLayout, F, backend);
+        let state = create_state!(HartState, HartStateLayout, F);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -595,14 +594,7 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -631,9 +623,9 @@ mod tests {
                 Ok(())
             };
 
-            let invalid_offset = DEVICES_ADDRESS_SPACE_LENGTH - 1024;
-            let aligned_offset = DEVICES_ADDRESS_SPACE_LENGTH + 512;
-            let misaligned_offset = DEVICES_ADDRESS_SPACE_LENGTH + 513;
+            let invalid_offset = 0u64.wrapping_sub(1024);
+            let aligned_offset = 512;
+            let misaligned_offset = 513;
 
             // Out of bounds loads / stores
             prop_assert!(perform_test(invalid_offset).is_err_and(|e|

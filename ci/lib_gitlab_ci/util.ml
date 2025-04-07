@@ -32,9 +32,10 @@ let include_rule ?changes ?if_ ?(when_ : when_workflow = Always) () :
     include_rule =
   {changes; if_; when_}
 
-let job ?after_script ?allow_failure ?artifacts ?before_script ?cache ?image
-    ?interruptible ?needs ?dependencies ?rules ?services ?stage ?variables
-    ?timeout ?tags ?when_ ?coverage ?retry ?parallel ~name ~script () =
+let job ?after_script ?allow_failure ?artifacts ?before_script ?cache ?id_tokens
+    ?image ?interruptible ?needs ?dependencies ?rules ?services ?stage
+    ?variables ?timeout ?tags ?when_ ?coverage ?retry ?parallel ~name ~script ()
+    =
   {
     name;
     after_script;
@@ -42,6 +43,7 @@ let job ?after_script ?allow_failure ?artifacts ?before_script ?cache ?image
     artifacts;
     before_script;
     cache;
+    id_tokens;
     image;
     interruptible;
     needs;
@@ -59,8 +61,8 @@ let job ?after_script ?allow_failure ?artifacts ?before_script ?cache ?image
     parallel;
   }
 
-let trigger_job ?needs ?rules ?stage ?when_ ~name trigger_include =
-  {name; needs; rules; stage; when_; trigger_include}
+let trigger_job ?needs ?inherit_ ?rules ?stage ?when_ ~name trigger_include =
+  {name; needs; inherit_; rules; stage; when_; trigger_include}
 
 let artifacts ?expire_in ?reports ?when_ ?expose_as ?name paths =
   (match (reports, paths) with

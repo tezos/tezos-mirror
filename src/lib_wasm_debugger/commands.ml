@@ -433,6 +433,11 @@ let reveals config request =
          supported by the debugger."
   | Request_dal_page {slot_id = {published_level; index}; page_index} ->
       request_dal_page config num_retries published_level index page_index
+  | Request_adal_page _ ->
+      (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
+
+         Handle this case for adaptive DAL. *)
+      assert false
 
 let write_debug_default config =
   match config.Config.timings_file with

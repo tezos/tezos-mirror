@@ -52,9 +52,12 @@ impl<M: backend::ManagerBase> ReservationSet<M> {
         Self { start_addr: space }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> backend::AllocatedOf<ReservationSetLayout, backend::Ref<'_, M>> {
-        self.start_addr.struct_ref()
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<ReservationSetLayout, F::Output> {
+        self.start_addr.struct_ref::<F>()
     }
 
     /// Unset any reservation
@@ -100,5 +103,13 @@ impl<M: backend::ManagerBase> ReservationSet<M> {
         // invalidates any reservation held by this hart.
         self.reset();
         start_addr != UNSET_VALUE && start_addr == align_address(addr, SIZE)
+    }
+}
+
+impl<M: backend::ManagerClone> Clone for ReservationSet<M> {
+    fn clone(&self) -> Self {
+        Self {
+            start_addr: self.start_addr.clone(),
+        }
     }
 }

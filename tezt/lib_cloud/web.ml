@@ -5,10 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Types
+
 type service = {name : string; url : string}
 
 type t = {
-  process : Process.t;
+  process : unit Lwt.t;
+  to_stop : unit Lwt.u;
   dir : string;
   monitoring : bool;
   prometheus : bool;
@@ -16,47 +19,13 @@ type t = {
 }
 
 let pp_docker_image fmt = function
-  | Env.Gcp {alias} -> Format.fprintf fmt "%s" alias
+  | Agent.Configuration.Gcp {alias} -> Format.fprintf fmt "%s" alias
   | Octez_release {tag} -> Format.fprintf fmt "Octez %s release" tag
 
-let configuration ~agents =
-  let str =
-    agents
-    |> List.map (fun agent ->
-           let Configuration.
-                 {
-                   machine_type;
-                   docker_image;
-                   max_run_duration;
-                   binaries_path;
-                   os;
-                 } =
-             Agent.configuration agent
-           in
-           Format.asprintf
-             {|
-## %s
-
-- **Machine type**: %s
-- **Docker_image**: %a
-- **Max_run_duration**: %s
-- **Binaries_path**: %s
-- **OS**: %s
-
-           |}
-             (Agent.name agent)
-             machine_type
-             pp_docker_image
-             docker_image
-             (Option.fold
-                ~none:"no limit"
-                ~some:(fun time -> string_of_int time ^ "s")
-                max_run_duration)
-             binaries_path
-             os)
-    |> String.concat "\n"
-  in
-  Format.asprintf "# Configurations@.%s\n" str
+let domain agents =
+  match Env.mode with
+  | `Orchestrator -> Proxy.get_agent agents |> Agent.point |> Option.get |> fst
+  | `Host | `Localhost | `Cloud -> "localhost"
 
 let string_docker_command agent =
   match Agent.runner agent with
@@ -83,149 +52,180 @@ let string_vm_command agent =
   | Some cmd_wrapper ->
       String.concat " " (cmd_wrapper.Gcloud.cmd :: cmd_wrapper.args)
 
-let debugging ~agents =
-  let str =
-    agents
-    |> List.map (fun agent ->
-           let host_run_command =
-             Printf.sprintf
-               {|
-```bash
-%s
-```
-            |}
-               (string_vm_command agent)
-           in
-           let docker_command =
-             Printf.sprintf {|
-```bash
-%s
-```
-|} (string_docker_command agent)
-           in
-           Printf.sprintf
-             {|
-## %s
-Connect on the VM:
-%s
+let monitored_binaries agent =
+  match Agent.process_monitor agent with
+  | None -> []
+  | Some process_monitor ->
+      let binaries = Process_monitor.get_binaries process_monitor in
+      let binaries =
+        List.sort (fun (g1, _) (g2, _) -> String.compare g1 g2) binaries
+      in
+      let binaries =
+        let open Jingoo.Jg_types in
+        List.fold_left
+          (fun res (group, name) ->
+            Tobj [("group", Tstr group); ("name", Tstr name)] :: res)
+          []
+          binaries
+      in
+      binaries
 
-Connect on the Docker:
-%s
-|}
-             (Agent.name agent)
-             host_run_command
-             docker_command)
-    |> String.concat "\n"
+let agent_jingo_template agent =
+  let open Jingoo.Jg_types in
+  let Agent.Configuration.
+        {
+          vm = {machine_type; docker_image; max_run_duration; binaries_path; os};
+          name;
+        } =
+    Agent.configuration agent
   in
-  Format.asprintf "# Debugging@.%s\n" str
+  Tobj
+    [
+      ("name", Tstr name);
+      ("machine_type", Tstr machine_type);
+      ("docker_image", Tstr (Format.asprintf "%a" pp_docker_image docker_image));
+      ( "max_run_duration",
+        Tstr
+          (Option.fold
+             ~none:"no limit"
+             ~some:(fun time -> string_of_int time ^ "s")
+             max_run_duration) );
+      ("binaries_path", Tstr binaries_path);
+      ("os", Tstr (Os.to_string os));
+      ("vm_command", Tstr (string_vm_command agent));
+      ("docker_command", Tstr (string_docker_command agent));
+      ("monitored_binaries", Tlist (monitored_binaries agent));
+    ]
 
-let monitoring ~agents =
-  if Env.monitoring then
-    let str =
-      agents
-      |> List.map (fun agent ->
-             let address = Agent.runner agent |> Runner.address in
-             Format.asprintf
-               "- [%s](http://%s:19999)"
-               (Agent.name agent)
-               address)
-      |> String.concat "\n"
-    in
-    Format.asprintf "# Monitoring@.%s\n" str
-  else
-    "# Monitoring\n Monitoring disabled. Use `--monitoring` to activate it.\n"
-
-let prometheus ~agents =
-  let domain =
-    match Env.mode with
-    | `Orchestrator ->
-        Proxy.get_agent agents |> Agent.point |> Option.get |> fst
-    | `Host | `Localhost | `Cloud -> "localhost"
+let monitoring_jingo_template agents agent =
+  let open Jingoo.Jg_types in
+  let host =
+    if Env.mode = `Localhost then "localhost"
+    else
+      match Agent.point agent with
+      | Some (host, _port) -> host
+      | None -> domain agents
   in
-  if Env.prometheus then
-    Format.asprintf
-      "# Prometheus\n [Prometheus dashboard](http://%s:%d)\n"
-      domain
-      Env.prometheus_port
-  else "Prometheus disabled. Use `--prometheus` to activate it.\n"
+  Tobj
+    [
+      ("name", Tstr (Agent.name agent));
+      ("uri", Tstr (sf "http://%s:19999" host));
+    ]
 
-let grafana ~agents =
-  let domain =
-    match Env.mode with
-    | `Orchestrator ->
-        Proxy.get_agent agents |> Agent.point |> Option.get |> fst
-    | `Host | `Localhost | `Cloud -> "localhost"
-  in
-  if Env.grafana then
-    Format.asprintf "# Grafana\n [Grafana dashboard](http://%s:3000)\n" domain
-  else "Grafana disabled. Use `--grafana` to activate it.\n"
+let service_jingo_template {name; url} =
+  let open Jingoo.Jg_types in
+  Tobj [("title", Tstr (String.capitalize_ascii name)); ("uri", Tstr url)]
 
-let service {name; url} =
-  Format.asprintf
-    "# %s\n [%s](%s)\n"
-    (String.capitalize_ascii name)
-    (String.lowercase_ascii name)
-    url
-
-let markdown_content ~agents ~services =
+let jingoo_template t agents =
+  let open Jingoo.Jg_types in
   [
-    configuration ~agents;
-    grafana ~agents;
-    prometheus ~agents;
-    monitoring ~agents;
+    ( "grafana",
+      Tobj
+        [
+          ("activated", Tbool Env.grafana);
+          ("uri", Tstr (Format.asprintf "http://%s:3000" (domain agents)));
+        ] );
+    ( "prometheus",
+      Tobj
+        [
+          ("activated", Tbool Env.prometheus);
+          ( "uri",
+            Tstr
+              (Format.asprintf
+                 "http://%s:%d"
+                 (domain agents)
+                 Env.prometheus_port) );
+        ] );
+    ( "monitoring",
+      Tlist
+        (if Env.monitoring then
+           List.map (monitoring_jingo_template agents) agents
+         else []) );
+    ("agents", Tlist (List.map agent_jingo_template agents));
+    ("services", Tlist (List.map service_jingo_template t.services));
   ]
-  @ List.map service services
-  @ [debugging ~agents]
-  |> String.concat "\n"
 
-let index dir = dir // "index.md"
+let index dir = dir // "index.html"
 
 let write t ~agents =
   (* The content is formatted in markdown and will be rendered in html via
      pandoc. *)
-  let content = markdown_content ~agents ~services:t.services in
+  let content =
+    Jingoo.Jg_template.from_file
+      Path.website_index
+      ~models:(jingoo_template t agents)
+  in
   let dir = t.dir in
   let index = index dir in
   Base.with_open_out index (fun oc -> output_string oc content) ;
-  Process.run
-    "docker"
-    [
-      "run";
-      "--rm";
-      "--volume";
-      Format.asprintf "%s:/data" dir;
-      "pandoc/core";
-      "index.md";
-      "-o";
-      "index.html";
-      "-s";
-    ]
+  let website_style = Path.website_style in
+  Log.info "Website: write" ;
+  Process.run "cp" [website_style; dir // "style.css"]
 
 let add_service t ~agents service =
   t.services <- service :: t.services ;
   write t ~agents
 
 let run () =
-  let* () =
-    Process.run "mkdir" ["-p"; Filename.get_temp_dir_name () // "website"]
-  in
+  (* We do not use the Temp.dir so that the base directory is predictable and
+     can be mounted by the proxy VM if [--proxy] is used. *)
   let dir = Filename.get_temp_dir_name () // "website" in
+  let* () = Process.run "mkdir" ["-p"; dir] in
   let index = index dir in
   let port = Env.website_port in
   let prometheus = Env.prometheus in
   let monitoring = Env.monitoring in
-  let process =
-    Process.spawn
-      "python3"
-      [
-        "-m";
-        "http.server";
-        string_of_int port;
-        "--directory";
-        Filename.dirname index;
-      ]
+  let stop, to_stop = Lwt.task () in
+  let logger next_handler request =
+    let meth = Dream.method_to_string (Dream.method_ request) in
+    let target = Dream.target request in
+    let req = Dream.client request in
+    let fd_field =
+      Dream.new_field ~name:"dream.fd" ~show_value:string_of_int ()
+    in
+    let fd_string =
+      match Dream.field request fd_field with
+      | None -> ""
+      | Some fd -> " fd " ^ string_of_int fd
+    in
+    let user_agent = Dream.headers request "User-Agent" |> String.concat " " in
+    Log.info
+      ~color:Log.Color.FG.blue
+      ~prefix:"dream"
+      "%s %s %s%s %s"
+      meth
+      target
+      req
+      fd_string
+      user_agent ;
+    next_handler request
   in
-  Lwt.return {process; dir; monitoring; prometheus; services = []}
+  let process =
+    Dream.serve ~stop ~port ~tls:false ~interface:"0.0.0.0"
+    (* @@ Dream.logger *)
+    @@ logger
+    @@ Dream.router
+         [
+           Dream.get "/metrics" (fun _ ->
+               let file = dir // "metrics.txt" in
+               let content =
+                 if Sys.file_exists file then read_file file else ""
+               in
+               let response = Dream.response content in
+               Dream.add_header
+                 response
+                 "Content-type"
+                 "text/plain; version=0.0.4; charset=utf-8" ;
+               Lwt.return response);
+           Dream.get "/style.css" (fun _ ->
+               let content = read_file (dir // "style.css") in
+               Dream.respond content);
+           Dream.get "/" (fun _ ->
+               let content = read_file index in
+               Dream.html content);
+         ]
+  in
+  Lwt.return {process; to_stop; dir; monitoring; prometheus; services = []}
 
 let start ~agents =
   let* t = run () in
@@ -234,14 +234,14 @@ let start ~agents =
 
 let shutdown t =
   Log.info "Shutting down the website..." ;
-  Process.terminate t.process ;
+  Lwt.wakeup t.to_stop () ;
   (* Do not fail if something happened during shutdown. *)
-  let* _ = Process.wait t.process in
+  let* () = t.process in
   Lwt.return_unit
 
 let push_metric =
   let table = Hashtbl.create 11 in
-  fun t ?(labels = []) ~name value ->
+  fun t ?help ?typ ?(labels = []) ~name value ->
     let i = Unix.gettimeofday () in
     let labels_str =
       let inner =
@@ -252,9 +252,22 @@ let push_metric =
       in
       match labels with [] -> "" | _ -> Format.asprintf "{ %s }" inner
     in
+    let help_str =
+      match help with
+      | Some help -> Format.asprintf "# HELP %s %s\n" name help
+      | None -> ""
+    in
+    let typ_str =
+      match typ with
+      | Some `Counter -> Format.asprintf "# TYPE %s counter\n" name
+      | Some `Gauge -> Format.asprintf "# TYPE %s gauge\n" name
+      | None -> ""
+    in
     let str =
       Format.asprintf
-        "%s %s %f %d"
+        "%s%s%s %s %f %d"
+        help_str
+        typ_str
         name
         labels_str
         value

@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "base-unix"
   "octez-distributed-internal" { = version }
-  "lwt" { >= "5.7.0" }
+  "lwt" { >= "5.7.0" & < "5.9.0" }
   "logs"
 ]
 build: [
@@ -20,4 +20,5 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Fork of distributed-lwt. Use for Octez only"

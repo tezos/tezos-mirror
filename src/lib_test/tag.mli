@@ -33,9 +33,21 @@
 
 (** ["flaky"]: the test is flaky.
 
-    This disables the test in [before_merging] pipelines of the CI
-    just like {!ci_disabled}. Contrary to {!ci_disabled} however, this
-    also gives the reason why the test is disabled: the test is flaky.
+    The semantics depends on other tags:
+    - if the test also has tag {!memory_3k}, {!memory_4k} or {!time_sensitive},
+      the test still runs in job [tezt-memory-3k], [tezt-memory-4k]
+      or [tezt-time-sensitive] respectively;
+    - if the test also has tag {!slow}, the test still runs in job [tezt-slow]
+      but this job is manual, so it does not run by default, except in
+      scheduled pipelines;
+    - if the test has none of these other tags, the test still runs in job [tezt-flaky],
+      but this job is manual, so it does not run by default, except in
+      scheduled pipelines; additionally, this job is allowed to fail.
+
+    In the general case, this tag thus disables the test in [before_merging]
+    pipelines of the CI just like {!ci_disabled}.
+    Contrary to {!ci_disabled} however, this also gives the reason
+    why the test is disabled: the test is flaky.
 
     Tip: you can list tests that are declared as flaky with [tezt --list flaky].
     You can check if they are still flaky with something like

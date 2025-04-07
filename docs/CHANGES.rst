@@ -3,6 +3,152 @@
 Changelog
 '''''''''
 
+Version 21.3
+============
+
+Baker
+-----
+
+- **Deprecation:** For Paris and Quebec protocols, launching a
+  baker daemon without specifying a DAL node endpoint is deprecated.
+  To opt out of this requirement, use the newly introduced
+  ``--without-dal`` option (MR :gl:`!16213`).
+  Using one of the CLI arguments ``--dal-node <uri>`` or ``--without-dal`` will be mandatory
+  The CLI argument ``--dal-node <uri>`` or ``--without-dal`` will be mandatory
+  in the next version of Octez.
+
+Smart Rollup node
+-----------------
+
+- Updated batcher with a new order structure. The RPC
+  ``/local/batcher/injection`` now has a new query argument
+  possibility ``"order": <int>``. The batcher will batch the
+  received chunk with the following priority order: First chunks with
+  ascending order then chunks by order of arrival. (MR :gl:`!15672`)
+
+- Injector now uses a heap structure for its queue which allows
+  to prioritize operations to send on L1. (MR :gl:`!15864`)
+
+- New RPC to retrieve values under a key in the durable storage
+  ``/global/block/<block_id>/durable/wasm_2_0_0/values?key=<key>&offset=<offset>&length=<length>``.
+  (MR :gl:`!15627`)
+
+- Added RPCs ``/global/block/<block_id>/committed_status`` to retrieve commitment
+  and cementation status for a given block (or an estimated timestamp
+  otherwise). (MR :gl:`!15409`)
+
+- Fixed an issue in the background store migration which could make the rollup
+  node send old heads in its stream at the end of the migration.  (MR :gl:`!15739`)
+
+- Fixed an issue in the background store migration which could make the rollup
+  node send old heads in its stream at the end of the migration.  (MR :gl:`!15739`)
+
+Version 21.2
+============
+
+Miscellaneous
+-------------
+
+- Fixed an issue on Ghostnet originated from lowering
+  ``consensus_rights_delay`` from 3 to 2 with the recent activation of the Quebec protocol. This issue does not affect mainnet, where
+  ``consensus_rights_delay`` was already set to 2 by the activation of Paris and will remain
+  unchanged with the activation of Quebec. (MR :gl:`!16219`)
+
+Version 21.1
+============
+
+DAL node
+--------
+
+- Fix a peering issue when the P2P identity changed recently. (MR :gl:`!15977`)
+
+- Do not attempt to connect to a peer we are already connected with. (MR :gl:`!15984`)
+
+- Introduce a timeout preventing too many reconnections to unreachable
+  points. (MR :gl:`!16005`)
+
+- Emit various warnings when the registered attester does not seem to attest
+  correctly, or when the DAL node seems to be lagging. (:gl:`!15306`,
+  :gl:`!15607`, :gl:`!15756`)
+
+- Set the message validation function at node startup, fixing :gl:`#7629`. (MR
+  :gl:`!15830`)
+
+- Retry DNS resolution of bootstrap points every 5 minutes. (MR :gl:`!15858`)
+
+- Keep established connections alive. This applies to the Layer 1 node as
+  well. (MR :gl:`!15914`)
+
+Baker
+-----
+
+- **Breaking change** Removed the baker daemon's
+  ``--dal-node-timeout-percentage`` argument. The DAL node now fetches the
+  slots' attestation status from the DAL node one level in advance. (MR
+  :gl:`!15554`)
+
+- An event at Notice level is now emitted when the delegate is not in the DAL committee,
+  that is, it has no assigned shards at the current level. (:gl:`!15846`)
+
+Version 21.0
+============
+
+General
+-------
+
+- Integrated binaries for Quebec (MR :gl:`!15611`).
+
+Smart Rollup node
+-----------------
+
+- Storage now uses SQLite as a backend instead of the custom indexed-file based
+  store. This change makes the rollup node more robust but entails a migration
+  of the store data. (MRs :gl:`!15053`, :gl:`!15026`, :gl:`!15059`,
+  :gl:`!15073`, :gl:`!15218`, :gl:`!15257`)
+
+- Allow to import snaphosts for older stores by migrating the data on import.
+  (MR :gl:`!15422`)
+
+- Fixed a bug which would make injection of messages in the batcher with the RPC
+  ``/local/batcher/injection`` fail if called too early. (MR :gl:`!15459`)
+
+DAL node
+~~~~~~~~
+
+- **Breaking_change** The configuration value ``metrics-addr`` is now an option.
+  It should not break unless the value differs from the default value
+  (``0.0.0.0:11733``). The new default value is ``None``, so no metrics are
+  exported by default.
+
+- **Breaking change** For the RPCs ``/p2p/gossipsub/topics/peers``,
+  ``/p2p/gossipsub/pkhs/peers``, and ``/p2p/gossipsub/slot_indexes/peers``, the
+  flag ``subscribed`` is removed and a new flag ``all`` is introduced. The
+  default behavior is now to list peers only for topics the current peer is
+  subscribed to, while the ``all`` flag can be used to recover the previous
+  behavior. (MR :gl:`!14518`)
+
+- **Breaking** Changed binary encoding of /config/network/dal. This change is
+  not retro-compatible.  As a result, the v21 DAL node is not compatible with
+  earlier Octez nodes.
+
+Version 21.0~rc3
+================
+
+General
+-------
+
+- Integrated binaries for Qena (MR :gl:`!15123`).
+
+DAL node
+--------
+
+- Fixed a memory leak in the DAL node.
+
+- Deactivate the metrics server by default
+
+- Fix ``--public-addr`` when the specified port was different
+  from the default one. (MR :gl:`!11732`)
+
 Version 21.0~rc1 and 21.0~rc2
 =============================
 

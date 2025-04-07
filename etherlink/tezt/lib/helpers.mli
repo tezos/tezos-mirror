@@ -35,6 +35,9 @@ val u16_to_bytes : int -> string
 (** [add_0x s] will add the hexa prefix `0x` before the given string. *)
 val add_0x : string -> string
 
+(** [remove_0x s] removes the [0x] prefix in [s] if it is present. *)
+val remove_0x : string -> string
+
 (** [mapping_position key map_position] computes the storage position for
     a value in a mapping given its [key] and the position of the map
     itself.
@@ -50,6 +53,9 @@ val hex_string_to_int : string -> int
 
 (** [hex_256_of_int n] returns the H256 of [n]. *)
 val hex_256_of_int : int -> string
+
+(** [hex_256_of_address address] returns the H256 of [address]. *)
+val hex_256_of_address : Eth_account.t -> string
 
 (** [next_rollup_node_level ~sc_rollup_node ~client] moves
     [sc_rollup_node] to the next level l1. *)
@@ -165,6 +171,7 @@ val bake_until_sync :
     transaction_hash and returns only when the receipt is non null, or [count]
     blocks have passed and the receipt is still not available. *)
 val wait_for_transaction_receipt :
+  ?websocket:Websocket.t ->
   ?count:int ->
   evm_node:Evm_node.t ->
   transaction_hash:string ->
@@ -181,6 +188,7 @@ val wait_for_application :
 (** [batch_n_transactions ~evm_node raw_transactions] batches [raw_transactions]
     to the [evm_node] and returns the requests and transaction hashes. *)
 val batch_n_transactions :
+  ?websocket:Websocket.t ->
   evm_node:Evm_node.t ->
   string list ->
   (Evm_node.request list * string list) Lwt.t
@@ -190,6 +198,7 @@ val batch_n_transactions :
     until the first one is applied in a block and returns, or fails if it isn't
     applied after [wait_for_blocks] blocks. *)
 val send_n_transactions :
+  ?websocket:Websocket.t ->
   produce_block:(unit -> ('a, Rpc.error) result Lwt.t) ->
   evm_node:Evm_node.t ->
   ?wait_for_blocks:int ->
@@ -220,9 +229,13 @@ val find_and_execute_withdrawal :
 (** Runs a sequencer in mode sandbox, with no connection needed to a
     rollup node. *)
 val init_sequencer_sandbox :
+  ?maximum_gas_per_transaction:int64 ->
+  ?genesis_timestamp:Client.timestamp ->
+  ?tx_pool_tx_per_addr_limit:int ->
   ?set_account_code:(string * string) list ->
   ?da_fee_per_byte:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?history_mode:Evm_node.history_mode ->
   ?patch_config:(JSON.t -> JSON.t) ->
   ?kernel:Uses.t ->
   ?bootstrap_accounts:string list ->
@@ -239,3 +252,27 @@ val send_transaction_to_sequencer : (unit -> 'a Lwt.t) -> Evm_node.t -> 'a Lwt.t
     with the results of [sends]. *)
 val send_transactions_to_sequencer :
   sends:(unit -> 'a Lwt.t) list -> Evm_node.t -> (int * 'a list) Lwt.t
+
+(** Run [octez-client transfer amount from giver to bridge --entrypoint deposit --arg '(Pair "sr_address" l2_address)']. *)
+val deposit :
+  ?env:string String_map.t ->
+  ?hooks:Process.hooks ->
+  ?log_output:bool ->
+  ?endpoint:Client.endpoint ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:int ->
+  ?safety_guard:int ->
+  ?storage_limit:int ->
+  ?counter:int ->
+  ?simulation:bool ->
+  ?force:bool ->
+  ?expect_failure:bool ->
+  amount:Tez.t ->
+  giver:string ->
+  sr_address:string ->
+  bridge:string ->
+  l2_address:string ->
+  Client.t ->
+  unit Lwt.t

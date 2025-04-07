@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -8,7 +8,6 @@ pub struct OutputOptions {
     pub log: bool,
     pub summary: bool,
     pub result: bool,
-    pub diff: bool,
 }
 
 pub struct LabelIndexes<'a> {

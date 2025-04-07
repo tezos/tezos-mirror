@@ -85,7 +85,6 @@ module Make (Args : Args) : sig
     unit
 end = struct
   open Args
-  module Errs = Io_errors.Make (File_manager.Io)
 
   let pp_key = Brassaia.Type.pp Hash.t
   let decode_key = Brassaia.Type.(unstage (decode_bin Hash.t))
@@ -385,8 +384,10 @@ end = struct
           (iter_pack_entry ~always v, finalise v, "Checking and fixing index")
     in
     let run_duration = Mtime_clock.counter () in
-    let file_manager = File_manager.open_ro config |> Errs.raise_if_error in
-    let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
+    let file_manager =
+      File_manager.open_ro config |> Io_errors.raise_if_error
+    in
+    let dispatcher = Dispatcher.init file_manager |> Io_errors.raise_if_error in
     let total = Dispatcher.end_offset dispatcher in
     let ingest_data progress =
       if File_manager.gc_allowed file_manager then
@@ -405,7 +406,7 @@ end = struct
       Progress.(with_reporter bar) ingest_data
     in
     finalise ();
-    File_manager.close file_manager |> Errs.raise_if_error;
+    File_manager.close file_manager |> Io_errors.raise_if_error;
     let run_duration = Mtime_clock.count run_duration in
     let store_stats fmt =
       Fmt.pf fmt "Store statistics:@,  @[<v 0>%a@]" Stats.pp stats

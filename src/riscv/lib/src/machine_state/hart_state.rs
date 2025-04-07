@@ -6,10 +6,11 @@
 use super::csregisters::xstatus::MStatus;
 use crate::{
     bits::u64,
+    default::ConstDefault,
     machine_state::{
-        bus::Address,
-        csregisters::{self, xstatus, CSRegister},
-        mode::{self, Mode, TrapMode},
+        csregisters::{self, CSRegister, xstatus},
+        main_memory::Address,
+        mode::{Mode, TrapMode},
         registers,
         reservation_set::{self, ReservationSet},
     },
@@ -29,7 +30,7 @@ pub struct HartState<M: backend::ManagerBase> {
     pub csregisters: csregisters::CSRegisters<M>,
 
     /// Current running mode of hart
-    pub mode: mode::ModeCell<M>,
+    pub mode: Cell<Mode, M>,
 
     /// Program counter
     pub pc: Cell<Address, M>,
@@ -43,7 +44,7 @@ pub type HartStateLayout = (
     registers::XRegistersLayout,
     registers::FRegistersLayout,
     csregisters::CSRegistersLayout,
-    mode::ModeLayout,
+    Atom<Mode>,
     Atom<Address>,                         // Program counter layout
     reservation_set::ReservationSetLayout, // Reservation set layout
 );
@@ -55,21 +56,24 @@ impl<M: backend::ManagerBase> HartState<M> {
             xregisters: registers::XRegisters::bind(space.0),
             fregisters: registers::FRegisters::bind(space.1),
             csregisters: csregisters::CSRegisters::bind(space.2),
-            mode: mode::ModeCell::bind(space.3),
+            mode: space.3,
             pc: space.4,
             reservation_set: ReservationSet::bind(space.5),
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> backend::AllocatedOf<HartStateLayout, backend::Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> backend::AllocatedOf<HartStateLayout, F::Output> {
         (
-            self.xregisters.struct_ref(),
-            self.fregisters.struct_ref(),
-            self.csregisters.struct_ref(),
-            self.mode.struct_ref(),
-            self.pc.struct_ref(),
-            self.reservation_set.struct_ref(),
+            self.xregisters.struct_ref::<F>(),
+            self.fregisters.struct_ref::<F>(),
+            self.csregisters.struct_ref::<F>(),
+            self.mode.struct_ref::<F>(),
+            self.pc.struct_ref::<F>(),
+            self.reservation_set.struct_ref::<F>(),
         )
     }
 
@@ -81,7 +85,7 @@ impl<M: backend::ManagerBase> HartState<M> {
         self.xregisters.reset();
         self.fregisters.reset();
         self.csregisters.reset();
-        self.mode.reset();
+        self.mode.write(Mode::DEFAULT);
         self.pc.write(pc);
         self.reservation_set.reset();
     }
@@ -185,20 +189,15 @@ impl<M: backend::ManagerBase> HartState<M> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::{
-        machine_state::hart_state::{HartState, HartStateLayout},
-        state_backend::tests::test_determinism,
-    };
-
-    #[test]
-    fn test_hart_state_reset() {
-        proptest::proptest!(|(pc: u64)| {
-            test_determinism::<HartStateLayout, _>(|space| {
-                let mut hart = HartState::bind(space);
-                hart.reset(pc);
-            });
-        });
+impl<M: backend::ManagerClone> Clone for HartState<M> {
+    fn clone(&self) -> Self {
+        Self {
+            xregisters: self.xregisters.clone(),
+            fregisters: self.fregisters.clone(),
+            csregisters: self.csregisters.clone(),
+            mode: self.mode.clone(),
+            pc: self.pc.clone(),
+            reservation_set: self.reservation_set.clone(),
+        }
     }
 }

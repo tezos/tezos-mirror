@@ -131,7 +131,7 @@ _`Attesting rights`
 _`Baker`
     When a delegate_ creates a new block_, it is called the baker of this block.
     `Baking rights`_ are distributed to different delegates based on their
-    available stake_. Only a delegate with baking rights
+    `baking power`_. Only a delegate with baking rights
     is allowed to bake.
     The baker selects transactions from the mempool_ to be included in the block it bakes.
 
@@ -142,11 +142,19 @@ _`Baker`
 _`Baking`
     The act of creating a new block_ by a baker_.
 
+_`Baking power`
+    The amount of tokens that determines a delegate_'s weight
+    in the selection of its baking and
+    `attesting rights`_. A delegate's baking power is computed from the
+    delegate's own tokens and the sums of tokens delegated and staked to
+    it (where staked tokens weigh more than tokens just delegated). See
+    :doc:`./baking_power` for details.
+
 _`Baking rights`
     Baking_/attesting_ a block_ can only be done by a delegate_ who holds the
     baking/attesting right for that block level_ and round_. At the start of a cycle_,
     baking and attesting rights are computed for all the block_ levels and rounds in the
-    cycle_, based on the proportion of the stake_ of each delegate_.
+    cycle_, based on the `baking power`_ of each delegate_.
 
     For each block_ level and round_, there is exactly one account that is allowed to bake, but several accounts are allowed to attest.
 
@@ -184,13 +192,13 @@ _`Delegate`
     Actual participation is under further provisions, like having a `minimal stake`_.
     A user account becomes a delegate by registering as such.
     Through delegation_, other accounts can delegate their rights to a delegate account.
-    The delegate's rights are calculated based on its stake_.
+
     Note that ``tz4`` accounts cannot be delegates.
 
 _`Delegation`
     An operation_ in which an account_ designates a
-    delegate_. The delegating account's balance increases the delegate_'s stake_ and consequently
-    its `baking rights`_ and `attesting rights`_. However, the delegate_ does not control the funds of
+    delegate_. The delegating account's balance increases the delegate_'s `baking power`_ and consequently
+    its `baking rights`_ and `attesting rights`_; it also increases its `voting power`_. However, the delegate_ does not control the funds of
     the delegating account_, e.g., it can not spend them.
 
 .. _def_double_signing_alpha:
@@ -346,14 +354,6 @@ _`Smart Rollup`
     (e.g., an EVM-compatible one), or an application-specific DApp.
     See :doc:`smart_rollups`.
 
-_`Stake`
-    The amount of tokens that determines a delegate_'s weight in the
-    governance process and in the selection of its baking and
-    `attesting rights`_. A delegate's stake is usually given by the
-    delegate's own tokens plus the sum of tokens delegated to
-    it. However, there are cases when this is not the case, see
-    :ref:`here<active_stake_alpha>` for details.
-
 _`Staker`
     A `user account`_ that made a security deposit.
     The user account must have set a delegate.
@@ -394,6 +394,12 @@ _`Voting period`
     Any of the ``proposal``, ``exploration``, ``cooldown``,
     ``promotion`` or ``adoption`` stages in the voting procedure when
     amending the `economic protocol`_.
+
+_`Voting power`
+    The amount of tokens that determines a delegate_'s weight in the
+    voting process. A delegate's voting power is computed from the
+    delegate's own tokens and the sum of tokens delegated to
+    it. See :ref:`voting_power_alpha` for details.
 
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains

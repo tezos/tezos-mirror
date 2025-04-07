@@ -10,6 +10,8 @@
   octez-proto-libs.protocol-environment
   octez-libs.tezos-context-brassaia
   octez-libs.tezos-context)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives))

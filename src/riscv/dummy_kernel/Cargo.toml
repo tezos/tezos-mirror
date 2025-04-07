@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies.tezos_crypto_rs]
 version = "0.6.0"
+path = "../../../sdk/rust/crypto"
 default-features = false
 
 [dependencies.tezos-smart-rollup]

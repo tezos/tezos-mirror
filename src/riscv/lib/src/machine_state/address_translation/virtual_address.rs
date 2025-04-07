@@ -15,15 +15,14 @@ use super::PAGE_OFFSET_WIDTH;
 use crate::{
     bits::{ones, u64},
     machine_state::{
-        bus::Address,
-        csregisters::{satp::SvLength, CSRRepr},
+        csregisters::{CSRRepr, satp::SvLength},
+        main_memory::Address,
     },
 };
 
 /// Obtain `VPN[index]` from a VPN field specified by `sv_length` Standard.
 ///
 /// The VPN ranges are indexed from 0. (Ignores the page offset field)
-/// e.g. `raw_range_VPN[0] = 8..=0` ([`Twiddle`] expects reversed bit ranges)
 fn get_raw_vpn_i_range(sv_length: &SvLength, index: usize) -> Option<(usize, usize)> {
     use SvLength::*;
     let bit_range = match (index, sv_length) {
@@ -42,7 +41,7 @@ pub const fn get_page_offset(addr: u64) -> u64 {
     addr & ones(PAGE_OFFSET_WIDTH as u64)
 }
 
-/// Obtain VPN[index] from a virtual address specified by `sv_length` Standard.
+/// Obtain `VPN[index]` from a virtual address specified by `sv_length` Standard.
 pub fn get_vpn_idx(v_addr: Address, sv_length: &SvLength, index: usize) -> Option<CSRRepr> {
     let bit_range = get_raw_vpn_i_range(sv_length, index)?;
     Some(u64::bits_subset(

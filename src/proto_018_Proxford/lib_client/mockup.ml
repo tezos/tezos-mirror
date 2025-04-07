@@ -101,8 +101,8 @@ module Parsed_account = struct
 
   let to_bootstrap_account repr =
     let open Lwt_result_syntax in
-    let* pk_uri = Tezos_client_base.Client_keys.neuterize repr.sk_uri in
-    let* public_key = Tezos_client_base.Client_keys.public_key pk_uri in
+    let* pk_uri = Client_keys.neuterize repr.sk_uri in
+    let* public_key = Client_keys.public_key pk_uri in
     let public_key_hash = Signature.Public_key.hash public_key in
     return
       Parameters.

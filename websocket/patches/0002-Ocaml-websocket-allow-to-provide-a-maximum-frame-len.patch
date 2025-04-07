@@ -1,0 +1,173 @@
+From 35e2ba071a2e0ac1fb39e58f71010200734a796f Mon Sep 17 00:00:00 2001
+From: Alain Mebsout <alain.mebsout@functori.com>
+Date: Sun, 22 Dec 2024 12:45:14 +0100
+Subject: [PATCH 1/1] Ocaml-websocket: allow to provide a maximum frame length
+
+---
+ websocket/core/websocket.ml            | 16 +++++++++++-----
+ websocket/core/websocket.mli           |  2 ++
+ websocket/lwt/websocket_cohttp_lwt.ml  |  8 ++++----
+ websocket/lwt/websocket_cohttp_lwt.mli |  1 +
+ websocket/lwt/websocket_lwt_unix.ml    |  3 ++-
+ websocket/lwt/websocket_lwt_unix.mli   |  1 +
+ 6 files changed, 21 insertions(+), 10 deletions(-)
+
+diff --git a/websocket/core/websocket.ml b/websocket/core/websocket.ml
+index 86ec1311f32..222e577b022 100644
+--- a/websocket/core/websocket.ml
++++ b/websocket/core/websocket.ml
+@@ -155,6 +155,7 @@ module type S = sig
+   type mode = Client of (int -> string) | Server
+
+   val make_read_frame :
++    ?max_len:int ->
+     ?buf:Buffer.t -> mode:mode -> IO.ic -> IO.oc -> unit -> Frame.t IO.t
+
+   val write_frame_to_buf : mode:mode -> Buffer.t -> Frame.t -> unit
+@@ -177,6 +178,7 @@ module type S = sig
+     type t
+
+     val create :
++      ?max_len:int ->
+       ?read_buf:Buffer.t ->
+       ?write_buf:Buffer.t ->
+       Cohttp.Request.t ->
+@@ -265,7 +267,7 @@ module Make (IO : Cohttp.S.IO) = struct
+     write_frame_to_buf ~mode buf @@ Frame.close code;
+     write oc @@ Buffer.contents buf
+
+-  let read_frame ic oc buf mode hdr =
++  let read_frame ?max_len ic oc buf mode hdr =
+     let hdr_part1 = EndianString.BigEndian.get_int8 hdr 0 in
+     let hdr_part2 = EndianString.BigEndian.get_int8 hdr 1 in
+     let final = is_bit_set 7 hdr_part1 in
+@@ -291,6 +293,10 @@ module Make (IO : Cohttp.S.IO) = struct
+     else if extension <> 0 then
+       close_with_code mode buf oc 1002 >>= fun () ->
+       proto_error "unsupported extension"
++    else if (match max_len with Some max -> payload_len > max | None -> false)
++    then
++      close_with_code mode buf oc 1009 >>= fun () ->
++      proto_error "frame payload too big"
+     else if Frame.Opcode.is_ctrl opcode && payload_len > 125 then
+       close_with_code mode buf oc 1002 >>= fun () ->
+       proto_error "control frame too big"
+@@ -315,11 +321,11 @@ module Make (IO : Cohttp.S.IO) = struct
+             let frame = Frame.of_bytes ~opcode ~extension ~final payload in
+             return frame)
+
+-  let make_read_frame ?(buf = Buffer.create 128) ~mode ic oc () =
++  let make_read_frame ?max_len ?(buf = Buffer.create 128) ~mode ic oc () =
+     Buffer.clear buf;
+     read_exactly ic 2 buf >>= function
+     | None -> raise End_of_file
+-    | Some hdr -> read_frame ic oc buf mode hdr
++    | Some hdr -> read_frame ?max_len ic oc buf mode hdr
+
+   module Request = Cohttp.Request.Make (IO)
+   module Response = Cohttp.Response.Make (IO)
+@@ -337,9 +343,9 @@ module Make (IO : Cohttp.S.IO) = struct
+
+     let source { endp; _ } = endp
+
+-    let create ?read_buf ?(write_buf = Buffer.create 128) http_request endp ic
++    let create ?max_len ?read_buf ?(write_buf = Buffer.create 128) http_request endp ic
+         oc =
+-      let read_frame = make_read_frame ?buf:read_buf ~mode:Server ic oc in
++      let read_frame = make_read_frame ?max_len ?buf:read_buf ~mode:Server ic oc in
+       {
+         buffer = write_buf;
+         endp;
+diff --git a/websocket/core/websocket.mli b/websocket/core/websocket.mli
+index 04f1689646b..359761b34fc 100644
+--- a/websocket/core/websocket.mli
++++ b/websocket/core/websocket.mli
+@@ -84,6 +84,7 @@ module type S = sig
+   type mode = Client of (int -> string) | Server
+
+   val make_read_frame :
++    ?max_len:int ->
+     ?buf:Buffer.t -> mode:mode -> IO.ic -> IO.oc -> unit -> Frame.t IO.t
+
+   val write_frame_to_buf : mode:mode -> Buffer.t -> Frame.t -> unit
+@@ -106,6 +107,7 @@ module type S = sig
+     type t
+
+     val create :
++      ?max_len:int ->
+       ?read_buf:Buffer.t ->
+       ?write_buf:Buffer.t ->
+       Cohttp.Request.t ->
+diff --git a/websocket/lwt/websocket_cohttp_lwt.ml b/websocket/lwt/websocket_cohttp_lwt.ml
+index f3b5b9ca03b..21376b94361 100644
+--- a/websocket/lwt/websocket_cohttp_lwt.ml
++++ b/websocket/lwt/websocket_cohttp_lwt.ml
+@@ -29,12 +29,12 @@ let send_frames stream oc =
+   in
+   Lwt_stream.iter_s send_frame stream
+
+-let read_frames ic oc handler_fn =
+-  let read_frame = Lwt_IO.make_read_frame ~mode:Server ic oc in
++let read_frames ?max_len ic oc handler_fn =
++  let read_frame = Lwt_IO.make_read_frame ?max_len ~mode:Server ic oc in
+   let rec inner () = read_frame () >>= Lwt.wrap1 handler_fn >>= inner in
+   inner ()
+
+-let upgrade_connection request incoming_handler io_error_handler =
++let upgrade_connection ?max_frame_length request incoming_handler io_error_handler =
+   let headers = Cohttp.Request.headers request in
+   (match Cohttp.Header.get headers "sec-websocket-key" with
+   | None ->
+@@ -61,7 +61,7 @@ let upgrade_connection request incoming_handler io_error_handler =
+       [
+         (* input: data from the client is read from the input channel
+          * of the tcp connection; pass it to handler function *)
+-        read_frames ic oc incoming_handler;
++        read_frames ?max_len:max_frame_length ic oc incoming_handler;
+         (* output: data for the client is written to the output
+          * channel of the tcp connection *)
+         send_frames frames_out_stream oc;
+diff --git a/websocket/lwt/websocket_cohttp_lwt.mli b/websocket/lwt/websocket_cohttp_lwt.mli
+index af333b7a48a..22f3f323399 100644
+--- a/websocket/lwt/websocket_cohttp_lwt.mli
++++ b/websocket/lwt/websocket_cohttp_lwt.mli
+@@ -19,6 +19,7 @@
+ open Websocket
+
+ val upgrade_connection :
++  ?max_frame_length:int ->
+   Cohttp.Request.t ->
+   (Frame.t -> unit) ->
+   (exn -> unit Lwt.t) ->
+diff --git a/websocket/lwt/websocket_lwt_unix.ml b/websocket/lwt/websocket_lwt_unix.ml
+index 4080aa7b7bd..608509b219a 100644
+--- a/websocket/lwt/websocket_lwt_unix.ml
++++ b/websocket/lwt/websocket_lwt_unix.ml
+@@ -101,11 +101,12 @@ let write { write_frame; _ } frame = write_frame frame
+ let close_transport { oc; _ } = Lwt_io.close oc
+
+ let connect ?(extra_headers = Cohttp.Header.init ())
++    ?max_frame_length
+     ?(random_string = Websocket.Rng.init ())
+     ?(ctx = Lazy.force Conduit_lwt_unix.default_ctx) ?buf client url =
+   let nonce = Base64.encode_exn (random_string 16) in
+   connect ctx client url nonce extra_headers >|= fun (ic, oc) ->
+-  let read_frame = make_read_frame ?buf ~mode:(Client random_string) ic oc in
++  let read_frame = make_read_frame ?max_len:max_frame_length ?buf ~mode:(Client random_string) ic oc in
+   let read_frame () =
+     Lwt.catch read_frame (fun exn ->
+         Lwt.async (fun () -> Lwt_io.close ic);
+diff --git a/websocket/lwt/websocket_lwt_unix.mli b/websocket/lwt/websocket_lwt_unix.mli
+index 2ad27369024..53a342e2bd8 100644
+--- a/websocket/lwt/websocket_lwt_unix.mli
++++ b/websocket/lwt/websocket_lwt_unix.mli
+@@ -39,6 +39,7 @@ val close_transport : conn -> unit Lwt.t
+
+ val connect :
+   ?extra_headers:Cohttp.Header.t ->
++  ?max_frame_length:int ->
+   ?random_string:(int -> string) ->
+   ?ctx:Conduit_lwt_unix.ctx ->
+   ?buf:Buffer.t ->
+--
+2.44.0

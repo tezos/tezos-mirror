@@ -4,16 +4,15 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    DebuggerApp, Instruction, SATPModeState, TranslationState, BLUE, GRAY, GREEN, NEXT_STYLE_FG,
-    ORANGE, RED, SELECTED_STYLE_FG, YELLOW,
+    BLUE, DebuggerApp, GRAY, GREEN, Instruction, NEXT_STYLE_FG, ORANGE, RED, SATPModeState,
+    SELECTED_STYLE_FG, TranslationState, YELLOW,
 };
 use octez_riscv::{
     machine_state::{
         csregisters::{
-            self,
+            self, CSRegister,
             satp::SvLength,
             xstatus::{ExtensionValue, MPPValue, MStatus, SPPValue},
-            CSRegister,
         },
         registers,
     },
@@ -243,8 +242,8 @@ where
             .borders(Borders::ALL)
             .border_set(border::THICK);
 
-        use csregisters::*;
         use CSRegister as CSR;
+        use csregisters::*;
 
         let mstatus: MStatus = self
             .stepper

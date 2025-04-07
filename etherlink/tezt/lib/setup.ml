@@ -31,6 +31,7 @@ type sequencer_setup = {
   boot_sector : string;
   kernel : Uses.t;
   enable_dal : bool;
+  enable_multichain : bool;
 }
 
 let uses _protocol =
@@ -40,14 +41,14 @@ let uses _protocol =
     Constant.smart_rollup_installer;
   ]
 
-let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
+let setup_l1_contracts ?(dictator = Constant.bootstrap2) ~kernel client =
   (* Originates the delayed transaction bridge. *)
   let* delayed_transaction_bridge =
     Client.originate_contract
       ~alias:"evm-seq-delayed-bridge"
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.public_key_hash
-      ~prg:(delayed_path ())
+      ~prg:(delayed_path ~kernel)
       ~burn_cap:Tez.one
       client
   in
@@ -129,9 +130,30 @@ let run_new_rpc_endpoint evm_node =
   let* () = Evm_node.run rpc_node in
   return rpc_node
 
-let run_new_observer_node ?(patch_config = Fun.id) ~sc_rollup_node evm_node =
+let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
+    ~sc_rollup_node ?rpc_server ?websockets ?history_mode evm_node =
   let preimages_dir = Evm_node.preimages_dir evm_node in
   let initial_kernel = Evm_node.initial_kernel evm_node in
+  let patch_config =
+    if finalized_view then
+      JSON.(
+        fun json ->
+          put
+            ("finalized_view", annotate ~origin:"" (`Bool true))
+            (patch_config json))
+    else patch_config
+  in
+  let patch_config =
+    match (rpc_server, websockets) with
+    | None, None -> patch_config
+    | _, _ ->
+        fun c ->
+          Evm_node.patch_config_with_experimental_feature
+            ?rpc_server
+            ?enable_websocket:websockets
+            ()
+          @@ patch_config c
+  in
   let* observer_mode =
     if Evm_node.supports_threshold_encryption evm_node then
       let bundler =
@@ -151,22 +173,26 @@ let run_new_observer_node ?(patch_config = Fun.id) ~sc_rollup_node evm_node =
         (Evm_node.Observer
            {
              initial_kernel;
-             preimages_dir;
+             preimages_dir = Some preimages_dir;
              private_rpc_port = Some (Port.fresh ());
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
            })
   in
   let* observer =
-    Evm_node.init ~patch_config ~mode:observer_mode (Evm_node.endpoint evm_node)
+    Evm_node.init
+      ~patch_config
+      ~mode:observer_mode
+      ?history_mode
+      (Evm_node.endpoint evm_node)
   in
   return observer
 
-let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
-    ?sequencer_private_rpc_port ~mainnet_compat ?genesis_timestamp
-    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
-    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
-    ?delayed_inbox_min_levels ?max_number_of_chunks ?commitment_period
-    ?challenge_window
+let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
+    ?sequencer_rpc_port ?sequencer_private_rpc_port ~mainnet_compat
+    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+    ?commitment_period ?challenge_window
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -175,8 +201,11 @@ let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
     ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
-    ?history_mode ~enable_dal ?dal_slots protocol =
+    ?enable_fast_withdrawal ?(threshold_encryption = false)
+    ?(drop_duplicate_when_injection = true)
+    ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
+    ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets
+    ?history_mode protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -193,7 +222,9 @@ let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
     else none
   in
   let client = Client.with_dal_node client ?dal_node in
-  let* l1_contracts = setup_l1_contracts client in
+  let* l1_contracts =
+    setup_l1_contracts ~kernel:(Kernel.of_use kernel) client
+  in
   let sc_rollup_node =
     Sc_rollup_node.create
       ~default_operator:Constant.bootstrap1.public_key_hash
@@ -201,7 +232,7 @@ let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
       node
       ~base_dir:(Client.base_dir client)
       ?dal_node
-      ?history_mode
+      ?history_mode:rollup_history_mode
   in
   let preimages_dir =
     Option.value
@@ -211,6 +242,7 @@ let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
   let output_config = Temp.file "config.yaml" in
   let*! () =
     Evm_node.make_kernel_installer_config
+      ?max_delayed_inbox_blueprint_length
       ~mainnet_compat
       ~sequencer:sequencer.public_key
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge
@@ -225,7 +257,9 @@ let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
       ?maximum_allowed_ticks
       ?maximum_gas_per_transaction
       ~enable_dal
+      ?enable_fast_withdrawal
       ?dal_slots
+      ~enable_multichain
       ?max_blueprint_lookahead_in_seconds
       ~bootstrap_accounts
       ~output:output_config
@@ -254,8 +288,10 @@ let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ~drop_duplicate_when_injection
-      ~node_transaction_validation:true
-      ?block_storage_sqlite3
+      ~blueprints_publisher_order_enabled
+      ?next_wasm_runtime
+      ?rpc_server
+      ?enable_websocket:websockets
       (* When adding new experimental feature please make sure it's a
          good idea to activate it for all test or not. *)
       ()
@@ -312,10 +348,17 @@ let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
       ?rpc_port:sequencer_rpc_port
       ~patch_config
       ~mode:sequencer_mode
+      ?history_mode
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* observer =
-    run_new_observer_node ~patch_config ~sc_rollup_node sequencer
+    run_new_observer_node
+      ~patch_config
+      ~sc_rollup_node
+      ?rpc_server
+      ?websockets
+      ?history_mode
+      sequencer
   in
   let* proxy =
     Evm_node.init
@@ -336,21 +379,24 @@ let setup_sequencer ?block_storage_sqlite3 ?sequencer_rpc_port
       boot_sector = output;
       kernel;
       enable_dal;
+      enable_multichain;
     }
 
 (* Register a single variant of a test but for all protocols. *)
-let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
-    ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ~kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?commitment_period
-    ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
-    ?(additional_uses = []) ?history_mode ~enable_dal
-    ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None) body ~title
-    ~tags protocols =
+let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
+    ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
+    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?max_number_of_chunks ?bootstrap_accounts
+    ?sequencer ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
+    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?commitment_period ?challenge_window
+    ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
+    ?rollup_history_mode ~enable_dal
+    ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
+    ~enable_multichain ?rpc_server ?websockets ?history_mode body ~title ~tags
+    protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -359,18 +405,16 @@ let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
     @ (if enable_dal then [Constant.octez_dal_node] else [])
     @ additional_uses
   in
-  let block_storage_sqlite3 =
-    Option.value
-      ~default:
-        ((* If the value is not provided, we need to deactivate it for everything
-              but latest. *)
-         kernel_tag = "latest")
-      block_storage_sqlite3
+  let rpc_server =
+    match (rpc_server, kernel) with
+    | Some _, _ -> rpc_server
+    | _, (Mainnet | Ghostnet) -> None (* default *)
+    | _, Latest -> Some Evm_node.Dream (* test with Dream for latest kernel *)
   in
   let body protocol =
     let* sequencer_setup =
       setup_sequencer
-        ~block_storage_sqlite3
+        ?max_delayed_inbox_blueprint_length
         ?sequencer_rpc_port
         ?sequencer_private_rpc_port
         ~mainnet_compat:false
@@ -396,10 +440,15 @@ let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
         ?maximum_gas_per_transaction
         ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
+        ?enable_fast_withdrawal
         ~threshold_encryption
+        ?rollup_history_mode
+        ?websockets
         ?history_mode
         ~enable_dal
         ?dal_slots
+        ~enable_multichain
+        ?rpc_server
         protocol
     in
     body sequencer_setup protocol
@@ -410,15 +459,17 @@ let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
        (the DAL node) runs and it loads the full DAL SRS which takes
        non-negligible memory. *)
     @ (if enable_dal then ["dal"; Tag.memory_3k] else [])
+    @ (if enable_multichain then ["multichain_enabled"] else [])
     @ tags
   in
   let title =
     sf
-      "%s (%s, %s, %s)"
+      "%s (%s, %s, %s, %s)"
       title
       (if threshold_encryption then "te_sequencer" else "sequencer")
       kernel_tag
       (if enable_dal then "with dal" else "without dal")
+      (if enable_multichain then "multichain" else "single chain")
   in
   (* Only register DAL tests for supporting kernels *)
   if (not enable_dal) || Kernel.supports_dal kernel then
@@ -431,7 +482,7 @@ let register_test ~__FILE__ ?block_storage_sqlite3 ?sequencer_rpc_port
       ~tags
       protocols
 
-let register_test_for_kernels ~__FILE__ ?block_storage_sqlite3
+let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
@@ -439,14 +490,15 @@ let register_test_for_kernels ~__FILE__ ?block_storage_sqlite3
     ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
     ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?history_mode ?commitment_period ?challenge_window
-    ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots ~title ~tags
-    body protocols =
+    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
+    ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots
+    ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
+    ?history_mode ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
         ~__FILE__
-        ?block_storage_sqlite3
+        ?max_delayed_inbox_blueprint_length
         ?sequencer_rpc_port
         ?sequencer_private_rpc_port
         ?commitment_period
@@ -471,11 +523,16 @@ let register_test_for_kernels ~__FILE__ ?block_storage_sqlite3
         ?maximum_gas_per_transaction
         ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
+        ?enable_fast_withdrawal
         ?additional_uses
-        ~threshold_encryption
+        ?rpc_server
+        ?websockets
         ?history_mode
+        ~threshold_encryption
+        ?rollup_history_mode
         ~enable_dal
         ?dal_slots
+        ~enable_multichain
         ~title
         ~tags
         body

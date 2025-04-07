@@ -130,7 +130,7 @@ let test_simple () =
 
 let test_imcompatible_mempool () =
   let open Lwt_result_syntax in
-  let* block, _ = Context.init1 ~consensus_threshold:0 () in
+  let* block, _ = Context.init1 ~consensus_threshold_size:0 () in
   let* block = Block.bake block in
   let* ctxt =
     let+ incr = Incremental.begin_construction block in

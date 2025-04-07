@@ -1,274 +1,248 @@
 [
   {
     "file": "src/proto_alpha/lib_sc_rollup_node/test/test_octez_conversions.ml",
-    "title": "alpha: Smart rollup types octez conversions: roundtrip (roundtrip dal_slot_history)",
+    "title": "alpha: Smart rollup types octez conversions: roundtrip (roundtrip dal_slot_history_cache)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "7687295",
+      "total_time": "49668780",
       "count": "1"
     }
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
-    "title": "alpha: sc rollup inbox (produce payloads proof and verifies it.)",
+    "title": "alpha: sc rollup inbox (Invalid merkelized payload hashes proof fails.)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "194427",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_alpha/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
-    "title": "alpha: sc rollup inbox (Checking inboxes history length)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "alpha"
-    ],
-    "successful_runs": {
-      "total_time": "20434",
+      "total_time": "483098",
       "count": "1"
     }
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/unit/test_global_constants_storage.ml",
-    "title": "alpha: Global constants storage (get always returned the registered constant)",
+    "title": "alpha: Global constants storage (expand on an expression containing a nonexistent global constant fails)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "100240",
+      "total_time": "120275",
       "count": "1"
     }
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/pbt/test_zk_rollup_encoding.ml",
-    "title": "alpha: ZK rollup encoding: : roundtrip (roundtrip Zk_rollup.t)",
+    "title": "alpha: ZK rollup encoding: : roundtrip (roundtrip Zk_rollup_account_repr.t)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "8954",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_alpha/lib_protocol/test/pbt/test_tez_repr.ml",
-    "title": "alpha: Tez_repr (Tez.(+?) is coherent w.r.t. Z.(+))",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "alpha"
-    ],
-    "successful_runs": {
-      "total_time": "386",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_alpha/lib_protocol/test/pbt/test_script_roundtrip.ml",
-    "title": "alpha: roundtrip_size (roundtrip_size)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "alpha"
-    ],
-    "successful_runs": {
-      "total_time": "27213",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_alpha/lib_protocol/test/pbt/test_script_comparison.ml",
-    "title": "alpha: compatible_with_packing (compatible_with_packing)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "alpha"
-    ],
-    "successful_runs": {
-      "total_time": "10013",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_alpha/lib_protocol/test/pbt/test_script_comparison.ml",
-    "title": "alpha: transitivity (transitivity)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "alpha"
-    ],
-    "successful_runs": {
-      "total_time": "21510",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_alpha/lib_protocol/test/pbt/test_sc_rollup_encoding.ml",
-    "title": "alpha: SC rollup encoding: : roundtrip (roundtrip Sc_rollup_commitment.t)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "alpha"
-    ],
-    "successful_runs": {
-      "total_time": "26027",
+      "total_time": "14390095",
       "count": "1"
     }
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/pbt/test_refutation_game.ml",
-    "title": "alpha: Refutation_game: Refutation (Perfect against Eager)",
+    "title": "alpha: Refutation_game: Refutation (Perfect against Keen)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "56967075",
+      "total_time": "96431027",
       "count": "1"
     }
   },
   {
-    "file": "src/proto_alpha/lib_protocol/test/pbt/test_operation_encoding.ml",
-    "title": "alpha: Operation_encoding: roundtrip (roundtrip Operation.t)",
+    "file": "src/proto_alpha/lib_protocol/test/pbt/test_gas_properties.ml",
+    "title": "alpha: gas properties (Consuming commutes)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "3815216",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_alpha/lib_protocol/test/pbt/test_merkle_list.ml",
-    "title": "alpha: scons_equiv (scons_scons_tr_equiv)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "alpha"
-    ],
-    "successful_runs": {
-      "total_time": "4499202",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_alpha/lib_protocol/test/pbt/test_compare_operations.ml",
-    "title": "alpha: Compare_operations (Compare operations is a strict total order)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "alpha"
-    ],
-    "successful_runs": {
-      "total_time": "376492",
+      "total_time": "1744",
       "count": "1"
     }
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/pbt/test_carbonated_map.ml",
-    "title": "alpha: Carbonated map (Merging with failing merge-overlap)",
+    "title": "alpha: Carbonated map (Find all elements)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "910497",
+      "total_time": "826421",
       "count": "1"
     }
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/pbt/saturation_fuzzing.ml",
-    "title": "alpha: add (t1 + t2 = t2 + t1)",
+    "title": "alpha: sub (t - 0 = t)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "3319",
+      "total_time": "221",
       "count": "1"
     }
   },
   {
-    "file": "src/proto_alpha/lib_protocol/test/integration/michelson/test_lazy_storage_diff.ml",
-    "title": "alpha: lazy storage diff (encoding roundtrip)",
+    "file": "src/proto_alpha/lib_client/test/test_proxy.ml",
+    "title": "alpha: proxy ([fst (split_key s)] is a prefix of [s])",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "212",
+      "total_time": "996607",
       "count": "1"
     }
   },
   {
-    "file": "src/proto_alpha/lib_plugin/test/test_consensus_filter.ml",
-    "title": "alpha: pre_filter (same level, different round, acceptable op)",
+    "file": "src/proto_021_PsquebeC/lib_sc_rollup_node/test/test_octez_conversions.ml",
+    "title": "021-PsquebeC: Smart rollup types octez conversions: roundtrip (roundtrip dal_slot_index)",
     "tags": [
       "alcotezt",
       "slow",
-      "alpha"
+      "quebeca"
     ],
     "successful_runs": {
-      "total_time": "1477",
+      "total_time": "261",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_021_PsquebeC/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
+    "title": "021-PsquebeC: sc rollup inbox (Produce a merkelized payload hashes proof and verify its validity.)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "quebeca"
+    ],
+    "successful_runs": {
+      "total_time": "78968",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_021_PsquebeC/lib_protocol/test/unit/test_global_constants_storage.ml",
+    "title": "021-PsquebeC: Global constants storage (expand: random)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "quebeca"
+    ],
+    "successful_runs": {
+      "total_time": "45871",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_021_PsquebeC/lib_protocol/test/pbt/test_zk_rollup_encoding.ml",
+    "title": "021-PsquebeC: ZK rollup encoding: : roundtrip (roundtrip Zk_rollup_operation_repr.t)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "quebeca"
+    ],
+    "successful_runs": {
+      "total_time": "1316299",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_021_PsquebeC/lib_protocol/test/pbt/test_refutation_game.ml",
+    "title": "021-PsquebeC: Refutation_game: Refutation (Perfect against Lazy)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "quebeca"
+    ],
+    "successful_runs": {
+      "total_time": "36681904",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_021_PsquebeC/lib_protocol/test/pbt/test_gas_properties.ml",
+    "title": "021-PsquebeC: gas properties ([free] is the neutral element of Gas addition)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "quebeca"
+    ],
+    "successful_runs": {
+      "total_time": "703",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_021_PsquebeC/lib_protocol/test/pbt/test_carbonated_map.ml",
+    "title": "021-PsquebeC: Carbonated map (Merge compared with list operation)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "quebeca"
+    ],
+    "successful_runs": {
+      "total_time": "1077012",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_021_PsquebeC/lib_protocol/test/pbt/test_bitset.ml",
+    "title": "021-PsquebeC: quantity (diff)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "quebeca"
+    ],
+    "successful_runs": {
+      "total_time": "2663165",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_021_PsquebeC/lib_protocol/test/pbt/saturation_fuzzing.ml",
+    "title": "021-PsquebeC: sub (t - t = 0)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "quebeca"
+    ],
+    "successful_runs": {
+      "total_time": "2465",
       "count": "1"
     }
   },
   {
     "file": "src/proto_020_PsParisC/lib_sc_rollup_node/test/test_octez_conversions.ml",
-    "title": "020-PsParisC: Smart rollup types octez conversions: roundtrip (roundtrip state_hash)",
+    "title": "020-PsParisC: Smart rollup types octez conversions: roundtrip (roundtrip address)",
     "tags": [
       "alcotezt",
       "slow",
       "parisc"
     ],
     "successful_runs": {
-      "total_time": "1847",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_020_PsParisC/lib_sc_rollup_node/test/test_octez_conversions.ml",
-    "title": "020-PsParisC: Smart rollup types octez conversions: roundtrip (roundtrip commitment_hash)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisc"
-    ],
-    "successful_runs": {
-      "total_time": "1505",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_020_PsParisC/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
-    "title": "020-PsParisC: sc rollup inbox (negative test of inclusion proof.)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisc"
-    ],
-    "successful_runs": {
-      "total_time": "1328455",
+      "total_time": "1259",
       "count": "1"
     }
   },
@@ -281,85 +255,46 @@
       "parisc"
     ],
     "successful_runs": {
-      "total_time": "160125",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_020_PsParisC/lib_protocol/test/unit/test_global_constants_storage.ml",
-    "title": "020-PsParisC: Global constants storage (expand is idempotent)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisc"
-    ],
-    "successful_runs": {
-      "total_time": "26072",
+      "total_time": "154978",
       "count": "1"
     }
   },
   {
     "file": "src/proto_020_PsParisC/lib_protocol/test/pbt/test_sc_rollup_tick_repr.ml",
-    "title": "020-PsParisC: Tick_repr (of_int only accepts natural numbers)",
+    "title": "020-PsParisC: Tick_repr (distance is a distance (triangle inequality))",
     "tags": [
       "alcotezt",
       "slow",
       "parisc"
     ],
     "successful_runs": {
-      "total_time": "195",
+      "total_time": "277",
       "count": "1"
     }
   },
   {
     "file": "src/proto_020_PsParisC/lib_protocol/test/pbt/test_refutation_game.ml",
-    "title": "020-PsParisC: Refutation_game: Refutation (dissection is one kernel_run)",
+    "title": "020-PsParisC: Refutation_game: Dissection (distance < nb_of_sections => (len dissection = succ (dist dissection)))",
     "tags": [
       "alcotezt",
       "slow",
       "parisc"
     ],
     "successful_runs": {
-      "total_time": "3778910",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_020_PsParisC/lib_protocol/test/pbt/test_refutation_game.ml",
-    "title": "020-PsParisC: Refutation_game: Dissection (gen_dissection produces a valid dissection)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisc"
-    ],
-    "successful_runs": {
-      "total_time": "210645",
+      "total_time": "7724",
       "count": "1"
     }
   },
   {
     "file": "src/proto_020_PsParisC/lib_protocol/test/pbt/test_carbonated_map.ml",
-    "title": "020-PsParisC: Carbonated map (Empty map is right identity for merge)",
+    "title": "020-PsParisC: Carbonated map (Add a new element increases size by one)",
     "tags": [
       "alcotezt",
       "slow",
       "parisc"
     ],
     "successful_runs": {
-      "total_time": "874514",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_020_PsParisC/lib_protocol/test/pbt/test_carbonated_map.ml",
-    "title": "020-PsParisC: Carbonated map (Test that fold commutes with folding over a list)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisc"
-    ],
-    "successful_runs": {
-      "total_time": "860574",
+      "total_time": "884850",
       "count": "1"
     }
   },
@@ -372,46 +307,20 @@
       "parisc"
     ],
     "successful_runs": {
-      "total_time": "262",
+      "total_time": "303",
       "count": "1"
     }
   },
   {
-    "file": "src/proto_020_PsParisC/lib_protocol/test/pbt/test_bitset.ml",
-    "title": "020-PsParisC: quantity (inter)",
+    "file": "src/proto_020_PsParisC/lib_protocol/test/pbt/liquidity_baking_pbt.ml",
+    "title": "020-PsParisC: Economic Properties (Share price only increases)",
     "tags": [
       "alcotezt",
       "slow",
       "parisc"
     ],
     "successful_runs": {
-      "total_time": "2611169",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_020_PsParisC/lib_protocol/test/pbt/test_balance_updates_encoding.ml",
-    "title": "020-PsParisC: Operation_encoding: legacy : roundtrip (roundtrip Balance_updates)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisc"
-    ],
-    "successful_runs": {
-      "total_time": "12580893",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_020_PsParisC/lib_protocol/test/integration/operations/test_transfer.ml",
-    "title": "020-PsParisC: transfer (block with multiple transfer paying fee)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisc"
-    ],
-    "successful_runs": {
-      "total_time": "29936",
+      "total_time": "72707877",
       "count": "1"
     }
   },
@@ -424,20 +333,7 @@
       "parisc"
     ],
     "successful_runs": {
-      "total_time": "14998921",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_020_PsParisC/lib_protocol/test/integration/michelson/test_interpretation.ml",
-    "title": "020-PsParisC: interpretation (map instr against options)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisc"
-    ],
-    "successful_runs": {
-      "total_time": "1380692",
+      "total_time": "18053078",
       "count": "1"
     }
   },
@@ -450,686 +346,187 @@
       "parisc"
     ],
     "successful_runs": {
-      "total_time": "786",
+      "total_time": "659",
       "count": "1"
     }
   },
   {
-    "file": "src/proto_020_PsParisC/lib_dac_plugin/test/test_dac_pages_encoding.ml",
-    "title": "020-PsParisC: [Unit] Dac_pages_encoding.ml (PBT for [Merkle_tree.Make_buffered] functor via serialization/deserialization roundtrip)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisc"
-    ],
-    "successful_runs": {
-      "total_time": "5947594",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_sc_rollup_node/test/test_octez_conversions.ml",
-    "title": "019-PtParisB: Smart rollup types octez conversions: roundtrip (roundtrip address)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "1384",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_sc_rollup_node/test/test_octez_conversions.ml",
-    "title": "019-PtParisB: Smart rollup types octez conversions: roundtrip (roundtrip refutation)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "26797",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
-    "title": "019-PtParisB: sc rollup inbox (test to verify a proof with another payload.)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "175384",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
-    "title": "019-PtParisB: sc rollup inbox (messages are correctly added in payloads history)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "165144",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/test_zk_rollup_encoding.ml",
-    "title": "019-PtParisB: ZK rollup encoding: : to_scalar (to_scalar Zk_rollup_operation.t)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "105335",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/test_sc_rollup_tick_repr.ml",
-    "title": "019-PtParisB: Tick_repr (distance is a distance (triangle inequality))",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "301",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/test_refutation_game.ml",
-    "title": "019-PtParisB: Refutation_game: Refutation (Perfect against SOL hater)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "27227127",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/test_refutation_game.ml",
-    "title": "019-PtParisB: Refutation_game: Dissection (distance < nb_of_sections => (len dissection = succ (dist dissection)))",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "10669",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/test_merkle_list.ml",
-    "title": "019-PtParisB: of_list_equiv (of_list_snoc_tr_equiv)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "3610927",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/test_carbonated_map.ml",
-    "title": "019-PtParisB: Carbonated map (Add a new element increases size by one)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "825234",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/test_carbonated_map.ml",
-    "title": "019-PtParisB: Carbonated map (Test map with failing function)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "860862",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/test_bytes_conversion.ml",
-    "title": "019-PtParisB: bytes and int/nat conversion : bytes_int_conv (int_of_bytes)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "345",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/test_bitset.ml",
-    "title": "019-PtParisB: quantity (fill)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "12866",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/saturation_fuzzing.ml",
-    "title": "019-PtParisB: sub (t1 - t2 <= t1)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "235",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/liquidity_baking_pbt.ml",
-    "title": "019-PtParisB: Machines Cross-Validation (Positive pools)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "61590435",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/pbt/liquidity_baking_pbt.ml",
-    "title": "019-PtParisB: Economic Properties (Share price only increases)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "61718253",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/integration/michelson/test_sapling.ml",
-    "title": "019-PtParisB: sapling (bench_fold_over_same_token)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "13352707",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/proto_019_PtParisB/lib_protocol/test/integration/michelson/test_interpretation.ml",
-    "title": "019-PtParisB: interpretation (check robustness overflow error in lwt)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "parisb"
-    ],
-    "successful_runs": {
-      "total_time": "6060011",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_requester/test/test_fuzzing_requester.ml",
-    "title": "Requester_PBT: read (Result.is_ok (read t key) = Option.is_some (read_opt t key))",
+    "file": "src/lib_stdlib/test-unix/test_circular_buffer_fuzzy.ml",
+    "title": "Stdlib.circular_buffer: Invalid argument (Stdlib.circular_buffer.equivalence-with-reference-implementation-without-invalid-argument)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "224259",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_shell/test/test_synchronisation_heuristic_fuzzy.ml",
-    "title": "synchronisation heuristic fuzzy: synchronisation heuristic fuzzy (Shell.synchronisation_heuristic.equivalence-with-reference-implementation (threshold 3) (latency 100))",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "2418757",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_shell/test/test_prevalidator_pending_operations.ml",
-    "title": "Prevalidator_pending_operations: fold ordering (Ensure that fold returns operations in their status and priority ordering)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "20734",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_shell/test/test_prevalidator_classification_operations.ml",
-    "title": "Prevalidator: recycle_operations ([recycle_operations ~live_blocks:empty] is empty)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "3883672",
+      "total_time": "142703",
       "count": "1"
     }
   },
   {
     "file": "src/lib_shell/test/test_prevalidator_classification.ml",
-    "title": "Prevalidator_classification: to_map (Check property between map, remove and add (1))",
+    "title": "Prevalidator_classification: is_in_mempool ([is_in_mempool] and [remove_*] are well-behaved)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "60913",
+      "total_time": "11767",
       "count": "1"
     }
   },
   {
     "file": "src/lib_scoru_wasm/test/test_parser_encoding.ml",
-    "title": "test lib scoru wasm: Parser Encodings (Vec)",
+    "title": "test lib scoru wasm: Parser Encodings (Func_type)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "18790",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_scoru_wasm/test/test_parser_encoding.ml",
-    "title": "test lib scoru wasm: Parser Encodings (Field)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "10286655",
+      "total_time": "48977",
       "count": "1"
     }
   },
   {
     "file": "src/lib_scoru_wasm/test/test_durable_shapshot.ml",
-    "title": "test lib scoru wasm: Durable snapshot (Stress-test operation write_value_exn. Initial size: 1000, 2000 operations)",
+    "title": "test lib scoru wasm: Durable snapshot (Stress-test operation find_value_exn. Initial size: 1000, 2000 operations)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "1136805",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_scoru_wasm/test/test_durable_shapshot.ml",
-    "title": "test lib scoru wasm: Durable snapshot (Stress-test operation delete. Initial size: 1000, 2000 operations)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "616719",
+      "total_time": "704859",
       "count": "1"
     }
   },
   {
     "file": "src/lib_scoru_wasm/fast/test/test_memory_access.ml",
-    "title": "test lib scoru-wasm-fast: Memory access (load_bytes behaves the same on both memory implementations)",
+    "title": "test lib scoru-wasm-fast: Memory access (store_num behaves the same on both memory implementations)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "29298782",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_proxy_server_config/test/test_proxy_server_config.ml",
-    "title": "Proxy_server_config: union_right_bias ([union_right_bias] is right biased)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "4269",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_proxy/test_helpers/shell_services/test/test_block_services.ml",
-    "title": "Block_services: merkle_proof_eq (merkle_proof_eq is symmetric: forall t1 t2, merkle_proof_eq t1 t2 = merkle_proof_eq t2 t1)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "434531",
+      "total_time": "9322508",
       "count": "1"
     }
   },
   {
     "file": "src/lib_proxy/test/test_fuzzing_light.ml",
-    "title": "Mode Light: Consensus consistency examples (min_agreement=1.000000, honest=3, rogue=0 consensus_expected=true)",
+    "title": "Mode Light: Consensus consistency examples (min_agreement=1.000000, honest=1, rogue=0 consensus_expected=true)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "144338",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_proxy/test/test_fuzzing_light.ml",
-    "title": "Mode Light: Consensus consistency examples (min_agreement=0.600000, honest=1, rogue=1 consensus_expected=true)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "359575",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_protocol_environment/test/test_mem_context_array_theory.ml",
-    "title": "Memory context array theory: domain (Test_mem_context_common.domain's specification )",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "188574",
+      "total_time": "133612",
       "count": "1"
     }
   },
   {
     "file": "src/lib_protocol_environment/test/test_cache.ml",
-    "title": "tezos-shell-context: cache (list keys returns all entries)",
+    "title": "tezos-shell-context: cache (future_cache_expectation repeats the past)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "7257967",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_protocol_environment/test/test_cache.ml",
-    "title": "tezos-shell-context: cache (from_cache with same domain copies)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "1980345",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_option_against_stdlib.ml",
-    "title": "FuzzRef: Option (Option.iter)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "5548",
+      "total_time": "4231861",
       "count": "1"
     }
   },
   {
     "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_list_against_stdlib.ml",
-    "title": "FuzzRef: List (List.filter_error)",
+    "title": "FuzzRef: List (List.find_map)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "73848",
+      "total_time": "25594",
       "count": "1"
     }
   },
   {
     "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_list_against_stdlib.ml",
-    "title": "FuzzRef: List (List.fold_left_map)",
+    "title": "FuzzRef: List (List.rev_filter)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "130059",
+      "total_time": "37003",
       "count": "1"
     }
   },
   {
-    "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_list_against_stdlib.ml",
-    "title": "FuzzRef: List (List.map2)",
+    "file": "src/lib_lazy_containers/test/lazy_vector_tests.ml",
+    "title": "Lazy structs tests: Lazy_vector (drop works)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "86205",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_list_against_stdlib.ml",
-    "title": "FuzzRef: List (List.rev_map2)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "95099",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_lazy_containers/test/chunked_byte_vector_tests.ml",
-    "title": "Chunked_byte_vector: Chunked_byte_vector (Mutable CBV/can write after grow)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "2710",
+      "total_time": "177131",
       "count": "1"
     }
   },
   {
     "file": "src/lib_layer2_store/test/test_indexed_store.ml",
-    "title": "tezos-layer2-store: indexed-store-pbt (indexed file store (sequential))",
+    "title": "tezos-layer2-store: indexed-store-pbt (gc in indexed file store (sequential))",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "6629215",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_hacl/test/test_prop_hacl_hash.ml",
-    "title": "tezos-crypto-shaX-props: SHA256_Props (SHA256_incremental_one)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "1555",
+      "total_time": "1996442",
       "count": "1"
     }
   },
   {
     "file": "src/lib_crypto_dal/test/test_dal_cryptobox.ml",
-    "title": "DAL cryptobox: PBT (page proofs)",
+    "title": "DAL cryptobox: PBT (shard proofs)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "1700109",
+      "total_time": "6429291",
       "count": "1"
     }
   },
   {
     "file": "src/lib_crypto_dal/test/test_dal_cryptobox.ml",
-    "title": "DAL cryptobox: PBT (commitment proof)",
+    "title": "DAL cryptobox: PBT (FFT domain selection)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "914758",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_crypto_dal/test/test_dal_cryptobox.ml",
-    "title": "DAL cryptobox: PBT (verify page out of bound)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "240253",
+      "total_time": "146275",
       "count": "1"
     }
   },
   {
     "file": "src/lib_crypto/test/test_run.ml",
-    "title": "tezos-crypto: timelock legacy (timelock legacy: raw scenario long)",
+    "title": "tezos-crypto: bls12_381-encodings (b58 key encodings)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "394937",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_crypto/test/test_run.ml",
-    "title": "tezos-crypto: ed25519-encodings (b58check.invalid)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "1232",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_context/test/test_merkle_proof.ml",
-    "title": "test_merkle_proof: random32_v1 (tree_proof_encoding)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "1122110",
+      "total_time": "16523",
       "count": "1"
     }
   },
   {
     "file": "src/lib_bls12_381_polynomial/test/test_main.ml",
-    "title": "PlonK: PBT (add_commutative)",
+    "title": "PlonK: PBT (add_absorbing)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "34939",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_base/test/test_time.ml",
-    "title": "Time: Protocol (Protocol.[add|diff] roundtrip)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "440",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_base/test/test_time.ml",
-    "title": "Time: System (System.rfc_encoding roundtrips in binary modulo precision)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "442",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_base/test/test_skip_list.ml",
-    "title": "Skip_list: skip list (Skip list: `back_path` won't produce invalid paths)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "805",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_base/test/test_sized.ml",
-    "title": "Sized: SizedSet (filter)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "4073",
+      "total_time": "34518",
       "count": "1"
     }
   },
@@ -1141,25 +538,37 @@
       "slow"
     ],
     "successful_runs": {
-      "total_time": "8002",
+      "total_time": "6680",
       "count": "1"
     }
   },
   {
-    "file": "irmin/test/irmin/generic-key/test.ml",
-    "title": "irmin/generic-key: SLOW_inlined_contents (Commit wide node)",
+    "file": "src/lib_base/test/test_p2p_addr.ml",
+    "title": "Base.P2p: P2p_point (Base.P2p_point.id.encode-decode roundtrip)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "3184298",
+      "total_time": "1130",
+      "count": "1"
+    }
+  },
+  {
+    "file": "irmin/test/irmin/generic-key/test.ml",
+    "title": "irmin/generic-key: SLOW_store_offset (Commit wide node)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "2679536",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Remove sequencer via sequencer admin contract (sequencer, latest) (without dal)",
+    "title": "Quebeca: Remove sequencer via sequencer admin contract (sequencer, latest, without dal)",
     "tags": [
       "admin",
       "admin_client",
@@ -1169,65 +578,43 @@
       "evm_node",
       "latest",
       "node",
-      "parisb",
+      "quebeca",
       "sequencer",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "25055253",
+      "total_time": "35018773",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Sequencer publishes the blueprints to L1 (sequencer, latest) (without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "data",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "node",
-      "parisb",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "22944792",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisc: Sequencer locks production if it's too ahead (sequencer, latest) (without dal)",
+    "title": "Parisc: Import sequencer snapshot in populated data dir (sequencer, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
-      "evm_kernel",
       "evm_node",
-      "latest",
-      "max_blueprint_ahead",
+      "mainnet",
+      "mainnet_evm_kernel",
       "node",
       "parisc",
+      "sequencer",
       "slow",
       "smart_rollup_installer",
-      "smart_rollup_node"
+      "smart_rollup_node",
+      "snapshots"
     ],
     "successful_runs": {
-      "total_time": "33834126",
+      "total_time": "25312251",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisc: Sequencer can provide blueprints on demand (sequencer, latest) (without dal)",
+    "title": "Parisc: Sequencer publishes the blueprints to L1 (sequencer, latest, without dal)",
     "tags": [
       "admin_client",
       "client",
@@ -1244,45 +631,45 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "13620253",
+      "total_time": "32633167",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Send a transaction to the delayed inbox (sequencer, latest) (without dal)",
+    "title": "Quebeca: Sequencer can provide blueprints on demand (sequencer, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "client",
-      "delayed_inbox",
+      "data",
       "evm",
-      "evm_kernel",
       "evm_node",
-      "latest",
+      "ghostnet",
+      "ghostnet_evm_kernel",
       "node",
-      "parisb",
+      "quebeca",
       "sequencer",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "18828619",
+      "total_time": "18793591",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisc: Send a deposit to the delayed inbox (sequencer, ghostnet) (without dal)",
+    "title": "Parisc: Send a deposit to the delayed inbox (sequencer, latest, without dal)",
     "tags": [
       "admin_client",
       "client",
       "delayed_inbox",
       "deposit",
       "evm",
+      "evm_kernel",
       "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
+      "latest",
       "node",
       "parisc",
       "sequencer",
@@ -1291,38 +678,36 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "18528334",
+      "total_time": "30054109",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: RPC method getBalance uses block parameter (sequencer, ghostnet) (without dal)",
+    "title": "Quebeca: RPC method produceBlock (sequencer, mainnet, without dal)",
     "tags": [
       "admin_client",
-      "block_param",
       "client",
       "evm",
       "evm_node",
-      "get_balance",
-      "ghostnet",
-      "ghostnet_evm_kernel",
+      "mainnet",
+      "mainnet_evm_kernel",
       "node",
-      "parisb",
-      "rpc",
+      "produce_block",
+      "quebeca",
       "sequencer",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "29338690",
+      "total_time": "19918420",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Largest possible delayed transaction is included (sequencer, mainnet) (without dal)",
+    "title": "Quebeca: Delayed transaction is included (sequencer, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
@@ -1333,71 +718,24 @@
       "mainnet",
       "mainnet_evm_kernel",
       "node",
-      "parisb",
+      "quebeca",
       "sequencer",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "22447319",
+      "total_time": "40399069",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Delayed inbox is populated at init from rollup node (sequencer, latest) (without dal)",
+    "title": "Parisc: Can start an Observer node without a rollup node (sequencer, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
-      "delayed_inbox",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "init",
-      "latest",
-      "node",
-      "parisb",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "31747807",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisc: Init evm node sequencer data dir from a rollup node data dir with delayed items (sequencer, latest) (without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "delayed_inbox",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "init",
-      "latest",
-      "node",
-      "parisc",
-      "rollup_node",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "26162833",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisc: Can start an Observer node (sequencer, mainnet) (without dal)",
-    "tags": [
-      "admin_client",
-      "client",
+      "dont_track_rollup_node",
       "evm",
       "evm_node",
       "mainnet",
@@ -1410,13 +748,13 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "30098500",
+      "total_time": "31420894",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Can restart an Observer node (sequencer, mainnet) (without dal)",
+    "title": "Quebeca: Can restart an Observer node (sequencer, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
@@ -1426,51 +764,51 @@
       "mainnet_evm_kernel",
       "node",
       "observer",
-      "parisb",
+      "quebeca",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "16864042",
+      "total_time": "29854578",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Observer forwards transaction (sequencer, mainnet) (without dal)",
+    "title": "Quebeca: Observer timeouts when blocks do not arrive quickly enough (sequencer, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
       "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
+      "ghostnet",
+      "ghostnet_evm_kernel",
       "node",
       "observer",
-      "parisb",
+      "quebeca",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node",
-      "transaction"
+      "timeout"
     ],
     "successful_runs": {
-      "total_time": "20819594",
+      "total_time": "34031254",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Sequencer is reimbursed for DA fees (sequencer, latest) (without dal)",
+    "title": "Quebeca: Sequencer is reimbursed for DA fees (sequencer, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
-      "evm_kernel",
       "evm_node",
-      "latest",
+      "mainnet",
+      "mainnet_evm_kernel",
       "node",
-      "parisb",
+      "quebeca",
       "sequencer",
       "slow",
       "smart_rollup_installer",
@@ -1478,75 +816,47 @@
       "transaction"
     ],
     "successful_runs": {
-      "total_time": "23865306",
+      "total_time": "27649376",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Force kernel upgrade (latest -> ghostnet) (sequencer, latest) (without dal)",
+    "title": "Parisc: EVM Kernel can upgrade to itself (sequencer, latest, without dal)",
     "tags": [
       "admin_client",
       "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "force",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "latest",
-      "node",
-      "parisb",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "upgrade",
-      "upgrade_scenario"
-    ],
-    "successful_runs": {
-      "total_time": "26928920",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisc: Delayed transaction timeout (sequencer, latest) (without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "delayed_inbox",
       "evm",
       "evm_kernel",
       "evm_node",
       "latest",
       "node",
       "parisc",
+      "self",
       "sequencer",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node",
-      "timeout"
+      "upgrade"
     ],
     "successful_runs": {
-      "total_time": "28763053",
+      "total_time": "35984369",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Delayed transaction timeout considers l1 level (sequencer, mainnet) (without dal)",
+    "title": "Quebeca: Forced blueprint can take predecessor timestamp (sequencer, latest, without dal)",
     "tags": [
       "admin_client",
       "client",
       "delayed_inbox",
       "evm",
+      "evm_kernel",
       "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "min_levels",
+      "latest",
       "node",
-      "parisb",
+      "quebeca",
       "sequencer",
       "slow",
       "smart_rollup_installer",
@@ -1554,13 +864,13 @@
       "timeout"
     ],
     "successful_runs": {
-      "total_time": "40362990",
+      "total_time": "30131091",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisc: Delayed inbox flushing (sequencer, ghostnet) (without dal)",
+    "title": "Parisc: Delayed inbox flushing (sequencer, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "client",
@@ -1578,47 +888,45 @@
       "timeout"
     ],
     "successful_runs": {
-      "total_time": "37020821",
+      "total_time": "47464078",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Rollup-node sequencer upgrade is applied to the sequencer local state. (sequencer, ghostnet) (without dal)",
+    "title": "Quebeca: Timestamp from the future are refused (sequencer, latest, without dal)",
     "tags": [
       "admin_client",
-      "auto",
+      "block",
       "client",
       "evm",
+      "evm_kernel",
       "evm_node",
-      "flaky",
-      "ghostnet",
-      "ghostnet_evm_kernel",
+      "latest",
       "node",
-      "parisb",
+      "quebeca",
       "sequencer",
-      "sequencer_upgrade",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node",
-      "sync"
+      "timestamp"
     ],
     "successful_runs": {
-      "total_time": "28218702",
+      "total_time": "33574890",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisc: Evm node don't read the same level twice (sequencer, mainnet) (without dal)",
+    "title": "Parisc: Evm node don't read the same level twice (sequencer, latest, without dal)",
     "tags": [
       "admin_client",
       "client",
       "event",
       "evm",
+      "evm_kernel",
       "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
+      "latest",
       "node",
       "parisc",
       "sequencer",
@@ -1627,45 +935,22 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "22318225",
+      "total_time": "32106343",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Alpha: Evm node don't read the same level twice (sequencer, mainnet) (without dal)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "client",
-      "event",
-      "evm",
-      "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "23894831",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisc: Checks the stage one reboots when reading too much chunks in a single L1 level (sequencer, latest) (without dal)",
+    "title": "Quebeca: Checks the stage one reboots when reading too much chunks in a single L1 level (sequencer, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
-      "evm_kernel",
       "evm_node",
-      "latest",
+      "ghostnet",
+      "ghostnet_evm_kernel",
       "node",
-      "parisc",
+      "quebeca",
       "reboot",
       "sequencer",
       "slow",
@@ -1673,123 +958,149 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "154633852",
+      "total_time": "172314336",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Checks the sequencer doesn't produce blueprint bigger than the given maximum number of chunks (sequencer, latest) (without dal)",
+    "title": "Quebeca: Sequencer use remote server to get preimages (sequencer, latest, without dal)",
     "tags": [
       "admin_client",
-      "blueprint",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "ghostnet_evm_kernel",
+      "latest",
+      "node",
+      "preimages_endpoint",
+      "quebeca",
+      "sequencer",
+      "slow",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "46622879",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Parisc: Sequencer can run debug_traceTransaction and return a valid log (sequencer, ghostnet, without dal)",
+    "tags": [
+      "admin_client",
+      "call",
+      "client",
+      "evm",
+      "evm_node",
+      "ghostnet",
+      "ghostnet_evm_kernel",
+      "node",
+      "parisc",
+      "rpc",
+      "slow",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "trace"
+    ],
+    "successful_runs": {
+      "total_time": "33507269",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Parisc: Test batch size limit (sequencer, ghostnet, without dal)",
+    "tags": [
+      "admin_client",
+      "batch_limit",
+      "client",
+      "evm_node",
+      "ghostnet",
+      "ghostnet_evm_kernel",
+      "node",
+      "parisc",
+      "rpc",
+      "slow",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "22205510",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Parisc: debug_traceTransaction with calltracer to see how revert is handled (sequencer, latest, without dal)",
+    "tags": [
+      "admin_client",
+      "call_trace",
       "client",
       "evm",
       "evm_kernel",
       "evm_node",
       "latest",
-      "limit",
-      "node",
-      "parisb",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "16603121",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisc: Sequencer checks the smart rollup address (sequencer, ghostnet) (without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
       "node",
       "parisc",
-      "sequencer",
+      "revert",
+      "rpc",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node",
-      "store"
+      "trace"
     ],
     "successful_runs": {
-      "total_time": "16763404",
+      "total_time": "27557741",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Parisb: Sequencer can replay a block (sequencer, mainnet) (without dal)",
+    "title": "Parisc: Outbox size limit resilience (fast) (sequencer, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
       "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisb",
-      "replay",
-      "rpc",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "19873374",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Originate EVM kernel with installer (proxy, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisc",
-      "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "8903515",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC method eth_getBalance (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "get_balance",
       "ghostnet",
       "ghostnet_evm_kernel",
       "node",
-      "parisb",
-      "proxy",
-      "rpc",
+      "outbox",
+      "parisc",
+      "slow",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "spam",
+      "withdraw"
+    ],
+    "successful_runs": {
+      "total_time": "51121840",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Quebeca: da fees test (sequencer, mainnet, without dal)",
+    "tags": [
+      "admin_client",
+      "client",
+      "da_fees",
+      "evm",
+      "evm_node",
+      "foo",
+      "mainnet",
+      "mainnet_evm_kernel",
+      "node",
+      "quebeca",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "9987905",
+      "total_time": "21247945",
       "count": "1"
     }
   },
@@ -1808,36 +1119,37 @@
       "parisc",
       "proxy",
       "rpc",
+      "simple_storage",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "26532634",
+      "total_time": "33999390",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: RPC method eth_blockNumber (proxy, mainnet, without dal)",
+    "title": "Quebeca: RPC method eth_blockNumber (proxy, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "block_number",
       "client",
       "evm",
       "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
+      "ghostnet",
+      "ghostnet_evm_kernel",
       "node",
-      "parisc",
       "proxy",
+      "quebeca",
       "rpc",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "8676887",
+      "total_time": "13324821",
       "count": "1"
     }
   },
@@ -1861,55 +1173,31 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "7519582",
+      "total_time": "13288801",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC method net_version (sequencer, latest, without dal)",
+    "title": "Quebeca: RPC method eth_getBlockByNumber (proxy, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "net_version",
-      "node",
-      "parisb",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "11162362",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: RPC method eth_getBlockByNumber (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
       "evm_node",
       "get_block_by_number",
-      "latest",
+      "mainnet",
+      "mainnet_evm_kernel",
       "node",
-      "parisc",
+      "proxy",
+      "quebeca",
       "rpc",
-      "sequencer",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "12792433",
+      "total_time": "14204225",
       "count": "1"
     }
   },
@@ -1933,103 +1221,31 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "9796171",
+      "total_time": "14731512",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC method eth_getBlockByHash (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "get_block_by_hash",
-      "latest",
-      "node",
-      "parisb",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "12152590",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC method eth_getBlockReceipts (proxy, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "get_block_receipts",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisb",
-      "proxy",
-      "rpc",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "28649657",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC method eth_getTransactionCount (proxy, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "get_transaction_count",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisb",
-      "proxy",
-      "rpc",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "7467537",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: RPC method eth_getTransactionCount in batch (proxy, mainnet, without dal)",
+    "title": "Quebeca: RPC method eth_getTransactionCount in batch (proxy, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
       "evm_node",
       "get_transaction_count_as_batch",
-      "mainnet",
-      "mainnet_evm_kernel",
+      "ghostnet",
+      "ghostnet_evm_kernel",
       "node",
-      "parisc",
       "proxy",
+      "quebeca",
       "rpc",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "7499660",
+      "total_time": "12723355",
       "count": "1"
     }
   },
@@ -2053,37 +1269,13 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "9984338",
+      "total_time": "25210108",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC eth_coinbase (proxy, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "coinbase",
-      "evm",
-      "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisb",
-      "proxy",
-      "rpc",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "8172312",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Block size is greater than zero (proxy, ghostnet, without dal)",
+    "title": "Parisc: Block size is greater than zero (sequencer, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "block",
@@ -2093,71 +1285,46 @@
       "ghostnet",
       "ghostnet_evm_kernel",
       "node",
-      "parisb",
-      "proxy",
+      "parisc",
+      "sequencer",
       "size",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "9680218",
+      "total_time": "27294651",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check L2 transfers are applied (proxy, latest, without dal)",
+    "title": "Quebeca: Check L2 blocks progression (proxy, ghostnet, without dal)",
     "tags": [
       "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "l2_transfer",
-      "latest",
-      "node",
-      "parisb",
-      "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "37270367",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check L2 chunked transfers are applied (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "chunked",
       "client",
       "evm",
       "evm_node",
       "ghostnet",
       "ghostnet_evm_kernel",
-      "l2_transfer",
+      "l2_blocks_progression",
       "node",
-      "parisc",
       "proxy",
+      "quebeca",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "36679359",
+      "total_time": "20661256",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check L2 chunked transfers are applied (sequencer, latest, without dal)",
+    "title": "Quebeca: Check L2 transfers are applied (proxy, latest, without dal)",
     "tags": [
       "admin_client",
-      "chunked",
       "client",
       "evm",
       "evm_kernel",
@@ -2165,24 +1332,23 @@
       "l2_transfer",
       "latest",
       "node",
-      "parisb",
-      "sequencer",
+      "proxy",
+      "quebeca",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "24661512",
+      "total_time": "42186555",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check RPC web3_clientVersion (proxy, ghostnet, without dal)",
+    "title": "Parisc: Check RPC web3_sha3 (proxy, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "client",
-      "client_version",
       "evm",
       "evm_node",
       "ghostnet",
@@ -2191,89 +1357,42 @@
       "parisc",
       "proxy",
       "rpc",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "8086246",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check RPC web3_clientVersion (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "client_version",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "node",
-      "parisb",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "10965391",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check RPC web3_sha3 (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "node",
-      "parisc",
-      "rpc",
-      "sequencer",
       "sha3",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "11395394",
+      "total_time": "13893604",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check `eth_getBlockByNumber` with full blocks returns the correct informations (proxy, mainnet, without dal)",
+    "title": "Quebeca: A block can be simulated in the rollup node (proxy, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
       "evm_node",
-      "full_blocks",
       "mainnet",
       "mainnet_evm_kernel",
       "node",
-      "parisc",
       "proxy",
+      "quebeca",
+      "simulate",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "29020208",
+      "total_time": "13131083",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check `eth_call.to` input can be null (proxy, mainnet, without dal)",
+    "title": "Quebeca: Check `eth_call.to` input can be null (proxy, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
@@ -2284,96 +1403,72 @@
       "mainnet_evm_kernel",
       "node",
       "null",
-      "parisb",
       "proxy",
+      "quebeca",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "8266113",
+      "total_time": "11911717",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check eth_call with contract creation (sequencer, latest, without dal)",
+    "title": "Parisc: Check L2 contract deployment (proxy, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "client",
-      "contract_create",
-      "eth_call",
+      "evm",
+      "evm_node",
+      "ghostnet",
+      "ghostnet_evm_kernel",
+      "l2_deploy",
+      "node",
+      "parisc",
+      "proxy",
+      "simple_storage",
+      "slow",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "37807765",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Quebeca: Check that a contract containing PUSH0 can successfully be deployed. (proxy, latest, without dal)",
+    "tags": [
+      "admin_client",
+      "client",
+      "deploy",
       "evm",
       "evm_kernel",
       "evm_node",
       "latest",
       "node",
-      "parisc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "10083467",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check L2 contract deployment (proxy, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "l2_deploy",
-      "latest",
-      "node",
-      "parisc",
       "proxy",
+      "quebeca",
+      "shanghai",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "29735006",
+      "total_time": "37688363",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check L2 erc20 contract deployment (proxy, mainnet, without dal)",
+    "title": "Parisc: Check blocks can contain more than 64 transactions (proxy, ghostnet, without dal)",
     "tags": [
       "admin_client",
+      "bigger_blocks",
       "client",
-      "erc20",
-      "evm",
-      "evm_node",
-      "l2_call",
-      "l2_deploy",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisc",
-      "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "86483733",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Call a view (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "eth_call",
       "evm",
       "evm_node",
       "ghostnet",
@@ -2381,19 +1476,18 @@
       "node",
       "parisc",
       "proxy",
-      "simulate",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "46323702",
+      "total_time": "34173686",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Call a view (sequencer, latest, without dal)",
+    "title": "Quebeca: Call a view (sequencer, latest, without dal)",
     "tags": [
       "admin_client",
       "client",
@@ -2403,70 +1497,22 @@
       "evm_node",
       "latest",
       "node",
-      "parisb",
+      "quebeca",
       "sequencer",
+      "simple_storage",
       "simulate",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "19915518",
+      "total_time": "38785828",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Call a view through an ethereum client (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "eth_call",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "node",
-      "parisc",
-      "sequencer",
-      "simulate",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "21749068",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: eth_call with a large amount of data (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "eth_call",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "large",
-      "node",
-      "parisc",
-      "proxy",
-      "simulate",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "7953505",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: eth_call with a large amount of data (sequencer, latest, without dal)",
+    "title": "Quebeca: eth_call with a large amount of data (proxy, latest, without dal)",
     "tags": [
       "admin_client",
       "client",
@@ -2477,217 +1523,120 @@
       "large",
       "latest",
       "node",
-      "parisb",
-      "sequencer",
+      "proxy",
+      "quebeca",
+      "simple_storage",
       "simulate",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "10816520",
+      "total_time": "12715096",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: eth_call with input instead of data (sequencer, latest, without dal)",
+    "title": "Quebeca: Minimum amout to withdraw (proxy, latest, without dal)",
     "tags": [
       "admin_client",
       "client",
-      "eth_call",
       "evm",
       "evm_kernel",
       "evm_node",
-      "input",
       "latest",
+      "mutez",
       "node",
-      "parisc",
+      "proxy",
+      "quebeca",
+      "slow",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "wei",
+      "withdraw"
+    ],
+    "successful_runs": {
+      "total_time": "87909430",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Quebeca: eth_estimateGas for contract creation (sequencer, ghostnet, without dal)",
+    "tags": [
+      "admin_client",
+      "client",
+      "eth_estimategas",
+      "evm",
+      "evm_node",
+      "ghostnet",
+      "ghostnet_evm_kernel",
+      "node",
+      "quebeca",
       "sequencer",
+      "simple_storage",
       "simulate",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "10462447",
+      "total_time": "25282608",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Creates a kernel with an initialized administrator key (proxy, mainnet, without dal)",
+    "title": "Parisc: eth_estimateGas allows additional fields (proxy, latest, without dal)",
+    "tags": [
+      "admin_client",
+      "client",
+      "eth_estimategas",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "parisc",
+      "proxy",
+      "remix",
+      "simple_storage",
+      "simulate",
+      "slow",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "14960587",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Quebeca: Ensures EVM kernel's upgrade fails if there is no administrator",
     "tags": [
       "admin_client",
       "administrator",
       "client",
-      "config",
-      "evm",
-      "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisb",
-      "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "10192817",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: eth_estimateGas for contract creation (proxy, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "eth_estimategas",
-      "evm",
-      "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisc",
-      "proxy",
-      "simulate",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "8758271",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: eth_estimateGas allows additional fields (proxy, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "eth_estimategas",
-      "evm",
-      "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisb",
-      "proxy",
-      "remix",
-      "simulate",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "9713030",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Ensure EVM node returns appropriate hash for any given transactions. (proxy, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
+      "debug_kernel",
       "evm_kernel",
       "evm_node",
-      "latest",
       "node",
-      "parisc",
-      "proxy",
-      "raw_tx",
-      "rpc",
+      "quebeca",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node",
-      "tx_hash"
+      "upgrade"
     ],
     "successful_runs": {
-      "total_time": "9473688",
+      "total_time": "16291656",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Ensure EVM node returns appropriate hash for any given transactions. (sequencer, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisb",
-      "raw_tx",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "tx_hash"
-    ],
-    "successful_runs": {
-      "total_time": "12330598",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Not being able to prepay a transaction leads to it not being included. (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "inclusion",
-      "node",
-      "parisc",
-      "prepay",
-      "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "9241176",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Not being able to prepay a transaction leads to it not being included. (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "inclusion",
-      "latest",
-      "node",
-      "parisb",
-      "prepay",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "12428900",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Not being able to prepay a transaction that was included leads to it not being injected. (sequencer, latest, without dal)",
+    "title": "Parisc: Not being able to prepay a transaction that was included leads to it not being injected. (proxy, latest, without dal)",
     "tags": [
       "admin_client",
       "client",
@@ -2699,152 +1648,30 @@
       "node",
       "parisc",
       "prepay",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "21237444",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Returns an error if the nonce is too low (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "node",
-      "nonce",
-      "parisc",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "18059111",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Accepts transactions with nonce too high. (proxy, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "node",
-      "nonce",
-      "parisc",
       "proxy",
-      "rpc",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "9846792",
+      "total_time": "40115761",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Accepts transactions with nonce too high. (sequencer, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "nonce",
-      "parisb",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "11066859",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC method eth_getTransactionByBlockHashAndIndex (proxy, ghostnet, without dal)",
+    "title": "Quebeca: RPC method eth_getTransactionByBlockHashAndIndex (sequencer, latest, without dal)",
     "tags": [
       "admin_client",
       "block_hash_and_index",
       "client",
       "evm",
-      "evm_node",
-      "get_transaction_by",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
-      "parisb",
-      "proxy",
-      "rpc",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "45303328",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: RPC method eth_getTransactionByBlockNumberAndIndex (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "block_number_and_index",
-      "client",
-      "evm",
-      "evm_node",
-      "get_transaction_by",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
-      "parisc",
-      "proxy",
-      "rpc",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "44662149",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC method eth_getTransactionByBlockNumberAndIndex (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "block_number_and_index",
-      "client",
-      "evm",
       "evm_kernel",
       "evm_node",
       "get_transaction_by",
       "latest",
       "node",
-      "parisb",
+      "quebeca",
       "rpc",
       "sequencer",
       "slow",
@@ -2852,7 +1679,7 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "30694977",
+      "total_time": "41870172",
       "count": "1"
     }
   },
@@ -2877,47 +1704,23 @@
       "transaction_by_hash"
     ],
     "successful_runs": {
-      "total_time": "14424360",
+      "total_time": "24863934",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC methods eth_getBlockTransactionCountByHash and eth_getBlockTransactionCountByNumber (proxy, latest, without dal)",
+    "title": "Quebeca: RPC methods eth_getBlockTransactionCountByHash and eth_getBlockTransactionCountByNumber (sequencer, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
-      "evm_kernel",
       "evm_node",
       "get_block_transaction_count_by",
-      "latest",
+      "mainnet",
+      "mainnet_evm_kernel",
       "node",
-      "parisb",
-      "proxy",
-      "rpc",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "30366878",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC methods eth_getUncleCountByBlockHash and eth_getUncleCountByBlockNumber (sequencer, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "get_uncle_count_by_block",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
-      "parisb",
+      "quebeca",
       "rpc",
       "sequencer",
       "slow",
@@ -2925,7 +1728,7 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "13826806",
+      "total_time": "26861172",
       "count": "1"
     }
   },
@@ -2949,57 +1752,7 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "13642814",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Simulation is EIP2200 resilient (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "eip2200",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "loop",
-      "node",
-      "parisc",
-      "proxy",
-      "simulation",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "44304378",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Simulation is EIP2200 resilient (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "eip2200",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "loop",
-      "node",
-      "parisb",
-      "sequencer",
-      "simulation",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "18281337",
+      "total_time": "23789129",
       "count": "1"
     }
   },
@@ -3023,260 +1776,23 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "10556543",
+      "total_time": "24262462",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: RPC methods eth_getStorageAt (proxy, latest, without dal)",
+    "title": "Parisc: Check that log index is correctly computed (sequencer, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "get_storage_at",
-      "latest",
-      "node",
-      "parisc",
-      "proxy",
-      "rpc",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "45214765",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC methods eth_getStorageAt (sequencer, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "get_storage_at",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisb",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "19946679",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Can submit many transactions. (sequencer, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
-      "parisb",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "tx_nonce"
-    ],
-    "successful_runs": {
-      "total_time": "21164603",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Tx with nonce too high are not included without previous transactions. (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "no_inclusion",
-      "node",
-      "parisc",
-      "proxy",
-      "rpc",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "tx_nonce"
-    ],
-    "successful_runs": {
-      "total_time": "11221724",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Tx with nonce too high are not included without previous transactions. (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "no_inclusion",
-      "node",
-      "parisb",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "tx_nonce"
-    ],
-    "successful_runs": {
-      "total_time": "12027339",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Originate EVM kernel with installer and dump PVM state (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
-      "parisb",
-      "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "9710932",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check getLogs RPC (sequencer, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "get_logs",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
-      "parisc",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "26780037",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check that log index is correctly computed (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
+      "events",
       "evm",
       "evm_node",
       "ghostnet",
       "ghostnet_evm_kernel",
       "log_index",
       "node",
-      "parisb",
-      "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "52349250",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Transactions can be replaced (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
-      "parisb",
-      "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "tx_pool"
-    ],
-    "successful_runs": {
-      "total_time": "30684962",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check L2 nested create (sequencer, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "inter_contract",
-      "l2_create",
-      "l2_deploy",
-      "node",
-      "parisb",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "24743310",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check L2 revert returns unused gas (sequencer, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
       "parisc",
       "sequencer",
       "slow",
@@ -3284,13 +1800,13 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "26497650",
+      "total_time": "42011328",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check L2 create collision (proxy, mainnet, without dal)",
+    "title": "Quebeca: Check L2 create collision (sequencer, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
@@ -3301,68 +1817,44 @@
       "mainnet",
       "mainnet_evm_kernel",
       "node",
-      "parisb",
-      "proxy",
+      "quebeca",
+      "sequencer",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "48472383",
+      "total_time": "38121574",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check that an L2 call to a smart contract with an intermediate call that runs out of gas still succeeds. (proxy, mainnet, without dal)",
+    "title": "Quebeca: Check ether wallet functions correctly (proxy, mainnet, without dal)",
     "tags": [
       "admin_client",
-      "call",
       "client",
       "evm",
       "evm_node",
+      "l2_call",
       "mainnet",
       "mainnet_evm_kernel",
       "node",
-      "out_of_gas",
-      "parisc",
       "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "64982056",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check ether wallet functions correctly (sequencer, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "l2_call",
-      "node",
-      "parisb",
-      "sequencer",
+      "quebeca",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node",
       "wallet"
     ],
     "successful_runs": {
-      "total_time": "24690899",
+      "total_time": "74337121",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check that the kernel can handle transactions that take too many ticks for a single run (proxy, mainnet, without dal)",
+    "title": "Quebeca: Check that the kernel can handle transactions that take too many ticks for a single run (proxy, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
@@ -3374,153 +1866,78 @@
       "mainnet_evm_kernel",
       "node",
       "out_of_ticks",
-      "parisb",
       "proxy",
+      "quebeca",
       "reboot",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "97456469",
+      "total_time": "97520001",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: estimateGas works with out of ticks (proxy, ghostnet, without dal)",
+    "title": "Parisc: Check L2 opcode timestamp (sequencer, latest, without dal)",
     "tags": [
       "admin_client",
       "client",
-      "estimate_gas",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
-      "out_of_ticks",
-      "parisb",
-      "proxy",
-      "simulate",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "39081556",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check that the node will reject a transaction that wouldn't fit in a kernel run. (sequencer, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "loop",
-      "node",
-      "out_of_ticks",
-      "parisc",
-      "rejected",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "29493756",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check recursive contract gasLimit is high enough (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "node",
-      "parisb",
-      "recursive",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "stack_depth"
-    ],
-    "successful_runs": {
-      "total_time": "23176280",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check that the `eth_estimateGas` cannot timeout. (proxy, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "estimate_gas",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "node",
-      "parisc",
-      "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "timeout"
-    ],
-    "successful_runs": {
-      "total_time": "29030438",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check block constants in opcode (proxy, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "block",
-      "client",
-      "constants",
       "evm",
       "evm_kernel",
       "evm_node",
       "latest",
       "node",
       "opcode",
-      "parisb",
+      "parisc",
+      "sequencer",
+      "slow",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "timestamp"
+    ],
+    "successful_runs": {
+      "total_time": "36546772",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Parisc: Check if blockhash opcode returns the actual hash of the block (proxy, mainnet, without dal)",
+    "tags": [
+      "admin_client",
+      "blockhash",
+      "client",
+      "evm",
+      "evm_node",
+      "mainnet",
+      "mainnet_evm_kernel",
+      "node",
+      "opcode",
+      "parisc",
       "proxy",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "64724535",
+      "total_time": "161840569",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Check that the node propagates reverts reason correctly. (sequencer, ghostnet, without dal)",
+    "title": "Parisc: Check that the node propagates reverts reason correctly. (sequencer, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
       "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
+      "mainnet",
+      "mainnet_evm_kernel",
       "node",
-      "parisb",
+      "parisc",
       "revert",
       "sequencer",
       "slow",
@@ -3528,139 +1945,44 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "16469529",
+      "total_time": "29292091",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Block gas limit returns 2^50. (proxy, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "block",
-      "client",
-      "evm",
-      "evm_node",
-      "gas_limit",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisc",
-      "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "28286984",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Outbox size limit resilience (slow) (proxy, ghostnet, without dal)",
+    "title": "Quebeca: RPC methods eth_maxPriorityFeePerGas (proxy, latest, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
+      "evm_kernel",
       "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
-      "outbox",
-      "parisc",
-      "proxy",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "withdraw"
-    ],
-    "successful_runs": {
-      "total_time": "406877482",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Check that the kernel submit a whitelist update message when flag is set. (sequencer, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "parisc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "update",
-      "whitelist"
-    ],
-    "successful_runs": {
-      "total_time": "22979287",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: RPC methods eth_maxPriorityFeePerGas (sequencer, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
+      "latest",
       "max_priority_fee_per_gas",
       "node",
-      "parisc",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "10098050",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: Proxy refuses transactions if read-only flag is set (proxy, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "latest",
-      "node",
-      "parisb",
       "proxy",
-      "read_only",
+      "quebeca",
+      "rpc",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "8327774",
+      "total_time": "12458442",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Unsupported RPC method (sequencer, latest, without dal)",
+    "title": "Parisc: Unsupported RPC method (sequencer, ghostnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
-      "evm_kernel",
       "evm_node",
-      "latest",
+      "ghostnet",
+      "ghostnet_evm_kernel",
       "node",
       "parisc",
       "rpc",
@@ -3671,105 +1993,78 @@
       "unsupported"
     ],
     "successful_runs": {
-      "total_time": "10615225",
+      "total_time": "22850751",
       "count": "1"
     }
   },
   {
     "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: Transaction pool can read the legacy encodings of the validation (proxy, ghostnet, without dal)",
+    "title": "Parisc: RPCs can be restricted (sequencer, latest, without dal)",
+    "tags": [
+      "admin_client",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "parisc",
+      "restricted",
+      "rpc",
+      "sequencer",
+      "slow",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "23833478",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Quebeca: Proxy can ignore block parameter (proxy, mainnet, without dal)",
     "tags": [
       "admin_client",
       "client",
       "evm",
       "evm_node",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "legacy",
+      "ignore_block_param",
+      "mainnet",
+      "mainnet_evm_kernel",
       "node",
-      "parisc",
       "proxy",
+      "quebeca",
+      "slow",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "74222347",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/eth_call.ml",
+    "title": "Parisc: Can override nonce in eth_call (sequencer, latest, without dal)",
+    "tags": [
+      "admin_client",
+      "client",
+      "eth_call",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "nonce_override",
+      "parisc",
       "slow",
       "smart_rollup_installer",
       "smart_rollup_node",
-      "txpool",
-      "validation"
+      "state_override"
     ],
     "successful_runs": {
-      "total_time": "25022194",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: getBlockBy returns base fee per gas and previous random number (proxy, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "get_block_by_hash",
-      "latest",
-      "node",
-      "parisb",
-      "proxy",
-      "rpc",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "26792691",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisc: RPC methods eth_feeHistory (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "fee_history",
-      "latest",
-      "node",
-      "parisc",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "14274505",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Parisb: RPC methods eth_feeHistory in the past (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "fee_history",
-      "latest",
-      "node",
-      "parisb",
-      "past",
-      "rpc",
-      "sequencer",
-      "slow",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "11851227",
+      "total_time": "22326212",
       "count": "1"
     }
   }

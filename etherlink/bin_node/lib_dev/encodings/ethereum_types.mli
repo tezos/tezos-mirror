@@ -53,6 +53,16 @@ val hex_of_utf8 : string -> hex
 (** [hex_of_bytes] transforms the [bytes] to hexadecimal. *)
 val hex_of_bytes : bytes -> hex
 
+type chain_id = Chain_id of Z.t [@@unboxed]
+
+module Chain_id : sig
+  val encoding : chain_id Data_encoding.t
+
+  val decode_le : bytes -> chain_id
+
+  val decode_be : bytes -> chain_id
+end
+
 (** Ethereum block hash (32 bytes) *)
 type block_hash = Block_hash of hex [@@unboxed]
 
@@ -81,6 +91,8 @@ module Qty : sig
   val zero : quantity
 
   val ( = ) : quantity -> quantity -> bool
+
+  val ( < ) : quantity -> quantity -> bool
 end
 
 val quantity_encoding : quantity Data_encoding.t
@@ -132,7 +144,7 @@ val address_encoding : address Data_encoding.t
 
 val decode_address : bytes -> address
 
-type transaction_object = {
+type legacy_transaction_object = {
   blockHash : block_hash option;
   blockNumber : quantity option;
   from : address;
@@ -149,20 +161,21 @@ type transaction_object = {
   s : hash;
 }
 
-val transaction_object_encoding : transaction_object Data_encoding.t
+val legacy_transaction_object_encoding :
+  legacy_transaction_object Data_encoding.t
 
-val transaction_object_from_rlp_item :
-  block_hash option -> Rlp.item -> transaction_object
+val legacy_transaction_object_from_rlp_item :
+  block_hash option -> Rlp.item -> legacy_transaction_object
 
-val transaction_object_from_rlp :
-  block_hash option -> bytes -> transaction_object
+val legacy_transaction_object_from_rlp :
+  block_hash option -> bytes -> legacy_transaction_object
 
-type block_transactions =
+type 'transaction_object block_transactions =
   | TxHash of hash list
-  | TxFull of transaction_object list
+  | TxFull of 'transaction_object list
 
 (** Ethereum block hash representation from RPCs. *)
-type block = {
+type 'transaction_object block = {
   number : quantity;
   hash : block_hash;
   parent : block_hash;
@@ -180,7 +193,7 @@ type block = {
   gasLimit : quantity;
   gasUsed : quantity;
   timestamp : quantity;
-  transactions : block_transactions;
+  transactions : 'transaction_object block_transactions;
   uncles : hash list;
   (* baseFeePerGas and prevRandao are set optionnal because old blocks didn't have
      them*)
@@ -188,7 +201,9 @@ type block = {
   prevRandao : block_hash option;
 }
 
-val block_encoding : block Data_encoding.t
+val block_encoding :
+  'transaction_object Data_encoding.t ->
+  'transaction_object block Data_encoding.t
 
 type transaction_log = {
   address : address;
@@ -226,8 +241,8 @@ module AddressMap : sig
 end
 
 type txpool = {
-  pending : transaction_object NonceMap.t AddressMap.t;
-  queued : transaction_object NonceMap.t AddressMap.t;
+  pending : legacy_transaction_object NonceMap.t AddressMap.t;
+  queued : legacy_transaction_object NonceMap.t AddressMap.t;
 }
 
 val txpool_encoding : txpool Data_encoding.t
@@ -252,7 +267,7 @@ val state_override_encoding : state_override Data_encoding.t
 
 val state_override_empty : state_override
 
-val block_from_rlp : bytes -> block
+val block_from_rlp : bytes -> legacy_transaction_object block
 
 module Block_parameter : sig
   (** Ethereum block params in RPCs. *)
@@ -308,4 +323,72 @@ module From_rlp : sig
   val decode_z : Rlp.item -> Z.t tzresult
 
   val decode_hex : Rlp.item -> hex tzresult
+end
+
+module Filter : sig
+  (** Event filter, see
+    https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs *)
+  type topic = One of hash | Or of hash list
+
+  val topic_encoding : topic Data_encoding.t
+
+  type filter_address = Single of address | Vec of address list
+
+  val filter_address_encoding : filter_address Data_encoding.t
+
+  type changes =
+    | Block_filter of block_hash
+    | Pending_transaction_filter of hash
+    | Log of transaction_log
+
+  val changes_encoding : changes Data_encoding.t
+
+  type t = {
+    from_block : Block_parameter.t option;
+    to_block : Block_parameter.t option;
+    address : filter_address option;
+    topics : topic option list option;
+    block_hash : block_hash option;
+  }
+
+  val encoding : t Data_encoding.t
+end
+
+module Subscription : sig
+  exception Unknown_subscription
+
+  type logs = {
+    address : Filter.filter_address option;
+    topics : Filter.topic option list option;
+  }
+
+  type kind = NewHeads | Logs of logs | NewPendingTransactions | Syncing
+
+  val kind_encoding : kind Data_encoding.t
+
+  type id = Id of hex [@@ocaml.unboxed]
+
+  val id_encoding : id Data_encoding.t
+
+  val id_input_encoding : id Data_encoding.t
+
+  type sync_status = {
+    startingBlock : quantity;
+    currentBlock : quantity;
+    highestBlock : quantity;
+    pulledStates : quantity;
+    knownStates : quantity;
+  }
+
+  type sync_output = {syncing : bool; status : sync_status}
+
+  type 'transaction_object output =
+    | NewHeads of 'transaction_object block
+    | Logs of transaction_log
+    | NewPendingTransactions of hash
+    | Syncing of sync_output
+
+  val output_encoding :
+    'transaction_object Data_encoding.t ->
+    'transaction_object output Data_encoding.t
 end

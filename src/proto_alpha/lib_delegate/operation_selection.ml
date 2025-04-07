@@ -166,6 +166,7 @@ type simulation_result = {
   block_header_metadata : block_header_metadata option;
   operations : packed_operation list list;
   operations_hash : Operation_list_list_hash.t;
+  manager_operations_infos : Baking_state.manager_operations_infos option;
 }
 
 let validate_operation inc op =
@@ -230,28 +231,33 @@ let filter_valid_managers_up_to_quota inc ~hard_gas_limit_per_block (ops, quota)
     =
   let open Lwt_syntax in
   let {Tezos_protocol_environment.max_size; max_op} = quota in
-  let rec loop (inc, curr_size, nb_ops, remaining_gas, acc) = function
-    | [] -> return (inc, List.rev acc)
-    | {op; size = op_size; gas = op_gas; _} :: l -> (
+  let rec loop (inc, curr_size, nb_ops, total_fees, remaining_gas, acc) =
+    function
+    | [] -> return (inc, nb_ops, total_fees, List.rev acc)
+    | {op; size = op_size; gas = op_gas; fee; _} :: l -> (
         match max_op with
-        | Some max_op when max_op = nb_ops + 1 -> return (inc, List.rev acc)
+        | Some max_op when max_op = nb_ops + 1 ->
+            return (inc, nb_ops, total_fees, List.rev acc)
         | None | Some _ -> (
             if Gas.Arith.(remaining_gas < op_gas) then
               (* If the remaining available gas is lower than the
                  considered operation's gas, we ignore this operation. *)
-              loop (inc, curr_size, nb_ops, remaining_gas, acc) l
+              loop (inc, curr_size, nb_ops, total_fees, remaining_gas, acc) l
             else
               let new_size = curr_size + op_size in
               if new_size > max_size then
                 (* We ignore the operation if summing its size to the
                    size of managers operations already validated is
                    greater than the quota. *)
-                loop (inc, curr_size, nb_ops, remaining_gas, acc) l
+                loop (inc, curr_size, nb_ops, total_fees, remaining_gas, acc) l
               else
                 let packed_op = Prioritized_operation.packed op in
                 let* inc'_opt = validate_operation inc packed_op in
                 match inc'_opt with
-                | None -> loop (inc, curr_size, nb_ops, remaining_gas, acc) l
+                | None ->
+                    loop
+                      (inc, curr_size, nb_ops, total_fees, remaining_gas, acc)
+                      l
                 | Some inc' ->
                     let new_remaining_gas =
                       Gas.Arith.sub remaining_gas op_gas
@@ -260,11 +266,12 @@ let filter_valid_managers_up_to_quota inc ~hard_gas_limit_per_block (ops, quota)
                       ( inc',
                         new_size,
                         succ nb_ops,
+                        Int64.add total_fees (Tez.to_mutez fee),
                         new_remaining_gas,
                         packed_op :: acc )
                       l))
   in
-  loop (inc, 0, 0, hard_gas_limit_per_block, []) ops
+  loop (inc, 0, 0, Int64.zero, hard_gas_limit_per_block, []) ops
 
 let filter_operations_with_simulation initial_inc fees_config
     ~hard_gas_limit_per_block {consensus; votes; anonymous; managers} =
@@ -300,7 +307,7 @@ let filter_operations_with_simulation initial_inc fees_config
       ~minimal_nanotez_per_byte
       managers
   in
-  let*! inc, managers =
+  let*! inc, manager_operation_number, total_fees, managers =
     filter_valid_managers_up_to_quota
       inc
       ~hard_gas_limit_per_block
@@ -324,6 +331,7 @@ let filter_operations_with_simulation initial_inc fees_config
           block_header_metadata = Some block_header_metadata;
           operations;
           operations_hash;
+          manager_operations_infos = Some {manager_operation_number; total_fees};
         }
   | None ->
       return
@@ -332,6 +340,7 @@ let filter_operations_with_simulation initial_inc fees_config
           block_header_metadata = None;
           operations;
           operations_hash;
+          manager_operations_infos = None;
         }
 
 let filter_valid_operations_up_to_quota_without_simulation (ops, quota) =

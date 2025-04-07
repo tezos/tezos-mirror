@@ -9,7 +9,7 @@
 //! _not_ compiling to **wasm**.
 
 use crate::state::{HostState, NextInput};
-use crate::MockHost;
+use crate::{DefaultSink, MockHost};
 use core::{
     cell::RefCell,
     cmp::min,
@@ -28,7 +28,7 @@ impl From<HostState> for MockHost {
         Self {
             info: super::info_for_level(state.curr_level as i32),
             state: RefCell::new(state),
-            debug_log: Box::new(RefCell::new(std::io::stderr())),
+            debug_log: Box::new(RefCell::new(DefaultSink)),
             keep_going: true,
         }
     }

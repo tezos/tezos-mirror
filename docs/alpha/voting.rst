@@ -15,10 +15,11 @@ The rest of this page gives more details about the amendment and voting process.
 Periods
 -------
 
-The amendment process consists of five *periods*. Each period lasts for 5 cycles
-(or approximately two weeks). The periods (listed below)
-typically succeed one to another for a total duration of approximately 2 months and
-a half, after which the whole amendment process starts again.
+The amendment process consists of five *periods*. Each period lasts
+for ``CYCLES_PER_VOTING_PERIOD`` = 14 cycles (that is, around 14
+days). The periods (listed below) typically succeed one to another for
+a total duration of approximately 2 months and a half, after which the
+whole amendment process starts again.
 
 The five periods are as follows:
 
@@ -34,10 +35,10 @@ The five periods are as follows:
   At the end of a **proposal period**, if participation reaches a
   :ref:`proposal quorum <proposal_quorum>`, the proposal with most support is
   selected and we move to an **exploration period**. Note that support is
-  measured in the cumulated staking power (expressed in mutez) that delegates supporting the
-  proposal have. E.g., a proposal supported by a single delegate with 600,000 tz of staking power
+  measured in the :ref:`voting power <voting_power_alpha>` that delegates supporting the
+  proposal have. E.g., a proposal supported by a single delegate with 600,000 tz of voting power
   has more support than a proposal supported by two delegates with 100,000 tz
-  each of staking power.
+  each of voting power.
 
   If there are no proposals, or a tie between two or more proposals,
   or if participation did not reach the proposal quorum, the process
@@ -90,6 +91,14 @@ The five periods are as follows:
 Activation
 ----------
 
+In the last block of the last cycle of an Adoption period (called activation block),
+the current Protocol learns about the Protocol into which the next
+block should be validated.
+Once the activation block is applied, the Octez shell initializes the new protocol and
+performs the protocol-stitching process. The first block of the cycle after the Adoption period
+belongs to the new Protocol. It does not contain attestations for the
+previous block.
+
 After the activation step, the blocks added to the chain are interpreted in the
 newly activated protocol. As a result gas costs may differ, new operations may
 be available, contracts using new opcodes may be injected, etc.
@@ -126,7 +135,7 @@ Super-majority and Quorum
 As mentioned above, during either of the **exploration** or **promotion** periods,
 delegates can cast ballots using the ``Ballot`` operation (see below).
 In both cases, delegates can cast a single Yea, Nay, or Pass ballot. A ballot
-has a weight equal to the delegate's stake as detailed above.
+has a weight equal to the delegate's voting power as detailed above.
 
 For either of these two periods, the process continues to the next period if the
 *vote participation* reaches *quorum* and there is a *super-majority* of
@@ -295,8 +304,6 @@ in the following samples::
   Blocks remaining until end of period: 64
   Current proposal: PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp
 
-It should be noted that the ballot number 2,400,000 ꜩ above is the stake counted in
-mutez (displayed in tez).
 The proposal has a total stake of 2,400,000 ꜩ, which may come from a single ballot
 from a delegate having a staking balance of 2,400,000 ꜩ or it may come from multiple ballots from
 delegates with a combined stake of 2,400,000 ꜩ.
@@ -316,7 +323,7 @@ following two conditions:
 
 - the protocol hash was already proposed on the network. In this case
   we can submit an additional proposal that "upvotes" an existing one
-  and our staking power are added to the ones already supporting the proposal.
+  and our voting power are added to the ones already supporting the proposal.
 - the protocol is known by the node. In particular the first proposer
   of a protocol should be able to successfully inject the protocol in
   its node which performs some checks, compiles and loads the

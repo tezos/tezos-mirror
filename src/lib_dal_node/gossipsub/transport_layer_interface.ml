@@ -152,6 +152,12 @@ module P2p_message_V1 = struct
         case (Tag tag) ~title encoding unwrap wrap)
       p2p_message_app_encoding
     |> union
+    |> def
+         "dal_p2p_message"
+         ~title:"dal-p2p-message"
+         ~description:"The encoding of P2P messages used for the DAL"
+
+  let _ = Data_encoding.(Registration.register p2p_message_encoding)
 
   let pp_list pp_elt =
     Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ") pp_elt

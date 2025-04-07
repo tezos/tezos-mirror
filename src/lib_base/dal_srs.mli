@@ -23,6 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [trusted_setup_candidate_directories] list directories in which
+   the dal trusted setup could be. All folders are used when looking for it,
+   the first one is the one selected when installing it. *)
+val trusted_setup_candidate_directories :
+  ?getenv_opt:(string -> string option) ->
+  ?getcwd:(unit -> string) ->
+  unit ->
+  string list
+
+(** [trusted_setup_preferred_directory] in which
+   the dal trusted setup will be installed. *)
+val trusted_setup_preferred_directory :
+  ?getenv_opt:(string -> string option) ->
+  ?getcwd:(unit -> string) ->
+  unit ->
+  string
+
 (** [find_trusted_setup_files] returns the path of the two files
    necessary to initialize cryptographic primitives used by the
    DAL. See {!module:Tezos_crypto_dal.Cryptobox}. *)

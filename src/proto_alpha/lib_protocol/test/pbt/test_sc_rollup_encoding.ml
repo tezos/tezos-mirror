@@ -122,13 +122,21 @@ module Index = Dal_slot_index_repr
 let pack_slots_headers_by_level list =
   let module ML = Map.Make (Raw_level_repr) in
   let module SSH = Set.Make (struct
-    include Dal_slot_repr.Header
+    type t =
+      Dal_slot_repr.Header.t
+      * Contract_repr.t
+      * Dal_attestation_repr.Accountability.attestation_status
 
-    let compare a b = Dal_slot_index_repr.compare a.id.index b.id.index
+    let compare (a, _, _) (b, _, _) =
+      let open Dal_slot_repr.Header in
+      Dal_slot_index_repr.compare a.id.index b.id.index
   end) in
   let map =
     List.fold_left
-      (fun map (Dal_slot_repr.Header.{id = {published_level; _}; _} as sh) ->
+      (fun map
+           (( Dal_slot_repr.Header.{id = {published_level; _}; _},
+              _publisher,
+              _status ) as sh) ->
         let l =
           ML.find published_level map |> Option.value ~default:SSH.empty
         in
@@ -152,6 +160,10 @@ let pack_slots_headers_by_level list =
       |> ML.bindings
       |> List.map (fun (k, ssh) -> (k, SSH.elements ssh))
 
+let gen_pkh =
+  let pkh, _, _ = Signature.generate_key ~algo:Ed25519 () in
+  Gen.return pkh
+
 let gen_dal_slots_history () =
   let open Gen in
   let open Dal_slot_repr in
@@ -159,11 +171,20 @@ let gen_dal_slots_history () =
     Tezos_protocol_alpha_parameters.Default_parameters.constants_test
   in
   let number_of_slots = constants.dal.number_of_slots in
-  (* Generate a list of (level * confirmed slot ID). *)
-  let* list = small_list (pair small_nat small_nat) in
+  (* Generate a list of (level * confirmed slot ID * public key hash *
+     attestation flag). *)
+  let* list = small_list (quad small_nat small_nat gen_pkh bool) in
   let list =
     List.rev_map
-      (fun (level, slot_index) ->
+      (fun (level, slot_index, publisher, is_proto_attested) ->
+        let attestation_status =
+          Dal_attestation_repr.Accountability.
+            {
+              attested_shards = (if is_proto_attested then 1 else 0);
+              total_shards = 1;
+              is_proto_attested;
+            }
+        in
         let published_level =
           Raw_level_repr.(
             (* use succ to avoid having a published_level = 0, as it's the
@@ -174,16 +195,19 @@ let gen_dal_slots_history () =
           Index.of_int_opt ~number_of_slots slot_index
           |> Option.value ~default:Index.zero
         in
-        Header.{id = {published_level; index}; commitment = Commitment.zero})
+        ( Header.{id = {published_level; index}; commitment = Commitment.zero},
+          Contract_repr.Implicit publisher,
+          attestation_status ))
       list
   in
   let rec loop history = function
     | [] -> return history
-    | (level, slot_headers) :: llist -> (
+    | (published_level, slot_headers) :: llist -> (
         let slot_headers =
           (* Sort the list in the right ordering before adding slots to slots_history. *)
           List.sort_uniq
-            (fun {Header.id = a; _} {id = b; _} ->
+            (fun ({Header.id = a; _}, _publisher, _status)
+                 ({id = b; _}, _publisher, _status) ->
               let c =
                 Raw_level_repr.compare a.published_level b.published_level
               in
@@ -191,10 +215,10 @@ let gen_dal_slots_history () =
             slot_headers
         in
         History.(
-          add_confirmed_slot_headers_no_cache
+          update_skip_list_no_cache
             ~number_of_slots
             history
-            level
+            ~published_level
             slot_headers)
         |> function
         | Ok history -> loop history llist

@@ -12,7 +12,8 @@ Tezos :doc:`governance <voting>`.
 
 If one does not have enough stake to participate on its own or does not want to
 set up the needed infrastructure, (s)he can use :ref:`delegation
-<delegating_coins>`. Therefore, in Tezos, it is the :ref:`delegates<def_delegate_alpha>`
+<delegating_coins>`, possibly complemented with :ref:`staking
+<staking_coins>`. Indeed, in Tezos, it is the :ref:`delegates<def_delegate_alpha>`
 that may participate in consensus.
 However, at each level, not all delegates necessarily participate, and their participation weight may differ.
 The selection of the delegates' participation rights at a level is done by running a
@@ -64,25 +65,46 @@ mentioned above, staked tez are weighted higher than non-staked tez
 when computing the baking power.
 
 
+.. _consensus_key_alpha:
+
 Consensus key
 ^^^^^^^^^^^^^
 
 The key used by a delegate to sign blocks and consensus operations is called the
 *consensus key*. By default, this is the delegate's private key, called its
 *manager key*. However, a delegate may specify another, dedicated key for this
-role. See :ref:`this page<consensus_key>` for further important details. In particular,
-both the delegate key and the consensus key give total control over the
-delegate's funds: indeed, the consensus key may sign a *drain* operation to
-transfer the delegate's free balance to an arbitrary account.  In :doc:`relevant RPCs<../api/openapi>`,
-like ``/chains/main/blocks/head/helpers/baking_rights``, both the delegate's
-manager and consensus keys are listed.
+role.
 
-If the :ref:`adaptive issuance <adaptive_issuance_alpha>`
-feature is activated, it grants delegators the ability to become
-'stakers' by placing security deposits. These deposits would contribute to their
-delegate's stake and could be subject to slashing penalties if their delegate
-misbehaves.  The staking power of funds placed by stakers and delegates is twice
-that of delegated funds.
+Setting a new consensus key is accomplished via the
+``Update_consensus_key`` operation. There is delay of
+``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles before the new key
+actually becomes the *active consensus key* that must be used to sign
+blocks and consensus operations; until then, it is called a *pending
+consensus key*. More precisely, the key becomes active after the cycle
+containing the ``Update_consensus_key`` operation is over and then
+another :ref:`CONSENSUS_KEY_ACTIVATION_DELAY<cs_constants_alpha>` full
+cycles have passed: if the update happens during cycle ``n``, then the
+key becomes active at the beginning of cycle ``n +
+CONSENSUS_KEY_ACTIVATION_DELAY + 1``.
+
+There may be multiple pending consensus keys, set to activate in
+different future cycles, and each one will replace the previously
+active consensus key in turn. If multiple ``Update_consensus_key``
+operations are performed within the same cycle ``n``, the last one
+takes precedence for determining which key to activate at the start of
+cycle ``n + CONSENSUS_KEY_ACTIVATION_DELAY + 1``.
+
+Note that both the manager key and the consensus key give total
+control over the delegate's spendable balance: indeed, the consensus
+key may sign a ``Drain_delegate`` operation to transfer the delegate's
+spendable balance to an arbitrary account. In :doc:`relevant
+RPCs<../api/openapi>` like
+``/chains/main/blocks/head/helpers/baking_rights``, both the
+delegate's manager and consensus keys are listed.
+
+See :ref:`this page<consensus_key>` for further important details,
+notably client commands that are helpful for handling consensus keys.
+
 
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -94,10 +116,17 @@ delegate cannot participate in the consensus algorithm.
 
 A delegate is marked as active at its registration.
 
-A delegate becomes passive at the end of cycle ``n`` when it has
-failed to participate in the consensus algorithm in
-the past ``CONSENSUS_RIGHTS_DELAY + 1`` cycles. That is, in cycles ``n``, ``n-1``,
-``n-2``, ..., ``n - CONSENSUS_RIGHTS_DELAY``.
+At the end of a cycle, a delegate gets deactivated if the chain has
+not witnessed any consensus activity (baking, attesting) from it during the
+past ``TOLERATED_INACTIVITY_PERIOD`` cycles, including the currently
+ending cycle.
+
+Note that there is an extra grace period of ``CONSENSUS_RIGHTS_DELAY``
+cycles when a delegate has just registered or has just been
+reactivated. This is to account for the fact that it will not receive
+consensus rights yet for the first ``CONSENSUS_RIGHTS_DELAY``
+cycles, so of course the chain cannot witness any activity from it
+during that time.
 
 Delegates' rights selection
 ---------------------------
@@ -161,13 +190,15 @@ Proof-of-stake parameters
    * - Parameter name
      - Parameter value
    * - ``BLOCKS_PER_CYCLE``
-     - 30720 blocks
+     - 10800 blocks
    * - ``CONSENSUS_RIGHTS_DELAY``
      - 2 cycles
    * - ``MINIMAL_STAKE``
      - 6,000 ꜩ
    * - ``MINIMAL_FROZEN_STAKE``
      - 600 ꜩ
+   * - ``TOLERATED_INACTIVITY_PERIOD``
+     - 2 cycles
 
 Further External Resources
 --------------------------

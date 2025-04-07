@@ -8,9 +8,9 @@
 
 use crate::{
     machine_state::{
-        bus::main_memory::MainMemoryLayout,
-        registers::{XRegister, XRegisters},
         MachineCoreState,
+        main_memory::MainMemoryLayout,
+        registers::{NonZeroXRegister, XRegister, XRegisters},
     },
     state_backend as backend,
     traps::Exception,
@@ -24,87 +24,88 @@ where
     ///
     /// Add `imm` to val(rs1) only on lowest 32 bits
     /// and store the sign-extended result in `rd`
-    pub fn run_addiw(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    pub fn run_addiw(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
         // We do not need to explicitly truncate for the lower bits since wrapping_add
         // has the same semantics & result on the lower 32 bits irrespective of bit width
         let rval = self.read(rs1);
         let result = rval.wrapping_add(imm as u64);
         // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
         let result = result as i32 as u64;
-        self.write(rd, result);
+        self.write_nz(rd, result);
     }
 
     /// `ADDW` R-type instruction
     ///
     /// Perform val(rs1) + val(rs2) but only on lowest 32 bits
     /// and store the sign-extended result in `rd`
-    pub fn run_addw(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_addw(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         // We do not need to explicitly truncate for the lower bits since wrapping_add
         // has the same semantics & result on the lower 32 bits irrespective of bit width
         let lhs = self.read(rs1);
         let rhs = self.read(rs2);
         // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
         let result = lhs.wrapping_add(rhs) as i32 as u64;
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
     /// `SUBW` R-type instruction
     ///
     /// Perform val(rs1) - val(rs2) but only on lowest 32 bits
     /// and store the sign-extended result in `rd`
-    pub fn run_subw(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_subw(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         // We do not need to explicitly truncate for the lower bits since wrapping_sub
         // has the same semantics & result on the lower 32 bits irrespective of bit width
         let lhs = self.read(rs1);
         let rhs = self.read(rs2);
         // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
         let result = lhs.wrapping_sub(rhs) as i32 as u64;
-        self.write(rd, result)
+        self.write_nz(rd, result)
     }
 
-    /// `SLLI` I-type instruction
-    ///
     /// Shift left logically
     /// (zeros are shifted in the lower bits)
     ///
-    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SLLI
-    pub fn run_slli(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    /// Relevant RISC-V opcodes:
+    /// - `SLLI`
+    /// - `C.SLLI`
+    pub fn run_slli(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
         // SLLI encoding allows to consider the whole immediate as the shift amount
-        self.write(rd, self.read(rs1) << imm)
+        self.write_nz(rd, self.read_nz(rs1) << imm)
     }
 
-    /// `SRLI` I-type instruction
-    ///
     /// Shift right logically
     /// (zeros are shifted in the upper bits)
     ///
-    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SRLI
-    pub fn run_srli(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    /// Relevant RISC-V opcodes:
+    /// - `SRLI`
+    /// - `C.SRLI`
+    pub fn run_srli(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
         // SLLI encoding allows to consider the whole immediate as the shift amount
-        self.write(rd, self.read(rs1) >> imm)
+        self.write_nz(rd, self.read_nz(rs1) >> imm)
     }
 
-    /// `SRAI` I-type instruction
-    ///
     /// Shift right arithmetically
     /// (sign-bits are shifted in the upper bits)
     ///
-    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SRAI
-    pub fn run_srai(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    /// Relevant RISC-V opcodes:
+    /// - `SRAI`
+    /// - `C.SRAI`
+    pub fn run_srai(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
         // SRAI encoding has bit imm[10] set, so need to mask the shift amount
+        // TODO: RV-459: Move bit-masking of shamt to the parser
         let sh_amt = imm & 0b11_1111;
 
         // Right shift on i64 is an arithmetic shift
-        let result = (self.read(rs1) as i64) >> sh_amt;
+        let result = (self.read_nz(rs1) as i64) >> sh_amt;
         // i64 as u64 is a no-op
-        self.write(rd, result as u64)
+        self.write_nz(rd, result as u64)
     }
 
     /// `SLLIW` I-type instruction
     ///
     /// Shift left logically only on lower 32 bits
     /// (zeros are shifted in the lower bits)
-    pub fn run_slliw(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    pub fn run_slliw(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
         // SLLIW encoding allows to consider the whole immediate as the shift amount
         // Since we are shifting left, we can operate directly on u64
         let result = self.read(rs1) << imm;
@@ -112,28 +113,28 @@ where
         // Even though SLLIW operates only on lowest 32 bits, RISC-V convention
         // mandates for register values to be saved in a sign-extended manner
         // Note: u64 as i32 as u64 will sign-extend the lowest 32 bits
-        self.write(rd, result as i32 as u64)
+        self.write_nz(rd, result as i32 as u64)
     }
 
     /// `SRLIW` I-type instruction
     ///
     /// Shift right logically only on lower 32 bits
     /// (zeros are shifted in the upper bits)
-    pub fn run_srliw(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    pub fn run_srliw(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
         // SRLIW encoding allows to consider the whole immediate as the shift amount
         let result = (self.read(rs1) as u32) >> imm;
 
         // Even though SRLIW operates only on lowest 32 bits, RISC-V convention
         // mandates for register values to be saved in a sign-extended manner
         // Note: u32 as i32 as u64 will sign-extend the lowest 32 bits
-        self.write(rd, result as i32 as u64)
+        self.write_nz(rd, result as i32 as u64)
     }
 
     /// `SRAIW` I-type instruction
     ///
     /// Shift right arithmetically only on lower 32 bits
     /// (sign-bits are shifted in the upper bits)
-    pub fn run_sraiw(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+    pub fn run_sraiw(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
         // SRAIW encoding has bit imm[10] set, so need to mask the shift amount
         let sh_amt = imm & 0b1_1111;
         // Right shift on i32 is an arithmetic shift
@@ -142,45 +143,51 @@ where
         // Even though SRAIW operates only on lowest 32 bits, RISC-V convention
         // mandates for register values to be saved in a sign-extended manner
         // Note: i32 as u64 will sign-extend the lowest 32 bits
-        self.write(rd, result as u64)
+        self.write_nz(rd, result as u64)
     }
 
-    /// `SLL` R-type instruction
-    ///
     /// Shift left logically bits in rs1 by shift_amount = val(rs2)\[5:0\]
-    /// saving the result in rd
+    /// saving the result in rd.
     /// (zeros are shifted in the lower bits)
-    pub fn run_sll(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    ///
+    /// Relevant opcodes:
+    /// - `SLL`
+    pub fn run_sll(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         // Get last 6 bits of rs2
-        let sh_amt = self.read(rs2) & 0b11_1111;
-        let result = self.read(rs1) << sh_amt;
-        self.write(rd, result)
+        // TODO: RV-459: Move bit-masking of shamt to the parser
+        let sh_amt = self.read_nz(rs2) & 0b11_1111;
+        let result = self.read_nz(rs1) << sh_amt;
+        self.write_nz(rd, result)
     }
 
-    /// `SRL` R-type instruction
-    ///
     /// Shift right logically bits in rs1 by shift_amount = val(rs2)\[5:0\]
     /// saving the result in rd
     /// (zeros are shifted in the upper bits)
-    pub fn run_srl(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    ///
+    /// Relevant opcodes:
+    /// - `SRL`
+    pub fn run_srl(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         // Get last 6 bits of rs2
-        let sh_amt = self.read(rs2) & 0b11_1111;
-        let result = self.read(rs1) >> sh_amt;
-        self.write(rd, result)
+        // TODO: RV-459: Move bit-masking of shamt to the parser
+        let sh_amt = self.read_nz(rs2) & 0b11_1111;
+        let result = self.read_nz(rs1) >> sh_amt;
+        self.write_nz(rd, result)
     }
 
-    /// `SRA` R-type instruction
-    ///
     /// Shift right arithmeticallly bits in rs1 by shift_amount = val(rs2)\[5:0\]
     /// saving the result in rd
     /// (sign-bits are shifted in the upper bits)
-    pub fn run_sra(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    ///
+    /// Relevant opcodes:
+    /// - `SRA`
+    pub fn run_sra(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         // Get last 6 bits of rs2
-        let sh_amt = self.read(rs2) & 0b11_1111;
+        // TODO: RV-459: Move bit-masking of shamt to the parser
+        let sh_amt = self.read_nz(rs2) & 0b11_1111;
         // Right shift on i64 is an arithmetic shift
-        let result = (self.read(rs1) as i64) >> sh_amt;
+        let result = (self.read_nz(rs1) as i64) >> sh_amt;
         // i64 as u64 is a no-op
-        self.write(rd, result as u64)
+        self.write_nz(rd, result as u64)
     }
 
     /// `SLLW` R-type instruction
@@ -188,7 +195,7 @@ where
     /// Shift left logically only lowest 32 bits in rs1
     /// by shift_amount = val(rs2)\[4:0\] saving the result in rd
     /// (zeros are shifted in the lower bits)
-    pub fn run_sllw(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_sllw(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         // Get last 5 bits of rs2
         let sh_amt = self.read(rs2) & 0b1_1111;
         // Since we are shifting left, we can operate directly on u64
@@ -196,7 +203,7 @@ where
         // Even though SLLW operates only on lowest 32 bits, RISC-V convention
         // mandates for register values to be saved in a sign-extended manner
         // Note: u64 as i32 as u64 will sign-extend the lowest 32 bits
-        self.write(rd, result as i32 as u64)
+        self.write_nz(rd, result as i32 as u64)
     }
 
     /// `SRLW` R-type instruction
@@ -204,14 +211,14 @@ where
     /// Shift right logically only the lowest 32 bits in rs1
     /// by shift_amount = val(rs2)\[4:0\] saving the result in rd
     /// (zeros are shifted in the upper bits)
-    pub fn run_srlw(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_srlw(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         // Get last 5 bits of rs2
         let sh_amt = self.read(rs2) & 0b1_1111;
         let result = (self.read(rs1) as u32) >> sh_amt;
         // Even though SRLW operates only on lowest 32 bits, RISC-V convention
         // mandates for register values to be saved in a sign-extended manner
         // Note: u32 as i32 as u64 will sign-extend the lowest 32 bits
-        self.write(rd, result as i32 as u64)
+        self.write_nz(rd, result as i32 as u64)
     }
 
     /// `SRAW` R-type instruction
@@ -219,7 +226,7 @@ where
     /// Shift right arithmeticallly only the lowest 32 bits bits in rs1
     /// by shift_amount = val(rs1)\[4:0\] saving the result in rd
     /// (sign-bits are shifted in the upper bits)
-    pub fn run_sraw(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+    pub fn run_sraw(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
         // Get last 5 bits of rs2
         let sh_amt = self.read(rs2) & 0b1_1111;
         // Right shift on i32 is an arithmetic shift
@@ -227,7 +234,7 @@ where
         // Even though SRAIW operates only on lowest 32 bits, RISC-V convention
         // mandates for register values to be saved in a sign-extended manner
         // Note: i32 as u64 will sign-extend the lowest 32 bits
-        self.write(rd, result as u64)
+        self.write_nz(rd, result as u64)
     }
 }
 
@@ -351,12 +358,12 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test, create_state,
         machine_state::{
-            bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
-            hart_state::{HartState, HartStateLayout},
-            registers::{a0, a1, a2, a3, a4, t0, t1, t2, t3, t4},
             MachineCoreState, MachineCoreStateLayout,
+            hart_state::{HartState, HartStateLayout},
+            main_memory::tests::T1K,
+            registers::{a0, a1, a2, a3, a4, nz, t0, t1, t2, t3, t4},
         },
         traps::Exception,
     };
@@ -367,12 +374,11 @@ mod tests {
             imm in any::<i64>(),
             reg_val in any::<i64>())|
         {
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             state.xregisters.write(a0, reg_val as u64);
             state.xregisters.write(t0, imm as u64);
-            state.xregisters.run_addiw(imm, a0, a1);
+            state.xregisters.run_addiw(imm, a0, nz::a1);
             // check against wrapping addition performed on the lowest 32 bits
             let r_val = reg_val as u32;
             let i_val = imm as u32;
@@ -380,7 +386,7 @@ mod tests {
                 state.xregisters.read(a1),
                 r_val.wrapping_add(i_val) as i32 as i64 as u64
             );
-            state.xregisters.run_addw(a0, t0, a2);
+            state.xregisters.run_addw(a0, t0, nz::a2);
             prop_assert_eq!(
                 state.xregisters.read(a2),
                 r_val.wrapping_add(i_val) as i32 as i64 as u64
@@ -393,12 +399,11 @@ mod tests {
             v1 in any::<i64>(),
             v2 in any::<i64>())|
         {
-            let mut backend = create_backend!(HartStateLayout, F);
-            let mut state = create_state!(HartState, F, backend);
+            let mut state = create_state!(HartState, F);
 
             state.xregisters.write(t0, v1 as u64);
             state.xregisters.write(a0, v2 as u64);
-            state.xregisters.run_subw(t0, a0, a1);
+            state.xregisters.run_subw(t0, a0, nz::a1);
             // check against wrapping subtraction performed on the lowest 32 bits
             let v1_u32 = v1 as u32;
             let v2_u32 = v2 as u32;
@@ -415,7 +420,17 @@ mod tests {
             $rd:ident, $expected_val:expr
         ) => {
             $state.xregisters.write($rs1, $r1_val);
-            $state.xregisters.$shift_fn($imm, $rs1, $rd);
+            $state.xregisters.$shift_fn($imm, $rs1, nz::$rd);
+            let new_val = $state.xregisters.read($rd);
+            assert_eq!(new_val, $expected_val);
+        };
+
+        ($state:ident, $shift_fn:tt, $imm:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr, non_zero
+        ) => {
+            $state.xregisters.write_nz(nz::$rs1, $r1_val);
+            $state.xregisters.$shift_fn($imm, nz::$rs1, nz::$rd);
             let new_val = $state.xregisters.read($rd);
             assert_eq!(new_val, $expected_val);
         };
@@ -429,7 +444,20 @@ mod tests {
         ) => {
             $state.xregisters.write($rs2, $r2_val);
             $state.xregisters.write($rs1, $r1_val);
-            $state.xregisters.$shift_fn($rs1, $rs2, $rd);
+            $state.xregisters.$shift_fn($rs1, $rs2, nz::$rd);
+            let new_val = $state.xregisters.read($rd);
+            assert_eq!(new_val, $expected_val);
+        };
+
+        ($state:ident, $shift_fn:tt,
+            $rs2:ident, $r2_val:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr,
+            non_zero
+        ) => {
+            $state.xregisters.write($rs2, $r2_val);
+            $state.xregisters.write($rs1, $r1_val);
+            $state.xregisters.$shift_fn(nz::$rs1, nz::$rs2, nz::$rd);
             let new_val = $state.xregisters.read($rd);
             assert_eq!(new_val, $expected_val);
         };
@@ -461,11 +489,39 @@ mod tests {
                 $expected_val
             );
         };
+
+        ($state:ident, $shift_fn_imm:tt, $shift_fn_reg:tt,
+            $rs2:ident, $r2_val:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr,
+            non_zero
+        ) => {
+            test_shift_instr!(
+                $state,
+                $shift_fn_imm,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val,
+                non_zero
+            );
+            test_shift_reg_instr!(
+                $state,
+                $shift_fn_reg,
+                $rs2,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val,
+                non_zero
+            );
+        };
     }
 
     backend_test!(test_shift, F, {
-        let mut backend = create_backend!(HartStateLayout, F);
-        let mut state = create_state!(HartState, F, backend);
+        let mut state = create_state!(HartState, F);
 
         // imm = 0
         test_both_shift_instr!(
@@ -477,7 +533,8 @@ mod tests {
             a0,
             0x1234_ABEF,
             a1,
-            0x1234_ABEF
+            0x1234_ABEF,
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -488,7 +545,8 @@ mod tests {
             a0,
             0x1234_ABEF,
             a0,
-            0x1234_ABEF
+            0x1234_ABEF,
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -499,7 +557,8 @@ mod tests {
             a0,
             0xFFFF_DEAD_1234_ABEF,
             a1,
-            0xFFFF_DEAD_1234_ABEF
+            0xFFFF_DEAD_1234_ABEF,
+            non_zero
         );
 
         // small imm (< 32))
@@ -512,7 +571,8 @@ mod tests {
             a0,
             0x1234_ABEF,
             a1,
-            0x1_234A_BEF0_0000
+            0x1_234A_BEF0_0000,
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -523,7 +583,8 @@ mod tests {
             a0,
             0x44_1234_ABEF,
             a1,
-            0x1104_8D2A
+            0x1104_8D2A,
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -534,7 +595,8 @@ mod tests {
             t0,
             -1_i64 as u64,
             a0,
-            0x0003_FFFF_FFFF_FFFF
+            0x0003_FFFF_FFFF_FFFF,
+            non_zero
         );
         test_both_shift_instr!(
             state,
@@ -545,7 +607,8 @@ mod tests {
             a0,
             0xFFFF_F0FF_FFF0_FF00,
             a0,
-            0xFFFF_FFFC_3FFF_FC3F
+            0xFFFF_FFFC_3FFF_FC3F,
+            non_zero
         );
 
         // big imm (>= 32))
@@ -558,9 +621,21 @@ mod tests {
             a0,
             0x1234_ABEF,
             a0,
-            0x34AB_EF00_0000_0000
+            0x34AB_EF00_0000_0000,
+            non_zero
         );
-        test_both_shift_instr!(state, run_srli, run_srl, a1, 40, a0, 0x1234_ABEF, a0, 0x0);
+        test_both_shift_instr!(
+            state,
+            run_srli,
+            run_srl,
+            a1,
+            40,
+            a0,
+            0x1234_ABEF,
+            a0,
+            0x0,
+            non_zero
+        );
         test_both_shift_instr!(
             state,
             run_srai,
@@ -570,7 +645,8 @@ mod tests {
             a0,
             0x8000_FAFF_1234_ABEF,
             a1,
-            0xFFFF_FFFF_FF80_00FA
+            0xFFFF_FFFF_FF80_00FA,
+            non_zero
         );
 
         // Use same register for shift and source
@@ -582,7 +658,8 @@ mod tests {
             a1,
             0b1001_0101,
             a2,
-            0x12A0_0000
+            0x12A0_0000,
+            non_zero
         );
         // Use same register for shift and destination
         test_shift_reg_instr!(
@@ -593,7 +670,8 @@ mod tests {
             a2,
             0b1101_0101,
             a1,
-            0x1AA0_0000
+            0x1AA0_0000,
+            non_zero
         );
         // Use same register for shift, source and destination
         test_shift_reg_instr!(
@@ -604,13 +682,13 @@ mod tests {
             a1,
             0b1101_0101,
             a1,
-            0x1AA0_0000
+            0x1AA0_0000,
+            non_zero
         );
     });
 
     backend_test!(test_shift_w, F, {
-        let mut backend = create_backend!(HartStateLayout, F);
-        let mut state = create_state!(HartState, F, backend);
+        let mut state = create_state!(HartState, F);
 
         // imm = 0
         test_both_shift_instr!(
@@ -755,14 +833,7 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let mut backend = create_backend!(MachineCoreStateLayout<T1K>, F);
-        let state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<T1K>,
-            F,
-            backend,
-            T1K
-        );
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -820,9 +891,9 @@ mod tests {
                 Ok(())
             };
 
-            let invalid_offset = DEVICES_ADDRESS_SPACE_LENGTH - 1024;
-            let aligned_offset = DEVICES_ADDRESS_SPACE_LENGTH + 512;
-            let misaligned_offset = DEVICES_ADDRESS_SPACE_LENGTH + 513;
+            let invalid_offset = 0u64.wrapping_sub(1024);
+            let aligned_offset = 512;
+            let misaligned_offset = 513;
 
             // Out of bounds loads / stores
             prop_assert!(perform_test(invalid_offset, true).is_err_and(|e|

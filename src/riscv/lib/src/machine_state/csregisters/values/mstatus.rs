@@ -10,7 +10,7 @@ use crate::{
         xstatus::{ExtensionValue, MPPValue, MStatus, SPPValue, XLenValue},
     },
     state_backend::{
-        AllocatedOf, Atom, Cell, EffectCell, EnumCell, EnumCellLayout, ManagerBase, ManagerRead,
+        AllocatedOf, Atom, Cell, EffectCell, FnManager, ManagerBase, ManagerClone, ManagerRead,
         ManagerReadWrite, ManagerWrite, Ref,
     },
     struct_layout,
@@ -18,7 +18,7 @@ use crate::{
 
 /// RISCV CSRegister.mstatus register state.
 /// Accounts for CSR rules like WPRI, WARL, WLRL.
-/// Contains only real fields (no shadows) hence it is a public field in [`super::CSRegisterValues`]
+/// Contains only real fields (no shadows) hence it is a public field in [`super::CSRValues`]
 pub struct MStatusValue<M: ManagerBase> {
     // Individual fields can be public since they are well typed and respect the WPRI, WARL, WLRL rules.
     // Except for fields which have side-effects. These ones have custom read/write/replace methods
@@ -28,10 +28,10 @@ pub struct MStatusValue<M: ManagerBase> {
     pub spie: Cell<bool, M>,
     pub ube: Cell<bool, M>,
     pub mpie: Cell<bool, M>,
-    pub spp: EnumCell<SPPValue, u8, M>,
-    pub mpp: EnumCell<MPPValue, u8, M>,
-    pub fs: EnumCell<ExtensionValue, u8, M>,
-    pub xs: EnumCell<ExtensionValue, u8, M>,
+    pub spp: Cell<SPPValue, M>,
+    pub mpp: Cell<MPPValue, M>,
+    pub fs: Cell<ExtensionValue, M>,
+    pub xs: Cell<ExtensionValue, M>,
     // vs is always OFF as we do not support the virtualisation extension
     pub mprv: Cell<bool, M>,
     pub sum: Cell<bool, M>,
@@ -39,8 +39,8 @@ pub struct MStatusValue<M: ManagerBase> {
     pub tvm: Cell<bool, M>,
     pub tw: Cell<bool, M>,
     pub tsr: Cell<bool, M>,
-    pub uxl: EnumCell<XLenValue, u8, M>,
-    pub sxl: EnumCell<XLenValue, u8, M>,
+    pub uxl: Cell<XLenValue, M>,
+    pub sxl: Cell<XLenValue, M>,
     pub sbe: Cell<bool, M>,
     pub mbe: Cell<bool, M>,
 }
@@ -53,70 +53,99 @@ impl<M: ManagerBase> MStatusValue<M> {
             spie: space.spie,
             ube: space.ube,
             mpie: space.mpie,
-            spp: EnumCell::bind(space.spp),
-            mpp: EnumCell::bind(space.mpp),
-            fs: EnumCell::bind(space.fs),
-            xs: EnumCell::bind(space.xs),
+            spp: space.spp,
+            mpp: space.mpp,
+            fs: space.fs,
+            xs: space.xs,
             mprv: space.mprv,
             sum: space.sum,
             mxr: space.mxr,
             tvm: space.tvm,
             tw: space.tw,
             tsr: space.tsr,
-            uxl: EnumCell::bind(space.uxl),
-            sxl: EnumCell::bind(space.sxl),
+            uxl: space.uxl,
+            sxl: space.sxl,
             sbe: space.sbe,
             mbe: space.mbe,
         }
     }
 
-    /// Obtain a structure with references to the bound regions of this type.
-    pub fn struct_ref(&self) -> AllocatedOf<MStatusLayout, Ref<'_, M>> {
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<MStatusLayout, F::Output> {
         MStatusLayoutF {
-            sie: self.sie.struct_ref(),
-            mie: self.mie.struct_ref(),
-            spie: self.spie.struct_ref(),
-            ube: self.ube.struct_ref(),
-            mpie: self.mpie.struct_ref(),
-            spp: self.spp.struct_ref(),
-            mpp: self.mpp.struct_ref(),
-            fs: self.fs.struct_ref(),
-            xs: self.xs.struct_ref(),
-            mprv: self.mprv.struct_ref(),
-            sum: self.sum.struct_ref(),
-            mxr: self.mxr.struct_ref(),
-            tvm: self.tvm.struct_ref(),
-            tw: self.tw.struct_ref(),
-            tsr: self.tsr.struct_ref(),
-            uxl: self.uxl.struct_ref(),
-            sxl: self.sxl.struct_ref(),
-            sbe: self.sbe.struct_ref(),
-            mbe: self.mbe.struct_ref(),
+            sie: self.sie.struct_ref::<F>(),
+            mie: self.mie.struct_ref::<F>(),
+            spie: self.spie.struct_ref::<F>(),
+            ube: self.ube.struct_ref::<F>(),
+            mpie: self.mpie.struct_ref::<F>(),
+            spp: self.spp.struct_ref::<F>(),
+            mpp: self.mpp.struct_ref::<F>(),
+            fs: self.fs.struct_ref::<F>(),
+            xs: self.xs.struct_ref::<F>(),
+            mprv: self.mprv.struct_ref::<F>(),
+            sum: self.sum.struct_ref::<F>(),
+            mxr: self.mxr.struct_ref::<F>(),
+            tvm: self.tvm.struct_ref::<F>(),
+            tw: self.tw.struct_ref::<F>(),
+            tsr: self.tsr.struct_ref::<F>(),
+            uxl: self.uxl.struct_ref::<F>(),
+            sxl: self.sxl.struct_ref::<F>(),
+            sbe: self.sbe.struct_ref::<F>(),
+            mbe: self.mbe.struct_ref::<F>(),
+        }
+    }
+}
+
+impl<M: ManagerClone> Clone for MStatusValue<M> {
+    fn clone(&self) -> Self {
+        Self {
+            sie: self.sie.clone(),
+            mie: self.mie.clone(),
+            spie: self.spie.clone(),
+            ube: self.ube.clone(),
+            mpie: self.mpie.clone(),
+            spp: self.spp.clone(),
+            mpp: self.mpp.clone(),
+            fs: self.fs.clone(),
+            xs: self.xs.clone(),
+            mprv: self.mprv.clone(),
+            sum: self.sum.clone(),
+            mxr: self.mxr.clone(),
+            tvm: self.tvm.clone(),
+            tw: self.tw.clone(),
+            tsr: self.tsr.clone(),
+            uxl: self.uxl.clone(),
+            sxl: self.sxl.clone(),
+            sbe: self.sbe.clone(),
+            mbe: self.mbe.clone(),
         }
     }
 }
 
 struct_layout!(
     pub struct MStatusLayout {
-        sie: Atom<bool>,
-        mie: Atom<bool>,
-        spie: Atom<bool>,
-        ube: Atom<bool>,
-        mpie: Atom<bool>,
-        spp: EnumCellLayout<u8>,
-        mpp: EnumCellLayout<u8>,
-        fs: EnumCellLayout<u8>,
-        xs: EnumCellLayout<u8>,
-        mprv: Atom<bool>,
-        sum: Atom<bool>,
-        mxr: Atom<bool>,
-        tvm: Atom<bool>,
-        tw: Atom<bool>,
-        tsr: Atom<bool>,
-        uxl: EnumCellLayout<u8>,
-        sxl: EnumCellLayout<u8>,
-        sbe: Atom<bool>,
-        mbe: Atom<bool>,
+        pub sie: Atom<bool>,
+        pub mie: Atom<bool>,
+        pub spie: Atom<bool>,
+        pub ube: Atom<bool>,
+        pub mpie: Atom<bool>,
+        pub spp: Atom<SPPValue>,
+        pub mpp: Atom<MPPValue>,
+        pub fs: Atom<ExtensionValue>,
+        pub xs: Atom<ExtensionValue>,
+        pub mprv: Atom<bool>,
+        pub sum: Atom<bool>,
+        pub mxr: Atom<bool>,
+        pub tvm: Atom<bool>,
+        pub tw: Atom<bool>,
+        pub tsr: Atom<bool>,
+        pub uxl: Atom<XLenValue>,
+        pub sxl: Atom<XLenValue>,
+        pub sbe: Atom<bool>,
+        pub mbe: Atom<bool>,
     }
 );
 

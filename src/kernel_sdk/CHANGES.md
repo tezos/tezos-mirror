@@ -3,8 +3,9 @@
 ## Version next
 
 ### SDK
+
 - Add experimental support for compiling kernels to a Hermit RISC-V image behind the `proto-alpha` flag.
-- Add an experimental rollup host with an in-memory store behind the `experimental-host-in-memory-store` flag.
+- Add an experimental rollup host for RISC-V with an in-memory store behind the `experimental-host-in-memory-store` flag.
 - Add an `OutboxQueue` that can be used when more than 100 outbox messages are produced at a given level.
 - Add `From OutboxMessageTransaction`, `From OutboxMessageTransactionBatch` for `OutboxMessage` to simplify construction.
 - Fix the incomplete inbox on the first level of using `MockHost::default()`.
@@ -24,10 +25,19 @@
 - Add `--keep-going` option to native cli, to control whether the kernel should exit once the inbox has been drained.
 - Implement the generic `reveal` host function in the `MockHost`, this allows in particular to use the DAL host functions in the mockup.
 - Bump `tezos_crypto_rs`/`tezos_data_encoding` to `0.6.0` release.
+- Allow overriding of the `debug_log` sink when using `MockHost`.
+- Rename `testing` feature flag to `mock-core-trait` on `core` crate.
+- Remove redundant `testing` feature flag from `debug` crate.
+- Remove redundant `testing` feature flag from `entrypoint` crate.
+- Remove redundant `testing` feature flag from `host` crate.
+- Disable `testing` as default features of the main `sdk` crate.
+- Change `Runtime::store_value_size` to return `PathNotFound` when the input is the path of a directory.
+- Add support for `MichelsonTimestamp` encoding and decoding.
 
 ### Installer client/kernel
 
 - Add support for using the `set` instruction with large (> 512 byte) values.
+- Add `merge-setup-files` subcommand to merge multiple configuration files in one.
 
 ## Version 0.2.2
 

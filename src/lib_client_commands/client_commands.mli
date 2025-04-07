@@ -35,5 +35,8 @@ val register : Protocol_hash.t -> (network option -> command list) -> unit
 
 val commands_for_version : Protocol_hash.t -> network option -> command list
 
+(** Tezos_clic option to disable coloring *)
+val dont_colorize : unit -> (bool, 'a) Tezos_clic.arg
+
 val get_versions :
   unit -> (Protocol_hash.t * (network option -> command list)) Seq.t

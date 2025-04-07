@@ -31,13 +31,15 @@ module VM : sig
   val init : unit -> unit Lwt.t
 
   val deploy :
+    auto_approve:bool ->
     max_run_duration:int option ->
     machine_type:string ->
     base_port:int ->
     ports_per_vm:int ->
     number_of_vms:int ->
     docker_image:string ->
-    os:string ->
+    os:Types.Os.t ->
+    prometheus_port:int ->
     unit Lwt.t
 
   val points : unit -> string list Lwt.t

@@ -14,15 +14,13 @@
 use super::PAGE_OFFSET_WIDTH;
 use crate::{
     bits::{ones, u64},
-    machine_state::{bus::Address, csregisters::satp::SvLength},
+    machine_state::{csregisters::satp::SvLength, main_memory::Address},
 };
 
 /// Obtain `PPN[index]` from a PPN field specified by `sv_length` Standard.
 ///
 /// The page offset is ignored when computing the ranges.
 /// (i.e., the PPN field starts at bit 0).
-///
-/// Example: `raw_range_PPN[0] = 8..=0`. This is because [`Twiddle`] expects the range in reverse
 #[inline(always)]
 pub(super) fn get_raw_ppn_i_range(sv_length: SvLength, index: usize) -> Option<(usize, usize)> {
     // We use a jump table instead of a match statement to improve performance.
@@ -93,7 +91,7 @@ pub fn set_ppn_idx(
 
 #[cfg(test)]
 mod tests {
-    use crate::machine_state::csregisters::{satp::SvLength, CSRRepr};
+    use crate::machine_state::csregisters::{CSRRepr, satp::SvLength};
     use proptest::proptest;
 
     #[test]

@@ -17,20 +17,6 @@ let install_finalizer server_finalizer =
   let* () = Tx_pool.shutdown () in
   Evm_context.shutdown ()
 
-let send_raw_transaction_method txn =
-  let open Rpc_encodings in
-  let message = Hex.of_string txn |> Hex.show |> Ethereum_types.hex_of_string in
-  JSONRPC.
-    {
-      method_ = Send_raw_transaction.method_;
-      parameters =
-        Some
-          (Data_encoding.Json.construct
-             Send_raw_transaction.input_encoding
-             message);
-      id = None;
-    }
-
 let main
     ({
        keep_alive;
@@ -76,39 +62,15 @@ let main
     match config.proxy.evm_node_endpoint with
     | None -> Tx_pool.Proxy
     | Some evm_node_endpoint ->
-        let injector raw_txn =
-          let* response =
-            let open Rollup_services in
-            call_service
-              ~keep_alive
-              ~base:evm_node_endpoint
-              (Services.dispatch_service ~path:Resto.Path.root)
-              ()
-              ()
-              (Singleton (send_raw_transaction_method raw_txn))
-          in
-
-          match response with
-          | Singleton {value = Ok json; id = _} ->
-              let open Rpc_encodings in
-              let hash =
-                Data_encoding.Json.destruct
-                  Send_raw_transaction.output_encoding
-                  json
-              in
-              return (Ok hash)
-          | Singleton {value = Error err; id = _}
-          | Batch [{value = Error err; id = _}] ->
-              return (Error err.message)
-          | Batch _ ->
-              (* should not be possible, we consider it failed *)
-              return
-                (Error
-                   "Upstream EVM endpoint returned an inconsistent response \
-                    (more than one result)")
-        in
-
-        Tx_pool.Forward {injector}
+        Tx_pool.Forward
+          {
+            injector =
+              (fun _ raw_tx ->
+                Injector.send_raw_transaction
+                  ~keep_alive:config.keep_alive
+                  ~base:evm_node_endpoint
+                  ~raw_tx);
+          }
   in
   let* () =
     if not config.experimental_features.enable_send_raw_transaction then
@@ -116,7 +78,7 @@ let main
     else
       Tx_pool.start
         {
-          rollup_node = (module Rollup_node_rpc);
+          backend = (module Rollup_node_rpc);
           smart_rollup_address;
           mode;
           tx_timeout_limit = config.tx_pool_timeout_limit;

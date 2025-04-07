@@ -29,10 +29,6 @@ CREATE TABLE "l1_l2_levels_relationships" (
   l1_level INT NOT NULL UNIQUE ON CONFLICT ABORT
 , finalized_l2_level INT DEFAULT 0);
 
-CREATE TABLE metadata (
-  smart_rollup_address TEXT NOT NULL
-);
-
 CREATE UNIQUE INDEX unapplied_upgrade
 ON kernel_upgrades (
   COALESCE(applied_before, -1)
@@ -55,10 +51,26 @@ CREATE TABLE transactions (
   object_fields BLOB NOT NULL
 );
 
-CREATE TABLE gc (
-  id INTEGER PRIMARY KEY,
-  last_gc_level INTEGER,
-  last_gc_timestamp TIMESTAMP,
-  last_split_level INTEGER,
-  last_split_timestamp TIMESTAMP
-)
+CREATE UNIQUE INDEX block_hash_index ON blocks (hash);
+
+CREATE TABLE pending_confirmations (
+    level serial PRIMARY KEY,
+    hash VARCHAR(32) NOT NULL
+);
+
+CREATE TABLE irmin_chunks (
+  level INTEGER,
+  timestamp TIMESTAMP
+);
+
+CREATE TABLE metadata (
+  key TEXT PRIMARY KEY NOT NULL,
+  value TEXT NOT null
+);
+
+CREATE TABLE block_storage_mode (
+  legacy INTEGER NOT NULL,
+  CONSTRAINT valid_legacy CHECK (legacy IN (0, 1))
+);
+
+CREATE INDEX index_transactions_block_number ON transactions(block_number)

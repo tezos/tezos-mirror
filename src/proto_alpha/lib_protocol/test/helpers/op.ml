@@ -32,19 +32,24 @@ let pack_operation ctxt signature contents =
   Operation.pack
     ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
 
-let raw_sign ?(watermark = Signature.Generic_operation) sk branch contents =
-  let unsigned =
-    Data_encoding.Binary.to_bytes_exn
-      Operation.unsigned_encoding
-      ({branch}, contents)
+let raw_sign (type kind) ctxt ?(watermark = Signature.Generic_operation)
+    (sk : Signature.secret_key) branch (contents : kind contents_list) =
+  let open Lwt_result_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let bytes =
+    Operation.Internal_for_tests.serialize_unsigned_operation
+      alpha_ctxt
+      branch
+      contents
   in
-  Signature.sign ~watermark sk unsigned
+  return (Signature.sign ~watermark sk bytes)
 
-let sign ?(watermark = Signature.Generic_operation) sk branch contents =
-  let signature =
-    Some (raw_sign ~watermark sk branch (Contents_list contents))
-  in
-  ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
+let sign ctxt ?(watermark = Signature.Generic_operation) sk branch contents =
+  let open Lwt_result_syntax in
+  let* signature = raw_sign ctxt ~watermark sk branch contents in
+  return
+    ({shell = {branch}; protocol_data = {contents; signature = Some signature}}
+      : _ Operation.t)
 
 (** Generates the block payload hash based on the hash [pred_hash] of
     the predecessor block and the hash of non-consensus operations of
@@ -77,8 +82,13 @@ let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
         | None -> return (del, [])
         | Some slots -> return (del, slots))
   in
-  let slot =
-    match slot with None -> Stdlib.List.hd slots | Some slot -> slot
+  let* slot =
+    match slot with
+    | None -> (
+        match List.hd slots with
+        | Some s -> return s
+        | None -> tzfail (Block.No_slots_found_for delegate_pkh))
+    | Some slot -> return slot
   in
   let* level =
     match level with
@@ -116,13 +126,47 @@ let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash
       ?branch
       attested_block
   in
-  let op = Single (Attestation {consensus_content; dal_content}) in
-  return
-    (sign
-       ~watermark:Operation.(to_watermark (Attestation Chain_id.zero))
-       signer
-       branch
-       op)
+  let contents = Single (Attestation {consensus_content; dal_content}) in
+  sign
+    ~watermark:Operation.(to_watermark (Attestation Chain_id.zero))
+    Context.(B attested_block)
+    signer
+    branch
+    contents
+
+let aggregate attestations =
+  let aggregate_content =
+    List.fold_left
+      (fun acc op ->
+        let {shell; protocol_data = {contents; signature}} : _ Operation.t =
+          op
+        in
+        match (contents, signature) with
+        | Single (Attestation {consensus_content; _}), Some (Bls bls_sig) -> (
+            let {slot; _} = consensus_content in
+            match acc with
+            | Some (shell, proposal, slots, signatures) ->
+                Some (shell, proposal, slot :: slots, bls_sig :: signatures)
+            | None ->
+                let {level; round; block_payload_hash; _} = consensus_content in
+                let proposal = {level; round; block_payload_hash} in
+                Some (shell, proposal, [slot], [bls_sig]))
+        | _, _ -> acc)
+      None
+      attestations
+  in
+  let open Option_syntax in
+  let* shell, consensus_content, committee, signatures = aggregate_content in
+  let+ signature =
+    Bls12_381_signature.MinPk.aggregate_signature_opt signatures
+  in
+  let contents =
+    Single (Attestations_aggregate {consensus_content; committee})
+  in
+  let protocol_data =
+    Operation_data {contents; signature = Some (Bls signature)}
+  in
+  {shell; protocol_data}
 
 let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
     ?branch attested_block =
@@ -140,6 +184,38 @@ let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
   in
   return (Operation.pack op)
 
+let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
+    attested_block =
+  let open Lwt_result_syntax in
+  let* committee =
+    match committee with
+    | Some committee -> return committee
+    | None ->
+        let* attesters = Context.get_attesters (B attested_block) in
+        return
+        @@ List.filter_map
+             (fun attester ->
+               match attester.Plugin.RPC.Validators.consensus_key with
+               | Bls _ -> Some attester.delegate
+               | _ -> None)
+             attesters
+  in
+  let* attestations =
+    List.map_es
+      (fun delegate ->
+        raw_attestation
+          ~delegate
+          ?level
+          ?round
+          ?block_payload_hash
+          ?branch
+          attested_block)
+      committee
+  in
+  match aggregate attestations with
+  | Some aggregate_attestation -> return aggregate_attestation
+  | None -> failwith "no Bls delegate found"
+
 let raw_preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
     attested_block =
   let open Lwt_result_syntax in
@@ -153,13 +229,13 @@ let raw_preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
       ?branch
       attested_block
   in
-  let op = Single (Preattestation consensus_content) in
-  return
-    (sign
-       ~watermark:Operation.(to_watermark (Preattestation Chain_id.zero))
-       signer
-       branch
-       op)
+  let contents = Single (Preattestation consensus_content) in
+  sign
+    ~watermark:Operation.(to_watermark (Preattestation Chain_id.zero))
+    Context.(B attested_block)
+    signer
+    branch
+    contents
 
 let preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
     attested_block =
@@ -176,8 +252,10 @@ let preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
   in
   return (Operation.pack op)
 
-let sign ?watermark sk ctxt (Contents_list contents) =
-  Operation.pack (sign ?watermark sk ctxt contents)
+let sign ?watermark ctxt sk branch (Contents_list contents) =
+  let open Lwt_result_syntax in
+  let* op = sign ctxt ?watermark sk branch contents in
+  return (Operation.pack op)
 
 let batch_operations ?(recompute_counters = false) ~source ctxt
     (operations : packed_operation list) =
@@ -230,7 +308,7 @@ let batch_operations ?(recompute_counters = false) ~source ctxt
   in
   let* account = Context.Contract.manager ctxt source in
   let*?@ operations = Operation.of_list operations in
-  return @@ sign account.sk (Context.branch ctxt) operations
+  sign ctxt account.sk (Context.branch ctxt) operations
 
 type gas_limit = Max | High | Low | Zero | Custom_gas of Gas.Arith.integral
 
@@ -372,7 +450,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
         operations @ [op]
   in
   let*?@ operations = Operation.of_list operations in
-  return @@ sign account.sk (Context.branch ctxt) operations
+  sign ctxt account.sk (Context.branch ctxt) operations
 
 let manager_operation_with_fixed_gas_limit ?(force_reveal = false) ?counter
     ~gas_limit ?(reveal_gas_limit = default_high_gas_limit) ?(fee = Tez.zero)
@@ -540,14 +618,14 @@ let revelation ?fee ?(gas_limit = High) ?storage_limit ?counter ?forge_pkh ctxt
       public_key
   in
   let sop = Contents_list (Single op) in
-  let+ account = Context.Contract.manager ctxt (Implicit source) in
-  sign account.sk (Context.branch ctxt) sop
+  let* account = Context.Contract.manager ctxt (Implicit source) in
+  sign ctxt account.sk (Context.branch ctxt) sop
 
 let failing_noop ctxt source arbitrary =
   let open Lwt_result_syntax in
   let op = Contents_list (Single (Failing_noop arbitrary)) in
   let* account = Account.find source in
-  return @@ sign account.sk (Context.branch ctxt) op
+  sign ctxt account.sk (Context.branch ctxt) op
 
 let originated_contract_hash op =
   let nonce = Protocol.Origination_nonce.initial (Operation.hash_packed op) in
@@ -567,7 +645,7 @@ let contract_origination_gen k ?force_reveal ?counter ?delegate ~script
   in
   let credit = Option.value ~default:default_credit credit in
   let operation = Origination {delegate; script; credit} in
-  let+ sop =
+  let* sop =
     manager_operation
       ?force_reveal
       ?counter
@@ -579,7 +657,8 @@ let contract_origination_gen k ?force_reveal ?counter ?delegate ~script
       ctxt
       operation
   in
-  k (sign account.sk (Context.branch ctxt) sop)
+  let* packed_operation = sign ctxt account.sk (Context.branch ctxt) sop in
+  return (k packed_operation)
 
 let contract_origination =
   contract_origination_gen (fun op -> (op, originated_contract op))
@@ -592,7 +671,7 @@ let register_global_constant ?force_reveal ?counter ?public_key ?fee ?gas_limit
   let open Lwt_result_syntax in
   let* account = Context.Contract.manager ctxt source in
   let operation = Register_global_constant {value} in
-  let+ sop =
+  let* sop =
     manager_operation
       ?force_reveal
       ?counter
@@ -604,7 +683,7 @@ let register_global_constant ?force_reveal ?counter ?public_key ?fee ?gas_limit
       ctxt
       operation
   in
-  sign account.sk (Context.branch ctxt) sop
+  sign ctxt account.sk (Context.branch ctxt) sop
 
 let unsafe_transaction ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ?(parameters = Script.unit_parameter) ?(entrypoint = Entrypoint.default)
@@ -622,8 +701,8 @@ let unsafe_transaction ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       ctxt
       top
   in
-  let+ account = Context.Contract.manager ctxt src in
-  sign account.sk (Context.branch ctxt) sop
+  let* account = Context.Contract.manager ctxt src in
+  sign ctxt account.sk (Context.branch ctxt) sop
 
 let transaction ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ?parameters ?entrypoint ctxt (src : Contract.t) (dst : Contract.t)
@@ -656,8 +735,8 @@ let delegation ?force_reveal ?fee ?gas_limit ?counter ?storage_limit ctxt source
       ctxt
       top
   in
-  let+ account = Context.Contract.manager ctxt source in
-  sign account.sk (Context.branch ctxt) sop
+  let* account = Context.Contract.manager ctxt source in
+  sign ctxt account.sk (Context.branch ctxt) sop
 
 let set_deposits_limit ?force_reveal ?fee ?gas_limit ?storage_limit ?counter
     ctxt source limit =
@@ -674,8 +753,8 @@ let set_deposits_limit ?force_reveal ?fee ?gas_limit ?storage_limit ?counter
       ctxt
       top
   in
-  let+ account = Context.Contract.manager ctxt source in
-  sign account.sk (Context.branch ctxt) sop
+  let* account = Context.Contract.manager ctxt source in
+  sign ctxt account.sk (Context.branch ctxt) sop
 
 let increase_paid_storage ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ctxt ~source ~destination (amount : Z.t) =
@@ -692,8 +771,8 @@ let increase_paid_storage ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       ctxt
       top
   in
-  let+ account = Context.Contract.manager ctxt source in
-  sign account.sk (Context.branch ctxt) sop
+  let* account = Context.Contract.manager ctxt source in
+  sign ctxt account.sk (Context.branch ctxt) sop
 
 let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
   let open Lwt_result_syntax in
@@ -738,6 +817,16 @@ let double_baking ctxt bh1 bh2 =
     protocol_data = Operation_data {contents; signature = None};
   }
 
+let dal_entrapment ctxt attestation slot_index shard_with_proof =
+  let contents =
+    Single (Dal_entrapment_evidence {attestation; slot_index; shard_with_proof})
+  in
+  let branch = Context.branch ctxt in
+  {
+    shell = {branch};
+    protocol_data = Operation_data {contents; signature = None};
+  }
+
 let seed_nonce_revelation ctxt level nonce =
   {
     shell = {branch = Context.branch ctxt};
@@ -775,7 +864,7 @@ let proposals ctxt proposer ?period proposals =
   let open Lwt_result_syntax in
   let* contents = proposals_contents ctxt proposer ?period proposals in
   let* account = Account.find (Context.Contract.pkh proposer) in
-  return (sign account.sk (Context.branch ctxt) (Contents_list contents))
+  sign ctxt account.sk (Context.branch ctxt) (Contents_list contents)
 
 let ballot_contents ctxt voter ?period proposal ballot =
   let open Lwt_result_syntax in
@@ -787,7 +876,7 @@ let ballot ctxt voter ?period proposal ballot =
   let open Lwt_result_syntax in
   let* contents = ballot_contents ctxt voter ?period proposal ballot in
   let* account = Account.find (Context.Contract.pkh voter) in
-  return (sign account.sk (Context.branch ctxt) (Contents_list contents))
+  sign ctxt account.sk (Context.branch ctxt) (Contents_list contents)
 
 let dummy_script =
   let open Micheline in
@@ -839,8 +928,8 @@ let transfer_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
       ctxt
       (Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint})
   in
-  let+ account = Context.Contract.manager ctxt source in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt source in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 let originated_sc_rollup op =
   let packed = Operation.hash_packed op in
@@ -862,7 +951,7 @@ let sc_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       (Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist})
   in
   let* account = Context.Contract.manager ctxt src in
-  let op = sign account.sk (Context.branch ctxt) to_sign_op in
+  let* op = sign ctxt account.sk (Context.branch ctxt) to_sign_op in
   let t = originated_sc_rollup op |> fun addr -> (op, addr) in
   return t
 
@@ -880,8 +969,8 @@ let sc_rollup_publish ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
       ctxt
       (Sc_rollup_publish {rollup; commitment})
   in
-  let+ account = Context.Contract.manager ctxt src in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt src in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 let sc_rollup_cement ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
     (src : Contract.t) rollup =
@@ -897,8 +986,8 @@ let sc_rollup_cement ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
       ctxt
       (Sc_rollup_cement {rollup})
   in
-  let+ account = Context.Contract.manager ctxt src in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt src in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 let sc_rollup_execute_outbox_message ?counter ?fee ?gas_limit ?storage_limit
     ?force_reveal ctxt (src : Contract.t) rollup cemented_commitment
@@ -916,8 +1005,8 @@ let sc_rollup_execute_outbox_message ?counter ?fee ?gas_limit ?storage_limit
       (Sc_rollup_execute_outbox_message
          {rollup; cemented_commitment; output_proof})
   in
-  let+ account = Context.Contract.manager ctxt src in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt src in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 let sc_rollup_recover_bond ?counter ?fee ?gas_limit ?storage_limit ?force_reveal
     ctxt (source : Contract.t) (sc_rollup : Sc_rollup.t)
@@ -934,8 +1023,8 @@ let sc_rollup_recover_bond ?counter ?fee ?gas_limit ?storage_limit ?force_reveal
       ctxt
       (Sc_rollup_recover_bond {sc_rollup; staker})
   in
-  let+ account = Context.Contract.manager ctxt source in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt source in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 let sc_rollup_add_messages ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ctxt (src : Contract.t) messages =
@@ -951,8 +1040,8 @@ let sc_rollup_add_messages ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       ctxt
       (Sc_rollup_add_messages {messages})
   in
-  let+ account = Context.Contract.manager ctxt src in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt src in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 let sc_rollup_refute ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
     (src : Contract.t) rollup opponent refutation =
@@ -968,8 +1057,8 @@ let sc_rollup_refute ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
       ctxt
       (Sc_rollup_refute {rollup; opponent; refutation})
   in
-  let+ account = Context.Contract.manager ctxt src in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt src in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 let sc_rollup_timeout ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
     (src : Contract.t) rollup stakers =
@@ -985,8 +1074,8 @@ let sc_rollup_timeout ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
       ctxt
       (Sc_rollup_timeout {rollup; stakers})
   in
-  let+ account = Context.Contract.manager ctxt src in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt src in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 let dal_publish_commitment ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ctxt (src : Contract.t) slot_header =
@@ -1002,8 +1091,8 @@ let dal_publish_commitment ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       ctxt
       (Dal_publish_commitment slot_header)
   in
-  let+ account = Context.Contract.manager ctxt src in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt src in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 let originated_zk_rollup op =
   let packed = Operation.hash_packed op in
@@ -1026,13 +1115,26 @@ let zk_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       (Zk_rollup_origination
          {public_parameters; circuits_info; init_state; nb_ops})
   in
-  let+ account = Context.Contract.manager ctxt src in
-  let op = sign account.sk (Context.branch ctxt) to_sign_op in
-  originated_zk_rollup op |> fun addr -> (op, addr)
+  let* account = Context.Contract.manager ctxt src in
+  let* op = sign ctxt account.sk (Context.branch ctxt) to_sign_op in
+  let addr = originated_zk_rollup op in
+  return (op, addr)
 
 let update_consensus_key ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    ctxt (src : Contract.t) pkh =
+    ?proof_signer ctxt (src : Contract.t) public_key =
   let open Lwt_result_syntax in
+  let* proof =
+    match proof_signer with
+    | None -> return_none
+    | Some account ->
+        let* account = Context.Contract.manager ctxt account in
+        let bytes =
+          Data_encoding.Binary.to_bytes_exn
+            Signature.Public_key.encoding
+            public_key
+        in
+        return_some (Signature.sign account.sk bytes)
+  in
   let* to_sign_op =
     manager_operation
       ?force_reveal
@@ -1042,20 +1144,20 @@ let update_consensus_key ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       ?storage_limit
       ~source:src
       ctxt
-      (Update_consensus_key pkh)
+      (Update_consensus_key {public_key; proof})
   in
-  let+ account = Context.Contract.manager ctxt src in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt src in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 let drain_delegate ctxt ~consensus_key ~delegate ~destination =
   let open Lwt_result_syntax in
   let contents =
     Single (Drain_delegate {consensus_key; delegate; destination})
   in
-  let+ account =
+  let* account =
     Context.Contract.manager ctxt (Contract.Implicit consensus_key)
   in
-  sign account.sk (Context.branch ctxt) (Contents_list contents)
+  sign ctxt account.sk (Context.branch ctxt) (Contents_list contents)
 
 let zk_rollup_publish ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
     (src : Contract.t) ~zk_rollup ~ops =
@@ -1071,8 +1173,8 @@ let zk_rollup_publish ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
       ctxt
       (Zk_rollup_publish {zk_rollup; ops})
   in
-  let+ account = Context.Contract.manager ctxt src in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt src in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 let zk_rollup_update ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
     (src : Contract.t) ~zk_rollup ~update =
@@ -1088,7 +1190,7 @@ let zk_rollup_update ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
       ctxt
       (Zk_rollup_update {zk_rollup; update})
   in
-  let+ account = Context.Contract.manager ctxt src in
-  sign account.sk (Context.branch ctxt) to_sign_op
+  let* account = Context.Contract.manager ctxt src in
+  sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 module Micheline = Micheline

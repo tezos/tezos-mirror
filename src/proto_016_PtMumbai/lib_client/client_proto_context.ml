@@ -28,7 +28,6 @@ open Alpha_context
 open Protocol_client_context
 open Tezos_micheline
 open Client_proto_contracts
-open Client_keys
 
 let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
@@ -275,7 +274,7 @@ let list_contract_labels cctxt ~chain ~block =
     (fun h ->
       (match (h : Contract.t) with
       | Implicit m -> (
-          Public_key_hash.rev_find cctxt m >>=? function
+          Client_keys.Public_key_hash.rev_find cctxt m >>=? function
           | None -> return ""
           | Some nm -> (
               Raw_contract_alias.find_opt cctxt nm >>=? function
@@ -324,7 +323,7 @@ let build_update_consensus_key ?fee ?gas_limit ?storage_limit consensus_pk =
 
 let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?fee ~manager_sk ~fee_parameter ?consensus_pk src_pk =
-  let source = Tezos_crypto.Signature.Public_key.hash src_pk in
+  let source = Signature.Public_key.hash src_pk in
   let delegate_op = build_delegate_operation ?fee (Some source) in
   match consensus_pk with
   | None -> (
@@ -385,7 +384,7 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
 let update_consensus_key cctxt ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ~consensus_pk ~manager_sk ~fee_parameter
     src_pk =
-  let source = Tezos_crypto.Signature.Public_key.hash src_pk in
+  let source = Signature.Public_key.hash src_pk in
   let operation = build_update_consensus_key ?fee consensus_pk in
   let operation = Annotated_manager_operation.Single_manager operation in
   Injection.inject_manager_operation
@@ -715,14 +714,14 @@ let read_key key =
       in
       let sk = Bip39.to_seed ~passphrase t in
       let sk = Bytes.sub sk 0 32 in
-      let sk : Tezos_crypto.Signature.Secret_key.t =
+      let sk : Signature.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn
              Tezos_crypto.Signature.Ed25519.Secret_key.encoding
              sk)
       in
-      let pk = Tezos_crypto.Signature.Secret_key.to_public_key sk in
-      let pkh = Tezos_crypto.Signature.Public_key.hash pk in
+      let pk = Signature.Secret_key.to_public_key sk in
+      let pkh = Signature.Public_key.hash pk in
       return (pkh, pk, sk)
 
 let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
@@ -762,11 +761,11 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?(encrypted = false) ?force key name =
   read_key key >>=? fun (pkh, pk, sk) ->
   fail_unless
-    (Tezos_crypto.Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
+    (Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
     (error_of_fmt
        "@[<v 2>Inconsistent activation key:@ Computed pkh: %a@ Embedded pkh: \
         %a @]"
-       Tezos_crypto.Signature.Public_key_hash.pp
+       Signature.Public_key_hash.pp
        pkh
        Tezos_crypto.Signature.Ed25519.Public_key_hash.pp
        key.pkh)

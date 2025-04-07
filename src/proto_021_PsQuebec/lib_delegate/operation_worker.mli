@@ -35,6 +35,7 @@ type t
 
 type candidate = {
   hash : Block_hash.t;
+  level_watched : Int32.t;
   round_watched : Round.t;
   payload_hash_watched : Block_payload_hash.t;
 }
@@ -54,7 +55,10 @@ type event =
    [true]).  Set [monitor_node_operations] to [false] to only consider
    externally provided (non-node) operations.  *)
 val create :
-  ?monitor_node_operations:bool -> #Protocol_client_context.full -> t Lwt.t
+  ?monitor_node_operations:bool ->
+  constants:Constants.t ->
+  #Protocol_client_context.full ->
+  t Lwt.t
 
 (** {1 Utilities} *)
 

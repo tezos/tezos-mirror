@@ -5,10 +5,10 @@
 use crate::Result;
 use regex::Regex;
 use serde::Deserialize;
-use std::collections::HashSet;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::time::Duration;
+use std::{collections::HashSet, fmt};
 use tezos_smart_rollup::utils::inbox::file::{InboxFile, Message};
 
 // Three sets of messages:
@@ -18,35 +18,59 @@ use tezos_smart_rollup::utils::inbox::file::{InboxFile, Message};
 // ... but all contained in one level
 const EXPECTED_LEVELS: usize = 1;
 
-pub fn handle_results(inbox: Box<Path>, logs: Box<Path>, expected_transfers: usize) -> Result<()> {
+pub fn handle_results(
+    inbox: Box<Path>,
+    all_logs: Vec<Box<Path>>,
+    expected_transfers: usize,
+) -> Result<()> {
     let inbox = InboxFile::load(&inbox)?;
 
-    let logs = read_to_string(&logs)?
-        .lines()
-        .map(serde_json::from_str)
-        .filter_map(|l| l.map(LogLine::classify).transpose())
-        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let all_metrics = all_logs
+        .iter()
+        .map(|logs| {
+            let logs = read_to_string(logs)?
+                .lines()
+                .map(serde_json::from_str)
+                .filter_map(|l| l.map(LogLine::classify).transpose())
+                .collect::<std::result::Result<Vec<_>, _>>()?;
 
-    let levels = logs_to_levels(logs)?;
+            let levels = logs_to_levels(logs)?;
 
-    if inbox.0.len() != levels.len() || levels.len() != EXPECTED_LEVELS {
-        return Err(format!(
-            "InboxFile contains {} levels, found {} in logs, expected {EXPECTED_LEVELS}",
-            inbox.0.len(),
-            levels.len()
-        )
-        .into());
+            if inbox.0.len() != levels.len() || levels.len() != EXPECTED_LEVELS {
+                return Err(format!(
+                    "InboxFile contains {} levels, found {} in logs, expected {EXPECTED_LEVELS}",
+                    inbox.0.len(),
+                    levels.len()
+                )
+                .into());
+            }
+
+            let [results]: [_; EXPECTED_LEVELS] = levels.try_into().unwrap();
+
+            check_deploy(&results)?;
+            let metrics = check_transfer_metrics(&results, expected_transfers)?;
+            check_balances(
+                &results,
+                &inbox.0[0][2 + expected_transfers..],
+                expected_transfers,
+            )?;
+
+            Ok(metrics)
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    if all_metrics.len() > 1 {
+        let len = all_metrics.len();
+
+        for (num, metrics) in all_metrics.iter().enumerate() {
+            println!("Run {} / {len} => {metrics}", num + 1);
+        }
+
+        let agg_metrics = TransferMetrics::aggregate(&all_metrics);
+        println!("\nAggregate => {agg_metrics}");
+    } else if let Some(metrics) = all_metrics.first() {
+        println!("{metrics}");
     }
-
-    let [results]: [_; EXPECTED_LEVELS] = levels.try_into().unwrap();
-
-    check_deploy(&results)?;
-    check_transfer_metrics(&results, expected_transfers)?;
-    check_balances(
-        &results,
-        &inbox.0[0][2 + expected_transfers..],
-        expected_transfers,
-    )?;
 
     Ok(())
 }
@@ -63,7 +87,39 @@ fn check_deploy(level: &Level) -> Result<()> {
     Ok(())
 }
 
-fn check_transfer_metrics(level: &Level, expected_transfers: usize) -> Result<()> {
+#[derive(Clone, Debug, Default)]
+struct TransferMetrics {
+    transfers: usize,
+    duration: Duration,
+    tps: f64,
+}
+
+impl TransferMetrics {
+    fn aggregate(metrics: &[TransferMetrics]) -> TransferMetrics {
+        let summed = metrics.iter().fold(Self::default(), |acc, m| Self {
+            transfers: acc.transfers + m.transfers,
+            duration: acc.duration + m.duration,
+            tps: acc.tps + m.tps,
+        });
+
+        Self {
+            tps: summed.tps / metrics.len() as f64,
+            ..summed
+        }
+    }
+}
+
+impl fmt::Display for TransferMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} FA2 transfers took {:?} @ {:.3} TPS",
+            self.transfers, self.duration, self.tps
+        )
+    }
+}
+
+fn check_transfer_metrics(level: &Level, expected_transfers: usize) -> Result<TransferMetrics> {
     if expected_transfers + 1 != level.executions.len() {
         return Err(format!(
             "Expected {expected_transfers} transfers, got {}",
@@ -77,12 +133,12 @@ fn check_transfer_metrics(level: &Level, expected_transfers: usize) -> Result<()
     // minting, all the way up to the _end_ of the last execution (transfer).
     let duration = level.executions[transfers].elapsed - level.executions[0].elapsed;
     let tps = (transfers as f64) / duration.as_secs_f64();
-    println!(
-        "{transfers} FA2 transfers took {:?} @ {tps:.3} TPS",
-        duration
-    );
 
-    Ok(())
+    Ok(TransferMetrics {
+        transfers,
+        duration,
+        tps,
+    })
 }
 
 // The generated transfers (for a number of accounts N), has a target final state:
@@ -141,7 +197,6 @@ fn check_balances(level: &Level, messages: &[Message], num_transfers: usize) -> 
         .into());
     }
 
-    println!("Balances are consistent");
     Ok(())
 }
 

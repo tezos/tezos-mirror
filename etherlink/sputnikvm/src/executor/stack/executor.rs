@@ -6,8 +6,8 @@ use crate::executor::stack::tagged_runtime::{RuntimeKind, TaggedRuntime};
 use crate::gasometer::{self, Gasometer, StorageTarget};
 use crate::maybe_borrowed::MaybeBorrowed;
 use crate::{
-	CallScheme, Capture, Config, Context, CreateScheme, ExitError, ExitReason, Handler, Opcode, Runtime, Stack,
-	Transfer,
+	CallScheme, Capture, Config, Context, CreateScheme, ExitError, ExitReason, Handler, Opcode,
+	Runtime, Stack, Transfer,
 };
 use alloc::{collections::BTreeSet, rc::Rc, vec::Vec};
 use core::{cmp::min, convert::Infallible};
@@ -802,7 +802,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet>
 		fn l64(gas: u64) -> u64 {
 			gas - gas / 64
 		}
-		
+
 		let is_static = call_scheme == CallScheme::StaticCall;
 
 		event!(Call {
@@ -1045,11 +1045,11 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 		self.state.code(address)
 	}
 
-	fn storage(&self, address: H160, index: H256) -> H256 {
+	fn storage(&mut self, address: H160, index: H256) -> H256 {
 		self.state.storage(address, index)
 	}
 
-	fn original_storage(&self, address: H160, index: H256) -> H256 {
+	fn original_storage(&mut self, address: H160, index: H256) -> H256 {
 		self.state
 			.original_storage(address, index)
 			.unwrap_or_default()
@@ -1347,7 +1347,7 @@ impl<'inner, 'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Pr
 		{
 			return (ExitReason::Error(error), Vec::new());
 		}
-		
+
 		event!(PrecompileSubcall {
 			code_address,
 			transfer: &transfer,

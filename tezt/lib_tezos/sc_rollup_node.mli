@@ -69,7 +69,6 @@ type argument =
   | Metrics_addr of string
   | Injector_attempts of int
   | Boot_sector_file of string
-  | Dac_observer of Dac_node.t
   | Loser_mode of string
   | No_degraded
   | Gc_frequency of int
@@ -119,6 +118,10 @@ val string_of_history_mode : history_mode -> string
     GC, and the [gc_frequency] is [1] by default to make it runs on
     every occasion during tests.
 
+    [remote_signer] makes the rollup node use a remote signer at the provided
+    URL to sign messages for keys that were registered with the ["remote:"]
+    scheme.
+
 *)
 val create :
   ?runner:Runner.t ->
@@ -127,6 +130,7 @@ val create :
   ?color:Log.Color.t ->
   ?data_dir:string ->
   base_dir:string ->
+  ?remote_signer:Uri.t ->
   ?event_pipe:string ->
   ?metrics_addr:string ->
   ?metrics_port:int ->
@@ -152,6 +156,7 @@ val create_with_endpoint :
   ?color:Log.Color.t ->
   ?data_dir:string ->
   base_dir:string ->
+  ?remote_signer:Uri.t ->
   ?event_pipe:string ->
   ?metrics_addr:string ->
   ?metrics_port:int ->
@@ -352,7 +357,7 @@ val change_node_and_restart :
 
 (** Change the rollup mode. This does not terminate nor restart the
     node. Change will take effect when the node is run/restart. *)
-val change_node_mode : t -> mode -> t
+val change_node_mode : t -> mode -> unit
 
 (** Change the rollup node operators. This does not terminate nor restart the
     node. Change will take effect when the node is run/restart. *)
@@ -378,11 +383,24 @@ val export_snapshot :
 val import_snapshot :
   ?apply_unsafe_patches:bool ->
   ?force:bool ->
+  ?no_check:bool ->
   t ->
   snapshot_file:string ->
   unit Runnable.process
 
+val list_metrics :
+  ?runner:Runner.t ->
+  ?path:string ->
+  ?hooks:Process_hooks.t ->
+  ?disable_performance_metrics:bool ->
+  unit ->
+  unit Lwt.t
+
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t
+
+(** [operators node] returns a pair with the default operator and all other
+    operators with their purpose. *)
+val operators : t -> string option * (purpose * string) list
 
 module RPC : RPC_core.CALLERS with type uri_provider := t

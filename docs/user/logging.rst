@@ -98,6 +98,9 @@ Common options:
 -  ``color=true`` enables logs coloring. It only works on ttys, in conjunction with
    ``format=pp-short``.
 
+- ``advertise-levels=true`` enables the advertisement of the log-level of each
+  events outputted in the sink.
+
 Options available only for the ``file-descriptor-path://`` case:
 
 -  ``with-pid=<bool>`` when ``true`` adds the current process-id to the
@@ -346,7 +349,7 @@ all the interactions with the node (but it does *not* use the logging
 framework).
 
 By default, the baker also generates internal logs, which are stored at
-``<client-base-dir>/logs/baker-<protocol-name>/*``. Hence, running two bakers
+``<client-base-dir>/logs/octez-baker-<protocol-name>/*``. Hence, running two bakers
 (for two different accounts) using the same protocol with the same base
 directory is not recommended.
 

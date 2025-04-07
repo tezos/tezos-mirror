@@ -13,10 +13,13 @@ depends: [
   "octez-proto-libs" { = version }
   "octez-shell-libs" { = version }
   "octez-libs" { = version }
+  "octez-rustzcash-deps" { = version }
+  "bls12-381" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+available: os-family != "windows"
 synopsis: "Tezos protocol alpha package"

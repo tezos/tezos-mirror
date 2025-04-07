@@ -339,7 +339,7 @@ let load_head_block data_dir =
   let* store =
     init
       ~store_dir:(Filename.concat data_dir "store")
-      ~context_dir:(Filename.concat data_dir "context")
+      ~context_root_dir:data_dir
       ~allow_testchains:false
       genesis
   in

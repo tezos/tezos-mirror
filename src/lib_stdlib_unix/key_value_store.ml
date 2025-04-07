@@ -1057,6 +1057,8 @@ let close t =
   let*! () = Files.close t.files in
   lockfile_unlock t.lockfile
 
+let root_dir t = t.root_dir
+
 let write_value :
     type file key value.
     ?override:bool ->

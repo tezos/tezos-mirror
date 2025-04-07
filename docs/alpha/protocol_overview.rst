@@ -119,6 +119,11 @@ kinds of protocol constants:
   be instantiated differently, for the same protocol, from one network
   to another (for instance, test networks move faster).
 
+- *derived* constants are not directly configurable, but they depend
+  on parametric constants. For instance, the issuance modification
+  delay is a derived constant which is always equal to the consensus
+  rights delay.
+
 The *list* of protocol constants can be found in the OCaml APIs:
 
 - fixed protocol constants are defined in the module
@@ -128,10 +133,19 @@ The *list* of protocol constants can be found in the OCaml APIs:
   :package-api:`Constants_parametric_repr
   <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_parametric_repr/index.html>`
 
+- derived constants are defined in the module
+  :package-api:`Constants_repr.Derived
+  <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_repr/Derived/index.html>`
+
+
 The *values* of protocol constants in any given protocol can be found using specific RPC calls:
 
-- one RPC for :ref:`all constants <GET_..--block_id--context--constants>`, as shown in :ref:`this example <get_protocol_constants>`
-- one RPC for :ref:`the parametric constants <GET_..--block_id--context--constants--parametric>`.
+- one RPC for :ref:`all constants
+  <GET_..--block_id--context--constants>` (fixed and parametric and
+  derived), as shown in :ref:`this example <get_protocol_constants>`
+
+- one RPC for :ref:`the parametric constants
+  <GET_..--block_id--context--constants--parametric>` specifically
 
 Further documentation of various protocol constants can be found in the subsystems where they conceptually belong.
 See, for example:

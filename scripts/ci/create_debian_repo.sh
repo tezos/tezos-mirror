@@ -12,9 +12,10 @@ set -eu
 
 # expected env vars
 # - ARCHITECTURES
-# - GPG_PASSPHRASE
-# - GPG_KEY_ID
-# - GPG_PRIVATE_KEY
+# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_KEY_ID
+# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_PASSPHRASE
+# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_PRIVATE_KEY
+# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_PUBLIC_KEY
 # - GCP_LINUX_PACKAGES_BUCKET
 
 if [ $# -lt 2 ]; then
@@ -76,24 +77,8 @@ TestBranch)
   ;;
 esac
 
-if [ "$CI_PROJECT_NAMESPACE" = "tezos" ] && [ "$CI_COMMIT_REF_PROTECTED" = "true" ]; then
-  # the keys used for official releases only
-  # These env vars are only available on tezos/tezos
-  # and in protected branches
-  GPG_KEY_ID="5DC80C4ED0B7C4FE"
-  GPG_PRIVATE_KEY="$GPG_LINUX_PACKAGES_PRIVATE_KEY"
-  GPG_PASSPHRASE="$GPG_LINUX_PACKAGES_PASSPHRASE"
-  echo "$GPG_LINUX_PACKAGES_PUBLIC_KEY" > \
-    ./scripts/packaging/package-signing-key-release.asc
-  GPG_PUBLIC_KEY="./scripts/packaging/package-signing-key-release.asc"
-else
-  # This is strictly for testing
-  # We embed these keys here for testing only.
-  GPG_KEY_ID="CFC482F3CD08D36D"
-  GPG_PASSPHRASE="07cde771b39a4ed394864baa46126b"
-  GPG_PRIVATE_KEY=$(cat ./scripts/packaging/test_repo_private.key)
-  GPG_PUBLIC_KEY="./scripts/packaging/package-signing-key.asc"
-fi
+# Retrieve GPG keys for repository
+. scripts/ci/repository-keys.sh
 
 echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import --
 
@@ -119,7 +104,7 @@ for release in $RELEASES; do             # unstable, jammy, noble ...
 
     # we also add the data packages that we built for
     # bookworm, that are distribution independent. Only for next packages
-    if [ -n "$PREFIX" ]; then
+    if [ -z "$PREFIX" ]; then
       for file in packages/debian/bookworm/*_all.deb; do
         cp "$file" "$TARGETDIR/${target}/"
         echo "Adding data package $file to $TARGETDIR/${target}/"

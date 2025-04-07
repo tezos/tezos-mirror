@@ -83,6 +83,19 @@ module Events = struct
       ~pp4:pp_int
       ("preattestations", Data_encoding.int31)
 
+  let pqc_progression =
+    declare_2
+      ~section
+      ~name:"pqc_progression"
+      ~level:Info
+      ~msg:
+        "preattesting voting power at {quorum_progression}% of the stake with \
+         {preattestations} preattestations"
+      ~pp1:pp_int
+      ("quorum_progression", Data_encoding.int31)
+      ~pp2:pp_int
+      ("preattestations", Data_encoding.int31)
+
   let qc_reached =
     declare_2
       ~section
@@ -111,6 +124,19 @@ module Events = struct
       ~pp3:pp_int
       ("voting_power", Data_encoding.int31)
       ~pp4:pp_int
+      ("attestations", Data_encoding.int31)
+
+  let qc_progression =
+    declare_2
+      ~section
+      ~name:"qc_progression"
+      ~level:Info
+      ~msg:
+        "attesting voting power at {quorum_progression}% of the stake with \
+         {attestations} attestations"
+      ~pp1:pp_int
+      ("quorum_progression", Data_encoding.int31)
+      ~pp2:pp_int
       ("attestations", Data_encoding.int31)
 
   let starting_new_monitoring =
@@ -149,6 +175,7 @@ end
 
 type candidate = {
   hash : Block_hash.t;
+  level_watched : Int32.t;
   round_watched : Round.t;
   payload_hash_watched : Block_payload_hash.t;
 }
@@ -156,12 +183,13 @@ type candidate = {
 let candidate_encoding =
   let open Data_encoding in
   conv
-    (fun {hash; round_watched; payload_hash_watched} ->
-      (hash, round_watched, payload_hash_watched))
-    (fun (hash, round_watched, payload_hash_watched) ->
-      {hash; round_watched; payload_hash_watched})
-    (obj3
+    (fun {hash; level_watched; round_watched; payload_hash_watched} ->
+      (hash, level_watched, round_watched, payload_hash_watched))
+    (fun (hash, level_watched, round_watched, payload_hash_watched) ->
+      {hash; level_watched; round_watched; payload_hash_watched})
+    (obj4
        (req "hash" Block_hash.encoding)
+       (req "level_watched" int32)
        (req "round_watched" Round.encoding)
        (req "payload_hash_watched" Block_payload_hash.encoding))
 
@@ -225,6 +253,7 @@ type pqc_watched = {
   mutable current_voting_power : int;
   mutable preattestations_received : Preattestation_set.t;
   mutable preattestations_count : int;
+  mutable previous_prequorum_progression : int;
 }
 
 type qc_watched = {
@@ -234,7 +263,13 @@ type qc_watched = {
   mutable current_voting_power : int;
   mutable attestations_received : Attestation_set.t;
   mutable attestations_count : int;
+  mutable previous_quorum_progression : int;
 }
+
+(* [quorum_progression_increment] is a constant used to output an event only if
+   the quorum progression has progressed of at least
+   [quorum_progression_increment] since the last output *)
+let quorum_progression_increment = 10
 
 type watch_kind = Pqc_watch of pqc_watched | Qc_watch of qc_watched
 
@@ -250,6 +285,7 @@ type t = {
   qc_event_stream : quorum_event_stream;
   lock : Lwt_mutex.t;
   monitor_node_operations : bool; (* Keep on monitoring node operations *)
+  committee_size : int;
 }
 
 let monitor_operations (cctxt : #Protocol_client_context.full) =
@@ -262,7 +298,7 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
        ~branch_delayed:true
        ~branch_refused:false
        ~refused:false
-       () [@profiler.record_s "monitor_operations RPC"])
+       () [@profiler.record_s {verbosity = Info} "monitor_operations RPC"])
   in
   let operation_stream =
     Lwt_stream.map
@@ -274,7 +310,7 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
        cctxt
        ~chain:cctxt#chain
        ~block:(`Head 0)
-       () [@profiler.record_s "shell_header RPC"])
+       () [@profiler.record_s {verbosity = Info} "shell_header RPC"])
   in
   let round =
     match Fitness.(round_from_raw shell_header.fitness) with
@@ -283,10 +319,13 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
   in
   return ((shell_header.level, round), operation_stream, stream_stopper)
 
-let make_initial_state ?(monitor_node_operations = true) () =
+let make_initial_state ?(monitor_node_operations = true) ~constants () =
   let qc_event_stream =
     let stream, push = Lwt_stream.create () in
     {stream; push}
+  in
+  let committee_size =
+    constants.Constants.parametric.consensus_committee_size
   in
   let canceler = Lwt_canceler.create () in
   let operation_pool = Operation_pool.empty in
@@ -298,11 +337,15 @@ let make_initial_state ?(monitor_node_operations = true) () =
     qc_event_stream;
     lock;
     monitor_node_operations;
+    committee_size;
   }
 
 let is_valid_consensus_content (candidate : candidate) consensus_content =
-  let {hash = _; round_watched; payload_hash_watched} = candidate in
-  Round.equal consensus_content.round round_watched
+  let {hash = _; level_watched; round_watched; payload_hash_watched} =
+    candidate
+  in
+  Int32.equal (Raw_level.to_int32 consensus_content.level) level_watched
+  && Round.equal consensus_content.round round_watched
   && Block_payload_hash.equal
        consensus_content.block_payload_hash
        payload_hash_watched
@@ -319,11 +362,13 @@ let reset_monitoring state =
       pqc_watched.current_voting_power <- 0 ;
       pqc_watched.preattestations_count <- 0 ;
       pqc_watched.preattestations_received <- Preattestation_set.empty ;
+      pqc_watched.previous_prequorum_progression <- 0 ;
       return_unit
   | Some (Qc_watch qc_watched) ->
       qc_watched.current_voting_power <- 0 ;
       qc_watched.attestations_count <- 0 ;
       qc_watched.attestations_received <- Attestation_set.empty ;
+      qc_watched.previous_quorum_progression <- 0 ;
       return_unit
 
 let update_monitoring ?(should_lock = true) state ops =
@@ -402,6 +447,24 @@ let update_monitoring ?(should_lock = true) state ops =
         cancel_monitoring state ;
         return_unit)
       else
+        let* () =
+          let current_ratio =
+            proposal_watched.current_voting_power * 100 / state.committee_size
+          in
+          (* We only want to output an event if the quorum progression has
+             progressed of at least [quorum_progression_increment] *)
+          if
+            current_ratio
+            > proposal_watched.previous_prequorum_progression
+              + quorum_progression_increment
+          then (
+            proposal_watched.previous_prequorum_progression <- current_ratio ;
+            Events.(
+              emit
+                pqc_progression
+                (current_ratio, proposal_watched.preattestations_count)))
+          else return_unit
+        in
         Events.(
           emit
             preattestations_received
@@ -475,6 +538,24 @@ let update_monitoring ?(should_lock = true) state ops =
         cancel_monitoring state ;
         return_unit)
       else
+        let* () =
+          let current_ratio =
+            proposal_watched.current_voting_power * 100 / state.committee_size
+          in
+          (* We only want to output an event if the quorum progression has
+             progressed of at least [quorum_progression_increment] *)
+          if
+            current_ratio
+            > proposal_watched.previous_quorum_progression
+              + quorum_progression_increment
+          then (
+            proposal_watched.previous_quorum_progression <- current_ratio ;
+            Events.(
+              emit
+                qc_progression
+                (current_ratio, proposal_watched.attestations_count)))
+          else return_unit
+        in
         Events.(
           emit
             attestations_received
@@ -506,6 +587,7 @@ let monitor_preattestation_quorum state ~consensus_threshold
            current_voting_power = 0;
            preattestations_received = Preattestation_set.empty;
            preattestations_count = 0;
+           previous_prequorum_progression = 0;
          })
   in
   monitor_quorum state new_proposal
@@ -522,6 +604,7 @@ let monitor_attestation_quorum state ~consensus_threshold ~get_slot_voting_power
            current_voting_power = 0;
            attestations_received = Attestation_set.empty;
            attestations_count = 0;
+           previous_quorum_progression = 0;
          })
   in
   monitor_quorum state new_proposal
@@ -578,39 +661,46 @@ let update_operations_pool state (head_level, head_round) =
   let operation_pool = {Operation_pool.empty with consensus = attestations} in
   state.operation_pool <- operation_pool
 
-let create ?(monitor_node_operations = true)
+let create ?(monitor_node_operations = true) ~constants
     (cctxt : #Protocol_client_context.full) =
   let open Lwt_syntax in
   let state =
     (make_initial_state
+       ~constants
        ~monitor_node_operations
-       () [@profiler.record_f "make initial state"])
+       () [@profiler.record_f {verbosity = Notice} "make initial state"])
   in
   (* TODO should we continue forever ? *)
   let rec worker_loop () =
     let* result =
-      (monitor_operations cctxt [@profiler.record_s "monitor operations"])
+      (monitor_operations
+         cctxt [@profiler.record_s {verbosity = Notice} "monitor operations"])
     in
     match result with
     | Error err -> Events.(emit loop_failed err)
     | Ok (head, operation_stream, op_stream_stopper) ->
+        () [@profiler.stop] ;
         ()
-        [@profiler.stop]
         [@profiler.record
-          Format.sprintf
-            "level : %ld, round : %s"
-            (fst head)
-            (Int32.to_string @@ Round.to_int32 @@ snd head)] ;
+          {verbosity = Notice}
+            (Format.sprintf
+               "level : %ld, round : %s"
+               (fst head)
+               (Int32.to_string @@ Round.to_int32 @@ snd head))] ;
         let* () = Events.(emit starting_new_monitoring ()) in
         state.canceler <- Lwt_canceler.create () ;
         Lwt_canceler.on_cancel state.canceler (fun () ->
-            op_stream_stopper () [@profiler.record_f "stream stopped"] ;
+            op_stream_stopper
+              () [@profiler.record_f {verbosity = Notice} "stream stopped"] ;
             cancel_monitoring
-              state [@profiler.record_f "cancel monitoring state"] ;
+              state
+            [@profiler.record_f {verbosity = Notice} "cancel monitoring state"] ;
+            () [@profiler.stop] ;
             return_unit) ;
         update_operations_pool
           state
-          head [@profiler.record_f "update operations pool"] ;
+          head
+        [@profiler.record_f {verbosity = Notice} "update operations pool"] ;
         let rec loop () =
           let* ops = Lwt_stream.get operation_stream in
           match ops with
@@ -618,25 +708,31 @@ let create ?(monitor_node_operations = true)
               (* When the stream closes, it means a new head has been set,
                  we reset the monitoring and flush current operations *)
               let* () = Events.(emit end_of_stream ()) in
-              op_stream_stopper () [@profiler.record_f "stream stopped"] ;
+              op_stream_stopper
+                () [@profiler.record_f {verbosity = Info} "stream stopped"] ;
               let* () =
                 (reset_monitoring
-                   state [@profiler.record_s "reset monitoring state"])
+                   state
+                 [@profiler.record_s
+                   {verbosity = Info} "reset monitoring state"])
               in
               () [@profiler.stop] ;
               worker_loop ()
           | Some ops ->
               (state.operation_pool <-
                 Operation_pool.add_operations state.operation_pool ops)
-              [@profiler.aggregate_f "add operations"] ;
+              [@profiler.aggregate_f {verbosity = Info} "add operations"] ;
               let* () =
                 (update_monitoring
                    state
-                   ops [@profiler.aggregate_f "update monitoring state"])
+                   ops
+                 [@profiler.aggregate_f
+                   {verbosity = Info} "update monitoring state"])
               in
               loop ()
         in
-        (loop () [@profiler.record_s "operations processing"])
+        (loop
+           () [@profiler.record_s {verbosity = Notice} "operations processing"])
   in
   Lwt.dont_wait
     (fun () ->

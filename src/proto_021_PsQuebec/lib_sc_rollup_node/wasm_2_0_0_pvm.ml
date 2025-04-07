@@ -202,12 +202,13 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
         "Waiting for DAL parameters"
     | Computing -> "Computing"
 
-  let eval_many ~reveal_builtins ~write_debug ~is_reveal_enabled:_ =
+  let eval_many ?(check_invalid_kernel = true) ~reveal_builtins ~write_debug
+      ~is_reveal_enabled:_ =
     Backend.compute_step_many
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~reveal_builtins
       ~write_debug
-      ?hooks:None
+      ~hooks:(Wasm_2_0_0_utilities.hooks ~check_invalid_kernel)
 end
 
 include Impl

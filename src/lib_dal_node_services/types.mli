@@ -38,6 +38,10 @@ type page_index = int
 module Slot_id : sig
   type t = {slot_level : level; slot_index : slot_index}
 
+  val equal : t -> t -> bool
+
+  val hash : t -> int
+
   module Comparable : Stdlib.Set.OrderedType with type t = t
 
   module Set : Set.S with type elt = t
@@ -256,18 +260,31 @@ type slot_header = {
       whether we also compute shards' proofs or not. *)
 type with_proof = {with_proof : bool}
 
-val slot_id_query : (level option * shard_index option) Resto.Query.t
+type proto_parameters = {
+  feature_enable : bool;
+  incentives_enable : bool;
+  number_of_slots : int;
+  attestation_lag : int;
+  attestation_threshold : int;
+  traps_fraction : Q.t;
+  cryptobox_parameters : Cryptobox.Verifier.parameters;
+  sc_rollup_challenge_window_in_blocks : int;
+  commitment_period_in_blocks : int;
+  dal_attested_slots_validity_lag : int;
+  blocks_per_cycle : int32;
+}
 
-val slot_query :
-  < padding : char ; slot_index : slot_index option > Resto.Query.t
-
-val wait_query : < wait : bool > Resto.Query.t
-
-val connected_query : < connected : bool > Resto.Query.t
-
-val subscribed_query : < subscribed : bool > Resto.Query.t
-
-val opt_header_status_query : header_status option Resto.Query.t
+(** The type contains all elements required to construct a trap accusation.
+    - [delegate]: the baker who attested,
+    - [slot_index]: the index of the slot containing the trap,
+    - [shard]: the DAL shard containing the trap share,
+    - [shard_proof]: proof provided for the shard. *)
+type trap = {
+  delegate : Signature.Public_key_hash.t;
+  slot_index : slot_index;
+  shard : Cryptobox.shard;
+  shard_proof : Cryptobox.shard_proof;
+}
 
 val slot_encoding : Cryptobox.slot Data_encoding.t
 
@@ -282,6 +299,10 @@ val profile_encoding : profile Data_encoding.t
 val with_proof_encoding : with_proof Data_encoding.t
 
 val attestable_slots_encoding : attestable_slots Data_encoding.t
+
+val proto_parameters_encoding : proto_parameters Data_encoding.t
+
+val trap_encoding : trap Data_encoding.t
 
 val pp_header_status : Format.formatter -> header_status -> unit
 
@@ -369,7 +390,10 @@ module Version : sig
 end
 
 module Health : sig
-  type status = Up | Degraded | Down | Ok | Ko
+  (* Those status aims to be relatively obvious to understand from the
+     context. It is ok to have synonymes if it makes sense given the
+     context. *)
+  type status = Up | Degraded | Down | Ok | Ko | No
 
   type t = {status : status; checks : (string * status) list}
 

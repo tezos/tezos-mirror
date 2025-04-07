@@ -163,7 +163,7 @@ let load_client_context (cctxt : ctxt_kind) =
       in
       let i = Random.bits () |> Int32.of_int in
       Bytes.set_int32_be b 0 i ;
-      let _, _, sk = V_latest.generate_key ~algo ~seed:b () in
+      let _, _, sk = generate_key ~algo ~seed:b () in
       sk
   in
   let* delegates_l =
@@ -251,8 +251,12 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
   let open Lwt_result_syntax in
   let chain = cctxt#chain in
   let monitor_node_operations = monitor_node_mempool in
+  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* constants =
+    Protocol.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+  in
   let*! operation_worker =
-    Operation_worker.create ?monitor_node_operations cctxt
+    Operation_worker.create ?monitor_node_operations ~constants cctxt
   in
   Baking_scheduling.create_initial_state
     cctxt

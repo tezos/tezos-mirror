@@ -17,13 +17,15 @@
 (** An amplificator process.  *)
 type t
 
-(** [try_amplification node_ctxt commitment slot_id amplificator]
+(** [try_amplification node_ctxt commitment slot_metrics slot_id amplificator]
     triggers an amplification, ie the reconstruction and publication of a
     partial set of shards. It is called each time a new shard is received by an
     observer node, after being added to the shard store
     [node_store.shard_store]. The argument [commitment] is the commitment of
-    the received shard. This function enqueues an amplification task for the
-    crypto process worker in the following case:
+    the received shard. The argument [slot_metrics] is the slot_metric
+    concerning the slot at [slot_id], containing various timing, eg. the time
+    the first shard was received. This function enqueues an amplification task
+    for the crypto process worker in the following case:
     - the prover SRS is available,
     - enough shards have been received to reconstruct the slot,
     - not all shards for the given commitment are stored (in
@@ -37,7 +39,11 @@ type t
     main process of the DAL node but by the process provided in the
     [amplificator] argument. *)
 val try_amplification :
-  Cryptobox.Commitment.t -> Types.slot_id -> t -> unit tzresult Lwt.t
+  Cryptobox.Commitment.t ->
+  Dal_metrics.slot_metrics ->
+  Types.slot_id ->
+  t ->
+  unit tzresult Lwt.t
 
 (** Creates a new amplificator process *)
 val make : Node_context.t -> t tzresult Lwt.t

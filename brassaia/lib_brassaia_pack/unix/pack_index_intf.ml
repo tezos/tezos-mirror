@@ -24,8 +24,13 @@ module type S = sig
   type key
   type value = int63 * int * Pack_value.Kind.t
 
-  include Index.S with type value := value and type t := t and type key := key
-  module Io : Io.S
+  include
+    Brassaia_index.Index.S
+      with type value := value
+       and type t := t
+       and type key := key
+
+  module Io = Io.Unix
 
   val init_exn :
     ?flush_callback:(unit -> unit) ->
@@ -64,13 +69,12 @@ module type S = sig
   val filter : t -> (key * value -> bool) -> unit
   val try_merge : t -> unit
 
-  module Stats = Index.Stats
-  module Key : Index.Key.S with type t = key
+  module Stats = Brassaia_index.Index.Stats
+  module Key : Brassaia_index.Index.Key.S with type t = key
 end
 
 module type Sigs = sig
   module type S = S
 
-  module Make (K : Brassaia.Hash.S) :
-    S with type key = K.t and module Io = Io.Unix
+  module Make (K : Brassaia.Hash.S) : S with type key = K.t
 end

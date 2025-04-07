@@ -41,21 +41,24 @@ It contains the following libraries:
 - {{!page-tezos_lwt_result_stdlib}Tezos_lwt_result_stdlib}: error-aware stdlib replacement
 - {{!module-Tezos_micheline}Tezos_micheline}: Internal AST and parser for the Michelson language
 - {{!module-Tezos_p2p_services}Tezos_p2p_services}: Descriptions of RPCs exported by [tezos-p2p]
-- {{!module-Tezos_requester}Tezos_requester}
+- {{!module-Tezos_profiler}Tezos_profiler}: The Octez Profiler
 - {{!module-Tezos_rpc}Tezos_rpc}: Library of auto-documented RPCs (service and hierarchy descriptions)
 - {{!module-Tezos_rpc_http}Tezos_rpc_http}: Library of auto-documented RPCs (http server and client)
 - {{!module-Tezos_rpc_http_client}Tezos_rpc_http_client}: Library of auto-documented RPCs (http client)
 - {{!module-Tezos_rpc_http_client_unix}Tezos_rpc_http_client_unix}: Unix implementation of the RPC client
 - {{!module-Tezos_rpc_http_server}Tezos_rpc_http_server}: Library of auto-documented RPCs (http server)
 - {{!module-Tezos_sapling}Tezos_sapling}
+- {{!module-Tezos_scoru_wasm}Tezos_scoru_wasm}
 - {{!module-Tezos_stdlib}Tezos_stdlib}: Yet-another local-extension of the OCaml standard library
 - {{!module-Tezos_stdlib_unix}Tezos_stdlib_unix}: Yet-another local-extension of the OCaml standard library (unix-specific fragment)
 - {{!module-Tezos_test_helpers}Tezos_test_helpers}
 - {{!module-Tezos_tree_encoding}Tezos_tree_encoding}: A general-purpose library to encode arbitrary data in Merkle trees
 - {{!module-Tezos_version}Tezos_version}: Version information generated from Git
+- {{!module-Tezos_webassembly_interpreter}Tezos_webassembly_interpreter}
 - {{!page-tezos_workers}Tezos_workers}: Worker library
 - {{!module-Tezt_wrapper}Tezt_wrapper}
 - {{!module-Cohttp}Cohttp}
 - {{!module-Data_encoding}Data_encoding}
+- {{!module-OpenTelemetry_client_cohttp_lwt}Opentelemetry_client_cohttp_lwt}
 - {{!module-Prometheus}Prometheus}
 - {{!module-Resto}Resto}

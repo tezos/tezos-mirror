@@ -37,7 +37,7 @@ val check_smart_contract : #full -> 'a option -> ('a -> 'b Lwt.t) -> 'b Lwt.t
     The storage has to be of type `pair key_hash 'a`.
 *)
 val get_contract_manager :
-  #full -> Contract_hash.t -> public_key_hash tzresult Lwt.t
+  #full -> Contract_hash.t -> Signature.public_key_hash tzresult Lwt.t
 
 (** Builds a delegation operation ready for injection *)
 val build_delegate_operation :

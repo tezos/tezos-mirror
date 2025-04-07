@@ -315,6 +315,10 @@ module Slot_id = struct
     let open Compare in
     or_else (Int32.compare l1 l2) (fun () -> Int.compare i1 i2)
 
+  let equal left right = compare left right = 0
+
+  let hash = Stdlib.Hashtbl.hash
+
   module Comparable = struct
     type nonrec t = t
 
@@ -345,9 +349,28 @@ type profile = Bootstrap | Operator of Operator_profile.t | Random_observer
 
 type with_proof = {with_proof : bool}
 
-(* Auxiliary functions.  *)
+type proto_parameters = {
+  feature_enable : bool;
+  incentives_enable : bool;
+  number_of_slots : int;
+  attestation_lag : int;
+  attestation_threshold : int;
+  traps_fraction : Q.t;
+  cryptobox_parameters : Cryptobox.Verifier.parameters;
+  sc_rollup_challenge_window_in_blocks : int;
+  commitment_period_in_blocks : int;
+  dal_attested_slots_validity_lag : int;
+  blocks_per_cycle : int32;
+}
 
-(* Encodings associated  to the types. *)
+type trap = {
+  delegate : Signature.Public_key_hash.t;
+  slot_index : slot_index;
+  shard : Cryptobox.shard;
+  shard_proof : Cryptobox.shard_proof;
+}
+
+(* Encodings associated to the types. *)
 
 let slot_id_encoding =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4396
@@ -465,90 +488,91 @@ let with_proof_encoding =
     (fun with_proof -> {with_proof})
     (obj1 (req "with_proof" bool))
 
-(* String parameters queries. *)
+let q_encoding =
+  Data_encoding.(
+    conv
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) -> Q.make num den)
+      (obj2 (req "numerator" z) (req "denominator" z)))
 
-let header_status_arg =
-  let destruct s =
-    let s = `String s in
-    try Ok (Data_encoding.Json.destruct header_status_encoding s)
-    with _ -> Error "Cannot parse header status value"
-  in
-  let construct = Data_encoding.Binary.to_string_exn header_status_encoding in
-  Tezos_rpc.Arg.make ~name:"header_status" ~destruct ~construct ()
+let proto_parameters_encoding : proto_parameters Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {
+           feature_enable;
+           incentives_enable;
+           number_of_slots;
+           attestation_lag;
+           attestation_threshold;
+           traps_fraction;
+           cryptobox_parameters;
+           sc_rollup_challenge_window_in_blocks;
+           commitment_period_in_blocks;
+           dal_attested_slots_validity_lag;
+           blocks_per_cycle;
+         } ->
+      ( ( feature_enable,
+          incentives_enable,
+          number_of_slots,
+          attestation_lag,
+          attestation_threshold,
+          traps_fraction ),
+        ( cryptobox_parameters,
+          sc_rollup_challenge_window_in_blocks,
+          commitment_period_in_blocks,
+          dal_attested_slots_validity_lag,
+          blocks_per_cycle ) ))
+    (fun ( ( feature_enable,
+             incentives_enable,
+             number_of_slots,
+             attestation_lag,
+             attestation_threshold,
+             traps_fraction ),
+           ( cryptobox_parameters,
+             sc_rollup_challenge_window_in_blocks,
+             commitment_period_in_blocks,
+             dal_attested_slots_validity_lag,
+             blocks_per_cycle ) ) ->
+      {
+        feature_enable;
+        incentives_enable;
+        number_of_slots;
+        attestation_lag;
+        attestation_threshold;
+        traps_fraction;
+        cryptobox_parameters;
+        sc_rollup_challenge_window_in_blocks;
+        commitment_period_in_blocks;
+        dal_attested_slots_validity_lag;
+        blocks_per_cycle;
+      })
+    (merge_objs
+       (obj6
+          (req "feature_enable" bool)
+          (req "incentives_enable" bool)
+          (req "number_of_slots" int31)
+          (req "attestation_lag" int31)
+          (req "attestation_threshold" int31)
+          (req "traps_fraction" q_encoding))
+       (obj5
+          (req "cryptobox_parameters" Cryptobox.Verifier.parameters_encoding)
+          (req "sc_rollup_challenge_window_in_blocks" int31)
+          (req "commitment_period_in_blocks" int31)
+          (req "dal_attested_slots_validity_lag" int31)
+          (req "blocks_per_cycle" int32)))
 
-let char =
-  Resto.Arg.make
-    ~name:"char"
-    ~destruct:(fun str ->
-      if String.length str = 1 then Ok (String.get str 0)
-      else Error "A single character string is expected")
-    ~construct:(fun c -> String.make 1 c)
-    ()
-
-let option_int =
-  Resto.Arg.make
-    ~name:"optional int"
-    ~destruct:(function
-      | "" -> Ok None
-      | str -> (
-          try Ok (Some (int_of_string str))
-          with Failure _ -> Error "int expected"))
-    ~construct:(function None -> "" | Some i -> string_of_int i)
-    ()
-
-let slot_query =
-  let open Tezos_rpc.Query in
-  query (fun padding slot_index ->
-      object
-        method padding = padding
-
-        method slot_index = slot_index
-      end)
-  |+ field "padding" char '\x00' (fun obj -> obj#padding)
-  |+ field "slot_index" option_int None (fun obj -> obj#slot_index)
-  |> seal
-
-let wait_query =
-  let open Tezos_rpc.Query in
-  query (fun wait ->
-      object
-        method wait = wait
-      end)
-  |+ flag "wait" (fun t -> t#wait)
-  |> seal
-
-let connected_query =
-  let open Tezos_rpc.Query in
-  query (fun connected ->
-      object
-        method connected = connected
-      end)
-  |+ flag "connected" (fun t -> t#connected)
-  |> seal
-
-let subscribed_query =
-  let open Tezos_rpc.Query in
-  query (fun subscribed ->
-      object
-        method subscribed = subscribed
-      end)
-  |+ flag "subscribed" (fun t -> t#subscribed)
-  |> seal
-
-let slot_id_query =
-  let open Tezos_rpc in
-  let open Query in
-  query (fun slot_level slot_index -> (slot_level, slot_index))
-  |+ opt_field "slot_level" Arg.int32 fst
-  |+ opt_field "slot_index" Arg.int snd
-  |> seal
-
-let opt_header_status_query =
-  let open Tezos_rpc in
-  let open Query in
-  query (fun header_status -> header_status)
-  |+ opt_field "status" header_status_arg (fun hs -> hs)
-  |> seal
+let trap_encoding =
+  Data_encoding.(
+    conv
+      (fun {delegate; slot_index; shard; shard_proof} ->
+        (delegate, slot_index, shard, shard_proof))
+      (fun (delegate, slot_index, shard, shard_proof) ->
+        {delegate; slot_index; shard; shard_proof})
+      (obj4
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "slot_index" uint8)
+         (req "shard" Cryptobox.shard_encoding)
+         (req "proof" Cryptobox.shard_proof_encoding)))
 
 module Store = struct
   (** Data kind stored in DAL. *)
@@ -673,7 +697,7 @@ module Version = struct
 end
 
 module Health = struct
-  type status = Up | Degraded | Down | Ok | Ko
+  type status = Up | Degraded | Down | Ok | Ko | No
 
   let status_encoding =
     Data_encoding.string_enum
@@ -683,6 +707,7 @@ module Health = struct
         ("down", Down);
         ("ok", Ok);
         ("ko", Ko);
+        ("no", No);
       ]
 
   type t = {status : status; checks : (string * status) list}
@@ -706,7 +731,8 @@ module Health = struct
       | Degraded -> "degraded"
       | Down -> "down"
       | Ok -> "ok"
-      | Ko -> "ko")
+      | Ko -> "ko"
+      | No -> "no")
 
   let pp fmt {status; checks} =
     Format.fprintf

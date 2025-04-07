@@ -144,6 +144,8 @@ let create ?(p2p_versions = P2p_version.supported) config pool message_config
 
 let config t = t.config
 
+let get_pool t = t.pool
+
 let create_connection t p2p_conn id_point point_info peer_info
     negotiated_version =
   let open Lwt_syntax in
@@ -159,7 +161,10 @@ let create_connection t p2p_conn id_point point_info peer_info
       t.config.incoming_app_message_queue_size
   in
   let messages = Lwt_pipe.Maybe_bounded.create ?bound () in
-  let greylister () =
+  let greylister ~motive =
+    let+ () =
+      Events.(emit greylist) (peer_id, fst id_point, snd id_point, motive)
+    in
     t.dependencies.pool_greylist_peer
       t.pool
       (P2p_peer_state.Info.peer_id peer_info)
@@ -333,12 +338,63 @@ let may_select_version ~compare accepted_versions remote_version motive =
   then return remote_version
   else P2p_rejection.rejecting motive
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7851
+
+   The function [is_compatible_chain] below is temporary compatibility code to
+   support the migration of Tezos DAL nodes to the new network naming scheme
+   introduced in MR !17288 on master.
+
+   Before MR !17288, DAL nodes used the hardcoded "dal-sandbox" network name on
+   any Tezos network, which was incorrect. The fix in the MR above introduces a
+   proper naming scheme where the DAL network name is derived from the L1 chain
+   name and prefixed with "DAL_", e.g., "TEZOS_MAINNET" -> "DAL_TEZOS_MAINNET".
+
+   This breaking change would prevents old and new DAL nodes from connecting
+   during the handshake due to mismatched network names. Consequently, the new
+   naming scheme will only be activated starting with the V23 release, while
+   this temporary compatibility function [is_compatible_chain] will introduced
+   in V22.
+
+   More precisely, to handle this transition smoothly, we follow a phased
+   migration plan inspired by past L1 P2P migrations:
+
+   - Step 1 (V22 release): DAL nodes advertise the old "dal-sandbox" name but
+   accept both "dal-sandbox" and "DAL_*" network names.
+
+   - Step 2 (V23 release): Nodes advertise the new "DAL_*" name while still
+     accepting both "dal-sandbox" and "DAL_*" network names.
+
+   - Step 3 (V24 release): Nodes advertise and accept only the new "DAL_*"
+     network names.
+
+   Once all nodes have migrated and Step 3 is reached, this compatibility
+   function should be removed and replaced with a strict equality check
+   [local = remote].
+
+   Note: L1 nodes and existing L1 networks are not affected by this workaround,
+   as their names do not start with "dal-" or "DAL_".
+*)
+let is_compatible_chain =
+  let open Distributed_db_version in
+  let open String in
+  let is_legacy_dal_network_name = equal "dal-sandbox" in
+  fun ~(local : Name.t) ~(remote : Name.t) ->
+    let local = (local :> string) in
+    let remote = (remote :> string) in
+    equal local remote
+    || (is_legacy_dal_network_name local && starts_with ~prefix:"DAL_" remote)
+    || (is_legacy_dal_network_name remote && starts_with ~prefix:"DAL_" local)
+
 let select ~chain_name ~distributed_db_versions ~p2p_versions remote =
   let open Error_monad.Result_syntax in
   assert (distributed_db_versions <> []) ;
   assert (p2p_versions <> []) ;
-  if chain_name <> remote.Network_version.chain_name then
-    P2p_rejection.rejecting Unknown_chain_name
+  if
+    not
+      (is_compatible_chain
+         ~local:chain_name
+         ~remote:remote.Network_version.chain_name)
+  then P2p_rejection.rejecting Unknown_chain_name
   else
     let+ distributed_db_version =
       may_select_version
@@ -390,7 +446,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
                   | Tezos_base.Data_encoding_wrapper.Encoding_error _
                   | Tezos_base.Data_encoding_wrapper
                     .Unexpected_size_of_encoded_value
-                  | P2p_errors.Decoding_error _
+                  | Tezos_base.Data_encoding_wrapper.Decoding_error _
                   | P2p_errors.Invalid_chunks_size _ ->
                       P2p_pool.greylist_addr t.pool (fst point)
                   | _ -> ())
@@ -736,10 +792,37 @@ let connect ?trusted ?expected_peer_id ?timeout t point =
                         (point, lazy (Printexc.to_string ex))
                     in
                     Lwt.return_error (TzTrace.make (error_of_exn ex))
-                | `Connection_failed ->
+                | `Connection_unreachable ->
                     let*! () =
                       Events.(emit connect_error)
-                        (point, lazy "connection failed")
+                        (point, lazy "connection unreachable")
+                    in
+                    tzfail P2p_errors.Connection_failed
+                | `Network_unreachable ->
+                    (* This may happen when we try to reach an ipv6
+                       address and there is no ipv6 interface on the
+                       host. *)
+                    let*! () =
+                      Events.(emit connect_error)
+                        (point, lazy "network unreachable")
+                    in
+                    tzfail P2p_errors.Connection_failed
+                | `Connection_refused ->
+                    let*! () =
+                      Events.(emit connect_error)
+                        (point, lazy "connection refused")
+                    in
+                    tzfail P2p_errors.Connection_failed
+                | `Connection_canceled ->
+                    let*! () =
+                      (* The canceler is set only when we shut down
+                         the P2p. *)
+                      if Lwt_canceler.canceling canceler then
+                        Events.(emit connect_error)
+                          (point, lazy "connection canceled (shutting down)")
+                      else
+                        Events.(emit connect_error)
+                          (point, lazy "connection canceled (timeout)")
                     in
                     tzfail P2p_errors.Connection_failed)
               r)

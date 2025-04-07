@@ -1,0 +1,32 @@
+groups:
+  {%- for group in groups %}
+  - name: {{ group.name }}
+  {%- if group.interval %}
+    interval: {{ group.interval }}
+  {%- endif %}
+    rules:
+    {%- for rule in group.rules %}
+      {%- if rule.alert %}
+      - alert: {{ rule.alert.name }}
+        expr: {{ rule.alert.expr }}
+        {%- if rule.alert.for_ %}
+        for: {{ rule.alert.for_ }}
+        {%- endif %}
+        labels:
+          severity:  {{ rule.alert.severity }}
+        {%- if (rule.alert.summary or rule.alert.description) %}
+        annotations:
+          {%- if rule.alert.summary %}
+          summary: {{ rule.alert.summary }}
+          {%- endif %}
+          {%- if rule.alert.description %}
+          description: {{ rule.alert.description }}
+          {%- endif %}
+        {%- endif %}
+      {%- endif %}
+      {%- if rule.record %}
+      - record: {{ rule.record.name }}
+        expr: {{ rule.record.expr }}
+      {%- endif %}
+    {%- endfor %}
+  {%- endfor %}

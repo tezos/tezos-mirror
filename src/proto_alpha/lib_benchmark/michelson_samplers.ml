@@ -604,7 +604,9 @@ module Make
       Data_encoding.Binary.of_string_exn Script_chain_id.encoding string
 
     let signature rng_state =
-      Script_signature.make (Michelson_base.signature rng_state)
+      Script_signature.make
+        (Tezos_crypto.Signature.V1.Of_V_latest.get_signature_exn
+           (Michelson_base.signature rng_state))
 
     let rec value : type a ac. (a, ac) Script_typed_ir.ty -> a sampler =
       let open Script_typed_ir in
@@ -618,8 +620,8 @@ module Make
         | String_t -> Michelson_base.string
         | Bytes_t -> Michelson_base.bytes
         | Mutez_t -> Michelson_base.tez
-        | Key_hash_t -> Crypto_samplers.pkh
-        | Key_t -> Crypto_samplers.pk
+        | Key_hash_t -> fun pkh -> Crypto_samplers.pkh pkh
+        | Key_t -> fun pk -> Crypto_samplers.pk pk
         | Timestamp_t -> Michelson_base.timestamp
         | Bool_t -> Base_samplers.uniform_bool
         | Address_t -> address

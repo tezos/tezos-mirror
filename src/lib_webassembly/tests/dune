@@ -6,7 +6,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-l2-libs.webassembly-interpreter
+  bls12-381.archive
+  octez-libs.webassembly-interpreter
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags

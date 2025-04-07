@@ -1,0 +1,56 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_lib_profiler_backends_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  bls12-381.archive
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.octez-profiler
+  octez-libs.octez-profiler.backends
+  octez-libs.stdlib-unix
+  octez-libs.error-monad
+  octez-libs.data-encoding
+  octez-libs.test-helpers
+  qcheck-alcotest
+  octez-alcotezt
+  tezt)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base
+  -open Tezos_base_unix
+  -open Tezos_profiler
+  -open Tezos_profiler_backends
+  -open Tezos_stdlib_unix
+  -open Tezos_error_monad
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules test_simple_profiler))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (modes native)
+ (libraries
+  src_lib_profiler_backends_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package octez-libs)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

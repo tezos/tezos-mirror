@@ -179,8 +179,12 @@ let chunk_tag = "\003"
 (** Tag indicating simulation is an evaluation *)
 let evaluation_tag = "\000"
 
-(** Tag indicating simulation is a validation *)
-let validation_tag = "\001"
+(** Tag indicating simulation is a validation
+
+    This tag can no longer be used, but if you plan to add another tag
+    please avoid using this one to avoid mistakes.
+*)
+let _validation_tag = "\001"
 
 (** [add_tag tag bytes] prefixes bytes by the given tag *)
 let add_tag tag bytes = tag ^ Bytes.to_string bytes |> String.to_bytes
@@ -203,36 +207,9 @@ let encode call =
   in
   return @@ List.map encode_message messages
 
-let encode_tx tx =
-  let open Result_syntax in
-  let* messages =
-    Bytes.of_string tx |> add_tag validation_tag |> split_in_messages
-  in
-  return @@ List.map encode_message messages
-
 type execution_result = {value : hash option; gas_used : quantity option}
 
 type call_result = (execution_result, hash) result
-
-type validation_result = (transaction_object, address) Either.t
-
-let validation_result_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        ~title:"Transaction object"
-        Json_only
-        transaction_object_encoding
-        (function Either.Left obj -> Some obj | _ -> None)
-        (fun obj -> Left obj);
-      case
-        ~title:"Address"
-        Json_only
-        address_encoding
-        (function Either.Right addr -> Some addr | _ -> None)
-        (fun addr -> Right addr);
-    ]
 
 type 'a simulation_result = ('a, string) result
 
@@ -311,9 +288,6 @@ module Encodings = struct
                data directory of the rollup node.")
 
   module type RLP_DECODING = sig
-    val decode_validation_result :
-      Rlp.item -> (transaction_object, address) Either.t tzresult
-
     val decode_call_result :
       Rlp.item -> (execution_result, hash) result tzresult
 
@@ -357,16 +331,6 @@ module Encodings = struct
         in
         Rlp.decode_result decode_execution_result decode_revert v
 
-      let decode_validation_result =
-        let open Result_syntax in
-        function
-        | Rlp.Value address -> return (Either.Right (decode_address address))
-        | rlp ->
-            error_with
-              "The simulation returned an ill-encoded validation result: %a"
-              Rlp.pp
-              rlp
-
       let simulation_result_from_rlp decode_payload bytes =
         let open Result_syntax in
         let decode_error_msg = function
@@ -391,12 +355,6 @@ module Encodings = struct
 
     module V1 = struct
       include V0
-
-      let decode_validation_result bytes =
-        let open Result_syntax in
-        try return (Either.Left (transaction_object_from_rlp_item None bytes))
-        with _ ->
-          error_with "The simulation returned an ill-encoded validation result"
 
       let simulation_result_from_rlp decode_payload bytes =
         let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
@@ -448,8 +406,3 @@ let gas_estimation bytes =
   let module Encodings = (val Encodings.Rlp_decoding.select_rlp_decodings bytes)
   in
   Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
-
-let is_tx_valid bytes =
-  let module Encodings = (val Encodings.Rlp_decoding.select_rlp_decodings bytes)
-  in
-  Encodings.simulation_result_from_rlp Encodings.decode_validation_result bytes

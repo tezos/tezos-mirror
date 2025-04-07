@@ -79,9 +79,9 @@ module type T = sig
        and type P256.Public_key.t = Tezos_crypto.Signature.P256.Public_key.t
        and type P256.t = Tezos_crypto.Signature.P256.t
        and type Bls.Public_key_hash.t =
-        Tezos_crypto.Signature.Bls.Public_key_hash.t
-       and type Bls.Public_key.t = Tezos_crypto.Signature.Bls.Public_key.t
-       and type Bls.t = Tezos_crypto.Signature.Bls.t
+        Tezos_crypto.Signature.Bls_aug.Public_key_hash.t
+       and type Bls.Public_key.t = Tezos_crypto.Signature.Bls_aug.Public_key.t
+       and type Bls.t = Tezos_crypto.Signature.Bls_aug.t
        and type Signature.public_key_hash =
         Tezos_crypto.Signature.V1.public_key_hash
        and type Signature.public_key = Tezos_crypto.Signature.V1.public_key
@@ -189,7 +189,7 @@ struct
   module CamlinternalFormatBasics = CamlinternalFormatBasics
   include Stdlib
   module Pervasives = Stdlib
-  module Profiler = Environment_profiler
+  module Profiler = Environment_profiler.Environment_profiler
 
   module Logging = struct
     type level = Internal_event.level =
@@ -319,25 +319,24 @@ struct
   module Ed25519 = Tezos_crypto.Signature.Ed25519
   module Secp256k1 = Tezos_crypto.Signature.Secp256k1
   module P256 = Tezos_crypto.Signature.P256
-  module Bls = Tezos_crypto.Signature.Bls
+  module Bls = Tezos_crypto.Signature.Bls_aug
 
   module Signature = struct
     include Tezos_crypto.Signature.V1
 
     let check ?watermark pk s bytes =
+      let[@warning "-26"] profiler_message =
+        match (pk : public_key) with
+        | Ed25519 _ -> "check_signature_ed25519"
+        | Secp256k1 _ -> "check_signature_secp256k1"
+        | P256 _ -> "check_signature_p256"
+        | Bls _ -> "check_signature_bls"
+      in
       (check
          ?watermark
          pk
          s
-         bytes
-       [@profiler.span_f
-         [
-           (match (pk : public_key) with
-           | Ed25519 _ -> "check_signature_ed25519"
-           | Secp256k1 _ -> "check_signature_secp256k1"
-           | P256 _ -> "check_signature_p256"
-           | Bls _ -> "check_signature_bls");
-         ]])
+         bytes [@profiler.aggregate_f {verbosity = Debug} profiler_message])
   end
 
   module Timelock = Tezos_crypto.Timelock
@@ -1257,7 +1256,10 @@ struct
           (let*! r = f x in
            Lwt.return (wrap_tzresult r))
           [@profiler.record_s
-            Format.asprintf "load_key(%s)" (Context.Cache.identifier_of_key x)])
+            {verbosity = Debug}
+              (Format.asprintf
+                 "load_key(%s)"
+                 (Context.Cache.identifier_of_key x))])
 
     (** Ensure that the cache is correctly loaded in memory
         before running any operations. *)
@@ -1287,7 +1289,7 @@ struct
          predecessor_context
          cache
          value_of_key)
-      [@profiler.record_s "load_predecessor_cache"]
+      [@profiler.record_s {verbosity = Debug} "load_predecessor_cache"]
 
     let begin_validation ctxt chain_id mode ~predecessor ~cache =
       let open Lwt_result_syntax in

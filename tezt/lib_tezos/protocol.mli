@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Quebec | ParisC | Alpha
+type t = R022 | Quebec | Alpha
 
 val encoding : t Data_encoding.t
 
@@ -63,6 +63,9 @@ val tag : t -> string
 
 (** Get the full hash of a protocol. *)
 val hash : t -> string
+
+(** Get the short hash of a protocol. *)
+val short_hash : t -> string
 
 (** Hash of protocol genesis *)
 val genesis_hash : string
