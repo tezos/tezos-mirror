@@ -39,15 +39,30 @@ module Watchdog = Lwt_process_watchdog.Daemon (Event)
 
 let stop (t : process) = Watchdog.stop t
 
-let start parameters =
+let start config events_config comm_socket_path node_version =
+  let parameters =
+    Parameters.
+      {
+        internal_events = events_config;
+        config;
+        rpc_comm_socket_path = comm_socket_path;
+        node_version;
+      }
+  in
+  let process =
+    Lwt_process_watchdog.create
+      ~parameters
+      ~parameters_encoding:Parameters.parameters_encoding
+  in
+
   let open Lwt_result_syntax in
   let run_process =
     Watchdog.run_process_with_sockets
-      parameters
+      process
       ~socket_prefix:rpc_process_socket_prefix
       ~process_name:"octez-rpc-process"
       ~handshake:rpc_process_socket_magic
   in
   let* new_server = run_process () in
   let _ = Watchdog.watch_dog ~start_new_server:run_process new_server in
-  return_unit
+  return process

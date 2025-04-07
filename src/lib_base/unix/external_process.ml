@@ -394,14 +394,16 @@ module Make (P : External_process_parameters.S) = struct
        by the external process. This is a temporary fix and a better
        solution would be welcome! *)
     let env =
-      Array.to_seq env
-      |> Seq.filter (fun binding ->
-             match String.split_on_char '=' binding with
-             | env_var_name :: _
-               when env_var_name = Internal_event_unix.env_var_name ->
-                 false
-             | _ -> true)
-      |> Array.of_seq
+      if P.share_sink then env
+      else
+        Array.to_seq env
+        |> Seq.filter (fun binding ->
+               match String.split_on_char '=' binding with
+               | env_var_name :: _
+                 when env_var_name = Internal_event_unix.env_var_name ->
+                   false
+               | _ -> true)
+        |> Array.of_seq
     in
     let process =
       Lwt_process.open_process_none ~env (process_path, Array.of_list args)
@@ -482,6 +484,12 @@ module Make (P : External_process_parameters.S) = struct
         let*! () =
           match external_process.process#state with
           | Running -> Lwt.return_unit
+          | Exited (WEXITED 127) ->
+              (* Exit Code 127 during shutdown as processes are killed
+                 asynchronously. Main process, External watchdogs and hypervisor
+                 processes might be unable to call specific subprocesses
+                 commands *)
+              Lwt_exit.exit_and_raise 0
           | Exited status ->
               let*! () = Events.(emit process_exited_abnormally status) in
               Lwt_exit.exit_and_raise 1
@@ -528,6 +536,7 @@ module Make (P : External_process_parameters.S) = struct
         let*! () =
           match p.external_process.process#state with
           | Running -> Lwt.return_unit
+          | Exited (WEXITED 127) -> Lwt.return_unit
           | Exited status -> Events.(emit process_exited_abnormally status)
         in
         fail_with_exn exn)
@@ -648,7 +657,8 @@ module Make (P : External_process_parameters.S) = struct
           Lwt_unix.with_timeout shutdown_timeout (fun () ->
               let* s = process#status in
               match s with
-              | Unix.WEXITED 0 -> Events.(emit process_exited_normally ())
+              | Unix.WEXITED 0 | Unix.WEXITED 127 ->
+                  Events.(emit process_exited_normally ())
               | status ->
                   let* () = Events.(emit process_exited_abnormally status) in
                   process#terminate ;

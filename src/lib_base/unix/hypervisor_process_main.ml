@@ -91,6 +91,8 @@ module Make_process_parameters (Params : External_process_parameters.S) = struct
     let command_line_args = Params.command_line_args
 
     let hypervisor_name = Params.hypervisor_name
+
+    let share_sink = Params.share_sink
   end
 
   module Processing = struct
@@ -107,14 +109,16 @@ module Make_process_parameters (Params : External_process_parameters.S) = struct
       let args = arg0 :: args in
       let env = Unix.environment () in
       let env =
-        Array.to_seq env
-        |> Seq.filter (fun binding ->
-               match String.split_on_char '=' binding with
-               | env_var_name :: _
-                 when env_var_name = Internal_event_unix.env_var_name ->
-                   false
-               | _ -> true)
-        |> Array.of_seq
+        if Params.share_sink then env
+        else
+          Array.to_seq env
+          |> Seq.filter (fun binding ->
+                 match String.split_on_char '=' binding with
+                 | env_var_name :: _
+                   when env_var_name = Internal_event_unix.env_var_name ->
+                     false
+                 | _ -> true)
+          |> Array.of_seq
       in
       let process =
         Lwt_process.open_process_none

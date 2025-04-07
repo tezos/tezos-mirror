@@ -117,6 +117,14 @@ let () =
   if Filename.basename Sys.argv.(0) = "octez-rpc-process" then
     exit (Cmdliner.Cmd.eval Octez_rpc_process.Main.cmd)
 
+let () =
+  if Filename.basename Sys.argv.(0) = "octez-rpc-process-watchdog-hypervisor"
+  then Octez_rpc_process.Command_line.Hypervisor.run ()
+
+let () =
+  if Filename.basename Sys.argv.(0) = "octez-rpc-process-watchdog" then
+    Octez_rpc_process.Command_line.Watchdog.run ()
+
 let term =
   let open Cmdliner.Term in
   ret (const (`Help (`Pager, None)))

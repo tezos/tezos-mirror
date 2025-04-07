@@ -513,7 +513,13 @@ let launch_rpc_server ?middleware (config : Config_file.t) dir rpc_server_kind
    - No_server: the node is not responding to any RPC. *)
 type rpc_server_kind =
   | Local_rpc_server of RPC_server.server list
-  | External_rpc_server of (RPC_server.server * Rpc_process_worker.process) list
+  | External_rpc_server of {
+      watchdog_process : External_watchdog.Process.t;
+      rpc_servers :
+        (RPC_server.server
+        * string (* comm_socket_path used to communicate with the rpc_process *))
+        list;
+    }
   | No_server
 
 (* Initializes an RPC server handled by the node main process. *)
@@ -578,6 +584,12 @@ let init_local_rpc_server_for_external_process ?middleware id
 let init_external_rpc_server ?middleware config node_version dir internal_events
     =
   let open Lwt_result_syntax in
+  (* Start the watchdog process that will monitor the RPC processes. *)
+  let* watchdog_process =
+    Octez_rpc_process.External_watchdog.Process.init
+      {internal_events}
+      ~process_path:Sys.executable_name
+  in
   (* Start one rpc_process for each rpc endpoint. *)
   let id = ref 0 in
   let* rpc_servers =
@@ -612,21 +624,21 @@ let init_external_rpc_server ?middleware config node_version dir internal_events
                     rpc = {config.rpc with external_listen_addrs = [addr]};
                   }
                 in
-                let rpc_process =
-                  Octez_rpc_process.Rpc_process_worker.create
-                    ~comm_socket_path
-                    config
-                    node_version
-                    internal_events
+                let* _ =
+                  Octez_rpc_process.External_watchdog.Process.start_server
+                    watchdog_process
+                    {
+                      config;
+                      internal_events;
+                      rpc_comm_socket_path = comm_socket_path;
+                      node_version;
+                    }
                 in
-                let* () =
-                  Octez_rpc_process.Rpc_process_worker.start rpc_process
-                in
-                return (local_rpc_server, rpc_process))
+                return (local_rpc_server, comm_socket_path))
               addrs)
       config.rpc.external_listen_addrs
   in
-  return (External_rpc_server rpc_servers)
+  return (External_rpc_server {watchdog_process; rpc_servers})
 
 let metrics_serve metrics_addrs =
   let open Lwt_result_syntax in
@@ -813,14 +825,41 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         List.iter_s
           (function
             | No_server -> Lwt.return_unit
-            | External_rpc_server rpc_servers ->
-                List.iter_p
+            | External_rpc_server {watchdog_process; rpc_servers} ->
+                List.iter_s
                   (fun (local_server, rpc_process) ->
                     (* Stop the RPC_process first to avoid requests to
-                       be forwarded to the note with a RPC_server that
+                       be forwarded to the node with a RPC_server that
                        is down. *)
+                    let*! res =
+                      Octez_rpc_process.External_watchdog.Process.stop_server
+                        watchdog_process
+                        rpc_process
+                    in
                     let*! () =
-                      Octez_rpc_process.Rpc_process_worker.stop rpc_process
+                      match res with
+                      | Ok () -> Lwt.return_unit
+                      | Error errs ->
+                          (* Filter out expected errors *)
+                          let unexpected_errors =
+                            List.filter
+                              (function
+                                | Exn (Unix.Unix_error (Unix.EPIPE, _, _))
+                                | Exn
+                                    (Unix.Unix_error (Unix.ECONNREFUSED, _, _))
+                                | Exn (Unix.Unix_error (Unix.ECONNRESET, _, _))
+                                | Canceled
+                                | Exn Lwt.Canceled ->
+                                    false
+                                | _ -> true)
+                              errs
+                          in
+                          if unexpected_errors <> [] then
+                            Format.eprintf
+                              "Closing rpc_process, unexpected error: %a@."
+                              (Format.pp_print_list Error_monad.pp)
+                              unexpected_errors ;
+                          Lwt.return_unit
                     in
                     let*! () = RPC_server.shutdown local_server in
                     Lwt.return_unit)
