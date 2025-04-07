@@ -22,3 +22,11 @@ Each command has its own help page:
 - [`tobi install --help`](tobi_install--help.html)
 - [`tobi reset --help`](tobi_reset--help.html)
 - [`tobi build --help`](tobi_build--help.html)
+
+### Configuration
+
+- [Configuration file (`tobi/config`)](configuration_file.md)
+
+## Explanations
+
+- [Why this configuration file format](why_this_configuration_file_format.md)
