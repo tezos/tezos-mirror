@@ -10,6 +10,9 @@ sudo apk add aws-cli
 # We use a file to list versions so that we can control what is actually displayed.
 versions_list_filename="versions.json"
 
+export AWS_ACCESS_KEY_ID="${AWS_KEY_RELEASE_PUBLISH}"
+export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_RELEASE_PUBLISH}"
+
 if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
   echo "The AWS credentials are not found. Make sure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are set."
   exit 1
