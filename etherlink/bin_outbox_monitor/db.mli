@@ -11,7 +11,7 @@ type t = Sqlite.t
 
 module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
 
-type withdrawal_kind = Xtz | FA of Ethereum_types.Address.t
+type withdrawal_kind = Xtz | FA of Ethereum_types.Address.t | Fast_xtz
 
 type withdrawal = {
   kind : withdrawal_kind;

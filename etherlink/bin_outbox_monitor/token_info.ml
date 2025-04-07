@@ -104,12 +104,15 @@ let get_fa_info ws_client token_addr =
 let get ws_client =
   let open Lwt_result_syntax in
   function
-  | Db.Xtz -> return {symbol = "XTZ"; decimals = Some 18}
-  | FA token_addr -> get_fa_info ws_client token_addr
+  | Db.Xtz -> return ({symbol = "XTZ"; decimals = Some 18}, false)
+  | FA token_addr ->
+      let* info = get_fa_info ws_client token_addr in
+      return (info, false)
+  | Fast_xtz -> return ({symbol = "XTZ"; decimals = Some 18}, true)
 
 let get_for_display ws_client token amount =
   let open Lwt_result_syntax in
-  let* {symbol; decimals} = get ws_client token in
+  let* {symbol; decimals}, fast = get ws_client token in
   let amount =
     let (Ethereum_types.Qty amount) = amount in
     let amount = Z.to_float amount in
@@ -117,4 +120,4 @@ let get_for_display ws_client token amount =
     | None -> amount
     | Some decimals -> amount /. (10. ** float_of_int decimals)
   in
-  return (amount, symbol)
+  return (amount, symbol, fast)

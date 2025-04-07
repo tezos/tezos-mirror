@@ -27,6 +27,16 @@ let extract_32 i ?padding data =
   in
   Bytes.sub data start length
 
+let extract_32_end i ?padding data =
+  let start = Bytes.length data - ((i + 1) * 32) in
+  let start, length =
+    match padding with
+    | None -> (start, 32)
+    | Some (`Left_padded l) -> (start + (32 - l), l)
+    | Some (`Right_padded l) -> (start, l)
+  in
+  Bytes.sub data start length
+
 let mk_filter address topic =
   let bloom =
     Filter_helpers.make_bloom_address_topics
@@ -54,9 +64,8 @@ module Event = struct
       ~section
       ~name:"withdrawal_log"
       ~msg:
-        "Withdrawal of {amount} {token} from {sender} to {receiver} in \
-         transaction {transactionHash}({transactionIndex}/{logIndex}) of block \
-         {blockNumber}"
+        "{fast} of {amount} {token} from {sender} to {receiver} in transaction \
+         {transactionHash}({transactionIndex}) of block {blockNumber}"
       ~level:Notice
       ("amount", Data_encoding.float)
       ("token", Data_encoding.string)
@@ -64,7 +73,7 @@ module Event = struct
       ("receiver", Contract.encoding)
       ("transactionHash", Ethereum_types.hash_encoding)
       ("transactionIndex", Db.quantity_hum_encoding)
-      ("logIndex", Db.quantity_hum_encoding)
+      ("fast", Data_encoding.bool)
       ("blockNumber", Db.quantity_hum_encoding)
       ~pp2:Format.pp_print_string
       ~pp3:(fun fmt a ->
@@ -72,12 +81,14 @@ module Event = struct
       ~pp4:Contract.pp
       ~pp5:Ethereum_types.pp_hash
       ~pp6:Ethereum_types.pp_quantity
-      ~pp7:Ethereum_types.pp_quantity
+      ~pp7:(fun fmt fast ->
+        Format.pp_print_string fmt
+        @@ match fast with true -> "Fast withdrawal" | false -> "Withdrawal")
       ~pp8:Ethereum_types.pp_quantity
 
   let emit_withdrawal_log ws_client (w : Db.withdrawal_log) =
     let open Lwt_result_syntax in
-    let* amount, symbol =
+    let* amount, symbol, fast =
       Token_info.get_for_display ws_client w.withdrawal.kind w.withdrawal.amount
     in
     Lwt_result.ok
@@ -89,7 +100,7 @@ module Event = struct
            w.withdrawal.receiver,
            w.transactionHash,
            w.transactionIndex,
-           w.logIndex,
+           fast,
            w.blockNumber )
 
   let parsing_error =
@@ -300,9 +311,52 @@ module FA_withdrawal = struct
       }
 end
 
+module Fast_withdrawal = struct
+  type event = {
+    amount : Ethereum_types.quantity;
+    sender : Ethereum_types.Address.t;
+    receiver : Contract.t;
+    withdrawal_id : Ethereum_types.quantity;
+  }
+
+  let address = Withdrawal.address
+
+  let topic =
+    kecack_topic "FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,address)"
+
+  let filter = mk_filter address topic
+
+  let decode_event_data (Ethereum_types.Hex hex_data) =
+    let open Result_syntax in
+    let data = Hex.to_bytes (`Hex hex_data) in
+    let* data =
+      match data with
+      | None -> error_with "Invalid hex data in fast withdrawal event"
+      | Some d -> return d
+    in
+    let* () =
+      if Bytes.length data < 5 * 32 then
+        error_with "Invalid length for data of fast withdrawal event"
+      else return_unit
+    in
+    let receiver =
+      extract_32 0 data ~padding:(`Right_padded 22)
+      |> Data_encoding.Binary.of_bytes_exn Contract.encoding
+    in
+    let withdrawal_id = extract_32 1 data |> Ethereum_types.decode_number_be in
+    let amount = extract_32 2 data |> Ethereum_types.decode_number_be in
+    (* ignore timestamp and payload *)
+    let sender =
+      extract_32_end 0 data ~padding:(`Left_padded 20)
+      |> Ethereum_types.decode_address
+    in
+    return {receiver; withdrawal_id; amount; sender}
+end
+
 type parsed =
   | Withdrawal of Withdrawal.data
   | FA_withdrawal of FA_withdrawal.event
+  | Fast_withdrawal of Fast_withdrawal.event
 
 let parsed_to_db = function
   | Withdrawal {amount; sender; receiver; withdrawal_id} ->
@@ -318,6 +372,8 @@ let parsed_to_db = function
         withdrawal_id;
       } ->
       Db.{kind = FA ticket_owner; amount; sender; receiver; withdrawal_id}
+  | Fast_withdrawal {amount; sender; receiver; withdrawal_id} ->
+      Db.{kind = Fast_xtz; amount; sender; receiver; withdrawal_id}
 
 let parsed_log_to_db (log : Ethereum_types.transaction_log) event =
   match log with
@@ -354,7 +410,12 @@ let parse_log (log : Ethereum_types.transaction_log) =
       | Some _ ->
           let* withdraw_data = FA_withdrawal.decode_event_log log in
           return (parsed_log_to_db log (FA_withdrawal withdraw_data))
-      | None -> return_none)
+      | None -> (
+          match Filter_helpers.filter_one_log Fast_withdrawal.filter log with
+          | Some _ ->
+              let* withdraw_data = Fast_withdrawal.decode_event_data log.data in
+              return (parsed_log_to_db log (Fast_withdrawal withdraw_data))
+          | None -> return_none))
 
 let handle_one_log ws_client db (log : Ethereum_types.transaction_log) =
   let open Lwt_result_syntax in
@@ -397,7 +458,11 @@ let filter_address =
     ]
 
 let filter_topics =
-  [Some (Ethereum_types.Filter.Or [Withdrawal.topic; FA_withdrawal.topic])]
+  [
+    Some
+      (Ethereum_types.Filter.Or
+         [Withdrawal.topic; FA_withdrawal.topic; Fast_withdrawal.topic]);
+  ]
 
 let monitor_withdrawals db ws_client =
   let open Lwt_result_syntax in

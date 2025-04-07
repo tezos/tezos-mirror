@@ -20,7 +20,7 @@ let quantity_hum_encoding =
     Ethereum_types.quantity_of_z
     Data_encoding.z
 
-type withdrawal_kind = Xtz | FA of Ethereum_types.Address.t
+type withdrawal_kind = Xtz | FA of Ethereum_types.Address.t | Fast_xtz
 
 type withdrawal = {
   kind : withdrawal_kind;
@@ -75,6 +75,12 @@ let withdrawal_kind_encoding =
            (req "ticket_owner" Ethereum_types.address_encoding))
         (function FA tow -> Some ((), tow) | _ -> None)
         (fun ((), tow) -> FA tow);
+      case
+        ~title:"FAST_XTZ"
+        (Tag 2)
+        (obj1 (req "kind" (constant "FAST_XTZ")))
+        (function Fast_xtz -> Some () | _ -> None)
+        (fun () -> Fast_xtz);
     ]
 
 let pp_withdrawal_kind fmt k =
@@ -85,6 +91,7 @@ let pp_withdrawal_kind fmt k =
         fmt
         "FA(%s)"
         (Ethereum_types.Address.to_string ticket_owner)
+  | Fast_xtz -> Format.pp_print_string fmt "Fast XTZ"
 
 let withdrawal_encoding =
   let open Data_encoding in
@@ -229,10 +236,13 @@ module Types = struct
   let withdrawal_kind =
     custom
       ~encode:(function
-        | Xtz -> Ok (0, None) | FA ticket_owner -> Ok (1, Some ticket_owner))
+        | Xtz -> Ok (0, None)
+        | FA ticket_owner -> Ok (1, Some ticket_owner)
+        | Fast_xtz -> Ok (2, None))
       ~decode:(function
         | 0, None -> Ok Xtz
         | 1, Some ticket_owner -> Ok (FA ticket_owner)
+        | 2, None -> Ok Fast_xtz
         | _ -> Error "not a valid withdrawal kind")
       (t2 int (option address))
 
