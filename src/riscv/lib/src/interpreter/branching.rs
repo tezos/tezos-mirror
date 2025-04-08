@@ -9,71 +9,8 @@ use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
 use crate::instruction_context::arithmetic::Arithmetic;
 use crate::machine_state::ProgramCounterUpdate;
-use crate::machine_state::hart_state::HartState;
-use crate::machine_state::memory::Address;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::parser::instruction::InstrWidth;
-use crate::state_backend as backend;
-
-impl<M> HartState<M>
-where
-    M: backend::ManagerReadWrite,
-{
-    /// Jump to Absolute Address `imm`.
-    /// Performs an unconditional control transfer to the target address,
-    /// formed by setting the least significant bit to zero.
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - JALR
-    pub fn run_j_absolute(&mut self, imm: i64) -> Address {
-        imm as u64 & !1
-    }
-
-    /// Store the next instruction address in `rd` and jump to the target address.
-    /// Always returns the target address (val(rs1) + imm)
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - `JALR`
-    pub fn run_jalr_imm(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        rd: NonZeroXRegister,
-        width: InstrWidth,
-    ) -> Address {
-        // The return address to be saved in rd
-        let return_address = self.pc.read().wrapping_add(width as u64);
-
-        // The target address is obtained by adding the sign-extended
-        // 12-bit I-immediate to the register rs1, then setting
-        // the least-significant bit of the result to zero
-        let target_address = self.xregisters.read_nz(rs1).wrapping_add(imm as u64) & !1;
-
-        self.xregisters.write_nz(rd, return_address);
-
-        target_address
-    }
-
-    /// Jump to absolute address `imm` and link register.
-    /// Store the next instruction address in `rd` and jump to the target address.
-    /// Always returns the target address formed by sign extending the immediate and setting
-    /// the least significant bit to 0.
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - `JALR`
-    pub fn run_jalr_absolute(
-        &mut self,
-        imm: i64,
-        rd: NonZeroXRegister,
-        width: InstrWidth,
-    ) -> Address {
-        // The return address to be saved in rd
-        let return_address = self.pc.read().wrapping_add(width as u64);
-        self.xregisters.write_nz(rd, return_address);
-
-        imm as u64 & !1
-    }
-}
 
 /// Performs an unconditional control transfer. The immediate is added to
 /// the pc to form the jump target address.
@@ -90,10 +27,6 @@ pub fn run_j<I: ICB>(icb: &mut I, imm: i64) -> <I as ICB>::XValue {
 }
 
 /// Performs an unconditional control transfer to the address in register `rs1`.
-///
-/// Relevant RISC-V opcodes:
-/// - JALR
-/// - C.JR
 pub fn run_jr<I: ICB>(icb: &mut I, rs1: NonZeroXRegister) -> <I as ICB>::XValue {
     // The target address is obtained by setting the
     // least-significant bit of the address in rs1 to zero
@@ -103,10 +36,6 @@ pub fn run_jr<I: ICB>(icb: &mut I, rs1: NonZeroXRegister) -> <I as ICB>::XValue 
 }
 
 /// Performs an unconditional control transfer to the target address,
-/// `target_address = val(rs1) + imm`
-///
-/// Relevant RISC-V opcodes:
-/// - JALR
 pub fn run_jr_imm<I: ICB>(icb: &mut I, imm: i64, rs1: NonZeroXRegister) -> <I as ICB>::XValue {
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xvalue_of_imm(imm);
@@ -118,12 +47,40 @@ pub fn run_jr_imm<I: ICB>(icb: &mut I, imm: i64, rs1: NonZeroXRegister) -> <I as
     lhs.and(rhs, icb)
 }
 
+/// Jump to Absolute Address `imm`.
+/// Performs an unconditional control transfer to the target address,
+/// formed by setting the least significant bit to zero.
+pub fn run_j_absolute<I: ICB>(icb: &mut I, imm: i64) -> <I as ICB>::XValue {
+    let imm = icb.xvalue_of_imm(imm);
+    let mask = icb.xvalue_of_imm(!1);
+    imm.and(mask, icb)
+}
+
+/// Store the next instruction address in `rd` and jump to the target address.
+/// Always returns the target address (current program counter + imm)
+pub fn run_jal<I: ICB>(
+    icb: &mut I,
+    imm: i64,
+    rd: NonZeroXRegister,
+    width: InstrWidth,
+) -> <I as ICB>::XValue {
+    // The return address to be saved in `rd` is that of the instruction following this one
+    let current_pc = icb.pc_read();
+    let width = icb.xvalue_of_imm(width as i64);
+    let return_address = current_pc.add(width, icb);
+
+    let imm = icb.xvalue_of_imm(imm);
+    // The target address is obtained by adding the imm to the current PC
+    let target_address = current_pc.add(imm, icb);
+
+    // Store the return address in rd
+    icb.xregister_write_nz(rd, return_address);
+
+    target_address
+}
+
 /// Performs an unconditional control transfer to the address in register `rs1`
 /// and stores the address of the instruction following the jump in register `rd`.
-///
-/// Relevant RISC-V opcodes:
-/// - JALR
-/// - C.JALR
 pub fn run_jalr<I: ICB>(
     icb: &mut I,
     rd: NonZeroXRegister,
@@ -138,6 +95,63 @@ pub fn run_jalr<I: ICB>(
     // The target address is obtained by setting the
     // least-significant bit of the address in rs1 to zero
     let target_address = icb.xregister_read_nz(rs1);
+    let mask = icb.xvalue_of_imm(!1);
+    let target_address = target_address.and(mask, icb);
+
+    // Store the return address in rd
+    icb.xregister_write_nz(rd, return_address);
+
+    target_address
+}
+
+/// Performs an unconditional control transfer to the target address,
+/// `target_address = val(rs1) + imm` and stores the address of the instruction
+/// following the jump in register `rd`.
+pub fn run_jalr_imm<I: ICB>(
+    icb: &mut I,
+    imm: i64,
+    rs1: NonZeroXRegister,
+    rd: NonZeroXRegister,
+    width: InstrWidth,
+) -> <I as ICB>::XValue {
+    // The return address to be saved in `rd` is that of the instruction following this one
+    let current_pc = icb.pc_read();
+    let width = icb.xvalue_of_imm(width as i64);
+    let return_address = current_pc.add(width, icb);
+
+    // The target address is obtained by adding the sign-extended
+    // 12-bit I-immediate to the register rs1, then setting
+    // the least-significant bit of the result to zero
+    let target_address = icb.xregister_read_nz(rs1);
+    let imm = icb.xvalue_of_imm(imm);
+    let target_address = target_address.add(imm, icb);
+    let mask = icb.xvalue_of_imm(!1);
+    let target_address = target_address.and(mask, icb);
+
+    // Store the return address in rd
+    icb.xregister_write_nz(rd, return_address);
+
+    target_address
+}
+
+/// Jump to absolute address `imm` and link register.
+/// Store the next instruction address in `rd` and jump to the target address.
+/// Always returns the target address formed by sign extending the immediate and setting
+/// the least significant bit to 0.
+pub fn run_jalr_absolute<I: ICB>(
+    icb: &mut I,
+    imm: i64,
+    rd: NonZeroXRegister,
+    width: InstrWidth,
+) -> <I as ICB>::XValue {
+    // The return address to be saved in `rd` is that of the instruction following this one
+    let current_pc = icb.pc_read();
+    let width = icb.xvalue_of_imm(width as i64);
+    let return_address = current_pc.add(width, icb);
+
+    // The target address is obtained by setting the
+    // least-significant bit of the immediate to zero
+    let target_address = icb.xvalue_of_imm(imm);
     let mask = icb.xvalue_of_imm(!1);
     let target_address = target_address.and(mask, icb);
 
@@ -222,7 +236,11 @@ mod tests {
     use crate::backend_test;
     use crate::create_state;
     use crate::instruction_context::Predicate;
+    use crate::interpreter::branching::run_j_absolute;
+    use crate::interpreter::branching::run_jal;
     use crate::interpreter::branching::run_jalr;
+    use crate::interpreter::branching::run_jalr_absolute;
+    use crate::interpreter::branching::run_jalr_imm;
     use crate::interpreter::branching::run_jr_imm;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
@@ -260,9 +278,7 @@ mod tests {
             // TEST JalrImm
             state.hart.pc.write(init_pc);
             state.hart.xregisters.write_nz(rs1, init_rs1);
-            let new_pc = state
-                .hart
-                .run_jalr_imm(imm, rs1, rd, InstrWidth::Uncompressed);
+            let new_pc = run_jalr_imm(&mut state, imm, rs1, rd, InstrWidth::Uncompressed);
 
             assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
@@ -270,16 +286,22 @@ mod tests {
 
             // TEST JAbsolute
             state.hart.pc.write(init_pc);
-            let new_pc = state.hart.run_j_absolute(imm);
+            let new_pc = run_j_absolute(&mut state, imm);
 
             assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, imm as u64 & !1);
 
+            // TEST Jal
+            state.hart.pc.write(init_pc);
+            let new_pc = run_jal(&mut state, imm, rd, InstrWidth::Uncompressed);
+
+            assert_eq!(state.hart.pc.read(), init_pc);
+            assert_eq!(new_pc, init_pc.wrapping_add(imm as u64));
+            assert_eq!(state.hart.xregisters.read_nz(rd), res_rd);
+
             // TEST JalrAbsolute
             state.hart.pc.write(init_pc);
-            let new_pc = state
-                .hart
-                .run_jalr_absolute(imm, rd, InstrWidth::Uncompressed);
+            let new_pc = run_jalr_absolute(&mut state, imm, rd, InstrWidth::Uncompressed);
 
             assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, imm as u64 & !1);
