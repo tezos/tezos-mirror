@@ -1,10 +1,10 @@
-# runtime + end-to-end test dependencies
+# runtime + datadog + end-to-end test dependencies
 #
-# This image builds on the runtime dependencies and additionally includes:
+# This image builds on the runtime + datadog dependencies and additionally includes:
 #
 # - ocamlformat and bisect-ppx-report, copied from the
 #   build image.
-# - eth-cli, installed from npm
+# - solc, eth-cli, installed from npm
 # - some utilities used in the Tezt integration test suite: curl, git, file
 # - some utilities used in the [unified_coverage] job: make, jq
 #
@@ -18,7 +18,7 @@ ARG OCAML_IMAGE
 ARG BUILD_IMAGE
 
 # hadolint ignore=DL3006
-FROM runtime as e2etest
+FROM runtime_datadog as e2etest
 
 LABEL org.opencontainers.image.title="e2etest"
 

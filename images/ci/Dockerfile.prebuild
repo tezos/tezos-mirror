@@ -1,4 +1,4 @@
-# runtime + prebuild dependencies
+# runtime + datadog + prebuild dependencies
 #
 # This image builds upon the `runtime` image, see its
 # header for details on its content.
@@ -12,7 +12,7 @@
 # - building images on top of it in the image stack (see README.md)
 
 # hadolint ignore=DL3006
-FROM runtime as prebuild
+FROM runtime_datadog as prebuild
 
 LABEL org.opencontainers.image.title="prebuild"
 
