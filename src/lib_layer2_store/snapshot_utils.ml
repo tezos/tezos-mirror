@@ -178,17 +178,40 @@ let add_download_command () =
         Format.eprintf "%a%!" pp_print_trace errs ;
         Stdlib.exit 1
 
-let download_file ~crash_resolver ~progress url =
-  let in_chan =
-    Unix.open_process_args_in Sys.argv.(0)
-    @@
-    if progress then [|"download-snapshot"; url; "--progress"|]
-    else [|"download-snapshot"; url|]
+let program_exists cmd =
+  let open Lwt_syntax in
+  let+ status =
+    Lwt_process.with_process_full
+      ("which", [|"which"; "-s"; cmd|])
+      (fun pc -> pc#status)
   in
+  match status with Unix.WEXITED 0 -> true | _ -> false
+
+let choose_download_command ~progress url =
+  let open Lwt_syntax in
+  (* We use curl to download if it is present in the PATH as it is faster.
+     Options used below are the following:
+     -f: Fail with non-zero code on HTTP errors.
+     -L: Follow redirects.
+     -s: Silent mode ...
+     -S: ... but still show errors.
+     -#: Display transfer progress as a bar.
+  *)
+  let+ curl_support = program_exists "curl" in
+  match (curl_support, progress) with
+  | true, true when Unix.isatty Unix.stderr ->
+      ("curl", [|"curl"; "-fL"; "-#"; url|])
+  | true, _ -> ("curl", [|"curl"; "-fLsS"; url|])
+  | false, true -> (Sys.argv.(0), [|"download-snapshot"; url; "--progress"|])
+  | false, false -> (Sys.argv.(0), [|"download-snapshot"; url|])
+
+let download_file ~crash_resolver ~progress url =
+  let open Lwt_syntax in
+  let* cmd, args = choose_download_command ~progress url in
+  let in_chan = Unix.open_process_args_in cmd args in
   let notify_crash fmt =
     Format.ksprintf (fun s -> Lwt.wakeup crash_resolver [Exn (Failure s)]) fmt
   in
-  let open Lwt_syntax in
   let pid = Unix.process_in_pid in_chan in
   let canceler = Lwt_canceler.create () in
   Lwt_canceler.on_cancel canceler (fun () ->
@@ -207,9 +230,13 @@ let download_file ~crash_resolver ~progress url =
                 match status with
                 | WEXITED n -> ("failed with code", n)
                 | WSIGNALED n -> ("was killed by signal", n)
-                | Unix.WSTOPPED n -> ("was stopped by signal", n)
+                | WSTOPPED n -> ("was stopped by signal", n)
               in
-              notify_crash "Snapshot download process %s %d" phrase n))
+              notify_crash
+                "Snapshot download process %s %d. Consider downloading \
+                 manually instead."
+                phrase
+                n))
     (fun exn ->
       notify_crash
         "Snapshot download processed crashed because %s"

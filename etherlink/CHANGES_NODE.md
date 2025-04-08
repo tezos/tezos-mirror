@@ -30,6 +30,7 @@
 - Command `snapshot info` now supports remote snapshot URLs and can print the
   snapshot header without downloading the whole snapshot. (!17407)
 - Allow to import snapshots from standard input with `-`. (!17463)
+- Use `curl` (faster) to download snapshots when available. (!17477)
 
 ### Documentation changes
 
