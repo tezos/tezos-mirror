@@ -88,3 +88,10 @@ By default, all mountpoints are monitored. If you want to selectively change mou
 .. code-block:: shell
 
     MOUNTPOINT="/opt"
+
+By default, the logs are fetched from Loki. If you want to use GCP logs, you can enable it with the ``LOGSRC`` variable, the GCP project id with the ``GCP`` variable and the ``GCP_DATASOURCE_UID`` for it's unique id in grafana.
+.. code-block:: shell
+
+    LOGSRC="gcp"
+    GCP_PROJECT_ID="project_id"
+    GCP_DATASOURCE_UID="datasource_uid"

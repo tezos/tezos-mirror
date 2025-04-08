@@ -9,11 +9,17 @@ STORAGE_MODE ?= default
 		--ext-str node_instance_label="$(NODE_INSTANCE_LABEL)" \
 		--ext-str storage_mode="$(STORAGE_MODE)" \
 		--ext-str mountpoint="$(MOUNTPOINT)" \
+		--ext-str logsrc="$(LOGSRC)" \
+		--ext-str gcp_project="$(GCP_PROJECT_ID)" \
+		--ext-str gcp_datasource_uid="$(GCP_DATASOURCE_UID)" \
 		src/$@ \
 			> output/$*.json
 
 clean:
 	rm output/*.json
+
+install-jb:
+	jb install github.com/grafana/grafonnet/gen/grafonnet-latest@main
 
 fmt:
 	find src -name '*.jsonnet' -exec jsonnetfmt -i {} \;

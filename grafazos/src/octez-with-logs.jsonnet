@@ -29,7 +29,9 @@ local node = import './node.jsonnet';
 local p2p = import './p2p.jsonnet';
 local workers = import './workers.jsonnet';
 local rpc = import './rpc.jsonnet';
-local logs = import './logs.jsonnet';
+
+local logsrc = std.extVar('logsrc');
+local logs = if logsrc == 'gcp' then import './logs-gcp.jsonnet' else import './logs-loki.jsonnet';
 
 //Position variables
 local p2p_y = 47;
