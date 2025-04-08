@@ -86,7 +86,8 @@ let extract_prequorum preattestations =
         }
   | _ -> None
 
-let info_of_header_and_ops ~in_protocol block_hash block_header operations =
+let info_of_header_and_ops ~in_protocol ~grandparent block_hash block_header
+    operations =
   let open Result_syntax in
   let shell = block_header.Tezos_base.Block_header.shell in
   let dummy_payload_hash = Block_payload_hash.zero in
@@ -131,10 +132,11 @@ let info_of_header_and_ops ~in_protocol block_hash block_header operations =
       prequorum;
       quorum;
       payload;
+      grandparent;
     }
 
 let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
-    block_header =
+    ~grandparent block_header =
   let open Lwt_result_syntax in
   (let* operations =
      match operations with
@@ -188,7 +190,12 @@ let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
               operations)
    in
    let*? block_info =
-     info_of_header_and_ops ~in_protocol block_hash block_header operations
+     info_of_header_and_ops
+       ~in_protocol
+       ~grandparent
+       block_hash
+       block_header
+       operations
    in
    return block_info)
   [@profiler.record_s
@@ -253,10 +260,28 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
                raw_header_b
              [@profiler.record_f {verbosity = Info} "parse pred block header"])
           in
+          let* grandparent =
+            let* raw_header =
+              Shell_services.Blocks.raw_header
+                cctxt
+                ~chain
+                ~block:(`Hash (predecessor_header.shell.predecessor, 0))
+                ()
+            in
+            let header =
+              (Data_encoding.Binary.of_bytes_exn
+                 Tezos_base.Block_header.encoding
+                 raw_header
+               [@profiler.record_f
+                 {verbosity = Info} "parse grandparent block header"])
+            in
+            return header.shell.predecessor
+          in
           compute_block_info
             cctxt
             ~in_protocol
             ~chain
+            ~grandparent
             predecessor_hash
             predecessor_header
         in
@@ -295,6 +320,7 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
             ~in_protocol:is_proposal_in_protocol
             ?operations
             ~chain
+            ~grandparent:predecessor.shell.predecessor
             block_hash
             block_header
         in
