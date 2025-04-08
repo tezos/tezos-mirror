@@ -89,7 +89,7 @@ let _teztale_snitch =
   Uses.make ~tag:"teztale_snitch" ~path:"./octez-teztale-snitch" ()
 
 (* TODO: Remove these once the binaries are completely removed from
-   [released-executables]. *)
+   [released-executables]. (issue : https://gitlab.com/tezos/tezos/-/issues/7763) *)
 
 let octez_baker_quebec =
   Uses.make ~tag:"baker_psquebec" ~path:"./octez-baker-PsQuebec" ()
