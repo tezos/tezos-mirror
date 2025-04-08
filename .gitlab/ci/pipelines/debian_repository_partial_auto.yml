@@ -258,6 +258,7 @@ apt_repo_debian_old:
   - oc.build-debian-old_b
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -289,6 +290,7 @@ apt_repo_debian:
   - oc.build-data_packages
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -318,6 +320,7 @@ oc.lintian_debian:
   - oc.build-debian
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - export DEBIAN_FRONTEND=noninteractive
   - apt-get update
