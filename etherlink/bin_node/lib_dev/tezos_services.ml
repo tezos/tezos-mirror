@@ -237,6 +237,26 @@ module Tezlink_protocols = struct
   let current = Shell_impl.{current_protocol = quebec; next_protocol = quebec}
 end
 
+(* Copied from src/proto_alpha/lib_protocol/constants_services.ml. *)
+(* TODO: #7875
+   Import from the protocol once it is exposed instead of copying it here. *)
+module Constants_services = struct
+  module RPC_path = Tezos_rpc.Path
+  module RPC_service = Tezos_rpc.Service
+  module RPC_query = Tezos_rpc.Query
+
+  let custom_root =
+    (RPC_path.(open_root / "context" / "constants")
+      : tezlink_rpc_context RPC_path.context)
+
+  let all =
+    RPC_service.get_service
+      ~description:"All constants"
+      ~query:RPC_query.empty
+      ~output:Alpha_context.Constants.encoding
+      custom_root
+end
+
 (* This is where we import service declarations from the protocol. *)
 module Imported_services = struct
   module Protocol_plugin_services = Imported_protocol_plugin.RPC.S
@@ -298,6 +318,16 @@ module Imported_services = struct
          ~query:Tezos_rpc.Query.empty
          ~output:Protocol_types.Tez.encoding
          (contract_arg_path "balance")
+
+  let _constants :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context,
+        unit,
+        unit,
+        Protocol_types.Alpha_context.Constants.t )
+      Tezos_rpc.Service.t =
+    import_service Constants_services.all
 end
 
 type block = Tezos_shell_services.Block_services.block
