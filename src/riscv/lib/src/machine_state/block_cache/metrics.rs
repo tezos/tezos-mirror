@@ -32,6 +32,10 @@ pub(crate) use core::block_metrics;
 #[cfg(not(feature = "metrics"))]
 pub(crate) use block_metrics;
 
+use super::bcall::Block;
+use crate::machine_state::memory::MemoryConfig;
+use crate::state_backend::ManagerBase;
+
 #[cfg(feature = "metrics")]
 #[doc(hidden)]
 pub mod core {
@@ -263,5 +267,85 @@ pub mod core {
                 .unwrap()
                 .cmp(&Hash::blake2b_hash(&other.instr).unwrap())
         }
+    }
+}
+
+/// Wrapper type that can be used to instrument any `B: Block` with metrics.
+pub struct BlockMetrics<B> {
+    block: B,
+}
+
+impl<B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase> Block<MC, M> for BlockMetrics<B> {
+    type BlockBuilder = B::BlockBuilder;
+
+    fn reset(&mut self)
+    where
+        M: crate::state_backend::ManagerReadWrite,
+    {
+        self.block.reset()
+    }
+
+    fn instr(&self) -> &[crate::state_backend::EnrichedCell<super::ICallPlaced<MC, M>, M>]
+    where
+        M: crate::state_backend::ManagerRead,
+    {
+        self.block.instr()
+    }
+
+    unsafe fn callable<'a>(
+        &'a mut self,
+        block_builder: &'a mut Self::BlockBuilder,
+    ) -> &'a (impl super::bcall::BCall<MC, M> + ?Sized + 'a)
+    where
+        M: crate::state_backend::ManagerRead + 'a,
+    {
+        self.block.callable(block_builder)
+    }
+
+    fn num_instr(&self) -> usize
+    where
+        M: crate::state_backend::ManagerRead,
+    {
+        self.block.num_instr()
+    }
+
+    fn struct_ref<'a, F: crate::state_backend::FnManager<crate::state_backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> crate::state_backend::AllocatedOf<super::bcall::BlockLayout, F::Output> {
+        self.block.struct_ref::<F>()
+    }
+
+    fn push_instr(&mut self, instr: crate::machine_state::instruction::Instruction)
+    where
+        M: crate::state_backend::ManagerReadWrite,
+    {
+        self.block.push_instr(instr)
+    }
+
+    fn invalidate(&mut self)
+    where
+        M: crate::state_backend::ManagerWrite,
+    {
+        self.block.invalidate()
+    }
+
+    fn bind(allocated: crate::state_backend::AllocatedOf<super::bcall::BlockLayout, M>) -> Self
+    where
+        <M as ManagerBase>::ManagerRoot: crate::state_backend::ManagerReadWrite,
+    {
+        Self {
+            block: B::bind(allocated),
+        }
+    }
+
+    fn block_hash(&self) -> &super::bcall::BlockHash {
+        self.block.block_hash()
+    }
+
+    fn start_block(&mut self)
+    where
+        M: crate::state_backend::ManagerWrite,
+    {
+        self.block.start_block()
     }
 }

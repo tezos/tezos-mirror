@@ -130,9 +130,9 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase> {
     /// This ensures that the builder in question is guaranteed to be alive, for at least as long
     /// as this block may be run via `BCall::run_block`.
     unsafe fn callable<'a>(
-        &mut self,
+        &'a mut self,
         block_builder: &'a mut Self::BlockBuilder,
-    ) -> &(impl BCall<MC, M> + ?Sized + 'a)
+    ) -> &'a (impl BCall<MC, M> + ?Sized + 'a)
     where
         M: ManagerRead + 'a;
 
@@ -321,9 +321,9 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
     /// This function is always safe to call.
     #[inline]
     unsafe fn callable<'a>(
-        &mut self,
+        &'a mut self,
         _bb: &'a mut Self::BlockBuilder,
-    ) -> &(impl BCall<MC, M> + ?Sized + 'a)
+    ) -> &'a (impl BCall<MC, M> + ?Sized + 'a)
     where
         M: ManagerRead + 'a,
     {
@@ -434,9 +434,9 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     /// This ensures that the builder in question is guaranteed to be alive, for at least as long
     /// as this block may be run via [`BCall::run_block`].
     unsafe fn callable<'a>(
-        &mut self,
+        &'a mut self,
         block_builder: &'a mut Self::BlockBuilder,
-    ) -> &(impl BCall<MC, M> + ?Sized + 'a)
+    ) -> &'a (impl BCall<MC, M> + ?Sized + 'a)
     where
         M: ManagerRead + 'a,
     {
