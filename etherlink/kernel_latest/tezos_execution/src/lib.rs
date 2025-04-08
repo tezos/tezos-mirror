@@ -2,17 +2,17 @@
 //
 // SPDX-License-Identifier: MIT
 
-use account_storage::TezlinkImplicitAccount;
-use tezos_crypto_rs::base58::FromBase58CheckError;
+use account_storage::{Manager, TezlinkImplicitAccount};
+use tezos_crypto_rs::{base58::FromBase58CheckError, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::Contract;
+use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::{
-    operation::{ManagerOperation, Operation},
+    operation::{ManagerOperation, Operation, OperationContent},
     operation_result::{
-        produce_operation_result, OperationError, OperationResultSum, Reveal,
-        RevealSuccess, ValidityError,
+        produce_operation_result, ApplyOperationError, OperationError,
+        OperationResultSum, Reveal, RevealSuccess, ValidityError,
     },
 };
 use thiserror::Error;
@@ -74,6 +74,48 @@ fn is_valid_tezlink_operation<Host: Runtime>(
     Ok(Ok(()))
 }
 
+fn reveal<Host: Runtime>(
+    host: &mut Host,
+    provided_hash: &PublicKeyHash,
+    account: &mut TezlinkImplicitAccount,
+    public_key: &PublicKey,
+) -> Result<Result<RevealSuccess, OperationError>, ApplyKernelError> {
+    log!(host, Debug, "Applying a reveal operation");
+    let manager = account.manager(host)?;
+
+    let expected_hash = match manager {
+        Manager::Revealed(pk) => {
+            return Ok(Err(ApplyOperationError::PreviouslyRevealedKey(pk).into()))
+        }
+        Manager::NotRevealed(pkh) => pkh,
+    };
+
+    // Ensure that the source of the operation is equal to the retrieved hash.
+    if &expected_hash != provided_hash {
+        return Ok(Err(
+            ApplyOperationError::InconsistentHash(expected_hash).into()
+        ));
+    }
+
+    // Check the public key
+    let pkh_from_pk = public_key.pk_hash();
+    if expected_hash != pkh_from_pk {
+        return Ok(Err(ApplyOperationError::InconsistentPublicKey(
+            expected_hash,
+        )
+        .into()));
+    }
+
+    // Set the public key as the manager
+    account.set_manager_public_key(host, public_key)?;
+
+    log!(host, Debug, "Reveal operation succeed");
+
+    Ok(Ok(RevealSuccess {
+        consumed_gas: 0_u64.into(),
+    }))
+}
+
 pub fn apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
@@ -85,7 +127,7 @@ pub fn apply_operation<Host: Runtime>(
         counter,
         gas_limit: _,
         storage_limit: _,
-        operation: _,
+        operation: content,
     } = &operation.content;
 
     log!(
@@ -96,7 +138,7 @@ pub fn apply_operation<Host: Runtime>(
     );
 
     let contract = Contract::from_b58check(&source.to_b58check())?;
-    let account =
+    let mut account =
         account_storage::TezlinkImplicitAccount::from_contract(context, &contract)?;
 
     log!(host, Debug, "Verifying that the operation is valid");
@@ -114,12 +156,15 @@ pub fn apply_operation<Host: Runtime>(
 
     log!(host, Debug, "Operation is valid");
 
-    // TODO: Don't force the receipt to a reveal receipt
-    let dummy_result = produce_operation_result::<Reveal>(Ok(RevealSuccess {
-        consumed_gas: 0_u64.into(),
-    }));
+    let receipt = match content {
+        OperationContent::Reveal { pk } => {
+            let reveal_result = reveal(host, source, &mut account, pk)?;
+            let manager_result = produce_operation_result(reveal_result);
+            OperationResultSum::Reveal(manager_result)
+        }
+    };
 
-    Ok(OperationResultSum::Reveal(dummy_result))
+    Ok(receipt)
 }
 
 #[cfg(test)]
