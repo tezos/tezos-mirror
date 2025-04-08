@@ -56,62 +56,95 @@ let local_head_too_old ?remote_head ~evm_node_endpoint
 
 let quantity_succ (Qty x) = Qty Z.(succ x)
 
-let rec catchup ?remote_head ~next_blueprint_number ~first_connection params =
+module Blueprints_sequence = struct
+  type t = (Blueprint_types.with_events, tztrace) Seq_es.t
+
+  let rec fold f acc seq =
+    let open Lwt_result_syntax in
+    let* next_step = Seq_es.uncons seq in
+    match next_step with
+    | None -> return (`Completed acc)
+    | Some (blueprint, seq) -> (
+        let* acc = f acc blueprint in
+        match acc with
+        | `Continue acc -> (fold [@tailcall]) f acc seq
+        | `Cut c -> return (`Cut c))
+
+  let make ~next_blueprint_number evm_node_endpoint : t =
+    let open Lwt_result_syntax in
+    Seq_es.ES.unfold
+      (fun (remote_head, next_blueprint_number) ->
+        let* is_too_old, remote_head =
+          local_head_too_old
+            ?remote_head
+            ~evm_node_endpoint
+            next_blueprint_number
+        in
+        if is_too_old then
+          let* blueprint =
+            (* See {Note keep_alive} *)
+            Evm_services.get_blueprint
+              ~keep_alive:true
+              ~evm_node_endpoint
+              next_blueprint_number
+          in
+          return
+            (Some
+               ( blueprint,
+                 (Some remote_head, quantity_succ next_blueprint_number) ))
+        else return None)
+      (None, next_blueprint_number)
+end
+
+let rec catchup ~next_blueprint_number ~first_connection params =
   let open Lwt_result_syntax in
   Metrics.start_bootstrapping () ;
-  let* local_head_too_old, remote_head =
-    local_head_too_old
-      ?remote_head
-      ~evm_node_endpoint:params.evm_node_endpoint
-      next_blueprint_number
+
+  let seq =
+    Blueprints_sequence.make ~next_blueprint_number params.evm_node_endpoint
   in
 
-  if local_head_too_old then
-    let* blueprint =
-      (* See {Note keep_alive} *)
-      Evm_services.get_blueprint
-        ~keep_alive:true
-        ~evm_node_endpoint:params.evm_node_endpoint
-        next_blueprint_number
-    in
-    let* r = params.on_new_blueprint next_blueprint_number blueprint in
-    match r with
-    | `Continue ->
-        (catchup [@tailcall])
-          ~next_blueprint_number:(quantity_succ next_blueprint_number)
-          ~remote_head
-          ~first_connection
-          params
-    | `Check_for_reorg level ->
-        (catchup [@tailcall])
-          ~next_blueprint_number:level
-          ~first_connection
-          params
-  else
-    let* () =
-      when_ (not first_connection) @@ fun () ->
-      let delay = Random.float 2. in
-      let*! () =
-        Events.retrying_connect ~endpoint:params.evm_node_endpoint ~delay
+  let* fold_result =
+    Blueprints_sequence.fold
+      (fun next_blueprint_number blueprint ->
+        let* result = params.on_new_blueprint next_blueprint_number blueprint in
+        match result with
+        | `Check_for_reorg l -> return (`Cut l)
+        | `Continue -> return (`Continue (quantity_succ next_blueprint_number)))
+      next_blueprint_number
+      seq
+  in
+
+  match fold_result with
+  | `Cut level -> catchup ~next_blueprint_number:level ~first_connection params
+  | `Completed next_blueprint_number -> (
+      let* () =
+        when_ (not first_connection) @@ fun () ->
+        let delay = Random.float 2. in
+        let*! () =
+          Events.retrying_connect ~endpoint:params.evm_node_endpoint ~delay
+        in
+        let*! () = Lwt_unix.sleep delay in
+        return_unit
       in
-      let*! () = Lwt_unix.sleep delay in
-      return_unit
-    in
 
-    let*! call_result =
-      Evm_services.monitor_blueprints
-        ~evm_node_endpoint:params.evm_node_endpoint
-        next_blueprint_number
-    in
+      let*! call_result =
+        Evm_services.monitor_blueprints
+          ~evm_node_endpoint:params.evm_node_endpoint
+          next_blueprint_number
+      in
 
-    match call_result with
-    | Ok blueprints_stream ->
-        (stream_loop [@tailcall]) next_blueprint_number params blueprints_stream
-    | Error _ ->
-        (catchup [@tailcall])
-          ~next_blueprint_number
-          ~first_connection:false
-          params
+      match call_result with
+      | Ok blueprints_stream ->
+          (stream_loop [@tailcall])
+            next_blueprint_number
+            params
+            blueprints_stream
+      | Error _ ->
+          (catchup [@tailcall])
+            ~next_blueprint_number
+            ~first_connection:false
+            params)
 
 and stream_loop (Qty next_blueprint_number) params stream =
   let open Lwt_result_syntax in
