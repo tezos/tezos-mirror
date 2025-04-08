@@ -175,12 +175,15 @@ mod tests {
     use tezos_tezlink::{
         block::TezBlock,
         operation::{ManagerOperation, Operation, OperationContent},
-        operation_result::{ContentResult, OperationResult, OperationResultSum},
+        operation_result::{
+            ApplyOperationError, ContentResult, OperationResult, OperationResultSum,
+            RevealSuccess,
+        },
     };
 
     use crate::{
-        account_storage::TezlinkImplicitAccount, apply_operation, context,
-        OperationError, ValidityError,
+        account_storage::{Manager, TezlinkImplicitAccount},
+        apply_operation, context, OperationError, ValidityError,
     };
 
     fn make_reveal_operation(
@@ -325,5 +328,160 @@ mod tests {
             )]),
         });
         assert_eq!(receipt, expected_receipt);
+    }
+
+    // At this point, tests are focused on the content of the operation. We should not revert with ValidityError anymore.
+    // Test a reveal operation on an already revealed account
+    #[test]
+    fn apply_reveal_operation_on_already_revealed_account() {
+        let mut host = MockKernelHost::default();
+
+        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("PublicKeyHash b58 conversion should have succeed");
+
+        let mut account = init_account(&mut host, &src);
+
+        // Setting the manager key of this account to its public_key, this account
+        // will be considered as revealed and the reveal operation should fail
+        let pk = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key creation should have succeed");
+
+        account
+            .set_manager_public_key(&mut host, &pk)
+            .expect("Setting manager field should have succeed");
+
+        // Applying the operation
+        let operation = make_reveal_operation(15, 1, 4, 5, src, pk.clone());
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), &operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        // Reveal operation should fail
+        let expected_receipt = OperationResultSum::Reveal(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Failed(vec![OperationError::Apply(
+                ApplyOperationError::PreviouslyRevealedKey(pk),
+            )]),
+        });
+        assert_eq!(receipt, expected_receipt);
+    }
+
+    // Test an invalid reveal operation where the manager is inconsistent for source
+    // (where source is different of the manager field)
+    #[test]
+    fn apply_reveal_operation_with_an_inconsistent_manager() {
+        let mut host = MockKernelHost::default();
+
+        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("PublicKeyHash b58 conversion should have succeed");
+
+        let mut account = init_account(&mut host, &src);
+
+        // Set the an inconsistent manager with the source
+        let inconsistent_pkh =
+            PublicKeyHash::from_b58check("tz1UEQcU7M43yUECMpKGJcxCVwHRaP819qhN")
+                .expect("PublicKeyHash b58 conversion should have succeed");
+
+        account
+            .set_manager_public_key_hash(&mut host, &inconsistent_pkh)
+            .expect("Setting manager field should have succeed");
+
+        let pk = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key creation should have succeed");
+
+        let operation = make_reveal_operation(15, 1, 4, 5, src, pk);
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), &operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Reveal(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Failed(vec![OperationError::Apply(
+                ApplyOperationError::InconsistentHash(inconsistent_pkh),
+            )]),
+        });
+
+        assert_eq!(receipt, expected_receipt);
+    }
+
+    // Test an invalid operation where the provided public key is inconsistent for the source
+    #[test]
+    fn apply_reveal_operation_with_an_inconsistent_public_key() {
+        let mut host = MockKernelHost::default();
+
+        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("PublicKeyHash b58 conversion should have succeed");
+
+        // Even if we don't use it we need to init the account
+        let _ = init_account(&mut host, &src);
+
+        // Wrong public key for source
+        let pk = PublicKey::from_b58check(
+            "edpkuT1qccDweCHnvgjLuNUHERpZmEaFZfbWvTzj2BxmTgQBZjaDFD",
+        )
+        .expect("Public key creation should have succeed");
+
+        let operation = make_reveal_operation(15, 1, 4, 5, src.clone(), pk);
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), &operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Reveal(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Failed(vec![OperationError::Apply(
+                ApplyOperationError::InconsistentPublicKey(src),
+            )]),
+        });
+
+        assert_eq!(receipt, expected_receipt);
+    }
+
+    // Test a valid reveal operation, the manager should go from NotRevealed to Revealed
+    #[test]
+    fn apply_reveal_operation() {
+        let mut host = MockKernelHost::default();
+
+        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("PublicKeyHash b58 conversion should have succeed");
+
+        let account = init_account(&mut host, &src);
+
+        let manager = account
+            .manager(&host)
+            .expect("Read manager should have succeed");
+
+        assert_eq!(manager, Manager::NotRevealed(src.clone()));
+
+        let pk = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key creation should have succeed");
+
+        let operation = make_reveal_operation(15, 1, 4, 5, src, pk.clone());
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), &operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Reveal(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(RevealSuccess {
+                consumed_gas: 0_u64.into(),
+            }),
+        });
+
+        assert_eq!(receipt, expected_receipt);
+
+        let manager = account
+            .manager(&host)
+            .expect("Read manager should have succeed");
+
+        assert_eq!(manager, Manager::Revealed(pk));
     }
 }
