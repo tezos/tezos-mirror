@@ -105,7 +105,8 @@ Note however that the Zcash parameters are in a different package now, which nee
 Furthermore, RPM packages are now available in a **dnf repository**. Installation instructions are detailed in :ref:`the documentation <installing_packages>`.
 
 When upgrading to v22, you can start or restart the ``octez-baker.service`` that runs all bakers for supported protocols.
-Alternatively, you can run them individually. For instance, to start a baker for the Quebec protocol, you can use the command::
+
+Alternatively, you can run them individually. For instance, to start only the baker for the Quebec protocol, you can use the command::
 
   $ sudo systemctl start octez-baker@PsQuebec
 
