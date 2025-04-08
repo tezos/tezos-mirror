@@ -10,6 +10,11 @@
 
 - Fixes `mixHash` being renamed into `prevRandao` in the output of our JSON RPC
   API server. (!17394)
+- Adds `GET /evm/blueprints/range?from_level=l&max_count=c` which returns a
+  sequence of at most `c` consecutive blueprints starting from (and containing
+  at least) level `l`. If the node does not have the blueprint for level `l` in
+  its store, the RPC returns a 404 error instead of an empty list. `c` default
+  to `1` if not specified and reduced to `500` if superior. (!17592)
 
 ### Metrics changes
 

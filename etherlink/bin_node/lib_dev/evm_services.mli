@@ -22,6 +22,13 @@ val get_blueprint :
   Ethereum_types.quantity ->
   Blueprint_types.with_events tzresult Lwt.t
 
+val get_blueprints :
+  keep_alive:bool ->
+  evm_node_endpoint:Uri.t ->
+  count:int64 ->
+  Ethereum_types.quantity ->
+  Blueprint_types.with_events list tzresult Lwt.t
+
 val register :
   (unit -> Ethereum_types.quantity Lwt.t) ->
   (Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t) ->
