@@ -65,19 +65,8 @@ RUN mkdir -p /usr/share/dal-trusted-setup && \
     sh /tmp/install_dal_trusted_setup.sh && \
     rm /tmp/install_dal_trusted_setup.sh /tmp/version.sh
 
-# Set NPM registry
-# NPM_REGISTRY_DOMAIN and NPM_REGISTRY are set in the GitLab CI/CD
-ARG NPM_REGISTRY_DOMAIN
-ARG NPM_REGISTRY
-
-RUN --mount=type=secret,id=npm_token \
-    if [ -n "$NPM_REGISTRY" ] ; then \
-      npm set registry "$NPM_REGISTRY" && \
-      npm set //${NPM_REGISTRY_DOMAIN}:_authToken="$(cat /run/secrets/npm_token)"; \
-    fi \
- && npm install -g "@datadog/datadog-ci@2.46.0" \
- # We need eth since e2e tests. This requires git as well.
- && npm install -g eth-cli@2.0.2 \
+# We need eth since e2e tests. This requires git as well.
+RUN npm install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts
  && npm install -g solc@0.8.28 \
  && PATH="/root/.cargo/bin:${PATH}" \
