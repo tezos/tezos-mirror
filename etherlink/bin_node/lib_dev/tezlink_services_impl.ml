@@ -50,7 +50,7 @@ let current_level (module Backend : Services_backend_sig.S) chain block
       cycle_position = Int32.rem level constants.blocks_per_cycle;
     }
 
-let _constants chain block =
+let constants chain block =
   let open Lwt_result_syntax in
   (* TODO: #7831
      take chain into account
@@ -114,4 +114,5 @@ let michelson_services_methods backend =
     balance =
       (fun _ _ _ ->
         Lwt_result_syntax.return @@ Ethereum_types.quantity_of_z Z.one);
+    constants;
   }

@@ -65,7 +65,9 @@ type tezos_services_implementation = {
   current_level : chain -> block -> level_query -> level tzresult Lwt.t;
   version : unit -> Tezlink_version.version tzresult Lwt.t;
   protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
-  balance : chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
+  balance :
+    chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
+  constants : chain -> block -> Protocol_types.Constants.t tzresult Lwt.t;
 }
 
 (* THIS IS THE ENTRYPOINT *)

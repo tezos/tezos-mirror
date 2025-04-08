@@ -167,7 +167,7 @@ module Protocol_types = struct
            (req "fixed" Alpha_context.Constants.fixed_encoding)
            (req "parametric" Alpha_context.Constants.Parametric.encoding))
 
-    let _convert : t -> Alpha_context.Constants.t tzresult =
+    let convert : t -> Alpha_context.Constants.t tzresult =
       convert_using_serialization
         ~name:"constants"
         ~dst:Alpha_context.Constants.encoding
@@ -319,7 +319,7 @@ module Imported_services = struct
          ~output:Protocol_types.Tez.encoding
          (contract_arg_path "balance")
 
-  let _constants :
+  let constants :
       ( [`GET],
         tezlink_rpc_context,
         tezlink_rpc_context,
@@ -347,7 +347,9 @@ type tezos_services_implementation = {
     chain -> block -> Imported_services.level_query -> level tzresult Lwt.t;
   version : unit -> Tezlink_version.version tzresult Lwt.t;
   protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
-  balance : chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
+  balance :
+    chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
+  constants : chain -> block -> Protocol_types.Constants.t tzresult Lwt.t;
 }
 
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
@@ -368,6 +370,10 @@ let build_block_dir impl =
        ~impl:(fun ({block; chain}, contract) _ _ ->
          impl.balance chain block contract)
        ~convert_output:Protocol_types.Tez.convert
+  |> register_with_conversion
+       ~service:Imported_services.constants
+       ~impl:(fun {block; chain} () () -> impl.constants chain block)
+       ~convert_output:Protocol_types.Constants.convert
 
 (** Builds the root director. *)
 let build_dir impl =
