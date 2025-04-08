@@ -170,7 +170,7 @@ module Params = struct
   let snapshot_file_or_url next =
     Tezos_clic.param
       ~name:"snapshot"
-      ~desc:"Snapshot archive file or URL."
+      ~desc:"Snapshot archive file, URL or stdin (when given `-`)."
       string
       next
 

@@ -39,7 +39,8 @@ val input_format : reader_input -> [`Compressed | `Uncompressed]
 (** Returns from where the snapshot input was constructed. Either [`Local
     filename] when the snapshot is read from a local file [filename] or [`Remote
     url] when the snapshot file is downloaded from [url].  *)
-val input_source : reader_input -> [`Local of string | `Remote of string]
+val input_source :
+  reader_input -> [`Local of string | `Remote of string | `Stdin]
 
 (** Add a download snapshot command to the executable (only for internal use). *)
 val add_download_command : unit -> unit
@@ -109,7 +110,9 @@ end) : sig
     string Lwt.t
 
   (** [with_open_snapshot file f] opens the snapshot file for reading, reads its
-      header and executes [f] then finally closes the channels. *)
+      header and executes [f] then finally closes the channels. [file] can be a
+      local file, a URL (in which case the snapshot is downloaded) or ["-"] for
+      reading from standard input. *)
   val with_open_snapshot :
     progress:bool ->
     string ->

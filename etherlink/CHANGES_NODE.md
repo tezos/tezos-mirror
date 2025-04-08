@@ -26,6 +26,7 @@
   disk footprint and is slightly more efficient. (!17407 !17420)
 - Command `snapshot info` now supports remote snapshot URLs and can print the
   snapshot header without downloading the whole snapshot. (!17407)
+- Allow to import snapshots from standard input with `-`. (!17463)
 
 ### Documentation changes
 

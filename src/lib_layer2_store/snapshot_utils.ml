@@ -41,7 +41,7 @@ module type READER_INPUT = sig
 
   val in_chan : in_channel
 
-  val source : [`Local of string | `Remote of string]
+  val source : [`Local of string | `Remote of string | `Stdin]
 
   val crashed : tztrace Lwt.t
 
@@ -229,6 +229,9 @@ let open_or_download_file ~progress file_or_url =
   then
     let+ chan, cancel = download_file ~crash_resolver ~progress file_or_url in
     ((chan, crashed, cancel), `Remote file_or_url)
+  else if file_or_url = "-" then
+    let cancel () = Lwt.return_unit in
+    return ((stdin, crashed, cancel), `Stdin)
   else
     try
       let chan = open_in_bin file_or_url in

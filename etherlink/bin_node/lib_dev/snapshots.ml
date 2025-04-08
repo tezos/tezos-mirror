@@ -427,6 +427,7 @@ let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
     match input_source snapshot_input with
     | `Local s -> (s, true)
     | `Remote s -> (s, not is_tty)
+    | `Stdin -> ("(stdin)", true)
   in
   let*! () =
     extract
