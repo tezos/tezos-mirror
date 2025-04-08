@@ -128,7 +128,12 @@ impl<T: Stackable> Slot<T> {
     }
 
     /// Emit IR to load a value from the current stack slot.
-    pub(super) fn load(&self, builder: &mut FunctionBuilder<'_>) -> Value {
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the memory is initialised - otherwise arbitrary bytes
+    /// (from uninitialised memory) will be returned.
+    pub(super) unsafe fn load(&self, builder: &mut FunctionBuilder<'_>) -> Value {
         builder.ins().stack_load(T::IR_TYPE, self.slot, 0)
     }
 }

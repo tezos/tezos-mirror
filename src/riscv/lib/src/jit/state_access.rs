@@ -23,7 +23,6 @@
 mod stack;
 
 use std::marker::PhantomData;
-use std::mem::MaybeUninit;
 
 use cranelift::codegen::ir::AbiParam;
 use cranelift::codegen::ir::FuncRef;
@@ -42,9 +41,9 @@ use cranelift_module::Module;
 use cranelift_module::ModuleResult;
 
 use super::builder::X64;
+use super::builder::errno::Errno;
 use crate::instruction_context::ICB;
 use crate::instruction_context::LoadStoreWidth;
-use crate::machine_state::AccessType;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
@@ -95,7 +94,8 @@ pub trait JitStateAccess: ManagerReadWrite {
     /// Handle an [`Exception`].
     ///
     /// If the exception is succesfully handled, the
-    /// `current_pc` is updated to the new value, and returns true.
+    /// `current_pc` is updated to the new value, and returns true. The `current_pc`
+    /// remains initialised to its previous value otherwise.
     ///
     /// If the exception needs to be treated by the execution environment,
     /// `result` is updated with the `EnvironException` and `false` is
@@ -473,7 +473,9 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         ]);
 
         let handled = builder.inst_results(call)[0];
-        let new_pc = pc_slot.load(builder);
+        // Safety: the pc is initialised prior to the call, and is guaranteed to
+        // remain initialised regardless of the result of external call.
+        let new_pc = unsafe { pc_slot.load(builder) };
 
         ExceptionHandledOutcome {
             handled,
@@ -523,10 +525,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
 
     /// Emit the required IR to call `memory_store`.
     ///
-    /// Returns `errno`.
-    ///
-    /// The `errno` value must be handled first - if set, it indicates
-    /// an exception has occurred.
+    /// Returns `errno` - on success, no additional values are returned.
     pub(super) fn memory_store(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -535,7 +534,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         value: X64,
         width: LoadStoreWidth,
         exception_ptr: Value,
-    ) -> Value {
+    ) -> impl Errno<(), MC, JSA> {
         let memory_store = self.memory_store.get_or_insert_with(|| {
             self.module
                 .declare_func_in_func(self.imports.memory_store, builder.func)
@@ -553,7 +552,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
 
         let errno = builder.inst_results(call)[0];
 
-        errno
+        (errno, |_: &mut FunctionBuilder<'_>| {})
     }
 }
 

@@ -8,6 +8,7 @@
 
 pub(super) mod arithmetic;
 pub(super) mod block_state;
+pub(super) mod errno;
 
 use cranelift::codegen::ir;
 use cranelift::codegen::ir::InstBuilder;
@@ -20,13 +21,13 @@ use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
 
 use self::block_state::DynamicValues;
+use self::errno::Errno;
 use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::instruction_context::LoadStoreWidth;
 use crate::instruction_context::Predicate;
 use crate::jit::builder::block_state::PCUpdate;
-use crate::machine_state::AccessType;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
@@ -257,32 +258,6 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         self.dynamic = snapshot;
         self.builder.switch_to_block(fallthrough);
     }
-
-    /// Insert exception handling branch that will be triggered at runtime
-    /// when `errno` indicates failure.
-    ///
-    /// The caller of this function is put back into the context of the happy path -
-    /// ie, where `errno` indicates success and no exception occurred.
-    fn handle_errno(&mut self, errno: Value) {
-        let on_error = self.builder.create_block();
-        let on_ok = self.builder.create_block();
-
-        self.builder.ins().brif(errno, on_error, &[], on_ok, &[]);
-
-        let snapshot = self.dynamic;
-
-        // Exception succesfully handled, we have a new PC and need to complete
-        // the current step.
-        self.builder.switch_to_block(on_error);
-        self.handle_exception();
-
-        self.builder.seal_block(on_error);
-
-        // The exception has to be handled by the environment. Do not complete
-        // the current step; this will be done by the ECall handling mechanism
-        self.builder.switch_to_block(on_ok);
-        self.dynamic = snapshot;
-    }
 }
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
@@ -418,7 +393,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
             self.exception_ptr_val,
         );
 
-        self.handle_errno(errno);
+        errno.handle(self);
 
         Some(())
     }
