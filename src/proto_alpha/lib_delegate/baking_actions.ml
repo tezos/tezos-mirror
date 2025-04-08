@@ -919,6 +919,10 @@ let prepare_waiting_for_quorum state =
       level_watched = latest_proposal.shell.level;
       round_watched = latest_proposal.round;
       payload_hash_watched = latest_proposal.payload_hash;
+      branch_watched =
+        (if state.global_state.constants.parametric.aggregate_attestation then
+           Some latest_proposal.grandparent
+         else None);
     }
   in
   (consensus_threshold, get_slot_voting_power, candidate)

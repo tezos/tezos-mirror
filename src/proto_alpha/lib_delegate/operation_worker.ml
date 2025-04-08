@@ -178,20 +178,32 @@ type candidate = {
   level_watched : Int32.t;
   round_watched : Round.t;
   payload_hash_watched : Block_payload_hash.t;
+  branch_watched : Block_hash.t option;
 }
 
 let candidate_encoding =
   let open Data_encoding in
   conv
-    (fun {hash; level_watched; round_watched; payload_hash_watched} ->
-      (hash, level_watched, round_watched, payload_hash_watched))
-    (fun (hash, level_watched, round_watched, payload_hash_watched) ->
-      {hash; level_watched; round_watched; payload_hash_watched})
-    (obj4
+    (fun {
+           hash;
+           level_watched;
+           round_watched;
+           payload_hash_watched;
+           branch_watched;
+         } ->
+      (hash, level_watched, round_watched, payload_hash_watched, branch_watched))
+    (fun ( hash,
+           level_watched,
+           round_watched,
+           payload_hash_watched,
+           branch_watched ) ->
+      {hash; level_watched; round_watched; payload_hash_watched; branch_watched})
+    (obj5
        (req "hash" Block_hash.encoding)
        (req "level_watched" int32)
        (req "round_watched" Round.encoding)
-       (req "payload_hash_watched" Block_payload_hash.encoding))
+       (req "payload_hash_watched" Block_payload_hash.encoding)
+       (req "branch_watched" (option Block_hash.encoding)))
 
 type event =
   | Prequorum_reached of candidate * Kind.preattestation operation list
@@ -340,8 +352,14 @@ let make_initial_state ?(monitor_node_operations = true) ~constants () =
     committee_size;
   }
 
-let is_valid_consensus_content (candidate : candidate) consensus_content =
-  let {hash = _; level_watched; round_watched; payload_hash_watched} =
+let is_eligible (candidate : candidate) branch consensus_content =
+  let {
+    hash = _;
+    level_watched;
+    round_watched;
+    payload_hash_watched;
+    branch_watched;
+  } =
     candidate
   in
   Int32.equal (Raw_level.to_int32 consensus_content.level) level_watched
@@ -349,6 +367,10 @@ let is_valid_consensus_content (candidate : candidate) consensus_content =
   && Block_payload_hash.equal
        consensus_content.block_payload_hash
        payload_hash_watched
+  && Option.fold
+       ~none:true
+       ~some:(fun branch' -> Block_hash.(branch = branch'))
+       branch_watched
 
 let cancel_monitoring state = state.proposal_watched <- None
 
@@ -400,10 +422,10 @@ let update_pqc_monitoring ~pqc_watched ops =
       | ({
            protocol_data =
              {contents = Single (Preattestation consensus_content); _};
-           _;
+           shell = {branch};
          } as op :
           Kind.preattestation Operation.t) -> (
-          if is_valid_consensus_content candidate_watched consensus_content then
+          if is_eligible candidate_watched branch consensus_content then
             match get_slot_voting_power ~slot:consensus_content.slot with
             | Some op_power ->
                 pqc_watched.preattestations_received <-
@@ -454,10 +476,10 @@ let update_qc_monitoring ~qc_watched ops =
       | ({
            protocol_data =
              {contents = Single (Attestation {consensus_content; _}); _};
-           _;
+           shell = {branch};
          } as op :
           Kind.attestation Operation.t) -> (
-          if is_valid_consensus_content candidate_watched consensus_content then
+          if is_eligible candidate_watched branch consensus_content then
             match get_slot_voting_power ~slot:consensus_content.slot with
             | Some op_power ->
                 qc_watched.attestations_received <-
