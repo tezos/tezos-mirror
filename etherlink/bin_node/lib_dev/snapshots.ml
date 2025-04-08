@@ -382,7 +382,8 @@ let check_header ~populated ~force ~data_dir (header : Header.t) :
   return_unit
 
 let info ~snapshot_file =
-  with_open_snapshot snapshot_file @@ fun snapshot_header snapshot_input ->
+  with_open_snapshot ~progress:false snapshot_file
+  @@ fun snapshot_header snapshot_input ->
   let format = input_format snapshot_input in
   Lwt_result_syntax.return (snapshot_header, format)
 
@@ -390,9 +391,11 @@ let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
   let open Lwt_result_syntax in
   let open Filename.Infix in
   Data_dir.use ~data_dir @@ fun () ->
+  let*! () = Events.importing_snapshot snapshot_file in
   Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
   @@ fun dest ->
-  with_open_snapshot snapshot_file @@ fun header snapshot_input ->
+  with_open_snapshot ~progress:true snapshot_file
+  @@ fun header snapshot_input ->
   let* store_history_mode =
     match (history_mode, header) with
     | Some h1, V1 {history_mode = h2; _} ->
@@ -400,7 +403,6 @@ let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
         else tzfail (History_mode_mismatch (h1, h2))
     | _ -> return_none
   in
-  let*! () = Events.importing_snapshot snapshot_file in
   let*! populated = Data_dir.populated ~data_dir in
   let*? () =
     error_when ((not force) && populated) (Data_dir_populated data_dir)
@@ -416,8 +418,15 @@ let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
     return_unit
   in
   let* () = check_header ~force ~populated ~data_dir header in
-  let archive_name =
-    match input_source snapshot_input with `Local s | `Remote s -> s
+  let*! is_tty = Lwt_unix.isatty Lwt_unix.stderr in
+  (* We always emit the importing event for local files. For remote files, we
+     only show the event if the output is not a TTY because if it is, the
+     progress bar will already be shown, and if it's not, no progress indicator
+     would be logged otherwise. *)
+  let archive_name, emit_event =
+    match input_source snapshot_input with
+    | `Local s -> (s, true)
+    | `Remote s -> (s, not is_tty)
   in
   let*! () =
     extract
@@ -426,9 +435,11 @@ let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
       ~display_progress:
         (`Periodic_event
           (fun elapsed_time ->
-            Events.import_snapshot_archive_in_progress
-              ~archive_name
-              ~elapsed_time))
+            if emit_event then
+              Events.import_snapshot_archive_in_progress
+                ~archive_name
+                ~elapsed_time
+            else Lwt.return_unit))
         (* [progress] modifies the signal handlers, which are necessary for
            [Lwt_exit] to work. As a consequence, if we want to be
            cancellable, we cannot have display bar. *)

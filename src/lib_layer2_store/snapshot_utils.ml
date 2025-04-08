@@ -44,6 +44,8 @@ module type READER_INPUT = sig
   val source : [`Local of string | `Remote of string]
 
   val crashed : tztrace Lwt.t
+
+  val cancel : unit -> unit Lwt.t
 end
 
 module type WRITER_OUTPUT = sig
@@ -115,15 +117,16 @@ let run ~cancellable k =
     Lwt.wrap_in_cancelable (Lwt_preemptive.detach k ())
   else Lwt.return (k ())
 
-let download_file_command url =
+let download_file_command url progress =
   let open Lwt_syntax in
   let uri = Uri.of_string url in
-  let pipe_stream stream =
+  let pipe_stream stream count_progress =
     let rec write_string offset str =
       let len = String.length str in
       let* written =
         Lwt_unix.write_string Lwt_unix.stdout str offset (len - offset)
       in
+      let* () = count_progress written in
       let reached = offset + written in
       if reached = len then return_unit else write_string reached str
     in
@@ -132,8 +135,32 @@ let download_file_command url =
   let* resp, body = Cohttp_lwt_unix.Client.get uri in
   match resp.status with
   | `OK ->
+      let with_progress =
+        if progress then
+          let size =
+            Option.map
+              int_of_string
+              (Cohttp.Header.get resp.headers "content-length")
+          in
+          let progress_bar =
+            match size with
+            | Some size ->
+                Progress_bar.progress_bar
+                  ~update_interval:0.5
+                  ~counter:`Bytes_speed
+                  ~message:"Downloading snapshot"
+                  ~color:(Terminal.Color.rgb 140 92 252)
+                  ~no_tty_quiet:true
+                  size
+            | None ->
+                Progress_bar.spinner ~no_tty_quiet:true "Downloading snapshot"
+          in
+          Progress_bar.Lwt.with_reporter progress_bar
+        else fun k -> k (fun _ -> Lwt.return_unit)
+      in
+      with_progress @@ fun count_progress ->
       let stream = Cohttp_lwt.Body.to_stream body in
-      let* () = pipe_stream stream in
+      let* () = pipe_stream stream count_progress in
       Lwt_result_syntax.return_unit
   | #Cohttp.Code.status_code as status_code ->
       failwith
@@ -144,25 +171,25 @@ let download_file_command url =
 let add_download_command () =
   if Sys.argv.(0) = "download-snapshot" then
     let url = Sys.argv.(1) in
-    match Lwt_main.run @@ download_file_command url with
+    let progress = Array.length Sys.argv = 3 in
+    match Lwt_main.run @@ download_file_command url progress with
     | Ok () -> Stdlib.exit 0
     | Error errs ->
         Format.eprintf "%a%!" pp_print_trace errs ;
         Stdlib.exit 1
 
-let download_file ~crash_resolver url =
-  let in_chan, pin, perr =
-    Unix.open_process_args_full
-      Sys.argv.(0)
-      [|"download-snapshot"; url|]
-      (Unix.environment ())
+let download_file ~crash_resolver ~progress url =
+  let in_chan =
+    Unix.open_process_args_in Sys.argv.(0)
+    @@
+    if progress then [|"download-snapshot"; url; "--progress"|]
+    else [|"download-snapshot"; url|]
   in
-  close_out_noerr pin ;
   let notify_crash fmt =
     Format.ksprintf (fun s -> Lwt.wakeup crash_resolver [Exn (Failure s)]) fmt
   in
   let open Lwt_syntax in
-  let pid = Unix.process_full_pid (in_chan, pin, perr) in
+  let pid = Unix.process_in_pid in_chan in
   let canceler = Lwt_canceler.create () in
   Lwt_canceler.on_cancel canceler (fun () ->
       Unix.kill pid Sys.sigterm ;
@@ -182,30 +209,31 @@ let download_file ~crash_resolver url =
                 | WSIGNALED n -> ("was killed by signal", n)
                 | Unix.WSTOPPED n -> ("was stopped by signal", n)
               in
-              notify_crash
-                "Snapshot download process %s %d: %s"
-                phrase
-                n
-                (In_channel.input_all perr)))
+              notify_crash "Snapshot download process %s %d" phrase n))
     (fun exn ->
       notify_crash
         "Snapshot download processed crashed because %s"
         (Printexc.to_string exn)) ;
-  Lwt_result.return in_chan
+  let cancel () =
+    let+ res = Lwt_canceler.cancel canceler in
+    match res with Ok () -> () | Error _ -> ()
+  in
+  Lwt_result.return (in_chan, cancel)
 
-let open_or_download_file file_or_url =
+let open_or_download_file ~progress file_or_url =
   let open Lwt_result_syntax in
   let crashed, crash_resolver = Lwt.task () in
   if
     String.starts_with ~prefix:"http://" file_or_url
     || String.starts_with ~prefix:"https://" file_or_url
   then
-    let+ chan = download_file ~crash_resolver file_or_url in
-    ((chan, crashed), `Remote file_or_url)
+    let+ chan, cancel = download_file ~crash_resolver ~progress file_or_url in
+    ((chan, crashed, cancel), `Remote file_or_url)
   else
     try
       let chan = open_in_bin file_or_url in
-      return ((chan, crashed), `Local file_or_url)
+      let cancel () = Lwt.return_unit in
+      return ((chan, crashed, cancel), `Local file_or_url)
     with Sys_error s ->
       failwith "Cannot open snapshot file %s: %s" file_or_url s
 
@@ -241,7 +269,7 @@ let periodic_report event =
 
 let create_reader_input (type a) ~src
     (module Reader : READER with type in_channel = a)
-    (in_chan : Stdlib.in_channel) crashed :
+    (in_chan : Stdlib.in_channel) crashed cancel :
     (module READER_INPUT with type in_channel = a) =
   (module struct
     include Reader
@@ -251,11 +279,14 @@ let create_reader_input (type a) ~src
     let source = src
 
     let crashed = crashed
+
+    let cancel = cancel
   end)
 
-let create_reader_input : src:_ -> reader -> in_channel -> _ -> reader_input =
- fun ~src (module R) s crash ->
-  let r = create_reader_input ~src (module R) s crash in
+let create_reader_input :
+    src:_ -> reader -> in_channel -> _ -> _ -> reader_input =
+ fun ~src (module R) s crash canc ->
+  let r = create_reader_input ~src (module R) s crash canc in
   let module R : READER_INPUT = (val r) in
   (module R)
 
@@ -402,7 +433,7 @@ struct
     in
     let display_progress =
       match display_progress with
-      | `Bar -> `Bar (Progress_bar.spinner ~message:"Extracting snapshot")
+      | `Bar -> `Bar (Progress_bar.spinner "Extracting snapshot")
       | `Periodic_event mk_event ->
           `Periodic_event (fun ~progress:_ -> mk_event)
     in
@@ -473,15 +504,19 @@ struct
     | `Crashed err :: _ | [_; `Crashed err] ->
         Lwt.cancel normal ;
         return_error err
-    | `Normal res :: _ -> return res
+    | `Normal res :: _ ->
+        let* () = Reader.cancel () in
+        return res
 
-  let with_open_snapshot file f =
+  let with_open_snapshot ~progress file f =
     let open Lwt_result_syntax in
-    let* (in_chan, crashed), src = open_or_download_file file in
+    let* (in_chan, crashed, cancel), src =
+      open_or_download_file ~progress file
+    in
     let reader =
       if is_compressed_snapshot in_chan then gzip_reader else stdlib_reader
     in
-    let reader_input = create_reader_input reader in_chan ~src crashed in
+    let reader_input = create_reader_input reader in_chan ~src crashed cancel in
     protect ~on_error:(fun error ->
         let module Reader = (val reader_input) in
         (try Reader.close_in Reader.in_chan with _ -> ()) ;

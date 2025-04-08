@@ -253,7 +253,7 @@ let iter_l2_blocks ?progress _ {l2_blocks; l2_head; _} f =
         match progress with
         | None -> fun f -> f (fun _ -> Lwt.return_unit)
         | Some message ->
-            let progress_bar = Progress_bar.spinner ~message in
+            let progress_bar = Progress_bar.spinner message in
             fun f -> Progress_bar.Lwt.with_reporter progress_bar f
       in
       track_progress @@ fun count_progress ->
