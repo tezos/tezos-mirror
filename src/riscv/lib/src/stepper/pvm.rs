@@ -89,8 +89,7 @@ impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts>
         preimages_dir: Option<Box<Path>>,
         block_builder: B::BlockBuilder,
     ) -> Result<Self, PvmStepperError> {
-        let space = Owned::allocate::<PvmLayout<MC, CL>>();
-        let mut pvm = Pvm::bind(space, block_builder);
+        let mut pvm = Pvm::empty(block_builder);
 
         let program = Program::<MC>::from_elf(program)?;
 
@@ -124,8 +123,7 @@ impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts>
 
     /// Obtain the root hash for the PVM state.
     pub fn hash(&self) -> Hash {
-        let refs = self.pvm.struct_ref::<FnManagerIdent>();
-        PvmLayout::<MC, CL>::state_hash(refs).unwrap()
+        self.pvm.hash().unwrap()
     }
 }
 

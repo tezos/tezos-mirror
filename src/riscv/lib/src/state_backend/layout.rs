@@ -177,7 +177,7 @@ macro_rules! struct_layout {
             > {
                 #[inline]
                 fn state_hash<M: $crate::state_backend::ManagerRead + $crate::state_backend::ManagerSerialise>(
-                    state: AllocatedOf<Self, M>
+                    state: $crate::state_backend::AllocatedOf<Self, M>
                 ) -> Result<$crate::storage::Hash, $crate::storage::HashError> {
                     $crate::storage::Hash::combine(&[
                         $(

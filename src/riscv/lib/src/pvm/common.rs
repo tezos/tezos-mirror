@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -17,17 +18,30 @@ use super::reveals::RevealRequestLayout;
 use crate::default::ConstDefault;
 use crate::instruction_context::ICB;
 use crate::machine_state;
+use crate::machine_state::CacheLayouts;
 use crate::machine_state::block_cache::bcall;
+use crate::machine_state::block_cache::bcall::Block;
 use crate::machine_state::csregisters::CSRegister;
-use crate::machine_state::memory;
+use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::a0;
 use crate::pvm::sbi;
 use crate::range_utils::less_than_bound;
 use crate::state_backend;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
+use crate::state_backend::CommitmentLayout;
+use crate::state_backend::FnManagerIdent;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ProofLayout;
+use crate::state_backend::ProofTree;
+use crate::state_backend::owned_backend::Owned;
 use crate::state_backend::proof_backend::ProofGen;
 use crate::state_backend::proof_backend::ProofWrapper;
+use crate::state_backend::proof_backend::proof::MerkleProof;
+use crate::state_backend::verify_backend::Verifier;
+use crate::storage::Hash;
+use crate::storage::HashError;
+use crate::struct_layout;
 use crate::traps::EnvironException;
 
 /// PVM configuration
@@ -65,24 +79,34 @@ impl<'a> Default for PvmHooks<'a> {
     }
 }
 
-/// PVM state layout
 #[cfg(feature = "supervisor")]
-pub type PvmLayout<MC, CL> = (
-    state_backend::Atom<u64>,
-    machine_state::MachineStateLayout<MC, CL>,
-    Atom<PvmStatus>,
-    RevealRequestLayout,
-    linux::SupervisorStateLayout,
-);
+struct_layout! {
+    pub struct PvmLayout<MC, CL> {
+        machine_state: machine_state::MachineStateLayout<MC, CL>,
+        reveal_request: RevealRequestLayout,
+        system_state: linux::SupervisorStateLayout,
+        version: Atom<u64>,
+        tick: Atom<u64>,
+        message_counter: Atom<u64>,
+        level: Atom<u32>,
+        level_is_set: Atom<bool>,
+        status: Atom<PvmStatus>,
+    }
+}
 
-/// PVM state layout
 #[cfg(not(feature = "supervisor"))]
-pub type PvmLayout<MC, CL> = (
-    state_backend::Atom<u64>,
-    machine_state::MachineStateLayout<MC, CL>,
-    Atom<PvmStatus>,
-    RevealRequestLayout,
-);
+struct_layout! {
+    pub struct PvmLayout<MC, CL> {
+        machine_state: machine_state::MachineStateLayout<MC, CL>,
+        reveal_request: RevealRequestLayout,
+        version: Atom<u64>,
+        tick: Atom<u64>,
+        message_counter: Atom<u64>,
+        level: Atom<u32>,
+        level_is_set: Atom<bool>,
+        status: Atom<PvmStatus>,
+    }
+}
 
 /// PVM status
 #[derive(
@@ -133,31 +157,24 @@ type PvmProofGen<'a, MC, CL, M> = Pvm<
 >;
 
 /// Proof-generating virtual machine
-pub struct Pvm<
-    MC: memory::MemoryConfig,
-    CL: machine_state::CacheLayouts,
-    B: bcall::Block<MC, M>,
-    M: state_backend::ManagerBase,
-> {
+pub struct Pvm<MC: MemoryConfig, CL: CacheLayouts, B: bcall::Block<MC, M>, M: ManagerBase> {
     pub(crate) machine_state: machine_state::MachineState<MC, CL, B, M>,
     reveal_request: RevealRequest<M>,
     #[cfg(feature = "supervisor")]
     pub(super) system_state: linux::SupervisorState<M>,
-    version: state_backend::Cell<u64, M>,
+    version: Cell<u64, M>,
+    pub(crate) tick: Cell<u64, M>,
+    pub(crate) message_counter: Cell<u64, M>,
+    pub(crate) level: Cell<u32, M>,
+    pub(crate) level_is_set: Cell<bool, M>,
     status: Cell<PvmStatus, M>,
 }
 
-impl<
-    MC: memory::MemoryConfig,
-    CL: machine_state::CacheLayouts,
-    B: bcall::Block<MC, M>,
-    M: state_backend::ManagerBase,
-> Pvm<MC, CL, B, M>
-{
+impl<MC: MemoryConfig, CL: CacheLayouts, B: bcall::Block<MC, M>, M: ManagerBase> Pvm<MC, CL, B, M> {
     /// Bind the block cache to the given allocated state and the given [block builder].
     ///
     /// [block builder]: bcall::Block::BlockBuilder
-    pub fn bind(
+    pub(crate) fn bind(
         space: state_backend::AllocatedOf<PvmLayout<MC, CL>, M>,
         block_builder: B::BlockBuilder,
     ) -> Self
@@ -165,32 +182,40 @@ impl<
         M::ManagerRoot: state_backend::ManagerReadWrite,
     {
         Self {
-            version: space.0,
-            machine_state: machine_state::MachineState::bind(space.1, block_builder),
-            status: space.2,
-            reveal_request: RevealRequest::bind(space.3),
+            machine_state: machine_state::MachineState::bind(space.machine_state, block_builder),
+            reveal_request: RevealRequest::bind(space.reveal_request),
             #[cfg(feature = "supervisor")]
-            system_state: linux::SupervisorState::bind(space.4),
+            system_state: linux::SupervisorState::bind(space.system_state),
+            version: space.version,
+            tick: space.tick,
+            message_counter: space.message_counter,
+            level: space.level,
+            level_is_set: space.level_is_set,
+            status: space.status,
         }
     }
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
     /// the constituents of `N` that were produced from the constituents of `&M`.
-    pub fn struct_ref<'a, F: state_backend::FnManager<state_backend::Ref<'a, M>>>(
+    pub(crate) fn struct_ref<'a, F: state_backend::FnManager<state_backend::Ref<'a, M>>>(
         &'a self,
     ) -> state_backend::AllocatedOf<PvmLayout<MC, CL>, F::Output> {
-        (
-            self.version.struct_ref::<F>(),
-            self.machine_state.struct_ref::<F>(),
-            self.status.struct_ref::<F>(),
-            self.reveal_request.struct_ref::<F>(),
+        PvmLayoutF {
+            machine_state: self.machine_state.struct_ref::<F>(),
+            reveal_request: self.reveal_request.struct_ref::<F>(),
             #[cfg(feature = "supervisor")]
-            self.system_state.struct_ref::<F>(),
-        )
+            system_state: self.system_state.struct_ref::<F>(),
+            version: self.version.struct_ref::<F>(),
+            tick: self.tick.struct_ref::<F>(),
+            message_counter: self.message_counter.struct_ref::<F>(),
+            level: self.level.struct_ref::<F>(),
+            level_is_set: self.level_is_set.struct_ref::<F>(),
+            status: self.status.struct_ref::<F>(),
+        }
     }
 
     /// Generate a proof-generating version of this PVM.
-    pub fn start_proof(&self) -> PvmProofGen<'_, MC, CL, M>
+    pub(crate) fn start_proof(&self) -> PvmProofGen<'_, MC, CL, M>
     where
         M: state_backend::ManagerRead,
     {
@@ -198,13 +223,17 @@ impl<
         Pvm::bind(space, bcall::InterpretedBlockBuilder)
     }
 
-    /// Reset the PVM state.
+    /// Reset the PVM.
     pub fn reset(&mut self)
     where
         M: state_backend::ManagerReadWrite,
     {
-        self.version.write(INITIAL_VERSION);
         self.machine_state.reset();
+        self.version.write(INITIAL_VERSION);
+        self.tick.write(0);
+        self.message_counter.write(0);
+        self.level.write(0);
+        self.level_is_set.write(false);
         self.status.write(PvmStatus::DEFAULT);
     }
 
@@ -223,11 +252,7 @@ impl<
     /// Handle an exception using the defined Execution Environment.
     // The conditional compilation below causes some warnings.
     #[cfg_attr(feature = "supervisor", allow(unused_variables, unreachable_code))]
-    pub fn handle_exception(
-        &mut self,
-        hooks: &mut PvmHooks<'_>,
-        exception: EnvironException,
-    ) -> bool
+    fn handle_exception(&mut self, hooks: &mut PvmHooks<'_>, exception: EnvironException) -> bool
     where
         M: state_backend::ManagerReadWrite,
     {
@@ -250,7 +275,7 @@ impl<
     }
 
     /// Perform one evaluation step.
-    pub fn eval_one(&mut self, hooks: &mut PvmHooks<'_>)
+    pub(crate) fn eval_one(&mut self, hooks: &mut PvmHooks<'_>)
     where
         M: state_backend::ManagerReadWrite,
     {
@@ -264,6 +289,7 @@ impl<
         if let Err(exc) = self.machine_state.step() {
             self.handle_exception(hooks, exc);
         }
+        self.tick.write(self.tick.read().wrapping_add(1u64));
     }
 
     /// Perform a range of evaluation steps. Returns the actual number of steps
@@ -282,7 +308,7 @@ impl<
     /// but a page fault is not)
     // The conditional compilation below causes some warnings.
     #[cfg_attr(feature = "supervisor", allow(unused_variables, unreachable_code))]
-    pub fn eval_max(&mut self, hooks: &mut PvmHooks<'_>, step_bounds: Bound<usize>) -> usize
+    pub(crate) fn eval_max(&mut self, hooks: &mut PvmHooks<'_>, step_bounds: Bound<usize>) -> usize
     where
         M: state_backend::ManagerReadWrite,
     {
@@ -299,7 +325,8 @@ impl<
             return 1;
         }
 
-        self.machine_state
+        let steps = self
+            .machine_state
             .step_max_handle::<Infallible>(step_bounds, |machine_state, exception| {
                 #[cfg(feature = "supervisor")]
                 return Ok(handle_system_call(
@@ -318,12 +345,14 @@ impl<
                     exception,
                 ))
             })
-            .steps
+            .steps;
+        self.tick.write(self.tick.read().wrapping_add(steps as u64));
+        steps
     }
 
     /// Respond to a request for input with no input. Returns `false` in case the
     /// machine wasn't expecting any input, otherwise returns `true`.
-    pub fn provide_no_input(&mut self) -> bool
+    pub(crate) fn provide_no_input(&mut self) -> bool
     where
         M: state_backend::ManagerReadWrite,
     {
@@ -335,26 +364,61 @@ impl<
 
     /// Provide input. Returns `false` if the machine state is not expecting
     /// input.
-    pub fn provide_input(&mut self, level: u32, counter: u32, payload: &[u8]) -> bool
+    pub(crate) fn provide_input(&mut self, level: u32, counter: u32, payload: &[u8]) -> bool
     where
         M: state_backend::ManagerReadWrite,
     {
-        sbi::provide_input(
+        if !sbi::provide_input(
             &mut self.status,
             &mut self.machine_state.core,
             level,
             counter,
             payload,
-        )
+        ) {
+            return false;
+        }
+        self.tick.write(self.tick.read().wrapping_add(1u64));
+        self.message_counter.write(counter as u64);
+        self.level_is_set.write(true);
+        self.level.write(level);
+        true
     }
 
     /// Provide reveal data in response to a reveal request.
     /// Returns `false` if the machine is not expecting a reveal.
-    pub fn provide_reveal_response(&mut self, reveal_data: &[u8]) -> bool
+    pub(crate) fn provide_reveal_response(&mut self, reveal_data: &[u8]) -> bool
     where
         M: state_backend::ManagerReadWrite,
     {
-        sbi::provide_reveal_response(&mut self.status, &mut self.machine_state.core, reveal_data)
+        if !sbi::provide_reveal_response(
+            &mut self.status,
+            &mut self.machine_state.core,
+            reveal_data,
+        ) {
+            return false;
+        }
+        self.tick.write(self.tick.read().wrapping_add(1u64));
+        true
+    }
+
+    /// Get the reveal request in the machine state.
+    pub(crate) fn reveal_request(&self) -> Vec<u8>
+    where
+        M: state_backend::ManagerRead,
+    {
+        self.reveal_request.to_vec()
+    }
+
+    /// Provide a reveal error response to the PVM
+    pub fn provide_reveal_error_response(&mut self)
+    where
+        M: state_backend::ManagerReadWrite,
+    {
+        self.machine_state
+            .core
+            .xregister_write(a0, SbiError::InvalidParam as u64);
+        self.tick.write(self.tick.read().wrapping_add(1u64));
+        self.status.write(PvmStatus::Evaluating);
     }
 
     /// Get the current machine status.
@@ -364,42 +428,48 @@ impl<
     {
         self.status.read()
     }
+}
 
-    /// Get the reveal request in the machine state
-    pub fn reveal_request(&self) -> Vec<u8>
-    where
-        M: state_backend::ManagerRead,
-    {
-        self.reveal_request.to_vec()
+impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, Owned>> Pvm<MC, CL, B, Owned> {
+    pub(crate) fn empty(block_builder: B::BlockBuilder) -> Self {
+        let space = Owned::allocate::<PvmLayout<MC, CL>>();
+        Self::bind(space, block_builder)
     }
 
-    /// Provide a reveal error response to the pvm
-    pub fn provide_reveal_error_response(&mut self)
-    where
-        M: state_backend::ManagerReadWrite,
-    {
-        self.machine_state
-            .core
-            .xregister_write(a0, SbiError::InvalidParam as u64);
-        self.status.write(PvmStatus::Evaluating);
+    pub(crate) fn hash(&self) -> Result<Hash, HashError> {
+        let refs = self.struct_ref::<FnManagerIdent>();
+        PvmLayout::<MC, CL>::state_hash(refs)
+    }
+}
+
+impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, Verifier>> Pvm<MC, CL, B, Verifier> {
+    /// Construct a PVM state from a Merkle proof.
+    pub fn from_proof(proof: &MerkleProof, block_builder: B::BlockBuilder) -> Option<Self> {
+        let space =
+            <PvmLayout<MC, CL> as ProofLayout>::from_proof(ProofTree::Present(proof)).ok()?;
+        Some(Self::bind(space, block_builder))
     }
 }
 
 impl<
-    MC: memory::MemoryConfig,
-    CL: machine_state::CacheLayouts,
+    MC: MemoryConfig,
+    CL: CacheLayouts,
     B: bcall::Block<MC, M> + Clone,
     M: state_backend::ManagerClone,
 > Clone for Pvm<MC, CL, B, M>
 {
     fn clone(&self) -> Self {
         Self {
-            version: self.version.clone(),
             machine_state: self.machine_state.clone(),
-            status: self.status.clone(),
             reveal_request: self.reveal_request.clone(),
             #[cfg(feature = "supervisor")]
             system_state: self.system_state.clone(),
+            version: self.version.clone(),
+            tick: self.tick.clone(),
+            message_counter: self.message_counter.clone(),
+            level: self.level.clone(),
+            level_is_set: self.level_is_set.clone(),
+            status: self.status.clone(),
         }
     }
 }
@@ -413,7 +483,7 @@ fn handle_system_call<MC, M>(
     hooks: &mut PvmHooks,
 ) -> bool
 where
-    MC: memory::MemoryConfig,
+    MC: MemoryConfig,
     M: state_backend::ManagerReadWrite,
 {
     system_state.handle_system_call(core, hooks, |core| {
@@ -439,6 +509,7 @@ mod tests {
     use crate::create_state;
     use crate::machine_state::TestCacheLayouts;
     use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+    use crate::machine_state::memory;
     use crate::machine_state::memory::M1M;
     use crate::machine_state::memory::Memory;
     use crate::machine_state::registers::a0;
