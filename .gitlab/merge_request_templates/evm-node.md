@@ -3,7 +3,10 @@
 # Checklist
 
 - [ ] Provide automatic testing.
-- [ ] Add an item in the [changelog](https://gitlab.com/tezos/tezos/-/blob/master/etherlink/CHANGES_NODE.md)
+- [ ] Add an item in the
+      [changelog](https://gitlab.com/tezos/tezos/-/blob/master/etherlink/CHANGES_NODE.md)
+- [ ] Add a page in the
+      [doc](https://gitlab.com/tezos/tezos/-/tree/master/etherlink/docs)
 
 # What
 
