@@ -219,7 +219,7 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
 
         let builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
-        let jsa_call = JsaCalls::func_calls(&mut self.module, &self.jsa_imports);
+        let jsa_call = JsaCalls::func_calls(&mut self.module, &self.jsa_imports, ptr);
 
         Builder::<'_, MC, JSA>::new(ptr, builder, jsa_call)
     }

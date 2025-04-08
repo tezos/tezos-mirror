@@ -20,12 +20,15 @@
 //! [function builder]: cranelift::frontend::FunctionBuilderContext
 //! [direct function call]: cranelift::codegen::ir::InstBuilder::call
 
+mod stack;
+
 use std::marker::PhantomData;
 
 use cranelift::codegen::ir::AbiParam;
 use cranelift::codegen::ir::FuncRef;
 use cranelift::codegen::ir::InstBuilder;
 use cranelift::codegen::ir::Signature;
+use cranelift::codegen::ir::Type;
 use cranelift::codegen::ir::Value;
 use cranelift::codegen::ir::types::I8;
 use cranelift::codegen::ir::types::I64;
@@ -38,7 +41,6 @@ use cranelift_module::Module;
 use cranelift_module::ModuleResult;
 
 use super::builder::X64;
-use super::builder::stack_slots::StackSlots;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
@@ -307,6 +309,7 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JsaImports<MC, JSA> {
 pub(super) struct JsaCalls<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     module: &'a mut JITModule,
     imports: &'a JsaImports<MC, JSA>,
+    ptr_type: Type,
     pc_write: Option<FuncRef>,
     xreg_read: Option<FuncRef>,
     xreg_write: Option<FuncRef>,
@@ -318,10 +321,15 @@ pub(super) struct JsaCalls<'a, MC: MemoryConfig, JSA: JitStateAccess> {
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
     /// Wrapper to simplify calling JSA methods from within the function under construction.
-    pub(super) fn func_calls(module: &'a mut JITModule, imports: &'a JsaImports<MC, JSA>) -> Self {
+    pub(super) fn func_calls(
+        module: &'a mut JITModule,
+        imports: &'a JsaImports<MC, JSA>,
+        ptr_type: Type,
+    ) -> Self {
         Self {
             module,
             imports,
+            ptr_type,
             pc_write: None,
             xreg_read: None,
             xreg_write: None,
@@ -392,16 +400,16 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         exception_ptr: Value,
         result_ptr: Value,
         current_pc: X64,
-        stack_slots: &mut StackSlots,
     ) -> ExceptionHandledOutcome {
         let handle_exception = self.handle_exception.get_or_insert_with(|| {
             self.module
                 .declare_func_in_func(self.imports.handle_exception, builder.func)
         });
 
-        stack_slots.instr_pc_store(builder, current_pc);
+        let pc_slot = stack::Slot::<stack::Address>::new(self.ptr_type, builder);
+        pc_slot.store(builder, current_pc.0);
 
-        let pc_ptr = stack_slots.instr_pc_ptr(builder);
+        let pc_ptr = pc_slot.ptr(builder);
 
         let call = builder.ins().call(*handle_exception, &[
             core_ptr,
@@ -411,9 +419,12 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         ]);
 
         let handled = builder.inst_results(call)[0];
-        let new_pc = stack_slots.instr_pc_load(builder);
+        let new_pc = pc_slot.load(builder);
 
-        ExceptionHandledOutcome { handled, new_pc }
+        ExceptionHandledOutcome {
+            handled,
+            new_pc: X64(new_pc),
+        }
     }
 
     /// Emit the required IR to call `raise_illegal_exception`.
