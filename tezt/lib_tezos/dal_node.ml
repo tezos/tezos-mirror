@@ -599,3 +599,77 @@ module Mockup = struct
 
   let stop t = Lwt.wakeup t.trigger_shutdown ()
 end
+
+module Mockup_for_baker = struct
+  type t = Mockup.t
+
+  let routes ~attestation_lag ~attesters ~attestable_slots =
+    [
+      (let path_pattern =
+         Format.sprintf
+           "/profiles/(tz[1234][a-zA-Z0-9]+)/attested_levels/([1-9][0-9]*)/attestable_slots"
+       in
+       Mockup.route ~path_pattern ~callback:(fun ~path ->
+           let open Ezjsonm in
+           let re = Re.Pcre.regexp path_pattern in
+           let attester =
+             match Re.exec_opt re path with
+             | Some groups -> Re.Group.get groups 1
+             | None -> Test.fail "failed to extract attested_level from %s" path
+           in
+           let attested_level =
+             match Re.exec_opt re path with
+             | Some groups -> Re.Group.get groups 2 |> int_of_string
+             | None -> Test.fail "failed to extract attested_level from %s" path
+           in
+           let published_level = attested_level - attestation_lag in
+           let mocked_json =
+             dict
+               [
+                 ("kind", string "attestable_slots_set");
+                 ( "attestable_slots_set",
+                   list bool @@ attestable_slots ~attester ~attested_level );
+                 ("published_level", int published_level);
+               ]
+           in
+           let body = value_to_string mocked_json in
+           Lwt.return_some (`Response body)));
+      (let path_pattern = "^/profiles/?$" in
+       Mockup.route ~path_pattern ~callback:(fun ~path:_ ->
+           let open Ezjsonm in
+           let mocked_json =
+             dict
+               [
+                 ("kind", string "controller");
+                 ( "controller_profiles",
+                   dict [("attesters", list string attesters)] );
+               ]
+           in
+           let body = value_to_string mocked_json in
+           Lwt.return_some (`Response body)));
+      (let path_pattern = "^/health/?$" in
+       Mockup.route ~path_pattern ~callback:(fun ~path:_ ->
+           let open Ezjsonm in
+           let mocked_json =
+             dict
+               [
+                 ("status", string "up");
+                 ( "checks",
+                   list
+                     (fun (name, status) ->
+                       dict [("name", string name); ("status", string status)])
+                     [("p2p", "up"); ("topics", "ok"); ("gossipsub", "up")] );
+               ]
+           in
+           let body = value_to_string mocked_json in
+           Lwt.return_some (`Response body)));
+    ]
+
+  let make ~name ~attestation_lag ~attesters ~attestable_slots =
+    let routes = routes ~attestation_lag ~attesters ~attestable_slots in
+    Mockup.make ~name ~routes
+
+  let run t = Mockup.run t
+
+  let stop t = Mockup.stop t
+end
