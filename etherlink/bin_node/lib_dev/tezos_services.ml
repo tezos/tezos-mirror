@@ -231,41 +231,23 @@ module Imported_services = struct
     import_service Constants_services.all
 end
 
-type block = Tezos_shell_services.Block_services.block
-
-type chain = Tezos_shell_services.Chain_services.chain
-
 let block_directory_path =
   Tezos_rpc.Path.subst2
   @@ Tezos_rpc.Path.prefix
        Tezos_shell_services.Chain_services.path
        Tezos_shell_services.Block_services.path
 
-type tezos_services_implementation = {
-  current_level : chain -> block -> offset:int32 -> level tzresult Lwt.t;
-  version : unit -> Tezlink_version.version tzresult Lwt.t;
-  protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
-  balance :
-    chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
-  constants : chain -> block -> Tezlink_constants.t tzresult Lwt.t;
-}
+let protocols () = Lwt_result_syntax.return Tezlink_protocols.current
 
-let michelson_services_methods backend =
-  {
-    current_level = Tezlink_services_impl.current_level backend;
-    version =
-      (fun () ->
-        (* TODO: #7857 need proper implementation *)
-        Lwt_result_syntax.return Tezlink_version.mock);
-    protocols = (fun () -> Lwt_result_syntax.return Tezlink_protocols.current);
-    balance =
-      (fun _ _ _ ->
-        Lwt_result_syntax.return @@ Ethereum_types.quantity_of_z Z.one);
-    constants = Tezlink_services_impl.constants;
-  }
+let balance _ _ _ =
+  Lwt_result_syntax.return @@ Ethereum_types.quantity_of_z Z.one
+
+let version () =
+  (* TODO: #7857 need proper implementation *)
+  Lwt_result_syntax.return Tezlink_version.mock
 
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
-let build_block_dir impl =
+let build_block_dir backend =
   let dir : tezlink_rpc_context Tezos_rpc.Directory.t =
     Tezos_rpc.Directory.empty
   in
@@ -273,23 +255,28 @@ let build_block_dir impl =
   |> register_with_conversion
        ~service:Imported_services.current_level
        ~impl:(fun {block; chain} query () ->
-         impl.current_level chain block ~offset:query.offset)
+         Tezlink_services_impl.current_level
+           backend
+           chain
+           block
+           ~offset:query.offset)
        ~convert_output:Protocol_types.Level.convert
   |> register ~service:Imported_services.protocols ~impl:(fun _ _ () ->
-         impl.protocols ())
+         protocols ())
   |> register_with_conversion
        ~service:Imported_services.balance
        ~impl:(fun ({block; chain}, contract) _ _ ->
-         impl.balance chain block contract)
+         balance chain block contract)
        ~convert_output:Protocol_types.Tez.convert
   |> register_with_conversion
        ~service:Imported_services.constants
-       ~impl:(fun {block; chain} () () -> impl.constants chain block)
+       ~impl:(fun {block; chain} () () ->
+         Tezlink_services_impl.constants chain block)
        ~convert_output:Tezlink_constants.convert
 
 (** Builds the root director. *)
-let build_dir impl =
-  let helper_dir = build_block_dir impl in
+let build_dir backend =
+  let helper_dir = build_block_dir backend in
   let root_directory =
     Tezos_rpc.Directory.prefix
       block_directory_path
@@ -300,14 +287,13 @@ let build_dir impl =
   Tezos_rpc.Directory.register
     root_directory
     Imported_services.version
-    (fun () () () -> impl.version ())
+    (fun () () () -> version ())
 
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
 (* module entrypoint *)
 let register_tezlink_services backend =
-  let impl = michelson_services_methods backend in
-  let directory = build_dir impl in
+  let directory = build_dir backend in
   let directory =
     Tezos_rpc.Directory.register_describe_directory_service
       directory
