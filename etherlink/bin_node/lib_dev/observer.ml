@@ -264,11 +264,6 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
       ~data_dir
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
-      ?tezlink_services:
-        (if chain_family = Michelson then
-           Some
-             Tezlink_services_impl.(michelson_services_methods observer_backend)
-         else None)
       Stateless
       config
       tx_container
