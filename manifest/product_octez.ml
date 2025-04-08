@@ -766,7 +766,12 @@ let octez_bls12_381_signature =
 (* TODO: dep_globs aren't added to the rules for JS tests *)
 let _octez_bls12_381_signature_tests =
   tezt
-    ["test_aggregated_signature"; "test_signature"; "utils"]
+    [
+      "test_threshold_signature";
+      "test_aggregated_signature";
+      "test_signature";
+      "utils";
+    ]
     ~path:"src/lib_bls12_381_signature/test"
     ~opam:"octez-libs"
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/5377
