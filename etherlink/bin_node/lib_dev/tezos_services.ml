@@ -250,6 +250,20 @@ type tezos_services_implementation = {
   constants : chain -> block -> Tezlink_constants.t tzresult Lwt.t;
 }
 
+let michelson_services_methods backend =
+  {
+    current_level = Tezlink_services_impl.current_level backend;
+    version =
+      (fun () ->
+        (* TODO: #7857 need proper implementation *)
+        Lwt_result_syntax.return Tezlink_version.mock);
+    protocols = (fun () -> Lwt_result_syntax.return Tezlink_protocols.current);
+    balance =
+      (fun _ _ _ ->
+        Lwt_result_syntax.return @@ Ethereum_types.quantity_of_z Z.one);
+    constants = Tezlink_services_impl.constants;
+  }
+
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
 let build_block_dir impl =
   let dir : tezlink_rpc_context Tezos_rpc.Directory.t =
@@ -291,7 +305,8 @@ let build_dir impl =
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
 (* module entrypoint *)
-let register_tezlink_services impl =
+let register_tezlink_services backend =
+  let impl = michelson_services_methods backend in
   let directory = build_dir impl in
   let directory =
     Tezos_rpc.Directory.register_describe_directory_service

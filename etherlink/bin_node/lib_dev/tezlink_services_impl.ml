@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_services
-
 let current_level (module Backend : Services_backend_sig.S) chain block ~offset
     =
   let open Lwt_result_syntax in
@@ -97,19 +95,4 @@ let constants chain block =
           Error_monad.pp_print_trace
           err
   in
-  return
-    Tezlink_constants.{fixed; parametric = Tezlink_constants.mainnet}
-
-let michelson_services_methods backend =
-  {
-    current_level = current_level backend;
-    version =
-      (fun () ->
-        (* TODO: #7857 need proper implementation *)
-        Lwt_result_syntax.return Tezlink_version.mock);
-    protocols = (fun () -> Lwt_result_syntax.return Tezlink_protocols.current);
-    balance =
-      (fun _ _ _ ->
-        Lwt_result_syntax.return @@ Ethereum_types.quantity_of_z Z.one);
-    constants;
-  }
+  return Tezlink_constants.{fixed; parametric = Tezlink_constants.mainnet}
