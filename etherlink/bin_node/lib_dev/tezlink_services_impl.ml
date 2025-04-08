@@ -7,12 +7,12 @@
 
 open Tezos_services
 
-let current_level (module Backend : Services_backend_sig.S) chain block
-    level_query =
+let current_level (module Backend : Services_backend_sig.S) chain block ~offset
+    =
   let open Lwt_result_syntax in
   let* offset =
     (* Tezos l1 requires non-negative offset #7845 *)
-    if level_query.offset >= 0l then return level_query.offset
+    if offset >= 0l then return offset
     else failwith "The specified level offset should be positive."
   in
 

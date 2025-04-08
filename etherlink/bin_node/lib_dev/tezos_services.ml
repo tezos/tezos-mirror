@@ -241,11 +241,8 @@ let block_directory_path =
        Tezos_shell_services.Chain_services.path
        Tezos_shell_services.Block_services.path
 
-type level_query = Imported_services.level_query = {offset : int32}
-
 type tezos_services_implementation = {
-  current_level :
-    chain -> block -> Imported_services.level_query -> level tzresult Lwt.t;
+  current_level : chain -> block -> offset:int32 -> level tzresult Lwt.t;
   version : unit -> Tezlink_version.version tzresult Lwt.t;
   protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
   balance :
@@ -262,7 +259,7 @@ let build_block_dir impl =
   |> register_with_conversion
        ~service:Imported_services.current_level
        ~impl:(fun {block; chain} query () ->
-         impl.current_level chain block query)
+         impl.current_level chain block ~offset:query.offset)
        ~convert_output:Protocol_types.Level.convert
   |> register ~service:Imported_services.protocols ~impl:(fun _ _ () ->
          impl.protocols ())

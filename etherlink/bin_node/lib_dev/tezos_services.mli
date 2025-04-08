@@ -21,11 +21,6 @@ module Tezlink_version : sig
   val mock : version
 end
 
-(* Query types *)
-type level_query = {offset : int32}
-
-(* Param types *)
-
 type block = Tezos_shell_services.Block_services.block
 
 type chain = Tezos_shell_services.Chain_services.chain
@@ -35,7 +30,7 @@ type contract = Imported_protocol.Alpha_context.Contract.t
 (** Container for the implementations necessary to answer tezos RPC requests. *)
 type tezos_services_implementation = {
   current_level :
-    chain -> block -> level_query -> Tezos_types.level tzresult Lwt.t;
+    chain -> block -> offset:int32 -> Tezos_types.level tzresult Lwt.t;
   version : unit -> Tezlink_version.version tzresult Lwt.t;
   protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
   balance :
