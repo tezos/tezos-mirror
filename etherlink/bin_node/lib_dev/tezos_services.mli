@@ -21,21 +21,6 @@ module Tezlink_version : sig
   val mock : version
 end
 
-module Protocol_types : sig
-  module Constants : sig
-    type fixed = Alpha_context.Constants.fixed
-
-    type parametric = Alpha_context.Constants.Parametric.t
-
-    type t = {fixed : fixed; parametric : parametric}
-
-    val values_to_fixed :
-      (int * int * int * int * int * int * int * int * int * int)
-      * (int * int * int * Z.t) ->
-      (fixed, error trace) result
-  end
-end
-
 (* Query types *)
 type level_query = {offset : int32}
 
@@ -55,7 +40,7 @@ type tezos_services_implementation = {
   protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
   balance :
     chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
-  constants : chain -> block -> Protocol_types.Constants.t tzresult Lwt.t;
+  constants : chain -> block -> Tezlink_constants.t tzresult Lwt.t;
 }
 
 (* THIS IS THE ENTRYPOINT *)

@@ -10,8 +10,6 @@ open Tezos_services
 let current_level (module Backend : Services_backend_sig.S) chain block
     level_query =
   let open Lwt_result_syntax in
-  let constants = Tezlink_constants.mainnet in
-
   let* offset =
     (* Tezos l1 requires non-negative offset #7845 *)
     if level_query.offset >= 0l then return level_query.offset
@@ -42,6 +40,7 @@ let current_level (module Backend : Services_backend_sig.S) chain block
 
   let current_block_number = Z.to_int32 current_block_number in
 
+  let constants = Tezlink_constants.mainnet in
   let level = Int32.add current_block_number offset in
   return
     Tezos_types.
@@ -90,9 +89,7 @@ let constants chain block =
   in
 
   let* fixed =
-    match
-      Tezos_services.Protocol_types.Constants.values_to_fixed fixed_values
-    with
+    match Tezlink_constants.values_to_fixed fixed_values with
     | Ok fixed -> return fixed
     | Error err ->
         failwith
@@ -101,8 +98,7 @@ let constants chain block =
           err
   in
   return
-    Tezos_services.Protocol_types.Constants.
-      {fixed; parametric = Tezlink_constants.mainnet}
+    Tezlink_constants.{fixed; parametric = Tezlink_constants.mainnet}
 
 let michelson_services_methods backend =
   {
