@@ -88,6 +88,18 @@ let teztale_server =
 let _teztale_snitch =
   Uses.make ~tag:"teztale_snitch" ~path:"./octez-teztale-snitch" ()
 
+(* TODO: Remove these once the binaries are completely removed from
+   [released-executables]. (issue : https://gitlab.com/tezos/tezos/-/issues/7763) *)
+
+let octez_baker_quebec =
+  Uses.make ~tag:"baker_psquebec" ~path:"./octez-baker-PsQuebec" ()
+
+let octez_baker_rio =
+  Uses.make ~tag:"baker_psriotum" ~path:"./octez-baker-PsRiotum" ()
+
+let octez_baker_alpha =
+  Uses.make ~tag:"baker_alpha" ~path:"./octez-baker-alpha" ()
+
 let yes_wallet =
   Uses.make
     ~tag:"yes_wallet"

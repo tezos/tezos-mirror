@@ -518,28 +518,19 @@ let start_protocol ?consensus_threshold ?round_duration
     ~parameter_file
     client
 
-(** Test that migration occuring through (agnostic) baker daemons
+(** Test that migration occurring through agnostic baker daemons does not halt the
+    chain.
 
-   - does not halt the chain;
-   - and that the migration block is not attested by the newer
-     protocol's baker (if not using agnostic baker).
+    This has become an issue of sort after updating the consensus protocol to
+    Tenderbake.  For one, attestations have become mandatory, and not only a sign
+    of healthiness. Then, a special case for the migration block was built-in as
+    a way to deal with first ever migration, in terms of consensus protocol, was
+    from Emmy* to Tenderbake.
 
-   This has become an issue of sort after updating the consensus protocol to
-   Tenderbake.  For one, attestations have become mandatory, and not only a sign
-   of healthiness. Then, a special case for the migration block was built-in as
-   a way to deal with first ever migration, in terms of consensus protocol, was
-   from Emmy* to Tenderbake.
-
-   Revisit this test, as it may start to fail, whenever a new (family of)
-   consensus protocol is put into place in Tezos. **)
+    Revisit this test, as it may start to fail, whenever a new (family of)
+    consensus protocol is put into place in Tezos. **)
 let test_migration_with_bakers ?(migration_level = 4)
-    ?(num_blocks_post_migration = 5) ~migrate_from ~migrate_to
-    ~use_agnostic_baker () =
-  let baker_string, uses =
-    if use_agnostic_baker then
-      ("agnostic_baker", [Constant.octez_experimental_agnostic_baker])
-    else ("baker", [Protocol.baker migrate_from; Protocol.baker migrate_to])
-  in
+    ?(num_blocks_post_migration = 5) ~migrate_from ~migrate_to () =
   Test.register
     ~__FILE__
     ~title:
@@ -548,19 +539,19 @@ let test_migration_with_bakers ?(migration_level = 4)
           daemon(s)"
          (Protocol.tag migrate_from)
          (Protocol.tag migrate_to)
-         baker_string)
+         "agnostic_baker")
     ~tags:
       [
         team;
         "protocol";
         "migration";
-        baker_string;
+        "agnostic_baker";
         "attesting";
         "metadata";
         "from_" ^ Protocol.tag migrate_from;
         "to_" ^ Protocol.tag migrate_to;
       ]
-    ~uses
+    ~uses:[Constant.octez_experimental_agnostic_baker]
   @@ fun () ->
   let* client, node =
     user_migratable_node_init ~migration_level ~migrate_to ()
@@ -579,27 +570,9 @@ let test_migration_with_bakers ?(migration_level = 4)
       (fun account -> account.Account.alias)
       (Array.to_list Account.Bootstrap.keys)
   in
-
-  let* () =
-    if use_agnostic_baker then (
-      Log.info "Launching agnostic baker" ;
-      let* _agnostic_baker =
-        Agnostic_baker.init ~name:"agnostic_baker" node client ~delegates
-      in
-      unit)
-    else (
-      Log.info
-        "Launching 2 bakers, one for %s (pre-migration protocol), one for \
-         %s(post-migration protocol)"
-        (Protocol.name migrate_from)
-        (Protocol.name migrate_to) ;
-      let baker_for_proto protocol =
-        let name = Printf.sprintf "baker-proto-%s" (Protocol.name protocol) in
-        Baker.init ~protocol ~name node client ~delegates
-      in
-      let* _baker_from_proto = baker_for_proto migrate_from in
-      let* _baker_to_proto = baker_for_proto migrate_to in
-      unit)
+  Log.info "Launching an agnostic baker" ;
+  let* _agnostic_baker =
+    Agnostic_baker.init ~name:"agnostic_baker" node client ~delegates
   in
   let* _ret = Node.wait_for_level node migration_level in
   let* () =
@@ -829,18 +802,7 @@ let test_forked_migration_manual ?(migration_level = 4)
     "qc_reached". This is because there is little time between both
     events, so there would be a risk that "qc_reached" happens before
     the second waiter has been registered. *)
-let wait_for_qc_at_level :
-    type baker.
-    wait_for:
-      (?where:string ->
-      baker ->
-      string ->
-      (JSON.t -> unit option) ->
-      unit Lwt.t) ->
-    int ->
-    baker ->
-    unit Lwt.t =
- fun ~wait_for level baker ->
+let wait_for_qc_at_level baker level =
   Log.info
     "Wait for a quorum event on a proposal at pre-migration level %d. At this \
      point, we know that attestations on this proposal have been propagated, \
@@ -850,7 +812,7 @@ let wait_for_qc_at_level :
   let where = sf "level = %d" level in
   let level_seen = ref false in
   let proposal_waiter =
-    wait_for baker "new_valid_proposal.v0" ~where (fun json ->
+    Agnostic_baker.wait_for baker "new_valid_proposal.v0" ~where (fun json ->
         let proposal_level = JSON.(json |-> "level" |> as_int) in
         if proposal_level = level then (
           level_seen := true ;
@@ -863,7 +825,7 @@ let wait_for_qc_at_level :
         else None)
   in
   Background.register proposal_waiter ;
-  wait_for baker "qc_reached.v0" ~where (fun (_ : JSON.t) ->
+  Agnostic_baker.wait_for baker "qc_reached.v0" ~where (fun (_ : JSON.t) ->
       if !level_seen then Some () else None)
 
 let get_block_at_level level client =
@@ -871,61 +833,30 @@ let get_block_at_level level client =
     client
     (RPC.get_chain_block ~version:"1" ~block:(string_of_int level) ())
 
-let wait_for_post_migration_proposal :
-    type baker.
-    wait_for:
-      (?where:string ->
-      baker ->
-      string ->
-      (JSON.t -> unit option) ->
-      unit Lwt.t) ->
-    int ->
-    baker ->
-    unit Lwt.t =
- fun ~wait_for post_migration_level baker ->
-  wait_for baker "new_valid_proposal.v0" (fun json ->
+let wait_for_post_migration_proposal baker post_migration_level =
+  Agnostic_baker.wait_for baker "new_valid_proposal.v0" (fun json ->
       let level = JSON.(json |-> "level" |> as_int) in
       if level = post_migration_level then Some ()
       else if level > post_migration_level then
         Test.fail "Reached level %d with a split network." level
       else None)
 
-let test_forked_migration_bakers bakers ~migrate_from ~migrate_to =
-  let baker_name, baker_tags, baker_uses =
-    match bakers with
-    | `Bakers ->
-        ( "baker",
-          ["baker"],
-          [Protocol.baker migrate_from; Protocol.baker migrate_to] )
-    | `Agnostic_bakers ->
-        ( "agnostic baker",
-          ["agnostic_baker"],
-          [Constant.octez_experimental_agnostic_baker] )
-    | `Mixed ->
-        ( "baker and agnostic baker",
-          ["baker"; "agnostic_baker"],
-          [
-            Protocol.baker migrate_from;
-            Protocol.baker migrate_to;
-            Constant.octez_experimental_agnostic_baker;
-          ] )
-  in
+let test_forked_migration_bakers ~migrate_from ~migrate_to =
   Test.register
     ~__FILE__
     ~tags:
       ([team; "protocol"; "migration"]
-      @ baker_tags
       @ [
+          "agnostic_baker";
           "attesting";
           "fork";
           "from_" ^ Protocol.tag migrate_from;
           "to_" ^ Protocol.tag migrate_to;
         ])
-    ~uses:baker_uses
+    ~uses:[Constant.octez_experimental_agnostic_baker]
     ~title:
       (Printf.sprintf
-         "%s forked migration blocks from %s to %s"
-         baker_name
+         "agnostic baker forked migration blocks from %s to %s"
          (Protocol.tag migrate_from)
          (Protocol.tag migrate_to))
   @@ fun () ->
@@ -958,9 +889,8 @@ let test_forked_migration_bakers bakers ~migrate_from ~migrate_to =
   and* () = connect cn2 cn3 in
 
   Log.info
-    "Partition bootstrap delegates into 3 groups. Start bakers for pre- and \
-     post-migration protocols or agnostic bakers, on a separate node for each \
-     group of delegates." ;
+    "Partition bootstrap delegates into 3 groups. Start agnostic bakers, on a \
+     separate node for each group of delegates." ;
   (* The groups are chosen considering baker rights at levels 4 and 5,
      see comment further below. *)
   let group1 =
@@ -973,21 +903,6 @@ let test_forked_migration_bakers bakers ~migrate_from ~migrate_to =
   let pp_delegates =
     let pp_sep fmt () = Format.fprintf fmt " and " in
     Format.pp_print_list ~pp_sep Format.pp_print_string
-  in
-  let baker_for_proto protocol (node, client, delegates) =
-    let name = sf "baker_%s_%s" (Protocol.tag protocol) (Node.name node) in
-    Log.info "Start %s for %a." name pp_delegates delegates ;
-    let event_sections_levels =
-      [(String.concat "." [Protocol.encoding_prefix protocol; "baker"], `Debug)]
-    in
-    (* We copy the code in {!Baker.init}, except that we don't wait
-       for the baker to be ready. Indeed, bakers aren't ready until
-       their protocol has been activated. *)
-    let* () = Node.wait_for_ready node in
-    let baker = Baker.create ~protocol ~name ~delegates node client in
-    let* () = Baker.run ~event_sections_levels baker in
-    Baker.log_block_injection ~color:Log.Color.FG.yellow baker ;
-    return baker
   in
 
   let agnostic_baker (node, client, delegates) =
@@ -1054,116 +969,24 @@ let test_forked_migration_bakers bakers ~migrate_from ~migrate_to =
   in
 
   let* () =
-    match bakers with
-    | `Bakers ->
-        let* baker1_from = baker_for_proto migrate_from group1
-        and* _baker2_from = baker_for_proto migrate_from group2
-        and* _baker3_from = baker_for_proto migrate_from group3
-        and* baker1_to = baker_for_proto migrate_to group1
-        and* _baker2_to = baker_for_proto migrate_to group2
-        and* baker3_to = baker_for_proto migrate_to group3 in
-
-        let* () = start_protocol () in
-        let* () =
-          check_adaptive_issuance_launch_cycle
-            ~loc:__LOC__
-            ~migrate_from
-            client1
-        in
-        let* () =
-          wait_for_qc_at_level
-            pre_migration_level
-            ~wait_for:Baker.wait_for
-            baker1_from
-        in
-        let* () = disconnect_clusters () in
-
-        let wait_for () =
-          let* () =
-            wait_for_post_migration_proposal
-              post_migration_level
-              ~wait_for:Baker.wait_for
-              baker1_to
-          and* () =
-            wait_for_post_migration_proposal
-              post_migration_level
-              ~wait_for:Baker.wait_for
-              baker3_to
-          in
-          unit
-        in
-        check_post_migration_proposal ~wait_for
-    | `Agnostic_bakers ->
-        let* agnostic_baker1 = agnostic_baker group1
-        and* _agnostic_baker2 = agnostic_baker group2
-        and* agnostic_baker3 = agnostic_baker group3 in
-
-        let* () = start_protocol () in
-        let* () =
-          check_adaptive_issuance_launch_cycle
-            ~loc:__LOC__
-            ~migrate_from
-            client1
-        in
-        let* () =
-          wait_for_qc_at_level
-            pre_migration_level
-            ~wait_for:Agnostic_baker.wait_for
-            agnostic_baker1
-        in
-        let* () = disconnect_clusters () in
-
-        let wait_for () =
-          let* () =
-            wait_for_post_migration_proposal
-              post_migration_level
-              ~wait_for:Agnostic_baker.wait_for
-              agnostic_baker1
-          and* () =
-            wait_for_post_migration_proposal
-              post_migration_level
-              ~wait_for:Agnostic_baker.wait_for
-              agnostic_baker3
-          in
-          unit
-        in
-        check_post_migration_proposal ~wait_for
-    | `Mixed ->
-        let* baker1_from = baker_for_proto migrate_from group1
-        and* baker1_to = baker_for_proto migrate_to group1
-        and* _agnostic_baker2 = agnostic_baker group2
-        and* agnostic_baker3 = agnostic_baker group3 in
-
-        let* () = start_protocol () in
-        let* () =
-          check_adaptive_issuance_launch_cycle
-            ~loc:__LOC__
-            ~migrate_from
-            client1
-        in
-        let* () =
-          wait_for_qc_at_level
-            pre_migration_level
-            ~wait_for:Baker.wait_for
-            baker1_from
-        in
-        let* () = disconnect_clusters () in
-
-        let wait_for () =
-          let* () =
-            wait_for_post_migration_proposal
-              post_migration_level
-              ~wait_for:Baker.wait_for
-              baker1_to
-          and* () =
-            wait_for_post_migration_proposal
-              post_migration_level
-              ~wait_for:Agnostic_baker.wait_for
-              agnostic_baker3
-          in
-          unit
-        in
-        check_post_migration_proposal ~wait_for
+    let* agnostic_baker1 = agnostic_baker group1
+    and* _agnostic_baker2 = agnostic_baker group2
+    and* agnostic_baker3 = agnostic_baker group3 in
+    let* () = start_protocol () in
+    let* () =
+      check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
+    in
+    let* () = wait_for_qc_at_level agnostic_baker1 pre_migration_level in
+    let* () = disconnect_clusters () in
+    let wait_for () =
+      let* () =
+        wait_for_post_migration_proposal agnostic_baker1 post_migration_level
+      and* () =
+        wait_for_post_migration_proposal agnostic_baker3 post_migration_level
+      in
+      unit
+    in
+    check_post_migration_proposal ~wait_for
   in
 
   let* () =
@@ -1979,19 +1802,8 @@ let test_unstaked_requests_and_min_delegated () =
 
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
-  test_migration_with_bakers
-    ~migrate_from
-    ~migrate_to
-    ~use_agnostic_baker:false
-    () ;
-  test_migration_with_bakers
-    ~migrate_from
-    ~migrate_to
-    ~use_agnostic_baker:true
-    () ;
-  List.iter
-    (test_forked_migration_bakers ~migrate_from ~migrate_to)
-    [`Bakers; `Agnostic_bakers; `Mixed] ;
+  test_migration_with_bakers ~migrate_from ~migrate_to () ;
+  test_forked_migration_bakers ~migrate_from ~migrate_to ;
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
   test_migration_with_snapshots ~migrate_from ~migrate_to ;
   test_tolerated_inactivity_period () ;

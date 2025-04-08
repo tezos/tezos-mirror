@@ -88,9 +88,6 @@ val parameter_file : ?constants:constants -> t -> string
 (** Get the path of the accuser of a protocol, such as ["./octez-accuser-alpha"]. *)
 val accuser : t -> Uses.t
 
-(** Get the path of the baker of a protocol, such as ["./octez-baker-alpha"]. *)
-val baker : t -> Uses.t
-
 (** Get the part of the daemon name that is specific to a protocol (e.g. ["PtEdo2Zk"]).
 
     This should not be used for anything except to compute the name of executables. *)
