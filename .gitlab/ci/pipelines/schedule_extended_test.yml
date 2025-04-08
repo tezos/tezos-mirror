@@ -2991,7 +2991,7 @@ oc.compile_sources_doc_bookworm:
   image: ocaml/opam:debian-12
   stage: test
   tags:
-  - gcp
+  - gcp_very_high_cpu
   rules:
   - when: always
   dependencies: []

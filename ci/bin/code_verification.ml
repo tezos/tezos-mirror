@@ -1398,11 +1398,12 @@ let jobs pipeline_type =
           ~timeout:(Hours 2)
           ["./docs/introduction/install-opam.sh"]
       in
-      let job_compile_sources ~__POS__ ~name ~image ~project ~branch =
+      let job_compile_sources ~__POS__ ~name ~image ~project ~branch ?cpu () =
         job
           ~__POS__
           ~name
           ~image
+          ?cpu
           ~dependencies:dependencies_needs_start
           ~rules:compile_octez_rules
           ~stage:Stages.test
@@ -1425,13 +1426,16 @@ let jobs pipeline_type =
               ~name:"oc.compile_sources_doc_bookworm"
               ~image:Images.opam_debian_bookworm
               ~project:"tezos/tezos"
-              ~branch:"latest-release";
+              ~branch:"latest-release"
+              ~cpu:Very_high
+              ();
             job_compile_sources
               ~__POS__
               ~name:"oc.compile_sources_doc_oracular"
               ~image:Images.opam_ubuntu_oracular
               ~project:"tezos/tezos"
-              ~branch:"latest-release";
+              ~branch:"latest-release"
+              ();
           ]
       (* Test compiling the [master] branch on Bookworm, to make sure
          that the compilation instructions in this branch are still
@@ -1444,7 +1448,9 @@ let jobs pipeline_type =
               ~name:"oc.compile_sources_doc_bookworm"
               ~image:Images.opam_debian_bookworm
               ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
-              ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+              ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}"
+              ~cpu:Very_high
+              ();
           ]
     in
     (* Tezt jobs.
