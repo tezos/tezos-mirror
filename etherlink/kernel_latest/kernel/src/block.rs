@@ -305,6 +305,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
             chain_header,
         ),
     };
+    log!(host, Debug, "Next blueprint number: {:?}", next_bip_number);
     let (blueprint, size) = read_blueprint::<_, ChainConfig>(
         host,
         config,
@@ -504,6 +505,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
     let (block_in_progress_provenance, block_in_progress) =
         match ChainConfig::read_block_in_progress(&safe_host)? {
             Some(block_in_progress) => {
+                log!(safe_host, Debug, "Restauring BIP from storage.");
                 (BlockInProgressProvenance::Storage, block_in_progress)
             }
             None => {
@@ -511,6 +513,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
                 // because the sequencer pool address is located outside of `/evm/world_state`.
                 upgrade::possible_sequencer_upgrade(safe_host.host)?;
 
+                log!(safe_host, Debug, "Creating BIP from Blueprint.");
                 // Execute at most one of the stored blueprints
                 let block_in_progress = match next_bip_from_blueprints(
                     safe_host.host,
@@ -519,7 +522,10 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     config,
                     &kernel_upgrade,
                 )? {
-                    BlueprintParsing::Next(bip) => bip,
+                    BlueprintParsing::Next(bip) => {
+                        log!(safe_host, Debug, "Creating BIP from Blueprint: Success.");
+                        bip
+                    }
                     BlueprintParsing::None => {
                         log!(
                             safe_host,
@@ -527,6 +533,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
                             "Estimated ticks: {}",
                             tick_counter.c
                         );
+                        log!(safe_host, Debug, "Creating BIP from Blueprint: Failure.");
                         return Ok(ComputationResult::Finished);
                     }
                 };

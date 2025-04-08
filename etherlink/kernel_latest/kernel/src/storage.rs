@@ -642,6 +642,7 @@ pub fn read_storage_version<Host: Runtime>(
             let version_u64 = u64::from_le_bytes(slice_of_bytes);
             let version =
                 FromPrimitive::from_u64(version_u64).ok_or(Error::InvalidConversion)?;
+            log!(host, Debug, "Current storage version: {:?}", version);
             Ok(version)
         }
         Err(e) => Err(e.into()),

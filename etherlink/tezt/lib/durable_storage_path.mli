@@ -113,6 +113,10 @@ val enable_multichain : path
 (** [enable_fast_withdrawal] is the path to the feature flag to activate fast withdrawals. *)
 val enable_fast_withdrawal : path
 
+(** [storage_version] is the path to the version of the storage used
+    by the kernel to detect if a storage migration is required. *)
+val storage_version : path
+
 module Ticket_table : sig
   (** [balance ~ticket_hash ~account] returns the path where the balance of
       [account] of ticket [ticket_hash] is. *)

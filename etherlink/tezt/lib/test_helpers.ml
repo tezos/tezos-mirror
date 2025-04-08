@@ -74,8 +74,8 @@ let get_timestamp i =
   |> Option.get |> Client.Time.to_notation
 
 let next_rollup_node_level ~sc_rollup_node ~client =
-  let* () = Client.bake_for_and_wait ~keys:[] client in
-  Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node
+  let* l1_level = Client.bake_for_and_wait_level ~keys:[] client in
+  Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node l1_level
 
 let produce_block ?(wait_on_blueprint_applied = true) ?timestamp evm_node =
   match Evm_node.mode evm_node with

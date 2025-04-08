@@ -553,6 +553,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       | None -> Enable true
     in
     Evm_node.patch_config_with_experimental_feature
+      ?l2_chains:(if enable_multichain then Some l2_chains else None)
       ~drop_duplicate_when_injection
       ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
@@ -630,6 +631,10 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
           sequencer)
       l2_chains
   in
+  (* Launching the sequencer made it produced the first blueprint, we
+     need to bake a block to include it in the inbox, which will
+     trigger the installation of the kernel in the rollup. *)
+  let* _lvl = Test_helpers.next_rollup_node_level ~sc_rollup_node ~client in
   let* proxys =
     Lwt_list.map_s
       (fun _l2 ->
