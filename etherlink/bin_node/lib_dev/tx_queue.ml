@@ -687,6 +687,7 @@ module Handlers = struct
     match request with
     | Inject {next_nonce; payload; tx_object; callback} ->
         protect @@ fun () ->
+        Tx_watcher.notify tx_object.hash ;
         let (Address (Hex addr)) = tx_object.from in
         let (Qty tx_nonce) = tx_object.nonce in
         let pending_callback (reason : pending_variant) =
