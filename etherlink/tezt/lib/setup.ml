@@ -176,7 +176,8 @@ let observer_counter =
   ref 0
 
 let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
-    ~sc_rollup_node ?rpc_server ?websockets ?history_mode ?l2_chain evm_node =
+    ~sc_rollup_node ?rpc_server ?websockets ?history_mode ?enable_tx_queue
+    ?l2_chain evm_node =
   let preimages_dir = Evm_node.preimages_dir evm_node in
   let initial_kernel = Evm_node.initial_kernel evm_node in
   let config_file = Temp.file (sf "config-%d.json" !observer_counter) in
@@ -191,9 +192,9 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
     else patch_config
   in
   let patch_config =
-    match (rpc_server, websockets) with
-    | None, None -> patch_config
-    | _, _ ->
+    match (rpc_server, websockets, enable_tx_queue) with
+    | None, None, None -> patch_config
+    | _, _, _ ->
         fun c ->
           Evm_node.patch_config_with_experimental_feature
             ?l2_chains:
@@ -202,6 +203,7 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
               | Some l2_chain -> Some [l2_chain])
             ?rpc_server
             ?enable_websocket:websockets
+            ?enable_tx_queue
             ()
           @@ patch_config c
   in
@@ -553,12 +555,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ()
   in
   let proxy_patch_config =
-    (* by default activate the tx_queue for the proxy *)
-    let enable_tx_queue =
-      match enable_tx_queue with
-      | Some enable_tx_queue -> enable_tx_queue
-      | None -> Enable true
-    in
     Evm_node.patch_config_with_experimental_feature
       ?l2_chains:(if enable_multichain then Some l2_chains else None)
       ~drop_duplicate_when_injection
@@ -566,7 +562,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?next_wasm_runtime
       ?rpc_server
       ?enable_websocket:websockets
-      ~enable_tx_queue
+      ?enable_tx_queue
       ?periodic_snapshot_path
       ()
   in
@@ -635,6 +631,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
           ?rpc_server
           ?websockets
           ?history_mode
+          ?enable_tx_queue
           sequencer)
       l2_chains
   in

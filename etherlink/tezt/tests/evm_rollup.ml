@@ -432,15 +432,10 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       unit
     else unit
   in
-  let enable_tx_queue =
-    match enable_tx_queue with
-    | Some enable_tx_queue -> enable_tx_queue
-    | None -> Evm_node.Enable true
-  in
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ?enable_websocket:websockets
-      ~enable_tx_queue
+      ?enable_tx_queue
       ()
   in
   let* produce_block, evm_node =

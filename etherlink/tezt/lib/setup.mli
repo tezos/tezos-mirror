@@ -70,6 +70,7 @@ val run_new_observer_node :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
   ?l2_chain:Evm_node.l2_setup ->
   Evm_node.t ->
   Evm_node.t Lwt.t
