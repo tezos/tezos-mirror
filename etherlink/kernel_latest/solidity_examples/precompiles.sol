@@ -31,7 +31,7 @@ contract PrecompileCaller {
         blake2fResult = callBlake2f();
     }
 
-    function callEcRecover() internal pure returns (address) {
+    function callEcRecover() public pure returns (address) {
         bytes32 hash = 0x5e806a52647a95f9e0f46d31cbe51e1a99f531dbe3a5f4de7d7a2be1d781c4af;
         uint8 v = 27;
         bytes32 r = 0x0b5e42292e5fd622f034cb6cbd7749e8deefee81a9d569cb092e7e51d5365a6a;
@@ -40,17 +40,17 @@ contract PrecompileCaller {
         return ecrecover(hash, v, r, s);
     }
 
-    function callSha256() internal pure returns (bytes32) {
+    function callSha256() public pure returns (bytes32) {
         bytes memory data = "Fast";
         return sha256(data);
     }
 
-    function callRipemd160() internal pure returns (bytes20) {
+    function callRipemd160() public pure returns (bytes20) {
         bytes memory data = "Fair";
         return ripemd160(data);
     }
 
-    function callIdentity() internal view returns (bytes memory) {
+    function callIdentity() public view returns (bytes memory) {
         bytes memory data = "Free";
         bytes memory result = new bytes(data.length);
         assembly {
@@ -69,7 +69,7 @@ contract PrecompileCaller {
         return result;
     }
 
-    function callModexp() internal view returns (bytes memory) {
+    function callModexp() public view returns (bytes memory) {
         bytes memory input = abi.encodePacked(
             uint256(0x02), // base
             uint256(0x03), // exponent
@@ -92,7 +92,7 @@ contract PrecompileCaller {
         return result;
     }
 
-    function callEcAdd() internal view returns (uint256[2] memory) {
+    function callEcAdd() public view returns (uint256[2] memory) {
         uint8[2] memory input1 = [
             0x0000000000000000000000000000000000000000000000000000000000000000,
             0x0000000000000000000000000000000000000000000000000000000000000000
@@ -118,7 +118,7 @@ contract PrecompileCaller {
         return result;
     }
 
-    function callEcMul() internal view returns (uint256[2] memory) {
+    function callEcMul() public view returns (uint256[2] memory) {
         // Point (1,2) on the elliptic curve and scalar 2
         uint256[3] memory input = [uint256(1), uint256(2), uint256(2)];
         uint256[2] memory result;
@@ -138,7 +138,7 @@ contract PrecompileCaller {
         return result;
     }
 
-    function callEcPairing() internal view returns (bool) {
+    function callEcPairing() public view returns (bool) {
         uint8[1] memory inputPairing = [
             0x0000000000000000000000000000000000000000000000000000000000000000
         ];
@@ -159,7 +159,7 @@ contract PrecompileCaller {
         return result;
     }
 
-    function callBlake2f() internal view returns (bytes memory) {
+    function callBlake2f() public view returns (bytes memory) {
         bytes memory blake2fInput = abi.encodePacked(
             hex"0000000048c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5d182e6ad7f520e511f6c3e2b8c68059b6bbd41fbabd9831f79217e1319cde05b61626300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000001"
         );
