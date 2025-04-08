@@ -763,7 +763,7 @@ evm_events_follower_diverged:
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_events_follower_fallback:
-  description: rollup node does not support fetching all events, falling back to multiple RPCs fetching
+  description: rollup node does not support fetching all events, falling back to fetching one event per RPC because of {error}
   level: warning
   section: evm_node.dev
   json format:
