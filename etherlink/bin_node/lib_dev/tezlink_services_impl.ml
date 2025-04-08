@@ -7,10 +7,11 @@
 
 open Tezos_services
 
-let current_level (module Backend : Services_backend_sig.S)
-    (constants : Imported_protocol.Alpha_context.Constants.Parametric.t) chain
-    block level_query =
+let current_level (module Backend : Services_backend_sig.S) chain block
+    level_query =
   let open Lwt_result_syntax in
+  let constants = Tezlink_constants.mainnet in
+
   let* offset =
     (* Tezos l1 requires non-negative offset #7845 *)
     if level_query.offset >= 0l then return level_query.offset
@@ -49,9 +50,9 @@ let current_level (module Backend : Services_backend_sig.S)
       cycle_position = Int32.rem level constants.blocks_per_cycle;
     }
 
-let michelson_services_methods backend constants =
+let michelson_services_methods backend =
   {
-    current_level = current_level backend constants;
+    current_level = current_level backend;
     version =
       (fun () ->
         (* TODO: #7857 need proper implementation *)

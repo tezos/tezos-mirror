@@ -217,9 +217,7 @@ let main
         (if chain_family = Michelson then
            Some
              Tezlink_services_impl.(
-               michelson_services_methods
-                 (module Rollup_node_rpc)
-                 Tezlink_constants.mainnet)
+               michelson_services_methods (module Rollup_node_rpc))
          else None)
       validation_mode
       config

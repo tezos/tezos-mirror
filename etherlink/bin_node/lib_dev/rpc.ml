@@ -234,9 +234,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
       ?tezlink_services:
         (if chain_family = L2_types.Michelson then
-           Some
-             Tezlink_services_impl.(
-               michelson_services_methods rpc_backend Tezlink_constants.mainnet)
+           Some Tezlink_services_impl.(michelson_services_methods rpc_backend)
          else None)
       Stateless
       rpc_config

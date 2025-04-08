@@ -267,10 +267,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       ?tezlink_services:
         (if chain_family = Michelson then
            Some
-             Tezlink_services_impl.(
-               michelson_services_methods
-                 observer_backend
-                 Tezlink_constants.mainnet)
+             Tezlink_services_impl.(michelson_services_methods observer_backend)
          else None)
       Stateless
       config
