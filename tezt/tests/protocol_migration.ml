@@ -545,7 +545,6 @@ let test_migration_with_bakers ?(migration_level = 4)
         team;
         "protocol";
         "migration";
-        "agnostic_baker";
         "attesting";
         "metadata";
         "from_" ^ Protocol.tag migrate_from;
@@ -645,7 +644,6 @@ let test_forked_migration_manual ?(migration_level = 4)
         team;
         "protocol";
         "migration";
-        "agnostic_baker";
         "attesting";
         "fork";
         "manual";
@@ -847,7 +845,6 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
     ~tags:
       ([team; "protocol"; "migration"]
       @ [
-          "agnostic_baker";
           "attesting";
           "fork";
           "from_" ^ Protocol.tag migrate_from;
@@ -889,7 +886,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   and* () = connect cn2 cn3 in
 
   Log.info
-    "Partition bootstrap delegates into 3 groups. Start agnostic bakers, on a \
+    "Partition bootstrap delegates into 3 groups. Start agnostic bakers on a \
      separate node for each group of delegates." ;
   (* The groups are chosen considering baker rights at levels 4 and 5,
      see comment further below. *)
