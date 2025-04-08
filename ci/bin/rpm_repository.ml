@@ -28,8 +28,9 @@ let generic_packages_image =
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
 let rockylinux_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["9.3"]); ("TAGS", ["gcp"])]]
-  | Full | Release -> [[("RELEASE", ["9.3"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+  | Partial -> [[("RELEASE", ["9.3"]); ("TAGS", ["gcp_very_high_cpu"])]]
+  | Full | Release ->
+      [[("RELEASE", ["9.3"]); ("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"])]]
 
 (** These are the set of Fedora release-architecture combinations for
     which we build rpm packages in the job
@@ -39,9 +40,11 @@ let rockylinux_package_release_matrix = function
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
 let fedora_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["39"]); ("TAGS", ["gcp"])]]
+  | Partial -> [[("RELEASE", ["39"]); ("TAGS", ["gcp_very_high_cpu"])]]
   | Full | Release ->
-      [[("RELEASE", ["39"; "42"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+      [
+        [("RELEASE", ["39"; "42"]); ("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"])];
+      ]
 
 (* Push .rpm artifacts to storagecloud rpm repository. *)
 let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
