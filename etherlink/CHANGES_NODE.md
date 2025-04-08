@@ -29,6 +29,8 @@
   (!17572)
 - Speeds up catch-up by fetching up to 500 blueprints at once when upstream EVM
   node allows it before applying them. (!17593)
+- Recovers automatically when the remote EVM node streams unexpected blueprints
+  from the future. (!17621)
 
 ### Storage changes
 

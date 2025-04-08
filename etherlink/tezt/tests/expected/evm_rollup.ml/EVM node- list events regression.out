@@ -1965,6 +1965,20 @@ txs_per_user_threshold_reached:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+unexpected_blueprint_from_remote_node:
+  description: remote node sent blueprint {number} instead of {expected}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* unexpected_blueprint_from_remote_node version 0 */
+      "unexpected_blueprint_from_remote_node.v0":
+        { "number": $positive_bignum,
+          "expected": $positive_bignum } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
 wasm_pvm_fallback:
   description: the node needs to fallback to the WASM PVM to execute a block
   level: warning

@@ -60,13 +60,23 @@ let on_new_blueprint config evm_node_endpoint next_blueprint_number
             blueprint_with_events
         in
         match reorg with
-        | Some level -> return (`Check_for_reorg level)
-        | None -> return `Continue)
+        | Some level -> return (`Restart_from level)
+        | None ->
+            (* We could not apply the received blueprint, and could not reorg
+               properly. There is something wrong with our state, we should
+               crash. *)
+            failwith
+              "Could not recover from failing to apply latest received \
+               blueprint.")
     | Ok tx_hashes ->
         let* () = confirm_txs config tx_hashes in
         return `Continue
     | Error (Node_error.Diverged {must_exit = false; _} :: _) ->
-        return `Continue
+        (* If we have diverged, but should keep the node alive. This happens
+           when the node successfully reset its head. We restart the blueprints
+           follower to the new expected blueprint number. *)
+        let*! head_info = Evm_context.head_info () in
+        return (`Restart_from head_info.next_blueprint_number)
     | Error err -> fail err
   else if Z.(lt level number) then
     (* The endpoint's stream has provided a blueprint smaller than
@@ -77,9 +87,16 @@ let on_new_blueprint config evm_node_endpoint next_blueprint_number
         blueprint_with_events
     in
     match reorg with
-    | Some level -> return (`Check_for_reorg level)
-    | None -> return `Continue
-  else return `Continue
+    | Some level -> return (`Restart_from level)
+    | None -> return (`Restart_from next_blueprint_number)
+  else
+    (* We received a blueprint in the future. Let’s try again. *)
+    let*! () =
+      Blueprint_events.unexpected_blueprint_from_remote_node
+        ~received:blueprint.number
+        ~expected:next_blueprint_number
+    in
+    return (`Restart_from next_blueprint_number)
 
 let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
     finalizer_private_server finalizer_rpc_process =

@@ -12,7 +12,7 @@ open Ethereum_types
 type handler =
   quantity ->
   Blueprint_types.with_events ->
-  [`Check_for_reorg of quantity | `Continue] tzresult Lwt.t
+  [`Restart_from of quantity | `Continue] tzresult Lwt.t
 
 (** [start ~time_between_blocks ~evm_node_endpoint ~get_next_blueprint_number k]
     is a never-returning function which iterates over blueprints streamed by

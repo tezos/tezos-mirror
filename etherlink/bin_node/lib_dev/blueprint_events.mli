@@ -70,6 +70,13 @@ val blueprint_proposal :
 val blueprint_production :
   Ethereum_types.quantity -> Time.System.Span.t -> unit Lwt.t
 
+(** [unexpected_blueprint_from_remote_node ~received ~expected] advertizes the node has
+    received a blueprint [number] while expected for [expected]. *)
+val unexpected_blueprint_from_remote_node :
+  received:Ethereum_types.quantity ->
+  expected:Ethereum_types.quantity ->
+  unit Lwt.t
+
 (** [worker_request_failed request_view state errs] warns that the
     blueprints_publisher worker encountered errors [errs]. *)
 val worker_request_failed :
