@@ -26,10 +26,6 @@
 (** Worker module for a single refutation game player.  The node's refutation
     coordinator will spawn a new refutation player for each refutation game.
 *)
-module Worker : Worker.T
-
-(** Type for a refutation game player.  *)
-type worker = Worker.infinite Worker.queue Worker.t
 
 (** [init_and_play node_ctxt ~self ~conflict ~game ~level] initializes a new
     refutation game player for signer [self].  After initizialization, the
@@ -43,14 +39,13 @@ val init_and_play :
   level:int32 ->
   unit tzresult Lwt.t
 
-(** [play worker game ~level] makes the [worker] play the next move depending
-      on the [game] state for their conflict.
-  *)
-val play : worker -> Game.t -> level:int32 -> unit Lwt.t
+(** [play opponent game ~level] makes the worker for the game against [opponent]
+    play the next move depending on the [game] state for their conflict.  *)
+val play : Signature.public_key_hash -> Game.t -> level:int32 -> unit Lwt.t
 
-(** Shutdown a refutaiton game player. *)
-val shutdown : worker -> unit Lwt.t
+(** Shutdown a refutation game player against a given opponent. *)
+val shutdown : Signature.public_key_hash -> unit Lwt.t
 
 (** [current_games ()] lists the opponents' this node is playing refutation
-    games against, alongside the worker that takes care of each game. *)
-val current_games : unit -> (Signature.public_key_hash * worker) list
+    games against. *)
+val current_games : unit -> Signature.public_key_hash list
