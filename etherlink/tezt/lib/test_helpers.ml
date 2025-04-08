@@ -476,7 +476,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
    produce a block after sending the transaction. *)
 let send_transaction_to_sequencer_dont_produce_block
     (transaction : unit -> 'a Lwt.t) sequencer =
-  let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
+  let wait_for = Evm_node.wait_for_tx_queue_add_transaction sequencer in
   let transaction = transaction () in
   let* _ = wait_for in
   Lwt.return transaction

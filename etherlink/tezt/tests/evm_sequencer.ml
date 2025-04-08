@@ -9985,10 +9985,12 @@ let test_finalized_view_forward_txn =
   let* finalized_observer =
     run_new_observer_node ~finalized_view:true ~sc_rollup_node sequencer
   in
+  let* () = Evm_node.wait_for_blueprint_applied finalized_observer 0 in
+
   (* Produce a few EVM blocks *)
   let* _ =
     repeat 4 @@ fun () ->
-    let* _ = produce_block sequencer in
+    let*@ _ = produce_block sequencer in
     unit
   in
   (* Produces two L1 blocks to ensure the L2 blocks are posted onchain by the sequencer *)
@@ -10009,23 +10011,22 @@ let test_finalized_view_forward_txn =
         let* tx = raw_transfer i in
         return (tx :: txns))
   in
+  let txns = (* respect transaction order *) List.rev txns in
 
   (* Inject the transactions. *)
   let* _ = batch_n_transactions ~evm_node:finalized_observer txns in
 
-  (* Create as many blocks as we have created transactions, check they all
-     contain one transaction. This should not be flaky because the
-     `eth_sendRawTransaction` implementation of the observer (in finalized
-     view) is blocked until the sequencer accepts the transaction. *)
-  let* _ =
-    repeat nb_transactions @@ fun () ->
-    let*@ txns_in_block = produce_block sequencer in
-    Check.(
-      (txns_in_block = 1)
-        int
-        ~error_msg:"Expected one transaction even without producing L1 blocks") ;
-    unit
-  in
+  (* Create a block as we have created transactions, check they all
+     contain one transaction. This
+     should not be flaky because the `eth_sendRawTransaction`
+     implementation of the observer (in finalized view) is blocked
+     until the sequencer accepts the transaction. *)
+  let*@ txns_in_block = produce_block sequencer in
+  Check.(
+    (txns_in_block = nb_transactions)
+      int
+      ~error_msg:
+        "Expected %R transactions even without producing L1 blocks, found %L") ;
 
   unit
 
