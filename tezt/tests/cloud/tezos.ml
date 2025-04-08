@@ -449,8 +449,8 @@ module Agnostic_baker = struct
 
   module Agent = struct
     let init ?(group = "L1") ?env ?name ~delegates
-        ?(path = Uses.path Constant.octez_experimental_agnostic_baker) ~client
-        ?dal_node ?dal_node_timeout_percentage node cloud agent =
+        ?(path = Uses.path Constant.octez_agnostic_baker) ~client ?dal_node
+        ?dal_node_timeout_percentage node cloud agent =
       let* path = Agent.copy agent ~source:path in
       let* () =
         Cloud.register_binary

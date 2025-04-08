@@ -1,4 +1,4 @@
-# Agnostic Baker (experimental)
+# Agnostic Baker
 
 ## Overview
 
@@ -11,19 +11,13 @@ It is designed to simplify the baking process for users, such that they will no
 longer need to run two baker binaries at migration time. This makes the need for
 protocol specific baking binaries obsolete.
 
-## Experimental purpose
-
-For now, the binary is continuously being developed and tested. This is the reason
-why users are warned that the binary is experimental and that it should not be
-used for real-life scenarios, for instance, baking on `mainnet`.
-
 ## Usage
 
 To run the agnostic baker, the command line syntax is similar to the one
 for the protocol-dependent baking binaries:
 
 ```bash
-./octez-experimental-agnostic-baker [OCTEZ-BAKER-COMMANDS]
+./octez-agnostic-baker [OCTEZ-BAKER-COMMANDS]
 ```
 
 The `[OCTEZ-BAKER-COMMANDS]` list consists of all the arguments that can be used

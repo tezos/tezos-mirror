@@ -64,7 +64,7 @@ ARG BINARIES_DESTINATION_PATH
 COPY ./octez-node $BINARIES_DESTINATION_PATH/octez-node
 COPY ./octez-dal-node $BINARIES_DESTINATION_PATH/octez-dal-node
 COPY ./octez-client $BINARIES_DESTINATION_PATH/octez-client
-COPY ./octez-experimental-agnostic-baker $BINARIES_DESTINATION_PATH/octez-experimental-agnostic-baker
+COPY ./octez-agnostic-baker $BINARIES_DESTINATION_PATH/octez-agnostic-baker
 COPY ./octez-smart-rollup-node $BINARIES_DESTINATION_PATH/octez-smart-rollup-node
 COPY ./smart-rollup-installer $BINARIES_DESTINATION_PATH/smart-rollup-installer
 COPY ./octez-evm-node  $BINARIES_DESTINATION_PATH/octez-evm-node

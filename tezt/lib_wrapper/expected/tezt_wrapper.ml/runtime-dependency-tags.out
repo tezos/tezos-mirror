@@ -11,6 +11,7 @@ accuser_psquebec: octez-accuser-PsQuebec
 accuser_psriotum: octez-accuser-PsRiotum
 accuser_alpha: octez-accuser-alpha
 admin_client: octez-admin-client
+agnostic_baker: octez-agnostic-baker
 baker_psquebec: octez-baker-PsQuebec
 baker_psriotum: octez-baker-PsRiotum
 baker_alpha: octez-baker-alpha
@@ -21,7 +22,6 @@ dac_node: octez-dac-node
 dal_node: octez-dal-node
 dsn_node: octez-dsn-node
 evm_node: octez-evm-node
-agnostic_baker: octez-experimental-agnostic-baker
 node: octez-node
 protocol_compiler: octez-protocol-compiler
 signer: octez-signer

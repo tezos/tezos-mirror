@@ -13,7 +13,7 @@ let default_node_endpoint =
     "http://localhost:%d"
     Octez_node_config.Config_file.default_rpc_port
 
-let default_daily_logs_path = Some "octez-experimental-agnostic-baker"
+let default_daily_logs_path = Some "octez-agnostic-baker"
 
 let extra_levels_for_old_baker = 3
 

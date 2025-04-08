@@ -7,7 +7,7 @@
 
 (* Testing
    -------
-   Component:    Agnostic baker (octez-experimental-agnostic-baker)
+   Component:    Agnostic baker (octez-agnostic-baker)
    Invocation:   dune exec tezt/tests/main.exe -- --file agnostic_baker_test.ml
    Subject:      Ensure that the agnostic baker behaves as expected
 
@@ -150,7 +150,7 @@ let migrate ~migrate_from ~migrate_to ~use_remote_signer =
         Protocol.tag migrate_from;
         Protocol.tag migrate_to;
       ]
-    ~uses:([Constant.octez_experimental_agnostic_baker] @ remote_signer)
+    ~uses:([Constant.octez_agnostic_baker] @ remote_signer)
   @@ fun () ->
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
   let consensus_rights_delay =
@@ -183,7 +183,7 @@ let register_protocol_independent () =
     ~__FILE__
     ~title:"Agnostic baker starts and stops"
     ~tags:[team; "sandbox"; "agnostic"; "baker"; "init"]
-    ~uses:[Constant.octez_experimental_agnostic_baker]
+    ~uses:[Constant.octez_agnostic_baker]
   @@ fun () ->
   let* node, client = Client.init_with_node `Client () in
   let* baker = Agnostic_baker.init node client in

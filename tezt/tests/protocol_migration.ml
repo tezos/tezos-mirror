@@ -545,13 +545,12 @@ let test_migration_with_bakers ?(migration_level = 4)
         team;
         "protocol";
         "migration";
-        "agnostic_baker";
         "attesting";
         "metadata";
         "from_" ^ Protocol.tag migrate_from;
         "to_" ^ Protocol.tag migrate_to;
       ]
-    ~uses:[Constant.octez_experimental_agnostic_baker]
+    ~uses:[Constant.octez_agnostic_baker]
   @@ fun () ->
   let* client, node =
     user_migratable_node_init ~migration_level ~migrate_to ()
@@ -645,14 +644,13 @@ let test_forked_migration_manual ?(migration_level = 4)
         team;
         "protocol";
         "migration";
-        "agnostic_baker";
         "attesting";
         "fork";
         "manual";
         "from_" ^ Protocol.tag migrate_from;
         "to_" ^ Protocol.tag migrate_to;
       ]
-    ~uses:[Constant.octez_experimental_agnostic_baker]
+    ~uses:[Constant.octez_agnostic_baker]
     ~title:
       (Printf.sprintf
          "manually forked migration blocks from %s to %s"
@@ -847,13 +845,12 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
     ~tags:
       ([team; "protocol"; "migration"]
       @ [
-          "agnostic_baker";
           "attesting";
           "fork";
           "from_" ^ Protocol.tag migrate_from;
           "to_" ^ Protocol.tag migrate_to;
         ])
-    ~uses:[Constant.octez_experimental_agnostic_baker]
+    ~uses:[Constant.octez_agnostic_baker]
     ~title:
       (Printf.sprintf
          "agnostic baker forked migration blocks from %s to %s"
@@ -889,7 +886,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   and* () = connect cn2 cn3 in
 
   Log.info
-    "Partition bootstrap delegates into 3 groups. Start agnostic bakers, on a \
+    "Partition bootstrap delegates into 3 groups. Start agnostic bakers on a \
      separate node for each group of delegates." ;
   (* The groups are chosen considering baker rights at levels 4 and 5,
      see comment further below. *)

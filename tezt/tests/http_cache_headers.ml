@@ -117,7 +117,7 @@ let test_if_none_match ~rpc_external =
     ~title
     ~tags:["rpc"; "middleware"; "http_cache_headers"]
     ~supports:(From_protocol 19)
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Initialize client, node and baker" ;
   let* node, client =

@@ -81,8 +81,8 @@ module Uses : sig
   (** ["./octez-admin-client"], with tag ["admin_client"]. *)
   val octez_admin_client : t
 
-  (** ["./octez-experimental-agnostic-baker"], with tag ["agnostic_baker"]. *)
-  val octez_experimental_agnostic_baker : t
+  (** ["./octez-agnostic-baker"], with tag ["agnostic_baker"]. *)
+  val octez_agnostic_baker : t
 
   (** Register a test that generates:
       {[

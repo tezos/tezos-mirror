@@ -62,7 +62,7 @@ __pycache__
 /safety-checker
 /octez-teztale-archiver
 /octez-teztale-server
-/octez-experimental-agnostic-baker
+/octez-agnostic-baker
 /octez-teztale-snitch
 
 /src/riscv/riscv-sandbox*

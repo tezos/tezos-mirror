@@ -29,7 +29,7 @@ depends: [
   "memtrace"
   "octez-protocol-compiler" { = version }
   "tezos-dal-node-lib" { = version }
-  "octez-experimental-agnostic-baker-lib" { = version }
+  "octez-agnostic-baker-lib" { = version }
   "octez-injector" { = version }
   "octez-l2-libs" { = version }
   "octez-alcotezt" { with-test & = version }

@@ -61,7 +61,7 @@ let check_node_version_check_bypass_test =
     ~title:"baker node version check bypass test"
     ~tags:[team; "node"; "baker"]
     ~supports:Protocol.(From_protocol 021)
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let baker =
@@ -81,7 +81,7 @@ let check_node_version_allowed_test =
     ~title:"baker node version allowed test"
     ~tags:[team; "node"; "baker"]
     ~supports:Protocol.(From_protocol 022)
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let* _baker =
@@ -98,7 +98,7 @@ let check_node_version_no_commit_allowed_test =
     ~title:"baker node version no commit allowed test"
     ~tags:[team; "node"; "baker"]
     ~supports:Protocol.(From_protocol 022)
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let* _baker =
@@ -111,7 +111,7 @@ let baker_reward_test =
     ~__FILE__
     ~title:"Baker rewards"
     ~tags:[team; "baker"; "rewards"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     (fun protocol ->
       let* parameter_file =
         Protocol.write_parameter_file
@@ -168,7 +168,7 @@ let baker_simple_test =
     ~__FILE__
     ~title:"baker test"
     ~tags:[team; "node"; "baker"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let* _ =
     baker_test protocol ~keys:(Account.Bootstrap.keys |> Array.to_list)
@@ -180,7 +180,7 @@ let baker_stresstest =
     ~__FILE__
     ~title:"baker stresstest"
     ~tags:[team; "node"; "baker"; "stresstest"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
@@ -197,7 +197,7 @@ let baker_stresstest_apply =
     ~__FILE__
     ~title:"baker stresstest with forced application"
     ~tags:[team; "node"; "baker"; "stresstest"; "apply"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
@@ -288,7 +288,7 @@ let baker_remote_test =
     ~__FILE__
     ~title:"Baker in RPC-only mode"
     ~tags:[team; "baker"; "remote"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
@@ -302,7 +302,7 @@ let baker_check_consensus_branch =
     ~__FILE__
     ~title:"Baker check branch in consensus operations"
     ~tags:[team; "baker"; "grandparent"; "parent"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
   let* node, client =
@@ -350,7 +350,7 @@ let force_apply_from_round =
     ~title:"Baker check force apply from round"
     ~tags:[team; "baker"; "force_apply_from_round"]
     ~supports:Protocol.(From_protocol 021)
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   log_step 1 "initialize a node and a client with protocol" ;
   let* node, client =
@@ -508,7 +508,7 @@ let simple_attestations_aggregation =
     ~title:"Simple attestations aggregation"
     ~tags:[team; "baker"; "attestation"; "aggregation"]
     ~supports:Protocol.(From_protocol 023)
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   log_step 1 "Initialize a node and a client with protocol" ;
   let consensus_rights_delay = 1 in

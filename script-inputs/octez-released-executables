@@ -5,7 +5,7 @@ octez-signer
 octez-codec
 octez-client
 octez-admin-client
-octez-experimental-agnostic-baker
+octez-agnostic-baker
 octez-node
 octez-accuser-PsRiotum
 octez-baker-PsRiotum

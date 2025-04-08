@@ -232,7 +232,7 @@ let test_threshold_zero =
     ~title:"bootstrap: test threshold zero"
     ~tags:
       [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Setup network" ;
   let* node, client =
@@ -269,7 +269,7 @@ let test_threshold_one =
     ~__FILE__
     ~title:"bootstrap: test threshold one"
     ~tags:[team; "bootstrap"; "threshold"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
   let* node, client =
@@ -309,7 +309,7 @@ let test_threshold_two =
     ~title:"bootstrap: test threshold two"
     ~tags:
       [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
   let* node, client =
@@ -378,7 +378,7 @@ let test_threshold_stuck =
     ~title:"bootstrap: test threshold stuck"
     ~tags:
       [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let sync_latency = 3 in
 
@@ -442,7 +442,7 @@ let test_threshold_split_view =
     ~title:"bootstrap: test threshold split view"
     ~tags:
       [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info
     "Add two peers with threshold zero, and one with threshold 2 and a high \
@@ -517,7 +517,7 @@ let test_many_nodes_bootstrap =
         "threshold";
         Tag.memory_4k;
       ]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let num_nodes = 8 in
   let running_time = 10.0 in
