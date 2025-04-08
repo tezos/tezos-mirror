@@ -9,6 +9,7 @@ module Imported_protocol = Tezos_protocol_021_PsQuebec.Protocol
 module Imported_protocol_plugin = Tezos_protocol_plugin_021_PsQuebec
 module Imported_protocol_parameters = Tezos_protocol_021_PsQuebec_parameters
 module Imported_env = Tezos_protocol_environment_021_PsQuebec
+module Alpha_context = Imported_protocol.Alpha_context
 
 (* The output type of the current_level service but with less duplicated
    information. Can be changed, as long as the [conversion_encoding] is also
@@ -122,6 +123,55 @@ module Protocol_types = struct
       q |> Ethereum_types.Qty.to_z |> Z.to_int64 |> Alpha_context.Tez.of_mutez
       |> Option.value ~default:Alpha_context.Tez.zero
       |> Result_syntax.return
+  end
+
+  module Constants = struct
+    type fixed = Alpha_context.Constants.fixed
+
+    type parametric = Alpha_context.Constants.Parametric.t
+
+    type t = {fixed : fixed; parametric : parametric}
+
+    let fixed_values_encoding =
+      let open Data_encoding in
+      merge_objs
+        (obj10
+           (req "proof_of_work_nonce_size" uint8)
+           (req "nonce_length" uint8)
+           (req "max_anon_ops_per_block" uint8)
+           (req "max_operation_data_length" int31)
+           (req "max_proposals_per_delegate" uint8)
+           (req "max_micheline_node_count" int31)
+           (req "max_micheline_bytes_limit" int31)
+           (req "max_allowed_global_constants_depth" int31)
+           (req "cache_layout_size" uint8)
+           (req "michelson_maximum_type_size" uint16))
+        (obj4
+           (req "max_slashing_period" uint8)
+           (req "smart_rollup_max_wrapped_proof_binary_size" int31)
+           (req "smart_rollup_message_size_limit" int31)
+           (req "smart_rollup_max_number_of_messages_per_level" n))
+
+    let values_to_fixed =
+      convert_using_serialization
+        ~name:"values_to_fixed"
+        ~dst:Alpha_context.Constants.fixed_encoding
+        ~src:fixed_values_encoding
+
+    let constants_encoding =
+      let open Data_encoding in
+      conv
+        (fun {fixed; parametric} -> (fixed, parametric))
+        (fun (fixed, parametric) -> {fixed; parametric})
+        (obj2
+           (req "fixed" Alpha_context.Constants.fixed_encoding)
+           (req "parametric" Alpha_context.Constants.Parametric.encoding))
+
+    let _convert : t -> Alpha_context.Constants.t tzresult =
+      convert_using_serialization
+        ~name:"constants"
+        ~dst:Alpha_context.Constants.encoding
+        ~src:constants_encoding
   end
 end
 
