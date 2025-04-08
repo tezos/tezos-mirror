@@ -11,10 +11,7 @@ module Imported_protocol_parameters = Tezos_protocol_021_PsQuebec_parameters
 module Imported_env = Tezos_protocol_environment_021_PsQuebec
 module Alpha_context = Imported_protocol.Alpha_context
 
-(* The output type of the current_level service but with less duplicated
-   information. Can be changed, as long as the [conversion_encoding] is also
-   changed. *)
-type level = {level : int32; cycle : int32; cycle_position : int32}
+type level = Tezos_types.level
 
 type error += Serialization_for_conversion of string * string
 

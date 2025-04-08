@@ -36,19 +36,6 @@ module Protocol_types : sig
   end
 end
 
-type level = {
-  level : int32;
-      (** The level of the block relative to genesis. This
-      is also the Shell's notion of level. *)
-  cycle : int32;
-      (** The current cycle's number. Note that cycles are a protocol-specific
-      notion. As a result, the cycle number starts at 0 with the first block of
-      the first version of protocol alpha. *)
-  cycle_position : int32;
-      (** The current level of the block relative to the first block of the current
-      cycle. *)
-}
-
 (* Query types *)
 type level_query = {offset : int32}
 
@@ -62,7 +49,8 @@ type contract = Imported_protocol.Alpha_context.Contract.t
 
 (** Container for the implementations necessary to answer tezos RPC requests. *)
 type tezos_services_implementation = {
-  current_level : chain -> block -> level_query -> level tzresult Lwt.t;
+  current_level :
+    chain -> block -> level_query -> Tezos_types.level tzresult Lwt.t;
   version : unit -> Tezlink_version.version tzresult Lwt.t;
   protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
   balance :

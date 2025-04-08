@@ -44,11 +44,12 @@ let current_level (module Backend : Services_backend_sig.S) chain block
 
   let level = Int32.add current_block_number offset in
   return
-    {
-      level;
-      cycle = Int32.div level constants.blocks_per_cycle;
-      cycle_position = Int32.rem level constants.blocks_per_cycle;
-    }
+    Tezos_types.
+      {
+        level;
+        cycle = Int32.div level constants.blocks_per_cycle;
+        cycle_position = Int32.rem level constants.blocks_per_cycle;
+      }
 
 let constants chain block =
   let open Lwt_result_syntax in
