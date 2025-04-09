@@ -44,6 +44,7 @@ type candidate = {
   level_watched : Int32.t;
   round_watched : Round.t;
   payload_hash_watched : Block_payload_hash.t;
+  branch_watched : Block_hash.t option;
 }
 
 val candidate_encoding : candidate Data_encoding.t

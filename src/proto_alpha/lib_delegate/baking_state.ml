@@ -152,6 +152,7 @@ type block_info = {
   prequorum : prequorum option;
   quorum : Kind.attestation operation list;
   payload : Operation_pool.payload;
+  grandparent : Block_hash.t;
 }
 
 type cache = {
@@ -189,6 +190,7 @@ let block_info_encoding =
            prequorum;
            quorum;
            payload;
+           grandparent;
          } ->
       ( hash,
         shell,
@@ -197,7 +199,8 @@ let block_info_encoding =
         round,
         prequorum,
         List.map Operation.pack quorum,
-        payload ))
+        payload,
+        grandparent ))
     (fun ( hash,
            shell,
            payload_hash,
@@ -205,10 +208,12 @@ let block_info_encoding =
            round,
            prequorum,
            quorum,
-           payload ) ->
+           payload,
+           grandparent ) ->
       {
         hash;
         shell;
+        grandparent;
         payload_hash;
         payload_round;
         round;
@@ -216,7 +221,7 @@ let block_info_encoding =
         quorum = List.filter_map Operation_pool.unpack_attestation quorum;
         payload;
       })
-    (obj8
+    (obj9
        (req "hash" Block_hash.encoding)
        (req "shell" Block_header.shell_header_encoding)
        (req "payload_hash" Block_payload_hash.encoding)
@@ -224,7 +229,8 @@ let block_info_encoding =
        (req "round" Round.encoding)
        (req "prequorum" (option prequorum_encoding))
        (req "quorum" (list (dynamic_size Operation.encoding)))
-       (req "payload" Operation_pool.payload_encoding))
+       (req "payload" Operation_pool.payload_encoding)
+       (req "grandparent" Block_hash.encoding))
 
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
@@ -1233,6 +1239,7 @@ let pp_block_info fmt
     {
       hash;
       shell;
+      grandparent = _;
       payload_hash;
       round;
       prequorum;

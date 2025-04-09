@@ -275,6 +275,7 @@ type block_info = {
   prequorum : prequorum option;
   quorum : Kind.attestation operation list;
   payload : Operation_pool.payload;
+  grandparent : Block_hash.t;
 }
 
 val block_info_encoding : block_info Data_encoding.t
