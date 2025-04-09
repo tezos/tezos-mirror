@@ -95,3 +95,10 @@ By default, the logs are fetched from Loki. If you want to use GCP logs, you can
     LOGSRC="gcp"
     GCP_PROJECT_ID="project_id"
     GCP_DATASOURCE_UID="datasource_uid"
+
+By default, dashboards are created without uid, resulting in a random one assigned by grafana.
+You can set a specific uid with the ``UID`` variable, which will be concatenated to a default uid set in each dasboard's definition.
+If ``UID`` is set to an empty string, then the uid is set to the default uid value set for each dashboard.
+.. code-block:: shell
+
+    UID="some_string"

@@ -2,6 +2,7 @@ all: basic logs full compact dal-basic profiling tezt_cloud-layer1
 
 NODE_INSTANCE_LABEL ?= instance
 STORAGE_MODE ?= default
+UID ?= default
 
 %.jsonnet:
 	jsonnet \
@@ -12,6 +13,7 @@ STORAGE_MODE ?= default
 		--ext-str logsrc="$(LOGSRC)" \
 		--ext-str gcp_project="$(GCP_PROJECT_ID)" \
 		--ext-str gcp_datasource_uid="$(GCP_DATASOURCE_UID)" \
+		--ext-str uid_ext="$(UID)" \
 		src/$@ \
 			> output/$*.json
 

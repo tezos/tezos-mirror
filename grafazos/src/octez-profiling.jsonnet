@@ -9,6 +9,10 @@ local panel = grafonnet.panel;
 local base = import './base.jsonnet';
 local profiling = import './profiling.jsonnet';
 
+// External variables
+local uid_ext = std.extVar('uid_ext');
+local uid = uid_ext == 'default';
+
 // Constants
 local panelWidth = 10;
 local panelHeight = 10;
@@ -19,7 +23,8 @@ local peer_validator_y = 121;
 local block_validator_y = 161;
 
 // Create the dashboard
-dashboard.new('Octez Profiling Dashboard')
+dashboard.new('Octez Profiling Dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
++ (if !uid then dashboard.withUid('octez-profiling' + uid_ext) else {})
 + dashboard.withDescription('In-depth profiling for Octez function performance, showing average execution times.')
 + dashboard.withTags(['tezos', 'octez', 'profiling'])
 + dashboard.time.withFrom('now-8h')
