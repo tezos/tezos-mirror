@@ -18,7 +18,7 @@ Type: string
 Template: octez-agnostic-baker/dal-node
 Type: boolean
 Default: true
-Description: Connect to the Octez DAL node ?
+Description: Connect to the Octez DAL node?
  By default, the octez-dal-node package is installed alongside the octez-agnostic-baker
  package to participate to the DAL network.
  .
