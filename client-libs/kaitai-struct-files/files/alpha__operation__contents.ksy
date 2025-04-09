@@ -137,6 +137,9 @@ types:
     - id: attestations_aggregate
       type: attestations_aggregate
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::attestations_aggregate)
+    - id: preattestations_aggregate
+      type: preattestations_aggregate
+      if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::preattestations_aggregate)
     - id: double_preattestation_evidence
       type: double_preattestation_evidence
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::double_preattestation_evidence)
@@ -876,6 +879,12 @@ types:
       type: s4be
     - id: block_payload_hash
       size: 32
+  preattestations_aggregate:
+    seq:
+    - id: consensus_content
+      type: consensus_content
+    - id: committee
+      type: committee_0
   price:
     seq:
     - id: id
@@ -2007,6 +2016,7 @@ enums:
     21: attestation
     23: attestation_with_dal
     24: dal_entrapment_evidence
+    30: preattestations_aggregate
     31: attestations_aggregate
     107: reveal
     108: transaction
