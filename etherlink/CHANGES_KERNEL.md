@@ -31,6 +31,7 @@
 - The EVM version is now written in the durable storage at `/evm/evm_version`. (!17202)
 - Replaced the custom ABI encoder/decoder with `alloy`'s encoder/decoder
   for improved maintainability. (!16670)
+- Keeps track of execution gas in addition to estimated ticks. (!17507)
 
 ## Calypso (6046630)
 

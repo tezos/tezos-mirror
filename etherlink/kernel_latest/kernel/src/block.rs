@@ -204,6 +204,7 @@ fn compute<Host: Runtime>(
                 receipt_info,
                 object_info,
                 estimated_ticks_used,
+                execution_gas_used,
             }) => {
                 if transaction.is_delayed() {
                     block_in_progress.register_delayed_transaction(transaction.tx_hash);
@@ -214,6 +215,7 @@ fn compute<Host: Runtime>(
                     object_info,
                     receipt_info,
                     estimated_ticks_used,
+                    execution_gas_used,
                     host,
                 )?;
                 log!(

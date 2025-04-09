@@ -509,6 +509,7 @@ pub struct ExecutionInfo {
     pub receipt_info: TransactionReceiptInfo,
     pub object_info: TransactionObjectInfo,
     pub estimated_ticks_used: u64,
+    pub execution_gas_used: U256,
 }
 
 pub enum ExecutionResult<T> {
@@ -592,6 +593,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         receipt_info,
         object_info,
         estimated_ticks_used: ticks_used,
+        execution_gas_used: gas_used,
     })
 }
 
