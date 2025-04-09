@@ -12903,7 +12903,7 @@ let () =
   test_websocket_heartbeat_monitoring () ;
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
   test_websocket_logs_event [Protocol.Alpha] ;
-  test_describe_endpoint protocols ;
+  test_describe_endpoint [Alpha] ;
   test_node_correctly_uses_batcher_heap [Protocol.Alpha] ;
   test_init_config_mainnet "mainnet" ;
   test_init_config_mainnet "testnet" ;
