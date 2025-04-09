@@ -12,9 +12,9 @@ use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
 use crate::storage::{
-    read_chain_id, read_storage_version, store_storage_version, StorageVersion,
-    DELAYED_BRIDGE, ENABLE_FA_BRIDGE, KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE,
-    SEQUENCER_GOVERNANCE,
+    read_chain_id, read_storage_version, store_dal_slots, store_storage_version,
+    tweak_dal_activation, StorageVersion, DELAYED_BRIDGE, ENABLE_FA_BRIDGE,
+    KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE, SEQUENCER_GOVERNANCE,
 };
 use evm_execution::account_storage::account_path;
 use evm_execution::account_storage::init_account_storage;
@@ -306,6 +306,19 @@ fn migrate_to<Host: Runtime>(
         }
         StorageVersion::V30 => {
             host.store_write_all(&ENABLE_FAST_FA_WITHDRAWAL, &[1_u8])?;
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V31 => {
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)?
+                || is_etherlink_network(host, TESTNET_CHAIN_ID)?
+            {
+                tweak_dal_activation(host, true)?;
+                // We allow 8 slots in order to have around twice the size of the inbox.
+                // NB:
+                // * One slot is 127kb.
+                // * The size of the inbox is 512kb.
+                store_dal_slots(host, &[0, 1, 2, 3, 4, 5, 6, 7])?
+            }
             Ok(MigrationStatus::Done)
         }
     }
