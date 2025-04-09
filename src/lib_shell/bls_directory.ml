@@ -49,4 +49,11 @@ let build_rpc_directory () =
         else None
       in
       return res) ;
+  register0 Bls_services.S.threshold_signatures (fun () sigs ->
+      let sigs =
+        List.map
+          (fun (s : Bls_services.S.threshold_signature) -> (s.id, s.signature))
+          sigs
+      in
+      return @@ Bls.threshold_signature_opt sigs) ;
   !dir

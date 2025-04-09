@@ -37,6 +37,9 @@ Node
 - Added RPC ``POST /bls/check_proof`` to check a BLS proof. (MR
   :gl:`!17461`)
 
+- Added RPC ``POST /bls/threshold_signatures`` to recover a BLS
+  threshold signature. (MR :gl:`!17467`)
+
 Client
 ------
 
@@ -58,6 +61,18 @@ Client
 
 - Add a new command ``check bls proof`` to check a BLS proof. (MR
   :gl:`!17461`)
+
+- Add a new command ``share bls secret key <sk> between <n> shares
+  with threshold <m>`` to share a BLS secret key between ``n``
+  participants so that any ``m`` participants can collaboratively sign
+  messages, while fewer than ``m`` participants cannot produce a valid
+  signature. Note that this command requires a secret key: make sure
+  that you are in a secure environment before using it. Alternatively,
+  one can implement their own version of secret sharing. (MR
+  :gl:`!17467`)
+
+- Add a new command ``threshold bls signatures`` to recover a BLS
+  threshold signature. (MR :gl:`!17467`)
 
 Signer
 ------

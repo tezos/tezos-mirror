@@ -286,6 +286,26 @@ module Local_helpers = struct
         secret_key = Encrypted "";
       }
 
+  let mk_account_from_bls_sk ~bls_sk ~alias =
+    let sk = Tezos_crypto.Signature.Bls.Secret_key.of_b58check_exn bls_sk in
+    let pk = Tezos_crypto.Signature.Bls.Secret_key.to_public_key sk in
+    let pkh =
+      Tezos_crypto.Signature.Bls.Public_key.hash pk
+      |> Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check
+    in
+    let public_key = Tezos_crypto.Signature.Bls.Public_key.to_b58check pk in
+    let secret_key = Account.Unencrypted bls_sk in
+    Log.info
+      ~color:Log.Color.FG.green
+      "Create an account for %s with pkh = %s."
+      alias
+      pkh ;
+    Account.{alias; public_key_hash = pkh; public_key; secret_key}
+
+  let bls_sk_to_b58_string (sk : Bls12_381_signature.sk) =
+    Tezos_crypto.Signature.Bls sk
+    |> Tezos_crypto.Signature.Secret_key.to_b58check
+
   let sign_and_aggregate_signatures ~kind ~watermark
       ~(signers : Account.key list) (msg : bytes) client =
     let signatures =
@@ -299,6 +319,23 @@ module Local_helpers = struct
     | Client -> Client.aggregate_bls_signatures client signatures
     | RPC ->
         Client.RPC.call client @@ RPC.post_bls_aggregate_signatures signatures
+
+  let sign_and_recover_threshold_signature ~kind ~watermark
+      ~(signers : (int * Account.key) list) (msg : bytes) client =
+    let signatures =
+      List.map
+        (fun (id, signer) ->
+          let signature =
+            Account.sign_bytes ~watermark ~signer msg
+            |> Tezos_crypto.Signature.to_b58check
+          in
+          (id, signature))
+        signers
+    in
+    match kind with
+    | Client -> Client.threshold_bls_signatures client signatures
+    | RPC ->
+        Client.RPC.call client @@ RPC.post_bls_threshold_signatures signatures
 
   let inject_bls_group_sign_op ~baker ~group_signature (op : Operation.t) client
       =
@@ -327,6 +364,36 @@ module Local_helpers = struct
         client
     in
     inject_bls_group_sign_op ~baker ~group_signature op client
+
+  let inject_threshold_bls_sign_op ~kind ~baker
+      ~(signers : (int * Account.key) list) (op : Operation.t) client =
+    let* op_hex = Operation.hex op client in
+    let manager_op = Hex.to_bytes op_hex in
+    let* group_signature =
+      sign_and_recover_threshold_signature
+        ~kind
+        ~watermark:Generic_operation
+        ~signers
+        manager_op
+        client
+    in
+    inject_bls_group_sign_op ~baker ~group_signature op client
+
+  let create_accounts_from_master_sk ~sk ~m ~n client =
+    if not (1 < m && m <= n) then
+      Test.fail "Invalid parameters for N = %d and M = %d" n m ;
+    let* group_pk, group_pkh, secret_shares =
+      Client.share_bls_secret_key ~sk ~n:5 ~m:3 client
+    in
+    let stakers =
+      List.map
+        (fun (id, bls_sk) ->
+          ( id,
+            mk_account_from_bls_sk ~bls_sk ~alias:("staker_" ^ string_of_int id)
+          ))
+        secret_shares
+    in
+    return (group_pk, group_pkh, stakers)
 
   let print_parameters parameters =
     let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
@@ -904,6 +971,214 @@ let test_all_stakers_sign_staking_operation_consensus_key ~kind =
   in
   unit
 
+(** N = 5 and M = 3 *)
+let test_threshold_number_stakers_sign_staking_operation_external_delegate ~kind
+    =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      (sf
+         "threshold number of stakers sign a staking operation with an \
+          external delegate (%s)"
+         (kind_to_string kind))
+    ~tags:(threshold_bls_tags @ ["threshold"; "external_delegate"])
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* _parameters, client, default_baker, funder, delegate =
+    Local_helpers.init_node_and_client_with_external_delegate ~protocol
+  in
+  let master_sk =
+    Bls12_381_signature.generate_sk @@ Tezos_hacl.Hacl.Rand.gen 32
+    |> Local_helpers.bls_sk_to_b58_string
+  in
+  (* Shamir's Secret Sharing *)
+  let* group_pk_bls, group_pkh_bls, stakers =
+    Local_helpers.create_accounts_from_master_sk ~sk:master_sk ~m:3 ~n:5 client
+  in
+  let group_staker =
+    Local_helpers.mk_fake_account_from_bls_pk
+      ~bls_pk:group_pk_bls
+      ~bls_pkh:group_pkh_bls
+      ~alias:"group_staker"
+  in
+  (* transfer 150000 from bootstrap2 to group_staker *)
+  let* () =
+    Local_helpers.transfer
+      ~baker:default_baker
+      ~amount:(Tez.of_int 150_000)
+      ~giver:funder
+      ~receiver:group_staker.public_key_hash
+      client
+  in
+
+  let signers = List.filteri (fun i _s -> i < 3) stakers in
+  (* reveal key for group_staker *)
+  let* op_reveal = Local_helpers.mk_op_reveal group_staker client in
+  let* _op_hash =
+    Local_helpers.inject_threshold_bls_sign_op
+      ~kind
+      ~baker:default_baker
+      ~signers
+      op_reveal
+      client
+  in
+  (* set delegate for group_staker to delegate *)
+  let* op_set_delegate =
+    Local_helpers.mk_op_set_delegate ~src:group_staker ~delegate client
+  in
+  let* _op_hash =
+    Local_helpers.inject_threshold_bls_sign_op
+      ~kind
+      ~baker:default_baker
+      ~signers
+      op_set_delegate
+      client
+  in
+  (* stake 140000 for group_staker *)
+  let* op_stake =
+    Local_helpers.mk_op_stake
+      ~staker:group_staker
+      ~amount:(Tez.of_int 140_000)
+      client
+  in
+  let* _op_hash =
+    Local_helpers.inject_threshold_bls_sign_op
+      ~kind
+      ~baker:default_baker
+      ~signers
+      op_stake
+      client
+  in
+  let* () =
+    Local_helpers.check_staked_balance_increase_when_baking
+      ~baker:delegate
+      ~staker:group_staker
+      client
+  in
+  unit
+
+(** N = 5 and M = 3 *)
+let test_threshold_number_stakers_sign_staking_operation_consensus_key ~kind =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      (sf
+         "threshold number of stakers sign a staking operation with a \
+          consensus key (%s)"
+         (kind_to_string kind))
+    ~tags:(threshold_bls_tags @ ["threshold"; "consensus_key"])
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* parameters, client, default_baker, funder =
+    Local_helpers.init_node_and_client ~protocol
+  in
+  let master_sk =
+    Bls12_381_signature.generate_sk @@ Tezos_hacl.Hacl.Rand.gen 32
+    |> Local_helpers.bls_sk_to_b58_string
+  in
+  (* Shamir's Secret Sharing *)
+  let* group_pk_bls, group_pkh_bls, stakers =
+    Local_helpers.create_accounts_from_master_sk ~sk:master_sk ~m:3 ~n:5 client
+  in
+  let group_staker =
+    Local_helpers.mk_fake_account_from_bls_pk
+      ~bls_pk:group_pk_bls
+      ~bls_pkh:group_pkh_bls
+      ~alias:"group_staker"
+  in
+  (* transfer 150000 from bootstrap2 to group_staker *)
+  let* () =
+    Local_helpers.transfer
+      ~baker:default_baker
+      ~amount:(Tez.of_int 150_000)
+      ~giver:funder
+      ~receiver:group_staker.public_key_hash
+      client
+  in
+
+  let signers = List.filteri (fun i _s -> i < 3) stakers in
+  (* reveal key for group_staker *)
+  let* op_reveal = Local_helpers.mk_op_reveal group_staker client in
+  let* _op_hash =
+    Local_helpers.inject_threshold_bls_sign_op
+      ~kind
+      ~baker:default_baker
+      ~signers
+      op_reveal
+      client
+  in
+  (* set delegate for group_staker to group_staker *)
+  let* op_set_delegate =
+    Local_helpers.mk_op_set_delegate
+      ~src:group_staker
+      ~delegate:group_staker
+      client
+  in
+  let* _op_hash =
+    Local_helpers.inject_threshold_bls_sign_op
+      ~kind
+      ~baker:default_baker
+      ~signers
+      op_set_delegate
+      client
+  in
+  (* stake 140000 for group_staker *)
+  let* op_stake =
+    Local_helpers.mk_op_stake
+      ~staker:group_staker
+      ~amount:(Tez.of_int 140_000)
+      client
+  in
+  let* _op_hash =
+    Local_helpers.inject_threshold_bls_sign_op
+      ~kind
+      ~baker:default_baker
+      ~signers
+      op_stake
+      client
+  in
+  (* gen keys delegate_consensus_key -s bls *)
+  let* delegate_consensus_key =
+    Local_helpers.gen_and_show_keys
+      ~alias:"delegate_consensus_key"
+      ~sig_alg:"bls"
+      client
+  in
+  (* create a proof for a consensus key *)
+  let* proof =
+    Client.create_bls_proof ~signer:delegate_consensus_key.alias client
+  in
+  (* set consensus key for group_staker to delegate_consensus_key *)
+  let* op_update_consensus_key =
+    Local_helpers.mk_op_update_consensus_key
+      ~delegate:group_staker
+      ~delegate_consensus_key
+      ~proof
+      client
+  in
+  let* _op_hash =
+    Local_helpers.inject_threshold_bls_sign_op
+      ~kind
+      ~baker:default_baker
+      ~signers
+      op_update_consensus_key
+      client
+  in
+  let* () =
+    Local_helpers.bake_for_consensus_rights_delay_and_wait
+      ~baker:default_baker
+      ~parameters
+      ~delegate:delegate_consensus_key
+      client
+  in
+  let* () =
+    Local_helpers.check_staked_balance_increase_when_baking
+      ~baker:delegate_consensus_key
+      ~staker:group_staker
+      client
+  in
+  unit
+
 let register ~protocols =
   test_single_staker_sign_staking_operation_self_delegate protocols ;
   test_single_staker_sign_staking_operation_external_delegate protocols ;
@@ -914,4 +1189,16 @@ let register ~protocols =
     protocols ;
   test_all_stakers_sign_staking_operation_external_delegate ~kind:RPC protocols ;
   test_all_stakers_sign_staking_operation_consensus_key ~kind:Client protocols ;
-  test_all_stakers_sign_staking_operation_consensus_key ~kind:RPC protocols
+  test_all_stakers_sign_staking_operation_consensus_key ~kind:RPC protocols ;
+  test_threshold_number_stakers_sign_staking_operation_external_delegate
+    ~kind:Client
+    protocols ;
+  test_threshold_number_stakers_sign_staking_operation_external_delegate
+    ~kind:RPC
+    protocols ;
+  test_threshold_number_stakers_sign_staking_operation_consensus_key
+    ~kind:Client
+    protocols ;
+  test_threshold_number_stakers_sign_staking_operation_consensus_key
+    ~kind:RPC
+    protocols

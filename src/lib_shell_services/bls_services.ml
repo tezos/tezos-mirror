@@ -38,6 +38,15 @@ module S = struct
          (req "public_key" Bls.Public_key.encoding)
          (req "public_key_hash" Bls.Public_key_hash.encoding))
 
+  type threshold_signature = {id : int; signature : Bls.t}
+
+  let threshold_signature_encoding =
+    let open Data_encoding in
+    conv
+      (fun {id; signature} -> (id, signature))
+      (fun (id, signature) -> {id; signature})
+      (obj2 (req "id" Data_encoding.int8) (req "signature" Bls.encoding))
+
   let aggregate_signatures =
     Tezos_rpc.Service.post_service
       ~description:"Aggregate BLS signatures"
@@ -61,6 +70,14 @@ module S = struct
       ~input:(list public_key_with_proof_encoding)
       ~output:(option public_key_and_public_key_hash_encoding)
       Tezos_rpc.Path.(path / "aggregate_public_keys")
+
+  let threshold_signatures =
+    Tezos_rpc.Service.post_service
+      ~description:"Threshold BLS signatures"
+      ~query:Tezos_rpc.Query.empty
+      ~input:(list threshold_signature_encoding)
+      ~output:(option Bls.encoding)
+      Tezos_rpc.Path.(path / "threshold_signatures")
 end
 
 let aggregate_signatures ctxt sigs =
@@ -71,3 +88,6 @@ let check_proof ctxt pk_with_proof =
 
 let aggregate_public_keys ctxt pks_with_proofs =
   Tezos_rpc.Context.make_call S.aggregate_public_keys ctxt () () pks_with_proofs
+
+let threshold_signatures ctxt sigs =
+  Tezos_rpc.Context.make_call S.threshold_signatures ctxt () () sigs
