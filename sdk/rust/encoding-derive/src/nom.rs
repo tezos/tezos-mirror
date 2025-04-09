@@ -6,11 +6,11 @@
 
 use once_cell::sync::Lazy as SyncLazy;
 
+use crate::constraints::{add_where_clauses, TokenStreamWithConstraints};
 use crate::encoding::*;
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
-use syn::parse_quote;
-use syn::spanned::Spanned;
+use syn::{parse_quote, punctuated::Punctuated, spanned::Spanned};
 
 const NOM_TUPLE_MAX: usize = 26;
 
@@ -19,7 +19,10 @@ pub fn generate_nom_read_for_data(
     data: &DataWithEncoding,
 ) -> TokenStream {
     let name = data.name;
-    let nom_read = generate_nom_read(&data.encoding);
+    let TokenStreamWithConstraints {
+        stream: nom_read,
+        constraints,
+    } = generate_nom_read(&data.encoding);
     // We want to derive NomReader<'a> for a fresh 'a.  To do this we
     // use a mix of the solutions proposed in
     // https://github.com/dtolnay/syn/issues/90
@@ -28,6 +31,7 @@ pub fn generate_nom_read_for_data(
     extended_generics.params.push(a.clone());
     let (impl_generics, _, _) = extended_generics.split_for_impl();
     let (_, ty_generics, where_clause) = generics.split_for_impl();
+    let where_clause = add_where_clauses(where_clause.cloned(), constraints, data.name.span());
     quote_spanned! {
         data.name.span()=>
         #[allow(unused_parens)]
@@ -41,25 +45,33 @@ pub fn generate_nom_read_for_data(
     }
 }
 
-fn generate_nom_read(encoding: &Encoding) -> TokenStream {
+fn generate_nom_read(encoding: &Encoding) -> TokenStreamWithConstraints {
     match encoding {
         Encoding::Unit => unreachable!(),
-        Encoding::Primitive(primitive, span) => generate_primitive_nom_read(*primitive, *span),
-        Encoding::Bytes(span) => generate_bytes_nom_read(*span),
+        Encoding::Primitive(primitive, span) => {
+            generate_primitive_nom_read(*primitive, *span).into()
+        }
+        Encoding::Bytes(span) => generate_bytes_nom_read(*span).into(),
         Encoding::Path(path) => {
-            quote_spanned!(path.span()=> <#path as tezos_data_encoding::nom::NomReader>::nom_read)
+            let mut constraints = Punctuated::new();
+            constraints
+                .push(parse_quote!(#path : for <'a> tezos_data_encoding::nom::NomReader<'a>));
+            TokenStreamWithConstraints {
+                stream: quote_spanned!(path.span()=><#path as tezos_data_encoding::nom::NomReader>::nom_read),
+                constraints,
+            }
         }
         Encoding::Struct(encoding) => generate_struct_nom_read(encoding),
         Encoding::Enum(encoding) => generate_enum_nom_read(encoding),
-        Encoding::String(size, span) => generate_string_nom_read(size, *span),
+        Encoding::String(size, span) => generate_string_nom_read(size, *span).into(),
         Encoding::OptionField(encoding, span) => generate_optional_field_nom_read(encoding, *span),
         Encoding::List(size, encoding, span) => generate_list_nom_read(size, encoding, *span),
         Encoding::Sized(size, encoding, span) => generate_sized_nom_read(size, encoding, *span),
         Encoding::Bounded(size, encoding, span) => generate_bounded_nom_read(size, encoding, *span),
         Encoding::ShortDynamic(encoding, span) => generate_short_dynamic_nom_read(encoding, *span),
         Encoding::Dynamic(size, encoding, span) => generate_dynamic_nom_read(size, encoding, *span),
-        Encoding::Zarith(span) => quote_spanned!(*span=> tezos_data_encoding::nom::zarith),
-        Encoding::Narith(span) => quote_spanned!(*span=> tezos_data_encoding::nom::narith),
+        Encoding::Zarith(span) => quote_spanned!(*span=> tezos_data_encoding::nom::zarith).into(),
+        Encoding::Narith(span) => quote_spanned!(*span=> tezos_data_encoding::nom::narith).into(),
     }
 }
 
@@ -107,7 +119,7 @@ fn generate_bytes_nom_read(span: Span) -> TokenStream {
     quote_spanned!(span=> tezos_data_encoding::nom::bytes)
 }
 
-fn generate_struct_nom_read(encoding: &StructEncoding) -> TokenStream {
+fn generate_struct_nom_read(encoding: &StructEncoding) -> TokenStreamWithConstraints {
     let generate_nom_read = match encoding.fields.len() {
         0 => unreachable!("No decoding for empty struct"),
         1 => generate_struct_one_field_nom_read,
@@ -117,16 +129,16 @@ fn generate_struct_nom_read(encoding: &StructEncoding) -> TokenStream {
     generate_nom_read(encoding)
 }
 
-fn generate_struct_one_field_nom_read(encoding: &StructEncoding) -> TokenStream {
+fn generate_struct_one_field_nom_read(encoding: &StructEncoding) -> TokenStreamWithConstraints {
     let name = encoding.name;
     let field = encoding.fields.first().unwrap();
     let field_name = field.name;
     let field_name_str = field_name.to_string();
-    let field_nom_read = generate_struct_field_nom_read(field);
-    quote_spanned!(encoding.name.span()=> nom::combinator::map(tezos_data_encoding::nom::field(#field_name_str, #field_nom_read), |#field_name| #name { #field_name }))
+    generate_struct_field_nom_read(field).map_stream(|field_nom_read|
+    quote_spanned!(encoding.name.span()=> nom::combinator::map(tezos_data_encoding::nom::field(#field_name_str, #field_nom_read), |#field_name| #name { #field_name })))
 }
 
-fn generate_struct_many_fields_nom_read(encoding: &StructEncoding) -> TokenStream {
+fn generate_struct_many_fields_nom_read(encoding: &StructEncoding) -> TokenStreamWithConstraints {
     let name = encoding.name;
     let field1 = encoding.fields.iter().map(|field| field.name);
     let field2 = field1.clone();
@@ -134,8 +146,17 @@ fn generate_struct_many_fields_nom_read(encoding: &StructEncoding) -> TokenStrea
         .fields
         .iter()
         .map(|field| format!("{}::{}", name, field.name));
-    let field_nom_read = encoding.fields.iter().map(generate_struct_field_nom_read);
-    quote_spanned! {
+    let mut constraints = Punctuated::new();
+    let field_nom_read = encoding.fields.iter().map(|field| {
+        let TokenStreamWithConstraints {
+            stream,
+            constraints: field_constraints,
+        } = generate_struct_field_nom_read(field);
+        constraints.extend(field_constraints);
+        stream
+    });
+    TokenStreamWithConstraints {
+        stream: quote_spanned! {
         encoding.name.span()=>
             nom::combinator::map(
                 nom::sequence::tuple((
@@ -143,10 +164,12 @@ fn generate_struct_many_fields_nom_read(encoding: &StructEncoding) -> TokenStrea
                 )),
                 |(#(#field1),*)| #name { #(#field2),* }
             )
+            },
+        constraints,
     }
 }
 
-fn generate_struct_multi_fields_nom_read(encoding: &StructEncoding) -> TokenStream {
+fn generate_struct_multi_fields_nom_read(encoding: &StructEncoding) -> TokenStreamWithConstraints {
     let name = encoding.name;
     let field1 = encoding.fields.iter().map(|field| field.name);
     let field2 = field1.clone();
@@ -154,36 +177,48 @@ fn generate_struct_multi_fields_nom_read(encoding: &StructEncoding) -> TokenStre
         .fields
         .iter()
         .map(|field| format!("{}::{}", name, field.name));
-    let field_nom_read = encoding.fields.iter().map(generate_struct_field_nom_read);
-    quote_spanned! {
+    let mut constraints = Punctuated::new();
+    let field_nom_read = encoding.fields.iter().map(|field| {
+        let TokenStreamWithConstraints {
+            stream,
+            constraints: field_constraints,
+        } = generate_struct_field_nom_read(field);
+        constraints.extend(field_constraints);
+        stream
+    });
+    TokenStreamWithConstraints {
+        stream: quote_spanned! {
         encoding.name.span()=>
             (|input| {
                 #(let (input, #field1) = tezos_data_encoding::nom::field(#field_name, #field_nom_read)(input)?;)*
                 Ok((input, #name { #(#field2),* }))
             })
+            },
+        constraints,
     }
 }
 
-fn generate_struct_field_nom_read(field: &FieldEncoding) -> TokenStream {
+fn generate_struct_field_nom_read(field: &FieldEncoding) -> TokenStreamWithConstraints {
     match field.kind {
         FieldKind::Encoded(ref field_enc) => {
-            let encoding = generate_nom_read(&field_enc.encoding);
-            if let Some(ref reserve) = field_enc.reserve {
-                quote! {
-                    tezos_data_encoding::nom::reserve(
-                        #reserve,
-                        #encoding
-                    )
+            generate_nom_read(&field_enc.encoding).map_stream(|encoding| {
+                if let Some(ref reserve) = field_enc.reserve {
+                    quote! {
+                        tezos_data_encoding::nom::reserve(
+                            #reserve,
+                            #encoding
+                        )
+                    }
+                } else {
+                    encoding
                 }
-            } else {
-                encoding
-            }
+            })
         }
-        FieldKind::Skip => quote!(|input| Ok((input, Default::default()))),
+        FieldKind::Skip => quote!(|input| Ok((input, Default::default()))).into(),
     }
 }
 
-fn generate_enum_nom_read(encoding: &EnumEncoding) -> TokenStream {
+fn generate_enum_nom_read(encoding: &EnumEncoding) -> TokenStreamWithConstraints {
     let tag_type = &encoding.tag_type;
     let tag_read = if encoding.tag_type == crate::symbol::rust::U8 {
         quote_spanned!(encoding.tag_type.span()=> nom::number::complete::u8)
@@ -191,17 +226,23 @@ fn generate_enum_nom_read(encoding: &EnumEncoding) -> TokenStream {
         quote_spanned!(encoding.tag_type.span()=> nom::number::complete::#tag_type(nom::number::Endianness::Big))
     };
     let tag_id = encoding.tags.iter().map(|tag| tag.id.clone());
-    let tags_nom_read = encoding
-        .tags
-        .iter()
-        .map(|tag| generate_tag_nom_read(tag, encoding.name));
+    let mut constraints = Punctuated::new();
+    let tags_nom_read = encoding.tags.iter().map(|tag| {
+        let TokenStreamWithConstraints {
+            stream,
+            constraints: tag_constraints,
+        } = generate_tag_nom_read(tag, encoding.name);
+        constraints.extend(tag_constraints);
+        stream
+    });
     let unknown_tag_error = if encoding.ignore_unknown {
         "unknown_tag"
     } else {
         "invalid_tag"
     };
     let unknown_tag_error = format_ident!("{}", unknown_tag_error, span = tag_type.span());
-    quote_spanned! {
+    TokenStreamWithConstraints {
+        stream: quote_spanned! {
         tag_type.span()=>
             (|input| {
                 let (input, tag) = #tag_read(input)?;
@@ -222,19 +263,21 @@ fn generate_enum_nom_read(encoding: &EnumEncoding) -> TokenStream {
                 };
                 Ok((input, variant))
             })
+        },
+        constraints,
     }
 }
 
-fn generate_tag_nom_read(tag: &Tag<'_>, enum_name: &syn::Ident) -> TokenStream {
+fn generate_tag_nom_read(tag: &Tag<'_>, enum_name: &syn::Ident) -> TokenStreamWithConstraints {
     let tag_name = tag.name;
     match &tag.encoding {
         Encoding::Unit => {
-            quote_spanned!(tag_name.span()=> |bytes| Ok((bytes, #enum_name::#tag_name)))
+            quote_spanned!(tag_name.span()=> |bytes| Ok((bytes, #enum_name::#tag_name))).into()
         }
         encoding => {
-            let nom_read = generate_nom_read(encoding);
+            generate_nom_read(encoding).map_stream(|nom_read| {
             let name = format!("{}::{}", enum_name, tag_name);
-            quote_spanned!(tag_name.span()=> nom::combinator::map(tezos_data_encoding::nom::variant(#name, #nom_read), #enum_name::#tag_name))
+                quote_spanned!(tag_name.span()=> nom::combinator::map(tezos_data_encoding::nom::variant(#name, #nom_read), #enum_name::#tag_name))})
         }
     }
 }
@@ -246,46 +289,60 @@ fn generate_string_nom_read(size: &Option<syn::Expr>, span: Span) -> TokenStream
     )
 }
 
-fn generate_optional_field_nom_read(encoding: &Encoding, span: Span) -> TokenStream {
-    let nom_read = generate_nom_read(encoding);
-    quote_spanned!(span=> tezos_data_encoding::nom::optional_field(#nom_read))
+fn generate_optional_field_nom_read(encoding: &Encoding, span: Span) -> TokenStreamWithConstraints {
+    generate_nom_read(encoding).map_stream(
+        |nom_read| quote_spanned!(span=> tezos_data_encoding::nom::optional_field(#nom_read)),
+    )
 }
 
 fn generate_list_nom_read(
     size: &Option<syn::Expr>,
     encoding: &Encoding,
     span: Span,
-) -> TokenStream {
-    let nom_read = generate_nom_read(encoding);
-    size.as_ref().map_or_else(
-        || quote_spanned!(span=> tezos_data_encoding::nom::list(#nom_read)),
-        |size| quote_spanned!(span=> tezos_data_encoding::nom::bounded_list(#size, #nom_read)),
+) -> TokenStreamWithConstraints {
+    generate_nom_read(encoding).map_stream(|nom_read| {
+        size.as_ref().map_or_else(
+            || quote_spanned!(span=> tezos_data_encoding::nom::list(#nom_read)),
+            |size| quote_spanned!(span=> tezos_data_encoding::nom::bounded_list(#size, #nom_read)),
+        )
+    })
+}
+
+fn generate_sized_nom_read(
+    size: &syn::Expr,
+    encoding: &Encoding,
+    span: Span,
+) -> TokenStreamWithConstraints {
+    generate_nom_read(encoding).map_stream(
+        |nom_read| quote_spanned!(span=> tezos_data_encoding::nom::sized(#size, #nom_read)),
     )
 }
 
-fn generate_sized_nom_read(size: &syn::Expr, encoding: &Encoding, span: Span) -> TokenStream {
-    let nom_read = generate_nom_read(encoding);
-    quote_spanned!(span=> tezos_data_encoding::nom::sized(#size, #nom_read))
+fn generate_bounded_nom_read(
+    size: &syn::Expr,
+    encoding: &Encoding,
+    span: Span,
+) -> TokenStreamWithConstraints {
+    generate_nom_read(encoding).map_stream(
+        |nom_read| quote_spanned!(span=> tezos_data_encoding::nom::bounded(#size, #nom_read)),
+    )
 }
 
-fn generate_bounded_nom_read(size: &syn::Expr, encoding: &Encoding, span: Span) -> TokenStream {
-    let nom_read = generate_nom_read(encoding);
-    quote_spanned!(span=> tezos_data_encoding::nom::bounded(#size, #nom_read))
-}
-
-fn generate_short_dynamic_nom_read(encoding: &Encoding, span: Span) -> TokenStream {
-    let nom_read = generate_nom_read(encoding);
-    quote_spanned!(span=> tezos_data_encoding::nom::short_dynamic(#nom_read))
+fn generate_short_dynamic_nom_read(encoding: &Encoding, span: Span) -> TokenStreamWithConstraints {
+    generate_nom_read(encoding).map_stream(
+        |nom_read| quote_spanned!(span=> tezos_data_encoding::nom::short_dynamic(#nom_read)),
+    )
 }
 
 fn generate_dynamic_nom_read(
     size: &Option<syn::Expr>,
     encoding: &Encoding,
     span: Span,
-) -> TokenStream {
-    let nom_read = generate_nom_read(encoding);
-    size.as_ref().map_or_else(
+) -> TokenStreamWithConstraints {
+    generate_nom_read(encoding).map_stream(|nom_read| {
+        size.as_ref().map_or_else(
         || quote_spanned!(span=> tezos_data_encoding::nom::dynamic(#nom_read)),
         |size| quote_spanned!(span=> tezos_data_encoding::nom::bounded_dynamic(#size, #nom_read)),
     )
+    })
 }
