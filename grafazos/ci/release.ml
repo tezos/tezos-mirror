@@ -27,6 +27,7 @@ let job_gitlab_release =
     ~image:Images.ci_release
     ~stage:Stages.publish_release_gitlab
     ~interruptible:false
+    ~dependencies:(Dependent [Artifacts (Common.job_build_grafazos ())])
     ~name:"gitlab:release"
     ["./grafazos/scripts/releases/create_gitlab_release.sh"]
 
