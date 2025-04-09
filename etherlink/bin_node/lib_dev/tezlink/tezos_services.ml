@@ -99,8 +99,6 @@ type tezlink_rpc_context = {
   chain : Tezos_shell_services.Chain_services.chain;
 }
 
-type contract = Imported_protocol.Alpha_context.Contract.t
-
 (** Builds a [tezlink_rpc_context] from paths parameters. *)
 let make_env (chain : Tezos_shell_services.Chain_services.chain)
     (block : Tezos_shell_services.Block_services.block) :
@@ -203,7 +201,7 @@ module Imported_services = struct
   let balance :
       ( [`GET],
         tezlink_rpc_context,
-        tezlink_rpc_context * contract,
+        tezlink_rpc_context * Tezos_types.Contract.t,
         unit,
         unit,
         Protocol_types.Tez.t )
