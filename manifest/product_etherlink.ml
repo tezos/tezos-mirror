@@ -23,6 +23,19 @@ include Product (struct
   let source = ["etherlink"; "src"] @ Product_websocket.product_source
 end)
 
+let quebec =
+  List.find (fun proto -> Protocol.short_hash proto = "PsQuebec") Protocol.all
+
+let tezlink_protocol_plugin =
+  match Protocol.plugin quebec with
+  | Some target -> target
+  | None -> (* unreachable *) assert false
+
+let tezlink_protocol_parameters =
+  match Protocol.parameters quebec with
+  | Some target -> target
+  | None -> (* unreachable *) assert false
+
 let tezt_etherlink =
   private_lib
     "tezt_etherlink"
@@ -222,6 +235,7 @@ let evm_node_lib_dev_encoding =
         websocket;
         re;
         uuidm;
+        tezlink_protocol_plugin;
       ]
 
 let evm_node_config =
@@ -241,19 +255,6 @@ let evm_node_config =
       ]
 
 let evm_node_lib_dev =
-  let quebec =
-    List.find (fun proto -> Protocol.short_hash proto = "PsQuebec") Protocol.all
-  in
-  let plugin =
-    match Protocol.plugin quebec with
-    | Some target -> target
-    | None -> (* unreachable *) assert false
-  in
-  let parameters =
-    match Protocol.parameters quebec with
-    | Some target -> target
-    | None -> (* unreachable *) assert false
-  in
   octez_evm_node_lib
     "evm_node_lib_dev"
     ~path:"etherlink/bin_node/lib_dev"
@@ -293,8 +294,8 @@ let evm_node_lib_dev =
         supported_installers;
         wasm_runtime;
         performance_metrics;
-        plugin;
-        parameters;
+        tezlink_protocol_plugin;
+        tezlink_protocol_parameters;
         octez_version;
         octez_shell_services;
       ]
