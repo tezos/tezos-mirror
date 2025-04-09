@@ -28,6 +28,10 @@ Each command has its own help page:
 - [Configuration file (`tobi/config`)](configuration_file.md)
 - [What Tobi needs from Opam files](what_Tobi_needs_from_Opam_files.md)
 
+### Cache
+
+- [The `_tobi` directory](the_tobi_directory.md)
+
 ## Explanations
 
 - [Why this configuration file format](why_this_configuration_file_format.md)
