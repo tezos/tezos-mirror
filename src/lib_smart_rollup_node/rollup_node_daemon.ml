@@ -336,15 +336,22 @@ let notify_synchronization (node_ctxt : _ Node_context.t) head_level =
 let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   let open Lwt_result_syntax in
   let* old_head = Node_context.last_processed_head_opt node_ctxt in
-  let old_head =
+  let old_head, old_level =
     match old_head with
     | Some h ->
-        `Head Layer1.{hash = h.header.block_hash; level = h.header.level}
+        ( `Head Layer1.{hash = h.header.block_hash; level = h.header.level},
+          h.header.level )
     | None ->
         (* if no head has been processed yet, we want to handle all blocks
            since, and including, the rollup origination. *)
         let origination_level = node_ctxt.genesis_info.level in
-        `Level (Int32.pred origination_level)
+        let l = Int32.pred origination_level in
+        (`Level l, l)
+  in
+  let missing_blocks = Int32.sub head.level old_level in
+  let*! () =
+    if missing_blocks > 1l then Daemon_event.catch_up missing_blocks
+    else Lwt.return_unit
   in
   let stripped_head = Layer1.head_of_header head in
   let*! reorg =
