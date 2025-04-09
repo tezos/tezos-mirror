@@ -10,7 +10,7 @@
   * [EIP-5656](https://eips.ethereum.org/EIPS/eip-5656)
   * [EIP-6780](https://eips.ethereum.org/EIPS/eip-6780)
 - A fast withdrawal entrypoint was added to the FA bridge precompiled contract
-  under a feature flag. (!17114)
+  under a feature flag. (!17114 !17494)
 - Hot and cold accesses are now enabled to better align gas consumption
   with the actual execution on Etherlink. (!17308)
 - Removes the `OutOfTicks` error when executing the EVM interpreter. We only
