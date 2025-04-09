@@ -36,11 +36,11 @@ ENV PATH=/root/.cargo/bin:$PATH
 # install rust toolchains and compilation targets
 RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 1.80.1 1.84.1 1.86.0 nightly-2025-01-30 nightly-2023-12-15 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
-    rustup target add --toolchain="$tc" \
-    wasm32-unknown-unknown \
-    riscv64gc-unknown-none-elf \
-    riscv64gc-unknown-linux-gnu \
-    x86_64-unknown-linux-musl; \
+        rustup target add --toolchain="$tc" wasm32-unknown-unknown; \
+        rustup target add --toolchain="$tc" riscv64gc-unknown-none-elf; \
+        rustup target add --toolchain="$tc" riscv64gc-unknown-linux-gnu; \
+        rustup target add --toolchain="$tc" riscv64gc-unknown-linux-musl; \
+        rustup target add --toolchain="$tc" x86_64-unknown-linux-musl; \
     done && \
     rustup component add --toolchain=nightly-2025-01-30 rustfmt miri rust-src && \
     rustup component add --toolchain=nightly-2023-12-15 rust-src llvm-tools
@@ -78,8 +78,9 @@ RUN cargo +1.78.0 install --locked cargo-audit --version 0.20.0 && \
 # Install a version of binutils which supports RISC-V and put symlink in PATH
 # hadolint ignore=DL3008
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y wabt binutils-riscv64-unknown-elf \
+    && apt-get install --no-install-recommends -y wabt binutils-riscv64-unknown-elf gcc-riscv64-linux-gnu \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/riscv64-linux-gnu-gcc /usr/bin/riscv64-unknown-linux-musl-gcc 
 
 RUN ln -s /usr/bin/riscv64-unknown-elf-objdump /usr/local/bin/objdump

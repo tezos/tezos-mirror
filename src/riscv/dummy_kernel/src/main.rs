@@ -1,5 +1,8 @@
 mod sbi_crypto;
 
+#[cfg(target_os = "linux")]
+mod linux_only;
+
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::inbox::InboxMessage;
@@ -15,6 +18,9 @@ use tezos_smart_rollup_constants::riscv::SbiError;
 
 #[entrypoint::main]
 pub fn entry(host: &mut impl Runtime) {
+    #[cfg(target_os = "linux")]
+    linux_only::dummy();
+
     let msg = "Hello World\n";
     debug_msg!(host, "{}", msg);
 

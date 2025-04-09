@@ -68,7 +68,8 @@ struct Foo {
     c: u8,
 }
 
-fn main() {
+/// Do some dummy stuff to test the kernel
+pub fn dummy() {
     unsafe {
         test_write(c"Hello World\n");
         test_writev([c"Hello\n", c"World\n"]);
