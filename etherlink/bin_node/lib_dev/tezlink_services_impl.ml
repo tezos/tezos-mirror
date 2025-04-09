@@ -5,6 +5,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_types
+
+module Path = struct
+  (** [to_path encoding value] uses [encoding] to encode [value] in
+      hexadecimal *)
+  let to_path encoding value =
+    let raw_key = Data_encoding.Binary.to_bytes_exn encoding value in
+    let (`Hex s) = Hex.of_bytes raw_key in
+    s
+
+  let account contract =
+    "/tezlink/context/contracts/index/" ^ to_path Contract.encoding contract
+
+  let balance contract = account contract ^ "/balance"
+end
+
+let balance read chain block c =
+  (* TODO: #7831 !17664
+     Support non-default chain and block parameters. *)
+  ignore chain ;
+  ignore block ;
+
+  Durable_storage.inspect_durable_and_decode_default
+    ~default:Tezos_types.Tez.zero
+    read
+    (Path.balance c)
+    (Data_encoding.Binary.of_bytes_exn Tez.encoding)
+
 module type Backend = sig
   include Durable_storage.READER
 
@@ -108,4 +136,13 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
             err
     in
     return Tezlink_constants.{fixed; parametric = Tezlink_constants.mainnet}
+
+  let read p =
+    let open Lwt_result_syntax in
+    let* state = Backend.get_state () in
+    Backend.read state p
+
+  (* TODO: #7831 !17664
+     we type [chain], even though we don't use it, to satisfy the compiler. *)
+  let balance (chain : [> `Main]) = balance read chain
 end
