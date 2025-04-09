@@ -377,7 +377,6 @@ mod tests {
                 // SAFETY: interpreted blocks are always callable
                 block.callable(interpreted_bb)
             }
-            .unwrap()
             .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
             let jitted_res = unsafe {
                 // # Safety - the block builder is alive for at least
