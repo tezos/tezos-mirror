@@ -56,8 +56,12 @@ let local_head_too_old ?remote_head ~evm_node_endpoint
 
 let quantity_succ (Qty x) = Qty Z.(succ x)
 
+let quantity_add (Qty x) y = Qty Z.(add x (of_int y))
+
 module Blueprints_sequence = struct
   type t = (Blueprint_types.with_events, tztrace) Seq_es.t
+
+  let legacy_rpc_fallback = ref false
 
   let rec fold f acc seq =
     let open Lwt_result_syntax in
@@ -70,7 +74,7 @@ module Blueprints_sequence = struct
         | `Continue acc -> (fold [@tailcall]) f acc seq
         | `Cut c -> return (`Cut c))
 
-  let make ~next_blueprint_number evm_node_endpoint : t =
+  let make_legacy_rpc ~next_blueprint_number evm_node_endpoint : t =
     let open Lwt_result_syntax in
     Seq_es.ES.unfold
       (fun (remote_head, next_blueprint_number) ->
@@ -94,6 +98,52 @@ module Blueprints_sequence = struct
                  (Some remote_head, quantity_succ next_blueprint_number) ))
         else return None)
       (None, next_blueprint_number)
+
+  let rec make_with_chunks ?remote_head ~next_blueprint_number evm_node_endpoint
+      : t =
+   fun () ->
+    let open Lwt_result_syntax in
+    let* is_too_old, remote_head =
+      local_head_too_old ?remote_head ~evm_node_endpoint next_blueprint_number
+    in
+    if is_too_old then
+      let*! blueprints =
+        (* See {Note keep_alive} *)
+        Evm_services.get_blueprints
+          ~keep_alive:true
+          ~evm_node_endpoint
+          ~count:500L
+          next_blueprint_number
+      in
+      match blueprints with
+      | Ok [] ->
+          (* The node should never return an empty-list. It is expected that it
+             will always return at least one element. *)
+          assert false
+      | Ok blueprints ->
+          let next_chunks =
+            make_with_chunks
+              ~remote_head
+              ~next_blueprint_number:
+                (quantity_add next_blueprint_number (List.length blueprints))
+              evm_node_endpoint
+          in
+          Seq_es.append (Seq_es.of_seq (List.to_seq blueprints)) next_chunks
+          @@ ()
+      | Error
+          (( Tezos_rpc.Context.Not_found _
+           | RPC_client_errors.Request_failed
+               {error = Unauthorized_uri | Forbidden; _} )
+          :: _) ->
+          legacy_rpc_fallback := true ;
+          make_legacy_rpc ~next_blueprint_number evm_node_endpoint ()
+      | Error err -> fail err
+    else return Seq_es.Nil
+
+  let make ~next_blueprint_number evm_node_endpoint : t =
+    if !legacy_rpc_fallback then
+      make_legacy_rpc ~next_blueprint_number evm_node_endpoint
+    else make_with_chunks ~next_blueprint_number evm_node_endpoint
 end
 
 let rec catchup ~next_blueprint_number ~first_connection params =

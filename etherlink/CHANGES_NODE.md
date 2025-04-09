@@ -27,6 +27,8 @@
 - Fixes a bug (which negatively impacted performance) in the EVM events batch
   fetching in case the rollup node has ACL filtering for the required RPC.
   (!17572)
+- Speeds up catch-up by fetching up to 500 blueprints at once when upstream EVM
+  node allows it before applying them. (!17593)
 
 ### Storage changes
 
