@@ -13,7 +13,7 @@ mkdir -p /run/octez-baker
 case "${1}" in
 install | upgrade)
   # if $2 is empty, then we're doing a fresh install.
-  # Ohtwerwise we're upgrading
+  # Otherwise we're upgrading
   if [ -n "$2" ]; then
     # the configure script is called with the version of the old
     # package in case of upgrade. We display a message to the user

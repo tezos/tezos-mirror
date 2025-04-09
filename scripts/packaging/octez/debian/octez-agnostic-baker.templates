@@ -28,7 +28,7 @@ Template: octez-agnostic-baker/dal-node-url
 Type: string
 Default: http://127.0.0.1:10732
 Description: Specify the url of the RPC server of the Octez DAL node:
- By default the octez-dal-node package is installed along side the octez-agnostic-baker.
+ By default the octez-dal-node package is installed alongside the octez-agnostic-baker.
 
 Template: octez-agnostic-baker/upgrade_note_current
 Type: note
