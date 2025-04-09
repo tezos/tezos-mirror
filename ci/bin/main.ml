@@ -349,7 +349,7 @@ let () =
       [
         Common.job_datadog_pipeline_trace;
         Common.job_container_scanning
-          ~docker_image:"tezos/tezos:octez-evm-node-v0.20"
+          ~docker_image:"tezos/tezos:octez-evm-node-v0.21"
           ~dockerfile_path:"build.Dockerfile";
       ]
     ~description:
