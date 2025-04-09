@@ -39,3 +39,5 @@ module Contract : sig
 
   val encoding : t Data_encoding.t
 end
+
+module Tez = Tezlink_imports.Alpha_context.Tez

@@ -52,3 +52,5 @@ module Contract = struct
 
   let encoding = Tezlink_imports.Alpha_context.Contract.encoding
 end
+
+module Tez = Tezlink_imports.Alpha_context.Tez
