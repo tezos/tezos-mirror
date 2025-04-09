@@ -600,6 +600,50 @@ let test_tezlink_version =
       ~error_msg:"Expected version %R but got %L") ;
   unit
 
+let test_tezlink_constants =
+  Protocol.register_regression_test
+    ~title:"Test of the constants rpc"
+    ~tags:["tezlink"; "rpc"; "constants"]
+    ~__FILE__
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_client;
+        Constant.WASM.evm_kernel;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+      ])
+  @@ fun protocol ->
+  let l2_chains =
+    [
+      {
+        (Evm_node.default_l2_setup ~l2_chain_id:12) with
+        l2_chain_family = "Michelson";
+      };
+    ]
+  in
+  let* {sequencer; client; _} =
+    Setup.setup_sequencer
+      ~mainnet_compat:false
+      ~enable_dal:false
+      ~enable_multichain:true
+      ~l2_chains
+      ~rpc_server:Evm_node.Resto
+      ~spawn_rpc:(Port.fresh ())
+      protocol
+  in
+  let hooks = Tezos_regression.hooks in
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "tezlink"})
+  in
+  let* _ =
+    Client.RPC.call ~hooks ~endpoint client
+    @@ RPC.get_chain_block_context_constants ()
+  in
+  unit
+
 let test_make_l2_kernel_installer_config chain_family =
   Protocol.register_test
     ~__FILE__
@@ -12885,4 +12929,5 @@ let () =
   test_tezlink_balance [Alpha] ;
   test_tezlink_protocols [Alpha] ;
   test_tezlink_version [Alpha] ;
+  test_tezlink_constants [Alpha] ;
   test_tezlink_produceBlock [Alpha]

@@ -7,6 +7,7 @@
 
 module Imported_protocol = Tezos_protocol_021_PsQuebec.Protocol
 module Imported_protocol_parameters = Tezos_protocol_021_PsQuebec_parameters
+module Alpha_context = Imported_protocol.Alpha_context
 
 module Tezlink_protocols : sig
   type protocols
@@ -18,6 +19,21 @@ module Tezlink_version : sig
   type version
 
   val mock : version
+end
+
+module Protocol_types : sig
+  module Constants : sig
+    type fixed = Alpha_context.Constants.fixed
+
+    type parametric = Alpha_context.Constants.Parametric.t
+
+    type t = {fixed : fixed; parametric : parametric}
+
+    val values_to_fixed :
+      (int * int * int * int * int * int * int * int * int * int)
+      * (int * int * int * Z.t) ->
+      (fixed, error trace) result
+  end
 end
 
 type level = {
@@ -49,7 +65,9 @@ type tezos_services_implementation = {
   current_level : chain -> block -> level_query -> level tzresult Lwt.t;
   version : unit -> Tezlink_version.version tzresult Lwt.t;
   protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
-  balance : chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
+  balance :
+    chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
+  constants : chain -> block -> Protocol_types.Constants.t tzresult Lwt.t;
 }
 
 (* THIS IS THE ENTRYPOINT *)

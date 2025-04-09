@@ -9,6 +9,7 @@ module Imported_protocol = Tezos_protocol_021_PsQuebec.Protocol
 module Imported_protocol_plugin = Tezos_protocol_plugin_021_PsQuebec
 module Imported_protocol_parameters = Tezos_protocol_021_PsQuebec_parameters
 module Imported_env = Tezos_protocol_environment_021_PsQuebec
+module Alpha_context = Imported_protocol.Alpha_context
 
 (* The output type of the current_level service but with less duplicated
    information. Can be changed, as long as the [conversion_encoding] is also
@@ -123,6 +124,55 @@ module Protocol_types = struct
       |> Option.value ~default:Alpha_context.Tez.zero
       |> Result_syntax.return
   end
+
+  module Constants = struct
+    type fixed = Alpha_context.Constants.fixed
+
+    type parametric = Alpha_context.Constants.Parametric.t
+
+    type t = {fixed : fixed; parametric : parametric}
+
+    let fixed_values_encoding =
+      let open Data_encoding in
+      merge_objs
+        (obj10
+           (req "proof_of_work_nonce_size" uint8)
+           (req "nonce_length" uint8)
+           (req "max_anon_ops_per_block" uint8)
+           (req "max_operation_data_length" int31)
+           (req "max_proposals_per_delegate" uint8)
+           (req "max_micheline_node_count" int31)
+           (req "max_micheline_bytes_limit" int31)
+           (req "max_allowed_global_constants_depth" int31)
+           (req "cache_layout_size" uint8)
+           (req "michelson_maximum_type_size" uint16))
+        (obj4
+           (req "max_slashing_period" uint8)
+           (req "smart_rollup_max_wrapped_proof_binary_size" int31)
+           (req "smart_rollup_message_size_limit" int31)
+           (req "smart_rollup_max_number_of_messages_per_level" n))
+
+    let values_to_fixed =
+      convert_using_serialization
+        ~name:"values_to_fixed"
+        ~dst:Alpha_context.Constants.fixed_encoding
+        ~src:fixed_values_encoding
+
+    let constants_encoding =
+      let open Data_encoding in
+      conv
+        (fun {fixed; parametric} -> (fixed, parametric))
+        (fun (fixed, parametric) -> {fixed; parametric})
+        (obj2
+           (req "fixed" Alpha_context.Constants.fixed_encoding)
+           (req "parametric" Alpha_context.Constants.Parametric.encoding))
+
+    let convert : t -> Alpha_context.Constants.t tzresult =
+      convert_using_serialization
+        ~name:"constants"
+        ~dst:Alpha_context.Constants.encoding
+        ~src:constants_encoding
+  end
 end
 
 (** [wrap conversion service_implementation] changes the output type
@@ -187,6 +237,26 @@ module Tezlink_protocols = struct
   let current = Shell_impl.{current_protocol = quebec; next_protocol = quebec}
 end
 
+(* Copied from src/proto_alpha/lib_protocol/constants_services.ml. *)
+(* TODO: #7875
+   Import from the protocol once it is exposed instead of copying it here. *)
+module Constants_services = struct
+  module RPC_path = Tezos_rpc.Path
+  module RPC_service = Tezos_rpc.Service
+  module RPC_query = Tezos_rpc.Query
+
+  let custom_root =
+    (RPC_path.(open_root / "context" / "constants")
+      : tezlink_rpc_context RPC_path.context)
+
+  let all =
+    RPC_service.get_service
+      ~description:"All constants"
+      ~query:RPC_query.empty
+      ~output:Alpha_context.Constants.encoding
+      custom_root
+end
+
 (* This is where we import service declarations from the protocol. *)
 module Imported_services = struct
   module Protocol_plugin_services = Imported_protocol_plugin.RPC.S
@@ -248,6 +318,16 @@ module Imported_services = struct
          ~query:Tezos_rpc.Query.empty
          ~output:Protocol_types.Tez.encoding
          (contract_arg_path "balance")
+
+  let constants :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context,
+        unit,
+        unit,
+        Protocol_types.Alpha_context.Constants.t )
+      Tezos_rpc.Service.t =
+    import_service Constants_services.all
 end
 
 type block = Tezos_shell_services.Block_services.block
@@ -267,7 +347,9 @@ type tezos_services_implementation = {
     chain -> block -> Imported_services.level_query -> level tzresult Lwt.t;
   version : unit -> Tezlink_version.version tzresult Lwt.t;
   protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
-  balance : chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
+  balance :
+    chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
+  constants : chain -> block -> Protocol_types.Constants.t tzresult Lwt.t;
 }
 
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
@@ -288,6 +370,10 @@ let build_block_dir impl =
        ~impl:(fun ({block; chain}, contract) _ _ ->
          impl.balance chain block contract)
        ~convert_output:Protocol_types.Tez.convert
+  |> register_with_conversion
+       ~service:Imported_services.constants
+       ~impl:(fun {block; chain} () () -> impl.constants chain block)
+       ~convert_output:Protocol_types.Constants.convert
 
 (** Builds the root director. *)
 let build_dir impl =
