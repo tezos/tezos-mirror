@@ -10,10 +10,7 @@
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::hart_state::HartState;
 use crate::machine_state::memory;
-use crate::machine_state::memory::Address;
-use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
-use crate::parser::instruction::InstrWidth;
 use crate::state_backend as backend;
 use crate::traps::Exception;
 
@@ -21,30 +18,6 @@ impl<M> HartState<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// Writes the address of the instruction following the jump (pc+2) to `rd`.
-    /// Jumps to the target address `val(rs1)`.
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - JALR
-    /// - C.JALR
-    pub fn run_jalr(
-        &mut self,
-        rd: NonZeroXRegister,
-        rs1: NonZeroXRegister,
-        width: InstrWidth,
-    ) -> Address {
-        // The return address to be saved in rd is the next instruction after this one.
-        let return_address = self.pc.read().wrapping_add(width as u64);
-
-        // The target address is obtained by setting the
-        // least-significant bit of the address in rs1 to zero
-        let target_address = self.xregisters.read_nz(rs1) & !1;
-
-        self.xregisters.write_nz(rd, return_address);
-
-        target_address
-    }
-
     /// `C.EBREAK` compressed instruction
     ///
     /// Equivalent to `EBREAK`.
@@ -81,7 +54,6 @@ mod tests {
     use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::nz;
-    use crate::parser::instruction::InstrWidth;
 
     backend_test!(test_run_j, F, {
         let test_case = [
@@ -102,33 +74,19 @@ mod tests {
         }
     });
 
-    backend_test!(test_cjr_cjalr, F, {
+    backend_test!(test_cjr, F, {
         let scenarios = [
-            (42, 2, nz::a2, 2, 44),
-            (u64::MAX - 1, -200_i64 as u64, nz::a2, -200_i64 as u64, 0),
+            (42, 2, nz::a2, 2),
+            (u64::MAX - 1, -200_i64 as u64, nz::a2, -200_i64 as u64),
             (
                 1_000_000_000_000,
                 u64::MAX - 1_000_000_000_000 + 3,
                 nz::a2,
                 u64::MAX - 1_000_000_000_000 + 3,
-                1_000_000_000_002,
             ),
         ];
-        for (init_pc, init_rs1, rs1, res_pc, res_rd) in scenarios {
+        for (init_pc, init_rs1, rs1, res_pc) in scenarios {
             let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-
-            // Test C.JALR
-            // save program counter and value for rs1.
-            state.hart.pc.write(init_pc);
-            state.hart.xregisters.write_nz(rs1, init_rs1);
-            let new_pc = state.hart.run_jalr(nz::ra, rs1, InstrWidth::Compressed);
-
-            // check the program counter hasn't changed, the returned
-            // value for the program counter is correct, and that the link
-            // register has been updated.
-            assert_eq!(state.hart.pc.read(), init_pc);
-            assert_eq!(new_pc, res_pc);
-            assert_eq!(state.hart.xregisters.read_nz(nz::ra), res_rd);
 
             // Test C.JR
             // save program counter and value for rs1.
