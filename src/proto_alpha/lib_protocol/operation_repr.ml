@@ -1263,6 +1263,28 @@ module Encoding = struct
             Attestations_aggregate {consensus_content; committee});
       }
 
+  let preattestations_aggregate_encoding =
+    obj2
+      (req "consensus_content" consensus_aggregate_content_encoding)
+      (req "committee" (list Slot_repr.encoding))
+
+  let preattestations_aggregate_case =
+    Case
+      {
+        tag = 30;
+        name = "preattestations_aggregate";
+        encoding = preattestations_aggregate_encoding;
+        select =
+          (function
+          | Contents (Preattestations_aggregate _ as op) -> Some op | _ -> None);
+        proj =
+          (fun (Preattestations_aggregate {consensus_content; committee}) ->
+            (consensus_content, committee));
+        inj =
+          (fun (consensus_content, committee) ->
+            Preattestations_aggregate {consensus_content; committee});
+      }
+
   let seed_nonce_revelation_case =
     Case
       {
@@ -1594,6 +1616,7 @@ module Encoding = struct
   let contents_cases_common =
     [
       PCase attestations_aggregate_case;
+      PCase preattestations_aggregate_case;
       PCase double_preattestation_evidence_case;
       PCase double_attestation_evidence_case;
       PCase seed_nonce_revelation_case;

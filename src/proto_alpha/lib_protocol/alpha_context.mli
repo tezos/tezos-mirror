@@ -5012,6 +5012,8 @@ module Operation : sig
 
     val attestations_aggregate_case : Kind.attestations_aggregate case
 
+    val preattestations_aggregate_case : Kind.preattestations_aggregate case
+
     val attestation_with_dal_case : Kind.attestation case
 
     val seed_nonce_revelation_case : Kind.seed_nonce_revelation case

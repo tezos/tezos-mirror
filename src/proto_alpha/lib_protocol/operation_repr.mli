@@ -756,6 +756,8 @@ module Encoding : sig
 
   val attestations_aggregate_case : Kind.attestations_aggregate case
 
+  val preattestations_aggregate_case : Kind.preattestations_aggregate case
+
   val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 
   val vdf_revelation_case : Kind.vdf_revelation case

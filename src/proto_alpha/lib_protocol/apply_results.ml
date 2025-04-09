@@ -1164,6 +1164,32 @@ module Encoding = struct
               {balance_updates; committee; consensus_power});
       }
 
+  let preattestations_aggregate_case =
+    Case
+      {
+        op_case = Operation.Encoding.preattestations_aggregate_case;
+        encoding = consensus_aggregate_result_encoding;
+        select =
+          (function
+          | Contents_result (Preattestations_aggregate_result _ as op) ->
+              Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Preattestations_aggregate _ as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        proj =
+          (function
+          | Preattestations_aggregate_result
+              {balance_updates; committee; consensus_power} ->
+              (balance_updates, committee, consensus_power));
+        inj =
+          (fun (balance_updates, committee, consensus_power) ->
+            Preattestations_aggregate_result
+              {balance_updates; committee; consensus_power});
+      }
+
   let seed_nonce_revelation_case =
     Case
       {
@@ -1754,9 +1780,9 @@ let common_cases =
 let contents_cases =
   let open Encoding in
   attestation_case :: attestation_with_dal_case :: preattestation_case
-  :: attestations_aggregate_case :: double_attestation_evidence_case
-  :: double_preattestation_evidence_case :: dal_entrapment_evidence_case
-  :: common_cases
+  :: attestations_aggregate_case :: preattestations_aggregate_case
+  :: double_attestation_evidence_case :: double_preattestation_evidence_case
+  :: dal_entrapment_evidence_case :: common_cases
 
 let make_contents_result
     (Encoding.Case
