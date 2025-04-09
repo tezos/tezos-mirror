@@ -166,7 +166,6 @@ sanity_ci:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   script:
@@ -216,7 +215,6 @@ oc.ocaml_fmt:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -279,7 +277,6 @@ oc.misc_checks:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -350,7 +347,6 @@ documentation:rst-check:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . $HOME/.venv/bin/activate
   script:
   - make --silent -C docs sphinx-check
@@ -428,7 +424,6 @@ oc.build_arm64-released:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -486,7 +481,6 @@ oc.build_arm64-exp-dev-extra:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -593,7 +587,6 @@ oc.build:static-x86_64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -689,7 +682,6 @@ oc.build:static-arm64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -789,7 +781,6 @@ oc.build_x86_64-released:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -909,7 +900,6 @@ oc.build_x86_64-exp-dev-extra:
     - $CI_PROJECT_DIR/_dune_cache
     policy: push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1000,7 +990,6 @@ wasm-runtime-check:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1069,7 +1058,6 @@ ocaml-check:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1288,7 +1276,6 @@ oc.tezt:fetch-records:
   allow_failure: true
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1326,7 +1313,6 @@ build_octez_source:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1591,7 +1577,6 @@ build-layer1-profiling:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1654,7 +1639,6 @@ select_tezts:
     exit_codes: 17
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   script:
@@ -1844,7 +1828,6 @@ kaitai_checks:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -1886,7 +1869,6 @@ kaitai_e2e_checks:
   - kaitai_checks
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - . ./scripts/install_build_deps.js.sh
   script:
@@ -1941,7 +1923,6 @@ oc.check_lift_limits_patch:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -1997,7 +1978,6 @@ oc.python_check:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - . $HOME/.venv/bin/activate
@@ -2055,7 +2035,6 @@ oc.integration:compiler-rejections:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -2129,7 +2108,6 @@ oc.script:test-gen-genesis:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - cd scripts/gen-genesis
   script:
@@ -2173,7 +2151,6 @@ oc.script:snapshot_alpha_and_link:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2234,7 +2211,6 @@ oc.script:test_octez_release_versions:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -2280,7 +2256,6 @@ oc.script:b58_prefix:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - . $HOME/.venv/bin/activate
   script:
@@ -2311,7 +2286,6 @@ oc.test-liquidity-baking-scripts:
   - oc.build_x86_64-exp-dev-extra
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
@@ -2556,7 +2530,6 @@ test_sdk_bindings:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . $HOME/.venv/bin/activate
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -3005,7 +2978,6 @@ oc.unit:non-proto-x86_64:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -3073,7 +3045,6 @@ oc.unit:etherlink-x86_64:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -3161,7 +3132,6 @@ oc.unit:other-x86_64:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -3249,7 +3219,6 @@ oc.unit:proto-x86_64:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -3333,7 +3302,6 @@ oc.unit:non-proto-arm64:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -3401,7 +3369,6 @@ oc.unit:webassembly-x86_64:
   - oc.docker:ci:amd64
   timeout: 20 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
@@ -3458,7 +3425,6 @@ oc.unit:protocol_compiles:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -3495,7 +3461,6 @@ de.unit:x86_64:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - dune runtest data-encoding
@@ -3519,7 +3484,6 @@ de.unit:arm64:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - dune runtest data-encoding
@@ -3543,7 +3507,6 @@ resto.unit:x86_64:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - dune runtest resto
@@ -3567,7 +3530,6 @@ resto.unit:arm64:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - dune runtest resto
@@ -4237,7 +4199,6 @@ tezt:static-binaries:
   - oc.tezt:fetch-records
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - mv octez-binaries/x86_64/octez-* .
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
@@ -4446,7 +4407,6 @@ documentation:odoc:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -4504,7 +4464,6 @@ documentation:manuals:
   - oc.build_dsn_node
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - make -C docs -j octez-gen
@@ -4579,7 +4538,6 @@ documentation:docgen:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -4637,7 +4595,6 @@ documentation:build_all:
   - documentation:docgen
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . $HOME/.venv/bin/activate
   script:
@@ -4689,7 +4646,6 @@ documentation:linkcheck:
   allow_failure: true
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . $HOME/.venv/bin/activate

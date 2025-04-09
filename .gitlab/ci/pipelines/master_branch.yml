@@ -97,7 +97,6 @@ oc.build:static-x86_64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -142,7 +141,6 @@ oc.build:static-arm64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -188,7 +186,6 @@ oc.build_arm64-released:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -244,7 +241,6 @@ oc.build_arm64-exp-dev-extra:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -351,7 +347,6 @@ oc.unified_coverage:
   allow_failure: true
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
@@ -416,7 +411,6 @@ documentation:odoc:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -466,7 +460,6 @@ documentation:manuals:
   - oc.build:static-x86_64-linux-binaries
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - scripts/ci/documentation:manuals_static.sh
@@ -518,7 +511,6 @@ documentation:docgen:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -574,7 +566,6 @@ documentation:build_all:
   - documentation:docgen
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . $HOME/.venv/bin/activate
   script:
@@ -628,7 +619,6 @@ publish:documentation:
     policy: pull-push
   interruptible: false
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . $HOME/.venv/bin/activate
   - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519

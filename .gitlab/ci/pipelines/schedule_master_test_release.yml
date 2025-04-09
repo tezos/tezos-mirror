@@ -92,7 +92,6 @@ oc.build:static-x86_64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -138,7 +137,6 @@ oc.build:static-arm64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -489,7 +487,6 @@ apt_repo_debian_old:
   - oc.build-debian-old_b
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -521,7 +518,6 @@ apt_repo_debian:
   - oc.build-data_packages
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -724,7 +720,6 @@ apt_repo_ubuntu_old:
   - oc.build-ubuntu-old_b
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -756,7 +751,6 @@ apt_repo_ubuntu:
   - oc.build-data_packages
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -935,7 +929,6 @@ rpm_repo_rockylinux:
   - oc.build-rockylinux-data
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
   script:
@@ -1117,7 +1110,6 @@ rpm_repo_fedora:
   - oc.build-fedora-data
   timeout: 60 minutes
   before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
   script:

@@ -60,7 +60,7 @@ let cargo_home =
    optional arguments. *)
 let before_script ?(take_ownership = false) ?(source_version = false)
     ?(eval_opam = false) ?(init_python_venv = false) ?(install_js_deps = false)
-    ?(datadog_job_info = true) before_script =
+    ?(datadog_job_info = false) before_script =
   let toggle t x = if t then [x] else [] in
   (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
   toggle datadog_job_info ". ./scripts/ci/datadog_send_job_info.sh"
