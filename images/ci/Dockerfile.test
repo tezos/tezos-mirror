@@ -1,4 +1,4 @@
-# runtime + build + test dependencies
+# runtime + datadog + build + test dependencies
 #
 # This image builds upon the `build` image, see
 # its header for details on its content.

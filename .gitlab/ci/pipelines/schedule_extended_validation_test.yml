@@ -392,6 +392,7 @@ oc.build_x86_64-released:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -446,6 +447,7 @@ oc.build_x86_64-exp-dev-extra:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -535,6 +537,7 @@ oc.tezt:fetch-records:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
