@@ -26,7 +26,9 @@ Each command has its own help page:
 ### Configuration
 
 - [Configuration file (`tobi/config`)](configuration_file.md)
+- [What Tobi needs from Opam files](what_Tobi_needs_from_Opam_files.md)
 
 ## Explanations
 
 - [Why this configuration file format](why_this_configuration_file_format.md)
+- [Why only equality constraints for internal dependencies](why_only_equality_constraints_for_internal_dependencies.md)
