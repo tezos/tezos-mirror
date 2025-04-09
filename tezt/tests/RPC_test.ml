@@ -697,7 +697,7 @@ let test_votes _test_mode_tag _protocol ?endpoint client =
   unit
 
 (* Test the various other RPCs. *)
-let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
+let test_misc_protocol _test_mode_tag protocol ?endpoint client =
   let* _ =
     Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_constants ()
@@ -736,6 +736,15 @@ let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
   let* _ =
     Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_helper_levels_in_current_cycle ()
+  in
+  let* () =
+    if Protocol.(number protocol >= 023) then
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_helper_total_baking_power ()
+      in
+      unit
+    else unit
   in
   unit
 

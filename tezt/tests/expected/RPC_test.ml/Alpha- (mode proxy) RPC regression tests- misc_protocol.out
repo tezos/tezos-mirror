@@ -142,3 +142,6 @@
 
 ./octez-client --mode proxy rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
 { "first": 1, "last": 8 }
+
+./octez-client --mode proxy rpc get /chains/main/blocks/head/helpers/total_baking_power
+"20000000000000"
