@@ -128,6 +128,15 @@ let invalid_blueprint_applied =
     ~level:Error
     ("level", Data_encoding.n)
 
+let unexpected_blueprint_from_remote_node =
+  declare_2
+    ~section
+    ~name:"unexpected_blueprint_from_remote_node"
+    ~msg:"remote node sent blueprint {number} instead of {expected}"
+    ~level:Warning
+    ("number", Data_encoding.n)
+    ("expected", Data_encoding.n)
+
 let missing_blueprints =
   declare_3
     ~section
@@ -205,6 +214,10 @@ let blueprint_proposal Ethereum_types.(Qty level) time =
 
 let blueprint_production Ethereum_types.(Qty level) time =
   emit blueprint_production (level, time)
+
+let unexpected_blueprint_from_remote_node ~received:Ethereum_types.(Qty level)
+    ~expected:Ethereum_types.(Qty expected) =
+  emit unexpected_blueprint_from_remote_node (level, expected)
 
 let worker_request_failed request_view errs =
   emit worker_request_failed (request_view, errs)

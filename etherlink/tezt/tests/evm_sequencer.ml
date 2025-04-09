@@ -1013,11 +1013,8 @@ let test_observer_reset =
   let* () = Evm_node.terminate observer_victim2 in
   let* () = Evm_node.run observer_victim2
   and* () = Evm_node.wait_for_reset observer_victim2 in
-  (* It will also refuse blocks. *)
-  let* _ =
-    let*@ _ = Rpc.produce_block invalid_sequencer in
-    unit
-  and* () = Evm_node.wait_for_blueprint_invalid_applied observer_victim2 in
+  (* It will also refuse blocks provided by the invalid sequencer. *)
+  let* _ = Evm_node.wait_for_diverged observer_victim2 in
 
   unit
 

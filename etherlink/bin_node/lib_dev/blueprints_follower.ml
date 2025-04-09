@@ -10,7 +10,7 @@ open Ethereum_types
 type handler =
   quantity ->
   Blueprint_types.with_events ->
-  [`Check_for_reorg of quantity | `Continue] tzresult Lwt.t
+  [`Restart_from of quantity | `Continue] tzresult Lwt.t
 
 type parameters = {
   on_new_blueprint : handler;
@@ -150,6 +150,16 @@ let rec catchup ~next_blueprint_number ~first_connection params =
   let open Lwt_result_syntax in
   Metrics.start_bootstrapping () ;
 
+  let* () =
+    when_ (not first_connection) @@ fun () ->
+    let delay = Random.float 2. in
+    let*! () =
+      Events.retrying_connect ~endpoint:params.evm_node_endpoint ~delay
+    in
+    let*! () = Lwt_unix.sleep delay in
+    return_unit
+  in
+
   let seq =
     Blueprints_sequence.make ~next_blueprint_number params.evm_node_endpoint
   in
@@ -159,7 +169,7 @@ let rec catchup ~next_blueprint_number ~first_connection params =
       (fun next_blueprint_number blueprint ->
         let* result = params.on_new_blueprint next_blueprint_number blueprint in
         match result with
-        | `Check_for_reorg l -> return (`Cut l)
+        | `Restart_from l -> return (`Cut l)
         | `Continue -> return (`Continue (quantity_succ next_blueprint_number)))
       next_blueprint_number
       seq
@@ -168,16 +178,6 @@ let rec catchup ~next_blueprint_number ~first_connection params =
   match fold_result with
   | `Cut level -> catchup ~next_blueprint_number:level ~first_connection params
   | `Completed next_blueprint_number -> (
-      let* () =
-        when_ (not first_connection) @@ fun () ->
-        let delay = Random.float 2. in
-        let*! () =
-          Events.retrying_connect ~endpoint:params.evm_node_endpoint ~delay
-        in
-        let*! () = Lwt_unix.sleep delay in
-        return_unit
-      in
-
       let*! call_result =
         Evm_services.monitor_blueprints
           ~evm_node_endpoint:params.evm_node_endpoint
@@ -220,10 +220,14 @@ and stream_loop (Qty next_blueprint_number) params stream =
             (Qty (Z.succ next_blueprint_number))
             params
             stream
-      | `Check_for_reorg level ->
+      | `Restart_from level ->
           (catchup [@tailcall])
             ~next_blueprint_number:level
-            ~first_connection:false
+            ~first_connection:
+              (* The connection was not interrupted, but we decided to restart
+                 following blueprints from a different level. As a consequence,
+                 no need to wait. *)
+              true
             params)
   | Ok None | Error [Timeout] ->
       (catchup [@tailcall])
