@@ -28,6 +28,7 @@ fn capture_debug_log(mint: &mut goldenfile::Mint) -> PvmHooks<'_> {
     hooks
 }
 
+#[cfg(not(feature = "supervisor"))]
 #[test]
 fn regression_frozen_jstz() {
     test_regression(
@@ -38,6 +39,18 @@ fn regression_frozen_jstz() {
     )
 }
 
+#[cfg(feature = "supervisor")]
+#[test]
+fn regression_frozen_jstz_linux_musl() {
+    test_regression(
+        "tests/expected/jstz-linux-musl",
+        "../assets/jstz-linux-musl",
+        "../assets/regression-inbox.json",
+        true,
+    )
+}
+
+#[cfg(not(feature = "supervisor"))]
 #[test]
 fn regression_frozen_dummy_kernel() {
     test_regression(
@@ -48,11 +61,34 @@ fn regression_frozen_dummy_kernel() {
     )
 }
 
+#[cfg(feature = "supervisor")]
+#[test]
+fn regression_frozen_dummy_kernel_linux_musl() {
+    test_regression(
+        "tests/expected/dummy-linux-musl",
+        "../assets/riscv-dummy-linux-musl.elf",
+        "../assets/dummy-kernel-inbox.json",
+        true,
+    )
+}
+
+#[cfg(not(feature = "supervisor"))]
 #[test]
 fn regression_dummy_kernel() {
     test_regression(
         "tests/expected/dummy_volatile",
         "../riscv-dummy.elf",
+        "../assets/dummy-kernel-inbox.json",
+        false,
+    )
+}
+
+#[cfg(feature = "supervisor")]
+#[test]
+fn regression_dummy_kernel_linux_musl() {
+    test_regression(
+        "tests/expected/dummy-linux-musl-volatile",
+        "../riscv-dummy-linux-musl.elf",
         "../assets/dummy-kernel-inbox.json",
         false,
     )
@@ -93,8 +129,21 @@ fn test_regression_for_block<B: Block<M64M, Owned>>(
     let mut mint = goldenfile::Mint::new(golden_dir);
 
     let (result, initial_hash, final_hash) = {
-        let boot_program = fs::read("../assets/hermit-loader").unwrap();
-        let main_program = fs::read(kernel_path).unwrap();
+        // We need to read the kernel in any case
+        let kernel = fs::read(kernel_path)
+            .expect("Failed to read kernel from disk. Try running `make build`.");
+
+        #[cfg(not(feature = "supervisor"))]
+        let program = fs::read("../assets/hermit-loader").unwrap();
+
+        #[cfg(not(feature = "supervisor"))]
+        let initrd = Some(kernel);
+
+        #[cfg(feature = "supervisor")]
+        let program = kernel;
+
+        #[cfg(feature = "supervisor")]
+        let initrd = None::<Vec<u8>>;
 
         let inbox = {
             let mut inbox = InboxBuilder::new();
@@ -111,8 +160,8 @@ fn test_regression_for_block<B: Block<M64M, Owned>>(
         const ORIGINATION_LEVEL: u32 = 1;
 
         let mut stepper = PvmStepper::<'_, M64M, DefaultCacheLayouts, Owned, B>::new(
-            &boot_program,
-            Some(&main_program),
+            &program,
+            initrd.as_deref(),
             inbox,
             hooks,
             ROLLUP_ADDRESS,
