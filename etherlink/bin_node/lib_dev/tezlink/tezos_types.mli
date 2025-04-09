@@ -17,3 +17,14 @@ type level = {
       (** The current level of the block relative to the first block of the current
       cycle. *)
 }
+
+(** [convert_using_serialization ~dst ~src value] Conversion from one type with
+    encoding [src] to another with encoding [dst], through serialization.
+    Costly, but useful to build instances of a type when no builder is
+    accessible. *)
+val convert_using_serialization :
+  name:string ->
+  dst:'a Data_encoding.t ->
+  src:'b Data_encoding.t ->
+  'b ->
+  'a tzresult

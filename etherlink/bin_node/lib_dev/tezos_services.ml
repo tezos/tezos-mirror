@@ -13,49 +13,6 @@ module Alpha_context = Imported_protocol.Alpha_context
 
 type level = Tezos_types.level
 
-type error += Serialization_for_conversion of string * string
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"evm_node.dev.tezlink.conversion_failure"
-    ~title:"Failed to convert a value through serialization"
-    ~description:
-      "Failed to convert a value to a protocol private datatype through \
-       serialization."
-    ~pp:(fun ppf (name, error) ->
-      Format.fprintf
-        ppf
-        "Failed to convert a value of type %s to a protocol private datatype \
-         through serialization: %s"
-        name
-        error)
-    Data_encoding.(obj2 (req "type_name" string) (req "error_msg" string))
-    (function
-      | Serialization_for_conversion (name, error) -> Some (name, error)
-      | _ -> None)
-    (fun (name, error) -> Serialization_for_conversion (name, error))
-
-(** [convert_using_serialization ~dst ~src value] Conversion from one type with
-    encoding [src] to another with encoding [dst], through serialization.
-    Costly, but useful to build instances of a type when no builder is
-    accessible. *)
-let convert_using_serialization ~name ~dst ~src value =
-  let open Result_syntax in
-  let* bytes =
-    Data_encoding.Binary.to_bytes src value
-    |> Result.map_error_e (fun e ->
-           tzfail
-           @@ Serialization_for_conversion
-                ( name,
-                  Format.asprintf "%a" Data_encoding.Binary.pp_write_error e ))
-  in
-  Data_encoding.Binary.of_bytes dst bytes
-  |> Result.map_error_e (fun e ->
-         tzfail
-         @@ Serialization_for_conversion
-              (name, Format.asprintf "%a" Data_encoding.Binary.pp_read_error e))
-
 (* Module importing, amending, and converting, protocol types. Those types
    might be difficult to actually build, so we define conversion function from
    local types to protocol types. *)
@@ -107,7 +64,7 @@ module Protocol_types = struct
            (req "expected_commitment" bool))
 
     let convert : level -> t tzresult =
-      convert_using_serialization
+      Tezos_types.convert_using_serialization
         ~name:"level"
         ~dst:encoding
         ~src:conversion_encoding
@@ -150,7 +107,7 @@ module Protocol_types = struct
            (req "smart_rollup_max_number_of_messages_per_level" n))
 
     let values_to_fixed =
-      convert_using_serialization
+      Tezos_types.convert_using_serialization
         ~name:"values_to_fixed"
         ~dst:Alpha_context.Constants.fixed_encoding
         ~src:fixed_values_encoding
@@ -165,7 +122,7 @@ module Protocol_types = struct
            (req "parametric" Alpha_context.Constants.Parametric.encoding))
 
     let convert : t -> Alpha_context.Constants.t tzresult =
-      convert_using_serialization
+      Tezos_types.convert_using_serialization
         ~name:"constants"
         ~dst:Alpha_context.Constants.encoding
         ~src:constants_encoding
