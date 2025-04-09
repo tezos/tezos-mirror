@@ -1,28 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Breaking changes
-
-### Configuration changes
-
-### RPCs changes
-
-### Metrics changes
-
-### Execution changes
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
-
 ## Version 0.21 (2025-04-09)
 
 This release finalizes the new experimental `tx_queue` which allows to send
