@@ -121,3 +121,164 @@ pub fn apply_operation<Host: Runtime>(
 
     Ok(OperationResultSum::Reveal(dummy_result))
 }
+
+#[cfg(test)]
+mod tests {
+    use tezos_crypto_rs::hash::UnknownSignature;
+    use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
+    use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+    use tezos_tezlink::{
+        block::TezBlock,
+        operation::{ManagerOperation, Operation, OperationContent},
+        operation_result::{ContentResult, OperationResult, OperationResultSum},
+    };
+
+    use crate::{
+        account_storage::TezlinkImplicitAccount, apply_operation, context,
+        OperationError, ValidityError,
+    };
+
+    fn make_reveal_operation(
+        fee: u64,
+        counter: u64,
+        gas_limit: u64,
+        storage_limit: u64,
+        source: PublicKeyHash,
+        pk: PublicKey,
+    ) -> Operation {
+        let branch = TezBlock::genesis_block_hash();
+        // No need a real signature for now
+        let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
+        Operation {
+            branch,
+            content: ManagerOperation {
+                source,
+                fee: fee.into(),
+                counter: counter.into(),
+                operation: OperationContent::Reveal { pk },
+                gas_limit: gas_limit.into(),
+                storage_limit: storage_limit.into(),
+            },
+            signature,
+        }
+    }
+
+    // This function setups an account that will pass the validity checks
+    fn init_account(
+        host: &mut impl Runtime,
+        src: &PublicKeyHash,
+    ) -> TezlinkImplicitAccount {
+        // Setting the account in TezlinkImplicitAccount
+        let contract = Contract::from_b58check(&src.to_b58check())
+            .expect("Contract b58 conversion should have succeed");
+
+        let context = context::Context::init_context();
+
+        // Allocate the account
+        TezlinkImplicitAccount::allocate(host, &context, &contract)
+            .expect("Account initialization should have succeed");
+
+        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+            .expect("Account creation should have succeed");
+
+        // Setting the balance to pass the validity check
+        account
+            .set_balance(host, &50_u64.into())
+            .expect("Set balance should have succeed");
+
+        account
+    }
+
+    // Test an operation on an account that has no entry in `/context/contracts/index`
+    // This should fail as an EmptyImplicitContract
+    #[test]
+    fn apply_operation_empty_account() {
+        let mut host = MockKernelHost::default();
+
+        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("PublicKeyHash b58 conversion should have succeed");
+
+        let pk = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key creation should have succeed");
+
+        let operation = make_reveal_operation(15, 1, 4, 5, src, pk);
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), &operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Reveal(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Failed(vec![OperationError::Validation(
+                ValidityError::EmptyImplicitContract,
+            )]),
+        });
+
+        assert_eq!(receipt, expected_receipt);
+    }
+
+    // Test that increasing the fees makes the operation fails
+    #[test]
+    fn apply_operation_cant_pay_fees() {
+        let mut host = MockKernelHost::default();
+
+        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("PublicKeyHash b58 conversion should have succeed");
+
+        let _ = init_account(&mut host, &src);
+
+        let pk = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key creation should have succeed");
+
+        // Fees are too high for source's balance
+        let operation = make_reveal_operation(100, 1, 4, 5, src, pk);
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), &operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Reveal(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Failed(vec![OperationError::Validation(
+                ValidityError::CantPayFees(50_u64.into()),
+            )]),
+        });
+
+        assert_eq!(receipt, expected_receipt);
+    }
+
+    // Test that a wrong counter should make the operation fails
+    #[test]
+    fn apply_operation_invalid_counter() {
+        let mut host = MockKernelHost::default();
+
+        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("PublicKeyHash b58 conversion should have succeed");
+
+        let _ = init_account(&mut host, &src);
+
+        let pk = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key creation should have succeed");
+
+        // Counter is incoherent for source's counter
+        let operation = make_reveal_operation(15, 15, 4, 5, src, pk);
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), &operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Reveal(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Failed(vec![OperationError::Validation(
+                ValidityError::InvalidCounter(0_u64.into()),
+            )]),
+        });
+        assert_eq!(receipt, expected_receipt);
+    }
+}
