@@ -1,10 +1,27 @@
 # Changelog
 
-## Unreleased
+## Version 0.21 (2025-04-09)
 
-### Breaking changes
+This release finalizes the new experimental `tx_queue` which allows to send
+multiple transactions to be included in a single block. It also improves the
+bootstrapping process with snapshots and considerably speeds up the catch-up
+phases.
 
-### Configuration changes
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+Configuration files created with versions v0.17 and v0.18 might cause encoding
+errors related to `l2_chain` or lead to `Mismatched_chain_family`
+issues. Operators of EVM nodes should verify their configurations by running:
+
+```
+octez-evm-node check config
+```
+
+If issues persist after verification, remove the `l2_chains` entry from the `experimental_features` section of your configuration file.
+
+By default, the configuration file (`config.json`) is located in your `data_dir`
+directory.
 
 ### RPCs changes
 
@@ -15,8 +32,6 @@
   at least) level `l`. If the node does not have the blueprint for level `l` in
   its store, the RPC returns a 404 error instead of an empty list. `c` default
   to `1` if not specified and reduced to `500` if superior. (!17592)
-
-### Metrics changes
 
 ### Execution changes
 
@@ -41,8 +56,6 @@
 - Allow to import snapshots from standard input with `-`. (!17463)
 - Use `curl` (faster) to download snapshots when available. (!17477)
 
-### Documentation changes
-
 ### Experimental features changes
 
 *No guarantees are provided regarding backward compatibility of experimental
@@ -50,19 +63,10 @@ features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
 
-Configuration files created with versions v0.17 and v0.18 might cause encoding errors related to `l2_chain` or lead to `Mismatched_chain_family` issues. Operators of EVM nodes should verify their configurations by running:
-
-```
-octez-evm-node check config
-```
-
-If issues persist after verification, remove the `l2_chains` entry from the `experimental_features` section of your configuration file.
-
-By default, the configuration file (`config.json`) is located in your `data_dir`
-directory.
-
 - Websocket server (with Resto backend) can be configured to rate limit messages
   with the field `experimental_features.websocket_rate_limit`. (!17510 !17523)
+- Add support for the `tx_queue` in RPC mode. (!17254)
+- Add support for the `tx_queue` in proxy mode. (!17246)
 
 ## Version 0.20 (2025-03-21)
 
