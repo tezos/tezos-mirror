@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023-2025 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
@@ -304,44 +304,48 @@ pub fn octez_riscv_compute_step_with_debug(
 #[ocaml::func]
 #[ocaml::sig("int64 -> state -> (state * int64)")]
 pub fn octez_riscv_compute_step_many(
-    max_steps: usize,
+    max_steps: u64,
     state: Pointer<State>,
 ) -> (Pointer<State>, i64) {
     apply_imm(state, |pvm| {
-        pvm.compute_step_many(&mut PvmHooks::default(), max_steps)
+        pvm.compute_step_many(&mut PvmHooks::default(), max_steps as usize)
     })
 }
 
 #[ocaml::func]
 #[ocaml::sig("int64 -> mut_state -> int64")]
-pub fn octez_riscv_mut_compute_step_many(max_steps: usize, state: Pointer<MutState>) -> i64 {
+pub fn octez_riscv_mut_compute_step_many(max_steps: u64, state: Pointer<MutState>) -> i64 {
     apply_mut(state, |pvm| {
-        pvm.compute_step_many(&mut PvmHooks::default(), max_steps)
+        pvm.compute_step_many(&mut PvmHooks::default(), max_steps as usize)
     })
 }
 
 #[ocaml::func]
 #[ocaml::sig("int64 -> state -> (int -> unit) -> (state * int64)")]
 pub fn octez_riscv_compute_step_many_with_debug(
-    max_steps: usize,
+    max_steps: u64,
     state: Pointer<State>,
     printer: ocaml::Value,
 ) -> (Pointer<State>, i64) {
     let mut hooks = PvmHooks::from_printer(printer, gc);
 
-    apply_imm(state, |pvm| pvm.compute_step_many(&mut hooks, max_steps))
+    apply_imm(state, |pvm| {
+        pvm.compute_step_many(&mut hooks, max_steps as usize)
+    })
 }
 
 #[ocaml::func]
 #[ocaml::sig("int64 -> mut_state -> (int -> unit) -> int64")]
 pub fn octez_riscv_mut_compute_step_many_with_debug(
-    max_steps: usize,
+    max_steps: u64,
     state: Pointer<MutState>,
     printer: ocaml::Value,
 ) -> i64 {
     let mut hooks = PvmHooks::from_printer(printer, gc);
 
-    apply_mut(state, |pvm| pvm.compute_step_many(&mut hooks, max_steps))
+    apply_mut(state, |pvm| {
+        pvm.compute_step_many(&mut hooks, max_steps as usize)
+    })
 }
 
 #[ocaml::func]
