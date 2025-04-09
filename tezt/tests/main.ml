@@ -137,6 +137,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Client_simulation_flag.register ~protocols ;
   Comparable_datatype.register ~protocols ;
   Consensus_key.register ~protocols ;
+  Companion_key.register ~protocols ;
   Contract_baker.register ~protocols ;
   Contract_big_map_to_self.register ~protocols ;
   Contract_entrypoints.register ~protocols ;

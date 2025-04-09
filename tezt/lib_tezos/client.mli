@@ -1154,8 +1154,20 @@ val paid_storage_space :
   t ->
   string Lwt.t
 
-(** Run [octez-client use <pk> as consensus key for delegate <src>] *)
+(** Run [octez-client set consensus key for <src> to <pk>] *)
 val update_consensus_key :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?expect_failure:bool ->
+  src:string ->
+  pk:string ->
+  t ->
+  unit Lwt.t
+
+(** Run [octez-client set companion key for <src> to <pk>] *)
+val update_companion_key :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
   ?wait:string ->
