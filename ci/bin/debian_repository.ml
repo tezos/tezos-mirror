@@ -558,6 +558,30 @@ let jobs pipeline_type =
         ];
       job_install_systemd_bin
         ~__POS__
+        ~name:"oc.install_bin_debian_bookworm_systemd_agnostic_baker"
+        ~allow_failure:Yes
+        ~dependencies:
+          (Dependent
+             [
+               Job job_docker_systemd_test_debian_dependencies;
+               Job job_apt_repo_debian;
+             ])
+        ~variables:
+          (variables
+             ~kind:"systemd-tests"
+             [
+               ("PREFIX", "");
+               ("DISTRIBUTION", "debian");
+               ("RELEASE", "bookworm");
+               ("AGNOSTIC_BAKER", "true");
+             ])
+        [
+          "./scripts/ci/systemd-packages-test.sh \
+           scripts/packaging/tests/deb/install-bin-deb.sh \
+           images/packages/debian-systemd-tests.Dockerfile";
+        ];
+      job_install_systemd_bin
+        ~__POS__
         ~name:"oc.upgrade_bin_debian_bookworm-systemd"
         ~allow_failure:Yes
         ~dependencies:
