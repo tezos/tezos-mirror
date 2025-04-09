@@ -47,7 +47,7 @@ riscv-supervised-dummy.elf::
 
 # Update checked-in binaries
 .PHONY: update-assets
-update-assets: assets/riscv-dummy.elf assets/jstz
+update-assets: assets/riscv-dummy.elf assets/jstz assets/jstz-linux-musl
 
 # Update the compiled dummy kernel used in CI tests
 assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
@@ -56,8 +56,13 @@ assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
 	@sha256sum $@ > $@.checksum
 
 assets/jstz assets/jstz.checksum::
-	@make -C jstz build
+	@make -C jstz build-kernel
 	@cp jstz/target/riscv64gc-unknown-hermit/release/jstz $@
+	@sha256sum $@ > $@.checksum
+
+assets/jstz-linux-musl assets/jstz-linux-musl.checksum::
+	@make -C jstz build-kernel-linux-musl
+	@cp jstz/target/riscv64gc-unknown-linux-musl/release/jstz $@
 	@sha256sum $@ > $@.checksum
 
 .PHONY: build-deps
