@@ -16,4 +16,4 @@ release_name="Grafazos version ${release_no_v}"
 gitlab_dashboards_package_name="grafazos-dashboards-${release_no_v}"
 gitlab_source_package_name="grafazos-source-${release_no_v}"
 
-source_tarball="grafazos-${release_no_v}"
+source_tarball="grafazos-${release_no_v}.tar.gz"
