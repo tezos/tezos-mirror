@@ -181,7 +181,7 @@ pub trait ChainConfigTrait: Debug {
 
     fn get_chain_family(&self) -> ChainFamily;
 
-    fn _storage_root_path(&self) -> RefPath;
+    fn storage_root_path(&self) -> RefPath;
 
     fn fmt_with_family(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let chain_family = self.get_chain_family();
@@ -346,7 +346,7 @@ impl ChainConfigTrait for EvmChainConfig {
         precompile_set::<Host>(enable_fa_bridge)
     }
 
-    fn _storage_root_path(&self) -> RefPath {
+    fn storage_root_path(&self) -> RefPath {
         ETHERLINK_SAFE_STORAGE_ROOT_PATH
     }
 }
@@ -480,7 +480,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         PrecompileBTreeMap::new()
     }
 
-    fn _storage_root_path(&self) -> RefPath {
+    fn storage_root_path(&self) -> RefPath {
         TEZLINK_SAFE_STORAGE_ROOT_PATH
     }
 }

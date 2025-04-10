@@ -41,7 +41,7 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
-use tezos_smart_rollup_host::path::Path;
+use tezos_smart_rollup_host::path::{OwnedPath, Path};
 
 pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
 
@@ -478,7 +478,10 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 
     let mut tick_counter = TickCounter::new(0u64);
 
-    let mut safe_host = SafeStorage { host };
+    let mut safe_host = SafeStorage {
+        host,
+        world_state: OwnedPath::from(&chain_config.storage_root_path()),
+    };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
     let precompiles = chain_config.precompiles_set(config.enable_fa_bridge);
 
@@ -1669,7 +1672,10 @@ mod tests {
         matches!(computation_result, ComputationResult::RebootNeeded);
 
         // The block is in progress, therefore it is in the safe storage.
-        let safe_host = SafeStorage { host: &mut host };
+        let safe_host = SafeStorage {
+            host: &mut host,
+            world_state: OwnedPath::from(&chain_config.storage_root_path()),
+        };
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
@@ -1767,7 +1773,10 @@ mod tests {
         matches!(computation_result, ComputationResult::RebootNeeded);
 
         // The block is in progress, therefore it is in the safe storage.
-        let safe_host = SafeStorage { host: &mut host };
+        let safe_host = SafeStorage {
+            host: &mut host,
+            world_state: OwnedPath::from(&chain_config.storage_root_path()),
+        };
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
