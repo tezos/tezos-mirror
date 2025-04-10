@@ -42,6 +42,7 @@ Each command has its own help page:
 
 - [The vision for the monorepo](the_vision_for_the_monorepo.md)
 - [Why and when can Tobi save time](why_and_when_can_Tobi_save_time.md)
+- [Why not just use `opam pin`](why_not_just_use_opam_pin.md)
 - [How `tobi list --installed` works](how_tobi_list_installed_works.md)
 - [How `tobi install` works](how_tobi_install_works.md)
 - [How `tobi reset` works](how_tobi_reset_works.md)
