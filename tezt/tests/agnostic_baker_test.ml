@@ -171,14 +171,7 @@ let migrate ~migrate_from ~migrate_to ~use_remote_signer =
   in
   unit
 
-let register ~migrate_from ~migrate_to =
-  (* We want to migrate only from Active protocols *)
-  if Agnostic_baker.protocol_status migrate_from = Active then (
-    migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;
-    migrate ~migrate_from ~migrate_to ~use_remote_signer:true)
-  else ()
-
-let register_protocol_independent () =
+let test_start_and_stop () =
   Test.register
     ~__FILE__
     ~title:"Agnostic baker starts and stops"
@@ -190,3 +183,12 @@ let register_protocol_independent () =
   let* () = Agnostic_baker.wait_for_ready baker in
   let* () = Agnostic_baker.terminate baker in
   unit
+
+let register ~migrate_from ~migrate_to =
+  (* We want to migrate only from Active protocols *)
+  if Agnostic_baker.protocol_status migrate_from = Active then (
+    migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;
+    migrate ~migrate_from ~migrate_to ~use_remote_signer:true)
+  else ()
+
+let register_protocol_independent () = test_start_and_stop ()
