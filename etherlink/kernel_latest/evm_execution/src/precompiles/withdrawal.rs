@@ -19,7 +19,7 @@ use crate::utilities::alloy::h160_to_alloy;
 use crate::utilities::alloy::u256_to_alloy;
 use crate::utilities::u256_to_bigint;
 use crate::withdrawal_counter::WithdrawalCounter;
-use crate::{fail_if_too_much, EthereumError};
+use crate::EthereumError;
 use alloy_primitives::FixedBytes;
 use alloy_sol_types::SolEvent;
 use crypto::hash::ContractKt1Hash;
@@ -300,7 +300,7 @@ pub fn withdrawal_precompile<Host: Runtime>(
     is_static: bool,
     transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    let estimated_ticks = fail_if_too_much!(tick_model::ticks_of_withdraw(), handler);
+    let estimated_ticks = tick_model::ticks_of_withdraw();
 
     let estimated_gas_cost = estimate_gas_cost(estimated_ticks, handler.gas_price());
     if let Err(err) = handler.record_cost(estimated_gas_cost) {

@@ -5,7 +5,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::fail_if_too_much;
 use crate::precompiles::call_precompile_with_gas_draining;
 use crate::precompiles::tick_model;
 use crate::{handler::EvmHandler, precompiles::PrecompileOutcome, EthereumError};
@@ -128,9 +127,7 @@ fn blake2f_precompile_without_gas_draining<Host: Runtime>(
     rounds_buf.copy_from_slice(&input[0..4]);
     let rounds: u32 = u32::from_be_bytes(rounds_buf);
 
-    // check that enough resources to execute (gas / ticks) are available
-    let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_blake2f(rounds), handler);
+    let estimated_ticks = tick_model::ticks_of_blake2f(rounds);
     let cost = rounds as u64; // static_gas + dynamic_gas
     if let Err(err) = handler.record_cost(cost) {
         log!(

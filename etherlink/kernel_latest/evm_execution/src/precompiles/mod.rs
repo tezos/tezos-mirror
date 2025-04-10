@@ -260,17 +260,6 @@ pub fn precompile_set_with_revert_withdrawals<Host: Runtime>(
     precompiles
 }
 
-#[macro_export]
-macro_rules! fail_if_too_much {
-    ($estimated_ticks : expr, $handler: expr) => {
-        if $estimated_ticks + $handler.estimated_ticks_used > $handler.ticks_allocated {
-            return Err(EthereumError::OutOfTicks);
-        } else {
-            $estimated_ticks
-        }
-    };
-}
-
 mod tick_model {
     pub fn ticks_of_sha256(data_size: usize) -> u64 {
         let size = data_size as u64;
@@ -315,7 +304,6 @@ mod test_helpers {
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     use super::precompile_set;
-    const DUMMY_ALLOCATED_TICKS: u64 = 100_000_000;
     pub const DUMMY_TICKETER: &str = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5";
 
     pub fn set_balance(
@@ -387,7 +375,6 @@ mod test_helpers {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );

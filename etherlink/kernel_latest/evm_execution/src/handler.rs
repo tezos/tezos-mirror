@@ -400,8 +400,6 @@ pub struct EvmHandler<'a, Host: Runtime> {
     /// The contexts associated with transaction(s) currently in
     /// progress
     transaction_data: Vec<TransactionLayerData<'a>>,
-    /// Estimated number of ticks remaining for the current run
-    pub ticks_allocated: u64,
     /// Estimated ticks spent for the execution of the current transaction,
     /// according to the ticks per gas per opcode model
     pub estimated_ticks_used: u64,
@@ -437,7 +435,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         block: &'a BlockConstants,
         config: &'a Config,
         precompiles: &'a dyn PrecompileSet<Host>,
-        ticks_allocated: u64,
         effective_gas_price: U256,
         tracer: Option<TracerInput>,
     ) -> Self {
@@ -449,7 +446,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             config,
             precompiles,
             transaction_data: vec![],
-            ticks_allocated,
             estimated_ticks_used: 0,
             effective_gas_price,
             tracer,
@@ -832,17 +828,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Account for the estimated ticks spent during the execution of the given opcode
-    pub fn account_for_ticks(
-        &mut self,
-        opcode: &Opcode,
-        gas: u64,
-    ) -> Result<(), EthereumError> {
-        self.estimated_ticks_used += tick_model_opcodes::ticks(opcode, gas);
-        if self.estimated_ticks_used > self.ticks_allocated {
-            Err(EthereumError::OutOfTicks)
-        } else {
-            Ok(())
-        }
+    pub fn account_for_ticks(&mut self, opcode: &Opcode, gas: u64) {
+        self.estimated_ticks_used += tick_model_opcodes::ticks(opcode, gas)
     }
 
     /// Clear the entire storage located at [address].
@@ -991,7 +978,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             let gas_cost = gas_after - gas_before;
 
             if let Some(opcode) = opcode {
-                self.account_for_ticks(&opcode, gas_cost)?;
+                self.account_for_ticks(&opcode, gas_cost);
                 #[cfg(feature = "benchmark-opcodes")]
                 benchmarks::end_opcode_section(self.host, gas_cost, &step_result);
             };
@@ -3101,8 +3088,6 @@ mod test {
     use tezos_ethereum::block::BlockFees;
     use tezos_evm_runtime::runtime::MockKernelHost;
 
-    const DUMMY_ALLOCATED_TICKS: u64 = 1_000_000_000;
-
     fn set_code(
         handler: &mut EvmHandler<'_, MockKernelHost>,
         address: &H160,
@@ -3202,7 +3187,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -3237,7 +3221,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -3279,7 +3262,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -3326,7 +3308,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -3396,7 +3377,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -3498,110 +3478,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
-            gas_price,
-            None,
-        );
-
-        let input_value = U256::from(2026_u32);
-        let mut input = [0_u8; 32];
-        input_value.to_big_endian(&mut input);
-
-        let address = H160::from_low_u64_be(118);
-        let transaction_context = TransactionContext::new(caller, address, U256::zero());
-        let transfer: Option<Transfer> = None;
-        let code: Vec<u8> = vec![
-            // get input data, subtract one and prepare as argument to nested call
-            Opcode::PUSH1.as_u8(),
-            1,
-            Opcode::PUSH1.as_u8(),
-            0, // call data offset
-            Opcode::CALLDATALOAD.as_u8(),
-            Opcode::SUB.as_u8(),
-            // check if result is zero - if so, skip to return
-            Opcode::DUP1.as_u8(),
-            Opcode::ISZERO.as_u8(),
-            Opcode::PUSH1.as_u8(),
-            28_u8, // to JPMDEST
-            Opcode::JUMPI.as_u8(),
-            // store result in memory to use as call argument
-            Opcode::PUSH1.as_u8(),
-            0,
-            Opcode::MSTORE.as_u8(),
-            // set call parameters
-            Opcode::PUSH1.as_u8(),
-            0, // return size
-            Opcode::PUSH1.as_u8(),
-            0, // return offset
-            Opcode::PUSH1.as_u8(),
-            32_u8, // arg size
-            Opcode::PUSH1.as_u8(),
-            0, // arg offset
-            Opcode::PUSH1.as_u8(),
-            0,                       // value
-            Opcode::ADDRESS.as_u8(), // address
-            Opcode::PUSH1.as_u8(),
-            0,                    // gas
-            Opcode::CALL.as_u8(), // call self
-            // when we get here we are done
-            Opcode::JUMPDEST.as_u8(),
-            Opcode::PUSH1.as_u8(),
-            0, // return data size
-            Opcode::PUSH1.as_u8(),
-            0, // return data offset
-            Opcode::RETURN.as_u8(),
-        ];
-
-        set_code(&mut handler, &address, code);
-
-        handler
-            .begin_initial_transaction(
-                CallContext {
-                    is_static: false,
-                    is_creation: false,
-                },
-                None,
-            )
-            .unwrap();
-
-        let result =
-            handler.execute_call(address, transfer, input.to_vec(), transaction_context);
-
-        match result {
-            Ok(result) => {
-                let expected_result =
-                    (ExitReason::Succeed(ExitSucceed::Returned), None, vec![]);
-                assert_eq!(result, expected_result);
-            }
-            Err(err) => {
-                panic!(
-                    "Expected call to fail because of call depth, but got {:?}",
-                    err
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn contract_call_succeeds_at_maximum_stack_depth() {
-        let mut mock_runtime = MockKernelHost::default();
-        let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
-        let mut evm_account_storage = init_account_storage().unwrap();
-        let config = EVMVersion::current_test_config();
-
-        let caller = H160::from_low_u64_be(8213);
-
-        let gas_price = U256::from(21000);
-
-        let mut handler = EvmHandler::new(
-            &mut mock_runtime,
-            &mut evm_account_storage,
-            caller,
-            &block,
-            &config,
-            &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -3702,7 +3578,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -3782,7 +3657,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -3847,7 +3721,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -3921,7 +3794,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -3992,7 +3864,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -4062,7 +3933,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -4141,79 +4011,12 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
 
         let hash_of_unavailable_block = handler.block_hash(U256::zero());
         assert_eq!(H256::zero(), hash_of_unavailable_block)
-    }
-
-    #[test]
-    fn transactions_fails_if_not_enough_allocated_ticks() {
-        let mut mock_runtime = MockKernelHost::default();
-        let block = dummy_first_block();
-        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
-        let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::london();
-        let caller = H160::from_low_u64_be(523_u64);
-
-        let gas_price = U256::from(21000);
-
-        let mut handler = EvmHandler::new(
-            &mut mock_runtime,
-            &mut evm_account_storage,
-            caller,
-            &block,
-            &config,
-            &precompiles,
-            10_000,
-            gas_price,
-            None,
-        );
-
-        let address = H160::from_low_u64_be(210_u64);
-        let input = vec![0_u8];
-        let transaction_context = TransactionContext::new(caller, address, U256::zero());
-        let transfer: Option<Transfer> = None;
-
-        let code: Vec<u8> = vec![
-            Opcode::PUSH1.as_u8(),
-            0u8,
-            Opcode::PUSH1.as_u8(),
-            0u8,
-            Opcode::PUSH1.as_u8(),
-            0u8,
-            Opcode::PUSH1.as_u8(),
-            0u8,
-            Opcode::PUSH1.as_u8(),
-            0u8,
-            Opcode::PUSH1.as_u8(),
-            0u8,
-            Opcode::RETURN.as_u8(),
-        ];
-
-        set_code(&mut handler, &address, code);
-        set_balance(&mut handler, &caller, U256::from(99_u32));
-
-        handler
-            .begin_initial_transaction(
-                CallContext {
-                    is_static: false,
-                    is_creation: false,
-                },
-                Some(30000),
-            )
-            .unwrap();
-
-        let result = handler.execute_call(address, transfer, input, transaction_context);
-
-        assert_eq!(
-            Err(EthereumError::OutOfTicks),
-            result,
-            "Contract call was expected to fail and run out of ticks: \n"
-        );
     }
 
     #[test]
@@ -4235,7 +4038,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -4295,7 +4097,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -4389,7 +4190,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -4445,7 +4245,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             U256::one(),
             None,
         );
@@ -4495,7 +4294,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -4579,7 +4377,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -4608,7 +4405,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             U256::one(),
             None,
         );
@@ -4651,7 +4447,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             None,
         );
@@ -4740,7 +4535,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             None,
         );
@@ -4847,7 +4641,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             None,
         );
@@ -4912,7 +4705,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             None,
         );
@@ -4989,7 +4781,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             U256::from(21000),
             None,
         );
@@ -5062,7 +4853,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS * 1000,
             gas_price,
             None,
         );
@@ -5144,7 +4934,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );
@@ -5200,7 +4989,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             U256::one(),
             None,
         );
@@ -5249,7 +5037,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS * 1000,
             U256::from(21000),
             None,
         );
@@ -5330,7 +5117,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             None,
         );
@@ -5402,7 +5188,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             None,
         );
@@ -5485,7 +5270,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );

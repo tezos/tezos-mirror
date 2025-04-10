@@ -43,7 +43,6 @@ use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::Path;
-use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
 pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
 
@@ -138,7 +137,6 @@ fn compute<Host: Runtime>(
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     sequencer_pool_address: Option<H160>,
-    maximum_allowed_ticks: u64,
     limits: &EvmLimits,
     tracer_input: Option<TracerInput>,
     evm_configuration: &Config,
@@ -156,15 +154,6 @@ fn compute<Host: Runtime>(
         let data_size: u64 = transaction.data_size();
 
         log!(host, Benchmarking, "Transaction data size: {}", data_size);
-        // TODO: https://gitlab.com/tezos/tezos/-/merge_requests/15079
-        // Will be removed
-        // The current number of ticks remaining for the current `kernel_run` is allocated for the
-        // transaction.
-        let allocated_ticks = estimate_remaining_ticks_for_transaction_execution(
-            maximum_allowed_ticks,
-            block_in_progress.estimated_ticks_in_run,
-            data_size,
-        );
 
         let retriable = !is_first_transaction;
 
@@ -208,7 +197,6 @@ fn compute<Host: Runtime>(
             &transaction,
             block_in_progress.index,
             evm_account_storage,
-            allocated_ticks,
             retriable,
             sequencer_pool_address,
             tracer_input,
@@ -363,7 +351,6 @@ pub fn compute_bip<Host: Runtime>(
     tick_counter: &mut TickCounter,
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
-    maximum_allowed_ticks: u64,
     tracer_input: Option<TracerInput>,
     chain_id: U256,
     da_fee_per_byte: U256,
@@ -387,7 +374,6 @@ pub fn compute_bip<Host: Runtime>(
         precompiles,
         &mut evm_account_storage,
         sequencer_pool_address,
-        maximum_allowed_ticks,
         limits,
         tracer_input,
         evm_configuration,
@@ -573,6 +559,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
         da_fee_per_byte,
         coinbase,
     );
+
     match computation_result {
         Ok(BlockComputationResult::Finished {
             included_delayed_transactions,
@@ -641,7 +628,6 @@ mod tests {
     use crate::storage::read_block_in_progress;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
-    use crate::tick_model::constants::MAX_ALLOWED_TICKS;
     use crate::transaction::Transaction;
     use crate::transaction::TransactionContent;
     use crate::transaction::TransactionContent::Ethereum;
@@ -1421,7 +1407,6 @@ mod tests {
             &precompiles,
             &mut evm_account_storage,
             None,
-            MAX_ALLOWED_TICKS,
             &EvmLimits::default(),
             None,
             &EVMVersion::current_test_config(),

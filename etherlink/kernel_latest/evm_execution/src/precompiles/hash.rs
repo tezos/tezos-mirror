@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::fail_if_too_much;
 use crate::precompiles::{tick_model, PrecompileOutcome};
 use crate::{handler::EvmHandler, EthereumError};
 use evm::{Context, ExitReason, ExitSucceed, Transfer};
@@ -22,8 +21,7 @@ pub fn sha256_precompile<Host: Runtime>(
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Debug, "Calling sha2-256 precompile");
-    let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_sha256(input.len()), handler);
+    let estimated_ticks = tick_model::ticks_of_sha256(input.len());
 
     let size = input.len() as u64;
     let data_word_size = (31 + size) / 32;
@@ -61,8 +59,7 @@ pub fn ripemd160_precompile<Host: Runtime>(
         Debug,
         "Calling ripemd-160 precompile"
     );
-    let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_ripemd160(input.len()), handler);
+    let estimated_ticks = tick_model::ticks_of_ripemd160(input.len());
 
     let size = input.len() as u64;
     let data_word_size = (31 + size) / 32;

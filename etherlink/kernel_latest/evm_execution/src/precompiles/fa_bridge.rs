@@ -13,7 +13,7 @@
 use crate::fa_bridge::withdrawal::FaFastWithdrawal;
 use crate::fa_bridge::FaWithdrawalKind::{Fast, Standard};
 use crate::fast_fa_withdrawals_enabled;
-use crate::{fail_if_too_much, EthereumError};
+use crate::EthereumError;
 use evm::{Context, Handler, Transfer};
 use primitive_types::{H160, U256};
 use tezos_evm_runtime::runtime::Runtime;
@@ -92,7 +92,7 @@ pub fn fa_bridge_precompile<Host: Runtime>(
     // consumes more ticks than allowed.
     let estimated_ticks = FA_WITHDRAWAL_PRECOMPILE_TICKS_SLOPE * (input.len() as u64)
         + FA_WITHDRAWAL_PRECOMPILE_TICKS_INTERCEPT;
-    handler.estimated_ticks_used += fail_if_too_much!(estimated_ticks, handler);
+    handler.estimated_ticks_used += estimated_ticks;
 
     // We also record gas cost which consists of computation cost (1 gas unit per 1000 ticks)
     // and added FA withdrawal cost (spam prevention measure).
@@ -232,7 +232,6 @@ mod tests {
             &block,
             &config,
             &precompiles,
-            100_000_000_000,
             U256::from(21000),
             None,
         );
@@ -359,7 +358,6 @@ mod tests {
             &block,
             &config,
             &precompiles,
-            1_000_000_000,
             U256::from(21000),
             None,
         );

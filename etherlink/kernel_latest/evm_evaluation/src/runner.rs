@@ -246,7 +246,6 @@ fn execute_transaction(
         env.tx.gas_price,
         transaction_value,
         pay_for_gas,
-        u64::MAX, // don't account for ticks during the test
         false,
         None,
     )

@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::fail_if_too_much;
 use crate::precompiles::tick_model;
 use crate::{handler::EvmHandler, precompiles::PrecompileOutcome, EthereumError};
 use evm::{Context, Transfer};
@@ -21,8 +20,7 @@ pub fn identity_precompile<Host: Runtime>(
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Debug, "Calling identity precompile");
-    let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_identity(input.len()), handler);
+    let estimated_ticks = tick_model::ticks_of_identity(input.len());
 
     let size = input.len() as u64;
     let data_word_size = (size + 31) / 32;

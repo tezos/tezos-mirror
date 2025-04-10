@@ -5271,6 +5271,7 @@ let test_ghostnet_kernel =
 
 let test_estimate_gas_out_of_ticks =
   register_both
+    ~kernels:[Kernel.Ghostnet; Kernel.Mainnet]
     ~tags:["evm"; "estimate_gas"; "out_of_ticks"; "simulate"; "loop"]
     ~title:"estimateGas works with out of ticks"
   @@ fun ~protocol:_ ~evm_setup:({evm_node; evm_version; _} as evm_setup) ->

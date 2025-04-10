@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::fail_if_too_much;
 use crate::precompiles::tick_model;
 use crate::{handler::EvmHandler, precompiles::PrecompileOutcome, EthereumError};
 use evm::{Context, Transfer};
@@ -61,8 +60,7 @@ pub fn ecrecover_precompile<Host: Runtime>(
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Debug, "Calling ecrecover precompile");
 
-    // check that enough resources to execute (gas / ticks) are available
-    let estimated_ticks = fail_if_too_much!(tick_model::ticks_of_ecrecover(), handler);
+    let estimated_ticks = tick_model::ticks_of_ecrecover();
     let cost = 3000;
     if let Err(err) = handler.record_cost(cost) {
         log!(
