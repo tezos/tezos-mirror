@@ -392,20 +392,11 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
 mod tests {
     use std::str::FromStr;
 
-    use crate::block_storage;
-    use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::chains::test_evm_chain_config;
-    use crate::configuration::Configuration;
     use crate::fees;
     use crate::main;
     use crate::parsing::RollupType;
     use crate::storage::{
         read_transaction_receipt_status, store_chain_id, ENABLE_FA_BRIDGE,
-    };
-    use crate::{
-        blueprint::Blueprint,
-        transaction::{Transaction, TransactionContent, Transactions},
-        upgrade::KernelUpgrade,
     };
     use evm_execution::account_storage::{self, EthereumAccountStorage};
     use evm_execution::fa_bridge::deposit::{ticket_hash, FaDeposit};
@@ -424,12 +415,10 @@ mod tests {
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::TransactionStatus;
     use tezos_ethereum::{
-        transaction::{TransactionHash, TransactionType},
-        tx_common::EthereumTransactionCommon,
+        transaction::TransactionType, tx_common::EthereumTransactionCommon,
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
 
-    use crate::transaction::Transactions::EthTxs;
     use tezos_evm_runtime::runtime::Runtime;
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{
@@ -437,25 +426,13 @@ mod tests {
     };
     use tezos_smart_rollup::outbox::{OutboxMessage, OutboxMessageTransaction};
     use tezos_smart_rollup::types::{Contract, Entrypoint};
-    use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
-    use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used to put traits interface in the scope
     use tezos_smart_rollup_mock::TransferMetadata;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
-    const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
-    const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
-
-    fn dummy_block_fees() -> BlockFees {
-        BlockFees::new(
-            DUMMY_BASE_FEE_PER_GAS.into(),
-            U256::from(DUMMY_BASE_FEE_PER_GAS),
-            DUMMY_DA_FEE.into(),
-        )
-    }
 
     fn set_balance<Host: Runtime>(
         host: &mut Host,
@@ -476,178 +453,6 @@ mod tests {
                 .balance_add(host, balance - current_balance)
                 .unwrap();
         }
-    }
-
-    fn hash_from_nonce(nonce: u64) -> TransactionHash {
-        let nonce = u64::to_le_bytes(nonce);
-        let mut hash = [0; 32];
-        hash[..8].copy_from_slice(&nonce);
-        hash
-    }
-
-    fn wrap_transaction(nonce: u64, tx: EthereumTransactionCommon) -> Transaction {
-        Transaction {
-            tx_hash: hash_from_nonce(nonce),
-            content: TransactionContent::Ethereum(tx),
-        }
-    }
-
-    fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transactions> {
-        Blueprint {
-            transactions: EthTxs(transactions),
-            timestamp: Timestamp::from(0i64),
-        }
-    }
-
-    const CREATE_LOOP_DATA: &str = "608060405234801561001057600080fd5b506101d0806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c80630b7d796e14610030575b600080fd5b61004a600480360381019061004591906100c2565b61004c565b005b60005b81811015610083576001600080828254610069919061011e565b92505081905550808061007b90610152565b91505061004f565b5050565b600080fd5b6000819050919050565b61009f8161008c565b81146100aa57600080fd5b50565b6000813590506100bc81610096565b92915050565b6000602082840312156100d8576100d7610087565b5b60006100e6848285016100ad565b91505092915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60006101298261008c565b91506101348361008c565b925082820190508082111561014c5761014b6100ef565b5b92915050565b600061015d8261008c565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820361018f5761018e6100ef565b5b60018201905091905056fea26469706673582212200cd6584173dbec22eba4ce6cc7cc4e702e00e018d340f84fc0ff197faf980ad264736f6c63430008150033";
-
-    const LOOP_1300: &str =
-        "0b7d796e0000000000000000000000000000000000000000000000000000000000000514";
-
-    const LOOP_4600: &str =
-        "0b7d796e00000000000000000000000000000000000000000000000000000000000011f8";
-
-    const TEST_SK: &str =
-        "84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502";
-
-    const TEST_ADDR: &str = "f0affc80a5f69f4a9a3ee01a640873b6ba53e539";
-
-    fn create_and_sign_transaction(
-        data: &str,
-        nonce: u64,
-        gas_limit: u64,
-        to: Option<H160>,
-        secret_key: &str,
-    ) -> EthereumTransactionCommon {
-        let data = hex::decode(data).unwrap();
-
-        let gas_price = U256::from(DUMMY_BASE_FEE_PER_GAS);
-        let gas_for_fees =
-            crate::fees::gas_for_fees(DUMMY_DA_FEE.into(), gas_price, &data, &[])
-                .unwrap();
-
-        let unsigned_tx = EthereumTransactionCommon::new(
-            TransactionType::Eip1559,
-            Some(DUMMY_CHAIN_ID),
-            nonce,
-            gas_price,
-            gas_price,
-            gas_limit + gas_for_fees,
-            to,
-            U256::zero(),
-            data,
-            vec![],
-            None,
-        );
-        unsigned_tx
-            .sign_transaction(String::from(secret_key))
-            .unwrap()
-    }
-
-    #[test]
-    fn test_reboot_during_block_production() {
-        // init host
-        let mut host = MockKernelHost::default();
-
-        crate::storage::store_minimum_base_fee_per_gas(
-            &mut host,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .unwrap();
-
-        // sanity check: no current block
-        assert!(
-            block_storage::read_current_number(&host).is_err(),
-            "Should not have found current block number"
-        );
-
-        //provision sender account
-        let sender = H160::from_str(TEST_ADDR).unwrap();
-        let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut evm_account_storage = account_storage::init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            sender_initial_balance,
-        );
-
-        // These transactions are generated with the loop.sol contract, which are:
-        // - create the contract
-        // - call `loop(1200)`
-        // - call `loop(4600)`
-        let create_transaction =
-            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
-        let loop_addr: H160 =
-            evm_execution::utilities::create_address_legacy(&sender, &0);
-        let loop_1200_tx =
-            create_and_sign_transaction(LOOP_1300, 1, 900_000, Some(loop_addr), TEST_SK);
-        let loop_4600_tx = create_and_sign_transaction(
-            LOOP_4600,
-            2,
-            2_600_000,
-            Some(loop_addr),
-            TEST_SK,
-        );
-
-        let proposals = vec![
-            blueprint(vec![wrap_transaction(0, create_transaction)]),
-            blueprint(vec![
-                wrap_transaction(1, loop_1200_tx),
-                wrap_transaction(2, loop_4600_tx),
-            ]),
-        ];
-        // Store blueprints
-        for (i, blueprint) in proposals.into_iter().enumerate() {
-            store_inbox_blueprint_by_number(&mut host, blueprint, U256::from(i))
-                .expect("Should have stored blueprint");
-        }
-        // the upgrade mechanism should not start otherwise it will fail
-        let broken_kernel_upgrade = KernelUpgrade {
-            preimage_hash: [0u8; PREIMAGE_HASH_SIZE],
-            activation_timestamp: Timestamp::from(1_000_000i64),
-        };
-        crate::upgrade::store_kernel_upgrade(&mut host, &broken_kernel_upgrade)
-            .expect("Should be able to store kernel upgrade");
-
-        let block_fees = dummy_block_fees();
-
-        // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let mut configuration = Configuration {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..Configuration::default()
-        };
-
-        crate::storage::store_minimum_base_fee_per_gas(
-            &mut host,
-            block_fees.minimum_base_fee_per_gas(),
-        )
-        .unwrap();
-        crate::storage::store_da_fee(&mut host, block_fees.da_fee_per_byte()).unwrap();
-
-        // If the upgrade is started, it should raise an error
-        let computation_result = crate::block::produce(
-            &mut host,
-            &test_evm_chain_config(),
-            &mut configuration,
-            None,
-            None,
-        )
-        .expect("Should have produced");
-
-        // test there is a new block
-        assert_eq!(
-            block_storage::read_current_number(&host)
-                .expect("should have found a block number"),
-            U256::zero(),
-            "There should have been a block registered"
-        );
-
-        // test reboot is set
-        matches!(
-            computation_result,
-            crate::block::ComputationResult::RebootNeeded
-        );
     }
 
     #[test]

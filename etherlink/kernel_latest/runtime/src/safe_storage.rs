@@ -262,4 +262,8 @@ impl<Host: Runtime> WithGas for SafeStorage<&mut Host> {
     fn add_execution_gas(&mut self, gas: u64) {
         self.host.add_execution_gas(gas)
     }
+
+    fn executed_gas(&self) -> u64 {
+        self.host.executed_gas()
+    }
 }

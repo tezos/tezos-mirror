@@ -226,8 +226,12 @@ impl Verbosity for EvalHost {
     }
 }
 
+// This is a blank implementation on purpose, as this is not useful for the
+// evaluation
 impl WithGas for EvalHost {
-    // This is a blank implementation on purpose, as this is not useful for the
-    // evaluation
     fn add_execution_gas(&mut self, _gas: u64) {}
+
+    fn executed_gas(&self) -> u64 {
+        self.host.executed_gas()
+    }
 }

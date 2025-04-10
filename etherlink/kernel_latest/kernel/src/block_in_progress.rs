@@ -586,6 +586,11 @@ impl EthBlockInProgress {
             signature: object_info.signature,
         }
     }
+
+    #[cfg(test)]
+    pub fn valid_txs(&self) -> Vec<[u8; TRANSACTION_HASH_SIZE]> {
+        self.valid_txs.clone()
+    }
 }
 
 #[cfg(test)]
