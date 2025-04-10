@@ -780,6 +780,7 @@ dependencies = [
  "getrandom 0.2.15",
  "hex",
  "libsecp256k1",
+ "num-bigint",
  "num-derive",
  "num-traits",
  "pretty_assertions",

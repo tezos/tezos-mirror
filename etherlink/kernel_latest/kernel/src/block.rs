@@ -601,7 +601,10 @@ mod tests {
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::chains::{EvmChainConfig, MichelsonChainConfig, TezTransactions};
+    use crate::chains::{
+        EvmChainConfig, MichelsonChainConfig, TezTransactions,
+        TEZLINK_SAFE_STORAGE_ROOT_PATH,
+    };
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::storage::read_block_in_progress;
@@ -620,6 +623,7 @@ mod tests {
     use evm_execution::precompiles::precompile_set;
     use primitive_types::{H160, U256};
     use std::str::FromStr;
+    use tezos_crypto_rs::hash::UnknownSignature;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::{
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
@@ -628,6 +632,12 @@ mod tests {
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime::Runtime;
+    use tezos_execution::account_storage::Manager;
+    use tezos_execution::account_storage::TezlinkImplicitAccount;
+    use tezos_execution::context;
+    use tezos_smart_rollup::types::Contract;
+    use tezos_smart_rollup::types::PublicKey;
+    use tezos_smart_rollup::types::PublicKeyHash;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::path::concat;
     use tezos_smart_rollup_host::path::RefPath;
@@ -637,6 +647,34 @@ mod tests {
     }
 
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
+    use tezos_tezlink::operation::ManagerOperation;
+    use tezos_tezlink::operation::Operation;
+    use tezos_tezlink::operation::OperationContent;
+
+    pub fn make_reveal_operation(
+        fee: u64,
+        counter: u64,
+        gas_limit: u64,
+        storage_limit: u64,
+        source: PublicKeyHash,
+        pk: PublicKey,
+    ) -> Operation {
+        let branch = tezos_tezlink::block::TezBlock::genesis_block_hash();
+        // No need a real signature for now
+        let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
+        Operation {
+            branch,
+            content: ManagerOperation {
+                source,
+                fee: fee.into(),
+                counter: counter.into(),
+                operation: OperationContent::Reveal { pk },
+                gas_limit: gas_limit.into(),
+                storage_limit: storage_limit.into(),
+            },
+            signature,
+        }
+    }
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transactions> {
         Blueprint {
@@ -645,9 +683,9 @@ mod tests {
         }
     }
 
-    fn tezlink_blueprint() -> Blueprint<TezTransactions> {
+    fn tezlink_blueprint(operations: Vec<Operation>) -> Blueprint<TezTransactions> {
         Blueprint {
-            transactions: TezTransactions(vec![]),
+            transactions: TezTransactions(operations),
             timestamp: Timestamp::from(0i64),
         }
     }
@@ -927,9 +965,9 @@ mod tests {
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
             vec![
-                tezlink_blueprint(),
-                tezlink_blueprint(),
-                tezlink_blueprint(),
+                tezlink_blueprint(vec![]),
+                tezlink_blueprint(vec![]),
+                tezlink_blueprint(vec![]),
             ],
         );
 
@@ -943,6 +981,61 @@ mod tests {
             .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
         assert_eq!(U256::from(2), read_current_number(&host).unwrap());
+    }
+
+    #[test]
+    // Test if tezlink block production works with a reveal operation
+    fn test_produce_tezlink_block_with_reveal_operation() {
+        let mut host = MockKernelHost::default();
+
+        let chain_config = dummy_tez_config();
+        let mut config = dummy_configuration();
+
+        let contract = Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("Contract creation should have succeeded");
+
+        let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+            .expect("Context creation should have succeeded");
+
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+            .expect("Account interface should be correct");
+
+        TezlinkImplicitAccount::allocate(&mut host, &context, &contract)
+            .expect("Contract initialization should have succeeded");
+
+        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("PublicKeyHash b58 conversion should have succeeded");
+
+        let pk = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key creation should have succeeded");
+
+        let manager = account
+            .manager(&host)
+            .expect("Retrieve manager should have succeeded");
+
+        assert_eq!(Manager::NotRevealed(src.clone()), manager);
+
+        let operation = make_reveal_operation(0, 1, 0, 0, src, pk.clone());
+
+        store_blueprints::<_, MichelsonChainConfig>(
+            &mut host,
+            vec![tezlink_blueprint(vec![operation])],
+        );
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+        assert_eq!(U256::from(0), read_current_number(&host).unwrap());
+
+        let manager = account
+            .manager(&host)
+            .expect("Retrieve manager should have succeeded");
+
+        assert_eq!(Manager::Revealed(pk), manager);
     }
 
     #[test]
