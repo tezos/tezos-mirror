@@ -2331,6 +2331,7 @@ dependencies = [
  "nom",
  "num-bigint",
  "primitive-types",
+ "rlp",
  "tezos-smart-rollup",
  "tezos_crypto_rs",
  "tezos_data_encoding",
