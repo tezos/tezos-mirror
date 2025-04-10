@@ -681,10 +681,7 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
     ///
     /// *NB* before running any block, you must ensure no partial block
     /// is in progress with [`BlockCache::complete_current_block`].
-    pub fn get_block(
-        &mut self,
-        phys_addr: Address,
-    ) -> Option<&mut (impl BCall<MC, M> + ?Sized + '_)>
+    pub fn get_block(&mut self, phys_addr: Address) -> Option<&(impl BCall<MC, M> + ?Sized + '_)>
     where
         M: ManagerRead,
     {
@@ -697,11 +694,12 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
 
         if entry.address.read() == phys_addr
             && self.fence_counter.read() == entry.fence_counter.read()
+            && entry.block.num_instr() > 0
         {
             unsafe {
                 // SAFETY: the block builder given to this function is the same as was given to the
                 //         'compile' function of this block.
-                entry.block.callable(&mut self.block_builder)
+                Some(entry.block.callable(&mut self.block_builder))
             }
         } else {
             None
@@ -1265,5 +1263,23 @@ mod tests {
 
         let result = state.step();
         assert_eq!(result, Err(EnvironException::EnvCallFromMMode));
+    }
+
+    /// The initialised block cache has an entry for address 0. The block at address 0 happens to
+    /// be empty, which causes the step function to loop indefinitely when it runs the block.
+    #[test]
+    fn test_get_empty_block_fails() {
+        type Layout = super::Layout<TEST_CACHE_BITS, TEST_CACHE_SIZE>;
+
+        let mut block_cache: BlockCache<Layout, Interpreted<M4K, Owned>, M4K, Owned> =
+            BlockCache::bind(Owned::allocate::<Layout>(), InterpretedBlockBuilder);
+
+        // Fetching empty block fails
+        assert!(block_cache.get_block(0).is_none());
+
+        block_cache.push_instr_compressed(0, Instruction::new_nop(InstrWidth::Compressed));
+
+        // Fetching non-empty block succeeds
+        assert!(block_cache.get_block(0).is_some());
     }
 }
