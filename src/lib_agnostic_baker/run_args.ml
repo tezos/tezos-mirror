@@ -14,6 +14,8 @@ let version_arg = "--version"
 
 let man_arg = "man"
 
+let only_exe args = List.compare_length_with args 1 = 0
+
 let is_help_cmd = List.mem ~equal:String.equal help_arg
 
 let is_version_cmd = List.mem ~equal:String.equal version_arg

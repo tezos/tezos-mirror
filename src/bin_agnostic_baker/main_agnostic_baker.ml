@@ -62,7 +62,11 @@ let run ~args () =
 
 let () =
   let args = Array.to_list Sys.argv in
-  if Run_args.(is_help_cmd args || is_version_cmd args || is_man_cmd args) then
+  if
+    Run_args.(
+      only_exe args || is_help_cmd args || is_version_cmd args
+      || is_man_cmd args)
+  then
     (* No need to run the baker commands, we just need to get their description,
        therefore we do not obtain the protocol plugin. *)
     Client_main_run.run
