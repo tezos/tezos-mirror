@@ -23,7 +23,7 @@ SANDBOX_ENABLE_FEATURES ?=
 NIGHTLY_VERSION = nightly-2025-01-30
 
 .PHONY: build
-build: riscv-dummy.elf riscv-sandbox
+build: riscv-dummy.elf riscv-dummy-linux-musl.elf riscv-sandbox
 	@cargo build --release --workspace $(NATIVE_OPT)
 	@make -C jstz build
 
@@ -41,13 +41,13 @@ riscv-dummy.elf::
 	@make -C dummy_kernel build
 	@ln -f dummy_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy $@
 
-riscv-supervised-dummy.elf::
-	@make -C supervised_dummy_kernel build
-	@ln -f supervised_dummy_kernel/target/riscv64gc-unknown-linux-musl/debug/riscv-supervised-dummy $@
+riscv-dummy-linux-musl.elf::
+	@make -C dummy_kernel build-linux-musl
+	@ln -f dummy_kernel/target/riscv64gc-unknown-linux-musl/release/riscv-dummy $@
 
 # Update checked-in binaries
 .PHONY: update-assets
-update-assets: assets/riscv-dummy.elf assets/jstz
+update-assets: assets/riscv-dummy.elf assets/riscv-dummy-linux-musl.elf assets/jstz assets/jstz-linux-musl
 
 # Update the compiled dummy kernel used in CI tests
 assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
@@ -55,9 +55,19 @@ assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
 	@cp dummy_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy $@
 	@sha256sum $@ > $@.checksum
 
+assets/riscv-dummy-linux-musl.elf assets/riscv-dummy-linux-musl.elf.checksum::
+	@make -C dummy_kernel build-linux-musl
+	@cp dummy_kernel/target/riscv64gc-unknown-linux-musl/release/riscv-dummy $@
+	@sha256sum $@ > $@.checksum
+
 assets/jstz assets/jstz.checksum::
-	@make -C jstz build
+	@make -C jstz build-kernel
 	@cp jstz/target/riscv64gc-unknown-hermit/release/jstz $@
+	@sha256sum $@ > $@.checksum
+
+assets/jstz-linux-musl assets/jstz-linux-musl.checksum::
+	@make -C jstz build-kernel-linux-musl
+	@cp jstz/target/riscv64gc-unknown-linux-musl/release/jstz $@
 	@sha256sum $@ > $@.checksum
 
 .PHONY: build-deps
@@ -80,7 +90,6 @@ endif
 
 	@make -C jstz build-deps
 	@make -C dummy_kernel build-deps
-	@make -C supervised_dummy_kernel build-deps
 
 	# Coverage deps
 	@./scripts/isa-suite-coverage.sh -d
@@ -114,7 +123,6 @@ check:
 	@cargo doc --document-private-items --no-deps $(CHECK_FEATURES)
 
 	@make -C dummy_kernel check
-	@make -C supervised_dummy_kernel check
 	@make -C jstz check
 
 .PHONY: audit
@@ -131,6 +139,5 @@ audit:
 clean:
 	@cargo clean
 	@make -C dummy_kernel clean
-	@make -C supervised_dummy_kernel clean
 	@make -C jstz clean
 	@rm -f riscv-sandbox riscv-dummy.elf

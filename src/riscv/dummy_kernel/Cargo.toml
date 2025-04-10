@@ -26,3 +26,6 @@ path = "../../kernel_sdk/constants"
 
 [dependencies]
 hex = "0.4.3"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2.169"

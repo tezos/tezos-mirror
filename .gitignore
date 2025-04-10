@@ -67,7 +67,7 @@ __pycache__
 
 /src/riscv/riscv-sandbox*
 /src/riscv/riscv-dummy.elf
-/src/riscv/riscv-supervised-dummy.elf
+/src/riscv/riscv-dummy-linux-musl.elf
 
 /src/proto_*/parameters/*-parameters.json
 

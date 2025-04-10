@@ -1,12 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["lib", "sandbox"]
-exclude = [
-  "jstz",
-  "dummy_kernel",
-  "supervised_dummy_kernel",
-  "tests",
-]
+exclude = ["jstz", "dummy_kernel", "tests"]
 
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"
