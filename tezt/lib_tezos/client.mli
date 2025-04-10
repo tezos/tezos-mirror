@@ -1166,6 +1166,23 @@ val update_consensus_key :
   t ->
   unit Lwt.t
 
+(** [update_fresh_consensus_key delegate client] runs the following commands:
+    [octez-client gen keys] to generate a new key,
+    [octez-client show address] to retrieve the newly generated key <fresh>,
+    and [octez-client update consensus key for <delegate> to <fresh>].
+    Returns the newly generated key <fresh>. *)
+val update_fresh_consensus_key :
+  ?alias:string ->
+  ?algo:string ->
+  ?hooks:Process_hooks.t ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?expect_failure:bool ->
+  Account.key ->
+  t ->
+  Account.key Lwt.t
+
 (** Run [octez-client set companion key for <src> to <pk>] *)
 val update_companion_key :
   ?hooks:Process.hooks ->

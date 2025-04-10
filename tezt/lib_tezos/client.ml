@@ -1482,6 +1482,22 @@ let update_consensus_key ?hooks ?endpoint ?(wait = "none") ?burn_cap
     @ optional_arg "burn-cap" Tez.to_string burn_cap)
   |> Process.check ?expect_failure
 
+let update_fresh_consensus_key ?alias ?algo ?hooks ?endpoint ?wait ?burn_cap
+    ?expect_failure (delegate : Account.key) client =
+  let* key = gen_and_show_keys ?alias ?sig_alg:algo client in
+  let* () =
+    update_consensus_key
+      ?hooks
+      ?endpoint
+      ?wait
+      ?burn_cap
+      ?expect_failure
+      ~src:delegate.alias
+      ~pk:key.alias
+      client
+  in
+  return key
+
 let update_companion_key ?hooks ?endpoint ?(wait = "none") ?burn_cap
     ?expect_failure ~src ~pk client =
   spawn_command
