@@ -13,6 +13,8 @@
   under a feature flag. (!17114)
 - Hot and cold accesses are now enabled to better align gas consumption
   with the actual execution on Etherlink. (!17308)
+- Removes the `OutOfTicks` error when executing the EVM interpreter. We only
+  use gas to decide when to reboot. (!15079)
 
 ### Bug fixes
 
