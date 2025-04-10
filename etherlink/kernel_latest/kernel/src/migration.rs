@@ -22,7 +22,8 @@ use evm_execution::configuration::EVMVersion;
 use evm_execution::precompiles::SYSTEM_ACCOUNT_ADDRESS;
 use evm_execution::precompiles::WITHDRAWAL_ADDRESS;
 use evm_execution::{
-    store_evm_version, ENABLE_FAST_WITHDRAWAL, NATIVE_TOKEN_TICKETER_PATH,
+    store_evm_version, ENABLE_FAST_FA_WITHDRAWAL, ENABLE_FAST_WITHDRAWAL,
+    NATIVE_TOKEN_TICKETER_PATH,
 };
 use primitive_types::U256;
 use tezos_evm_logging::{log, Level::*};
@@ -301,6 +302,10 @@ fn migrate_to<Host: Runtime>(
                 RefPath::assert_from(b"/evm/info_per_level/stats/total");
             host.store_delete(&EVM_INFO_PER_LEVEL_STATS_NUMBERS)?;
             host.store_delete(&EVM_INFO_PER_LEVEL_STATS_TOTAL)?;
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V30 => {
+            host.store_write_all(&ENABLE_FAST_FA_WITHDRAWAL, &[1_u8])?;
             Ok(MigrationStatus::Done)
         }
     }
