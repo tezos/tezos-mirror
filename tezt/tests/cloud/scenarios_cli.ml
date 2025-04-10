@@ -22,6 +22,8 @@ end
 module type Dal = sig
   val blocks_history : int
 
+  val producer_key : string option
+
   val fundraiser : string option
 
   val network_typ : Network.t Clap.typ
@@ -110,6 +112,13 @@ module Dal () : Dal = struct
       ~section
       ~long:"fundraiser"
       ~description:"Fundraiser secret key that has enough money on test network"
+      ()
+
+  let producer_key =
+    Clap.optional_string
+      ~section
+      ~long:"producer-key"
+      ~description:"Producer secret key that has enough money"
       ()
 
   let producers_delay =
