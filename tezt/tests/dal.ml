@@ -1235,7 +1235,7 @@ let test_slot_management_logic protocol parameters cryptobox node client
   let* (`OpHash oph1) =
     publish_dummy_slot
       ~source:Constant.bootstrap1
-      ~fee:1_000
+      ~fee:10_000
       ~index:0
       ~message:"a"
       cryptobox
@@ -1244,7 +1244,7 @@ let test_slot_management_logic protocol parameters cryptobox node client
   let* (`OpHash oph2) =
     publish_dummy_slot
       ~source:Constant.bootstrap2
-      ~fee:1_500
+      ~fee:15_000
       ~index:1
       ~message:"b"
       cryptobox
@@ -1253,7 +1253,7 @@ let test_slot_management_logic protocol parameters cryptobox node client
   let* (`OpHash oph3) =
     publish_dummy_slot
       ~source:Constant.bootstrap3
-      ~fee:2_000
+      ~fee:20_000
       ~index:0
       ~message:"c"
       cryptobox
@@ -1262,7 +1262,7 @@ let test_slot_management_logic protocol parameters cryptobox node client
   let* (`OpHash oph4) =
     publish_dummy_slot
       ~source:Constant.bootstrap4
-      ~fee:1_200
+      ~fee:12_000
       ~index:1
       ~message:"d"
       cryptobox
@@ -1271,7 +1271,7 @@ let test_slot_management_logic protocol parameters cryptobox node client
   let* (`OpHash oph5) =
     publish_dummy_slot_with_wrong_proof_for_same_content
       ~source:Constant.bootstrap5
-      ~fee:3_000
+      ~fee:30_000
       ~index:2
       cryptobox
       client
@@ -1281,7 +1281,7 @@ let test_slot_management_logic protocol parameters cryptobox node client
   let* (`OpHash oph6) =
     publish_dummy_slot_with_wrong_proof_for_different_slot_size
       ~source:bootstrap6
-      ~fee:3_000
+      ~fee:30_000
       ~index:2
       parameters
       cryptobox
@@ -1523,7 +1523,7 @@ let test_all_available_slots _protocol parameters cryptobox node client
         let* (`OpHash _oph1) =
           publish_dummy_slot
             ~source
-            ~fee:1_000
+            ~fee:13_000
             ~index
             ~message:"a"
             cryptobox
@@ -1733,7 +1733,7 @@ let () =
    argument can be used to wait for the shards to be received by one
    or several other DAL nodes. Returns the published commitment and
    the level at which it was published. *)
-let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
+let publish_store_and_wait_slot ?counter ?force ?(fee = 12_000) node client
     slot_producer_dal_node source ~index ~wait_slot
     ~number_of_extra_blocks_to_bake ?delegates content =
   let* commitment, proof =
@@ -1892,10 +1892,10 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   in
   let* level = Node.get_level node in
   let pub_level = level + 1 in
-  let publish ?fee source ~index content =
+  let publish ?(fee = 12_000) source ~index content =
     let content = Helpers.make_slot ~slot_size content in
     let* commitment =
-      Helpers.publish_and_store_slot ?fee client dal_node source ~index content
+      Helpers.publish_and_store_slot ~fee client dal_node source ~index content
     in
     return (index, commitment)
   in
@@ -1913,8 +1913,8 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
      We decide to have two failed slots instead of just one to better test some
      internal aspects of failed slots headers recording (i.e. having a collection
      of data instead of just one). *)
-  let* slot2_a = publish Constant.bootstrap3 ~index:4 ~fee:1_200 "test4_a" in
-  let* slot2_b = publish Constant.bootstrap4 ~index:4 ~fee:1_350 "test4_b" in
+  let* slot2_a = publish Constant.bootstrap3 ~index:4 ~fee:12_000 "test4_a" in
+  let* slot2_b = publish Constant.bootstrap4 ~index:4 ~fee:13_500 "test4_b" in
   let* slot3 = publish Constant.bootstrap5 ~index:5 ~fee:1 "test5" in
   let* slot4 =
     let slot = Helpers.make_slot ~slot_size "never associated to a slot_id" in
