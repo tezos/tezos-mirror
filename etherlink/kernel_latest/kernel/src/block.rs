@@ -147,15 +147,12 @@ fn compute<Host: Runtime>(
         "Queue length {}.",
         block_in_progress.queue_length()
     );
-    let mut is_first_transaction = true;
     // iteration over all remaining transaction in the block
     while block_in_progress.has_tx() {
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
         let data_size: u64 = transaction.data_size();
 
         log!(host, Benchmarking, "Transaction data size: {}", data_size);
-
-        let retriable = !is_first_transaction;
 
         if !can_fit_in_reboot(
             limits,
@@ -197,7 +194,6 @@ fn compute<Host: Runtime>(
             &transaction,
             block_in_progress.index,
             evm_account_storage,
-            retriable,
             sequencer_pool_address,
             tracer_input,
             evm_configuration,
@@ -227,25 +223,10 @@ fn compute<Host: Runtime>(
                     block_in_progress.estimated_ticks_in_run
                 );
             }
-
-            ExecutionResult::Retriable(_) => {
-                // It is the first block processed in this reboot. Additionally,
-                // it is the first transaction processed from this block in this
-                // reboot. The tick limit cannot be larger.
-                log!(
-                    host,
-                    Debug,
-                    "The transaction exhausted the ticks of the \
-                         current reboot but will be retried."
-                );
-                block_in_progress.repush_tx(transaction);
-                return Ok(BlockInProgressComputationResult::RebootNeeded);
-            }
             ExecutionResult::Invalid => {
                 on_invalid_transaction(host, &transaction, block_in_progress, data_size)
             }
         };
-        is_first_transaction = false;
     }
     Ok(BlockInProgressComputationResult::Finished {
         included_delayed_transactions: block_in_progress.delayed_txs.clone(),
