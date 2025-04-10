@@ -414,6 +414,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
     if state.force_attest_all then attest_all_ previous_block (block, state)
     else return (block, state)
   in
+  let* () = state.check_finalized_block (block, state) in
   return (block, state)
 
 let rec repeat n f acc =

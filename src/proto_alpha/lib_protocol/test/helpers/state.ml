@@ -33,6 +33,7 @@ type t = {
     (Signature.Public_key_hash.t * Protocol.Denunciations_repr.item) list;
   double_signings : double_signing_state list;
   force_attest_all : bool;
+  check_finalized_block : Block.t * t -> unit tzresult Lwt.t;
 }
 
 (** Expected number of cycles before staking parameters get applied *)

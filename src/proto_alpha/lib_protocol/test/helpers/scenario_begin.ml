@@ -82,6 +82,7 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
 
 (** Initialize the test, given some initial parameters *)
 let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
+    ?(check_finalized_block = fun _ -> Lwt_result_syntax.return_unit)
     delegates_name_list : (constants, t) scenarios =
   exec (fun (constants : constants) ->
       let open Lwt_result_syntax in
@@ -149,6 +150,7 @@ let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
             pending_slashes = [];
             double_signings = [];
             force_attest_all;
+            check_finalized_block;
           }
       in
       let* () = check_all_balances block state in
