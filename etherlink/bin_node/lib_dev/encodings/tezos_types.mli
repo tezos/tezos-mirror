@@ -26,4 +26,8 @@ val address_of_b58exn : string -> address
 
 val address_to_hex_exn : address -> string
 
-module Tez = Tezos_protocol_021_PsQuebec.Protocol.Alpha_context.Tez
+module Tez : sig
+  include module type of Tezos_protocol_021_PsQuebec.Protocol.Alpha_context.Tez
+
+  val of_string_exn : string -> t
+end

@@ -56,4 +56,12 @@ let address_to_hex_exn address =
   let (`Hex key) = Hex.of_bytes raw_key in
   key
 
-module Tez = Tezos_protocol_021_PsQuebec.Protocol.Alpha_context.Tez
+module Tez = struct
+  include Tezos_protocol_021_PsQuebec.Protocol.Alpha_context.Tez
+
+  let of_string_exn str =
+    match of_string str with
+    | None ->
+        raise (Invalid_argument (Printf.sprintf "Invalid tez value: %s" str))
+    | Some s -> s
+end

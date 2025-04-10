@@ -242,7 +242,8 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
 
 let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
     ~mainnet_compat ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?(bootstrap_accounts = Evm_node.default_bootstrap_accounts)
+    ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
+    ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?sequencer_pool_address ?da_fee_per_byte ?minimum_base_fee_per_gas
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
@@ -271,7 +272,8 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ?dal_slots
       ~enable_multichain:false
       ?max_blueprint_lookahead_in_seconds
-      ~bootstrap_accounts
+      ~eth_bootstrap_accounts
+      ~tez_bootstrap_accounts
       ~output:output_config
       ?evm_version
       ?enable_fa_bridge
@@ -294,7 +296,8 @@ let generate_l2_kernel_config (l2_setup : Evm_node.l2_setup) =
       ?sequencer_pool_address:l2_setup.sequencer_pool_address
       ?minimum_base_fee_per_gas:l2_setup.minimum_base_fee_per_gas
       ?da_fee_per_byte:l2_setup.da_fee_per_byte
-      ?bootstrap_accounts:l2_setup.bootstrap_accounts
+      ?eth_bootstrap_accounts:l2_setup.eth_bootstrap_accounts
+      ?tez_bootstrap_accounts:l2_setup.tez_bootstrap_accounts
       ?world_state_path:l2_setup.world_state_path
       ~output:l2_config
       ()
@@ -316,7 +319,8 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
         da_fee_per_byte,
         sequencer_pool_address,
         maximum_gas_per_transaction,
-        bootstrap_accounts ) =
+        eth_bootstrap_accounts,
+        tez_bootstrap_accounts ) =
     match l2_setups with
     | [
      {
@@ -324,17 +328,25 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
        da_fee_per_byte;
        sequencer_pool_address;
        maximum_gas_per_transaction;
-       bootstrap_accounts;
        world_state_path;
+       eth_bootstrap_accounts;
+       tez_bootstrap_accounts;
        _;
      };
     ] ->
+        let eth_bootstrap_accounts =
+          (* If `world_state_path` is `/evm/world_state`, it means the bootstrap accounts have already been written to that path.
+             To avoid duplicating this information in the configuration file — which would unnecessarily bloat the rollup origination
+             operation and cause an error — we skip including them here. *)
+          if world_state_path = Some "/evm/world_state" then None
+          else eth_bootstrap_accounts
+        in
         ( minimum_base_fee_per_gas,
           da_fee_per_byte,
           sequencer_pool_address,
           maximum_gas_per_transaction,
-          if world_state_path = Some "/evm/world_state" then None
-          else bootstrap_accounts )
+          eth_bootstrap_accounts,
+          tez_bootstrap_accounts )
     | _ -> assert false
   in
   (* In the kernel, the multichain notion was not introduced yet. *)
@@ -368,7 +380,8 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
       ?dal_slots
       ~enable_multichain:true
       ?max_blueprint_lookahead_in_seconds
-      ?bootstrap_accounts
+      ?eth_bootstrap_accounts
+      ?tez_bootstrap_accounts
       ~output:rollup_config
       ?enable_fa_bridge
       ?evm_version
@@ -408,7 +421,8 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?enable_fast_fa_withdrawal
       ?dal_slots
       ?max_blueprint_lookahead_in_seconds
-      ?bootstrap_accounts:chain_config.Evm_node.bootstrap_accounts
+      ?eth_bootstrap_accounts:chain_config.Evm_node.eth_bootstrap_accounts
+      ?tez_bootstrap_accounts:chain_config.Evm_node.tez_bootstrap_accounts
       ?enable_fa_bridge
       ?evm_version
       ~preimages_dir
@@ -671,8 +685,9 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?commitment_period ?challenge_window
-    ?(bootstrap_accounts = Evm_node.default_bootstrap_accounts) ?sequencer
-    ?sequencer_pool_address ?kernel ?da_fee ?minimum_base_fee_per_gas
+    ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
+    ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
+    ?sequencer ?sequencer_pool_address ?kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?threshold_encryption
@@ -688,7 +703,8 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
           {
             (Evm_node.default_l2_setup ~l2_chain_id:1) with
             sequencer_pool_address;
-            bootstrap_accounts = Some bootstrap_accounts;
+            eth_bootstrap_accounts = Some eth_bootstrap_accounts;
+            tez_bootstrap_accounts = Some tez_bootstrap_accounts;
             da_fee_per_byte = da_fee;
             minimum_base_fee_per_gas;
             maximum_gas_per_transaction;
@@ -745,8 +761,9 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?(bootstrap_accounts = Evm_node.default_bootstrap_accounts) ?sequencer
-    ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
+    ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
+    ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
+    ?sequencer ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
@@ -780,7 +797,8 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
             sequencer_pool_address;
             minimum_base_fee_per_gas;
             maximum_gas_per_transaction;
-            bootstrap_accounts = Some bootstrap_accounts;
+            eth_bootstrap_accounts = Some eth_bootstrap_accounts;
+            tez_bootstrap_accounts = Some tez_bootstrap_accounts;
           };
         ]
     | Some l2_chains -> l2_chains
@@ -866,8 +884,9 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?(bootstrap_accounts = Evm_node.default_bootstrap_accounts) ?sequencer
-    ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
+    ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
+    ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
+    ?sequencer ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
@@ -892,7 +911,8 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?delayed_inbox_timeout
     ?delayed_inbox_min_levels
     ?max_number_of_chunks
-    ~bootstrap_accounts
+    ~eth_bootstrap_accounts
+    ~tez_bootstrap_accounts
     ?sequencer
     ?sequencer_pool_address
     ~kernel
@@ -931,8 +951,9 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?(bootstrap_accounts = Evm_node.default_bootstrap_accounts) ?sequencer
-    ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
+    ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
+    ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
+    ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
     ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
@@ -958,7 +979,8 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?delayed_inbox_timeout
         ?delayed_inbox_min_levels
         ?max_number_of_chunks
-        ~bootstrap_accounts
+        ~eth_bootstrap_accounts
+        ~tez_bootstrap_accounts
         ?sequencer
         ?sequencer_pool_address
         ~kernel
