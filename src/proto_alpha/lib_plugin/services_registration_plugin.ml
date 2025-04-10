@@ -9,7 +9,6 @@
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/7369 *)
 
-open Protocol
 open Environment
 
 let patched_services =

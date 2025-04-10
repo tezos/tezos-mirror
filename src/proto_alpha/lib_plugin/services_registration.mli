@@ -36,6 +36,8 @@
     Protocol RPC services provide a {i read-only} view of the Ledger state.
   *)
 
+open Protocol
+open Environment
 open Alpha_context
 
 type rpc_context = {

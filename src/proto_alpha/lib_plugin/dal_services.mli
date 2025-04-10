@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Environment
+open Error_monad
+
 (** [shards ctxt ~level] returns the DAL committee as a mapping from the public
     key hash of members of the committee to the list of shard indexes associated
     to that member. *)

@@ -281,14 +281,6 @@
         "Mempool_validation",
         "Apply",
 
-        "Services_registration",
-        "Constants_services",
-        "Sapling_services",
-        "Voting_services",
-        "Dal_services",
-        "Adaptive_issuance_services",
-        "Alpha_services",
-
         "Main"
     ]
 }

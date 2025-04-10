@@ -33,6 +33,9 @@
     This is a mostly internal module used from [rpc_services] in [Main].
  *)
 
+open Protocol
+open Environment
+open Error_monad
 open Alpha_context
 
 module Seed_computation : sig

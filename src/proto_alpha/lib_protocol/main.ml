@@ -86,9 +86,7 @@ let validation_passes =
       {max_size = 512 * 1024; max_op = None};
     ]
 
-let rpc_services =
-  Alpha_services.register () ;
-  Services_registration.get_rpc_services ()
+let rpc_services = RPC_directory.empty
 
 type validation_state = Validate.validation_state
 

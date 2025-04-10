@@ -23,4 +23,4 @@ index b226dc5417..cef4feef6e 100644
 +      {max_size = max_int; max_op = None};
      ]
  
- let rpc_services =
+ let rpc_services = RPC_directory.empty

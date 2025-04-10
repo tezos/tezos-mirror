@@ -127,7 +127,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       | Some x -> return x
       | None ->
           let* constants =
-            Protocol.Alpha_services.Constants.parametric cctxt ref_block
+            Plugin.Alpha_services.Constants.parametric cctxt ref_block
           in
           let out =
             constants

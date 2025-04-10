@@ -89,3 +89,5 @@ Internal
   addresses, and are registered the same way as consensus keys. They are used at validation
   time for the consensus, so the type of the storage ``delegate_sampler_state`` had to be
   updated. (MR :gl:`!17213`)
+
+- Moved remaining RPC implementations to the protocol plugin. (:gl:`!14079`)

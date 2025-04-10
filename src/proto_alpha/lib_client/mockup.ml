@@ -57,7 +57,7 @@ module Protocol_constants_overrides = struct
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_full cctxt in
     let* {parametric; _} =
-      Protocol.Constants_services.all cpctxt (cpctxt#chain, cpctxt#block)
+      Plugin.Constants_services.all cpctxt (cpctxt#chain, cpctxt#block)
     in
     let to_chain_id_opt = function `Hash c -> Some c | _ -> None in
     let* header =

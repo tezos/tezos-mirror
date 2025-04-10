@@ -39,7 +39,7 @@ module Plugin = struct
 
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
-    Protocol.Constants_services.parametric cpctxt (chain, block)
+    Plugin.Constants_services.parametric cpctxt (chain, block)
 
   let get_constants chain block ctxt =
     let open Lwt_result_syntax in
@@ -101,7 +101,7 @@ module Plugin = struct
       (* Let's use Head. In practice the number of slots of `Head will
          be greater. If the slot index is not valid, in any case it
          will be caught by the forge or during the injection. *)
-      Protocol.Constants_services.parametric cpctxt (chain, `Head 0)
+      Plugin.Constants_services.parametric cpctxt (chain, `Head 0)
     in
     (* If the number of slots changes between two protocol, the call
        could fail while it should succeed. This is a corner case to
