@@ -60,6 +60,9 @@ Available services:
         happen during the bootstrapping process, and closing the stream at
         the end. If the node was already bootstrapped, returns the current
         head immediately. 
+    - GET /tezlink/monitor/heads/<chain_id>
+        Monitor all blocks that are successfully validated and applied by the
+        node and selected as the new head of the given chain. 
     - GET /tezlink/version
         Get information on the node version 
   - GET /version
@@ -130,6 +133,9 @@ Available services:
       happen during the bootstrapping process, and closing the stream at the
       end. If the node was already bootstrapped, returns the current head
       immediately. 
+  - GET /monitor/heads/<chain_id>
+      Monitor all blocks that are successfully validated and applied by the
+      node and selected as the new head of the given chain. 
   - GET /version
       Get information on the node version 
 

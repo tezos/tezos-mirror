@@ -137,7 +137,7 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
     let* block_number = shell_block_param_to_block_number block in
     Backend.tez_nth_block (Z.of_int32 block_number)
 
-  let _monitor_heads chain query =
+  let monitor_heads chain query =
     (* TODO: #7831
        take chain into account
        For the moment this implementation only supports the main chain, once
