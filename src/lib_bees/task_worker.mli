@@ -25,21 +25,37 @@ type 'a message_error =
     during the whole program lifetime for parallelised computation. *)
 val worker : string -> int -> (task_worker, launch_error) result
 
-(** [launch_task worker name func arg] create a request named [name] and
-    executing [func args], and push it to [worker] queue, returning a promise
-    for the request result. *)
+(** [launch_task_and_wait worker name func ?on_completion arg] create a request named
+    [name] and executing [func args], and push it to [worker] queue, returning a
+    promise for the request result. An optional callback [on_completion] can be
+    used to trigger specific computations once the request is completed. *)
+val launch_task_and_wait :
+  task_worker ->
+  string ->
+  ('a -> 'b) ->
+  ?on_completion:('b -> unit) ->
+  'a ->
+  ('b, 'c message_error) result Lwt.t
+
+(** [launch_tasks_and_wait worker name func ?on_completion args] runs
+    {!val-launch_task_and_wait} for each each [arg] in [args], in parallel. *)
+val launch_tasks_and_wait :
+  task_worker ->
+  string ->
+  ('a -> 'b) ->
+  ?on_completion:('b -> unit) ->
+  'a list ->
+  ('b, 'c message_error) result list Lwt.t
+
+(** [launch_task worker name func ?on_completion arg] create a request named
+    [name] and executing [func args], and push it to [worker] queue, true if the
+    request has been pushed successfully and false otherwise. An optional
+    callback [on_completion] can be used to trigger specific computations once
+    the request is completed *)
 val launch_task :
   task_worker ->
   string ->
   ('a -> 'b) ->
+  ?on_completion:('b -> unit) ->
   'a ->
-  ('b, 'c message_error) result Lwt.t
-
-(** [launch_tasks worker name func args] runs {!val-launch_task} for each
-    each [arg] in [args], in parallel. *)
-val launch_tasks :
-  task_worker ->
-  string ->
-  ('a -> 'b) ->
-  'a list ->
-  ('b, 'c message_error) result list Lwt.t
+  bool
