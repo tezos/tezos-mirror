@@ -469,6 +469,7 @@ type configuration = {
   memtrace : bool;
   data_dir : string option;
   fundraiser : string option;
+  producers_delay : int;
   blocks_history : int;
   bootstrap_node_identity_file : string option;
   bootstrap_dal_node_identity_file : string option;
@@ -3362,34 +3363,36 @@ let ensure_enough_funds t i =
       else Lwt.return_unit
 
 let produce_slot t level i =
-  toplog "producing slots for level %d" level ;
-  let* () = ensure_enough_funds t i in
-  toplog "ensured enough funds are available" ;
-  let producer = List.nth t.producers i in
-  let index = producer.slot_index in
-  let content =
-    Format.asprintf "%d:%d" level index
-    |> Helpers.make_slot
-         ~padding:false
-         ~slot_size:t.parameters.cryptobox.slot_size
-  in
-  let* _ = Node.wait_for_level producer.node level in
-  let* _ =
-    (* A dry-run of the "publish dal commitment" command outputs fees of 516µtz and
-       1333 gas consumed. We added a (quite small) margin to it. *)
-    Helpers.publish_and_store_slot
-      ~fee:520
-      ~gas_limit:1400
-      ~dont_wait:true
-      producer.client
-      producer.dal_node
-      producer.account
-      ~force:true
-      ~index
-      content
-  in
-  Log.info "publish slot" ;
-  Lwt.return_unit
+  if level mod t.configuration.producers_delay = 0 then (
+    toplog "producing slots for level %d" level ;
+    let* () = ensure_enough_funds t i in
+    toplog "ensured enough funds are available" ;
+    let producer = List.nth t.producers i in
+    let index = producer.slot_index in
+    let content =
+      Format.asprintf "%d:%d" level index
+      |> Helpers.make_slot
+           ~padding:false
+           ~slot_size:t.parameters.cryptobox.slot_size
+    in
+    let* _ = Node.wait_for_level producer.node level in
+    let* _ =
+      (* A dry-run of the "publish dal commitment" command outputs fees of 516µtz and
+         1333 gas consumed. We added a (quite small) margin to it. *)
+      Helpers.publish_and_store_slot
+        ~fee:520
+        ~gas_limit:1400
+        ~dont_wait:true
+        producer.client
+        producer.dal_node
+        producer.account
+        ~force:true
+        ~index
+        content
+    in
+    Log.info "publish slot" ;
+    Lwt.return_unit)
+  else Lwt.return_unit
 
 let producers_not_ready t =
   (* If not all the producer nodes are ready, we do not publish the commitment
@@ -3446,6 +3449,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let teztale = Cli.teztale in
     let memtrace = Cli.memtrace in
     let data_dir = Cli.data_dir in
+    let producers_delay = Cli.producers_delay in
     let fundraiser =
       Option.fold
         ~none:(Sys.getenv_opt "TEZT_CLOUD_FUNDRAISER")
@@ -3507,6 +3511,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         memtrace;
         data_dir;
         fundraiser;
+        producers_delay;
         blocks_history;
         bootstrap_node_identity_file;
         bootstrap_dal_node_identity_file;

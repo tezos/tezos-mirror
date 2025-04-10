@@ -40,6 +40,8 @@ module type Dal = sig
 
   val producers : int
 
+  val producers_delay : int
+
   val producer_machine_type : string option
 
   val observer_slot_indices : int list
@@ -109,6 +111,15 @@ module Dal () : Dal = struct
       ~long:"fundraiser"
       ~description:"Fundraiser secret key that has enough money on test network"
       ()
+
+  let producers_delay =
+    Clap.default_int
+      ~section
+      ~long:"producers-delay"
+      ~description:
+        "Delay in levels between two slot productions. Default is 1 meaning \
+         \"produce every level\"."
+      1
 
   let network_typ : Network.t Clap.typ =
     Clap.typ
