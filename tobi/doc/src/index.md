@@ -38,6 +38,7 @@ Each command has its own help page:
 
 ## Explanations
 
+- [Why and when can Tobi save time](why_and_when_can_Tobi_save_time.md)
 - [How `tobi list --installed` works](how_tobi_list_installed_works.md)
 - [How `tobi install` works](how_tobi_install_works.md)
 - [How `tobi reset` works](how_tobi_reset_works.md)
