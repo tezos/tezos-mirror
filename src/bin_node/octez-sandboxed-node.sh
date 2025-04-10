@@ -48,7 +48,8 @@ EOF
         --rpc-addr "127.0.0.1:$rpc" \
         --rpc-tls "${node_dir}/tezos.crt,${node_dir}/tezos.key" \
         --expected-pow "$expected_pow" \
-        --connections "$expected_connections"
+        --connections "$expected_connections" \
+        --history-mode "rolling:20"
 
       cat > "${node_dir}/tezos.crt" << EOF
 Certificate:
@@ -176,7 +177,8 @@ EOF
         --net-addr "127.0.0.1:$port" \
         --rpc-addr "127.0.0.1:$rpc" \
         --expected-pow "$expected_pow" \
-        --connections "$expected_connections"
+        --connections "$expected_connections" \
+        --history-mode "rolling:20"
     fi
   fi
 
