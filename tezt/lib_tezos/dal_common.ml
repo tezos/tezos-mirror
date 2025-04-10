@@ -674,19 +674,15 @@ module Helpers = struct
           err
     | Ok v -> v
 
-  let publish_commitment ?dont_wait ?counter ?force ?source ?fee ?error ~index
-      ~commitment ~proof client =
-    (* We scale the fees to match the actual gas cost of publishing a slot header.
-       Doing this here allows to keep the diff small as gas cost for
-       publishing slot header is adjusted. *)
-    let fee = Option.map (fun x -> x * 13) fee in
+  let publish_commitment ?dont_wait ?counter ?force ?source ?fee ?gas_limit
+      ?error ~index ~commitment ~proof client =
     Operation.Manager.(
       inject
         ?dont_wait
         ?error
         ?force
         [
-          make ?source ?fee ?counter
+          make ?source ?fee ?counter ?gas_limit
           @@ dal_publish_commitment ~index ~commitment ~proof;
         ]
         client)
@@ -715,7 +711,7 @@ module Helpers = struct
         in
         store_slot ~slot_index (Either.Right endpoint) slot
 
-  let publish_and_store_slot ?dont_wait ?counter ?force ?(fee = 1_200) client
+  let publish_and_store_slot ?dont_wait ?counter ?force ?fee ?gas_limit client
       dal_node source ~index content =
     (* We override store slot so that it uses a DAL node in this file. *)
     let* commitment_string, proof =
@@ -729,7 +725,8 @@ module Helpers = struct
         ?counter
         ?force
         ~source
-        ~fee
+        ?fee
+        ?gas_limit
         ~index
         ~commitment
         ~proof

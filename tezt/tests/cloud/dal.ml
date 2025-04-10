@@ -3375,7 +3375,11 @@ let produce_slot t level i =
   in
   let* _ = Node.wait_for_level producer.node level in
   let* _ =
+    (* A dry-run of the "publish dal commitment" command outputs fees of 516µtz and
+       1333 gas consumed. We added a (quite small) margin to it. *)
     Helpers.publish_and_store_slot
+      ~fee:520
+      ~gas_limit:1400
       ~dont_wait:true
       producer.client
       producer.dal_node
