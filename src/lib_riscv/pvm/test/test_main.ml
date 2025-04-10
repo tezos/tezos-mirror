@@ -1,13 +1,19 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2023-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2023-2025 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
 let tests =
   [
+    ( "Backend",
+      [
+        ( "PVM advances the expected number of steps",
+          `Quick,
+          Test_backend.test_advance_dummy_kernel );
+      ] );
     ( "Storage",
       [
         ("Simple test", `Quick, Test_storage.test_simple);

@@ -5023,10 +5023,15 @@ let _octez_embedded_protocol_packer =
 
 let _octez_riscv_pvm_test =
   tezt
-    ["test_main"; "test_storage"]
+    ["test_main"; "test_backend"; "test_storage"; "utils"]
     ~path:"src/lib_riscv/pvm/test"
     ~opam:"octez-riscv-pvm-test"
     ~synopsis:"Tests for RISC-V OCaml API"
+    ~dep_globs:
+      [
+        "../../../riscv/assets/riscv-dummy.elf";
+        "../../../riscv/assets/riscv-dummy.elf.checksum";
+      ]
     ~deps:
       [
         octez_rust_deps;

@@ -22,7 +22,7 @@
   -open Tezos_stdlib_unix
   -open Tezos_base_test_helpers
   -open Octez_alcotezt)
- (modules test_main test_storage))
+ (modules test_main test_backend test_storage utils))
 
 (executable
  (name main)
@@ -35,6 +35,9 @@
 (rule
  (alias runtest)
  (package octez-riscv-pvm-test)
+ (deps
+  (glob_files ../../../riscv/assets/riscv-dummy.elf)
+  (glob_files ../../../riscv/assets/riscv-dummy.elf.checksum))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
