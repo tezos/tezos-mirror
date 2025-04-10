@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use primitive_types::{H256, U256};
-use std::{array::TryFromSliceError, str::FromStr};
+use std::array::TryFromSliceError;
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_smart_rollup::types::Timestamp;
 
@@ -20,8 +20,12 @@ impl TezBlock {
     pub fn genesis_block_hash() -> H256 {
         // This H256 comes from this b58 hash 'BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9'
         // That is the ghostnet genesis hash according to 'devtools/get_contracts/config.ml'
-        H256::from_str("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8423e7c02934")
-            .unwrap()
+        H256::from_slice(
+            &hex::decode(
+                "8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8423e7c02934",
+            )
+            .unwrap(),
+        )
     }
 
     fn hash(&self) -> H256 {
