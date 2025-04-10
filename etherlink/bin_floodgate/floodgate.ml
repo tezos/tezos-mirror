@@ -84,39 +84,39 @@ let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account =
         (Some data, contract)
   in
   let rec salvo ~start ~nonce_limit ~nonce =
+    let is_last_nonce = Compare.Z.(Z.succ nonce = nonce_limit) in
     let open Lwt_syntax in
-    if nonce > nonce_limit then return_unit
-    else
-      let callback reason =
-        match reason with
-        | `Accepted _ -> return_unit
-        | `Refused ->
-            let* () = Floodgate_events.transaction_refused account in
-            return_unit
-        | `Confirmed ->
-            let end_ = Time.System.now () in
-            let* () =
-              Floodgate_events.transaction_confirmed
-                account
-                Ptime.(diff end_ start)
-            in
-            if nonce = nonce_limit then loop () else return_unit
-        | `Dropped ->
-            let* () = Floodgate_events.transaction_dropped account in
-            if nonce = nonce_limit then loop () else return_unit
-      in
-      let* () =
-        Tx_queue.transfer
-          ~nonce
-          ~infos
-          ~callback
-          ~gas_limit
-          ~from:account
-          ~to_
-          ?data
-          ()
-      in
-      salvo ~start ~nonce_limit ~nonce:(Z.succ nonce)
+    let callback reason =
+      match reason with
+      | `Accepted _ -> return_unit
+      | `Refused ->
+          let* () = Floodgate_events.transaction_refused account in
+          return_unit
+      | `Confirmed ->
+          let end_ = Time.System.now () in
+          let* () =
+            Floodgate_events.transaction_confirmed
+              account
+              Ptime.(diff end_ start)
+          in
+          if is_last_nonce then loop () else return_unit
+      | `Dropped ->
+          let* () = Floodgate_events.transaction_dropped account in
+          if is_last_nonce then loop () else return_unit
+    in
+    let* () =
+      Tx_queue.transfer
+        ~nonce
+        ~infos
+        ~callback
+        ~gas_limit
+        ~from:account
+        ~to_
+        ?data
+        ()
+    in
+    if not is_last_nonce then salvo ~start ~nonce_limit ~nonce:(Z.succ nonce)
+    else return_unit
   and loop () =
     let start = Time.System.now () in
     let nonce_limit = Z.(of_int txs_per_salvo + account.nonce) in
