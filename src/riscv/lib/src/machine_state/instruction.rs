@@ -38,6 +38,7 @@ use crate::default::ConstDefault;
 use crate::instruction_context::ICB;
 use crate::instruction_context::IcbFnResult;
 use crate::instruction_context::IcbLoweringFn;
+use crate::instruction_context::LoadStoreWidth;
 use crate::instruction_context::Predicate;
 use crate::instruction_context::Shift;
 use crate::interpreter::branching;
@@ -697,6 +698,12 @@ impl OpCode {
             Self::ShiftRightImmediateUnsigned => Some(Args::run_shift_right_immediate_unsigned),
             Self::ShiftRightImmediateSigned => Some(Args::run_shift_right_immediate_signed),
 
+            // Stores
+            Self::Sdnz => Some(Args::run_sdnz),
+            Self::Swnz => Some(Args::run_swnz),
+            Self::Shnz => Some(Args::run_shnz),
+            Self::Sbnz => Some(Args::run_sbnz),
+
             // Errors
             Self::Unknown => Some(Args::run_illegal),
             Self::ECall => Some(Args::run_ecall),
@@ -980,15 +987,12 @@ macro_rules! impl_store_type {
         }
     };
 
-    ($fn: ident, non_zero) => {
+    ($fn: ident, $width: expr) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.$fn(self.imm, self.rs1.nzx, self.rs2.nzx)
-                .map(|_| Next(self.width))
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            let res = load_store::run_store(icb, self.imm, self.rs1.nzx, self.rs2.nzx, $width);
+            I::map(res, |_| Next(self.width))
         }
     };
 }
@@ -1347,10 +1351,10 @@ impl Args {
     impl_store_type!(run_sh);
     impl_store_type!(run_sw);
     impl_store_type!(run_sd);
-    impl_store_type!(run_sdnz, non_zero);
-    impl_store_type!(run_swnz, non_zero);
-    impl_store_type!(run_shnz, non_zero);
-    impl_store_type!(run_sbnz, non_zero);
+    impl_store_type!(run_sdnz, LoadStoreWidth::Double);
+    impl_store_type!(run_swnz, LoadStoreWidth::Word);
+    impl_store_type!(run_shnz, LoadStoreWidth::Half);
+    impl_store_type!(run_sbnz, LoadStoreWidth::Byte);
 
     // Branching instructions
     impl_branch!(run_branch_equal, Predicate::Equal);

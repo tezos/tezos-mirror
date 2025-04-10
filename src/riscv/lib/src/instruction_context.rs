@@ -11,10 +11,13 @@ pub(super) mod arithmetic;
 
 use arithmetic::Arithmetic;
 
+use crate::machine_state::AccessType;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Args;
+use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::memory::OutOfBounds;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
@@ -122,6 +125,16 @@ pub trait ICB {
 
     /// Exception to perform an ECall at the current mode
     fn ecall(&mut self) -> Self::IResult<ProgramCounterUpdate<Self::XValue>>;
+
+    /// Write value to main memory, at the given address.
+    ///
+    /// The value is truncated to the width given by [`LoadStoreWidth`].
+    fn main_memory_store(
+        &mut self,
+        phys_address: Self::XValue,
+        value: Self::XValue,
+        width: LoadStoreWidth,
+    ) -> Self::IResult<()>;
 
     // ----------------
     // Provided Methods
@@ -265,6 +278,25 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
             Mode::Machine => Exception::EnvCallFromMMode,
         })
     }
+
+    #[inline(always)]
+    fn main_memory_store(
+        &mut self,
+        address: Self::XValue,
+        value: Self::XValue,
+        width: LoadStoreWidth,
+    ) -> Self::IResult<()> {
+        let phys_address = self.translate(address, AccessType::Store)?;
+
+        let res = match width {
+            LoadStoreWidth::Byte => self.main_memory.write::<u8>(phys_address, value as u8),
+            LoadStoreWidth::Half => self.main_memory.write::<u16>(phys_address, value as u16),
+            LoadStoreWidth::Word => self.main_memory.write::<u32>(phys_address, value as u32),
+            LoadStoreWidth::Double => self.main_memory.write::<u64>(phys_address, value),
+        };
+
+        res.map_err(|_: OutOfBounds| Exception::StoreAMOAccessFault(phys_address))
+    }
 }
 
 /// Operators for producing a boolean from two values.
@@ -304,4 +336,43 @@ pub enum Shift {
     RightUnsigned,
     /// Arithmetic right shift. Sign-bits (ones) are shifted into the most significant bits.
     RightSigned,
+}
+
+/// Supported value widths for loading from/storing to main memory for XRegisters.
+///
+/// **NB** This type may be passed over C-FFI. See [state_access] for more
+/// information.
+///
+/// For now, the approach taken chooses to pass enums as integers, and parse
+/// them back into the Enum variant on the rust side - to avoid potential UB
+/// should an incorrect discriminant be parsed. We therefore choose explicit
+/// constants for each - so that we know very precisely what values are expected.
+///
+/// [state_access]: crate::jit::state_access
+#[derive(Debug)]
+#[repr(u8)]
+pub enum LoadStoreWidth {
+    Byte = Self::BYTE_WIDTH,
+    Half = Self::HALF_WIDTH,
+    Word = Self::WORD_WIDTH,
+    Double = Self::DOUBLE_WIDTH,
+}
+
+impl LoadStoreWidth {
+    const BYTE_WIDTH: u8 = std::mem::size_of::<u8>() as u8;
+    const HALF_WIDTH: u8 = std::mem::size_of::<u16>() as u8;
+    const WORD_WIDTH: u8 = std::mem::size_of::<u32>() as u8;
+    const DOUBLE_WIDTH: u8 = std::mem::size_of::<u64>() as u8;
+
+    /// Convert a value-width in bytes to the appropriate
+    /// `LoadStoreWidth`, if supported.
+    pub fn new(val: u8) -> Option<Self> {
+        match val {
+            Self::BYTE_WIDTH => Some(Self::Byte),
+            Self::HALF_WIDTH => Some(Self::Half),
+            Self::WORD_WIDTH => Some(Self::Word),
+            Self::DOUBLE_WIDTH => Some(Self::Double),
+            _ => None,
+        }
+    }
 }

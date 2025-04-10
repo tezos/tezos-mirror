@@ -20,12 +20,15 @@
 //! [function builder]: cranelift::frontend::FunctionBuilderContext
 //! [direct function call]: cranelift::codegen::ir::InstBuilder::call
 
+mod stack;
+
 use std::marker::PhantomData;
 
 use cranelift::codegen::ir::AbiParam;
 use cranelift::codegen::ir::FuncRef;
 use cranelift::codegen::ir::InstBuilder;
 use cranelift::codegen::ir::Signature;
+use cranelift::codegen::ir::Type;
 use cranelift::codegen::ir::Value;
 use cranelift::codegen::ir::types::I8;
 use cranelift::codegen::ir::types::I64;
@@ -38,7 +41,9 @@ use cranelift_module::Module;
 use cranelift_module::ModuleResult;
 
 use super::builder::X64;
-use super::builder::stack_slots::StackSlots;
+use super::builder::errno::Errno;
+use crate::instruction_context::ICB;
+use crate::instruction_context::LoadStoreWidth;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
@@ -61,6 +66,8 @@ const HANDLE_EXCEPTION: &str = "JSA::handle_exception";
 const RAISE_ILLEGAL_INSTRUCTION_EXCEPTION: &str = "JSA::raise_illegal_instruction_exception";
 
 const ECALL_FROM_MODE: &str = "JSA::ecall_from_mode";
+
+const MEMORY_STORE: &str = "JSA::memory_store";
 
 /// State Access that a JIT-compiled block may use.
 ///
@@ -87,7 +94,8 @@ pub trait JitStateAccess: ManagerReadWrite {
     /// Handle an [`Exception`].
     ///
     /// If the exception is succesfully handled, the
-    /// `current_pc` is updated to the new value, and returns true.
+    /// `current_pc` is updated to the new value, and returns true. The `current_pc`
+    /// remains initialised to its previous value otherwise.
     ///
     /// If the exception needs to be treated by the execution environment,
     /// `result` is updated with the `EnvironException` and `false` is
@@ -121,6 +129,36 @@ pub trait JitStateAccess: ManagerReadWrite {
         core: &mut MachineCoreState<MC, Self>,
         exception_out: &mut Option<Exception>,
     );
+
+    /// Store the lowest `width` bytes of the given value to memory, at the physical address.
+    ///
+    /// If the store is successful, `false` is returned to indicate no exception handling is necessary.
+    ///
+    /// If the store fails (due to out of bouds etc) then an exception will be written
+    /// to `exception_out` and `true` returned to indicate exception handling will be necessary.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `width` passed is not a supported [`LoadStoreWidth`].
+    extern "C" fn memory_store<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
+        address: u64,
+        value: u64,
+        width: u8,
+        exception_out: &mut Option<Exception>,
+    ) -> bool {
+        let Some(width) = LoadStoreWidth::new(width) else {
+            panic!("The given width {width} is not a supported LoadStoreWidth");
+        };
+
+        match <MachineCoreState<MC, Self> as ICB>::main_memory_store(core, address, value, width) {
+            Ok(()) => false,
+            Err(exception) => {
+                *exception_out = Some(exception);
+                true
+            }
+        }
+    }
 }
 
 impl JitStateAccess for Owned {
@@ -211,6 +249,11 @@ pub(super) fn register_jsa_symbols<MC: MemoryConfig, JSA: JitStateAccess>(
         ECALL_FROM_MODE,
         <JSA as JitStateAccess>::ecall::<MC> as *const u8,
     );
+
+    builder.symbol(
+        MEMORY_STORE,
+        <JSA as JitStateAccess>::memory_store::<MC> as *const u8,
+    );
 }
 
 /// Identifications of globally imported [`JitStateAccess`] methods.
@@ -221,6 +264,7 @@ pub(super) struct JsaImports<MC: MemoryConfig, JSA: JitStateAccess> {
     handle_exception: FuncId,
     raise_illegal_instruction_exception: FuncId,
     ecall_from_mode: FuncId,
+    memory_store: FuncId,
     _pd: PhantomData<(MC, JSA)>,
 }
 
@@ -290,6 +334,15 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JsaImports<MC, JSA> {
         let ecall_from_mode =
             module.declare_function(ECALL_FROM_MODE, Linkage::Import, &ecall_from_mode_sig)?;
 
+        // Memory
+        let memory_store_sig = Signature {
+            params: vec![ptr, address, xvalue, AbiParam::new(I8), ptr],
+            returns: vec![AbiParam::new(I8)],
+            call_conv,
+        };
+        let memory_store =
+            module.declare_function(MEMORY_STORE, Linkage::Import, &memory_store_sig)?;
+
         Ok(Self {
             pc_write,
             xreg_read,
@@ -297,6 +350,7 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JsaImports<MC, JSA> {
             handle_exception,
             raise_illegal_instruction_exception,
             ecall_from_mode,
+            memory_store,
             _pd: PhantomData,
         })
     }
@@ -307,27 +361,35 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JsaImports<MC, JSA> {
 pub(super) struct JsaCalls<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     module: &'a mut JITModule,
     imports: &'a JsaImports<MC, JSA>,
+    ptr_type: Type,
     pc_write: Option<FuncRef>,
     xreg_read: Option<FuncRef>,
     xreg_write: Option<FuncRef>,
     handle_exception: Option<FuncRef>,
     raise_illegal_instruction_exception: Option<FuncRef>,
     ecall_from_mode: Option<FuncRef>,
+    memory_store: Option<FuncRef>,
     _pd: PhantomData<(MC, JSA)>,
 }
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
     /// Wrapper to simplify calling JSA methods from within the function under construction.
-    pub(super) fn func_calls(module: &'a mut JITModule, imports: &'a JsaImports<MC, JSA>) -> Self {
+    pub(super) fn func_calls(
+        module: &'a mut JITModule,
+        imports: &'a JsaImports<MC, JSA>,
+        ptr_type: Type,
+    ) -> Self {
         Self {
             module,
             imports,
+            ptr_type,
             pc_write: None,
             xreg_read: None,
             xreg_write: None,
             handle_exception: None,
             raise_illegal_instruction_exception: None,
             ecall_from_mode: None,
+            memory_store: None,
             _pd: PhantomData,
         }
     }
@@ -392,16 +454,16 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         exception_ptr: Value,
         result_ptr: Value,
         current_pc: X64,
-        stack_slots: &mut StackSlots,
     ) -> ExceptionHandledOutcome {
         let handle_exception = self.handle_exception.get_or_insert_with(|| {
             self.module
                 .declare_func_in_func(self.imports.handle_exception, builder.func)
         });
 
-        stack_slots.instr_pc_store(builder, current_pc);
+        let pc_slot = stack::Slot::<stack::Address>::new(self.ptr_type, builder);
+        pc_slot.store(builder, current_pc.0);
 
-        let pc_ptr = stack_slots.instr_pc_ptr(builder);
+        let pc_ptr = pc_slot.ptr(builder);
 
         let call = builder.ins().call(*handle_exception, &[
             core_ptr,
@@ -411,9 +473,14 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         ]);
 
         let handled = builder.inst_results(call)[0];
-        let new_pc = stack_slots.instr_pc_load(builder);
+        // Safety: the pc is initialised prior to the call, and is guaranteed to
+        // remain initialised regardless of the result of external call.
+        let new_pc = unsafe { pc_slot.load(builder) };
 
-        ExceptionHandledOutcome { handled, new_pc }
+        ExceptionHandledOutcome {
+            handled,
+            new_pc: X64(new_pc),
+        }
     }
 
     /// Emit the required IR to call `raise_illegal_exception`.
@@ -454,6 +521,38 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         builder
             .ins()
             .call(*ecall_from_mode, &[core_ptr, exception_ptr]);
+    }
+
+    /// Emit the required IR to call `memory_store`.
+    ///
+    /// Returns `errno` - on success, no additional values are returned.
+    pub(super) fn memory_store(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        core_ptr: Value,
+        phys_address: X64,
+        value: X64,
+        width: LoadStoreWidth,
+        exception_ptr: Value,
+    ) -> impl Errno<(), MC, JSA> {
+        let memory_store = self.memory_store.get_or_insert_with(|| {
+            self.module
+                .declare_func_in_func(self.imports.memory_store, builder.func)
+        });
+
+        let width = builder.ins().iconst(I8, width as u8 as i64);
+
+        let call = builder.ins().call(*memory_store, &[
+            core_ptr,
+            phys_address.0,
+            value.0,
+            width,
+            exception_ptr,
+        ]);
+
+        let errno = builder.inst_results(call)[0];
+
+        (errno, |_: &mut FunctionBuilder<'_>| {})
     }
 }
 

@@ -8,7 +8,7 @@
 
 pub(super) mod arithmetic;
 pub(super) mod block_state;
-pub(super) mod stack_slots;
+pub(super) mod errno;
 
 use cranelift::codegen::ir;
 use cranelift::codegen::ir::InstBuilder;
@@ -21,10 +21,11 @@ use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
 
 use self::block_state::DynamicValues;
-use self::stack_slots::StackSlots;
+use self::errno::Errno;
 use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
+use crate::instruction_context::LoadStoreWidth;
 use crate::instruction_context::Predicate;
 use crate::jit::builder::block_state::PCUpdate;
 use crate::machine_state::ProgramCounterUpdate;
@@ -73,9 +74,6 @@ pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
 
     /// Value representing a pointer to `result: Result<(), EnvironException>`
     result_ptr_val: Value,
-
-    /// Stack Slots for storing temporary values on the stack during execution.
-    stack_slots: StackSlots,
 }
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
@@ -100,8 +98,6 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         let exception_ptr_val = builder.block_params(entry_block)[3];
         let result_ptr_val = builder.block_params(entry_block)[4];
 
-        let stack_slots = StackSlots::new(ptr, &mut builder);
-
         Self {
             ptr,
             builder,
@@ -111,7 +107,6 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
             exception_ptr_val,
             result_ptr_val,
             dynamic: DynamicValues::new(pc_val),
-            stack_slots,
             end_block: None,
         }
     }
@@ -218,7 +213,6 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
             self.exception_ptr_val,
             self.result_ptr_val,
             current_pc,
-            &mut self.stack_slots,
         );
 
         // if handled -> jump to end with updated pc_ptr. Add steps += 1
@@ -382,6 +376,26 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         self.handle_exception();
 
         None
+    }
+
+    fn main_memory_store(
+        &mut self,
+        phys_address: Self::XValue,
+        value: Self::XValue,
+        width: LoadStoreWidth,
+    ) -> Self::IResult<()> {
+        let errno = self.jsa_call.memory_store(
+            &mut self.builder,
+            self.core_ptr_val,
+            phys_address,
+            value,
+            width,
+            self.exception_ptr_val,
+        );
+
+        errno.handle(self);
+
+        Some(())
     }
 }
 
