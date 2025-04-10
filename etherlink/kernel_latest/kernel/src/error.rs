@@ -11,6 +11,7 @@ use primitive_types::U256;
 use rlp::DecoderError;
 use tezos_data_encoding::enc::BinError;
 use tezos_ethereum::tx_common::SigError;
+use tezos_execution::ApplyKernelError;
 use tezos_indexable_storage::IndexableStorageError;
 use tezos_smart_rollup_encoding::entrypoint::EntrypointError;
 use tezos_smart_rollup_encoding::michelson::ticket::TicketError;
@@ -89,6 +90,8 @@ pub enum EncodingError {
 pub enum Error {
     #[error(transparent)]
     Transfer(TransferError),
+    #[error(transparent)]
+    Operation(ApplyKernelError),
     #[error(transparent)]
     Storage(StorageError),
     #[error("Invalid conversion")]

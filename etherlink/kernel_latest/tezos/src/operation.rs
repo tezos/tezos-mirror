@@ -10,6 +10,7 @@ use nom::error::{ErrorKind, ParseError};
 use nom::{bytes::complete::take, Finish};
 use primitive_types::H256;
 use rlp::Decodable;
+use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{HashType, UnknownSignature};
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
@@ -214,6 +215,12 @@ impl Operation {
         let bytes = self.to_bytes()?;
         s.append(&bytes);
         Ok(())
+    }
+
+    pub fn hash(&self) -> Result<H256, BinError> {
+        let serialized_op = self.to_bytes()?;
+        let op_hash = digest_256(&serialized_op);
+        Ok(H256::from_slice(&op_hash))
     }
 }
 

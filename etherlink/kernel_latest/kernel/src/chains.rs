@@ -32,9 +32,13 @@ use std::{
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_execution::context;
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
-use tezos_tezlink::{block::TezBlock, operation::Operation};
+use tezos_tezlink::{
+    block::{AppliedOperation, TezBlock},
+    operation::Operation,
+};
 
 pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state");
@@ -89,7 +93,7 @@ pub struct TezBlockInProgress {
     number: U256,
     timestamp: Timestamp,
     previous_hash: H256,
-    #[allow(dead_code)]
+    applied: Vec<AppliedOperation>,
     operations: VecDeque<Operation>,
 }
 
@@ -427,6 +431,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             number: current_block_number,
             timestamp: blueprint.timestamp,
             previous_hash: header.hash,
+            applied: vec![],
             operations: VecDeque::from(operations),
         }
     }
@@ -481,7 +486,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
             number,
             timestamp,
             previous_hash,
-            operations: _,
+            mut applied,
+            mut operations,
         } = block_in_progress;
         log!(
             host,
@@ -490,7 +496,31 @@ impl ChainConfigTrait for MichelsonChainConfig {
             number
         );
 
-        let tezblock = TezBlock::new(number, timestamp, previous_hash)?;
+        let context = context::Context::from(&self.storage_root_path())?;
+
+        // Compute operations that are in the block in progress
+        while !operations.is_empty() {
+            // Retrieve the next operation in the VecDequeue
+            let operation = operations.pop_front().ok_or(error::Error::Reboot)?;
+
+            // Try to apply the operation with the tezos_execution crate, return a receipt
+            // on whether it failed or not
+            let receipt = tezos_execution::apply_operation(host, &context, &operation)?;
+
+            // Compute the hash of the operation
+            let hash = operation.hash()?;
+
+            // Add the applied operation in the block in progress
+            let applied_operation = AppliedOperation {
+                hash,
+                data: operation,
+                receipt,
+            };
+            applied.push(applied_operation);
+        }
+
+        // Create a Tezos block from the block in progess
+        let tezblock = TezBlock::new(number, timestamp, previous_hash, applied)?;
         let new_block = L2Block::Tezlink(tezblock);
         let root = self.storage_root_path();
         crate::block_storage::store_current(host, &root, &new_block)

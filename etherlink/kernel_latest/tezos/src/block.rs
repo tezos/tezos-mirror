@@ -145,13 +145,14 @@ impl TezBlock {
         number: U256,
         timestamp: Timestamp,
         previous_hash: H256,
+        operations: Vec<AppliedOperation>,
     ) -> Result<Self, BinError> {
         let block = Self {
             hash: H256::zero(),
             number,
             timestamp,
             previous_hash,
-            operations: vec![],
+            operations,
         };
         Ok(Self {
             hash: block.hash()?,
@@ -197,7 +198,7 @@ mod tests {
         let number = U256::one();
         let timestamp = Timestamp::from(0);
         let previous_hash = TezBlock::genesis_block_hash();
-        TezBlock::new(number, timestamp, previous_hash)
+        TezBlock::new(number, timestamp, previous_hash, vec![])
             .expect("Block creation should have succeeded")
     }
 
