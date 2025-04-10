@@ -64,6 +64,7 @@ pub enum StorageVersion {
     V28,
     V29,
     V30,
+    V31,
 }
 
 impl From<StorageVersion> for u64 {
@@ -78,7 +79,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V30;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V31;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 
@@ -746,6 +747,25 @@ pub fn enable_dal<Host: Runtime>(host: &Host) -> anyhow::Result<bool> {
     } else {
         Ok(false)
     }
+}
+
+pub fn tweak_dal_activation<Host: Runtime>(
+    host: &mut Host,
+    activate_dal: bool,
+) -> anyhow::Result<()> {
+    if activate_dal {
+        host.store_write_all(&ENABLE_DAL, &[])?
+    } else {
+        host.store_delete(&ENABLE_DAL)?
+    }
+    Ok(())
+}
+
+pub fn store_dal_slots<Host: Runtime>(
+    host: &mut Host,
+    slots: &[u8],
+) -> anyhow::Result<()> {
+    Ok(host.store_write_all(&DAL_SLOTS, slots)?)
 }
 
 pub fn dal_slots<Host: Runtime>(host: &Host) -> anyhow::Result<Option<Vec<u8>>> {

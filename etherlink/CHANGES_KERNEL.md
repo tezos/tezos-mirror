@@ -15,6 +15,8 @@
   with the actual execution on Etherlink. (!17308)
 - Removes the `OutOfTicks` error when executing the EVM interpreter. We only
   use gas to decide when to reboot. (!15079)
+- The flag to activate DAL has been enabled, slots from 0 to 7 can now be used
+  from the kernel's perspective. (!17636)
 
 ### Bug fixes
 
