@@ -171,14 +171,7 @@ let migrate ~migrate_from ~migrate_to ~use_remote_signer =
   in
   unit
 
-let register ~migrate_from ~migrate_to =
-  (* We want to migrate only from Active protocols *)
-  if Agnostic_baker.protocol_status migrate_from = Active then (
-    migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;
-    migrate ~migrate_from ~migrate_to ~use_remote_signer:true)
-  else ()
-
-let register_protocol_independent () =
+let test_start_and_stop () =
   Test.register
     ~__FILE__
     ~title:"Agnostic baker starts and stops"
@@ -190,3 +183,34 @@ let register_protocol_independent () =
   let* () = Agnostic_baker.wait_for_ready baker in
   let* () = Agnostic_baker.terminate baker in
   unit
+
+let test_man () =
+  Regression.register
+    ~__FILE__
+    ~title:"Agnostic baker man"
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "man"]
+    ~uses:[Constant.octez_agnostic_baker]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let hooks = Tezos_regression.hooks in
+  let* () = Process.run ~hooks (Uses.path Constant.octez_agnostic_baker) [] in
+  let* () =
+    Process.run ~hooks (Uses.path Constant.octez_agnostic_baker) ["--help"]
+  in
+  let* () =
+    Process.run ~hooks (Uses.path Constant.octez_agnostic_baker) ["man"]
+  in
+  unit
+
+let register ~migrate_from ~migrate_to =
+  (* We want to migrate only from Active protocols *)
+  if Agnostic_baker.protocol_status migrate_from = Active then (
+    migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;
+    migrate ~migrate_from ~migrate_to ~use_remote_signer:true)
+  else ()
+
+let register_protocol_independent () =
+  test_start_and_stop () ;
+  test_man ()

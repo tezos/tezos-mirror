@@ -6,6 +6,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [only_exe args] returns [true] iff [args] only contains one argument, which is the executable. *)
+val only_exe : string list -> bool
+
 (** [is_help_cmd args] returns [true] iff [--help] is amongst [args]. *)
 val is_help_cmd : string list -> bool
 
