@@ -255,6 +255,7 @@ mod test {
                 )| {
                     let mut state = state_cell.borrow_mut();
                     state.reset();
+                    state.main_memory.set_all_readable_writeable();
 
                     state.hart.xregisters.write(a0, r1_addr);
                     state.write_to_bus(0, a0, r1_val)?;
@@ -299,6 +300,7 @@ mod test {
                 )| {
                     let mut state = state_cell.borrow_mut();
                     state.reset();
+                    state.main_memory.set_all_readable_writeable();
 
                     state.hart.xregisters.write(a0, r1_addr);
                     state.write_to_bus(0, a0, r1_val)?;

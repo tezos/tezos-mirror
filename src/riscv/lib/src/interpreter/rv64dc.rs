@@ -108,6 +108,7 @@ mod test {
         )| {
             let mut state = state_cell.borrow_mut();
             state.reset();
+            state.main_memory.set_all_readable_writeable();
 
             // Turn fs on
             let mstatus = MStatus::from_bits(0u64).with_fs(ExtensionValue::Dirty);
@@ -146,6 +147,7 @@ mod test {
         )| {
             let mut state = state_cell.borrow_mut();
             state.reset();
+            state.main_memory.set_all_readable_writeable();
 
             // Turn fs on
             let mstatus = MStatus::from_bits(0u64).with_fs(ExtensionValue::Dirty);

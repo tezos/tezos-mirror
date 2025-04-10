@@ -59,6 +59,41 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M: ManagerBase>
 
         Ok(())
     }
+
+    /// Mark the whole memory as readable and writeable
+    #[cfg(test)]
+    pub(crate) fn set_all_readable_writeable(&mut self)
+    where
+        B: Buddy<M>,
+        M: ManagerReadWrite,
+    {
+        #[cfg(feature = "supervisor")]
+        self.protect_pages(0, TOTAL_BYTES, Permissions::ReadWrite)
+            .unwrap();
+    }
+
+    /// Update an element in the region without checking memory protections. `address` is in bytes.
+    #[cfg(test)]
+    pub(crate) fn write_instruction_unchecked<E>(
+        &mut self,
+        address: Address,
+        value: E,
+    ) -> Result<(), OutOfBounds>
+    where
+        E: Elem,
+        M: ManagerWrite,
+    {
+        let length = mem::size_of::<E>();
+        Self::check_bounds(address, length)?;
+
+        self.data.write(address as usize, value);
+        #[cfg(feature = "supervisor")]
+        {
+            self.readable_pages.modify_access(address, length, true);
+            self.executable_pages.modify_access(address, length, true);
+        }
+        Ok(())
+    }
 }
 
 impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M> Memory<M>
@@ -358,7 +393,9 @@ pub mod tests {
         let space = F::allocate::<<M4K as MemoryConfig>::Layout>();
         let mut memory = M4K::bind(space);
 
-        memory.write(0, 0x1122334455667788u64).unwrap();
+        memory
+            .write_instruction_unchecked(0, 0x1122334455667788u64)
+            .unwrap();
 
         macro_rules! check_address {
             ($ty:ty, $addr:expr, $value:expr) => {

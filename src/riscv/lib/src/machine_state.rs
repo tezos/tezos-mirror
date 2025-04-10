@@ -724,7 +724,6 @@ mod tests {
     use crate::machine_state::registers::NonZeroXRegister;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
-    use crate::machine_state::registers::a2;
     use crate::machine_state::registers::nz;
     use crate::machine_state::registers::t0;
     use crate::machine_state::registers::t1;
@@ -767,26 +766,23 @@ mod tests {
             let jump_addr = memory::FIRST_ADDRESS + jump_addr * 4;
 
             // Instruction which performs a unit op (AUIPC with t0)
-            const T2_ENC: u64 = 0b0_0111; // x7
+            const T2_ENC: u32 = 0b0_0111; // x7
 
             state.core.hart.pc.write(init_pc_addr);
-            state.core.hart.xregisters.write(a1, T2_ENC << 7 | 0b0010111);
-            state.core.hart.xregisters.write(a2, init_pc_addr);
-            state.core.run_sw(0, a2, a1).expect("Storing instruction should succeed");
+            state.core.main_memory.write_instruction_unchecked::<u32>(init_pc_addr, T2_ENC << 7 |
+                0b0010111).expect("Storing instruction should succeed");
             state.step().expect("should not raise trap to EE");
             prop_assert_eq!(state.core.hart.xregisters.read(t2), init_pc_addr);
             prop_assert_eq!(state.core.hart.pc.read(), init_pc_addr + 4);
 
             // Instruction which updates pc by returning an address
             // t3 = jump_addr, (JALR imm=0, rs1=t3, rd=t0)
-            const T0_ENC: u64 = 0b00101; // x5
-            const OP_JALR: u64 = 0b110_0111;
-            const F3_0: u64 = 0b000;
+            const T0_ENC: u32 = 0b00101; // x5
+            const OP_JALR: u32 = 0b110_0111;
+            const F3_0: u32 = 0b000;
 
             state.core.hart.pc.write(init_pc_addr);
-            state.core.hart.xregisters.write(a1, T2_ENC << 15 | F3_0 << 12 | T0_ENC << 7 | OP_JALR);
-            state.core.hart.xregisters.write(a2, init_pc_addr);
-            state.core.run_sw(0, a2, a1).expect("Storing instruction should succeed");
+            state.core.main_memory.write_instruction_unchecked(init_pc_addr, T2_ENC << 15 | F3_0 << 12 | T0_ENC << 7 | OP_JALR).unwrap();
             state.core.hart.xregisters.write(t2, jump_addr);
 
             // Since we've written a new instruction to the init_pc_addr - we need to
@@ -822,7 +818,7 @@ mod tests {
             let stvec_addr = init_pc_addr + 4 * stvec_offset;
             let mtvec_addr = init_pc_addr + 4 * mtvec_offset;
 
-            const ECALL: u64 = 0b111_0011;
+            const ECALL: u32 = 0b111_0011;
 
             // stvec is in DIRECT mode
             state.core.hart.csregisters.write(CSRegister::stvec, stvec_addr);
@@ -832,9 +828,7 @@ mod tests {
             // TEST: Raise ECALL exception ==>> environment exception
             state.core.hart.mode.write(Mode::Machine);
             state.core.hart.pc.write(init_pc_addr);
-            state.core.hart.xregisters.write(a1, ECALL);
-            state.core.hart.xregisters.write(a2, init_pc_addr);
-            state.core.run_sw(0, a2, a1).expect("Storing instruction should succeed");
+            state.core.main_memory.write_instruction_unchecked(init_pc_addr, ECALL).unwrap();
             let e = state.step()
                 .expect_err("should raise Environment Exception");
             assert_eq!(e, EnvironException::EnvCallFromMMode);
@@ -877,9 +871,7 @@ mod tests {
             state.core.hart.pc.write(init_pc_addr);
             state.core.hart.csregisters.write(CSRegister::medeleg, medeleg_val);
 
-            state.core.hart.xregisters.write(a1, EBREAK);
-            state.core.hart.xregisters.write(a2, init_pc_addr);
-            state.core.run_sw(0, a2, a1).expect("Storing instruction should succeed");
+            state.core.main_memory.write_instruction_unchecked(init_pc_addr, EBREAK).unwrap();
             state.step().expect("should not raise environment exception");
             // pc should be mtvec_addr since exceptions aren't offset (by VECTORED mode)
             // even in VECTORED mode, only interrupts
@@ -990,6 +982,7 @@ mod tests {
                 || InterpretedBlockBuilder
             );
             state.reset();
+            state.core.main_memory.set_all_readable_writeable();
 
             let start_ram = memory::FIRST_ADDRESS;
 
@@ -1240,6 +1233,7 @@ mod tests {
                 || InterpretedBlockBuilder
             );
             state.reset();
+            state.core.main_memory.set_all_readable_writeable();
 
             state
                 .core
@@ -1370,7 +1364,7 @@ mod tests {
             state
                 .core
                 .main_memory
-                .write(phys_addr + offset * 4, uncompressed_bytes)
+                .write_instruction_unchecked(phys_addr + offset * 4, uncompressed_bytes)
                 .unwrap();
         }
 
@@ -1506,6 +1500,8 @@ mod tests {
             DefaultCacheLayouts,
             Interpreted<M8K, F::Manager>, || InterpretedBlockBuilder);
 
+        state.core.main_memory.set_all_readable_writeable();
+
         // Write the instructions to the beginning of the main memory and point the program
         // counter at the first instruction.
         state.core.hart.pc.write(phys_addr);
@@ -1515,41 +1511,41 @@ mod tests {
         state
             .core
             .main_memory
-            .write(phys_addr, auipc_bytes)
+            .write_instruction_unchecked(phys_addr, auipc_bytes)
             .unwrap();
         state
             .core
             .main_memory
-            .write(phys_addr + 4, cj_bytes)
+            .write_instruction_unchecked(phys_addr + 4, cj_bytes)
             .unwrap();
 
         // block B
         state
             .core
             .main_memory
-            .write(block_b_addr, clui_bytes)
+            .write_instruction_unchecked(block_b_addr, clui_bytes)
             .unwrap();
         state
             .core
             .main_memory
-            .write(block_b_addr + 2, addiw_bytes)
+            .write_instruction_unchecked(block_b_addr + 2, addiw_bytes)
             .unwrap();
         state
             .core
             .main_memory
-            .write(block_b_addr + 6, csw_bytes)
+            .write_instruction_unchecked(block_b_addr + 6, csw_bytes)
             .unwrap();
         state
             .core
             .main_memory
-            .write(block_b_addr + 8, jalr_bytes)
+            .write_instruction_unchecked(block_b_addr + 8, jalr_bytes)
             .unwrap();
 
         // Overwritten jump dest
         state
             .core
             .main_memory
-            .write(phys_addr + 1024, overwrite_bytes)
+            .write_instruction_unchecked(phys_addr + 1024, overwrite_bytes)
             .unwrap();
 
         state.step_max(Bound::Included(block_a.len()));
