@@ -48,4 +48,5 @@ Each command has its own help page:
 - [How `tobi reset` works](how_tobi_reset_works.md)
 - [How `tobi build` works](how_tobi_build_works.md)
 - [Why this configuration file format](why_this_configuration_file_format.md)
+- [Why both Opam files and `tobi/config`](why_both_Opam_files_and_tobi_config.md)
 - [Why only equality constraints for internal dependencies](why_only_equality_constraints_for_internal_dependencies.md)
