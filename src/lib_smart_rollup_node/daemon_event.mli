@@ -43,6 +43,10 @@ val new_head_processed : Block_hash.t -> int32 -> Ptime.Span.t -> unit Lwt.t
     the given [level]. *)
 val new_head_degraded : Block_hash.t -> int32 -> unit Lwt.t
 
+(** [catch_up level] emits the event that we need to catch up on multiple
+    levels. *)
+val catch_up : int32 -> unit Lwt.t
+
 (** [processing_heads_iteration heads] emits the event that the [heads] are
     going to be processed. *)
 val processing_heads_iteration : Layer1.head list -> unit Lwt.t

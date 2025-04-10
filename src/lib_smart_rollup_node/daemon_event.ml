@@ -73,6 +73,14 @@ module Simple = struct
       ("from", Data_encoding.int32)
       ("to", Data_encoding.int32)
 
+  let catch_up =
+    declare_1
+      ~section
+      ~name:"smart_rollup_node_daemon_catch_up"
+      ~msg:"Catching up on {levels} blocks"
+      ~level:Notice
+      ("levels", Data_encoding.int32)
+
   let processing_heads_iteration =
     declare_3
       ~section
@@ -245,6 +253,8 @@ let new_heads_processed = new_heads_iteration Simple.new_heads_processed
 
 let new_heads_side_process_finished =
   new_heads_iteration Simple.new_heads_side_process_finished
+
+let catch_up levels = Simple.(emit catch_up) levels
 
 let included_operation ?errors status operation =
   match status with
