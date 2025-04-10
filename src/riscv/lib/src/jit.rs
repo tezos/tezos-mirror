@@ -909,107 +909,160 @@ mod tests {
         }
     });
 
-    backend_test!(test_jr, F, {
+    backend_test!(test_jump_instructions, F, {
         use crate::machine_state::registers::NonZeroXRegister::*;
 
+        let test_jr = |base_reg: NonZeroXRegister,
+                       base_val: i64,
+                       expected_pc: u64,
+                       instruction_width: InstrWidth|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(base_reg, base_val, instruction_width),
+                    I::new_jr(base_reg, instruction_width),
+                    I::new_nop(instruction_width),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.pc.read(), expected_pc);
+                }))
+                .set_expected_steps(2)
+                .build()
+        };
+
+        let test_jr_imm = |base_reg: NonZeroXRegister,
+                           base_val: i64,
+                           offset: i64,
+                           expected_pc: u64,
+                           instruction_width: InstrWidth|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(base_reg, base_val, instruction_width),
+                    I::new_jr_imm(base_reg, offset, instruction_width),
+                    I::new_nop(instruction_width),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.pc.read(), expected_pc);
+                }))
+                .set_expected_steps(2)
+                .build()
+        };
+
+        let test_jalr = |base_reg: NonZeroXRegister,
+                         base_val: i64,
+                         rd: NonZeroXRegister,
+                         expected_pc: u64,
+                         expected_rd: u64,
+                         instruction_width: InstrWidth|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(base_reg, base_val, instruction_width),
+                    I::new_jalr(rd, base_reg, instruction_width),
+                    I::new_nop(instruction_width),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.pc.read(), expected_pc);
+                    assert_eq!(core.hart.xregisters.read_nz(rd), expected_rd);
+                }))
+                .set_expected_steps(2)
+                .build()
+        };
+
+        let test_jalr_imm = |base_reg: NonZeroXRegister,
+                             base_val: i64,
+                             offset: i64,
+                             rd: NonZeroXRegister,
+                             expected_pc: u64,
+                             expected_rd: u64,
+                             instruction_width: InstrWidth|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(base_reg, base_val, instruction_width),
+                    I::new_jalr_imm(rd, base_reg, offset, instruction_width),
+                    I::new_nop(instruction_width),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.pc.read(), expected_pc);
+                    assert_eq!(core.hart.xregisters.read_nz(rd), expected_rd);
+                }))
+                .set_expected_steps(2)
+                .build()
+        };
+
+        let test_jalr_absolute = |target: i64,
+                                  rd: NonZeroXRegister,
+                                  instruction_width: InstrWidth,
+                                  expected_rd: u64|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_jalr_absolute(rd, target, instruction_width),
+                    I::new_nop(instruction_width),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.pc.read(), target as u64);
+                    assert_eq!(core.hart.xregisters.read_nz(rd), expected_rd);
+                }))
+                .set_expected_steps(1)
+                .build()
+        };
+
+        let test_j_absolute = |target: i64, instruction_width: InstrWidth| -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_j_absolute(target, instruction_width),
+                    I::new_nop(instruction_width),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.pc.read(), target as u64);
+                }))
+                .set_expected_steps(1)
+                .build()
+        };
+
+        let test_jal = |offset: i64,
+                        initial_pc: u64,
+                        expected_pc: u64,
+                        expected_x1: u64,
+                        intruction_width: InstrWidth|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_instructions(&[I::new_jal(x1, offset, intruction_width)])
+                .set_initial_pc(initial_pc)
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.pc.read(), expected_pc);
+                    assert_eq!(core.hart.xregisters.read_nz(x1), expected_x1);
+                }))
+                .set_expected_steps(1)
+                .build()
+        };
+
         let scenarios: &[Scenario<F>] = &[
-            ScenarioBuilder::default()
-                // Jumping should exit the block
-                .set_instructions(&[
-                    I::new_li(x2, 10, Compressed),
-                    I::new_jr(x2, Compressed),
-                    I::new_nop(Compressed),
-                ])
-                .set_assert_hook(assert_hook!(core, F, {
-                    assert_eq!(core.hart.pc.read(), 10);
-                }))
-                .set_expected_steps(2)
-                .build(),
-            ScenarioBuilder::default()
-                // Jumping to start of the block should still exit.
-                .set_instructions(&[I::new_li(x6, 0, Compressed), I::new_jr(x6, Compressed)])
-                .set_assert_hook(assert_hook!(core, F, {
-                    assert_eq!(core.hart.pc.read(), 0);
-                }))
-                .set_expected_steps(2)
-                .build(),
-        ];
-
-        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
-        let mut interpreted_bb = InterpretedBlockBuilder;
-
-        for scenario in scenarios {
-            scenario.run(&mut jit, &mut interpreted_bb);
-        }
-    });
-
-    backend_test!(test_jr_imm, F, {
-        use crate::machine_state::registers::NonZeroXRegister::*;
-
-        let scenarios: &[Scenario<F>] = &[
-            ScenarioBuilder::default()
-                // Jumping to the next instruction should exit the block
-                .set_instructions(&[
-                    I::new_li(x2, 10, Uncompressed),
-                    I::new_jr_imm(x2, 10, Compressed),
-                    I::new_nop(Uncompressed),
-                ])
-                .set_assert_hook(assert_hook!(core, F, {
-                    assert_eq!(core.hart.pc.read(), 20);
-                }))
-                .set_expected_steps(2)
-                .build(),
-            ScenarioBuilder::default()
-                // Jumping to start of the block should still exit.
-                .set_instructions(&[
-                    I::new_li(x6, 10, Compressed),
-                    I::new_jr_imm(x6, -10, Uncompressed),
-                ])
-                .set_assert_hook(assert_hook!(core, F, {
-                    assert_eq!(core.hart.pc.read(), 0);
-                }))
-                .set_expected_steps(2)
-                .build(),
-        ];
-
-        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
-        let mut interpreted_bb = InterpretedBlockBuilder;
-
-        for scenario in scenarios {
-            scenario.run(&mut jit, &mut interpreted_bb);
-        }
-    });
-
-    backend_test!(test_jalr, F, {
-        use crate::machine_state::registers::NonZeroXRegister::*;
-
-        let scenarios: &[Scenario<F>] = &[
-            ScenarioBuilder::default()
-                // Jumping should exit the block
-                .set_instructions(&[
-                    I::new_li(x2, 100_000, Uncompressed),
-                    I::new_jalr(x1, x2, Uncompressed),
-                    I::new_nop(Uncompressed),
-                ])
-                .set_assert_hook(assert_hook!(core, F, {
-                    assert_eq!(core.hart.pc.read(), 100_000);
-                    assert_eq!(core.hart.xregisters.read_nz(x1), 8);
-                }))
-                .set_expected_steps(2)
-                .build(),
-            ScenarioBuilder::default()
-                // Jumping to start of the block should still exit.
-                .set_instructions(&[
-                    I::new_li(x6, 0, Compressed),
-                    I::new_jalr(x3, x6, Compressed),
-                    I::new_nop(Compressed),
-                ])
-                .set_assert_hook(assert_hook!(core, F, {
-                    assert_eq!(core.hart.pc.read(), 0);
-                    assert_eq!(core.hart.xregisters.read_nz(x3), 4);
-                }))
-                .set_expected_steps(2)
-                .build(),
+            // Test jr
+            test_jr(x2, 10, 10, Compressed),
+            test_jr(x6, 0, 0, Uncompressed),
+            // Test jr_imm
+            test_jr_imm(x2, 10, 10, 20, Compressed),
+            test_jr_imm(x6, 10, -10, 0, Uncompressed),
+            // Test jalr
+            test_jalr(x2, 100_000, x1, 100_000, 8, Uncompressed),
+            test_jalr(x6, 0, x3, 0, 4, Compressed),
+            // Test jalr_imm
+            test_jalr_imm(x1, 10, 10, x2, 20, 4, Compressed),
+            test_jalr_imm(x1, 1000, -10, x2, 990, 8, Uncompressed),
+            // Test jalr_absolute
+            test_jalr_absolute(10, x1, Compressed, 2),
+            test_jalr_absolute(0, x3, Uncompressed, 4),
+            // Test j_absolute
+            test_j_absolute(10, Compressed),
+            test_j_absolute(0, Uncompressed),
+            // Test jal
+            test_jal(10, 0, 10, 2, Compressed),
+            test_jal(-10, 10, 0, 12, Compressed),
+            test_jal(1000, 1000, 2000, 1004, Uncompressed),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

@@ -1512,16 +1512,12 @@ impl Args {
     impl_cr_nz_type!(integer::run_neg, run_neg);
     impl_ci_type!(load_store::run_li, run_li, non_zero);
 
-    /// SAFETY: This function must only be called on an `Args` belonging
-    /// to the same OpCode as the OpCode used to derive this function.
     fn run_j<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
         let addr = branching::run_j(icb, self.imm);
         let pcu = ProgramCounterUpdate::Set(addr);
         icb.ok(pcu)
     }
 
-    /// SAFETY: This function must only be called on an `Args` belonging
-    /// to the same OpCode as the OpCode used to derive this function.
     fn run_j_absolute<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
         let addr = branching::run_j_absolute(icb, self.imm);
         let pcu = ProgramCounterUpdate::Set(addr);
@@ -1531,7 +1527,8 @@ impl Args {
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_jr<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-        let addr = branching::run_jr(icb, self.rs1.nzx);
+        let rs1 = unsafe { self.rs1.nzx };
+        let addr = branching::run_jr(icb, rs1);
         let pcu = ProgramCounterUpdate::Set(addr);
         icb.ok(pcu)
     }
@@ -1539,7 +1536,8 @@ impl Args {
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_jr_imm<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-        let addr = branching::run_jr_imm(icb, self.imm, self.rs1.nzx);
+        let rs1 = unsafe { self.rs1.nzx };
+        let addr = branching::run_jr_imm(icb, self.imm, rs1);
         let pcu = ProgramCounterUpdate::Set(addr);
         icb.ok(pcu)
     }
@@ -1547,7 +1545,8 @@ impl Args {
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_jal<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-        let addr = branching::run_jal(icb, self.imm, self.rd.nzx, self.width);
+        let rd = unsafe { self.rd.nzx };
+        let addr = branching::run_jal(icb, self.imm, rd, self.width);
         let pcu = ProgramCounterUpdate::Set(addr);
         icb.ok(pcu)
     }
@@ -1555,7 +1554,9 @@ impl Args {
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_jalr<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-        let addr = branching::run_jalr(icb, self.rd.nzx, self.rs1.nzx, self.width);
+        let rd = unsafe { self.rd.nzx };
+        let rs1 = unsafe { self.rs1.nzx };
+        let addr = branching::run_jalr(icb, rd, rs1, self.width);
         let pcu = ProgramCounterUpdate::Set(addr);
         icb.ok(pcu)
     }
@@ -1563,7 +1564,9 @@ impl Args {
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_jalr_imm<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-        let addr = branching::run_jalr_imm(icb, self.imm, self.rs1.nzx, self.rd.nzx, self.width);
+        let rs1 = unsafe { self.rs1.nzx };
+        let rd = unsafe { self.rd.nzx };
+        let addr = branching::run_jalr_imm(icb, self.imm, rs1, rd, self.width);
         let pcu = ProgramCounterUpdate::Set(addr);
         icb.ok(pcu)
     }
@@ -1571,7 +1574,8 @@ impl Args {
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_jalr_absolute<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-        let addr = branching::run_jalr_absolute(icb, self.imm, self.rd.nzx, self.width);
+        let rd = unsafe { self.rd.nzx };
+        let addr = branching::run_jalr_absolute(icb, self.imm, rd, self.width);
         let pcu = ProgramCounterUpdate::Set(addr);
         icb.ok(pcu)
     }
