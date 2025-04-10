@@ -481,13 +481,13 @@ mod tests {
         let n4 = MerkleProof::Leaf(MerkleProofLeaf::Read(vec![123, 234, 42, 1, 2, 3]));
 
         let root = MerkleProof::Node(vec![n1.clone()]);
-        check_serialisation(root, &[TAG_NODE << 6 | TAG_READ << 4, 12, 15, 30, 40]);
+        check_serialisation(root, &[(TAG_NODE << 6) | (TAG_READ << 4), 12, 15, 30, 40]);
 
         let root = MerkleProof::Node(vec![n1.clone(), n2.clone()]);
         check_serialisation(
             root,
             &[
-                [TAG_NODE << 6 | TAG_READ << 4 | TAG_BLIND << 2].as_ref(),
+                [(TAG_NODE << 6) | (TAG_READ << 4) | (TAG_BLIND << 2)].as_ref(),
                 &[12, 15, 30, 40],
                 h1.as_ref(),
             ]
@@ -498,7 +498,7 @@ mod tests {
         check_serialisation(
             root,
             &[
-                [TAG_NODE << 6 | TAG_READ << 4 | TAG_BLIND << 2 | TAG_BLIND].as_ref(),
+                [(TAG_NODE << 6) | (TAG_READ << 4) | (TAG_BLIND << 2) | TAG_BLIND].as_ref(),
                 &[12, 15, 30, 40],
                 h1.as_ref(),
                 h2.as_ref(),
@@ -511,7 +511,7 @@ mod tests {
             root,
             &[
                 [
-                    TAG_NODE << 6 | TAG_READ << 4 | TAG_BLIND << 2 | TAG_READ,
+                    (TAG_NODE << 6) | (TAG_READ << 4) | (TAG_BLIND << 2) | TAG_READ,
                     TAG_BLIND << 6,
                 ]
                 .as_ref(),
@@ -682,8 +682,8 @@ mod tests {
         let [(_, h0), (d1, _), (d2, _), (_, h3), (d4, _), (_, h5)] =
             [16, 40, 32, 100, 16, 200].map(gen_hash_data);
         let tag_bytes = [
-            TAG_NODE << 6 | TAG_NODE << 4 | TAG_BLIND << 2 | TAG_READ << 0,
-            TAG_NODE << 6 | TAG_READ << 4 | TAG_BLIND << 2 | TAG_READ << 0,
+            (TAG_NODE << 6) | (TAG_NODE << 4) | (TAG_BLIND << 2) | (TAG_READ << 0),
+            (TAG_NODE << 6) | (TAG_READ << 4) | (TAG_BLIND << 2) | (TAG_READ << 0),
             TAG_BLIND << 6,
         ];
         let val_bytes = [h0.as_ref(), &d1, &d2, h3.as_ref(), &d4, h5.as_ref()].concat();
@@ -751,9 +751,9 @@ mod tests {
         let [(d0, _), (_, h1), (_, h2), (d3, _), (d4, _), (_, h5)] =
             [20, 100, 100, 16, 30, 200].map(gen_hash_data);
         let tag_bytes = [
-            TAG_NODE << 6 | TAG_NODE << 4 | TAG_NODE << 2 | TAG_READ << 0,
-            TAG_BLIND << 6 | TAG_BLIND << 4 | TAG_READ << 2 | TAG_NODE << 0,
-            TAG_READ << 6 | TAG_BLIND << 4,
+            (TAG_NODE << 6) | (TAG_NODE << 4) | (TAG_NODE << 2) | (TAG_READ << 0),
+            (TAG_BLIND << 6) | (TAG_BLIND << 4) | (TAG_READ << 2) | (TAG_NODE << 0),
+            (TAG_READ << 6) | (TAG_BLIND << 4),
         ];
         let val_bytes = [&d0, h1.as_ref(), h2.as_ref(), &d3, &d4, h5.as_ref()].concat();
 
@@ -801,9 +801,9 @@ mod tests {
 
         // ExpectedLeaf tag error
         let tag_bytes_bad = [
-            TAG_NODE << 6 | TAG_NODE << 4 | TAG_NODE << 2 | TAG_READ << 0,
-            TAG_BLIND << 6 | TAG_NODE << 4 /* Expected Leaf */ | TAG_READ << 2 | TAG_NODE << 0,
-            TAG_READ << 6 | TAG_BLIND << 4,
+            (TAG_NODE << 6) | (TAG_NODE << 4) | (TAG_NODE << 2) | (TAG_READ << 0),
+            (TAG_BLIND << 6) | (TAG_NODE << 4) | (TAG_READ << 2) | (TAG_NODE << 0),
+            (TAG_READ << 6) | (TAG_BLIND << 4),
         ];
         let raw_bytes = [fh.as_ref(), &tag_bytes_bad, &val_bytes].concat();
         check_bad_deserialisation(&raw_bytes, root.clone(), DeserialiseError::ExpectedLeaf);

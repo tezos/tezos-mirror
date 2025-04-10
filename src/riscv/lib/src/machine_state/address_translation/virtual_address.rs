@@ -67,8 +67,8 @@ mod tests {
             vpn_4 in 0_u64..(1 << 8),
             offset in 0_u64..(1 << 12),
         )| {
-            let ppn_parts = vpn_0 | vpn_1 << 9 | vpn_2 << 18 | vpn_3 << 27 | vpn_4 << 36;
-            let vaddr = offset | ppn_parts << 12;
+            let ppn_parts = vpn_0 | (vpn_1 << 9) | (vpn_2 << 18) | (vpn_3 << 27) | (vpn_4 << 36);
+            let vaddr = offset | (ppn_parts << 12);
 
             let run_tests = |sv_length, args| {
                 for (idx, res) in args {

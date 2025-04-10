@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_satp_rw() {
-        let satp = Satp::from_bits(8u64 << 60 | 0xD07 << 44 | 0xABC_DEAD_0BAD);
+        let satp = Satp::from_bits((8u64 << 60) | (0xD07 << 44) | 0xABC_DEAD_0BAD);
         let mode = satp.mode();
         let asid = satp.asid();
         let ppn = satp.ppn();

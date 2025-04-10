@@ -89,7 +89,7 @@ const STATUS_ENUM_COERCIBLE: bool = {
 impl From<PvmStatus> for Status {
     fn from(item: PvmStatus) -> Self {
         if STATUS_ENUM_COERCIBLE {
-            unsafe { std::mem::transmute(item) }
+            unsafe { std::mem::transmute::<PvmStatus, Self>(item) }
         } else {
             unreachable!()
         }
@@ -99,7 +99,7 @@ impl From<PvmStatus> for Status {
 impl From<Status> for PvmStatus {
     fn from(item: Status) -> Self {
         if STATUS_ENUM_COERCIBLE {
-            unsafe { std::mem::transmute(item) }
+            unsafe { std::mem::transmute::<Status, Self>(item) }
         } else {
             unreachable!()
         }

@@ -529,10 +529,7 @@ fn run_block_inner<MC: MemoryConfig, M: ManagerReadWrite>(
     core: &mut MachineCoreState<MC, M>,
     instr_pc: &mut Address,
     steps: &mut usize,
-) -> Result<(), Exception>
-where
-    M: ManagerReadWrite,
-{
+) -> Result<(), Exception> {
     for instr in instr.iter() {
         match run_instr(instr, core) {
             Ok(ProgramCounterUpdate::Next(width)) => {

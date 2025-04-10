@@ -166,7 +166,7 @@ enum RiscvGdbEvent {
     DoneStep,
 }
 
-impl<'a, S: Stepper> Target for RiscvGdb<'a, S> {
+impl<S: Stepper> Target for RiscvGdb<'_, S> {
     type Error = String;
     type Arch = gdbstub_arch::riscv::Riscv64;
 
@@ -189,7 +189,7 @@ impl<'a, S: Stepper> Target for RiscvGdb<'a, S> {
     }
 }
 
-impl<'a, S: Stepper> SingleThreadBase for RiscvGdb<'a, S> {
+impl<S: Stepper> SingleThreadBase for RiscvGdb<'_, S> {
     fn read_registers(&mut self, regs: &mut RiscvCoreRegs<u64>) -> TargetResult<(), Self> {
         let state = self.stepper.machine_state();
         regs.pc = state.hart.pc.read();
@@ -230,7 +230,7 @@ impl<'a, S: Stepper> SingleThreadBase for RiscvGdb<'a, S> {
     }
 }
 
-impl<'a, S: Stepper> SingleThreadResume for RiscvGdb<'a, S> {
+impl<S: Stepper> SingleThreadResume for RiscvGdb<'_, S> {
     fn resume(&mut self, _signal: Option<Signal>) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -241,7 +241,7 @@ impl<'a, S: Stepper> SingleThreadResume for RiscvGdb<'a, S> {
     }
 }
 
-impl<'a, S: Stepper> SingleThreadSingleStep for RiscvGdb<'a, S> {
+impl<S: Stepper> SingleThreadSingleStep for RiscvGdb<'_, S> {
     fn step(&mut self, signal: Option<Signal>) -> Result<(), Self::Error> {
         self.single_step = true;
 
@@ -257,7 +257,7 @@ impl<'a, S: Stepper> SingleThreadSingleStep for RiscvGdb<'a, S> {
     }
 }
 
-impl<'a, S: Stepper> Breakpoints for RiscvGdb<'a, S> {
+impl<S: Stepper> Breakpoints for RiscvGdb<'_, S> {
     // there are several kinds of breakpoints - this target uses software breakpoints
     // We implement support for Software Breakpoints, in a similar fashion to
     // the debugger.
@@ -267,7 +267,7 @@ impl<'a, S: Stepper> Breakpoints for RiscvGdb<'a, S> {
     }
 }
 
-impl<'a, S: Stepper> SwBreakpoint for RiscvGdb<'a, S> {
+impl<S: Stepper> SwBreakpoint for RiscvGdb<'_, S> {
     fn add_sw_breakpoint(
         &mut self,
         addr: u64,
@@ -349,7 +349,7 @@ impl<'a, S: Stepper> run_blocking::BlockingEventLoop for RiscvEventLoop<'a, S> {
     }
 }
 
-impl<'a, S: Stepper> ExecFile for RiscvGdb<'a, S> {
+impl<S: Stepper> ExecFile for RiscvGdb<'_, S> {
     // returns the input filename that we're currently executing
     // this allows hermit to load the file from the local filesystem
     fn get_exec_file(

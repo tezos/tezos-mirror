@@ -115,7 +115,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         // We don't allow shared mappings
         match flags.visibility {
             Visibility::Private => {}
-            Visibility::Shared { .. } => return Err(Error::NoSystemCall),
+            Visibility::Shared => return Err(Error::NoSystemCall),
         }
 
         // We don't support file descriptors yet

@@ -121,23 +121,23 @@ mod tests {
             };
 
             run_tests(SvLength::Sv39,
-                [ppn_0, ppn_1, ppn_2 | ppn_4 << 18].to_vec(),
+                [ppn_0, ppn_1, ppn_2 | (ppn_4 << 18)].to_vec(),
             [
                 (over_3, None),
                 (0, Some(ppn_0)),
                 (1, Some(ppn_1)),
-                (2, Some(ppn_2 | ppn_4 << 18)),
+                (2, Some(ppn_2 | (ppn_4 << 18))),
             ].to_vec(),
             );
 
             run_tests(SvLength::Sv48,
-                [ppn_0, ppn_1, ppn_2, ppn_3 | ppn_4 << 9].to_vec(),
+                [ppn_0, ppn_1, ppn_2, ppn_3 | (ppn_4 << 9)].to_vec(),
             [
                 (over_3 + 1, None),
                 (0, Some(ppn_0)),
                 (1, Some(ppn_1)),
                 (2, Some(ppn_2)),
-                (3, Some(ppn_3 | ppn_4 << 9)),
+                (3, Some(ppn_3 | (ppn_4 << 9))),
             ].to_vec());
 
             run_tests(SvLength::Sv57, [

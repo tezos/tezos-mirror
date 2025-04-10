@@ -18,7 +18,7 @@ pub struct Console<'a> {
     options: ConsoleOptions,
 }
 
-impl<'a> Console<'a> {
+impl Console<'_> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {

@@ -28,6 +28,9 @@ ARG TARGETARCH
 # why the git config???
 COPY --chown=tezos:tezos .gitconfig /home/tezos/
 
+# Rust installer script
+COPY --chown=tezos:tezos install-rust.sh /tmp/
+
 # hadolint ignore=DL3018,DL3019
 RUN apk update \
 # Do not use apk --no-cache here because opam needs the cache.
@@ -38,7 +41,6 @@ RUN apk update \
     bash \
     build-base \
     ca-certificates \
-    cargo \
     cmake \
     coreutils \
     eudev-dev \
@@ -60,6 +62,7 @@ RUN apk update \
     tar \
     unzip \
     wget \
+    curl \
     xz \
     zlib-dev \
     zlib-static \
@@ -75,6 +78,8 @@ RUN apk update \
  # Opam from Edge is Opam 2.2
  && apk add --no-cache \
     opam --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
+ # Install Cargo and Rust (more information in the shell script)
+ && ./install-rust.sh \
 # Cleanup
  && rm -rf /tmp/*
 

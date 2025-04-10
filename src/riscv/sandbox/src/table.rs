@@ -51,7 +51,7 @@ fn section_summary(table: &mut Table, data: &[(&BenchStats, &String)]) {
         let name = Cell::new(name);
         let outcome = Cell::new(&stats.run_result);
         let total_steps =
-            Cell::new(&thousand_format(stats.total_steps, 0)).set_alignment(CellAlignment::Right);
+            Cell::new(thousand_format(stats.total_steps, 0)).set_alignment(CellAlignment::Right);
         let speed = Cell::new(speed).set_alignment(CellAlignment::Right);
         table.add_row(vec![name, outcome, total_steps, speed]);
     }

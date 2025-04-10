@@ -55,15 +55,15 @@
 //! These backends can be:
 //!
 //! - [Owned]
-//!     Backend which has the full state allocated in memory. It can execute one step
-//!     or multiple steps at a time faster.
+//!   Backend which has the full state allocated in memory. It can execute one step
+//!   or multiple steps at a time faster.
 //! - [Verifier]
-//!     Backend capable of partially allocating a state and verify a given proof.
-//!     Needs to be light on memory usage since it runs in the protocol.
+//!   Backend capable of partially allocating a state and verify a given proof.
+//!   Needs to be light on memory usage since it runs in the protocol.
 //! - [ProofGen]
-//!     Backend capable of generating a proof for running one step.
+//!   Backend capable of generating a proof for running one step.
 //! - [Ref]
-//!     Helper backend to wrap another backend through a reference to it.
+//!   Helper backend to wrap another backend through a reference to it.
 //!
 //! [Layouts]: layout::Layout
 //! [Owned]: owned_backend::Owned

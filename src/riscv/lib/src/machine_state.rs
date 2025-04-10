@@ -388,7 +388,7 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
                 self.fetch_instr_halfword(phys_addr)?
             };
 
-            let combined = (upper as u32) << 16 | (first_halfword as u32);
+            let combined = ((upper as u32) << 16) | (first_halfword as u32);
             let instr = parse_uncompressed_instruction(combined);
             if let Instr::Cacheable(instr) = instr {
                 let instr = Instruction::from(&instr);
@@ -769,7 +769,7 @@ mod tests {
             const T2_ENC: u32 = 0b0_0111; // x7
 
             state.core.hart.pc.write(init_pc_addr);
-            state.core.main_memory.write_instruction_unchecked::<u32>(init_pc_addr, T2_ENC << 7 |
+            state.core.main_memory.write_instruction_unchecked::<u32>(init_pc_addr, (T2_ENC << 7) |
                 0b0010111).expect("Storing instruction should succeed");
             state.step().expect("should not raise trap to EE");
             prop_assert_eq!(state.core.hart.xregisters.read(t2), init_pc_addr);
@@ -782,7 +782,7 @@ mod tests {
             const F3_0: u32 = 0b000;
 
             state.core.hart.pc.write(init_pc_addr);
-            state.core.main_memory.write_instruction_unchecked(init_pc_addr, T2_ENC << 15 | F3_0 << 12 | T0_ENC << 7 | OP_JALR).unwrap();
+            state.core.main_memory.write_instruction_unchecked(init_pc_addr, (T2_ENC << 15) | (F3_0 << 12) | (T0_ENC << 7) | OP_JALR).unwrap();
             state.core.hart.xregisters.write(t2, jump_addr);
 
             // Since we've written a new instruction to the init_pc_addr - we need to
@@ -856,17 +856,14 @@ mod tests {
 
             let init_pc_addr = memory::FIRST_ADDRESS + pc_addr_offset * 4;
             let mtvec_addr = init_pc_addr + 4 * mtvec_offset;
-            const EBREAK: u64 = 1 << 20 | 0b111_0011;
+            const EBREAK: u64 = (1 << 20) | 0b111_0011;
 
             // mtvec is in VECTORED mode
             state.core.hart.csregisters.write(CSRegister::mtvec, mtvec_addr | 1);
 
             // TEST: Raise exception, (and no interrupt before) take trap from M-mode to M-mode
             // (test no delegation takes place, even if delegation is on, traps never lower privilege)
-            let medeleg_val = 1 << Exception::IllegalInstruction.exception_code() |
-                1 << Exception::EnvCallFromSMode.exception_code() |
-                1 << Exception::EnvCallFromMMode.exception_code() |
-                1 << Exception::Breakpoint.exception_code();
+            let medeleg_val = (1 << Exception::IllegalInstruction.exception_code()) | (1 << Exception::EnvCallFromSMode.exception_code()) | (1 << Exception::EnvCallFromMMode.exception_code()) | (1 << Exception::Breakpoint.exception_code());
             state.core.hart.mode.write(Mode::Machine);
             state.core.hart.pc.write(init_pc_addr);
             state.core.hart.csregisters.write(CSRegister::medeleg, medeleg_val);
@@ -910,10 +907,7 @@ mod tests {
             state.core.hart.csregisters.write(CSRegister::stvec, stvec_addr | 1);
 
             let bad_address = memory::FIRST_ADDRESS.wrapping_sub((pc_addr_offset + 10) * 4);
-            let medeleg_val = 1 << Exception::IllegalInstruction.exception_code() |
-                1 << Exception::EnvCallFromSMode.exception_code() |
-                1 << Exception::EnvCallFromMMode.exception_code() |
-                1 << Exception::InstructionAccessFault(bad_address).exception_code();
+            let medeleg_val = (1 << Exception::IllegalInstruction.exception_code()) | (1 << Exception::EnvCallFromSMode.exception_code()) | (1 << Exception::EnvCallFromMMode.exception_code()) | (1 << Exception::InstructionAccessFault(bad_address).exception_code());
             state.core.hart.mode.write(Mode::User);
             state.core.hart.pc.write(bad_address);
             state.core.hart.csregisters.write(CSRegister::medeleg, medeleg_val);

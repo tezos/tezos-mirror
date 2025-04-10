@@ -1072,109 +1072,109 @@ const fn sign_extend_u16(value: u16, size: usize) -> i64 {
 
 const fn clw_imm(instr: u16) -> i64 {
     // instr[5] | instr[12:10] | instr[6] | 00
-    let res = u16::bits_subset(instr, 5, 5) << 6
-        | u16::bits_subset(instr, 12, 10) << 3
-        | u16::bits_subset(instr, 6, 6) << 2;
+    let res = (u16::bits_subset(instr, 5, 5) << 6)
+        | (u16::bits_subset(instr, 12, 10) << 3)
+        | (u16::bits_subset(instr, 6, 6) << 2);
     res as i64
 }
 
 const fn cld_imm(instr: u16) -> i64 {
     // instr[6:5] | instr[12:10] | 000
-    let res = u16::bits_subset(instr, 6, 5) << 6 | u16::bits_subset(instr, 12, 10) << 3;
+    let res = (u16::bits_subset(instr, 6, 5) << 6) | (u16::bits_subset(instr, 12, 10) << 3);
     res as i64
 }
 
 const fn ci_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
-    let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
+    let res = (u16::bits_subset(instr, 12, 12) << 5) | u16::bits_subset(instr, 6, 2);
     sign_extend_u16(res, 6)
 }
 
 const fn cslli_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
-    let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
+    let res = (u16::bits_subset(instr, 12, 12) << 5) | u16::bits_subset(instr, 6, 2);
     res as i64
 }
 
 const fn ci_addi16sp_imm(instr: u16) -> i64 {
     // instr[12] | instr[4:3] | instr[5] | instr[2] | instr[6] | 0000
-    let res = u16::bits_subset(instr, 12, 12) << 9
-        | u16::bits_subset(instr, 4, 3) << 7
-        | u16::bits_subset(instr, 5, 5) << 6
-        | u16::bits_subset(instr, 2, 2) << 5
-        | u16::bits_subset(instr, 6, 6) << 4;
+    let res = (u16::bits_subset(instr, 12, 12) << 9)
+        | (u16::bits_subset(instr, 4, 3) << 7)
+        | (u16::bits_subset(instr, 5, 5) << 6)
+        | (u16::bits_subset(instr, 2, 2) << 5)
+        | (u16::bits_subset(instr, 6, 6) << 4);
     sign_extend_u16(res, 10)
 }
 
 const fn ci_lwsp_imm(instr: u16) -> i64 {
     // instr[3:2] | instr[12] | instr[6:4] | 00
-    let res = u16::bits_subset(instr, 3, 2) << 6
-        | u16::bits_subset(instr, 12, 12) << 5
-        | u16::bits_subset(instr, 6, 4) << 2;
+    let res = (u16::bits_subset(instr, 3, 2) << 6)
+        | (u16::bits_subset(instr, 12, 12) << 5)
+        | (u16::bits_subset(instr, 6, 4) << 2);
     res as i64
 }
 
 const fn ci_ldsp_imm(instr: u16) -> i64 {
     // instr[4:2] | instr[12] | instr[6:5] | 000
-    let res = u16::bits_subset(instr, 4, 2) << 6
-        | u16::bits_subset(instr, 12, 12) << 5
-        | u16::bits_subset(instr, 6, 5) << 3;
+    let res = (u16::bits_subset(instr, 4, 2) << 6)
+        | (u16::bits_subset(instr, 12, 12) << 5)
+        | (u16::bits_subset(instr, 6, 5) << 3);
     res as i64
 }
 
 const fn css_swsp_imm(instr: u16) -> i64 {
     // instr[8:7] | instr[12:9] | 00
-    let res = u16::bits_subset(instr, 8, 7) << 6 | u16::bits_subset(instr, 12, 9) << 2;
+    let res = (u16::bits_subset(instr, 8, 7) << 6) | (u16::bits_subset(instr, 12, 9) << 2);
     res as i64
 }
 
 const fn css_sdsp_imm(instr: u16) -> i64 {
     // instr[9:7] | instr[12:10] | 000
-    let res = u16::bits_subset(instr, 9, 7) << 6 | u16::bits_subset(instr, 12, 10) << 3;
+    let res = (u16::bits_subset(instr, 9, 7) << 6) | (u16::bits_subset(instr, 12, 10) << 3);
     res as i64
 }
 
 const fn ciw_imm(instr: u16) -> i64 {
     // instr[10:7] | instr[12:11] | instr[5] | instr[6] | 00
-    let res = u16::bits_subset(instr, 10, 7) << 6
-        | u16::bits_subset(instr, 12, 11) << 4
-        | u16::bits_subset(instr, 5, 5) << 3
-        | u16::bits_subset(instr, 6, 6) << 2;
+    let res = (u16::bits_subset(instr, 10, 7) << 6)
+        | (u16::bits_subset(instr, 12, 11) << 4)
+        | (u16::bits_subset(instr, 5, 5) << 3)
+        | (u16::bits_subset(instr, 6, 6) << 2);
     res as i64
 }
 
 const fn cb_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:5] | instr[2] | instr[11:10] | instr[4:3] | 0
-    let res = u16::bits_subset(instr, 12, 12) << 8
-        | u16::bits_subset(instr, 6, 5) << 6
-        | u16::bits_subset(instr, 2, 2) << 5
-        | u16::bits_subset(instr, 11, 10) << 3
-        | u16::bits_subset(instr, 4, 3) << 1;
+    let res = (u16::bits_subset(instr, 12, 12) << 8)
+        | (u16::bits_subset(instr, 6, 5) << 6)
+        | (u16::bits_subset(instr, 2, 2) << 5)
+        | (u16::bits_subset(instr, 11, 10) << 3)
+        | (u16::bits_subset(instr, 4, 3) << 1);
     sign_extend_u16(res, 9)
 }
 
 const fn cb_shamt_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
-    let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
+    let res = (u16::bits_subset(instr, 12, 12) << 5) | u16::bits_subset(instr, 6, 2);
     res as i64
 }
 
 const fn cb_andi_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
-    let res = u16::bits_subset(instr, 12, 12) << 5 | u16::bits_subset(instr, 6, 2);
+    let res = (u16::bits_subset(instr, 12, 12) << 5) | u16::bits_subset(instr, 6, 2);
     sign_extend_u16(res, 6)
 }
 
 const fn cj_imm(instr: u16) -> i64 {
     // instr[12] | instr[8] | instr[10:9] | instr[6] | instr[7] | instr[2] | instr[11] | instr[5:3] | 0
-    let res = u16::bits_subset(instr, 12, 12) << 11
-        | u16::bits_subset(instr, 8, 8) << 10
-        | u16::bits_subset(instr, 10, 9) << 8
-        | u16::bits_subset(instr, 6, 6) << 7
-        | u16::bits_subset(instr, 7, 7) << 6
-        | u16::bits_subset(instr, 2, 2) << 5
-        | u16::bits_subset(instr, 11, 11) << 4
-        | u16::bits_subset(instr, 5, 3) << 1;
+    let res = (u16::bits_subset(instr, 12, 12) << 11)
+        | (u16::bits_subset(instr, 8, 8) << 10)
+        | (u16::bits_subset(instr, 10, 9) << 8)
+        | (u16::bits_subset(instr, 6, 6) << 7)
+        | (u16::bits_subset(instr, 7, 7) << 6)
+        | (u16::bits_subset(instr, 2, 2) << 5)
+        | (u16::bits_subset(instr, 11, 11) << 4)
+        | (u16::bits_subset(instr, 5, 3) << 1);
     sign_extend_u16(res, 12)
 }
 
@@ -1398,7 +1398,7 @@ pub fn parse<E>(bytes: u16, more: impl FnOnce() -> Result<u16, E>) -> Result<Ins
         Ok(parse_compressed_instruction(bytes))
     } else {
         let upper = more()?;
-        let combined = (upper as u32) << 16 | (bytes as u32);
+        let combined = ((upper as u32) << 16) | (bytes as u32);
         Ok(parse_uncompressed_instruction(combined))
     }
 }

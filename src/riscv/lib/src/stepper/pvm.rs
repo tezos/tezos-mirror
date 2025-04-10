@@ -127,7 +127,7 @@ impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts>
     }
 }
 
-impl<'hooks, MC: MemoryConfig, CL: CacheLayouts> PvmStepper<'hooks, MC, CL, Owned> {
+impl<MC: MemoryConfig, CL: CacheLayouts> PvmStepper<'_, MC, CL, Owned> {
     /// Produce the Merkle proof for evaluating one step on the given PVM state.
     /// The given stepper takes one step.
     pub fn produce_proof(&mut self) -> Option<Proof> {
@@ -149,8 +149,8 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts> PvmStepper<'hooks, MC, CL, Owne
     }
 }
 
-impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>
-    PvmStepper<'hooks, MC, CL, M, B>
+impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>
+    PvmStepper<'_, MC, CL, M, B>
 {
     /// Non-continuing variant of [`Stepper::step_max`]
     fn step_max_once(&mut self, steps: Bound<usize>) -> StepperStatus {
@@ -329,17 +329,15 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, M: ManagerReadWrite>
     }
 }
 
-impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, M: ManagerReadWrite>
-    PvmStepper<'hooks, MC, CL, M>
-{
+impl<MC: MemoryConfig, CL: CacheLayouts, M: ManagerReadWrite> PvmStepper<'_, MC, CL, M> {
     /// Perform one evaluation step.
     pub fn eval_one(&mut self) {
         self.pvm.eval_one(&mut self.hooks)
     }
 }
 
-impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, Verifier>>
-    PvmStepper<'hooks, MC, CL, Verifier, B>
+impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, Verifier>>
+    PvmStepper<'_, MC, CL, Verifier, B>
 {
     /// Try to take one step. Stepping with the [`Verifier`] backend may panic
     /// when attempting to access absent data. Return [`NotFound`] panics, which
@@ -366,8 +364,8 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, Verifier>>
     }
 }
 
-impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts> Stepper
-    for PvmStepper<'hooks, MC, CL, Owned, B>
+impl<MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts> Stepper
+    for PvmStepper<'_, MC, CL, Owned, B>
 {
     type MemoryConfig = MC;
 

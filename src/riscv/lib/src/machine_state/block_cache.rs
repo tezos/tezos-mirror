@@ -83,7 +83,6 @@ pub mod bcall;
 pub mod metrics;
 
 use std::marker::PhantomData;
-use std::u64;
 
 use bcall::BCall;
 use bcall::Block;
@@ -312,9 +311,8 @@ pub type PartialBlockLayout = (Atom<Address>, Atom<bool>, Atom<u8>);
 ///
 /// If a block is being partially executed, if either:
 /// - an error occurs
-/// - a jump or branch occurs
-/// then the partial block is reset, and execution will continue with
-/// a potentially different block.
+/// - a jump or branch occurs then the partial block is reset, and execution will continue with a
+///   potentially different block.
 pub struct PartialBlock<M: ManagerBase> {
     phys_addr: Cell<Address, M>,
     in_progress: Cell<bool, M>,

@@ -117,7 +117,7 @@ where
 
 /// Single element of type `E`
 #[repr(transparent)]
-pub struct Cell<E: 'static, M: ManagerBase + ?Sized> {
+pub struct Cell<E: 'static, M: ManagerBase> {
     region: Cells<E, 1, M>,
 }
 
@@ -328,7 +328,7 @@ impl<E: CellReadWrite> CellReadWrite for &mut E {
 
 /// Multiple elements of type `E`
 #[repr(transparent)]
-pub struct Cells<E: 'static, const LEN: usize, M: ManagerBase + ?Sized> {
+pub struct Cells<E: 'static, const LEN: usize, M: ManagerBase> {
     region: M::Region<E, LEN>,
 }
 
@@ -495,7 +495,7 @@ impl<E: Clone, const LEN: usize, M: ManagerClone> Clone for Cells<E, LEN, M> {
 }
 
 /// Multiple elements of an unspecified type
-pub struct DynCells<const LEN: usize, M: ManagerBase + ?Sized> {
+pub struct DynCells<const LEN: usize, M: ManagerBase> {
     region: M::DynRegion<LEN>,
 }
 
@@ -613,7 +613,7 @@ pub(crate) mod tests {
     use crate::state_backend::layout::Layout;
 
     /// Dummy type that helps us implement custom normalisation via [Elem]
-    #[repr(packed)]
+    #[repr(C, packed)]
     #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Default)]
     struct Flipper {
         a: u8,

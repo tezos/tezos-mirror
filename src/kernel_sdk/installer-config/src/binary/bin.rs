@@ -43,7 +43,7 @@ fn bytes_dynamic(b: &impl AsRef<[u8]>, output: &mut Vec<u8>) -> BinResult {
     Ok(())
 }
 
-impl<'a> BinWriter for RefBytes<'a> {
+impl BinWriter for RefBytes<'_> {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
         bytes_dynamic(self, output)
     }

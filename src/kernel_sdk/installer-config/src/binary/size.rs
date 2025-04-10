@@ -22,7 +22,7 @@ pub trait EncodingSize {
 
 const MAX_SIZE_REF_PATH: usize = 1 + PATH_MAX_SIZE;
 
-impl<'a> EncodingSize for RefBytes<'a> {
+impl EncodingSize for RefBytes<'_> {
     const MAX_SIZE: usize = 4 + MAX_FILE_CHUNK_SIZE;
 }
 

@@ -276,8 +276,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Default for JIT<MC, M> {
 
 #[cfg(test)]
 mod tests {
-    use std::i64;
-
     use Instruction as I;
 
     use super::*;
