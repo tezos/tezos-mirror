@@ -247,8 +247,7 @@ val init_sequencer_sandbox :
   ?patch_config:(JSON.t -> JSON.t) ->
   ?kernel:Uses.t ->
   ?evm_version:Evm_version.t ->
-  ?eth_bootstrap_accounts:string list ->
-  ?tez_bootstrap_accounts:Account.key list ->
+  ?bootstrap_accounts:string list ->
   unit ->
   Evm_node.t Lwt.t
 

@@ -40,28 +40,3 @@ let block_from_binary bytes =
     in
     {number; hash; timestamp; parent_hash = parent})
   else raise (Invalid_argument "Expected a string of length 44")
-
-(* We don't yet support smart contracts so all addresses are implicit accounts. *)
-type address = Signature.V1.public_key_hash
-
-let address_encoding =
-  Tezos_protocol_021_PsQuebec.Protocol.Alpha_context.Contract.implicit_encoding
-
-let address_of_b58check = Signature.V1.Public_key_hash.of_b58check
-
-let address_of_b58exn = Signature.V1.Public_key_hash.of_b58check_exn
-
-let address_to_hex_exn address =
-  let raw_key = Data_encoding.Binary.to_bytes_exn address_encoding address in
-  let (`Hex key) = Hex.of_bytes raw_key in
-  key
-
-module Tez = struct
-  include Tezos_protocol_021_PsQuebec.Protocol.Alpha_context.Tez
-
-  let of_string_exn str =
-    match of_string str with
-    | None ->
-        raise (Invalid_argument (Printf.sprintf "Invalid tez value: %s" str))
-    | Some s -> s
-end

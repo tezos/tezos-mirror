@@ -82,8 +82,7 @@ let clean_path path =
     []
     (List.rev path)
 
-let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
-    ?eth_bootstrap_accounts ?tez_bootstrap_accounts ?minimum_base_fee_per_gas
+let make_l2 ~boostrap_balance ?bootstrap_accounts ?minimum_base_fee_per_gas
     ?da_fee_per_byte ?sequencer_pool_address ?maximum_gas_per_transaction
     ?set_account_code ?world_state_path ~l2_chain_id ~l2_chain_family ~output ()
     =
@@ -92,38 +91,18 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
     | None -> ["evm"; "world_state"; l2_chain_id]
     | Some (_, value) -> clean_path (String.split_on_char '/' value)
   in
-  let eth_bootstrap_accounts =
-    match eth_bootstrap_accounts with
+  let bootstrap_accounts =
+    match bootstrap_accounts with
     | None -> []
-    | Some eth_bootstrap_accounts ->
+    | Some bootstrap_accounts ->
         let open Ethereum_types in
-        let balance = padded_32_le_int_bytes eth_bootstrap_balance in
+        let balance = padded_32_le_int_bytes boostrap_balance in
         List.map
           (fun (Address (Hex address)) ->
             make_instr
               ~path_prefix:(world_state_prefix @ ["eth_accounts"; address])
               (Some ("balance", balance)))
-          eth_bootstrap_accounts
-        |> List.flatten
-  in
-  let tez_bootstrap_accounts =
-    match tez_bootstrap_accounts with
-    | None -> []
-    | Some tez_bootstrap_accounts ->
-        let open Tezos_types in
-        List.map
-          (fun address ->
-            make_instr
-              ~path_prefix:
-                [
-                  "tezlink";
-                  "context";
-                  "contracts";
-                  "index";
-                  address_to_hex_exn address;
-                ]
-              (Some ("balance", Tez.to_string tez_bootstrap_balance)))
-          tez_bootstrap_accounts
+          bootstrap_accounts
         |> List.flatten
   in
   let set_account_code =
@@ -167,12 +146,11 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
         Hex.to_bytes_exn (`Hex addr) |> String.of_bytes)
       ~path_prefix:world_state_prefix
       sequencer_pool_address
-    @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ set_account_code
+    @ bootstrap_accounts @ set_account_code
   in
   Installer_config.to_file (config_instrs @ world_state_instrs) ~output
 
-let make ~mainnet_compat ~eth_bootstrap_balance ~tez_bootstrap_balance
-    ?l2_chain_ids ?eth_bootstrap_accounts ?tez_bootstrap_accounts
+let make ~mainnet_compat ~boostrap_balance ?l2_chain_ids ?bootstrap_accounts
     ?kernel_root_hash ?chain_id ?sequencer ?delayed_bridge ?ticketer ?admin
     ?sequencer_governance ?kernel_governance ?kernel_security_governance
     ?minimum_base_fee_per_gas ?da_fee_per_byte ?delayed_inbox_timeout
@@ -182,38 +160,18 @@ let make ~mainnet_compat ~eth_bootstrap_balance ~tez_bootstrap_balance
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?enable_multichain
     ?set_account_code ?max_delayed_inbox_blueprint_length ?evm_version ~output
     () =
-  let eth_bootstrap_accounts =
+  let bootstrap_accounts =
     let open Ethereum_types in
-    match eth_bootstrap_accounts with
+    match bootstrap_accounts with
     | None -> []
-    | Some eth_bootstrap_accounts ->
-        let balance = padded_32_le_int_bytes eth_bootstrap_balance in
+    | Some bootstrap_accounts ->
+        let balance = padded_32_le_int_bytes boostrap_balance in
         List.map
           (fun (Address (Hex address)) ->
             make_instr
               ~path_prefix:["evm"; "world_state"; "eth_accounts"; address]
               (Some ("balance", balance)))
-          eth_bootstrap_accounts
-        |> List.flatten
-  in
-  let tez_bootstrap_accounts =
-    match tez_bootstrap_accounts with
-    | None -> []
-    | Some tez_bootstrap_accounts ->
-        let open Tezos_types in
-        List.map
-          (fun address ->
-            make_instr
-              ~path_prefix:
-                [
-                  "tezlink";
-                  "context";
-                  "contracts";
-                  "index";
-                  address_to_hex_exn address;
-                ]
-              (Some ("balance", Tez.to_string tez_bootstrap_balance)))
-          tez_bootstrap_accounts
+          bootstrap_accounts
         |> List.flatten
   in
   let set_account_code =
@@ -294,7 +252,7 @@ let make ~mainnet_compat ~eth_bootstrap_balance ~tez_bootstrap_balance
     @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
     @ make_instr ~convert:le_int64_bytes max_blueprint_lookahead_in_seconds
-    @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ set_account_code
+    @ bootstrap_accounts @ set_account_code
     @ make_instr remove_whitelist
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_fa_bridge
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_dal

@@ -34,28 +34,24 @@ type l2_setup = {
   l2_chain_id : int;
   l2_chain_family : string;
   world_state_path : string option;
-  eth_bootstrap_accounts : string list option;
-  tez_bootstrap_accounts : Account.key list option;
+  bootstrap_accounts : string list option;
   sequencer_pool_address : string option;
   minimum_base_fee_per_gas : Wei.t option;
   da_fee_per_byte : Wei.t option;
   maximum_gas_per_transaction : int64 option;
 }
 
-let eth_default_bootstrap_accounts =
+let default_bootstrap_accounts =
   List.map
     (fun account -> account.Eth_account.address)
     (Array.to_list Eth_account.bootstrap_accounts)
-
-let tez_default_bootstrap_accounts = Array.to_list Account.Bootstrap.keys
 
 let default_l2_setup ~l2_chain_id =
   {
     l2_chain_id;
     l2_chain_family = "EVM";
     world_state_path = Some "/evm/world_state";
-    eth_bootstrap_accounts = Some eth_default_bootstrap_accounts;
-    tez_bootstrap_accounts = Some tez_default_bootstrap_accounts;
+    bootstrap_accounts = Some default_bootstrap_accounts;
     sequencer_pool_address = None;
     minimum_base_fee_per_gas = None;
     da_fee_per_byte = None;
@@ -1748,9 +1744,8 @@ let ten_years_in_seconds = 3600 * 24 * 365 * 10 |> Int64.of_int
 
 let make_kernel_installer_config ?(l2_chain_ids = [])
     ?max_delayed_inbox_blueprint_length ?(mainnet_compat = false)
-    ?(remove_whitelist = false) ?kernel_root_hash ?chain_id
-    ?eth_bootstrap_balance ?tez_bootstrap_balance ?eth_bootstrap_accounts
-    ?tez_bootstrap_accounts ?sequencer ?delayed_bridge ?ticketer ?administrator
+    ?(remove_whitelist = false) ?kernel_root_hash ?chain_id ?bootstrap_balance
+    ?bootstrap_accounts ?sequencer ?delayed_bridge ?ticketer ?administrator
     ?sequencer_governance ?kernel_governance ?kernel_security_governance
     ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
@@ -1835,45 +1830,25 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
         "dal-slots"
         (fun l -> String.concat "," (List.map string_of_int l))
         dal_slots
-    @ Cli_arg.optional_arg
-        "eth-bootstrap-balance"
-        Wei.to_string
-        eth_bootstrap_balance
-    @ Cli_arg.optional_arg
-        "tez-bootstrap-balance"
-        Tez.to_string
-        tez_bootstrap_balance
+    @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance
     @ Cli_arg.optional_arg "evm-version" Evm_version.to_string evm_version
-    @ (match tez_bootstrap_accounts with
-      | None -> []
-      | Some tez_bootstrap_accounts ->
-          List.flatten
-          @@ List.map
-               (fun tez_bootstrap_account ->
-                 [
-                   "--tez-bootstrap-account";
-                   tez_bootstrap_account.Account.public_key_hash;
-                 ])
-               tez_bootstrap_accounts)
     @
-    match eth_bootstrap_accounts with
+    match bootstrap_accounts with
     | None -> []
-    | Some eth_bootstrap_accounts ->
+    | Some bootstrap_accounts ->
         List.flatten
         @@ List.map
-             (fun eth_bootstrap_account ->
-               ["--eth-bootstrap-account"; eth_bootstrap_account])
-             eth_bootstrap_accounts
+             (fun bootstrap_account ->
+               ["--bootstrap-account"; bootstrap_account])
+             bootstrap_accounts
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
   Runnable.{value = process; run = Process.check}
 
-let make_l2_kernel_installer_config ?chain_id ?chain_family
-    ?eth_bootstrap_balance ?tez_bootstrap_balance ?eth_bootstrap_accounts
-    ?tez_bootstrap_accounts ?minimum_base_fee_per_gas
-    ?(da_fee_per_byte = Wei.zero) ?sequencer_pool_address
-    ?maximum_gas_per_transaction ?(set_account_code = []) ?world_state_path
-    ~output () =
+let make_l2_kernel_installer_config ?chain_id ?chain_family ?bootstrap_balance
+    ?bootstrap_accounts ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
+    ?sequencer_pool_address ?maximum_gas_per_transaction
+    ?(set_account_code = []) ?world_state_path ~output () =
   let set_account_code =
     List.flatten
     @@ List.map
@@ -1900,36 +1875,17 @@ let make_l2_kernel_installer_config ?chain_id ?chain_family
         "maximum-gas-per-transaction"
         Int64.to_string
         maximum_gas_per_transaction
-    @ Cli_arg.optional_arg
-        "eth-bootstrap-balance"
-        Wei.to_string
-        eth_bootstrap_balance
-    @ Cli_arg.optional_arg
-        "tez-bootstrap-balance"
-        Tez.to_string
-        tez_bootstrap_balance
-    @ (match tez_bootstrap_accounts with
-      | None -> []
-      | Some tez_bootstrap_accounts ->
-          List.flatten
-          @@ List.map
-               (fun tez_bootstrap_account ->
-                 [
-                   "--tez-bootstrap-account";
-                   tez_bootstrap_account.Account.public_key_hash;
-                 ])
-               tez_bootstrap_accounts)
+    @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance
     @
-    match eth_bootstrap_accounts with
+    match bootstrap_accounts with
     | None -> []
-    | Some eth_bootstrap_accounts ->
+    | Some bootstrap_accounts ->
         List.flatten
         @@ List.map
-             (fun eth_bootstrap_account ->
-               ["--eth-bootstrap-account"; eth_bootstrap_account])
-             eth_bootstrap_accounts
+             (fun bootstrap_account ->
+               ["--bootstrap-account"; bootstrap_account])
+             bootstrap_accounts
   in
-
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
   Runnable.{value = process; run = Process.check}
 
