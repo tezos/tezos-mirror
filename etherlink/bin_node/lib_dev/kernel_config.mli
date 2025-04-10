@@ -13,11 +13,9 @@ type evm_version = Shanghai | Cancun
     [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
 val make :
   mainnet_compat:bool ->
-  eth_bootstrap_balance:Ethereum_types.NonceMap.key ->
-  tez_bootstrap_balance:Tezos_types.Tez.t ->
+  boostrap_balance:Ethereum_types.NonceMap.key ->
   ?l2_chain_ids:L2_types.chain_id list ->
-  ?eth_bootstrap_accounts:Ethereum_types.address list ->
-  ?tez_bootstrap_accounts:Tezos_types.address list ->
+  ?bootstrap_accounts:Ethereum_types.address list ->
   ?kernel_root_hash:string * string ->
   ?chain_id:string * string ->
   ?sequencer:string * string ->
@@ -53,10 +51,8 @@ val make :
     generates a configuration file located at [output] for the chain [l2_chain_id],
     where [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
 val make_l2 :
-  eth_bootstrap_balance:Ethereum_types.NonceMap.key ->
-  tez_bootstrap_balance:Tezos_types.Tez.t ->
-  ?eth_bootstrap_accounts:Ethereum_types.address list ->
-  ?tez_bootstrap_accounts:Tezos_types.address list ->
+  boostrap_balance:Z.t ->
+  ?bootstrap_accounts:Ethereum_types.address list ->
   ?minimum_base_fee_per_gas:string * string ->
   ?da_fee_per_byte:string * string ->
   ?sequencer_pool_address:string * string ->

@@ -425,11 +425,10 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     ?tx_pool_tx_per_addr_limit ?set_account_code ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?history_mode ?patch_config
     ?(kernel = Constant.WASM.evm_kernel) ?evm_version
-    ?(eth_bootstrap_accounts =
+    ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
-        (Array.to_list Eth_account.bootstrap_accounts))
-    ?(tez_bootstrap_accounts = Array.to_list Account.Bootstrap.keys) () =
+        (Array.to_list Eth_account.bootstrap_accounts)) () =
   let wallet_dir = Temp.dir "wallet" in
   let output_config = Temp.file "config.yaml" in
   let preimages_dir = Temp.dir "wasm_2_0_0" in
@@ -441,8 +440,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
       ~output:output_config
-      ~eth_bootstrap_accounts
-      ~tez_bootstrap_accounts
+      ~bootstrap_accounts
       ?evm_version
       ()
   in

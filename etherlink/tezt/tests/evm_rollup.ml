@@ -298,11 +298,10 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?(kernel = Kernel.Latest) ?evm_version
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) ?chain_id
-    ?(eth_bootstrap_accounts =
+    ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
         (Array.to_list Eth_account.bootstrap_accounts))
-    ?(tez_bootstrap_accounts = Array.to_list Account.Bootstrap.keys)
     ?(with_administrator = true) ?da_fee_per_byte ?minimum_base_fee_per_gas
     ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
@@ -369,8 +368,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ~mainnet_compat:false
         ~remove_whitelist:Option.(is_some whitelist)
         ?kernel_root_hash
-        ~eth_bootstrap_accounts
-        ~tez_bootstrap_accounts
+        ~bootstrap_accounts
         ?da_fee_per_byte
         ?minimum_base_fee_per_gas
         ?ticketer
@@ -531,9 +529,9 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
 
 let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?(additional_uses = []) ?commitment_period ?challenge_window
-    ?eth_bootstrap_accounts ?tez_bootstrap_accounts ?whitelist ?da_fee_per_byte
-    ?minimum_base_fee_per_gas ?rollup_operator_key ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?restricted_rpcs ~setup_mode ~enable_dal
+    ?bootstrap_accounts ?whitelist ?da_fee_per_byte ?minimum_base_fee_per_gas
+    ?rollup_operator_key ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?restricted_rpcs ~setup_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [4] else None) ~enable_multichain
     ?websockets ?enable_fast_withdrawal ?evm_version ?enable_tx_queue f
     protocols =
@@ -579,8 +577,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
               ?whitelist
               ?commitment_period
               ?challenge_window
-              ?eth_bootstrap_accounts
-              ?tez_bootstrap_accounts
+              ?bootstrap_accounts
               ?da_fee_per_byte
               ?minimum_base_fee_per_gas
               ?rollup_operator_key
@@ -603,11 +600,10 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     kernels
 
 let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
-    ?admin ?commitment_period ?challenge_window ?eth_bootstrap_accounts
-    ?tez_bootstrap_accounts ?da_fee_per_byte ?minimum_base_fee_per_gas
-    ?whitelist ?rollup_operator_key ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?restricted_rpcs ?websockets
-    ?enable_fast_withdrawal ?evm_version f protocols =
+    ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?restricted_rpcs
+    ?websockets ?enable_fast_withdrawal ?evm_version f protocols =
   let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
@@ -618,8 +614,7 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
       ?admin
       ?commitment_period
       ?challenge_window
-      ?eth_bootstrap_accounts
-      ?tez_bootstrap_accounts
+      ?bootstrap_accounts
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
       ?whitelist
@@ -643,8 +638,8 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
 
 let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?additional_uses ?additional_config ?admin ?commitment_period
-    ?challenge_window ?eth_bootstrap_accounts ?tez_bootstrap_accounts
-    ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
+    ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version
     ?genesis_timestamp ?enable_tx_queue f protocols =
@@ -658,8 +653,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
       ?admin
       ?commitment_period
       ?challenge_window
-      ?eth_bootstrap_accounts
-      ?tez_bootstrap_accounts
+      ?bootstrap_accounts
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
       ?whitelist
@@ -690,11 +684,11 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
   register ~enable_dal:true ~enable_multichain:true
 
 let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
-    ?admin ?commitment_period ?challenge_window ?eth_bootstrap_accounts
-    ?tez_bootstrap_accounts ?da_fee_per_byte ?minimum_base_fee_per_gas
-    ?time_between_blocks ?whitelist ?rollup_operator_key ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?restricted_rpcs ?max_blueprints_ahead
-    ?websockets ?evm_version f protocols : unit =
+    ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
+    ?rollup_operator_key ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version f protocols
+    : unit =
   register_proxy
     ~title
     ~tags
@@ -704,8 +698,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin
     ?commitment_period
     ?challenge_window
-    ?eth_bootstrap_accounts
-    ?tez_bootstrap_accounts
+    ?bootstrap_accounts
     ?da_fee_per_byte
     ?minimum_base_fee_per_gas
     ?whitelist
@@ -726,8 +719,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin
     ?commitment_period
     ?challenge_window
-    ?eth_bootstrap_accounts
-    ?tez_bootstrap_accounts
+    ?bootstrap_accounts
     ?da_fee_per_byte
     ?minimum_base_fee_per_gas
     ?time_between_blocks
@@ -992,7 +984,7 @@ let test_rpc_getBlockReceipts_aux ?websocket {evm_node; produce_block; _} =
 let test_rpc_getBlockReceipts =
   register_both
     ~time_between_blocks:Nothing
-    ~eth_bootstrap_accounts:Eth_account.lots_of_address
+    ~bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["evm"; "rpc"; "get_block_receipts"]
     ~title:"RPC method eth_getBlockReceipts"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
@@ -2107,7 +2099,7 @@ let test_simulate =
 
 let test_full_blocks =
   register_proxy
-    ~eth_bootstrap_accounts:Eth_account.lots_of_address
+    ~bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["evm"; "full_blocks"]
     ~title:
       "Check `eth_getBlockByNumber` with full blocks returns the correct \
@@ -2237,7 +2229,7 @@ let test_inject_100_transactions =
   register_proxy
     ~tags:["evm"; "bigger_blocks"]
     ~title:"Check blocks can contain more than 64 transactions"
-    ~eth_bootstrap_accounts:Eth_account.lots_of_address
+    ~bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
@@ -3281,7 +3273,7 @@ let test_rpc_getTransactionByBlockHashAndIndex =
     ~tags:["evm"; "rpc"; "get_transaction_by"; "block_hash_and_index"]
     ~title:"RPC method eth_getTransactionByBlockHashAndIndex"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~eth_bootstrap_accounts:Eth_account.lots_of_address
+    ~bootstrap_accounts:Eth_account.lots_of_address
   @@ fun ~protocol:_ -> test_rpc_getTransactionByBlockArgAndIndex ~by:`Hash
 
 let test_rpc_getTransactionByBlockNumberAndIndex =
@@ -3289,7 +3281,7 @@ let test_rpc_getTransactionByBlockNumberAndIndex =
     ~tags:["evm"; "rpc"; "get_transaction_by"; "block_number_and_index"]
     ~title:"RPC method eth_getTransactionByBlockNumberAndIndex"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~eth_bootstrap_accounts:Eth_account.lots_of_address
+    ~bootstrap_accounts:Eth_account.lots_of_address
   @@ fun ~protocol:_ -> test_rpc_getTransactionByBlockArgAndIndex ~by:`Number
 
 type storage_migration_results = {
@@ -3307,12 +3299,12 @@ type storage_migration_results = {
      on master.
    - everytime a new path/rpc/object is stored in the kernel, a new sanity check
      MUST be generated. *)
-let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
+let gen_kernel_migration_test ~from ~to_ ?bootstrap_accounts ?chain_id
     ?(admin = Constant.bootstrap5) ~scenario_prior ~scenario_after protocol =
   let* evm_setup =
     setup_evm_kernel
       ?chain_id
-      ?eth_bootstrap_accounts
+      ?bootstrap_accounts
       ~da_fee_per_byte:Wei.zero
       ~minimum_base_fee_per_gas:(Wei.of_string "21000")
       ~kernel:from
@@ -3544,7 +3536,7 @@ let test_cannot_prepayed_leads_to_no_inclusion =
     ~tags:["evm"; "prepay"; "inclusion"]
     ~title:
       "Not being able to prepay a transaction leads to it not being included."
-    ~eth_bootstrap_accounts:[]
+    ~bootstrap_accounts:[]
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   (* No bootstrap accounts, so no one has funds. *)
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
@@ -3844,7 +3836,7 @@ let test_transaction_storage_before_and_after_migration =
   gen_kernel_migration_test
     ~from:Ghostnet
     ~to_:Latest
-    ~eth_bootstrap_accounts:Eth_account.lots_of_address
+    ~bootstrap_accounts:Eth_account.lots_of_address
     ~scenario_prior
     ~scenario_after
     protocol
@@ -3939,7 +3931,7 @@ let test_rpc_getBlockTransactionCountBy =
     ~title:
       "RPC methods eth_getBlockTransactionCountByHash and \
        eth_getBlockTransactionCountByNumber"
-    ~eth_bootstrap_accounts:Eth_account.lots_of_address
+    ~bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup ->
   let {produce_block; evm_node; _} = evm_setup in
@@ -4535,7 +4527,7 @@ let test_block_hash_regression =
      genesis timestamp can be found in tezt/lib_tezos/client.ml *)
   let* {evm_node; _} =
     setup_evm_kernel
-      ~eth_bootstrap_accounts:
+      ~bootstrap_accounts:
         (List.map
            (fun account -> account.Eth_account.address)
            (Array.to_list Eth_account.bootstrap_accounts)
@@ -5696,7 +5688,7 @@ let test_reveal_storage =
       ~admin:None
       ~additional_config
       ~force_install_kernel:false
-      ~eth_bootstrap_accounts:[]
+      ~bootstrap_accounts:[]
       protocol
   in
 

@@ -150,7 +150,7 @@ module Params = struct
                    [\"1970-01-01T00:00:00Z\"]) or in number of seconds since \
                    the {!Time.Protocol.epoch}."))
 
-  let eth_address =
+  let l2_address =
     Tezos_clic.parameter (fun _ address ->
         let open Lwt_result_syntax in
         let hex = Evm_node_lib_dev.Misc.normalize_addr address in
@@ -161,11 +161,6 @@ module Params = struct
             (fun () -> failwith "%s is not a valid address" address)
         in
         return (Evm_node_lib_dev_encoding.Ethereum_types.Address (Hex hex)))
-
-  let tez_address =
-    Tezos_clic.parameter (fun _ address ->
-        Lwt.return
-          (Evm_node_lib_dev_encoding.Tezos_types.address_of_b58check address))
 
   let l2_level =
     Tezos_clic.parameter (fun () s ->
@@ -1408,7 +1403,7 @@ let make_sequencer_upgrade_command =
     @@ Tezos_clic.param
          ~name:"pool_address"
          ~desc:"Pool address of the sequencer"
-         Params.eth_address
+         Params.l2_address
     @@ prefixes ["at"; "activation"; "timestamp"]
     @@ param
          ~name:"activation_timestamp"
@@ -1883,37 +1878,10 @@ let config_key_flag ~name =
       if enable then return_some (name, "") else return_none)
   @@ Tezos_clic.switch ~long ~doc ()
 
-let eth_bootstrap_account_arg =
-  let long = "eth-bootstrap-account" in
-  let doc =
-    Format.sprintf "Add an etherlink bootstrap account in the installer config."
-  in
-  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.eth_address
-
-let tez_bootstrap_account_arg =
-  let long = "tez-bootstrap-account" in
-  let doc =
-    Format.sprintf "Add an tezlink bootstrap account in the installer config."
-  in
-  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"tz1..." Params.tez_address
-
-let eth_bootstrap_balance_arg =
-  Tezos_clic.default_arg
-    ~long:"eth-bootstrap-balance"
-    ~doc:"Balance of the etherlink bootstrap accounts"
-    ~default:"9999000000000000000000"
-    ~placeholder:"9999000000000000000000"
-  @@ Tezos_clic.parameter (fun _ s -> Lwt_result.return @@ Z.of_string s)
-
-let tez_bootstrap_balance_arg =
-  Tezos_clic.default_arg
-    ~long:"tez-bootstrap-balance"
-    ~doc:"Balance of the tezlink bootstrap accounts"
-    ~default:"3800000"
-    ~placeholder:"3800000"
-  @@ Tezos_clic.parameter (fun _ s ->
-         Lwt_result.return
-         @@ Evm_node_lib_dev_encoding.Tezos_types.Tez.of_string_exn s)
+let bootstrap_account_arg =
+  let long = "bootstrap-account" in
+  let doc = Format.sprintf "Add a bootstrap account in the installer config." in
+  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.l2_address
 
 let set_account_code =
   let long = "set-code" in
@@ -1948,17 +1916,20 @@ let make_l2_kernel_config_command =
     ~desc:
       "Produce a file containing the part of the kernel configuration \
        instructions related to a particular L2 chain."
-    (args12
+    (args10
        (config_key_arg ~name:"minimum_base_fee_per_gas" ~placeholder:"111...")
        (config_key_arg ~name:"da_fee_per_byte" ~placeholder:"111...")
        (config_key_arg ~name:"sequencer_pool_address" ~placeholder:"0x...")
        (config_key_arg
           ~name:"maximum_gas_per_transaction"
           ~placeholder:"30000...")
-       eth_bootstrap_balance_arg
-       eth_bootstrap_account_arg
-       tez_bootstrap_balance_arg
-       tez_bootstrap_account_arg
+       (Tezos_clic.default_arg
+          ~long:"bootstrap-balance"
+          ~doc:"Balance of the bootstrap accounts."
+          ~default:"9999000000000000000000"
+          ~placeholder:"9999000000000000000000"
+       @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
+       bootstrap_account_arg
        set_account_code
        (config_key_arg
           ~name:"world_state_path"
@@ -1985,10 +1956,8 @@ let make_l2_kernel_config_command =
            da_fee_per_byte,
            sequencer_pool_address,
            maximum_gas_per_transaction,
-           eth_bootstrap_balance,
-           eth_bootstrap_accounts,
-           tez_bootstrap_balance,
-           tez_bootstrap_accounts,
+           boostrap_balance,
+           bootstrap_accounts,
            set_account_code,
            world_state_path,
            l2_chain_id,
@@ -2004,14 +1973,12 @@ let make_l2_kernel_config_command =
         | Some l2_chain_id -> return (Chain_id.to_string l2_chain_id)
       in
       Evm_node_lib_dev.Kernel_config.make_l2
-        ~eth_bootstrap_balance
-        ~tez_bootstrap_balance
-        ?eth_bootstrap_accounts
-        ?tez_bootstrap_accounts
         ?minimum_base_fee_per_gas
         ?da_fee_per_byte
         ?sequencer_pool_address
         ?maximum_gas_per_transaction
+        ~boostrap_balance
+        ?bootstrap_accounts
         ?set_account_code
         ?world_state_path
         ~l2_chain_id
@@ -2030,6 +1997,7 @@ let l2_chain_ids_arg =
 
 let make_kernel_config_command =
   let open Tezos_clic in
+  let open Lwt_result_syntax in
   command
     ~group:Groups.kernel
     ~desc:"Create a configuration for the kernel installer."
@@ -2064,14 +2032,18 @@ let make_kernel_config_command =
              ~name:"max_blueprint_lookahead_in_seconds"
              ~placeholder:"500")
           (config_key_flag ~name:"remove_whitelist")
-          eth_bootstrap_balance_arg
-          eth_bootstrap_account_arg
-          tez_bootstrap_balance_arg
-          tez_bootstrap_account_arg
+          (Tezos_clic.default_arg
+             ~long:"bootstrap-balance"
+             ~doc:"Balance of the bootstrap accounts"
+             ~default:"9999000000000000000000"
+             ~placeholder:"9999000000000000000000"
+          @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
+          bootstrap_account_arg
+          set_account_code
           (config_key_flag ~name:"enable_fa_bridge")
-          (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args8
           (config_key_flag ~name:"enable_dal")
+          (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
+       (args6
           (config_key_flag ~name:"enable_multichain")
           l2_chain_ids_arg
           (config_key_arg
@@ -2079,8 +2051,7 @@ let make_kernel_config_command =
              ~placeholder:"1000")
           (config_key_flag ~name:"enable_fast_withdrawal")
           (config_key_flag ~name:"enable_fast_fa_withdrawal")
-          evm_version_arg
-          set_account_code))
+          evm_version_arg))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
@@ -2106,26 +2077,22 @@ let make_kernel_config_command =
              maximum_gas_per_transaction,
              max_blueprint_lookahead_in_seconds,
              remove_whitelist,
-             eth_bootstrap_balance,
-             eth_bootstrap_accounts,
-             tez_bootstrap_balance,
-             tez_bootstrap_accounts,
+             boostrap_balance,
+             bootstrap_accounts,
+             set_account_code,
              enable_fa_bridge,
+             enable_dal,
              dal_slots ),
-           ( enable_dal,
-             enable_multichain,
+           ( enable_multichain,
              l2_chain_ids,
              max_delayed_inbox_blueprint_length,
              enable_fast_withdrawal,
              enable_fast_fa_withdrawal,
-             evm_version,
-             set_account_code ) )
+             evm_version ) )
          output
          () ->
       Evm_node_lib_dev.Kernel_config.make
         ~mainnet_compat
-        ~eth_bootstrap_balance
-        ~tez_bootstrap_balance
         ?l2_chain_ids
         ?kernel_root_hash
         ?chain_id
@@ -2146,8 +2113,8 @@ let make_kernel_config_command =
         ?maximum_gas_per_transaction
         ?max_blueprint_lookahead_in_seconds
         ?remove_whitelist
-        ?eth_bootstrap_accounts
-        ?tez_bootstrap_accounts
+        ~boostrap_balance
+        ?bootstrap_accounts
         ?enable_fa_bridge
         ?enable_dal
         ?dal_slots
@@ -2242,7 +2209,7 @@ let fund_arg =
     "The address of an account to provide with funds in the sandbox (can be \
      repeated to fund multiple accounts)."
   in
-  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.eth_address
+  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.l2_address
 
 let sandbox_config_args =
   Tezos_clic.args13
