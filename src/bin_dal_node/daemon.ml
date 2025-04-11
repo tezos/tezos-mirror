@@ -1482,24 +1482,24 @@ let run ~data_dir ~configuration_override =
   let cctxt = Rpc_context.make endpoint in
   let* dal_config = fetch_dal_config cctxt in
   let* network_name = infer_dal_network_name cctxt in
-  let bootstrap_names = points @ dal_config.bootstrap_peers in
+  let initial_peers_names = points @ dal_config.bootstrap_peers in
   let*! () =
-    if bootstrap_names = [] then Event.emit_config_error_no_bootstrap ()
+    if initial_peers_names = [] then Event.emit_config_error_no_bootstrap ()
     else Lwt.return_unit
   in
   (* Resolve:
      - [points] from DAL node config file and CLI.
-     - [dal_config.bootstrap_peers] from the L1 network config. *)
-  (* Update the list of bootstrap every 5 minutes *)
-  let* get_bootstrap_points =
-    let* current_points = resolve bootstrap_names in
-    let bootstrap_points = ref current_points in
+     - [dal_config.bootstrap_peers] from the L1 network config.
+     Re-resolve every bootstrap_dns_refresh_delay = 5 minutes. *)
+  let* get_initial_points =
+    let* current_points = resolve initial_peers_names in
+    let initial_points = ref current_points in
     let rec loop () =
       catch_es
         (fun () ->
           let*! () = Lwt_unix.sleep Constants.bootstrap_dns_refresh_delay in
-          let* current_points = resolve bootstrap_names in
-          bootstrap_points := current_points ;
+          let* current_points = resolve initial_peers_names in
+          initial_points := current_points ;
           loop ())
         ~catch_only:(function Lwt.Canceled -> true | _ -> false)
     in
@@ -1509,7 +1509,7 @@ let run ~data_dir ~configuration_override =
           let () = Lwt.cancel dns_job in
           Lwt.return_unit)
     in
-    return (fun () -> !bootstrap_points)
+    return (fun () -> !initial_points)
   in
   let* p2p_config = Transport_layer_parameters.p2p_config config in
   let p2p_limits = Transport_layer_parameters.p2p_limits in
@@ -1589,7 +1589,7 @@ let run ~data_dir ~configuration_override =
     let gs_worker =
       Gossipsub.Worker.(
         make
-          ~initial_points:get_bootstrap_points
+          ~initial_points:get_initial_points
           ~events_logging:(Logging.event ~verbose:config.verbose)
           ~self
           rng
@@ -1599,7 +1599,7 @@ let run ~data_dir ~configuration_override =
     Gossipsub.Worker.start [] gs_worker ;
     gs_worker
   in
-  let points = get_bootstrap_points () in
+  let points = get_initial_points () in
   (* Create a transport (P2P) layer instance. *)
   let* transport_layer =
     Gossipsub.Transport_layer.create
