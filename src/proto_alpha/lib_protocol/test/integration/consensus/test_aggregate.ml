@@ -306,8 +306,12 @@ let test_aggregate_attestation_non_bls_delegate () =
       let consensus_content : Alpha_context.consensus_aggregate_content =
         {level; round; block_payload_hash}
       in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7935
+         Add tests with dal_content = Some _. *)
       let contents : _ Alpha_context.contents_list =
-        Single (Attestations_aggregate {consensus_content; committee = [slot]})
+        Single
+          (Attestations_aggregate
+             {consensus_content; committee = [(slot, None)]})
       in
       let aggregate : operation =
         {shell; protocol_data = Operation_data {contents; signature}}

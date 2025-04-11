@@ -296,7 +296,7 @@ and _ contents =
       -> Kind.preattestations_aggregate contents
   | Attestations_aggregate : {
       consensus_content : consensus_aggregate_content;
-      committee : Slot_repr.t list;
+      committee : (Slot_repr.t * dal_content option) list;
     }
       -> Kind.attestations_aggregate contents
   | Seed_nonce_revelation : {
@@ -550,6 +550,13 @@ let of_list l =
   match of_list_internal l with
   | Ok contents -> Ok contents
   | Error s -> Result_syntax.tzfail @@ Contents_list_error s
+
+let committee_slots committee = List.map fst committee
+
+let tmp_to_old_committee committee = List.map fst committee
+
+let tmp_of_old_committee committee =
+  List.map (fun slot -> (slot, None)) committee
 
 let tx_rollup_operation_tag_offset = 150
 
@@ -1257,9 +1264,13 @@ module Encoding = struct
           | Contents (Attestations_aggregate _ as op) -> Some op | _ -> None);
         proj =
           (fun (Attestations_aggregate {consensus_content; committee}) ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/7935
+               Take dal_content into account. *)
+            let committee = tmp_to_old_committee committee in
             (consensus_content, committee));
         inj =
           (fun (consensus_content, committee) ->
+            let committee = tmp_of_old_committee committee in
             Attestations_aggregate {consensus_content; committee});
       }
 
@@ -2518,7 +2529,9 @@ let weight_of : packed_operation -> operation_weight =
       W (Consensus, Weight_attestations_aggregate aggregate_infos)
   | Single (Attestations_aggregate {consensus_content; committee}) ->
       let aggregate_infos =
-        aggregate_infos_from_content consensus_content committee
+        aggregate_infos_from_content
+          consensus_content
+          (committee_slots committee)
       in
       W (Consensus, Weight_attestations_aggregate aggregate_infos)
   | Single (Proposals {period; source; _}) ->

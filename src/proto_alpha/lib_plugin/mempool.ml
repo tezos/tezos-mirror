@@ -824,8 +824,7 @@ let sources_from_operation ctxt
             } ) ->
           return @@ map_pkh_env [delegate; consensus_pkh]
       | Error _ -> return_nil)
-  | Single (Preattestations_aggregate {consensus_content; committee})
-  | Single (Attestations_aggregate {consensus_content; committee}) ->
+  | Single (Preattestations_aggregate {consensus_content; committee}) ->
       let level = Level.from_raw ctxt consensus_content.level in
       let* sources =
         Lwt_list.fold_left_s
@@ -845,6 +844,28 @@ let sources_from_operation ctxt
             | Error _ -> return acc)
           []
           committee
+      in
+      return @@ map_pkh_env sources
+  | Single (Attestations_aggregate {consensus_content; committee}) ->
+      let level = Level.from_raw ctxt consensus_content.level in
+      let* sources =
+        Lwt_list.fold_left_s
+          (fun acc slot ->
+            let* slot_owner = Stake_distribution.slot_owner ctxt level slot in
+            match slot_owner with
+            | Ok
+                ( _ctxt,
+                  {
+                    delegate;
+                    consensus_pkh;
+                    consensus_pk = _;
+                    companion_pkh = _;
+                    companion_pk = _;
+                  } ) ->
+                return (delegate :: consensus_pkh :: acc)
+            | Error _ -> return acc)
+          []
+          (Operation.committee_slots committee)
       in
       return @@ map_pkh_env sources
   | Single (Seed_nonce_revelation _)

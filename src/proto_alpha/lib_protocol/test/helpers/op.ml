@@ -165,6 +165,7 @@ let aggregate attestations =
     Bls12_381_signature.MinPk.aggregate_signature_opt signatures
   in
   let contents =
+    let committee = Operation.tmp_of_old_committee committee in
     Single (Attestations_aggregate {consensus_content; committee})
   in
   let protocol_data =

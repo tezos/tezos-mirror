@@ -1101,7 +1101,7 @@ module Consensus = struct
           in
           return operation_state)
         operation_state
-        committee
+        (Operation.committee_slots committee)
     in
     return {info; operation_state; block_state}
 
@@ -1157,7 +1157,7 @@ module Consensus = struct
               | Bls pk -> return (pk :: public_keys, power + total_voting_power)
               | _ -> tzfail Validate_errors.Consensus.Non_bls_key_in_aggregate)
             ([], 0)
-            committee
+            (Operation.tmp_to_old_committee committee)
         in
         (* Fail on empty committee *)
         let*? () =

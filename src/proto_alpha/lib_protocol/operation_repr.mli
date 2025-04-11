@@ -289,10 +289,10 @@ and _ contents =
       committee : Slot_repr.t list;
     }
       -> Kind.preattestations_aggregate contents
-  (* Aggregate of attestations without dal_content. *)
+  (* Aggregate of attestations. *)
   | Attestations_aggregate : {
       consensus_content : consensus_aggregate_content;
-      committee : Slot_repr.t list;
+      committee : (Slot_repr.t * dal_content option) list;
     }
       -> Kind.attestations_aggregate contents
   (* Seed_nonce_revelation: Nonces are created by bakers and are
@@ -583,6 +583,23 @@ type packed_operation = {
 val pack : 'kind operation -> packed_operation
 
 val manager_kind : 'kind manager_operation -> 'kind Kind.manager
+
+(** Extracts the slots from a
+    {!constructor:contents.Attestations_aggregate} committee. *)
+val committee_slots :
+  (Slot_repr.t * dal_content option) list -> Slot_repr.t list
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7935
+   The following two functions are used so that despite the type
+   having been updated with DAL contents, attestations aggregate still
+   has the old logic without DAL. They should be removed once the new
+   logic has been implemented everywhere. *)
+
+val tmp_to_old_committee :
+  (Slot_repr.t * dal_content option) list -> Slot_repr.t list
+
+val tmp_of_old_committee :
+  Slot_repr.t list -> (Slot_repr.t * dal_content option) list
 
 val encoding : packed_operation Data_encoding.t
 
