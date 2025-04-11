@@ -161,11 +161,10 @@ module Params = struct
   let l2_address =
     Tezos_clic.parameter (fun _ address ->
         let open Lwt_result_syntax in
-        let hex = Evm_node_lib_dev.Misc.normalize_addr address in
+        let*? (`Hex hex) = Evm_node_lib_dev.Misc.normalize_hex address in
         let* () =
           when_
-            (Option.is_none (Hex.to_string (`Hex hex))
-            || String.length hex <> 40)
+            (String.length hex <> 40)
             (fun () -> failwith "%s is not a valid address" address)
         in
         return (Evm_node_lib_dev_encoding.Ethereum_types.Address (Hex hex)))
@@ -1901,12 +1900,13 @@ let set_account_code =
   let doc = Format.sprintf "Add code to an account in the installer config." in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x...,0x...."
   @@ Tezos_clic.parameter (fun _ address_code ->
+         let open Lwt_result_syntax in
          match String.split ',' address_code with
          | [address; code] ->
-             let address =
-               String.trim @@ Evm_node_lib_dev.Misc.normalize_addr address
+             let*? (`Hex address) =
+               Evm_node_lib_dev.Misc.normalize_hex address
              in
-             Lwt.return_ok (address, code)
+             return (String.trim address, code)
          | _ -> failwith "Parsing error for set-code")
 
 let evm_version_arg =
@@ -2752,12 +2752,25 @@ let preemptive_kernel_download_command =
        preimages_arg
        preimages_endpoint_arg
        num_download_retries)
-    (prefixes ["download"; "kernel"; "with"; "root"; "hash"]
+    (prefixes ["download"; "kernel"]
     @@ param
-         ~name:"root hash"
-         ~desc:"Root hash of the kernel to download."
+         ~name:"kernel-id"
+         ~desc:
+           "Either a root hash of the kernel to download, or the name of a \
+            supported kernel (\"bifrost\", \"calypso\" or \"calypso2\")."
          (Tezos_clic.parameter (fun _ str ->
-              Lwt_result_syntax.return @@ `Hex str))
+              let open Evm_node_lib_dev.Constants in
+              let open Lwt_result_syntax in
+              match kernel_from_string str with
+              | Some kernel -> return (root_hash_from_kernel kernel)
+              | None ->
+                  trace
+                    (error_of_fmt
+                       "%s in neither a known kernel nor a valid root hash"
+                       str)
+                    (let open Lwt_result_syntax in
+                     let*? hex = Evm_node_lib_dev.Misc.normalize_hex str in
+                     return hex)))
     @@ stop)
     (fun ( data_dir,
            config_file,

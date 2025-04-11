@@ -142,8 +142,9 @@ let make_l2 ~boostrap_balance ?bootstrap_accounts ?minimum_base_fee_per_gas
   let world_state_instrs =
     make_instr
       ~convert:(fun addr ->
-        let addr = Misc.normalize_addr addr in
-        Hex.to_bytes_exn (`Hex addr) |> String.of_bytes)
+        match Misc.normalize_hex addr with
+        | Ok (`Hex hex) -> hex
+        | Error _ -> raise (Invalid_argument "sequencer_pool_address"))
       ~path_prefix:world_state_prefix
       sequencer_pool_address
     @ bootstrap_accounts @ set_account_code
@@ -246,8 +247,9 @@ let make ~mainnet_compat ~boostrap_balance ?l2_chain_ids ?bootstrap_accounts
     @ make_instr ~convert:le_int64_bytes delayed_inbox_min_levels
     @ make_instr
         ~convert:(fun addr ->
-          let addr = Misc.normalize_addr addr in
-          Hex.to_bytes_exn (`Hex addr) |> String.of_bytes)
+          match Misc.normalize_hex addr with
+          | Ok hex -> Hex.to_bytes_exn hex |> String.of_bytes
+          | Error _ -> raise (Invalid_argument "sequencer_pool_address"))
         sequencer_pool_address
     @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction

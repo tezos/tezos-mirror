@@ -800,11 +800,12 @@ Kernel commands:
       of the L2 chain.
       Defaults to `EVM`.
   
-  download kernel with root hash <root hash> [--data-dir <data-dir>]
-      [--config-file <path>] [--preimages-dir <_evm_installer_preimages>]
+  download kernel <kernel-id> [--data-dir <data-dir>] [--config-file <path>]
+      [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [--retry <1>]
     Preemptively download a kernel before running the EVM node.
-    <root hash>: Root hash of the kernel to download.
+    <kernel-id>: Either a root hash of the kernel to download, or the name of
+      a supported kernel ("bifrost", "calypso" or "calypso2").
     --data-dir <data-dir>: The path to the EVM node data directory.
       Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
       if it exists, or `$HOME/.octez-evm-node` otherwise.

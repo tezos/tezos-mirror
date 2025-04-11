@@ -4,6 +4,11 @@
 
 ### Breaking changes
 
+- Replaces the command `download kernel with root hash` by `download kernel`.
+  In addition to supporting root hash prefixed by `0x` (something the previous
+  command was rejecting), `download kernel` also accept known kernel names
+  (currently, `bifrost`, `calypso` and `calypso2`). (!todo)
+
 ### Configuration changes
 
 ### RPCs changes

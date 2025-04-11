@@ -17,3 +17,9 @@ val rollup_address :
 val network_of_address :
   Tezos_crypto.Hashed.Smart_rollup_address.t ->
   Configuration.supported_network option
+
+type kernel = Bifrost | Calypso | Calypso2
+
+val kernel_from_string : string -> kernel option
+
+val root_hash_from_kernel : kernel -> Hex.t
