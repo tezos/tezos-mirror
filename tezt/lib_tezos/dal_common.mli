@@ -113,6 +113,7 @@ module Helpers : sig
     ?force:bool ->
     ?source:Account.key ->
     ?fee:int ->
+    ?gas_limit:int ->
     ?error:rex ->
     index:int ->
     commitment:Cryptobox.commitment ->
@@ -136,6 +137,7 @@ module Helpers : sig
     ?counter:int ->
     ?force:bool ->
     ?fee:int ->
+    ?gas_limit:int ->
     Client.t ->
     Dal_node.t ->
     Account.key ->

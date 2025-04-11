@@ -22,6 +22,8 @@ end
 module type Dal = sig
   val blocks_history : int
 
+  val producer_key : string option
+
   val fundraiser : string option
 
   val network_typ : Network.t Clap.typ
@@ -39,6 +41,8 @@ module type Dal = sig
   val dal_producers_slot_indices : int list
 
   val producers : int
+
+  val producers_delay : int
 
   val producer_machine_type : string option
 
@@ -109,6 +113,22 @@ module Dal () : Dal = struct
       ~long:"fundraiser"
       ~description:"Fundraiser secret key that has enough money on test network"
       ()
+
+  let producer_key =
+    Clap.optional_string
+      ~section
+      ~long:"producer-key"
+      ~description:"Producer secret key that has enough money"
+      ()
+
+  let producers_delay =
+    Clap.default_int
+      ~section
+      ~long:"producers-delay"
+      ~description:
+        "Delay in levels between two slot productions. Default is 1 meaning \
+         \"produce every level\"."
+      1
 
   let network_typ : Network.t Clap.typ =
     Clap.typ

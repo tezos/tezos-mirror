@@ -468,7 +468,9 @@ type configuration = {
   teztale : bool;
   memtrace : bool;
   data_dir : string option;
+  producer_key : string option;
   fundraiser : string option;
+  producers_delay : int;
   blocks_history : int;
   bootstrap_node_identity_file : string option;
   bootstrap_dal_node_identity_file : string option;
@@ -2036,10 +2038,29 @@ let init_public_network cloud (configuration : configuration)
   in
   let () = toplog "Initializing the producers" in
   let* producer_accounts =
-    Client.stresstest_gen_keys
-      ~alias_prefix:"dal_producer"
-      (List.length configuration.dal_node_producers)
-      bootstrap.client
+    match configuration.producer_key with
+    | None ->
+        Client.stresstest_gen_keys
+          ~alias_prefix:"dal_producer"
+          (List.length configuration.dal_node_producers)
+          bootstrap.client
+    | Some producer_key -> (
+        match configuration.dal_node_producers with
+        | [_] ->
+            let* () =
+              Client.import_secret_key
+                bootstrap.client
+                (Unencrypted producer_key)
+                ~alias:"producer_key"
+            in
+            let* account =
+              Client.show_address ~alias:"producer_key" bootstrap.client
+            in
+            return [account]
+        | _ ->
+            Test.fail
+              "A producer key can only be used if there is exactly one slot on \
+               which data are produced.")
   in
   let* etherlink_rollup_operator_key =
     if etherlink_configuration <> None then
@@ -2059,7 +2080,11 @@ let init_public_network cloud (configuration : configuration)
     else Lwt.return []
   in
   let accounts_to_fund =
-    List.map (fun producer -> (producer, 10 * 1_000_000)) producer_accounts
+    (if configuration.producer_key = None then
+       List.map (fun producer -> (producer, 10 * 1_000_000)) producer_accounts
+     else
+       (* When a producer key has been given, it is assumed to have money and should not be funded. *)
+       [])
     @ List.map
         (fun operator -> (operator, 11_000 * 1_000_000))
         etherlink_rollup_operator_key
@@ -2429,7 +2454,8 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       ~alias:account.Account.alias
   in
   let () = toplog "Init producer: reveal account" in
-  let*! () = Client.reveal client ~endpoint ~src:account.Account.alias in
+  let*? process = Client.reveal client ~endpoint ~src:account.Account.alias in
+  let* _ = Process.wait process in
   let () = toplog "Init producer: create agent" in
   let* dal_node =
     Dal_node.Agent.create
@@ -3331,8 +3357,21 @@ let on_new_block t ~level =
 
 let ensure_enough_funds t i =
   let producer = List.nth t.producers i in
-  match t.configuration.network with
-  | `Sandbox -> (* Producer has enough money *) Lwt.return_unit
+  match (t.configuration.network, t.configuration.producer_key) with
+  | `Sandbox, _ -> (* Producer has enough money *) Lwt.return_unit
+  | _, Some _ ->
+      (* Producer key is assumed to have enough money. We simply check that it is the case,
+         but do not refund it. *)
+      let* balance =
+        RPC_core.call t.bootstrap.node_rpc_endpoint
+        @@ RPC.get_chain_block_context_contract_balance
+             ~id:producer.account.public_key_hash
+             ()
+      in
+      if balance < Tez.of_mutez_int 520 then
+        Lwt.fail_with
+          "Producer key has not enough money anymore to publish slots"
+      else Lwt.return_unit
   | _ ->
       let* balance =
         RPC_core.call t.bootstrap.node_rpc_endpoint
@@ -3362,30 +3401,36 @@ let ensure_enough_funds t i =
       else Lwt.return_unit
 
 let produce_slot t level i =
-  toplog "producing slots for level %d" level ;
-  let* () = ensure_enough_funds t i in
-  toplog "ensured enough funds are available" ;
-  let producer = List.nth t.producers i in
-  let index = producer.slot_index in
-  let content =
-    Format.asprintf "%d:%d" level index
-    |> Helpers.make_slot
-         ~padding:false
-         ~slot_size:t.parameters.cryptobox.slot_size
-  in
-  let* _ = Node.wait_for_level producer.node level in
-  let* _ =
-    Helpers.publish_and_store_slot
-      ~dont_wait:true
-      producer.client
-      producer.dal_node
-      producer.account
-      ~force:true
-      ~index
-      content
-  in
-  Log.info "publish slot" ;
-  Lwt.return_unit
+  if level mod t.configuration.producers_delay = 0 then (
+    toplog "producing slots for level %d" level ;
+    let* () = ensure_enough_funds t i in
+    toplog "ensured enough funds are available" ;
+    let producer = List.nth t.producers i in
+    let index = producer.slot_index in
+    let content =
+      Format.asprintf "%d:%d" level index
+      |> Helpers.make_slot
+           ~padding:false
+           ~slot_size:t.parameters.cryptobox.slot_size
+    in
+    let* _ = Node.wait_for_level producer.node level in
+    let* _ =
+      (* A dry-run of the "publish dal commitment" command outputs fees of 516µtz and
+         1333 gas consumed. We added a (quite small) margin to it. *)
+      Helpers.publish_and_store_slot
+        ~fee:520
+        ~gas_limit:1400
+        ~dont_wait:true
+        producer.client
+        producer.dal_node
+        producer.account
+        ~force:true
+        ~index
+        content
+    in
+    Log.info "publish slot" ;
+    Lwt.return_unit)
+  else Lwt.return_unit
 
 let producers_not_ready t =
   (* If not all the producer nodes are ready, we do not publish the commitment
@@ -3442,6 +3487,8 @@ let register (module Cli : Scenarios_cli.Dal) =
     let teztale = Cli.teztale in
     let memtrace = Cli.memtrace in
     let data_dir = Cli.data_dir in
+    let producer_key = Cli.producer_key in
+    let producers_delay = Cli.producers_delay in
     let fundraiser =
       Option.fold
         ~none:(Sys.getenv_opt "TEZT_CLOUD_FUNDRAISER")
@@ -3503,6 +3550,8 @@ let register (module Cli : Scenarios_cli.Dal) =
         memtrace;
         data_dir;
         fundraiser;
+        producer_key;
+        producers_delay;
         blocks_history;
         bootstrap_node_identity_file;
         bootstrap_dal_node_identity_file;
