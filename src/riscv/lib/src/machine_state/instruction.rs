@@ -212,7 +212,7 @@ pub enum OpCode {
     ShiftRightSigned,
     SetLessThanSigned,
     SetLessThanUnsigned,
-    Addw,
+    AddWord,
     SubWord,
     Sllw,
     Srlw,
@@ -456,7 +456,7 @@ impl OpCode {
             Self::ShiftRightSigned => Args::run_shift_right_signed,
             Self::SetLessThanSigned => Args::run_set_less_than_signed,
             Self::SetLessThanUnsigned => Args::run_set_less_than_unsigned,
-            Self::Addw => Args::run_addw,
+            Self::AddWord => Args::run_add_word,
             Self::SubWord => Args::run_sub_word,
             Self::Sllw => Args::run_sllw,
             Self::Srlw => Args::run_srlw,
@@ -652,6 +652,7 @@ impl OpCode {
             Self::Neg => Some(Args::run_neg),
             Self::Nop => Some(Args::run_nop),
             Self::Add => Some(Args::run_add),
+            Self::AddWord => Some(Args::run_add_word),
             Self::Sub => Some(Args::run_sub),
             Self::SubWord => Some(Args::run_sub_word),
             Self::And => Some(Args::run_and),
@@ -1310,7 +1311,7 @@ impl Args {
         run_set_less_than_unsigned,
         non_zero_rd
     );
-    impl_r_type!(run_addw, non_zero_rd);
+    impl_r_type!(integer::run_add_word, run_add_word, non_zero_rd);
     impl_r_type!(integer::run_sub_word, run_sub_word, non_zero_rd);
     impl_r_type!(run_sllw, non_zero_rd);
     impl_r_type!(run_srlw, non_zero_rd);
@@ -1624,10 +1625,9 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::Sltu(args) => {
                 Instruction::new_set_less_than_unsigned(args.rd, args.rs1, args.rs2)
             }
-            InstrCacheable::Addw(args) => Instruction {
-                opcode: OpCode::Addw,
-                args: args.into(),
-            },
+            InstrCacheable::Addw(args) => {
+                Instruction::new_add_word(args.rd, args.rs1, args.rs2, InstrWidth::Uncompressed)
+            }
             InstrCacheable::Subw(args) => {
                 Instruction::new_sub_word(args.rd, args.rs1, args.rs2, InstrWidth::Uncompressed)
             }

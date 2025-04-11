@@ -45,6 +45,25 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::AddWord`].
+    pub(crate) fn new_add_word(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::AddWord,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Sub`].
     pub(crate) fn new_sub(
         rd: NonZeroXRegister,

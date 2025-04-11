@@ -73,6 +73,17 @@ pub fn run_add(
     icb.xregister_write_nz(rd, result)
 }
 
+/// Perform `val(rs1) + val(rs2)` but only on lowest 32 bits
+/// and store the sign-extended result in `rd`.
+pub fn run_add_word(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+    let lhs = icb.xregister_read(rs1);
+    let rhs = icb.xregister_read(rs2);
+    let result = lhs.add(rhs, icb);
+    let res = icb.narrow(result);
+    let res = icb.extend_signed(res);
+    icb.xregister_write_nz(rd, res)
+}
+
 /// Perform [`val(rs1) - val(rs2)`] and store the result in `rd`
 ///
 /// Relevant RISC-V opcodes:
