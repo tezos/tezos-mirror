@@ -23,8 +23,8 @@
 
 type t
 
-(** [create ~node_endpoint] returns a non initialized daemon. *)
-val create : node_endpoint:string -> t
+(** [create ~node_endpoint ~keep_alive] returns a non initialized daemon. *)
+val create : node_endpoint:string -> keep_alive:bool -> t
 
 (** [run daemon] Runs the daemon responsible for the spawn/stop of the
     baker daemons. *)

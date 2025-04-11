@@ -14,7 +14,8 @@
   octez-shell-libs.client-base-unix
   octez-node-config
   octez-shell-libs.client-commands
-  octez-libs.octez-profiler)
+  octez-libs.octez-profiler
+  octez-libs.stdlib-unix)
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
@@ -25,4 +26,5 @@
   -open Tezos_base_unix
   -open Tezos_client_base_unix
   -open Tezos_client_commands
-  -open Tezos_profiler))
+  -open Tezos_profiler
+  -open Tezos_stdlib_unix))

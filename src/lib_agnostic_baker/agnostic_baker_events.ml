@@ -102,3 +102,14 @@ let period_status =
     ("block", Block_hash.encoding)
     ("period", string)
     ("remaining", int31)
+
+(* Error *)
+let cannot_connect =
+  declare_1
+    ~section
+    ~alternative_color
+    ~level:Error
+    ~name:"agnostic_baker_cannot_connect"
+    ~msg:"Cannot connect to node. {message}"
+    ~pp1:Format.pp_print_string
+    ("message", Data_encoding.string)

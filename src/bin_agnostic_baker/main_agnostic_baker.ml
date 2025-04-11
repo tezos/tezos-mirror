@@ -33,7 +33,11 @@ let lwt_run ~args () =
     Client_main_run.init_logging (module Agnostic_baker_config) ~base_dir ()
   in
   () [@profiler.overwrite may_start_profiler base_dir] ;
-  let daemon = Daemon.create ~node_endpoint:(Run_args.get_endpoint args) in
+  let daemon =
+    Daemon.create
+      ~node_endpoint:(Run_args.get_endpoint args)
+      ~keep_alive:(Run_args.keep_alive args)
+  in
   let* (_ : unit) = Daemon.run daemon in
   let*! () = Lwt_utils.never_ending () in
   return_unit

@@ -25,3 +25,7 @@ val get_endpoint : string list -> string
 (** [get_base_dir args] returns the value associated to the [--base-dir] argument
     amongst [args]. *)
 val get_base_dir : string list -> string option
+
+(** [keep_alive args] returns [true] iff [--keep-alive] (or [-K]) is amongst
+    [args]. *)
+val keep_alive : string list -> bool
