@@ -9,6 +9,7 @@ use log::{debug, error, info, trace, warn};
 use ocaml::Error;
 use runtime_bifrost::internal_runtime::InternalRuntime as BifrostInternalRuntime;
 use runtime_calypso::internal_runtime::InternalRuntime as CalypsoInternalRuntime;
+use runtime_calypso2::internal_runtime::InternalRuntime as Calypso2InternalRuntime;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_host::{
     input::Message,
@@ -496,6 +497,16 @@ impl BifrostInternalRuntime for Host {
 }
 
 impl CalypsoInternalRuntime for Host {
+    fn __internal_store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
+        trace!("store_get_hash({path})");
+        let hash =
+            bindings::store_get_hash(self.tree(), path.as_bytes()).map_err(from_binding_error)?;
+
+        Ok(hash.as_bytes().to_vec())
+    }
+}
+
+impl Calypso2InternalRuntime for Host {
     fn __internal_store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
         trace!("store_get_hash({path})");
         let hash =
