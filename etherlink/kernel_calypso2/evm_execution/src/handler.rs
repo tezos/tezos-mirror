@@ -2263,7 +2263,8 @@ pub fn trace_call<Host: Runtime>(
     value: U256,
     gas_used: u64,
     input: Vec<u8>,
-    address: H160,
+    context_address: H160,
+    code_address: H160,
     target_gas: Option<u64>,
     output: &[u8],
     reason: &ExitReason,
@@ -2277,15 +2278,25 @@ pub fn trace_call<Host: Runtime>(
             },
     })) = handler.tracer
     {
-        let mut call_trace = CallTrace::new_minimal_trace(
-            match call_scheme {
-                CallScheme::Call => "CALL",
-                CallScheme::CallCode => "CALLCODE",
-                CallScheme::DelegateCall => "DELEGATECALL",
-                CallScheme::StaticCall => "STATICCALL",
+        let (type_, from) = match call_scheme {
+            CallScheme::Call => ("CALL", caller),
+            CallScheme::StaticCall => ("STATICCALL", caller),
+            CallScheme::DelegateCall => {
+                // FIXME: #7738 this only point to parent call
+                // address if it was not a DELEGATECALL or
+                // CALLCODE itself
+                ("DELEGATECALL", context_address)
             }
-            .into(),
-            caller,
+            CallScheme::CallCode => {
+                // FIXME: #7738 this only point to parent call
+                // address if it was not a DELEGATECALL or
+                // CALLCODE itself
+                ("CALLCODE", context_address)
+            }
+        };
+        let mut call_trace = CallTrace::new_minimal_trace(
+            type_.into(),
+            from,
             value,
             gas_used,
             input,
@@ -2294,7 +2305,10 @@ pub fn trace_call<Host: Runtime>(
             (handler.stack_depth() + 1).try_into().unwrap_or_default(),
         );
 
-        call_trace.add_to(Some(address));
+        // for the trace we want the contract address to always be the "to"
+        // field, not necessarily the address used in the transition context
+        // which may be something else (eg DELEGATECALL)
+        call_trace.add_to(Some(code_address));
         call_trace.add_gas(target_gas);
         call_trace.add_output(Some(output.to_owned()));
 
@@ -2798,9 +2812,8 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                     return Capture::Exit((ethereum_error_to_exit_reason(&err), vec![]));
                 }
 
-                let address = transaction_context.context.address;
-
                 let gas_before = self.gas_used();
+                let context_address = transaction_context.context.address;
                 let result = self.execute_call(
                     code_address,
                     transfer,
@@ -2821,7 +2834,8 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                             value,
                             gas_after - gas_before,
                             input,
-                            address,
+                            context_address,
+                            code_address,
                             target_gas,
                             &output,
                             &reason,

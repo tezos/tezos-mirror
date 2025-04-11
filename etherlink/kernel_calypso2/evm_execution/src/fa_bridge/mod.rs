@@ -234,6 +234,9 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
                     U256::zero(),
                     gas_after - gas_before,
                     deposit.calldata(),
+                    // It’s a simple call, so the context address and the address of the code being
+                    // executed are the same
+                    proxy,
                     proxy,
                     gas_limit,
                     output,
