@@ -44,6 +44,7 @@ module Parameters = struct
     state_recorder : bool;
     node_version_check_bypass : bool;
     node_version_allowed : string option;
+    keep_alive : bool;
   }
 
   type session_state = {mutable ready : bool}
@@ -88,7 +89,7 @@ let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
     ?(remote_mode = false) ?operations_pool ?dal_node_rpc_endpoint
     ?dal_node_timeout_percentage ?(state_recorder = false)
     ?(node_version_check_bypass = false) ?node_version_allowed ~base_dir
-    ~node_data_dir ~node_rpc_endpoint () =
+    ~node_data_dir ~node_rpc_endpoint ?(keep_alive = false) () =
   let agnostic_baker =
     create
       ~path
@@ -113,6 +114,7 @@ let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
         state_recorder;
         node_version_check_bypass;
         node_version_allowed;
+        keep_alive;
       }
   in
   agnostic_baker
@@ -124,7 +126,8 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
     ?(remote_mode = false) ?operations_pool ?dal_node
     ?dal_node_timeout_percentage ?(state_recorder = false)
-    ?(node_version_check_bypass = false) ?node_version_allowed node client =
+    ?(node_version_check_bypass = false) ?node_version_allowed ?keep_alive node
+    client =
   let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
   let agnostic_baker =
     create_from_uris
@@ -147,6 +150,7 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
       ~base_dir:(Client.base_dir client)
       ~node_data_dir:(Node.data_dir node)
       ~node_rpc_endpoint:(Node.as_rpc_endpoint node)
+      ?keep_alive
       ()
   in
   on_event agnostic_baker (handle_event agnostic_baker) ;
@@ -224,6 +228,11 @@ let run ?env ?event_level ?event_sections_levels (agnostic_baker : t) =
       Fun.id
       agnostic_baker.persistent_state.node_version_allowed
   in
+  let keep_alive =
+    Cli_arg.optional_switch
+      "keep-alive"
+      agnostic_baker.persistent_state.keep_alive
+  in
   let run_args =
     if agnostic_baker.persistent_state.remote_mode then ["remotely"]
     else ["with"; "local"; "node"; node_data_dir]
@@ -233,7 +242,7 @@ let run ?env ?event_level ?event_sections_levels (agnostic_baker : t) =
     @ run_args @ delegates @ liquidity_baking_toggle_vote @ votefile
     @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
     @ dal_node_timeout_percentage @ state_recorder @ node_version_check_bypass
-    @ node_version_allowed
+    @ node_version_allowed @ keep_alive
   in
 
   let on_terminate _ =
@@ -273,7 +282,7 @@ let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
     ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
     ?votefile ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
     ?operations_pool ?dal_node ?dal_node_timeout_percentage ?state_recorder
-    ?node_version_check_bypass ?node_version_allowed node client =
+    ?node_version_check_bypass ?node_version_allowed ?keep_alive node client =
   let* () = Node.wait_for_ready node in
   let agnostic_baker =
     create
@@ -293,6 +302,7 @@ let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
       ?node_version_check_bypass
       ?node_version_allowed
       ~delegates
+      ?keep_alive
       node
       client
   in
