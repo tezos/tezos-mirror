@@ -83,6 +83,9 @@ type rpc_server =
   | Resto  (** Resto/Cohttp (default) *)
   | Dream  (** Dream/httpun *)
 
+(** Profiling mode for PVM execution. *)
+type profile_mode = Minimal | Flamegraph
+
 (** Parameters for monitoring websocket connection heartbeats. *)
 type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
 

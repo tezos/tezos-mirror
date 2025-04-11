@@ -71,6 +71,19 @@ val eval :
   Irmin_context.tree ->
   (Irmin_context.tree * int64 * string trace Seq.t * int32) tzresult Lwt.t
 
+val profile :
+  ?migrate_to:Tezos_scoru_wasm.Pvm_input_kind.protocol ->
+  ?hooks:Tezos_scoru_wasm.Hooks.t ->
+  collapse:bool ->
+  with_time:bool ->
+  no_reboot:bool ->
+  int32 ->
+  string trace Seq.t ->
+  config ->
+  string Octez_smart_rollup_wasm_debugger_lib.Custom_section.FuncMap.t ->
+  Irmin_context.tree ->
+  (Irmin_context.tree * string trace Seq.t * int32) tzresult Lwt.t
+
 val encode :
   Tezos_scoru_wasm.Wasm_pvm_state.Internal_state.pvm_state ->
   Irmin_context.tree ->

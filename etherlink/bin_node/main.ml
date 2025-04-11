@@ -124,6 +124,14 @@ module Params = struct
         let list = String.split ',' s in
         Lwt.return_ok list)
 
+  let profile =
+    let open Lwt_result_syntax in
+    Tezos_clic.parameter (fun _ s ->
+        match s with
+        | "minimal" -> return Configuration.Minimal
+        | "flamegraph" -> return Configuration.Flamegraph
+        | _ -> failwith "Available options are 'minimal' and 'flamegraph'.")
+
   let time_between_blocks =
     Tezos_clic.parameter (fun _ s ->
         let time_between_blocks =
@@ -313,10 +321,15 @@ let mainnet_compat_arg =
     ()
 
 let profile_arg =
-  Tezos_clic.switch
+  Tezos_clic.arg_or_switch
     ~long:"profile"
-    ~doc:"Profile the execution of the WASM PVM."
-    ()
+    ~placeholder:"minimal|flamegraph"
+    ~doc:
+      "Profile the execution of the WASM PVM; 'minimal' provides a file to \
+       which it streamlines tick and gas consumption, 'flamegraph' creates a \
+       flamegraph indexed on tick consumption"
+    ~default:"flamegraph"
+    Params.profile
 
 let disable_da_fees_arg =
   Tezos_clic.switch
@@ -1575,12 +1588,12 @@ let replay_many_command =
       in
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       Evm_node_lib_dev.Replay.main
-        ~profile
         ~disable_da_fees
         ?kernel
         ?kernel_verbosity
         ~data_dir
         ~number:l2_level
+        ?profile
         configuration)
 
 let replay_command =
@@ -1624,12 +1637,12 @@ let replay_command =
       in
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       Evm_node_lib_dev.Replay.main
-        ~profile
         ~disable_da_fees
         ?kernel
         ?kernel_verbosity
         ~data_dir
         ~number:l2_level
+        ?profile
         ~upto
         configuration)
 

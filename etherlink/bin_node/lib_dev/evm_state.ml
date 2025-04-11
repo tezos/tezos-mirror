@@ -32,8 +32,8 @@ let event_kernel_log ~kind ~msg =
     (fun (level, msg) -> Events.event_kernel_log ~level ~kind ~msg)
     level_and_msg
 
-let execute ?(wasm_pvm_fallback = false) ?(profile = false)
-    ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
+let execute ?(wasm_pvm_fallback = false) ?profile ?(kind = Events.Application)
+    ~data_dir ?(log_file = "kernel_log")
     ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
     ~native_execution evm_state inbox =
   let open Lwt_result_syntax in
@@ -47,81 +47,96 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
         messages := msg :: !messages ;
         event_kernel_log ~kind ~msg)
   in
-  let eval evm_state =
-    if profile then
-      let filename =
-        Filename.concat
-          (kernel_logs_directory ~data_dir)
-          (log_file ^ "_profile.csv")
-      in
-      let flags = Unix.[O_WRONLY; O_CREAT; O_TRUNC] in
-      Lwt_io.with_file ~mode:Lwt_io.Output ~flags filename @@ fun oc ->
-      let*! () = Events.replay_csv_available filename in
-      let*! () = Lwt_io.fprintf oc "ticks_used\n" in
-      let hooks =
-        Tezos_scoru_wasm.Hooks.(
-          no_hooks
-          |> on_pvm_reboot (fun ticks ->
-                 let*! () = Lwt_io.fprintf oc "%Ld\n" ticks in
-                 Lwt_io.flush oc))
-      in
-      let* evm_state, _ticks, _inboxes, _level =
-        Wasm_debugger.eval
-          ~hooks
-          ~migrate_to:Proto_alpha
-          ~write_debug
-          ~wasm_entrypoint
-          0l
-          inbox
-          {config with flamecharts_directory = data_dir}
-          Inbox
-          evm_state
-      in
-      return evm_state
-    else
-      (* The [inbox] parameter is inherited from the WASM debugger, where the
-         inbox is a list of list of messages (because it supports running the
-         fast exec for several Tezos level in a raw).
+  let* evm_state =
+    match profile with
+    | Some Configuration.Minimal ->
+        let filename =
+          Filename.concat
+            (kernel_logs_directory ~data_dir)
+            (log_file ^ "_profile.csv")
+        in
+        let flags = Unix.[O_WRONLY; O_CREAT; O_TRUNC] in
+        Lwt_io.with_file ~mode:Lwt_io.Output ~flags filename @@ fun oc ->
+        let*! () = Events.replay_csv_available filename in
+        let*! () = Lwt_io.fprintf oc "ticks_used\n" in
+        let hooks =
+          Tezos_scoru_wasm.Hooks.(
+            no_hooks
+            |> on_pvm_reboot (fun ticks ->
+                   let*! () = Lwt_io.fprintf oc "%Ld\n" ticks in
+                   Lwt_io.flush oc))
+        in
+        let* evm_state, _ticks, _inboxes, _level =
+          Wasm_debugger.eval
+            ~hooks
+            ~migrate_to:Proto_alpha
+            ~write_debug
+            ~wasm_entrypoint
+            0l
+            inbox
+            config
+            Inbox
+            evm_state
+        in
+        return evm_state
+    | Some Configuration.Flamegraph ->
+        let* evm_state, _, _ =
+          Wasm_debugger.profile
+            ~migrate_to:Proto_alpha
+            ~collapse:false
+            ~with_time:true
+            ~no_reboot:false
+            0l
+            inbox
+            {config with flamecharts_directory = data_dir}
+            Octez_smart_rollup_wasm_debugger_lib.Custom_section.FuncMap.empty
+            evm_state
+        in
+        return evm_state
+    | None ->
+        (* The [inbox] parameter is inherited from the WASM debugger, where the
+           inbox is a list of list of messages (because it supports running the
+           fast exec for several Tezos level in a raw).
 
-         As far as the EVM node is concerned, we only “emulate” one Tezos level
-         at a time, so we only keep the first item ([inbox] is in parctise
-         always a singleton). *)
-      let*! evm_state =
-        Lwt.catch
-          (fun () ->
-            let inbox =
-              match Seq.uncons inbox with Some (x, _) -> x | _ -> []
-            in
-            Wasm_runtime.run
-              ~preimages_dir:config.preimage_directory
-              ?preimages_endpoint:config.preimage_endpoint
-              ~native_execution
-              ~entrypoint:wasm_entrypoint
-              evm_state
-              config.destination
-              inbox)
-          (fun exn ->
-            if wasm_pvm_fallback then
-              let*! () = Events.wasm_pvm_fallback () in
-              let*! res =
-                Wasm_debugger.eval
-                  ~migrate_to:Proto_alpha
-                  ~write_debug
-                  ~wasm_entrypoint
-                  0l
-                  inbox
-                  config
-                  Inbox
-                  evm_state
+           As far as the EVM node is concerned, we only “emulate” one Tezos level
+           at a time, so we only keep the first item ([inbox] is in parctise
+           always a singleton). *)
+        let*! evm_state =
+          Lwt.catch
+            (fun () ->
+              let inbox =
+                match Seq.uncons inbox with Some (x, _) -> x | _ -> []
               in
-              match res with
-              | Ok (evm_state, _, _, _) -> Lwt.return evm_state
-              | Error _err -> Stdlib.failwith "The WASM PVM raised an exception"
-            else Lwt.reraise exn)
-      in
-      return evm_state
+              Wasm_runtime.run
+                ~preimages_dir:config.preimage_directory
+                ?preimages_endpoint:config.preimage_endpoint
+                ~native_execution
+                ~entrypoint:wasm_entrypoint
+                evm_state
+                config.destination
+                inbox)
+            (fun exn ->
+              if wasm_pvm_fallback then
+                let*! () = Events.wasm_pvm_fallback () in
+                let*! res =
+                  Wasm_debugger.eval
+                    ~migrate_to:Proto_alpha
+                    ~write_debug
+                    ~wasm_entrypoint
+                    0l
+                    inbox
+                    config
+                    Inbox
+                    evm_state
+                in
+                match res with
+                | Ok (evm_state, _, _, _) -> Lwt.return evm_state
+                | Error _err ->
+                    Stdlib.failwith "The WASM PVM raised an exception"
+              else Lwt.reraise exn)
+        in
+        return evm_state
   in
-  let* evm_state = eval evm_state in
   (* The messages are accumulated during the execution and stored
      atomatically at the end to preserve their order. *)
   let*! () =
@@ -336,7 +351,7 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir
   in
   let export_gas_used (Qty gas) =
     match (profile, log_file) with
-    | Some true, Some log_file ->
+    | Some Configuration.Minimal, Some log_file ->
         let filename =
           Filename.concat
             (kernel_logs_directory ~data_dir)

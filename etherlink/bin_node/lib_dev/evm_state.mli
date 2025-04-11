@@ -21,7 +21,7 @@ val kernel_logs_directory : data_dir:string -> string
 *)
 val execute :
   ?wasm_pvm_fallback:bool ->
-  ?profile:bool ->
+  ?profile:Configuration.profile_mode ->
   ?kind:Events.kernel_log_kind ->
   data_dir:string ->
   ?log_file:string ->
@@ -100,7 +100,7 @@ type apply_result =
 val apply_blueprint :
   ?wasm_pvm_fallback:bool ->
   ?log_file:string ->
-  ?profile:bool ->
+  ?profile:Configuration.profile_mode ->
   data_dir:string ->
   chain_family:L2_types.chain_family ->
   config:Wasm_debugger.config ->

@@ -183,9 +183,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
 
   let replay number =
     let open Lwt_result_syntax in
-    let* result =
-      Executor.replay ~log_file:"replay_rpc" ~profile:false number
-    in
+    let* result = Executor.replay ~log_file:"replay_rpc" number in
     match result with
     | Apply_success {block = Eth block; _} -> return block
     | Apply_success {block = Tez _; _} ->

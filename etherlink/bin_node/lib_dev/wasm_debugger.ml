@@ -68,6 +68,8 @@ let wrap_as_durable_storage = Wasm_utils.wrap_as_durable_storage
 
 let eval = Wasm.Commands.eval
 
+let profile = Wasm.Commands.profile
+
 let encode =
   Ctx.Tree_encoding_runner.encode Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
 
