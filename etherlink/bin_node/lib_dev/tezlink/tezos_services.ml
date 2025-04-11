@@ -109,9 +109,7 @@ type chain = Tezos_shell_services.Chain_services.chain
 type tezlink_rpc_context = {block : block; chain : chain}
 
 (** Builds a [tezlink_rpc_context] from paths parameters. *)
-let make_env (chain : Tezos_shell_services.Chain_services.chain)
-    (block : Tezos_shell_services.Block_services.block) :
-    tezlink_rpc_context Lwt.t =
+let make_env (chain : chain) (block : block) : tezlink_rpc_context Lwt.t =
   Lwt.return {block; chain}
 
 module Tezlink_version = struct
@@ -247,6 +245,15 @@ module Imported_services = struct
   let chain_id :
       ([`GET], chain, chain, unit, unit, Chain_id.t) Tezos_rpc.Service.t =
     import_service Tezos_shell_services.Chain_services.S.chain_id
+  let _header :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context,
+        unit,
+        unit,
+        Block_services.block_header )
+      Tezos_rpc.Service.t =
+    import_service Block_services.S.header
 end
 
 let chain_directory_path = Tezos_shell_services.Chain_services.path
