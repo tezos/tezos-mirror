@@ -19,7 +19,9 @@ use crate::{
 };
 use anyhow::Context;
 use evm_execution::{
-    configuration::EVMVersion, precompiles::PrecompileBTreeMap, trace::TracerInput,
+    configuration::EVMVersion,
+    precompiles::{precompile_set, PrecompileBTreeMap},
+    trace::TracerInput,
 };
 use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, Encodable};
@@ -222,6 +224,11 @@ pub trait ChainConfigTrait: Debug {
         host: &mut impl Runtime,
         enable_fa_bridge: bool,
     ) -> anyhow::Result<()>;
+
+    fn precompiles_set<Host: Runtime>(
+        &self,
+        enable_fa_bridge: bool,
+    ) -> PrecompileBTreeMap<Host>;
 }
 
 impl ChainConfigTrait for EvmChainConfig {
@@ -323,6 +330,13 @@ impl ChainConfigTrait for EvmChainConfig {
         enable_fa_bridge: bool,
     ) -> anyhow::Result<()> {
         start_simulation_mode(host, enable_fa_bridge, &self.evm_config)
+    }
+
+    fn precompiles_set<Host: Runtime>(
+        &self,
+        enable_fa_bridge: bool,
+    ) -> PrecompileBTreeMap<Host> {
+        precompile_set::<Host>(enable_fa_bridge)
     }
 }
 
@@ -446,6 +460,13 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _enable_fa_bridge: bool,
     ) -> anyhow::Result<()> {
         Ok(())
+    }
+
+    fn precompiles_set<Host: Runtime>(
+        &self,
+        _enable_fa_bridge: bool,
+    ) -> PrecompileBTreeMap<Host> {
+        PrecompileBTreeMap::new()
     }
 }
 
