@@ -2734,7 +2734,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                     code_address,
                     transfer,
                     input.clone(),
-                    transaction_context.clone(),
+                    transaction_context,
                 );
                 let gas_after = self.gas_used();
 
@@ -2752,25 +2752,15 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                                 },
                         })) = self.tracer
                         {
-                            let (type_, from) = match call_scheme {
-                                CallScheme::Call => ("CALL", caller),
-                                CallScheme::StaticCall => ("STATICCALL", caller),
-                                CallScheme::DelegateCall => {
-                                    // FIXME: #7738 this only point to parent call
-                                    // address if it was not a DELEGATECALL or
-                                    // CALLCODE itself
-                                    ("DELEGATECALL", transaction_context.context.address)
-                                }
-                                CallScheme::CallCode => {
-                                    // FIXME: #7738 this only point to parent call
-                                    // address if it was not a DELEGATECALL or
-                                    // CALLCODE itself
-                                    ("CALLCODE", transaction_context.context.address)
-                                }
-                            };
                             let mut call_trace = CallTrace::new_minimal_trace(
-                                type_.into(),
-                                from,
+                                match call_scheme {
+                                    CallScheme::Call => "CALL",
+                                    CallScheme::CallCode => "CALLCODE",
+                                    CallScheme::DelegateCall => "DELEGATECALL",
+                                    CallScheme::StaticCall => "STATICCALL",
+                                }
+                                .into(),
+                                caller,
                                 value,
                                 gas_after - gas_before,
                                 input,
@@ -2779,11 +2769,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                                 (self.stack_depth() + 1).try_into().unwrap_or_default(),
                             );
 
-                            // for the trace we want the contract address to always be the "to"
-                            // field, not necessarily the address used in the transition context
-                            // which may be something else (eg DELEGATECALL)
-                            call_trace.add_to(Some(code_address));
-
+                            call_trace.add_to(Some(address));
                             call_trace.add_gas(target_gas);
                             call_trace.add_output(Some(output.to_owned()));
 
