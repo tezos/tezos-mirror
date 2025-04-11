@@ -244,6 +244,18 @@ impl<MC: MemoryConfig, M: ManagerClone> Clone for Interpreted<MC, M> {
     }
 }
 
+/// The function signature for dispatching a block run.
+///
+/// Internally, this may be interpreted, just-in-time compiled, or do
+/// additional work over just execution.
+type Dispatch<MC, M> = unsafe fn(
+    &mut InlineJit<MC, M>,
+    &mut MachineCoreState<MC, M>,
+    Address,
+    &mut usize,
+    &mut <InlineJit<MC, M> as Block<MC, M>>::BlockBuilder,
+) -> Result<(), EnvironException>;
+
 /// Blocks that are compiled to native code for execution, when possible.
 ///
 /// Not all instructions are currently supported, when a block contains
@@ -253,11 +265,93 @@ impl<MC: MemoryConfig, M: ManagerClone> Clone for Interpreted<MC, M> {
 pub struct InlineJit<MC: MemoryConfig, M: JitStateAccess> {
     fallback: Interpreted<MC, M>,
     jit_fn: Option<JCall<MC, M>>,
-    /// Whether or not compilation has been attempted.
+    dispatch: Dispatch<MC, M>,
+}
+
+impl<MC: MemoryConfig, M: JitStateAccess> InlineJit<MC, M> {
+    /// The default initial dispatcher for inline jit.
     ///
-    /// **N.B.** compilation may fail, in which case `compiled` will still be true, and fallback
-    /// should occur to the interpreted block.
-    compiled: bool,
+    /// This will run the block in interpreted mode by default, but will attempt to JIT-compile
+    /// the block.
+    ///
+    /// # SAFETY
+    ///
+    /// The `block_builder` must be the same every time this function is called.
+    ///
+    /// This ensures that the builder in question is guaranteed to be alive, for at least as long
+    /// as this block may be run via [`Block::run_block`].
+    unsafe fn run_block_interpreted(
+        &mut self,
+        core: &mut MachineCoreState<MC, M>,
+        instr_pc: Address,
+        steps: &mut usize,
+        block_builder: &mut <Self as Block<MC, M>>::BlockBuilder,
+    ) -> Result<(), EnvironException> {
+        // trigger JIT compilation
+        let instr = self
+            .fallback
+            .instr
+            .iter()
+            .take(<Self as Block<MC, M>>::num_instr(self))
+            .map(|i| i.read_stored())
+            .collect::<Vec<_>>();
+
+        self.jit_fn = block_builder.0.compile(&instr);
+
+        if self.jit_fn.is_some() {
+            self.dispatch = Self::run_block_compiled;
+        } else {
+            self.dispatch = Self::run_block_not_compiled;
+        }
+
+        // Safety: the block builder passed to this function is always the same for the
+        // lifetime of the block
+        unsafe { (self.dispatch)(self, core, instr_pc, steps, block_builder) }
+    }
+
+    /// Run a block where JIT-compilation has been attempted, but failed for any reason.
+    ///
+    /// # SAFETY
+    ///
+    /// The `block_builder` must be the same every time this function is called.
+    ///
+    /// This ensures that the builder in question is guaranteed to be alive, for at least as long
+    /// as this block may be run via [`Block::run_block`].
+    unsafe fn run_block_not_compiled(
+        &mut self,
+        core: &mut MachineCoreState<MC, M>,
+        instr_pc: Address,
+        steps: &mut usize,
+        block_builder: &mut <Self as Block<MC, M>>::BlockBuilder,
+    ) -> Result<(), EnvironException> {
+        // Safety: this function is always safe to call
+        unsafe {
+            self.fallback
+                .run_block(core, instr_pc, steps, &mut block_builder.1)
+        }
+    }
+
+    /// Run a block using the result of JIT-compilation, where this has been successful.
+    ///
+    /// # SAFETY
+    ///
+    /// The `block_builder` must be the same every time this function is called.
+    ///
+    /// This ensures that the builder in question is guaranteed to be alive, for at least as long
+    /// as this block may be run via [`Block::run_block`].
+    unsafe fn run_block_compiled(
+        &mut self,
+        core: &mut MachineCoreState<MC, M>,
+        instr_pc: Address,
+        steps: &mut usize,
+        _block_builder: &mut <Self as Block<MC, M>>::BlockBuilder,
+    ) -> Result<(), EnvironException> {
+        let fun = self.jit_fn.as_ref().unwrap();
+
+        // Safety: the block builder passed to this function is always the same for the
+        // lifetime of the block
+        unsafe { fun.call(core, instr_pc, steps) }
+    }
 }
 
 impl<MC: MemoryConfig, M: JitStateAccess> NewState<M> for InlineJit<MC, M> {
@@ -268,7 +362,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> NewState<M> for InlineJit<MC, M> {
         Self {
             fallback: Interpreted::new(manager),
             jit_fn: None,
-            compiled: false,
+            dispatch: Self::run_block_interpreted,
         }
     }
 }
@@ -280,7 +374,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerWrite,
     {
-        self.compiled = false;
+        self.dispatch = Self::run_block_interpreted;
         self.jit_fn = None;
         self.fallback.start_block()
     }
@@ -289,7 +383,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerWrite,
     {
-        self.compiled = false;
+        self.dispatch = Self::run_block_interpreted;
         self.jit_fn = None;
         self.fallback.invalidate()
     }
@@ -298,7 +392,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerReadWrite,
     {
-        self.compiled = false;
+        self.dispatch = Self::run_block_interpreted;
         self.jit_fn = None;
         self.fallback.reset()
     }
@@ -307,7 +401,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerReadWrite,
     {
-        self.compiled = false;
+        self.dispatch = Self::run_block_interpreted;
         self.jit_fn = None;
         self.fallback.push_instr(instr)
     }
@@ -323,7 +417,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         Self {
             fallback: Interpreted::bind(allocated),
             jit_fn: None,
-            compiled: false,
+            dispatch: Self::run_block_interpreted,
         }
     }
 
@@ -331,6 +425,8 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         self.fallback.struct_ref::<F>()
     }
 
+    /// Run a block, using the currently selected dispatch mechanism
+    ///
     /// # SAFETY
     ///
     /// The `block_builder` must be the same every time this function is called.
@@ -347,34 +443,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerReadWrite,
     {
-        if !self.compiled {
-            // trigger JIT compilation
-            let instr = self
-                .fallback
-                .instr
-                .iter()
-                .take(<Self as Block<MC, M>>::num_instr(self))
-                .map(|i| i.read_stored())
-                .collect::<Vec<_>>();
-
-            let jitfn = block_builder.0.compile(&instr);
-
-            self.jit_fn = jitfn;
-            self.compiled = true;
-        }
-
-        match &self.jit_fn {
-            // SAFETY: JIT is guaranteed to be alive here by the caller.
-            //         this is due to the only way to run a block requiring
-            //         a builder. The caller invariant is that the builder
-            //         must be alive for the duration that any called block
-            //         remains valid.
-            Some(jcall) => unsafe { jcall.call(core, instr_pc, steps) },
-            None => unsafe {
-                self.fallback
-                    .run_block(core, instr_pc, steps, &mut block_builder.1)
-            },
-        }
+        unsafe { (self.dispatch)(self, core, instr_pc, steps, block_builder) }
     }
 
     fn num_instr(&self) -> usize
@@ -390,7 +459,7 @@ impl<MC: MemoryConfig, M: JitStateAccess + ManagerClone> Clone for InlineJit<MC,
         Self {
             fallback: self.fallback.clone(),
             jit_fn: None,
-            compiled: false,
+            dispatch: Self::run_block_interpreted,
         }
     }
 }
