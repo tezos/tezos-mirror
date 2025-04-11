@@ -27,13 +27,22 @@ use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use crate::cli::CommonOptions;
 use crate::cli::RunOptions;
 use crate::posix_exit_mode;
-/// Execution style of blocks
-#[cfg(not(feature = "inline-jit"))]
-pub type BlockImpl = bcall::Interpreted<M1G, Owned>;
 
-/// Execution style of blocks
+/// Inner execution strategy for blocks.
+#[cfg(not(feature = "inline-jit"))]
+type BlockImplInner = bcall::Interpreted<M1G, Owned>;
+
+/// Inner execution strategy for blocks.
 #[cfg(feature = "inline-jit")]
-pub type BlockImpl = bcall::InlineJit<M1G, Owned>;
+type BlockImplInner = bcall::InlineJit<M1G, Owned>;
+
+/// Executor of blocks
+#[cfg(not(feature = "metrics"))]
+pub type BlockImpl = BlockImplInner;
+
+/// Executor of blocks
+#[cfg(feature = "metrics")]
+pub type BlockImpl = octez_riscv::machine_state::block_cache::metrics::BlockMetrics<BlockImplInner>;
 
 pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
     let program = fs::read(&opts.input)?;

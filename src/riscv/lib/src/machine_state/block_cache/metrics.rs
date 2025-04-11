@@ -19,7 +19,7 @@
 /// This macro has no effect when the `metrics` feature is disabled.
 #[cfg(not(feature = "metrics"))]
 macro_rules! block_metrics {
-    (constructed = $block:expr) => {};
+    (hash = $hash:expr, constructed = $block:expr) => {};
 
     (hash = $hash:expr, record_jitted) => {};
 
@@ -31,6 +31,11 @@ pub(crate) use core::block_metrics;
 
 #[cfg(not(feature = "metrics"))]
 pub(crate) use block_metrics;
+
+use super::bcall::Block;
+use super::bcall::BlockHash;
+use crate::machine_state::memory::MemoryConfig;
+use crate::state_backend::ManagerBase;
 
 #[cfg(feature = "metrics")]
 #[doc(hidden)]
@@ -57,9 +62,9 @@ pub mod core {
     ///
     /// This macro has no effect when the `metrics` feature is disabled.
     macro_rules! block_metrics {
-        (constructed = $block:expr) => {
+        (hash = $hash:expr, constructed = $block:expr) => {
             $crate::machine_state::block_cache::metrics::core::BlockCacheMetrics::with_borrow_mut(
-                |bm| bm.record_constructed($block),
+                |bm| bm.record_constructed($hash, $block),
             );
         };
 
@@ -119,12 +124,9 @@ pub mod core {
         /// Record that the given block has been constructed.
         pub fn record_constructed<MC: MemoryConfig, B: Block<MC, M>, M: ManagerRead>(
             &mut self,
+            hash: &Hash,
             block: &B,
         ) {
-            let BlockHash::Runnable(hash) = block.block_hash() else {
-                panic!("Completed blocks must be runnable");
-            };
-
             if let Some(entry) = self.entries.get_mut(hash) {
                 entry.constructed_count += 1;
                 return;
@@ -262,6 +264,122 @@ pub mod core {
             Hash::blake2b_hash(self.instr.as_slice())
                 .unwrap()
                 .cmp(&Hash::blake2b_hash(&other.instr).unwrap())
+        }
+    }
+}
+
+/// Wrapper type that can be used to instrument any `B: Block` with metrics.
+pub struct BlockMetrics<B> {
+    block: B,
+    #[cfg(test)]
+    pub(crate) block_hash: BlockHash,
+    #[cfg(not(test))]
+    block_hash: BlockHash,
+}
+
+impl<B> BlockMetrics<B> {
+    /// Wrap a block with metrics.
+    ///
+    /// Since BlockMetrics doesn't take a `M: ManagerBase` as a type-parameter,
+    /// we can't use it with `create_state!`.
+    #[cfg(test)]
+    pub(super) fn new(block: B) -> Self {
+        Self {
+            block,
+            block_hash: BlockHash::Dirty,
+        }
+    }
+}
+
+impl<B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase> Block<MC, M> for BlockMetrics<B> {
+    type BlockBuilder = B::BlockBuilder;
+
+    fn reset(&mut self)
+    where
+        M: crate::state_backend::ManagerReadWrite,
+    {
+        self.block.reset();
+        self.block_hash = BlockHash::Dirty;
+    }
+
+    fn instr(&self) -> &[crate::state_backend::EnrichedCell<super::ICallPlaced<MC, M>, M>]
+    where
+        M: crate::state_backend::ManagerRead,
+    {
+        self.block.instr()
+    }
+
+    unsafe fn callable<'a>(
+        &'a mut self,
+        block_builder: &'a mut Self::BlockBuilder,
+    ) -> &'a (impl super::bcall::BCall<MC, M> + ?Sized + 'a)
+    where
+        M: crate::state_backend::ManagerRead + 'a,
+    {
+        if let BlockHash::Dirty = self.block_hash {
+            let hash = super::bcall::block_hash(self.block.instr());
+            block_metrics!(hash = &hash, constructed = self);
+
+            self.block_hash = BlockHash::Runnable(hash);
+        }
+
+        block_metrics!(hash = &self.block_hash, record_called);
+        self.block.callable(block_builder)
+    }
+
+    fn num_instr(&self) -> usize
+    where
+        M: crate::state_backend::ManagerRead,
+    {
+        self.block.num_instr()
+    }
+
+    fn struct_ref<'a, F: crate::state_backend::FnManager<crate::state_backend::Ref<'a, M>>>(
+        &'a self,
+    ) -> crate::state_backend::AllocatedOf<super::bcall::BlockLayout, F::Output> {
+        self.block.struct_ref::<F>()
+    }
+
+    fn push_instr(&mut self, instr: crate::machine_state::instruction::Instruction)
+    where
+        M: crate::state_backend::ManagerReadWrite,
+    {
+        self.block.push_instr(instr);
+        self.block_hash = BlockHash::Dirty;
+    }
+
+    fn invalidate(&mut self)
+    where
+        M: crate::state_backend::ManagerWrite,
+    {
+        self.block.invalidate();
+        self.block_hash = BlockHash::Dirty;
+    }
+
+    fn bind(allocated: crate::state_backend::AllocatedOf<super::bcall::BlockLayout, M>) -> Self
+    where
+        <M as ManagerBase>::ManagerRoot: crate::state_backend::ManagerReadWrite,
+    {
+        Self {
+            block: B::bind(allocated),
+            block_hash: BlockHash::Dirty,
+        }
+    }
+
+    fn start_block(&mut self)
+    where
+        M: crate::state_backend::ManagerWrite,
+    {
+        self.block.start_block();
+        self.block_hash = BlockHash::Dirty;
+    }
+}
+
+impl<B: Clone> Clone for BlockMetrics<B> {
+    fn clone(&self) -> Self {
+        Self {
+            block: self.block.clone(),
+            block_hash: BlockHash::Dirty,
         }
     }
 }
