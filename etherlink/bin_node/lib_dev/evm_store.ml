@@ -738,6 +738,10 @@ DO UPDATE SET value = excluded.value
     let select_with_level =
       (level ->? block) @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
 
+    let tez_select_with_level =
+      (level ->? tezos_block)
+      @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+
     let select_with_hash =
       (block_hash ->? block)
       @@ {eos|SELECT block FROM blocks WHERE hash = ?|eos}
@@ -1471,6 +1475,14 @@ module Blocks = struct
     if full_transaction_object then
       Option.map_es (block_with_objects store) block_opt
     else return (Option.map Transaction_object.block_from_legacy block_opt)
+
+  let tez_find_with_level store level =
+    let open Lwt_result_syntax in
+    let* block_opt =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Blocks.tez_select_with_level level
+    in
+    return block_opt
 
   let find_with_hash ~full_transaction_object store hash =
     let open Lwt_result_syntax in
