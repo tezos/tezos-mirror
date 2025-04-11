@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023, 2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
@@ -31,7 +31,6 @@ use anyhow::Context;
 use block_in_progress::EthBlockInProgress;
 use evm::Config;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
-use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
@@ -481,8 +480,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 
     let mut safe_host = SafeStorage { host };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
-    let precompiles =
-        precompiles::precompile_set::<SafeStorage<&mut Host>>(config.enable_fa_bridge);
+    let precompiles = chain_config.precompiles_set(config.enable_fa_bridge);
 
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
@@ -619,6 +617,7 @@ mod tests {
         account_path, init_account_storage, EthereumAccountStorage,
     };
     use evm_execution::configuration::EVMVersion;
+    use evm_execution::precompiles::precompile_set;
     use primitive_types::{H160, U256};
     use std::str::FromStr;
     use tezos_ethereum::block::BlockFees;
@@ -1347,7 +1346,7 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let block_constants = first_block(&mut host);
-        let precompiles = precompiles::precompile_set(false);
+        let precompiles = precompile_set(false);
 
         //provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
