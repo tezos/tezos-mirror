@@ -241,8 +241,10 @@ module Term = struct
     let open Cmdliner in
     let default_list = Configuration_file.default.peers in
     let doc =
-      "An additional peer list to expand the bootstrap peers from the Octez \
-       node's configuration parameter dal_config.bootstrap_peers."
+      "An additional list of peers (bootstrap or not) to connect to, expanding \
+       the one from the DAL node's configuration parameter 'peers' and the one \
+       from the Octez node's configuration parameter \
+       'dal_config.bootstrap_peers'."
     in
     Arg.(
       value
