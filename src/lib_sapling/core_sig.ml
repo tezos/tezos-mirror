@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Reference specification is version 2020.1.2
-    https://github.com/zcash/zips/blob/master/protocol/sapling.pdf
+    https://github.com/zcash/zips/blob/main/rendered/protocol/sapling.pdf
  *)
 
 (** Each instance of the Sapling protocol should be identified by a unique string
