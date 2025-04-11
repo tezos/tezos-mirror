@@ -358,12 +358,6 @@ types:
       type: s4be
     - id: block_payload_hash
       size: 32
-    - id: dal_tag
-      type: u1
-      enum: bool
-    - id: dal
-      type: z
-      if: (dal_tag == bool::true)
   bls_mode_preattestation:
     seq:
     - id: level
