@@ -107,6 +107,9 @@ const MADVISE: u64 = 233;
 /// System call number for `getrandom` on RISC-V
 const GETRANDOM: u64 = 278;
 
+/// System call number for `clock_gettime` on RISC-V
+const CLOCK_GETTIME: u64 = 113;
+
 /// Key into the auxiliary vector which informs supervised processes of auxiliary information
 #[derive(Clone, Copy)]
 #[repr(u64)]
@@ -664,6 +667,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             MUNMAP => dispatch2!(munmap, core),
             MADVISE => dispatch0!(madvise),
             GETRANDOM => dispatch2!(getrandom, core),
+            CLOCK_GETTIME => dispatch2!(clock_gettime, core),
             SBI_FIRMWARE_TEZOS => return on_tezos(core),
             _ => Err(Error::NoSystemCall),
         };
@@ -836,6 +840,32 @@ impl<M: ManagerBase> SupervisorState<M> {
             result: 0,
             control_flow: false,
         })
+    }
+
+    /// Handle `clock_gettime` system call. Fills the timespec structure with zeros.
+    ///
+    /// See: <https://www.man7.org/linux/man-pages/man2/clock_gettime.2.html>
+    fn handle_clock_gettime(
+        &mut self,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
+        _clockid: u64,
+        tp: u64,
+    ) -> Result<u64, Error>
+    where
+        M: ManagerReadWrite,
+    {
+        // Size of struct timespec (8 bytes for tv_sec + 8 bytes for tv_nsec)
+        const TIMESPEC_SIZE: usize = 16;
+
+        // Write zeros to the timespec structure
+        if tp != 0 {
+            core.main_memory.write(tp, [0u8; TIMESPEC_SIZE])?;
+        } else {
+            return Err(Error::InvalidArgument);
+        }
+
+        // Return 0 as an indicator of success
+        Ok(0)
     }
 }
 
@@ -1130,5 +1160,68 @@ mod tests {
             default_on_tezos_handler,
         );
         assert!(result);
+    });
+
+    // Check that the `clock_gettime` system call fills the timespec with zeros.
+    backend_test!(clock_gettime_fills_with_zeros, F, {
+        type MemLayout = M4K;
+
+        let mut machine_state = create_state!(
+            MachineCoreState,
+            MachineCoreStateLayout<MemLayout>,
+            F,
+            MemLayout
+        );
+        machine_state.reset();
+
+        // Make sure everything is readable and writable. Otherwise, we'd get access faults.
+        machine_state
+            .main_memory
+            .protect_pages(0, MemLayout::TOTAL_BYTES, Permissions::ReadWrite)
+            .unwrap();
+
+        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+
+        // System call number
+        machine_state
+            .hart
+            .xregisters
+            .write(registers::a7, CLOCK_GETTIME);
+
+        // Any clock ID (we ignore it anyway)
+        machine_state.hart.xregisters.write(registers::a0, 1u64);
+
+        // Timespec pointer (must be non-zero)
+        let timespec_ptr = 0x100;
+
+        // Fill the timespec struct with non-zero values to verify they are zeroed
+        machine_state
+            .main_memory
+            .write(timespec_ptr, [0xFF; 16])
+            .unwrap();
+
+        machine_state
+            .hart
+            .xregisters
+            .write(registers::a1, timespec_ptr);
+
+        // Perform the system call
+        let result = supervisor_state.handle_system_call(
+            &mut machine_state,
+            &mut PvmHooks::default(),
+            default_on_tezos_handler,
+        );
+        assert!(result);
+
+        // Verify that a0 contains 0 (success)
+        let ret = machine_state.hart.xregisters.read(registers::a0);
+        assert_eq!(ret, 0);
+
+        // Verify that the timespec is zeroed out
+        let timespec = machine_state
+            .main_memory
+            .read::<[u8; 16]>(timespec_ptr)
+            .unwrap();
+        assert_eq!(timespec, [0u8; 16]);
     });
 }
