@@ -17,6 +17,8 @@
   use gas to decide when to reboot. (!15079)
 - The flag to activate DAL has been enabled, slots from 0 to 7 can now be used
   from the kernel's perspective. (!17636)
+- Execution gas is now used to compute the changes in gas price over time,
+  instead of estimated ticks. (!17630)
 
 ### Bug fixes
 

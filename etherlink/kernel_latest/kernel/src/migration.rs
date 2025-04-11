@@ -12,9 +12,10 @@ use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
 use crate::storage::{
-    read_chain_id, read_storage_version, store_dal_slots, store_storage_version,
-    tweak_dal_activation, StorageVersion, DELAYED_BRIDGE, ENABLE_FA_BRIDGE,
-    KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE, SEQUENCER_GOVERNANCE,
+    read_chain_id, read_storage_version, store_backlog, store_dal_slots,
+    store_storage_version, tweak_dal_activation, StorageVersion, DELAYED_BRIDGE,
+    ENABLE_FA_BRIDGE, KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE,
+    SEQUENCER_GOVERNANCE,
 };
 use evm_execution::account_storage::account_path;
 use evm_execution::account_storage::init_account_storage;
@@ -319,6 +320,14 @@ fn migrate_to<Host: Runtime>(
                 // * The size of the inbox is 512kb.
                 store_dal_slots(host, &[0, 1, 2, 3, 4, 5, 6, 7])?
             }
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V32 => {
+            // We clear the gas price backlog. This is because the backlog’s unit has changed from
+            // ticks to gas, and there is easily a factor 1,000 between the two. Clearing backlog
+            // will prevent an undesired gas price spike at migration time.
+            store_backlog(host, 0)?;
+
             Ok(MigrationStatus::Done)
         }
     }

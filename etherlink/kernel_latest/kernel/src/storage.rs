@@ -65,6 +65,7 @@ pub enum StorageVersion {
     V29,
     V30,
     V31,
+    V32,
 }
 
 impl From<StorageVersion> for u64 {
@@ -79,7 +80,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V31;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V32;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 
@@ -129,8 +130,8 @@ const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
 const EVM_DA_FEE: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/da_fee_per_byte");
-const TICK_BACKLOG_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/fees/backlog");
-const TICK_BACKLOG_TIMESTAMP_PATH: RefPath =
+const BACKLOG_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/fees/backlog");
+const BACKLOG_TIMESTAMP_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/last_timestamp");
 
 /// The sequencer pool is the designated account that the data-availability fees are sent to.
@@ -468,23 +469,20 @@ pub fn read_minimum_base_fee_per_gas<Host: Runtime>(host: &Host) -> Result<U256,
     read_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS).map_err(Error::from)
 }
 
-pub fn read_tick_backlog(host: &impl Runtime) -> Result<u64, Error> {
-    read_u64_le(host, &TICK_BACKLOG_PATH).map_err(Error::from)
+pub fn read_backlog(host: &impl Runtime) -> Result<u64, Error> {
+    read_u64_le(host, &BACKLOG_PATH).map_err(Error::from)
 }
 
-pub fn store_tick_backlog(host: &mut impl Runtime, value: u64) -> Result<(), Error> {
-    write_u64_le(host, &TICK_BACKLOG_PATH, value).map_err(Error::from)
+pub fn store_backlog(host: &mut impl Runtime, value: u64) -> Result<(), Error> {
+    write_u64_le(host, &BACKLOG_PATH, value).map_err(Error::from)
 }
 
-pub fn read_tick_backlog_timestamp(host: &impl Runtime) -> Result<u64, Error> {
-    read_u64_le(host, &TICK_BACKLOG_TIMESTAMP_PATH).map_err(Error::from)
+pub fn read_backlog_timestamp(host: &impl Runtime) -> Result<u64, Error> {
+    read_u64_le(host, &BACKLOG_TIMESTAMP_PATH).map_err(Error::from)
 }
 
-pub fn store_tick_backlog_timestamp(
-    host: &mut impl Runtime,
-    value: u64,
-) -> Result<(), Error> {
-    write_u64_le(host, &TICK_BACKLOG_TIMESTAMP_PATH, value)?;
+pub fn store_backlog_timestamp(host: &mut impl Runtime, value: u64) -> Result<(), Error> {
+    write_u64_le(host, &BACKLOG_TIMESTAMP_PATH, value)?;
     Ok(())
 }
 
