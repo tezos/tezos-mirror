@@ -156,13 +156,8 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
   on_event agnostic_baker (handle_event agnostic_baker) ;
   agnostic_baker
 
-let run ?env ?event_level ?event_sections_levels (agnostic_baker : t) =
-  (match agnostic_baker.status with
-  | Not_running -> ()
-  | Running _ ->
-      Test.fail "agnostic_baker %s is already running" agnostic_baker.name) ;
+let run_args agnostic_baker =
   let delegates = agnostic_baker.persistent_state.delegates in
-  let runner = agnostic_baker.persistent_state.runner in
   let node_data_dir = agnostic_baker.persistent_state.node_data_dir in
   let base_dir = agnostic_baker.persistent_state.base_dir in
   let node_addr =
@@ -237,14 +232,18 @@ let run ?env ?event_level ?event_sections_levels (agnostic_baker : t) =
     if agnostic_baker.persistent_state.remote_mode then ["remotely"]
     else ["with"; "local"; "node"; node_data_dir]
   in
-  let arguments =
-    ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
-    @ run_args @ delegates @ liquidity_baking_toggle_vote @ votefile
-    @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
-    @ dal_node_timeout_percentage @ state_recorder @ node_version_check_bypass
-    @ node_version_allowed @ keep_alive
-  in
+  ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
+  @ run_args @ delegates @ liquidity_baking_toggle_vote @ votefile
+  @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
+  @ dal_node_timeout_percentage @ state_recorder @ node_version_check_bypass
+  @ node_version_allowed @ keep_alive
 
+let run ?env ?event_level ?event_sections_levels ?(extra_arguments = [])
+    (agnostic_baker : t) =
+  (match agnostic_baker.status with
+  | Not_running -> ()
+  | Running _ ->
+      Test.fail "agnostic_baker %s is already running" agnostic_baker.name) ;
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
     trigger_ready agnostic_baker None ;
@@ -256,9 +255,20 @@ let run ?env ?event_level ?event_sections_levels (agnostic_baker : t) =
     ?event_sections_levels
     agnostic_baker
     {ready = false}
-    arguments
+    (run_args agnostic_baker @ extra_arguments)
     ~on_terminate
-    ?runner
+    ?runner:agnostic_baker.persistent_state.runner
+
+let spawn_run ?env (agnostic_baker : t) =
+  (match agnostic_baker.status with
+  | Not_running -> ()
+  | Running _ ->
+      Test.fail "agnostic_baker %s is already running" agnostic_baker.name) ;
+  Process.spawn
+    ?env
+    ?runner:agnostic_baker.persistent_state.runner
+    agnostic_baker.path
+    (run_args agnostic_baker)
 
 let check_event ?where agnostic_baker name promise =
   let* result = promise in
