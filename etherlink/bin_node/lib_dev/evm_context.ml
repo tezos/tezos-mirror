@@ -662,6 +662,12 @@ module State = struct
            and fetch the receipts here. *)
         assert false
 
+  let store_tez_block_unsafe conn block =
+    let open Lwt_result_syntax in
+    (* Store the block itself. *)
+    let* () = Evm_store.Blocks.tez_store conn block in
+    return_nil
+
   (** [apply_blueprint_store_unsafe ctxt payload delayed_transactions] applies
       the blueprint [payload] on the head of [ctxt], and commit the resulting
       state to Irmin and the node’s store.
@@ -786,9 +792,7 @@ module State = struct
             let* receipts =
               match block with
               | Eth block -> store_block_unsafe conn evm_state block
-              | Tez _ ->
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
-                  Lwt_result.return []
+              | Tez block -> store_tez_block_unsafe conn block
             in
             let*! evm_state = Evm_state.clear_block_storage block evm_state in
             return (evm_state, receipts)

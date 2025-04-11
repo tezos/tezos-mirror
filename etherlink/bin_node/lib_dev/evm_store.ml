@@ -275,6 +275,12 @@ module Q = struct
                  bytes)))
       string
 
+  let tezos_block =
+    custom
+      ~encode:L2_types.Tezos_block.encode_block
+      ~decode:L2_types.Tezos_block.decode_block
+      string
+
   let timestamp =
     custom
       ~encode:(fun t -> Ok (Time.Protocol.to_seconds t))
@@ -723,6 +729,10 @@ DO UPDATE SET value = excluded.value
   module Blocks = struct
     let insert =
       (t3 level block_hash block ->. unit)
+      @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
+
+    let tez_insert =
+      (t3 level block_hash tezos_block ->. unit)
       @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
 
     let select_with_level =
@@ -1401,6 +1411,10 @@ module Blocks = struct
       (block : Ethereum_types.legacy_transaction_object Ethereum_types.block) =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Blocks.insert (block.number, block.hash, block)
+
+  let tez_store store (block : L2_types.Tezos_block.t) =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Blocks.tez_insert (block.number, block.hash, block)
 
   let block_with_objects store block =
     let open Lwt_result_syntax in
