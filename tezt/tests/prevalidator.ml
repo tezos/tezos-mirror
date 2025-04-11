@@ -3764,36 +3764,47 @@ module Revamped = struct
   let consensus_minimal_slots_feature_flag =
     Protocol.register_test
       ~__FILE__
-      ~title:"Mempool filters attestations with non-minimal slots"
-      ~tags:[team; "mempool"; "attestations"; "minimal"; "slots"]
+      ~title:"Mempool filters consensus operations with non-minimal slots"
+      ~tags:[team; "mempool"; "consensus"; "minimal"; "slots"]
       ~supports:(Protocol.From_protocol 023)
     @@ fun protocol ->
     log_step 1 "Initialize node and activate protocol" ;
-    let* node, client =
-      Client.init_with_node
-        ~nodes_args:[Synchronisation_threshold 0; Private_mode; Connections 0]
-        `Client
-        ()
-    in
     let* parameter_file =
       Protocol.write_parameter_file
         ~base:(Either.Right (protocol, None))
         [(["aggregate_attestation"], `Bool true)]
     in
-    let* () =
-      Client.activate_protocol_and_wait ~protocol ~parameter_file client
+    let* node, client =
+      Client.init_with_protocol `Client ~protocol ~parameter_file ()
     in
+    let* _ = Node.wait_for_level node 1 in
     log_step 2 "Bake 3 blocks to have multiple valid levels to attest for" ;
-    let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
-    let* level =
-      bake_for ~empty:true ~protocol ~wait_for_flush:true node client
-    in
+    let* level = Client.bake_for_and_wait_level ~count:3 client in
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    log_step 3 "Inject attestations for all accepted levels " ;
-    (* Mempool is expected to accept attestations for the following three levels *)
+    log_step 3 "Inject consensus operations for all accepted levels " ;
+    (* Mempool is expected to accept consensus operations for the following
+       levels *)
     let accepted_levels = [level - 1; level; level + 1] in
+    let attest_for ~delegate ~level ~slot =
+      Operation.Consensus.(
+        inject
+          (attestation ~slot ~level ~round:0 ~block_payload_hash ())
+          ~force:true
+          ~protocol
+          ~signer:delegate
+          client)
+    in
+    let preattest_for ~delegate ~level ~slot =
+      Operation.Consensus.(
+        inject
+          (preattestation ~slot ~level ~round:0 ~block_payload_hash)
+          ~force:true
+          ~protocol
+          ~signer:delegate
+          client)
+    in
     let* validated, refused =
       Lwt_list.fold_left_s
         (fun (validated, refused) level ->
@@ -3819,43 +3830,31 @@ module Revamped = struct
                   "found no delegate with more than one slot at level %d"
                   level
           in
-          (* Inject an attestation with a non-minimal slot *)
-          let* (`OpHash op_refused) =
-            Operation.Consensus.(
-              inject
-                (attestation
-                   ~slot:(List.nth slots 1)
-                   ~level
-                   ~round:0
-                   ~block_payload_hash
-                   ())
-                ~force:true
-                ~protocol
-                ~signer:delegate
-                client)
-          in
           (* Inject an attestation with a minimal slot *)
-          let* (`OpHash op_valid) =
-            Operation.Consensus.(
-              inject
-                (attestation
-                   ~slot:(List.hd slots)
-                   ~level
-                   ~round:0
-                   ~block_payload_hash
-                   ())
-                ~force:true
-                ~protocol
-                ~signer:delegate
-                client)
+          let* (`OpHash valid_attestation) =
+            attest_for ~delegate ~level ~slot:(List.hd slots)
           in
-          return (op_valid :: validated, op_refused :: refused))
+          (* Inject an attestation with a non-minimal slot *)
+          let* (`OpHash refused_attestation) =
+            attest_for ~delegate ~level ~slot:(List.nth slots 1)
+          in
+          (* Inject a preattestation with a minimal slot *)
+          let* (`OpHash valid_preattestation) =
+            preattest_for ~delegate ~level ~slot:(List.hd slots)
+          in
+          (* Inject a preattestation with a non-minimal slot *)
+          let* (`OpHash refused_preattestation) =
+            preattest_for ~delegate ~level ~slot:(List.nth slots 1)
+          in
+          return
+            ( valid_attestation :: valid_preattestation :: validated,
+              refused_attestation :: refused_preattestation :: refused ))
         ([], [])
         accepted_levels
     in
     log_step 4 "Check that operations where correctly filtered by the mempool" ;
-    (* Check that all attestations with non-minimal slots where refused, and all
-       attestations with a minimal slot where validated *)
+    (* Check that operations with minimal slots were validated, while those with
+       non-minimal slots were refused *)
     let* () = check_mempool ~validated ~refused client in
     unit
 end
