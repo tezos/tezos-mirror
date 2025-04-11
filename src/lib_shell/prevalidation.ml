@@ -70,7 +70,6 @@ module type T = sig
     protocol_operation Shell_operation.operation ->
     [ `Passed_prefilter of Prevalidator_pending_operations.priority
     | Prevalidator_classification.error_classification ]
-    Lwt.t
 
   type replacements =
     (Operation_hash.t * Prevalidator_classification.error_classification) list
@@ -182,22 +181,21 @@ module MakeAbstract
     create_aux ~old_state chain_store head timestamp
 
   let pre_filter state (filter_config, (_ : Prevalidator_bounding.config)) op =
-    let open Lwt_syntax in
-    let* result =
+    let result =
       Proto.Plugin.pre_filter state.plugin_info filter_config op.protocol
     in
     match result with
     | `Passed_prefilter `High ->
-        return (`Passed_prefilter Prevalidator_pending_operations.High)
+        `Passed_prefilter Prevalidator_pending_operations.High
     | `Passed_prefilter `Medium ->
-        return (`Passed_prefilter Prevalidator_pending_operations.Medium)
+        `Passed_prefilter Prevalidator_pending_operations.Medium
     | `Passed_prefilter (`Low q) ->
-        return (`Passed_prefilter (Prevalidator_pending_operations.Low q))
+        `Passed_prefilter (Prevalidator_pending_operations.Low q)
     | ( `Branch_delayed _err
       | `Branch_refused _err
       | `Outdated _err
       | `Refused _err ) as err ->
-        return err
+        err
 
   type error_classification = Prevalidator_classification.error_classification
 

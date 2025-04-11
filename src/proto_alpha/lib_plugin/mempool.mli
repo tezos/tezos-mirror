@@ -95,7 +95,6 @@ val pre_filter :
   | `Branch_refused of tztrace
   | `Refused of tztrace
   | `Outdated of tztrace ]
-  Lwt.t
 
 (** Return a conflict handler for {!Protocol.Mempool.add_operation}
     (see {!Protocol.Mempool.conflict_handler}).

@@ -493,7 +493,7 @@ let acceptable_op ~config ~round_durations ~round_zero_duration ~proposal_level
 type level_and_round = {level : Raw_level.t; round : Round.t}
 
 let pre_filter_far_future_consensus_ops info config
-    ({level = op_level; round = op_round} : level_and_round) : bool Lwt.t =
+    ({level = op_level; round = op_round} : level_and_round) : bool =
   let open Result_syntax in
   let res =
     let now_timestamp = Time.System.now () |> Time.System.to_protocol in
@@ -510,16 +510,13 @@ let pre_filter_far_future_consensus_ops info config
       ~op_round
       ~now_timestamp
   in
-  match res with Ok b -> Lwt.return b | Error _ -> Lwt.return_false
+  match res with Ok b -> b | Error _ -> false
 
 let prefilter_consensus_operation info config level_and_round =
-  let open Lwt_syntax in
-  let* keep = pre_filter_far_future_consensus_ops info config level_and_round in
-  if keep then return (`Passed_prefilter consensus_prio)
+  let keep = pre_filter_far_future_consensus_ops info config level_and_round in
+  if keep then `Passed_prefilter consensus_prio
   else
-    return
-      (`Branch_refused
-        [Environment.wrap_tzerror Consensus_operation_in_far_future])
+    `Branch_refused [Environment.wrap_tzerror Consensus_operation_in_far_future]
 
 (** A quasi infinite amount of "valid" (pre)attestations could be
       sent by a committee member, one for each possible round number.
@@ -533,10 +530,7 @@ let prefilter_consensus_operation info config level_and_round =
 let pre_filter info config
     ({shell = _; protocol_data = Operation_data {contents; _} as op} :
       Main.operation) =
-  let open Lwt_syntax in
   let prefilter_manager_op manager_op =
-    return
-    @@
     match pre_filter_manager info config op manager_op with
     | `Passed_prefilter prio -> `Passed_prefilter (manager_prio prio)
     | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as err
@@ -545,7 +539,7 @@ let pre_filter info config
   in
   match contents with
   | Single (Failing_noop _) ->
-      return (`Refused [Environment.wrap_tzerror Wrong_operation])
+      `Refused [Environment.wrap_tzerror Wrong_operation]
   | Single (Preattestation consensus_content)
   | Single (Attestation {consensus_content; dal_content = _}) ->
       let level_and_round : level_and_round =
@@ -555,11 +549,11 @@ let pre_filter info config
   | Single (Preattestations_aggregate _) ->
       (* Aggregate are built at baking time and shouldn't be broadcasted between
          mempools. *)
-      return (`Refused [Environment.wrap_tzerror Wrong_operation])
+      `Refused [Environment.wrap_tzerror Wrong_operation]
   | Single (Attestations_aggregate _) ->
       (* Aggregate are built at baking time and shouldn't be broadcasted between
          mempools. *)
-      return (`Refused [Environment.wrap_tzerror Wrong_operation])
+      `Refused [Environment.wrap_tzerror Wrong_operation]
   | Single (Seed_nonce_revelation _)
   | Single (Double_preattestation_evidence _)
   | Single (Double_attestation_evidence _)
@@ -570,7 +564,7 @@ let pre_filter info config
   | Single (Vdf_revelation _)
   | Single (Drain_delegate _)
   | Single (Ballot _) ->
-      return (`Passed_prefilter other_prio)
+      `Passed_prefilter other_prio
   | Single (Manager_operation _) as op -> prefilter_manager_op op
   | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
 

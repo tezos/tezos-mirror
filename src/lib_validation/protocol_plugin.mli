@@ -74,7 +74,6 @@ module type T = sig
       | `Branch_refused of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace ]
-      Lwt.t
 
     (** Return a conflict handler for {!Mempool.add_operation}.
 
