@@ -99,7 +99,7 @@ let spawn_baker protocol_hash =
   let*! () = Events.(emit baker_running) protocol_hash in
   return {protocol_hash; process = {thread; canceller}}
 
-(** [hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash 
+(** [hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
     ~level_to_kill_old_baker] moves the current baker into the old baker slot
     (to be killed later) and spawns a new baker for [~next_protocol_hash] *)
 let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
@@ -178,7 +178,7 @@ let monitor_heads ~node_addr =
 (** [monitor_voting_periods ~state head_stream] continuously monitors [heads_stream]
     to detect protocol changes. It will:
     - Shut down an old baker it its time has come;
-    - Spawn and "hot-swap" to a new baker if the next protocol hash is different. 
+    - Spawn and "hot-swap" to a new baker if the next protocol hash is different.
     The voting period information is used for logging purposes. *)
 let monitor_voting_periods ~state head_stream =
   let open Lwt_result_syntax in
