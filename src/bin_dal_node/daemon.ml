@@ -1589,7 +1589,7 @@ let run ~data_dir ~configuration_override =
     let gs_worker =
       Gossipsub.Worker.(
         make
-          ~bootstrap_points:get_bootstrap_points
+          ~initial_points:get_bootstrap_points
           ~events_logging:(Logging.event ~verbose:config.verbose)
           ~self
           rng
