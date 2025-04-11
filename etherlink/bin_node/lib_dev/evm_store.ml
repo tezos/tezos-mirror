@@ -115,10 +115,13 @@ module Q = struct
              Ethereum_types.(block_encoding legacy_transaction_object_encoding)
              payload))
       ~decode:(fun bytes ->
-        Option.to_result ~none:"Not a valid block payload"
-        @@ Data_encoding.Binary.of_string_opt
+        Result.map_error
+          (Format.asprintf
+             "Not a valid block payload: %a"
+             Data_encoding.Binary.pp_read_error)
+          (Data_encoding.Binary.of_string
              Ethereum_types.(block_encoding legacy_transaction_object_encoding)
-             bytes)
+             bytes))
       string
 
   let timestamp =

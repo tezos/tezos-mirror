@@ -551,6 +551,11 @@ type 'transaction_object block = {
      them*)
   baseFeePerGas : quantity option;
   prevRandao : block_hash option;
+  withdrawals : hash list option;
+  withdrawalsRoot : hash option;
+  blobGasUsed : hex option;
+  excessBlobGas : hex option;
+  parentBeaconBlockRoot : hash option;
 }
 
 let decode_list decoder list =
@@ -655,6 +660,11 @@ let block_from_rlp_v0 bytes =
         uncles = [];
         baseFeePerGas = None;
         prevRandao = None;
+        withdrawals = None;
+        withdrawalsRoot = None;
+        blobGasUsed = None;
+        excessBlobGas = None;
+        parentBeaconBlockRoot = None;
       }
   | _ -> raise (Invalid_argument "Expected a List of 13 elements")
 
@@ -752,14 +762,40 @@ let block_from_rlp_v1 bytes =
         uncles = [];
         baseFeePerGas;
         prevRandao;
+        withdrawals = None;
+        withdrawalsRoot = None;
+        blobGasUsed = None;
+        excessBlobGas = None;
+        parentBeaconBlockRoot = None;
       }
   | _ -> raise (Invalid_argument "Expected a List of 15 elements")
 
+let block_from_rlp_v2 bytes =
+  {
+    (block_from_rlp_v1 bytes) with
+    withdrawals = Some [];
+    (* merkle root of an empty SSZ list, this hash is reused across many zero-root structures in Ethereum *)
+    withdrawalsRoot =
+      Some
+        (Hash
+           (Hex
+              "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"));
+    blobGasUsed = Some (Hex "0");
+    excessBlobGas = Some (Hex "0");
+    parentBeaconBlockRoot =
+      Some
+        (Hash
+           (Hex
+              "0000000000000000000000000000000000000000000000000000000000000000"));
+  }
+
 let block_from_rlp bytes =
   let first_byte = Bytes.get bytes 0 in
+  let length = Bytes.length bytes in
   if first_byte = Char.chr 1 then
-    let length = Bytes.length bytes in
     block_from_rlp_v1 (Bytes.sub bytes 1 (length - 1))
+  else if first_byte = Char.chr 2 then
+    block_from_rlp_v2 (Bytes.sub bytes 1 (length - 1))
   else block_from_rlp_v0 bytes
 
 let block_encoding transaction_object_encoding =
@@ -787,6 +823,11 @@ let block_encoding transaction_object_encoding =
            uncles;
            baseFeePerGas;
            prevRandao;
+           withdrawals;
+           withdrawalsRoot;
+           blobGasUsed;
+           excessBlobGas;
+           parentBeaconBlockRoot;
          } ->
       ( ( ( number,
             hash,
@@ -808,7 +849,12 @@ let block_encoding transaction_object_encoding =
             transactions,
             uncles,
             baseFeePerGas ) ),
-        prevRandao ))
+        ( prevRandao,
+          withdrawals,
+          withdrawalsRoot,
+          blobGasUsed,
+          excessBlobGas,
+          parentBeaconBlockRoot ) ))
     (fun ( ( ( number,
                hash,
                parent,
@@ -829,7 +875,12 @@ let block_encoding transaction_object_encoding =
                transactions,
                uncles,
                baseFeePerGas ) ),
-           prevRandao ) ->
+           ( prevRandao,
+             withdrawals,
+             withdrawalsRoot,
+             blobGasUsed,
+             excessBlobGas,
+             parentBeaconBlockRoot ) ) ->
       {
         number;
         hash;
@@ -852,6 +903,11 @@ let block_encoding transaction_object_encoding =
         transactions;
         uncles;
         prevRandao;
+        withdrawals;
+        withdrawalsRoot;
+        blobGasUsed;
+        excessBlobGas;
+        parentBeaconBlockRoot;
       })
     (merge_objs
        (merge_objs
@@ -879,12 +935,17 @@ let block_encoding transaction_object_encoding =
                 (block_transactions_encoding transaction_object_encoding))
              (req "uncles" (list hash_encoding))
              (opt "baseFeePerGas" quantity_encoding)))
-       (obj1
+       (obj6
           (* [mixHash] has been replaced by [prevRandao] internally in the
              Paris EVM version, but every public RPC endpoints we have been
              testing keep using [mixHash] in their JSON encoding (probably for
              backward compatibility). *)
-          (opt "mixHash" block_hash_encoding)))
+          (opt "mixHash" block_hash_encoding)
+          (opt "withdrawals" (list hash_encoding))
+          (opt "withdrawalsRoot" hash_encoding)
+          (opt "blobGasUsed" hex_encoding)
+          (opt "excessBlobGas" hex_encoding)
+          (opt "parentBeaconBlockRoot" hash_encoding)))
 
 type call = {
   from : address option;
