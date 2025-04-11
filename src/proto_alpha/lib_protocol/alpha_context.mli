@@ -4539,18 +4539,26 @@ module Kind : sig
 
   type attestation_consensus_kind = Attestation_consensus_kind
 
+  type preattestations_aggregate_consensus_kind =
+    | Preattestations_aggregate_consensus_kind
+
   type attestations_aggregate_consensus_kind =
     | Attestations_aggregate_consensus_kind
 
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Attestation_kind : attestation_consensus_kind consensus
+    | Preattestations_aggregate_kind
+        : preattestations_aggregate_consensus_kind consensus
     | Attestations_aggregate_kind
         : attestations_aggregate_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
   type attestation = attestation_consensus_kind consensus
+
+  type preattestations_aggregate =
+    preattestations_aggregate_consensus_kind consensus
 
   type attestations_aggregate = attestations_aggregate_consensus_kind consensus
 
@@ -4657,6 +4665,8 @@ end
 type 'a consensus_operation_type =
   | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
+  | Preattestations_aggregate
+      : Kind.preattestations_aggregate consensus_operation_type
   | Attestations_aggregate
       : Kind.attestations_aggregate consensus_operation_type
 
@@ -4705,6 +4715,11 @@ and _ contents =
       dal_content : dal_content option;
     }
       -> Kind.attestation contents
+  | Preattestations_aggregate : {
+      consensus_content : consensus_aggregate_content;
+      committee : Slot.t list;
+    }
+      -> Kind.preattestations_aggregate contents
   | Attestations_aggregate : {
       consensus_content : consensus_aggregate_content;
       committee : Slot.t list;
@@ -4996,6 +5011,8 @@ module Operation : sig
     val attestation_case : Kind.attestation case
 
     val attestations_aggregate_case : Kind.attestations_aggregate case
+
+    val preattestations_aggregate_case : Kind.preattestations_aggregate case
 
     val attestation_with_dal_case : Kind.attestation case
 

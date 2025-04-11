@@ -676,6 +676,37 @@ let attestations_aggregate_descriptor =
         | None -> return_nil);
   }
 
+let preattestations_aggregate_descriptor =
+  let open Lwt_result_syntax in
+  {
+    parameters = Fun.id;
+    required_cycle = (fun _ -> 1);
+    required_block = (fun _ -> 1);
+    prelude = (On 1, fun state -> return ([], state));
+    opt_prelude = None;
+    candidates_generator =
+      (fun state ->
+        let open Lwt_result_syntax in
+        let* preattestations =
+          List.filter_map_es
+            (fun (delegate, consensus_key_opt) ->
+              let* slots_opt =
+                Context.get_attester_slot (B state.block) delegate
+              in
+              let delegate = Option.value ~default:delegate consensus_key_opt in
+              let* signer = Account.find delegate in
+              match (slots_opt, signer.sk) with
+              | Some (_ :: _), Bls _ ->
+                  let* op = Op.raw_preattestation ~delegate state.block in
+                  return (Some op)
+              | _, _ -> return_none)
+            state.delegates
+        in
+        match Op.aggregate_preattestations preattestations with
+        | Some op -> return [op]
+        | None -> return_nil);
+  }
+
 module Manager = Manager_operation_helpers
 
 let required_nb_account = 7
@@ -831,6 +862,7 @@ type op_kind =
   | KAttestation
   | KPreattestation
   | KAttestations_aggregate
+  | KPreattestations_aggregate
   | KBallotExp
   | KBallotProm
   | KProposals
@@ -849,6 +881,7 @@ let op_kind_of_packed_operation op =
   | Single (Preattestation _) -> KPreattestation
   | Single (Attestation _) -> KAttestation
   | Single (Attestations_aggregate _) -> KAttestations_aggregate
+  | Single (Preattestations_aggregate _) -> KPreattestations_aggregate
   | Single (Seed_nonce_revelation _) -> KNonce
   | Single (Vdf_revelation _) -> KVdf
   | Single (Double_attestation_evidence _) -> KDbl_consensus
@@ -869,6 +902,7 @@ let pp_op_kind fmt kind =
     (match kind with
     | KManager -> "manager"
     | KAttestations_aggregate -> "attestations_aggregate"
+    | KPreattestations_aggregate -> "preattestations_aggregate"
     | KAttestation -> "attestation"
     | KPreattestation -> "preattestation"
     | KBallotExp -> "ballot"
@@ -887,6 +921,7 @@ let descriptor_of ~nb_bootstrap ~max_batch_size = function
   | KAttestation -> attestation_descriptor
   | KAttestations_aggregate -> attestations_aggregate_descriptor
   | KPreattestation -> preattestation_descriptor
+  | KPreattestations_aggregate -> preattestations_aggregate_descriptor
   | KBallotExp -> ballot_exploration_descriptor
   | KBallotProm -> ballot_promotion_descriptor
   | KProposals -> proposal_descriptor

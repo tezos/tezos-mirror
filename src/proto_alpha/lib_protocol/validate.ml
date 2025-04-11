@@ -1558,6 +1558,8 @@ module Anonymous = struct
       | ( Single (Attestation {consensus_content = e1; dal_content = _}),
           Single (Attestation {consensus_content = e2; dal_content = _}) ) ->
           return (e1, e2, Misbehaviour.Double_attesting)
+      | ( Single (Preattestations_aggregate _),
+          Single (Preattestations_aggregate _) )
       | Single (Attestations_aggregate _), Single (Attestations_aggregate _) ->
           (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
              handle denunciation for aggregates. *)
@@ -3043,6 +3045,8 @@ let check_operation ?(check_signature = true) info (type kind)
         Consensus.check_attestation info ~check_signature operation
       in
       return_unit
+  | Single (Preattestations_aggregate _) ->
+      tzfail Validate_errors.Consensus.Aggregate_in_mempool
   | Single (Attestations_aggregate _) ->
       tzfail Validate_errors.Consensus.Aggregate_in_mempool
   | Single (Proposals _) ->
@@ -3102,7 +3106,7 @@ let check_operation_conflict (type kind) operation_conflict_state oph
         operation_conflict_state
         oph
         operation
-  | Single (Attestations_aggregate _) ->
+  | Single (Preattestations_aggregate _) | Single (Attestations_aggregate _) ->
       (* This case is unreachable because the operation is assumed to be valid,
          and aggregates are never valid in mempools. *)
       assert false
@@ -3166,7 +3170,7 @@ let add_valid_operation operation_conflict_state oph (type kind)
       Consensus.add_preattestation operation_conflict_state oph operation
   | Single (Attestation _) ->
       Consensus.add_attestation operation_conflict_state oph operation
-  | Single (Attestations_aggregate _) ->
+  | Single (Preattestations_aggregate _) | Single (Attestations_aggregate _) ->
       (* This case is unreachable because the operation is assumed to be valid,
          and aggregates are never valid in mempools. *)
       assert false
@@ -3218,7 +3222,7 @@ let remove_operation operation_conflict_state (type kind)
       Consensus.remove_preattestation operation_conflict_state operation
   | Single (Attestation _) ->
       Consensus.remove_attestation operation_conflict_state operation
-  | Single (Attestations_aggregate _) ->
+  | Single (Preattestations_aggregate _) | Single (Attestations_aggregate _) ->
       (* This case is unreachable because the operation is assumed to be valid,
          and aggregates are never valid in mempools. *)
       assert false
@@ -3322,6 +3326,8 @@ let validate_operation ?(check_signature = true)
             block_state
             oph
             operation
+      | Single (Preattestations_aggregate _) ->
+          tzfail Validate_errors.Consensus.Aggregate_not_implemented
       | Single (Attestations_aggregate _) ->
           Consensus.validate_attestations_aggregate
             ~check_signature

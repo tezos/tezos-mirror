@@ -552,6 +552,10 @@ let pre_filter info config
         {level = consensus_content.level; round = consensus_content.round}
       in
       prefilter_consensus_operation info config level_and_round
+  | Single (Preattestations_aggregate _) ->
+      (* Aggregate are built at baking time and shouldn't be broadcasted between
+         mempools. *)
+      return (`Refused [Environment.wrap_tzerror Wrong_operation])
   | Single (Attestations_aggregate _) ->
       (* Aggregate are built at baking time and shouldn't be broadcasted between
          mempools. *)
@@ -694,11 +698,12 @@ let find_manager {shell = _; protocol_data = Operation_data {contents; _}} =
   | Single (Manager_operation {source; _}) -> Some source
   | Cons (Manager_operation {source; _}, _) -> Some source
   | Single
-      ( Preattestation _ | Attestation _ | Attestations_aggregate _
-      | Proposals _ | Ballot _ | Seed_nonce_revelation _ | Vdf_revelation _
-      | Double_baking_evidence _ | Double_preattestation_evidence _
-      | Double_attestation_evidence _ | Dal_entrapment_evidence _
-      | Activate_account _ | Drain_delegate _ | Failing_noop _ ) ->
+      ( Preattestation _ | Attestation _ | Preattestations_aggregate _
+      | Attestations_aggregate _ | Proposals _ | Ballot _
+      | Seed_nonce_revelation _ | Vdf_revelation _ | Double_baking_evidence _
+      | Double_preattestation_evidence _ | Double_attestation_evidence _
+      | Dal_entrapment_evidence _ | Activate_account _ | Drain_delegate _
+      | Failing_noop _ ) ->
       None
 
 (* The purpose of this module is to offer a version of
@@ -825,6 +830,7 @@ let sources_from_operation ctxt
             } ) ->
           return @@ map_pkh_env [delegate; consensus_pkh]
       | Error _ -> return_nil)
+  | Single (Preattestations_aggregate {consensus_content; committee})
   | Single (Attestations_aggregate {consensus_content; committee}) ->
       let level = Level.from_raw ctxt consensus_content.level in
       let* sources =

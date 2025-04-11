@@ -124,6 +124,7 @@ type op_kind =
   | KAttestation
   | KPreattestation
   | KAttestations_aggregate
+  | KPreattestations_aggregate
   | KBallotExp
   | KBallotProm
   | KProposals

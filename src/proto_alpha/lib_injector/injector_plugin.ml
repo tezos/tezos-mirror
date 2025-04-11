@@ -155,6 +155,7 @@ module Proto_client = struct
     | Preattestation_result _ -> Successful
     | Attestation_result _ -> Successful
     | Attestations_aggregate_result _ -> Successful
+    | Preattestations_aggregate_result _ -> Successful
     | Seed_nonce_revelation_result _ -> Successful
     | Vdf_revelation_result _ -> Successful
     | Double_attestation_evidence_result _ -> Successful
