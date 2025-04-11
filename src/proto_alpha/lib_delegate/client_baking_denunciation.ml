@@ -241,14 +241,10 @@ let events_of_kind (type kind) (op_kind : kind denunciable_consensus_operation)
           double_preattestation_denounced,
           preattestation_conflict_ignored )
 
-let should_different_slots_be_denunced (type kind) state
-    (op_kind : kind denunciable_consensus_operation) =
-  match op_kind with
-  | Attestation ->
-      (* attestations with different slots are not denunced under
-         aggregate_attestation feature flag *)
-      not state.constants.parametric.aggregate_attestation
-  | _ -> true
+let should_different_slots_be_denunced (type kind) state =
+  (* consensus operations with different slots are not denunced under
+     aggregate_attestation feature flag *)
+  not state.constants.parametric.aggregate_attestation
 
 let process_consensus_op (type kind) state cctxt
     (op_kind : kind denunciable_consensus_operation) (new_op : kind Operation.t)
@@ -306,7 +302,7 @@ let process_consensus_op (type kind) state cctxt
             if
               Block_payload_hash.(existing_payload_hash <> new_payload_hash)
               || Slot.(existing_slot <> slot)
-                 && should_different_slots_be_denunced state op_kind
+                 && should_different_slots_be_denunced state
               || Block_hash.(existing_op.shell.branch <> new_op.shell.branch)
             then (
               (* Same level, round, and delegate, and:

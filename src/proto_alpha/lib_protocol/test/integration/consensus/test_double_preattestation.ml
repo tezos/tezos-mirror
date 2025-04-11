@@ -403,6 +403,42 @@ end = struct
     in
     already_denounced __LOC__ e
 
+  (** Check that a double preattestation evidence fails under
+    aggregate_attestation feature flag when operations have distinct slots and
+    are otherwise identical. *)
+  let different_slots_under_feature_flag () =
+    let open Lwt_result_syntax in
+    let* genesis, _ =
+      Context.init2 ~consensus_threshold_size:0 ~aggregate_attestation:true ()
+    in
+    let* block = Block.bake genesis in
+    let* attesters = Context.get_attesters (B block) in
+    let delegate, slot1, slot2 =
+      (* Find an attester with more than 1 slot. *)
+      WithExceptions.Option.get
+        ~loc:__LOC__
+        (List.find_map
+           (fun (attester : RPC.Validators.t) ->
+             match attester.slots with
+             | slot1 :: slot2 :: _ -> Some (attester.delegate, slot1, slot2)
+             | _ -> None)
+           attesters)
+    in
+    let* preattestation1 = Op.raw_preattestation ~delegate ~slot:slot1 block in
+    let* preattestation2 = Op.raw_preattestation ~delegate ~slot:slot2 block in
+    let double_preattestation_evidence =
+      double_preattestation (B block) preattestation1 preattestation2
+    in
+    let*! res = Block.bake ~operation:double_preattestation_evidence block in
+    let* () =
+      Assert.proto_error ~loc:__LOC__ res (function
+          | Validate_errors.Anonymous.Invalid_denunciation
+              Misbehaviour.Double_preattesting ->
+              true
+          | _ -> false)
+    in
+    return_unit
+
   let my_tztest title test =
     Tztest.tztest (Format.sprintf "%s: %s" name title) test
 
@@ -446,6 +482,10 @@ end = struct
         "valid double preattestation injected multiple times"
         `Quick
         test_two_double_preattestation_evidences_leads_to_duplicate_denunciation;
+      my_tztest
+        "different slots under feature flag"
+        `Quick
+        different_slots_under_feature_flag;
     ]
 end
 

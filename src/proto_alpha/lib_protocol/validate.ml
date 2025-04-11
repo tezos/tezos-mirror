@@ -1575,14 +1575,15 @@ module Anonymous = struct
     let same_branches = Block_hash.(op1.shell.branch = op2.shell.branch) in
     let same_slots = Slot.(e1.slot = e2.slot) in
     let ordered_hashes = Operation_hash.(op1_hash < op2_hash) in
-    (* attestations with different slots are not slashed when
+    (* consensus operations with different slots are not slashed when
        aggregate_attestation feature flag is enabled. *)
     let aggregate_attestation_feature_flag =
       Constants.aggregate_attestation vi.ctxt
     in
     let is_slot_denunciable =
       match kind with
-      | Misbehaviour.Double_attesting -> not aggregate_attestation_feature_flag
+      | Misbehaviour.(Double_attesting | Double_preattesting) ->
+          not aggregate_attestation_feature_flag
       | _ -> true
     in
     let is_denunciation_consistent =
