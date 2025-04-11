@@ -284,7 +284,6 @@ mod tests {
     use crate::backend_test;
     use crate::instruction_context::LoadStoreWidth;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::block_cache::bcall::BCall;
     use crate::machine_state::block_cache::bcall::Block;
     use crate::machine_state::block_cache::bcall::Interpreted;
     use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
@@ -376,9 +375,13 @@ mod tests {
             // Run the block in both interpreted and jitted mode.
             let interpreted_res = unsafe {
                 // SAFETY: interpreted blocks are always callable
-                block.callable(interpreted_bb)
-            }
-            .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
+                block.run_block(
+                    &mut interpreted,
+                    initial_pc,
+                    &mut interpreted_steps,
+                    interpreted_bb,
+                )
+            };
             let jitted_res = unsafe {
                 // # Safety - the block builder is alive for at least
                 //            the duration of the `run` function.

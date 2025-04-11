@@ -84,7 +84,6 @@ pub mod metrics;
 
 use std::marker::PhantomData;
 
-use bcall::BCall;
 use bcall::Block;
 
 use super::MachineCoreState;
@@ -803,7 +802,7 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
 
     /// Lookup a block by a physical address.
     ///
-    /// If one is found it can then be executed with [`BCall::run_block`].
+    /// If one is found it can then be executed with [`BlockCall::run_block`].
     ///
     /// *NB* before running any block, you must ensure no partial block
     /// is in progress with [`BlockCache::complete_current_block`].
@@ -913,9 +912,11 @@ impl<B: Block<MC, M>, MC: MemoryConfig, M: ManagerReadWrite> BlockCall<'_, B, MC
     ) -> Result<(), EnvironException> {
         if *steps + self.entry.block.num_instr() <= max_steps {
             // Safety: the same block builder is passed through every time.
-            let block = unsafe { self.entry.block.callable(self.builder) };
-
-            block.run_block(core, instr_pc, steps)
+            unsafe {
+                self.entry
+                    .block
+                    .run_block(core, instr_pc, steps, self.builder)
+            }
         } else {
             self.partial
                 .run_block_partial(core, steps, max_steps, self.entry)

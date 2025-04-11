@@ -35,38 +35,6 @@ use crate::state_backend::Ref;
 use crate::traps::EnvironException;
 use crate::traps::Exception;
 
-/// A block derived from a sequence of [`Instruction`] that can be directly run
-/// over the [`MachineCoreState`].
-///
-/// This allows static dispatch of this block, via different strategies. Namely:
-/// interpretation and Just-In-Time compilation.
-pub trait BCall<MC: MemoryConfig, M: ManagerBase> {
-    /// The number of instructions contained in the block.
-    ///
-    /// Executing a block will consume up to `num_instr` steps.
-    fn num_instr(&self) -> usize
-    where
-        M: ManagerRead;
-
-    /// Run a block against the machine state.
-    ///
-    /// When calling this function, there must be no partial block in progress. To ensure
-    /// this, you must always run [`BlockCache::complete_current_block`] prior to fetching
-    /// and running a new block.
-    ///
-    /// There _must_ also be sufficient steps remaining, to execute the block in full.
-    ///
-    /// [`BlockCache::complete_current_block`]: super::BlockCache::complete_current_block
-    fn run_block(
-        &self,
-        core: &mut MachineCoreState<MC, M>,
-        instr_pc: Address,
-        steps: &mut usize,
-    ) -> Result<(), EnvironException>
-    where
-        M: ManagerReadWrite;
-}
-
 /// State Layout for Blocks
 pub type BlockLayout = (Atom<u8>, [Atom<Instruction>; CACHE_INSTR]);
 
@@ -76,7 +44,7 @@ pub type BlockLayout = (Atom<u8>, [Atom<Instruction>; CACHE_INSTR]);
 /// Blocks will never contain more than [`CACHE_INSTR`] instructions.
 pub trait Block<MC: MemoryConfig, M: ManagerBase>: NewState<M> {
     /// Block construction may require additional state not kept in storage,
-    /// this is then passed as a parameter to [`Block::callable`].
+    /// this is then passed as a parameter to [`Block::run_block`].
     type BlockBuilder: Default;
 
     /// Bind the block to the given allocated state.
@@ -104,12 +72,12 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase>: NewState<M> {
     where
         M: ManagerRead;
 
-    /// Invalidate a block, it will no longer be callable.
+    /// Invalidate a block, meaning it should no longer be run.
     fn invalidate(&mut self)
     where
         M: ManagerWrite;
 
-    /// Reset a block to the default state, it will no longer be callable.
+    /// Reset a block to the default state, it should no longer be run.
     fn reset(&mut self)
     where
         M: ManagerReadWrite;
@@ -119,8 +87,13 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase>: NewState<M> {
     where
         M: ManagerRead;
 
-    /// Get a callable block from an entry. The entry must have passed the address, fence, and
-    /// non-empty checks.
+    /// Run a block against the machine state.
+    ///
+    /// When calling this function, there must be no partial block in progress. To ensure
+    /// this, you must always run [`BlockCache::complete_current_block`] prior to fetching
+    /// and running a new block.
+    ///
+    /// There _must_ also be sufficient steps remaining, to execute the block in full.
     ///
     /// # Safety
     ///
@@ -128,13 +101,18 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase>: NewState<M> {
     /// (may) have natively compiled this block to machine code.
     ///
     /// This ensures that the builder in question is guaranteed to be alive, for at least as long
-    /// as this block may be run via `BCall::run_block`.
-    unsafe fn callable<'a>(
-        &'a mut self,
-        block_builder: &'a mut Self::BlockBuilder,
-    ) -> &'a (impl BCall<MC, M> + ?Sized + 'a)
+    /// as this block may be run.
+    ///
+    /// [`BlockCache::complete_current_block`]: super::BlockCache::complete_current_block
+    unsafe fn run_block(
+        &mut self,
+        core: &mut MachineCoreState<MC, M>,
+        instr_pc: Address,
+        steps: &mut usize,
+        block_builder: &mut Self::BlockBuilder,
+    ) -> Result<(), EnvironException>
     where
-        M: ManagerRead + 'a;
+        M: ManagerReadWrite;
 }
 
 /// Interpreted blocks are built automatically, and require no additional context.
@@ -151,34 +129,6 @@ pub struct InterpretedBlockBuilder;
 pub struct Interpreted<MC: MemoryConfig, M: ManagerBase> {
     instr: [EnrichedCell<ICallPlaced<MC, M>, M>; CACHE_INSTR],
     len_instr: Cell<u8, M>,
-}
-
-impl<MC: MemoryConfig, M: ManagerBase> BCall<MC, M> for [EnrichedCell<ICallPlaced<MC, M>, M>] {
-    #[inline]
-    fn num_instr(&self) -> usize
-    where
-        M: ManagerRead,
-    {
-        self.len()
-    }
-
-    fn run_block(
-        &self,
-        core: &mut MachineCoreState<MC, M>,
-        mut instr_pc: Address,
-        steps: &mut usize,
-    ) -> Result<(), EnvironException>
-    where
-        M: ManagerReadWrite,
-    {
-        if let Err(e) = run_block_inner(self, core, &mut instr_pc, steps) {
-            core.handle_step_result(instr_pc, Err(e))?;
-            // If we succesfully handled an error, need to increment steps one more.
-            *steps += 1;
-        }
-
-        Ok(())
-    }
 }
 
 impl<MC: MemoryConfig, M: ManagerBase> NewState<M> for Interpreted<MC, M> {
@@ -265,15 +215,23 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
     ///
     /// This function is always safe to call.
     #[inline(always)]
-    unsafe fn callable<'a>(
-        &'a mut self,
-        _bb: &'a mut Self::BlockBuilder,
-    ) -> &'a (impl BCall<MC, M> + ?Sized + 'a)
+    unsafe fn run_block(
+        &mut self,
+        core: &mut MachineCoreState<MC, M>,
+        mut instr_pc: Address,
+        steps: &mut usize,
+        _block_builder: &mut Self::BlockBuilder,
+    ) -> Result<(), EnvironException>
     where
-        M: ManagerRead + 'a,
+        M: ManagerReadWrite,
     {
-        let len = self.len_instr.read();
-        &self.instr[0..len as usize]
+        if let Err(e) = run_block_inner(self.instr(), core, &mut instr_pc, steps) {
+            core.handle_step_result(instr_pc, Err(e))?;
+            // If we succesfully handled an error, need to increment steps one more.
+            *steps += 1;
+        }
+
+        Ok(())
     }
 }
 
@@ -291,7 +249,7 @@ impl<MC: MemoryConfig, M: ManagerClone> Clone for Interpreted<MC, M> {
 /// Not all instructions are currently supported, when a block contains
 /// unsupported instructions, a fallback to [`Interpreted`] mode occurs.
 ///
-/// Blocks are compiled upon calling [`Block::callable`], in a *stop the world* fashion.
+/// Blocks are compiled upon calling [`Block::run_block`], in a *stop the world* fashion.
 pub struct InlineJit<MC: MemoryConfig, M: JitStateAccess> {
     fallback: Interpreted<MC, M>,
     jit_fn: Option<JCall<MC, M>>,
@@ -375,74 +333,54 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
 
     /// # SAFETY
     ///
-    /// The `block_builder` must be the same as the block builder given to the `compile` call that
-    /// (may) have natively compiled this block to machine code.
+    /// The `block_builder` must be the same every time this function is called.
     ///
     /// This ensures that the builder in question is guaranteed to be alive, for at least as long
-    /// as this block may be run via [`BCall::run_block`].
-    unsafe fn callable<'a>(
-        &'a mut self,
-        block_builder: &'a mut Self::BlockBuilder,
-    ) -> &'a (impl BCall<MC, M> + ?Sized + 'a)
-    where
-        M: ManagerRead + 'a,
-    {
-        if self.compiled {
-            return self;
-        }
-
-        // trigger JIT compilation
-        let instr = self
-            .fallback
-            .instr
-            .iter()
-            .take(<Self as Block<MC, M>>::num_instr(self))
-            .map(|i| i.read_stored())
-            .collect::<Vec<_>>();
-
-        let jitfn = block_builder.0.compile(&instr);
-
-        self.jit_fn = jitfn;
-        self.compiled = true;
-
-        self
-    }
-
-    fn num_instr(&self) -> usize
-    where
-        M: ManagerRead,
-    {
-        self.fallback.num_instr()
-    }
-}
-
-impl<MC: MemoryConfig, M: JitStateAccess> BCall<MC, M> for InlineJit<MC, M> {
-    fn num_instr(&self) -> usize
-    where
-        M: ManagerRead,
-    {
-        self.fallback.num_instr()
-    }
-
-    fn run_block(
-        &self,
+    /// as this block may be run via [`Block::run_block`].
+    unsafe fn run_block(
+        &mut self,
         core: &mut MachineCoreState<MC, M>,
         instr_pc: Address,
         steps: &mut usize,
+        block_builder: &mut Self::BlockBuilder,
     ) -> Result<(), EnvironException>
     where
         M: ManagerReadWrite,
     {
+        if !self.compiled {
+            // trigger JIT compilation
+            let instr = self
+                .fallback
+                .instr
+                .iter()
+                .take(<Self as Block<MC, M>>::num_instr(self))
+                .map(|i| i.read_stored())
+                .collect::<Vec<_>>();
+
+            let jitfn = block_builder.0.compile(&instr);
+
+            self.jit_fn = jitfn;
+            self.compiled = true;
+        }
+
         match &self.jit_fn {
             // SAFETY: JIT is guaranteed to be alive here by the caller.
-            //         this is due to the only way to run a block being
-            //         by calling `Block::callable` first. That function
-            //         requires the caller uphold the invariant that
-            //         the builder be alive for the lifetime of the
-            //         `BCall`.
+            //         this is due to the only way to run a block requiring
+            //         a builder. The caller invariant is that the builder
+            //         must be alive for the duration that any called block
+            //         remains valid.
             Some(jcall) => unsafe { jcall.call(core, instr_pc, steps) },
-            None => self.fallback.instr().run_block(core, instr_pc, steps),
+            None => self
+                .fallback
+                .run_block(core, instr_pc, steps, &mut block_builder.1),
         }
+    }
+
+    fn num_instr(&self) -> usize
+    where
+        M: ManagerRead,
+    {
+        self.fallback.num_instr()
     }
 }
 
