@@ -3613,6 +3613,11 @@ oc.compile_sources_doc_bookworm:
   variables:
     CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
