@@ -2028,6 +2028,11 @@ oc.script:snapshot_alpha_and_link:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.script:test_octez_release_versions:
   image: ${ci_image_name}/build:${ci_image_tag}

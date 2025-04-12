@@ -1292,6 +1292,8 @@ let jobs pipeline_type =
         ~stage:Stages.test
         ~image:Images.CI.build
         ~cpu:Very_high
+        ~retry:
+          {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
         ~dependencies:order_after_build
           (* Since the above dependencies are only for ordering, we do not set [dependent] *)
         ~rules:(make_rules ~changes:changeset_script_snapshot_alpha_and_link ())
