@@ -1504,6 +1504,11 @@ etherlink.build:static-x86_64:
     - octez-evm-*
     - etherlink-*
     when: on_success
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 etherlink.build:static-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
