@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** node parameters for the DAL. *)
+(** L1 node parameters for the DAL. *)
 
 (* Parameters of the DAL cryptographic primitives. *)
 type parameters = {
@@ -37,9 +37,7 @@ type parameters = {
 val parameters_encoding : parameters Data_encoding.t
 
 type t = {
-  activated : bool;
-      (** [true] if the DAL is activated. This may have
-          an impact on the loading time of the node. *)
+  activated : bool;  (** [true] if the DAL is activated. *)
   bootstrap_peers : string list;
       (** List of bootstrap peers to use in the DAL p2p. *)
 }

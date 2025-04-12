@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A [t] value contains the needed informations for a running a DAL node. Its
+(** A [t] value contains the needed information for running a DAL node. Its
     fields are available through accessors. *)
 type t
 
