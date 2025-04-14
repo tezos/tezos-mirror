@@ -9,12 +9,10 @@
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::hart_state::HartState;
 use crate::machine_state::memory;
-use crate::machine_state::memory::Address;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegisters;
 use crate::parser::instruction::FenceSet;
-use crate::parser::instruction::InstrWidth;
 use crate::state_backend as backend;
 use crate::traps::Exception;
 
@@ -68,18 +66,6 @@ where
             Mode::Machine => Exception::EnvCallFromMMode,
         }
     }
-
-    /// Store the next instruction address in `rd` and jump to the target address.
-    /// Always returns the target address (current program counter + imm)
-    pub fn run_jal(&mut self, imm: i64, rd: NonZeroXRegister, width: InstrWidth) -> Address {
-        let current_pc = self.pc.read();
-
-        // Save the address after jump instruction into rd
-        let return_address = current_pc.wrapping_add(width as u64);
-        self.xregisters.write_nz(rd, return_address);
-
-        current_pc.wrapping_add(imm as u64)
-    }
 }
 
 impl<MC, M> MachineCoreState<MC, M>
@@ -130,7 +116,6 @@ mod tests {
     use crate::machine_state::registers::t2;
     use crate::machine_state::registers::t3;
     use crate::parser::instruction::FenceSet;
-    use crate::parser::instruction::InstrWidth;
     use crate::traps::Exception;
 
     backend_test!(test_bitwise, F, {
@@ -241,32 +226,6 @@ mod tests {
             state.mode.write(mode);
             let instr_res = state.run_ecall();
             assert!(instr_res == expected_e);
-        }
-    });
-
-    backend_test!(test_jal, F, {
-        let ipc_imm_rd_fpc_frd = [
-            (42, 42, nz::t1, 84, 46),
-            (0, 1000, nz::t1, 1000, 4),
-            (50, -100, nz::t1, -50_i64 as u64, 54),
-            (u64::MAX - 1, 100, nz::t1, 98_i64 as u64, 2),
-            (
-                1_000_000_000_000,
-                (u64::MAX - 1_000_000_000_000 + 1) as i64,
-                nz::t2,
-                0,
-                1_000_000_000_004,
-            ),
-        ];
-        for (init_pc, imm, rd, res_pc, res_rd) in ipc_imm_rd_fpc_frd {
-            let mut state = create_state!(HartState, F);
-
-            state.pc.write(init_pc);
-            let new_pc = state.run_jal(imm, rd, InstrWidth::Uncompressed);
-
-            assert_eq!(state.pc.read(), init_pc);
-            assert_eq!(new_pc, res_pc);
-            assert_eq!(state.xregisters.read_nz(rd), res_rd);
         }
     });
 

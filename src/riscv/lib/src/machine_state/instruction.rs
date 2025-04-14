@@ -45,7 +45,6 @@ use crate::interpreter::branching;
 use crate::interpreter::integer;
 use crate::interpreter::load_store;
 use crate::machine_state::ProgramCounterUpdate::Next;
-use crate::machine_state::ProgramCounterUpdate::Set;
 use crate::parser::instruction::AmoArgs;
 use crate::parser::instruction::CIBDTypeArgs;
 use crate::parser::instruction::CIBNZTypeArgs;
@@ -376,7 +375,6 @@ pub enum OpCode {
     Csrrsi,
     Csrrci,
 
-    // RV32C compressed instructions
     /// Jumps to val(rs1)
     Jr,
     /// Effects are to store the next instruction address in rd and jump to val(rs1).
@@ -664,7 +662,11 @@ impl OpCode {
             Self::J => Some(Args::run_j),
             Self::Jr => Some(Args::run_jr),
             Self::JrImm => Some(Args::run_jr_imm),
+            Self::JAbsolute => Some(Args::run_j_absolute),
+            Self::Jal => Some(Args::run_jal),
             Self::Jalr => Some(Args::run_jalr),
+            Self::JalrImm => Some(Args::run_jalr_imm),
+            Self::JalrAbsolute => Some(Args::run_jalr_absolute),
             Self::Addi => Some(Args::run_addi),
             Self::Andi => Some(Args::run_andi),
             Self::SetLessThanSigned => Some(Args::run_set_less_than_signed),
@@ -1392,31 +1394,6 @@ impl Args {
         icb.ok(Next(self.width))
     }
 
-    // RV64I jump instructions
-    //
-    /// SAFETY: This function must only be called on an `Args` belonging
-    /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_jal<MC: MemoryConfig, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-        Ok(Set(core.hart.run_jal(self.imm, self.rd.nzx, self.width)))
-    }
-
-    /// SAFETY: This function must only be called on an `Args` belonging
-    /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_jalr_imm<MC: MemoryConfig, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-        Ok(Set(core.hart.run_jalr_imm(
-            self.imm,
-            self.rs1.nzx,
-            self.rd.nzx,
-            self.width,
-        )))
-    }
-
     // RV64A atomic instructions
     impl_amo_type!(run_lrw);
     impl_amo_type!(run_scw);
@@ -1541,28 +1518,17 @@ impl Args {
         icb.ok(pcu)
     }
 
-    fn run_j_absolute<MC: MemoryConfig, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-        Ok(Set(core.hart.run_j_absolute(self.imm)))
-    }
-
-    unsafe fn run_jalr_absolute<MC: MemoryConfig, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-        Ok(Set(core.hart.run_jalr_absolute(
-            self.imm,
-            self.rd.nzx,
-            self.width,
-        )))
+    fn run_j_absolute<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+        let addr = branching::run_j_absolute(icb, self.imm);
+        let pcu = ProgramCounterUpdate::Set(addr);
+        icb.ok(pcu)
     }
 
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_jr<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-        let addr = branching::run_jr(icb, self.rs1.nzx);
+        let rs1 = unsafe { self.rs1.nzx };
+        let addr = branching::run_jr(icb, rs1);
         let pcu = ProgramCounterUpdate::Set(addr);
         icb.ok(pcu)
     }
@@ -1570,7 +1536,17 @@ impl Args {
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_jr_imm<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-        let addr = branching::run_jr_imm(icb, self.imm, self.rs1.nzx);
+        let rs1 = unsafe { self.rs1.nzx };
+        let addr = branching::run_jr_imm(icb, self.imm, rs1);
+        let pcu = ProgramCounterUpdate::Set(addr);
+        icb.ok(pcu)
+    }
+
+    /// SAFETY: This function must only be called on an `Args` belonging
+    /// to the same OpCode as the OpCode used to derive this function.
+    unsafe fn run_jal<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+        let rd = unsafe { self.rd.nzx };
+        let addr = branching::run_jal(icb, self.imm, rd, self.width);
         let pcu = ProgramCounterUpdate::Set(addr);
         icb.ok(pcu)
     }
@@ -1578,7 +1554,28 @@ impl Args {
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_jalr<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-        let addr = branching::run_jalr(icb, self.rd.nzx, self.rs1.nzx, self.width);
+        let rd = unsafe { self.rd.nzx };
+        let rs1 = unsafe { self.rs1.nzx };
+        let addr = branching::run_jalr(icb, rd, rs1, self.width);
+        let pcu = ProgramCounterUpdate::Set(addr);
+        icb.ok(pcu)
+    }
+
+    /// SAFETY: This function must only be called on an `Args` belonging
+    /// to the same OpCode as the OpCode used to derive this function.
+    unsafe fn run_jalr_imm<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+        let rs1 = unsafe { self.rs1.nzx };
+        let rd = unsafe { self.rd.nzx };
+        let addr = branching::run_jalr_imm(icb, self.imm, rs1, rd, self.width);
+        let pcu = ProgramCounterUpdate::Set(addr);
+        icb.ok(pcu)
+    }
+
+    /// SAFETY: This function must only be called on an `Args` belonging
+    /// to the same OpCode as the OpCode used to derive this function.
+    unsafe fn run_jalr_absolute<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+        let rd = unsafe { self.rd.nzx };
+        let addr = branching::run_jalr_absolute(icb, self.imm, rd, self.width);
         let pcu = ProgramCounterUpdate::Set(addr);
         icb.ok(pcu)
     }
