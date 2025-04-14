@@ -1379,33 +1379,21 @@ module Monitoring_app = struct
           (fun (_, _, x) (_, _, y) -> Option.compare Float.compare x y)
           bakers_info
       in
-      if network = `Mainnet then
-        Lwt.return ["• Baker performance not displayed for the mainnet network"]
-        (* fixme: remove the clause above when we start producing slots
-           on Mainnet. Before, it does not make sense to report baker
-           performances for this network. *)
-      else
-        let worst_bakers = take 5 sorted_bakers in
-        let best_bakers = List.rev (take 5 (List.rev sorted_bakers)) in
-        Lwt.return
-          ("• Baker performance ranked from worst to best (truncated to 10 \
-            bakers):" :: view_bakers worst_bakers
-          @ ("▪ ..." :: view_bakers best_bakers))
+      let worst_bakers = take 5 sorted_bakers in
+      let best_bakers = List.rev (take 5 (List.rev sorted_bakers)) in
+      Lwt.return
+        ("• Baker performance ranked from worst to best (truncated to 10 \
+          bakers):" :: view_bakers worst_bakers
+        @ ("▪ ..." :: view_bakers best_bakers))
 
-    let fetch_slots_info network =
-      if network = `Mainnet then
-        (* fixme: remove the clause above when we start producing slots
-           on Mainnet. Before, it does not make sense to report slots
-           info for this network. *)
-        Lwt.return ["• Slots info not displayed for the mainnet network"]
-      else
-        let* data =
-          (* fixme: should use protocol parameterized number of slots *)
-          Lwt_list.map_p
-            (fun slot_index -> fetch_slot_info ~slot_index)
-            (List.init 32 Fun.id)
-        in
-        Lwt.return (view_slot_info data)
+    let fetch_slots_info () =
+      let* data =
+        (* fixme: should use protocol parameterized number of slots *)
+        Lwt_list.map_p
+          (fun slot_index -> fetch_slot_info ~slot_index)
+          (List.init 32 Fun.id)
+      in
+      Lwt.return (view_slot_info data)
 
     let action ~slack_bot_token ~slack_channel_id ~configuration () =
       let network = configuration.network in
@@ -1422,7 +1410,7 @@ module Monitoring_app = struct
       let* ratio_dal_commitments_total_info =
         fetch_dal_commitments_total_info ()
       in
-      let* slots_info = fetch_slots_info configuration.network in
+      let* slots_info = fetch_slots_info () in
       let network_overview_info =
         network_info :: ratio_dal_commitments_total_info :: slots_info
       in
