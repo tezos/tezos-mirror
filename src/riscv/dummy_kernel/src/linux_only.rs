@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use std::ffi::CStr;
+use std::time::Instant;
+use std::time::SystemTime;
 
 unsafe fn test_write(msg: &CStr) {
     let message_endl = msg.to_bytes();
@@ -97,4 +99,10 @@ pub fn dummy() {
 
     let boxed = Box::new(Foo::default());
     println!("Debug {boxed:#?}");
+
+    let time = SystemTime::now();
+    println!("System time: {time:?}");
+
+    let instant = Instant::now();
+    println!("Instant: {instant:?}");
 }
