@@ -35,6 +35,24 @@ class Base58CheckTest {
         assertEquals(baseB58Pk, b58Pk)
     }
 
+    @Test fun spSig() {
+        // sk: spsk1ppL4ohtyZeighKZehzfGr2p6dL51kwQqEV2N1sNT7rx9cg5jG
+        // msg: "a"
+        val baseB58Sig = "spsig1Dm7vPsHHTNdeYrTYtyBjEgwmdcMpCRBEHctmE63qQ4Cbt78sNxLYFG2qQq7ouQwqAqH2hGXr7fi2fAJh2WLUtvDFbSH2e"
+        val sig = Secp256k1Signature.fromB58check(baseB58Sig)
+        val b58Sig = sig.toB58check()
+        assertEquals(baseB58Sig, b58Sig)
+    }
+
+    @Test fun blSig() {
+        // sk: BLsk27Wo9tVS8XbNDfCD7X9FnQBwZ4o2gQCZxXkJRmdFYoUTvuTu1S
+        // msg: "a"
+        val baseB58Sig = "BLsigB5MLy2Godk2FSEfWyi1A8XsvgMmZq6siYN7fdTiu5kRapXtrd7Ebit97qinPmF9j5zpPGGoe7Du6JB2Ybpo9839z4E6CSQRNCR3FRqAfWYdoMLz5cTYjmYT1MczxXahrnV8JtZzNF"
+        val sig = BlsSignature.fromB58check(baseB58Sig)
+        val b58Sig = sig.toB58check()
+        assertEquals(baseB58Sig, b58Sig)
+    }
+
     @Test fun decodeInvalidChecksum() {
         val exception = assertFailsWith<Exception.Base58>(
             "Converting hash with invalid checksum must fail"

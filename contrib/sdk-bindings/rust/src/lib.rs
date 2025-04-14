@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_crypto_rs::base58;
+use tezos_crypto_rs::{base58, CryptoError};
 
 uniffi::setup_scaffolding!();
 
@@ -16,4 +16,6 @@ pub enum Error {
     Base58(#[from] base58::FromBase58CheckError),
     #[error("Forging failure: {0:?}")]
     Forge(#[from] forge::ForgingError),
+    #[error("Cryptography failure: {0:?}")]
+    Crypto(CryptoError),
 }
