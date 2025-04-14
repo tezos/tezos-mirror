@@ -37,9 +37,7 @@
   tezos-dal-node-services
   octez-evm-node-libs.evm_node_supported_installers
   octez-evm-node-libs.evm_node_wasm_runtime
-  octez-performance-metrics
-  octez-libs.version
-  octez-shell-libs.shell-services)
+  octez-performance-metrics)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

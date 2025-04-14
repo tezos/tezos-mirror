@@ -310,8 +310,6 @@ let evm_node_lib_dev =
         supported_installers;
         wasm_runtime;
         performance_metrics;
-        octez_version;
-        octez_shell_services;
       ]
 
 let evm_node_lib_dev_client =
