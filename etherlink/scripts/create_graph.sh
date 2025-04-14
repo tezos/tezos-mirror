@@ -20,27 +20,32 @@ for file in "$dir"/*.csv; do
   name=$(echo "$base" | grep -o '[0-9]\+')
 
   awk -v i=$i -v name="$name" '
-    BEGIN { section = ""; tick_sum = 0 }
-    /^ticks_used$/ { section = "ticks"; next }
+    BEGIN { section = ""; max_tick = 0 }
+    /^ticks_used$/ {
+      section = "ticks";
+      max_tick = 0;
+      next
+    }
     /^gas_used$/ {
-        if (section == "ticks") {
-            print i, tick_sum, name >> "data_ticks.tmp"
-        }
-        section = "gas"; next
+      if (section == "ticks") {
+        print i, max_tick, name >> "data_ticks.tmp"
+      }
+      section = "gas";
+      next
     }
     /^[0-9]/ {
-        if (section == "ticks") {
-            tick_sum += $1
-        } else if (section == "gas") {
-            print i, $1, name >> "data_gas.tmp"
-        }
+      if (section == "ticks" && $1 > max_tick) {
+        max_tick = $1
+      } else if (section == "gas") {
+        print i, $1, name >> "data_gas.tmp"
+      }
     }
     END {
-        if (tick_sum > 0 && section == "ticks") {
-            print i, tick_sum, name >> "data_ticks.tmp"
-        }
+      if (max_tick > 0 && section == "ticks") {
+        print i, max_tick, name >> "data_ticks.tmp"
+      }
     }
-    ' "$file"
+  ' "$file"
 
   i=$((i + 1))
 done
@@ -58,14 +63,14 @@ set xtics format ""
 set ytics nomirror
 set y2tics
 set ylabel "Ticks Used (% of 3e10)"
-set y2label "Gas Used"
+set y2label "Gas Used (% of 3e7)"
 
 # Map x-index to numeric IDs
 set xtics ($(awk '!seen[$1]++ { printf "\"%s\" %d\n", $3, $1 }' data_ticks.tmp | paste -sd, -))
 
 plot \
     'data_ticks.tmp' using 1:(\$2 / 30000000000.0 * 100) title 'Ticks (%)' with linespoints pt 7 lc rgb 'blue' axes x1y1, \
-    'data_gas.tmp' using 1:2 title 'Gas' with linespoints pt 7 lc rgb 'red' axes x1y2
+    'data_gas.tmp' using 1:(\$2 / 30000000.0 * 100) title 'Gas (%)' with linespoints pt 7 lc rgb 'red' axes x1y2
 EOF
 
 # Open image
