@@ -273,7 +273,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   type worker_state = {
     stats : Introspection.stats;
     gossip_state : GS.state;
-    bootstrap_points : unit -> Point.t list;
+    persistent_points : unit -> Point.t list;
     trusted_peers : Peer.Set.t;
     connected_bootstrap_peers : Peer.Set.t;
     events_stream : event Stream.t;
@@ -710,14 +710,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
                  Connect {peer = trusted_peer; origin = Trusted}) ;
           let p2p_output_stream = state.p2p_output_stream in
-          let bootstrap_points =
-            state.bootstrap_points ()
+          let persistent_points =
+            state.persistent_points ()
             |> List.filter point_can_be_contacted
             |> Point.Set.of_list
           in
           Point.Set.iter
             (fun point -> Stream.push (Connect_point {point}) p2p_output_stream)
-            bootstrap_points) ;
+            persistent_points) ;
         let state =
           (* We reset the map every 6h. This prevents this map to contain outdated points. *)
           if Int64.(equal (rem gstate_view.heartbeat_ticks 21600L) 0L) then
@@ -946,13 +946,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         event_loop_promise
 
   let make ?(events_logging = fun _event -> Monad.return ())
-      ?(bootstrap_points = fun () -> []) ~self rng limits parameters =
+      ?(initial_points = fun () -> []) ~self rng limits parameters =
     {
       self;
       status = Starting;
       state =
         {
-          bootstrap_points;
+          persistent_points = initial_points;
           stats = Introspection.empty_stats ();
           gossip_state = GS.make rng limits parameters;
           trusted_peers = Peer.Set.empty;

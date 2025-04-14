@@ -225,7 +225,9 @@ val version :
   service
 
 module P2P : sig
-  (** A service to initiate a connection with another point. *)
+  (** A service to initiate a connection with another point. The connection is
+      not regularly re-established, contrary to what happens to the initial
+      peers given via the configuration or the CLI. *)
   val post_connect :
     < meth : [`POST]
     ; input : P2p_point.Id.t
