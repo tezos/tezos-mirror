@@ -31,7 +31,7 @@ pub fn generate_bin_write_for_data(
 fn generate_bin_write(encoding: &Encoding) -> TokenStream {
     match encoding {
         Encoding::Unit => unreachable!(),
-        Encoding::Primitive(primitive, span) => generage_primitive_bin_write(*primitive, *span),
+        Encoding::Primitive(primitive, span) => generate_primitive_bin_write(*primitive, *span),
         Encoding::Bytes(span) => generate_bytes_bin_write(*span),
         Encoding::Path(path) => {
             quote_spanned!(path.span()=> <#path as tezos_data_encoding::enc::BinWriter>::bin_write)
@@ -58,7 +58,7 @@ fn generate_bytes_bin_write(span: Span) -> TokenStream {
     quote_spanned!(span=> tezos_data_encoding::enc::bytes)
 }
 
-fn generage_primitive_bin_write(kind: PrimitiveEncoding, span: Span) -> TokenStream {
+fn generate_primitive_bin_write(kind: PrimitiveEncoding, span: Span) -> TokenStream {
     match kind {
         PrimitiveEncoding::Int8
         | PrimitiveEncoding::Uint8

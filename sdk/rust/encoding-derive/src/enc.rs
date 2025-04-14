@@ -27,7 +27,7 @@ pub fn generate_encoding_for_data(
 pub(crate) fn generate_encoding(encoding: &Encoding) -> TokenStream {
     match encoding {
         Encoding::Unit => quote!(tezos_data_encoding::encoding::Encoding::Unit),
-        Encoding::Primitive(primitive, span) => generage_primitive_encoding(*primitive, *span),
+        Encoding::Primitive(primitive, span) => generate_primitive_encoding(*primitive, *span),
         Encoding::Bytes(span) => {
             quote_spanned!(*span=> tezos_data_encoding::encoding::Encoding::Bytes)
         }
@@ -52,7 +52,7 @@ pub(crate) fn generate_encoding(encoding: &Encoding) -> TokenStream {
     }
 }
 
-fn generage_primitive_encoding(kind: PrimitiveEncoding, span: Span) -> TokenStream {
+fn generate_primitive_encoding(kind: PrimitiveEncoding, span: Span) -> TokenStream {
     let ident = kind.make_ident(span);
     quote_spanned!(ident.span()=> tezos_data_encoding::encoding::Encoding::#ident)
 }

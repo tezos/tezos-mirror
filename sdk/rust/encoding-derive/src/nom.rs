@@ -44,7 +44,7 @@ pub fn generate_nom_read_for_data(
 fn generate_nom_read(encoding: &Encoding) -> TokenStream {
     match encoding {
         Encoding::Unit => unreachable!(),
-        Encoding::Primitive(primitive, span) => generage_primitive_nom_read(*primitive, *span),
+        Encoding::Primitive(primitive, span) => generate_primitive_nom_read(*primitive, *span),
         Encoding::Bytes(span) => generate_bytes_nom_read(*span),
         Encoding::Path(path) => {
             quote_spanned!(path.span()=> <#path as tezos_data_encoding::nom::NomReader>::nom_read)
@@ -74,7 +74,7 @@ fn get_primitive_byte_mapping(kind: PrimitiveEncoding) -> Option<&'static str> {
         .find_map(|(k, s)| if kind == *k { Some(*s) } else { None })
 }
 
-fn generage_primitive_nom_read(kind: PrimitiveEncoding, span: Span) -> TokenStream {
+fn generate_primitive_nom_read(kind: PrimitiveEncoding, span: Span) -> TokenStream {
     match kind {
         PrimitiveEncoding::Int8 | PrimitiveEncoding::Uint8 => {
             generate_byte_nom_read(get_primitive_byte_mapping(kind).unwrap(), span)
