@@ -35,6 +35,8 @@ pub(crate) use block_metrics;
 use super::bcall::Block;
 use super::bcall::BlockHash;
 use crate::machine_state::memory::MemoryConfig;
+use crate::state::NewState;
+use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 
 #[cfg(feature = "metrics")]
@@ -283,9 +285,21 @@ impl<B> BlockMetrics<B> {
     /// Since BlockMetrics doesn't take a `M: ManagerBase` as a type-parameter,
     /// we can't use it with `create_state!`.
     #[cfg(test)]
-    pub(super) fn new(block: B) -> Self {
+    pub(super) fn wrap(block: B) -> Self {
         Self {
             block,
+            block_hash: BlockHash::Dirty,
+        }
+    }
+}
+
+impl<B: NewState<M>, M: ManagerBase> NewState<M> for BlockMetrics<B> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            block: B::new(manager),
             block_hash: BlockHash::Dirty,
         }
     }

@@ -14,6 +14,7 @@ use super::Buddy;
 use super::BuddyLayout;
 use super::branch::BuddyBranch2;
 use super::branch::BuddyBranch2Layout;
+use crate::state::NewState;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::CommitmentLayout;
 use crate::state_backend::FnManager;
@@ -174,6 +175,19 @@ macro_rules! combined_buddy_branch {
         {
             fn eq(&self, other: &Self) -> bool {
                 self.0.eq(&other.0)
+            }
+        }
+
+        impl<B, M> NewState<M> for $name<B, M>
+        where
+            B: NewState<M>,
+            M: ManagerBase,
+        {
+            fn new(manager: &mut M) -> Self
+            where
+                M: ManagerAlloc,
+            {
+                Self(NewState::new(manager))
             }
         }
 

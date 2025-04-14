@@ -32,6 +32,7 @@ use crate::bits::Bits64;
 use crate::bits::ones;
 use crate::bits::u64;
 use crate::machine_state::mode::Mode;
+use crate::state::NewState;
 use crate::state_backend as backend;
 use crate::state_backend::ManagerRead;
 use crate::traps::Exception;
@@ -1659,6 +1660,17 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
     {
         let fs = self.mstatus().fs.read();
         fs == ExtensionValue::Off
+    }
+}
+
+impl<M: backend::ManagerBase> NewState<M> for CSRegisters<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: backend::ManagerAlloc,
+    {
+        Self {
+            registers: CSRValues::new(manager),
+        }
     }
 }
 

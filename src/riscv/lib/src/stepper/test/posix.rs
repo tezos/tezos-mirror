@@ -9,9 +9,10 @@ use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::a0;
 use crate::machine_state::registers::a7;
-use crate::state_backend::AllocatedOf;
+use crate::state::NewState;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
+use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
@@ -29,15 +30,6 @@ pub struct PosixState<M: ManagerBase> {
 }
 
 impl<M: ManagerBase> PosixState<M> {
-    /// Bind the posix state to the given allocated space.
-    pub fn bind(space: AllocatedOf<PosixStateLayout, M>) -> Self {
-        Self {
-            code: space.0,
-            exited: space.1,
-            exit_mode: space.2,
-        }
-    }
-
     /// If an exit has been requested, return the exit code.
     #[allow(dead_code)]
     pub fn exit_code(&self) -> Option<u64>
@@ -120,6 +112,19 @@ impl<M: ManagerBase> PosixState<M> {
 
             // Unimplemented
             _ => Err(format!("Unknown system call number {a7_val}")),
+        }
+    }
+}
+
+impl<M: ManagerBase> NewState<M> for PosixState<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        PosixState {
+            code: Cell::new(manager),
+            exited: Cell::new(manager),
+            exit_mode: Cell::new(manager),
         }
     }
 }

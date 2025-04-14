@@ -99,6 +99,7 @@ use crate::cache_utils::Sizes;
 use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::machine_state::instruction::Args;
 use crate::parser::instruction::InstrWidth;
+use crate::state::NewState;
 use crate::state_backend;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::Atom;
@@ -106,6 +107,7 @@ use crate::state_backend::Cell;
 use crate::state_backend::EnrichedCell;
 use crate::state_backend::EnrichedValue;
 use crate::state_backend::FnManager;
+use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerClone;
 use crate::state_backend::ManagerRead;
@@ -181,7 +183,7 @@ pub struct AddressCellLayout;
 impl state_backend::Layout for AddressCellLayout {
     type Allocated<M: state_backend::ManagerBase> = Cell<Address, M>;
 
-    fn allocate<M: state_backend::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
+    fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         Cell::bind(backend.allocate_region([!0]))
     }
 }
@@ -280,12 +282,26 @@ impl<MC: MemoryConfig, B: Block<MC, M>, M: ManagerBase> Cached<MC, B, M> {
     }
 }
 
+impl<MC: MemoryConfig, B: Block<MC, M>, M: ManagerBase> NewState<M> for Cached<MC, B, M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            address: Cell::new_with(manager, !0),
+            block: B::new(manager),
+            fence_counter: Cell::new(manager),
+            _pd: PhantomData,
+        }
+    }
+}
+
 impl<MC: MemoryConfig, B: Block<MC, M> + Clone, M: ManagerClone> Clone for Cached<MC, B, M> {
     fn clone(&self) -> Self {
         Self {
             address: self.address.clone(),
-            fence_counter: self.fence_counter.clone(),
             block: self.block.clone(),
+            fence_counter: self.fence_counter.clone(),
             _pd: PhantomData,
         }
     }
@@ -358,10 +374,23 @@ impl<M: ManagerBase> PartialBlock<M> {
     }
 }
 
+impl<M: ManagerBase> NewState<M> for PartialBlock<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            phys_addr: Cell::new(manager),
+            in_progress: Cell::new(manager),
+            progress: Cell::new(manager),
+        }
+    }
+}
+
 /// Trait for capturing the different possible layouts of the instruction cache (i.e.
 /// controlling the number of cache entries present).
 pub trait BlockCacheLayout: state_backend::CommitmentLayout + state_backend::ProofLayout {
-    type Entries<MC: MemoryConfig, B: Block<MC, M>, M: ManagerBase>;
+    type Entries<MC: MemoryConfig, B: Block<MC, M>, M: ManagerBase>: NewState<M>;
 
     type Sizes;
 
@@ -513,6 +542,21 @@ pub struct BlockCache<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, 
 impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
     BlockCache<BCL, B, MC, M>
 {
+    /// Allocate a new block cache.
+    pub fn new(manager: &mut M, block_builder: B::BlockBuilder) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            current_block_addr: Cell::new_with(manager, !0),
+            next_instr_addr: Cell::new_with(manager, !0),
+            fence_counter: Cell::new(manager),
+            partial_block: PartialBlock::new(manager),
+            entries: NewState::new(manager),
+            block_builder,
+        }
+    }
+
     /// Bind the block cache to the given allocated state and the given [block builder].
     ///
     /// [block builder]: Block::BlockBuilder

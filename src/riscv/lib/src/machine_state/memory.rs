@@ -14,6 +14,7 @@ use tezos_smart_rollup_constants::riscv::SbiError;
 use thiserror::Error;
 
 use super::registers::XValue;
+use crate::state::NewState;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::CommitmentLayout;
 use crate::state_backend::Elem;
@@ -130,7 +131,7 @@ impl From<OutOfBounds> for SbiError {
 }
 
 /// Instance of memory
-pub trait Memory<M: ManagerBase>: Sized {
+pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
     /// Read an element in the region. `address` is in bytes.
     fn read<E>(&self, address: Address) -> Result<E, OutOfBounds>
     where

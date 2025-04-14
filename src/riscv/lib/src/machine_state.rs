@@ -54,6 +54,7 @@ use crate::program::Program;
 use crate::range_utils::bound_saturating_sub;
 use crate::range_utils::less_than_bound;
 use crate::range_utils::unwrap_bound;
+use crate::state::NewState;
 use crate::state_backend as backend;
 use crate::state_backend::ManagerReadWrite;
 use crate::traps::EnvironException;
@@ -78,78 +79,6 @@ pub struct MachineCoreState<MC: memory::MemoryConfig, M: backend::ManagerBase> {
     pub hart: HartState<M>,
     pub main_memory: MC::State<M>,
     pub translation_cache: TranslationCache<M>,
-}
-
-impl<MC: memory::MemoryConfig, M: backend::ManagerClone> Clone for MachineCoreState<MC, M> {
-    fn clone(&self) -> Self {
-        Self {
-            hart: self.hart.clone(),
-            main_memory: self.main_memory.clone(),
-            translation_cache: self.translation_cache.clone(),
-        }
-    }
-}
-
-/// Layout for the machine state - everything required to fetch & run instructions.
-pub type MachineStateLayout<MC, CL> = (
-    MachineCoreStateLayout<MC>,
-    <CL as CacheLayouts>::BlockCacheLayout,
-);
-
-/// The machine state contains everything required to fetch & run instructions.
-pub struct MachineState<
-    MC: memory::MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
-    M: backend::ManagerBase,
-> {
-    pub core: MachineCoreState<MC, M>,
-    pub block_cache: BlockCache<CL::BlockCacheLayout, B, MC, M>,
-}
-
-impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M> + Clone, M: backend::ManagerClone>
-    Clone for MachineState<MC, CL, B, M>
-{
-    fn clone(&self) -> Self {
-        Self {
-            core: self.core.clone(),
-            block_cache: self.block_cache.clone(),
-        }
-    }
-}
-
-/// How to modify the program counter
-#[derive(Debug, PartialEq)]
-pub enum ProgramCounterUpdate<AddressRepr> {
-    /// Jump to a fixed address
-    Set(AddressRepr),
-    /// Offset to the next instruction by current instruction width
-    Next(InstrWidth),
-}
-
-/// Result type when running multiple steps at a time with [`MachineState::step_max`]
-#[derive(Debug)]
-pub struct StepManyResult<E> {
-    pub steps: usize,
-    pub error: Option<E>,
-}
-
-/// Runs a syscall instruction (ecall, ebreak)
-macro_rules! run_syscall_instr {
-    ($state: ident, $run_fn: ident) => {{ Err($state.hart.$run_fn()) }};
-}
-
-/// Runs a xret instruction (mret, sret, mnret)
-macro_rules! run_xret_instr {
-    ($state: ident, $run_fn: ident) => {{ $state.hart.$run_fn().map(Set) }};
-}
-
-/// Runs a no-arguments instruction (wfi, fenceI)
-macro_rules! run_no_args_instr {
-    ($state: ident, $instr: ident, $run_fn: ident) => {{
-        $state.$run_fn();
-        Ok(Next($instr.width()))
-    }};
 }
 
 impl<MC: memory::MemoryConfig, M: backend::ManagerBase> MachineCoreState<MC, M> {
@@ -245,9 +174,105 @@ impl<MC: memory::MemoryConfig, M: backend::ManagerBase> MachineCoreState<MC, M> 
     }
 }
 
+impl<MC: memory::MemoryConfig, M: backend::ManagerBase> NewState<M> for MachineCoreState<MC, M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: backend::ManagerAlloc,
+    {
+        Self {
+            hart: HartState::new(manager),
+            main_memory: NewState::new(manager),
+            translation_cache: TranslationCache::new(manager),
+        }
+    }
+}
+
+impl<MC: memory::MemoryConfig, M: backend::ManagerClone> Clone for MachineCoreState<MC, M> {
+    fn clone(&self) -> Self {
+        Self {
+            hart: self.hart.clone(),
+            main_memory: self.main_memory.clone(),
+            translation_cache: self.translation_cache.clone(),
+        }
+    }
+}
+
+/// Layout for the machine state - everything required to fetch & run instructions.
+pub type MachineStateLayout<MC, CL> = (
+    MachineCoreStateLayout<MC>,
+    <CL as CacheLayouts>::BlockCacheLayout,
+);
+
+/// The machine state contains everything required to fetch & run instructions.
+pub struct MachineState<
+    MC: memory::MemoryConfig,
+    CL: CacheLayouts,
+    B: Block<MC, M>,
+    M: backend::ManagerBase,
+> {
+    pub core: MachineCoreState<MC, M>,
+    pub block_cache: BlockCache<CL::BlockCacheLayout, B, MC, M>,
+}
+
+impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M> + Clone, M: backend::ManagerClone>
+    Clone for MachineState<MC, CL, B, M>
+{
+    fn clone(&self) -> Self {
+        Self {
+            core: self.core.clone(),
+            block_cache: self.block_cache.clone(),
+        }
+    }
+}
+
+/// How to modify the program counter
+#[derive(Debug, PartialEq)]
+pub enum ProgramCounterUpdate<AddressRepr> {
+    /// Jump to a fixed address
+    Set(AddressRepr),
+    /// Offset to the next instruction by current instruction width
+    Next(InstrWidth),
+}
+
+/// Result type when running multiple steps at a time with [`MachineState::step_max`]
+#[derive(Debug)]
+pub struct StepManyResult<E> {
+    pub steps: usize,
+    pub error: Option<E>,
+}
+
+/// Runs a syscall instruction (ecall, ebreak)
+macro_rules! run_syscall_instr {
+    ($state: ident, $run_fn: ident) => {{ Err($state.hart.$run_fn()) }};
+}
+
+/// Runs a xret instruction (mret, sret, mnret)
+macro_rules! run_xret_instr {
+    ($state: ident, $run_fn: ident) => {{ $state.hart.$run_fn().map(Set) }};
+}
+
+/// Runs a no-arguments instruction (wfi, fenceI)
+macro_rules! run_no_args_instr {
+    ($state: ident, $instr: ident, $run_fn: ident) => {{
+        $state.$run_fn();
+        Ok(Next($instr.width()))
+    }};
+}
+
 impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::ManagerBase>
     MachineState<MC, CL, B, M>
 {
+    /// Allocate a new machine state.
+    pub fn new(manager: &mut M, block_builder: B::BlockBuilder) -> Self
+    where
+        M: backend::ManagerAlloc,
+    {
+        Self {
+            core: MachineCoreState::new(manager),
+            block_cache: BlockCache::new(manager, block_builder),
+        }
+    }
+
     /// Bind the block cache to the given allocated state and the given [block builder].
     ///
     /// [block builder]: Block::BlockBuilder

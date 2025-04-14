@@ -15,6 +15,7 @@ use crate::machine_state::mode::TrapMode;
 use crate::machine_state::registers;
 use crate::machine_state::reservation_set;
 use crate::machine_state::reservation_set::ReservationSet;
+use crate::state::NewState;
 use crate::state_backend as backend;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
@@ -189,6 +190,22 @@ impl<M: backend::ManagerBase> HartState<M> {
     {
         // Interrupts are not implemented yet.
         None
+    }
+}
+
+impl<M: backend::ManagerBase> NewState<M> for HartState<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: backend::ManagerAlloc,
+    {
+        Self {
+            xregisters: registers::XRegisters::new(manager),
+            fregisters: registers::FRegisters::new(manager),
+            csregisters: csregisters::CSRegisters::new(manager),
+            mode: Cell::new(manager),
+            pc: Cell::new(manager),
+            reservation_set: ReservationSet::new(manager),
+        }
     }
 }
 

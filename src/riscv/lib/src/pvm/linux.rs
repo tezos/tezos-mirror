@@ -33,10 +33,12 @@ use crate::machine_state::memory::Permissions;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers;
 use crate::program::Program;
+use crate::state::NewState;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
 use crate::state_backend::FnManager;
+use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerClone;
 use crate::state_backend::ManagerRead;
@@ -427,6 +429,21 @@ pub struct SupervisorState<M: ManagerBase> {
 }
 
 impl<M: ManagerBase> SupervisorState<M> {
+    /// Allocate a new supervisor state.
+    pub fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        SupervisorState {
+            tid_address: Cell::new(manager),
+            exited: Cell::new(manager),
+            exit_code: Cell::new(manager),
+            program: Cell::new(manager),
+            heap: Cell::new(manager),
+            stack_guard: Cell::new(manager),
+        }
+    }
+
     /// Bind the given allocated regions to the supervisor state.
     pub fn bind(space: AllocatedOf<SupervisorStateLayout, M>) -> Self {
         SupervisorState {

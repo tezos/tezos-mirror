@@ -29,6 +29,7 @@ use crate::machine_state::memory::M1G;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::mode;
 use crate::program::Program;
+use crate::state::NewState;
 use crate::state_backend::owned_backend::Owned;
 use crate::traps::EnvironException;
 
@@ -127,12 +128,9 @@ impl<MC: MemoryConfig, B: Block<MC, Owned>> TestStepper<MC, TestCacheLayouts, B>
         mode: mode::Mode,
         block_builder: B::BlockBuilder,
     ) -> Result<(Self, BTreeMap<u64, String>), TestStepperError> {
-        let (posix_space, machine_state_space) = Owned::allocate::<TestStepperLayout<MC>>();
-        let posix_state = PosixState::bind(posix_space);
-        let machine_state = MachineState::bind(machine_state_space, block_builder);
         let mut stepper = Self {
-            posix_state,
-            machine_state,
+            posix_state: PosixState::new(&mut Owned),
+            machine_state: MachineState::new(&mut Owned, block_builder),
         };
 
         // By default the Posix EE expects to exit in a specific privilege mode.

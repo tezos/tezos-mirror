@@ -20,11 +20,13 @@ use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Instruction;
 use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
+use crate::state::NewState;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
 use crate::state_backend::EnrichedCell;
 use crate::state_backend::FnManager;
+use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerClone;
 use crate::state_backend::ManagerRead;
@@ -74,7 +76,7 @@ pub type BlockLayout = (Atom<u8>, [Atom<Instruction>; CACHE_INSTR]);
 ///
 /// A block is a sequence of at least one instruction, which may be executed sequentially.
 /// Blocks will never contain more than [`CACHE_INSTR`] instructions.
-pub trait Block<MC: MemoryConfig, M: ManagerBase> {
+pub trait Block<MC: MemoryConfig, M: ManagerBase>: NewState<M> {
     /// Block construction may require additional state not kept in storage,
     /// this is then passed as a parameter to [`Block::callable`].
     type BlockBuilder: Default;
@@ -196,6 +198,18 @@ impl<MC: MemoryConfig, M: ManagerBase> BCall<MC, M> for [EnrichedCell<ICallPlace
     }
 }
 
+impl<MC: MemoryConfig, M: ManagerBase> NewState<M> for Interpreted<MC, M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            len_instr: Cell::new(manager),
+            instr: NewState::new(manager),
+        }
+    }
+}
+
 impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
     type BlockBuilder = InterpretedBlockBuilder;
 
@@ -304,6 +318,20 @@ pub struct InlineJit<MC: MemoryConfig, M: JitStateAccess> {
     /// should occur to the interpreted block.
     compiled: bool,
     block_hash: BlockHash,
+}
+
+impl<MC: MemoryConfig, M: JitStateAccess> NewState<M> for InlineJit<MC, M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            fallback: Interpreted::new(manager),
+            jit_fn: None,
+            compiled: false,
+            block_hash: BlockHash::Dirty,
+        }
+    }
 }
 
 impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
@@ -530,7 +558,7 @@ mod test {
 
             // use block metrics, since interpreted has no hash
             let $block_name =
-                &mut BlockMetrics::new(create_state!(Interpreted, BlockLayout, $F, M4K));
+                &mut BlockMetrics::wrap(create_state!(Interpreted, BlockLayout, $F, M4K));
             let $bb_name =
                 &mut <Interpreted<M4K, M<$F>> as Block<M4K, M<$F>>>::BlockBuilder::default();
             {

@@ -10,6 +10,7 @@ use serde::Serialize;
 use super::Buddy;
 use super::BuddyLayout;
 use crate::bits::ones;
+use crate::state::NewState;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
@@ -94,6 +95,17 @@ pub struct BuddyLeaf<const PAGES: u64, M: ManagerBase> {
     /// Each bit of the `u64` represents a page.
     /// The least significant bit is the page with index 0.
     set: Cell<u64, M>,
+}
+
+impl<const PAGES: u64, M: ManagerBase> NewState<M> for BuddyLeaf<PAGES, M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            set: Cell::new(manager),
+        }
+    }
 }
 
 impl<const PAGES: u64, M: ManagerBase> Buddy<M> for BuddyLeaf<PAGES, M> {
