@@ -804,6 +804,13 @@ val get_chain_block_helper_validators :
 val get_chain_block_helper_levels_in_current_cycle :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/total_baking_power]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_helper_total_baking_power :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** RPC: [POST /bls/aggregate_signatures] *)
 val post_bls_aggregate_signatures : string list -> string t
 

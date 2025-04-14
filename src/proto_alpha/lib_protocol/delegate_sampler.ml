@@ -271,4 +271,9 @@ module For_RPC = struct
       Delegate_staking_parameters.of_delegate ctxt delegate
     in
     Lwt.return @@ Stake_context.baking_weight ctxt staking_parameters stake
+
+  let total_baking_power ctxt cycle =
+    let open Lwt_result_syntax in
+    let+ total_active_stake = Stake_storage.get_total_active_stake ctxt cycle in
+    Stake_repr.staking_weight total_active_stake
 end

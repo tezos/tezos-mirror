@@ -4122,6 +4122,13 @@ module S = struct
       ~query:RPC_query.empty
       ~output:int32
       RPC_path.(path / "consecutive_round_zero")
+
+  let total_baking_power =
+    RPC_service.get_service
+      ~description:"Returns the total baking power for the current cycle"
+      ~query:RPC_query.empty
+      ~output:Data_encoding.int64
+      RPC_path.(path / "total_baking_power")
 end
 
 type Environment.Error_monad.error += Negative_level_offset
@@ -4179,7 +4186,11 @@ let register () =
   Registration.register0
     ~chunked:false
     S.consecutive_round_zero
-    (fun ctxt () () -> Consecutive_round_zero.get ctxt)
+    (fun ctxt () () -> Consecutive_round_zero.get ctxt) ;
+  Registration.register0 ~chunked:false S.total_baking_power (fun ctxt () () ->
+      Stake_distribution.For_RPC.total_baking_power
+        ctxt
+        (Level.current ctxt).cycle)
 
 let current_level ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.current_level ctxt block {offset} ()

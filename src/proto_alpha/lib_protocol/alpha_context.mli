@@ -5176,6 +5176,8 @@ module Stake_distribution : sig
   module For_RPC : sig
     val delegate_current_baking_power :
       context -> Signature.public_key_hash -> int64 tzresult Lwt.t
+
+    val total_baking_power : context -> Cycle.t -> int64 tzresult Lwt.t
   end
 
   module Internal_for_tests : sig
