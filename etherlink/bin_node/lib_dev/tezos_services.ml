@@ -247,7 +247,7 @@ let version () =
   Lwt_result_syntax.return Tezlink_version.mock
 
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
-let build_block_dir backend =
+let build_block_dir (module Backend : Tezlink_backend_sig.S) =
   let dir : tezlink_rpc_context Tezos_rpc.Directory.t =
     Tezos_rpc.Directory.empty
   in
@@ -255,11 +255,7 @@ let build_block_dir backend =
   |> register_with_conversion
        ~service:Imported_services.current_level
        ~impl:(fun {block; chain} query () ->
-         Tezlink_services_impl.current_level
-           backend
-           chain
-           block
-           ~offset:query.offset)
+         Backend.current_level chain block ~offset:query.offset)
        ~convert_output:Protocol_types.Level.convert
   |> register ~service:Imported_services.protocols ~impl:(fun _ _ () ->
          protocols ())
@@ -270,8 +266,7 @@ let build_block_dir backend =
        ~convert_output:Protocol_types.Tez.convert
   |> register_with_conversion
        ~service:Imported_services.constants
-       ~impl:(fun {block; chain} () () ->
-         Tezlink_services_impl.constants chain block)
+       ~impl:(fun {block; chain} () () -> Backend.constants chain block)
        ~convert_output:Tezlink_constants.convert
 
 (** Builds the root director. *)

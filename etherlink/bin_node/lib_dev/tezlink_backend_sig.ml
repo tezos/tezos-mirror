@@ -5,6 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* THIS IS THE ENTRYPOINT *)
-val register_tezlink_services :
-  (module Tezlink_backend_sig.S) -> Evm_directory.t
+module type S = sig
+  val current_level :
+    [> `Main] ->
+    [> `Head of 'a] ->
+    offset:int32 ->
+    Tezos_types.level tzresult Lwt.t
+
+  val constants :
+    [> `Main] -> [> `Head of 'a] -> Tezlink_constants.t tzresult Lwt.t
+end
