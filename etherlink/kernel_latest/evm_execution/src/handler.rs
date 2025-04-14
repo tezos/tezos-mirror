@@ -2326,6 +2326,87 @@ fn cached_storage_access<Host: Runtime>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+pub fn trace_call<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    call_scheme: CallScheme,
+    caller: H160,
+    value: U256,
+    gas_used: u64,
+    input: Vec<u8>,
+    context_address: H160,
+    code_address: H160,
+    target_gas: Option<u64>,
+    output: &[u8],
+    reason: &ExitReason,
+) {
+    if let Some(CallTracer(CallTracerInput {
+        transaction_hash,
+        config:
+            CallTracerConfig {
+                with_logs,
+                only_top_call: false,
+            },
+    })) = handler.tracer
+    {
+        let (type_, from) = match call_scheme {
+            CallScheme::Call => ("CALL", caller),
+            CallScheme::StaticCall => ("STATICCALL", caller),
+            CallScheme::DelegateCall => {
+                // FIXME: #7738 this only point to parent call
+                // address if it was not a DELEGATECALL or
+                // CALLCODE itself
+                ("DELEGATECALL", context_address)
+            }
+            CallScheme::CallCode => {
+                // FIXME: #7738 this only point to parent call
+                // address if it was not a DELEGATECALL or
+                // CALLCODE itself
+                ("CALLCODE", context_address)
+            }
+        };
+        let mut call_trace = CallTrace::new_minimal_trace(
+            type_.into(),
+            from,
+            value,
+            gas_used,
+            input,
+            // We need to make the distinction between the initial call (depth 0)
+            // and the other subcalls
+            (handler.stack_depth() + 1).try_into().unwrap_or_default(),
+        );
+
+        // for the trace we want the contract address to always be the "to"
+        // field, not necessarily the address used in the transition context
+        // which may be something else (eg DELEGATECALL)
+        call_trace.add_to(Some(code_address));
+        call_trace.add_gas(target_gas);
+        call_trace.add_output(Some(output.to_owned()));
+
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
+        // For errors and revert reasons, find the appropriate values
+        // to return for tracing. The following values are kind of placeholders.
+        match reason {
+            ExitReason::Succeed(_) => (),
+            ExitReason::Error(e) => call_trace.add_error(Some(format!("{:?}", e).into())),
+            ExitReason::Revert(r) => {
+                call_trace.add_error(Some(format!("{:?}", r).into()))
+            }
+            ExitReason::Fatal(f) => call_trace.add_error(Some(format!("{:?}", f).into())),
+        };
+
+        if with_logs {
+            call_trace.add_logs(
+                handler
+                    .transaction_data
+                    .last()
+                    .map(|tx_layer| tx_layer.logs.clone()),
+            )
+        }
+        let _ = tracer::store_call_trace(handler.host, call_trace, &transaction_hash);
+    }
+}
+
 /// SELFDESTRUCT implementation prior to EIP-6780.
 /// See https://eips.ethereum.org/EIPS/eip-6780.
 fn mark_delete_legacy<Host: Runtime>(
@@ -2917,9 +2998,8 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
                     return Capture::Exit((ethereum_error_to_exit_reason(&err), vec![]));
                 }
 
-                let address = transaction_context.context.address;
-
                 let gas_before = self.gas_used();
+                let context_address = transaction_context.context.address;
                 let result = self.execute_call(
                     code_address,
                     transfer,
@@ -2933,79 +3013,19 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
                         log!(self.host, Debug, "Call ended with reason: {:?}", reason);
 
                         // TRACING
-                        if let Some(CallTracer(CallTracerInput {
-                            transaction_hash,
-                            config:
-                                CallTracerConfig {
-                                    with_logs,
-                                    only_top_call: false,
-                                },
-                        })) = self.tracer
-                        {
-                            let (type_, from) = match call_scheme {
-                                CallScheme::Call => ("CALL", caller),
-                                CallScheme::StaticCall => ("STATICCALL", caller),
-                                CallScheme::DelegateCall => {
-                                    // FIXME: #7738 this only point to parent call
-                                    // address if it was not a DELEGATECALL or
-                                    // CALLCODE itself
-                                    ("DELEGATECALL", transaction_context.context.address)
-                                }
-                                CallScheme::CallCode => {
-                                    // FIXME: #7738 this only point to parent call
-                                    // address if it was not a DELEGATECALL or
-                                    // CALLCODE itself
-                                    ("CALLCODE", transaction_context.context.address)
-                                }
-                            };
-                            let mut call_trace = CallTrace::new_minimal_trace(
-                                type_.into(),
-                                from,
-                                value,
-                                gas_after - gas_before,
-                                input,
-                                // We need to make the distinction between the initial call (depth 0)
-                                // and the other subcalls
-                                (self.stack_depth() + 1).try_into().unwrap_or_default(),
-                            );
-
-                            // for the trace we want the contract address to always be the "to"
-                            // field, not necessarily the address used in the transition context
-                            // which may be something else (eg DELEGATECALL)
-                            call_trace.add_to(Some(code_address));
-                            call_trace.add_gas(target_gas);
-                            call_trace.add_output(Some(output.to_owned()));
-
-                            // TODO: https://gitlab.com/tezos/tezos/-/issues/7437
-                            // For errors and revert reasons, find the appropriate values
-                            // to return for tracing. The following values are kind of placeholders.
-                            match &reason {
-                                ExitReason::Succeed(_) => (),
-                                ExitReason::Error(e) => {
-                                    call_trace.add_error(Some(format!("{:?}", e).into()))
-                                }
-                                ExitReason::Revert(r) => {
-                                    call_trace.add_error(Some(format!("{:?}", r).into()))
-                                }
-                                ExitReason::Fatal(f) => {
-                                    call_trace.add_error(Some(format!("{:?}", f).into()))
-                                }
-                            };
-
-                            if with_logs {
-                                call_trace.add_logs(
-                                    self.transaction_data
-                                        .last()
-                                        .map(|tx_layer| tx_layer.logs.clone()),
-                                )
-                            }
-
-                            let _ = tracer::store_call_trace(
-                                self.host,
-                                call_trace,
-                                &transaction_hash,
-                            );
-                        }
+                        trace_call(
+                            self,
+                            call_scheme,
+                            caller,
+                            value,
+                            gas_after - gas_before,
+                            input,
+                            context_address,
+                            code_address,
+                            target_gas,
+                            &output,
+                            &reason,
+                        );
 
                         Capture::Exit((reason, output))
                     }
