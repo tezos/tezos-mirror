@@ -59,12 +59,19 @@ module Tx_queue = struct
 
   (* as found in etherlink/bin_floodgate/tx_queue.ml *)
   let transfer ctx ?to_ ?(value = Z.zero) ~nonce ~data () =
+    let open Lwt_result_syntax in
     let txn = Craft.transfer ctx ~nonce ?to_ ~value ~data () in
     let tx_raw = Ethereum_types.hex_to_bytes txn in
     let hash = Ethereum_types.hash_raw_tx tx_raw in
     let**? tx = Transaction.decode tx_raw in
     let**? tx_object = Transaction.to_transaction_object ~hash tx in
-    inject tx_object txn ~next_nonce:(Ethereum_types.Qty nonce)
+    let+ res =
+      Tx_container.add
+        tx_object
+        ~raw_tx:txn
+        ~next_nonce:(Ethereum_types.Qty nonce)
+    in
+    match res with Ok _hash -> Ok () | Error _ as res -> res
 end
 
 module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
@@ -716,7 +723,11 @@ let handle_confirmed_txs {db; ws_client; _}
                    exec.blockNumber )
              in
              let* () = Db.Deposits.set_claimed db nonce exec in
-             let* () = Tx_queue.confirm tx_hash in
+             let* () =
+               Tx_queue.confirm_transactions
+                 ~clear_pending_queue_after:false
+                 ~confirmed_txs:(Seq.cons tx_hash Seq.empty)
+             in
              return_unit
          | Some {status; _} ->
              let*! () =

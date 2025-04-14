@@ -376,7 +376,6 @@ end
 module Request = struct
   type ('a, 'b) t =
     | Inject : request -> ((unit, string) result, tztrace) t
-    | Confirm : {txn_hash : Ethereum_types.hash} -> (unit, tztrace) t
     | Find : {
         txn_hash : Ethereum_types.hash;
       }
@@ -431,15 +430,6 @@ module Request = struct
              (req "payload" Ethereum_types.hex_encoding))
           (function
             | View (Inject {payload; _}) -> Some ((), payload) | _ -> None)
-          (fun _ -> assert false);
-        case
-          Json_only
-          ~title:"Confirm"
-          (obj2
-             (req "request" (constant "confirm"))
-             (req "transaction_hash" Ethereum_types.hash_encoding))
-          (function
-            | View (Confirm {txn_hash}) -> Some ((), txn_hash) | _ -> None)
           (fun _ -> assert false);
         case
           Json_only
@@ -530,8 +520,6 @@ module Request = struct
     let open Format in
     match r with
     | Inject {payload = Hex txn; _} -> fprintf fmt "Inject %s" txn
-    | Confirm {txn_hash = Hash (Hex txn_hash)} ->
-        fprintf fmt "Confirm %s" txn_hash
     | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
     | Tick _ -> fprintf fmt "Tick"
     | Clear -> fprintf fmt "Clear"
@@ -819,13 +807,6 @@ module Handlers = struct
         else
           return
             (Error "Transaction limit was reached. Transaction is rejected.")
-    | Confirm {txn_hash} -> (
-        protect @@ fun () ->
-        match Pending_transactions.pop state.pending txn_hash with
-        | Some {pending_callback; _} ->
-            let*! () = pending_callback `Confirmed in
-            return_unit
-        | None -> return_unit)
     | Find {txn_hash} ->
         protect @@ fun () ->
         return @@ Transaction_objects.find state.tx_object txn_hash
@@ -1063,9 +1044,6 @@ let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
     worker
     (Inject {next_nonce; payload = txn; tx_object; callback})
   |> handle_request_error
-
-let confirm txn_hash =
-  bind_worker @@ fun w -> push_request w (Confirm {txn_hash})
 
 let start ~config ~keep_alive () =
   let open Lwt_result_syntax in
