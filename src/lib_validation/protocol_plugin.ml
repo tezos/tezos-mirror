@@ -38,7 +38,6 @@ module type T = sig
       | `Branch_refused of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace ]
-      Lwt.t
 
     val conflict_handler : config -> Mempool.conflict_handler
 
@@ -103,7 +102,7 @@ module No_plugin (Proto : Registered_protocol.T) :
 
     let syntactic_check _ = Lwt.return `Well_formed
 
-    let pre_filter _ _ _ = Lwt.return @@ `Passed_prefilter (`Low [])
+    let pre_filter _ _ _ = `Passed_prefilter (`Low [])
 
     let conflict_handler _ ~existing_operation ~new_operation =
       if compare_operations existing_operation new_operation < 0 then `Replace

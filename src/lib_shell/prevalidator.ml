@@ -380,18 +380,18 @@ module Make_s
 
   type pre_filter_result = Drop | Priority of Pending_ops.priority
 
-  let pre_filter pv ~notifier parsed_op : pre_filter_result Lwt.t =
-    let open Lwt_syntax in
-    let* v =
+  let pre_filter pv ~notifier parsed_op : pre_filter_result =
+    let v =
       Prevalidation_t.pre_filter pv.validation_state pv.config parsed_op
     in
     match v with
     | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as errs
       ->
         handle_classification ~notifier pv.shell (parsed_op, errs) ;
-        let* () = Events.(emit operation_classified) parsed_op.hash in
-        return Drop
-    | `Passed_prefilter priority -> return (Priority priority)
+        Events.(emit__dont_wait__use_with_care operation_classified)
+          parsed_op.hash ;
+        Drop
+    | `Passed_prefilter priority -> Priority priority
 
   let set_mempool shell mempool =
     shell.mempool <- mempool ;
@@ -730,7 +730,7 @@ module Make_s
             ()
             [@profiler.overwrite
               Opentelemetry_profiler.add_event "parse_operation succeeded"] ;
-            let* v =
+            let v =
               pre_filter
                 pv
                 ~notifier:(mk_notifier pv.operation_stream)
@@ -939,7 +939,7 @@ module Make_s
       let*! new_pending_operations, nb_pending =
         Operation_hash.Map.fold_s
           (fun oph op (pending, nb_pending) ->
-            (let*! v =
+            (let v =
                pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
              in
              match v with

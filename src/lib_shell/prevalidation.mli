@@ -92,7 +92,6 @@ module type T = sig
     protocol_operation Shell_operation.operation ->
     [ `Passed_prefilter of Prevalidator_pending_operations.priority
     | Prevalidator_classification.error_classification ]
-    Lwt.t
 
   (** Contain the hash and new classification of any operations that
       had to be removed to make room for a newly added operation. *)

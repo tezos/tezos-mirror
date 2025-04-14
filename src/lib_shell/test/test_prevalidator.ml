@@ -124,12 +124,11 @@ module Plugin = struct
     include Plugin
 
     let pre_filter _ _ {shell = _; protocol_data} =
-      Lwt.return
-      @@ `Passed_prefilter
-           (match protocol_data with
-           | High -> `High
-           | Medium -> `Medium
-           | Low -> `Low [])
+      `Passed_prefilter
+        (match protocol_data with
+        | High -> `High
+        | Medium -> `Medium
+        | Low -> `Low [])
   end
 end
 
