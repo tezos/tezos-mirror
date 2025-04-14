@@ -1039,6 +1039,12 @@ module Tx_container (Tx : Tx_queue_types.L2_transaction) = struct
     let on_close _ = Lwt.return_unit
   end
 
+  type address = Tx.address
+
+  type legacy_transaction_object = Tx.legacy
+
+  type transaction_object = Tx.t
+
   let table = Worker.create_table Queue
 
   let worker_promise, worker_waker = Lwt.task ()

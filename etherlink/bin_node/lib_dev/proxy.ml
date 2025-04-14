@@ -25,6 +25,12 @@ let container_forward_tx ~evm_node_endpoint ~keep_alive :
     L2_types.evm_chain_family Services_backend_sig.tx_container =
   Services_backend_sig.Evm_tx_container
     (module struct
+      type address = Ethereum_types.address
+
+      type legacy_transaction_object = Ethereum_types.legacy_transaction_object
+
+      type transaction_object = Transaction_object.t
+
       let nonce ~next_nonce _address = Lwt_result.return next_nonce
 
       let add ~next_nonce:_ _tx_object ~raw_tx =

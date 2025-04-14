@@ -185,11 +185,17 @@ type endpoint = Rpc of Uri.t | Websocket of Websocket_client.t
     {!Services.dispatch_request} to request informations about pending
     transactions. *)
 module type Tx_container = sig
+  type address
+
+  type legacy_transaction_object
+
+  type transaction_object
+
   (** [nonce ~next_nonce address] must returns the next gap nonce
       available. *)
   val nonce :
     next_nonce:Ethereum_types.quantity ->
-    Ethereum_types.address ->
+    address ->
     Ethereum_types.quantity tzresult Lwt.t
 
   (** [add ~next_nonce tx_object raw_tx] returns the next gap nonce
@@ -197,13 +203,13 @@ module type Tx_container = sig
       [next_nonce] is the next expected nonce found in the backend. *)
   val add :
     next_nonce:Ethereum_types.quantity ->
-    Ethereum_types.legacy_transaction_object ->
+    legacy_transaction_object ->
     raw_tx:Ethereum_types.hex ->
     (Ethereum_types.hash, string) result tzresult Lwt.t
 
   (** [find hash] returns the transaction_object found in tx
       container. *)
-  val find : Ethereum_types.hash -> Transaction_object.t option tzresult Lwt.t
+  val find : Ethereum_types.hash -> transaction_object option tzresult Lwt.t
 
   (** [content ()] returns all the transactions found in tx
       container. *)
@@ -262,10 +268,10 @@ module type Tx_container = sig
     validate_tx:
       ('a ->
       string ->
-      Ethereum_types.legacy_transaction_object ->
+      legacy_transaction_object ->
       [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t) ->
     initial_validation_state:'a ->
-    (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
+    (string * legacy_transaction_object) list tzresult Lwt.t
 end
 
 (** ['f tx_container] is a GADT parametrized by the same type argument
@@ -275,7 +281,11 @@ end
 
 type 'f tx_container =
   | Evm_tx_container :
-      (module Tx_container)
+      (module Tx_container
+         with type address = Ethereum_types.address
+          and type legacy_transaction_object =
+            Ethereum_types.legacy_transaction_object
+          and type transaction_object = Transaction_object.t)
       -> L2_types.evm_chain_family tx_container
   | Michelson_tx_container :
       (module Tx_container)

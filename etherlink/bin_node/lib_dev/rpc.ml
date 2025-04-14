@@ -65,6 +65,12 @@ let container_forward_request ~public_endpoint ~private_endpoint ~keep_alive :
     L2_types.evm_chain_family Services_backend_sig.tx_container =
   Services_backend_sig.Evm_tx_container
     (module struct
+      type address = Ethereum_types.address
+
+      type legacy_transaction_object = Ethereum_types.legacy_transaction_object
+
+      type transaction_object = Transaction_object.t
+
       let rpc_error =
         Internal_event.Simple.declare_2
           ~section:Events.section
