@@ -24,9 +24,9 @@ val with_timing_f_e :
     error monad returns an error. *)
 val unwrap_error_monad : (unit -> 'a tzresult Lwt.t) -> 'a Lwt.t
 
-(** [normalize_addr addr] normalized an L2 address [addr],
-    i.e. lowercase it and remove prefix "0x". *)
-val normalize_addr : string -> string
+(** [normalize_hex str] normalized an hexa-encoded string, i.e. lowercase it
+    and remove prefix "0x" if it exists. *)
+val normalize_hex : string -> Hex.t tzresult
 
 (** [interpolate str vars] computes a new string when the variables specified
     in [vars] are replaced by their value.

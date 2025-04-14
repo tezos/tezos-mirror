@@ -42,11 +42,17 @@ let unwrap_error_monad f =
   | Error errs ->
       Lwt.fail_with (Format.asprintf "%a" Error_monad.pp_print_trace errs)
 
-let normalize_addr str =
+let normalize_hex str =
+  let open Result_syntax in
   let str = String.lowercase_ascii str in
-  match String.remove_prefix ~prefix:"0x" str with
-  | Some str -> str
-  | None -> str
+  let str =
+    match String.remove_prefix ~prefix:"0x" str with
+    | Some str -> str
+    | None -> str
+  in
+  let res = `Hex str in
+  if Option.is_some (Hex.to_string res) then return res
+  else error_with "%s is not a valid hexa-encoded string" str
 
 let interpolate str
     (vars : (char * [`Available of string | `Disabled of string]) list) =
