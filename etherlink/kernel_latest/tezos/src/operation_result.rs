@@ -111,3 +111,18 @@ pub struct OperationResult<M: OperationKind> {
 pub enum OperationResultSum {
     Reveal(OperationResult<Reveal>),
 }
+
+pub fn produce_operation_result<M: OperationKind>(
+    result: Result<M::Success, OperationError>,
+) -> OperationResult<M> {
+    match result {
+        Ok(success) => OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(success),
+        },
+        Err(operation_error) => OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Failed(vec![operation_error]),
+        },
+    }
+}

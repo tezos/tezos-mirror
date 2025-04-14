@@ -10,7 +10,10 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Contract;
 use tezos_tezlink::{
     operation::{ManagerOperation, Operation},
-    operation_result::ValidityError,
+    operation_result::{
+        produce_operation_result, OperationError, OperationResultSum, Reveal,
+        RevealSuccess, ValidityError,
+    },
 };
 use thiserror::Error;
 
@@ -71,12 +74,11 @@ fn is_valid_tezlink_operation<Host: Runtime>(
     Ok(Ok(()))
 }
 
-// TOOD: apply_operation function should return an operation receipt
 pub fn apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     operation: &Operation,
-) -> Result<(), ApplyKernelError> {
+) -> Result<OperationResultSum, ApplyKernelError> {
     let ManagerOperation {
         source,
         fee,
@@ -101,13 +103,21 @@ pub fn apply_operation<Host: Runtime>(
 
     let validity_result = is_valid_tezlink_operation(host, &account, fee, counter)?;
 
-    // TODO: ignoring the validity error for now
-    if let Err(_validity_err) = validity_result {
+    if let Err(validity_err) = validity_result {
         log!(host, Debug, "Operation is invalid, exiting apply_operation");
-        return Ok(());
+        // TODO: Don't force the receipt to a reveal receipt
+        let receipt = produce_operation_result::<Reveal>(Err(
+            OperationError::Validation(validity_err),
+        ));
+        return Ok(OperationResultSum::Reveal(receipt));
     }
 
     log!(host, Debug, "Operation is valid");
 
-    Ok(())
+    // TODO: Don't force the receipt to a reveal receipt
+    let dummy_result = produce_operation_result::<Reveal>(Ok(RevealSuccess {
+        consumed_gas: 0_u64.into(),
+    }));
+
+    Ok(OperationResultSum::Reveal(dummy_result))
 }
