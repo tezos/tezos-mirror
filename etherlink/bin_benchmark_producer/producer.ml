@@ -23,8 +23,8 @@ let register ~title ~registered ~tx_per_call =
         Constant.smart_rollup_installer;
       ]
   @@ fun () ->
-  (* max_gas_per_tx must be equivalent to kernel_latest/kernel/src/block.rs max_gas_per_reboot *)
-  let max_gas_per_tx = 30_000_000 * 4 / 3 in
+  (* max_gas_per_tx must be equivalent to bin_node/lib_dev/durable_storage.ml maximum_gas_per_transaction *)
+  let max_gas_per_tx = 30_000_000 in
   (* da_fee_per_byte must be equivalent to kernel_latest/kernel/src/fees.rs DA_FEE_PER_BYTE *)
   let da_fee_per_byte = Wei.to_wei_z Z.(of_int 4 * pow (of_int 10) 12) in
   (* gas_price must be big yumyum value kekw *)

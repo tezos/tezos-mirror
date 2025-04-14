@@ -40,7 +40,7 @@ for i in $(seq 0 $((num_splits - 1))); do
 
   ./octez-evm-node replay blueprints from "$from" to "$to" \
     --data-dir "$data_dir" \
-    --profile export &
+    --profile minimal &
 
   pids+=($!)
 
