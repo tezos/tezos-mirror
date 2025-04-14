@@ -225,6 +225,31 @@ let evm_node_lib_dev_encoding =
         uuidm;
       ]
 
+let evm_node_lib_dev_tezlink =
+  let quebec =
+    List.find (fun proto -> Protocol.short_hash proto = "PsQuebec") Protocol.all
+  in
+  let tezlink_protocol_plugin =
+    match Protocol.plugin quebec with
+    | Some target -> target
+    | None -> (* unreachable *) assert false
+  in
+  let tezlink_protocol_parameters =
+    match Protocol.parameters quebec with
+    | Some target -> target
+    | None -> (* unreachable *) assert false
+  in
+  octez_evm_node_lib
+    "evm_node_lib_dev_tezlink"
+    ~path:"etherlink/bin_node/lib_dev/tezlink"
+    ~synopsis:"Tezlink dependencies for the EVM node"
+    ~deps:
+      [
+        tezlink_protocol_plugin;
+        tezlink_protocol_parameters;
+        octez_base |> open_ ~m:"TzPervasives";
+      ]
+
 let evm_node_config =
   octez_evm_node_lib
     "evm_node_config"
@@ -242,19 +267,6 @@ let evm_node_config =
       ]
 
 let evm_node_lib_dev =
-  let quebec =
-    List.find (fun proto -> Protocol.short_hash proto = "PsQuebec") Protocol.all
-  in
-  let plugin =
-    match Protocol.plugin quebec with
-    | Some target -> target
-    | None -> (* unreachable *) assert false
-  in
-  let parameters =
-    match Protocol.parameters quebec with
-    | Some target -> target
-    | None -> (* unreachable *) assert false
-  in
   octez_evm_node_lib
     "evm_node_lib_dev"
     ~path:"etherlink/bin_node/lib_dev"
@@ -273,6 +285,7 @@ let evm_node_lib_dev =
         octez_version_value;
         octez_stdlib_unix |> open_;
         evm_node_lib_dev_encoding |> open_;
+        evm_node_lib_dev_tezlink |> open_;
         lwt_watcher;
         lwt_exit;
         octez_sqlite |> open_;
@@ -294,8 +307,6 @@ let evm_node_lib_dev =
         supported_installers;
         wasm_runtime;
         performance_metrics;
-        plugin;
-        parameters;
         octez_version;
         octez_shell_services;
       ]

@@ -24,6 +24,8 @@ depends: [
   "re" { >= "1.10.0" }
   "octez-smart-rollup-wasm-debugger-plugin"
   "uuidm" { >= "0.9.9" }
+  "octez-protocol-021-PsQuebec-libs"
+  "tezos-protocol-021-PsQuebec"
   "octez-shell-libs"
   "dream" { >= "1.0.0~alpha7" }
   "octez-version"
@@ -32,8 +34,6 @@ depends: [
   "octez-smart-rollup-wasm-debugger-lib"
   "tezos-dal-node-services"
   "octez-performance-metrics"
-  "octez-protocol-021-PsQuebec-libs"
-  "tezos-protocol-021-PsQuebec"
 ]
 conflicts: [
   "websocket"

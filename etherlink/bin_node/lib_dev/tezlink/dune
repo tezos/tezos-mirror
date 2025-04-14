@@ -1,0 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name evm_node_lib_dev_tezlink)
+ (public_name octez-evm-node-libs.evm_node_lib_dev_tezlink)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-protocol-021-PsQuebec-libs.plugin
+  tezos-protocol-021-PsQuebec.parameters
+  octez-libs.base)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))
