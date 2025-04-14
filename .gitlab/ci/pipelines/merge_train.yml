@@ -1597,6 +1597,11 @@ build-layer1-profiling:
     expire_in: 1 day
     paths:
     - ./octez-binaries/x86_64/octez-node
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
