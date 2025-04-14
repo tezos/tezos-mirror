@@ -31,8 +31,7 @@ use crate::commands::bench::data::SimpleBenchData;
 use crate::commands::bench::save_to_file;
 use crate::commands::bench::show_results;
 use crate::commands::run::BlockImpl;
-use crate::commands::run::UseStepper;
-use crate::commands::run::general_run;
+use crate::commands::run::make_pvm_stepper;
 use crate::format_status;
 
 /// Helper function to look in the [`Stepper`] to peek for the current [`Instr`]
@@ -146,19 +145,17 @@ fn bench_iteration(path: &Path, opts: &BenchRunOptions) -> Result<BenchData, Box
     let program = std::fs::read(path)?;
     let initrd = opts.initrd.as_ref().map(fs::read).transpose()?;
 
-    struct Runner<'a>(&'a BenchRunOptions);
+    let mut stepper = make_pvm_stepper::<BlockImpl>(
+        program.as_slice(),
+        initrd.as_deref(),
+        &opts.common,
+        Default::default(),
+    )?;
 
-    impl UseStepper<BenchData> for Runner<'_> {
-        fn advance<S: Stepper>(self, mut stepper: S) -> BenchData {
-            let opts = &self.0;
-            match opts.mode {
-                BenchMode::Simple => bench_simple(&mut stepper, opts),
-                BenchMode::Fine => bench_fine(&mut stepper, opts),
-            }
-        }
-    }
-
-    general_run::<_, _, BlockImpl>(&opts.common, program, initrd, Runner(opts))
+    Ok(match opts.mode {
+        BenchMode::Simple => bench_simple(&mut stepper, opts),
+        BenchMode::Fine => bench_fine(&mut stepper, opts),
+    })
 }
 
 fn transform_folders(inputs: &[Box<Path>]) -> Result<Vec<PathBuf>, Box<dyn Error>> {
