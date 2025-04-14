@@ -64,15 +64,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::AddWordi`].
-    pub(crate) fn new_add_word_i(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::AddWordImmediate`].
+    pub(crate) fn new_add_word_immediate(
         rd: NonZeroXRegister,
         rs1: XRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::AddWordi,
+            opcode: OpCode::AddWordImmediate,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),

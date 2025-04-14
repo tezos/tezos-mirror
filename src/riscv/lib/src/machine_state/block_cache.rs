@@ -1081,7 +1081,7 @@ mod tests {
         let mut block_state = create_state!(BlockCache, TestLayout, F, TestLayout, Interpreted<M4K, F::Manager>, M4K, || InterpretedBlockBuilder);
 
         let addiw = Instruction::try_from(TaggedInstruction {
-            opcode: OpCode::AddWordi,
+            opcode: OpCode::AddWordImmediate,
             args: TaggedArgs {
                 rd: nz::a1.into(),
                 rs1: a1.into(),

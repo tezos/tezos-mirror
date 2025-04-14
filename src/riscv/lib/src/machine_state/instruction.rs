@@ -220,7 +220,7 @@ pub enum OpCode {
 
     // RV64I I-type instructions
     Addi,
-    AddWordi,
+    AddWordImmediate,
     Xori,
     Ori,
     Andi,
@@ -462,7 +462,7 @@ impl OpCode {
             Self::Srlw => Args::run_srlw,
             Self::Sraw => Args::run_sraw,
             Self::Addi => Args::run_addi,
-            Self::AddWordi => Args::run_add_word_i,
+            Self::AddWordImmediate => Args::run_add_word_immediate,
             Self::Xori => Args::run_xori,
             Self::Ori => Args::run_ori,
             Self::Andi => Args::run_andi,
@@ -653,7 +653,7 @@ impl OpCode {
             Self::Nop => Some(Args::run_nop),
             Self::Add => Some(Args::run_add),
             Self::AddWord => Some(Args::run_add_word),
-            Self::AddWordi => Some(Args::run_add_word_i),
+            Self::AddWordImmediate => Some(Args::run_add_word_immediate),
             Self::Sub => Some(Args::run_sub),
             Self::SubWord => Some(Args::run_sub_word),
             Self::And => Some(Args::run_and),
@@ -1320,7 +1320,11 @@ impl Args {
 
     // RV64I I-type instructions
     impl_i_type!(integer::run_addi, run_addi, non_zero);
-    impl_i_type!(integer::run_add_word_i, run_add_word_i, non_zero_rd);
+    impl_i_type!(
+        integer::run_add_word_immediate,
+        run_add_word_immediate,
+        non_zero_rd
+    );
     impl_i_type!(run_xori, non_zero);
     impl_i_type!(run_ori, non_zero);
     impl_i_type!(integer::run_andi, run_andi, non_zero);
@@ -1647,9 +1651,12 @@ impl From<&InstrCacheable> for Instruction {
 
             // RV64I I-type instructions
             InstrCacheable::Addi(args) => Instruction::from_ic_addi(args),
-            InstrCacheable::Addiw(args) => {
-                Instruction::new_add_word_i(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed)
-            }
+            InstrCacheable::Addiw(args) => Instruction::new_add_word_immediate(
+                args.rd,
+                args.rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
             InstrCacheable::Xori(args) => Instruction::from_ic_xori(args),
             InstrCacheable::Ori(args) => Instruction::from_ic_ori(args),
             InstrCacheable::Andi(args) => Instruction::from_ic_andi(args),

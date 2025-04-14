@@ -667,7 +667,7 @@ mod tests {
             ScenarioBuilder::default()
                 .set_instructions(&[
                     I::new_li(nz::a0, 10, Uncompressed),
-                    I::new_add_word_i(nz::a1, a0, 1 as i64, Compressed),
+                    I::new_add_word_immediate(nz::a1, a0, 1_i64, Compressed),
                 ])
                 .set_assert_hook(assert_hook!(core, F, {
                     assert_eq!(core.hart.xregisters.read_nz(nz::a1), 11);
@@ -679,7 +679,7 @@ mod tests {
             ScenarioBuilder::default()
                 .set_instructions(&[
                     I::new_li(nz::a0, 0xFFFFFFFF, Compressed),
-                    I::new_add_word_i(nz::a1, a0, 0xFFFFFFFF as i64, Compressed),
+                    I::new_add_word_immediate(nz::a1, a0, 0xFFFFFFFF_i64, Compressed),
                 ])
                 .set_assert_hook(assert_hook!(core, F, {
                     // In 32-bit addition:
