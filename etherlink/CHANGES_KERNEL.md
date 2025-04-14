@@ -29,6 +29,8 @@
   opcodes, now fully complying with [EIP-3860](https://eips.ethereum.org/EIPS/eip-3860). (!16890)
 - The EVM is now refunding accounts as expected during inter (layer)
   transactions. (!16973)
+- Ported a security patch that fixed a bug causing proxy calls from FA deposits to
+  not correctly revert state on failure. This also includes a fix for tracing inner calls. (!17704)
 
 ### Internal
 
