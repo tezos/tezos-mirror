@@ -75,7 +75,7 @@ fn make_field(field: &syn::Field) -> Result<FieldEncoding> {
         None => {
             let encoding = make_type_encoding(&field.ty, meta)?;
             let encoding = make_bounded_encoding(meta, encoding)?;
-            let reserve = get_attribute_with_param(meta, &symbol::RESERVE, None, true)?;
+            let reserve = get_attribute_with_param(meta, &symbol::RESERVE, true)?;
             assert_empty_meta(meta)?;
             FieldKind::Encoded(Box::new(EncodedField {
                 encoding,
@@ -145,8 +145,7 @@ fn make_basic_encoding_from_type<'a>(
     let ident = &path.segments.last().unwrap().ident;
     let encoding = if ident == symbol::rust::STRING {
         // String type is mapped to String encoding.
-        let string_attr =
-            get_attribute_with_option(meta, &symbol::STRING, Some(&symbol::MAX), true)?;
+        let string_attr = get_attribute_with_option(meta, &symbol::STRING, true)?;
         Encoding::String(string_attr.and_then(|param| param.param), ident.span())
     } else if ident == symbol::rust::I64 && has_attribute(meta, &symbol::TIMESTAMP) {
         if let Some(timestamp) = get_attribute_no_param(meta, &symbol::TIMESTAMP)? {
@@ -158,9 +157,7 @@ fn make_basic_encoding_from_type<'a>(
         // direct mapping from Rust type to encoding
         assert_builtin_encoding(meta, &mapped)?;
         Encoding::Primitive(mapped, ident.span())
-    } else if let Some(builtin) =
-        get_attribute_with_param(meta, &symbol::BUILTIN, Some(&symbol::KIND), true)?
-    {
+    } else if let Some(builtin) = get_attribute_with_param(meta, &symbol::BUILTIN, true)? {
         // Built-in encoding is specified.
         Encoding::Primitive(builtin.param, builtin.span)
     } else if let Some(meta) = get_composite_meta(meta)? {
@@ -175,15 +172,10 @@ fn make_basic_encoding_from_type<'a>(
 }
 
 /// Consumes the rightmost meta attribute to make basic encoding.
-fn get_basic_encoding_from_meta<'a>(
-    _ty: &'a syn::Path,
-    meta: &mut Vec<syn::Meta>,
-) -> Result<Option<Encoding<'a>>> {
+fn get_basic_encoding_from_meta<'a>(meta: &mut Vec<syn::Meta>) -> Result<Option<Encoding<'a>>> {
     let encoding = if let Some(bytes) = get_attribute_no_param(meta, &symbol::STRING)? {
         Encoding::Bytes(bytes.span)
-    } else if let Some(string) =
-        get_attribute_with_option(meta, &symbol::STRING, Some(&symbol::MAX), true)?
-    {
+    } else if let Some(string) = get_attribute_with_option(meta, &symbol::STRING, true)? {
         Encoding::String(string.param, string.span)
     } else if let Some(zarith) = get_attribute_no_param(meta, &symbol::Z_ARITH)? {
         Encoding::Zarith(zarith.span)
@@ -191,9 +183,7 @@ fn get_basic_encoding_from_meta<'a>(
         Encoding::Narith(mutez.span)
     } else if let Some(mutez) = get_attribute_no_param(meta, &symbol::MU_TEZ)? {
         Encoding::Narith(mutez.span)
-    } else if let Some(builtin) =
-        get_attribute_with_param(meta, &symbol::BUILTIN, Some(&symbol::KIND), true)?
-    {
+    } else if let Some(builtin) = get_attribute_with_param(meta, &symbol::BUILTIN, true)? {
         Encoding::Primitive(builtin.param, builtin.span)
     } else {
         return Ok(None);
@@ -206,7 +196,7 @@ fn make_basic_encoding_from_meta<'a>(
     ty: &'a syn::Path,
     meta: &mut Vec<syn::Meta>,
 ) -> Result<Encoding<'a>> {
-    get_basic_encoding_from_meta(ty, meta)?
+    get_basic_encoding_from_meta(meta)?
         .ok_or_else(|| error_spanned(ty, "No basic encoding specified"))
 }
 
@@ -236,12 +226,9 @@ fn get_composite_meta(meta: &mut Vec<syn::Meta>) -> Result<Option<Vec<syn::Meta>
 
 /// Asserts that meta attribute corresponds to the specified built-in encoding `kind`.
 fn assert_builtin_encoding(meta: &mut Vec<syn::Meta>, kind: &PrimitiveEncoding) -> Result<()> {
-    if let Some(builtin) = get_attribute_with_param::<PrimitiveEncoding>(
-        meta,
-        &symbol::BUILTIN,
-        Some(&symbol::KIND),
-        true,
-    )? {
+    if let Some(builtin) =
+        get_attribute_with_param::<PrimitiveEncoding>(meta, &symbol::BUILTIN, true)?
+    {
         if *kind != builtin.param {
             return Err(error(
                 builtin.span,
@@ -278,9 +265,7 @@ fn make_list_encoding_from_meta<'a>(
     meta: &mut Vec<syn::Meta>,
     encoding: Encoding<'a>,
 ) -> Result<Encoding<'a>> {
-    let encoding = if let Some(list) =
-        get_attribute_with_option(meta, &symbol::LIST, Some(&symbol::MAX), true)?
-    {
+    let encoding = if let Some(list) = get_attribute_with_option(meta, &symbol::LIST, true)? {
         Encoding::List(list.param, Box::new(encoding), list.span)
     } else {
         encoding
@@ -300,9 +285,7 @@ fn make_list_encoding_from_type<'a>(
         } else {
             return Err(error_spanned(ty, "Incompatible type for `bytes` encoding"));
         }
-    } else if let Some(list_meta) =
-        get_attribute_with_option(meta, &symbol::LIST, Some(&symbol::MAX), true)?
-    {
+    } else if let Some(list_meta) = get_attribute_with_option(meta, &symbol::LIST, true)? {
         Encoding::List(list_meta.param, Box::new(encoding), list_meta.span)
     } else {
         Encoding::List(None, Box::new(encoding), ty.span())
@@ -342,17 +325,11 @@ fn make_bounded_encoding<'a>(
         if meta.is_empty() {
             return Ok(encoding);
         }
-        encoding = if let Some(sized) =
-            get_attribute_with_param(meta, &symbol::SIZED, Some(&symbol::SIZE), true)?
-        {
+        encoding = if let Some(sized) = get_attribute_with_param(meta, &symbol::SIZED, true)? {
             Encoding::Sized(sized.param, Box::new(encoding), sized.span)
-        } else if let Some(bounded) =
-            get_attribute_with_param(meta, &symbol::BOUNDED, Some(&symbol::MAX), true)?
-        {
+        } else if let Some(bounded) = get_attribute_with_param(meta, &symbol::BOUNDED, true)? {
             Encoding::Bounded(bounded.param, Box::new(encoding), bounded.span)
-        } else if let Some(dynamic) =
-            get_attribute_with_option(meta, &symbol::DYNAMIC, Some(&symbol::MAX), true)?
-        {
+        } else if let Some(dynamic) = get_attribute_with_option(meta, &symbol::DYNAMIC, true)? {
             Encoding::Dynamic(dynamic.param, Box::new(encoding), dynamic.span)
         } else if let Some(short_dynamic) = get_attribute(meta, &symbol::SHORT_DYNAMIC) {
             Encoding::ShortDynamic(Box::new(encoding), short_dynamic.span())
@@ -378,12 +355,11 @@ struct AttrWithParam<T> {
 fn get_attribute_with_option<T: syn::parse::Parse>(
     meta: &mut Vec<syn::Meta>,
     name: &symbol::Symbol,
-    attr: Option<&symbol::Symbol>,
     is_default: bool,
 ) -> Result<Option<AttrWithParam<Option<T>>>> {
     get_attribute(meta, name)
         .map(|meta| {
-            let param = get_value_parsed(&meta, attr, is_default)?;
+            let param = get_value_parsed(&meta, is_default)?;
             Ok(AttrWithParam {
                 param,
                 span: meta.span(),
@@ -396,12 +372,11 @@ fn get_attribute_with_option<T: syn::parse::Parse>(
 fn get_attribute_with_param<T: syn::parse::Parse>(
     meta: &mut Vec<syn::Meta>,
     name: &symbol::Symbol,
-    attr: Option<&symbol::Symbol>,
     is_default: bool,
 ) -> Result<Option<AttrWithParam<T>>> {
     get_attribute(meta, name)
         .map(|meta| {
-            if let Some(param) = get_value_parsed(&meta, attr, is_default)? {
+            if let Some(param) = get_value_parsed(&meta, is_default)? {
                 Ok(AttrWithParam {
                     param,
                     span: meta.span(),
@@ -530,11 +505,7 @@ fn get_attribute(meta: &mut Vec<syn::Meta>, name: &symbol::Symbol) -> Option<syn
     }
 }
 
-fn get_value<'a>(
-    meta: &'a syn::Meta,
-    _attr: Option<&symbol::Symbol>,
-    is_default: bool,
-) -> Result<Option<&'a syn::Lit>> {
+fn get_value(meta: &syn::Meta, is_default: bool) -> Result<Option<&syn::Lit>> {
     match meta {
         syn::Meta::Path(_) => Ok(None),
         syn::Meta::NameValue(name_value) if is_default => Ok(Some(&name_value.lit)),
@@ -542,12 +513,8 @@ fn get_value<'a>(
     }
 }
 
-fn get_value_parsed<T: syn::parse::Parse>(
-    meta: &syn::Meta,
-    name: Option<&symbol::Symbol>,
-    is_default: bool,
-) -> Result<Option<T>> {
-    let lit = get_value(meta, name, is_default)?;
+fn get_value_parsed<T: syn::parse::Parse>(meta: &syn::Meta, is_default: bool) -> Result<Option<T>> {
+    let lit = get_value(meta, is_default)?;
     lit.as_ref().map(|lit| parse_value(lit)).transpose()
 }
 
