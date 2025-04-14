@@ -1030,11 +1030,11 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 		self.state.basic(address).balance
 	}
 
-	fn code_size(&self, address: H160) -> U256 {
+	fn code_size(&mut self, address: H160) -> U256 {
 		self.state.code_size(address)
 	}
 
-	fn code_hash(&self, address: H160) -> H256 {
+	fn code_hash(&mut self, address: H160) -> H256 {
 		if !self.exists(address) {
 			return H256::default();
 		}
@@ -1042,7 +1042,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 		self.state.code_hash(address)
 	}
 
-	fn code(&self, address: H160) -> Vec<u8> {
+	fn code(&mut self, address: H160) -> Vec<u8> {
 		self.state.code(address)
 	}
 
@@ -1060,7 +1060,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 			.unwrap_or_default()
 	}
 
-	fn exists(&self, address: H160) -> bool {
+	fn exists(&mut self, address: H160) -> bool {
 		if self.config.empty_considered_exists {
 			self.state.exists(address)
 		} else {
