@@ -12,12 +12,6 @@
 
 ### Execution changes
 
-- `--profile` now has two different modes; `minimal` and `flamegraph`.
-  `minimal` provides a file to which it streamlines tick and gas
-  consumption, `flamegraph` creates a flamegraph indexed on tick
-  consumption (!17608)
-- Adds support for Calypso2 native execution. (!17693)
-
 ### Storage changes
 
 ### Documentation changes
@@ -28,6 +22,24 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.22 (2025-04-14)
+
+This releases of the EVM node adds support for executing natively the Calypso2
+kernel (the update which was activated on mainnet on block 10,453,254). This
+will improve performance for computationally intensive RPCs like `eth_call`
+(where the native execution is used by default).
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+### Execution changes
+
+- `--profile` now has two different modes; `minimal` and `flamegraph`.
+  `minimal` provides a file to which it streamlines tick and gas
+  consumption, `flamegraph` creates a flamegraph indexed on tick
+  consumption (!17608)
+- Adds support for Calypso2 native execution. (!17693)
 
 ## Version 0.21 (2025-04-09)
 
