@@ -16,6 +16,7 @@
   octez-version.value
   octez-libs.stdlib-unix
   octez-evm-node-libs.evm_node_lib_dev_encoding
+  octez-evm-node-libs.evm_node_lib_dev_tezlink
   lwt-watcher
   lwt-exit
   octez-l2-libs.sqlite
@@ -37,8 +38,6 @@
   octez-evm-node-libs.evm_node_supported_installers
   octez-evm-node-libs.evm_node_wasm_runtime
   octez-performance-metrics
-  octez-protocol-021-PsQuebec-libs.plugin
-  tezos-protocol-021-PsQuebec.parameters
   octez-libs.version
   octez-shell-libs.shell-services)
  (flags
@@ -48,6 +47,7 @@
   -open Tezos_workers
   -open Tezos_stdlib_unix
   -open Evm_node_lib_dev_encoding
+  -open Evm_node_lib_dev_tezlink
   -open Octez_sqlite
   -open Tezos_client_base
   -open Evm_node_config

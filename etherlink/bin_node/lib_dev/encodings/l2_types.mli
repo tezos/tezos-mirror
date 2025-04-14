@@ -44,7 +44,22 @@ module Chain_family : sig
   val pp : Format.formatter -> chain_family -> unit
 end
 
-type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_types.block
+module Tezos_block : sig
+  type block = {
+    number : Ethereum_types.quantity;
+    hash : Ethereum_types.block_hash;
+    timestamp : Ethereum_types.quantity;
+    parent_hash : Ethereum_types.block_hash;
+  }
+
+  val decode_block_hash : bytes -> Ethereum_types.block_hash
+
+  val genesis_parent_hash : Ethereum_types.block_hash
+
+  val block_from_binary : bytes -> block
+end
+
+type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.block
 
 val block_hash : 'a block -> Ethereum_types.block_hash
 
