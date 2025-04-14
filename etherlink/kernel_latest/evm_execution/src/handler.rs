@@ -12,7 +12,7 @@
 use crate::access_record::AccessRecord;
 use crate::account_storage::{
     account_path, AccountStorageError, EthereumAccount, EthereumAccountStorage,
-    StorageValue, CODE_HASH_DEFAULT,
+    StorageValue,
 };
 use crate::precompiles::reentrancy_guard::ReentrancyGuard;
 use crate::precompiles::{FA_BRIDGE_PRECOMPILE_ADDRESS, WITHDRAWAL_ADDRESS};
@@ -53,6 +53,7 @@ use tezos_smart_rollup_encoding::michelson::{
 };
 use tezos_smart_rollup_encoding::outbox::OutboxMessage;
 use tezos_smart_rollup_storage::StorageError;
+use tezos_storage::helpers::bytes_hash;
 
 /// Withdrawal interface of the ticketer contract
 pub type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
@@ -383,6 +384,24 @@ pub type StorageCache = HashMap<usize, LayerCache>;
 /// default value as specified by EIP-1153.
 pub type TransientStorage = HashMap<usize, TransientLayer>;
 
+#[derive(Default)]
+struct Contract {
+    code: Vec<u8>,
+    hash: H256,
+}
+
+/// The contract cache is used each time a contract was called
+/// and is considered "hot". Each heated contract will cost 100 for
+/// a CALL instead of 2_600 for a cold contract.
+// NB: The cache is implicitely bounded in memory thanks to the
+// gas limit. At most we can do 11_538 different cold CALLs which
+// costs 2_600 gas. (11_538 × 2_600 = 30M gas).
+// In memory it means we take at most:
+// 11_538 × 24_576B = 283_557_888B = 284MB.
+// 24_576 is MAX_CODE_SIZE as per EIP-170.
+// See: https://eips.ethereum.org/EIPS/eip-170.
+type ContractCache = HashMap<H160, Contract>;
+
 /// The implementation of the SputnikVM [Handler] trait
 pub struct EvmHandler<'a, Host: Runtime> {
     /// The host
@@ -415,6 +434,9 @@ pub struct EvmHandler<'a, Host: Runtime> {
     /// access storage slots before any transaction happens.
     /// See: `fn original_storage`.
     original_storage_cache: LayerCache,
+    /// Code contract cache during a given execution.
+    /// NB: See `ContractCache`'s documentation for more information.
+    contract_cache: ContractCache,
     /// Transient storage as specified by EIP-1153.
     pub transient_storage: TransientStorage,
     /// All the freshly created contracts.
@@ -452,6 +474,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             storage_cache: HashMap::with_capacity(10),
             original_storage_cache: HashMap::with_capacity(10),
             transient_storage: HashMap::with_capacity(10),
+            contract_cache: HashMap::with_capacity(10),
             created_contracts: BTreeSet::new(),
             reentrancy_guard: ReentrancyGuard::new(vec![
                 WITHDRAWAL_ADDRESS,
@@ -1568,6 +1591,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         address: H160,
         code: &[u8],
     ) -> Result<(), EthereumError> {
+        self.update_contract_cache(address, code);
         self.get_or_create_account(address)?
             .set_code(self.host, code)
             .map_err(EthereumError::from)
@@ -1706,6 +1730,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 self.created_contracts.insert(new_address);
             }
 
+            // We flush the storage's cache into the durable storage
+            // by actually writing in it.
+            self.flush_storage_cache()?;
+            self.clear_internal_caches();
+
             Ok(ExecutionOutcome {
                 gas_used,
                 logs: last_layer.logs,
@@ -1761,9 +1790,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(EthereumError::from)?;
 
         let _ = self.transaction_data.pop();
-        self.storage_cache.clear();
-        self.transient_storage.clear();
-        self.original_storage_cache.clear();
+        self.clear_internal_caches();
 
         Ok(ExecutionOutcome {
             gas_used,
@@ -1817,19 +1844,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     r
                 );
 
-                let commit_result = self.commit_initial_transaction(
-                    if let Some(new_address) = new_address {
-                        ExecutionResult::ContractDeployed(new_address, result)
-                    } else {
-                        ExecutionResult::CallSucceeded(r, result)
-                    },
-                );
-
-                // We flush the storage's cache into the durable storage
-                // by actually writing in it.
-                self.flush_storage_cache()?;
-
-                commit_result
+                self.commit_initial_transaction(if let Some(new_address) = new_address {
+                    ExecutionResult::ContractDeployed(new_address, result)
+                } else {
+                    ExecutionResult::CallSucceeded(r, result)
+                })
             }
             Ok((ExitReason::Revert(ExitRevert::Reverted), _, result)) => {
                 self.rollback_initial_transaction(ExecutionResult::CallReverted(result))
@@ -2231,6 +2250,46 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     pub(crate) fn disable_reentrancy_guard(&mut self) {
         self.reentrancy_guard.disable();
     }
+
+    fn update_contract_cache(&mut self, address: H160, code: &[u8]) -> H256 {
+        let hash = bytes_hash(code);
+        let code = code.to_vec();
+        self.contract_cache.insert(address, Contract { code, hash });
+        hash
+    }
+
+    fn get_contract(&mut self, address: H160) -> Contract {
+        if let Some(contract) = self.contract_cache.get(&address) {
+            Contract {
+                code: contract.code.to_vec(),
+                hash: contract.hash,
+            }
+        } else {
+            let code = self
+                .get_account(address)
+                .ok()
+                .flatten()
+                .and_then(|a| a.code(self.host).ok());
+
+            match code {
+                Some(code) => {
+                    let hash = self.update_contract_cache(address, &code);
+                    Contract {
+                        code: code.to_vec(),
+                        hash,
+                    }
+                }
+                None => Contract::default(),
+            }
+        }
+    }
+
+    fn clear_internal_caches(&mut self) {
+        self.storage_cache.clear();
+        self.transient_storage.clear();
+        self.original_storage_cache.clear();
+        self.contract_cache.clear();
+    }
 }
 
 fn update_cache<Host: Runtime>(
@@ -2493,34 +2552,23 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
             .unwrap_or_default()
     }
 
-    fn code_size(&self, address: H160) -> U256 {
-        self.get_account(address)
-            .ok()
-            .flatten()
-            .and_then(|a| a.code_size(self.host).ok())
-            .unwrap_or_default()
+    fn code_size(&mut self, address: H160) -> U256 {
+        let code = self.get_contract(address).code;
+        U256::from(code.len())
     }
 
     // Hash of the chosen account's code, the empty hash (CODE_HASH_DEFAULT) if the account has no code,
     // or 0 if the account does not exist or has been destroyed.
-    fn code_hash(&self, address: H160) -> H256 {
+    fn code_hash(&mut self, address: H160) -> H256 {
         if !self.exists(address) {
             return H256::zero();
         }
 
-        self.get_account(address)
-            .ok()
-            .flatten()
-            .and_then(|a| a.code_hash(self.host).ok())
-            .unwrap_or(CODE_HASH_DEFAULT)
+        self.get_contract(address).hash
     }
 
-    fn code(&self, address: H160) -> Vec<u8> {
-        self.get_account(address)
-            .ok()
-            .flatten()
-            .and_then(|a| a.code(self.host).ok())
-            .unwrap_or_default()
+    fn code(&mut self, address: H160) -> Vec<u8> {
+        self.get_contract(address).code
     }
 
     fn storage(&mut self, address: H160, index: H256) -> H256 {
@@ -2632,7 +2680,7 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
         self.block.chain_id
     }
 
-    fn exists(&self, address: H160) -> bool {
+    fn exists(&mut self, address: H160) -> bool {
         self.code_size(address) > U256::zero()
             || self.get_nonce(address).unwrap_or_default() > 0
             || self.balance(address) > U256::zero()
@@ -3075,7 +3123,7 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::account_storage::init_account_storage;
+    use crate::account_storage::{init_account_storage, CODE_HASH_DEFAULT};
     use crate::configuration::EVMVersion;
     use crate::precompiles;
     use evm::Config;
@@ -3092,6 +3140,7 @@ mod test {
         address: &H160,
         code: Vec<u8>,
     ) {
+        handler.update_contract_cache(*address, &code);
         let mut account = handler.get_or_create_account(*address).unwrap();
         account.delete_code(handler.borrow_host()).unwrap(); //first clean code if it exists.
         account.set_code(handler.borrow_host(), &code).unwrap();
@@ -4369,7 +4418,7 @@ mod test {
 
         let gas_price = U256::from(21000);
 
-        let handler = EvmHandler::new(
+        let mut handler = EvmHandler::new(
             &mut mock_runtime,
             &mut evm_account_storage,
             caller,
