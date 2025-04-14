@@ -724,20 +724,14 @@ mod tests {
     use super::instruction::tagged_instruction::TaggedRegister;
     use super::registers::XRegister;
     use crate::backend_test;
-    use crate::bits::Bits64;
-    use crate::bits::FixedWidthBits;
     use crate::bits::u16;
     use crate::create_state;
     use crate::default::ConstDefault;
     use crate::machine_state::DefaultCacheLayouts;
     use crate::machine_state::TestCacheLayouts;
     use crate::machine_state::address_translation::PAGE_SIZE;
-    use crate::machine_state::address_translation::pte::PPNField;
-    use crate::machine_state::address_translation::pte::PageTableEntry;
     use crate::machine_state::csregisters::CSRRepr;
     use crate::machine_state::csregisters::CSRegister;
-    use crate::machine_state::csregisters::satp::Satp;
-    use crate::machine_state::csregisters::satp::TranslationAlgorithm;
     use crate::machine_state::csregisters::xstatus;
     use crate::machine_state::csregisters::xstatus::MStatus;
     use crate::machine_state::memory;
@@ -747,14 +741,12 @@ mod tests {
     use crate::machine_state::memory::Memory;
     use crate::machine_state::mode::Mode;
     use crate::machine_state::registers::NonZeroXRegister;
-    use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::nz;
     use crate::machine_state::registers::t0;
     use crate::machine_state::registers::t1;
     use crate::machine_state::registers::t2;
     use crate::parser::XRegisterParsed::*;
-    use crate::parser::instruction::CIBNZTypeArgs;
     use crate::parser::instruction::Instr;
     use crate::parser::instruction::InstrCacheable;
     use crate::parser::instruction::InstrWidth;
@@ -1081,7 +1073,17 @@ mod tests {
 
     // Test that the machine state does not behave differently when potential ephermeral state is
     // reset that may impact instruction address translation caching.
+    #[cfg(not(feature = "supervisor"))] // This only makes sense when PTEs have an effect
     backend_test!(test_instruction_address_cache, F, {
+        use crate::bits::Bits64;
+        use crate::bits::FixedWidthBits;
+        use crate::machine_state::address_translation::pte::PPNField;
+        use crate::machine_state::address_translation::pte::PageTableEntry;
+        use crate::machine_state::csregisters::satp::Satp;
+        use crate::machine_state::csregisters::satp::TranslationAlgorithm;
+        use crate::machine_state::registers::a0;
+        use crate::parser::instruction::CIBNZTypeArgs;
+
         // Specify the layout in physcal memory.
         let main_mem_addr = memory::FIRST_ADDRESS;
         let code0_addr = main_mem_addr;
