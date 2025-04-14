@@ -8,7 +8,7 @@
 open Test_helpers
 open Rpc.Syntax
 
-let register ~title ~registered ~tx_per_call ~max_gas_per_tx =
+let register ~title ~registered ~tx_per_call =
   Test.register
     ~__FILE__
     ~title
@@ -23,8 +23,12 @@ let register ~title ~registered ~tx_per_call ~max_gas_per_tx =
         Constant.smart_rollup_installer;
       ]
   @@ fun () ->
-  let gas_price = 10_000_000_000 in
+  (* max_gas_per_tx must be equivalent to kernel_latest/kernel/src/block.rs max_gas_per_reboot *)
+  let max_gas_per_tx = 30_000_000 * 4 / 3 in
+  (* da_fee_per_byte must be equivalent to kernel_latest/kernel/src/fees.rs DA_FEE_PER_BYTE *)
   let da_fee_per_byte = Wei.to_wei_z Z.(of_int 4 * pow (of_int 10) 12) in
+  (* gas_price must be big yumyum value kekw *)
+  let gas_price = 10_000_000_000 in
 
   let account = Eth_account.bootstrap_accounts.(0) in
   let patch_config =
