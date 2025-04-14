@@ -647,7 +647,8 @@ let changeset_mir_tzt =
 let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
     ?(executable_files = "script-inputs/octez-released-executables")
     ?(experimental_executables = "script-inputs/octez-experimental-executables")
-    ?version_executable ?(release = false) ?rules ?dependencies () : tezos_job =
+    ?version_executable ?(release = false) ?rules ?dependencies ?retry () :
+    tezos_job =
   let arch_string = arch_to_string arch in
   let name = "oc.build:static-" ^ arch_string ^ "-linux-binaries" in
   let artifacts =
@@ -672,6 +673,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
     ~arch
     ~cpu
     ~name
+    ?retry
     ~image:Images.CI.build
     ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
     ~variables:

@@ -452,6 +452,11 @@ oc.build:static-x86_64-linux-binaries:
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.build:static-arm64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}

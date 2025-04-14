@@ -154,6 +154,11 @@ oc.build:static-x86_64-linux-binaries:
     expire_in: 90 days
     paths:
     - octez-binaries/$ARCH/*
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
