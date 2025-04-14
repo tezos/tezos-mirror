@@ -110,6 +110,19 @@ Its storage version is 26.
 - Deposits can now specify a chain id, but it is currently ignored. (!16153)
 - All blueprints in storage are deleted after a flush event. (!15673)
 
+### Security Upgrades
+
+#### Calypso2 (9ab8acd)
+
+**Note:** This commit is not part of the `master` branch of the Octez
+repository, but is part of [`etherlink-security-upgrades`][su-3] instead.
+
+[su-3]: https://gitlab.com/tezos/tezos/-/tree/etherlink-security-upgrade-3
+
+This security upgrade addresses a severe bug found in the deposit of FA tokens
+from Tezos to Etherlink. The bug was never triggered on Mainnet before the
+activation of the kernel on block 10,453,254.
+
 ## Bifrost (7386d0b)
 
 This kernel has been activated on Etherlink Testnet on block
