@@ -518,7 +518,7 @@ let encoding default_display : t Data_encoding.t =
            fee_parameters;
            mode;
            loser_mode;
-           apply_unsafe_patches = _;
+           apply_unsafe_patches;
            execute_outbox_messages_filter;
            unsafe_pvm_patches;
            dal_node_endpoint;
@@ -552,6 +552,7 @@ let encoding default_display : t Data_encoding.t =
             fee_parameters,
             mode,
             loser_mode,
+            apply_unsafe_patches,
             unsafe_pvm_patches,
             execute_outbox_messages_filter ) ),
         ( ( dal_node_endpoint,
@@ -581,6 +582,7 @@ let encoding default_display : t Data_encoding.t =
                fee_parameters,
                mode,
                loser_mode,
+               apply_unsafe_patches,
                unsafe_pvm_patches,
                execute_outbox_messages_filter ) ),
            ( ( dal_node_endpoint,
@@ -611,10 +613,7 @@ let encoding default_display : t Data_encoding.t =
         fee_parameters;
         mode;
         loser_mode;
-        apply_unsafe_patches =
-          (* Flag --apply-unsafe-patches must always be given on command
-             line. *)
-          false;
+        apply_unsafe_patches;
         unsafe_pvm_patches;
         execute_outbox_messages_filter;
         dal_node_endpoint;
@@ -658,7 +657,7 @@ let encoding default_display : t Data_encoding.t =
                 ~description:"Access control list"
                 Tezos_rpc_http_server.RPC_server.Acl.policy_encoding
                 default_acl))
-          (obj8
+          (obj9
              (opt "metrics-addr" ~description:"Metrics address" string)
              (dft "performance-metrics" bool true)
              (dft
@@ -685,6 +684,13 @@ let encoding default_display : t Data_encoding.t =
                    (for test only!)"
                 Loser_mode.encoding
                 Loser_mode.no_failures)
+             (dft
+                "apply-unsafe-patches"
+                ~description:
+                  "Apply the unsafe PVM patches for this rollup (either user \
+                   provided or hardcoded)."
+                bool
+                false)
              (dft
                 "unsafe-pvm-patches"
                 ~description:
@@ -945,6 +951,13 @@ module Cli = struct
     let rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr in
     let rpc_port = Option.value ~default:configuration.rpc_port rpc_port in
     let acl = override_acl ~rpc_addr ~rpc_port configuration.acl acl_override in
+    let* () =
+      when_ ((not apply_unsafe_patches) && configuration.apply_unsafe_patches)
+      @@ fun () ->
+      failwith
+        "Configuration is registered to apply unsafe PVM patches. Flag \
+         --apply-unsafe-patches must always be given on command line."
+    in
     return
       {
         configuration with
