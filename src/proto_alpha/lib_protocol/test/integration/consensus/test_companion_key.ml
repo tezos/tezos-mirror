@@ -419,12 +419,156 @@ let test_register_other_accounts_as_ck =
      used for the first time. *)
   --> next_cycle
 
+let test_self_register_as_companion =
+  let consensus_rights_delay =
+    Default_parameters.constants_mainnet.consensus_rights_delay
+  in
+  let delegate = "delegate" in
+  let check_finalized_block = check_cks delegate in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> set S.consensus_rights_delay consensus_rights_delay
+  --> begin_test
+        ~algo:Bls
+        ~force_attest_all:true
+        ~check_finalized_block
+        [delegate]
+  (* As expected, a delegate cannot register itself as a companion,
+     if it is already itself its own consensus key *)
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun _ err ->
+          Error_helpers.check_error_constructor_name
+            ~loc:__LOC__
+            ~expected:
+              Protocol.Delegate_consensus_key
+              .Invalid_consensus_key_update_active
+            err)
+        (update_companion_key ~ck_name:delegate delegate)
+  (* We can change that *)
+  --> add_account "consensus_key"
+  --> update_consensus_key ~ck_name:"consensus_key" delegate
+  (* Freed from the consensus obligations, delegate can now focus on
+     its true calling: companionship. However, self-centered as ever,
+     it decided that its companion would be... itself *)
+  --> update_companion_key ~ck_name:delegate delegate
+  (* Checks *)
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:delegate
+        ~registered_for:delegate
+        Active
+        Consensus
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:"consensus_key"
+        ~registered_for:delegate
+        Pending
+        Consensus
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:delegate
+        ~registered_for:delegate
+        Pending
+        Companion
+  (* Activate *)
+  --> wait_n_cycles (consensus_rights_delay + 1)
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:delegate
+        ~registered_for:delegate
+        Unregistered
+        Consensus
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:"consensus_key"
+        ~registered_for:delegate
+        Active
+        Consensus
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:delegate
+        ~registered_for:delegate
+        Active
+        Companion
+  (* Bake a cycle for auto checks *)
+  --> next_cycle
+  (* After a while, delegate realised that companionship is better shared.
+     So, in a surprising turn of events, it went back to the consensus, to make
+     room for a new companion in its storage. *)
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun _ err ->
+          Error_helpers.check_error_constructor_name
+            ~loc:__LOC__
+            ~expected:
+              Protocol.Delegate_consensus_key
+              .Invalid_consensus_key_update_active
+            err)
+        (update_consensus_key ~ck_name:delegate delegate)
+  --> add_account ~algo:Bls "companion_key"
+  --> update_companion_key ~ck_name:"companion_key" delegate
+  --> update_consensus_key ~ck_name:delegate delegate
+  (* Checks *)
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:"consensus_key"
+        ~registered_for:delegate
+        Active
+        Consensus
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:delegate
+        ~registered_for:delegate
+        Active
+        Companion
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:delegate
+        ~registered_for:delegate
+        Pending
+        Consensus
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:"companion_key"
+        ~registered_for:delegate
+        Pending
+        Companion
+  (* Activation *)
+  --> wait_n_cycles (consensus_rights_delay + 1)
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:"consensus_key"
+        ~registered_for:delegate
+        Unregistered
+        Consensus
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:delegate
+        ~registered_for:delegate
+        Unregistered
+        Companion
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:delegate
+        ~registered_for:delegate
+        Active
+        Consensus
+  --> check_ck_status
+        ~loc:__LOC__
+        ~ck:"companion_key"
+        ~registered_for:delegate
+        Active
+        Companion
+  --> next_cycle
+
 let tests =
   tests_of_scenarios
   @@ [
        ( "Simple update ck for delegate",
          test_simple_register_consensus_and_companion_keys );
        ("Register other accounts as ck", test_register_other_accounts_as_ck);
+       ("Self register as companion", test_self_register_as_companion);
      ]
 
 let () =
