@@ -704,6 +704,8 @@ let jobs pipeline_type =
            ~when_:On_success
            ["octez-evm-*"; "etherlink-*"])
       ~cpu:Very_high
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~before_script:
         [
           "./scripts/ci/take_ownership.sh";
