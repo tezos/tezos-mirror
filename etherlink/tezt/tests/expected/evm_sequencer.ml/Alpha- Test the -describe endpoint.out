@@ -79,7 +79,7 @@ Available services:
   
   + chains/<chain_id>/blocks/<block_id>/
     - GET /chains/<chain_id>/blocks/<block_id>/context/constants
-        All constants
+        All constants 
     - GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/balance
         The spendable balance of a contract (in mutez), also known as liquid
         balance. Corresponds to tez owned by the contract that are neither
