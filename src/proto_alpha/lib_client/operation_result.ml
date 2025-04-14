@@ -834,7 +834,11 @@ let pp_manager_operation_contents_result ppf op_result =
     | Delegation_result _ -> "delegation"
     | Register_global_constant_result _ -> "global constant registration"
     | Set_deposits_limit_result _ -> "deposits limit modification"
-    | Update_consensus_key_result _ -> "consensus key update"
+    | Update_consensus_key_result {kind; _} ->
+        Format.asprintf
+          "%a key update"
+          Operation_repr.pp_consensus_key_kind
+          kind
     | Increase_paid_storage_result _ -> "paid storage increase"
     | Transfer_ticket_result _ -> "tickets transfer"
     | Sc_rollup_originate_result _ -> "smart rollup origination"
@@ -861,7 +865,7 @@ let pp_manager_operation_contents_result ppf op_result =
         pp_balance_updates ppf balance_updates
     | Set_deposits_limit_result {consumed_gas} ->
         pp_consumed_gas ppf consumed_gas
-    | Update_consensus_key_result {consumed_gas} ->
+    | Update_consensus_key_result {consumed_gas; kind = _} ->
         pp_consumed_gas ppf consumed_gas
     | Transaction_result tx -> pp_transaction_result ppf tx
     | Origination_result op_res -> pp_origination_result ppf op_res
