@@ -76,6 +76,7 @@ let bonus_baking_reward ctxt ~attestation_power =
 type ordered_slots = {
   delegate : Signature.public_key_hash;
   consensus_key : Signature.public_key_hash;
+  companion_key : Bls.Public_key_hash.t option;
   slots : Slot.t list;
 }
 
@@ -97,6 +98,7 @@ let attesting_rights (ctxt : t) level =
                   {
                     delegate = consensus_pk.delegate;
                     consensus_key = consensus_pk.consensus_pkh;
+                    companion_key = consensus_pk.companion_pkh;
                     slots = [slot];
                   }
             | Some slots -> Some {slots with slots = slot :: slots.slots})

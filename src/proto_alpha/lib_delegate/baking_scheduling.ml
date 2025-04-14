@@ -923,7 +923,13 @@ let try_resolve_consensus_keys cctxt key =
           | Error _ | Ok [] -> try_find_delegate_key (head_offset - 1)
           | Ok
               (Plugin.RPC.Validators.
-                 {delegate; level = _; consensus_key = _; slots = _}
+                 {
+                   delegate;
+                   level = _;
+                   consensus_key = _;
+                   companion_key = _;
+                   slots = _;
+                 }
               :: _) ->
               (* The primary registered key as delegate found. Return it. *)
               return delegate

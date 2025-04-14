@@ -89,7 +89,11 @@ module Delegate_id : sig
 end
 
 module Delegate : sig
-  type t = {consensus_key : Consensus_key.t; delegate_id : Delegate_id.t}
+  type t = {
+    consensus_key : Consensus_key.t;
+    companion_key : Consensus_key.t option;
+    delegate_id : Delegate_id.t;
+  }
 
   val encoding : t Data_encoding.t
 
