@@ -31,3 +31,6 @@ runtime-bifrost = { package = "tezos-evm-runtime-bifrost", path = "../kernel_bif
 # Calypso
 kernel-calypso = { package = "evm_kernel_calypso", path = "../kernel_calypso/kernel", default-features = false }
 runtime-calypso = { package = "tezos-evm-runtime-calypso", path = "../kernel_calypso/runtime", default-features = false }
+# Calypso 2
+kernel-calypso2 = { package = "evm_kernel_calypso2", path = "../kernel_calypso2/kernel", default-features = false }
+runtime-calypso2 = { package = "tezos-evm-runtime-calypso2", path = "../kernel_calypso2/runtime", default-features = false }

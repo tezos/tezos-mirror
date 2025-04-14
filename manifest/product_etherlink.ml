@@ -85,6 +85,7 @@ let evm_node_rust_deps =
               [S "source_tree"; S "../sputnikvm"];
               [S "source_tree"; S "../kernel_bifrost"];
               [S "source_tree"; S "../kernel_calypso"];
+              [S "source_tree"; S "../kernel_calypso2"];
               [S "source_tree"; S "../../src/rustzcash_deps"];
               [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
               [S "source_tree"; S "../../src/riscv"];

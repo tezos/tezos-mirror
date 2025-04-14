@@ -16,6 +16,7 @@
   `minimal` provides a file to which it streamlines tick and gas
   consumption, `flamegraph` creates a flamegraph indexed on tick
   consumption (!17608)
+- Adds support for Calypso2 native execution. (!17693)
 
 ### Storage changes
 
