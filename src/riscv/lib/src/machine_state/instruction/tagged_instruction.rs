@@ -412,7 +412,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | ECall
         | Unknown => ArgsShape::NZXSrcNZXDest,
 
-        Addiw
+        AddWordi
         | AddWord
         | SubWord
         | Sllw

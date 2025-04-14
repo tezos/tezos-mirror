@@ -1476,7 +1476,7 @@ mod tests {
             })
             .unwrap(),
             Instruction::try_from(TaggedInstruction {
-                opcode: OpCode::Addiw,
+                opcode: OpCode::AddWordi,
                 args: TaggedArgs {
                     rd: nz::a1.into(),
                     rs1: a1.into(),

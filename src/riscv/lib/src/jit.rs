@@ -657,6 +657,48 @@ mod tests {
         }
     });
 
+    backend_test!(test_add_word_i, F, {
+        use Instruction as I;
+
+        use crate::machine_state::registers::a0;
+        use crate::machine_state::registers::nz;
+
+        let scenarios: &[Scenario<F>] = &[
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(nz::a0, 10, Uncompressed),
+                    I::new_add_word_i(nz::a1, a0, 1 as i64, Compressed),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(nz::a1), 11);
+                }))
+                .build(),
+            // Test that we wrap around and truncate before sign extending. This
+            // operation 0xFFFFFFFF + 0xFFFFFFFF should produce a different result
+            // for 32-bit (truncated sum with sign extension) vs 64-bit operations.
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(nz::a0, 0xFFFFFFFF, Compressed),
+                    I::new_add_word_i(nz::a1, a0, 0xFFFFFFFF as i64, Compressed),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    // In 32-bit addition:
+                    // 0xFFFFFFFF + 0xFFFFFFFF = 0x1FFFFFFFE
+                    // Truncated to 32 bits: 0xFFFFFFFE
+                    // Sign extended to 64 bits: 0xFFFFFFFFFFFFFFFE
+                    assert_eq!(core.hart.xregisters.read_nz(nz::a1), -2i64 as u64);
+                }))
+                .build(),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
     backend_test!(test_sub, F, {
         use Instruction as I;
 
