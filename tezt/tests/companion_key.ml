@@ -44,6 +44,31 @@ let companion_key_typ : companion_key Check.typ =
         (active_companion_key, pending_companion_keys))
       (tuple2 (option string) (list (tuple2 int string))))
 
+let get_validators_companion_key ?level (delegate : Account.key) client =
+  let* json =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_helper_validators
+         ?level
+         ~delegate:delegate.public_key_hash
+         ()
+  in
+  let companion_key = JSON.(json |=> 0 |-> "companion_key" |> as_string_opt) in
+  Log.info
+    ~color:Log.Color.FG.green
+    "companion_key = %s"
+    (match companion_key with Some ck -> ck | None -> "None") ;
+  return companion_key
+
+let check_validators_companion_key ~__LOC__ ?level (delegate : Account.key)
+    client ~expected =
+  let* companion_key = get_validators_companion_key ?level delegate client in
+  Check.(
+    (companion_key = expected)
+      (option string)
+      ~__LOC__
+      ~error_msg:"Expected %R, got %L") ;
+  unit
+
 let get_companion_key ?block client (delegate : Account.key) :
     companion_key Lwt.t =
   let* json =
@@ -156,6 +181,18 @@ let test_update_companion_key =
       ~__LOC__
       delegate
       ~expected_active:companion_key_bls
+      client
+  in
+  let* () =
+    check_validators_companion_key ~__LOC__ delegate ~expected:None client
+  in
+  let* current_level = get_current_level client in
+  let* () =
+    check_validators_companion_key
+      ~__LOC__
+      ~level:(current_level.level + 1)
+      delegate
+      ~expected:(Some companion_key_bls.public_key_hash)
       client
   in
   unit
