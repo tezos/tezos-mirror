@@ -28,8 +28,8 @@ init_sandboxed_client() {
 
   # Binaries
   signer="$local_signer -d $client_dir"
-  client="$local_client -base-dir $client_dir -endpoint $endpoint"
-  admin_client="$local_admin_client -base-dir $client_dir -endpoint $endpoint"
+  client="$local_client --base-dir $client_dir --endpoint $endpoint"
+  admin_client="$local_admin_client --base-dir $client_dir --endpoint $endpoint"
   compiler="$local_compiler"
 }
 
@@ -142,16 +142,15 @@ main() {
       endpoint="http://$host:$rpc"
     fi
 
-    baker="$local_baker -base-dir $client_dir -endpoint $endpoint"
-    accuser="$local_accuser -base-dir $client_dir -endpoint $endpoint"
-    sc_rollup_node="$local_sc_rollup_node -base-dir $client_dir -endpoint $endpoint"
-
+    baker="$local_baker --base-dir $client_dir --endpoint $endpoint"
+    accuser="$local_accuser --base-dir $client_dir --endpoint $endpoint"
+    sc_rollup_node="$local_sc_rollup_node --base-dir $client_dir --endpoint $endpoint"
     echo '#!/bin/sh' > "$client_dir"/bin/octez-baker-"$protocol_without_number"
     echo "exec $baker \"\$@\"" >> "$client_dir"/bin/octez-baker-"$protocol_without_number"
     chmod +x "$client_dir"/bin/octez-baker-"$protocol_without_number"
 
     echo '#!/bin/sh' > "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
-    echo "exec $sc_rollup_node \"\$@\" -data-dir $rollup_node_dir" >> "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
+    echo "exec $sc_rollup_node \"\$@\" --data-dir $rollup_node_dir" >> "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
     chmod +x "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
 
     echo '#!/bin/sh' > "$client_dir"/bin/octez-accuser-"$protocol_without_number"
