@@ -23,9 +23,9 @@ type t = {
 
     @param ws_client Websocket client for querying token contracts
     @param kind The withdrawal kind (XTZ or FA token)
-    @return Token information
+    @return Tuple of (Token information, fast withdrawal)
 *)
-val get : Websocket_client.t -> Db.withdrawal_kind -> t tzresult Lwt.t
+val get : Websocket_client.t -> Db.withdrawal_kind -> (t * bool) tzresult Lwt.t
 
 (** [get_for_display ws_client kind amount] retrieves token information and
     formats the amount for display.
@@ -37,10 +37,11 @@ val get : Websocket_client.t -> Db.withdrawal_kind -> t tzresult Lwt.t
     @param ws_client Websocket client for querying token contracts
     @param kind The withdrawal kind (XTZ or FA token)
     @param amount The amount in raw units
-    @return Tuple of (formatted amount, token symbol)
+    @return Tuple of (formatted amount, token symbol, fast), [fast = true] for
+      fast withdrawals
 *)
 val get_for_display :
   Websocket_client.t ->
   Db.withdrawal_kind ->
   Ethereum_types.quantity ->
-  (float * string) tzresult Lwt.t
+  (float * string * bool) tzresult Lwt.t

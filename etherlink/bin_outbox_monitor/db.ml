@@ -20,7 +20,11 @@ let quantity_hum_encoding =
     Ethereum_types.quantity_of_z
     Data_encoding.z
 
-type withdrawal_kind = Xtz | FA of Ethereum_types.Address.t
+type withdrawal_kind =
+  | Xtz
+  | FA of Ethereum_types.Address.t
+  | Fast_xtz
+  | Fast_FA of Ethereum_types.Address.t
 
 type withdrawal = {
   kind : withdrawal_kind;
@@ -75,6 +79,20 @@ let withdrawal_kind_encoding =
            (req "ticket_owner" Ethereum_types.address_encoding))
         (function FA tow -> Some ((), tow) | _ -> None)
         (fun ((), tow) -> FA tow);
+      case
+        ~title:"FAST_XTZ"
+        (Tag 2)
+        (obj1 (req "kind" (constant "FAST_XTZ")))
+        (function Fast_xtz -> Some () | _ -> None)
+        (fun () -> Fast_xtz);
+      case
+        ~title:"FAST_FA"
+        (Tag 3)
+        (obj2
+           (req "kind" (constant "FAST_FA"))
+           (req "ticket_owner" Ethereum_types.address_encoding))
+        (function Fast_FA tow -> Some ((), tow) | _ -> None)
+        (fun ((), tow) -> Fast_FA tow);
     ]
 
 let pp_withdrawal_kind fmt k =
@@ -84,6 +102,12 @@ let pp_withdrawal_kind fmt k =
       Format.fprintf
         fmt
         "FA(%s)"
+        (Ethereum_types.Address.to_string ticket_owner)
+  | Fast_xtz -> Format.pp_print_string fmt "Fast XTZ"
+  | Fast_FA ticket_owner ->
+      Format.fprintf
+        fmt
+        "Fast FA(%s)"
         (Ethereum_types.Address.to_string ticket_owner)
 
 let withdrawal_encoding =
@@ -229,10 +253,15 @@ module Types = struct
   let withdrawal_kind =
     custom
       ~encode:(function
-        | Xtz -> Ok (0, None) | FA ticket_owner -> Ok (1, Some ticket_owner))
+        | Xtz -> Ok (0, None)
+        | FA ticket_owner -> Ok (1, Some ticket_owner)
+        | Fast_xtz -> Ok (2, None)
+        | Fast_FA ticket_owner -> Ok (3, Some ticket_owner))
       ~decode:(function
         | 0, None -> Ok Xtz
         | 1, Some ticket_owner -> Ok (FA ticket_owner)
+        | 2, None -> Ok Fast_xtz
+        | 3, Some ticket_owner -> Ok (Fast_FA ticket_owner)
         | _ -> Error "not a valid withdrawal kind")
       (t2 int (option address))
 
