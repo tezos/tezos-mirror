@@ -15,3 +15,6 @@ hex.workspace = true
 
 primitive-types.workspace = true
 tezos-smart-rollup.workspace = true
+num-bigint.workspace = true
+tezos_data_encoding.workspace = true
+nom.workspace = true
