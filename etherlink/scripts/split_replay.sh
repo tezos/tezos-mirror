@@ -2,9 +2,25 @@
 
 set -e
 
-if [ "$#" -ne 4 ]; then
-  echo "Usage: $0 <start_block> <end_block> <data_dir> <num_splits>"
+usage() {
+  cat << EOF
+Usage:
+  $0 <start_block> <end_block> <data_dir> <num_splits>
+
+Arguments:
+  start_block    Starting block number for the replay.
+  end_block      Ending block number for the replay.
+  data_dir       Path to the node directory containing the blocks.
+  num_splits     Number of processes (or CPU cores) to parallelize the replay.
+
+Example:
+  $0 1 500 sandbox_evm_node1 4
+EOF
   exit 1
+}
+
+if [ "$#" -ne 4 ]; then
+  usage
 fi
 
 start_block=$1

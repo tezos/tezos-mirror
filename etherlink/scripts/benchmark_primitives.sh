@@ -3,7 +3,32 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 <cores> <subset> <graph_output_file>  [--clean]"
+  cat << EOF
+Usage:
+  $0 <cores> <subset> <graph_output_file> [--clean]
+
+Arguments:
+  cores               Number of CPU cores to use during replay
+  subset              Category of contracts or operations to benchmark
+  graph_output_file   Path to the output graph image (e.g. results.png)
+  --clean             (Optional) Remove temporary files after execution
+
+<subset> categories:
+  general_contracts     Typical ERC contracts (ERC20, ERC1155), contract loops,
+                        storage operations, and signature verification utilities.
+
+  problematic_opcodes   Contracts containing gas-heavy or problematic EVM opcodes,
+                        such as SHA3, CREATE2, SSTORE.
+
+  gas_sinks             Contracts designed to consume large amounts of gas,
+                        including deep loops or memory-intensive logic.
+
+  precompiled           Contracts that invoke EVM precompiles:
+                        ECRecover, SHA256, RIPEMD160, MODEXP, BLAKE2f.
+
+Example:
+  $0 4 gas_sinks results.png --clean
+EOF
   exit 1
 }
 
