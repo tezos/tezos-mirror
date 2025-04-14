@@ -343,7 +343,10 @@ mod tests {
             // Create the states for the interpreted and jitted runs.
             let mut interpreted =
                 create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            interpreted.main_memory.set_all_readable_writeable();
+
             let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            jitted.main_memory.set_all_readable_writeable();
 
             let hash = super::Hash::blake2b_hash(&self.instructions).unwrap();
 
