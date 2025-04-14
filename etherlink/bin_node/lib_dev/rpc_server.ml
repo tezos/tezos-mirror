@@ -168,8 +168,9 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
     match rpc_server_family with
     | Rpc_types.Single_chain_node_rpc_server L2_types.Michelson ->
         let (module Backend : Services_backend_sig.S), _ = ctxt in
-        Tezos_services.register_tezlink_services
-          (module Backend.Tezlink_backend)
+        Evm_directory.init_from_resto_directory
+        @@ Tezos_services.register_tezlink_services
+             (module Backend.Tezlink_backend)
     | Single_chain_node_rpc_server L2_types.EVM
     | Multichain_sequencer_rpc_server ->
         Evm_directory.empty config.experimental_features.rpc_server

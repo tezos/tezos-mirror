@@ -295,4 +295,4 @@ let register_tezlink_services backend =
       Tezos_rpc.Service.description_service
   in
   let tezlink_directory = Tezos_rpc.Directory.prefix tezlink_root directory in
-  Evm_directory.init_from_resto_directory tezlink_directory
+  tezlink_directory
