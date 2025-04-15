@@ -36,9 +36,9 @@ use hart_state::HartState;
 use hart_state::HartStateLayout;
 use instruction::Instruction;
 use memory::Address;
+use memory::BadMemoryAccess;
 use memory::Memory;
 use memory::MemoryConfig;
-use memory::OutOfBounds;
 use mode::Mode;
 
 use crate::bits::u64;
@@ -367,7 +367,7 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
         self.core
             .main_memory
             .read_exec(phys_addr)
-            .map_err(|_: OutOfBounds| Exception::InstructionAccessFault(phys_addr))
+            .map_err(|_: BadMemoryAccess| Exception::InstructionAccessFault(phys_addr))
     }
 
     /// Fetch instruction from the address given by program counter
@@ -696,8 +696,8 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
 /// Errors that occur from interacting with the [MachineState]
 #[derive(Debug, derive_more::From, thiserror::Error)]
 pub enum MachineError {
-    #[error("Address out of bounds")]
-    AddressError(OutOfBounds),
+    #[error("Error while accessing memory")]
+    MemoryError(BadMemoryAccess),
 
     #[error("Device tree error: {0}")]
     DeviceTreeError(vm_fdt::Error),

@@ -7,7 +7,7 @@ use std::num::TryFromIntError;
 
 use arbitrary_int::TryNewError;
 
-use crate::machine_state::memory::OutOfBounds;
+use crate::machine_state::memory::BadMemoryAccess;
 use crate::machine_state::registers::XRegisters;
 use crate::machine_state::registers::XValue;
 use crate::machine_state::registers::a0;
@@ -74,8 +74,8 @@ impl From<Infallible> for Error {
     }
 }
 
-impl From<OutOfBounds> for Error {
-    fn from(_: OutOfBounds) -> Self {
+impl From<BadMemoryAccess> for Error {
+    fn from(_: BadMemoryAccess) -> Self {
         Self::Fault
     }
 }

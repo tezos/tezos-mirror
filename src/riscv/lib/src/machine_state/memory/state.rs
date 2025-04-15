@@ -5,8 +5,8 @@
 use std::mem;
 
 use super::Address;
+use super::BadMemoryAccess;
 use super::Memory;
-use super::OutOfBounds;
 #[cfg(feature = "supervisor")]
 use super::Permissions;
 use super::buddy::Buddy;
@@ -52,9 +52,9 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M: ManagerBase>
 {
     /// Ensure the access is within bounds.
     #[inline]
-    fn check_bounds(address: Address, length: usize) -> Result<(), OutOfBounds> {
+    fn check_bounds(address: Address, length: usize) -> Result<(), BadMemoryAccess> {
         if length > TOTAL_BYTES.saturating_sub(address as usize) {
-            return Err(OutOfBounds);
+            return Err(BadMemoryAccess);
         }
 
         Ok(())
@@ -78,7 +78,7 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M: ManagerBase>
         &mut self,
         address: Address,
         value: E,
-    ) -> Result<(), OutOfBounds>
+    ) -> Result<(), BadMemoryAccess>
     where
         E: Elem,
         M: ManagerWrite,
@@ -103,7 +103,7 @@ where
     M: ManagerBase,
 {
     #[inline]
-    fn read<E>(&self, address: Address) -> Result<E, OutOfBounds>
+    fn read<E>(&self, address: Address) -> Result<E, BadMemoryAccess>
     where
         E: Elem,
         M: ManagerRead,
@@ -114,7 +114,7 @@ where
         #[cfg(feature = "supervisor")]
         unsafe {
             if !self.readable_pages.can_access(address, mem::size_of::<E>()) {
-                return Err(OutOfBounds);
+                return Err(BadMemoryAccess);
             }
         }
 
@@ -122,7 +122,7 @@ where
     }
 
     #[inline]
-    fn read_exec<E>(&self, address: Address) -> Result<E, OutOfBounds>
+    fn read_exec<E>(&self, address: Address) -> Result<E, BadMemoryAccess>
     where
         E: Elem,
         M: ManagerRead,
@@ -137,14 +137,14 @@ where
                 .executable_pages
                 .can_access(address, mem::size_of::<E>())
             {
-                return Err(OutOfBounds);
+                return Err(BadMemoryAccess);
             }
         }
 
         Ok(self.data.read(address as usize))
     }
 
-    fn read_all<E>(&self, address: Address, values: &mut [E]) -> Result<(), OutOfBounds>
+    fn read_all<E>(&self, address: Address, values: &mut [E]) -> Result<(), BadMemoryAccess>
     where
         E: Elem,
         M: ManagerRead,
@@ -158,7 +158,7 @@ where
                 .readable_pages
                 .can_access(address, mem::size_of_val(values))
             {
-                return Err(OutOfBounds);
+                return Err(BadMemoryAccess);
             }
         }
 
@@ -167,7 +167,7 @@ where
     }
 
     #[inline]
-    fn write<E>(&mut self, address: Address, value: E) -> Result<(), OutOfBounds>
+    fn write<E>(&mut self, address: Address, value: E) -> Result<(), BadMemoryAccess>
     where
         E: Elem,
         M: ManagerReadWrite,
@@ -178,7 +178,7 @@ where
         #[cfg(feature = "supervisor")]
         unsafe {
             if !self.writable_pages.can_access(address, mem::size_of::<E>()) {
-                return Err(OutOfBounds);
+                return Err(BadMemoryAccess);
             }
         }
 
@@ -186,7 +186,7 @@ where
         Ok(())
     }
 
-    fn write_all<E>(&mut self, address: Address, values: &[E]) -> Result<(), OutOfBounds>
+    fn write_all<E>(&mut self, address: Address, values: &[E]) -> Result<(), BadMemoryAccess>
     where
         E: Elem,
         M: ManagerReadWrite,
@@ -200,7 +200,7 @@ where
                 .writable_pages
                 .can_access(address, mem::size_of_val(values))
             {
-                return Err(OutOfBounds);
+                return Err(BadMemoryAccess);
             }
         }
 
@@ -255,7 +255,7 @@ where
         address: Address,
         length: usize,
         perms: Permissions,
-    ) -> Result<(), OutOfBounds>
+    ) -> Result<(), BadMemoryAccess>
     where
         M: ManagerWrite,
     {
@@ -272,7 +272,7 @@ where
     }
 
     #[cfg(feature = "supervisor")]
-    fn deallocate_pages(&mut self, address: Address, length: usize) -> Result<(), OutOfBounds>
+    fn deallocate_pages(&mut self, address: Address, length: usize) -> Result<(), BadMemoryAccess>
     where
         M: ManagerReadWrite,
     {
@@ -294,7 +294,7 @@ where
         address_hint: Option<Address>,
         length: usize,
         allow_replace: bool,
-    ) -> Result<Address, OutOfBounds>
+    ) -> Result<Address, BadMemoryAccess>
     where
         M: ManagerReadWrite,
     {
@@ -321,7 +321,7 @@ where
                 idx << super::OFFSET_BITS
             }),
         }
-        .ok_or(OutOfBounds)
+        .ok_or(BadMemoryAccess)
     }
 
     #[cfg(feature = "supervisor")]
@@ -331,7 +331,7 @@ where
         length: usize,
         perms: Permissions,
         allow_replace: bool,
-    ) -> Result<Address, OutOfBounds>
+    ) -> Result<Address, BadMemoryAccess>
     where
         M: ManagerReadWrite,
     {

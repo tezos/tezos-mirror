@@ -13,7 +13,7 @@ use super::csregisters::satp::SvLength;
 use super::csregisters::satp::TranslationAlgorithm;
 use super::memory;
 use super::memory::Address;
-use super::memory::OutOfBounds;
+use super::memory::BadMemoryAccess;
 use super::mode::Mode;
 use crate::bits::Bits64;
 use crate::machine_state::address_translation::pte::PageTableEntry;
@@ -104,7 +104,7 @@ where
         let addr = a + vpn_i * pte_size;
         pte = PageTableEntry::from_bits(
             bus.read(addr)
-                .map_err(|_: OutOfBounds| Exception::LoadAccessFault(addr))?,
+                .map_err(|_: BadMemoryAccess| Exception::LoadAccessFault(addr))?,
         );
 
         // 3. If pte.v = 0, or if pte.r = 0 and pte.w = 1, stop and raise a page-fault

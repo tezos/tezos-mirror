@@ -8,7 +8,7 @@
 //!
 //! Blocks are sets of instructions that are often - but not always - executed immediately after each
 //! other. The main exceptions to this are:
-//! - instructions may trigger exceptions (e.g. `OutOfBounds` when interacting with memory)
+//! - instructions may trigger exceptions (e.g. `BadMemoryAccess` when interacting with memory)
 //! - branching instructions
 //!
 //! Specifically, blocks that contain a backwards branching instruction will often terminate with
