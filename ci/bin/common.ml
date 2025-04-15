@@ -139,44 +139,6 @@ let enable_kernels =
 
 (* Common GitLab CI caches *)
 
-(** Add variable enabling sccache.
-
-    This function should be applied to jobs that build rust files and
-    which has a configured sccache Gitlab CI cache.
-
-    - [key] and [path] configure the key under which the cache is
-    stored, and the path that will be cached. By default, the [key]
-    contains the name of the job, thus scoping the cache to all
-    instances of that job. By default, [path] is the folder
-    ["$CI_PROJECT_DIR/_sccache"], and this function also sets the
-    environment dir [SCCACHE_DIR] such that sccache stores its caches
-    there.
-
-    - [cache_size] sets the environment variable [SCCACHE_CACHE_SIZE]
-    that configures the maximum size of the cache.
-
-    - [error_log], [idle_timeout] and [log] sets the environment
-    variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
-    [SCCACHE_LOG] respectively. See the sccache documentation for more
-    information on these variables. *)
-let enable_sccache ?key ?error_log ?idle_timeout ?log
-    ?(path = "$CI_PROJECT_DIR/_sccache") ?(cache_size = "5G") job =
-  let key =
-    Option.value
-      ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-      key
-  in
-  job
-  |> append_variables
-       ([("SCCACHE_DIR", path); ("SCCACHE_CACHE_SIZE", cache_size)]
-       @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
-       @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
-       @ opt_var "SCCACHE_LOG" Fun.id log)
-  |> append_cache (cache ~key [path])
-  (* Starts sccache and sets [RUSTC_WRAPPER] *)
-  |> append_before_script [". ./scripts/ci/sccache-start.sh"]
-  |> append_after_script ["./scripts/ci/sccache-stop.sh"]
-
 (** Enable caching of Cargo's target folder which stores files which
     can speed up subsequent compilation passes.
 
@@ -199,28 +161,6 @@ let enable_cargo_target_caches ?key job =
            cache_dir // "etherlink_wasm_runtime" );
        ]
   |> append_cache (cache ~key [cache_dir])
-
-(** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
-
-    This function should only be applied to jobs that have a GitLab CI
-    cache for [CARGO_HOME], as enabled through [enable_cache_cargo] (that
-    function calls this function, so there is no need to apply both).
-    Exceptions can be made for jobs that must have CARGO_HOME set to
-    something different than {!cargo_home}. *)
-let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
-
-(** Adds a GitLab CI cache for the CARGO_HOME folder.
-
-    More precisely, we only cache the non-SCM dependencies in the
-    sub-directory [registry/cache]. *)
-let enable_cargo_cache job =
-  job
-  |> append_cache
-       (cache
-          ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-          [cargo_home // "registry/cache"])
-  (* Allow Cargo to access the network *)
-  |> enable_networked_cargo
 
 (** Add variable enabling dune cache.
 
