@@ -36,6 +36,10 @@ pub enum AccountStorageError {
     RlpDecoderError(DecoderError),
     #[error("Storage error: error while reading a value (incorrect size). Expected {expected} but got {actual}")]
     InvalidLoadValue { expected: usize, actual: usize },
+    #[error("Storage error: Failed to encode a value with BinWriter: {0}")]
+    BinWriteError(String),
+    #[error("Storage error: Failed to decode a value with NomReader: {0}")]
+    NomReadError(String),
     /// Some account balance became greater than what can be
     /// stored in an unsigned 256 bit integer.
     #[error("Account balance overflow")]
@@ -75,6 +79,10 @@ impl From<GenStorageError> for AccountStorageError {
             GenStorageError::Runtime(e) => {
                 AccountStorageError::DurableStorageError(DurableStorageError::from(e))
             }
+            GenStorageError::BinWriteError(msg) => {
+                AccountStorageError::BinWriteError(msg)
+            }
+            GenStorageError::NomReadError(msg) => AccountStorageError::NomReadError(msg),
             GenStorageError::Storage(e) => AccountStorageError::StorageError(e),
             GenStorageError::RlpDecoderError(e) => {
                 AccountStorageError::RlpDecoderError(e)

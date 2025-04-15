@@ -2579,6 +2579,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
+ "tezos_data_encoding",
  "tezos_ethereum_latest",
  "thiserror 1.0.69",
 ]
