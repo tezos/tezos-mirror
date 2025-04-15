@@ -78,6 +78,10 @@ directory.
   at least) level `l`. If the node does not have the blueprint for level `l` in
   its store, the RPC returns a 404 error instead of an empty list. `c` default
   to `1` if not specified and reduced to `500` if superior. (!17592)
+- Blocks now include placeholders for (!17673):
+  - `withdrawals` and `withdrawalsRoot` (EIP-4895)
+  - `blobGasUsed` and `excessBlobGas` (EIP-4844)
+  - `parentBeaconBlockRoot` (EIP-4788)
 
 ### Execution changes
 

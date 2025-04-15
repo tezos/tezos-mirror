@@ -233,12 +233,15 @@ impl EthBlock {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<EthBlock, DecoderError> {
         let first = *bytes.first().ok_or(DecoderError::Custom("Empty bytes"))?;
-        if first == 0x01 {
-            let decoder = Rlp::new(&bytes[1..]);
-            Self::rlp_decode_v1(&decoder)
-        } else {
-            let decoder = Rlp::new(bytes);
-            Self::rlp_decode_v0(&decoder)
+        match first {
+            0x01 | 0x02 => {
+                let decoder = Rlp::new(&bytes[1..]);
+                Self::rlp_decode_v1(&decoder)
+            }
+            _ => {
+                let decoder = Rlp::new(bytes);
+                Self::rlp_decode_v0(&decoder)
+            }
         }
     }
 
@@ -362,7 +365,14 @@ impl EthBlock {
 }
 
 impl VersionedEncoding for EthBlock {
-    const VERSION: u8 = 1;
+    // Versions history
+    //   - 0x02: Interpreted by the node as blocks with
+    //      - `withdrawals` and `withdrawalsRoot` (EIP-4895)
+    //      - `blobGasUsed` and `excessBlobGas` (EIP-4844)
+    //      - `parentBeaconBlockRoot` (EIP-4788)
+    //   - 0x01: EIP-1559 compliant blocks
+    //   - No tag: legacy blocks
+    const VERSION: u8 = 2;
 
     fn unversionned_encode(&self) -> bytes::BytesMut {
         let mut s = RlpStream::new();

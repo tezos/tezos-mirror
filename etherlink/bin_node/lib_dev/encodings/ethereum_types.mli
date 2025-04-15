@@ -189,6 +189,11 @@ type 'transaction_object block = {
      them*)
   baseFeePerGas : quantity option;
   prevRandao : block_hash option;
+  withdrawals : hash list option;
+  withdrawalsRoot : hash option;
+  blobGasUsed : hex option;
+  excessBlobGas : hex option;
+  parentBeaconBlockRoot : hash option;
 }
 
 val block_encoding :
