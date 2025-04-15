@@ -26,3 +26,5 @@ fuzzing = []
 
 [dev-dependencies]
 macrotest = "1.1.0"
+nom.workspace = true
+tezos_data_encoding.workspace = true
