@@ -38,9 +38,9 @@ use gdbstub::target::ext::breakpoints::SwBreakpointOps;
 use gdbstub::target::ext::exec_file::ExecFile;
 use gdbstub_arch::riscv::reg::RiscvCoreRegs;
 use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::memory::BadMemoryAccess;
 use octez_riscv::machine_state::memory::M1G;
 use octez_riscv::machine_state::memory::Memory;
-use octez_riscv::machine_state::memory::OutOfBounds;
 use octez_riscv::pvm::PvmHooks;
 use octez_riscv::state_backend::FnManagerIdent;
 use octez_riscv::stepper::StepResult;
@@ -216,7 +216,7 @@ impl<S: Stepper> SingleThreadBase for RiscvGdb<'_, S> {
 
         match state.main_memory.read_all(start_addr, data) {
             Ok(()) => Ok(data.len()),
-            Err(OutOfBounds) => Err(TargetError::Errno(DEFAULT)),
+            Err(BadMemoryAccess) => Err(TargetError::Errno(DEFAULT)),
         }
     }
 

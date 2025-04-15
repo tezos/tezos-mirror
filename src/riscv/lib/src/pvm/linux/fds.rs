@@ -37,12 +37,8 @@ impl<M: ManagerBase> SupervisorState<M> {
         // TODO: RV-487: Memory mappings are not yet protected. We assume the kernel knows what
         // it's doing for now.
         let mut data = vec![0u8; length as usize];
-        let Ok(()) = core
-            .main_memory
-            .read_all(addr.to_machine_address(), &mut data)
-        else {
-            return Err(Error::Fault);
-        };
+        core.main_memory
+            .read_all(addr.to_machine_address(), &mut data)?;
 
         match fd {
             FileDescriptorWriteable::StandardOutput | FileDescriptorWriteable::StandardError => {
@@ -125,15 +121,15 @@ impl<M: ManagerBase> SupervisorState<M> {
 
                 // TODO: RV-487: Memory mappings are not yet protected. We assume the kernel knows
                 // what it's doing for now.
-                let Ok(addr) = core.main_memory.read(struct_addr_base.to_machine_address()) else {
-                    return Err(Error::Fault);
-                };
+                let addr = core
+                    .main_memory
+                    .read(struct_addr_base.to_machine_address())?;
 
                 // TODO: RV-487: Memory mappings are not yet protected. We assume the kernel knows
                 // what it's doing for now.
-                let Ok(length) = core.main_memory.read(struct_addr_len.to_machine_address()) else {
-                    return Err(Error::Fault);
-                };
+                let length = core
+                    .main_memory
+                    .read(struct_addr_len.to_machine_address())?;
 
                 if length > 0 {
                     // Once we found a non-zero data segment to write, we break out of the loop

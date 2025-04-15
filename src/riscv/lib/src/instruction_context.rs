@@ -15,9 +15,9 @@ use crate::machine_state::AccessType;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Args;
+use crate::machine_state::memory::BadMemoryAccess;
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
-use crate::machine_state::memory::OutOfBounds;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
@@ -295,7 +295,7 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
             LoadStoreWidth::Double => self.main_memory.write::<u64>(phys_address, value),
         };
 
-        res.map_err(|_: OutOfBounds| Exception::StoreAMOAccessFault(phys_address))
+        res.map_err(|_: BadMemoryAccess| Exception::StoreAMOAccessFault(phys_address))
     }
 }
 

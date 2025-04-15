@@ -6,8 +6,8 @@
 use crate::machine_state::AccessType;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory;
+use crate::machine_state::memory::BadMemoryAccess;
 use crate::machine_state::memory::Memory;
-use crate::machine_state::memory::OutOfBounds;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
 use crate::state_backend as backend;
@@ -27,7 +27,7 @@ where
 
         self.main_memory
             .read(address)
-            .map_err(|_: OutOfBounds| Exception::LoadAccessFault(address))
+            .map_err(|_: BadMemoryAccess| Exception::LoadAccessFault(address))
     }
 
     /// Generic read function for loading `mem::size_of<T>` bytes from address val(rs1) + imm
@@ -61,7 +61,7 @@ where
 
         self.main_memory
             .write(address, value)
-            .map_err(|_: OutOfBounds| Exception::StoreAMOAccessFault(address))
+            .map_err(|_: BadMemoryAccess| Exception::StoreAMOAccessFault(address))
     }
 
     /// Generic store operation for writing `mem::size_of<T>` bytes starting at address val(rs1) + imm

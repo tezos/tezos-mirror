@@ -120,12 +120,12 @@ impl TryFrom<XValue> for Permissions {
     }
 }
 
-/// Address out of bounds error
+/// Something went wrong when accessing the memory
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Error, derive_more::Display)]
-pub struct OutOfBounds;
+pub struct BadMemoryAccess;
 
-impl From<OutOfBounds> for SbiError {
-    fn from(_value: OutOfBounds) -> Self {
+impl From<BadMemoryAccess> for SbiError {
+    fn from(_value: BadMemoryAccess) -> Self {
         SbiError::InvalidAddress
     }
 }
@@ -133,31 +133,31 @@ impl From<OutOfBounds> for SbiError {
 /// Instance of memory
 pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
     /// Read an element in the region. `address` is in bytes.
-    fn read<E>(&self, address: Address) -> Result<E, OutOfBounds>
+    fn read<E>(&self, address: Address) -> Result<E, BadMemoryAccess>
     where
         E: Elem,
         M: ManagerRead;
 
     /// Read an element in the region that will be used in execution. `address` is in bytes.
-    fn read_exec<E>(&self, address: Address) -> Result<E, OutOfBounds>
+    fn read_exec<E>(&self, address: Address) -> Result<E, BadMemoryAccess>
     where
         E: Elem,
         M: ManagerRead;
 
     /// Read elements from the region. `address` is in bytes.
-    fn read_all<E>(&self, address: Address, values: &mut [E]) -> Result<(), OutOfBounds>
+    fn read_all<E>(&self, address: Address, values: &mut [E]) -> Result<(), BadMemoryAccess>
     where
         E: Elem,
         M: ManagerRead;
 
     /// Update an element in the region. `address` is in bytes.
-    fn write<E>(&mut self, address: Address, value: E) -> Result<(), OutOfBounds>
+    fn write<E>(&mut self, address: Address, value: E) -> Result<(), BadMemoryAccess>
     where
         E: Elem,
         M: ManagerReadWrite;
 
     /// Update multiple elements in the region. `address` is in bytes.
-    fn write_all<E>(&mut self, address: Address, values: &[E]) -> Result<(), OutOfBounds>
+    fn write_all<E>(&mut self, address: Address, values: &[E]) -> Result<(), BadMemoryAccess>
     where
         E: Elem,
         M: ManagerReadWrite;
@@ -179,7 +179,7 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         address: Address,
         length: usize,
         perms: Permissions,
-    ) -> Result<(), OutOfBounds>
+    ) -> Result<(), BadMemoryAccess>
     where
         M: ManagerWrite;
 
@@ -190,13 +190,13 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         address_hint: Option<Address>,
         length: usize,
         allow_replace: bool,
-    ) -> Result<Address, OutOfBounds>
+    ) -> Result<Address, BadMemoryAccess>
     where
         M: ManagerReadWrite;
 
     /// Allocate pages for the given address range.
     #[cfg(feature = "supervisor")]
-    fn deallocate_pages(&mut self, address: Address, length: usize) -> Result<(), OutOfBounds>
+    fn deallocate_pages(&mut self, address: Address, length: usize) -> Result<(), BadMemoryAccess>
     where
         M: ManagerReadWrite;
 
@@ -208,7 +208,7 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         length: usize,
         perms: Permissions,
         allow_replace: bool,
-    ) -> Result<Address, OutOfBounds>
+    ) -> Result<Address, BadMemoryAccess>
     where
         M: ManagerReadWrite;
 
@@ -218,7 +218,7 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         &mut self,
         address: Address,
         length: usize,
-    ) -> Result<(), OutOfBounds>
+    ) -> Result<(), BadMemoryAccess>
     where
         M: ManagerReadWrite,
     {
