@@ -35,6 +35,7 @@ let cleared =
 
 let injecting_transactions =
   declare_1
+    ~section
     ~name:"tx_queue_injecting_transaction"
     ~msg:"injecting {n} transactions"
     ~level:Info
@@ -60,6 +61,7 @@ let callback_error =
 
 let add_transaction =
   declare_1
+    ~section
     ~name:"tx_queue_add_transaction"
     ~msg:"transaction {tx_hash} received"
     ~level:Debug
@@ -68,6 +70,7 @@ let add_transaction =
 
 let transaction_dropped =
   declare_1
+    ~section
     ~name:"tx_queue_transaction_dropped"
     ~msg:"transaction {tx_hash} dropped"
     ~level:Debug
@@ -76,6 +79,7 @@ let transaction_dropped =
 
 let transaction_confirmed =
   declare_1
+    ~section
     ~name:"tx_queue_transaction_confirmed"
     ~msg:"transaction {tx_hash} confirmed"
     ~level:Debug
@@ -84,6 +88,7 @@ let transaction_confirmed =
 
 let missing_tx_object =
   declare_1
+    ~section
     ~name:"tx_queue_missing_tx_object"
     ~msg:"transaction {tx_hash} has no associated object"
     ~level:Error
