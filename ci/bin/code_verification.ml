@@ -850,7 +850,6 @@ let jobs pipeline_type =
         ~arch
         ~rules:(make_rules ~manual:Yes ~changes:Teztale.Common.changeset ())
         ()
-      |> enable_cargo_cache |> enable_sccache
     in
     [
       job_build_arm64_release;
