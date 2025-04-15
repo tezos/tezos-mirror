@@ -2572,6 +2572,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "hex",
+ "nom",
  "primitive-types",
  "rlp",
  "sha3",

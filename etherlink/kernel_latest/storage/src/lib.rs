@@ -10,12 +10,19 @@ pub mod helpers;
 
 use crate::error::Error;
 
+use helpers::is_incomplete;
+use nom::error::ParseError;
+use nom::Finish;
 use primitive_types::{H256, U256};
 use rlp::{Decodable, Encodable};
 
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
+use tezos_data_encoding::enc::BinWriter;
+use tezos_data_encoding::nom as tezos_nom;
+use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_nom::error::DecodeError;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
 
@@ -239,4 +246,59 @@ pub fn read_b58_kt1(host: &impl Runtime, path: &impl Path) -> Option<ContractKt1
     let bytes = host.store_read_all(path).ok()?;
     let kt1_b58 = String::from_utf8(bytes).ok()?;
     ContractKt1Hash::from_b58check(&kt1_b58).ok()
+}
+
+/// Store the `value` into the storage at the given `path`
+///
+/// The stored value must implement BinWriter
+pub fn store_bin(
+    value: &impl BinWriter,
+    host: &mut impl Runtime,
+    path: &impl Path,
+) -> Result<(), Error> {
+    let mut buffer = vec![];
+    value.bin_write(&mut buffer)?;
+    host.store_write_all(path, &buffer)?;
+    Ok(())
+}
+
+/// Return a potential decoded value using NomReader
+/// at the given `path`
+pub fn read_nom_value<T: for<'a> NomReader<'a>>(
+    host: &impl Runtime,
+    path: &impl Path,
+) -> Result<T, Error> {
+    let bytes = host.store_read_all(path)?;
+    let result = T::nom_read(&bytes);
+    // The finish function may panic if the parser is a *streaming parser* that has not enough data.
+    // To be sure we don't panic, verify if the result is complete
+    if is_incomplete(&result) {
+        let incomplete_error =
+            DecodeError::from_error_kind(bytes.as_ref(), nom::error::ErrorKind::Eof);
+        return Err(incomplete_error.into());
+    }
+    // Finish the parsing because we can't panic now
+    let (remaining, value) = result.finish()?;
+    // Verify that all data were consumed
+    if !remaining.is_empty() {
+        return Err(Error::NomReadError(format!(
+            "decoding didn't consume all data, remaining data: {:?}",
+            remaining
+        )));
+    }
+    Ok(value)
+}
+
+/// Return an optional decoded value using NomReader
+/// at the given `path`
+pub fn read_optional_nom_value<T: for<'a> NomReader<'a>>(
+    host: &impl Runtime,
+    path: &impl Path,
+) -> Result<Option<T>, Error> {
+    if let Some(ValueType::Value) = host.store_has(path)? {
+        let value = read_nom_value(host, path)?;
+        Ok(Some(value))
+    } else {
+        Ok(None)
+    }
 }

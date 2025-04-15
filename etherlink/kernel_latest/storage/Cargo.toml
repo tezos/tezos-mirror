@@ -25,3 +25,4 @@ tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-storage.workspace = true
 tezos_data_encoding.workspace = true
+nom.workspace = true
