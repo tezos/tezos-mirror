@@ -67,11 +67,11 @@ RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.80
     && rm -r rust-std-1.80.1-riscv64gc-unknown-hermit rust-std-1.80.1-riscv64gc-unknown-hermit.tar.gz
 
 # Install Taplo
-RUN cargo +1.78.0 install taplo-cli --version 0.8.1 --locked && \
+RUN cargo +1.86.0 install taplo-cli --version 0.9.3 --locked && \
     taplo --version
 
 # Install cargo-audit
-RUN cargo +1.78.0 install --locked cargo-audit --version 0.20.0 && \
+RUN cargo +1.86.0 install --locked cargo-audit --version 0.21.2 && \
     cargo audit --version
 
 # install wabt: https://packages.debian.org/source/sid/wabt
