@@ -15,6 +15,7 @@ use std::{
     fs::{read, read_to_string, File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
+    process::exit,
 };
 use structopt::StructOpt;
 use walkdir::{DirEntry, WalkDir};
@@ -582,6 +583,18 @@ pub fn main() {
         result: opt.result,
     };
 
+    let skip_data_path = Path::new(&opt.resources).join(SKIP_DATA_FILE);
+    let skip_data: SkipData = match read(&skip_data_path) {
+        Ok(reader) => serde_yaml::from_reader(&*reader)
+            .expect("Reading data(s) to skip should succeed."),
+        Err(_) => {
+            write_out!(output_file, "ERROR: the specified path [{}] can not be found, data(s) \
+                                     that should be skipped will not be and the outcome of the \
+                                     evaluation will be erroneous.", skip_data_path.display());
+            exit(1)
+        }
+    };
+
     if output.log {
         write_out!(
             output_file,
@@ -589,20 +602,6 @@ pub fn main() {
             folder_path.to_str().unwrap()
         );
     }
-
-    let skip_data_path = Path::new(&opt.resources).join(SKIP_DATA_FILE);
-    let skip_data: SkipData = match read(&skip_data_path) {
-        Ok(reader) => serde_yaml::from_reader(&*reader)
-            .expect("Reading data(s) to skip should succeed."),
-        Err(_) => {
-            write_out!(output_file, "WARNING: the specified path [{}] can not be found, data(s) \
-                                   that should be skipped will not be and the outcome of the \
-                                   evaluation could be erroneous.", skip_data_path.display());
-            SkipData {
-                datas: HashMap::new(),
-            }
-        }
-    };
 
     for test_file in test_files.into_iter() {
         let splitted_path: Vec<&str> = test_file.to_str().unwrap().split('/').collect();
