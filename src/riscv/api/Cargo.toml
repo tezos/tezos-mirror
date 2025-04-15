@@ -1,0 +1,35 @@
+[package]
+name = "octez-riscv-api"
+version = "0.0.0"
+edition = "2021"
+
+[lints]
+workspace = true
+
+[dependencies]
+arbitrary-int.workspace = true
+num_enum.workspace = true
+sha2.workspace = true
+strum.workspace = true
+ocaml.workspace = true
+
+[dependencies.octez-riscv]
+path = "../lib"
+
+[dependencies.ocaml-sys]
+# We don't care about the version. Ideally this gets pinned to what `ocaml` needs.
+version = "*"
+default-features = false
+
+[dependencies.ocaml-boxroot-sys]
+# We don't care about the version. Ideally this gets pinned to what `ocaml` needs.
+version = "*"
+default-features = false
+
+[build-dependencies]
+ocaml-build.workspace = true
+
+[features]
+default = ["ocaml/default"]
+# `ci` must be activated in isolation. Activating it in conjuction with `default` causes build errors.
+ci = ["ocaml/without-ocamlopt", "ocaml-sys/without-ocamlopt", "ocaml/derive"]

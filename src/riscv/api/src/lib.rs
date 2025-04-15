@@ -7,6 +7,8 @@ mod move_semantics;
 mod pointer_apply;
 
 use std::fs;
+use std::ops::Deref;
+use std::ops::DerefMut;
 use std::str;
 
 use arbitrary_int::u31;
@@ -16,24 +18,23 @@ use num_enum::IntoPrimitive;
 use num_enum::TryFromPrimitive;
 use ocaml::Pointer;
 use ocaml::ToValue;
+use octez_riscv::pvm::PvmHooks;
+use octez_riscv::pvm::PvmStatus;
+use octez_riscv::pvm::node_pvm::NodePvm;
+use octez_riscv::pvm::node_pvm::PvmStorage;
+use octez_riscv::pvm::node_pvm::PvmStorageError;
+use octez_riscv::state_backend::ManagerReadWrite;
+use octez_riscv::state_backend::hash::Hash;
+use octez_riscv::state_backend::owned_backend::Owned;
+use octez_riscv::state_backend::proof_backend::proof;
+use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
+use octez_riscv::storage;
+use octez_riscv::storage::StorageError;
 use pointer_apply::ApplyReadOnly;
 use pointer_apply::apply_imm;
 use pointer_apply::apply_mut;
 use sha2::Digest;
 use sha2::Sha256;
-
-use crate::pvm::PvmHooks;
-use crate::pvm::PvmStatus;
-use crate::pvm::node_pvm::NodePvm;
-use crate::pvm::node_pvm::PvmStorage;
-use crate::pvm::node_pvm::PvmStorageError;
-use crate::state_backend::ManagerReadWrite;
-use crate::state_backend::hash::Hash;
-use crate::state_backend::owned_backend::Owned;
-use crate::state_backend::proof_backend::proof;
-use crate::state_backend::proof_backend::proof::serialise_proof;
-use crate::storage;
-use crate::storage::StorageError;
 
 const HERMIT_LOADER: &[u8] = include_bytes!("../../assets/hermit-loader");
 
@@ -173,14 +174,12 @@ pub struct OutputProof;
 
 ocaml::custom!(OutputProof);
 
-impl<'a> PvmHooks<'a> {
-    fn from_printer(printer: ocaml::Value, gc: &'a ocaml::Runtime) -> PvmHooks<'a> {
-        let putchar = move |c: u8| unsafe {
-            ocaml::Value::call(&printer, gc, [ocaml::Int::from(c)])
-                .expect("compute_step: putchar error")
-        };
-        PvmHooks::new(putchar)
-    }
+fn pvm_hooks_from_printer(printer: ocaml::Value, gc: &ocaml::Runtime) -> PvmHooks {
+    let putchar = move |c: u8| unsafe {
+        ocaml::Value::call(&printer, gc, [ocaml::Int::from(c)])
+            .expect("compute_step: putchar error")
+    };
+    PvmHooks::new(putchar)
 }
 
 #[ocaml::func]
@@ -296,7 +295,7 @@ pub fn octez_riscv_compute_step_with_debug(
     state: Pointer<State>,
     printer: ocaml::Value,
 ) -> Pointer<State> {
-    let mut hooks = PvmHooks::from_printer(printer, gc);
+    let mut hooks = pvm_hooks_from_printer(printer, gc);
 
     apply_imm(state, |pvm| pvm.compute_step(&mut hooks)).0
 }
@@ -327,7 +326,7 @@ pub fn octez_riscv_compute_step_many_with_debug(
     state: Pointer<State>,
     printer: ocaml::Value,
 ) -> (Pointer<State>, i64) {
-    let mut hooks = PvmHooks::from_printer(printer, gc);
+    let mut hooks = pvm_hooks_from_printer(printer, gc);
 
     apply_imm(state, |pvm| {
         pvm.compute_step_many(&mut hooks, max_steps as usize)
@@ -341,7 +340,7 @@ pub fn octez_riscv_mut_compute_step_many_with_debug(
     state: Pointer<MutState>,
     printer: ocaml::Value,
 ) -> i64 {
-    let mut hooks = PvmHooks::from_printer(printer, gc);
+    let mut hooks = pvm_hooks_from_printer(printer, gc);
 
     apply_mut(state, |pvm| {
         pvm.compute_step_many(&mut hooks, max_steps as usize)
@@ -494,7 +493,21 @@ pub unsafe fn octez_riscv_storage_export_snapshot(
 
 /// Proofs
 #[ocaml::sig]
-pub type Proof = proof::Proof;
+pub struct Proof(proof::Proof);
+
+impl Deref for Proof {
+    type Target = proof::Proof;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Proof {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 ocaml::custom!(Proof);
 
@@ -512,6 +525,7 @@ pub fn octez_riscv_proof_stop_state(_proof: Pointer<Proof>) -> [u8; 32] {
 
 #[ocaml::func]
 #[ocaml::sig("input option -> proof -> input_request option")]
+// Allow some warnings while this method goes through iterations.
 #[expect(
     unreachable_code,
     unused_variables,

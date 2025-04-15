@@ -2588,11 +2588,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "octez-riscv-api"
+version = "0.0.0"
+dependencies = [
+ "arbitrary-int",
+ "num_enum",
+ "ocaml",
+ "ocaml-boxroot-sys",
+ "ocaml-build",
+ "ocaml-sys",
+ "octez-riscv",
+ "sha2 0.10.8",
+ "strum 0.26.3",
+]
+
+[[package]]
 name = "octez-rust-deps"
 version = "0.0.0"
 dependencies = [
  "librustzcash",
- "octez-riscv",
+ "octez-riscv-api",
  "wasmer-c-api",
 ]
 

@@ -36,15 +36,7 @@ itertools.workspace = true
 range-collections.workspace = true
 elf.workspace = true
 
-[dependencies.ocaml]
-workspace = true
-optional = true
-
-[build-dependencies]
-ocaml-build.workspace = true
-
 [dev-dependencies]
-hex.workspace = true
 rand.workspace = true
 proptest.workspace = true
 lazy_static.workspace = true
@@ -53,6 +45,5 @@ goldenfile.workspace = true
 
 [features]
 default = []
-ocaml-api = ["ocaml"]
 supervisor = []
 metrics = []

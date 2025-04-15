@@ -10,4 +10,4 @@
   -w -9-27-66)
  (modules octez_riscv_api))
 
-(copy_files ../../riscv/lib/octez_riscv_api.*)
+(copy_files ../../riscv/api/octez_riscv_api.*)

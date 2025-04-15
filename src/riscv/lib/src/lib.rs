@@ -22,6 +22,3 @@ pub mod state_backend;
 pub mod stepper;
 pub mod storage;
 pub mod traps;
-
-#[cfg(feature = "ocaml-api")]
-pub mod ocaml_api;

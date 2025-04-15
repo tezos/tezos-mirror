@@ -2,7 +2,7 @@
 
 open! Bigarray
 
-(* file: ocaml_api.rs *)
+(* file: lib.rs *)
 
 type repo
 type state

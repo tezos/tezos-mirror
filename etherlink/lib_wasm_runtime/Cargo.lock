@@ -3306,7 +3306,7 @@ dependencies = [
  "log",
  "ocaml",
  "ocaml-build",
- "octez-riscv",
+ "octez-riscv-api",
  "tezos-evm-runtime-bifrost",
  "tezos-evm-runtime-calypso",
  "tezos-evm-runtime-calypso2",
@@ -3351,6 +3351,21 @@ dependencies = [
  "thiserror",
  "try-blocks",
  "vm-fdt",
+]
+
+[[package]]
+name = "octez-riscv-api"
+version = "0.0.0"
+dependencies = [
+ "arbitrary-int",
+ "num_enum",
+ "ocaml",
+ "ocaml-boxroot-sys",
+ "ocaml-build",
+ "ocaml-sys",
+ "octez-riscv",
+ "sha2 0.10.8",
+ "strum 0.26.3",
 ]
 
 [[package]]

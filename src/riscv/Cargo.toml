@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["lib", "sandbox"]
+members = ["lib", "sandbox", "api"]
 exclude = ["jstz", "dummy_kernel"]
 
 [workspace.lints.clippy]
