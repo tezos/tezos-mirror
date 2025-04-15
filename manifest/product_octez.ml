@@ -2598,7 +2598,12 @@ let octez_bees =
 
 let _octez_bees_tests =
   tezt
-    ["mocked_worker"; "test_bees_unit"; "test_bees_unit_eio"]
+    [
+      "mocked_worker";
+      "test_bees_unit";
+      "test_bees_unit_eio";
+      "test_bees_task_worker";
+    ]
     ~path:"src/lib_bees/test"
     ~opam:"octez-libs"
     ~deps:
