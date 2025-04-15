@@ -194,8 +194,7 @@ You may also access this whole documentation as a single `text file <https://oct
    :caption: Protocol Reference Manuals
    :hidden:
 
-   Quebec Protocol Reference <active/index>
-   Rio Protocol Reference <rio/index>
+   Rio Protocol Reference <active/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
@@ -222,7 +221,6 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    protocols/naming
-   protocols/021_quebec
    protocols/022_rio
    protocols/alpha
    protocols/history

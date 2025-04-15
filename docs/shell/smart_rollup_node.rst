@@ -298,7 +298,7 @@ batching:${OPERATOR_ADDR2}``.  Where the rollup node will use
 ``${OPERATOR_ADDR1}`` for everything else.
 
 The L1 chain has a limitation of one manager operation per key per
-block (see :doc:`../active/precheck`). In the case of a high
+block (see :ref:`one_manager_op_per_manager_per_block`). In the case of a high
 throughput rollup, this limitation could slow down the rollup by
 capping the number of L2 messages that the rollup node's batcher
 purpose can inject per block to the maximum size of one L1 operation's
