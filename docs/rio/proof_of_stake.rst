@@ -65,6 +65,7 @@ mentioned above, staked tez are weighted higher than non-staked tez
 when computing the baking power.
 
 
+.. _consensus_key:
 .. _consensus_key_rio:
 
 Consensus key
@@ -95,20 +96,15 @@ takes precedence for determining which key to activate at the start of
 cycle ``n + CONSENSUS_KEY_ACTIVATION_DELAY + 1``.
 
 Note that both the manager key and the consensus key give total
-control over the delegate's spendable balance: indeed, the consensus
-key may sign a ``Drain_delegate`` operation to transfer the delegate's
-spendable balance to an arbitrary account. In :doc:`relevant
-RPCs<../api/openapi>` like
-``/chains/main/blocks/head/helpers/baking_rights``, both the
-delegate's manager and consensus keys are listed.
-
-See :ref:`this page<consensus_key>` for further important details,
-notably client commands that are helpful for handling consensus keys.
+control over the delegate's spendable balance.
+See :ref:`this page<consensus_key_details>` for further important details,
+including client commands that are helpful for handling consensus keys.
 
 
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_rio:
 
 A delegate can be marked as either active or passive. A passive
@@ -135,6 +131,7 @@ Tezos being proof-of-stake, the delegates' rights are selected at
 random based on their :doc:`baking power<baking_power>`. Let us detail
 the selection mechanism used in Tezos.
 
+.. _random_seed:
 .. _random_seed_rio:
 
 Random seed
@@ -146,7 +143,9 @@ values in the protocol, in particular for selecting delegates to participate in 
 
 For more information on randomness generation, see :doc:`randomness-generation<randomness_generation>`.
 
+.. _rights:
 .. _rights_rio:
+.. _slots:
 .. _slots_rio:
 
 Slot selection
@@ -178,6 +177,7 @@ simple procedure which has as its initial state: the level, the
 level belongs, and the slot.
 
 
+.. _ps_constants:
 .. _ps_constants_rio:
 
 Proof-of-stake parameters

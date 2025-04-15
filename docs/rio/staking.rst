@@ -61,6 +61,7 @@ unfrozen by stakers. This is a two step process which spans for at least
 ``UNSTAKE_FINALIZATION_DELAY`` cycles (cf. :ref:`Staked funds
 management <staked_funds_management_rio>`).
 
+.. _pseudo_operations:
 .. _pseudo_operations_rio:
 
 A user interface is provided for delegates and stakers to interact
@@ -76,6 +77,7 @@ custodians, exchanges, and other parties to support the functionality.
 stakers. In other words, smart contracts cannot stake funds (they can
 of course still delegate them).
 
+.. _staking_policy_configuration:
 .. _staking_policy_configuration_rio:
 
 Staking policy configuration
@@ -120,6 +122,7 @@ stake) nor its consequence on voting and baking powers. That is,
 overdelegated funds are not counted towards a delegate baking power, but
 they do increase their voting power.
 
+.. _staked_funds_management:
 .. _staked_funds_management_rio:
 
 Staked funds management
