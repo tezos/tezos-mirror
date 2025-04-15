@@ -19,6 +19,11 @@ purge)
   # Purge debconf data for the package in any case
   # shellcheck disable=SC2119
   db_purge || true
+  rm -f "/var/tezos/.tezos-client/*_highwatermarks"
+  rm -f "/var/tezos/.tezos-client/*_stateful_nonces"
+  rm -Rf "/var/tezos/.tezos-client/logs"
+  rm -f /var/log/tezos/accuser*.log
+  rm -f /var/log/tezos/baker*.log
   echo "Octez baker purged"
   ;;
 upgrade)
