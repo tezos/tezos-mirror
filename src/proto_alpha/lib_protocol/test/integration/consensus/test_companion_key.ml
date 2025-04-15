@@ -652,6 +652,28 @@ let test_register_same_key_multiple_times =
   --> update_either_ck ~ck_name:ck delegate
   --> next_cycle
 
+let test_register_new_key_every_cycle =
+  let consensus_rights_delay =
+    Default_parameters.constants_mainnet.consensus_rights_delay
+  in
+  let delegate = "delegate" in
+  let check_finalized_block = check_cks delegate in
+  let update_both_cks delegate =
+    add_account "consensus_key"
+    --> update_consensus_key ~ck_name:"consensus_key" delegate
+    --> add_account ~algo:Bls "companion_key"
+    --> update_companion_key ~ck_name:"companion_key" delegate
+  in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> set S.consensus_rights_delay consensus_rights_delay
+  --> begin_test
+        ~algo:Bls
+        ~force_attest_all:true
+        ~check_finalized_block
+        [delegate]
+  --> loop (consensus_rights_delay + 2) (update_both_cks delegate --> next_cycle)
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -661,6 +683,7 @@ let tests =
        ("Self register as companion", test_self_register_as_companion);
        ( "Register same key multiple times",
          test_register_same_key_multiple_times );
+       ("Test register new key every cycle", test_register_new_key_every_cycle);
      ]
 
 let () =
