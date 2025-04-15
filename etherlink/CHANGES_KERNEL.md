@@ -19,6 +19,8 @@
   from the kernel's perspective. (!17636)
 - Execution gas is now used to compute the changes in gas price over time,
   instead of estimated ticks. (!17630)
+- The EVM now uses a cache for contract code/hash/size which improves time
+  performances on the execution side. (!17716)
 
 ### Bug fixes
 
