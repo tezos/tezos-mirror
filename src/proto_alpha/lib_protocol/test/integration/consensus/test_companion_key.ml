@@ -765,6 +765,103 @@ let test_registration_override =
         [("update consensus", Consensus); ("update companion", Companion)]
   --> next_block
 
+let test_in_registration_table_twice =
+  (* We manually set consensus_rights_delay,
+     to ensure all update operations are made without any key being activated.
+     This ensures that a key can be pending for two different cycles at the same time. *)
+  let consensus_rights_delay = 4 in
+  let delegate = "delegate" in
+  let check_finalized_block = check_cks delegate in
+  let check_is_pending_twice ~loc ~ck ~registered_for kind =
+    let open Lwt_result_syntax in
+    exec_unit (fun (block, state) ->
+        let delegate = State.find_account registered_for state in
+        let ck = State.find_account ck state in
+        let* info = Context.Delegate.info (B block) delegate.pkh in
+        let {
+          Delegate_services.pending_consensus_keys;
+          pending_companion_keys;
+          _;
+        } =
+          info
+        in
+        let pending_list =
+          (match kind with
+          | Consensus -> pending_consensus_keys
+          | Companion ->
+              pending_companion_keys
+              |> List.map (fun (cycle, key) ->
+                     (cycle, (Signature.Bls key : Signature.public_key_hash))))
+          |> List.map snd
+        in
+        let occurrences =
+          List.filter (Signature.Public_key_hash.equal ck.pkh) pending_list
+        in
+        match occurrences with
+        | _ :: _ :: _ -> return_unit
+        | _ ->
+            failwith
+              "Given key %a is not registered for two different cycles for %a \
+               (%s)"
+              Signature.Public_key_hash.pp
+              ck.pkh
+              Signature.Public_key_hash.pp
+              delegate.pkh
+              loc)
+  in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> set S.consensus_rights_delay consensus_rights_delay
+  --> set S.cache_stake_distribution_cycles (consensus_rights_delay + 3)
+  --> set S.cache_sampler_state_cycles (consensus_rights_delay + 3)
+  --> begin_test
+        ~algo:Bls
+        ~force_attest_all:true
+        ~check_finalized_block
+        [delegate]
+  --> add_account ~algo:Bls "ck1"
+  --> add_account ~algo:Bls "ck2"
+  --> fold_tag
+        (fun kind ->
+          update_key ~kind ~ck_name:"ck1" delegate
+          --> next_cycle
+          --> update_key ~kind ~ck_name:"ck2" delegate
+          --> next_cycle
+          --> update_key ~kind ~ck_name:"ck1" delegate
+          --> check_is_pending_twice
+                ~loc:__LOC__
+                ~ck:"ck1"
+                ~registered_for:delegate
+                kind
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck2"
+                ~registered_for:delegate
+                Pending
+                kind
+          --> wait_n_cycles (consensus_rights_delay - 1)
+          (* ck1 is both active AND pending *)
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck2"
+                ~registered_for:delegate
+                Pending
+                kind
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck1"
+                ~registered_for:delegate
+                Active
+                kind
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck1"
+                ~registered_for:delegate
+                Pending
+                kind)
+        [("update consensus", Consensus); ("update companion", Companion)]
+  --> next_block
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -777,6 +874,7 @@ let tests =
        ("Test register new key every cycle", test_register_new_key_every_cycle);
        ("Test register key at end of cycle", test_register_key_end_of_cycle);
        ("Test registration override", test_registration_override);
+       ("Test double registration", test_in_registration_table_twice);
      ]
 
 let () =
