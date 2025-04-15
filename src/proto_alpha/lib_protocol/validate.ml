@@ -526,8 +526,8 @@ module Consensus = struct
       [Partial_validation] modes.
 
       Return the slot owner's consensus key and voting power. *)
-  let check_preexisting_block_preattestation vi consensus_info block_info
-      {level; round; block_payload_hash = bph; slot} =
+  let check_preexisting_block_preattestation vi block_info
+      {level; round; block_payload_hash = bph; slot = _} =
     let open Lwt_result_syntax in
     let*? locked_round =
       match block_info.locked_round with
@@ -543,16 +543,13 @@ module Consensus = struct
     let*? () = check_round kind locked_round round in
     let expected_payload_hash = block_info.header_contents.payload_hash in
     let*? () = check_payload_hash kind expected_payload_hash bph in
-    let*? consensus_key, voting_power, _dal_power =
-      get_delegate_details consensus_info.preattestation_slot_map kind slot
-    in
-    return (consensus_key, voting_power)
+    return_unit
 
   (** Preattestation checks for Construction mode.
 
       Return the slot owner's consensus key and voting power. *)
-  let check_constructed_block_preattestation vi consensus_info cons_info
-      {level; round; block_payload_hash = bph; slot} =
+  let check_constructed_block_preattestation vi cons_info
+      {level; round; block_payload_hash = bph; slot = _} =
     let open Lwt_result_syntax in
     let expected_payload_hash = cons_info.header_contents.payload_hash in
     let*? () =
@@ -571,10 +568,7 @@ module Consensus = struct
        however check that all preattestations have the same round in
        [check_construction_preattestation_round_consistency] further below. *)
     let*? () = check_payload_hash kind expected_payload_hash bph in
-    let*? consensus_key, voting_power, _dal_power =
-      get_delegate_details consensus_info.preattestation_slot_map kind slot
-    in
-    return (consensus_key, voting_power)
+    return_unit
 
   (** Preattestation/attestation checks for Mempool mode.
 
@@ -655,17 +649,33 @@ module Consensus = struct
     let* consensus_key, voting_power =
       match vi.mode with
       | Application block_info | Partial_validation block_info ->
-          check_preexisting_block_preattestation
-            vi
-            consensus_info
-            block_info
-            consensus_content
+          let* () =
+            check_preexisting_block_preattestation
+              vi
+              block_info
+              consensus_content
+          in
+          let*? consensus_key, voting_power, _dal_power =
+            get_delegate_details
+              consensus_info.preattestation_slot_map
+              Preattestation
+              consensus_content.slot
+          in
+          return (consensus_key, voting_power)
       | Construction construction_info ->
-          check_constructed_block_preattestation
-            vi
-            consensus_info
-            construction_info
-            consensus_content
+          let* () =
+            check_constructed_block_preattestation
+              vi
+              construction_info
+              consensus_content
+          in
+          let*? consensus_key, voting_power, _dal_power =
+            get_delegate_details
+              consensus_info.preattestation_slot_map
+              Preattestation
+              consensus_content.slot
+          in
+          return (consensus_key, voting_power)
       | Mempool ->
           check_mempool_consensus
             vi
