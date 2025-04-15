@@ -8,7 +8,23 @@
         "round": 0,
         "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG"
       },
-        "committee": [ 0, 23, 51, 893 ]
+      "committee": [
+        {
+          "slot": 0
+        },
+        {
+          "slot": 23,
+          "dal_attestation": "2048"
+        },
+        {
+          "slot": 51,
+          "dal_attestation": "0"
+        },
+        {
+          "slot": 893,
+          "dal_attestation": "1"
+        }
+       ]
     }
   ],
   "signature": "BLsigBANTUiNcB2UB7VMj1yTn4SgX9NZabdSY3cHBZgDvFoDcJWrtYZZZshA8LEjY46wqxoWM7PvDTatLiDoiCTmc4p2LVdsXLC9CPtDmZYe7mr33uPgLyVutVSqMmrxRF1ej9Ce7p7nRH"
