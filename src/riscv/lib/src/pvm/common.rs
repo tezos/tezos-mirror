@@ -521,9 +521,12 @@ where
 mod tests {
     use std::mem;
 
+    #[cfg(feature = "supervisor")]
+    use proptest::proptest;
     use rand::Fill;
     use rand::thread_rng;
     use tezos_smart_rollup_constants::riscv::REVEAL_REQUEST_MAX_SIZE;
+    #[cfg(not(feature = "supervisor"))]
     use tezos_smart_rollup_constants::riscv::SBI_CONSOLE_PUTCHAR;
     use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
     use tezos_smart_rollup_constants::riscv::SBI_TEZOS_INBOX_NEXT;
@@ -543,6 +546,10 @@ mod tests {
     use crate::machine_state::registers::a3;
     use crate::machine_state::registers::a6;
     use crate::machine_state::registers::a7;
+    #[cfg(feature = "supervisor")]
+    use crate::pvm::common::tests::memory::Address;
+    #[cfg(feature = "supervisor")]
+    use crate::pvm::linux;
     use crate::state_backend::owned_backend::Owned;
     use crate::state_backend::test_helpers::TestBackendFactory;
 
@@ -652,6 +659,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "supervisor"))]
     fn test_write_debug() {
         type MC = M1M;
         type L = PvmLayout<MC, TestCacheLayouts>;
@@ -694,9 +702,71 @@ mod tests {
         // Drop `hooks` to regain access to the mutable references it kept
         mem::drop(hooks);
 
-        // Compare what characters have been passed to the hook verrsus what we
+        // Compare what characters have been passed to the hook versus what we
         // intended to write
         assert_eq!(written, buffer);
+    }
+
+    #[test]
+    #[cfg(feature = "supervisor")]
+    fn test_write_debug() {
+        const WRITTEN_SIZE: usize = 100;
+        proptest!(|(
+            address in 0u64 as Address..(1024 * 1024 - WRITTEN_SIZE) as Address,
+            written: [u8; WRITTEN_SIZE],
+        )|{
+            type MC = M1M;
+            type L = PvmLayout<MC, TestCacheLayouts>;
+            type B = bcall::Interpreted<MC, Owned>;
+
+            let mut buffer = Vec::new();
+            let mut hooks = PvmHooks::new(|c| buffer.push(c));
+
+            // Setup PVM
+            let space = Owned::allocate::<L>();
+            let mut pvm = Pvm::<MC, TestCacheLayouts, B, _>::bind(space, InterpretedBlockBuilder);
+            pvm.reset();
+            pvm.machine_state
+                .core
+                .main_memory
+                .set_all_readable_writeable();
+
+            // Write characters
+            pvm.machine_state
+                .core
+                .main_memory
+                .write_all(address, &written)
+                .unwrap();
+
+            // Write the `write` system call number for `ecall`
+            pvm.machine_state.core.hart.xregisters.write(a7, linux::WRITE);
+
+            // Write `stdout` as the file descriptor parameter
+            pvm.machine_state.core.hart.xregisters.write(a0, 1);
+
+            // Write the address for the string to be read from
+            pvm.machine_state
+                .core
+                .hart
+                .xregisters
+                .write(a1, address);
+
+            // Write the length of the string
+            pvm.machine_state
+                .core
+                .hart
+                .xregisters
+                .write(a2, written.len() as u64);
+
+            pvm.handle_exception(&mut hooks, EnvironException::EnvCallFromUMode);
+
+            // Drop `hooks` to regain access to the mutable references it kept
+            mem::drop(hooks);
+
+            // Compare what characters have been passed to the hook versus what we
+            // intended to write
+            assert_eq!(written.to_vec(), buffer);
+        });
     }
 
     backend_test!(test_reveal, F, {

@@ -57,7 +57,7 @@ const GETCWD: u64 = 17;
 const OPENAT: u64 = 56;
 
 /// System call number for `write` on RISC-V
-const WRITE: u64 = 64;
+pub(crate) const WRITE: u64 = 64;
 
 /// System call number for `writev` on RISC-V
 const WRITEV: u64 = 66;
