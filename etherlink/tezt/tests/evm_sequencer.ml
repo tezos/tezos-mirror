@@ -607,6 +607,15 @@ let test_tezlink_manager_key =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
+let test_tezlink_counter =
+  register_tezlink_test
+    ~title:"Test of the counter rpc"
+    ~tags:["evm"; "rpc"; "counter"]
+  @@ fun {sequencer; _} _protocol ->
+  let* res = account_rpc sequencer Constant.bootstrap1 "counter" in
+  Check.(JSON.(res |> as_int = 1) int ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let test_tezlink_version =
   register_tezlink_test
     ~title:"Test of the version rpc"
@@ -13312,6 +13321,7 @@ let () =
   test_tezlink_current_level [Alpha] ;
   test_tezlink_balance [Alpha] ;
   test_tezlink_manager_key [Alpha] ;
+  test_tezlink_counter [Alpha] ;
   test_tezlink_protocols [Alpha] ;
   test_tezlink_version [Alpha] ;
   test_tezlink_constants [Alpha] ;
