@@ -57,6 +57,10 @@ module Tezos_block : sig
   val genesis_parent_hash : Ethereum_types.block_hash
 
   val block_from_binary : bytes -> block
+
+  val encode_block : block -> (string, string) result
+
+  val decode_block : string -> (block, string) result
 end
 
 type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.block

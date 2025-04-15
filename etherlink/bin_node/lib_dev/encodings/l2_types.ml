@@ -83,6 +83,37 @@ module Tezos_block = struct
       in
       {number; hash; timestamp; parent_hash = parent})
     else raise (Invalid_argument "Expected a string of length 44")
+
+  let encode_block (block : block) : (string, string) result =
+    let (Ethereum_types.Qty number) = block.number in
+    let (Ethereum_types.Qty timestamp) = block.timestamp in
+
+    let z_to_32_be z =
+      let bytes = Bytes.make 32 '\000' in
+      Bytes.set_int32_be bytes 0 (Z.to_int32 z) ;
+      bytes
+    in
+
+    let z_to_64_le z =
+      let bytes = Bytes.make 64 '\000' in
+      Bytes.set_int64_le bytes 0 (Z.to_int64 z) ;
+      bytes
+    in
+
+    let number_bytes = z_to_32_be number in
+    let parent_bytes = Ethereum_types.encode_block_hash block.parent_hash in
+    let timestamp_bytes = z_to_64_le timestamp in
+
+    let encoded_block = Bytes.create 44 in
+    Bytes.blit number_bytes 0 encoded_block 0 4 ;
+    Bytes.blit parent_bytes 0 encoded_block 4 32 ;
+    Bytes.blit timestamp_bytes 0 encoded_block 36 8 ;
+
+    Ok (Bytes.to_string encoded_block)
+
+  let decode_block (b : string) : (block, string) result =
+    let b = Bytes.of_string b in
+    try Ok (block_from_binary b) with e -> Error (Printexc.to_string e)
 end
 
 type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.block

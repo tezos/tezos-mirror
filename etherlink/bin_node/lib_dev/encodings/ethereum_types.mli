@@ -62,6 +62,8 @@ val pp_block_hash : Format.formatter -> block_hash -> unit
 
 val decode_block_hash : bytes -> block_hash
 
+val encode_block_hash : block_hash -> bytes
+
 val genesis_parent_hash : block_hash
 
 val block_hash_to_bytes : block_hash -> string
