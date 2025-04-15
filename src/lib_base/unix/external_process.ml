@@ -235,6 +235,7 @@ module Make (P : External_process_parameters.S) = struct
   }
 
   type hypervisee = {
+    pid : int;
     input : Lwt_io.output_channel;
     output : Lwt_io.input_channel;
   }
@@ -479,7 +480,12 @@ module Make (P : External_process_parameters.S) = struct
           process_hypervisee_init hypervisee_input hypervisee_output parameters
         in
         let*! () = Events.(emit hypervisee_initialized hypervisee_pid) in
-        return {input = hypervisee_input; output = hypervisee_output})
+        return
+          {
+            pid = hypervisee_pid;
+            input = hypervisee_input;
+            output = hypervisee_output;
+          })
       (fun exn ->
         let*! () =
           match external_process.process#state with
@@ -590,6 +596,8 @@ module Make (P : External_process_parameters.S) = struct
     send_request_aux ~retried:false
 
   let restart_hypervisee = restart_hypervisee ~stop_hypervisee:true
+
+  let pid p = p.hypervisee.pid
 
   (* The initialization phase aims to configure the external process
      and start its associated process. This will result in the call
