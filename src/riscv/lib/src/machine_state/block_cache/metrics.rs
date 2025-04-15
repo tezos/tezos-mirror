@@ -32,12 +32,15 @@ pub(crate) use core::block_metrics;
 #[cfg(not(feature = "metrics"))]
 pub(crate) use block_metrics;
 
+use super::ICallPlaced;
 use super::bcall::Block;
-use super::bcall::BlockHash;
 use crate::machine_state::memory::MemoryConfig;
 use crate::state::NewState;
+use crate::state_backend::EnrichedCell;
 use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerRead;
+use crate::storage::Hash;
 
 #[cfg(feature = "metrics")]
 #[doc(hidden)]
@@ -47,9 +50,9 @@ pub mod core {
     use std::collections::HashMap;
     use std::path::Path;
 
+    use super::BlockHash;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::block_cache::bcall::Block;
-    use crate::machine_state::block_cache::bcall::BlockHash;
     use crate::machine_state::instruction::Instruction;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::memory::MemoryConfig;
@@ -152,11 +155,7 @@ pub mod core {
 
         /// Record that the block identified by `hash` has been
         /// successfully jit-compiled.
-        pub fn record_jitted(&mut self, hash: &BlockHash) {
-            let BlockHash::Runnable(hash) = hash else {
-                panic!("Compiled blocks must be runnable");
-            };
-
+        pub fn record_jitted(&mut self, hash: &Hash) {
             let entry = self
                 .entries
                 .get_mut(hash)
@@ -317,7 +316,7 @@ impl<B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase> Block<MC, M> for BlockMe
         M: crate::state_backend::ManagerRead + 'a,
     {
         if let BlockHash::Dirty = self.block_hash {
-            let hash = super::bcall::block_hash(self.block.instr());
+            let hash = block_hash(self.block.instr());
             block_metrics!(hash = &hash, constructed = self);
 
             self.block_hash = BlockHash::Runnable(hash);
@@ -382,4 +381,31 @@ impl<B: Clone> Clone for BlockMetrics<B> {
             block_hash: BlockHash::Dirty,
         }
     }
+}
+
+/// The hash of a block is by default `Dirty` - ie it may be under construction.
+///
+/// Only once blocks are made callable, within the specific context of the current backend, is
+/// the hash calculated. At this point the block is declared `Runnable`.
+#[derive(Debug, PartialEq, Eq)]
+pub enum BlockHash {
+    /// This block may be under construction.
+    ///
+    /// In order for any such block to run, it may be made runnable. First by calculating
+    /// its block hash and triggering any side effects (such as JIT compilation).
+    Dirty,
+    /// This block can be run.
+    Runnable(Hash),
+}
+
+/// Construct a block hash from the contained instructions.
+fn block_hash<MC: MemoryConfig, M: ManagerRead>(
+    block: &[EnrichedCell<ICallPlaced<MC, M>, M>],
+) -> Hash {
+    let instr = block
+        .iter()
+        .map(|i| i.read_ref_stored())
+        .collect::<Vec<_>>();
+
+    Hash::blake2b_hash(instr).expect("Hashing instructions always succeeds")
 }

@@ -9,7 +9,6 @@
 
 use super::CACHE_INSTR;
 use super::ICallPlaced;
-use super::metrics::block_metrics;
 use super::run_instr;
 use crate::default::ConstDefault;
 use crate::jit::JCall;
@@ -33,7 +32,6 @@ use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::ManagerWrite;
 use crate::state_backend::Ref;
-use crate::state_backend::hash::Hash;
 use crate::traps::EnvironException;
 use crate::traps::Exception;
 
@@ -137,21 +135,6 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase>: NewState<M> {
     ) -> &'a (impl BCall<MC, M> + ?Sized + 'a)
     where
         M: ManagerRead + 'a;
-}
-
-/// The hash of a block is by default `Dirty` - ie it may be under construction.
-///
-/// Only once blocks are made callable, within the specific context of the current backend, is
-/// the hash calculated. At this point the block is declared `Runnable`.
-#[derive(Debug, PartialEq, Eq)]
-pub enum BlockHash {
-    /// This block may be under construction.
-    ///
-    /// In order for any such block to run, it may be made runnable. First by calculating
-    /// its block hash and triggering any side effects (such as JIT compilation).
-    Dirty,
-    /// This block can be run.
-    Runnable(Hash),
 }
 
 /// Interpreted blocks are built automatically, and require no additional context.
@@ -317,7 +300,6 @@ pub struct InlineJit<MC: MemoryConfig, M: JitStateAccess> {
     /// **N.B.** compilation may fail, in which case `compiled` will still be true, and fallback
     /// should occur to the interpreted block.
     compiled: bool,
-    block_hash: BlockHash,
 }
 
 impl<MC: MemoryConfig, M: JitStateAccess> NewState<M> for InlineJit<MC, M> {
@@ -329,7 +311,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> NewState<M> for InlineJit<MC, M> {
             fallback: Interpreted::new(manager),
             jit_fn: None,
             compiled: false,
-            block_hash: BlockHash::Dirty,
         }
     }
 }
@@ -343,7 +324,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     {
         self.compiled = false;
         self.jit_fn = None;
-        self.block_hash = BlockHash::Dirty;
         self.fallback.start_block()
     }
 
@@ -353,7 +333,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     {
         self.compiled = false;
         self.jit_fn = None;
-        self.block_hash = BlockHash::Dirty;
         self.fallback.invalidate()
     }
 
@@ -363,7 +342,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     {
         self.compiled = false;
         self.jit_fn = None;
-        self.block_hash = BlockHash::Dirty;
         self.fallback.reset()
     }
 
@@ -373,7 +351,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     {
         self.compiled = false;
         self.jit_fn = None;
-        self.block_hash = BlockHash::Dirty;
         self.fallback.push_instr(instr)
     }
 
@@ -389,7 +366,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
             fallback: Interpreted::bind(allocated),
             jit_fn: None,
             compiled: false,
-            block_hash: BlockHash::Dirty,
         }
     }
 
@@ -415,31 +391,19 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
             return self;
         }
 
-        let hash = match self.block_hash {
-            BlockHash::Dirty => {
-                let hash = block_hash(self.instr());
-                self.block_hash = BlockHash::Runnable(hash);
-                hash
-            }
-            BlockHash::Runnable(hash) => hash,
-        };
-
         // trigger JIT compilation
         let instr = self
             .fallback
             .instr
             .iter()
             .take(<Self as Block<MC, M>>::num_instr(self))
-            .map(|i| i.read_ref_stored());
+            .map(|i| i.read_stored())
+            .collect::<Vec<_>>();
 
-        let jitfn = block_builder.0.compile(&hash, instr);
+        let jitfn = block_builder.0.compile(&instr);
 
         self.jit_fn = jitfn;
         self.compiled = true;
-
-        if self.jit_fn.is_some() {
-            block_metrics!(hash = &self.block_hash, record_jitted);
-        }
 
         self
     }
@@ -488,7 +452,6 @@ impl<MC: MemoryConfig, M: JitStateAccess + ManagerClone> Clone for InlineJit<MC,
             fallback: self.fallback.clone(),
             jit_fn: None,
             compiled: false,
-            block_hash: BlockHash::Dirty,
         }
     }
 }
@@ -522,134 +485,4 @@ fn run_block_inner<MC: MemoryConfig, M: ManagerReadWrite>(
     }
 
     Ok(())
-}
-
-/// Construct a block hash from the contained instructions.
-pub(super) fn block_hash<MC: MemoryConfig, M: ManagerRead>(
-    block: &[EnrichedCell<ICallPlaced<MC, M>, M>],
-) -> Hash {
-    let instr = block
-        .iter()
-        .map(|i| i.read_ref_stored())
-        .collect::<Vec<_>>();
-
-    Hash::blake2b_hash(instr).expect("Hashing instructions always succeeds")
-}
-
-#[cfg(test)]
-mod test {
-    use super::Block;
-    use super::BlockHash;
-    use super::InlineJit;
-    use super::Interpreted;
-    use crate::backend_test;
-    use crate::machine_state::block_cache::metrics::BlockMetrics;
-    use crate::machine_state::instruction::Instruction;
-    use crate::machine_state::memory::M4K;
-    use crate::machine_state::registers::nz;
-    use crate::parser::instruction::InstrWidth;
-    use crate::state::NewState;
-    use crate::state_backend::test_helpers::TestBackendFactory;
-
-    macro_rules! run_in_block_impl {
-        ($F: ty, $block_name:ident, $bb_name:ident, $expr: block) => {{
-            type M<F> = <F as TestBackendFactory>::Manager;
-
-            // use block metrics, since interpreted has no hash
-            let $block_name = &mut <BlockMetrics<Interpreted<M4K, M<$F>>> as NewState<M<$F>>>::new(
-                &mut <$F>::manager(),
-            );
-            let $bb_name =
-                &mut <Interpreted<M4K, M<$F>> as Block<M4K, M<$F>>>::BlockBuilder::default();
-            {
-                $expr
-            }
-
-            // use jit, which has the hash
-            let $block_name = &mut InlineJit::<M4K, _>::new(&mut <$F>::manager());
-            let $bb_name =
-                &mut <InlineJit<M4K, M<$F>> as Block<M4K, M<$F>>>::BlockBuilder::default();
-
-            { $expr }
-        }};
-    }
-
-    backend_test!(block_with_instr_callable, F, {
-        run_in_block_impl!(F, block, bb, {
-            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
-
-            // Safety: block builder alive for the duration of this scope
-            unsafe { block.callable(bb) };
-            assert!(matches!(block.block_hash, BlockHash::Runnable(_)));
-        });
-    });
-
-    backend_test!(block_made_dirty_on_clone, F, {
-        run_in_block_impl!(F, block, bb, {
-            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
-
-            // Safety: block builder alive for the duration of this scope
-            unsafe { block.callable(bb) };
-
-            let new_block = block.clone();
-            assert!(matches!(new_block.block_hash, BlockHash::Dirty));
-        });
-    });
-
-    backend_test!(block_made_dirty_on_push, F, {
-        run_in_block_impl!(F, block, bb, {
-            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
-            assert!(matches!(block.block_hash, BlockHash::Dirty));
-
-            // Safety: block builder alive for the duration of this scope
-            unsafe { block.callable(bb) };
-            assert!(matches!(block.block_hash, BlockHash::Runnable(_)));
-
-            // push
-            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
-            assert!(matches!(block.block_hash, BlockHash::Dirty));
-        });
-    });
-
-    backend_test!(block_hash_unique_for_unique_instructions_sanity, F, {
-        run_in_block_impl!(F, block, bb, {
-            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
-            block.push_instr(Instruction::new_li(nz::a2, 3, InstrWidth::Compressed));
-
-            // Safety: block builder alive for the duration of this scope
-            unsafe { block.callable(bb) };
-            let BlockHash::Runnable(hash_1) = block.block_hash else {
-                unreachable!()
-            };
-
-            block.reset();
-            assert!(matches!(block.block_hash, BlockHash::Dirty));
-
-            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
-
-            // Safety: block builder alive for the duration of this scope
-            unsafe { block.callable(bb) };
-            let BlockHash::Runnable(hash_2) = block.block_hash else {
-                unreachable!()
-            };
-
-            assert_ne!(
-                hash_1, hash_2,
-                "Hashes for unique sets of instructions must not match"
-            );
-
-            block.push_instr(Instruction::new_li(nz::a2, 3, InstrWidth::Compressed));
-
-            // Safety: block builder alive for the duration of this scope
-            unsafe { block.callable(bb) };
-            let BlockHash::Runnable(hash_3) = block.block_hash else {
-                unreachable!()
-            };
-
-            assert_eq!(
-                hash_1, hash_3,
-                "Hashes for identical instructions must match"
-            );
-        });
-    });
 }
