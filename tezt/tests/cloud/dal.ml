@@ -1379,12 +1379,23 @@ module Monitoring_app = struct
           (fun (_, _, x) (_, _, y) -> Option.compare Float.compare x y)
           bakers_info
       in
-      let worst_bakers = take 5 sorted_bakers in
-      let best_bakers = List.rev (take 5 (List.rev sorted_bakers)) in
+      (* `group_by n l` outputs the list of lists with the same elements as `l`
+         but with `n` elements per list (except the last one).
+         For instance
+         `group_by 4 [a_1, ..., a_10] = [[a_1, ..., a_4], [a_5, ..., a_8],  [a_9, a_10]]`
+      *)
+      let group_by n =
+        let rec bis local_acc main_acc k = function
+          | [] -> List.rev (List.rev local_acc :: main_acc)
+          | l when k = 0 -> bis [] (List.rev local_acc :: main_acc) n l
+          | hd :: tl -> bis (hd :: local_acc) main_acc (k - 1) tl
+        in
+        bis [] [] n
+      in
       Lwt.return
-        ("• Baker performance ranked from worst to best (truncated to 10 \
-          bakers):" :: view_bakers worst_bakers
-        @ ("▪ ..." :: view_bakers best_bakers))
+        (["• Baker performance ranked from worst to best:"]
+        :: (* Since Slack message size is limited, we group the bakers by packs of 20. *)
+           group_by 20 (view_bakers sorted_bakers))
 
     let fetch_slots_info () =
       let* data =
@@ -1414,7 +1425,6 @@ module Monitoring_app = struct
       let network_overview_info =
         network_info :: ratio_dal_commitments_total_info :: slots_info
       in
-      let* bakers_info = fetch_bakers_info network in
       let data =
         let open Format_app in
         section [title_info] ()
@@ -1426,11 +1436,20 @@ module Monitoring_app = struct
                  ~url:(network_to_image_url network)
                  ~alt:(Network.to_string network))
             ()
-        @ section ["*Baker performance overview*"] ()
-        @ section bakers_info ()
       in
-      let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
-      Lwt.return_unit
+      let* thread_id = post_message ~slack_channel_id ~slack_bot_token data in
+      let* bakers_info = fetch_bakers_info network in
+      Lwt_list.iter_s
+        (fun to_post ->
+          let data =
+            let open Format_app in
+            section to_post ()
+          in
+          let* _ts =
+            post_message ~ts:thread_id ~slack_channel_id ~slack_bot_token data
+          in
+          Lwt.return_unit)
+        bakers_info
 
     (* Relies on UTC (Universal Time Coordinated).
        Paris operates on Central European Time (CET), which is UTC+1
