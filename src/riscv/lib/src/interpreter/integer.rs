@@ -73,6 +73,20 @@ pub fn run_add(
     icb.xregister_write_nz(rd, result)
 }
 
+/// Perform `val(rs1) + val(rs2)` but only on lowest 32 bits
+/// and store the sign-extended result in `rd`.
+pub fn run_add_word(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+    let lhs = icb.xregister_read(rs1);
+    let rhs = icb.xregister_read(rs2);
+
+    let sum = lhs.add(rhs, icb);
+
+    let res = icb.narrow(sum);
+    let res = icb.extend_signed(res);
+
+    icb.xregister_write_nz(rd, res)
+}
+
 /// Perform [`val(rs1) - val(rs2)`] and store the result in `rd`
 ///
 /// Relevant RISC-V opcodes:
@@ -159,6 +173,20 @@ pub fn run_addi(icb: &mut impl ICB, imm: i64, rs1: NonZeroXRegister, rd: NonZero
     let rhs = icb.xvalue_of_imm(imm);
     let result = lhs.add(rhs, icb);
     icb.xregister_write_nz(rd, result)
+}
+
+/// Perform `val(rs1) + imm` but only on lowest 32 bits
+/// and store the sign-extended result in `rd`
+pub fn run_add_word_immediate(icb: &mut impl ICB, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
+    let lhs = icb.xregister_read(rs1);
+    let rhs = icb.xvalue_of_imm(imm);
+
+    let sum = lhs.add(rhs, icb);
+
+    let res = icb.narrow(sum);
+    let res = icb.extend_signed(res);
+
+    icb.xregister_write_nz(rd, res)
 }
 
 /// Saves in `rd` the bitwise AND between the value in `rs1` and `imm`

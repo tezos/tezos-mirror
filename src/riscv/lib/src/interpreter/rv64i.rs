@@ -18,34 +18,6 @@ impl<M> XRegisters<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// `ADDIW` I-type instruction
-    ///
-    /// Add `imm` to val(rs1) only on lowest 32 bits
-    /// and store the sign-extended result in `rd`
-    pub fn run_addiw(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
-        // We do not need to explicitly truncate for the lower bits since wrapping_add
-        // has the same semantics & result on the lower 32 bits irrespective of bit width
-        let rval = self.read(rs1);
-        let result = rval.wrapping_add(imm as u64);
-        // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
-        let result = result as i32 as u64;
-        self.write_nz(rd, result);
-    }
-
-    /// `ADDW` R-type instruction
-    ///
-    /// Perform val(rs1) + val(rs2) but only on lowest 32 bits
-    /// and store the sign-extended result in `rd`
-    pub fn run_addw(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
-        // We do not need to explicitly truncate for the lower bits since wrapping_add
-        // has the same semantics & result on the lower 32 bits irrespective of bit width
-        let lhs = self.read(rs1);
-        let rhs = self.read(rs2);
-        // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
-        let result = lhs.wrapping_add(rhs) as i32 as u64;
-        self.write_nz(rd, result)
-    }
-
     /// `SLLIW` I-type instruction
     ///
     /// Shift left logically only on lower 32 bits
@@ -341,15 +313,12 @@ where
 mod tests {
     use proptest::arbitrary::any;
     use proptest::prop_assert;
-    use proptest::prop_assert_eq;
     use proptest::proptest;
 
     use crate::backend_test;
     use crate::create_state;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
-    use crate::machine_state::hart_state::HartState;
-    use crate::machine_state::hart_state::HartStateLayout;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
@@ -363,31 +332,6 @@ mod tests {
     use crate::machine_state::registers::t3;
     use crate::machine_state::registers::t4;
     use crate::traps::Exception;
-
-    backend_test!(test_add_w, F, {
-        proptest!(|(
-            imm in any::<i64>(),
-            reg_val in any::<i64>())|
-        {
-            let mut state = create_state!(HartState, F);
-
-            state.xregisters.write(a0, reg_val as u64);
-            state.xregisters.write(t0, imm as u64);
-            state.xregisters.run_addiw(imm, a0, nz::a1);
-            // check against wrapping addition performed on the lowest 32 bits
-            let r_val = reg_val as u32;
-            let i_val = imm as u32;
-            prop_assert_eq!(
-                state.xregisters.read(a1),
-                r_val.wrapping_add(i_val) as i32 as i64 as u64
-            );
-            state.xregisters.run_addw(a0, t0, nz::a2);
-            prop_assert_eq!(
-                state.xregisters.read(a2),
-                r_val.wrapping_add(i_val) as i32 as i64 as u64
-            );
-        });
-    });
 
     macro_rules! test_shift_instr {
         ($state:ident, $shift_fn:tt, $imm:expr,
