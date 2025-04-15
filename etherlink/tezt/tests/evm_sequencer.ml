@@ -581,6 +581,32 @@ let test_tezlink_balance =
     (Tez.to_mutez res = 3800000000000) int ~error_msg:"Expected %R but got %L") ;
   unit
 
+let account_rpc sequencer account key =
+  let path =
+    sf
+      "/tezlink/chains/main/blocks/head/context/contracts/%s/%s"
+      account.Account.public_key_hash
+      key
+  in
+
+  let* res =
+    Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+    |> Runnable.run
+  in
+  return @@ JSON.parse ~origin:"curl_protocols" res
+
+let test_tezlink_manager_key =
+  register_tezlink_test
+    ~title:"Test of the manager_key rpc"
+    ~tags:["rpc"; "manager_key"]
+  @@ fun {sequencer; _} _protocol ->
+  let* res = account_rpc sequencer Constant.bootstrap1 "manager_key" in
+  Check.(
+    JSON.(res |> as_string_opt = None)
+      (option string)
+      ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let test_tezlink_version =
   register_tezlink_test
     ~title:"Test of the version rpc"
@@ -13264,6 +13290,7 @@ let () =
   test_durable_storage_consistency [Alpha] ;
   test_tezlink_current_level [Alpha] ;
   test_tezlink_balance [Alpha] ;
+  test_tezlink_manager_key [Alpha] ;
   test_tezlink_protocols [Alpha] ;
   test_tezlink_version [Alpha] ;
   test_tezlink_constants [Alpha] ;
