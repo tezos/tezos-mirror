@@ -68,7 +68,7 @@ let register_protocol_independent_tests () =
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =
   let migrate_from = Option.get @@ Protocol.previous_protocol migrate_to in
-  Agnostic_baker_test.register ~migrate_from ~migrate_to ;
+  Agnostic_baker_test.register_migration ~migrate_from ~migrate_to ;
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Protocol_migration.register ~migrate_from ~migrate_to ;
   Weeklynet.register () ;
@@ -100,7 +100,7 @@ let register_old_protocol_migration_tests () =
       | _, Alpha -> () (* Already in register_protocol_migration_tests *)
       | None, _ -> ()
       | Some migrate_from, migrate_to ->
-          Agnostic_baker_test.register ~migrate_from ~migrate_to ;
+          Agnostic_baker_test.register_migration ~migrate_from ~migrate_to ;
           Sc_rollup_migration.register ~migrate_from ~migrate_to ;
           Dal.register_migration ~migrate_from ~migrate_to)
     Protocol.all
@@ -116,6 +116,7 @@ let register_old_protocol_migration_tests () =
 let register_protocol_tests_that_use_supports_correctly () =
   let protocols = Protocol.all in
   Adaptive_issuance.register ~protocols ;
+  Agnostic_baker_test.register ~protocols ;
   Bad_annot.register ~protocols ;
   Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols ;

@@ -114,3 +114,43 @@ let copy_dir ?(perm = 0o755) ?progress src dst =
     ()
 
 let copy_file = copy_file ~count_progress:(fun _ -> ())
+
+let rec retry ?max_delay ~delay ~factor ~tries ~is_error ~emit ?(msg = "") f x =
+  let open Lwt.Syntax in
+  let* result = f x in
+  match result with
+  | Ok _ as r -> Lwt.return r
+  | Error (err :: _) as errs when tries > 0 && is_error err -> (
+      let* () =
+        emit (Format.sprintf "%sRetrying in %.2f seconds..." msg delay)
+      in
+      let* result =
+        Lwt.pick
+          [
+            (let* () = Lwt_unix.sleep delay in
+             Lwt.return `Continue);
+            (let* _ = Lwt_exit.clean_up_starts in
+             Lwt.return `Killed);
+          ]
+      in
+      match result with
+      | `Killed -> Lwt.return errs
+      | `Continue ->
+          let next_delay = delay *. factor in
+          let delay =
+            Option.fold
+              ~none:next_delay
+              ~some:(fun max_delay -> Float.min next_delay max_delay)
+              max_delay
+          in
+          retry
+            ?max_delay
+            ~delay
+            ~factor
+            ~msg
+            ~tries:(tries - 1)
+            ~is_error
+            ~emit
+            f
+            x)
+  | Error _ as err -> Lwt.return err

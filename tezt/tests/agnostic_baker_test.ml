@@ -204,7 +204,56 @@ let test_man () =
   in
   unit
 
-let register ~migrate_from ~migrate_to =
+let test_keep_alive =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Agnostic baker --keep-alive"
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "keep_alive"]
+    ~uses:(fun _ -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol ~protocol `Client () in
+  let baker =
+    Agnostic_baker.create ~node_version_check_bypass:true node client
+  in
+  let* () = Node.terminate node in
+  (* Start the baker with no node running and no [--keep-alive], it crashes. *)
+  let process = Agnostic_baker.spawn_run baker in
+  let* () = Process.check_error ~msg:(rex "Cannot connect to node") process in
+  (* Start the baker with no node running and [--keep-alive], it'll wait. *)
+  let wait_for_cannot_connect =
+    Agnostic_baker.wait_for
+      baker
+      "agnostic_baker_cannot_connect.v0"
+      (fun _json -> Some ())
+  in
+  let* () = Agnostic_baker.run ~extra_arguments:["--keep-alive"] baker
+  and* () = wait_for_cannot_connect in
+  (* Start the node. *)
+  let* () = Node.run node [] and* () = Node.wait_for_ready node in
+  (* Bake a block, the baker is connected so it'll see it. *)
+  let wait_baker_proposal =
+    (* This is an event emitted by the baker lib. *)
+    Agnostic_baker.wait_for baker "new_valid_proposal.v0" (fun _json -> Some ())
+  in
+  let wait_period_status =
+    (* This is an event emitted by the agnostic baker. *)
+    Agnostic_baker.wait_for baker "period_status.v0" (fun _json -> Some ())
+  in
+  let* () = Client.bake_for_and_wait client
+  and* () = wait_baker_proposal
+  and* () = wait_period_status in
+  (* Kill the node now that they are connected, the baker will stay alive. *)
+  let* () = Node.terminate node and* () = wait_for_cannot_connect in
+  (* Redo the procedure, restart the node and wait for the block events. *)
+  let* () = Node.run node [] and* () = Node.wait_for_ready node in
+  let* () = Client.bake_for_and_wait client
+  and* () = wait_baker_proposal
+  and* () = wait_period_status in
+  unit
+
+let register ~protocols = test_keep_alive protocols
+
+let register_migration ~migrate_from ~migrate_to =
   (* We want to migrate only from Active protocols *)
   if Agnostic_baker.protocol_status migrate_from = Active then (
     migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;

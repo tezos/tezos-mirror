@@ -52,8 +52,12 @@ val run :
   ?env:string String_map.t ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?extra_arguments:string list ->
   t ->
   unit Lwt.t
+
+(** Spawn [octez-agnostic-baker run] similarly to {!run} but returns the process. *)
+val spawn_run : ?env:string String_map.t -> t -> Process.t
 
 (** Liquidity baking vote values. *)
 type liquidity_baking_vote = Off | On | Pass
@@ -144,6 +148,7 @@ val create :
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
+  ?keep_alive:bool ->
   Node.t ->
   Client.t ->
   t
@@ -186,6 +191,7 @@ val create_from_uris :
   base_dir:string ->
   node_data_dir:string ->
   node_rpc_endpoint:Endpoint.t ->
+  ?keep_alive:bool ->
   unit ->
   t
 
@@ -245,6 +251,7 @@ val init :
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
+  ?keep_alive:bool ->
   Node.t ->
   Client.t ->
   t Lwt.t

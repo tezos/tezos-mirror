@@ -27,11 +27,32 @@ type state = {
   node_endpoint : string;
   mutable current_baker : baker option;
   mutable old_baker : baker_to_kill option;
+  keep_alive : bool;
 }
 
 type t = state
 
 (* ---- Baker Process Management ---- *)
+
+let rec retry_on_disconnection ~emit node_addr f =
+  let open Lwt_result_syntax in
+  let*! result = f () in
+  match result with
+  | Ok () -> return_unit
+  | Error (Lost_node_connection :: _ | Cannot_connect_to_node _ :: _) ->
+      let* _level =
+        Utils.retry
+          ~emit
+          ~max_delay:10.
+          ~delay:1.
+          ~factor:1.5
+          ~tries:max_int
+          ~is_error:(function Cannot_connect_to_node _ -> true | _ -> false)
+          (fun node_addr -> Rpc_services.get_level ~node_addr)
+          node_addr
+      in
+      retry_on_disconnection ~emit node_addr f
+  | Error trace -> fail trace
 
 (** [run_thread ~protocol_hash ~baker_commands ~cancel_promise]
     returns the main running thread for the baker given its protocol [~protocol_hash],
@@ -78,7 +99,7 @@ let spawn_baker protocol_hash =
   let*! () = Events.(emit baker_running) protocol_hash in
   return {protocol_hash; process = {thread; canceller}}
 
-(** [hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash 
+(** [hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
     ~level_to_kill_old_baker] moves the current baker into the old baker slot
     (to be killed later) and spawns a new baker for [~next_protocol_hash] *)
 let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
@@ -157,7 +178,7 @@ let monitor_heads ~node_addr =
 (** [monitor_voting_periods ~state head_stream] continuously monitors [heads_stream]
     to detect protocol changes. It will:
     - Shut down an old baker it its time has come;
-    - Spawn and "hot-swap" to a new baker if the next protocol hash is different. 
+    - Spawn and "hot-swap" to a new baker if the next protocol hash is different.
     The voting period information is used for logging purposes. *)
 let monitor_voting_periods ~state head_stream =
   let open Lwt_result_syntax in
@@ -277,8 +298,8 @@ let may_start_initial_baker state =
   in
   may_start ~head_stream:None ()
 
-let create ~node_endpoint =
-  {node_endpoint; current_baker = None; old_baker = None}
+let create ~node_endpoint ~keep_alive =
+  {node_endpoint; current_baker = None; old_baker = None; keep_alive}
 
 let run state =
   let open Lwt_result_syntax in
@@ -289,8 +310,27 @@ let run state =
         let*! () = Events.(emit stopping_daemon) () in
         Lwt.return_unit)
   in
-  let* () = may_start_initial_baker state in
-  let* head_stream = monitor_heads ~node_addr in
+  let* () =
+    if state.keep_alive then
+      retry_on_disconnection
+        ~emit:(Events.emit Agnostic_baker_events.cannot_connect)
+        node_addr
+        (fun () -> may_start_initial_baker state)
+    else may_start_initial_baker state
+  in
+  let monitor_voting_periods () =
+    let* head_stream = monitor_heads ~node_addr in
+    monitor_voting_periods ~state head_stream
+  in
   (* Monitoring voting periods through heads monitoring to avoid
      missing UAUs. *)
-  Lwt.pick [monitor_voting_periods ~state head_stream; baker_thread ~state]
+  Lwt.pick
+    [
+      (* We do not care if --keep-alive is provided, if the baker thread doesn't
+         have the argument it'll abort the process anyway. *)
+      retry_on_disconnection
+        ~emit:(fun _ -> Lwt.return_unit)
+        node_addr
+        monitor_voting_periods;
+      baker_thread ~state;
+    ]

@@ -46,3 +46,14 @@ let get_endpoint args =
   @@ get_arg_value ~arg:endpoint_arg ~short_arg:endpoint_short_arg args
 
 let get_base_dir = get_arg_value ~arg:base_dir_arg ~short_arg:base_dir_short_arg
+
+let keep_alive_arg = "--keep-alive"
+
+let keep_alive_short_arg = "-K"
+
+let keep_alive args =
+  List.find
+    (fun arg ->
+      String.equal keep_alive_short_arg arg || String.equal keep_alive_arg arg)
+    args
+  |> Option.is_some

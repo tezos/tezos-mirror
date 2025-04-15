@@ -869,38 +869,21 @@ let perform_sanity_check cctxt ~chain_id =
   in
   return_unit
 
-let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
+let retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
     ~tries ?(msg = "Connection failed. ") f x =
-  let open Lwt_result_syntax in
-  let*! result = f x in
-  match result with
-  | Ok _ as r -> Lwt.return r
-  | Error
-      (RPC_client_errors.Request_failed {error = Connection_failed _; _} :: _)
-    as err
-    when tries > 0 -> (
-      let*! () = cctxt#message "%sRetrying in %.2f seconds..." msg delay in
-      let*! result =
-        Lwt.pick
-          [
-            (let*! () = Lwt_unix.sleep delay in
-             Lwt.return `Continue);
-            (let*! _ = Lwt_exit.clean_up_starts in
-             Lwt.return `Killed);
-          ]
-      in
-      match result with
-      | `Killed -> Lwt.return err
-      | `Continue ->
-          let next_delay = delay *. factor in
-          let delay =
-            Option.fold
-              ~none:next_delay
-              ~some:(fun max_delay -> Float.min next_delay max_delay)
-              max_delay
-          in
-          retry cctxt ?max_delay ~delay ~factor ~msg ~tries:(tries - 1) f x)
-  | Error _ as err -> Lwt.return err
+  Utils.retry
+    ~emit:(cctxt#message "%s")
+    ?max_delay
+    ~delay
+    ~factor
+    ~tries
+    ~msg
+    ~is_error:(function
+      | RPC_client_errors.Request_failed {error = Connection_failed _; _} ->
+          true
+      | _ -> false)
+    f
+    x
 
 (* This function attempts to resolve the primary delegate associated with the given [key].
 

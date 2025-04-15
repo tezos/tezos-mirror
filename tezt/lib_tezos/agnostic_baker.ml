@@ -44,6 +44,7 @@ module Parameters = struct
     state_recorder : bool;
     node_version_check_bypass : bool;
     node_version_allowed : string option;
+    keep_alive : bool;
   }
 
   type session_state = {mutable ready : bool}
@@ -88,7 +89,7 @@ let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
     ?(remote_mode = false) ?operations_pool ?dal_node_rpc_endpoint
     ?dal_node_timeout_percentage ?(state_recorder = false)
     ?(node_version_check_bypass = false) ?node_version_allowed ~base_dir
-    ~node_data_dir ~node_rpc_endpoint () =
+    ~node_data_dir ~node_rpc_endpoint ?(keep_alive = false) () =
   let agnostic_baker =
     create
       ~path
@@ -113,6 +114,7 @@ let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
         state_recorder;
         node_version_check_bypass;
         node_version_allowed;
+        keep_alive;
       }
   in
   agnostic_baker
@@ -124,7 +126,8 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
     ?(remote_mode = false) ?operations_pool ?dal_node
     ?dal_node_timeout_percentage ?(state_recorder = false)
-    ?(node_version_check_bypass = false) ?node_version_allowed node client =
+    ?(node_version_check_bypass = false) ?node_version_allowed ?keep_alive node
+    client =
   let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
   let agnostic_baker =
     create_from_uris
@@ -147,18 +150,14 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
       ~base_dir:(Client.base_dir client)
       ~node_data_dir:(Node.data_dir node)
       ~node_rpc_endpoint:(Node.as_rpc_endpoint node)
+      ?keep_alive
       ()
   in
   on_event agnostic_baker (handle_event agnostic_baker) ;
   agnostic_baker
 
-let run ?env ?event_level ?event_sections_levels (agnostic_baker : t) =
-  (match agnostic_baker.status with
-  | Not_running -> ()
-  | Running _ ->
-      Test.fail "agnostic_baker %s is already running" agnostic_baker.name) ;
+let run_args agnostic_baker =
   let delegates = agnostic_baker.persistent_state.delegates in
-  let runner = agnostic_baker.persistent_state.runner in
   let node_data_dir = agnostic_baker.persistent_state.node_data_dir in
   let base_dir = agnostic_baker.persistent_state.base_dir in
   let node_addr =
@@ -224,18 +223,27 @@ let run ?env ?event_level ?event_sections_levels (agnostic_baker : t) =
       Fun.id
       agnostic_baker.persistent_state.node_version_allowed
   in
+  let keep_alive =
+    Cli_arg.optional_switch
+      "keep-alive"
+      agnostic_baker.persistent_state.keep_alive
+  in
   let run_args =
     if agnostic_baker.persistent_state.remote_mode then ["remotely"]
     else ["with"; "local"; "node"; node_data_dir]
   in
-  let arguments =
-    ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
-    @ run_args @ delegates @ liquidity_baking_toggle_vote @ votefile
-    @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
-    @ dal_node_timeout_percentage @ state_recorder @ node_version_check_bypass
-    @ node_version_allowed
-  in
+  ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
+  @ run_args @ delegates @ liquidity_baking_toggle_vote @ votefile
+  @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
+  @ dal_node_timeout_percentage @ state_recorder @ node_version_check_bypass
+  @ node_version_allowed @ keep_alive
 
+let run ?env ?event_level ?event_sections_levels ?(extra_arguments = [])
+    (agnostic_baker : t) =
+  (match agnostic_baker.status with
+  | Not_running -> ()
+  | Running _ ->
+      Test.fail "agnostic_baker %s is already running" agnostic_baker.name) ;
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
     trigger_ready agnostic_baker None ;
@@ -247,9 +255,20 @@ let run ?env ?event_level ?event_sections_levels (agnostic_baker : t) =
     ?event_sections_levels
     agnostic_baker
     {ready = false}
-    arguments
+    (run_args agnostic_baker @ extra_arguments)
     ~on_terminate
-    ?runner
+    ?runner:agnostic_baker.persistent_state.runner
+
+let spawn_run ?env (agnostic_baker : t) =
+  (match agnostic_baker.status with
+  | Not_running -> ()
+  | Running _ ->
+      Test.fail "agnostic_baker %s is already running" agnostic_baker.name) ;
+  Process.spawn
+    ?env
+    ?runner:agnostic_baker.persistent_state.runner
+    agnostic_baker.path
+    (run_args agnostic_baker)
 
 let check_event ?where agnostic_baker name promise =
   let* result = promise in
@@ -273,7 +292,7 @@ let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
     ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
     ?votefile ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
     ?operations_pool ?dal_node ?dal_node_timeout_percentage ?state_recorder
-    ?node_version_check_bypass ?node_version_allowed node client =
+    ?node_version_check_bypass ?node_version_allowed ?keep_alive node client =
   let* () = Node.wait_for_ready node in
   let agnostic_baker =
     create
@@ -293,6 +312,7 @@ let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
       ?node_version_check_bypass
       ?node_version_allowed
       ~delegates
+      ?keep_alive
       node
       client
   in
