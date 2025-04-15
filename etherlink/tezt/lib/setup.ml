@@ -775,7 +775,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     | None ->
         [
           {
-            (Evm_node.default_l2_setup ~l2_chain_id:0) with
+            (Evm_node.default_l2_setup ~l2_chain_id:1337) with
             da_fee_per_byte = da_fee;
             sequencer_pool_address;
             minimum_base_fee_per_gas;
