@@ -31,7 +31,6 @@ use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::hash::Hash;
 use crate::state_backend::owned_backend::Owned;
 use crate::state_backend::proof_backend::proof;
-use crate::state_backend::proof_backend::proof::deserialise_proof;
 use crate::state_backend::proof_backend::proof::serialise_proof;
 use crate::storage;
 use crate::storage::StorageError;
@@ -557,7 +556,7 @@ pub unsafe fn octez_riscv_serialise_proof(proof: Pointer<Proof>) -> ocaml::Value
 
 #[ocaml::func]
 #[ocaml::sig("bytes -> (proof, string) Result.t")]
-pub fn octez_riscv_deserialise_proof(bytes: &[u8]) -> Result<Pointer<Proof>, String> {
+pub fn octez_riscv_deserialise_proof(_bytes: &[u8]) -> Result<Pointer<Proof>, String> {
     todo!("RV-555")
 }
 
