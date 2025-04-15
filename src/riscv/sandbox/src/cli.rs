@@ -243,10 +243,6 @@ pub struct CommonOptions {
     #[arg(long, default_value_t = false)]
     pub timings: bool,
 
-    /// Run as PVM.
-    #[arg(long)]
-    pub pvm: bool,
-
     #[command(flatten)]
     pub preimage: PreimageOptions,
 }

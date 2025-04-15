@@ -127,7 +127,6 @@ build_jstz_riscv() {
 run_jstz_riscv() {
   LOG="$DATA_DIR/log.$1.log"
   $PROFILING_WRAPPER "./$SANDBOX_BIN" run \
-    --pvm \
     "${JSTZ_SANDBOX_PARAMS[@]}" \
     --inbox-file "$RUN_INBOX" \
     --address "$DEFAULT_ROLLUP_ADDRESS" \

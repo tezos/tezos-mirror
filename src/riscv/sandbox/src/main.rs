@@ -5,8 +5,6 @@
 
 use std::error::Error;
 
-use cli::ExitMode;
-use octez_riscv::machine_state::mode::Mode;
 use octez_riscv::stepper::StepperStatus;
 
 mod cli;
@@ -24,14 +22,6 @@ fn format_status(result: &StepperStatus) -> String {
         Exited { status, .. } => format!("Exit with exit code = {}", status),
         Running { .. } => "Timeout".to_string(),
         Errored { cause, message, .. } => format!("{message}\nCaused by: {cause}"),
-    }
-}
-
-fn posix_exit_mode(exit_mode: &ExitMode) -> Mode {
-    match exit_mode {
-        ExitMode::User => Mode::User,
-        ExitMode::Supervisor => Mode::Supervisor,
-        ExitMode::Machine => Mode::Machine,
     }
 }
 
