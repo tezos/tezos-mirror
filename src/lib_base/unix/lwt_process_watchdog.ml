@@ -5,23 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Process_init_too_slow
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"process_worker.Process_init_too_slow"
-    ~title:"Process init too slow"
-    ~description:"Process init too slow"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Process init timeout: too slow to start. This is certainly due to the \
-         slow DAL initialization.")
-    Data_encoding.unit
-    (function Process_init_too_slow -> Some () | _ -> None)
-    (fun () -> Process_init_too_slow)
-
 module type NAME = sig
   val base : string list
 
@@ -232,23 +215,7 @@ module Daemon (Event : EVENTS) = struct
     in
     let* () = Socket.handshake init_socket_fd handshake in
     let* () = Socket.send init_socket_fd t.parameters_encoding t.parameters in
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6579
-       Workaround: increase default timeout. If the timeout is still not
-       enough and an Lwt_unix.Timeout is triggered, we display a
-       comprehensive message.
-    *)
-    let timeout = Ptime.Span.of_int_s 120 in
-    let* () =
-      protect
-        (fun () -> Socket.recv ~timeout init_socket_fd Data_encoding.unit)
-        ~on_error:(function
-          | err
-            when List.exists
-                   (function Exn Lwt_unix.Timeout -> true | _ -> false)
-                   err ->
-              tzfail Process_init_too_slow
-          | e -> fail e)
-    in
+    let* () = Socket.recv init_socket_fd Data_encoding.unit in
     let*! () = Lwt_unix.close init_socket_fd in
     let*! () = Event.(emit process_started) pid in
     t.server <- Some process ;
