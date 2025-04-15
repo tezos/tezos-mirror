@@ -178,6 +178,12 @@ let update_consensus_key_any_algo_with_fresh_key ~ck_name src =
 let update_companion_key_with_fresh_key ~ck_name src =
   add_account ~algo:Bls ck_name --> update_companion_key ~ck_name src
 
+(* Should only be used with tz4 *)
+let update_key ~kind ~ck_name src =
+  match kind with
+  | Consensus -> update_consensus_key ~ck_name src
+  | Companion -> update_companion_key ~ck_name src
+
 let test_simple_register_consensus_and_companion_keys =
   let bootstrap_accounts = ["bootstrap1"; "bootstrap2"] in
   let delegate = "delegate" in
@@ -674,6 +680,35 @@ let test_register_new_key_every_cycle =
         [delegate]
   --> loop (consensus_rights_delay + 2) (update_both_cks delegate --> next_cycle)
 
+let test_register_key_end_of_cycle =
+  let consensus_rights_delay =
+    Default_parameters.constants_mainnet.consensus_rights_delay
+  in
+  let delegate = "delegate" in
+  let check_finalized_block = check_cks delegate in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> set S.consensus_rights_delay consensus_rights_delay
+  --> begin_test
+        ~algo:Bls
+        ~force_attest_all:true
+        ~check_finalized_block
+        [delegate]
+  --> add_account ~algo:Bls "ck"
+  --> exec bake_until_next_cycle_end_but_one
+  --> fold_tag
+        (fun kind ->
+          update_key ~kind ~ck_name:"ck" delegate
+          --> wait_n_cycles (consensus_rights_delay + 1)
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck"
+                ~registered_for:delegate
+                Active
+                kind)
+        [("update consensus", Consensus); ("update companion", Companion)]
+  --> next_cycle
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -684,6 +719,7 @@ let tests =
        ( "Register same key multiple times",
          test_register_same_key_multiple_times );
        ("Test register new key every cycle", test_register_new_key_every_cycle);
+       ("Test register key at end of cycle", test_register_key_end_of_cycle);
      ]
 
 let () =
