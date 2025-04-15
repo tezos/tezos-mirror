@@ -562,6 +562,96 @@ let test_self_register_as_companion =
         Companion
   --> next_cycle
 
+let test_register_same_key_multiple_times =
+  let consensus_rights_delay =
+    Default_parameters.constants_mainnet.consensus_rights_delay
+  in
+  let delegate = "delegate" in
+  let ck = "ck" in
+  let check_finalized_block = check_cks delegate in
+  let update_either_ck ~ck_name delegate =
+    Tag "consensus" --> update_consensus_key ~ck_name delegate
+    |+ Tag "companion" --> update_companion_key ~ck_name delegate
+  in
+  let check_ck_cannot_be_registered =
+    assert_failure
+      ~loc:__LOC__
+      ~expected_error:(fun (_block, state) err ->
+        let delegate = State.find_account delegate state in
+        let ck = State.find_account ck state in
+        let cycle, ck_pkh = Account_helpers.latest_consensus_key delegate in
+        if Signature.Public_key_hash.equal ck_pkh ck.pkh then
+          Assert.expect_error ~loc:__LOC__ err (function
+              | [
+                  Protocol.Delegate_consensus_key
+                  .Invalid_consensus_key_update_noop (err_cycle, err_kind);
+                ] ->
+                  Int32.equal
+                    (Protocol.Cycle_repr.to_int32 err_cycle)
+                    (State_account.Cycle.to_int32 cycle)
+                  && err_kind = Consensus
+              | _ -> false)
+        else
+          Error_helpers.check_error_constructor_name
+            ~loc:__LOC__
+            ~expected:
+              Protocol.Delegate_consensus_key
+              .Invalid_consensus_key_update_active
+            err)
+      (update_consensus_key ~ck_name:ck delegate)
+    --> assert_failure
+          ~loc:__LOC__
+          ~expected_error:(fun (_block, state) err ->
+            let delegate = State.find_account delegate state in
+            let ck = State.find_account ck state in
+            let cycle, ck_pkh = Account_helpers.latest_companion_key delegate in
+            if
+              Option.fold
+                ~none:false
+                ~some:(fun x -> Signature.Public_key_hash.equal ck.pkh (Bls x))
+                ck_pkh
+            then
+              Assert.expect_error ~loc:__LOC__ err (function
+                  | [
+                      Protocol.Delegate_consensus_key
+                      .Invalid_consensus_key_update_noop (err_cycle, err_kind);
+                    ] ->
+                      Int32.equal
+                        (Protocol.Cycle_repr.to_int32 err_cycle)
+                        (State_account.Cycle.to_int32 cycle)
+                      && err_kind = Companion
+                  | _ -> false)
+            else
+              Error_helpers.check_error_constructor_name
+                ~loc:__LOC__
+                ~expected:
+                  Protocol.Delegate_consensus_key
+                  .Invalid_consensus_key_update_active
+                err)
+          (update_companion_key ~ck_name:ck delegate)
+  in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> set S.consensus_rights_delay consensus_rights_delay
+  --> begin_test
+        ~algo:Bls
+        ~force_attest_all:true
+        ~check_finalized_block
+        [delegate]
+  --> add_account ~algo:Bls ck
+  --> update_either_ck ~ck_name:ck delegate
+  (* The key cannot be registered again *)
+  --> check_ck_cannot_be_registered
+  --> wait_n_cycles (consensus_rights_delay + 1)
+  --> check_ck_cannot_be_registered
+  (* We can now register other keys, and ck can be registered again after that *)
+  --> add_account "consensus_key"
+  --> update_consensus_key ~ck_name:"consensus_key" delegate
+  --> add_account ~algo:Bls "companion_key"
+  --> update_companion_key ~ck_name:"companion_key" delegate
+  --> update_either_ck ~ck_name:ck delegate
+  --> next_cycle
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -569,6 +659,8 @@ let tests =
          test_simple_register_consensus_and_companion_keys );
        ("Register other accounts as ck", test_register_other_accounts_as_ck);
        ("Self register as companion", test_self_register_as_companion);
+       ( "Register same key multiple times",
+         test_register_same_key_multiple_times );
      ]
 
 let () =

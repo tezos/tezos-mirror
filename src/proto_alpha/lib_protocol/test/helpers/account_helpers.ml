@@ -651,6 +651,15 @@ let current_companion_key account current_cycle =
     account.companion_keys
   |> Option.map snd
 
+let latest_consensus_key account =
+  CycleMap.max_binding_opt account.consensus_keys
+  |> Option.value ~default:(Cycle.root, account.pkh)
+
+let latest_companion_key account =
+  CycleMap.max_binding_opt account.companion_keys
+  |> Option.fold ~none:(Cycle.root, None) ~some:(fun (cycle, pkh) ->
+         (cycle, Some pkh))
+
 let pp_ck_map pkh_pp fmt map =
   Format.pp_print_list
     (fun out (c, pkh) -> Format.fprintf out "(%a, %a)" Cycle.pp c pkh_pp pkh)
