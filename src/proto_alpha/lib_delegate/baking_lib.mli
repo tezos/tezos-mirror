@@ -43,19 +43,19 @@ val bake :
   ?count:int ->
   ?votes:Baking_configuration.per_block_votes_config ->
   ?state_recorder:Baking_configuration.state_recorder_config ->
-  Baking_state.Consensus_key.t list ->
+  Baking_state.Key.t list ->
   unit tzresult Lwt.t
 
 val preattest :
   Protocol_client_context.full ->
   ?force:bool ->
-  Baking_state.Consensus_key.t list ->
+  Baking_state.Key.t list ->
   unit tzresult Lwt.t
 
 val attest :
   Protocol_client_context.full ->
   ?force:bool ->
-  Baking_state.Consensus_key.t list ->
+  Baking_state.Key.t list ->
   unit tzresult Lwt.t
 
 val propose :
@@ -69,7 +69,7 @@ val propose :
   ?extra_operations:Baking_configuration.Operations_source.t ->
   ?context_path:string ->
   ?state_recorder:Baking_configuration.state_recorder_config ->
-  Baking_state.Consensus_key.t list ->
+  Baking_state.Key.t list ->
   unit tzresult Lwt.t
 
 (** [repropose] tries to bake a new block proposal on the same level
@@ -80,5 +80,5 @@ val repropose :
   Protocol_client_context.full ->
   ?force:bool ->
   ?force_round:Round.t ->
-  Baking_state.Consensus_key.t list ->
+  Baking_state.Key.t list ->
   unit tzresult Lwt.t

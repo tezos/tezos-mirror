@@ -29,7 +29,7 @@ open Baking_errors
 
 module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
-module Consensus_key_id = struct
+module Key_id = struct
   type t = Signature.Public_key_hash.t
 
   let to_pkh pkh = pkh
@@ -43,12 +43,12 @@ module Consensus_key_id = struct
   module Table = Signature.Public_key_hash.Table
 end
 
-module Consensus_key = struct
+module Key = struct
   (** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
   type t = {
     alias : string option;
-    id : Consensus_key_id.t;
+    id : Key_id.t;
     public_key : Signature.Public_key.t;
     secret_key_uri : Client_keys.sk_uri;
   }
@@ -111,8 +111,8 @@ end
 
 module Delegate = struct
   type t = {
-    consensus_key : Consensus_key.t;
-    companion_key : Consensus_key.t option;
+    consensus_key : Key.t;
+    companion_key : Key.t option;
     delegate_id : Delegate_id.t;
   }
 
@@ -124,27 +124,24 @@ module Delegate = struct
       (fun (consensus_key, delegate_id, companion_key) ->
         {consensus_key; delegate_id; companion_key})
       (obj3
-         (req "consensus_key" Consensus_key.encoding)
+         (req "consensus_key" Key.encoding)
          (req "delegate" Delegate_id.encoding)
-         (opt "companion_key" Consensus_key.encoding))
+         (opt "companion_key" Key.encoding))
 
   let pp fmt {consensus_key; delegate_id; companion_key} =
     let str_companion_key =
       match companion_key with
       | Some companion_key ->
-          Format.asprintf
-            " with companion key %a"
-            Consensus_key.pp
-            companion_key
+          Format.asprintf " with companion key %a" Key.pp companion_key
       | None -> ""
     in
     if Signature.Public_key_hash.equal consensus_key.id delegate_id then
-      Format.fprintf fmt "%a%s" Consensus_key.pp consensus_key str_companion_key
+      Format.fprintf fmt "%a%s" Key.pp consensus_key str_companion_key
     else
       Format.fprintf
         fmt
         "%a%s@,on behalf of %a"
-        Consensus_key.pp
+        Key.pp
         consensus_key
         str_companion_key
         Delegate_id.pp
@@ -659,7 +656,7 @@ type global_state = {
   (* the validation mode used by the baker*)
   validation_mode : validation_mode;
   (* the delegates on behalf of which the baker is running *)
-  delegates : Consensus_key.t list;
+  delegates : Key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
@@ -1076,9 +1073,9 @@ let may_load_attestable_data state =
 
 module DelegateSet = struct
   include Set.Make (struct
-    type t = Consensus_key.t
+    type t = Key.t
 
-    let compare Consensus_key.{id = pkh; _} Consensus_key.{id = pkh'; _} =
+    let compare Key.{id = pkh; _} Key.{id = pkh'; _} =
       Signature.Public_key_hash.compare pkh pkh'
   end)
 
@@ -1247,7 +1244,7 @@ let pp_global_state fmt {chain_id; config; validation_mode; delegates; _} =
     config
     pp_validation_mode
     validation_mode
-    Format.(pp_print_list Consensus_key.pp)
+    Format.(pp_print_list Key.pp)
     delegates
 
 let pp_option pp fmt = function

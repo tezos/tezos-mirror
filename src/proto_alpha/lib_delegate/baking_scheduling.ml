@@ -897,7 +897,7 @@ let retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
 let try_resolve_consensus_keys cctxt key =
   let open Lwt_syntax in
   let levels_to_inspect = 50 in
-  let pkh = Consensus_key_id.to_pkh key.Consensus_key.id in
+  let pkh = Key_id.to_pkh key.Key.id in
   let* res =
     Plugin.Alpha_services.Delegate.deactivated cctxt (`Main, `Head 0) pkh
   in

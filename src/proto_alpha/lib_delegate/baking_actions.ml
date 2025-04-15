@@ -247,7 +247,7 @@ let sign_block_header global_state proposer unsigned_block_header =
           (may_sign_block
              cctxt
              block_location
-             ~delegate:proposer.Consensus_key.id
+             ~delegate:proposer.Key.id
              ~level
              ~round [@profiler.record_s {verbosity = Debug} "may sign"])
         in
@@ -964,7 +964,7 @@ let compute_round (proposal : proposal) round_durations =
 let notice_delegates_without_slots all_delegates delegate_slots level =
   let delegates_without_slots =
     List.filter
-      (fun {Baking_state.Consensus_key.id; _} ->
+      (fun {Baking_state.Key.id; _} ->
         not
         @@ List.exists
              (fun ({delegate = {consensus_key; _}; _} : delegate_slot) ->

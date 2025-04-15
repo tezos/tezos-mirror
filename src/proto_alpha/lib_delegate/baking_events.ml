@@ -604,13 +604,11 @@ module Delegates = struct
         Format.fprintf
           ppf
           "@[<v 2>@,%a@]"
-          Format.(
-            pp_print_list ~pp_sep:pp_print_cut Baking_state.Consensus_key.pp)
+          Format.(pp_print_list ~pp_sep:pp_print_cut Baking_state.Key.pp)
           delegates)
       ( "delegates",
         Data_encoding.list
-          Baking_state.Consensus_key
-          .consensus_key_without_sk_encoding__cannot_decode )
+          Baking_state.Key.consensus_key_without_sk_encoding__cannot_decode )
 end
 
 module Scheduling = struct
@@ -1126,8 +1124,8 @@ module Actions = struct
       ~msg:
         "The following delegates have no attesting rights at level {level}: \
          {delegates}"
-      ~pp1:(Format.pp_print_list Baking_state.Consensus_key.pp)
-      ("delegates", Data_encoding.list Baking_state.Consensus_key.encoding)
+      ~pp1:(Format.pp_print_list Baking_state.Key.pp)
+      ("delegates", Data_encoding.list Baking_state.Key.encoding)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
 

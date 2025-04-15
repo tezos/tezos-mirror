@@ -70,7 +70,7 @@ type worker = {
   push_task : forge_request option -> unit;
   push_event : forge_event option -> unit;
   event_stream : forge_event Lwt_stream.t;
-  delegate_signing_queues : Delegate_signing_queue.t Consensus_key_id.Table.t;
+  delegate_signing_queues : Delegate_signing_queue.t Key_id.Table.t;
 }
 
 type t = worker
@@ -82,7 +82,7 @@ let get_event_stream state = state.event_stream
 let cancel_all_pending_tasks {delegate_signing_queues; _} =
   Lwt.dont_wait
     (fun () ->
-      Consensus_key_id.Table.iter_p
+      Key_id.Table.iter_p
         (fun _ queue -> Delegate_signing_queue.cancel_pending_tasks queue)
         delegate_signing_queues)
     (fun _exn -> ())
@@ -90,7 +90,7 @@ let cancel_all_pending_tasks {delegate_signing_queues; _} =
 let shutdown state =
   let open Lwt_syntax in
   let* () =
-    Consensus_key_id.Table.iter_p
+    Key_id.Table.iter_p
       (fun _ queue -> Delegate_signing_queue.cancel_all_tasks_and_close queue)
       state.delegate_signing_queues
   in
@@ -99,13 +99,13 @@ let shutdown state =
 
 let get_or_create_queue worker delegate =
   match
-    Consensus_key_id.Table.find_opt
+    Key_id.Table.find_opt
       worker.delegate_signing_queues
       delegate.Baking_state.Delegate.consensus_key.id
   with
   | None ->
       let queue = Delegate_signing_queue.create delegate in
-      Consensus_key_id.Table.add
+      Key_id.Table.add
         worker.delegate_signing_queues
         delegate.consensus_key.id
         queue ;
@@ -189,7 +189,7 @@ let start (baking_state : Baking_state.global_state) =
   let open Lwt_result_syntax in
   let task_stream, push_task = Lwt_stream.create () in
   let event_stream, push_event = Lwt_stream.create () in
-  let delegate_signing_queues = Consensus_key_id.Table.create 13 in
+  let delegate_signing_queues = Key_id.Table.create 13 in
   let state : worker =
     {push_task; push_event; event_stream; delegate_signing_queues}
   in
