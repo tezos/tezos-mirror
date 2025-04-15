@@ -30,6 +30,8 @@ let variables : variables =
        (unlike [GCP_REGISTRY], see below). This is used to locate the
        CI images, which are always pushed to the public repository. *)
     ("ci_image_name", "${GCP_REGISTRY}/${CI_PROJECT_PATH}/ci");
+    ( "ci_image_name_protected",
+      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/ci" );
     (* /!\ GCP_REGISTRY is the variable containing the name of the registry to and from
        which docker images are produced and consumed. This variable is defined at tezos
        level with the value unprotected registry and at tezos/tezos level in its protected
