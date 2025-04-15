@@ -14,7 +14,10 @@ NATIVE_OPT := --target="$(NATIVE_TARGET)"
 endif
 
 # We don't want to check all features in CI, so we provide this varible to configure it.
-CHECK_FEATURES ?= --all-features
+CHECK_FLAGS ?= --features default,inline-jit,supervisor
+
+# CI needs the ability to toggle some features 
+EXTRA_FLAGS ?=
 
 # Mechanism to allow enabling additional features - for example JIT
 SANDBOX_ENABLE_FEATURES ?= 
@@ -24,7 +27,7 @@ NIGHTLY_VERSION = nightly-2025-01-30
 
 .PHONY: build
 build: riscv-dummy.elf riscv-dummy-linux-musl.elf riscv-sandbox
-	@cargo build --release --workspace $(NATIVE_OPT)
+	@cargo build --release --workspace $(NATIVE_OPT) $(EXTRA_FLAGS)
 	@make -C jstz build
 
 .PHONY: riscv-sandbox
@@ -96,17 +99,17 @@ endif
 
 .PHONY: test
 test: build
-	@cargo test --workspace
+	@cargo test --workspace $(EXTRA_FLAGS)
 	@make -C dummy_kernel test
 	@make -C jstz test
 
 .PHONY: test-long
 test-long:
-	@cargo test --release -- test_jstz_determinism test_jstz_proofs_one_step --nocapture --ignored
+	@cargo test --release $(EXTRA_FLAGS) -- test_jstz_determinism test_jstz_proofs_one_step --nocapture --ignored
 
 .PHONY: test-miri
 test-miri:
-	@cargo +$(NIGHTLY_VERSION) miri test -- miri
+	@cargo +$(NIGHTLY_VERSION) miri test $(EXTRA_FLAGS) -- miri
 
 .PHONY: coverage
 coverage:
@@ -118,9 +121,9 @@ check:
 	@taplo format --check $(shell ls **/Cargo.toml)
 
 	@cargo update --workspace --locked
-	@cargo check --workspace --all-targets $(CHECK_FEATURES)
-	@cargo clippy --workspace --all-targets $(CHECK_FEATURES) -- --deny warnings
-	@cargo doc --document-private-items --no-deps $(CHECK_FEATURES)
+	@cargo check --workspace --all-targets $(CHECK_FLAGS) $(EXTRA_FLAGS)
+	@cargo clippy --workspace --all-targets $(CHECK_FLAGS) $(EXTRA_FLAGS) -- --deny warnings
+	@cargo doc --document-private-items --no-deps $(CHECK_FLAGS) $(EXTRA_FLAGS)
 
 	@make -C dummy_kernel check
 	@make -C jstz check

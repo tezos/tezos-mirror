@@ -3336,8 +3336,6 @@ dependencies = [
  "ieee-apsqrt",
  "itertools",
  "num_enum",
- "ocaml",
- "ocaml-build",
  "paste",
  "range-collections",
  "rustc_apfloat",

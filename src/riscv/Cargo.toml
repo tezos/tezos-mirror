@@ -29,7 +29,6 @@ lazy_static = "1.4.0"
 meansd = "2.1.0"
 num_enum = "0.7.2"
 numfmt = "1.1.1"
-ocaml = "1.1.0"
 ocaml-build = "1.0.0"
 paste = "1.0.14"
 proptest = "1.4.0"
@@ -72,3 +71,7 @@ features = ["derive"]
 [workspace.dependencies.hex]
 version = "0.4.3"
 features = ["serde"]
+
+[workspace.dependencies.ocaml]
+version = "1.1.0"
+default-features = false
