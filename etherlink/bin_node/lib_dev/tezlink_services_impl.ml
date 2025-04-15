@@ -67,27 +67,32 @@ module type Backend = sig
 end
 
 module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
-  type block_param = [`Head]
+  type block_param = [`Head | `Level of int32]
+
+  let shell_block_param_to_block_number =
+    let open Lwt_result_syntax in
+    function
+    | `Head ->
+        let* (Qty current_block_number) =
+          Backend.block_param_to_block_number (Block_parameter Latest)
+        in
+        return current_block_number
+    | `Level l -> return (Z.of_int32 l)
 
   let current_level chain block ~offset =
     let open Lwt_result_syntax in
+    let `Main = chain in
+
     let* offset =
       (* Tezos l1 requires non-negative offset #7845 *)
       if offset >= 0l then return offset
       else failwith "The specified level offset should be positive."
     in
 
-    let `Main = chain in
-    let `Head = block in
-
-    let* (Qty current_block_number) =
-      Backend.block_param_to_block_number (Block_parameter Latest)
-    in
-
-    let current_block_number = Z.to_int32 current_block_number in
+    let* block_number = shell_block_param_to_block_number block in
 
     let constants = Tezlink_constants.all_constants in
-    let level = Int32.add current_block_number offset in
+    let level = Z.to_int32 (Z.add block_number (Z.of_int32 offset)) in
     return
       Tezos_types.
         {
@@ -96,10 +101,9 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
           cycle_position = Int32.rem level constants.parametric.blocks_per_cycle;
         }
 
-  let constants chain block =
+  let constants chain (_block : block_param) =
     let open Lwt_result_syntax in
     let `Main = chain in
-    let `Head = block in
     return Tezlink_constants.all_constants
 
   let read ~block p =
@@ -107,6 +111,9 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
     let block =
       match block with
       | `Head -> Ethereum_types.Block_parameter.(Block_parameter Latest)
+      | `Level l ->
+          Ethereum_types.Block_parameter.(
+            Block_parameter (Number (Qty (Z.of_int32 l))))
     in
     let* state = Backend.get_state ~block () in
     Backend.read state p
@@ -120,9 +127,6 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
   let header chain block =
     let open Lwt_result_syntax in
     let `Main = chain in
-    let `Head = block in
-    let* (Qty block_number) =
-      Backend.block_param_to_block_number (Block_parameter Latest)
-    in
+    let* block_number = shell_block_param_to_block_number block in
     Backend.tez_nth_block block_number
 end

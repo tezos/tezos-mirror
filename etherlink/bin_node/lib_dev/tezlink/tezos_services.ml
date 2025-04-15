@@ -399,6 +399,7 @@ let check_chain =
 let check_block =
   let open Result_syntax in
   function
+  | `Level l -> return (`Level l)
   | `Head 0 -> return `Head
   | block ->
       tzfail
