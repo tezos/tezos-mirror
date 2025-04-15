@@ -575,7 +575,8 @@ let test_tezlink_balance =
   let* res =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
   in
-  Check.((Tez.to_mutez res = 0) int ~error_msg:"Expected %R but got %L") ;
+  Check.(
+    (Tez.to_mutez res = 3800000000000) int ~error_msg:"Expected %R but got %L") ;
   unit
 
 let test_tezlink_version =
