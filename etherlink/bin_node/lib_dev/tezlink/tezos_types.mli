@@ -38,6 +38,15 @@ module Contract : sig
   type t = Tezlink_imports.Alpha_context.Contract.t
 
   val encoding : t Data_encoding.t
+
+  val of_b58check : string -> t tzresult
+
+  (** Convert a contract to a hex string.*)
+  val to_hex : t -> string
 end
 
-module Tez = Tezlink_imports.Alpha_context.Tez
+module Tez : sig
+  include module type of Tezlink_imports.Alpha_context.Tez
+
+  val of_string_exn : string -> t
+end

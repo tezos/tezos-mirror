@@ -51,6 +51,23 @@ module Contract = struct
   type t = Tezlink_imports.Alpha_context.Contract.t
 
   let encoding = Tezlink_imports.Alpha_context.Contract.encoding
+
+  let of_b58check s =
+    Tezlink_imports.Imported_env.wrap_tzresult
+    @@ Tezlink_imports.Alpha_context.Contract.of_b58check s
+
+  let to_hex c =
+    let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+    let (`Hex key) = Hex.of_bytes raw_key in
+    key
 end
 
-module Tez = Tezlink_imports.Alpha_context.Tez
+module Tez = struct
+  include Tezlink_imports.Alpha_context.Tez
+
+  let of_string_exn str =
+    match of_string str with
+    | None ->
+        raise (Invalid_argument (Printf.sprintf "Invalid tez value: %s" str))
+    | Some s -> s
+end
