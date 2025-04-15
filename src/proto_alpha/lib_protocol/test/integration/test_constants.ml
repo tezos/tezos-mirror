@@ -150,6 +150,16 @@ let check_protocol_time_correlation
     days
 
 let () =
+  register_test
+    ~title:"delay increment per round is greater than or equal to one second"
+  @@ fun () ->
+  let constants = Default_parameters.constants_mainnet in
+  Assert.is_true
+    ~loc:__LOC__
+    Protocol.Alpha_context.(
+      constants.delay_increment_per_round >= Period.one_second)
+
+let () =
   register_test ~title:"one cycle is 1 day" @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
   check_protocol_time_correlation ~constants ~cycles:1l ~days:1l

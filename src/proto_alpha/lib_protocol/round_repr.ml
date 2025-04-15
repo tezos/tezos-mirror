@@ -122,25 +122,7 @@ module Durations = struct
   }
 
   type error +=
-    | Non_increasing_rounds of {increment : Period_repr.t}
     | Round_durations_must_be_at_least_one_second of {round : Period_repr.t}
-
-  let () =
-    register_error_kind
-      `Permanent
-      ~id:"durations.non_increasing_rounds"
-      ~title:"Non increasing round"
-      ~description:"The provided rounds are not increasing."
-      ~pp:(fun ppf increment ->
-        Format.fprintf
-          ppf
-          "The provided rounds are not increasing (increment: %a)"
-          Period_repr.pp
-          increment)
-      Data_encoding.(obj1 (req "increment" Period_repr.encoding))
-      (function
-        | Non_increasing_rounds {increment} -> Some increment | _ -> None)
-      (fun increment -> Non_increasing_rounds {increment})
 
   let pp fmt t =
     Format.fprintf
@@ -159,11 +141,9 @@ module Durations = struct
         (Round_durations_must_be_at_least_one_second
            {round = first_round_duration})
     in
-    let* () =
-      error_when
-        Compare.Int64.(Period_repr.to_seconds delay_increment_per_round < 1L)
-        (Non_increasing_rounds {increment = delay_increment_per_round})
-    in
+    (* Note that [delay_increment_per_round] is allowed to be 0 here for testing
+       purposes. It MUST be strictly positive on any actual network to ensure
+       strictly increasing round durations, as required by Tenderbake. *)
     return {first_round_duration; delay_increment_per_round}
 
   let create_opt ~first_round_duration ~delay_increment_per_round =
