@@ -48,7 +48,6 @@ val start_public_server :
   rpc_server_family:Rpc_types.rpc_server_family ->
   ?delegate_health_check_to:Uri.t ->
   ?evm_services:evm_services_methods ->
-  ?tezlink_services:Tezos_services.tezos_services_implementation ->
   ?data_dir:string ->
   Validate.validation_mode ->
   Configuration.t ->

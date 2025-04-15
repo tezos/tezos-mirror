@@ -5,59 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Imported_protocol = Tezos_protocol_021_PsQuebec.Protocol
-module Imported_protocol_plugin = Tezos_protocol_plugin_021_PsQuebec
-module Imported_protocol_parameters = Tezos_protocol_021_PsQuebec_parameters
-module Imported_env = Tezos_protocol_environment_021_PsQuebec
-module Alpha_context = Imported_protocol.Alpha_context
+include Tezlink_imports
 
-(* The output type of the current_level service but with less duplicated
-   information. Can be changed, as long as the [conversion_encoding] is also
-   changed. *)
-type level = {level : int32; cycle : int32; cycle_position : int32}
-
-type error += Serialization_for_conversion of string * string
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"evm_node.dev.tezlink.conversion_failure"
-    ~title:"Failed to convert a value through serialization"
-    ~description:
-      "Failed to convert a value to a protocol private datatype through \
-       serialization."
-    ~pp:(fun ppf (name, error) ->
-      Format.fprintf
-        ppf
-        "Failed to convert a value of type %s to a protocol private datatype \
-         through serialization: %s"
-        name
-        error)
-    Data_encoding.(obj2 (req "type_name" string) (req "error_msg" string))
-    (function
-      | Serialization_for_conversion (name, error) -> Some (name, error)
-      | _ -> None)
-    (fun (name, error) -> Serialization_for_conversion (name, error))
-
-(** [convert_using_serialization ~dst ~src value] Conversion from one type with
-    encoding [src] to another with encoding [dst], through serialization.
-    Costly, but useful to build instances of a type when no builder is
-    accessible. *)
-let convert_using_serialization ~name ~dst ~src value =
-  let open Result_syntax in
-  let* bytes =
-    Data_encoding.Binary.to_bytes src value
-    |> Result.map_error_e (fun e ->
-           tzfail
-           @@ Serialization_for_conversion
-                ( name,
-                  Format.asprintf "%a" Data_encoding.Binary.pp_write_error e ))
-  in
-  Data_encoding.Binary.of_bytes dst bytes
-  |> Result.map_error_e (fun e ->
-         tzfail
-         @@ Serialization_for_conversion
-              (name, Format.asprintf "%a" Data_encoding.Binary.pp_read_error e))
+type level = Tezos_types.level
 
 (* Module importing, amending, and converting, protocol types. Those types
    might be difficult to actually build, so we define conversion function from
@@ -110,7 +60,7 @@ module Protocol_types = struct
            (req "expected_commitment" bool))
 
     let convert : level -> t tzresult =
-      convert_using_serialization
+      Tezos_types.convert_using_serialization
         ~name:"level"
         ~dst:encoding
         ~src:conversion_encoding
@@ -123,55 +73,6 @@ module Protocol_types = struct
       q |> Ethereum_types.Qty.to_z |> Z.to_int64 |> Alpha_context.Tez.of_mutez
       |> Option.value ~default:Alpha_context.Tez.zero
       |> Result_syntax.return
-  end
-
-  module Constants = struct
-    type fixed = Alpha_context.Constants.fixed
-
-    type parametric = Alpha_context.Constants.Parametric.t
-
-    type t = {fixed : fixed; parametric : parametric}
-
-    let fixed_values_encoding =
-      let open Data_encoding in
-      merge_objs
-        (obj10
-           (req "proof_of_work_nonce_size" uint8)
-           (req "nonce_length" uint8)
-           (req "max_anon_ops_per_block" uint8)
-           (req "max_operation_data_length" int31)
-           (req "max_proposals_per_delegate" uint8)
-           (req "max_micheline_node_count" int31)
-           (req "max_micheline_bytes_limit" int31)
-           (req "max_allowed_global_constants_depth" int31)
-           (req "cache_layout_size" uint8)
-           (req "michelson_maximum_type_size" uint16))
-        (obj4
-           (req "max_slashing_period" uint8)
-           (req "smart_rollup_max_wrapped_proof_binary_size" int31)
-           (req "smart_rollup_message_size_limit" int31)
-           (req "smart_rollup_max_number_of_messages_per_level" n))
-
-    let values_to_fixed =
-      convert_using_serialization
-        ~name:"values_to_fixed"
-        ~dst:Alpha_context.Constants.fixed_encoding
-        ~src:fixed_values_encoding
-
-    let constants_encoding =
-      let open Data_encoding in
-      conv
-        (fun {fixed; parametric} -> (fixed, parametric))
-        (fun (fixed, parametric) -> {fixed; parametric})
-        (obj2
-           (req "fixed" Alpha_context.Constants.fixed_encoding)
-           (req "parametric" Alpha_context.Constants.Parametric.encoding))
-
-    let convert : t -> Alpha_context.Constants.t tzresult =
-      convert_using_serialization
-        ~name:"constants"
-        ~dst:Alpha_context.Constants.encoding
-        ~src:constants_encoding
   end
 end
 
@@ -330,30 +231,23 @@ module Imported_services = struct
     import_service Constants_services.all
 end
 
-type block = Tezos_shell_services.Block_services.block
-
-type chain = Tezos_shell_services.Chain_services.chain
-
 let block_directory_path =
   Tezos_rpc.Path.subst2
   @@ Tezos_rpc.Path.prefix
        Tezos_shell_services.Chain_services.path
        Tezos_shell_services.Block_services.path
 
-type level_query = Imported_services.level_query = {offset : int32}
+let protocols () = Lwt_result_syntax.return Tezlink_protocols.current
 
-type tezos_services_implementation = {
-  current_level :
-    chain -> block -> Imported_services.level_query -> level tzresult Lwt.t;
-  version : unit -> Tezlink_version.version tzresult Lwt.t;
-  protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
-  balance :
-    chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
-  constants : chain -> block -> Protocol_types.Constants.t tzresult Lwt.t;
-}
+let balance _ _ _ =
+  Lwt_result_syntax.return @@ Ethereum_types.quantity_of_z Z.one
+
+let version () =
+  (* TODO: #7857 need proper implementation *)
+  Lwt_result_syntax.return Tezlink_version.mock
 
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
-let build_block_dir impl =
+let build_block_dir (module Backend : Tezlink_backend_sig.S) =
   let dir : tezlink_rpc_context Tezos_rpc.Directory.t =
     Tezos_rpc.Directory.empty
   in
@@ -361,23 +255,23 @@ let build_block_dir impl =
   |> register_with_conversion
        ~service:Imported_services.current_level
        ~impl:(fun {block; chain} query () ->
-         impl.current_level chain block query)
+         Backend.current_level chain block ~offset:query.offset)
        ~convert_output:Protocol_types.Level.convert
   |> register ~service:Imported_services.protocols ~impl:(fun _ _ () ->
-         impl.protocols ())
+         protocols ())
   |> register_with_conversion
        ~service:Imported_services.balance
        ~impl:(fun ({block; chain}, contract) _ _ ->
-         impl.balance chain block contract)
+         balance chain block contract)
        ~convert_output:Protocol_types.Tez.convert
   |> register_with_conversion
        ~service:Imported_services.constants
-       ~impl:(fun {block; chain} () () -> impl.constants chain block)
-       ~convert_output:Protocol_types.Constants.convert
+       ~impl:(fun {block; chain} () () -> Backend.constants chain block)
+       ~convert_output:Tezlink_constants.convert
 
 (** Builds the root director. *)
-let build_dir impl =
-  let helper_dir = build_block_dir impl in
+let build_dir backend =
+  let helper_dir = build_block_dir backend in
   let root_directory =
     Tezos_rpc.Directory.prefix
       block_directory_path
@@ -388,17 +282,17 @@ let build_dir impl =
   Tezos_rpc.Directory.register
     root_directory
     Imported_services.version
-    (fun () () () -> impl.version ())
+    (fun () () () -> version ())
 
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
 (* module entrypoint *)
-let register_tezlink_services impl =
-  let directory = build_dir impl in
+let register_tezlink_services backend =
+  let directory = build_dir backend in
   let directory =
     Tezos_rpc.Directory.register_describe_directory_service
       directory
       Tezos_rpc.Service.description_service
   in
   let tezlink_directory = Tezos_rpc.Directory.prefix tezlink_root directory in
-  Evm_directory.init_from_resto_directory tezlink_directory
+  tezlink_directory

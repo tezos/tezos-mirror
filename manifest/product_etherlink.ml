@@ -245,9 +245,12 @@ let evm_node_lib_dev_tezlink =
     ~synopsis:"Tezlink dependencies for the EVM node"
     ~deps:
       [
+        evm_node_lib_dev_encoding |> open_;
         tezlink_protocol_plugin;
         tezlink_protocol_parameters;
         octez_base |> open_ ~m:"TzPervasives";
+        octez_shell_services;
+        octez_version;
       ]
 
 let evm_node_config =
@@ -307,8 +310,6 @@ let evm_node_lib_dev =
         supported_installers;
         wasm_runtime;
         performance_metrics;
-        octez_version;
-        octez_shell_services;
       ]
 
 let evm_node_lib_dev_client =

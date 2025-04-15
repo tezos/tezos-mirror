@@ -213,12 +213,6 @@ let main
   let* server_finalizer =
     Rpc_server.start_public_server
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
-      ?tezlink_services:
-        (if chain_family = Michelson then
-           Some
-             Tezlink_services_impl.(
-               michelson_services_methods (module Rollup_node_rpc))
-         else None)
       validation_mode
       config
       tx_container

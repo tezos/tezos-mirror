@@ -144,8 +144,8 @@ let monitor_performances ~data_dir =
   Lwt.dont_wait aux (Fun.const ())
 
 let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
-    ?delegate_health_check_to ?evm_services ?tezlink_services ?data_dir
-    validation (config : Configuration.t) tx_container ctxt =
+    ?delegate_health_check_to ?evm_services ?data_dir validation
+    (config : Configuration.t) tx_container ctxt =
   let open Lwt_result_syntax in
   let*! can_start_performance_metrics =
     Octez_performance_metrics.supports_performance_metrics ()
@@ -163,14 +163,17 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
           impl.smart_rollup_address
           impl.time_between_blocks
   in
-  let* register_tezos_services =
-    match tezlink_services with
-    | None ->
-        return (Evm_directory.empty config.experimental_features.rpc_server)
-    | Some impl -> (
-        match config.experimental_features.rpc_server with
-        | Resto -> return (Tezos_services.register_tezlink_services impl)
-        | Dream -> tzfail Node_error.Dream_rpc_tezlink)
+  let*? () = Rpc_types.check_rpc_server_config rpc_server_family config in
+  let register_tezos_services =
+    match rpc_server_family with
+    | Rpc_types.Single_chain_node_rpc_server L2_types.Michelson ->
+        let (module Backend : Services_backend_sig.S), _ = ctxt in
+        Evm_directory.init_from_resto_directory
+        @@ Tezos_services.register_tezlink_services
+             (module Backend.Tezlink_backend)
+    | Single_chain_node_rpc_server L2_types.EVM
+    | Multichain_sequencer_rpc_server ->
+        Evm_directory.empty config.experimental_features.rpc_server
   in
   (* If spawn_rpc is defined, use it as intermediate *)
   let rpc =

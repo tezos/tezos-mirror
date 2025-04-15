@@ -4,3 +4,27 @@
 (* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
+
+type level = {
+  level : int32;
+      (** The level of the block relative to genesis. This
+      is also the Shell's notion of level. *)
+  cycle : int32;
+      (** The current cycle's number. Note that cycles are a protocol-specific
+      notion. As a result, the cycle number starts at 0 with the first block of
+      the first version of protocol alpha. *)
+  cycle_position : int32;
+      (** The current level of the block relative to the first block of the current
+      cycle. *)
+}
+
+(** [convert_using_serialization ~dst ~src value] Conversion from one type with
+    encoding [src] to another with encoding [dst], through serialization.
+    Costly, but useful to build instances of a type when no builder is
+    accessible. *)
+val convert_using_serialization :
+  name:string ->
+  dst:'a Data_encoding.t ->
+  src:'b Data_encoding.t ->
+  'b ->
+  'a tzresult
