@@ -2352,7 +2352,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             .unwrap_or_default()
     }
 
-    fn code_size(&self, address: H160) -> U256 {
+    fn code_size(&mut self, address: H160) -> U256 {
         self.get_account(address)
             .ok()
             .flatten()
@@ -2362,7 +2362,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
     // Hash of the chosen account's code, the empty hash (CODE_HASH_DEFAULT) if the account has no code,
     // or 0 if the account does not exist or has been destroyed.
-    fn code_hash(&self, address: H160) -> H256 {
+    fn code_hash(&mut self, address: H160) -> H256 {
         if !self.exists(address) {
             return H256::zero();
         }
@@ -2374,7 +2374,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             .unwrap_or(CODE_HASH_DEFAULT)
     }
 
-    fn code(&self, address: H160) -> Vec<u8> {
+    fn code(&mut self, address: H160) -> Vec<u8> {
         self.get_account(address)
             .ok()
             .flatten()
@@ -2467,7 +2467,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         self.block.chain_id
     }
 
-    fn exists(&self, address: H160) -> bool {
+    fn exists(&mut self, address: H160) -> bool {
         self.code_size(address) > U256::zero()
             || self.get_nonce(address).unwrap_or_default() > 0
             || self.balance(address) > U256::zero()
