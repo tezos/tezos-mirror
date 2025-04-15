@@ -709,6 +709,62 @@ let test_register_key_end_of_cycle =
         [("update consensus", Consensus); ("update companion", Companion)]
   --> next_cycle
 
+let test_registration_override =
+  let delegate = "delegate" in
+  let check_finalized_block = check_cks delegate in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> begin_test
+        ~algo:Bls
+        ~force_attest_all:true
+        ~check_finalized_block
+        [delegate]
+  --> add_account ~algo:Bls "ck1"
+  --> add_account ~algo:Bls "ck2"
+  --> fold_tag
+        (fun kind ->
+          update_key ~kind ~ck_name:"ck1" delegate
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck1"
+                ~registered_for:delegate
+                Pending
+                kind
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck2"
+                ~registered_for:delegate
+                Unregistered
+                kind
+          --> update_key ~kind ~ck_name:"ck2" delegate
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck1"
+                ~registered_for:delegate
+                Unregistered
+                kind
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck2"
+                ~registered_for:delegate
+                Pending
+                kind
+          --> update_key ~kind ~ck_name:"ck1" delegate
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck1"
+                ~registered_for:delegate
+                Pending
+                kind
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck2"
+                ~registered_for:delegate
+                Unregistered
+                kind)
+        [("update consensus", Consensus); ("update companion", Companion)]
+  --> next_block
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -720,6 +776,7 @@ let tests =
          test_register_same_key_multiple_times );
        ("Test register new key every cycle", test_register_new_key_every_cycle);
        ("Test register key at end of cycle", test_register_key_end_of_cycle);
+       ("Test registration override", test_registration_override);
      ]
 
 let () =
