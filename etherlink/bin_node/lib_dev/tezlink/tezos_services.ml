@@ -65,6 +65,16 @@ module Protocol_types = struct
         ~dst:encoding
         ~src:conversion_encoding
   end
+
+  module Public_key = struct
+    include Tezlink_imports.Imported_env.Signature.Public_key
+
+    let convert : Signature.Public_key.t -> t tzresult =
+      Tezos_types.convert_using_serialization
+        ~name:"public_key"
+        ~dst:encoding
+        ~src:Signature.Public_key.encoding
+  end
 end
 
 (** [wrap conversion service_implementation] changes the output type
@@ -209,6 +219,17 @@ module Imported_services = struct
          ~output:Tezos_types.Tez.encoding
          (contract_arg_path "balance")
 
+  let manager_key :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context * Tezos_types.Contract.t,
+        unit,
+        unit,
+        Protocol_types.Alpha_context.public_key option )
+      Tezos_rpc.Service.t =
+    let open Tezos_rpc in
+    Service.subst1 Imported_protocol_plugin.Contract_services.S.manager_key
+
   let constants :
       ( [`GET],
         tezlink_rpc_context,
@@ -249,6 +270,14 @@ let build_block_dir (module Backend : Tezlink_backend_sig.S) =
        ~service:Imported_services.balance
        ~impl:(fun ({chain; block}, contract) _ _ ->
          Backend.balance chain block contract)
+  |> register_with_conversion
+       ~service:Imported_services.manager_key
+       ~impl:(fun ({chain; block}, contract) _ _ ->
+         Backend.manager_key chain block contract)
+       ~convert_output:(function
+         | None -> Result.return_none
+         | Some pk ->
+             Result.map Option.some @@ Protocol_types.Public_key.convert pk)
   |> register_with_conversion
        ~service:Imported_services.constants
        ~impl:(fun {block; chain} () () -> Backend.constants chain block)

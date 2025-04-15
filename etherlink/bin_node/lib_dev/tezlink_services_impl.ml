@@ -19,6 +19,8 @@ module Path = struct
     "/tezlink/context/contracts/index/" ^ to_path Contract.encoding contract
 
   let balance contract = account contract ^ "/balance"
+
+  let manager_key contract = account contract ^ "/manager_key"
 end
 
 let balance read chain block c =
@@ -32,6 +34,17 @@ let balance read chain block c =
     read
     (Path.balance c)
     (Data_encoding.Binary.of_bytes_exn Tez.encoding)
+
+let manager_key read chain block c =
+  (* TODO: #7831 !17664
+     Support non-default chain and block parameters. *)
+  ignore chain ;
+  ignore block ;
+
+  Durable_storage.inspect_durable_and_decode_opt
+    read
+    (Path.manager_key c)
+    (Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding)
 
 module type Backend = sig
   include Durable_storage.READER
@@ -145,4 +158,8 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
   (* TODO: #7831 !17664
      we type [chain], even though we don't use it, to satisfy the compiler. *)
   let balance (chain : [> `Main]) = balance read chain
+
+  (* TODO: #7831 !17664
+     we type [chain], even though we don't use it, to satisfy the compiler. *)
+  let manager_key (chain : [> `Main]) = manager_key read chain
 end
