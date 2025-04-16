@@ -149,9 +149,14 @@ module Frozen_tez = struct
         mul_q a.self_current Q.(add one limit)
         |> of_q ~round:`Up |> min total_current)
     in
-    let self_portion = Tez.ratio a.self_current total_current_with_limit in
-    (* Baker's advantage for the mutez *)
-    let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round:`Up in
+    let self_quantity =
+      (* Special case *)
+      if Tez.(equal total_current zero) then tez
+      else
+        let self_portion = Tez.ratio a.self_current total_current_with_limit in
+        (* Baker's advantage for the mutez *)
+        Tez.mul_q tez self_portion |> Tez.of_q ~round:`Up
+    in
     let remains = Tez.(tez -! self_quantity) in
     (* Baker's edge. Round up for the baker's advantage again *)
     let bakers_edge = Tez.mul_q remains edge |> Tez.of_q ~round:`Up in
