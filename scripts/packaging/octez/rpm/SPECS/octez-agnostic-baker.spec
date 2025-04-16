@@ -19,7 +19,7 @@ Requires(pre): octez-client
 %install
 mkdir -p %{buildroot}/usr/bin/
 mkdir -p %{buildroot}/usr/share/octez-agnostic-baker
-install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-agnostic-baker %{buildroot}/usr/bin/
+install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-baker %{buildroot}/usr/bin/
 install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-accuser-P* %{buildroot}/usr/bin/
 install -m 0755 $HOME/rpmbuild/SPECS/scripts/wait-for-node-up.sh %{buildroot}/usr/share/octez-agnostic-baker/
 install -m 0755 $HOME/rpmbuild/SPECS/scripts/systemd-octez-agnostic-baker.sh %{buildroot}/usr/share/octez-agnostic-baker/
@@ -33,7 +33,7 @@ install -D -m 644 $HOME/rpmbuild/SPECS/octez-agnostic-baker.octez-agnostic-baker
 install -D -m 644  $HOME/rpmbuild/SPECS/octez-agnostic-baker.octez-accuser.default %{buildroot}/etc/default/octez-accuser
 install -D -m 644  $HOME/rpmbuild/SPECS/octez-agnostic-baker.default %{buildroot}/etc/default/octez-baker
 %files
-/usr/bin/octez-agnostic-baker
+/usr/bin/octez-baker
 /usr/bin/octez-accuser-*
 /usr/share/octez-agnostic-baker/wait-for-node-up.sh
 /usr/share/octez-agnostic-baker/systemd-octez-agnostic-baker.sh
