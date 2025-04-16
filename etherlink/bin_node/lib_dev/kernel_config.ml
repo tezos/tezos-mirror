@@ -110,17 +110,21 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
     match tez_bootstrap_accounts with
     | None -> []
     | Some tez_bootstrap_accounts ->
+        let open Tezos_types in
         List.map
-          (fun address ->
-            make_instr
-              ~path_prefix:
-                (Tezlink_services_impl.Path.account address
-                |> String.split_on_char '/' |> clean_path)
-              (Some
-                 ( "balance",
-                   Data_encoding.Binary.to_string_exn
-                     Tezos_types.Tez.encoding
-                     tez_bootstrap_balance )))
+          (fun manager ->
+            let make_account_field key value converter =
+              let path_prefix =
+                manager |> Signature.V1.Public_key.hash |> Contract.of_implicit
+                |> Tezlink_services_impl.Path.account
+                |> String.split_on_char '/' |> clean_path
+              in
+              make_instr ~path_prefix (Some (key, converter value))
+            in
+            make_account_field
+              "balance"
+              tez_bootstrap_balance
+              (Data_encoding.Binary.to_string_exn Tez.encoding))
           tez_bootstrap_accounts
         |> List.flatten
   in

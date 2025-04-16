@@ -54,7 +54,7 @@ val make_l2 :
   eth_bootstrap_balance:Z.t ->
   tez_bootstrap_balance:Tezos_types.Tez.t ->
   ?eth_bootstrap_accounts:Ethereum_types.address list ->
-  ?tez_bootstrap_accounts:Tezos_types.Contract.t list ->
+  ?tez_bootstrap_accounts:Signature.V1.Public_key.t list ->
   ?minimum_base_fee_per_gas:string * string ->
   ?da_fee_per_byte:string * string ->
   ?sequencer_pool_address:string * string ->

@@ -174,10 +174,9 @@ module Params = struct
         in
         return (Evm_node_lib_dev_encoding.Ethereum_types.Address (Hex hex)))
 
-  let tez_contract =
-    Tezos_clic.parameter (fun _ contract ->
-        Lwt.return
-          (Evm_node_lib_dev_tezlink.Tezos_types.Contract.of_b58check contract))
+  let tez_account =
+    Tezos_clic.parameter (fun _ public_key ->
+        Lwt.return (Signature.V1.Public_key.of_b58check public_key))
 
   let l2_level =
     Tezos_clic.parameter (fun () s ->
@@ -1934,7 +1933,7 @@ let tez_bootstrap_account_arg =
   let doc =
     Format.sprintf "Add a tezlink bootstrap account in the installer config."
   in
-  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"tz1..." Params.tez_contract
+  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"edp..." Params.tez_account
 
 let eth_bootstrap_balance_arg =
   Tezos_clic.default_arg

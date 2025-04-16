@@ -41,8 +41,7 @@ module Contract : sig
 
   val of_b58check : string -> t tzresult
 
-  (** Convert a contract to a hex string.*)
-  val to_hex : t -> string
+  val of_implicit : Signature.V1.public_key_hash -> t
 end
 
 module Tez : sig
