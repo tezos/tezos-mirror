@@ -538,6 +538,9 @@ let test_tezlink_current_level =
       = "The specified level offset should be positive.")
       string
       ~error_msg:"Should have failed: expected %R but got %L") ;
+  (* test numeric block parameter *)
+  let* res = rpc_current_level "3" ~offset:1 in
+  let* () = check_current_level res 4 in
 
   unit
 
