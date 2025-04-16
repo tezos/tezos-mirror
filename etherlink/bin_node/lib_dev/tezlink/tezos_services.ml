@@ -193,12 +193,6 @@ module Imported_services = struct
       Tezos_rpc.Service.t =
     import_service Tezos_shell_services.Shell_services.Blocks.S.protocols
 
-  let contract_arg_path s =
-    let contract_path = Imported_protocol_plugin.RPC.Contract.S.path in
-    let contract_args = Imported_protocol.Alpha_context.Contract.rpc_arg in
-    Imported_env.RPC_path.(contract_path /: contract_args / s)
-
-  (* TODO: #7876 Expose and import the service definition from the plugin. *)
   let balance :
       ( [`GET],
         tezlink_rpc_context,
@@ -208,16 +202,7 @@ module Imported_services = struct
         Tezos_types.Tez.t )
       Tezos_rpc.Service.t =
     Tezos_rpc.Service.subst1
-    (* TODO: #7876 should be imported *)
-    @@ Tezos_rpc.Service.get_service
-         ~description:
-           "The spendable balance of a contract (in mutez), also known as \
-            liquid balance. Corresponds to tez owned by the contract that are \
-            neither staked, nor in unstaked requests, nor in frozen bonds. \
-            Identical to the 'spendable' RPC."
-         ~query:Tezos_rpc.Query.empty
-         ~output:Tezos_types.Tez.encoding
-         (contract_arg_path "balance")
+      Imported_protocol_plugin.Contract_services.S.balance
 
   let manager_key :
       ( [`GET],
