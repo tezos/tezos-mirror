@@ -301,6 +301,10 @@ impl TryFrom<u64> for Flags {
             }
         };
 
+        // `MAP_NORESERVE` does nothing for us as we have no swap
+        const MAP_NORESERVE: u64 = 0x4000;
+        probe_and_clear(MAP_NORESERVE);
+
         // If there are other bits set, that means we likely don't support them
         if flags != 0 {
             return Err(Error::InvalidArgument);
