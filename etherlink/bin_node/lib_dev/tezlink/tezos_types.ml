@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -45,3 +46,11 @@ let convert_using_serialization ~name ~dst ~src value =
          tzfail
          @@ Serialization_for_conversion
               (name, Format.asprintf "%a" Data_encoding.Binary.pp_read_error e))
+
+module Contract = struct
+  type t = Tezlink_imports.Alpha_context.Contract.t
+
+  let encoding = Tezlink_imports.Alpha_context.Contract.encoding
+end
+
+module Tez = Tezlink_imports.Alpha_context.Tez

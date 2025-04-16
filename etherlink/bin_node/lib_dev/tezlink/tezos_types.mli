@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -28,3 +29,15 @@ val convert_using_serialization :
   src:'b Data_encoding.t ->
   'b ->
   'a tzresult
+
+(** Imports the type Contract.t from Alpha_context. Not everything is imported
+    from Alpha_context.Contract as most of it require a context, which we
+    can't provide.
+ *)
+module Contract : sig
+  type t = Tezlink_imports.Alpha_context.Contract.t
+
+  val encoding : t Data_encoding.t
+end
+
+module Tez = Tezlink_imports.Alpha_context.Tez

@@ -65,15 +65,6 @@ module Protocol_types = struct
         ~dst:encoding
         ~src:conversion_encoding
   end
-
-  module Tez = struct
-    include Alpha_context.Tez
-
-    let convert q =
-      q |> Ethereum_types.Qty.to_z |> Z.to_int64 |> Alpha_context.Tez.of_mutez
-      |> Option.value ~default:Alpha_context.Tez.zero
-      |> Result_syntax.return
-  end
 end
 
 (** [wrap conversion service_implementation] changes the output type
@@ -98,8 +89,6 @@ type tezlink_rpc_context = {
   block : Tezos_shell_services.Block_services.block;
   chain : Tezos_shell_services.Chain_services.chain;
 }
-
-type contract = Imported_protocol.Alpha_context.Contract.t
 
 (** Builds a [tezlink_rpc_context] from paths parameters. *)
 let make_env (chain : Tezos_shell_services.Chain_services.chain)
@@ -203,10 +192,10 @@ module Imported_services = struct
   let balance :
       ( [`GET],
         tezlink_rpc_context,
-        tezlink_rpc_context * contract,
+        tezlink_rpc_context * Tezos_types.Contract.t,
         unit,
         unit,
-        Protocol_types.Tez.t )
+        Tezos_types.Tez.t )
       Tezos_rpc.Service.t =
     Tezos_rpc.Service.subst1
     (* TODO: #7876 should be imported *)
@@ -217,7 +206,7 @@ module Imported_services = struct
             neither staked, nor in unstaked requests, nor in frozen bonds. \
             Identical to the 'spendable' RPC."
          ~query:Tezos_rpc.Query.empty
-         ~output:Protocol_types.Tez.encoding
+         ~output:Tezos_types.Tez.encoding
          (contract_arg_path "balance")
 
   let constants :
@@ -239,9 +228,6 @@ let block_directory_path =
 
 let protocols () = Lwt_result_syntax.return Tezlink_protocols.current
 
-let balance _ _ _ =
-  Lwt_result_syntax.return @@ Ethereum_types.quantity_of_z Z.one
-
 let version () =
   (* TODO: #7857 need proper implementation *)
   Lwt_result_syntax.return Tezlink_version.mock
@@ -259,11 +245,10 @@ let build_block_dir (module Backend : Tezlink_backend_sig.S) =
        ~convert_output:Protocol_types.Level.convert
   |> register ~service:Imported_services.protocols ~impl:(fun _ _ () ->
          protocols ())
-  |> register_with_conversion
+  |> register
        ~service:Imported_services.balance
-       ~impl:(fun ({block; chain}, contract) _ _ ->
-         balance chain block contract)
-       ~convert_output:Protocol_types.Tez.convert
+       ~impl:(fun ({chain; block}, contract) _ _ ->
+         Backend.balance chain block contract)
   |> register_with_conversion
        ~service:Imported_services.constants
        ~impl:(fun {block; chain} () () -> Backend.constants chain block)

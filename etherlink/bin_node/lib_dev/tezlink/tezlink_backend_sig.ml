@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_types
+
 module type S = sig
   val current_level :
     [> `Main] ->
@@ -14,4 +16,7 @@ module type S = sig
 
   val constants :
     [> `Main] -> [> `Head of 'a] -> Tezlink_constants.t tzresult Lwt.t
+
+  val balance :
+    [> `Main] -> [> `Head of 'a] -> Contract.t -> Tez.t tzresult Lwt.t
 end
