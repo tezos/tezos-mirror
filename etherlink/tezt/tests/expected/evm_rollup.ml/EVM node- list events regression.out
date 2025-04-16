@@ -1911,6 +1911,19 @@ tx_pool_users_threshold_reached:
     { /* tx_pool_users_threshold_reached version 0 */
       "tx_pool_users_threshold_reached.v0": any }
   
+tx_queue_add_transaction:
+  description: transaction {tx_hash} received
+  level: debug
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_add_transaction version 0 */
+      "tx_queue_add_transaction.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 tx_queue_callback_error:
   description: A callback produced an error: [<v 2>@{error}@]
   level: error
@@ -1927,6 +1940,14 @@ tx_queue_cleared:
     { /* tx_queue_cleared version 0 */
       "tx_queue_cleared.v0": any }
   
+tx_queue_injecting_transaction:
+  description: injecting {n} transactions
+  level: info
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_injecting_transaction version 0 */
+      "tx_queue_injecting_transaction.v0": integer ∈ [-2^30, 2^30] }
+  
 tx_queue_is_ready:
   description: tx queue is ready
   level: notice
@@ -1934,6 +1955,19 @@ tx_queue_is_ready:
   json format:
     { /* tx_queue_is_ready version 0 */
       "tx_queue_is_ready.v0": any }
+  
+tx_queue_missing_tx_object:
+  description: transaction {tx_hash} has no associated object
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_missing_tx_object version 0 */
+      "tx_queue_missing_tx_object.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_queue_rpc_error:
   description: an RPC produced the error :
@@ -1946,6 +1980,32 @@ tx_queue_rpc_error:
       "tx_queue_rpc_error.v0":
         { "code": integer ∈ [-2^31-1, 2^31],
           "message": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+tx_queue_transaction_confirmed:
+  description: transaction {tx_hash} confirmed
+  level: debug
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_transaction_confirmed version 0 */
+      "tx_queue_transaction_confirmed.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+tx_queue_transaction_dropped:
+  description: transaction {tx_hash} dropped
+  level: debug
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_transaction_dropped version 0 */
+      "tx_queue_transaction_dropped.v0": $unistring }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
@@ -2509,6 +2569,19 @@ tx_queue_callback_error:
   json format:
     { /* tx_queue_callback_error version 0 */
       "tx_queue_callback_error.v0": any }
+  
+tx_queue_missing_tx_object:
+  description: transaction {tx_hash} has no associated object
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_missing_tx_object version 0 */
+      "tx_queue_missing_tx_object.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_queue_rpc_error:
   description: an RPC produced the error :
