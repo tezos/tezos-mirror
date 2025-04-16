@@ -253,7 +253,7 @@ module Address_nonce = struct
     | None -> return next_nonce
 end
 
-module Tx_object = struct
+module Transaction_objects = struct
   open Ethereum_types
   module S = String.Hashtbl
 
@@ -340,7 +340,7 @@ end
 type state = {
   mutable queue : queue_request Queue.t;
   pending : Pending_transactions.t;
-  tx_object : Tx_object.t;
+  tx_object : Transaction_objects.t;
   tx_per_address : Transactions_per_addr.t;
   address_nonce : Address_nonce.t;
   config : Configuration.tx_queue;
@@ -640,7 +640,7 @@ let pop_queue_until state ~validation_state ~validate_tx =
     | None -> return rev_selected
     | Some {hash; payload; queue_callback} -> (
         let raw_tx = Ethereum_types.hex_to_bytes payload in
-        let tx_object = Tx_object.find state.tx_object hash in
+        let tx_object = Transaction_objects.find state.tx_object hash in
         match tx_object with
         | None ->
             (* Drop that tx because no tx_object associated. this is
@@ -717,7 +717,7 @@ module Handlers = struct
             | Error errs -> Tx_queue_events.callback_error errs
           in
           Transactions_per_addr.decrement state.tx_per_address tx_object.from ;
-          Tx_object.remove state.tx_object tx_object.hash ;
+          Transaction_objects.remove state.tx_object tx_object.hash ;
           Lwt.dont_wait
             (fun () -> callback (reason :> all_variant))
             (fun exn ->
@@ -739,7 +739,7 @@ module Handlers = struct
                 Transactions_per_addr.decrement
                   state.tx_per_address
                   tx_object.from ;
-                Tx_object.remove state.tx_object tx_object.hash ;
+                Transaction_objects.remove state.tx_object tx_object.hash ;
                 return
                 @@ Address_nonce.remove
                      state.address_nonce
@@ -778,7 +778,7 @@ module Handlers = struct
               Transactions_per_addr.increment
                 state.tx_per_address
                 tx_object.from ;
-              Tx_object.add state.tx_object tx_object ;
+              Transaction_objects.add state.tx_object tx_object ;
               let Ethereum_types.(Qty next_nonce) = next_nonce in
               let*? () =
                 Address_nonce.add
@@ -802,7 +802,8 @@ module Handlers = struct
             return_unit
         | None -> return_unit)
     | Find {txn_hash} ->
-        protect @@ fun () -> return @@ Tx_object.find state.tx_object txn_hash
+        protect @@ fun () ->
+        return @@ Transaction_objects.find state.tx_object txn_hash
     | Tick {evm_node_endpoint} ->
         protect @@ fun () ->
         let all_transactions = Queue.to_seq state.queue in
@@ -943,7 +944,7 @@ module Handlers = struct
         pending = Pending_transactions.empty ~start_size:(config.max_size / 4);
         (* start with /4 and let it grow if necessary to not allocate
            too much at start. *)
-        tx_object = Tx_object.empty ~start_size:(config.max_size / 4);
+        tx_object = Transaction_objects.empty ~start_size:(config.max_size / 4);
         address_nonce = Address_nonce.empty ~start_size:(config.max_size / 10);
         (* start with /10 and let it grow if necessary to not allocate
            too much at start. It's expected to have less different
