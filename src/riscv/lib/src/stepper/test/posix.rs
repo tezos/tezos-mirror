@@ -10,7 +10,6 @@ use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::a0;
 use crate::machine_state::registers::a7;
 use crate::state::NewState;
-use crate::state_backend::Atom;
 use crate::state_backend::Cell;
 use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
@@ -18,9 +17,6 @@ use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::ManagerWrite;
 use crate::traps::EnvironException;
-
-/// Layout for [`PosixState`]
-pub type PosixStateLayout = (Atom<u64>, Atom<u8>, Atom<Mode>);
 
 /// Posix execution environment state
 pub struct PosixState<M: ManagerBase> {

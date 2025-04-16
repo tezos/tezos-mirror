@@ -8,20 +8,21 @@ use std::io::Write;
 use std::ops::Bound;
 
 use goldenfile::Mint;
-use octez_riscv::machine_state::block_cache::bcall::Block;
-use octez_riscv::machine_state::block_cache::bcall::InlineJit;
-use octez_riscv::machine_state::block_cache::bcall::Interpreted;
-use octez_riscv::machine_state::memory::M1M;
-use octez_riscv::machine_state::mode::Mode;
-use octez_riscv::machine_state::registers::XRegister;
-use octez_riscv::machine_state::registers::XValue;
-use octez_riscv::machine_state::registers::gp;
-use octez_riscv::state_backend::ManagerRead;
-use octez_riscv::state_backend::owned_backend::Owned;
-use octez_riscv::stepper::Stepper;
-use octez_riscv::stepper::test::TestStepper;
-use octez_riscv::stepper::test::TestStepperResult::*;
 use paste::paste;
+
+use crate::machine_state::block_cache::bcall::Block;
+use crate::machine_state::block_cache::bcall::InlineJit;
+use crate::machine_state::block_cache::bcall::Interpreted;
+use crate::machine_state::memory::M1M;
+use crate::machine_state::mode::Mode;
+use crate::machine_state::registers::XRegister;
+use crate::machine_state::registers::XValue;
+use crate::machine_state::registers::gp;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::owned_backend::Owned;
+use crate::stepper::Stepper;
+use crate::stepper::test::TestStepper;
+use crate::stepper::test::TestStepperResult::*;
 
 const TESTS_DIR: &str = "../assets/generated";
 const GOLDEN_DIR: &str = "tests/expected";
