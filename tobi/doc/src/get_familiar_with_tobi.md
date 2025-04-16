@@ -160,6 +160,7 @@ The reason Dune has nothing to do is that Tobi tells it to ignore `data-encoding
 and to instead use the version of `octez-libs` that Tobi installed in `_opam`.
 `tobi build octez-node` will thus not recompile `octez-libs` if `octez-libs`
 is installed, whether there are important changes in `octez-libs` or not.
+See also [Why and when can Tobi save time](why_and_when_can_Tobi_save_time.md).
 
 ## Clean up
 
