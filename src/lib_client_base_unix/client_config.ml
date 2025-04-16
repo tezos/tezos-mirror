@@ -245,6 +245,7 @@ module Cfg_file = struct
     confirmations : int option;
     password_filename : string option;
     internal_events : Tezos_base.Internal_event_config.t option;
+    log : Tezos_base_unix.Logs_simple_config.cfg option;
   }
 
   let default =
@@ -261,6 +262,7 @@ module Cfg_file = struct
       confirmations = Some 0;
       password_filename = None;
       internal_events = None;
+      log = None;
     }
 
   open Data_encoding
@@ -280,6 +282,7 @@ module Cfg_file = struct
              confirmations;
              password_filename;
              internal_events;
+             log;
            } ->
         ( ( base_dir,
             node_addr,
@@ -291,7 +294,7 @@ module Cfg_file = struct
             remote_signer,
             signing_version,
             confirmations ),
-          (password_filename, internal_events) ))
+          (password_filename, internal_events, log) ))
       (fun ( ( base_dir,
                node_addr,
                node_port,
@@ -302,7 +305,7 @@ module Cfg_file = struct
                remote_signer,
                signing_version,
                confirmations ),
-             (password_filename, internal_events) ) ->
+             (password_filename, internal_events, log) ) ->
         let web_port = Option.value ~default:default.web_port web_port in
         {
           base_dir;
@@ -317,6 +320,7 @@ module Cfg_file = struct
           confirmations;
           password_filename;
           internal_events;
+          log;
         })
       (merge_objs
          (obj10
@@ -330,9 +334,15 @@ module Cfg_file = struct
             (opt "remote_signer" Tezos_rpc.Encoding.uri_encoding)
             (opt "signing_version" Signature.version_encoding)
             (opt "confirmations" int8))
-         (obj2
+         (obj3
             (opt "password_filename" string)
-            (opt "internal_events" Tezos_base.Internal_event_config.encoding)))
+            (opt "internal_events" Tezos_base.Internal_event_config.encoding)
+            (opt
+               "log"
+               ~description:
+                 "Configuration of the Lwt-log sink (part of the logging \
+                  framework)"
+               Tezos_base_unix.Logs_simple_config.cfg_encoding)))
 
   let from_json json = Data_encoding.Json.destruct encoding json
 
