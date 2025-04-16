@@ -44,7 +44,7 @@ type event = {name : string; value : JSON.t; timestamp : float}
 (** See [Daemon.Make.on_event]. *)
 val on_event : t -> (event -> unit) -> unit
 
-(** Spawn [octez-agnostic-baker run].
+(** Spawn [octez-baker run].
 
     The resulting promise is fulfilled as soon as the agnostic baker has been
     spawned. It continues running in the background. *)
@@ -56,7 +56,7 @@ val run :
   t ->
   unit Lwt.t
 
-(** Spawn [octez-agnostic-baker run] similarly to {!run} but returns the process. *)
+(** Spawn [octez-baker run] similarly to {!run} but returns the process. *)
 val spawn_run : ?env:string String_map.t -> t -> Process.t
 
 (** Liquidity baking vote values. *)
