@@ -1,0 +1,22 @@
+[Unit]
+Description=Octez baker service
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Restart=on-failure
+TimeoutStartSec=300
+TimeoutStopSec=300
+
+EnvironmentFile=-/etc/default/octez-node
+EnvironmentFile=-/etc/default/octez-baker
+
+# The baker is started only if the node is up and running
+ExecStartPre=/usr/share/octez-agnostic-baker/wait-for-node-up.sh
+
+ExecStart=/usr/share/octez-agnostic-baker/systemd-octez-agnostic-baker.sh start
+ExecStop=/usr/share/octez-agnostic-baker/systemd-octez-agnostic-baker.sh stop
+
+[Install]
+WantedBy=multi-user.target

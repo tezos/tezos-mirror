@@ -68,6 +68,28 @@ Description: Octez baking software for the Tezos blockchain.
  octez-dal-node to be installed as well. For key management it is recommended
  to install a remote signer on a different host.
 
+Package: octez-agnostic-baker
+Architecture: amd64 arm64
+Pre-Depends:
+ octez-client (= ${source:Version}),
+ debconf (>= 0.5) | debconf-2.0
+Depends:
+ ${misc:Depends}, ${shlibs:Depends},
+ octez-node (= ${source:Version}),
+ curl, systemd
+Recommends:
+ octez-signer (= ${source:Version}),
+ octez-dal-node (= ${source:Version})
+Description: Octez baking software for the Tezos blockchain.
+ The Octez baker includes the necessary tools and functionalities for
+ participating in the baking process, such as block creation, attestations, and
+ protocol-specific consensus mechanisms.
+ .
+ This package installs the baker, the accuser and the Octez node. By default,
+ installing this package causes the recommended packages octez-signer and
+ octez-dal-node to be installed as well. For key management it is recommended
+ to install a remote signer on a different host.
+
 Package: octez-signer
 Architecture: amd64 arm64
 Depends: ${misc:Depends}, ${shlibs:Depends}, octez-client (= ${source:Version}),

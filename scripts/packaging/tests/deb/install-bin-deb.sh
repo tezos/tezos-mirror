@@ -6,7 +6,26 @@ set -x
 REPO="https://storage.googleapis.com/${GCP_LINUX_PACKAGES_BUCKET:-tezos-linux-repo}/$CI_COMMIT_REF_NAME"
 DISTRO=$1
 RELEASE=$2
-DATADIR=${3:-}
+
+shift 2
+DATADIR=
+AGNOSTIC_BAKER=
+while [ $# -gt 0 ]; do
+  case "$1" in
+  --data-dir)
+    DATADIR="$2"
+    shift 2
+    ;;
+  --agnostic-baker)
+    AGNOSTIC_BAKER="$2"
+    shift 2
+    ;;
+  *)
+    echo "Unknown argument: $1"
+    exit 1
+    ;;
+  esac
+done
 
 # include apt-get function with retry
 . scripts/packaging/tests/tests-common.inc.sh
@@ -37,6 +56,7 @@ octez-node octez-node/purge_warning boolean true
 octez-node octez-node/snapshot-import boolean true
 octez-node octez-node/snapshot-no-check boolean true
 octez-baker octez-baker/liquidity-vote select on
+octez-agnostic-baker octez-baker/liquidity-vote select on
 debconf debconf/frontend select Noninteractive
 EOF
   # preseed the package
@@ -46,7 +66,11 @@ EOF
   sudo debconf-get-selections | grep octez
 fi
 
-apt-get install -y octez-baker
+if [ "${AGNOSTIC_BAKER:-}" = "true" ]; then
+  apt-get install -y octez-agnostic-baker
+else
+  apt-get install -y octez-baker
+fi
 
 if [ -n "$DATADIR" ]; then
   echo "Setup Custom data dir"

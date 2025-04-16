@@ -50,6 +50,14 @@ while ! docker inspect -f '{{.State.Running}}' systemd 2> /dev/null | grep -q tr
   elapsed=$((elapsed + 1))
 done
 
+ARGS=""
+if [ -n "${DATADIR:-}" ]; then
+  ARGS="$ARGS --data-dir $DATADIR"
+fi
+if [ -n "${AGNOSTIC_BAKER:-}" ]; then
+  ARGS="$ARGS --agnostic-baker $AGNOSTIC_BAKER"
+fi
+
 # Execute the command inside the container
 docker exec \
   -e "PREFIX=$PREFIX" \
@@ -62,7 +70,7 @@ docker exec \
   -e "CI_COMMIT_SHORT_SHA=$CI_COMMIT_SHORT_SHA" \
   -e "GCP_LINUX_PACKAGES_BUCKET=$GCP_LINUX_PACKAGES_BUCKET" \
   -i systemd \
-  /bin/sh -c "$TESTFILE $DISTRIBUTION $RELEASE ${DATADIR:-}"
+  /bin/sh -c "$TESTFILE $DISTRIBUTION $RELEASE $ARGS"
 
 # Capture exit status
 EXIT=$?

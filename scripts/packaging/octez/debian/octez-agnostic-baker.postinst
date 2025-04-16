@@ -1,0 +1,94 @@
+#!/bin/sh
+
+set -e
+
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+echoerr() { echo "$@" 1>&2; }
+
+db_version 2.0
+
+# work directory to store temporary files associated to this package
+mkdir -p /run/octez-agnostic-baker
+
+case "${1}" in
+configure)
+  # if $2 is empty, then we're doing a fresh install.
+  # if $DPKG_RUNNING_VERSION" is empty a reconfigure
+  # Otherwise we're upgrading
+  if [ -z "${2:-}" ] || [ -z "$DPKG_RUNNING_VERSION" ]; then
+    echoerr "Fresh installation (or reconfigure) of the Octez agnostic baker"
+
+    db_get octez-agnostic-baker/liquidity-vote
+    echo "LQVOTE=${RET}" > /etc/default/octez-baker
+
+    db_get octez-agnostic-baker/baker-key
+    echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
+
+    db_get octez-agnostic-baker/dal-node
+    DAL=${RET}
+    case "$DAL" in
+    true)
+      db_get octez-agnostic-baker/dal-node-url
+      DALURL=${RET}
+      echo "RUNTIME_OPTS=\"--keep-alive --dal-node $DALURL\"" >> /etc/default/octez-baker
+      ;;
+    false)
+      echo "RUNTIME_OPTS=--keep-alive --without-dal" >> /etc/default/octez-baker
+      ;;
+    esac
+
+    mkdir -p /var/tezos/.tezos-client
+    chown tezos:tezos /var/tezos/.tezos-client
+  else
+    echoerr "Upgrading octez-agnostic-baker from version $2 ( postinst )"
+    # the configure script is called with the version of the old
+    # package in case of upgrade. We display a message to the user
+    # in this case. See octez-node.postinst for a detailed explanation.
+    case "$2" in
+    1:*)
+      : noop
+      ;;
+    *)
+      echoerr "Setting defaults in /etc/default/octez-baker"
+      echoerr "Migrating values when possible"
+
+      db_get octez-agnostic-baker/liquidity-vote
+      echo "LQVOTE=${RET}" >> /etc/default/octez-baker
+      echoerr "LQVOTE=${RET}"
+
+      db_get octez-agnostic-baker/baker-key
+      echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
+      echoerr "BAKER_KEY=${RET}"
+
+      db_get octez-agnostic-baker/dal-node
+      DAL=${RET}
+      case "$DAL" in
+      true)
+        db_get octez-agnostic-baker/dal-node-url
+        DALURL=${RET}
+        echo "RUNTIME_OPTS=\" --keep-alive --dal-node $DALURL\"" >> /etc/default/octez-baker
+        echoerr "RUNTIME_OPTS=--keep-alive --dal-node $DALURL"
+        ;;
+      false)
+        echo "RUNTIME_OPTS=--keep-alive --without-dal" >> /etc/default/octez-baker
+        echoerr "RUNTIME_OPTS=--keep-alive --without-dal"
+        ;;
+      esac
+
+      db_input high octez-agnostic-baker/upgrade_note_current || true
+      #shellcheck disable=SC2119
+      db_go || true
+      ;;
+    esac
+  fi
+  ;;
+*)
+  : nop
+  ;;
+esac
+
+systemctl daemon-reload || true
+
+#DEBHELPER#

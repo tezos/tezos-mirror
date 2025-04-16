@@ -1,0 +1,4 @@
+binaries/octez-agnostic-baker /usr/bin/
+binaries/octez-accuser-P* /usr/bin/
+scripts/wait-for-node-up.sh /usr/share/octez-agnostic-baker/
+scripts/systemd-octez-agnostic-baker.sh /usr/share/octez-agnostic-baker/
