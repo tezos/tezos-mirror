@@ -6,6 +6,23 @@
 dir="$1"
 output="${2:-out.png}"
 
+usage() {
+  cat << EOF
+Usage:
+  $0 <csv_directory> [output_file.png]
+
+Arguments:
+  csv_directory     Path to the directory containing CSV logs
+                    (e.g., data_dir/kernel_logs).
+  output_file.png   (Optional) Output image file for the graph.
+                    Defaults to 'out.png' if not provided.
+
+Example:
+  $0 sandbox_evm_node1/kernel_logs results.png
+EOF
+  exit 1
+}
+
 if [ -z "$dir" ]; then
   echo "Usage: $0 <csv_directory> [output_file.png]"
   exit 1
