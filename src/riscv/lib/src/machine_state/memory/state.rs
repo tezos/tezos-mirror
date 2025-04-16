@@ -52,9 +52,9 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M: ManagerBase>
 {
     /// Ensure the access is within bounds.
     #[inline]
-    fn check_bounds(address: Address, length: usize) -> Result<(), BadMemoryAccess> {
+    fn check_bounds<E>(address: Address, length: usize, error: E) -> Result<(), E> {
         if length > TOTAL_BYTES.saturating_sub(address as usize) {
-            return Err(BadMemoryAccess);
+            return Err(error);
         }
 
         Ok(())
@@ -84,7 +84,7 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M: ManagerBase>
         M: ManagerWrite,
     {
         let length = mem::size_of::<E>();
-        Self::check_bounds(address, length)?;
+        Self::check_bounds(address, length, BadMemoryAccess)?;
 
         self.data.write(address as usize, value);
         #[cfg(feature = "supervisor")]
@@ -108,7 +108,7 @@ where
         E: Elem,
         M: ManagerRead,
     {
-        Self::check_bounds(address, mem::size_of::<E>())?;
+        Self::check_bounds(address, mem::size_of::<E>(), BadMemoryAccess)?;
 
         // SAFETY: The bounds check above ensures the access check below is safe
         #[cfg(feature = "supervisor")]
@@ -127,7 +127,7 @@ where
         E: Elem,
         M: ManagerRead,
     {
-        Self::check_bounds(address, mem::size_of::<E>())?;
+        Self::check_bounds(address, mem::size_of::<E>(), BadMemoryAccess)?;
 
         // SAFETY: The bounds check above ensures the access check below is safe
         #[cfg(feature = "supervisor")]
@@ -149,7 +149,7 @@ where
         E: Elem,
         M: ManagerRead,
     {
-        Self::check_bounds(address, mem::size_of_val(values))?;
+        Self::check_bounds(address, mem::size_of_val(values), BadMemoryAccess)?;
 
         // SAFETY: The bounds check above ensures the access check below is safe
         #[cfg(feature = "supervisor")]
@@ -172,7 +172,7 @@ where
         E: Elem,
         M: ManagerReadWrite,
     {
-        Self::check_bounds(address, mem::size_of::<E>())?;
+        Self::check_bounds(address, mem::size_of::<E>(), BadMemoryAccess)?;
 
         // SAFETY: The bounds check above ensures the access check below is safe
         #[cfg(feature = "supervisor")]
@@ -191,7 +191,7 @@ where
         E: Elem,
         M: ManagerReadWrite,
     {
-        Self::check_bounds(address, mem::size_of_val(values))?;
+        Self::check_bounds(address, mem::size_of_val(values), BadMemoryAccess)?;
 
         // SAFETY: The bounds check above ensures the access check below is safe
         #[cfg(feature = "supervisor")]
@@ -255,11 +255,11 @@ where
         address: Address,
         length: usize,
         perms: Permissions,
-    ) -> Result<(), BadMemoryAccess>
+    ) -> Result<(), super::MemoryGovernanceError>
     where
         M: ManagerWrite,
     {
-        Self::check_bounds(address, length)?;
+        Self::check_bounds(address, length, super::MemoryGovernanceError)?;
 
         self.readable_pages
             .modify_access(address, length, perms.can_read());
@@ -272,11 +272,15 @@ where
     }
 
     #[cfg(feature = "supervisor")]
-    fn deallocate_pages(&mut self, address: Address, length: usize) -> Result<(), BadMemoryAccess>
+    fn deallocate_pages(
+        &mut self,
+        address: Address,
+        length: usize,
+    ) -> Result<(), super::MemoryGovernanceError>
     where
         M: ManagerReadWrite,
     {
-        Self::check_bounds(address, length)?;
+        Self::check_bounds(address, length, super::MemoryGovernanceError)?;
 
         // See RV-561: Use `u64` for indices and lengths that come from the PVM
         let pages = (length as u64).div_ceil(super::PAGE_SIZE.get());
@@ -294,7 +298,7 @@ where
         address_hint: Option<Address>,
         length: usize,
         allow_replace: bool,
-    ) -> Result<Address, BadMemoryAccess>
+    ) -> Result<Address, super::MemoryGovernanceError>
     where
         M: ManagerReadWrite,
     {
@@ -306,7 +310,7 @@ where
         match address_hint {
             // Caller wants to allocate at a specific address
             Some(address) => {
-                Self::check_bounds(address, length)?;
+                Self::check_bounds(address, length, super::MemoryGovernanceError)?;
 
                 // Buddy memory manager works on page indices, not addresses
                 let idx = address >> super::OFFSET_BITS;
@@ -321,7 +325,7 @@ where
                 idx << super::OFFSET_BITS
             }),
         }
-        .ok_or(BadMemoryAccess)
+        .ok_or(super::MemoryGovernanceError)
     }
 
     #[cfg(feature = "supervisor")]
@@ -331,7 +335,7 @@ where
         length: usize,
         perms: Permissions,
         allow_replace: bool,
-    ) -> Result<Address, BadMemoryAccess>
+    ) -> Result<Address, super::MemoryGovernanceError>
     where
         M: ManagerReadWrite,
     {
@@ -377,17 +381,17 @@ pub mod tests {
         type OwnedM4K = <M4K as MemoryConfig>::State<Owned>;
 
         // Zero-sized reads or writes are always valid
-        assert!(OwnedM0::check_bounds(0, 0).is_ok());
-        assert!(OwnedM0::check_bounds(1, 0).is_ok());
-        assert!(OwnedM4K::check_bounds(0, 0).is_ok());
-        assert!(OwnedM4K::check_bounds(4096, 0).is_ok());
-        assert!(OwnedM4K::check_bounds(2 * 4096, 0).is_ok());
+        assert!(OwnedM0::check_bounds(0, 0, ()).is_ok());
+        assert!(OwnedM0::check_bounds(1, 0, ()).is_ok());
+        assert!(OwnedM4K::check_bounds(0, 0, ()).is_ok());
+        assert!(OwnedM4K::check_bounds(4096, 0, ()).is_ok());
+        assert!(OwnedM4K::check_bounds(2 * 4096, 0, ()).is_ok());
 
         // Bounds checks
-        assert!(OwnedM0::check_bounds(0, 1).is_err());
-        assert!(OwnedM0::check_bounds(1, 1).is_err());
-        assert!(OwnedM4K::check_bounds(4096, 1).is_err());
-        assert!(OwnedM4K::check_bounds(2 * 4096, 1).is_err());
+        assert!(OwnedM0::check_bounds(0, 1, ()).is_err());
+        assert!(OwnedM0::check_bounds(1, 1, ()).is_err());
+        assert!(OwnedM4K::check_bounds(4096, 1, ()).is_err());
+        assert!(OwnedM4K::check_bounds(2 * 4096, 1, ()).is_err());
     }
 
     backend_test!(test_endianess, F, {
