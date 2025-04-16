@@ -97,7 +97,7 @@ Agnostic Baker
 
 - Fix the support of ``--keep-alive`` for the agnostic baker. (MR :gl:`!17685`)
 
-- The agnostic baker binary becomes ``octez-agnostic-baker``. (MR :gl:`!17491`)
+- The agnostic baker binary becomes ``octez-baker``. (MR :gl:`!17491`, :gl:`!17747`)
 
 - The agnostic baker now has the same CLI as the classical baker, getting rid of the
   ``--`` separator. (MR :gl:`!17348`)

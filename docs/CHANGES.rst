@@ -155,7 +155,7 @@ Smart Rollup node
 Agnostic Baker
 --------------
 
-- The agnostic baker binary becomes ``octez-agnostic-baker``. (MR :gl:`!17491`)
+- The agnostic baker binary becomes ``octez-baker``. (MR :gl:`!17491`, :gl:`!17747`)
 
 - Released agnostic baker binary as experimental. (MR :gl:`!16318`)
 
