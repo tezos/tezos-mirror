@@ -28,6 +28,7 @@ use self::state_access::JsaCalls;
 use self::state_access::JsaImports;
 use self::state_access::register_jsa_symbols;
 use crate::machine_state::MachineCoreState;
+use crate::machine_state::block_cache::metrics::block_metrics;
 use crate::machine_state::instruction::Instruction;
 use crate::machine_state::memory::MemoryConfig;
 use crate::state_backend::hash::Hash;
@@ -154,12 +155,12 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
     ///
     /// Not all instructions are currently supported. For blocks containing
     /// unsupported instructions, `None` will be returned.
-    pub fn compile<'a>(
-        &mut self,
-        hash: &Hash,
-        instr: impl IntoIterator<Item = &'a Instruction>,
-    ) -> Option<JCall<MC, JSA>> {
-        if let Some(compilation_result) = self.cache.get(hash) {
+    pub fn compile(&mut self, instr: &[Instruction]) -> Option<JCall<MC, JSA>> {
+        let Ok(hash) = Hash::blake2b_hash(instr) else {
+            return None;
+        };
+
+        if let Some(compilation_result) = self.cache.get(&hash) {
             return compilation_result.clone();
         }
 
@@ -181,7 +182,7 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
             let Some(pc_update) = pc_update else {
                 builder.end_unconditional_exception();
 
-                let jcall = self.produce_function(hash);
+                let jcall = self.produce_function(&hash);
 
                 return Some(jcall);
             };
@@ -193,7 +194,7 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
         }
 
         builder.end();
-        let jcall = self.produce_function(hash);
+        let jcall = self.produce_function(&hash);
 
         Some(jcall)
     }
@@ -232,6 +233,7 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
         let jcall = JCall { fun };
 
         self.cache.insert(*hash, Some(jcall.clone()));
+        block_metrics!(hash = hash, record_jitted);
 
         JCall { fun }
     }
@@ -346,8 +348,6 @@ mod tests {
             let mut jitted = MachineCoreState::<M4K, _>::new(&mut manager);
             jitted.main_memory.set_all_readable_writeable();
 
-            let hash = super::Hash::blake2b_hash(&self.instructions).unwrap();
-
             // Create the block of instructions.
             let mut block = Interpreted::<M4K, _>::new(&mut manager);
             block.start_block();
@@ -370,7 +370,7 @@ mod tests {
 
             // Create the JIT function.
             let fun = jit
-                .compile(&hash, instructions(&block).as_slice())
+                .compile(instructions(&block).as_slice())
                 .expect("Compilation of block should succeed.");
 
             // Run the block in both interpreted and jitted mode.
@@ -1590,7 +1590,6 @@ mod tests {
         ];
 
         let success: &[I] = &[I::new_nop(Compressed)];
-        let success_hash = super::Hash::blake2b_hash(success).unwrap();
 
         let mut manager = F::manager();
 
@@ -1599,7 +1598,6 @@ mod tests {
 
             let mut jitted = MachineCoreState::<M4K, _>::new(&mut manager);
             let mut block = Interpreted::<M4K, _>::new(&mut manager);
-            let failure_hash = super::Hash::blake2b_hash(failure).unwrap();
 
             block.start_block();
             for instr in failure.iter() {
@@ -1614,7 +1612,7 @@ mod tests {
             jitted.hart.xregisters.write_nz(x1, 1);
 
             // Act
-            let res = jit.compile(&failure_hash, instructions(&block).as_slice());
+            let res = jit.compile(instructions(&block).as_slice());
 
             assert!(
                 res.is_none(),
@@ -1627,7 +1625,7 @@ mod tests {
             }
 
             let fun = jit
-                .compile(&success_hash, instructions(&block).as_slice())
+                .compile(instructions(&block).as_slice())
                 .expect("Compilation of subsequent functions should succeed");
             let jitted_res = unsafe {
                 // # Safety - the jit is not dropped until after we
