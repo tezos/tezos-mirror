@@ -84,8 +84,16 @@ Signer
 Baker
 -----
 
+- Enables ``advertises_level`` in baker logs by default, logs are prefixed by
+  the logging level. It can be disabled by setting ``"log" : { advertises_level
+  : false }`` in the client configuration. (MR :gl:`!17737`)
+
 Agnostic Baker
 --------------
+
+- Enables ``advertises_level`` in baker logs by default, logs are prefixed by
+  the logging level. It can be disabled by setting ``"log" : { advertises_level
+  : false }`` in the client configuration. (MR :gl:`!17737`)
 
 - Fix the support of ``--keep-alive`` for the agnostic baker. (MR :gl:`!17685`)
 
