@@ -67,6 +67,8 @@ pub enum Permissions {
     Write,
     ReadWrite,
     ReadExec,
+    #[cfg(test)]
+    ReadWriteExec,
 }
 
 impl Permissions {
@@ -75,6 +77,8 @@ impl Permissions {
         match self {
             Self::None | Self::Write => false,
             Self::Read | Self::ReadWrite | Self::ReadExec => true,
+            #[cfg(test)]
+            Self::ReadWriteExec => true,
         }
     }
 
@@ -83,6 +87,8 @@ impl Permissions {
         match self {
             Self::None | Self::Read | Self::ReadExec => false,
             Self::ReadWrite | Self::Write => true,
+            #[cfg(test)]
+            Self::ReadWriteExec => true,
         }
     }
 
@@ -91,6 +97,8 @@ impl Permissions {
         match self {
             Self::None | Self::Read | Self::ReadWrite | Self::Write => false,
             Self::ReadExec => true,
+            #[cfg(test)]
+            Self::ReadWriteExec => true,
         }
     }
 }

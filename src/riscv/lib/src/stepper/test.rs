@@ -138,6 +138,15 @@ impl<MC: MemoryConfig, B: Block<MC, Owned>> TestStepper<MC, TestCacheLayouts, B>
 
         // The interpreter needs a program to run.
         let elf_program = Program::<MC>::from_elf(program)?;
+
+        #[cfg(feature = "supervisor")]
+        stepper
+            .machine_state
+            .core
+            .main_memory
+            .protect_pages(0, MC::TOTAL_BYTES, Permissions::ReadWriteExec)
+            .unwrap();
+
         stepper
             .machine_state
             .setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
