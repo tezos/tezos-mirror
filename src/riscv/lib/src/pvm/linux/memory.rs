@@ -32,7 +32,6 @@ use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::memory::PAGE_SIZE;
 use crate::machine_state::memory::Permissions;
-use crate::machine_state::registers;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerReadWrite;
 
@@ -93,6 +92,10 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// Handle `mmap` system call.
     ///
     /// See: <https://man7.org/linux/man-pages/man2/mmap.2.html>
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "The system call dispatch mechanism needs these arguments to exist, they can't be on a nested structure"
+    )]
     pub(super) fn handle_mmap<MC>(
         &mut self,
         core: &mut MachineCoreState<MC, M>,
@@ -100,17 +103,13 @@ impl<M: ManagerBase> SupervisorState<M> {
         length: NonZeroU64,
         perms: Permissions,
         flags: Flags,
+        _fd: NoFileDescriptor,
+        _offset: Zero,
     ) -> Result<u64, Error>
     where
         MC: MemoryConfig,
         M: ManagerReadWrite,
     {
-        // We don't support file descriptors yet
-        let NoFileDescriptor = core.hart.xregisters.try_read(registers::a4)?;
-
-        // Offset must be 0 as we don't support file descriptors
-        let Zero = core.hart.xregisters.try_read(registers::a5)?;
-
         // We don't allow shared mappings
         match flags.visibility {
             Visibility::Private => {}
