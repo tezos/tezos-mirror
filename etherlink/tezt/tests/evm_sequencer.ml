@@ -541,6 +541,18 @@ let test_tezlink_current_level =
   (* test numeric block parameter *)
   let* res = rpc_current_level "3" ~offset:1 in
   let* () = check_current_level res 4 in
+  let* res = rpc_current_level "genesis" in
+  let err = JSON.(res |> as_list |> List.hd) in
+  Check.(
+    JSON.(
+      err |-> "id" |> as_string
+      = "evm_node.dev.tezlink.unsupported_block_parameter")
+      string
+      ~error_msg:"Should have failed: expected %R but got %L") ;
+  Check.(
+    JSON.(err |-> "block" |> as_string = "genesis")
+      string
+      ~error_msg:"Should have failed: expected %R but got %L") ;
 
   unit
 
