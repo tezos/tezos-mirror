@@ -264,7 +264,11 @@ module Transaction_objects = struct
   let add htbl
       (({hash = Hash (Hex hash); _} : Ethereum_types.legacy_transaction_object)
        as tx_object) =
-    S.replace htbl hash tx_object
+    (* Here we uses `add` and not `replace`. If a transaction is
+       submitted multiple times then we register it each time in the
+       hashtable. Meaning that for `find` to returns None, we must
+       call `remove` as many times as the transaction was added. *)
+    S.add htbl hash tx_object
 
   let find htbl (Hash (Hex hash)) = S.find htbl hash
 
