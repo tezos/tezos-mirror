@@ -350,7 +350,6 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
         None
     }
 
-    #[allow(unused)]
     fn map<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
     where
         F: FnOnce(Value) -> Next,
@@ -358,7 +357,6 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
         res.map(f)
     }
 
-    #[allow(unused)]
     fn and_then<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
     where
         F: FnOnce(Value) -> Self::IResult<Next>,

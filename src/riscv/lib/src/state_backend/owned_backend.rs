@@ -317,7 +317,6 @@ impl ManagerClone for Owned {
     fn clone_region<E: Clone + 'static, const LEN: usize>(
         region: &Self::Region<E, LEN>,
     ) -> Self::Region<E, LEN> {
-        #[allow(clippy::clone_on_copy)]
         region.clone()
     }
 
@@ -330,7 +329,6 @@ impl ManagerClone for Owned {
         V::E: Clone,
         V::D: Clone,
     {
-        #[allow(clippy::clone_on_copy)]
         cell.clone()
     }
 }

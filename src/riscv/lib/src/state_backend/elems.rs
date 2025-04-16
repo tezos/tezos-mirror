@@ -17,7 +17,10 @@ pub trait Elem: StaticCopy {
 
     /// Convert from stored representation in place.
     // The naming of this function trips Clippy.
-    #[allow(clippy::wrong_self_convention)]
+    #[expect(
+        clippy::wrong_self_convention,
+        reason = "It's an appropriate name when ignoring Rust's from/to naming convention"
+    )]
     fn from_stored_in_place(&mut self);
 
     /// Read a value from its stored representation.

@@ -3,6 +3,9 @@ resolver = "2"
 members = ["lib", "sandbox"]
 exclude = ["jstz", "dummy_kernel"]
 
+[workspace.lints.clippy]
+allow_attributes = "deny"
+
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"
 private_intra_doc_links = "allow"

@@ -27,7 +27,6 @@ pub struct PosixState<M: ManagerBase> {
 
 impl<M: ManagerBase> PosixState<M> {
     /// If an exit has been requested, return the exit code.
-    #[allow(dead_code)]
     pub fn exit_code(&self) -> Option<u64>
     where
         M: ManagerRead,

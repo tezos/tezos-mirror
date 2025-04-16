@@ -9,7 +9,10 @@ use super::CSRegister;
 ///
 /// For example, sstatus exists as a [`CSRegister`] but the value is actually derived from
 /// mstatus, which is also a [`RootCSRegister`]. Similarly for sip/mip, sie/mie, fflags/frm/fcsr.
-#[allow(non_camel_case_types)]
+#[expect(
+    non_camel_case_types,
+    reason = "We want to use the register names from the RISC-V specification"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter, strum::Display)]
 pub(super) enum RootCSRegister {
     // Unprivileged Floating-Point CSRs

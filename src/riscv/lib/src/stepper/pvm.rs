@@ -78,7 +78,10 @@ impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts>
     PvmStepper<'hooks, MC, CL, Owned, B>
 {
     /// Create a new PVM stepper.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Not worth refactoring this constructor function"
+    )]
     pub fn new(
         program: &[u8],
         initrd: Option<&[u8]>,

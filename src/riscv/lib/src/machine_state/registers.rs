@@ -15,7 +15,7 @@ use crate::machine_state::backend;
 use crate::state::NewState;
 
 /// Integer register index
-#[allow(non_camel_case_types)] // To make names consistent with specification
+#[expect(non_camel_case_types, reason = "Consistent with RISC-V spec")]
 #[repr(u8)]
 #[derive(
     Clone,
@@ -285,7 +285,7 @@ impl<M: backend::ManagerClone> Clone for XRegisters<M> {
 }
 
 /// Register index for integer registers known from the opcode to be `!=x0`.
-#[allow(non_camel_case_types)] // To make names consistent with specification
+#[expect(non_camel_case_types, reason = "Consistent with RISC-V spec")]
 #[repr(u8)]
 #[derive(
     Clone,
@@ -398,7 +398,7 @@ pub mod nz {
 }
 
 /// Floating-point number register index
-#[allow(non_camel_case_types)] // To make names consistent with specification
+#[expect(non_camel_case_types, reason = "Consistent with RISC-V spec")]
 #[repr(u8)]
 #[derive(
     Debug,
