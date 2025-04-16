@@ -51,12 +51,12 @@ octez-accuser: src/bin_agnostic_accuser
 octez-accuser-PsQuebec: src/proto_021_PsQuebec/bin_accuser
 octez-accuser-PsRiotum: src/proto_022_PsRiotum/bin_accuser
 octez-accuser-alpha: src/proto_alpha/bin_accuser
-octez-agnostic-baker: src/bin_agnostic_baker
-octez-agnostic-baker-lib: src/lib_agnostic_baker
 octez-alcotezt: tezt/lib_alcotezt
+octez-baker: src/bin_agnostic_baker
 octez-baker-PsQuebec: src/proto_021_PsQuebec/bin_baker
 octez-baker-PsRiotum: src/proto_022_PsRiotum/bin_baker
 octez-baker-alpha: src/proto_alpha/bin_baker
+octez-baker-lib: src/lib_agnostic_baker
 octez-client: src/bin_client
 octez-codec: src/bin_codec
 octez-codec-kaitai: client-libs/bin_codec_kaitai

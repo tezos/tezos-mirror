@@ -4,11 +4,11 @@ efunc_core	all	6
 octez-accuser	exec	1
 octez-accuser-PsQuebec	exec	1
 octez-accuser-PsRiotum	exec	1
-octez-agnostic-baker	exec	1
-octez-agnostic-baker-lib	all	2
 octez-alcotezt	all	7
+octez-baker	exec	1
 octez-baker-PsQuebec	exec	1
 octez-baker-PsRiotum	exec	1
+octez-baker-lib	all	2
 octez-client	exec	1
 octez-codec	exec	1
 octez-crawler	all	4

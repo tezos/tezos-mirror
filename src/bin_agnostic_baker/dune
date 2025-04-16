@@ -3,8 +3,8 @@
 
 (executable
  (name main_agnostic_baker)
- (public_name octez-agnostic-baker)
- (package octez-agnostic-baker)
+ (public_name octez-baker)
+ (package octez-baker)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-rust-deps
@@ -12,7 +12,7 @@
   octez-libs.base
   octez-libs.base.unix
   octez-shell-libs.client-base-unix
-  octez-agnostic-baker-lib
+  octez-baker-lib
   octez-libs.octez-profiler
   octez-protocol-021-PsQuebec-libs.agnostic-baker
   octez-protocol-022-PsRiotum-libs.agnostic-baker
