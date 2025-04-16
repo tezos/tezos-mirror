@@ -522,12 +522,15 @@ let test_tezlink_current_level =
   (* test with offset larger than a cycle *)
   let* res = rpc_current_level "head" ~offset:40000 in
   let* () = check_current_level res 40000 in
-  (* test negative offset *)
+  (* Bake 5 blocks and test that "head" is now at level 5. *)
   let* () =
     repeat 5 (fun () ->
         let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
+  let* res = rpc_current_level "head" in
+  let* () = check_current_level res 5 in
+  (* test negative offset *)
   let* res = rpc_current_level "head" ~offset:(-1) in
   Check.(
     JSON.(
