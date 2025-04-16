@@ -8,6 +8,7 @@ use crate::block_storage;
 use crate::blueprint_storage::{
     blueprint_path, clear_all_blueprints, store_current_block_header,
 };
+use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
@@ -86,7 +87,8 @@ mod legacy {
     pub fn read_next_blueprint_number<Host: Runtime>(
         host: &Host,
     ) -> anyhow::Result<U256> {
-        match block_storage::read_current_number(host) {
+        match block_storage::read_current_number(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)
+        {
             Err(err) => match err.downcast_ref() {
                 Some(GenStorageError::Runtime(RuntimeError::PathNotFound)) => {
                     Ok(U256::zero())
@@ -157,7 +159,10 @@ fn migrate_to<Host: Runtime>(
             //
             // We need only the former.
 
-            let current_number = block_storage::read_current_number(host)?;
+            let current_number = block_storage::read_current_number(
+                host,
+                &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            )?;
             let to_clean = U256::min(
                 current_number + 1,
                 evm_execution::storage::blocks::BLOCKS_STORED.into(),
@@ -273,7 +278,11 @@ fn migrate_to<Host: Runtime>(
         }
         StorageVersion::V27 => {
             // Initialize the next_blueprint_info field
-            match block_storage::read_current(host, &crate::chains::ChainFamily::Evm) {
+            match block_storage::read_current(
+                host,
+                &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                &crate::chains::ChainFamily::Evm,
+            ) {
                 Ok(block) => {
                     store_current_block_header(host, &block.into())?;
                     Ok(MigrationStatus::Done)

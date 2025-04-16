@@ -457,7 +457,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
         let tezblock = TezBlock::new(number, timestamp, previous_hash);
         let new_block = L2Block::Tezlink(tezblock);
-        crate::block_storage::store_current(host, &new_block)
+        let root = self.storage_root_path();
+        crate::block_storage::store_current(host, &root, &new_block)
             .context("Failed to store the current block")?;
         Ok(BlockComputationResult::Finished {
             included_delayed_transactions: vec![],

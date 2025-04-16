@@ -636,6 +636,7 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
+        let chain_config = test_evm_chain_config();
 
         match read_proxy_inbox(
             &mut host,
@@ -643,7 +644,7 @@ mod tests {
             &conf.tezos_contracts,
             false,
             false,
-            &test_evm_chain_config(),
+            &chain_config,
         )
         .unwrap()
         {
@@ -656,7 +657,8 @@ mod tests {
         };
 
         // The dummy chunk in the inbox is registered at block 10
-        store_current_number(&mut host, U256::from(9)).unwrap();
+        store_current_number(&mut host, &chain_config.storage_root_path(), U256::from(9))
+            .unwrap();
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0

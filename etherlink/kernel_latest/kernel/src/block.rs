@@ -598,13 +598,10 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 mod tests {
     use super::*;
     use crate::block_storage;
-    use crate::block_storage::read_current_number;
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::chains::{
-        ChainFamily, EvmChainConfig, MichelsonChainConfig, TezTransactions,
-    };
+    use crate::chains::{EvmChainConfig, MichelsonChainConfig, TezTransactions};
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::storage::read_block_in_progress;
@@ -632,6 +629,13 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime::Runtime;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_host::path::concat;
+    use tezos_smart_rollup_host::path::RefPath;
+
+    fn read_current_number(host: &impl Runtime) -> anyhow::Result<U256> {
+        Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
+    }
+
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transactions> {
@@ -886,8 +890,15 @@ mod tests {
         .expect("The block production failed.");
     }
 
-    fn assert_current_block_reading_validity<Host: Runtime>(host: &mut Host) {
-        match block_storage::read_current(host, &ChainFamily::Evm) {
+    fn assert_current_block_reading_validity<Host: Runtime>(
+        host: &mut Host,
+        chain_config: &impl ChainConfigTrait,
+    ) {
+        match block_storage::read_current(
+            host,
+            &chain_config.storage_root_path(),
+            &chain_config.get_chain_family(),
+        ) {
             Ok(_) => (),
             Err(e) => {
                 panic!("Block reading failed: {:?}\n", e)
@@ -902,6 +913,16 @@ mod tests {
 
         let chain_config = dummy_tez_config();
         let mut config = dummy_configuration();
+
+        // We need to store something at the tezlink root path,
+        // otherwise the copy of the root done by the safe storage will fail
+        let path = concat(
+            &chain_config.storage_root_path(),
+            &RefPath::assert_from(b"/fee"),
+        )
+        .expect("Path concatenation should have succeeded");
+        host.store_write_all(&path, &[4; 32])
+            .expect("Write in durable storage should have succeeded");
 
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
@@ -1216,11 +1237,13 @@ mod tests {
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
         let mut host = MockKernelHost::default();
 
+        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
+
         let mut evm_account_storage = init_account_storage().unwrap();
 
         produce_block_with_several_valid_txs(&mut host, &mut evm_account_storage);
 
-        assert_current_block_reading_validity(&mut host);
+        assert_current_block_reading_validity(&mut host, &chain_config);
     }
 
     #[test]
@@ -1285,8 +1308,11 @@ mod tests {
         )
         .unwrap();
 
-        let blocks_index =
-            block_storage::internal_for_tests::init_blocks_index().unwrap();
+        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        let blocks_index = block_storage::internal_for_tests::init_blocks_index(
+            &chain_config.storage_root_path(),
+        )
+        .unwrap();
 
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![])]);
 
@@ -1302,7 +1328,7 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &chain_config,
             &mut dummy_configuration(),
             None,
             None,
@@ -1311,12 +1337,15 @@ mod tests {
 
         let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
 
-        let current_block_hash =
-            block_storage::read_current(&mut host, &ChainFamily::Evm)
-                .unwrap()
-                .hash()
-                .as_bytes()
-                .to_vec();
+        let current_block_hash = block_storage::read_current(
+            &mut host,
+            &chain_config.storage_root_path(),
+            &chain_config.get_chain_family(),
+        )
+        .unwrap()
+        .hash()
+        .as_bytes()
+        .to_vec();
 
         assert_eq!(number_of_blocks_indexed + 1, new_number_of_blocks_indexed);
 
@@ -1499,8 +1528,8 @@ mod tests {
     }
 
     fn check_current_block_number<Host: Runtime>(host: &mut Host, nb: usize) {
-        let current_nb = block_storage::read_current_number(host)
-            .expect("Should have manage to check block number");
+        let current_nb =
+            read_current_number(host).expect("Should have manage to check block number");
         assert_eq!(current_nb, U256::from(nb), "Incorrect block number");
     }
 
@@ -1508,13 +1537,14 @@ mod tests {
     fn test_first_blocks() {
         let mut host = MockKernelHost::default();
 
+        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
         // first block should be 0
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &chain_config,
             &mut dummy_configuration(),
             None,
             None,
@@ -1527,7 +1557,7 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &chain_config,
             &mut dummy_configuration(),
             None,
             None,
@@ -1540,7 +1570,7 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &chain_config,
             &mut dummy_configuration(),
             None,
             None,
@@ -1615,7 +1645,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            block_storage::read_current_number(&host).is_err(),
+            read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
 
@@ -1664,7 +1694,7 @@ mod tests {
 
         // test no new block
         assert!(
-            block_storage::read_current_number(&host).is_err(),
+            read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
 
@@ -1708,7 +1738,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            block_storage::read_current_number(&host).is_err(),
+            read_current_number(&host).is_err(),
             "Should not have found current block number"
         );
         //provision sender account
@@ -1763,8 +1793,7 @@ mod tests {
 
         // test no new block
         assert_eq!(
-            block_storage::read_current_number(&host)
-                .expect("should have found a block number"),
+            read_current_number(&host).expect("should have found a block number"),
             U256::zero(),
             "There should have been one block registered"
         );
