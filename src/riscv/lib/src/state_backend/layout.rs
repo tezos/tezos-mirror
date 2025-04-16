@@ -382,6 +382,9 @@ mod tests {
     use super::*;
     use crate::backend_test;
     use crate::default::ConstDefault;
+    use crate::state::NewState;
+    use crate::state_backend::Cell;
+    use crate::state_backend::Cells;
     use crate::state_backend::CommitmentLayout;
     use crate::state_backend::FnManagerIdent;
     use crate::state_backend::ProofLayout;
@@ -399,13 +402,16 @@ mod tests {
 
     // Test that the Atom layout initialises the underlying Cell correctly.
     backend_test!(test_cell_init, F, {
-        assert_eq!(F::allocate::<Atom<MyFoo>>().read(), MyFoo::DEFAULT);
+        assert_eq!(
+            Cell::<MyFoo, _>::new(&mut F::manager()).read(),
+            MyFoo::DEFAULT
+        );
     });
 
     // Test that the Array layout initialises the underlying Cells correctly.
     backend_test!(test_cells_init, F, {
         assert_eq!(
-            F::allocate::<Array<MyFoo, 1337>>().read_all(),
+            Cells::<MyFoo, 1337, _>::new(&mut F::manager()).read_all(),
             [MyFoo::DEFAULT; 1337]
         );
     });
@@ -420,7 +426,10 @@ mod tests {
         }
 
         fn inner(bar: u64, qux: [u8; 64]) {
-            let mut foo = Owned::allocate::<Foo>();
+            let mut foo = AllocatedOf::<Foo, Owned> {
+                bar: Cell::new(&mut Owned),
+                qux: Cells::new(&mut Owned),
+            };
 
             foo.bar.write(bar);
             foo.qux.write_all(&qux);

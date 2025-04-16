@@ -674,14 +674,12 @@ pub(crate) mod tests {
 
     use crate::backend_test;
     use crate::default::ConstDefault;
-    use crate::state_backend::Array;
+    use crate::state::NewState;
+    use crate::state_backend::Cell;
+    use crate::state_backend::Cells;
     use crate::state_backend::DynCells;
     use crate::state_backend::Elem;
     use crate::state_backend::FnManagerIdent;
-    use crate::state_backend::ManagerAlloc;
-    use crate::state_backend::ManagerBase;
-    use crate::state_backend::layout::Atom;
-    use crate::state_backend::layout::Layout;
 
     /// Dummy type that helps us implement custom normalisation via [Elem]
     #[repr(C, packed)]
@@ -733,9 +731,10 @@ pub(crate) mod tests {
 
     backend_test!(test_region_overlap, F, {
         const LEN: usize = 64;
-        type OurLayout = (Array<u64, LEN>, Array<u64, LEN>);
 
-        let (mut array1, mut array2) = F::allocate::<OurLayout>();
+        let mut manager = F::manager();
+        let mut array1: Cells<u64, LEN, _> = Cells::new(&mut manager);
+        let mut array2: Cells<u64, LEN, _> = Cells::new(&mut manager);
 
         // Allocate two consecutive arrays
         // let mut array1 = manager.allocate_region(array1_place);
@@ -776,8 +775,9 @@ pub(crate) mod tests {
     });
 
     backend_test!(test_cell_overlap, F, {
-        type OurLayout = (Atom<[u64; 4]>, Atom<[u64; 4]>);
-        let (mut cell1, mut cell2) = F::allocate::<OurLayout>();
+        let mut manager = F::manager();
+        let mut cell1: Cell<[u64; 4], _> = Cell::new(&mut manager);
+        let mut cell2: Cell<[u64; 4], _> = Cell::new(&mut manager);
 
         // Cell should be zero-initialised.
         assert_eq!(cell1.read(), [0; 4]);
@@ -807,17 +807,8 @@ pub(crate) mod tests {
         {
             const LEN: usize = 8;
 
-            struct FlipperLayout;
-
-            impl Layout for FlipperLayout {
-                type Allocated<M: ManagerBase> = DynCells<LEN, M>;
-
-                fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-                    DynCells::bind(backend.allocate_dyn_region())
-                }
-            }
-
-            let mut state = F::allocate::<FlipperLayout>();
+            let mut manager = F::manager();
+            let mut state = DynCells::<LEN, _>::new(&mut manager);
 
             // This should panic because we are trying to write an element at the address which
             // corresponds to the end of the buffer.
@@ -826,18 +817,9 @@ pub(crate) mod tests {
     );
 
     backend_test!(test_dynregion_stored_format, F, {
-        struct FlipperLayout;
-
-        impl Layout for FlipperLayout {
-            type Allocated<B: ManagerBase> = DynCells<1024, B>;
-
-            fn allocate<B: ManagerAlloc>(backend: &mut B) -> Self::Allocated<B> {
-                DynCells::bind(backend.allocate_dyn_region())
-            }
-        }
-
         // Writing to one item of the region must convert to stored format.
-        let mut region = F::allocate::<FlipperLayout>();
+        let mut manager = F::manager();
+        let mut region = DynCells::<1024, _>::new(&mut manager);
 
         region.write(0, Flipper { a: 13, b: 37 });
         assert_eq!(region.read::<Flipper>(0), Flipper { a: 13, b: 37 });
@@ -867,10 +849,9 @@ pub(crate) mod tests {
     });
 
     backend_test!(test_region_stored_format, F, {
-        type FlipperLayout = Array<Flipper, 4>;
-
         // Writing to one item of the region must convert to stored format.
-        let mut region = F::allocate::<FlipperLayout>();
+        let mut manager = F::manager();
+        let mut region = Cells::<Flipper, 4, _>::new(&mut manager);
 
         region.write(0, Flipper { a: 13, b: 37 });
         assert_eq!(region.read(0), Flipper { a: 13, b: 37 });

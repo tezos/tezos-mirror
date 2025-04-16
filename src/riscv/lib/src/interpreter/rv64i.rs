@@ -316,9 +316,7 @@ mod tests {
     use proptest::proptest;
 
     use crate::backend_test;
-    use crate::create_state;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
@@ -331,6 +329,7 @@ mod tests {
     use crate::machine_state::registers::t2;
     use crate::machine_state::registers::t3;
     use crate::machine_state::registers::t4;
+    use crate::state::NewState;
     use crate::traps::Exception;
 
     macro_rules! test_shift_instr {
@@ -388,7 +387,7 @@ mod tests {
     }
 
     backend_test!(test_shift_w, F, {
-        let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+        let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
         // imm = 0
         test_both_shift_instr!(
@@ -533,7 +532,7 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+        let state = MachineCoreState::<M4K, _>::new(&mut F::manager());
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

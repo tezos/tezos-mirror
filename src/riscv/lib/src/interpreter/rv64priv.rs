@@ -135,9 +135,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::backend_test;
-    use crate::create_state;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::csregisters::CSRRepr;
     use crate::machine_state::csregisters::CSRegister;
     use crate::machine_state::csregisters::xstatus;
@@ -145,11 +143,11 @@ mod tests {
     use crate::machine_state::mode::Mode;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::t0;
+    use crate::state::NewState;
     use crate::traps::Exception;
 
     backend_test!(test_sfence, F, {
-        type L = MachineCoreStateLayout<M4K>;
-        let mut state = create_state!(MachineCoreState, L, F, M4K);
+        let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
         let run_test = |state: &mut MachineCoreState<_, _>,
                         mode: Mode,

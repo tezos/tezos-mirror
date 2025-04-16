@@ -91,19 +91,16 @@ mod tests {
     use proptest::proptest;
 
     use crate::backend_test;
-    use crate::create_state;
     use crate::interpreter::integer::run_and;
     use crate::interpreter::integer::run_andi;
     use crate::interpreter::integer::run_or;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::csregisters::CSRRepr;
     use crate::machine_state::csregisters::CSRegister;
     use crate::machine_state::csregisters::xstatus::MPPValue;
     use crate::machine_state::csregisters::xstatus::MStatus;
     use crate::machine_state::csregisters::xstatus::SPPValue;
     use crate::machine_state::hart_state::HartState;
-    use crate::machine_state::hart_state::HartStateLayout;
     use crate::machine_state::memory::Address;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::mode::Mode;
@@ -116,11 +113,12 @@ mod tests {
     use crate::machine_state::registers::t2;
     use crate::machine_state::registers::t3;
     use crate::parser::instruction::FenceSet;
+    use crate::state::NewState;
     use crate::traps::Exception;
 
     backend_test!(test_bitwise, F, {
         proptest!(|(val in any::<u64>(), imm in any::<u64>())| {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
             // The sign-extension of an immediate on 12 bits has bits 31:11 equal the sign-bit
             let prefix_mask = 0xFFFF_FFFF_FFFF_F800;
@@ -156,7 +154,7 @@ mod tests {
     backend_test!(test_bitwise_reg, F, {
         // TODO: RV-512: move to integer.rs once all are supported.
         proptest!(|(v1 in any::<u64>(), v2 in any::<u64>())| {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
             state.hart.xregisters.write(a0, v1);
             state.hart.xregisters.write(t3, v2);
@@ -185,14 +183,14 @@ mod tests {
     });
 
     backend_test!(test_ebreak, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+        let state = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
         let ret_val = state.hart.run_ebreak();
         assert_eq!(ret_val, Exception::Breakpoint);
     });
 
     backend_test!(test_fence, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+        let state = MachineCoreState::<M4K, _>::new(&mut F::manager());
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -214,7 +212,7 @@ mod tests {
     });
 
     backend_test!(test_ecall, F, {
-        let mut state = create_state!(HartState, F);
+        let mut state = HartState::new(&mut F::manager());
 
         let mode_exc = [
             (Mode::User, Exception::EnvCallFromUMode),
@@ -235,7 +233,7 @@ mod tests {
             mepc in any::<Address>(),
             sepc in any::<Address>(),
         )| {
-            let mut state = create_state!(HartState, F);
+            let mut state = HartState::new(&mut F::manager());
 
             // 4-byte align
             let mepc = mepc & !0b11;

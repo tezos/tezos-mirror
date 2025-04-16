@@ -64,14 +64,13 @@ mod test {
     use proptest::proptest;
 
     use crate::backend_test;
-    use crate::create_state;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::a2;
     use crate::machine_state::registers::a3;
     use crate::machine_state::registers::a4;
     use crate::machine_state::registers::nz;
+    use crate::state::NewState;
 
     backend_test!(test_run_li, F, {
         let imm_rdrs1_res = [
@@ -81,7 +80,7 @@ mod test {
         ];
 
         for (imm, rd_rs1, res) in imm_rdrs1_res {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
             super::run_li(&mut state, imm, rd_rs1);
             assert_eq!(state.hart.xregisters.read_nz(rd_rs1), res);
         }
@@ -89,7 +88,7 @@ mod test {
 
     backend_test!(test_lui, F, {
         proptest!(|(imm in any::<i64>())| {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
             state.hart.xregisters.write(a2, 0);
             state.hart.xregisters.write(a4, 0);
 

@@ -54,16 +54,14 @@ mod tests {
     use proptest::proptest;
 
     use crate::backend_test;
-    use crate::create_state;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::hart_state::HartState;
-    use crate::machine_state::hart_state::HartStateLayout;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::a3;
     use crate::machine_state::registers::a4;
     use crate::machine_state::registers::nz;
     use crate::machine_state::registers::t0;
+    use crate::state::NewState;
     use crate::traps::Exception;
 
     backend_test!(test_caddiw, F, {
@@ -71,7 +69,7 @@ mod tests {
             imm in any::<i64>(),
             reg_val in any::<i64>())|
         {
-            let mut state = create_state!(HartState, F);
+            let mut state = HartState::new(&mut F::manager());
 
             state.xregisters.write_nz(nz::a0, reg_val as u64);
             state.xregisters.run_caddiw(imm, nz::a0);
@@ -86,7 +84,7 @@ mod tests {
     });
 
     backend_test!(test_run_cldsp_clwsp, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+        let state = MachineCoreState::<M4K, _>::new(&mut F::manager());
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

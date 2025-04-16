@@ -76,9 +76,7 @@ mod test {
 
     use crate::backend_test;
     use crate::bits::Bits64;
-    use crate::create_state;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::csregisters::CSRegister;
     use crate::machine_state::csregisters::xstatus::ExtensionValue;
     use crate::machine_state::csregisters::xstatus::MStatus;
@@ -88,6 +86,7 @@ mod test {
     use crate::machine_state::registers::fa3;
     use crate::machine_state::registers::parse_xregister;
     use crate::machine_state::registers::sp;
+    use crate::state::NewState;
     use crate::traps::Exception;
 
     const ZERO_OFFSET: i64 = 0;
@@ -97,7 +96,7 @@ mod test {
     const OUT_OF_BOUNDS_OFFSET: i64 = MC::TOTAL_BYTES as i64;
 
     backend_test!(test_cfsd_cfld, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<MC>, F, MC);
+        let state = MachineCoreState::<MC, _>::new(&mut F::manager());
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -137,7 +136,7 @@ mod test {
     });
 
     backend_test!(test_cfsdsp_cfldsp, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<MC>, F, MC);
+        let state = MachineCoreState::<MC, _>::new(&mut F::manager());
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

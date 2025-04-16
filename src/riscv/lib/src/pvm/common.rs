@@ -534,7 +534,6 @@ mod tests {
 
     use super::*;
     use crate::backend_test;
-    use crate::create_state;
     use crate::machine_state::TestCacheLayouts;
     use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
     use crate::machine_state::memory;
@@ -556,12 +555,10 @@ mod tests {
     #[test]
     fn test_read_input() {
         type MC = M1M;
-        type L = PvmLayout<MC, TestCacheLayouts>;
         type B = bcall::Interpreted<MC, Owned>;
 
         // Setup PVM
-        let space = Owned::allocate::<L>();
-        let mut pvm = Pvm::<MC, TestCacheLayouts, B, _>::bind(space, InterpretedBlockBuilder);
+        let mut pvm = Pvm::<MC, TestCacheLayouts, B, _>::new(&mut Owned, InterpretedBlockBuilder);
         pvm.reset();
         pvm.machine_state
             .core
@@ -662,15 +659,13 @@ mod tests {
     #[cfg(not(feature = "supervisor"))]
     fn test_write_debug() {
         type MC = M1M;
-        type L = PvmLayout<MC, TestCacheLayouts>;
         type B = bcall::Interpreted<MC, Owned>;
 
         let mut buffer = Vec::new();
         let mut hooks = PvmHooks::new(|c| buffer.push(c));
 
         // Setup PVM
-        let space = Owned::allocate::<L>();
-        let mut pvm = Pvm::<MC, TestCacheLayouts, B, _>::bind(space, InterpretedBlockBuilder);
+        let mut pvm = Pvm::<MC, TestCacheLayouts, B, _>::new(&mut Owned, InterpretedBlockBuilder);
         pvm.reset();
         pvm.machine_state
             .core
@@ -716,15 +711,13 @@ mod tests {
             written: [u8; WRITTEN_SIZE],
         )|{
             type MC = M1M;
-            type L = PvmLayout<MC, TestCacheLayouts>;
             type B = bcall::Interpreted<MC, Owned>;
 
             let mut buffer = Vec::new();
             let mut hooks = PvmHooks::new(|c| buffer.push(c));
 
             // Setup PVM
-            let space = Owned::allocate::<L>();
-            let mut pvm = Pvm::<MC, TestCacheLayouts, B, _>::bind(space, InterpretedBlockBuilder);
+            let mut pvm = Pvm::<MC, TestCacheLayouts, B, _>::new(&mut Owned, InterpretedBlockBuilder);
             pvm.reset();
             pvm.machine_state
                 .core
@@ -771,13 +764,11 @@ mod tests {
 
     backend_test!(test_reveal, F, {
         type MC = M1M;
-        type L = PvmLayout<MC, TestCacheLayouts>;
         type B<F> = bcall::Interpreted<MC, <F as TestBackendFactory>::Manager>;
 
         // Setup PVM
-        let mut pvm = create_state!(Pvm, L, F, MC, TestCacheLayouts, B<F>, || {
-            InterpretedBlockBuilder
-        });
+        let mut pvm =
+            Pvm::<MC, TestCacheLayouts, B<F>, _>::new(&mut F::manager(), InterpretedBlockBuilder);
         pvm.reset();
         pvm.machine_state
             .core
@@ -848,13 +839,11 @@ mod tests {
 
     backend_test!(test_reveal_insufficient_buffer_size, F, {
         type MC = M1M;
-        type L = PvmLayout<MC, TestCacheLayouts>;
         type B<F> = bcall::Interpreted<MC, <F as TestBackendFactory>::Manager>;
 
         // Setup PVM
-        let mut pvm = create_state!(Pvm, L, F, MC, TestCacheLayouts, B<F>, || {
-            InterpretedBlockBuilder
-        });
+        let mut pvm =
+            Pvm::<MC, TestCacheLayouts, B<F>, _>::new(&mut F::manager(), InterpretedBlockBuilder);
         pvm.reset();
         pvm.machine_state
             .core

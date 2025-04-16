@@ -725,7 +725,6 @@ mod tests {
     use super::registers::XRegister;
     use crate::backend_test;
     use crate::bits::u16;
-    use crate::create_state;
     use crate::default::ConstDefault;
     use crate::machine_state::DefaultCacheLayouts;
     use crate::machine_state::TestCacheLayouts;
@@ -762,13 +761,10 @@ mod tests {
     use crate::traps::TrapContext;
 
     backend_test!(test_step, F, {
-        let state = create_state!(
-            MachineState,
-            MachineStateLayout<M4K, DefaultCacheLayouts>,
-            F,
-            M4K,
-            DefaultCacheLayouts,
-            Interpreted<M4K, F::Manager>, || InterpretedBlockBuilder);
+        let state = MachineState::<M4K, DefaultCacheLayouts, Interpreted<M4K, _>, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -813,13 +809,10 @@ mod tests {
     });
 
     backend_test!(test_step_env_exc, F, {
-        let state = create_state!(
-            MachineState,
-            MachineStateLayout<M4K, DefaultCacheLayouts>,
-            F,
-            M4K,
-            DefaultCacheLayouts,
-            Interpreted<M4K, F::Manager>, || InterpretedBlockBuilder);
+        let state = MachineState::<M4K, DefaultCacheLayouts, Interpreted<M4K, _>, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -854,13 +847,10 @@ mod tests {
     });
 
     backend_test!(test_step_exc_mm, F, {
-        let state = create_state!(
-            MachineState,
-            MachineStateLayout<M4K, DefaultCacheLayouts>,
-            F,
-            M4K,
-            DefaultCacheLayouts, 
-            Interpreted<M4K, F::Manager>, || InterpretedBlockBuilder);
+        let state = MachineState::<M4K, DefaultCacheLayouts, Interpreted<M4K, _>, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -899,13 +889,10 @@ mod tests {
     });
 
     backend_test!(test_step_exc_us, F, {
-        let state = create_state!(
-            MachineState, 
-            MachineStateLayout<M4K, DefaultCacheLayouts>, 
-            F, 
-            M4K, 
-            DefaultCacheLayouts, 
-            Interpreted<M4K, F::Manager>, || InterpretedBlockBuilder);
+        let state = MachineState::<M4K, DefaultCacheLayouts, Interpreted<M4K, _>, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -983,15 +970,11 @@ mod tests {
 
         // Configure the machine state.
         let base_state = {
-            let mut state = create_state!(
-                MachineState,
-                LocalLayout,
-                F,
-                M4K,
-                TestCacheLayouts,
-                BlockRunner<F>,
-                || InterpretedBlockBuilder
+            let mut state = MachineState::<M4K, TestCacheLayouts, BlockRunner<F>, _>::new(
+                &mut F::manager(),
+                InterpretedBlockBuilder,
             );
+
             state.reset();
             state.core.main_memory.set_all_readable_writeable();
 
@@ -1244,14 +1227,9 @@ mod tests {
 
         // Configure the state backend.
         let base_state = {
-            let mut state = create_state!(
-                MachineState,
-                LocalLayout,
-                F,
-                M1M,
-                TestCacheLayouts,
-                BlockRunner<F>,
-                || InterpretedBlockBuilder
+            let mut state = MachineState::<M1M, TestCacheLayouts, BlockRunner<F>, _>::new(
+                &mut F::manager(),
+                InterpretedBlockBuilder,
             );
             state.reset();
             state.core.main_memory.set_all_readable_writeable();
@@ -1334,13 +1312,10 @@ mod tests {
 
     // Ensure that cloning the machine state does not result in a stack overflow
     backend_test!(test_machine_state_cloneable, F, {
-        let state = create_state!(
-            MachineState,
-            MachineStateLayout<M1M, DefaultCacheLayouts>,
-            F,
-            M1M,
-            DefaultCacheLayouts,
-            Interpreted<M1M, F::Manager>, || InterpretedBlockBuilder);
+        let state = MachineState::<M1M, DefaultCacheLayouts, Interpreted<M1M, _>, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let second = state.clone();
 
@@ -1351,13 +1326,10 @@ mod tests {
     });
 
     backend_test!(test_block_cache_crossing_pages_creates_new_block, F, {
-        let mut state = create_state!(
-            MachineState,
-            MachineStateLayout<M8K, DefaultCacheLayouts>,
-            F,
-            M8K,
-            DefaultCacheLayouts,
-            Interpreted<M8K, F::Manager>, || InterpretedBlockBuilder);
+        let mut state = MachineState::<M8K, DefaultCacheLayouts, Interpreted<M8K, _>, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let uncompressed_bytes = 0x5307b3;
 
@@ -1513,13 +1485,10 @@ mod tests {
 
         let block_b_addr = phys_addr + 128;
 
-        let mut state = create_state!(
-            MachineState,
-            MachineStateLayout<M8K, DefaultCacheLayouts>,
-            F,
-            M8K,
-            DefaultCacheLayouts,
-            Interpreted<M8K, F::Manager>, || InterpretedBlockBuilder);
+        let mut state = MachineState::<M8K, DefaultCacheLayouts, Interpreted<M8K, _>, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         state.core.main_memory.set_all_readable_writeable();
 

@@ -409,6 +409,7 @@ pub type RefVerifierAlloc<'a, L> = AllocatedOf<L, Ref<'a, verify_backend::Verifi
 pub(crate) mod test_helpers {
     use super::AllocatedOf;
     use super::Layout;
+    use super::ManagerAlloc;
     use super::ManagerClone;
     use super::ManagerDeserialise;
     use super::ManagerReadWrite;
@@ -438,10 +439,11 @@ pub(crate) mod test_helpers {
             + ManagerSerialise
             + ManagerDeserialise
             + ManagerClone
+            + ManagerAlloc
             + JitStateAccess;
 
-        /// Allocate using the test backend manager.
-        fn allocate<L: Layout>() -> AllocatedOf<L, Self::Manager>;
+        /// Construct a manager.
+        fn manager() -> Self::Manager;
     }
 
     /// Copy the allocated space by serialising and deserialising it.
@@ -485,6 +487,7 @@ pub mod tests {
     use self::owned_backend::Owned;
     use super::*;
     use crate::backend_test;
+    use crate::state::NewState;
 
     /// Run `f` twice against two different randomised backends and see if the
     /// resulting backend state is the same afterwards.
@@ -496,53 +499,20 @@ pub mod tests {
         // TODO: RV-46: This test will be re-introduced but customised for initialisation testing.
     }
 
-    /// Given a `State<M: Manager>`, optionally its `StateLayout`,
-    /// a [`TestBackendFactory`] type, a `backend` created with `create_backend!` macro,
-    /// create the location and return the created `State<M>`.
-    #[macro_export]
-    macro_rules! create_state {
-        // For an extra generic in the state (MachineState for example)
-        ($State:tt, $StateLayout:ty, $Factory:ty $(, $ExtraGenerics:ty)* $(, || $arg: expr)*) => {
-            {
-                let new_state =
-                    $State::<
-                        $($ExtraGenerics,)*
-                        <$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Manager,
-                    >::bind(
-                        <$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::allocate::<$StateLayout>(),
-                        $($arg,)*
-                    );
-
-                new_state
-            }
-        };
-
-        ($State:tt, $Factory:ty) => {
-            create_state!($State, paste::paste!([<$State Layout>]), $Factory)
-        };
-    }
-
     backend_test!(test_example, F, {
         struct Example<M: ManagerBase> {
             first: Cell<u64, M>,
             second: Cells<u32, 4, M>,
         }
 
-        type ExampleLayout = (Atom<u64>, Array<u32, 4>);
-
-        impl<M: ManagerBase> Example<M> {
-            fn bind(space: AllocatedOf<ExampleLayout, M>) -> Self {
-                Example {
-                    first: space.0,
-                    second: space.1,
-                }
-            }
-        }
-
         let first_value: u64 = rand::random();
         let second_value: [u32; 4] = rand::random();
 
-        let mut instance = create_state!(Example, ExampleLayout, F);
+        let mut manager = F::manager();
+        let mut instance = Example {
+            first: Cell::new(&mut manager),
+            second: Cells::new(&mut manager),
+        };
 
         instance.first.write(first_value);
         assert_eq!(instance.first.read(), first_value);

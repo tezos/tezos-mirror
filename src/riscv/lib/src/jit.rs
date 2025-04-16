@@ -280,13 +280,10 @@ mod tests {
 
     use super::*;
     use crate::backend_test;
-    use crate::create_state;
     use crate::instruction_context::LoadStoreWidth;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::block_cache::bcall::BCall;
     use crate::machine_state::block_cache::bcall::Block;
-    use crate::machine_state::block_cache::bcall::BlockLayout;
     use crate::machine_state::block_cache::bcall::Interpreted;
     use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
     use crate::machine_state::memory::M4K;
@@ -298,6 +295,7 @@ mod tests {
     use crate::machine_state::registers::nz;
     use crate::parser::instruction::InstrWidth;
     use crate::parser::instruction::InstrWidth::*;
+    use crate::state::NewState;
     use crate::state_backend::FnManagerIdent;
     use crate::state_backend::ManagerRead;
     use crate::state_backend::test_helpers::TestBackendFactory;
@@ -341,17 +339,17 @@ mod tests {
             interpreted_bb: &mut InterpretedBlockBuilder,
         ) {
             // Create the states for the interpreted and jitted runs.
-            let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut manager = F::manager();
+            let mut interpreted = MachineCoreState::<M4K, _>::new(&mut manager);
             interpreted.main_memory.set_all_readable_writeable();
 
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut jitted = MachineCoreState::<M4K, _>::new(&mut manager);
             jitted.main_memory.set_all_readable_writeable();
 
             let hash = super::Hash::blake2b_hash(&self.instructions).unwrap();
 
             // Create the block of instructions.
-            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
+            let mut block = Interpreted::<M4K, _>::new(&mut manager);
             block.start_block();
             for instr in self.instructions.iter() {
                 block.push_instr(*instr);
@@ -1594,11 +1592,13 @@ mod tests {
         let success: &[I] = &[I::new_nop(Compressed)];
         let success_hash = super::Hash::blake2b_hash(success).unwrap();
 
+        let mut manager = F::manager();
+
         for failure in failure_scenarios.iter() {
             let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
 
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
+            let mut jitted = MachineCoreState::<M4K, _>::new(&mut manager);
+            let mut block = Interpreted::<M4K, _>::new(&mut manager);
             let failure_hash = super::Hash::blake2b_hash(failure).unwrap();
 
             block.start_block();

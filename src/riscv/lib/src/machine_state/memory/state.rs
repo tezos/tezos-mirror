@@ -368,6 +368,7 @@ pub mod tests {
     use crate::backend_test;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::memory::MemoryConfig;
+    use crate::state::NewState;
     use crate::state_backend::owned_backend::Owned;
 
     #[test]
@@ -390,8 +391,8 @@ pub mod tests {
     }
 
     backend_test!(test_endianess, F, {
-        let space = F::allocate::<<M4K as MemoryConfig>::Layout>();
-        let mut memory = M4K::bind(space);
+        let mut manager = F::manager();
+        let mut memory = <<M4K as MemoryConfig>::State<_>>::new(&mut manager);
 
         memory
             .write_instruction_unchecked(0, 0x1122334455667788u64)

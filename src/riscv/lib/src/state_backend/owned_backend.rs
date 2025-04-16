@@ -11,11 +11,9 @@ use std::mem::MaybeUninit;
 
 use serde::ser::SerializeTuple;
 
-use super::AllocatedOf;
 use super::Elem;
 use super::EnrichedValue;
 use super::EnrichedValueLinked;
-use super::Layout;
 use super::ManagerAlloc;
 use super::ManagerBase;
 use super::ManagerClone;
@@ -29,13 +27,6 @@ use super::StaticCopy;
 /// Manager that allows state binders to own the state storage
 #[derive(Clone, Copy, Debug)]
 pub struct Owned;
-
-impl Owned {
-    /// Allocate regions for the given layout.
-    pub fn allocate<L: Layout>() -> AllocatedOf<L, Self> {
-        L::allocate(&mut Self)
-    }
-}
 
 impl ManagerBase for Owned {
     type Region<E: 'static, const LEN: usize> = [E; LEN];
@@ -364,8 +355,8 @@ pub mod test_helpers {
     impl TestBackendFactory for OwnedTestBackendFactory {
         type Manager = Owned;
 
-        fn allocate<L: Layout>() -> AllocatedOf<L, Self::Manager> {
-            Owned::allocate::<L>()
+        fn manager() -> Self::Manager {
+            Owned
         }
     }
 

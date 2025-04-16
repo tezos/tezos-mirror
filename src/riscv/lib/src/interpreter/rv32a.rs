@@ -228,12 +228,10 @@ mod test {
     use proptest::prelude::*;
 
     use crate::backend_test;
-    use crate::create_state;
     use crate::interpreter::atomics::SC_FAILURE;
     use crate::interpreter::atomics::SC_SUCCESS;
     use crate::interpreter::integer::run_addi;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::a2;
@@ -244,8 +242,9 @@ mod test {
             backend_test!($name, F, {
                 use $crate::machine_state::registers::nz;
                 use $crate::machine_state::memory::M4K;
+                use $crate::state::NewState;
 
-                let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+                let state = MachineCoreState::<M4K, _>::new(&mut F::manager());
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(
@@ -289,8 +288,9 @@ mod test {
         ($instr: ident, $f: expr, $align: expr, $t: ident) => {
             backend_test!($instr, F, {
                 use $crate::machine_state::memory::M4K;
+                use $crate::state::NewState;
 
-                let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+                let state = MachineCoreState::<M4K, _>::new(&mut F::manager());
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(

@@ -926,8 +926,6 @@ mod tests {
 
     use super::*;
     use crate::backend_test;
-    use crate::create_state;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::memory::M4K;
 
     /// Default handler for the `on_tezos` parameter of [`SupervisorState::handle_system_call`]
@@ -947,14 +945,9 @@ mod tests {
         type MemLayout = M4K;
         const MEM_BYTES: usize = MemLayout::TOTAL_BYTES;
 
-        let mut machine_state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<MemLayout>,
-            F,
-            MemLayout
-        );
-
-        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+        let mut manager = F::manager();
+        let mut machine_state = MachineCoreState::<MemLayout, _>::new(&mut manager);
+        let mut supervisor_state = SupervisorState::new(&mut manager);
 
         machine_state
             .hart
@@ -981,12 +974,8 @@ mod tests {
     backend_test!(ppoll_init_fds, F, {
         type MemLayout = M4K;
 
-        let mut machine_state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<MemLayout>,
-            F,
-            MemLayout
-        );
+        let mut manager = F::manager();
+        let mut machine_state = MachineCoreState::<MemLayout, _>::new(&mut manager);
         machine_state.reset();
 
         // Make sure everything is readable and writable. Otherwise, we'd get access faults.
@@ -996,7 +985,7 @@ mod tests {
             .unwrap();
 
         for fd in [0i32, 1, 2] {
-            let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+            let mut supervisor_state = SupervisorState::new(&mut manager);
 
             let base_address = 0x10;
             machine_state.main_memory.write(base_address, fd).unwrap();
@@ -1040,12 +1029,8 @@ mod tests {
     backend_test!(rt_sigaction_no_handler, F, {
         type MemLayout = M4K;
 
-        let mut machine_state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<MemLayout>,
-            F,
-            MemLayout
-        );
+        let mut manager = F::manager();
+        let mut machine_state = MachineCoreState::<MemLayout, _>::new(&mut manager);
         machine_state.reset();
 
         // Make sure everything is readable and writable. Otherwise, we'd get access faults.
@@ -1054,7 +1039,7 @@ mod tests {
             .protect_pages(0, MemLayout::TOTAL_BYTES, Permissions::ReadWrite)
             .unwrap();
 
-        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+        let mut supervisor_state = SupervisorState::new(&mut manager);
 
         // System call number
         machine_state
@@ -1098,13 +1083,9 @@ mod tests {
     backend_test!(sigaltstack_zero_parameter, F, {
         type MemLayout = M4K;
 
-        let mut machine_state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<MemLayout>,
-            F,
-            MemLayout
-        );
-        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+        let mut manager = F::manager();
+        let mut machine_state = MachineCoreState::<MemLayout, _>::new(&mut manager);
+        let mut supervisor_state = SupervisorState::new(&mut manager);
 
         // System call number
         machine_state
@@ -1128,13 +1109,9 @@ mod tests {
     backend_test!(rt_sigaction_zero_parameter, F, {
         type MemLayout = M4K;
 
-        let mut machine_state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<MemLayout>,
-            F,
-            MemLayout
-        );
-        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+        let mut manager = F::manager();
+        let mut machine_state = MachineCoreState::<MemLayout, _>::new(&mut manager);
+        let mut supervisor_state = SupervisorState::new(&mut manager);
 
         // System call number
         machine_state
@@ -1165,13 +1142,9 @@ mod tests {
     backend_test!(rt_sigprocmask_zero_parameter, F, {
         type MemLayout = M4K;
 
-        let mut machine_state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<MemLayout>,
-            F,
-            MemLayout
-        );
-        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+        let mut manager = F::manager();
+        let mut machine_state = MachineCoreState::<MemLayout, _>::new(&mut manager);
+        let mut supervisor_state = SupervisorState::new(&mut manager);
 
         // System call number
         machine_state
@@ -1202,12 +1175,8 @@ mod tests {
     backend_test!(clock_gettime_fills_with_zeros, F, {
         type MemLayout = M4K;
 
-        let mut machine_state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<MemLayout>,
-            F,
-            MemLayout
-        );
+        let mut manager = F::manager();
+        let mut machine_state = MachineCoreState::<MemLayout, _>::new(&mut manager);
         machine_state.reset();
 
         // Make sure everything is readable and writable. Otherwise, we'd get access faults.
@@ -1216,7 +1185,7 @@ mod tests {
             .protect_pages(0, MemLayout::TOTAL_BYTES, Permissions::ReadWrite)
             .unwrap();
 
-        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+        let mut supervisor_state = SupervisorState::new(&mut manager);
 
         // System call number
         machine_state
@@ -1265,12 +1234,8 @@ mod tests {
     backend_test!(gettimeofday_fills_with_zeros, F, {
         type MemLayout = M4K;
 
-        let mut machine_state = create_state!(
-            MachineCoreState,
-            MachineCoreStateLayout<MemLayout>,
-            F,
-            MemLayout
-        );
+        let mut manager = F::manager();
+        let mut machine_state = MachineCoreState::<MemLayout, _>::new(&mut manager);
         machine_state.reset();
 
         // Make sure everything is readable and writable. Otherwise, we'd get access faults.
@@ -1279,7 +1244,7 @@ mod tests {
             .protect_pages(0, MemLayout::TOTAL_BYTES, Permissions::ReadWrite)
             .unwrap();
 
-        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+        let mut supervisor_state = SupervisorState::new(&mut manager);
 
         // System call number
         machine_state

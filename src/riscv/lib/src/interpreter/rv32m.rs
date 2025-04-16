@@ -132,20 +132,19 @@ mod test {
     use proptest::proptest;
 
     use crate::backend_test;
-    use crate::create_state;
     use crate::machine_state::registers::XRegisters;
-    use crate::machine_state::registers::XRegistersLayout;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::a2;
     use crate::machine_state::registers::a3;
+    use crate::state::NewState;
 
     backend_test!(test_div_rem_invariant, F, {
         proptest!(|(
             r1_val in any::<u64>(),
             r2_val in any::<u64>(),
         )| {
-            let mut state = create_state!(XRegisters, F);
+            let mut state = XRegisters::new(&mut F::manager());
 
             state.write(a0, r1_val);
             state.write(a1, r2_val);
@@ -165,7 +164,7 @@ mod test {
             r1_val in any::<u64>(),
             r2_val in any::<u64>(),
         )| {
-            let mut state = create_state!(XRegisters, F);
+            let mut state = XRegisters::new(&mut F::manager());
 
             state.write(a0, r1_val);
             state.write(a1, r2_val);

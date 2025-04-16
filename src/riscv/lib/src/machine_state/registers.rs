@@ -650,10 +650,9 @@ mod tests {
 
     use super::*;
     use crate::backend_test;
-    use crate::create_state;
 
     backend_test!(test_zero, F, {
-        let mut registers = create_state!(XRegisters, XRegistersLayout, F);
+        let mut registers = XRegisters::new(&mut F::manager());
 
         // x0 should always read 0.
         assert_eq!(registers.read(x0), 0);
@@ -669,7 +668,7 @@ mod tests {
     ];
 
     backend_test!(test_arbitrary_register, F, {
-        let mut registers = create_state!(XRegisters, XRegistersLayout, F);
+        let mut registers = XRegisters::new(&mut F::manager());
 
         // Initialise the registers with something.
         for reg in NONZERO_REGISTERS {
@@ -695,7 +694,7 @@ mod tests {
     });
 
     backend_test!(test_try_read_u32, F, {
-        let mut registers = create_state!(XRegisters, XRegistersLayout, F);
+        let mut registers = XRegisters::new(&mut F::manager());
 
         // Reading an integer that is too large should fail
         registers.write(x1, 1 << 32);
