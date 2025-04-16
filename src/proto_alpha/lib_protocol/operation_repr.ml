@@ -1868,30 +1868,23 @@ module Encoding = struct
         {
           tag = 41;
           name = "bls_mode_attestation";
-          encoding =
-            merge_objs
-              consensus_aggregate_content_encoding
-              (obj1 (opt "dal" dal_content_encoding));
+          encoding = consensus_aggregate_content_encoding;
           select =
             (function Contents (Attestation _ as op) -> Some op | _ -> None);
           proj =
-            (fun (Attestation {consensus_content; dal_content}) ->
-              ( {
-                  level = consensus_content.level;
-                  round = consensus_content.round;
-                  block_payload_hash = consensus_content.block_payload_hash;
-                },
-                Option.map
-                  (fun dal_content -> dal_content.attestation)
-                  dal_content ));
+            (fun (Attestation {consensus_content; dal_content = _}) ->
+              {
+                level = consensus_content.level;
+                round = consensus_content.round;
+                block_payload_hash = consensus_content.block_payload_hash;
+              });
           inj =
-            (fun ({level; round; block_payload_hash}, dal_content) ->
+            (fun {level; round; block_payload_hash} ->
               Attestation
                 {
                   consensus_content =
                     {slot = Slot_repr.zero; level; round; block_payload_hash};
-                  dal_content =
-                    Option.map (fun attestation -> {attestation}) dal_content;
+                  dal_content = None;
                 });
         }
 
