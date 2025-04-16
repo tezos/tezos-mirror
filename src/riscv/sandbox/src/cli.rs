@@ -30,6 +30,16 @@ pub enum ExitMode {
 
 #[derive(Debug, Clone, Parser)]
 pub struct Cli {
+    /// Configure the log level
+    #[cfg(feature = "log")]
+    #[arg(long, default_value = "warn")]
+    pub log_level: octez_riscv::log::tracing_internal::Level,
+
+    /// Log to a JSON file
+    #[cfg(feature = "log")]
+    #[arg(long)]
+    pub log_json_file: Option<Box<Path>>,
+
     #[command(subcommand)]
     pub command: Mode,
 }
