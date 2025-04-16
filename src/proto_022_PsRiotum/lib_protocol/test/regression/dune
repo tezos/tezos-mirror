@@ -7,7 +7,6 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-rustzcash-deps
   octez-libs.base
   tezt-tezos
   tezos-protocol-022-PsRiotum.protocol
@@ -33,6 +32,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   src_proto_022_PsRiotum_lib_protocol_test_regression_tezt_lib
   tezt)
  (link_flags

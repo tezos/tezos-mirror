@@ -10,8 +10,8 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "bls12-381" {with-test}
   "octez-evm-node-libs" { with-test & = version }
+  "bls12-381" {with-test}
   "octez-libs" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "octez-alcotezt" {with-test}

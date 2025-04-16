@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
+(* Copyright (c) 2022-2025 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
@@ -50,52 +50,60 @@ let octez_evm_node_lib =
     ~container:registered_octez_evm_node_libs
     ~package:"octez-evm-node-libs"
 
-let evm_node_rust_deps =
-  octez_evm_node_lib
-    "evm_node_rust_deps"
-    ~path:"etherlink/lib_wasm_runtime"
-    ~synopsis:"WASM runtime foreign archive"
-    ~foreign_archives:["octez_evm_node_rust_deps"]
-    ~dune:
-      Dune.
-        [
-          [
-            S "dirs";
-            S ":standard";
-            (* We need this stanza to ensure .cargo can be used as a
-               dependency via source_tree. *)
-            S ".cargo";
-            (* Do not track Cargo output directory. *)
-            [S "not"; S "target"];
-          ];
-          [
-            S "rule";
-            [
-              S "targets";
-              S "liboctez_evm_node_rust_deps.a";
-              S "dlloctez_evm_node_rust_deps.so";
-            ];
-            [
-              S "deps";
-              [S "file"; S "build.sh"];
-              [S "file"; S "Cargo.toml"];
-              [S "file"; S "Cargo.lock"];
-              [S "file"; S "../../rust-toolchain"];
-              [S "source_tree"; S ".cargo"];
-              [S "source_tree"; S "../sputnikvm"];
-              [S "source_tree"; S "../kernel_bifrost"];
-              [S "source_tree"; S "../kernel_calypso"];
-              [S "source_tree"; S "../kernel_calypso2"];
-              [S "source_tree"; S "../../src/rustzcash_deps"];
-              [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
-              [S "source_tree"; S "../../src/riscv"];
-              [S "source_tree"; S "../../src/kernel_sdk"];
-              [S "source_tree"; S "../../sdk/rust"];
-              [S "source_tree"; S "src"];
-            ];
-            [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
-          ];
-        ]
+let lib_etherlink_wasm_runtime =
+  rust_archive
+    Manifest_link_deps.LinkTypes.
+      [
+        RustDep Rustzcash;
+        RustDep Riscv_pvm;
+        RustDep Wasmer;
+        RustDep Etherlink_wasm_runtime;
+      ]
+    (octez_evm_node_lib
+       "evm_node_rust_deps"
+       ~path:"etherlink/lib_wasm_runtime"
+       ~synopsis:"WASM runtime foreign archive"
+       ~foreign_archives:["octez_evm_node_rust_deps"]
+       ~dune:
+         Dune.
+           [
+             [
+               S "dirs";
+               S ":standard";
+               (* We need this stanza to ensure .cargo can be used as a
+                  dependency via source_tree. *)
+               S ".cargo";
+               (* Do not track Cargo output directory. *)
+               [S "not"; S "target"];
+             ];
+             [
+               S "rule";
+               [
+                 S "targets";
+                 S "liboctez_evm_node_rust_deps.a";
+                 S "dlloctez_evm_node_rust_deps.so";
+               ];
+               [
+                 S "deps";
+                 [S "file"; S "build.sh"];
+                 [S "file"; S "Cargo.toml"];
+                 [S "file"; S "Cargo.lock"];
+                 [S "file"; S "../../rust-toolchain"];
+                 [S "source_tree"; S ".cargo"];
+                 [S "source_tree"; S "../sputnikvm"];
+                 [S "source_tree"; S "../kernel_bifrost"];
+                 [S "source_tree"; S "../kernel_calypso"];
+                 [S "source_tree"; S "../kernel_calypso2"];
+                 [S "source_tree"; S "../../src/rustzcash_deps"];
+                 [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
+                 [S "source_tree"; S "../../src/riscv"];
+                 [S "source_tree"; S "../../src/kernel_sdk"];
+                 [S "source_tree"; S "../../sdk/rust"];
+                 [S "source_tree"; S "src"];
+               ];
+               [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
+             ];
+           ])
 
 let tezt ?(deps = []) = tezt ~deps:(bls12_381_archive :: deps)
 
@@ -140,6 +148,7 @@ let wasm_runtime =
     "evm_node_wasm_runtime"
     ~path:"etherlink/lib_wasm_runtime/ocaml-api"
     ~synopsis:"WASM runtime compatible with the WASM PVM"
+    ~link_deps:lib_etherlink_wasm_runtime
     ~deps:[octez_layer2_irmin_context |> open_; wasm_runtime_callbacks]
     ~flags:
       (Flags.standard
@@ -353,7 +362,6 @@ let _octez_evm_node_tests =
     ~deps:
       [
         bls12_381_archive;
-        evm_node_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_base_test_helpers |> open_;
@@ -391,7 +399,6 @@ let _tezt_etherlink =
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
         evm_node_lib_dev_encoding;
-        octez_rust_deps;
         Protocol.(main alpha);
       ]
     ~with_macos_security_framework:true
@@ -417,7 +424,6 @@ let _evm_node =
       [[S ":include"; S "%{workspace_root}/link-flags-evm-node.sexp"]]
     ~deps:
       [
-        evm_node_rust_deps;
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
@@ -513,7 +519,6 @@ let _floodgate_bin =
     ~deps:
       [
         bls12_381_archive;
-        evm_node_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         efunc_core;
@@ -538,7 +543,6 @@ let _outbox_monitor =
     ~deps:
       [
         bls12_381_archive;
-        evm_node_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_version_value;

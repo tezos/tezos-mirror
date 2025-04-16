@@ -7,7 +7,6 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-rust-deps
   octez-libs.base
   octez-libs.crypto
   octez-shell-libs.context-ops
@@ -69,6 +68,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   src_lib_store_unix_test_tezt_lib
   tezt)
  (link_flags

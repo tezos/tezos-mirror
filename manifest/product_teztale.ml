@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -163,7 +164,6 @@ let _teztale_archiver =
     ~link_flags
     ~deps:
       ([
-         octez_rust_deps (* for rustzcash *);
          bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
          octez_stdlib_unix |> open_;

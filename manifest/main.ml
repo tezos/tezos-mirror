@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
+(* Copyright (c) 2022-2025 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -98,7 +98,6 @@ let () =
       octez_test_helpers |> open_;
       tezt_wrapper |> open_ |> open_ ~m:"Base";
       str;
-      octez_rust_deps;
       bls12_381_archive;
       bls12_381;
       tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";

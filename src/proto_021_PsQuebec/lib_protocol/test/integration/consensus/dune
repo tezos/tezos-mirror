@@ -8,7 +8,6 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-rustzcash-deps
   octez-alcotezt
   octez-libs.base
   tezos-protocol-021-PsQuebec.protocol
@@ -48,6 +47,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   src_proto_021_PsQuebec_lib_protocol_test_integration_consensus_tezt_lib
   tezt)
  (link_flags

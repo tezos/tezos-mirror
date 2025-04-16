@@ -7,7 +7,7 @@
  (package octez-baker-PsRiotum)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-rustzcash-deps
+  octez-rust-deps
   bls12-381.archive
   octez-libs.base
   octez-libs.clic

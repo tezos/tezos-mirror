@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1208,6 +1209,7 @@ module Target = struct
     c_library_flags : string list option;
     conflicts : t list;
     deps : t list;
+    link_deps : Manifest_link_deps.t list;
     tests_deps : t option list;
     dune : Dune.s_expr;
     flags : Flags.t option;
@@ -1327,6 +1329,11 @@ module Target = struct
           "Manifest.Target.inline_tests_backend cannot be given no_target"
     | Some target -> Inline_tests_backend target
 
+  let is_internal_kind_lib (kind : kind) =
+    match kind with
+    | Public_library _ | Private_library _ -> true
+    | Public_executable _ | Private_executable _ | Test_executable _ -> false
+
   let convert_to_identifier = String.map @@ function '-' | '.' -> '_' | c -> c
 
   (* List of all targets, in reverse order of registration. *)
@@ -1345,6 +1352,47 @@ module Target = struct
 
   (* Set to [false] by [generate] to prevent further modifying the above references. *)
   let can_register = ref true
+
+  let kind_name_for_errors kind =
+    match kind with
+    | Public_library {public_name = name; _}
+    | Private_library name
+    | Public_executable ({public_name = name; _}, _)
+    | Private_executable (name, _)
+    | Test_executable {names = name, _; _} ->
+        name
+
+  (* Note: this function is redefined below for the version with optional targets. *)
+  let rec name_for_errors = function
+    | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
+        name_for_errors target
+    | Internal {kind; _} -> kind_name_for_errors kind
+
+  module TargetLinkDeps = Manifest_link_deps.LinkDeps (struct
+    type target = t
+
+    type internal_target = internal
+
+    type target_kind = kind
+
+    let get_internal = get_internal
+
+    let get_link_deps t = t.link_deps
+
+    let is_internal_kind_lib = is_internal_kind_lib
+
+    let debug_name = name_for_errors
+
+    let debug_kind = kind_name_for_errors
+
+    let path_of_internal_target t = t.path
+
+    let error = error
+  end)
 
   let register_internal ({path; opam; product; kind; _} as internal) =
     let path = sanitize_path path in
@@ -1372,25 +1420,6 @@ module Target = struct
     | _ -> ()) ;
     registered := internal :: !registered ;
     Some (Internal internal)
-
-  let kind_name_for_errors kind =
-    match kind with
-    | Public_library {public_name = name; _}
-    | Private_library name
-    | Public_executable ({public_name = name; _}, _)
-    | Private_executable (name, _)
-    | Test_executable {names = name, _; _} ->
-        name
-
-  (* Note: this function is redefined below for the version with optional targets. *)
-  let rec name_for_errors = function
-    | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
-    | Optional target
-    | Re_export target
-    | Select {package = target; _}
-    | Open (target, _) ->
-        name_for_errors target
-    | Internal {kind; _} -> kind_name_for_errors kind
 
   let rec names_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> (name, [])
@@ -1438,6 +1467,7 @@ module Target = struct
     ?dep_globs:string list ->
     ?dep_globs_rec:string list ->
     ?deps:t option list ->
+    ?link_deps:Manifest_link_deps.t list ->
     ?dune:Dune.s_expr ->
     ?flags:Flags.t ->
     ?foreign_archives:string list ->
@@ -1505,8 +1535,8 @@ module Target = struct
 
   let internal ~product make_kind ?all_modules_except ?bisect_ppx
       ?c_library_flags ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
-      ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
-      ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
+      ?(dep_globs_rec = []) ?(deps = []) ?(link_deps = []) ?(dune = Dune.[])
+      ?flags ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
       ?inline_tests_deps ?inline_tests_link_flags ?inline_tests_libraries
       ?wrapped ?documentation ?(link_flags = []) ?(linkall = false) ?modes
       ?modules ?(modules_without_implementation = [])
@@ -1520,8 +1550,12 @@ module Target = struct
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
       ?(with_macos_security_framework = false) ?(source = []) ~path ?enabled_if
       names =
+    let kind = make_kind names in
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
+    let deps, link_deps =
+      TargetLinkDeps.compute_deps ~target_kind:kind ~target_deps:deps ~link_deps
+    in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
     let ppx_runtime_libraries = List.filter_map Fun.id ppx_runtime_libraries in
     let implements =
@@ -1540,7 +1574,6 @@ module Target = struct
       in
       List.flatten (List.map (get_opens []) deps)
     in
-    let kind = make_kind names in
     let preprocess, inline_tests =
       match
         ( inline_tests,
@@ -1857,6 +1890,7 @@ module Target = struct
         c_library_flags;
         conflicts;
         deps;
+        link_deps;
         dune;
         flags;
         foreign_archives;
@@ -1910,6 +1944,11 @@ module Target = struct
         dep_globs_rec;
         enabled_if;
       }
+
+  let rust_archive link_deps target =
+    target
+    |> Option.map @@ TargetLinkDeps.register_target link_deps
+    |> Option.to_list |> List.flatten
 
   let public_lib ?internal_name =
     internal @@ fun public_name ->
@@ -2414,6 +2453,7 @@ module Sub_lib = struct
        ?dep_globs
        ?dep_globs_rec
        ?deps
+       ?link_deps
        ?dune
        ?flags
        ?foreign_archives
@@ -2502,6 +2542,7 @@ module Sub_lib = struct
       ?c_library_flags
       ?conflicts
       ?deps
+      ?link_deps
       ?dep_files
       ?dep_globs
       ?dep_globs_rec
@@ -2621,6 +2662,8 @@ module Product (M : sig
   val source : string list
 end) =
 struct
+  let rust_archive = Target.rust_archive
+
   let public_lib = Target.public_lib ~product:M.name ~source:M.source
 
   let private_lib = Target.private_lib ~product:M.name ~source:M.source
@@ -2699,11 +2742,7 @@ let generate_dune (internal : Target.internal) =
     in
     (libraries, ppx_runtime_libraries, List.rev !empty_files_to_create)
   in
-  let is_lib =
-    match internal.kind with
-    | Public_library _ | Private_library _ -> true
-    | Public_executable _ | Private_executable _ | Test_executable _ -> false
-  in
+  let is_lib = Target.is_internal_kind_lib internal.kind in
   let library_flags =
     if internal.linkall && is_lib then Some Dune.[S ":standard"; S "-linkall"]
     else None

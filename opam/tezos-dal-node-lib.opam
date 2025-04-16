@@ -15,11 +15,11 @@ depends: [
   "dal_node_migrations" { = version }
   "octez-shell-libs" { = version }
   "octez-l2-libs" { = version }
+  "octez-rust-deps" { with-test & = version }
   "ppx_hash" {with-test}
   "bam-ppx" { with-test & >= "0.3" }
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "bls12-381" { with-test & = version }
-  "octez-rust-deps" { with-test & = version }
   "tezt-bam" { with-test & >= "0.3" }
 ]
 build: [

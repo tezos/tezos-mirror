@@ -12,7 +12,6 @@
   tezt-tezos
   tezt_etherlink
   octez-evm-node-libs.evm_node_lib_dev_encoding
-  octez-rust-deps
   tezos-protocol-alpha.protocol)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (library_flags (:standard -linkall))
@@ -32,6 +31,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   etherlink_tezt_tests_tezt_lib
   tezt)
  (link_flags

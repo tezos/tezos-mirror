@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -58,8 +58,6 @@ val octez_rpc_http : Manifest.target
 val octez_rpc_http_server : Manifest.target
 
 val octez_rust_deps : Manifest.target
-
-val octez_rustzcash_deps : Manifest.target
 
 val octez_scoru_wasm_debugger_lib : Manifest.target
 

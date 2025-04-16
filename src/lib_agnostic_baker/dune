@@ -6,7 +6,6 @@
  (public_name octez-agnostic-baker-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-rustzcash-deps
   bls12-381.archive
   octez-libs.data-encoding
   octez-libs.base

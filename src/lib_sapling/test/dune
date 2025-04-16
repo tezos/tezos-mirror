@@ -7,7 +7,6 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-rustzcash-deps
   octez-libs.tezos-sapling
   octez-libs.crypto
   str
@@ -41,6 +40,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rustzcash-deps
   src_lib_sapling_test_tezt_lib
   tezt)
  (link_flags

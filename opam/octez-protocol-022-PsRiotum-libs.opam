@@ -32,7 +32,6 @@ depends: [
   "octez-agnostic-baker-lib" { = version }
   "octez-injector" { = version }
   "octez-l2-libs" { = version }
-  "octez-rustzcash-deps" { with-test & = version }
   "octez-alcotezt" { with-test & = version }
 ]
 build: [

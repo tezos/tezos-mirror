@@ -5,6 +5,7 @@
  (name bench)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-rust-deps
   octez-libs.base
   tezt
   octez-alcotezt

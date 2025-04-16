@@ -7,7 +7,6 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-rust-deps
   octez-libs.micheline
   tezos-micheline-rewriting
   tezos-protocol-alpha.protocol
@@ -25,6 +24,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   src_lib_benchmark_lib_micheline_rewriting_test_tezt_lib
   tezt)
  (link_flags
