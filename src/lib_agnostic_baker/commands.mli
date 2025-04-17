@@ -16,3 +16,10 @@ val baker_commands :
   ?plugin:(module Protocol_plugin_sig.S) ->
   unit ->
   Tezos_client_base.Client_context.full Tezos_clic.command list
+
+(** [accuser_commands ?plugin ()] behaves similarly to [baker_commands], but
+    for the accuser process. *)
+val accuser_commands :
+  ?plugin:(module Protocol_plugin_sig.S) ->
+  unit ->
+  Tezos_client_base.Client_context.full Tezos_clic.command list
