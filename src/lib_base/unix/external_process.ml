@@ -528,6 +528,7 @@ module Make (P : External_process_parameters.S) = struct
                       (option Profiler.report_encoding)
                       (option Profiler.report_encoding))))
         in
+        let*! () = Lwt_io.close p.hypervisee.output in
         (* Restart the hypervisee. *)
         let* hypervisee = start_hypervisee p.external_process p.parameters in
         p.hypervisee <- hypervisee ;
@@ -651,6 +652,8 @@ module Make (P : External_process_parameters.S) = struct
               Lwt.return_unit
           | e -> Lwt.reraise e)
     in
+    let* () = Lwt_io.close p.hypervisee.output
+    and* () = Lwt_io.close p.external_process.output in
     let* () =
       Lwt.catch
         (fun () ->
