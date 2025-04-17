@@ -179,10 +179,12 @@ let update_companion_key_with_fresh_key ~ck_name src =
   add_account ~algo:Bls ck_name --> update_companion_key ~ck_name src
 
 (* Should only be used with tz4 *)
-let update_key ~kind ~ck_name src =
+let update_key ?proof_signer ?force_no_signer ~kind ~ck_name src =
   match kind with
-  | Consensus -> update_consensus_key ~ck_name src
-  | Companion -> update_companion_key ~ck_name src
+  | Consensus ->
+      update_consensus_key ?proof_signer ?force_no_signer ~ck_name src
+  | Companion ->
+      update_companion_key ?proof_signer ?force_no_signer ~ck_name src
 
 let test_simple_register_consensus_and_companion_keys =
   let bootstrap_accounts = ["bootstrap1"; "bootstrap2"] in
@@ -992,6 +994,38 @@ let test_fail_already_registered =
             (update_key ~kind ~ck_name:"ck" delegate))
         [("update consensus", Consensus); ("update companion", Companion)]
 
+let test_fail_no_signer =
+  let open Lwt_result_syntax in
+  let delegate = "delegate" in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> begin_test ~force_attest_all:true [delegate]
+  --> add_account ~algo:Bls "ck"
+  --> fold_tag
+        (fun kind ->
+          assert_failure
+            ~loc:__LOC__
+            ~expected_error:(fun (_block, state) err ->
+              let delegate = State.find_account delegate state in
+              let ck = State.find_account "ck" state in
+              let* ck_account = Account.find ck.pkh in
+              Assert.expect_error ~loc:__LOC__ err (function
+                  | [
+                      Protocol.Validate_errors.Manager
+                      .Update_consensus_key_with_tz4_without_proof
+                        {
+                          kind = err_kind;
+                          source = err_source;
+                          public_key = err_pk;
+                        };
+                    ] ->
+                      Signature.Public_key_hash.equal err_source delegate.pkh
+                      && Signature.Public_key.equal err_pk ck_account.pk
+                      && err_kind = kind
+                  | _ -> false))
+            (update_key ~force_no_signer:true ~kind ~ck_name:"ck" delegate))
+        [("update consensus", Consensus); ("update companion", Companion)]
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -1009,6 +1043,7 @@ let tests =
        ("Test fail forbidden tz4", test_forbidden_tz4);
        ("Test fail noop", test_fail_noop);
        ("Test already registered", test_fail_already_registered);
+       ("Test fail if no signer", test_fail_no_signer);
      ]
 
 let () =
