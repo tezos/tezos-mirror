@@ -185,6 +185,9 @@ Commands related to the agnostic baker daemon.:
   
   run vdf 
     Launch the VDF daemon
+  
+  run accuser 
+    Launch the accuser daemon
 
 Miscellaneous commands:
 

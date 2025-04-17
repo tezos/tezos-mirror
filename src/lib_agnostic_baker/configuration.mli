@@ -51,6 +51,9 @@ val sources_param :
     Tezos_client_base.Client_context.full )
   Tezos_clic.params
 
+val preserved_levels_arg :
+  (int, Tezos_client_base.Client_context.full) Tezos_clic.arg
+
 type t = {
   pidfile : string option;
   node_version_check_bypass : bool;

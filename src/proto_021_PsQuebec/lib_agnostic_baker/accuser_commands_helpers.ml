@@ -5,11 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin : Protocol_plugin_sig.S = struct
-  let protocol_hash = Protocol.hash
-
-  module Baker_commands_helpers = Baker_commands_helpers
-  module Accuser_commands_helpers = Accuser_commands_helpers
-end
-
-let () = Protocol_plugins.register (module Plugin)
+let run ~cctxt ~preserved_levels ~keep_alive =
+  let cctxt = new Protocol_client_context.wrap_full cctxt in
+  Client_daemon.Accuser.run
+    cctxt
+    ~chain:cctxt#chain
+    ~preserved_levels
+    ~keep_alive

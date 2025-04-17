@@ -28,8 +28,20 @@ module type BAKER_COMMANDS_HELPERS = sig
     unit tzresult Lwt.t
 end
 
+module type ACCUSER_COMMANDS_HELPERS = sig
+  (** [run ~cctxt ~preserved_levels ~keep_alive] is the main running function signature
+      that all protocol plugins will implement for the accuser. *)
+  val run :
+    cctxt:Tezos_client_base.Client_context.full ->
+    preserved_levels:int ->
+    keep_alive:bool ->
+    unit tzresult Lwt.t
+end
+
 module type S = sig
   val protocol_hash : Protocol_hash.t
 
   module Baker_commands_helpers : BAKER_COMMANDS_HELPERS
+
+  module Accuser_commands_helpers : ACCUSER_COMMANDS_HELPERS
 end
