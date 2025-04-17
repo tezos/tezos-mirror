@@ -155,7 +155,7 @@ formula<baking_power_overview_alpha>`.
 
 The baking rights are determined
 :ref:`CONSENSUS_RIGHTS_DELAY<cs_constants_alpha>` in advance, which is
-``2`` :ref:`cycles<def_cycle_alpha>` for the Quebec protocol. More
+currently ``2`` :ref:`cycles<def_cycle_alpha>`. More
 precisely, at the end of cycle ``n`` and beginning of cycle ``n+1``,
 the baking rights for cycle ``n+1+CONSENSUS_RIGHTS_DELAY=n+3`` are
 :doc:`randomly generated<randomness_generation>` based on the current

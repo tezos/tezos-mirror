@@ -165,7 +165,7 @@ To run a delegate, you first need to register as one using
 your user account::
 
    octez-client register key bob as delegate
-   
+
 You also need to stake some tez, as explained above, so as to have at least ``MINIMAL_STAKE = 6000`` :ref:`baking power <minimal_baking_power>`, taking into account your own and all your delegators' staked balances, as well as their delegated balances with a lesser weight.
 Most commonly, you would stake (at least) the needed amount from your own tez, without waiting for delegators::
 
@@ -189,13 +189,13 @@ baking rights at higher rounds, like 2 in the example above.
 Inactive delegates
 ~~~~~~~~~~~~~~~~~~
 
-If a delegate doesn't show any sign of activity for ``consensus_rights_delay``
+If a delegate doesn't show any sign of activity for :ref:`TOLERATED_INACTIVITY_PERIOD <ps_constants>` cycles,
 it is marked **inactive** and its rights are removed.
 This mechanism is important to remove inactive delegates and reallocate
 their rights to the active ones so that the network is always working
 smoothly.
 Normally even a baker with the minimal stake should perform enough
-operations during 5 cycles to remain active.
+operations during this period to remain active.
 If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
 
