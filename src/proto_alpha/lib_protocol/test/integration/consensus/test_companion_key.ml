@@ -862,6 +862,33 @@ let test_in_registration_table_twice =
         [("update consensus", Consensus); ("update companion", Companion)]
   --> next_block
 
+let test_unregistered =
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> begin_test ~force_attest_all:true ["bootstrap"]
+  (* This account is not a delegate *)
+  --> add_account_with_funds ~funder:"bootstrap" "account" Half
+  --> add_account ~algo:Bls "ck"
+  --> fold_tag
+        (fun kind ->
+          assert_failure
+            ~loc:__LOC__
+            ~expected_error:(fun (_block, state) err ->
+              let account = State.find_account "account" state in
+              Assert.expect_error ~loc:__LOC__ err (function
+                  | [
+                      Protocol.Apply
+                      .Update_consensus_key_on_unregistered_delegate
+                        (err_account_pkh, err_kind);
+                    ] ->
+                      Signature.Public_key_hash.equal
+                        err_account_pkh
+                        account.pkh
+                      && err_kind = kind
+                  | _ -> false))
+            (update_key ~kind ~ck_name:"ck" "account"))
+        [("update consensus", Consensus); ("update companion", Companion)]
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -875,6 +902,7 @@ let tests =
        ("Test register key at end of cycle", test_register_key_end_of_cycle);
        ("Test registration override", test_registration_override);
        ("Test double registration", test_in_registration_table_twice);
+       ("Test fail on unregistered delegate", test_unregistered);
      ]
 
 let () =
