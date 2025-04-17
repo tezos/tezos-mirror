@@ -1026,6 +1026,32 @@ let test_fail_no_signer =
             (update_key ~force_no_signer:true ~kind ~ck_name:"ck" delegate))
         [("update consensus", Consensus); ("update companion", Companion)]
 
+let test_fail_wrong_signer =
+  let open Lwt_result_syntax in
+  let delegate = "delegate" in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> begin_test ~force_attest_all:true ~algo:Bls [delegate; "signer"]
+  --> add_account ~algo:Bls "ck"
+  --> fold_tag
+        (fun kind ->
+          assert_failure
+            ~loc:__LOC__
+            ~expected_error:(fun (_block, state) err ->
+              let ck = State.find_account "ck" state in
+              let* ck_account = Account.find ck.pkh in
+              Assert.expect_error ~loc:__LOC__ err (function
+                  | [
+                      Protocol.Validate_errors.Manager
+                      .Update_consensus_key_with_incorrect_proof
+                        {kind = err_kind; public_key = err_pk; proof = _};
+                    ] ->
+                      Signature.Public_key.equal err_pk ck_account.pk
+                      && err_kind = kind
+                  | _ -> false))
+            (update_key ~proof_signer:"signer" ~kind ~ck_name:"ck" delegate))
+        [("update consensus", Consensus); ("update companion", Companion)]
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -1044,6 +1070,7 @@ let tests =
        ("Test fail noop", test_fail_noop);
        ("Test already registered", test_fail_already_registered);
        ("Test fail if no signer", test_fail_no_signer);
+       ("Test fail if wrong signer", test_fail_wrong_signer);
      ]
 
 let () =
