@@ -646,7 +646,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
     fn get_word_size(&self, init_code: &[u8]) -> u64 {
         // ceil(len(init_code) / 32)
-        (init_code.len() as u64 + 31) / 32
+        (init_code.len() as u64).div_ceil(32)
     }
 
     fn record_init_code_cost(&mut self, init_code: &[u8]) -> Result<(), ExitError> {
