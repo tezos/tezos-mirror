@@ -933,7 +933,7 @@ module Tezt = struct
       ?(tezt_parallel = 1) ?(tezt_variant = "")
       ?(before_script = before_script ~source_version:true ~eval_opam:false [])
       ?timeout ?(disable_test_timeout = false) ?job_select_tezts ~dependencies
-      ?allow_failure () : tezos_job =
+      ?allow_failure ?(keep_going = false) () : tezos_job =
     let variables =
       [
         ("JUNIT", "tezt-junit.xml");
@@ -1016,6 +1016,7 @@ module Tezt = struct
              Printf.sprintf " --junit-tag 'dd_tags[tezt-tag.%s]=%s'" tag tag)
       |> String.concat ""
     in
+    let keep_going_opt = if keep_going then " --keep-going" else "" in
     job
       ?timeout
       ~__POS__
@@ -1078,7 +1079,7 @@ module Tezt = struct
            --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
            tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
            ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn \
-           5_000_000_000" ^ junit_tags;
+           5_000_000_000" ^ keep_going_opt ^ junit_tags;
       ]
 
   (** Tezt tag selector string.
