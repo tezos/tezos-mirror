@@ -19,7 +19,7 @@ ARG OCAML_IMAGE
 ARG BUILD_IMAGE
 
 # hadolint ignore=DL3006
-FROM runtime as e2etest
+FROM monitoring as e2etest
 
 LABEL org.opencontainers.image.title="e2etest"
 
