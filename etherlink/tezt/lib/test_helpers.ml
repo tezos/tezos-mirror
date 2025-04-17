@@ -425,7 +425,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     ?tx_pool_tx_per_addr_limit ?set_account_code ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?history_mode ?patch_config
     ?(kernel = Constant.WASM.evm_kernel) ?evm_version
-    ?(bootstrap_accounts =
+    ?(eth_bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
         (Array.to_list Eth_account.bootstrap_accounts)) () =
@@ -440,7 +440,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
       ~output:output_config
-      ~bootstrap_accounts
+      ~eth_bootstrap_accounts
       ?evm_version
       ()
   in

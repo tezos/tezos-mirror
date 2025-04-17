@@ -33,14 +33,17 @@ type l2_setup = {
   l2_chain_id : int;
   l2_chain_family : string;
   world_state_path : string option;
-  bootstrap_accounts : string list option;
+  eth_bootstrap_accounts : string list option;
+  tez_bootstrap_accounts : Account.key list option;
   sequencer_pool_address : string option;
   minimum_base_fee_per_gas : Wei.t option;
   da_fee_per_byte : Wei.t option;
   maximum_gas_per_transaction : int64 option;
 }
 
-val default_bootstrap_accounts : string list
+val eth_default_bootstrap_accounts : string list
+
+val tez_default_bootstrap_accounts : Account.key list
 
 val default_l2_setup : l2_chain_id:int -> l2_setup
 
@@ -636,8 +639,10 @@ val wait_termination : t -> unit Lwt.t
 val make_l2_kernel_installer_config :
   ?chain_id:int ->
   ?chain_family:string ->
-  ?bootstrap_balance:Wei.t ->
-  ?bootstrap_accounts:string list ->
+  ?eth_bootstrap_balance:Wei.t ->
+  ?tez_bootstrap_balance:Tez.t ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?minimum_base_fee_per_gas:Wei.t ->
   ?da_fee_per_byte:Wei.t ->
   ?sequencer_pool_address:string ->
@@ -657,8 +662,8 @@ val make_kernel_installer_config :
   ?remove_whitelist:bool ->
   ?kernel_root_hash:string ->
   ?chain_id:int ->
-  ?bootstrap_balance:Wei.t ->
-  ?bootstrap_accounts:string list ->
+  ?eth_bootstrap_balance:Wei.t ->
+  ?eth_bootstrap_accounts:string list ->
   ?sequencer:string ->
   ?delayed_bridge:string ->
   ?ticketer:string ->

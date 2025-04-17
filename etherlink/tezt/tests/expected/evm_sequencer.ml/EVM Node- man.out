@@ -702,13 +702,12 @@ Kernel commands:
       [--sequencer-pool-address <0x...>] [--maximum-allowed-ticks <11000...>]
       [--maximum-gas-per-transaction <30000...>]
       [--max-blueprint-lookahead-in-seconds <500>] [--remove-whitelist]
-      [--bootstrap-balance <9999000000000000000000>]
-      [--bootstrap-account <0x...>] [--set-code <0x...,0x....>]
-      [--enable-fa-bridge] [--enable-dal] [--dal-slots <0,1,4,6,...>]
-      [--enable-multichain] [--l2-chain-id <1>]
-      [--max-delayed-inbox-blueprint-length <1000>]
+      [--eth-bootstrap-balance <9999000000000000000000>]
+      [--eth-bootstrap-account <0x...>] [--enable-fa-bridge]
+      [--dal-slots <0,1,4,6,...>] [--enable-dal] [--enable-multichain]
+      [--l2-chain-id <1>] [--max-delayed-inbox-blueprint-length <1000>]
       [--enable-fast-withdrawal] [--enable-fast-fa-withdrawal]
-      [--evm-version <cancun|shanghai>]
+      [--evm-version <cancun|shanghai>] [--set-code <0x...,0x....>]
     Create a configuration for the kernel installer.
     <kernel config file>: File path where the config will be written to.
     --mainnet-compat: Generate a configuration compatible with the first
@@ -744,16 +743,14 @@ Kernel commands:
     --max-blueprint-lookahead-in-seconds <500>: Value for
       max_blueprint_lookahead_in_seconds in the installer config.
     --remove-whitelist: Enable flag remove_whitelist in the installer config.
-    --bootstrap-balance <9999000000000000000000>: Balance of the bootstrap
-      accounts
+    --eth-bootstrap-balance <9999000000000000000000>: Balance (in Wei) of the
+      etherlink bootstrap accounts
       Defaults to `9999000000000000000000`.
-    --bootstrap-account <0x...>: Add a bootstrap account in the installer
-      config.
-    --set-code <0x...,0x....>: Add code to an account in the installer
-      config.
+    --eth-bootstrap-account <0x...>: Add an etherlink bootstrap account in
+      the installer config.
     --enable-fa-bridge: Enable flag enable_fa_bridge in the installer config.
-    --enable-dal: Enable flag enable_dal in the installer config.
     --dal-slots <0,1,4,6,...>: Value for dal_slots in the installer config.
+    --enable-dal: Enable flag enable_dal in the installer config.
     --enable-multichain: Enable flag enable_multichain in the installer
       config.
     --l2-chain-id <1>: Specify one of the chain ids in the kernel, can be
@@ -766,13 +763,16 @@ Kernel commands:
       installer config.
     --evm-version <cancun|shanghai>: Value for evm_version in the installer
       config.
+    --set-code <0x...,0x....>: Add code to an account in the installer
+      config.
   
   make l2 kernel installer config <kernel config file>
       [--minimum-base-fee-per-gas <111...>] [--da-fee-per-byte <111...>]
       [--sequencer-pool-address <0x...>]
       [--maximum-gas-per-transaction <30000...>]
-      [--bootstrap-balance <9999000000000000000000>]
-      [--bootstrap-account <0x...>] [--set-code <0x...,0x....>]
+      [--eth-bootstrap-balance <9999000000000000000000>]
+      [--eth-bootstrap-account <0x...>] [--tez-bootstrap-balance <3800000>]
+      [--tez-bootstrap-account <tz1...>] [--set-code <0x...,0x....>]
       [--world-state-path </evm/world_state/<chain_id>>] [--l2-chain-id <1>]
       [--l2-chain-family <EVM>]
     Produce a file containing the part of the kernel configuration
@@ -786,11 +786,16 @@ Kernel commands:
       installer config.
     --maximum-gas-per-transaction <30000...>: Value for
       maximum_gas_per_transaction in the installer config.
-    --bootstrap-balance <9999000000000000000000>: Balance of the bootstrap
-      accounts.
+    --eth-bootstrap-balance <9999000000000000000000>: Balance (in Wei) of the
+      etherlink bootstrap accounts
       Defaults to `9999000000000000000000`.
-    --bootstrap-account <0x...>: Add a bootstrap account in the installer
-      config.
+    --eth-bootstrap-account <0x...>: Add an etherlink bootstrap account in
+      the installer config.
+    --tez-bootstrap-balance <3800000>: Balance (in tez) of the tezlink
+      bootstrap accounts
+      Defaults to `3800000`.
+    --tez-bootstrap-account <tz1...>: Add a tezlink bootstrap account in the
+      installer config.
     --set-code <0x...,0x....>: Add code to an account in the installer
       config.
     --world-state-path </evm/world_state/<chain_id>>: Value for
