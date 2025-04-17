@@ -620,9 +620,13 @@ module P2P = struct
   let patch_peer ctxt peer () acl = Node_context.P2P.patch_peer ctxt peer acl
 
   module Gossipsub = struct
-    let get_mesh ctxt () () =
+    let get_mesh ctxt q () =
       let open Lwt_result_syntax in
-      return @@ Node_context.P2P.Gossipsub.get_mesh ctxt
+      return
+      @@ Node_context.P2P.Gossipsub.get_mesh
+           ?slot_index:q#slot_index
+           ?delegate:q#delegate
+           ctxt
 
     let get_topics ctxt () () =
       let open Lwt_result_syntax in

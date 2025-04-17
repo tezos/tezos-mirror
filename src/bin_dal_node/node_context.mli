@@ -271,8 +271,14 @@ module P2P : sig
     Types.P2P.Peer.Info.t option tzresult Lwt.t
 
   module Gossipsub : sig
-    (** [get_mesh t] returns the mesh of this peer. *)
-    val get_mesh : t -> (Types.Topic.t * Types.Peer.t list) list
+    (** [get_mesh ?slot_index ?delegate t] returns the mesh of this peer.
+        Optional arguments allow to restrict the output to topics related to provided
+        [slot_index] or [delegate]. *)
+    val get_mesh :
+      ?slot_index:Types.slot_index ->
+      ?delegate:Signature.public_key_hash ->
+      t ->
+      (Types.Topic.t * Types.Peer.t list) list
 
     (** [get_topics t] returns the list of topics the node is subscribed to. *)
     val get_topics : t -> Types.Topic.t list

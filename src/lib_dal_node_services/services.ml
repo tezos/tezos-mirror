@@ -91,7 +91,7 @@ let level_query =
   let open Query in
   query (fun level -> level) |+ opt_field "level" Arg.int32 (fun t -> t) |> seal
 
-let trap_query =
+let topic_query =
   let open Tezos_rpc in
   let open Query in
   query (fun delegate slot_index ->
@@ -379,7 +379,7 @@ let get_traps :
       "For a given published level, return all the traps known by the node. \
        Optional arguments allow to restrict the output to a given delegate or \
        slot index."
-    ~query:trap_query
+    ~query:topic_query
     ~output:(Data_encoding.list Types.trap_encoding)
     Tezos_rpc.Path.(
       open_root / "published_levels" /: Tezos_rpc.Arg.int32 / "known_traps")
@@ -621,14 +621,18 @@ module P2P = struct
         ; output : (Topic.t * Peer.t list) list
         ; prefix : unit
         ; params : unit
-        ; query : unit >
+        ; query :
+            < delegate : Signature.public_key_hash option
+            ; slot_index : slot_index option > >
         service =
       Tezos_rpc.Service.get_service
         ~description:
           "Get the mesh of the peer. Concretely, the RPC returns a list of \
            topics, where each topic is associated to the remote peers with \
-           which the current node shares a full connection (on that topic)."
-        ~query:Tezos_rpc.Query.empty
+           which the current node shares a full connection (on that topic). \
+           Optional arguments allow to restrict the output to a given delegate \
+           or slot index."
+        ~query:topic_query
         ~output:(Data_encoding.list topic_with_peers)
         (open_root / "mesh")
 
