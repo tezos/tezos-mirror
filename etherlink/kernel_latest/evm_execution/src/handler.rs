@@ -33,7 +33,7 @@ use alloc::borrow::Cow;
 use alloc::rc::Rc;
 use core::convert::Infallible;
 use evm::executor::stack::Log;
-use evm::gasometer::{GasCost, Gasometer, MemoryCost};
+use evm::gasometer::{GasCost, Gasometer, MemoryCost, TransactionCost};
 use evm::{
     CallScheme, Capture, Config, Context, CreateScheme, ExitError, ExitFatal, ExitReason,
     ExitRevert, ExitSucceed, Handler, Opcode, Resolve, Stack, Transfer,
@@ -44,7 +44,7 @@ use std::cmp::min;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use tezos_data_encoding::enc::{BinResult, BinWriter};
-use tezos_ethereum::access_list::AccessList;
+use tezos_ethereum::access_list::{AccessList, AccessListItem};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
@@ -446,7 +446,7 @@ pub struct EvmHandler<'a, Host: Runtime> {
     pub created_contracts: BTreeSet<H160>,
     /// Reentrancy guard prevents circular calls to impure precompiles
     reentrancy_guard: ReentrancyGuard,
-    /// Access lists as specified by EIP-2930.
+    /// Access list as specified by EIP-2930.
     access_list: AccessList,
 }
 
@@ -486,6 +486,47 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             ]),
             access_list,
         }
+    }
+
+    pub fn preheat_with_accesslist(&mut self) -> Result<(), EthereumError> {
+        // EIP-3651
+        if self.config.warm_coinbase_address {
+            self.get_contract(self.block_coinbase());
+            if self.mark_address_as_hot(self.block_coinbase()).is_err() {
+                return Err(EthereumError::InconsistentState(Cow::from(format!(
+                    "Failed to mark coinbase address {} as hot",
+                    self.block_coinbase(),
+                ))));
+            }
+        }
+
+        for AccessListItem {
+            address,
+            storage_keys,
+        } in self.access_list.clone()
+        {
+            // Pre-heat contract code
+            self.get_contract(address);
+            if self.mark_address_as_hot(address).is_err() {
+                return Err(EthereumError::InconsistentState(Cow::from(format!(
+                    "Failed to mark access list address {} as hot",
+                    address
+                ))));
+            }
+
+            for index in storage_keys {
+                // Pre-heat storage slots
+                self.storage(address, index);
+                if self.mark_storage_as_hot(address, index).is_err() {
+                    return Err(EthereumError::InconsistentState(Cow::from(format!(
+                        "Failed to mark access list storage slot at address {} and index {} as hot",
+                        address, index
+                    ))));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Get the total amount of gas used for the duration of the current
@@ -565,6 +606,24 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .gasometer
             .as_mut()
             .map(|gasometer| gasometer.record_cost(cost))
+            .unwrap_or(Ok(()))
+    }
+
+    /// Record the intrinsic gas cost of a transaction
+    pub fn record_transaction(
+        &mut self,
+        transaction_cost: TransactionCost,
+    ) -> Result<(), ExitError> {
+        let Some(layer) = self.transaction_data.last_mut() else {
+            return Err(ExitError::Other(Cow::from(
+                "Recording cost, but there is no transaction in progress",
+            )));
+        };
+
+        layer
+            .gasometer
+            .as_mut()
+            .map(|gasometer| gasometer.record_transaction(transaction_cost))
             .unwrap_or(Ok(()))
     }
 
@@ -654,12 +713,15 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         (init_code.len() as u64).div_ceil(32)
     }
 
-    fn record_init_code_cost(&mut self, init_code: &[u8]) -> Result<(), ExitError> {
+    fn init_code_cost(&self, init_code: &[u8]) -> u64 {
         // As per EIP-3860:
         // > We define init_code_cost to equal INITCODE_WORD_COST * get_word_size(init_code).
         // where INITCODE_WORD_COST is 2.
-        let init_code_cost = 2 * self.get_word_size(init_code);
-        self.record_cost(init_code_cost)
+        2 * self.get_word_size(init_code)
+    }
+
+    fn record_init_code_cost(&mut self, init_code: &[u8]) -> Result<(), ExitError> {
+        self.record_cost(self.init_code_cost(init_code))
     }
 
     /// Mark a location in durable storage as _hot_ for the purpose of calculating
@@ -747,6 +809,17 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         self.created_contracts.contains(address)
     }
 
+    fn access_list_address_len(&self) -> usize {
+        self.access_list.len()
+    }
+
+    fn access_list_storage_len(&self) -> usize {
+        self.access_list
+            .iter()
+            .map(|AccessListItem { storage_keys, .. }| storage_keys.len())
+            .sum()
+    }
+
     /// Record the base fee part of the transaction cost. We need the SputnikVM
     /// error code in case this goes wrong, so that's what we return.
     fn record_base_gas_cost(
@@ -754,24 +827,38 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         is_create: bool,
         data: &[u8],
     ) -> Result<(), ExitError> {
-        let base_cost = if is_create {
-            self.config.gas_transaction_create
+        let mut zero_data_len = 0;
+        let mut non_zero_data_len = 0;
+        let access_list_address_len = self.access_list_address_len();
+        let access_list_storage_len = self.access_list_storage_len();
+
+        data.iter().for_each(|datum| {
+            if *datum == 0_u8 {
+                zero_data_len += 1;
+            } else {
+                non_zero_data_len += 1;
+            }
+        });
+
+        let transaction_cost = if is_create {
+            let initcode_cost = self.init_code_cost(data);
+            TransactionCost::Create {
+                zero_data_len,
+                non_zero_data_len,
+                access_list_address_len,
+                access_list_storage_len,
+                initcode_cost,
+            }
         } else {
-            self.config.gas_transaction_call
+            TransactionCost::Call {
+                zero_data_len,
+                non_zero_data_len,
+                access_list_address_len,
+                access_list_storage_len,
+            }
         };
 
-        let data_cost: u64 = data
-            .iter()
-            .map(|datum| {
-                if *datum == 0_u8 {
-                    self.config.gas_transaction_zero_data
-                } else {
-                    self.config.gas_transaction_non_zero_data
-                }
-            })
-            .sum();
-
-        self.record_cost(base_cost + data_cost)
+        self.record_transaction(transaction_cost)
     }
 
     /// Add withdrawals to the current transaction layer
@@ -1473,20 +1560,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             )));
         }
 
-        if let Err(err) = self.record_base_gas_cost(true, &input) {
-            return self.end_initial_transaction(Ok((
-                ExitReason::Error(err),
-                None,
-                vec![],
-            )));
-        }
-
-        if self.mark_address_as_hot(address).is_err() {
-            return Err(EthereumError::InconsistentState(Cow::from(
-                "Failed to mark callee address as hot",
-            )));
-        }
-
         // We check that the maximum allowed init code size as specified by EIP-3860
         // can not be reached.
         if let Some(max_initcode_size) = self.config.max_initcode_size {
@@ -1499,13 +1572,17 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             }
         }
 
-        if let Err(err) = self.record_init_code_cost(&input) {
-            log!(self.host, Debug, "{:?}: Cannot record init code cost.", err);
-
+        if let Err(err) = self.record_base_gas_cost(true, &input) {
             return self.end_initial_transaction(Ok((
-                ExitReason::Error(ExitError::OutOfGas),
+                ExitReason::Error(err),
                 None,
                 vec![],
+            )));
+        }
+
+        if self.mark_address_as_hot(address).is_err() {
+            return Err(EthereumError::InconsistentState(Cow::from(
+                "Failed to mark callee address as hot",
             )));
         }
 
@@ -1667,6 +1744,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             self.config,
             AccessRecord::default(),
         ));
+
+        self.preheat_with_accesslist()?;
 
         self.evm_account_storage
             .begin_transaction(self.host)
@@ -2698,11 +2777,6 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
     }
 
     fn is_cold(&mut self, address: H160, index: Option<H256>) -> Result<bool, ExitError> {
-        // EIP-3651
-        if self.config.warm_coinbase_address && address == self.block_coinbase() {
-            return Ok(false);
-        }
-
         match index {
             Some(index) => {
                 let is_cold = self.is_storage_hot(address, index).map(|x| !x);

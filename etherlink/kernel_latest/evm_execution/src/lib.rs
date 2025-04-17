@@ -278,8 +278,6 @@ pub fn run_transaction<'a, Host>(
     value: U256,
     pay_for_gas: bool,
     tracer: Option<TracerInput>,
-    // TODO: Implement EIP_2930.
-    // See: https://eips.ethereum.org/EIPS/eip-2930.
     access_list: AccessList,
 ) -> Result<Option<handler::ExecutionOutcome>, EthereumError>
 where
