@@ -16,6 +16,7 @@
 (package (name internal-devtools_proto-context-du))
 (package (name kaitai))
 (package (name kaitai-of-data-encoding))
+(package (name octez-accuser))
 (package (name octez-accuser-PsQuebec))
 (package (name octez-accuser-PsRiotum))
 (package (name octez-accuser-alpha))
