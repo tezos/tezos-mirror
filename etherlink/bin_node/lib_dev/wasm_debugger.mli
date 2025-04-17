@@ -95,3 +95,8 @@ val decode :
 
 val get_wasm_version :
   Irmin_context.tree -> Tezos_scoru_wasm.Wasm_pvm_state.version Lwt.t
+
+val get_function_symbols :
+  Irmin_context.tree ->
+  string Octez_smart_rollup_wasm_debugger_lib.Custom_section.FuncMap.t tzresult
+  Lwt.t
