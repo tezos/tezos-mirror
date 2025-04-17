@@ -22,8 +22,12 @@ use crate::pvm::common::PvmStatus;
 use crate::state::NewState;
 use crate::state_backend;
 use crate::state_backend::AllocatedOf;
+use crate::state_backend::CommitmentLayout;
+use crate::state_backend::FnManagerIdent;
+use crate::state_backend::ProofLayout;
+use crate::state_backend::ProofTree;
 use crate::state_backend::owned_backend::Owned;
-use crate::state_backend::proof_backend::proof::MerkleProof;
+use crate::state_backend::proof_backend::proof::Proof;
 use crate::state_backend::verify_backend::Verifier;
 use crate::storage;
 use crate::storage::Hash;
@@ -171,12 +175,70 @@ impl NodePvm {
     pub fn hash(&self) -> Hash {
         self.with_backend(|pvm| pvm.hash().unwrap())
     }
+
+    /// Produce the Merkle proof corresponding to the next step of the PVM.
+    /// If the next step is an input request, provide the given input.
+    pub fn produce_proof(
+        &self,
+        input: Option<PvmInput>,
+        pvm_hooks: &mut PvmHooks,
+    ) -> Option<Proof> {
+        let mut proof_state = self.state.start_proof();
+
+        match input {
+            None => proof_state.eval_one(pvm_hooks),
+            Some(input) => {
+                if !proof_state.provide_input(input) {
+                    return None;
+                }
+            }
+        }
+
+        let refs = proof_state.struct_ref::<FnManagerIdent>();
+        let merkle_proof = NodePvmLayout::to_merkle_tree(refs)
+            .ok()?
+            .to_merkle_proof()
+            .ok()?;
+
+        let refs = proof_state.struct_ref::<FnManagerIdent>();
+        let final_hash = NodePvmLayout::state_hash(refs).ok()?;
+        Some(Proof::new(merkle_proof, final_hash))
+    }
 }
 
 impl NodePvm<Verifier> {
-    /// Construct a PVM state from a Merkle proof.
-    pub fn from_proof(proof: &MerkleProof) -> Option<Self> {
-        Pvm::from_proof(proof, InterpretedBlockBuilder).map(|s| Self { state: Box::new(s) })
+    /// Verify the proof with the given input. Upon success, return the input
+    /// request which corresponds to the initial state of the proof.
+    pub fn verify_proof(
+        proof: &Proof,
+        input: Option<PvmInput>,
+        pvm_hooks: &mut PvmHooks,
+    ) -> Option<()> {
+        let proof_tree = proof.tree();
+        let mut pvm = Pvm::from_proof(proof_tree, InterpretedBlockBuilder).map(|state| Self {
+            state: Box::new(state),
+        })?;
+
+        pvm.with_backend_mut(|pvm| {
+            match input {
+                None => pvm.eval_one(pvm_hooks),
+                Some(input) => {
+                    if !pvm.provide_input(input) {
+                        return None;
+                    }
+                }
+            };
+
+            let refs = pvm.struct_ref::<FnManagerIdent>();
+            let final_hash =
+                NodePvmLayout::partial_state_hash(refs, ProofTree::Present(proof_tree)).ok()?;
+            if final_hash != proof.final_state_hash() {
+                return None;
+            }
+
+            // TODO: RV-556: Construct and return input request upon successful verification
+            todo!()
+        })
     }
 }
 

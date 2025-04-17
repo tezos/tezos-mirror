@@ -24,8 +24,6 @@ use octez_riscv::pvm::PvmStatus;
 use octez_riscv::pvm::node_pvm::NodePvm;
 use octez_riscv::pvm::node_pvm::PvmStorage;
 use octez_riscv::pvm::node_pvm::PvmStorageError;
-use octez_riscv::state_backend::ManagerReadWrite;
-use octez_riscv::state_backend::hash::Hash;
 use octez_riscv::state_backend::owned_backend::Owned;
 use octez_riscv::state_backend::proof_backend::proof;
 use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
@@ -118,6 +116,7 @@ unsafe impl ocaml::ToValue for BytesWrapper {
 }
 
 /// Input values are passed into the PVM after an input request has been made.
+/// Analogous to the [`PvmInput`] type.
 #[derive(ocaml::FromValue)]
 #[ocaml::sig(
     "Inbox_message of {inbox_level: int32; message_counter: int64; payload: bytes} | Reveal of bytes"
@@ -527,61 +526,50 @@ ocaml::custom!(Proof);
 
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
-pub fn octez_riscv_proof_start_state(_proof: Pointer<Proof>) -> [u8; 32] {
-    todo!()
+pub fn octez_riscv_proof_start_state(proof: Pointer<Proof>) -> [u8; 32] {
+    proof.as_ref().initial_state_hash().into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
-pub fn octez_riscv_proof_stop_state(_proof: Pointer<Proof>) -> [u8; 32] {
-    todo!()
+pub fn octez_riscv_proof_stop_state(proof: Pointer<Proof>) -> [u8; 32] {
+    proof.as_ref().final_state_hash().into()
+}
+
+#[ocaml::func]
+#[ocaml::sig("input option -> state -> proof option")]
+pub fn octez_riscv_produce_proof(
+    input: Option<Input>,
+    state: Pointer<State>,
+) -> Option<Pointer<Proof>> {
+    let input = input.map(|i| i.into());
+    let proof = state.apply_ro(|pvm| NodePvm::produce_proof(pvm, input, &mut PvmHooks::default()));
+    proof.map(|p| Pointer::from(Proof(p)))
 }
 
 #[ocaml::func]
 #[ocaml::sig("input option -> proof -> input_request option")]
 // Allow some warnings while this method goes through iterations.
 #[expect(
-    unreachable_code,
     unused_variables,
-    clippy::diverging_sub_expression,
     reason = "There are some gaps in this method while it is being iterated on"
 )]
-pub unsafe fn octez_riscv_verify_proof(
-    proof: Pointer<Proof>,
+pub fn octez_riscv_verify_proof(
     input: Option<Input>,
+    proof: Pointer<Proof>,
 ) -> Option<Pointer<InputRequest>> {
-    let mut state = NodePvm::from_proof(proof.as_ref().tree())?;
+    let input = input.map(|i| i.into());
+    let input_request = NodePvm::verify_proof(proof.as_ref(), input, &mut PvmHooks::default());
 
-    match input {
-        Some(input) => apply_set_input(&mut state, input),
-        None => state.compute_step(&mut PvmHooks::none()),
-    }
-
-    // TODO: RV-362: Check the final state
-    let hash: Hash = todo!("Can't obtain the final state hash just yet");
-
-    if hash != proof.as_ref().final_state_hash() {
-        return None;
-    }
-
-    // TODO: RV-336: Need to construct InputRequest
-    Some(todo!())
-}
-
-#[ocaml::func]
-#[ocaml::sig("input option -> state -> proof option")]
-pub unsafe fn octez_riscv_produce_proof(
-    _input: Option<Input>,
-    _state: Pointer<State>,
-) -> Option<Pointer<InputRequest>> {
-    None
+    // TODO: RV-556: Return an `InputRequest`
+    todo!()
 }
 
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
 pub unsafe fn octez_riscv_serialise_proof(proof: Pointer<Proof>) -> ocaml::Value {
     // Safety: the function needs to return the same `ocaml::Value` as in the signature.
-    // In this case, an ocaml bytes value has to be returned.
+    // In this case, an OCaml bytes value has to be returned.
     let serialisation: Vec<u8> = serialise_proof(proof.as_ref()).collect();
     unsafe { ocaml::Value::bytes(serialisation) }
 }
