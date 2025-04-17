@@ -143,7 +143,7 @@ let get_slot_content_from_shards cryptobox store slot_id =
   (* Store the slot so that next calls don't require a reconstruction. *)
   let* () = Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id in
   let*! () =
-    Event.emit_fetched_slot
+    Event.emit_reconstructed_slot
       ~size:(Bytes.length slot)
       ~shards:(Seq.length shards)
   in

@@ -200,7 +200,7 @@ open struct
       ("profiles", Types.profile_encoding)
       ("error", Error_monad.trace_encoding)
 
-  let fetched_slot =
+  let reconstructed_slot =
     declare_2
       ~section
       ~prefix_name_with_section:true
@@ -1075,7 +1075,8 @@ let emit_fetched_l1_info_success ~requested_info ~endpoint =
 let emit_failed_to_persist_profiles ~profiles ~error =
   emit failed_to_persist_profiles (profiles, error)
 
-let emit_fetched_slot ~size ~shards = emit fetched_slot (size, shards)
+let emit_reconstructed_slot ~size ~shards =
+  emit reconstructed_slot (size, shards)
 
 let emit_layer1_node_new_head ~hash ~level ~fitness =
   emit layer1_node_new_head (hash, level, fitness)
