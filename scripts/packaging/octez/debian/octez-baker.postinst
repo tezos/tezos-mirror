@@ -36,6 +36,10 @@ configure)
     db_get octez-baker/baker-key
     echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
 
+    db_get octez-baker/agnostic-baker
+    echo "AGNOSTIC_BAKER=${RET}" >> /etc/default/octez-baker
+    echoerr "AGNOSTIC_BAKER=${RET}"
+
     db_get octez-baker/dal-node
     DAL=${RET}
     case "$DAL" in
@@ -71,6 +75,10 @@ configure)
       db_get octez-baker/baker-key
       echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
       echoerr "BAKER_KEY=${RET}"
+
+      db_get octez-baker/agnostic-baker
+      echo "AGNOSTIC_BAKER=${RET}" >> /etc/default/octez-baker
+      echoerr "AGNOSTIC_BAKER=${RET}"
 
       db_get octez-baker/dal-node
       DAL=${RET}

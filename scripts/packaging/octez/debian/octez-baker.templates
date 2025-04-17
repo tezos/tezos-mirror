@@ -39,3 +39,8 @@ Description: Important upgrade information
  the configuration of the octez-baker
  .
  Please review the release notes for more information.
+
+Template: octez-baker/agnostic-baker
+Type: boolean
+Default: false
+Description: Use the octez-baker instead of protocol's baker dedicated binaries?
