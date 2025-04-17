@@ -540,3 +540,136 @@ module Proxy = struct
 
   let stop t = Lwt.wakeup t.trigger_shutdown ()
 end
+
+module Mockup = struct
+  type answer = [`Response of string]
+
+  type route = {
+    path_pattern : Re.Pcre.regexp;
+    callback : path:string -> answer option Lwt.t;
+  }
+
+  type t = {
+    name : string;
+    routes : route list;
+    shutdown : unit Lwt.t;
+    trigger_shutdown : unit Lwt.u;
+  }
+
+  let make ~name ~routes =
+    let shutdown, trigger_shutdown = Lwt.task () in
+    {name; routes; shutdown; trigger_shutdown}
+
+  let route ~path_pattern ~callback =
+    {path_pattern = Re.Pcre.regexp path_pattern; callback}
+
+  let find_mocked_action t ~path =
+    List.find_opt
+      (fun act -> Re.Pcre.pmatch ~rex:act.path_pattern path)
+      t.routes
+
+  let run t ~port =
+    let callback _conn req _body =
+      let uri = Cohttp.Request.uri req in
+      let uri_str = Uri.to_string uri in
+      let path = Uri.path uri in
+      match find_mocked_action t ~path with
+      | Some action -> (
+          Log.debug "[%s] mocking request: '%s'" t.name uri_str ;
+          let* res = action.callback ~path in
+          match res with
+          | None -> Cohttp_lwt_unix.Server.respond_not_found ()
+          | Some (`Response body) ->
+              Log.debug "[%s] responding with mock: '%s'" t.name body ;
+              Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ())
+      | None ->
+          Log.warn "[%s] no mock route for: '%s', failing." t.name uri_str ;
+          Cohttp_lwt_unix.Server.respond_error
+            ~status:`Not_implemented
+            ~body:"Unmocked RPC"
+            ()
+    in
+    let start () =
+      Cohttp_lwt_unix.Server.create
+        ~mode:(`TCP (`Port port))
+        ~stop:t.shutdown
+        (Cohttp_lwt_unix.Server.make ~callback ())
+    in
+    Lwt.async start
+
+  let stop t = Lwt.wakeup t.trigger_shutdown ()
+end
+
+module Mockup_for_baker = struct
+  type t = Mockup.t
+
+  let routes ~attestation_lag ~attesters ~attestable_slots =
+    [
+      (let path_pattern =
+         Format.sprintf
+           "/profiles/(tz[1234][a-zA-Z0-9]+)/attested_levels/([1-9][0-9]*)/attestable_slots"
+       in
+       Mockup.route ~path_pattern ~callback:(fun ~path ->
+           let open Ezjsonm in
+           let re = Re.Pcre.regexp path_pattern in
+           let attester =
+             match Re.exec_opt re path with
+             | Some groups -> Re.Group.get groups 1
+             | None -> Test.fail "failed to extract attested_level from %s" path
+           in
+           let attested_level =
+             match Re.exec_opt re path with
+             | Some groups -> Re.Group.get groups 2 |> int_of_string
+             | None -> Test.fail "failed to extract attested_level from %s" path
+           in
+           let published_level = attested_level - attestation_lag in
+           let mocked_json =
+             dict
+               [
+                 ("kind", string "attestable_slots_set");
+                 ( "attestable_slots_set",
+                   list bool @@ attestable_slots ~attester ~attested_level );
+                 ("published_level", int published_level);
+               ]
+           in
+           let body = value_to_string mocked_json in
+           Lwt.return_some (`Response body)));
+      (let path_pattern = "^/profiles/?$" in
+       Mockup.route ~path_pattern ~callback:(fun ~path:_ ->
+           let open Ezjsonm in
+           let mocked_json =
+             dict
+               [
+                 ("kind", string "controller");
+                 ( "controller_profiles",
+                   dict [("attesters", list string attesters)] );
+               ]
+           in
+           let body = value_to_string mocked_json in
+           Lwt.return_some (`Response body)));
+      (let path_pattern = "^/health/?$" in
+       Mockup.route ~path_pattern ~callback:(fun ~path:_ ->
+           let open Ezjsonm in
+           let mocked_json =
+             dict
+               [
+                 ("status", string "up");
+                 ( "checks",
+                   list
+                     (fun (name, status) ->
+                       dict [("name", string name); ("status", string status)])
+                     [("p2p", "up"); ("topics", "ok"); ("gossipsub", "up")] );
+               ]
+           in
+           let body = value_to_string mocked_json in
+           Lwt.return_some (`Response body)));
+    ]
+
+  let make ~name ~attestation_lag ~attesters ~attestable_slots =
+    let routes = routes ~attestation_lag ~attesters ~attestable_slots in
+    Mockup.make ~name ~routes
+
+  let run t = Mockup.run t
+
+  let stop t = Mockup.stop t
+end

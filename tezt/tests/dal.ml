@@ -625,12 +625,13 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
 let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
-    ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
-    ?number_of_slots ?custom_constants ?commitment_period ?challenge_window
-    ?(dal_enable = true) ?incentives_enable ?traps_fraction ?dal_rewards_weight
-    ?event_sections_levels ?node_arguments ?activation_timestamp
-    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
-    ?blocks_per_cycle ?blocks_per_commitment variant scenario =
+    ?(uses = fun _ -> []) ?additional_bootstrap_accounts ?attestation_lag
+    ?number_of_shards ?number_of_slots ?custom_constants ?commitment_period
+    ?challenge_window ?(dal_enable = true) ?incentives_enable ?traps_fraction
+    ?dal_rewards_weight ?event_sections_levels ?node_arguments
+    ?activation_timestamp ?consensus_committee_size ?minimal_block_delay
+    ?delay_increment_per_round ?blocks_per_cycle ?blocks_per_commitment variant
+    scenario =
   let description = "Testing DAL L1 integration" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -640,6 +641,7 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
   test
     ?regression
     ~__FILE__
+    ~uses
     ~tags
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
@@ -2968,9 +2970,10 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
   in
   let run_baker delegates target_level =
     let* baker =
+      let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
       Agnostic_baker.init
         ~event_sections_levels:[(Protocol.name protocol ^ ".baker", `Debug)]
-        ~dal_node
+        ~dal_node_rpc_endpoint
         ~delegates
         ~state_recorder:true
         node
@@ -3464,7 +3467,8 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   Log.info
     "[e2e.start_baker] spawn a baker daemon with all bootstrap accounts@." ;
   let* _baker =
-    Agnostic_baker.init ~dal_node:baker_dal_node l1_node l1_client
+    let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint baker_dal_node in
+    Agnostic_baker.init ~dal_node_rpc_endpoint l1_node l1_client
   in
 
   (* To be sure that we just moved to [start_dal_slots_level], we wait and extra
@@ -4233,7 +4237,10 @@ let test_baker_registers_profiles _protocol _parameters _cryptobox l1_node
     "Terminate the DAL node and then start the baker; the baker cannot attest \
      but can advance" ;
   let* () = Dal_node.terminate dal_node in
-  let baker = Agnostic_baker.create ~dal_node l1_node client ~delegates in
+  let baker =
+    let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
+    Agnostic_baker.create ~dal_node_rpc_endpoint l1_node client ~delegates
+  in
   let wait_for_attestation_event =
     Agnostic_baker.wait_for baker "failed_to_get_attestations.v0" (fun _json ->
         Some ())
@@ -4561,8 +4568,10 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
     in
     Log.info "Start bakers for the current and the next protocols" ;
 
-    let baker = Agnostic_baker.create ~dal_node node client in
-
+    let baker =
+      let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
+      Agnostic_baker.create ~dal_node_rpc_endpoint node client
+    in
     let* () = Agnostic_baker.run baker in
 
     let* _level = Node.wait_for_level node migration_level in
@@ -4793,12 +4802,13 @@ let test_restart_dal_node _protocol dal_parameters _cryptobox node client
       3 * blocks_per_cycle
   in
   let* baker =
+    let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
     Agnostic_baker.init
       ~delegates:all_pkhs
       ~liquidity_baking_toggle_vote:(Some On)
       ~state_recorder:true
       ~force_apply_from_round:0
-      ~dal_node
+      ~dal_node_rpc_endpoint
       node
       client
   in
@@ -7530,9 +7540,10 @@ let scenario_tutorial_dal_baker =
       in
       Log.info "Step 5: Run an Octez baking daemon" ;
       let* _baker =
+        let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
         Agnostic_baker.init
           ~event_sections_levels:[(Protocol.name protocol ^ ".baker", `Debug)]
-          ~dal_node
+          ~dal_node_rpc_endpoint
           ~delegates:all_delegates
           ~liquidity_baking_toggle_vote:(Some On)
           ~state_recorder:true
@@ -10091,6 +10102,69 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
     bootstrap_accounts_participation ;
   unit
 
+let use_mockup_node_for_getting_attestable_slots _protocol dal_parameters
+    cryptobox l1_node client _bootstrap_key =
+  let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
+  let attestation_lag = dal_parameters.attestation_lag in
+
+  Log.info "Start the mocked DAL node" ;
+  let dal_node_mockup =
+    let attesters =
+      Account.Bootstrap.keys |> Array.to_list
+      |> List.map (fun b -> b.Account.public_key_hash)
+    in
+    let attestable_slots ~attester:_ ~attested_level:_ =
+      List.init number_of_slots (fun _0 -> true)
+    in
+    Dal_node.Mockup_for_baker.make
+      ~name:"mock-dal-node"
+      ~attestation_lag
+      ~attesters
+      ~attestable_slots
+  in
+  let port = Port.fresh () in
+  let () = Dal_node.Mockup_for_baker.run dal_node_mockup ~port in
+  let dal_node_rpc_endpoint =
+    Endpoint.make ~host:"localhost" ~scheme:"http" ~port ()
+  in
+  let baker = Agnostic_baker.create ~dal_node_rpc_endpoint l1_node client in
+
+  Log.info "Publish a slot" ;
+  let* (`OpHash _op_hash) =
+    publish_dummy_slot
+      ~source:Constant.bootstrap1
+      ~index:0
+      ~message:"a"
+      cryptobox
+      client
+  in
+  let* publish_level =
+    let* op_level = Node.get_level l1_node in
+    return @@ (op_level + 1)
+  in
+
+  Log.info "Start the baker" ;
+  let* () = Agnostic_baker.run baker in
+
+  (* +2 blocks for the attested block to be final, +1 for some slack *)
+  let* _ = Node.wait_for_level l1_node (publish_level + attestation_lag + 3) in
+  let* () = Agnostic_baker.terminate baker in
+  let () = Dal_node.Mockup_for_baker.stop dal_node_mockup in
+
+  let attested_level = publish_level + attestation_lag in
+  Log.info
+    "Check that the slot published at level %d was attested at level %d"
+    publish_level
+    attested_level ;
+  let* {dal_attestation; _} =
+    Node.RPC.(
+      call l1_node
+      @@ get_chain_block_metadata ~block:(string_of_int attested_level) ())
+  in
+  Check.((Some [|true|] = dal_attestation) (option (array bool)))
+    ~error_msg:"Unexpected DAL attestation: expected %L, got %R" ;
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -10502,7 +10576,13 @@ let register ~protocols =
 
   (* Register end-to-end tests *)
   register_end_to_end_tests ~protocols ;
-  dal_crypto_benchmark ()
+  dal_crypto_benchmark () ;
+  scenario_with_layer1_node
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~activation_timestamp:Now
+    "mockup get_attestable_slots"
+    use_mockup_node_for_getting_attestable_slots
+    protocols
 
 let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
   let offsets = [-2; -1; 0; 1; 2] in

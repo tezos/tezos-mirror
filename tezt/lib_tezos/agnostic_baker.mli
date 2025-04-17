@@ -127,10 +127,9 @@ val extra_levels_for_old_baker : int
 
     If [remote_mode] is specified, the agnostic baker will run in RPC-only mode.
 
-    If [dal_node] is specified, then it is the DAL node that the baker queries
-    in order to determine the attestations it sends to the L1 node. A
-    [--dal_node] argument is passed to specify the DAL node's endpoint.
- *)
+    If a [dal_node_rpc_endpoint] is specified, then the baker queries it in
+    order to determine the DAL content of the attestations it sends to the L1
+    node.  *)
 val create :
   ?runner:Runner.t ->
   ?path:string ->
@@ -143,7 +142,7 @@ val create :
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
-  ?dal_node:Dal_node.t ->
+  ?dal_node_rpc_endpoint:Endpoint.t ->
   ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
@@ -154,8 +153,7 @@ val create :
   t
 
 (** Similar to {!create}, but nodes RPCs addresses, wallet base directory and L1
-    data directory are directly provided instead of a {!Client.t}, a {!Node.t}
-    and optionally a {!Dal_node.t}.
+    data directory are directly provided instead of a {!Client.t} and a {!Node.t}.
 
     The [node_data_dir] parameter provides the (local) node's data directory
     used for baking.
@@ -166,11 +164,9 @@ val create :
     The [base_dir] parameter contains needed information about the wallets used
     by the agnostic baker.
 
-    If [dal_node_rpc_endpoint] is specified, then it provides the DAL node RPC
-    server's endpoint that the baker queries in order to determine the
-    attestations it sends to the L1 node. A [--dal-node] argument is passed
-    to specify the DAL node's endpoint.
- *)
+    If a [dal_node_rpc_endpoint] is specified, then the baker queries it in
+    order to determine the DAL content of the attestations it sends to the L1
+    node. *)
 val create_from_uris :
   ?runner:Runner.t ->
   ?path:string ->
@@ -195,7 +191,7 @@ val create_from_uris :
   unit ->
   t
 
-(** Initialize an agnositc baker.
+(** Initialize a protocol-agnostic baker.
 
     This creates agnostic baker, waits for it to be ready, and then
     returns it.
@@ -246,7 +242,7 @@ val init :
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
-  ?dal_node:Dal_node.t ->
+  ?dal_node_rpc_endpoint:Endpoint.t ->
   ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->

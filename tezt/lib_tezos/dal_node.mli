@@ -265,3 +265,66 @@ module Proxy : sig
   (** Stops the proxy server. *)
   val stop : proxy -> unit
 end
+
+(** This module provides a mock HTTP server for selected RPCs.
+    It responds to registered routes with mock data and fails all other requests.
+    It is similar with the {!Proxy} module. *)
+module Mockup : sig
+  (** An instance of the mockup server. *)
+  type t
+
+  (** Represents a possible response from a mocked-up route. *)
+  type answer = [`Response of string]
+
+  (** A route definition. *)
+  type route
+
+  (** Creates a route for the mockup, containing a [path_pattern] pattern and a
+      [callback].
+      The [callback] is provided with the [path] actually matched and is used to
+      retrieve the DAL node answer for the given [path]. *)
+  val route :
+    path_pattern:string ->
+    callback:(path:string -> answer option Lwt.t) ->
+    route
+
+  (** Creates a new mockup instance. *)
+  val make : name:string -> routes:route list -> t
+
+  (** Starts the mockup server. *)
+  val run : t -> port:int -> unit
+
+  (** Stops the mockup server. *)
+  val stop : t -> unit
+end
+
+(** This module provides a mock server for the RPCs needed by the baker. It is
+    based on the {!Mockup} module. *)
+module Mockup_for_baker : sig
+  type t
+
+  (** [make ~name ~attestation_lag ~attesters ~attestable_slots] creates a new
+      instance of the mockup server with name [name].
+
+      It responds to the 'GET /profiles' RPC with an attester profile based
+      on the provided [attesters].
+
+      It responds to the 'GET
+      /profiles/<attester>/attested_levels/<attested_level>/attestable_slots'
+      with the list of attestable slots provided by [attestable_slots ~attester
+      ~attested_level]. The parameter [attestation_lag] is needed to compute the
+      corresponding [published_level = attested_level - attestation_lag] in the
+      RPC's response. *)
+  val make :
+    name:string ->
+    attestation_lag:int ->
+    attesters:string list ->
+    attestable_slots:(attester:string -> attested_level:int -> bool list) ->
+    t
+
+  (** Starts running the mockup server at the given port. *)
+  val run : t -> port:int -> unit
+
+  (** Stops the proxy server. *)
+  val stop : t -> unit
+end

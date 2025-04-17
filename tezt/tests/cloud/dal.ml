@@ -2412,11 +2412,12 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       ~alias:account.alias
   in
   let* baker =
+    let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
     Agnostic_baker.Agent.init
       ~name:(Format.asprintf "baker-%d" i)
       ~delegates:[account.Account.alias]
       ~client
-      ?dal_node
+      ?dal_node_rpc_endpoint
       node
       cloud
       agent
