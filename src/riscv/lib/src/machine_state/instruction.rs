@@ -71,7 +71,6 @@ use crate::parser::instruction::ITypeArgs;
 use crate::parser::instruction::InstrCacheable;
 use crate::parser::instruction::InstrRoundingMode;
 use crate::parser::instruction::InstrWidth;
-use crate::parser::instruction::NonZeroRdITypeArgs;
 use crate::parser::instruction::NonZeroRdRTypeArgs;
 use crate::parser::instruction::NonZeroRdUJTypeArgs;
 use crate::parser::instruction::RTypeArgs;
@@ -684,6 +683,12 @@ impl OpCode {
             Self::ShiftLeftImmediate => Some(Args::run_shift_left_immediate),
             Self::ShiftRightImmediateUnsigned => Some(Args::run_shift_right_immediate_unsigned),
             Self::ShiftRightImmediateSigned => Some(Args::run_shift_right_immediate_signed),
+            Self::Sllw => Some(Args::run_sllw),
+            Self::Srlw => Some(Args::run_srlw),
+            Self::Sraw => Some(Args::run_sraw),
+            Self::Slliw => Some(Args::run_slliw),
+            Self::Srliw => Some(Args::run_srliw),
+            Self::Sraiw => Some(Args::run_sraiw),
 
             // Stores
             Self::Sdnz => Some(Args::run_sdnz),
@@ -1322,9 +1327,9 @@ impl Args {
     );
     impl_r_type!(integer::run_add_word, run_add_word, non_zero_rd);
     impl_r_type!(integer::run_sub_word, run_sub_word, non_zero_rd);
-    impl_r_type!(run_sllw, non_zero_rd);
-    impl_r_type!(run_srlw, non_zero_rd);
-    impl_r_type!(run_sraw, non_zero_rd);
+    impl_r_type!(integer::run_sllw, run_sllw, non_zero_rd);
+    impl_r_type!(integer::run_srlw, run_srlw, non_zero_rd);
+    impl_r_type!(integer::run_sraw, run_sraw, non_zero_rd);
 
     // RV64I I-type instructions
     impl_i_type!(integer::run_addi, run_addi, non_zero);
@@ -1339,9 +1344,9 @@ impl Args {
     impl_i_type!(run_shift_left_immediate, Shift::Left);
     impl_i_type!(run_shift_right_immediate_unsigned, Shift::RightUnsigned);
     impl_i_type!(run_shift_right_immediate_signed, Shift::RightSigned);
-    impl_i_type!(run_slliw, non_zero_rd);
-    impl_i_type!(run_srliw, non_zero_rd);
-    impl_i_type!(run_sraiw, non_zero_rd);
+    impl_i_type!(integer::run_slliw, run_slliw, non_zero_rd);
+    impl_i_type!(integer::run_srliw, run_srliw, non_zero_rd);
+    impl_i_type!(integer::run_sraiw, run_sraiw, non_zero_rd);
     impl_i_type!(
         integer::run_set_less_than_immediate_signed,
         run_set_less_than_immediate_signed,
@@ -1636,18 +1641,9 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::Subw(args) => {
                 Instruction::new_sub_word(args.rd, args.rs1, args.rs2, InstrWidth::Uncompressed)
             }
-            InstrCacheable::Sllw(args) => Instruction {
-                opcode: OpCode::Sllw,
-                args: args.into(),
-            },
-            InstrCacheable::Srlw(args) => Instruction {
-                opcode: OpCode::Srlw,
-                args: args.into(),
-            },
-            InstrCacheable::Sraw(args) => Instruction {
-                opcode: OpCode::Sraw,
-                args: args.into(),
-            },
+            InstrCacheable::Sllw(args) => Instruction::from_ic_sllw(args),
+            InstrCacheable::Srlw(args) => Instruction::from_ic_srlw(args),
+            InstrCacheable::Sraw(args) => Instruction::from_ic_sraw(args),
 
             // RV64I I-type instructions
             InstrCacheable::Addi(args) => Instruction::from_ic_addi(args),
@@ -1663,18 +1659,9 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::Slli(args) => Instruction::from_ic_slli(args),
             InstrCacheable::Srli(args) => Instruction::from_ic_srli(args),
             InstrCacheable::Srai(args) => Instruction::from_ic_srai(args),
-            InstrCacheable::Slliw(args) => Instruction {
-                opcode: OpCode::Slliw,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
-            InstrCacheable::Srliw(args) => Instruction {
-                opcode: OpCode::Srliw,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
-            InstrCacheable::Sraiw(args) => Instruction {
-                opcode: OpCode::Sraiw,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Slliw(args) => Instruction::from_ic_slliw(args),
+            InstrCacheable::Srliw(args) => Instruction::from_ic_srliw(args),
+            InstrCacheable::Sraiw(args) => Instruction::from_ic_sraiw(args),
             InstrCacheable::Slti(args) => {
                 Instruction::new_set_less_than_immediate_signed(args.rd, args.rs1, args.imm)
             }
@@ -2323,18 +2310,6 @@ impl From<&NonZeroRdRTypeArgs> for Args {
 }
 
 impl ITypeArgs {
-    fn to_args(self, width: InstrWidth) -> Args {
-        Args {
-            rd: self.rd.into(),
-            rs1: self.rs1.into(),
-            imm: self.imm,
-            width,
-            ..Args::DEFAULT
-        }
-    }
-}
-
-impl NonZeroRdITypeArgs {
     fn to_args(self, width: InstrWidth) -> Args {
         Args {
             rd: self.rd.into(),

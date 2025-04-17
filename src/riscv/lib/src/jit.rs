@@ -1747,6 +1747,31 @@ mod tests {
             ),
             shift_reg(I::new_shift_right_signed, (x1, !0), (x3, 126), !0),
             shift_reg(I::new_shift_right_signed, (x1, -8), (x3, 2), -2_i64 as u64),
+            // SLLW tests (Shift Left Logical Word)
+            shift_reg(I::new_sllw, (x1, 1), (x3, 1), 2),
+            shift_reg(I::new_sllw, (x1, 1), (x3, 31), 0xFFFF_FFFF_8000_0000),
+            shift_reg(I::new_sllw, (x1, 2), (x3, 31), 0),
+            shift_reg(I::new_sllw, (x1, 1), (x3, 95), 0xFFFF_FFFF_8000_0000),
+            // SRLW tests (Shift Right Logical Word)
+            shift_reg(I::new_srlw, (x1, 2), (x3, 1), 1),
+            shift_reg(I::new_srlw, (x1, 0x80000000), (x3, 31), 1),
+            shift_reg(I::new_srlw, (x1, 1), (x3, 31), 0),
+            shift_reg(I::new_srlw, (x1, 0x80000000), (x3, 95), 1),
+            // SRAW tests (Shift Right Arithmetic Word)
+            shift_reg(I::new_sraw, (x1, 2), (x3, 1), 1),
+            shift_reg(
+                I::new_sraw,
+                (x1, 0x80000000),
+                (x3, 31),
+                0xFFFF_FFFF_FFFF_FFFF,
+            ),
+            shift_reg(I::new_sraw, (x1, 0x40000000), (x3, 31), 0),
+            shift_reg(
+                I::new_sraw,
+                (x1, 0x80000000),
+                (x3, 95),
+                0xFFFF_FFFF_FFFF_FFFF,
+            ),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
@@ -1819,6 +1844,18 @@ mod tests {
                 2,
                 -2_i64 as u64,
             ),
+            // SLLIW tests (Shift Left Logical Immediate Word)
+            shift_imm(I::new_slliw, (x1, 1), 1, 2),
+            shift_imm(I::new_slliw, (x1, 1), 31, 0xFFFF_FFFF_8000_0000),
+            shift_imm(I::new_slliw, (x1, 2), 31, 0),
+            // SRLIW tests (Shift Right Logical Immediate Word)
+            shift_imm(I::new_srliw, (x1, 2), 1, 1),
+            shift_imm(I::new_srliw, (x1, 0x80000000), 31, 1),
+            shift_imm(I::new_srliw, (x1, 1), 31, 0),
+            // SRAIW tests (Shift Right Arithmetic Immediate Word)
+            shift_imm(I::new_sraiw, (x1, 2), 1, 1),
+            shift_imm(I::new_sraiw, (x1, 0x80000000), 31, 0xFFFF_FFFF_FFFF_FFFF),
+            shift_imm(I::new_sraiw, (x1, 0x40000000), 31, 0),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

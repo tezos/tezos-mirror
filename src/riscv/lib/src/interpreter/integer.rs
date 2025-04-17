@@ -283,6 +283,141 @@ pub fn run_set_less_than_unsigned(
     icb.xregister_write_nz(rd, res);
 }
 
+/// Shift left logically only lowest 32 bits in rs1
+/// by shift_amount = val(rs2)[4:0] saving the result in rd
+/// (zeros are shifted in the lower bits)
+pub fn run_sllw(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+    let lhs = icb.xregister_read(rs1);
+    let rhs = icb.xregister_read(rs2);
+
+    // Mask to get only bottom 5 bits for shift amount
+    let shift_amount = rhs.and(icb.xvalue_of_imm(0b1_1111), icb);
+
+    // Perform shift on bottom 32 bits
+    let result = lhs.shift(Shift::Left, shift_amount, icb);
+
+    // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
+    let result = icb.narrow(result);
+    let result = icb.extend_signed(result);
+
+    icb.xregister_write_nz(rd, result);
+}
+
+/// Shift right logically only lowest 32 bits in rs1
+/// by shift_amount = val(rs2)[4:0] saving the result in rd
+/// (zeros are shifted in the upper bits)
+pub fn run_srlw(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+    let lhs = icb.xregister_read(rs1);
+    let rhs = icb.xregister_read(rs2);
+
+    // Mask to get only bottom 5 bits for shift amount
+    let shift_amount = rhs.and(icb.xvalue_of_imm(0b1_1111), icb);
+
+    let lhs = icb.narrow(lhs);
+    let lhs = icb.extend_unsigned(lhs);
+    // Perform shift on bottom 32 bits
+    let result = lhs.shift(Shift::RightUnsigned, shift_amount, icb);
+
+    // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
+    let result = icb.narrow(result);
+    let result = icb.extend_signed(result);
+
+    icb.xregister_write_nz(rd, result);
+}
+
+/// Shift right arithmetically only lowest 32 bits in rs1
+/// by shift_amount = val(rs2)[4:0] saving the result in rd
+/// (sign-bits are shifted in the upper bits)
+pub fn run_sraw(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+    let lhs = icb.xregister_read(rs1);
+    let rhs = icb.xregister_read(rs2);
+
+    // Get last 5 bits of rs2
+    let shift_amount = rhs.and(icb.xvalue_of_imm(0b1_1111), icb);
+
+    // Narrow to 32 bits
+    let lhs = icb.narrow(lhs);
+    // Extend with sign bit (not zeros)
+    let lhs = icb.extend_signed(lhs);
+
+    // Perform shift on bottom 32 bits
+    let result = lhs.shift(Shift::RightSigned, shift_amount, icb);
+
+    // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
+    let result = icb.narrow(result);
+    let result = icb.extend_signed(result);
+
+    icb.xregister_write_nz(rd, result);
+}
+
+/// Shift left logically only on lower 32 bits
+/// by immediate value imm, saving the result in rd
+/// (zeros are shifted in the lower bits)
+pub fn run_slliw(icb: &mut impl ICB, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
+    let lhs = icb.xregister_read(rs1);
+    let shift_amount = icb.xvalue_of_imm(imm);
+
+    // First narrow to 32 bits
+    let lhs = icb.narrow(lhs);
+    // Convert back to 64-bit value but with upper 32 bits zeroed
+    let lhs = icb.extend_unsigned(lhs);
+
+    // Perform the shift
+    let result = lhs.shift(Shift::Left, shift_amount, icb);
+
+    // Truncate and sign-extend the result
+    let result = icb.narrow(result);
+    let result = icb.extend_signed(result);
+
+    icb.xregister_write_nz(rd, result);
+}
+
+/// Shift right logically only on lower 32 bits
+/// by immediate value imm, saving the result in rd
+/// (zeros are shifted in the upper bits)
+pub fn run_srliw(icb: &mut impl ICB, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
+    let lhs = icb.xregister_read(rs1);
+    let shift_amount = icb.xvalue_of_imm(imm);
+
+    // First narrow to 32 bits
+    let lhs = icb.narrow(lhs);
+    // Convert back to 64-bit value but with upper 32 bits zeroed
+    let lhs = icb.extend_unsigned(lhs);
+
+    // Perform the shift
+    let result = lhs.shift(Shift::RightUnsigned, shift_amount, icb);
+
+    // Truncate and sign-extend the result
+    let result = icb.narrow(result);
+    let result = icb.extend_signed(result);
+
+    icb.xregister_write_nz(rd, result);
+}
+
+/// Shift right arithmetically only on lower 32 bits
+/// by immediate value imm, saving the result in rd
+/// (sign-bits are shifted in the upper bits)
+pub fn run_sraiw(icb: &mut impl ICB, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
+    let lhs = icb.xregister_read(rs1);
+
+    // Mask the shift amount to 5 bits (0-31) as per RISC-V spec for 32-bit operations
+    let shift_amount = icb.xvalue_of_imm(imm & 0b1_1111);
+
+    // First narrow to 32 bits
+    let lhs = icb.narrow(lhs);
+    // Extend with sign bit (not zeros)
+    let lhs = icb.extend_signed(lhs);
+
+    // Perform the shift
+    let result = lhs.shift(Shift::RightSigned, shift_amount, icb);
+
+    // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
+    let result = icb.narrow(result);
+    let result = icb.extend_signed(result);
+
+    icb.xregister_write_nz(rd, result);
+}
+
 /// Multiply val(rs1) with val(rs2) and store the lower 64 bits of the result
 /// in register `rd`.
 ///
