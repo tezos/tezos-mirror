@@ -24,7 +24,7 @@ pub fn sha256_precompile<Host: Runtime>(
     let estimated_ticks = tick_model::ticks_of_sha256(input.len());
 
     let size = input.len() as u64;
-    let data_word_size = (31 + size) / 32;
+    let data_word_size = size.div_ceil(32);
     let cost = 60 + 12 * data_word_size;
 
     if let Err(err) = handler.record_cost(cost) {
@@ -62,7 +62,7 @@ pub fn ripemd160_precompile<Host: Runtime>(
     let estimated_ticks = tick_model::ticks_of_ripemd160(input.len());
 
     let size = input.len() as u64;
-    let data_word_size = (31 + size) / 32;
+    let data_word_size = size.div_ceil(32);
     let cost = 600 + 120 * data_word_size;
 
     if let Err(err) = handler.record_cost(cost) {

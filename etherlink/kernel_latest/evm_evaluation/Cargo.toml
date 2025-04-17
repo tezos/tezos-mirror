@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -36,3 +36,4 @@ regex = "1.10.2"
 default = ["debug"]
 disable-file-logs = []
 debug = ["tezos-evm-logging/debug"]
+serde = []

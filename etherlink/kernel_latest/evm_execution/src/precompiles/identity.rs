@@ -23,7 +23,7 @@ pub fn identity_precompile<Host: Runtime>(
     let estimated_ticks = tick_model::ticks_of_identity(input.len());
 
     let size = input.len() as u64;
-    let data_word_size = (size + 31) / 32;
+    let data_word_size = size.div_ceil(32);
     let static_gas = 15;
     let dynamic_gas = 3 * data_word_size;
     let cost = static_gas + dynamic_gas;
