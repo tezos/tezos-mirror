@@ -345,6 +345,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         value,
         true,
         tracer_input,
+        transaction.access_list.clone(),
     ) {
         Ok(outcome) => outcome,
         Err(err) => {

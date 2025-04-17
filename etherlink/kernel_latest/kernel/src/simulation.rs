@@ -33,6 +33,7 @@ use evm_execution::{
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
+use tezos_ethereum::access_list::empty_access_list;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::rlp_helpers::{
     append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
@@ -485,6 +486,8 @@ impl Evaluation {
             self.value.unwrap_or_default(),
             false,
             tracer_input,
+            // TODO: Replace this by the decoded access lists if any.
+            empty_access_list(),
         ) {
             Ok(Some(outcome)) if !self.with_da_fees => {
                 let result: SimulationResult<CallResult, String> =
@@ -782,6 +785,7 @@ mod tests {
             transaction_value,
             false,
             None,
+            empty_access_list(),
         );
         assert!(outcome.is_ok(), "contract should have been created");
         let outcome = outcome.unwrap();

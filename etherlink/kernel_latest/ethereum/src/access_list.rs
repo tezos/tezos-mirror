@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -46,3 +47,7 @@ impl Decodable for AccessListItem {
 }
 
 pub type AccessList = Vec<AccessListItem>;
+
+pub fn empty_access_list() -> AccessList {
+    vec![]
+}

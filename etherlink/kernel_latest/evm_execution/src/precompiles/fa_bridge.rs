@@ -236,6 +236,7 @@ mod tests {
     use evm::ExitError;
     use primitive_types::{H160, U256};
     use tezos_data_encoding::enc::BinWriter;
+    use tezos_ethereum::access_list::empty_access_list;
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     use crate::{
@@ -282,6 +283,7 @@ mod tests {
             &precompiles,
             U256::from(21000),
             None,
+            empty_access_list(),
         );
 
         if disable_reentrancy_guard {
@@ -408,6 +410,7 @@ mod tests {
             &precompiles,
             U256::from(21000),
             None,
+            empty_access_list(),
         );
 
         handler

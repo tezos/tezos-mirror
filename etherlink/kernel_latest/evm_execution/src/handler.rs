@@ -44,6 +44,7 @@ use std::cmp::min;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use tezos_data_encoding::enc::{BinResult, BinWriter};
+use tezos_ethereum::access_list::AccessList;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
@@ -445,6 +446,8 @@ pub struct EvmHandler<'a, Host: Runtime> {
     pub created_contracts: BTreeSet<H160>,
     /// Reentrancy guard prevents circular calls to impure precompiles
     reentrancy_guard: ReentrancyGuard,
+    /// Access lists as specified by EIP-2930.
+    access_list: AccessList,
 }
 
 impl<'a, Host: Runtime> EvmHandler<'a, Host> {
@@ -459,6 +462,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         precompiles: &'a dyn PrecompileSet<Host>,
         effective_gas_price: U256,
         tracer: Option<TracerInput>,
+        access_list: AccessList,
     ) -> Self {
         Self {
             host,
@@ -480,6 +484,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 WITHDRAWAL_ADDRESS,
                 FA_BRIDGE_PRECOMPILE_ADDRESS,
             ]),
+            access_list,
         }
     }
 
@@ -3128,6 +3133,7 @@ mod test {
     use std::cmp::Ordering;
     use std::str::FromStr;
     use std::vec;
+    use tezos_ethereum::access_list::empty_access_list;
     use tezos_ethereum::block::BlockFees;
     use tezos_evm_runtime::runtime::MockKernelHost;
 
@@ -3233,6 +3239,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let result = handler
@@ -3267,6 +3274,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let code_hash: H256 = CODE_HASH_DEFAULT;
@@ -3308,6 +3316,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let code_hash: H256 = CODE_HASH_DEFAULT;
@@ -3354,6 +3363,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address = H160::from_low_u64_be(213_u64);
@@ -3423,6 +3433,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address = H160::from_low_u64_be(213_u64);
@@ -3524,6 +3535,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let input_value = U256::from(1025_u32); // transaction depth for contract below is callarg - 1
@@ -3624,6 +3636,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address = H160::from_low_u64_be(312);
@@ -3703,6 +3716,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let value = U256::zero();
@@ -3767,6 +3781,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let value = U256::zero();
@@ -3840,6 +3855,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address = H160::from_low_u64_be(117);
@@ -3910,6 +3926,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -3979,6 +3996,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -4057,6 +4075,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let hash_of_unavailable_block = handler.block_hash(U256::zero());
@@ -4084,6 +4103,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -4143,6 +4163,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -4236,6 +4257,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         // { (SELFDESTRUCT 0x10) }
@@ -4291,6 +4313,7 @@ mod test {
             &precompiles,
             U256::one(),
             None,
+            empty_access_list(),
         );
 
         set_balance(&mut handler, &caller, U256::from(10000));
@@ -4340,6 +4363,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address_1 = H160::from_low_u64_be(210_u64);
@@ -4423,6 +4447,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let hash = handler.code_hash(H160::from_low_u64_le(1));
@@ -4451,6 +4476,7 @@ mod test {
             &precompiles,
             U256::one(),
             None,
+            empty_access_list(),
         );
 
         set_balance(&mut handler, &caller, U256::from(1000000000));
@@ -4493,6 +4519,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address_1 = H160::from_low_u64_be(210_u64);
@@ -4581,6 +4608,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address_1 = H160::from_low_u64_be(210_u64);
@@ -4687,6 +4715,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let target_destruct =
@@ -4751,6 +4780,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let contrac_addr =
@@ -4827,6 +4857,7 @@ mod test {
             &precompiles,
             U256::from(21000),
             None,
+            empty_access_list(),
         );
 
         handler
@@ -4899,6 +4930,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -4980,6 +5012,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let initial_code = [1; 49153]; // MAX_INIT_CODE_SIZE + 1
@@ -5035,6 +5068,7 @@ mod test {
             &precompiles,
             U256::one(),
             None,
+            empty_access_list(),
         );
 
         let _ = handler.begin_initial_transaction(
@@ -5083,6 +5117,7 @@ mod test {
             &precompiles,
             U256::from(21000),
             None,
+            empty_access_list(),
         );
 
         let address1 = H160::from_low_u64_be(210_u64);
@@ -5163,6 +5198,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         // SUICIDE would charge 25,000 gas when the destination is non-existent,
@@ -5234,6 +5270,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         // CALL would charge 25,000 gas when the destination is non-existent,
@@ -5316,6 +5353,7 @@ mod test {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         set_balance(&mut handler, &caller, U256::from(100_000_u32));
