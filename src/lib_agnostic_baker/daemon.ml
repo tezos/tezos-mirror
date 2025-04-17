@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Agnostic_baker_errors
+open Errors
 
 module Profiler = struct
   include (val Profiler.wrap Agnostic_baker_profiler.agnostic_baker_profiler)
@@ -162,7 +162,7 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
     let* current_baker =
       match state.current_baker with
       | Some baker -> return baker
-      | None -> tzfail Missing_current_baker
+      | None -> tzfail (Missing_current_agent Agent.name)
     in
     let next_proto_status = Parameters.protocol_status next_protocol_hash in
     let*! () =
@@ -273,7 +273,7 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
           in
           let* current_protocol_hash =
             match state.current_baker with
-            | None -> tzfail Missing_current_baker
+            | None -> tzfail (Missing_current_agent Agent.name)
             | Some baker -> return baker.protocol_hash
           in
           let* () =
@@ -307,7 +307,7 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
       | Some baker -> baker.process.thread
       | None -> Lwt.return 0
     in
-    if retcode = 0 then return_unit else tzfail Baker_process_error
+    if retcode = 0 then return_unit else tzfail (Agent_process_error Agent.name)
 
   (* ---- Agnostic Baker Bootstrap ---- *)
 
