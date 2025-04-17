@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod interpreter;
 mod posix;
 
 use std::collections::BTreeMap;
@@ -10,7 +11,6 @@ use std::ops::Bound;
 use derive_more::Error;
 use derive_more::From;
 use posix::PosixState;
-use posix::PosixStateLayout;
 
 use super::StepResult;
 use super::Stepper;
@@ -20,13 +20,16 @@ use crate::machine_state::CacheLayouts;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::MachineError;
 use crate::machine_state::MachineState;
-use crate::machine_state::MachineStateLayout;
 use crate::machine_state::StepManyResult;
 use crate::machine_state::TestCacheLayouts;
 use crate::machine_state::block_cache::bcall::Block;
 use crate::machine_state::block_cache::bcall::Interpreted;
 use crate::machine_state::memory::M1G;
+#[cfg(feature = "supervisor")]
+use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
+#[cfg(feature = "supervisor")]
+use crate::machine_state::memory::Permissions;
 use crate::machine_state::mode;
 use crate::program::Program;
 use crate::state::NewState;
@@ -84,9 +87,6 @@ pub enum TestStepperError {
     MachineError(MachineError),
 }
 
-pub type TestStepperLayout<MC = M1G, CL = TestCacheLayouts> =
-    (PosixStateLayout, MachineStateLayout<MC, CL>);
-
 pub struct TestStepper<
     MC: MemoryConfig = M1G,
     CL: CacheLayouts = TestCacheLayouts,
@@ -138,6 +138,15 @@ impl<MC: MemoryConfig, B: Block<MC, Owned>> TestStepper<MC, TestCacheLayouts, B>
 
         // The interpreter needs a program to run.
         let elf_program = Program::<MC>::from_elf(program)?;
+
+        #[cfg(feature = "supervisor")]
+        stepper
+            .machine_state
+            .core
+            .main_memory
+            .protect_pages(0, MC::TOTAL_BYTES, Permissions::ReadWriteExec)
+            .unwrap();
+
         stepper
             .machine_state
             .setup_boot(&elf_program, initrd, mode::Mode::Machine)?;

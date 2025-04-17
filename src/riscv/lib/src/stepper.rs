@@ -12,7 +12,8 @@ use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerRead;
 
 pub mod pvm;
-pub mod test;
+#[cfg(test)]
+mod test;
 
 /// Status of a stepper
 #[derive(Clone, Debug, PartialEq, Eq)]
