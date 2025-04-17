@@ -29,8 +29,30 @@ let lwt_run ~args () =
       ~default:Agnostic_baker_config.default_base_dir
       (Run_args.get_base_dir args)
   in
+  let full =
+    new Tezos_client_base_unix.Client_context_unix.unix_full
+      ~chain:Agnostic_baker_config.default_chain
+      ~block:Agnostic_baker_config.default_block
+      ~confirmations:None
+      ~password_filename:None
+      ~base_dir:Agnostic_baker_config.default_base_dir
+      ~rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.default_config
+      ~verbose_rpc_error_diagnostics:false
+  in
+  let* parsed, _remaining =
+    Agnostic_baker_config.parse_config_args
+      full
+      (List.tl args |> Option.value ~default:[])
+  in
+  let parsed_config_file = parsed.Client_config.parsed_config_file in
+  let parsed_args = parsed.Client_config.parsed_args in
   let*! () =
-    Client_main_run.init_logging (module Agnostic_baker_config) ~base_dir ()
+    Client_main_run.init_logging
+      ?parsed_args
+      ?parsed_config_file
+      (module Agnostic_baker_config)
+      ~base_dir
+      ()
   in
   () [@profiler.overwrite may_start_profiler base_dir] ;
   let daemon =
