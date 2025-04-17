@@ -1052,6 +1052,32 @@ let test_fail_wrong_signer =
             (update_key ~proof_signer:"signer" ~kind ~ck_name:"ck" delegate))
         [("update consensus", Consensus); ("update companion", Companion)]
 
+let test_fail_companion_not_tz4 =
+  let open Lwt_result_syntax in
+  let delegate = "delegate" in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> begin_test ~force_attest_all:true ~algo:Bls [delegate; "signer"]
+  --> fold_tag
+        (fun algo -> add_account ~algo "ck")
+        [("Ed25519", Ed25519); ("Secp256k1", Secp256k1); ("P256", P256)]
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun (_block, state) err ->
+          let delegate = State.find_account delegate state in
+
+          let ck = State.find_account "ck" state in
+          let* ck_account = Account.find ck.pkh in
+          Assert.expect_error ~loc:__LOC__ err (function
+              | [
+                  Protocol.Validate_errors.Manager.Update_companion_key_not_tz4
+                    {source = err_source; public_key = err_pk};
+                ] ->
+                  Signature.Public_key_hash.equal err_source delegate.pkh
+                  && Signature.Public_key.equal err_pk ck_account.pk
+              | _ -> false))
+        (update_key ~kind:Companion ~ck_name:"ck" delegate)
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -1071,6 +1097,7 @@ let tests =
        ("Test already registered", test_fail_already_registered);
        ("Test fail if no signer", test_fail_no_signer);
        ("Test fail if wrong signer", test_fail_wrong_signer);
+       ("Test fail companion not tz4", test_fail_companion_not_tz4);
      ]
 
 let () =
