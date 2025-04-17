@@ -15,7 +15,10 @@
 
 ### Metrics changes
 
-### Execution changes
+### Command-line interface changes
+
+- Adds `--private-rpc-port` to `run observer` to enable the private RPC server
+  from command-line. (!17762)
 
 ### Storage changes
 
