@@ -128,9 +128,8 @@ let test_tez_block_roundtrip ~title ~level ~timestamp ~parent_hash () =
     @@ L2_types.Tezos_block.decode_block encoding_result
   in
   Check.(
-    (Z.to_int @@ Ethereum_types.Qty.to_z decoding_result.level
-    = Z.to_int @@ Ethereum_types.Qty.to_z block.level)
-      int
+    (decoding_result.level = block.level)
+      int32
       ~error_msg:"Wrong decoded of number for block: got %L instead of %R") ;
   Check.(
     (Z.to_int @@ Ethereum_types.Qty.to_z decoding_result.timestamp
@@ -186,14 +185,14 @@ let () =
 
   test_tez_block_roundtrip
     ~title:"all zeros tez block"
-    ~level:(Qty Z.zero)
+    ~level:0l
     ~timestamp:(Qty Z.zero)
     ~parent_hash:zero_hash
     () ;
 
   test_tez_block_roundtrip
     ~title:"genesis successor"
-    ~level:(Qty Z.one)
+    ~level:0l
     ~timestamp:(Qty Z.one)
     ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
     ()

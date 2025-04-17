@@ -49,7 +49,7 @@ end
 
 module Tezos_block = struct
   type t = {
-    level : Ethereum_types.quantity;
+    level : int32;
     hash : Ethereum_types.block_hash;
     timestamp : Ethereum_types.quantity;
     parent_hash : Ethereum_types.block_hash;
@@ -67,9 +67,7 @@ module Tezos_block = struct
   (* When Tezos block will be complete *)
   let block_from_binary bytes =
     if Bytes.length bytes = 44 then (
-      let level = Bytes.make 4 '\000' in
-      Bytes.blit bytes 0 level 0 4 ;
-      let level = Ethereum_types.Qty (Helpers.decode_z_be level) in
+      let level = Bytes.get_int32_be bytes 0 in
       let previous_hash = Bytes.make 32 '\000' in
       Bytes.blit bytes 4 previous_hash 0 32 ;
       let parent = Ethereum_types.decode_block_hash previous_hash in
@@ -84,14 +82,7 @@ module Tezos_block = struct
     else raise (Invalid_argument "Expected a string of length 44")
 
   let encode_block (block : t) : (string, string) result =
-    let (Ethereum_types.Qty level) = block.level in
     let (Ethereum_types.Qty timestamp) = block.timestamp in
-
-    let z_to_32_be z =
-      let bytes = Bytes.make 32 '\000' in
-      Bytes.set_int32_be bytes 0 (Z.to_int32 z) ;
-      bytes
-    in
 
     let z_to_64_be z =
       let bytes = Bytes.make 64 '\000' in
@@ -99,12 +90,11 @@ module Tezos_block = struct
       bytes
     in
 
-    let level_bytes = z_to_32_be level in
     let parent_bytes = Ethereum_types.encode_block_hash block.parent_hash in
     let timestamp_bytes = z_to_64_be timestamp in
 
     let encoded_block = Bytes.create 44 in
-    Bytes.blit level_bytes 0 encoded_block 0 4 ;
+    Bytes.set_int32_be encoded_block 0 block.level ;
     Bytes.blit parent_bytes 0 encoded_block 4 32 ;
     Bytes.blit timestamp_bytes 0 encoded_block 36 8 ;
 
@@ -121,7 +111,9 @@ let block_hash block =
   match block with Eth block -> block.hash | Tez block -> block.hash
 
 let block_number block =
-  match block with Eth block -> block.number | Tez block -> block.level
+  match block with
+  | Eth block -> block.number
+  | Tez block -> Qty (Z.of_int32 block.level)
 
 let block_number_of_transactions block =
   match block with

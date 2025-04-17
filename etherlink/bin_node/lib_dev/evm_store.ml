@@ -1418,7 +1418,10 @@ module Blocks = struct
 
   let tez_store store (block : L2_types.Tezos_block.t) =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.Blocks.tez_insert (block.level, block.hash, block)
+    Db.exec
+      conn
+      Q.Blocks.tez_insert
+      (Qty (Z.of_int32 block.level), block.hash, block)
 
   let block_with_objects store block =
     let open Lwt_result_syntax in
