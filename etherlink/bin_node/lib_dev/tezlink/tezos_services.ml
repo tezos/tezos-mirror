@@ -26,6 +26,12 @@ module Protocol_types = struct
       else invalid_arg "Cycle_repr.of_int32_exn"
   end
 
+  let tezlink_to_tezos_chain_id_exn ~l2_chain_id _chain =
+    let (L2_types.Chain_id l2_chain_id) = l2_chain_id in
+    let bytes = Bytes.make 4 '\000' in
+    l2_chain_id |> Z.to_int32 |> Bytes.set_int32_be bytes 0 ;
+    Chain_id.of_bytes_exn bytes
+
   module Level = struct
     type t = Alpha_context.Level.t
 
