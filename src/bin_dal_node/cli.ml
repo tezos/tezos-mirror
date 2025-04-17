@@ -547,16 +547,19 @@ let make ~run =
           verbose;
         }
     in
-    let profile = Operator_profile.make ~attesters ~producers ?observers () in
+    let profile =
+      Controller_profiles.make ~attesters ~producers ?observers ()
+    in
     match (bootstrap_flag, observers, profile) with
-    | false, None, profiles when Operator_profile.is_empty profiles -> run None
-    | false, Some _, profiles when Operator_profile.is_empty profiles ->
+    | false, None, profiles when Controller_profiles.is_empty profiles ->
+        run None
+    | false, Some _, profiles when Controller_profiles.is_empty profiles ->
         (* The user only mentioned '--observer' without any slot and
            without any other profile. It will be assigned to random
            slots. *)
         run (Some Profile_manager.random_observer)
-    | false, _, _ -> run @@ Some (Profile_manager.operator profile)
-    | true, None, profiles when Operator_profile.is_empty profiles ->
+    | false, _, _ -> run @@ Some (Profile_manager.controller profile)
+    | true, None, profiles when Controller_profiles.is_empty profiles ->
         run @@ Some Profile_manager.bootstrap
     | true, _, _ ->
         `Error

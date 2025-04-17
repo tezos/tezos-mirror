@@ -208,9 +208,9 @@ let get_fetched_assigned_shard_indices ctxt ~level ~pkh =
 let version {network_name; _} =
   Types.Version.make ~network_version:(Gossipsub.version ~network_name)
 
-let warn_if_attesters_not_delegates ctxt operator_profiles =
+let warn_if_attesters_not_delegates ctxt controller_profiles =
   let open Lwt_result_syntax in
-  let pkh_set = Operator_profile.attesters operator_profiles in
+  let pkh_set = Controller_profiles.attesters controller_profiles in
   if Signature.Public_key_hash.Set.is_empty pkh_set then return_unit
   else
     let level = get_last_finalized_level ctxt in

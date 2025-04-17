@@ -152,7 +152,7 @@ val get_protocol_parameters :
     is incompatible with other profiles. *)
 val patch_profiles :
   < meth : [`PATCH]
-  ; input : Operator_profile.t
+  ; input : Controller_profiles.t
   ; output : unit
   ; prefix : unit
   ; params : unit

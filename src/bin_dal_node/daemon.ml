@@ -509,7 +509,7 @@ module Handler = struct
       match
         Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
       with
-      | Operator profile -> Operator_profile.attesters profile
+      | Controller profile -> Controller_profiles.attesters profile
       | _ -> Signature.Public_key_hash.Set.empty
     in
     if Signature.Public_key_hash.Set.is_empty attesters then return_unit
@@ -974,8 +974,8 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
       match
         Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
       with
-      | Operator profile
-        when Operator_profile.is_observed_slot slot_index profile -> (
+      | Controller profile
+        when Controller_profiles.is_observed_slot slot_index profile -> (
           match amplificator with
           | None ->
               let*! () = Event.emit_amplificator_uninitialized () in
@@ -1659,7 +1659,7 @@ let run ~data_dir ~configuration_override =
   in
   let* () =
     match Profile_manager.get_profiles profile_ctxt with
-    | Operator profile ->
+    | Controller profile ->
         Node_context.warn_if_attesters_not_delegates ctxt profile
     | _ -> return_unit
   in

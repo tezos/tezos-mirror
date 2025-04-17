@@ -239,15 +239,16 @@ type header_status =
     (** The slot header was included in an L1 block but not timely attested. *)
   ]
 
-(** DAL node can track one or many profiles that correspond to various modes
-      that the DAL node would operate in. *)
+(** A DAL node can be in one of two profiles (aka modes): bootstrap or
+    controller. A controller node can have one or more (sub)profiles that
+    correspond to various roles that the DAL node may have. *)
 type profile =
   | Bootstrap
-      (** The bootstrap profile facilitates peer discovery in the DAL
+      (** The bootstrap profile/mode facilitates peer discovery in the DAL
           network.  Note that bootstrap nodes are incompatible with
           attester/producer/observer profiles as bootstrap nodes are
           expected to connect to all the meshes with degree 0. *)
-  | Operator of Operator_profile.t
+  | Controller of Controller_profiles.t
 
 (** Information associated to a slot header in the RPC services of the DAL
       node. *)

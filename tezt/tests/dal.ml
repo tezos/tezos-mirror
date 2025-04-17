@@ -2772,18 +2772,20 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   let profile1 = Dal_RPC.Attester Constant.bootstrap1.public_key_hash in
   let profile2 = Dal_RPC.Attester Constant.bootstrap2.public_key_hash in
   (* We start with empty profile list *)
-  let* () = check_profiles ~__LOC__ dal_node ~expected:(Operator []) in
+  let* () = check_profiles ~__LOC__ dal_node ~expected:(Controller []) in
   (* Adding [Attester] profile with pkh that is not encoded as
      [Tezos_crypto.Signature.Public_key_hash.encoding] should fail. *)
   let* () = check_bad_attester_pkh_encoding (Attester "This is invalid PKH") in
   (* Test adding duplicate profiles stores profile only once *)
   let* () = patch_profile_rpc profile1 in
   let* () = patch_profile_rpc profile1 in
-  let* () = check_profiles ~__LOC__ dal_node ~expected:(Operator [profile1]) in
+  let* () =
+    check_profiles ~__LOC__ dal_node ~expected:(Controller [profile1])
+  in
   (* Test adding multiple profiles *)
   let* () = patch_profile_rpc profile2 in
   let* () =
-    check_profiles ~__LOC__ dal_node ~expected:(Operator [profile1; profile2])
+    check_profiles ~__LOC__ dal_node ~expected:(Controller [profile1; profile2])
   in
   (* Test that the patched profiles are persisted after restart using SIGTERM. *)
   let* () = Dal_node.terminate dal_node in
@@ -2791,7 +2793,7 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   let* () = Dal_node.run dal_node ~wait_ready:true in
 
   let* () =
-    check_profiles ~__LOC__ dal_node ~expected:(Operator [profile1; profile2])
+    check_profiles ~__LOC__ dal_node ~expected:(Controller [profile1; profile2])
   in
   (* Test whether the patched profiles persist after a restart using SIGSTOP
      (that is, even if we stop the DAL node abruptly). *)
@@ -2804,7 +2806,7 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   check_profiles
     ~__LOC__
     dal_node
-    ~expected:(Operator [profile1; profile2; profile3])
+    ~expected:(Controller [profile1; profile2; profile3])
 
 (* Check that result of the DAL node's
    GET /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices
@@ -4257,7 +4259,7 @@ let test_baker_registers_profiles _protocol _parameters _cryptobox l1_node
      the baker behavior changes in this respect, the constant may need
      adjusting. *)
   let* () = Lwt_unix.sleep 2.0 in
-  check_profiles ~__LOC__ dal_node ~expected:(Operator profiles)
+  check_profiles ~__LOC__ dal_node ~expected:(Controller profiles)
 
 (** This helper funciton terminates dal_node2 and dal_node3 (in addition to
     those in [extra_nodes_to_restart]), and restart them after creating two
@@ -4635,7 +4637,7 @@ let test_producer_profile _protocol _dal_parameters _cryptobox _node _client
     check_profiles
       ~__LOC__
       dal_node
-      ~expected:Dal_RPC.(Operator [Producer index])
+      ~expected:Dal_RPC.(Controller [Producer index])
   in
   unit
 
@@ -4890,7 +4892,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
     check_profiles
       ~__LOC__
       producer
-      ~expected:Dal_RPC.(Operator [Producer index])
+      ~expected:Dal_RPC.(Controller [Producer index])
   in
   Log.info "Slot producer DAL node is running" ;
 
@@ -4940,7 +4942,8 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
     check_profiles
       ~__LOC__
       attester
-      ~expected:Dal_RPC.(Operator (List.map (fun pkh -> Attester pkh) all_pkhs))
+      ~expected:
+        Dal_RPC.(Controller (List.map (fun pkh -> Attester pkh) all_pkhs))
   in
   (* We need to bake some blocks until the L1 node notifies the
      attester DAL nodes that some L1 block is final and they have DAL
@@ -5548,7 +5551,7 @@ module Amplification = struct
       check_profiles
         ~__LOC__
         slot_producer
-        ~expected:Dal_RPC.(Operator [Producer slot_index])
+        ~expected:Dal_RPC.(Controller [Producer slot_index])
     in
     let* slot_producer_peer_id = Dal_node.read_identity slot_producer in
     info "Slot producer DAL node is running" ;
@@ -5557,7 +5560,7 @@ module Amplification = struct
       check_profiles
         ~__LOC__
         observer
-        ~expected:Dal_RPC.(Operator [Observer slot_index])
+        ~expected:Dal_RPC.(Controller [Observer slot_index])
     in
     let* observer_peer_id = Dal_node.read_identity observer in
     info "Observer DAL node is running" ;
@@ -5569,7 +5572,7 @@ module Amplification = struct
              check_profiles
                ~__LOC__
                attester.dal_node
-               ~expected:Dal_RPC.(Operator [Attester attester.pkh]))
+               ~expected:Dal_RPC.(Controller [Attester attester.pkh]))
            all_attesters
     in
     info "Attesters are running" ;
@@ -5872,7 +5875,7 @@ module Amplification = struct
       check_profiles
         ~__LOC__
         producer
-        ~expected:Dal_RPC.(Operator [Producer index])
+        ~expected:Dal_RPC.(Controller [Producer index])
     in
     Log.info "Slot producer DAL node is running" ;
 
@@ -5884,7 +5887,7 @@ module Amplification = struct
       check_profiles
         ~__LOC__
         observer
-        ~expected:Dal_RPC.(Operator [Observer index])
+        ~expected:Dal_RPC.(Controller [Observer index])
     in
     Log.info "Observer DAL node is running" ;
 
@@ -6177,7 +6180,7 @@ module Garbage_collection = struct
       check_profiles
         ~__LOC__
         slot_producer
-        ~expected:Dal_RPC.(Operator [Producer slot_index])
+        ~expected:Dal_RPC.(Controller [Producer slot_index])
     in
     Log.info "Slot producer DAL node is running" ;
 
@@ -6186,7 +6189,7 @@ module Garbage_collection = struct
         ~__LOC__
         attester
         ~expected:
-          (Dal_RPC.Operator
+          (Dal_RPC.Controller
              (List.map (fun pkh -> Dal_RPC.Attester pkh) bootstrap_pkhs))
     in
 
@@ -6407,7 +6410,7 @@ module Garbage_collection = struct
       check_profiles
         ~__LOC__
         slot_producer
-        ~expected:Dal_RPC.(Operator [Producer slot_index])
+        ~expected:Dal_RPC.(Controller [Producer slot_index])
     in
     Log.info "Slot producer DAL node is running" ;
 
@@ -6415,7 +6418,7 @@ module Garbage_collection = struct
       check_profiles
         ~__LOC__
         observer
-        ~expected:Dal_RPC.(Operator [Observer slot_index])
+        ~expected:Dal_RPC.(Controller [Observer slot_index])
     in
     Log.info "Observer DAL node is running" ;
 
@@ -6424,7 +6427,7 @@ module Garbage_collection = struct
         ~__LOC__
         attester
         ~expected:
-          (Dal_RPC.Operator
+          (Dal_RPC.Controller
              (List.map (fun pkh -> Dal_RPC.Attester pkh) bootstrap_pkhs))
     in
     Log.info "Attester DAL node is running" ;
@@ -7045,7 +7048,7 @@ let test_rpc_get_connections _protocol dal_parameters _cryptobox node client
     check_profiles
       ~__LOC__
       producer
-      ~expected:Dal_RPC.(Operator [Producer index])
+      ~expected:Dal_RPC.(Controller [Producer index])
   in
   Log.info "Slot producer DAL node is running" ;
 
@@ -7057,7 +7060,7 @@ let test_rpc_get_connections _protocol dal_parameters _cryptobox node client
     check_profiles
       ~__LOC__
       observer
-      ~expected:Dal_RPC.(Operator [Observer index])
+      ~expected:Dal_RPC.(Controller [Observer index])
   in
   Log.info "Observer DAL node is running" ;
 
@@ -8089,7 +8092,7 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
     check_profiles
       ~__LOC__
       producer
-      ~expected:Dal_RPC.(Operator [Producer slot_index])
+      ~expected:Dal_RPC.(Controller [Producer slot_index])
   in
   Log.info "Slot producer DAL node is running" ;
 

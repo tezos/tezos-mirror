@@ -185,14 +185,14 @@ module Dal_RPC = struct
 
   type commitment = string
 
-  type operator_profile =
+  type controller_profile =
     | Attester of string
     | Producer of int
     | Observer of int
 
-  type operator_profiles = operator_profile list
+  type controller_profiles = controller_profile list
 
-  type profile = Bootstrap | Operator of operator_profiles
+  type profile = Bootstrap | Controller of controller_profiles
 
   type slot_header = {
     slot_level : int;
@@ -291,7 +291,7 @@ module Dal_RPC = struct
       ]
       JSON.as_string
 
-  let json_of_operator_profile list =
+  let json_of_controller_profile list =
     let attesters, producers, observers =
       List.fold_left
         (fun (attesters, producers, observers) -> function
@@ -314,7 +314,7 @@ module Dal_RPC = struct
         ("observers", `A (List.rev observers));
       ]
 
-  let operator_profile_of_json json =
+  let controller_profile_of_json json =
     let open JSON in
     let attesters = json |-> "attesters" |> as_list |> List.map as_string in
     let producers = json |-> "operators" |> as_list |> List.map as_int in
@@ -328,14 +328,14 @@ module Dal_RPC = struct
     match json |-> "kind" |> as_string with
     | "bootstrap" -> Bootstrap
     | "controller" ->
-        let operator_profiles =
-          operator_profile_of_json (json |-> "controller_profiles")
+        let controller_profiles =
+          controller_profile_of_json (json |-> "controller_profiles")
         in
-        Operator operator_profiles
+        Controller controller_profiles
     | _ -> failwith "invalid case"
 
   let patch_profiles profiles =
-    let data : RPC_core.data = Data (json_of_operator_profile profiles) in
+    let data : RPC_core.data = Data (json_of_controller_profile profiles) in
     make ~data PATCH ["profiles"] as_empty_object_or_fail
 
   let get_profiles () = make GET ["profiles"] profiles_of_json
@@ -807,13 +807,13 @@ module Check = struct
   open Dal_RPC
 
   let profiles_typ : profile Check.typ =
-    let pp_operator_profile ppf = function
+    let pp_controller_profile ppf = function
       | Attester pkh -> Format.fprintf ppf "Attester %s" pkh
       | Producer slot_index -> Format.fprintf ppf "Producer %d" slot_index
       | Observer slot_index -> Format.fprintf ppf "Observer %d" slot_index
     in
-    let equal_operator_profile op1 op2 =
-      match (op1, op2) with
+    let equal_controller_profile c1 c2 =
+      match (c1, c2) with
       | Attester pkh1, Attester pkh2 -> String.equal pkh1 pkh2
       | Producer slot_index1, Producer slot_index2 ->
           Int.equal slot_index1 slot_index2
@@ -823,20 +823,20 @@ module Check = struct
     in
     let pp ppf = function
       | Bootstrap -> Format.fprintf ppf "Bootstrap"
-      | Operator operator_profiles ->
+      | Controller controller_profiles ->
           Format.fprintf
             ppf
-            "Operator [%a]"
-            (Format.pp_print_list pp_operator_profile)
-            operator_profiles
+            "Controller [%a]"
+            (Format.pp_print_list pp_controller_profile)
+            controller_profiles
     in
     let equal p1 p2 =
       match (p1, p2) with
       | Bootstrap, Bootstrap -> true
-      | Operator ops1, Operator ops2 ->
-          let ops1 = List.sort compare ops1 in
-          let ops2 = List.sort compare ops2 in
-          List.equal equal_operator_profile ops1 ops2
+      | Controller c1, Controller c2 ->
+          let c1 = List.sort compare c1 in
+          let c2 = List.sort compare c2 in
+          List.equal equal_controller_profile c1 c2
       | _, _ -> false
     in
     Check.equalable pp equal

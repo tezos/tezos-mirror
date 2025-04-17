@@ -321,7 +321,7 @@ let encoding : t Data_encoding.t =
 module V0 = struct
   type v0_profile =
     | Bootstrap
-    | Operator of Operator_profile.t
+    | Controller of Controller_profiles.t
     | Random_observer
 
   let v0_profile_encoding =
@@ -339,11 +339,11 @@ module V0 = struct
           (Tag 2)
           (obj2
              (req "kind" (constant "controller"))
-             (req "controller_profiles" Operator_profile.encoding))
+             (req "controller_profiles" Controller_profiles.encoding))
           (function
-            | Operator operator_profiles -> Some ((), operator_profiles)
+            | Controller controller_profiles -> Some ((), controller_profiles)
             | _ -> None)
-          (function (), operator_profiles -> Operator operator_profiles);
+          (function (), controller_profiles -> Controller controller_profiles);
         case
           ~title:"Random_observer"
           (Tag 3)
@@ -355,7 +355,7 @@ module V0 = struct
   let to_latest_profile = function
     | Random_observer -> Profile_manager.Random_observer
     | Bootstrap -> Profile_manager.bootstrap
-    | Operator op_profile -> Profile_manager.operator op_profile
+    | Controller profile -> Profile_manager.controller profile
 
   (* Legacy V0 configuration type used solely for migration purposes.
 
@@ -405,7 +405,10 @@ module V0 = struct
          (dft "metrics-addr" P2p_point.Id.encoding default_metrics_addr))
       (obj2
          (dft "history_mode" history_mode_encoding default_history_mode)
-         (dft "profiles" v0_profile_encoding (Operator Operator_profile.empty)))
+         (dft
+            "profiles"
+            v0_profile_encoding
+            (Controller Controller_profiles.empty)))
 
   let to_latest_version
       ( ( data_dir,
@@ -499,7 +502,7 @@ module V1 = struct
          (dft
             "profiles"
             V0.v0_profile_encoding
-            (V0.Operator Operator_profile.empty))
+            (V0.Controller Controller_profiles.empty))
          (req "version" int31)
          (dft "service_name" (Data_encoding.option Data_encoding.string) None)
          (dft

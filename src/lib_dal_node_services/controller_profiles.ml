@@ -46,11 +46,11 @@ let attester_only t =
 
 let attesters t = t.attesters
 
-let is_empty op =
-  (not (has_observer op)) && (not (has_attester op)) && not (has_producer op)
+let is_empty t =
+  (not (has_observer t)) && (not (has_attester t)) && not (has_producer t)
 
-let producer_slot_out_of_bounds number_of_slots op =
-  Slot_set.find_first (fun i -> i < 0 || i >= number_of_slots) op.producers
+let producer_slot_out_of_bounds number_of_slots t =
+  Slot_set.find_first (fun i -> i < 0 || i >= number_of_slots) t.producers
 
 let is_observed_slot slot_index {observers; _} =
   Slot_set.mem slot_index observers
@@ -68,19 +68,19 @@ let make ?(attesters = []) ?(producers = []) ?(observers = []) () =
     attesters = Pkh_set.of_list attesters;
   }
 
-let merge ?(on_new_attester = fun _ -> ()) op1 op2 =
+let merge ?(on_new_attester = fun _ -> ()) t1 t2 =
   let ( @ ) = Slot_set.union in
   let ( @. ) =
     Pkh_set.iter
       (fun pkh ->
-        if not (Pkh_set.mem pkh op1.attesters) then on_new_attester pkh)
-      op2.attesters ;
+        if not (Pkh_set.mem pkh t1.attesters) then on_new_attester pkh)
+      t2.attesters ;
     Pkh_set.union
   in
   {
-    producers = op1.producers @ op2.producers;
-    attesters = op1.attesters @. op2.attesters;
-    observers = op1.observers @ op2.observers;
+    producers = t1.producers @ t2.producers;
+    attesters = t1.attesters @. t2.attesters;
+    observers = t1.observers @ t2.observers;
   }
 
 let encoding =

@@ -23,43 +23,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module handles operator profiles for the DAL node *)
+(** This module deals with the different profiles of a DAL node in controller
+    mode. *)
 
-(** An operator DAL node can play three different roles:
+(** An controller DAL node can play three different roles:
     - attester for some pkh: checks that the shards assigned to this pkh are published
-    - slot producer for some slot index: splits slots into shards and publishes the shards
-    - slot observer for some slot index: collects the shards
-    corresponding to some slot index, reconstructs slots when enough
-    shards are seen, and republishes missing shards.
+    - operator for some slot index,
+    - observer for some slot index.
 
-    A single DAL node can play several of these roles at once. We call a profile the
-    set of roles played by a DAL node and represent it as a triple of sets. *)
+    Operator and observer DAL nodes can "produce" slots, that is, they split a
+    slot into shards and publish the shards. They are therefore also called
+    "slot producers".
+
+    Operators and observers also perform amplification: they reconstruct a slot
+    when enough shards are seen, and republish the missing shards. They both are
+    called "prover" profiles, because they need to generate shard proofs,
+    needing the full SRS, while the attester profile only needs the smaller,
+    "verifier SRS".
+
+    The difference between operators and observers is that operators can
+    participate in refutation games (because they store slot data for the whole
+    refutation period), while observers cannot.
+
+    A single DAL node can play several of these roles at once. We call a profile
+    the set of roles played by a DAL node and represent it as a triple of
+    sets. *)
 type t
 
 val encoding : t Data_encoding.t
 
-(** The empty operator; an operator with this profile does nothing *)
+(** The empty controller; a controller with this profile does nothing *)
 val empty : t
 
 val is_empty : t -> bool
 
-(** [has_attester operator] returns true if there is a public key in the
-    attester field of [operator] *)
+(** [has_attester t] returns true if there is a public key in the
+    attester field of [t] *)
 val has_attester : t -> bool
 
-(** [has_producer operator] returns true if there is a slot index in the
-    producer field of [operator] *)
+(** [has_producer t] returns true if there is a slot index in the
+    producer field of [t] *)
 val has_producer : t -> bool
 
-(** [has_observer operator] returns true if there is a slot index in the
-    observer field of [operator] *)
+(** [has_observer t] returns true if there is a slot index in the
+    observer field of [t] *)
 val has_observer : t -> bool
 
-(** [attester_only operator] returns true if [operator] has an attester role,
+(** [attester_only t] returns true if [t] has an attester role,
     and no producer, not observer roles. *)
 val attester_only : t -> bool
 
-(** [attesters operator] returns the set of attesters registered within the
+(** [attesters t] returns the set of attesters registered within the
     attester profile, if any. *)
 val attesters : t -> Signature.Public_key_hash.Set.t
 
@@ -82,7 +96,7 @@ val can_publish_on_slot_index : int -> t -> bool
 val get_all_slot_indexes : t -> int list
 
 (** [make ~attesters ~producers ~observers ()] returns an
-    operator profile for a node that is an attester for the public keys in
+    controller mode for a node that is an attester for the public keys in
     [attesters], a producer for each slot indexes in [producers], and an
     observer for all slot indexes in [observer]. When a list is empty or not
     specified, no value for the corresponding role will be included in the
@@ -94,8 +108,8 @@ val make :
   unit ->
   t
 
-(** [merge ~on_new_attester op1 op2] returns an operator profile that
-    contains both op1 & op2. [on_new_attester] is a function triggered for each
-    public key in [op2] that is not already in [op1] *)
+(** [merge ~on_new_attester op1 op2] returns a controller mode that contains
+    both op1 & op2. [on_new_attester] is a function triggered for each public
+    key in [op2] that is not already in [op1] *)
 val merge :
   ?on_new_attester:(Signature.Public_key_hash.t -> unit) -> t -> t -> t
