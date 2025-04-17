@@ -915,6 +915,64 @@ let test_forbidden_tz4 =
             (update_key ~kind ~ck_name:"ck" "delegate"))
         [("update consensus", Consensus); ("update companion", Companion)]
 
+let test_fail_noop =
+  let consensus_rights_delay =
+    Default_parameters.constants_mainnet.consensus_rights_delay
+  in
+  let delegate = "delegate" in
+  let check_finalized_block = check_cks delegate in
+  let assert_fail_with_invalid_consensus_key_update_noop kind =
+    assert_failure ~loc:__LOC__ ~expected_error:(fun (_block, state) err ->
+        let delegate = State.find_account delegate state in
+        let cycle =
+          match kind with
+          | Consensus -> Account_helpers.latest_consensus_key delegate |> fst
+          | Companion -> Account_helpers.latest_companion_key delegate |> fst
+        in
+        Assert.expect_error ~loc:__LOC__ err (function
+            | [
+                Protocol.Delegate_consensus_key.Invalid_consensus_key_update_noop
+                  (err_cycle, err_kind);
+              ] ->
+                Int32.equal
+                  (Protocol.Cycle_repr.to_int32 err_cycle)
+                  (State_account.Cycle.to_int32 cycle)
+                && err_kind = kind
+            | _ -> false))
+  in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> set S.consensus_rights_delay consensus_rights_delay
+  --> begin_test ~force_attest_all:true ~check_finalized_block [delegate]
+  --> add_account ~algo:Bls "ck"
+  --> fold_tag
+        (fun kind ->
+          update_key ~kind ~ck_name:"ck" delegate
+          (* Cannot register a pending key *)
+          --> loop
+                (consensus_rights_delay + 1)
+                (check_ck_status
+                   ~loc:__LOC__
+                   ~ck:"ck"
+                   ~registered_for:delegate
+                   Pending
+                   kind
+                --> assert_fail_with_invalid_consensus_key_update_noop
+                      kind
+                      (update_key ~kind ~ck_name:"ck" delegate)
+                --> next_cycle)
+          (* Once it's active: same error *)
+          --> check_ck_status
+                ~loc:__LOC__
+                ~ck:"ck"
+                ~registered_for:delegate
+                Active
+                kind
+          --> assert_fail_with_invalid_consensus_key_update_noop
+                kind
+                (update_key ~kind ~ck_name:"ck" delegate))
+        [("update consensus", Consensus); ("update companion", Companion)]
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -930,6 +988,7 @@ let tests =
        ("Test double registration", test_in_registration_table_twice);
        ("Test fail on unregistered delegate", test_unregistered);
        ("Test fail forbidden tz4", test_forbidden_tz4);
+       ("Test fail noop", test_fail_noop);
      ]
 
 let () =
