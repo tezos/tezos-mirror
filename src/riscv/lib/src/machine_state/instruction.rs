@@ -379,10 +379,6 @@ pub enum OpCode {
     Jr,
     /// Effects are to store the next instruction address in rd and jump to val(rs1).
     Jalr,
-    CAddw,
-
-    // RV64C compressed instructions
-    CAddiw,
 
     // RV64DC compressed instructions
     CFld,
@@ -621,9 +617,7 @@ impl OpCode {
             Self::BranchNotEqualZero => Args::run_branch_not_equal_zero,
             Self::Li => Args::run_li,
             Self::Mv => Args::run_mv,
-            Self::CAddw => Args::run_caddw,
             Self::Nop => Args::run_nop,
-            Self::CAddiw => Args::run_caddiw,
             Self::CFld => Args::run_cfld,
             Self::CFldsp => Args::run_cfldsp,
             Self::CFsd => Args::run_cfsd,
@@ -1101,32 +1095,6 @@ macro_rules! impl_ci_type {
     };
 }
 
-macro_rules! impl_cr_type {
-    ($fn: ident) => {
-        /// SAFETY: This function must only be called on an `Args` belonging
-        /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.hart.xregisters.$fn(self.rd.x, self.rs2.x);
-            Ok(ProgramCounterUpdate::Next(self.width))
-        }
-    };
-
-    ($fn: ident, non_zero) => {
-        /// SAFETY: This function must only be called on an `Args` belonging
-        /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.hart.xregisters.$fn(self.rd.nzx, self.rs2.nzx);
-            Ok(ProgramCounterUpdate::Next(self.width))
-        }
-    };
-}
-
 macro_rules! impl_cr_nz_type {
     ($impl: path, $fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
@@ -1595,10 +1563,6 @@ impl Args {
     fn run_ecall<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
         icb.ecall()
     }
-
-    // RV64C compressed instructions
-    impl_ci_type!(run_caddiw, non_zero);
-    impl_cr_type!(run_caddw);
 
     // RV64C compressed instructions
     impl_fload_type!(run_cfld);
@@ -2214,14 +2178,13 @@ impl From<&InstrCacheable> for Instruction {
                 Instruction::new_sdnz(args.rs1, args.rs2, args.imm, InstrWidth::Compressed)
             }
             InstrCacheable::CSdsp(args) => Instruction::from_ic_csdsp(args),
-            InstrCacheable::CAddiw(args) => Instruction {
-                opcode: OpCode::CAddiw,
-                args: args.into(),
-            },
-            InstrCacheable::CAddw(args) => Instruction {
-                opcode: OpCode::CAddw,
-                args: args.into(),
-            },
+            InstrCacheable::CAddiw(args) => Instruction::new_add_word_immediate(
+                args.rd_rs1,
+                args.rd_rs1.into(),
+                args.imm,
+                InstrWidth::Compressed,
+            ),
+            InstrCacheable::CAddw(args) => Instruction::from_ic_caddw(args),
             InstrCacheable::CSubw(args) => Instruction::from_ic_csubw(args),
 
             // RV64DC compressed instructions
