@@ -21,15 +21,12 @@ override_dh_installman:
 		do \
 			ln -s debian/octez-baker/usr/share/man/man1/octez-accuser.1.gz \
 			debian/octez-baker/usr/share/man/man1/$$bin.1.gz ; \
-			ln -s debian/octez-agnostic-baker/usr/share/man/man1/octez-accuser.1.gz \
-			debian/octez-agnostic-baker/usr/share/man/man1/$$bin.1.gz ; \
 		done
 
 override_dh_installdocs:
 	dh_installdocs
 	dh_installdocs -p octez-node docs/README.octez-node
 	dh_installdocs -p octez-baker docs/README.octez-baker
-	dh_installdocs -p octez-agnostic-baker docs/README.octez-agnostic-baker
 	dh_installdocs -p octez-signer docs/octez-signer.service
 	dh_installdocs -p octez-signer docs/README.octez-signer
 
@@ -40,21 +37,15 @@ override_dh_installsystemd:
 	dh_installsystemd -p octez-baker --no-start
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser@
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-agnostic-baker
-	dh_installsystemd -p octez-agnostic-baker --no-start
-	dh_installsystemd -p octez-agnostic-baker --no-enable --no-start --name octez-accuser@
-	dh_installsystemd -p octez-agnostic-baker --no-enable --no-start --name octez-agnostic-baker-bin
 
 override_dh_installlogrotate:
 	dh_installlogrotate --package=octez-node
 	dh_installlogrotate --package=octez-baker
-	dh_installlogrotate --package=octez-agnostic-baker
 
 override_dh_install:
 	dh_install
 	mkdir -p debian/octez-baker/etc/default/
 	cp debian/octez-baker.octez-accuser.default debian/octez-baker/etc/default/octez-accuser
-	mkdir -p debian/octez-agnostic-baker/etc/default/
-	cp debian/octez-agnostic-baker.octez-accuser.default debian/octez-agnostic-baker/etc/default/octez-accuser
 	dh_installdebconf
 
 override_dh_fixperms:

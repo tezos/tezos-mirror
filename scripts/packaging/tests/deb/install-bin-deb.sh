@@ -56,7 +56,6 @@ octez-node octez-node/purge_warning boolean true
 octez-node octez-node/snapshot-import boolean true
 octez-node octez-node/snapshot-no-check boolean true
 octez-baker octez-baker/liquidity-vote select on
-octez-agnostic-baker octez-baker/liquidity-vote select on
 debconf debconf/frontend select Noninteractive
 EOF
   # preseed the package
