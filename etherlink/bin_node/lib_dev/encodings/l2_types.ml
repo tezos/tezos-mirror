@@ -47,9 +47,8 @@ module Chain_family = struct
   let pp fmt cf = Format.fprintf fmt "%s" (to_string cf)
 end
 
-(* WIP: Minimal Block Tezos (should be equal to shell_block header) *)
 module Tezos_block = struct
-  type block = {
+  type t = {
     number : Ethereum_types.quantity;
     hash : Ethereum_types.block_hash;
     timestamp : Ethereum_types.quantity;
@@ -84,7 +83,7 @@ module Tezos_block = struct
       {number; hash; timestamp; parent_hash = parent})
     else raise (Invalid_argument "Expected a string of length 44")
 
-  let encode_block (block : block) : (string, string) result =
+  let encode_block (block : t) : (string, string) result =
     let (Ethereum_types.Qty number) = block.number in
     let (Ethereum_types.Qty timestamp) = block.timestamp in
 
@@ -111,12 +110,12 @@ module Tezos_block = struct
 
     Ok (Bytes.to_string encoded_block)
 
-  let decode_block (b : string) : (block, string) result =
+  let decode_block (b : string) : (t, string) result =
     let b = Bytes.of_string b in
     try Ok (block_from_binary b) with e -> Error (Printexc.to_string e)
 end
 
-type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.block
+type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.t
 
 let block_hash block =
   match block with Eth block -> block.hash | Tez block -> block.hash
