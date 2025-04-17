@@ -75,7 +75,7 @@ module Tezos_block = struct
       let parent = Ethereum_types.decode_block_hash previous_hash in
       let timestamp = Bytes.make 8 '\000' in
       Bytes.blit bytes 36 timestamp 0 8 ;
-      let timestamp = Ethereum_types.Qty (Helpers.decode_z_le timestamp) in
+      let timestamp = Ethereum_types.Qty (Helpers.decode_z_be timestamp) in
       let block_hash = Block_hash.hash_bytes [bytes] in
       let hash =
         Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
@@ -93,15 +93,15 @@ module Tezos_block = struct
       bytes
     in
 
-    let z_to_64_le z =
+    let z_to_64_be z =
       let bytes = Bytes.make 64 '\000' in
-      Bytes.set_int64_le bytes 0 (Z.to_int64 z) ;
+      Bytes.set_int64_be bytes 0 (Z.to_int64 z) ;
       bytes
     in
 
     let number_bytes = z_to_32_be number in
     let parent_bytes = Ethereum_types.encode_block_hash block.parent_hash in
-    let timestamp_bytes = z_to_64_le timestamp in
+    let timestamp_bytes = z_to_64_be timestamp in
 
     let encoded_block = Bytes.create 44 in
     Bytes.blit number_bytes 0 encoded_block 0 4 ;

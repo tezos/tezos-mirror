@@ -57,7 +57,7 @@ impl TezBlock {
         // Encode all block fields
         let num_enc: [u8; 4] = number.as_u32().to_be_bytes();
         let predecessor: [u8; 32] = previous_hash.to_fixed_bytes();
-        let time_enc: [u8; 8] = timestamp.i64().to_le_bytes();
+        let time_enc: [u8; 8] = timestamp.i64().to_be_bytes();
 
         // Append encoded fields to data
         data.extend_from_slice(&num_enc);
@@ -74,7 +74,7 @@ impl TezBlock {
 
         // Decode the timestamp
         let timestamp_array: [u8; 8] = bytes[36..44].try_into()?;
-        let timestamp = Timestamp::from(i64::from_le_bytes(timestamp_array));
+        let timestamp = Timestamp::from(i64::from_be_bytes(timestamp_array));
 
         Ok(TezBlock::new(number, timestamp, previous_hash))
     }
