@@ -91,11 +91,11 @@ module Protocol_types = struct
     let tezlink_block_to_shell_header (block : L2_types.Tezos_block.t) :
         Block_header.shell_header =
       let open Mock in
-      let (Ethereum_types.Qty number) = block.number in
+      let (Ethereum_types.Qty level) = block.level in
       let (Ethereum_types.Qty timestamp) = block.timestamp in
       let predecessor = ethereum_to_tezos_block_hash block.parent_hash in
       {
-        level = Z.to_int32 number;
+        level = Z.to_int32 level;
         proto_level;
         predecessor;
         timestamp = Time.Protocol.of_seconds @@ Z.to_int64 timestamp;
