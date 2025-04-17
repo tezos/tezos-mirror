@@ -712,7 +712,8 @@ struct
                    close handlers w (Some errs)))
           [@profiler.wrap_f
             {driver_ids = [Opentelemetry]}
-              (Tezos_profiler_backend.Opentelemetry_profiler.update_scope
+              (Tezos_profiler_complex_backends.Opentelemetry_profiler
+               .update_scope
                  _scope)])
     in
     let* r = protect_result ~canceler:w.canceler (fun () -> loop ()) in

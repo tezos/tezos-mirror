@@ -314,7 +314,7 @@ struct
 
   let base_name = String.concat "-" Name.base
 
-  type scope
+  type scope = Opentelemetry.Scope.t
 
   type metadata = {scope : scope option}
 
