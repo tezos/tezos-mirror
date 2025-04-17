@@ -2452,7 +2452,8 @@ let sandbox_command =
         config_file)
 
 let observer_run_args =
-  Tezos_clic.args11
+  Tezos_clic.args12
+    private_rpc_port_arg
     evm_node_endpoint_arg
     bundler_node_endpoint_arg
     preimages_arg
@@ -2495,7 +2496,8 @@ let observer_command =
              blacklisted_rpcs,
              whitelisted_rpcs,
              finalized_view ),
-           ( evm_node_endpoint,
+           ( private_rpc_port,
+             evm_node_endpoint,
              threshold_encryption_bundler_endpoint,
              preimages,
              preimages_endpoint,
@@ -2521,6 +2523,7 @@ let observer_command =
         ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
+        ?private_rpc_port
         ~verbose
         ?preimages
         ?preimages_endpoint

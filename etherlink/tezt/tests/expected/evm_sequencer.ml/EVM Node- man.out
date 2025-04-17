@@ -280,7 +280,8 @@ Run commands:
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
       [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--evm-node-endpoint <url>] [--bundler-node-endpoint <url>]
+      [--private-rpc-port <PORT>] [--evm-node-endpoint <url>]
+      [--bundler-node-endpoint <url>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--initial-kernel <evm_installer.wasm>] [--dont-track-rollup-node]
@@ -325,6 +326,7 @@ Run commands:
       --blacklisted-rpcs.
     --finalized-view: If the flag is set, the node will use the latest final
       state of the rollup, not its current HEAD, for any read-only operation.
+    --private-rpc-port <PORT>: The EVM node private server rpc port.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
     --bundler-node-endpoint <url>: The address of a service which encrypts
       incoming transactions for the rollup.
