@@ -51,7 +51,7 @@ module Tezos_block = struct
   type t = {
     level : int32;
     hash : Ethereum_types.block_hash;
-    timestamp : Ethereum_types.quantity;
+    timestamp : Time.Protocol.t;
     parent_hash : Ethereum_types.block_hash;
   }
 
@@ -71,9 +71,7 @@ module Tezos_block = struct
       let previous_hash = Bytes.make 32 '\000' in
       Bytes.blit bytes 4 previous_hash 0 32 ;
       let parent = Ethereum_types.decode_block_hash previous_hash in
-      let timestamp = Bytes.make 8 '\000' in
-      Bytes.blit bytes 36 timestamp 0 8 ;
-      let timestamp = Ethereum_types.Qty (Helpers.decode_z_be timestamp) in
+      let timestamp = Time.Protocol.of_seconds @@ Bytes.get_int64_be bytes 36 in
       let block_hash = Block_hash.hash_bytes [bytes] in
       let hash =
         Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
@@ -82,21 +80,15 @@ module Tezos_block = struct
     else raise (Invalid_argument "Expected a string of length 44")
 
   let encode_block (block : t) : (string, string) result =
-    let (Ethereum_types.Qty timestamp) = block.timestamp in
-
-    let z_to_64_be z =
-      let bytes = Bytes.make 64 '\000' in
-      Bytes.set_int64_be bytes 0 (Z.to_int64 z) ;
-      bytes
-    in
-
     let parent_bytes = Ethereum_types.encode_block_hash block.parent_hash in
-    let timestamp_bytes = z_to_64_be timestamp in
 
     let encoded_block = Bytes.create 44 in
     Bytes.set_int32_be encoded_block 0 block.level ;
     Bytes.blit parent_bytes 0 encoded_block 4 32 ;
-    Bytes.blit timestamp_bytes 0 encoded_block 36 8 ;
+    Bytes.set_int64_be
+      encoded_block
+      36
+      (Time.Protocol.to_seconds block.timestamp) ;
 
     Ok (Bytes.to_string encoded_block)
 

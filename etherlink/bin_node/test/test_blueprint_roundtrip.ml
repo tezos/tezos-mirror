@@ -132,9 +132,8 @@ let test_tez_block_roundtrip ~title ~level ~timestamp ~parent_hash () =
       int32
       ~error_msg:"Wrong decoded of number for block: got %L instead of %R") ;
   Check.(
-    (Z.to_int @@ Ethereum_types.Qty.to_z decoding_result.timestamp
-    = Z.to_int @@ Ethereum_types.Qty.to_z block.timestamp)
-      int
+    (decoding_result.timestamp = block.timestamp)
+      (convert Time.Protocol.to_seconds int64)
       ~error_msg:"Wrong decoded of timestamp for block: got %L instead of %R") ;
   Check.(
     (Ethereum_types.block_hash_to_bytes decoding_result.parent_hash
@@ -186,14 +185,14 @@ let () =
   test_tez_block_roundtrip
     ~title:"all zeros tez block"
     ~level:0l
-    ~timestamp:(Qty Z.zero)
+    ~timestamp:Time.Protocol.epoch
     ~parent_hash:zero_hash
     () ;
 
   test_tez_block_roundtrip
     ~title:"genesis successor"
     ~level:0l
-    ~timestamp:(Qty Z.one)
+    ~timestamp:Time.Protocol.epoch
     ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
     ()
 

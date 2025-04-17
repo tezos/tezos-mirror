@@ -202,7 +202,7 @@ let blueprint_applied block process_time =
       emit
         blueprint_application
         ( Z.of_int32 block.level,
-          block.timestamp |> Qty.to_z |> Z.to_int64 |> Time.Protocol.of_seconds,
+          block.timestamp,
           0,
           Z.zero,
           block.hash,

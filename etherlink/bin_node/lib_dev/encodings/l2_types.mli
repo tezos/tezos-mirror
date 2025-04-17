@@ -48,7 +48,7 @@ module Tezos_block : sig
   type t = {
     level : int32;
     hash : Ethereum_types.block_hash;
-    timestamp : Ethereum_types.quantity;
+    timestamp : Time.Protocol.t;
     parent_hash : Ethereum_types.block_hash;
   }
 
