@@ -62,10 +62,10 @@ impl L2Block {
         }
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
         match self {
-            Self::Etherlink(block) => block.to_bytes(),
-            Self::Tezlink(block) => block.to_bytes(),
+            Self::Etherlink(block) => Ok(block.to_bytes()),
+            Self::Tezlink(block) => Ok(block.to_bytes()?),
         }
     }
 

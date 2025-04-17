@@ -48,15 +48,9 @@ module Chain_family = struct
 end
 
 module Tezos_block = struct
-  type block_without_hash = {
-    level : int32;
-    timestamp : Time.Protocol.t;
-    parent_hash : Ethereum_types.block_hash;
-  }
-
   type t = {
-    level : int32;
     hash : Ethereum_types.block_hash;
+    level : int32;
     timestamp : Time.Protocol.t;
     parent_hash : Ethereum_types.block_hash;
   }
@@ -69,7 +63,7 @@ module Tezos_block = struct
     Ethereum_types.Block_hash
       (Hex "8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8423e7c02934")
 
-  let block_without_hash_encoding : block_without_hash Data_encoding.t =
+  let block_encoding : t Data_encoding.t =
     let open Data_encoding in
     let timestamp_encoding = Time.Protocol.encoding in
     let block_hash_encoding =
@@ -83,36 +77,25 @@ module Tezos_block = struct
     in
     def "tezlink_block"
     @@ conv
-         (fun ({level; parent_hash; timestamp} : block_without_hash) ->
-           (level, parent_hash, timestamp))
-         (fun (level, parent_hash, timestamp) ->
-           {level; parent_hash; timestamp})
-         (obj3
+         (fun {hash; level; parent_hash; timestamp} ->
+           (hash, level, parent_hash, timestamp))
+         (fun (hash, level, parent_hash, timestamp) ->
+           {hash; level; parent_hash; timestamp})
+         (obj4
+            (req "hash" block_hash_encoding)
             (req "level" int32)
             (req "parent_hash" block_hash_encoding)
             (req "timestamp" timestamp_encoding))
 
-  let () = Data_encoding.Registration.register block_without_hash_encoding
+  let () = Data_encoding.Registration.register block_encoding
 
   (* This function may be replaced in the future by an already existing function *)
   (* When Tezos block will be complete *)
-  let block_from_binary bytes : t =
-    let ({level; parent_hash; timestamp} : block_without_hash) =
-      Data_encoding.Binary.of_bytes_exn block_without_hash_encoding bytes
-    in
-    let block_hash = Block_hash.hash_bytes [bytes] in
-    let hash =
-      Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
-    in
-    {level; parent_hash; timestamp; hash}
+  let block_from_binary bytes =
+    Data_encoding.Binary.of_bytes_exn block_encoding bytes
 
-  let encode_block ({level; parent_hash; timestamp; hash = _} : t) :
-      (string, string) result =
-    Ok
-      (Bytes.to_string
-      @@ Data_encoding.Binary.to_bytes_exn
-           block_without_hash_encoding
-           {level; parent_hash; timestamp})
+  let encode_block (block : t) : (string, string) result =
+    Ok (Data_encoding.Binary.to_string_exn block_encoding block)
 
   let decode_block (b : string) : (t, string) result =
     let b = Bytes.of_string b in

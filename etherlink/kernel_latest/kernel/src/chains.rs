@@ -455,7 +455,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             number
         );
 
-        let tezblock = TezBlock::new(number, timestamp, previous_hash);
+        let tezblock = TezBlock::new(number, timestamp, previous_hash)?;
         let new_block = L2Block::Tezlink(tezblock);
         let root = self.storage_root_path();
         crate::block_storage::store_current(host, &root, &new_block)
