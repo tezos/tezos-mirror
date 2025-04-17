@@ -65,11 +65,7 @@ EOF
   sudo debconf-get-selections | grep octez
 fi
 
-if [ "${AGNOSTIC_BAKER:-}" = "true" ]; then
-  apt-get install -y octez-agnostic-baker
-else
-  apt-get install -y octez-baker
-fi
+apt-get install -y octez-baker
 
 if [ -n "$DATADIR" ]; then
   echo "Setup Custom data dir"

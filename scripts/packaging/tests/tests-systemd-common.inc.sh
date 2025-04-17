@@ -6,21 +6,19 @@ systemctl start octez-node.service
 
 # give some time to the node to create the identity
 # otherwise the octez-client call below will give an error
-if [ "${AGNOSTIC_BAKER:-}" = "true" ]; then
-  /usr/share/octez-agnostic-baker/wait-for-node-up.sh
-else
-  /usr/share/octez-baker/wait-for-node-up.sh
-fi
+/usr/share/octez-baker/wait-for-node-up.sh
 
 su tezos -c "octez-client gen keys alice"
 key=$(su tezos -c "octez-client show address alice" | grep Hash: | awk '{ print $2 }')
 echo "BAKER_KEY=$key" >> /etc/default/octez-baker
 
 if [ "${AGNOSTIC_BAKER:-}" = "true" ]; then
-  systemctl start octez-agnostic-baker.service
+  echo "AGNOSTIC_BAKER=true" >> /etc/default/octez-baker
 else
-  systemctl start octez-baker.service
+  echo "AGNOSTIC_BAKER=false" >> /etc/default/octez-baker
 fi
+
+systemctl start octez-baker.service
 
 su tezos -c "octez-node config show"
 
@@ -35,16 +33,14 @@ echo "Log: /var/log/tezos/node.log"
 echo "-----------------------"
 tail /var/log/tezos/node.log
 
+systemctl status octez-baker.service
 if [ "${AGNOSTIC_BAKER:-}" = "true" ]; then
   systemctl status octez-agnostic-baker.service
-  systemctl status octez-agnostic-baker-bin.service
 
-  echo "Log: /var/log/tezos/agnostic-baker.log"
+  echo "Log: /var/log/tezos/baker.log"
   echo "-----------------------"
-  tail /var/log/tezos/agnostic-baker.log
+  tail /var/log/tezos/baker.log
 else
-  systemctl status octez-baker.service
-
   for logfile in /var/log/tezos/baker-P*.log; do
     proto=$(basename "$logfile" | sed -E 's/baker-(P[^.]+).log/\1/')
     systemctl status "octez-baker@$proto.service"
