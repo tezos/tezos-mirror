@@ -2313,6 +2313,7 @@ dependencies = [
  "libsecp256k1",
  "primitive-types",
  "rlp",
+ "serde",
  "sha3",
  "tezos-smart-rollup-encoding",
  "tezos_crypto_rs",

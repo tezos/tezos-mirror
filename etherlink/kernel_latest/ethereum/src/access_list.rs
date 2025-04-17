@@ -12,6 +12,8 @@ use crate::rlp_helpers::{decode_field, decode_list, next};
 /// which are being accessed during a contract invocation.
 /// For more information see `<https://eips.ethereum.org/EIPS/eip-2930>`.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "evaluation", derive(serde::Deserialize))]
+#[cfg_attr(feature = "evaluation", serde(rename_all = "camelCase"))]
 pub struct AccessListItem {
     /// Address of the contract invoked during execution
     pub address: H160,
