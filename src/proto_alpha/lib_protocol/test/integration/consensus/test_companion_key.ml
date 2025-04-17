@@ -973,6 +973,25 @@ let test_fail_noop =
                 (update_key ~kind ~ck_name:"ck" delegate))
         [("update consensus", Consensus); ("update companion", Companion)]
 
+let test_fail_already_registered =
+  let delegate = "delegate" in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> begin_test ~force_attest_all:true ~algo:Bls [delegate; "ck"]
+  --> fold_tag
+        (fun kind ->
+          assert_failure
+            ~loc:__LOC__
+            ~expected_error:(fun _ err ->
+              Error_helpers.check_error_constructor_name
+                ~loc:__LOC__
+                ~expected:
+                  Protocol.Delegate_consensus_key
+                  .Invalid_consensus_key_update_active
+                err)
+            (update_key ~kind ~ck_name:"ck" delegate))
+        [("update consensus", Consensus); ("update companion", Companion)]
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -989,6 +1008,7 @@ let tests =
        ("Test fail on unregistered delegate", test_unregistered);
        ("Test fail forbidden tz4", test_forbidden_tz4);
        ("Test fail noop", test_fail_noop);
+       ("Test already registered", test_fail_already_registered);
      ]
 
 let () =
