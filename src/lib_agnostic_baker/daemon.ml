@@ -44,6 +44,14 @@ module Baker_agent : AGENT = struct
   let init_sapling_params = true
 end
 
+module Accuser_agent : AGENT = struct
+  let name = "accuser"
+
+  let commands = Commands.accuser_commands
+
+  let init_sapling_params = false
+end
+
 module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
   type process = {thread : int Lwt.t; canceller : int Lwt.u}
 
@@ -387,3 +395,4 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
 end
 
 module Baker = Make_daemon (Baker_agent)
+module Accuser = Make_daemon (Accuser_agent)
