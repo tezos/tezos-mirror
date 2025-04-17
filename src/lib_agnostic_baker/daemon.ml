@@ -7,7 +7,6 @@
 (*****************************************************************************)
 
 open Agnostic_baker_errors
-module Events = Agnostic_baker_events
 
 module Profiler = struct
   include (val Profiler.wrap Agnostic_baker_profiler.agnostic_baker_profiler)
@@ -143,7 +142,7 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
   (** [spawn_baker protocol_hash] spawns a new baker process for the given [protocol_hash]. *)
   let spawn_baker protocol_hash =
     let open Lwt_result_syntax in
-    let*! () = Events.(emit starting_baker) protocol_hash in
+    let*! () = Events.(emit starting_agent) (Agent.name, protocol_hash) in
     let cancel_promise, canceller = Lwt.wait () in
     let thread =
       run_thread
@@ -151,7 +150,7 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
         ~cancel_promise
         ~init_sapling_params:Agent.init_sapling_params
     in
-    let*! () = Events.(emit baker_running) protocol_hash in
+    let*! () = Events.(emit agent_running) (Agent.name, protocol_hash) in
     return {protocol_hash; process = {thread; canceller}}
 
   (** [hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
@@ -170,8 +169,8 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
       Events.(emit protocol_encountered) (next_proto_status, next_protocol_hash)
     in
     let*! () =
-      Events.(emit become_old_baker)
-        (current_protocol_hash, level_to_kill_old_baker)
+      Events.(emit become_old_agent)
+        (Agent.name, current_protocol_hash, level_to_kill_old_baker)
     in
     state.old_baker <-
       Some {baker = current_baker; level_to_kill = level_to_kill_old_baker} ;
@@ -193,7 +192,9 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
              ~node_addr [@profiler.record_s {verbosity = Notice} "get_level"])
         in
         if head_level >= level_to_kill then (
-          let*! () = Events.(emit stopping_baker) baker.protocol_hash in
+          let*! () =
+            Events.(emit stopping_agent) (Agent.name, baker.protocol_hash)
+          in
           Lwt.wakeup
             baker.process.canceller
             0 [@profiler.record_f {verbosity = Notice} "kill old baker"] ;
@@ -362,16 +363,16 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
   let run state =
     let open Lwt_result_syntax in
     let node_addr = state.node_endpoint in
-    let*! () = Events.(emit starting_daemon) () in
+    let*! () = Events.(emit starting_daemon) Agent.name in
     let _ccid =
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
-          let*! () = Events.(emit stopping_daemon) () in
+          let*! () = Events.(emit stopping_daemon) Agent.name in
           Lwt.return_unit)
     in
     let* () =
       if state.keep_alive then
         retry_on_disconnection
-          ~emit:(Events.emit Agnostic_baker_events.cannot_connect)
+          ~emit:(Events.emit Events.cannot_connect)
           node_addr
           (fun () -> may_start_initial_baker state)
       else may_start_initial_baker state

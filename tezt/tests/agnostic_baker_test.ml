@@ -30,11 +30,11 @@ let wait_for_active_protocol_waiting agnostic_baker =
     (fun _json -> Some ())
 
 let wait_for_become_old_baker agnostic_baker =
-  Agnostic_baker.wait_for agnostic_baker "become_old_baker.v0" (fun _json ->
+  Agnostic_baker.wait_for agnostic_baker "become_old_agent.v0" (fun _json ->
       Some ())
 
 let wait_for_stopping_baker agnostic_baker =
-  Agnostic_baker.wait_for agnostic_baker "stopping_baker.v0" (fun _json ->
+  Agnostic_baker.wait_for agnostic_baker "stopping_agent.v0" (fun _json ->
       Some ())
 
 let remote_sign client =
@@ -221,10 +221,7 @@ let test_keep_alive =
   let* () = Process.check_error ~msg:(rex "Cannot connect to node") process in
   (* Start the baker with no node running and [--keep-alive], it'll wait. *)
   let wait_for_cannot_connect =
-    Agnostic_baker.wait_for
-      baker
-      "agnostic_baker_cannot_connect.v0"
-      (fun _json -> Some ())
+    Agnostic_baker.wait_for baker "cannot_connect.v0" (fun _json -> Some ())
   in
   let* () = Agnostic_baker.run ~extra_arguments:["--keep-alive"] baker
   and* () = wait_for_cannot_connect in
