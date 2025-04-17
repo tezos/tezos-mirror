@@ -177,15 +177,6 @@ impl Layout for CSRValuesLayout {
         AllocatedOf<MStatusLayout, M>,
         AllocatedOf<XipCellLayout, M>,
     >;
-
-    fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        let backend = std::cell::RefCell::new(backend);
-        Self::Allocated::new_with(
-            || MStatusLayout::allocate(*backend.borrow_mut()),
-            || XipCellLayout::allocate(*backend.borrow_mut()),
-            || EffectCellLayout::<CSRRepr>::allocate(*backend.borrow_mut()),
-        )
-    }
 }
 
 impl CommitmentLayout for CSRValuesLayout {

@@ -40,12 +40,6 @@ pub struct BuddyLeafLayout<const PAGES: u64>;
 
 impl<const PAGES: u64> Layout for BuddyLeafLayout<PAGES> {
     type Allocated<M: ManagerBase> = BuddyLeaf<PAGES, M>;
-
-    fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        Self::Allocated {
-            set: Atom::<u64>::allocate(backend),
-        }
-    }
 }
 
 impl<const PAGES: u64> CommitmentLayout for BuddyLeafLayout<PAGES> {

@@ -28,7 +28,6 @@ use super::proof_backend::tree::Tree;
 use super::verify_backend::PartialState;
 use super::verify_backend::{self};
 use crate::array_utils::boxed_array;
-use crate::default::ConstDefault;
 use crate::state_backend::verify_backend::PageId;
 use crate::storage::binary;
 
@@ -257,7 +256,7 @@ impl<T: ProofLayout> ProofLayout for Box<T> {
 
 impl<T> ProofLayout for Atom<T>
 where
-    T: serde::Serialize + serde::de::DeserializeOwned + ConstDefault + 'static,
+    T: serde::Serialize + serde::de::DeserializeOwned + 'static,
 {
     fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         // The Merkle leaf must hold the serialisation of the initial state.
@@ -289,7 +288,7 @@ where
 
 impl<T, const LEN: usize> ProofLayout for Array<T, LEN>
 where
-    T: serde::Serialize + serde::de::DeserializeOwned + ConstDefault + 'static,
+    T: serde::Serialize + serde::de::DeserializeOwned + 'static,
 {
     fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         // RV-282: Break down into multiple leaves if the size of the `Cells`

@@ -5,29 +5,18 @@
 
 use std::marker::PhantomData;
 
-use crate::default::ConstDefault;
-
 /// Structural description of a state type
 pub trait Layout {
     /// Representation of the allocated regions in the state backend
     type Allocated<M: super::ManagerBase>;
-
-    /// Allocate regions in the given state backend.
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M>;
 }
 
 impl Layout for () {
     type Allocated<M: super::ManagerBase> = ();
-
-    fn allocate<M: super::ManagerAlloc>(_backend: &mut M) -> Self::Allocated<M> {}
 }
 
 impl<T: Layout> Layout for Box<T> {
     type Allocated<M: super::ManagerBase> = Box<T::Allocated<M>>;
-
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        Box::new(T::allocate(backend))
-    }
 }
 
 /// `L::Allocated`
@@ -39,13 +28,8 @@ pub struct Atom<T> {
     _pd: PhantomData<T>,
 }
 
-impl<T: ConstDefault + 'static> Layout for Atom<T> {
+impl<T: 'static> Layout for Atom<T> {
     type Allocated<M: super::ManagerBase> = super::Cell<T, M>;
-
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        let region = backend.allocate_region([T::DEFAULT; 1]);
-        super::Cell::bind(region)
-    }
 }
 
 /// Layout for a fixed number of values
@@ -54,16 +38,8 @@ pub struct Array<T, const LEN: usize> {
     _pd: PhantomData<T>,
 }
 
-impl<T: 'static, const LEN: usize> Layout for Array<T, LEN>
-where
-    [T; LEN]: ConstDefault,
-{
+impl<T: 'static, const LEN: usize> Layout for Array<T, LEN> {
     type Allocated<M: super::ManagerBase> = super::Cells<T, LEN, M>;
-
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        let region = backend.allocate_region(<[T; LEN]>::DEFAULT);
-        super::Cells::bind(region)
-    }
 }
 
 /// Layout for a fixed number of bytes, readable as types implementing [`super::elems::Elem`].
@@ -71,11 +47,6 @@ pub struct DynArray<const LEN: usize> {}
 
 impl<const LEN: usize> Layout for DynArray<LEN> {
     type Allocated<M: super::ManagerBase> = super::DynCells<LEN, M>;
-
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        let region = backend.allocate_dyn_region();
-        super::DynCells::bind(region)
-    }
 }
 
 /// Usage: Provide a struct with each field holding a layout.
@@ -134,16 +105,6 @@ macro_rules! struct_layout {
                     ),+
                 >;
 
-                #[inline]
-                fn allocate<M: $crate::state_backend::ManagerAlloc>(
-                    backend: &mut M,
-                ) -> Self::Allocated<M> {
-                    Self::Allocated {
-                        $($field_name: <[<$field_name:camel>] as $crate::state_backend::Layout>::allocate(
-                            backend
-                        )),+
-                    }
-                }
             }
 
             impl <
@@ -246,10 +207,6 @@ where
     B: Layout,
 {
     type Allocated<M: super::ManagerBase> = (A::Allocated<M>, B::Allocated<M>);
-
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        (A::allocate(backend), B::allocate(backend))
-    }
 }
 
 impl<A, B, C> Layout for (A, B, C)
@@ -259,14 +216,6 @@ where
     C: Layout,
 {
     type Allocated<M: super::ManagerBase> = (A::Allocated<M>, B::Allocated<M>, C::Allocated<M>);
-
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        (
-            A::allocate(backend),
-            B::allocate(backend),
-            C::allocate(backend),
-        )
-    }
 }
 
 impl<A, B, C, D> Layout for (A, B, C, D)
@@ -282,15 +231,6 @@ where
         C::Allocated<M>,
         D::Allocated<M>,
     );
-
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        (
-            A::allocate(backend),
-            B::allocate(backend),
-            C::allocate(backend),
-            D::allocate(backend),
-        )
-    }
 }
 
 impl<A, B, C, D, E> Layout for (A, B, C, D, E)
@@ -308,16 +248,6 @@ where
         D::Allocated<M>,
         E::Allocated<M>,
     );
-
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        (
-            A::allocate(backend),
-            B::allocate(backend),
-            C::allocate(backend),
-            D::allocate(backend),
-            E::allocate(backend),
-        )
-    }
 }
 
 impl<A, B, C, D, E, F> Layout for (A, B, C, D, E, F)
@@ -337,17 +267,6 @@ where
         E::Allocated<M>,
         F::Allocated<M>,
     );
-
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        (
-            A::allocate(backend),
-            B::allocate(backend),
-            C::allocate(backend),
-            D::allocate(backend),
-            E::allocate(backend),
-            F::allocate(backend),
-        )
-    }
 }
 
 impl<T, const LEN: usize> Layout for [T; LEN]
@@ -355,10 +274,6 @@ where
     T: Layout,
 {
     type Allocated<M: super::ManagerBase> = [T::Allocated<M>; LEN];
-
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        std::array::from_fn(|_| T::allocate(backend))
-    }
 }
 
 /// This [`Layout`] is identical to [`[T; LEN]`] but it allows you to choose a very high `LEN`.
@@ -369,12 +284,6 @@ where
     T: Layout,
 {
     type Allocated<M: super::ManagerBase> = Vec<T::Allocated<M>>;
-
-    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        let mut space = Vec::with_capacity(LEN);
-        space.resize_with(LEN, || T::allocate(backend));
-        space
-    }
 }
 
 #[cfg(test)]

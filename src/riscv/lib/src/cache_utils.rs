@@ -12,7 +12,6 @@ use crate::state_backend::AllocatedOf;
 use crate::state_backend::CommitmentLayout;
 use crate::state_backend::FromProofResult;
 use crate::state_backend::Layout;
-use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerSerialise;
 use crate::state_backend::Many;
@@ -91,10 +90,6 @@ impl<const BITS: usize, const SIZE: usize, CachedLayout: Layout> Layout
     for Sizes<BITS, SIZE, CachedLayout>
 {
     type Allocated<M: ManagerBase> = <Many<CachedLayout, SIZE> as Layout>::Allocated<M>;
-
-    fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        Many::<CachedLayout, SIZE>::allocate(backend)
-    }
 }
 
 impl<const BITS: usize, const SIZE: usize, CachedLayout: CommitmentLayout> CommitmentLayout

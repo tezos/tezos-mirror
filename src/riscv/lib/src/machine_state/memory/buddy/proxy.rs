@@ -15,7 +15,6 @@ use crate::state_backend::CommitmentLayout;
 use crate::state_backend::FnManager;
 use crate::state_backend::FromProofResult;
 use crate::state_backend::Layout;
-use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerSerialise;
 use crate::state_backend::PartialHashError;
@@ -36,10 +35,6 @@ where
     (): BuddyLayoutMatch<PAGES>,
 {
     type Allocated<M: ManagerBase> = <PickLayout<PAGES> as Layout>::Allocated<M>;
-
-    fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        <PickLayout<PAGES> as Layout>::allocate(backend)
-    }
 }
 
 impl<const PAGES: usize> CommitmentLayout for BuddyLayoutProxy<PAGES>

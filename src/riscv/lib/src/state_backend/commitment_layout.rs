@@ -16,7 +16,6 @@ use super::hash::HashWriter;
 use super::proof_backend::merkle::MERKLE_ARITY;
 use super::proof_backend::merkle::MERKLE_LEAF_SIZE;
 use super::proof_backend::merkle::chunks_to_writer;
-use crate::default::ConstDefault;
 use crate::state_backend::hash::build_custom_merkle_hash;
 
 /// [`Layouts`] which may be used for commitments
@@ -35,7 +34,7 @@ impl<T: CommitmentLayout> CommitmentLayout for Box<T> {
 
 impl<T> CommitmentLayout for Atom<T>
 where
-    T: serde::Serialize + ConstDefault + 'static,
+    T: serde::Serialize + 'static,
 {
     fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         Hash::blake2b_hash(state)
@@ -44,7 +43,7 @@ where
 
 impl<T, const LEN: usize> CommitmentLayout for Array<T, LEN>
 where
-    T: serde::Serialize + Copy + ConstDefault + 'static,
+    T: serde::Serialize + Copy + 'static,
 {
     fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         Hash::blake2b_hash(state)
