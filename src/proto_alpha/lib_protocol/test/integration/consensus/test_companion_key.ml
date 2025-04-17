@@ -889,6 +889,32 @@ let test_unregistered =
             (update_key ~kind ~ck_name:"ck" "account"))
         [("update consensus", Consensus); ("update companion", Companion)]
 
+let test_forbidden_tz4 =
+  let open Lwt_result_syntax in
+  init_constants ()
+  (* tz4 forbidden *)
+  --> set S.allow_tz4_delegate_enable false
+  --> begin_test ~force_attest_all:true ["delegate"]
+  --> add_account ~algo:Bls "ck"
+  --> fold_tag
+        (fun kind ->
+          assert_failure
+            ~loc:__LOC__
+            ~expected_error:(fun (_block, state) err ->
+              let ck = State.find_account "ck" state in
+              let* ck_account = Account.find ck.pkh in
+              Assert.expect_error ~loc:__LOC__ err (function
+                  | [
+                      Protocol.Delegate_consensus_key
+                      .Invalid_consensus_key_update_tz4 err_ck_bls_pk;
+                    ] ->
+                      Signature.Public_key.equal
+                        (Bls err_ck_bls_pk)
+                        ck_account.pk
+                  | _ -> false))
+            (update_key ~kind ~ck_name:"ck" "delegate"))
+        [("update consensus", Consensus); ("update companion", Companion)]
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -903,6 +929,7 @@ let tests =
        ("Test registration override", test_registration_override);
        ("Test double registration", test_in_registration_table_twice);
        ("Test fail on unregistered delegate", test_unregistered);
+       ("Test fail forbidden tz4", test_forbidden_tz4);
      ]
 
 let () =
