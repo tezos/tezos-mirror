@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024-2025 TriliTech <contact@trili.tech>                    *)
-(* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024-2025 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -60,8 +60,9 @@ let from_api_output : Api.output -> output =
 let to_api_input : input -> Api.input =
  fun input ->
   match input with
-  | Inbox_message (outbox_level, message_index, payload) ->
-      Inbox_message (outbox_level, message_index, Bytes.of_string payload)
+  | Inbox_message (inbox_level, message_counter, payload) ->
+      Inbox_message
+        {inbox_level; message_counter; payload = Bytes.of_string payload}
   | Reveal raw_reveal -> Reveal (Bytes.of_string raw_reveal)
 
 let from_api_input_request : Api.input_request -> input_request =

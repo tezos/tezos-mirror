@@ -18,6 +18,7 @@ type state = Api.state
 
 type status = Api.status
 
+(* TODO RV-615: Improve the `input` type exposed in protocol environment *)
 (* Mirrors Api.input but requires manual conversion *)
 type input = Inbox_message of int32 * int64 * string | Reveal of string
 

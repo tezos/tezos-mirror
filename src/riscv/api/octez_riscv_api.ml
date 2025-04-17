@@ -9,7 +9,7 @@ type state
 type mut_state
 type id
 type status = Evaluating | Waiting_for_input | Waiting_for_reveal
-type input = Inbox_message of int32 * int64 * bytes | Reveal of bytes
+type input = Inbox_message of {inbox_level: int32; message_counter: int64; payload: bytes} | Reveal of bytes
 type input_request = No_input_required | Initial | First_after of int32 * int64 | Needs_reveal of bytes
 type output_info = {message_index : int64; outbox_level : int32}
 type output = {info : output_info; encoded_message : bytes}

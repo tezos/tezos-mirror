@@ -17,6 +17,7 @@ use crate::machine_state::block_cache::block::InterpretedBlockBuilder;
 use crate::machine_state::mode::Mode;
 use crate::program::Program;
 use crate::pvm::common::PvmHooks;
+use crate::pvm::common::PvmInput;
 use crate::pvm::common::PvmStatus;
 use crate::state::NewState;
 use crate::state_backend;
@@ -73,23 +74,23 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
     where
         M: state_backend::ManagerRead,
     {
-        self.with_backend(|state| state.status())
+        self.with_backend(|pvm| pvm.status())
     }
 
     pub fn get_tick(&self) -> u64
     where
         M: state_backend::ManagerRead,
     {
-        self.with_backend(|state| state.tick.read())
+        self.with_backend(|pvm| pvm.tick.read())
     }
 
     pub fn get_current_level(&self) -> Option<u32>
     where
         M: state_backend::ManagerRead,
     {
-        self.with_backend(|state| {
-            if state.level_is_set.read() {
-                Some(state.level.read())
+        self.with_backend(|pvm| {
+            if pvm.level_is_set.read() {
+                Some(pvm.level.read())
             } else {
                 None
             }
@@ -100,7 +101,7 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
     where
         M: state_backend::ManagerRead,
     {
-        self.with_backend(|state| state.message_counter.read())
+        self.with_backend(|pvm| pvm.message_counter.read())
     }
 
     /// Get the reveal request from the PVM state
@@ -108,18 +109,17 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
     where
         M: state_backend::ManagerRead,
     {
-        self.with_backend(|state| state.reveal_request())
+        self.with_backend(|pvm| pvm.reveal_request())
     }
 
     pub fn install_boot_sector(&mut self, loader: &[u8], kernel: &[u8])
     where
         M: state_backend::ManagerReadWrite,
     {
-        self.with_backend_mut(|state| {
+        self.with_backend_mut(|pvm| {
             let program = Program::<NodePvmMemConfig>::from_elf(loader)
                 .expect("Could not parse Hermit loader");
-            state
-                .machine_state
+            pvm.machine_state
                 .setup_boot(&program, Some(kernel), Mode::Supervisor)
                 .unwrap()
         })
@@ -129,41 +129,21 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
     where
         M: state_backend::ManagerReadWrite,
     {
-        self.with_backend_mut(|state| state.eval_one(pvm_hooks))
+        self.with_backend_mut(|pvm| pvm.eval_one(pvm_hooks))
     }
 
     pub fn compute_step_many(&mut self, pvm_hooks: &mut PvmHooks, max_steps: usize) -> i64
     where
         M: state_backend::ManagerReadWrite,
     {
-        self.with_backend_mut(|state| state.eval_max(pvm_hooks, Bound::Included(max_steps))) as i64
+        self.with_backend_mut(|pvm| pvm.eval_max(pvm_hooks, Bound::Included(max_steps))) as i64
     }
 
-    pub fn set_input_message(&mut self, level: u32, message_counter: u64, input: Vec<u8>)
+    pub fn set_input(&mut self, input: PvmInput) -> bool
     where
         M: state_backend::ManagerReadWrite,
     {
-        self.with_backend_mut(|state| {
-            assert!(
-                state.provide_input(level, message_counter as u32, &input),
-                "Cannot accept input in current state ({})",
-                state.status()
-            )
-        })
-    }
-
-    /// Set reveal data reponse to pvm state
-    pub fn set_reveal_response(&mut self, reveal_data: &[u8])
-    where
-        M: state_backend::ManagerReadWrite,
-    {
-        self.with_backend_mut(|state| {
-            assert!(
-                state.provide_reveal_response(reveal_data),
-                "Cannot accept reveal in current state ({})",
-                state.status()
-            )
-        })
+        self.with_backend_mut(|pvm| pvm.provide_input(input))
     }
 
     /// Only used by the rollup node in "loser mode" in order to test
@@ -175,8 +155,8 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
     where
         M: state_backend::ManagerReadWrite,
     {
-        self.with_backend_mut(|state| {
-            state.insert_failure();
+        self.with_backend_mut(|pvm| {
+            pvm.insert_failure();
         })
     }
 }
@@ -189,7 +169,7 @@ impl NodePvm {
 
     /// Compute the root hash of the PVM state.
     pub fn hash(&self) -> Hash {
-        self.with_backend(|state| state.hash().unwrap())
+        self.with_backend(|pvm| pvm.hash().unwrap())
     }
 }
 
@@ -267,8 +247,8 @@ impl PvmStorage {
 
     /// Create a new commit for `state` and  return the commit id.
     pub fn commit(&mut self, state: &NodePvm) -> Result<Hash, PvmStorageError> {
-        Ok(state.with_backend(|state| {
-            let struct_ref = state.struct_ref::<state_backend::FnManagerIdent>();
+        Ok(state.with_backend(|pvm| {
+            let struct_ref = pvm.struct_ref::<state_backend::FnManagerIdent>();
             self.repo.commit_serialised(&struct_ref)
         })?)
     }

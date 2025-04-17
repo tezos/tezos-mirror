@@ -19,6 +19,7 @@ use num_enum::TryFromPrimitive;
 use ocaml::Pointer;
 use ocaml::ToValue;
 use octez_riscv::pvm::PvmHooks;
+use octez_riscv::pvm::PvmInput;
 use octez_riscv::pvm::PvmStatus;
 use octez_riscv::pvm::node_pvm::NodePvm;
 use octez_riscv::pvm::node_pvm::PvmStorage;
@@ -118,10 +119,33 @@ unsafe impl ocaml::ToValue for BytesWrapper {
 
 /// Input values are passed into the PVM after an input request has been made.
 #[derive(ocaml::FromValue)]
-#[ocaml::sig("Inbox_message of int32 * int64 * bytes | Reveal of bytes")]
+#[ocaml::sig(
+    "Inbox_message of {inbox_level: int32; message_counter: int64; payload: bytes} | Reveal of bytes"
+)]
 pub enum Input<'a> {
-    InboxMessage(u32, u64, &'a [u8]),
+    InboxMessage {
+        inbox_level: u32,
+        message_counter: u64,
+        payload: &'a [u8],
+    },
     Reveal(&'a [u8]),
+}
+
+impl<'a> From<Input<'a>> for PvmInput<'a> {
+    fn from(val: Input<'a>) -> Self {
+        match val {
+            Input::InboxMessage {
+                inbox_level,
+                message_counter,
+                payload,
+            } => PvmInput::InboxMessage {
+                inbox_level,
+                message_counter,
+                payload,
+            },
+            Input::Reveal(data) => PvmInput::Reveal(data),
+        }
+    }
 }
 
 /// Describes possible input requests the PVM may ask for during execution.
@@ -442,27 +466,17 @@ pub fn octez_riscv_mut_state_hash(state: Pointer<MutState>) -> [u8; 32] {
     state.apply_ro(NodePvm::hash).into()
 }
 
-fn apply_set_input<M: ManagerReadWrite>(pvm: &mut NodePvm<M>, input: Input) {
-    match input {
-        Input::InboxMessage(level, message_counter, payload) => {
-            pvm.set_input_message(level, message_counter, payload.to_vec())
-        }
-        Input::Reveal(reveal_data) => {
-            pvm.set_reveal_response(reveal_data);
-        }
-    }
-}
-
 #[ocaml::func]
 #[ocaml::sig("state -> input -> state")]
 pub fn octez_riscv_set_input(state: Pointer<State>, input: Input) -> Pointer<State> {
-    apply_imm(state, |pvm| apply_set_input(pvm, input)).0
+    apply_imm(state, |pvm| NodePvm::set_input(pvm, input.into())).0
 }
 
 #[ocaml::func]
 #[ocaml::sig("mut_state -> input -> unit")]
 pub fn octez_riscv_mut_set_input(state: Pointer<MutState>, input: Input) -> () {
-    apply_mut(state, |pvm| apply_set_input(pvm, input))
+    let res = apply_mut(state, |pvm| NodePvm::set_input(pvm, input.into()));
+    assert!(res)
 }
 
 #[ocaml::func]
