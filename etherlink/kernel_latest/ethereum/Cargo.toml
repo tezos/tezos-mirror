@@ -28,3 +28,7 @@ tezos_crypto_rs.workspace = true
 libsecp256k1.workspace = true
 
 tezos-smart-rollup-encoding.workspace = true
+
+[features]
+default = []
+benchmark = []
