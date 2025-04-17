@@ -4186,6 +4186,9 @@ let test_flushed_blueprint_reorg =
     ~title:"Flush delayed inbox event leads to reorg"
     ~use_dal:Register_without_feature
     ~use_threshold_encryption:Register_without_feature
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -5085,6 +5088,9 @@ let test_upgrade_activated_after_flush_level =
       ]
     ~title:
       "Upgrade injected and activated after flushed level (on invalid branch)"
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {
            client;
            l1_contracts;
@@ -5233,6 +5239,9 @@ let test_upgrade_injected_after_flush_level =
         "after";
       ]
     ~title:"Upgrade injected after flushed level (on invalid branch)"
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {
            client;
            l1_contracts;
@@ -6254,6 +6263,9 @@ let test_sequencer_upgrade =
     ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"; Tag.flaky]
     ~title:
       "Rollup-node sequencer upgrade is applied to the sequencer local state."
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {
            sc_rollup_node;
            l1_contracts;
@@ -6839,6 +6851,9 @@ let test_stage_one_reboot =
     ~title:
       "Checks the stage one reboots when reading too much chunks in a single \
        L1 level"
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {sc_rollup_node; client; sc_rollup_address; _} _protocol ->
   let* chunks =
     Lwt_list.map_s (fun i ->
@@ -7348,6 +7363,9 @@ let test_preimages_endpoint_retry =
     ~kernels:[Latest]
     ~additional_uses:[Constant.WASM.ghostnet_kernel]
     ~genesis_timestamp
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {
            sc_rollup_node;
            l1_contracts;
@@ -11117,6 +11135,9 @@ let test_websocket_newPendingTransactions_event =
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~websockets:true
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {sequencer; sc_rollup_node; _} _protocol ->
   let* observer =
     run_new_observer_node
@@ -11167,6 +11188,9 @@ let test_websocket_logs_event =
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~websockets:true
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {sequencer; observer; evm_version; _} _protocol ->
   let scenario evm_node =
     let* websocket = Evm_node.open_websocket evm_node in
