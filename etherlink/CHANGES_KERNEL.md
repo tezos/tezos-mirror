@@ -28,6 +28,8 @@
     - [`KT1NnH9DCAoY1pfPNvb9cw9XPKQnHAFYFHXa` for the sequencer governance][sqgov]
 - Computes the execution gas assuming a minimum base fee per gas instead of
   current gas price. The paid DA fees remain unchanged. (!17954)
+- The EVM now supports optional access lists.
+  See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930). (!17766)
 
 ### Bug fixes
 
