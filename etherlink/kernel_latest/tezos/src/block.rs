@@ -2,12 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::{operation::Operation, operation_result::OperationResultSum};
 use nom::bytes::complete::take;
 use nom::combinator::map;
 use nom::error::ParseError;
 use nom::Finish;
 use primitive_types::{H256, U256};
 use tezos_crypto_rs::blake2b::digest_256;
+use tezos_crypto_rs::hash::HashType;
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom as tezos_nom;
 use tezos_data_encoding::nom::error::DecodeError;
@@ -16,6 +18,45 @@ use tezos_enc::{BinError, BinWriter};
 use tezos_nom::{NomReader, NomResult};
 use tezos_smart_rollup::types::Timestamp;
 
+#[derive(PartialEq, Debug)]
+pub struct AppliedOperation {
+    // OperationHash are 32 bytes long
+    pub hash: H256,
+    pub data: Operation,
+    pub receipt: OperationResultSum,
+}
+
+impl NomReader<'_> for AppliedOperation {
+    fn nom_read(input: &'_ [u8]) -> NomResult<'_, Self> {
+        // OperationHash are 32 bytes long
+        let size = HashType::OperationHash.size();
+        let (input, hash) =
+            map(take::<usize, &[u8], NomError>(size), H256::from_slice)(input)?;
+        let (input, operation) = Operation::nom_read(input)?;
+        let (input, receipt) = OperationResultSum::nom_read(input)?;
+        let applied_op = Self {
+            hash,
+            data: operation,
+            receipt,
+        };
+        Ok((input, applied_op))
+    }
+}
+
+impl BinWriter for AppliedOperation {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
+        let Self {
+            hash,
+            data,
+            receipt,
+        } = self;
+        tezos_enc::put_bytes(hash.as_bytes(), output);
+        data.bin_write(output)?;
+        receipt.bin_write(output)?;
+        Ok(())
+    }
+}
+
 // WIP: This structure will evolve to look like Tezos block
 #[derive(PartialEq, Debug)]
 pub struct TezBlock {
@@ -23,6 +64,7 @@ pub struct TezBlock {
     pub number: U256,
     pub timestamp: Timestamp,
     pub previous_hash: H256,
+    pub operations: Vec<AppliedOperation>,
 }
 
 impl NomReader<'_> for TezBlock {
@@ -40,6 +82,9 @@ impl NomReader<'_> for TezBlock {
         let (remaining, timestamp) = nom::number::complete::be_i64(remaining)?;
         let timestamp = Timestamp::from(timestamp);
 
+        let (remaining, operations) =
+            tezos_nom::dynamic(tezos_nom::list(AppliedOperation::nom_read))(remaining)?;
+
         Ok((
             remaining,
             Self {
@@ -47,6 +92,7 @@ impl NomReader<'_> for TezBlock {
                 number,
                 timestamp,
                 previous_hash,
+                operations,
             },
         ))
     }
@@ -61,12 +107,16 @@ impl BinWriter for TezBlock {
             number,
             timestamp,
             previous_hash,
+            operations,
         } = self;
         // Encode all block fields
         tezos_enc::put_bytes(&hash.to_fixed_bytes(), output);
         tezos_enc::u32(&number.as_u32(), output)?;
         tezos_enc::put_bytes(&previous_hash.to_fixed_bytes(), output);
         tezos_enc::i64(&timestamp.i64(), output)?;
+        tezos_enc::dynamic(tezos_enc::list(AppliedOperation::bin_write))(
+            operations, output,
+        )?;
         Ok(())
     }
 }
@@ -101,6 +151,7 @@ impl TezBlock {
             number,
             timestamp,
             previous_hash,
+            operations: vec![],
         };
         Ok(Self {
             hash: block.hash()?,

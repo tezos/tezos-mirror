@@ -647,7 +647,7 @@ mod tests {
 
     fn tezlink_blueprint() -> Blueprint<TezTransactions> {
         Blueprint {
-            transactions: TezTransactions {},
+            transactions: TezTransactions(vec![]),
             timestamp: Timestamp::from(0i64),
         }
     }

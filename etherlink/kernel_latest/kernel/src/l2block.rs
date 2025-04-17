@@ -37,7 +37,7 @@ impl L2Block {
     pub fn number_of_transactions(&self) -> usize {
         match &self {
             Self::Etherlink(block) => block.transactions.len(),
-            Self::Tezlink(_) => 0,
+            Self::Tezlink(block) => block.operations.len(),
         }
     }
 
