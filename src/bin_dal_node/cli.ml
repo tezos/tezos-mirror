@@ -142,7 +142,7 @@ module Term = struct
 
   let attester_profile_printer = Signature.Public_key_hash.pp
 
-  let observer_producer_profile_printer = Format.pp_print_int
+  let producer_profile_printer = Format.pp_print_int
 
   let attester_profile_arg =
     let open Cmdliner in
@@ -176,7 +176,7 @@ module Term = struct
       | Some i when i < 0 -> error ()
       | Some slot_index -> Ok slot_index
     in
-    Arg.conv (decoder, observer_producer_profile_printer)
+    Arg.conv (decoder, producer_profile_printer)
 
   let observer_profile_arg =
     let open Cmdliner in
@@ -193,7 +193,7 @@ module Term = struct
       | Some i when i < 0 -> error ()
       | Some slot_index -> Ok slot_index
     in
-    Arg.conv (decoder, observer_producer_profile_printer)
+    Arg.conv (decoder, producer_profile_printer)
 
   let attester_profile =
     let open Cmdliner in
@@ -205,9 +205,13 @@ module Term = struct
       & opt (list attester_profile_arg) []
       & info ~docs ~doc ~docv:"PKH1,PKH2,..." ["attester-profiles"; "attester"])
 
-  let producer_profile =
+  let operator_profile =
     let open Cmdliner in
-    let doc = "The Octez DAL node producer profiles for given slot indexes." in
+    let doc =
+      "The Octez DAL node operator profiles for given slot indexes. These were \
+       previously known as producer profiles, however this name now refers to \
+       both operator and observer profiles."
+    in
     Arg.(
       value
       & opt (list producer_profile_arg) []
@@ -271,8 +275,8 @@ module Term = struct
        number, the string \"full\" or the string \"auto\". A number is \
        interpreted as the number of blocks the shards should be kept; the \
        string \"full\" means no shard deletion, the string \"auto\" means the \
-       default of the profile: 3 months for an observer or a slot producer, \
-       twice the attestation lag for an attester and other profiles."
+       default of the profile: 3 months for an operator, twice the attestation \
+       lag for an attester and other profiles."
     in
     let decoder =
       Configuration_file.(
@@ -359,7 +363,7 @@ module Term = struct
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
-       $ producer_profile $ observer_profile $ bootstrap_profile $ peers
+       $ operator_profile $ observer_profile $ bootstrap_profile $ peers
        $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
        $ verbose))
 end
@@ -524,7 +528,7 @@ type options = {
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
-      endpoint metrics_addr attesters producers observers bootstrap_flag peers
+      endpoint metrics_addr attesters operators observers bootstrap_flag peers
       history_mode service_name service_namespace fetch_trusted_setup verbose =
     let run profile =
       run
@@ -548,7 +552,7 @@ let make ~run =
         }
     in
     let profile =
-      Controller_profiles.make ~attesters ~producers ?observers ()
+      Controller_profiles.make ~attesters ~operators ?observers ()
     in
     match (bootstrap_flag, observers, profile) with
     | false, None, profiles when Controller_profiles.is_empty profiles ->

@@ -72,7 +72,7 @@ let is_bootstrap_profile = function
 
 let is_prover_profile = function
   | Types.Bootstrap -> false
-  | Types.Controller p -> Controller_profiles.(has_observer p || has_producer p)
+  | Types.Controller p -> Controller_profiles.(has_observer p || has_operator p)
 
 let is_empty = function
   | Types.Bootstrap -> false
@@ -150,7 +150,7 @@ let validate_slot_indexes t ~number_of_slots =
   | Types.Bootstrap -> return_unit
   | Controller c -> (
       match
-        Controller_profiles.producer_slot_out_of_bounds number_of_slots c
+        Controller_profiles.operator_slot_out_of_bounds number_of_slots c
       with
       | Some slot_index ->
           tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
@@ -188,7 +188,7 @@ let on_new_head t ~number_of_slots gs_worker committee =
   | Types.Bootstrap ->
       join_topics_for_bootstrap ~number_of_slots gs_worker committee
   | Controller c ->
-      (* The topics associated to observers and producers can change
+      (* The topics associated to observers and operators can change
          if there new active bakers. However, for attesters, new slots
          are not created on new head, only on a new protocol. *)
       let slots = Controller_profiles.get_all_slot_indexes c in
@@ -201,7 +201,7 @@ let get_profiles t =
 
 let supports_refutations t =
   match get_profiles t with
-  | Controller c -> Controller_profiles.(has_producer c)
+  | Controller c -> Controller_profiles.(has_operator c)
   | Bootstrap -> false
 
 (* Returns the period relevant for a refutation game. With a block time of 10
@@ -223,18 +223,18 @@ let get_attested_data_default_store_period t proto_parameters =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7772
      This period should be zero. *)
   let bootstrap_node_period = 2 * proto_parameters.attestation_lag in
-  (* For observability purpose, we aim for a non-slot producer profile
+  (* For observability purpose, we aim for a non-slot operator profile
      to keep shards for about 10 minutes.
      150 blocks is 10 minutes on Ghostnet, 20 minutes on Mainnet. *)
   let default_period = 150 in
   let supports_refutations_bis, period =
     match get_profiles t with
     | Controller c ->
-        let has_producer = Controller_profiles.(has_producer c) in
+        let has_operator = Controller_profiles.(has_operator c) in
         let period =
-          if has_producer then refutation_game_period else default_period
+          if has_operator then refutation_game_period else default_period
         in
-        (has_producer, period)
+        (has_operator, period)
     | Bootstrap -> (false, bootstrap_node_period)
   in
   (* This is just to keep this function synced with {!supports_refutations}. *)

@@ -598,7 +598,7 @@ type t = {
      to [bootstrap.node_rpc_endpoint] which is a public endpoint when the
      '--bootstrap' argument is not provided *)
   bakers : baker list;
-  producers : producer list;
+  producers : producer list; (* NOTE: they have the observer profile*)
   observers : observer list;
   etherlink : etherlink option;
   time_between_blocks : int;
@@ -2784,7 +2784,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
       let* () =
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow network)
-          ~producer_profiles:dal_slots
+          ~operator_profiles:dal_slots
           ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
           dal_node
       in
@@ -2847,7 +2847,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
                let* () =
                  Dal_node.init_config
                    ~expected_pow:(Network.expected_pow network)
-                   ~producer_profiles:[slot_index]
+                   ~operator_profiles:[slot_index]
                    ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
                    dal_node
                in

@@ -153,7 +153,7 @@ val init_config :
   ?expected_pow:float ->
   ?peers:string list ->
   ?attester_profiles:string list ->
-  ?producer_profiles:int list ->
+  ?operator_profiles:int list ->
   ?observer_profiles:int list ->
   ?bootstrap_profile:bool ->
   ?history_mode:history_mode ->
@@ -163,7 +163,7 @@ val init_config :
 val update_config :
   ?peers:string list ->
   ?attester_profiles:string list ->
-  ?producer_profiles:int list ->
+  ?operator_profiles:int list ->
   ?observer_profiles:int list ->
   ?bootstrap_profile:bool ->
   ?history_mode:history_mode ->

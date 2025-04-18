@@ -467,7 +467,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
   let* dal_node =
     if enable_dal then
       let dal_node = Dal_node.create ~node () in
-      let* () = Dal_node.init_config ?producer_profiles:dal_slots dal_node in
+      let* () = Dal_node.init_config ?operator_profiles:dal_slots dal_node in
       let* () = Dal_node.run ~wait_ready:true dal_node in
       some dal_node
     else none

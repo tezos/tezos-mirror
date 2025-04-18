@@ -101,8 +101,8 @@ let () =
       Format.fprintf
         ppf
         "The prover SRS must be loaded before using proving functions. Change \
-         the current profile of your DAL node to slot producer or observer to \
-         be able to compute proofs.")
+         the current profile of your DAL node to a slot producer one (operator \
+         or observer) to be able to compute proofs.")
     Data_encoding.empty
     (function No_prover_SRS -> Some () | _ -> None)
     (fun () -> No_prover_SRS)

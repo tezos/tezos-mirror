@@ -26,44 +26,44 @@
 module Slot_set = Set.Make (Int)
 module Pkh_set = Signature.Public_key_hash.Set
 
-type t = {producers : Slot_set.t; attesters : Pkh_set.t; observers : Slot_set.t}
+type t = {operators : Slot_set.t; attesters : Pkh_set.t; observers : Slot_set.t}
 
 let empty =
   {
-    producers = Slot_set.empty;
+    operators = Slot_set.empty;
     attesters = Pkh_set.empty;
     observers = Slot_set.empty;
   }
 
-let has_producer {producers; _} = not (Slot_set.is_empty producers)
+let has_operator {operators; _} = not (Slot_set.is_empty operators)
 
 let has_attester {attesters; _} = not (Pkh_set.is_empty attesters)
 
 let has_observer {observers; _} = not (Slot_set.is_empty observers)
 
 let attester_only t =
-  has_attester t && (not (has_producer t)) && not (has_observer t)
+  has_attester t && (not (has_operator t)) && not (has_observer t)
 
 let attesters t = t.attesters
 
 let is_empty t =
-  (not (has_observer t)) && (not (has_attester t)) && not (has_producer t)
+  (not (has_observer t)) && (not (has_attester t)) && not (has_operator t)
 
-let producer_slot_out_of_bounds number_of_slots t =
-  Slot_set.find_first (fun i -> i < 0 || i >= number_of_slots) t.producers
+let operator_slot_out_of_bounds number_of_slots t =
+  Slot_set.find_first (fun i -> i < 0 || i >= number_of_slots) t.operators
 
 let is_observed_slot slot_index {observers; _} =
   Slot_set.mem slot_index observers
 
-let can_publish_on_slot_index slot_index {observers; producers; _} =
-  Slot_set.mem slot_index observers || Slot_set.mem slot_index producers
+let can_publish_on_slot_index slot_index {observers; operators; _} =
+  Slot_set.mem slot_index observers || Slot_set.mem slot_index operators
 
-let get_all_slot_indexes {producers; observers; _} =
-  Slot_set.(union producers observers |> to_seq) |> List.of_seq
+let get_all_slot_indexes {operators; observers; _} =
+  Slot_set.(union operators observers |> to_seq) |> List.of_seq
 
-let make ?(attesters = []) ?(producers = []) ?(observers = []) () =
+let make ?(attesters = []) ?(operators = []) ?(observers = []) () =
   {
-    producers = Slot_set.of_list producers;
+    operators = Slot_set.of_list operators;
     observers = Slot_set.of_list observers;
     attesters = Pkh_set.of_list attesters;
   }
@@ -78,7 +78,7 @@ let merge ?(on_new_attester = fun _ -> ()) t1 t2 =
     Pkh_set.union
   in
   {
-    producers = t1.producers @ t2.producers;
+    operators = t1.operators @ t2.operators;
     attesters = t1.attesters @. t2.attesters;
     observers = t1.observers @ t2.observers;
   }
@@ -86,13 +86,13 @@ let merge ?(on_new_attester = fun _ -> ()) t1 t2 =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {producers; observers; attesters} ->
-      ( Slot_set.elements producers,
+    (fun {operators; observers; attesters} ->
+      ( Slot_set.elements operators,
         Slot_set.elements observers,
         Pkh_set.elements attesters ))
-    (fun (producers, observers, attesters) ->
+    (fun (operators, observers, attesters) ->
       {
-        producers = Slot_set.of_list producers;
+        operators = Slot_set.of_list operators;
         observers = Slot_set.of_list observers;
         attesters = Pkh_set.of_list attesters;
       })

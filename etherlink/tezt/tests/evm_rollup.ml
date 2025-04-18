@@ -317,7 +317,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
   let* dal_node =
     if enable_dal then
       let dal_node = Dal_node.create ~node () in
-      let* () = Dal_node.init_config ?producer_profiles:dal_slots dal_node in
+      let* () = Dal_node.init_config ?operator_profiles:dal_slots dal_node in
       let* () = Dal_node.run ~wait_ready:true dal_node in
       some dal_node
     else none

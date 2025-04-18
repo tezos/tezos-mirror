@@ -187,7 +187,7 @@ module RPC : sig
   (** Profiles that operate on shards/slots. *)
   type controller_profile =
     | Attester of string
-    | Producer of int
+    | Operator of int
     | Observer of int
 
   (** List of controller profiles.  *)

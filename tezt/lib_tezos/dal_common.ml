@@ -187,7 +187,7 @@ module Dal_RPC = struct
 
   type controller_profile =
     | Attester of string
-    | Producer of int
+    | Operator of int
     | Observer of int
 
   type controller_profiles = controller_profile list
@@ -292,17 +292,17 @@ module Dal_RPC = struct
       JSON.as_string
 
   let json_of_controller_profile list =
-    let attesters, producers, observers =
+    let attesters, operators, observers =
       List.fold_left
-        (fun (attesters, producers, observers) -> function
-          | Attester pkh -> (`String pkh :: attesters, producers, observers)
-          | Producer slot_index ->
+        (fun (attesters, operators, observers) -> function
+          | Attester pkh -> (`String pkh :: attesters, operators, observers)
+          | Operator slot_index ->
               ( attesters,
-                `Float (float_of_int slot_index) :: producers,
+                `Float (float_of_int slot_index) :: operators,
                 observers )
           | Observer slot_index ->
               ( attesters,
-                producers,
+                operators,
                 `Float (float_of_int slot_index) :: observers ))
         ([], [], [])
         list
@@ -310,17 +310,17 @@ module Dal_RPC = struct
     `O
       [
         ("attesters", `A (List.rev attesters));
-        ("operators", `A (List.rev producers));
+        ("operators", `A (List.rev operators));
         ("observers", `A (List.rev observers));
       ]
 
   let controller_profile_of_json json =
     let open JSON in
     let attesters = json |-> "attesters" |> as_list |> List.map as_string in
-    let producers = json |-> "operators" |> as_list |> List.map as_int in
+    let operators = json |-> "operators" |> as_list |> List.map as_int in
     let observers = json |-> "observers" |> as_list |> List.map as_int in
     List.map (fun pkh -> Attester pkh) attesters
-    @ List.map (fun i -> Producer i) producers
+    @ List.map (fun i -> Operator i) operators
     @ List.map (fun i -> Observer i) observers
 
   let profiles_of_json json =
@@ -809,13 +809,13 @@ module Check = struct
   let profiles_typ : profile Check.typ =
     let pp_controller_profile ppf = function
       | Attester pkh -> Format.fprintf ppf "Attester %s" pkh
-      | Producer slot_index -> Format.fprintf ppf "Producer %d" slot_index
+      | Operator slot_index -> Format.fprintf ppf "Operator %d" slot_index
       | Observer slot_index -> Format.fprintf ppf "Observer %d" slot_index
     in
     let equal_controller_profile c1 c2 =
       match (c1, c2) with
       | Attester pkh1, Attester pkh2 -> String.equal pkh1 pkh2
-      | Producer slot_index1, Producer slot_index2 ->
+      | Operator slot_index1, Operator slot_index2 ->
           Int.equal slot_index1 slot_index2
       | Observer slot_index1, Observer slot_index2 ->
           Int.equal slot_index1 slot_index2

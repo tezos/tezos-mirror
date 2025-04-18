@@ -251,7 +251,7 @@ module Handler = struct
   let gossipsub_app_messages_validation ctxt cryptobox head_level
       proto_parameters ?message ~message_id () =
     if is_bootstrap_node ctxt then
-      (* 1. As bootstrap nodes advertise their profiles to attester and producer
+      (* 1. As bootstrap nodes advertise their profiles to controller
          nodes, they shouldn't receive messages or messages ids. If this
          happens, received data are considered as spam (invalid), and the remote
          peer might be punished, depending on the Gossipsub implementation. *)

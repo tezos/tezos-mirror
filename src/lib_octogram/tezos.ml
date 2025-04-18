@@ -2357,7 +2357,7 @@ module Start_octez_dal_node = struct
       | None -> Port.fresh ()
     in
     let mk_addr port = Format.sprintf "0.0.0.0:%d" port in
-    let producer_profiles = List.map positive_int_of_string producer_profiles in
+    let operator_profiles = List.map positive_int_of_string producer_profiles in
     let* client_opt =
       match (path_client, base_dir) with
       | Some path_client, Some base_dir ->
@@ -2414,7 +2414,7 @@ module Start_octez_dal_node = struct
         ~expected_pow:0.
         ~peers
         ~attester_profiles
-        ~producer_profiles
+        ~operator_profiles
         ~bootstrap_profile
         dal_node
     in

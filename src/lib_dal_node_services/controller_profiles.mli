@@ -61,49 +61,49 @@ val is_empty : t -> bool
     attester field of [t] *)
 val has_attester : t -> bool
 
-(** [has_producer t] returns true if there is a slot index in the
-    producer field of [t] *)
-val has_producer : t -> bool
+(** [has_operator t] returns true if there is a slot index in the
+    operator field of [t] *)
+val has_operator : t -> bool
 
 (** [has_observer t] returns true if there is a slot index in the
     observer field of [t] *)
 val has_observer : t -> bool
 
 (** [attester_only t] returns true if [t] has an attester role,
-    and no producer, not observer roles. *)
+    and no operator, not observer roles. *)
 val attester_only : t -> bool
 
 (** [attesters t] returns the set of attesters registered within the
     attester profile, if any. *)
 val attesters : t -> Signature.Public_key_hash.Set.t
 
-(** [producer_slot_out_of_bounds n op] returns the first slot index that for
-    producer that is not between 0 and n - 1; it returns [None] if no slot
-    index was outside these bounds *)
-val producer_slot_out_of_bounds : int -> t -> int option
+(** [operator_slot_out_of_bounds n t] returns the first slot index that for
+    operator that is not between 0 and n - 1; it returns [None] if no slot index
+    was outside these bounds *)
+val operator_slot_out_of_bounds : int -> t -> int option
 
 (** [is_observed_slot i op] returns true if and only if [op] contains an
     observer for slot index [i] *)
 val is_observed_slot : int -> t -> bool
 
 (** [can_publish_on_slot_index slot_index op] returns true if and only
-    if [op] contains an observer or a producet for slot index
+    if [op] contains an observer or an operator for slot index
     [slot_index] *)
 val can_publish_on_slot_index : int -> t -> bool
 
-(** Returns all slot indexes used in the profile, whether they are for producer
+(** Returns all slot indexes used in the profile, whether they are for operator
     or observer *)
 val get_all_slot_indexes : t -> int list
 
-(** [make ~attesters ~producers ~observers ()] returns an
+(** [make ~attesters ~operators ~observers ()] returns an
     controller mode for a node that is an attester for the public keys in
-    [attesters], a producer for each slot indexes in [producers], and an
+    [attesters], a operator for each slot indexes in [operators], and an
     observer for all slot indexes in [observer]. When a list is empty or not
     specified, no value for the corresponding role will be included in the
     result ; [make ()] returns [empty] *)
 val make :
   ?attesters:Signature.Public_key_hash.t list ->
-  ?producers:int list ->
+  ?operators:int list ->
   ?observers:int list ->
   unit ->
   t

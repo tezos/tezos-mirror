@@ -54,10 +54,10 @@ end
 type slot_id = Slot_id.t
 
 (** A topic is defined by a public key hash of an attester and a slot index.
-    - A slot producer tracks the topic associated to a given slot index for all
+    - An operator tracks the topic associated to a given slot index for all
     the public key-hashes;
     - The attester tracks its own public key hash for all the slot indices;
-    - A slot consumer tracks topics associated to a given slot index and enough
+    - An observer tracks topics associated to a given slot index and enough
     public key-hashes so that the number of covered shards is enough to recover
     the slot data. *)
 module Topic : sig
@@ -245,9 +245,9 @@ type header_status =
 type profile =
   | Bootstrap
       (** The bootstrap profile/mode facilitates peer discovery in the DAL
-          network.  Note that bootstrap nodes are incompatible with
-          attester/producer/observer profiles as bootstrap nodes are
-          expected to connect to all the meshes with degree 0. *)
+          network. Note that bootstrap nodes are incompatible with
+          attester/operator/observer profiles as bootstrap nodes are expected to
+          connect to all the meshes with degree 0. *)
   | Controller of Controller_profiles.t
 
 (** Information associated to a slot header in the RPC services of the DAL

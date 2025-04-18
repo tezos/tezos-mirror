@@ -107,10 +107,11 @@ val add_and_register_controller_profiles :
     The function returns the updated profile. *)
 val register_profile : t -> number_of_slots:int -> Gossipsub.Worker.t -> t
 
-(** Checks that each producer profile only refers to slot indexes strictly
-    smaller than [number_of_slots]. This may not be the case when the profile
-    context is first built because there is no information about the number of
-    slots. Returns an [Invalid_slot_index] error if the check fails. *)
+(** Checks that each producer (operator or observer) profile only refers to slot
+    indexes strictly smaller than [number_of_slots]. This may not be the case
+    when the profile context is first built because there is no information
+    about the number of slots. Returns an [Invalid_slot_index] error if the
+    check fails. *)
 val validate_slot_indexes : t -> number_of_slots:int -> unit tzresult
 
 (** [on_new_head t ~number_of_slots gs_worker committee] performs profile-related
@@ -127,7 +128,7 @@ val get_profiles : t -> Types.profile
 
 (** Returns the number of previous blocks for which the node should keep the
     shards in the storage, depending on the profile of the node (3 months for
-    observer & slot producer, twice attestation lag for attester) *)
+    operators, twice attestation lag for observers and attesters.) *)
 val get_attested_data_default_store_period : t -> Types.proto_parameters -> int
 
 (** Resolves a profile by either returning it unchanged (for bootstrap
