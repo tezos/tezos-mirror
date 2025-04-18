@@ -58,9 +58,6 @@ pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     /// Value representing a pointer to `steps: usize`
     steps_ptr_val: Value,
 
-    /// Value representing a pointer to `Option<Exception>`
-    exception_ptr_val: Value,
-
     /// Values that are dynamically updated throughout lowering.
     dynamic: DynamicValues,
 
@@ -95,8 +92,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         let core_ptr_val = builder.block_params(entry_block)[0];
         let pc_val = X64(builder.block_params(entry_block)[1]);
         let steps_ptr_val = builder.block_params(entry_block)[2];
-        let exception_ptr_val = builder.block_params(entry_block)[3];
-        let result_ptr_val = builder.block_params(entry_block)[4];
+        let result_ptr_val = builder.block_params(entry_block)[3];
 
         Self {
             ptr,
@@ -104,7 +100,6 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
             jsa_call,
             core_ptr_val,
             steps_ptr_val,
-            exception_ptr_val,
             result_ptr_val,
             dynamic: DynamicValues::new(pc_val),
             end_block: None,
@@ -204,13 +199,13 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
     }
 
     /// Handle an exception that has occurred.
-    fn handle_exception(&mut self) {
+    fn handle_exception(&mut self, exception_ptr: Value) {
         let current_pc = self.pc_read();
 
         let outcome = self.jsa_call.handle_exception(
             &mut self.builder,
             self.core_ptr_val,
-            self.exception_ptr_val,
+            exception_ptr,
             self.result_ptr_val,
             current_pc,
         );
@@ -342,10 +337,11 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
     }
 
     fn err_illegal_instruction<In>(&mut self) -> Self::IResult<In> {
-        self.jsa_call
-            .raise_illegal_instruction_exception(&mut self.builder, self.exception_ptr_val);
+        let exception_ptr = self
+            .jsa_call
+            .raise_illegal_instruction_exception(&mut self.builder);
 
-        self.handle_exception();
+        self.handle_exception(exception_ptr);
 
         None
     }
@@ -368,10 +364,9 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
     }
 
     fn ecall(&mut self) -> Self::IResult<ProgramCounterUpdate<Self::XValue>> {
-        self.jsa_call
-            .ecall(&mut self.builder, self.core_ptr_val, self.exception_ptr_val);
+        let exception_ptr = self.jsa_call.ecall(&mut self.builder, self.core_ptr_val);
 
-        self.handle_exception();
+        self.handle_exception(exception_ptr);
 
         None
     }
@@ -388,7 +383,6 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
             phys_address,
             value,
             width,
-            self.exception_ptr_val,
         );
 
         errno.handle(self);

@@ -23,6 +23,7 @@
 mod stack;
 
 use std::marker::PhantomData;
+use std::mem::MaybeUninit;
 
 use cranelift::codegen::ir::AbiParam;
 use cranelift::codegen::ir::FuncRef;
@@ -42,6 +43,7 @@ use cranelift_module::ModuleResult;
 
 use super::builder::X64;
 use super::builder::errno::Errno;
+use super::builder::errno::ErrnoImpl;
 use crate::instruction_context::ICB;
 use crate::instruction_context::LoadStoreWidth;
 use crate::machine_state::MachineCoreState;
@@ -109,7 +111,7 @@ pub trait JitStateAccess: ManagerReadWrite {
     extern "C" fn handle_exception<MC: MemoryConfig>(
         core: &mut MachineCoreState<MC, Self>,
         current_pc: &mut Address,
-        exception: &Option<Exception>,
+        exception: &Exception,
         result: &mut Result<(), EnvironException>,
     ) -> bool;
 
@@ -117,8 +119,8 @@ pub trait JitStateAccess: ManagerReadWrite {
     ///
     /// Writes the instruction to the given exception memory, after which it would be safe to
     /// assume it is initialised.
-    extern "C" fn raise_illegal_instruction_exception(exception_out: &mut Option<Exception>) {
-        *exception_out = Some(Exception::IllegalInstruction);
+    extern "C" fn raise_illegal_instruction_exception(exception_out: &mut MaybeUninit<Exception>) {
+        exception_out.write(Exception::IllegalInstruction);
     }
 
     /// Raise the appropriate environment-call exception given the current machine mode.
@@ -127,7 +129,7 @@ pub trait JitStateAccess: ManagerReadWrite {
     /// assume it is initialised.
     extern "C" fn ecall<MC: MemoryConfig>(
         core: &mut MachineCoreState<MC, Self>,
-        exception_out: &mut Option<Exception>,
+        exception_out: &mut MaybeUninit<Exception>,
     );
 
     /// Store the lowest `width` bytes of the given value to memory, at the physical address.
@@ -184,11 +186,10 @@ impl JitStateAccess for Owned {
     extern "C" fn handle_exception<MC: MemoryConfig>(
         core: &mut MachineCoreState<MC, Self>,
         current_pc: &mut Address,
-        exception: &Option<Exception>,
+        exception: &Exception,
         result: &mut Result<(), EnvironException>,
     ) -> bool {
-        let exception = exception.expect("handle_exception requires that the exception be set");
-        let res = core.address_on_exception(exception, *current_pc);
+        let res = core.address_on_exception(*exception, *current_pc);
 
         match res {
             Err(e) => {
@@ -204,7 +205,7 @@ impl JitStateAccess for Owned {
 
     extern "C" fn ecall<MC: MemoryConfig>(
         core: &mut MachineCoreState<MC, Self>,
-        exception_out: &mut Option<Exception>,
+        exception_out: &mut MaybeUninit<Exception>,
     ) {
         let exception = match core.hart.mode.read() {
             Mode::User => Exception::EnvCallFromUMode,
@@ -212,7 +213,7 @@ impl JitStateAccess for Owned {
             Mode::Machine => Exception::EnvCallFromMMode,
         };
 
-        *exception_out = Some(exception);
+        exception_out.write(exception);
     }
 }
 
@@ -489,8 +490,10 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
     pub(super) fn raise_illegal_instruction_exception(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
-        exception_ptr: Value,
-    ) {
+    ) -> Value {
+        let exception_slot = stack::Slot::<Exception>::new(self.ptr_type, builder);
+        let exception_ptr = exception_slot.ptr(builder);
+
         let raise_illegal = self
             .raise_illegal_instruction_exception
             .get_or_insert_with(|| {
@@ -501,18 +504,18 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
             });
 
         builder.ins().call(*raise_illegal, &[exception_ptr]);
+
+        exception_ptr
     }
 
     /// Emit the required IR to call `ecall`.
     ///
     /// This sets the exception to `Some(_)` with the appropriate environment call exception for
     /// the current machine mode.
-    pub(super) fn ecall(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        core_ptr: Value,
-        exception_ptr: Value,
-    ) {
+    pub(super) fn ecall(&mut self, builder: &mut FunctionBuilder<'_>, core_ptr: Value) -> Value {
+        let exception_slot = stack::Slot::<Exception>::new(self.ptr_type, builder);
+        let exception_ptr = exception_slot.ptr(builder);
+
         let ecall_from_mode = self.ecall_from_mode.get_or_insert_with(|| {
             self.module
                 .declare_func_in_func(self.imports.ecall_from_mode, builder.func)
@@ -521,6 +524,8 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         builder
             .ins()
             .call(*ecall_from_mode, &[core_ptr, exception_ptr]);
+
+        exception_ptr
     }
 
     /// Emit the required IR to call `memory_store`.
@@ -533,12 +538,14 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         phys_address: X64,
         value: X64,
         width: LoadStoreWidth,
-        exception_ptr: Value,
     ) -> impl Errno<(), MC, JSA> {
         let memory_store = self.memory_store.get_or_insert_with(|| {
             self.module
                 .declare_func_in_func(self.imports.memory_store, builder.func)
         });
+
+        let exception_slot = stack::Slot::<Exception>::new(self.ptr_type, builder);
+        let exception_ptr = exception_slot.ptr(builder);
 
         let width = builder.ins().iconst(I8, width as u8 as i64);
 
@@ -552,7 +559,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
 
         let errno = builder.inst_results(call)[0];
 
-        (errno, |_: &mut FunctionBuilder<'_>| {})
+        ErrnoImpl::new(errno, exception_ptr, |_| {})
     }
 }
 
