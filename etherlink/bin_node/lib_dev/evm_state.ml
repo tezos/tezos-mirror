@@ -221,14 +221,10 @@ let kernel_version evm_state =
   let+ version = inspect evm_state Durable_storage_path.kernel_version in
   match version with Some v -> Bytes.unsafe_to_string v | None -> "(unknown)"
 
-let current_block_height evm_state =
+let current_block_height ~root evm_state =
   let open Lwt_syntax in
   let* current_block_number =
-    inspect
-      evm_state
-      (Durable_storage_path.Block.current_number
-       (* TODO: Remove etherlink root *)
-         ~root:Durable_storage_path.etherlink_root)
+    inspect evm_state (Durable_storage_path.Block.current_number ~root)
   in
   match current_block_number with
   | None ->
@@ -330,12 +326,13 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir
     ~chain_family ~config ~native_execution_policy evm_state
     (blueprint : Blueprint_types.payload) =
   let open Lwt_result_syntax in
+  let root = Durable_storage_path.root_of_chain_family chain_family in
   let exec_inputs =
     List.map
       (function `External payload -> `Input ("\001" ^ payload))
       blueprint
   in
-  let*! (Qty before_height) = current_block_height evm_state in
+  let*! (Qty before_height) = current_block_height ~root evm_state in
   let* evm_state =
     execute
       ~native_execution:(native_execution_policy = Configuration.Always)
@@ -427,7 +424,7 @@ let get_delayed_inbox_item evm_state hash =
       return res
   | _ -> failwith "invalid delayed inbox item"
 
-let clear_block_storage block evm_state =
+let clear_block_storage chain_family block evm_state =
   let open Lwt_syntax in
   (* We have 2 path to clear related to block storage:
      1. The predecessor block.
@@ -437,6 +434,7 @@ let clear_block_storage block evm_state =
      necessary to produce the next block. Block production starts by reading
      the head to retrieve information such as parent block hash.
   *)
+  let root = Durable_storage_path.root_of_chain_family chain_family in
   let block_parent = L2_types.block_parent block in
   let block_number = L2_types.block_number block in
   let (Qty number) = block_number in
@@ -444,9 +442,7 @@ let clear_block_storage block evm_state =
   let* evm_state =
     if number > Z.zero then
       let pred_block_path =
-        Durable_storage_path.Block.by_hash (* TODO: Remove etherlink root *)
-          ~root:Durable_storage_path.etherlink_root
-          block_parent
+        Durable_storage_path.Block.by_hash ~root block_parent
       in
       delete ~kind:Value evm_state pred_block_path
     else return evm_state
@@ -461,8 +457,7 @@ let clear_block_storage block evm_state =
     if number >= to_keep then
       let index_path =
         Durable_storage_path.Indexes.block_by_number
-        (* TODO: Remove etherlink root *)
-          ~root:Durable_storage_path.etherlink_root
+          ~root
           (Nth (Z.sub number to_keep))
       in
       delete ~kind:Value evm_state index_path

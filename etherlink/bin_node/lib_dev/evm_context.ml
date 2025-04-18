@@ -801,7 +801,9 @@ module State = struct
               | Eth block -> store_block_unsafe conn evm_state block
               | Tez block -> store_tez_block_unsafe conn block
             in
-            let*! evm_state = Evm_state.clear_block_storage block evm_state in
+            let*! evm_state =
+              Evm_state.clear_block_storage chain_family block evm_state
+            in
             return (evm_state, receipts)
           else
             let*! receipts =
@@ -2053,8 +2055,10 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let*! evm_state = Irmin_context.PVMState.get evm_node_context in
   return (evm_node_context, evm_state, final_l2_block.header.level)
 
-let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
+let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
+    ~irmin_context =
   let open Lwt_result_syntax in
+  let root = Durable_storage_path.root_of_chain_family chain_family in
   (* Tell the kernel that it is executed by an EVM node *)
   let*! evm_state = Evm_state.flag_local_exec evm_state in
   (* We remove the delayed inbox from the EVM state. Its contents will be
@@ -2070,9 +2074,7 @@ let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
     let*! current_blueprint_number_opt =
       Evm_state.inspect
         evm_state
-        (Durable_storage_path.Block.current_number
-         (* TODO: Remove etherlink root *)
-           ~root:Durable_storage_path.etherlink_root)
+        (Durable_storage_path.Block.current_number ~root)
     in
     match current_blueprint_number_opt with
     | Some bytes -> return (Bytes.to_string bytes |> Z.of_bits)
@@ -2084,9 +2086,7 @@ let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
     let*! current_block_hash_opt =
       Evm_state.inspect
         evm_state
-        (Durable_storage_path.Block.current_hash
-         (* TODO: Remove etherlink root *)
-           ~root:Durable_storage_path.etherlink_root)
+        (Durable_storage_path.Block.current_hash ~root)
     in
     match current_block_hash_opt with
     | Some _bytes -> return_unit
@@ -2153,7 +2153,17 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
   let* evm_events =
     get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state
   in
-  let* () = init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context in
+  let chain_family =
+    Configuration.retrieve_chain_family
+      ~l2_chains:configuration.Configuration.experimental_features.l2_chains
+  in
+  let* () =
+    init_store_from_rollup_node
+      ~chain_family
+      ~data_dir
+      ~evm_state
+      ~irmin_context
+  in
   let* smart_rollup_address, _genesis_level =
     rollup_node_metadata ~rollup_node_data_dir
   in
