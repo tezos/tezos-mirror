@@ -37,7 +37,8 @@
  (package octez-riscv-pvm-test)
  (deps
   (glob_files ../../../riscv/assets/riscv-dummy.elf)
-  (glob_files ../../../riscv/assets/riscv-dummy.elf.checksum))
+  (glob_files ../../../riscv/assets/riscv-dummy.elf.checksum)
+  (glob_files ../../../riscv/lib/tests/expected/jstz/proof_initial))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

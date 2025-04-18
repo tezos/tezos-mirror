@@ -5,12 +5,14 @@
 
 mod common;
 
+use std::io::Write;
 use std::ops::Bound;
 use std::time::Instant;
 
 use common::*;
 use octez_riscv::machine_state::CacheLayouts;
 use octez_riscv::machine_state::DefaultCacheLayouts;
+use octez_riscv::machine_state::TestCacheLayouts;
 use octez_riscv::machine_state::memory::M64M;
 use octez_riscv::machine_state::memory::MemoryConfig;
 use octez_riscv::state_backend::hash;
@@ -34,8 +36,27 @@ fn test_jstz_proofs_full() {
     test_jstz_proofs(true)
 }
 
+#[test]
+fn test_jstz_initial_proof_regression() {
+    // Configuring the stepper with `TestCachelayouts` to match the node PVM
+    // and make the test run faster.
+    let make_stepper = make_stepper_factory::<TestCacheLayouts>();
+    let mut stepper = make_stepper();
+
+    eprintln!("> Producing proof ...");
+    let proof = stepper.produce_proof().unwrap();
+    let proof_serialisation: Vec<u8> = serialise_proof(&proof).collect();
+
+    // This file is also used in the tests for the OCaml `lib_riscv` library
+    let mut mint = goldenfile::Mint::new("tests/expected/jstz");
+    let mut proof_capture = mint.new_goldenfile("proof_initial").unwrap();
+
+    let proof_bytes = hex::encode(proof_serialisation);
+    writeln!(proof_capture, "{proof_bytes}").unwrap();
+}
+
 fn test_jstz_proofs(full: bool) {
-    let make_stepper = make_stepper_factory();
+    let make_stepper = make_stepper_factory::<DefaultCacheLayouts>();
 
     let mut base_stepper = make_stepper();
     let base_result = base_stepper.step_max(Bound::Unbounded);

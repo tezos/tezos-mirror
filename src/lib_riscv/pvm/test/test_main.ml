@@ -13,6 +13,10 @@ let tests =
         ( "PVM advances the expected number of steps",
           `Quick,
           Test_backend.test_advance_dummy_kernel );
+        ( "Proofs produced via the OCaml API match those produced by the \
+           sandboxed RISC-V PVM",
+          `Quick,
+          Test_backend.test_jstz_proof_regression );
       ] );
     ( "Storage",
       [
