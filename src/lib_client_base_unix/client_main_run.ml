@@ -427,7 +427,7 @@ let init_logging (module C : M) ?(parsed_args : Client_config.cli_args option)
     |> Option.map Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
   in
   (* Update config with color logging switch and advertise levels *)
-  let log_cfg =
+  let default_log_cfg =
     let colors =
       match parsed_args with
       | None -> None
@@ -437,6 +437,14 @@ let init_logging (module C : M) ?(parsed_args : Client_config.cli_args option)
       ?advertise_levels:C.advertise_log_levels
       ?colors
       ()
+  in
+  let log_cfg =
+    match parsed_config_file with
+    | Some parsed_config_file ->
+        Option.value
+          ~default:default_log_cfg
+          parsed_config_file.Client_config.Cfg_file.log
+    | None -> default_log_cfg
   in
   let config =
     make_with_defaults ?enable_default_daily_logs_at:daily_logs_path ~log_cfg ()
