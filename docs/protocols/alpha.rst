@@ -57,6 +57,11 @@ RPC Changes
   a given delegate (``none`` if not yet set), and the list of pending updates to
   that key in the following cycles. (MR :gl:`!17236`)
 
+- Updated ``GET
+  /chains/<chain_id>/blocks/<block_id>/helpers/validators?delegate=<delegate_pkh>&level=<level_id>``
+  with the new field ``companion_key`` which returns the active companion key for
+  the given ``delegate`` and ``level``. (MR :gl:`!17703`)
+
 Operation receipts
 ------------------
 

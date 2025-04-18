@@ -3957,21 +3957,23 @@ module Validators = struct
     level : Raw_level.t;
     delegate : Signature.Public_key_hash.t;
     consensus_key : Signature.public_key_hash;
+    companion_key : Bls.Public_key_hash.t option;
     slots : Slot.t list;
   }
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun {level; delegate; consensus_key; slots} ->
-        (level, delegate, slots, consensus_key))
-      (fun (level, delegate, slots, consensus_key) ->
-        {level; delegate; consensus_key; slots})
-      (obj4
+      (fun {level; delegate; consensus_key; companion_key; slots} ->
+        (level, delegate, slots, consensus_key, companion_key))
+      (fun (level, delegate, slots, consensus_key, companion_key) ->
+        {level; delegate; consensus_key; companion_key; slots})
+      (obj5
          (req "level" Raw_level.encoding)
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "slots" (list Slot.encoding))
-         (req "consensus_key" Signature.Public_key_hash.encoding))
+         (req "consensus_key" Signature.Public_key_hash.encoding)
+         (opt "companion_key" Bls.Public_key_hash.encoding))
 
   module S = struct
     open Data_encoding
@@ -4016,8 +4018,9 @@ module Validators = struct
     let+ ctxt, rights = Baking.attesting_rights ctxt level in
     ( ctxt,
       Signature.Public_key_hash.Map.fold
-        (fun _pkh {Baking.delegate; consensus_key; slots} acc ->
-          {level = level.level; delegate; consensus_key; slots} :: acc)
+        (fun _pkh {Baking.delegate; consensus_key; companion_key; slots} acc ->
+          {level = level.level; delegate; consensus_key; companion_key; slots}
+          :: acc)
         rights
         acc )
 

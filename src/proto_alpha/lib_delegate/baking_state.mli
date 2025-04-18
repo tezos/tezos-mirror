@@ -26,8 +26,10 @@
 open Protocol
 open Alpha_context
 
-(** {2 Consensus key type and functions} *)
-module Consensus_key_id : sig
+(** {2 Key type and functions}
+
+    Used for both consensus keys and companion keys. *)
+module Key_id : sig
   type t
 
   (** Only use at library frontiers *)
@@ -46,10 +48,10 @@ module Consensus_key_id : sig
   end
 end
 
-module Consensus_key : sig
+module Key : sig
   type t = private {
     alias : string option;
-    id : Consensus_key_id.t;
+    id : Key_id.t;
     public_key : Signature.public_key;
     secret_key_uri : Client_keys.sk_uri;
   }
@@ -89,7 +91,11 @@ module Delegate_id : sig
 end
 
 module Delegate : sig
-  type t = {consensus_key : Consensus_key.t; delegate_id : Delegate_id.t}
+  type t = {
+    consensus_key : Key.t;
+    companion_key : Key.t option;
+    delegate_id : Delegate_id.t;
+  }
 
   val encoding : t Data_encoding.t
 
@@ -145,7 +151,7 @@ val compute_delegate_slots :
   ?block:Block_services.block ->
   level:int32 ->
   chain:Shell_services.chain ->
-  Consensus_key.t list ->
+  Key.t list ->
   delegate_slots tzresult Lwt.t
 
 (** {2 Consensus operations types functions} *)
@@ -503,7 +509,7 @@ type global_state = {
   operation_worker : Operation_worker.t;
   mutable forge_worker_hooks : forge_worker_hooks;
   validation_mode : validation_mode;
-  delegates : Consensus_key.t list;
+  delegates : Key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }

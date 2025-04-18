@@ -29,7 +29,7 @@ open Baking_errors
 
 module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
-module Consensus_key_id = struct
+module Key_id = struct
   type t = Signature.Public_key_hash.t
 
   let to_pkh pkh = pkh
@@ -43,12 +43,12 @@ module Consensus_key_id = struct
   module Table = Signature.Public_key_hash.Table
 end
 
-module Consensus_key = struct
+module Key = struct
   (** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
   type t = {
     alias : string option;
-    id : Consensus_key_id.t;
+    id : Key_id.t;
     public_key : Signature.Public_key.t;
     secret_key_uri : Client_keys.sk_uri;
   }
@@ -110,26 +110,40 @@ module Delegate_id = struct
 end
 
 module Delegate = struct
-  type t = {consensus_key : Consensus_key.t; delegate_id : Delegate_id.t}
+  type t = {
+    consensus_key : Key.t;
+    companion_key : Key.t option;
+    delegate_id : Delegate_id.t;
+  }
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun {consensus_key; delegate_id} -> (consensus_key, delegate_id))
-      (fun (consensus_key, delegate_id) -> {consensus_key; delegate_id})
-      (merge_objs
-         Consensus_key.encoding
-         (obj1 (req "delegate" Delegate_id.encoding)))
+      (fun {consensus_key; companion_key; delegate_id} ->
+        (consensus_key, delegate_id, companion_key))
+      (fun (consensus_key, delegate_id, companion_key) ->
+        {consensus_key; delegate_id; companion_key})
+      (obj3
+         (req "consensus_key" Key.encoding)
+         (req "delegate" Delegate_id.encoding)
+         (opt "companion_key" Key.encoding))
 
-  let pp fmt {consensus_key; delegate_id} =
+  let pp fmt {consensus_key; delegate_id; companion_key} =
+    let str_companion_key =
+      match companion_key with
+      | Some companion_key ->
+          Format.asprintf " with companion key %a" Key.pp companion_key
+      | None -> ""
+    in
     if Signature.Public_key_hash.equal consensus_key.id delegate_id then
-      Consensus_key.pp fmt consensus_key
+      Format.fprintf fmt "%a%s" Key.pp consensus_key str_companion_key
     else
       Format.fprintf
         fmt
-        "%a@,on behalf of %a"
-        Consensus_key.pp
+        "%a%s@,on behalf of %a"
+        Key.pp
         consensus_key
+        str_companion_key
         Delegate_id.pp
         delegate_id
 end
@@ -642,7 +656,7 @@ type global_state = {
   (* the validation mode used by the baker*)
   validation_mode : validation_mode;
   (* the delegates on behalf of which the baker is running *)
-  delegates : Consensus_key.t list;
+  delegates : Key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
@@ -1059,9 +1073,9 @@ let may_load_attestable_data state =
 
 module DelegateSet = struct
   include Set.Make (struct
-    type t = Consensus_key.t
+    type t = Key.t
 
-    let compare Consensus_key.{id = pkh; _} Consensus_key.{id = pkh'; _} =
+    let compare Key.{id = pkh; _} Key.{id = pkh'; _} =
       Signature.Public_key_hash.compare pkh pkh'
   end)
 
@@ -1082,16 +1096,29 @@ let delegate_slots attesting_rights delegates =
   let own_delegate_first_slots, own_delegate_slots, all_delegate_voting_power =
     List.fold_left
       (fun (own_list, own_map, all_map) slot ->
-        let {Plugin.RPC.Validators.consensus_key; delegate; slots; _} = slot in
+        let {
+          Plugin.RPC.Validators.consensus_key;
+          companion_key;
+          delegate;
+          slots;
+          level = _;
+        } =
+          slot
+        in
         let first_slot = Stdlib.List.hd slots in
         let attesting_power = List.length slots in
         let all_map = SlotMap.add first_slot attesting_power all_map in
         let own_list, own_map =
           match DelegateSet.find_pkh consensus_key own_delegates with
           | Some consensus_key ->
+              let companion_key =
+                Option.bind companion_key (fun companion_key ->
+                    DelegateSet.find_pkh (Bls companion_key) own_delegates)
+              in
               let attesting_slot =
                 {
-                  delegate = {consensus_key; delegate_id = delegate};
+                  delegate =
+                    {consensus_key; delegate_id = delegate; companion_key};
                   first_slot;
                   attesting_power;
                 }
@@ -1217,7 +1244,7 @@ let pp_global_state fmt {chain_id; config; validation_mode; delegates; _} =
     config
     pp_validation_mode
     validation_mode
-    Format.(pp_print_list Consensus_key.pp)
+    Format.(pp_print_list Key.pp)
     delegates
 
 let pp_option pp fmt = function

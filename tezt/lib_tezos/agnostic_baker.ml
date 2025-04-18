@@ -328,7 +328,17 @@ let log_block_injection ?color baker =
         let open JSON in
         let level = event.value |-> "level" |> as_int in
         let round = event.value |-> "round" |> as_int in
-        let delegate = event.value |-> "delegate" |-> "alias" |> as_string in
+        let delegate =
+          event.value |-> "delegate" |-> "alias" |> as_string_opt
+        in
+        let delegate =
+          match delegate with
+          | None ->
+              (* The encoding was changed in Protocol 023 *)
+              event.value |-> "delegate" |-> "consensus_key" |-> "alias"
+              |> as_string
+          | Some delegate -> delegate
+        in
         Log.info
           ?color
           "[%s] Block injected at level %d round %d for %s."

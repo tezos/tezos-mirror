@@ -81,7 +81,7 @@ val run :
   ?constants:Constants.t ->
   chain:Chain_services.chain ->
   Baking_configuration.t ->
-  Baking_state.Consensus_key.t list ->
+  Baking_state.Key.t list ->
   unit tzresult Lwt.t
 
 (** {2 Functions only needed for the baking_lib} *)
@@ -145,7 +145,7 @@ val create_initial_state :
   Operation_worker.t ->
   current_proposal:proposal ->
   ?constants:Constants.t ->
-  Baking_state.Consensus_key.t list ->
+  Baking_state.Key.t list ->
   state tzresult Lwt.t
 
 (** [automaton_loop ?stop_on_event baking_configuration on_error loop_state
