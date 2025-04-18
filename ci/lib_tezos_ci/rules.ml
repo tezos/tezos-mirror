@@ -60,6 +60,9 @@ let schedule_extended_rpc_tests =
 let schedule_extended_validation_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_VALIDATION_TESTS"
 
+let schedule_extended_baker_remote_mode_tests =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_BAKER_REMOTE_MODE_TESTS"
+
 let schedule_test_release =
   scheduled && var "TZ_SCHEDULE_KIND" == str "TEST_RELEASE"
 

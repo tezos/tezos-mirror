@@ -83,13 +83,24 @@ let liquidity_baking_votefile ?path vote =
       ]) ;
   votefile
 
+let enable_remote_mode =
+  match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
+  | Some "EXTENDED_BAKER_REMOTE_MODE_TESTS" -> Some true
+  | Some _ -> Some false
+  | _ -> None
+
 let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
     ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
-    ?(remote_mode = false) ?operations_pool ?dal_node_rpc_endpoint
+    ?remote_mode ?operations_pool ?dal_node_rpc_endpoint
     ?dal_node_timeout_percentage ?(state_recorder = false)
     ?(node_version_check_bypass = false) ?node_version_allowed ~base_dir
     ~node_data_dir ~node_rpc_endpoint ?(keep_alive = false) () =
+  let remote_mode =
+    Option.value
+      remote_mode
+      ~default:(Option.value enable_remote_mode ~default:false)
+  in
   let agnostic_baker =
     create
       ~path
@@ -124,7 +135,7 @@ let handle_event node ({name; _} : event) =
 
 let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
-    ?(remote_mode = false) ?operations_pool ?dal_node_rpc_endpoint
+    ?remote_mode ?operations_pool ?dal_node_rpc_endpoint
     ?dal_node_timeout_percentage ?(state_recorder = false)
     ?(node_version_check_bypass = false) ?node_version_allowed ?keep_alive node
     client =
@@ -139,7 +150,7 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
       ?votefile
       ~liquidity_baking_toggle_vote
       ?force_apply_from_round
-      ~remote_mode
+      ?remote_mode
       ?operations_pool
       ?dal_node_rpc_endpoint
       ?dal_node_timeout_percentage
