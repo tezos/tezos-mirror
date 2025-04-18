@@ -14,12 +14,13 @@ set -eu
 
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
-url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_package_name}/${release_no_v}"
-
+gitlab_dashboards_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_dashboards_package_name}/${release_no_v}"
+gitlab_source_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_source_package_name}/${release_no_v}"
 # Copied from `scripts/ci/create_gitlab_package.sh`.
 gitlab_upload() {
   local_path="${1}"
-  remote_file="${2}"
+  remote_file="${2-${local_path}}"
+  url="${3:-${gitlab_source_url}}"
 
   # Upload only if not running in dry-run
   if [ -z "${dry_run:-}" ]; then
@@ -59,19 +60,40 @@ dashboards="$(find grafazos/output/ -type f -name "*.json")"
 
 echo "Upload Grafazos Dashboards"
 for dashboard in ${dashboards}; do
-  gitlab_upload "${dashboard}" "$(basename "${dashboard}")"
+  gitlab_upload "${dashboard}" "$(basename "${dashboard}")" "${gitlab_dashboards_url}"
 done
 
-ret=$(curl -fsSL -X GET \
+# Create and upload a tarball for Grafazos source
+echo "Upload Grafazos source"
+git archive HEAD --format=tar "grafazos/" | bzip2 > "${source_tarball}"
+
+# Checksums
+sha256sum "${source_tarball}" > "${source_tarball}.sha256"
+sha512sum "${source_tarball}" > "${source_tarball}.sha512"
+
+gitlab_upload "${source_tarball}" "${source_tarball}"
+gitlab_upload "${source_tarball}.sha256" "${source_tarball}.sha256"
+gitlab_upload "${source_tarball}.sha512" "${source_tarball}.sha512"
+
+# Get gitlab packages URL
+ret_dashboards=$(curl -fsSL -X GET \
   -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-  "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_package_name}" |
+  "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_dashboards_package_name}" |
+  jq -r ".[] | select(.version==\"${release_no_v}\") | ._links.web_path")
+ret_source=$(curl -fsSL -X GET \
+  -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+  "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_source_package_name}" |
   jq -r ".[] | select(.version==\"${release_no_v}\") | ._links.web_path")
 
-if [ -z "${ret}" ]; then
-  echo "Error: ${gitlab_package_name} could not find package matching version ${release_no_v}"
+if [ -z "${ret_dashboards}" ]; then
+  echo "Error: ${gitlab_dashboards_package_name} could not find package matching version ${release_no_v}"
+  exit 1
+elif [ -z "${ret_source}" ]; then
+  echo "Error: ${gitlab_source_package_name} could not find package matching version ${release_no_v}"
   exit 1
 else
-  dashboards_url="https://${CI_SERVER_HOST}${ret}"
+  dashboards_url="https://${CI_SERVER_HOST}${ret_dashboards}"
+  source_url="https://${CI_SERVER_HOST}${ret_source}"
 fi
 
 # GitLab Release command-line tool
@@ -83,4 +105,5 @@ export DEBUG='true'
 release-cli create \
   --name="${release_name}" \
   --tag-name="${CI_COMMIT_TAG}" \
-  --assets-link="{\"name\":\"Dashboards\",\"url\":\"${dashboards_url}\",\"link_type\":\"package\"}"
+  --assets-link="{\"name\":\"Dashboards\",\"url\":\"${dashboards_url}\",\"link_type\":\"package\"}" \
+  --assets-link="{\"name\":\"Grafazos source\",\"url\":\"${source_url}\",\"link_type\":\"other\"}"
