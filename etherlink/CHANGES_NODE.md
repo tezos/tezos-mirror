@@ -7,7 +7,7 @@
 - Replaces the command `download kernel with root hash` by `download kernel`.
   In addition to supporting root hash prefixed by `0x` (something the previous
   command was rejecting), `download kernel` also accept known kernel names
-  (currently, `bifrost`, `calypso` and `calypso2`). (!todo)
+  (currently, `bifrost`, `calypso` and `calypso2`). (!17696)
 
 ### Configuration changes
 
@@ -19,6 +19,12 @@
 
 - Adds `--private-rpc-port` to `run observer` to enable the private RPC server
   from command-line. (!17762)
+
+- Previously when submitting the same transaction multiple times, if
+  the first fails to be included by the sequencer then all following
+  will fails. Now when submitting multiple time the same transaction,
+  the first occurrence that could succeed does. (!17740)
+
 
 ### Storage changes
 
