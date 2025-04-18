@@ -64,6 +64,10 @@ let unaggregated_eligible_attestation = function
   | Validate_errors.Consensus.Unaggregated_eligible_attestation _ -> true
   | _ -> false
 
+let empty_aggregation_committee = function
+  | Validate_errors.Consensus.Empty_aggregation_committee -> true
+  | _ -> false
+
 let find_aggregate_result receipt =
   let result_opt =
     List.find_map
@@ -350,6 +354,28 @@ let eligible_attestation_must_be_aggregated () =
       Assert.proto_error ~loc:__LOC__ res unaggregated_eligible_attestation
   | _ -> assert false
 
+let test_empty_committee () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* consensus_content =
+    let* attestation = Op.raw_attestation block in
+    match attestation.protocol_data with
+    | {contents = Single (Attestation {consensus_content; _}); _} ->
+        let Alpha_context.{level; round; block_payload_hash; slot = _} =
+          consensus_content
+        in
+        return Alpha_context.{level; round; block_payload_hash}
+  in
+  let contents =
+    Alpha_context.Attestations_aggregate {consensus_content; committee = []}
+  in
+  let signature = Some Signature.(of_bls Signature.Bls.zero) in
+  let operation = Op.pack_operation (B block) signature (Single contents) in
+  let*! res = Block.bake ~operation block in
+  Assert.proto_error ~loc:__LOC__ res empty_aggregation_committee
+
 let tests =
   [
     Tztest.tztest
@@ -384,6 +410,7 @@ let tests =
       "eligible_attestation_must_be_aggregated"
       `Quick
       eligible_attestation_must_be_aggregated;
+    Tztest.tztest "empty committee" `Quick test_empty_committee;
   ]
 
 let () =

@@ -135,6 +135,7 @@ module Consensus = struct
     | Non_bls_key_in_aggregate
     | Public_key_aggregation_failure
     | Unaggregated_eligible_attestation of Operation_hash.t
+    | Empty_aggregation_committee
 
   let () =
     register_error_kind
@@ -429,7 +430,17 @@ module Consensus = struct
       Data_encoding.(obj1 (req "hash" Operation_hash.encoding))
       (function
         | Unaggregated_eligible_attestation hash -> Some hash | _ -> None)
-      (fun hash -> Unaggregated_eligible_attestation hash)
+      (fun hash -> Unaggregated_eligible_attestation hash) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.empty_aggregation_committee"
+      ~title:"Empty aggregation committee"
+      ~description:"The aggregation committee is empty"
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "The aggregation committee is empty.")
+      Data_encoding.empty
+      (function Empty_aggregation_committee -> Some () | _ -> None)
+      (fun () -> Empty_aggregation_committee)
 end
 
 module Voting = struct

@@ -1119,6 +1119,12 @@ module Consensus = struct
             ([], 0)
             committee
         in
+        (* Fail on empty committee *)
+        let*? () =
+          error_when
+            (List.is_empty public_keys)
+            Validate_errors.Consensus.Empty_aggregation_committee
+        in
         (* Check signature *)
         let* () =
           if check_signature then

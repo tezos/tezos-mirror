@@ -88,6 +88,7 @@ module Consensus : sig
     | Non_bls_key_in_aggregate
     | Public_key_aggregation_failure
     | Unaggregated_eligible_attestation of Operation_hash.t
+    | Empty_aggregation_committee
 end
 
 (** Errors that may arise while validating a voting operation. *)
