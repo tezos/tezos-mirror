@@ -82,6 +82,11 @@ val attesters : t -> Signature.Public_key_hash.Set.t
     was outside these bounds *)
 val operator_slot_out_of_bounds : int -> t -> int option
 
+(** [observer_slot_out_of_bounds n t] returns the first slot index that for
+    observer that is not between 0 and n - 1; it returns [None] if no slot index
+    was outside these bounds *)
+val observer_slot_out_of_bounds : int -> t -> int option
+
 (** [is_observed_slot i op] returns true if and only if [op] contains an
     observer for slot index [i] *)
 val is_observed_slot : int -> t -> bool

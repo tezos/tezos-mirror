@@ -52,6 +52,9 @@ let is_empty t =
 let operator_slot_out_of_bounds number_of_slots t =
   Slot_set.find_first (fun i -> i < 0 || i >= number_of_slots) t.operators
 
+let observer_slot_out_of_bounds number_of_slots t =
+  Slot_set.find_first (fun i -> i < 0 || i >= number_of_slots) t.observers
+
 let is_observed_slot slot_index {observers; _} =
   Slot_set.mem slot_index observers
 

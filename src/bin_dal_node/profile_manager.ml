@@ -154,7 +154,13 @@ let validate_slot_indexes t ~number_of_slots =
       with
       | Some slot_index ->
           tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
-      | None -> return_unit)
+      | None -> (
+          match
+            Controller_profiles.observer_slot_out_of_bounds number_of_slots c
+          with
+          | Some slot_index ->
+              tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
+          | None -> return_unit))
 
 (* TODO https://gitlab.com/tezos/tezos/-/issues/5934
    We need a mechanism to ease the tracking of newly added/removed topics. *)
