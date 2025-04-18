@@ -276,6 +276,7 @@ trigger:octez_monitoring:
   inherit:
     variables:
     - ci_image_name
+    - ci_image_name_protected
     - jsonnet_image_name
   needs: []
   trigger:

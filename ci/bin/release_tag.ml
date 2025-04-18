@@ -46,7 +46,8 @@ let monitoring_child_pipeline =
     "octez_monitoring"
     ~description:"Octez monitoring jobs"
     ~inherit_:
-      (Gitlab_ci.Types.Variable_list ["ci_image_name"; "jsonnet_image_name"])
+      (Gitlab_ci.Types.Variable_list
+         ["ci_image_name"; "ci_image_name_protected"; "jsonnet_image_name"])
     ~jobs:
       [
         job_datadog_pipeline_trace;
