@@ -223,10 +223,14 @@ let maybe_register_trap traps_store ~traps_fraction message_id message =
         ~shard_proof
   | Ok false -> ()
   | Error _ ->
-      Event.emit_dont_wait__trap_registration_fail
-        ~delegate
-        ~slot_index
-        ~shard_index
+      Lwt.dont_wait
+        (fun () ->
+          Event.emit_trap_check_failure
+            ~delegate
+            ~published_level:level
+            ~slot_index
+            ~shard_index)
+        (fun exc -> raise exc)
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment slot polynomial =

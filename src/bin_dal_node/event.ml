@@ -938,19 +938,6 @@ open struct
       ("shard_index", Data_encoding.int31)
       ("delegate", Signature.Public_key_hash.encoding)
 
-  let trap_registration_fail =
-    declare_3
-      ~section
-      ~prefix_name_with_section:true
-      ~name:"trap_registration_fail"
-      ~msg:
-        "An error occurred when checking if the shard for delegate {delegate}, \
-         slot index {slot_index} and shard index {shard_index} is a trap"
-      ~level:Warning
-      ("delegate", Signature.Public_key_hash.encoding)
-      ("slot_index", Data_encoding.int31)
-      ("shard_index", Data_encoding.int31)
-
   let registered_pkh_not_a_delegate =
     declare_1
       ~section
@@ -1258,11 +1245,6 @@ let emit_trap_injection_failure ~delegate ~published_level ~attested_level
 let emit_trap_check_failure ~published_level ~slot_index ~shard_index ~delegate
     =
   emit trap_check_failure (published_level, slot_index, shard_index, delegate)
-
-let emit_dont_wait__trap_registration_fail ~delegate ~slot_index ~shard_index =
-  emit__dont_wait__use_with_care
-    trap_registration_fail
-    (delegate, slot_index, shard_index)
 
 let emit_registered_pkh_not_a_delegate ~pkh =
   emit registered_pkh_not_a_delegate pkh
