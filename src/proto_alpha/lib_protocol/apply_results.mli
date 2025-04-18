@@ -190,6 +190,7 @@ and _ successful_manager_operation_result =
     }
       -> Kind.increase_paid_storage successful_manager_operation_result
   | Update_consensus_key_result : {
+      kind : Operation_repr.consensus_key_kind;
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.update_consensus_key successful_manager_operation_result

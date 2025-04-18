@@ -69,6 +69,7 @@ type _ successful_manager_operation_result =
     }
       -> Kind.increase_paid_storage successful_manager_operation_result
   | Update_consensus_key_result : {
+      kind : Operation_repr.consensus_key_kind;
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.update_consensus_key successful_manager_operation_result
@@ -469,15 +470,19 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.update_consensus_key_case
       ~encoding:
         Data_encoding.(
-          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+          obj2
+            (req "kind" Operation_repr.consensus_key_kind_encoding)
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Update_consensus_key_result _ as op) ->
             Some op
         | _ -> None)
       ~kind:Kind.Update_consensus_key_manager_kind
       ~proj:(function
-        | Update_consensus_key_result {consumed_gas} -> consumed_gas)
-      ~inj:(fun consumed_gas -> Update_consensus_key_result {consumed_gas})
+        | Update_consensus_key_result {kind; consumed_gas} ->
+            (kind, consumed_gas))
+      ~inj:(fun (kind, consumed_gas) ->
+        Update_consensus_key_result {kind; consumed_gas})
 
   let set_deposits_limit_case =
     make

@@ -1490,7 +1490,10 @@ let apply_manager_operation :
         return
           ( ctxt,
             Update_consensus_key_result
-              {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
+              {
+                kind;
+                consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
+              },
             [] )
     | Dal_publish_commitment slot_header ->
         let*? ctxt, slot_header =

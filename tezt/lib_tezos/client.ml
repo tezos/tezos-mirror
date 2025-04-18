@@ -1482,6 +1482,17 @@ let update_consensus_key ?hooks ?endpoint ?(wait = "none") ?burn_cap
     @ optional_arg "burn-cap" Tez.to_string burn_cap)
   |> Process.check ?expect_failure
 
+let update_companion_key ?hooks ?endpoint ?(wait = "none") ?burn_cap
+    ?expect_failure ~src ~pk client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["set"; "companion"; "key"; "for"; src; "to"; pk]
+    @ optional_arg "burn-cap" Tez.to_string burn_cap)
+  |> Process.check ?expect_failure
+
 let drain_delegate ?hooks ?endpoint ?(wait = "none") ?expect_failure ~delegate
     ~consensus_key ?destination client =
   let destination =
