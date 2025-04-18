@@ -7,6 +7,8 @@
 (*****************************************************************************)
 open Tezos_types
 
+let root = Durable_storage_path.tezlink_root
+
 module Path = struct
   (** [to_path encoding value] uses [encoding] to encode [value] in
       hexadecimal *)
@@ -50,11 +52,13 @@ let counter read c =
 let nth_block read n =
   let open Lwt_result_syntax in
   let number = Durable_storage_path.Block.(Nth n) in
-  let* (Ethereum_types.Qty level) = Durable_storage.block_number read number in
+  let* (Ethereum_types.Qty level) =
+    Durable_storage.block_number ~root read number
+  in
   let* block_hash_opt =
     Durable_storage.inspect_durable_and_decode_opt
       read
-      (Durable_storage_path.Indexes.block_by_number (Nth level))
+      (Durable_storage_path.Indexes.block_by_number ~root (Nth level))
       Ethereum_types.decode_block_hash
   in
   match block_hash_opt with
@@ -63,7 +67,7 @@ let nth_block read n =
       let* block_opt =
         Durable_storage.inspect_durable_and_decode_opt
           read
-          (Durable_storage_path.Block.by_hash block_hash)
+          (Durable_storage_path.Block.by_hash ~root block_hash)
           L2_types.Tezos_block.block_from_binary
       in
       match block_opt with
@@ -76,7 +80,7 @@ let nth_block_hash read n =
   let number = Durable_storage_path.Block.(Nth n) in
   Durable_storage.inspect_durable_and_decode_opt
     read
-    (Durable_storage_path.Indexes.block_by_number number)
+    (Durable_storage_path.Indexes.block_by_number ~root number)
     Ethereum_types.decode_block_hash
 
 module Make_block_storage (Reader : Durable_storage.READER) :

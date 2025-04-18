@@ -106,14 +106,14 @@ let is_multichain_enabled read =
   let* bytes_opt = read Durable_storage_path.Feature_flags.multichain in
   return (Option.is_some bytes_opt)
 
-let block_number read n =
+let block_number ~root read n =
   let open Lwt_result_syntax in
   match n with
   (* This avoids an unecessary service call in case we ask a block's number
      with an already expected/known block number [n]. *)
   | Durable_storage_path.Block.Nth i -> return @@ Ethereum_types.Qty i
   | Durable_storage_path.Block.Current -> (
-      let+ answer = read Durable_storage_path.Block.current_number in
+      let+ answer = read (Durable_storage_path.Block.current_number ~root) in
       match answer with
       | Some bytes -> Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits)
       | None ->

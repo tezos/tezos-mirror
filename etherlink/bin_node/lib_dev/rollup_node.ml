@@ -164,7 +164,11 @@ end) : Services_backend_sig.Backend = struct
     let read_from_block_parameter param =
       let* state = Reader.get_state ~block:(Block_parameter param) () in
       let* value =
-        Reader.read state Durable_storage_path.Block.current_number
+        Reader.read
+          state
+          (Durable_storage_path.Block.current_number
+           (* TODO: Remove etherlink root *)
+             ~root:Durable_storage_path.etherlink_root)
       in
       match value with
       | Some value ->
@@ -176,7 +180,12 @@ end) : Services_backend_sig.Backend = struct
     | Block_hash {hash; _} -> (
         let* state = Reader.get_state ~block:(Block_parameter Latest) () in
         let* value =
-          Reader.read state (Durable_storage_path.Block.by_hash hash)
+          Reader.read
+            state
+            (Durable_storage_path.Block.by_hash
+             (* We're expecting an etherlink block here so we can inline etherlink root *)
+               ~root:Durable_storage_path.etherlink_root
+               hash)
         in
         match value with
         | Some value ->

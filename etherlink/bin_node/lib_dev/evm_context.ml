@@ -521,10 +521,15 @@ module State = struct
       if not ctxt.legacy_block_storage then
         Evm_store.Blocks.find_hash_of_number conn (Qty number)
       else
+        let chain_family =
+          Configuration.retrieve_chain_family
+            ~l2_chains:ctxt.configuration.experimental_features.l2_chains
+        in
+        let root = Durable_storage_path.root_of_chain_family chain_family in
         let*! bytes =
           Evm_state.inspect
             evm_state
-            (Durable_storage_path.Indexes.block_by_number (Nth number))
+            (Durable_storage_path.Indexes.block_by_number ~root (Nth number))
         in
         return (Option.map Ethereum_types.decode_block_hash bytes)
     in
@@ -1699,10 +1704,18 @@ module State = struct
             if not ctxt.legacy_block_storage then
               Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
             else
+              let chain_family =
+                Configuration.retrieve_chain_family
+                  ~l2_chains:ctxt.configuration.experimental_features.l2_chains
+              in
+              let root =
+                Durable_storage_path.root_of_chain_family chain_family
+              in
               let*! bytes =
                 Evm_state.inspect
                   ctxt.session.evm_state
                   (Durable_storage_path.Indexes.block_by_number
+                     ~root
                      (Nth pred_number))
               in
               return (Option.map Ethereum_types.decode_block_hash bytes)
@@ -2055,7 +2068,11 @@ let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
   (* Assert we can read the current blueprint number *)
   let* current_blueprint_number =
     let*! current_blueprint_number_opt =
-      Evm_state.inspect evm_state Durable_storage_path.Block.current_number
+      Evm_state.inspect
+        evm_state
+        (Durable_storage_path.Block.current_number
+         (* TODO: Remove etherlink root *)
+           ~root:Durable_storage_path.etherlink_root)
     in
     match current_blueprint_number_opt with
     | Some bytes -> return (Bytes.to_string bytes |> Z.of_bits)
@@ -2065,7 +2082,11 @@ let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
   (* Assert we can read the current block hash *)
   let* () =
     let*! current_block_hash_opt =
-      Evm_state.inspect evm_state Durable_storage_path.Block.current_hash
+      Evm_state.inspect
+        evm_state
+        (Durable_storage_path.Block.current_hash
+         (* TODO: Remove etherlink root *)
+           ~root:Durable_storage_path.etherlink_root)
     in
     match current_block_hash_opt with
     | Some _bytes -> return_unit

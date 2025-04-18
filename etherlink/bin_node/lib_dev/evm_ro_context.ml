@@ -161,8 +161,9 @@ let get_irmin_hash_from_block_hash ~chain_family ctxt hash =
   (* we use the latest state to read the contents of the block *)
   let* latest_hash = find_latest_hash ctxt in
   let* evm_tree = get_evm_state ctxt latest_hash in
+  let root = Durable_storage_path.root_of_chain_family chain_family in
   let*! res =
-    Evm_state.inspect evm_tree Durable_storage_path.Block.(by_hash hash)
+    Evm_state.inspect evm_tree Durable_storage_path.Block.(by_hash ~root hash)
   in
   match res with
   | Some block_bytes ->
@@ -392,7 +393,11 @@ struct
         let* irmin_hash = find_irmin_hash Ctxt.ctxt block_param in
         let* evm_state = get_evm_state Ctxt.ctxt irmin_hash in
         let*! bytes =
-          Evm_state.inspect evm_state Durable_storage_path.(Block.by_hash hash)
+          Evm_state.inspect
+            evm_state
+            Durable_storage_path.(
+              (* We're expecting an etherlink block here so we can inline etherlink root *)
+              Block.by_hash ~root:Durable_storage_path.etherlink_root hash)
         in
         match bytes with
         | Some bytes ->

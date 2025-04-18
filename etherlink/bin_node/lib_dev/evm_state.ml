@@ -224,7 +224,11 @@ let kernel_version evm_state =
 let current_block_height evm_state =
   let open Lwt_syntax in
   let* current_block_number =
-    inspect evm_state Durable_storage_path.Block.current_number
+    inspect
+      evm_state
+      (Durable_storage_path.Block.current_number
+       (* TODO: Remove etherlink root *)
+         ~root:Durable_storage_path.etherlink_root)
   in
   match current_block_number with
   | None ->
@@ -239,8 +243,9 @@ let current_block_height evm_state =
 
 let current_block_hash ~chain_family evm_state =
   let open Lwt_result_syntax in
+  let root = Durable_storage_path.root_of_chain_family chain_family in
   let*! current_hash =
-    inspect evm_state Durable_storage_path.Block.current_hash
+    inspect evm_state (Durable_storage_path.Block.current_hash ~root)
   in
   match current_hash with
   | Some h -> return (decode_block_hash h)
@@ -344,9 +349,10 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir
       exec_inputs
   in
   let* block_hash = current_block_hash ~chain_family evm_state in
+  let root = Durable_storage_path.root_of_chain_family chain_family in
   let* block =
     let*! bytes =
-      inspect evm_state (Durable_storage_path.Block.by_hash block_hash)
+      inspect evm_state (Durable_storage_path.Block.by_hash ~root block_hash)
     in
     return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
   in
@@ -437,7 +443,11 @@ let clear_block_storage block evm_state =
   (* Handles case (1.). *)
   let* evm_state =
     if number > Z.zero then
-      let pred_block_path = Durable_storage_path.Block.by_hash block_parent in
+      let pred_block_path =
+        Durable_storage_path.Block.by_hash (* TODO: Remove etherlink root *)
+          ~root:Durable_storage_path.etherlink_root
+          block_parent
+      in
       delete ~kind:Value evm_state pred_block_path
     else return evm_state
   in
@@ -451,6 +461,8 @@ let clear_block_storage block evm_state =
     if number >= to_keep then
       let index_path =
         Durable_storage_path.Indexes.block_by_number
+        (* TODO: Remove etherlink root *)
+          ~root:Durable_storage_path.etherlink_root
           (Nth (Z.sub number to_keep))
       in
       delete ~kind:Value evm_state index_path
