@@ -190,16 +190,6 @@ open struct
       ("info", Data_encoding.string)
       ("endpoint", Data_encoding.string)
 
-  let failed_to_persist_profiles =
-    declare_2
-      ~section
-      ~prefix_name_with_section:true
-      ~name:"failed_to_persist_profiles"
-      ~msg:"failed to persist the profiles to the config file"
-      ~level:Error
-      ("profiles", Types.profile_encoding)
-      ("error", Error_monad.trace_encoding)
-
   let reconstructed_slot =
     declare_2
       ~section
@@ -1071,9 +1061,6 @@ let emit_resolved_bootstrap_points_total ~number =
 
 let emit_fetched_l1_info_success ~requested_info ~endpoint =
   emit fetched_l1_info_success (requested_info, endpoint)
-
-let emit_failed_to_persist_profiles ~profiles ~error =
-  emit failed_to_persist_profiles (profiles, error)
 
 let emit_reconstructed_slot ~size ~shards =
   emit reconstructed_slot (size, shards)
