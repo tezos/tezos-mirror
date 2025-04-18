@@ -441,6 +441,7 @@ module Profile_handlers = struct
                 ~published_level:slot_id.Types.Slot_id.slot_level
                 ~slot_index:slot_id.slot_index
                 ~shard_index
+                ~delegate:pkh
             in
             return false)
       assigned_shard_indexes

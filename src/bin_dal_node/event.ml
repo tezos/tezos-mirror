@@ -924,17 +924,19 @@ open struct
       ("error", trace_encoding)
 
   let trap_check_failure =
-    declare_3
+    declare_4
       ~section
       ~prefix_name_with_section:true
       ~name:"trap_check_failure"
       ~msg:
         "An error occurred when checking the trap for published level \
-         {published_level}, slot index {slot_index}, shard index {shard_index}"
+         {published_level}, slot index {slot_index}, shard index {shard_index} \
+         and delegate {delegate}"
       ~level:Warning
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
+      ("delegate", Signature.Public_key_hash.encoding)
 
   let trap_registration_fail =
     declare_3
@@ -1253,8 +1255,9 @@ let emit_trap_injection_failure ~delegate ~published_level ~attested_level
     trap_injection_failure
     (delegate, published_level, attested_level, slot_index, shard_index, error)
 
-let emit_trap_check_failure ~published_level ~slot_index ~shard_index =
-  emit trap_check_failure (published_level, slot_index, shard_index)
+let emit_trap_check_failure ~published_level ~slot_index ~shard_index ~delegate
+    =
+  emit trap_check_failure (published_level, slot_index, shard_index, delegate)
 
 let emit_dont_wait__trap_registration_fail ~delegate ~slot_index ~shard_index =
   emit__dont_wait__use_with_care
