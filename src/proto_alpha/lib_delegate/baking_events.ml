@@ -117,6 +117,17 @@ module Commands = struct
          Please check your DAL node and possibly restart it."
       ~pp1:Uri.pp
       ("endpoint", Tezos_rpc.Encoding.uri_encoding)
+
+  let recommend_octez_baker =
+    declare_0
+      ~section
+      ~name:"recommend_octez_baker"
+      ~level:Warning
+      ~msg:
+        "The `octez-baker` binary is now available. We recommend using it \
+         instead of `octez-baker-<protocol>`, as it automatically handles \
+         protocol switches."
+      ()
 end
 
 module State_transitions = struct

@@ -26,6 +26,7 @@
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 val run_baker :
+  ?recommend_agnostic_baker:bool ->
   string option
   * bool
   * string option

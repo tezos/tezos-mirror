@@ -207,9 +207,18 @@ module Accuser = struct
 end
 
 module VDF = struct
-  let run (cctxt : Protocol_client_context.full) ~chain ~keep_alive =
+  let run ?(recommend_agnostic_baker = true)
+      (cctxt : Protocol_client_context.full) ~chain ~keep_alive =
     let open Lwt_result_syntax in
     let process () =
+      let*! () =
+        if recommend_agnostic_baker then
+          cctxt#warning
+            "The `octez-baker` binary is now available. We recommend using it \
+             instead of `octez-baker-<protocol>`, as it automatically handles \
+             protocol switches."
+        else Lwt.return_unit
+      in
       let*! () =
         cctxt#message
           "VDF daemon %a (%s) for %a started."

@@ -746,7 +746,7 @@ let baker_args =
     pre_emptive_forge_time_arg
     remote_calls_timeout_arg
 
-let run_baker
+let run_baker ?(recommend_agnostic_baker = true)
     ( pidfile,
       node_version_check_bypass,
       node_version_allowed,
@@ -766,6 +766,10 @@ let run_baker
       remote_calls_timeout ) baking_mode sources cctxt =
   let open Lwt_result_syntax in
   may_lock_pidfile pidfile @@ fun () ->
+  let*! () =
+    if recommend_agnostic_baker then Events.(emit recommend_octez_baker ())
+    else Lwt.return_unit
+  in
   let* () =
     check_node_version cctxt node_version_check_bypass node_version_allowed
   in
