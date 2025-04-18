@@ -14,25 +14,13 @@ let docker_build =
   let cache = Hashtbl.create 11 in
   fun ?(docker_image = Agent.Configuration.Gcp {alias = Env.dockerfile_alias})
       ~push
+      ~ssh_public_key
       () ->
     if Hashtbl.mem cache docker_image then (
       Log.info "Docker image is already built. Nothing to do" ;
       Lwt.return_unit)
-    else
-      let ssh_public_key_filename = Env.ssh_public_key_filename () in
+    else (
       Hashtbl.replace cache docker_image () ;
-      Log.info
-        "Checking the existence of ssh public key '%s'..."
-        ssh_public_key_filename ;
-      let* ssh_public_key =
-        let* () =
-          if not (Sys.file_exists ssh_public_key_filename) then (
-            Log.info "SSH public key not found, creating it..." ;
-            Ssh.generate_key ())
-          else Lwt.return_unit
-        in
-        Process.run_and_read_stdout ~name:"cat" "cat" [ssh_public_key_filename]
-      in
       let alias =
         match docker_image with
         | Gcp {alias} -> alias
@@ -92,7 +80,7 @@ let docker_build =
           Lwt.return_unit)
         else Lwt.return_unit
       in
-      unit
+      unit)
 
 let deploy_docker_registry () =
   Log.info "Tezt_Cloud found with value: %s" Env.tezt_cloud ;

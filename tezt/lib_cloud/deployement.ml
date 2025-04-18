@@ -222,10 +222,12 @@ module Remote = struct
            (fun
              (workspace_name, (vm_configuration, configurations, number_of_vms))
            ->
+             let* ssh_public_key = Ssh.public_key () in
              let* () =
                Jobs.docker_build
                  ~docker_image:vm_configuration.Agent.Configuration.docker_image
                  ~push:Env.push_docker
+                 ~ssh_public_key
                  ()
              in
              let* () = Terraform.VM.Workspace.select workspace_name in
@@ -324,6 +326,7 @@ module Localhost = struct
         in
         Lwt.return docker_network
     in
+    let* ssh_public_key = Ssh.public_key () in
     let* processes =
       List.to_seq configurations
       |> Seq.mapi (fun i configuration ->
@@ -336,6 +339,7 @@ module Localhost = struct
                Jobs.docker_build
                  ~docker_image:configuration.Agent.Configuration.vm.docker_image
                  ~push:false
+                 ~ssh_public_key
                  ()
              in
              let* docker_image =
