@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides different services related to DAL slots. *)
+(** This module provides different services related to DAL. *)
 
 open Tezos_crypto_dal
 

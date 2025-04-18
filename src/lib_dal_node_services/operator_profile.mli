@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This module handle operator profiles for the DAL node *)
+(** This module handles operator profiles for the DAL node *)
 
 (** An operator DAL node can play three different roles:
     - attester for some pkh: checks that the shards assigned to this pkh are published

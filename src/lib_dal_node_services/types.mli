@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module defines the main types related to DAL. *)
+
 module Cryptobox = Tezos_crypto_dal.Cryptobox
 
 (** A Tezos level. *)
