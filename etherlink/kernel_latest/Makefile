@@ -21,6 +21,20 @@ else
 endif
 	@cargo build --target wasm32-unknown-unknown --release ${EXCLUDE} ${FEATURES}
 
+.PHONY: build-debug
+build-debug:
+ifdef EVM_KERNEL_FEATURES
+	$(eval FEATURES := --features ${EVM_KERNEL_FEATURES})
+endif
+ifdef EXCLUDE_MEMBER
+	$(eval EXCLUDE := --workspace --exclude ${EXCLUDE_MEMBER})
+else
+# By default evm-evaluation is excluded as it's an isolated component
+# of the EVM workspace.
+	$(eval EXCLUDE := --workspace --exclude evm-evaluation)
+endif
+	@cargo build --profile release-with-debug --target wasm32-unknown-unknown ${EXCLUDE} ${FEATURES}
+
 .PHONY: build-evm-execution
 build-evm-execution:
 	@cargo build --target wasm32-unknown-unknown --release --package evm-execution-latest
