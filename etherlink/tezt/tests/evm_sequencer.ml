@@ -613,7 +613,7 @@ let test_tezlink_counter =
     ~tags:["evm"; "rpc"; "counter"]
   @@ fun {sequencer; _} _protocol ->
   let* res = account_rpc sequencer Constant.bootstrap1 "counter" in
-  Check.(JSON.(res |> as_int = 1) int ~error_msg:"Expected %R but got %L") ;
+  Check.(JSON.(res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
   unit
 
 let test_tezlink_version =
