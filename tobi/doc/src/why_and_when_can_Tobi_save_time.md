@@ -39,7 +39,11 @@ need to be compiled.
 In particular, with modular packaging and modular releases,
 it can make sense to have component C declare that
 it depends on a particular version of its dependency D.
-Then Tobi would continue to build C with this old version of D,
-and changes made to D should not impact C until one updates the version constraint.
-When the version constraint is updated `tobi build` tells you that
-you have to reinstall D.
+If all engineers use Tobi to build C,
+then they build C with this old version of D.
+Changes made to D thus do not impact C.
+When the authors of C want to use a newer version of D,
+they update the version constraint.
+Now if you try to build C with the old version of D installed,
+Tobi could notice and tell you before even trying to build.
+(This particular check is not implemented yet.)
