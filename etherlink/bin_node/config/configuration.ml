@@ -87,7 +87,7 @@ let default_tx_queue =
   {
     max_size = 1000;
     max_transaction_batch_length = None;
-    max_lifespan_s = 2;
+    max_lifespan_s = 4;
     tx_per_addr_limit = 16L;
   }
 
@@ -313,7 +313,7 @@ let default_experimental_features =
     websocket_rate_limit = None;
     spawn_rpc = None;
     l2_chains = default_l2_chains;
-    enable_tx_queue = None;
+    enable_tx_queue = Some default_tx_queue;
     periodic_snapshot_path = None;
   }
 

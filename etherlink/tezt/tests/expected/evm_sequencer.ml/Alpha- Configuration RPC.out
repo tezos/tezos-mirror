@@ -24,8 +24,8 @@
     "enable_tx_queue": {
       "max_size": 1000,
       "max_transaction_batch_length": null,
-      "max_lifespan": 2,
-      "tx_per_addr_limit": "16"
+      "max_lifespan": 100000,
+      "tx_per_addr_limit": "100000"
     },
     "periodic_snapshot_path": null
   },
@@ -84,7 +84,12 @@
     "monitor_websocket_heartbeat": "disabled",
     "spawn_rpc": null,
     "l2_chains": null,
-    "enable_tx_queue": null,
+    "enable_tx_queue": {
+      "max_size": 1000,
+      "max_transaction_batch_length": null,
+      "max_lifespan": 100000,
+      "tx_per_addr_limit": "100000"
+    },
     "periodic_snapshot_path": null
   },
   "proxy": {
@@ -135,7 +140,12 @@
     "monitor_websocket_heartbeat": "disabled",
     "spawn_rpc": null,
     "l2_chains": null,
-    "enable_tx_queue": null,
+    "enable_tx_queue": {
+      "max_size": 1000,
+      "max_transaction_batch_length": null,
+      "max_lifespan": 100000,
+      "tx_per_addr_limit": "100000"
+    },
     "periodic_snapshot_path": null
   },
   "proxy": {

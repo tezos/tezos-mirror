@@ -1384,7 +1384,10 @@ let patch_config_with_experimental_feature
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length
     ?(monitor_websocket_heartbeat = enable_websocket) ?websocket_rate_limit
-    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_chains () =
+    ?(enable_tx_queue =
+      Config
+        {max_size = 1000; max_lifespan = 100_000; tx_per_addr_limit = 100_000})
+    ?spawn_rpc ?periodic_snapshot_path ?l2_chains () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1403,15 +1406,21 @@ let patch_config_with_experimental_feature
          | Resto -> `String "resto"
          | Dream -> `String "dream")
   |> conditional_json_put enable_websocket ~name:"enable_websocket" (`Bool true)
-  |> optional_json_put enable_tx_queue ~name:"enable_tx_queue" (function
-         | Config {max_size; max_lifespan; tx_per_addr_limit} ->
-             `O
-               [
-                 ("max_size", `Float (Float.of_int max_size));
-                 ("max_lifespan", `Float (Float.of_int max_lifespan));
-                 ("tx_per_addr_limit", `String (string_of_int tx_per_addr_limit));
-               ]
-         | Enable b -> `Bool b)
+  |> fun json ->
+  let value_json =
+    JSON.annotate ~origin:"evm_node.config_patch"
+    @@
+    match enable_tx_queue with
+    | Config {max_size; max_lifespan; tx_per_addr_limit} ->
+        `O
+          [
+            ("max_size", `Float (Float.of_int max_size));
+            ("max_lifespan", `Float (Float.of_int max_lifespan));
+            ("tx_per_addr_limit", `String (string_of_int tx_per_addr_limit));
+          ]
+    | Enable b -> `Bool b
+  in
+  JSON.put ("enable_tx_queue", value_json) json
   |> optional_json_put
        max_websocket_message_length
        ~name:"max_websocket_message_length"
