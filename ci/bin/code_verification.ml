@@ -1749,6 +1749,10 @@ let jobs pipeline_type =
           ~changes:changeset_riscv_kernels
           ["make -C src/riscv audit"]
       in
+      let riscv_ci_flags =
+        (* These flags ensure we don't need Ocaml installed in the check and test jobs *)
+        "--no-default-features --features ci"
+      in
       let job_check_riscv_kernels : tezos_job =
         make_job_kernel
           ~stage:Stages.build
@@ -1756,7 +1760,11 @@ let jobs pipeline_type =
           ~name:"check_riscv_kernels"
           ~changes:changeset_riscv_kernels
           ~dependencies:(Dependent [Job job_audit_riscv_deps])
-          ["make -C src/riscv CHECK_FEATURES= check"]
+          [
+            Format.asprintf
+              "make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='%s' check"
+              riscv_ci_flags;
+          ]
       in
       let job_test_riscv_kernels : tezos_job =
         make_job_kernel
@@ -1764,7 +1772,11 @@ let jobs pipeline_type =
           ~name:"test_riscv_kernels"
           ~changes:changeset_riscv_kernels
           ~dependencies:(Dependent [Job job_check_riscv_kernels])
-          ["make -C src/riscv test"]
+          [
+            Format.asprintf
+              "make -C src/riscv EXTRA_FLAGS='%s' test"
+              riscv_ci_flags;
+          ]
       in
       let job_test_long_riscv_kernels : tezos_job =
         make_job_kernel
@@ -1772,7 +1784,11 @@ let jobs pipeline_type =
           ~name:"test_long_riscv_kernels"
           ~changes:changeset_riscv_kernels
           ~dependencies:(Dependent [Job job_check_riscv_kernels])
-          ["make -C src/riscv test-long"]
+          [
+            Format.asprintf
+              "make -C src/riscv EXTRA_FLAGS='%s' test-long"
+              riscv_ci_flags;
+          ]
       in
       let job_test_miri_riscv_kernels : tezos_job =
         make_job_kernel
@@ -1780,7 +1796,11 @@ let jobs pipeline_type =
           ~name:"test_miri_riscv_kernels"
           ~changes:changeset_riscv_kernels
           ~dependencies:(Dependent [Job job_check_riscv_kernels])
-          ["make -C src/riscv test-miri"]
+          [
+            Format.asprintf
+              "make -C src/riscv EXTRA_FLAGS='%s' test-miri"
+              riscv_ci_flags;
+          ]
       in
       let job_test_evm_compatibility : tezos_job =
         make_job_kernel

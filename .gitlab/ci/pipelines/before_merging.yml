@@ -2761,7 +2761,8 @@ check_riscv_kernels:
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
-  - make -C src/riscv CHECK_FEATURES= check
+  - make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features --features ci'
+    check
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -2803,7 +2804,7 @@ test_riscv_kernels:
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
-  - make -C src/riscv test
+  - make -C src/riscv EXTRA_FLAGS='--no-default-features --features ci' test
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -2845,7 +2846,7 @@ test_long_riscv_kernels:
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
-  - make -C src/riscv test-long
+  - make -C src/riscv EXTRA_FLAGS='--no-default-features --features ci' test-long
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -2887,7 +2888,7 @@ test_miri_riscv_kernels:
   before_script:
   - . ./scripts/ci/sccache-start.sh
   script:
-  - make -C src/riscv test-miri
+  - make -C src/riscv EXTRA_FLAGS='--no-default-features --features ci' test-miri
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:

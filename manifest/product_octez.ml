@@ -3613,7 +3613,7 @@ let octez_riscv_api =
     ~dep_globs_rec:["../../riscv/*"]
     ~link_deps:lib_wasmer_riscv
     ~modules:["octez_riscv_api"]
-    ~dune:Dune.[[S "copy_files"; S "../../riscv/lib/octez_riscv_api.*"]]
+    ~dune:Dune.[[S "copy_files"; S "../../riscv/api/octez_riscv_api.*"]]
 
 let octez_riscv_pvm =
   public_lib
