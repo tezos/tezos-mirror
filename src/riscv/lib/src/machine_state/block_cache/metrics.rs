@@ -308,12 +308,18 @@ impl<B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase> Block<MC, M> for BlockMe
         self.block.instr()
     }
 
-    unsafe fn callable<'a>(
-        &'a mut self,
-        block_builder: &'a mut Self::BlockBuilder,
-    ) -> &'a (impl super::bcall::BCall<MC, M> + ?Sized + 'a)
+    /// # Safety
+    ///
+    /// The `block_builder` parameter must always be the same one, for the lifetime of the block.
+    unsafe fn run_block(
+        &mut self,
+        core: &mut crate::machine_state::MachineCoreState<MC, M>,
+        instr_pc: crate::machine_state::memory::Address,
+        steps: &mut usize,
+        block_builder: &mut Self::BlockBuilder,
+    ) -> Result<(), crate::traps::EnvironException>
     where
-        M: crate::state_backend::ManagerRead + 'a,
+        M: crate::state_backend::ManagerReadWrite,
     {
         if let BlockHash::Dirty = self.block_hash {
             let hash = block_hash(self.block.instr());
@@ -323,7 +329,7 @@ impl<B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase> Block<MC, M> for BlockMe
         }
 
         block_metrics!(hash = &self.block_hash, record_called);
-        self.block.callable(block_builder)
+        self.block.run_block(core, instr_pc, steps, block_builder)
     }
 
     fn num_instr(&self) -> usize

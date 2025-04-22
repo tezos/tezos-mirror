@@ -24,7 +24,6 @@ use address_translation::PAGE_SIZE;
 use address_translation::translation_cache::TranslationCache;
 use address_translation::translation_cache::TranslationCacheLayout;
 use block_cache::BlockCache;
-use block_cache::bcall::BCall;
 use block_cache::bcall::Block;
 pub use cache_layouts::CacheLayouts;
 pub use cache_layouts::DefaultCacheLayouts;
@@ -529,18 +528,8 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
             let res = match self.translate_instr_address(current_mode, satp, instr_pc) {
                 Err(e) => Err(e),
                 Ok(phys_addr) => match self.block_cache.get_block(phys_addr) {
-                    Some(block) if block.num_instr() <= max_steps - *steps => {
-                        block.run_block(&mut self.core, instr_pc, steps)?;
-
-                        continue 'run;
-                    }
-                    Some(_) => {
-                        self.block_cache.run_block_partial(
-                            &mut self.core,
-                            phys_addr,
-                            steps,
-                            max_steps,
-                        )?;
+                    Some(mut block) => {
+                        block.run_block(&mut self.core, instr_pc, steps, max_steps)?;
 
                         continue 'run;
                     }
