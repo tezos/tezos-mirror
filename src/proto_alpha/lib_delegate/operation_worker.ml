@@ -714,8 +714,21 @@ let run ?(monitor_node_operations = true) ~constants
   in
   let rec worker_loop () =
     let* result =
-      (monitor_operations
-         cctxt [@profiler.record_s {verbosity = Notice} "monitor operations"])
+      (* If the call to [monitor_operations] RPC fails, retry 5 times during 25
+         seconds before crashing the worker . *)
+      Utils.retry
+        ~emit:(cctxt#message "%s")
+        ~max_delay:10.
+        ~delay:1.
+        ~factor:2.
+        ~tries:5
+        ~is_error:(function _ -> true)
+        ~msg:"unable to call monitor operations RPC."
+        (fun () ->
+          (monitor_operations
+             cctxt
+           [@profiler.record_s {verbosity = Notice} "monitor operations"]))
+        ()
     in
     match result with
     | Error err -> Events.(emit loop_failed err)
