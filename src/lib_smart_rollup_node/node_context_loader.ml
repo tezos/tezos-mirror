@@ -64,7 +64,9 @@ let create_sync_info () =
   }
 
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
-    ?log_kernel_debug_file ?last_whitelist_update mode l1_ctxt genesis_info
+    ?log_kernel_debug_file ?last_whitelist_update
+    ~(store_access : 'store Store_sigs.mode)
+    ~(context_access : 'context Store_sigs.mode) l1_ctxt genesis_info
     ~(lcc : lcc) ~lpc kind current_protocol
     Configuration.(
       {sc_rollup_address = rollup_address; dal_node_endpoint; _} as
@@ -81,7 +83,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
   in
   let* () = update_metadata metadata ~data_dir in
   let* store =
-    Node_context.Node_store.init_with_migration mode metadata ~data_dir
+    Node_context.Node_store.init_with_migration store_access metadata ~data_dir
   in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
@@ -94,12 +96,12 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     Context.load
       (module C)
       ~cache_size:irmin_cache_size
-      mode
+      context_access
       (Configuration.default_context_dir data_dir)
   in
   let* () =
     Node_context.Node_store.check_and_set_history_mode
-      mode
+      store_access
       store
       configuration.history_mode
   in

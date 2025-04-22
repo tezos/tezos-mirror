@@ -92,8 +92,7 @@ type sync_info = {
 type 'a t = {
   config : Configuration.t;  (** Inlined configuration for the rollup node. *)
   cctxt : Client_context.full;  (** Client context used by the rollup node. *)
-  degraded : ('a, bool) Reference.t;
-      (** Track if node running in degraded mode. *)
+  degraded : bool Reference.rw;  (** Track if node running in degraded mode. *)
   dal_cctxt : Dal_node_client.cctxt option;
       (** DAL client context to query the dal node, if the rollup node supports
           the DAL. *)
@@ -111,15 +110,16 @@ type 'a t = {
   unsafe_patches : Pvm_patches.t;  (** Patches to apply to the PVM. *)
   lockfile : Lwt_unix.file_descr;
       (** A lock file acquired when the node starts. *)
-  store : 'a store;  (** The store for the persistent storage. *)
-  context : 'a Context.t;  (** The persistent context for the rollup node. *)
-  lcc : ('a, lcc) Reference.t;
+  store : 'store store;  (** The store for the persistent storage. *)
+  context : 'context Context.t;
+      (** The persistent context for the rollup node. *)
+  lcc : lcc Reference.rw;
       (** Last cemented commitment on L1 (independently of synchronized status
           of rollup node) and its level. *)
-  lpc : ('a, Commitment.t option) Reference.t;
+  lpc : Commitment.t option Reference.rw;
       (** The last published commitment on L1, i.e. commitment that the operator
           is staked on (even if the rollup node is not synchronized). *)
-  private_info : ('a, private_info option) Reference.t;
+  private_info : private_info option Reference.rw;
       (** contains information for the rollup when it's private.*)
   kernel_debug_logger : debug_logger;
       (** Logger used for writing [kernel_debug] messages *)
@@ -133,12 +133,19 @@ type 'a t = {
           a stream of L2 blocks. *)
   sync : sync_info;  (** Synchronization status with respect to the L1 node.  *)
 }
+  constraint 'a = < store : 'store ; context : 'context >
 
 (** Read/write node context {!t}. *)
-type rw = [`Read | `Write] t
+type rw = < store : [`Read | `Write] ; context : [`Read | `Write] > t
 
 (** Read only node context {!t}. *)
-type ro = [`Read] t
+type ro = < store : [`Read] ; context : [`Read] > t
+
+(** Node_context with read/write access to store. *)
+type 'a rw_store = < store : [`Read | `Write] ; context : 'a > t
+
+(** Node_context with read/write access to context. *)
+type 'a rw_context = < store : 'a ; context : [`Read | `Write] > t
 
 (** [get_operator cctxt purpose] returns the public key hash for the operator
     who has purpose [purpose], if any.
@@ -191,7 +198,8 @@ val gc_lockfile_path : data_dir:string -> string
 
 (** [checkout_context node_ctxt block_hash] returns the context at block
     [block_hash]. *)
-val checkout_context : 'a t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
+val checkout_context :
+  < store : _ ; context : 'a > t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
 
 (** Returns [true] if the rollup node supports the DAL and if DAL is enabled for
     the current protocol. *)
@@ -200,6 +208,12 @@ val dal_supported : _ t -> bool
 (** [readonly node_ctxt] returns a read only version of the node context
     [node_ctxt].  *)
 val readonly : _ t -> ro
+
+val readonly_store :
+  < store : _ ; context : 'a > t -> < store : Store_sigs.ro ; context : 'a > t
+
+val readonly_context :
+  < store : 'a ; context : _ > t -> < store : 'a ; context : Store_sigs.ro > t
 
 (** {2 Abstraction over store} *)
 
@@ -251,14 +265,14 @@ val get_full_l2_block :
 
 (** [save_level t head] registers the correspondences [head.level |->
     head.hash] in the store. *)
-val save_level : rw -> Layer1.head -> unit tzresult Lwt.t
+val save_level : _ rw_store -> Layer1.head -> unit tzresult Lwt.t
 
 (** [save_l2_block t l2_block] remembers that the [l2_block] is processed. The
     system should not have to come back to it. *)
-val save_l2_block : rw -> Sc_rollup_block.t -> unit tzresult Lwt.t
+val save_l2_block : _ rw_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
 
 (** [set_l2_head t l2_block] sets [l2_block] as the new head of the L2 chain. *)
-val set_l2_head : rw -> Sc_rollup_block.t -> unit tzresult Lwt.t
+val set_l2_head : _ rw_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
 
 (** [last_processed_head_opt store] returns the last processed head if it
     exists. *)
@@ -267,7 +281,7 @@ val last_processed_head_opt : _ t -> Sc_rollup_block.t option tzresult Lwt.t
 (** [mark_finalized_head store hash level] remembers that the block with [hash]
     at [level] is finalized. By construction, every block whose level is smaller
     than [level] is also finalized. *)
-val set_finalized : rw -> Block_hash.t -> int32 -> unit tzresult Lwt.t
+val set_finalized : _ rw_store -> Block_hash.t -> int32 -> unit tzresult Lwt.t
 
 (** [get_finalized_level t] returns the last finalized level. *)
 val get_finalized_level : _ t -> int32 tzresult Lwt.t
@@ -344,7 +358,8 @@ val commitment_exists : _ t -> Commitment.Hash.t -> bool tzresult Lwt.t
 
 (** [save_commitment t commitment] saves a commitment in the store an returns is
     hash. *)
-val save_commitment : rw -> Commitment.t -> Commitment.Hash.t tzresult Lwt.t
+val save_commitment :
+  _ rw_store -> Commitment.t -> Commitment.Hash.t tzresult Lwt.t
 
 (** [commitment_published_at_level t hash] returns the levels at which the
     commitment was first published and the one at which it was included by in a
@@ -359,7 +374,7 @@ val commitment_published_at_level :
 (** [save_commitment_published_at_level t hash levels] saves the
     publication/inclusion information for a commitment with [hash]. *)
 val set_commitment_published_at_level :
-  rw ->
+  _ rw_store ->
   Commitment.Hash.t ->
   Store.Commitments_published_at_levels.publication_levels ->
   unit tzresult Lwt.t
@@ -374,14 +389,14 @@ val commitment_was_published :
   _ t -> source:commitment_source -> Commitment.Hash.t -> bool tzresult Lwt.t
 
 (** [set_lcc t lcc] saves the LCC both on disk and in the node context. It's written in the context iff [lcc] is is younger than its current value. *)
-val set_lcc : rw -> lcc -> unit tzresult Lwt.t
+val set_lcc : _ rw_store -> lcc -> unit tzresult Lwt.t
 
 (** [register_published_commitment t c ~first_published_at_level ~level
     ~published_by_us] saves the publishing information for commitment [c] both
     on disk and in the node context. We remember the first publication level
     and the level the commitment was published by us. *)
 val register_published_commitment :
-  rw ->
+  _ rw_store ->
   Commitment.t ->
   first_published_at_level:int32 ->
   level:int32 ->
@@ -406,7 +421,7 @@ val find_inbox :
 (** [save_inbox t inbox] remembers the [inbox] in the storage. It is associated
     to its hash which is returned. *)
 val save_inbox :
-  rw ->
+  _ rw_store ->
   Octez_smart_rollup.Inbox.t ->
   Octez_smart_rollup.Inbox.Hash.t tzresult Lwt.t
 
@@ -438,7 +453,7 @@ val get_num_messages :
     [messages] to the [payloads_hash]. The payload hash must be computed by
     calling, e.g. {!Sc_rollup.Inbox.add_all_messages}. *)
 val save_messages :
-  rw ->
+  _ rw_store ->
   Merkelized_payload_hashes_hash.t ->
   level:int32 ->
   string list ->
@@ -460,14 +475,14 @@ type proto_info = {
 (** Marks the outbox message at index for a given outbox level as executed in
     the persistent storage. *)
 val set_outbox_message_executed :
-  rw -> outbox_level:int32 -> index:int -> unit tzresult Lwt.t
+  _ rw_store -> outbox_level:int32 -> index:int -> unit tzresult Lwt.t
 
 (** [register_outbox_messages node_ctxt ~outbox_level ~indexes] registers the
     messages indexes for the [outbox_level]. If messages were already registered
     for this level, they are overwritten. Messages marked as executed are
     preserved. *)
 val register_outbox_messages :
-  rw -> outbox_level:int32 -> indexes:int list -> unit tzresult Lwt.t
+  _ rw_store -> outbox_level:int32 -> indexes:int list -> unit tzresult Lwt.t
 
 (** Returns the pending messages (i.e. unexecuted) that can now be executed.
     The returned list contains outbox levels and indexes for each level (in
@@ -508,10 +523,13 @@ val protocol_activation_level :
     information associated to the [block], if there is a protocol change
     between [block] and [predecessor]. *)
 val save_protocol_info :
-  rw -> Layer1.header -> predecessor:Layer1.header -> unit tzresult Lwt.t
+  _ rw_store ->
+  Layer1.header ->
+  predecessor:Layer1.header ->
+  unit tzresult Lwt.t
 
 (** Save the protocol activation levels from L1 if possible. *)
-val save_protocols_from_l1 : rw -> unit tzresult Lwt.t
+val save_protocols_from_l1 : _ rw_store -> unit tzresult Lwt.t
 
 (** {3 DAL} *)
 
@@ -542,7 +560,7 @@ val get_slot_indexes :
 (** [save_slot_header t ~published_in_block_hash header] saves the [header] as
     being published for its index in the provided block hash on Layer 1. *)
 val save_slot_header :
-  rw ->
+  _ rw_store ->
   published_in_block_hash:Block_hash.t ->
   Dal.Slot_header.t ->
   unit tzresult Lwt.t
@@ -570,7 +588,7 @@ val list_slots_statuses :
     block with hash in [node_ctxt.store].
 *)
 val save_slot_status :
-  rw ->
+  _ rw_store ->
   Block_hash.t ->
   Dal.Slot_index.t ->
   [`Confirmed | `Unconfirmed] ->
@@ -586,15 +604,11 @@ val save_slot_status :
     it is run asynchronously. When [force = true], a GC is triggered
     independently of [node_ctxt.config.gc_parameters]. *)
 val gc :
-  ?wait_finished:bool ->
-  ?force:bool ->
-  [> `Write] t ->
-  level:int32 ->
-  unit tzresult Lwt.t
+  ?wait_finished:bool -> ?force:bool -> rw -> level:int32 -> unit tzresult Lwt.t
 
 (** [cancel_gc t] stops any currently ongoing GC. It returns [true] if a GC was
     canceled. *)
-val cancel_gc : rw -> bool Lwt.t
+val cancel_gc : _ rw_context -> bool Lwt.t
 
 type gc_level = {gc_triggered_at : int32; gc_target : int32}
 
@@ -618,7 +632,7 @@ val splitting_period : _ t -> int
 
 val get_last_context_split_level : _ t -> int32 option tzresult Lwt.t
 
-val save_context_split_level : rw -> int32 -> unit tzresult Lwt.t
+val save_context_split_level : _ rw_store -> int32 -> unit tzresult Lwt.t
 
 (** {2 Helpers} *)
 
@@ -650,5 +664,5 @@ module Internal_for_tests : sig
   (** Extract the underlying store from the node context. This function is
            unsafe to use outside of tests as it breaks the abstraction barrier
            provided by the [Node_context]. *)
-  val unsafe_get_store : 'a t -> 'a Store.t
+  val unsafe_get_store : < store : 'a ; .. > t -> 'a Store.t
 end

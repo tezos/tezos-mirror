@@ -43,7 +43,8 @@ module type DAL_SLOTS_TRACKER = sig
         ones the rollup node will download, and stores the results in
         [Store.Dal_confirmed_slots].}
       }  *)
-  val process_head : Node_context.rw -> Layer1.head -> unit tzresult Lwt.t
+  val process_head :
+    _ Node_context.rw_store -> Layer1.head -> unit tzresult Lwt.t
 end
 
 (** Protocol specific functions to reconstruct inboxes from L1 blocks. *)
@@ -57,7 +58,7 @@ module type INBOX = sig
       serialized messages present in the block (with the internal messages added
       by the protocol). *)
   val process_head :
-    Node_context.rw ->
+    _ Node_context.rw_store ->
     predecessor:Layer1.header ->
     Layer1.header ->
     (Octez_smart_rollup.Inbox.Hash.t
@@ -95,7 +96,7 @@ module type INBOX = sig
         messages] reconstructs the inbox on disk for the [messages]. See
         {!val:process_head} for the return values. *)
     val process_messages :
-      Node_context.rw ->
+      _ Node_context.rw_store ->
       is_first_block:bool ->
       predecessor:Layer1.header ->
       string list ->
@@ -216,7 +217,10 @@ module type REFUTATION_GAME_HELPERS = sig
     for the current [game] for the execution step starting with
     [start_state]. *)
   val generate_proof :
-    Node_context.rw -> Game.t -> Context.pvmstate -> string tzresult Lwt.t
+    _ Node_context.rw_context ->
+    Game.t ->
+    Context.pvmstate ->
+    string tzresult Lwt.t
 
   (** [make_dissection plugin node_ctxt cache ~start_state ~start_chunk
       ~our_stop_chunk ~default_number_of_sections ~commitment_period_tick_offset
@@ -226,7 +230,7 @@ module type REFUTATION_GAME_HELPERS = sig
       dissection has [default_number_of_sections] if there are enough ticks. *)
   val make_dissection :
     (module PARTIAL) ->
-    Node_context.rw ->
+    _ Node_context.t ->
     Pvm_plugin_sig.state_cache ->
     start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state option ->
     start_chunk:Game.dissection_chunk ->

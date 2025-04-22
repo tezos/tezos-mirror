@@ -213,7 +213,7 @@ let outbox_message_match_filter (message : Outbox_message.summary)
         txs
   | _ -> false
 
-let publish_executable_messages (node_ctxt : _ Node_context.t) =
+let publish_executable_messages (node_ctxt : _ Node_context.rw_context) =
   let open Lwt_result_syntax in
   let operator = Node_context.get_operator node_ctxt Executing_outbox in
   unless (operator = None) @@ fun () ->

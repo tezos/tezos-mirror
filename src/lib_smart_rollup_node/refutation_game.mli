@@ -28,7 +28,7 @@
 (** [play_opening_move node_ctxt conflict] injects the opening refutation
     game move for [conflict]. *)
 val play_opening_move :
-  [< `Read | `Write > `Read] Node_context.t ->
+  _ Node_context.t ->
   Octez_smart_rollup.Game.conflict ->
   (unit, tztrace) result Lwt.t
 
@@ -37,7 +37,7 @@ val play_opening_move :
     [self] and [opponent], where [commitment_period_tick_offset] is the tick
     offset for the commitment period for the conflict. *)
 val play :
-  Node_context.rw ->
+  _ Node_context.rw_context ->
   Pvm_plugin_sig.state_cache ->
   self:Signature.public_key_hash ->
   commitment_period_tick_offset:Z.t ->
