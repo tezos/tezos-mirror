@@ -29,4 +29,7 @@ module type S = sig
 
   val counter :
     [> `Main] -> [> `Head of 'a] -> Tezos_types.Contract.t -> Z.t tzresult Lwt.t
+
+  val header :
+    [> `Main] -> [> `Head of 'a] -> L2_types.Tezos_block.t tzresult Lwt.t
 end

@@ -184,7 +184,7 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
      we type [chain], even though we don't use it, to satisfy the compiler. *)
   let counter (chain : [> `Main]) = counter read chain
 
-  let _header chain block =
+  let header chain block =
     let open Lwt_result_syntax in
     (* TODO: #7831
        take chain and block into account

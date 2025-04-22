@@ -105,7 +105,7 @@ module Protocol_types = struct
         context;
       }
 
-    let _tezlink_block_to_block_header ~l2_chain_id
+    let tezlink_block_to_block_header ~l2_chain_id
         ((block : L2_types.Tezos_block.t), chain) :
         Block_services.block_header tzresult =
       let open Result_syntax in
@@ -332,7 +332,8 @@ module Imported_services = struct
   let chain_id :
       ([`GET], chain, chain, unit, unit, Chain_id.t) Tezos_rpc.Service.t =
     import_service Tezos_shell_services.Chain_services.S.chain_id
-  let _header :
+
+  let header :
       ( [`GET],
         tezlink_rpc_context,
         tezlink_rpc_context,
@@ -358,7 +359,8 @@ let version () =
   Lwt_result_syntax.return Tezlink_version.mock
 
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
-let register_block_services (module Backend : Tezlink_backend_sig.S) base_dir =
+let register_block_services ~l2_chain_id
+    (module Backend : Tezlink_backend_sig.S) base_dir =
   let dir =
     Tezos_rpc.Directory.empty
     |> register_with_conversion
@@ -385,6 +387,15 @@ let register_block_services (module Backend : Tezlink_backend_sig.S) base_dir =
          ~service:Imported_services.constants
          ~impl:(fun {block; chain} () () -> Backend.constants chain block)
          ~convert_output:Tezlink_constants.convert
+    |> register_with_conversion
+         ~service:Imported_services.header
+         ~impl:(fun {chain; block} () () ->
+           let open Lwt_result_syntax in
+           let* header = Backend.header chain block in
+           Lwt_result_syntax.return (header, chain))
+         ~convert_output:
+           (Protocol_types.Block_header.tezlink_block_to_block_header
+              ~l2_chain_id)
   in
   Tezos_rpc.Directory.prefix
     block_directory_path
@@ -413,7 +424,7 @@ let register_chain_services ~l2_chain_id
 (** Builds the root directory. *)
 let build_dir ~l2_chain_id backend =
   Tezos_rpc.Directory.empty
-  |> register_block_services backend
+  |> register_block_services ~l2_chain_id backend
   |> register_chain_services ~l2_chain_id backend
   |> register ~service:Imported_services.version ~impl:(fun () () () ->
          version ())
