@@ -63,7 +63,10 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JCall<MC, JSA> {
         steps: &mut usize,
     ) -> Result<(), EnvironException> {
         let mut res = Ok(());
-        (self.fun)(core, pc, steps, &mut res);
+
+        unsafe {
+            (self.fun)(core, pc, steps, &mut res);
+        }
 
         res
     }

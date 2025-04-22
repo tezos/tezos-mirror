@@ -329,7 +329,8 @@ impl<B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase> Block<MC, M> for BlockMe
         }
 
         block_metrics!(hash = &self.block_hash, record_called);
-        self.block.run_block(core, instr_pc, steps, block_builder)
+
+        unsafe { self.block.run_block(core, instr_pc, steps, block_builder) }
     }
 
     fn num_instr(&self) -> usize

@@ -71,7 +71,7 @@ impl<const PAGES: usize, M: ManagerBase> PagePermissions<PAGES, M> {
         let end_page = address.wrapping_add(length).wrapping_sub(1) >> super::OFFSET_BITS;
 
         for page in start_page..=end_page {
-            if !self.pages.get_unchecked(page).read() {
+            if unsafe { !self.pages.get_unchecked(page).read() } {
                 return false;
             }
         }
