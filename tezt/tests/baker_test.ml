@@ -847,6 +847,220 @@ let prequorum_check_levels =
   let* _ = Mempool.get_mempool client in
   unit
 
+(* Test that the baker correctly aggregates eligible attestations on reproposals.*)
+let attestations_aggregation_on_reproposal =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Attestations aggregation on reproposal"
+    ~tags:[team; "baker"; "attestation"; "aggregation"; "reproposal"]
+    ~supports:Protocol.(From_protocol 023)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  let consensus_rights_delay = 1 in
+  let consensus_committee_size = 256 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      [
+        (["allow_tz4_delegate_enable"], `Bool true);
+        (["aggregate_attestation"], `Bool true);
+        (* Using custom consensus constants to be able to trigger reproposals *)
+        (["consensus_committee_size"], `Int consensus_committee_size);
+        (["consensus_threshold_size"], `Int 70);
+        (* Diminish some constants to activate consensus keys faster,
+           and make round durations as small as possible *)
+        (["minimal_block_delay"], `String "4");
+        (["delay_increment_per_round"], `String "0");
+        (["blocks_per_cycle"], `Int 2);
+        (["nonce_revelation_threshold"], `Int 1);
+        (["consensus_rights_delay"], `Int consensus_rights_delay);
+        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+      ]
+  in
+  let* node, client =
+    Client.init_with_protocol
+      `Client
+      ~additional_revealed_bootstrap_account_count:1
+      ~protocol
+      ~parameter_file
+      ~timestamp:Now
+      ()
+  in
+  let* _ = Node.wait_for_level node 1 in
+  let bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5 =
+    Constant.(bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5)
+  in
+  (* Setup bootstrap6 as an additional delegate *)
+  let* bootstrap6 = Client.show_address ~alias:"bootstrap6" client in
+  Log.info
+    "Generate BLS keys and assign them as consensus keys for bootstrap 1 to 3" ;
+  let* ck1 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap1 client in
+  let* ck2 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap2 client in
+  let* ck3 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap3 client in
+  Log.info "Launch a baker with bootstrap5" ;
+  (* Bootstrap5 does not have enough voting power to progress independently. We
+     manually inject consensus operations to control the progression of
+     consensus. *)
+  let* _baker =
+    Agnostic_baker.init
+      ~delegates:[Constant.bootstrap5.public_key_hash]
+      node
+      client
+  in
+  Log.info "Bake until BLS consensus keys are activated" ;
+  let keys =
+    public_key_hashes
+      [ck1; ck2; ck3; bootstrap1; bootstrap2; bootstrap3; bootstrap4]
+  in
+  let* () = Client.bake_for_and_wait ~keys ~count:4 client in
+  (* BLS consensus keys are now activated. We feed the node with just enough
+     consensus operations for the baker to bake a block at level 6. *)
+  let* slots = Operation.Consensus.get_slots_by_consensus_key ~level:5 client in
+  let* round = fetch_round client in
+  let* branch = Operation.Consensus.get_branch ~attested_level:5 client in
+  let* block_payload_hash =
+    Operation.Consensus.get_block_payload_hash ~block:"5" client
+  in
+  Log.info "Injecting consensus for bootstrap1 at level 5 round %d@." round ;
+  let* () =
+    Operation.Consensus.(
+      let slot = first_slot ~slots ck1 in
+      let* _ =
+        preattest_for
+          ~protocol
+          ~branch
+          ~slot
+          ~level:5
+          ~round
+          ~block_payload_hash
+          ck1
+          client
+      in
+      let* _ =
+        attest_for
+          ~protocol
+          ~branch
+          ~slot
+          ~level:5
+          ~round
+          ~block_payload_hash
+          ck1
+          client
+      in
+      unit)
+  in
+  let* _ = Node.wait_for_level node 6 in
+  let* () =
+    check_consensus_operations
+      ~expected_aggregated_committee:(public_key_hashes [bootstrap1])
+      ~expected_attestations:(public_key_hashes [bootstrap5])
+      client
+  in
+  (* The baker running bootstrap5 doesn't have enough voting power to progress
+     alone. Since we won't attest any block at level 6, it will keep baking
+     level 6 as round increases. *)
+  Log.info "Attesting level 5 round %d with bootstrap2 & 4" round ;
+  (* Inject additional attestations for level 5. These attestations are expected
+     to be included in the coming level 6 proposal. In particular, bootstrap2
+     attestation is expected to be incorporated into the aggregation.
+     Since the baker didn't witnessed a prequorum, it is expected to bake a
+     fresh proposal. *)
+  let* () =
+    Lwt_list.iter_s
+      Operation.Consensus.(
+        fun (delegate : Account.key) ->
+          let slot = first_slot ~slots delegate in
+          let* _ =
+            attest_for
+              ~protocol
+              ~branch
+              ~slot
+              ~level:5
+              ~round
+              ~block_payload_hash
+              delegate
+              client
+          in
+          unit)
+      [ck2; bootstrap4]
+  in
+  let* _ = Node.wait_for_branch_switch ~level:6 node in
+  let* () =
+    check_consensus_operations
+      ~expected_aggregated_committee:
+        (public_key_hashes [bootstrap1; bootstrap2])
+      ~expected_attestations:(public_key_hashes [bootstrap4; bootstrap5])
+      client
+  in
+  Log.info "Preattesting the latest block at level 6 with bootstrap1 & 2" ;
+  (* We preattest the latest block at level 6 with enough voting power to
+     trigger a prequorum. Consequently, the baker is expected to lock on the
+     preattested payload and only bake reproposals. *)
+  let* () =
+    let* slots =
+      Operation.Consensus.get_slots_by_consensus_key ~level:6 client
+    in
+    let* round = fetch_round client in
+    let* branch = Operation.Consensus.get_branch ~attested_level:6 client in
+    let* block_payload_hash =
+      Operation.Consensus.get_block_payload_hash client
+    in
+    Log.info "Preattesting level 6 round %d with branch %s" round branch ;
+    Lwt_list.iter_s
+      Operation.Consensus.(
+        fun (delegate : Account.key) ->
+          let slot = first_slot ~slots delegate in
+          let* _ =
+            preattest_for
+              ~protocol
+              ~branch
+              ~slot
+              ~level:6
+              ~round
+              ~block_payload_hash
+              delegate
+              client
+          in
+          unit)
+      [ck1; ck2; bootstrap4]
+  in
+  (* Inject additional attestations for level 5. These attestations are expected
+     to be included in the coming level 6 reproposals. In particular, bootstrap3
+     attestation is expected to be incorporated into the aggregation. *)
+  Log.info "Attesting level 5 round %d with bootstrap3 & 6" round ;
+  let* () =
+    Lwt_list.iter_s
+      Operation.Consensus.(
+        fun (delegate : Account.key) ->
+          let slot = first_slot ~slots delegate in
+          let* _ =
+            attest_for
+              ~protocol
+              ~branch
+              ~slot
+              ~level:5
+              ~round
+              ~block_payload_hash
+              delegate
+              client
+          in
+          unit)
+      [ck3; bootstrap6]
+  in
+  let* _ = Node.wait_for_branch_switch ~level:6 node in
+  let* () =
+    check_consensus_operations
+      ~expected_aggregated_committee:
+        (public_key_hashes [bootstrap1; bootstrap2; bootstrap3])
+      ~expected_attestations:
+        (public_key_hashes [bootstrap4; bootstrap5; bootstrap6])
+      ~expected_preattestations:
+        (public_key_hashes [bootstrap1; bootstrap2; bootstrap4; bootstrap5])
+      client
+  in
+  unit
+
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
@@ -861,4 +1075,5 @@ let register ~protocols =
   baker_check_consensus_branch protocols ;
   force_apply_from_round protocols ;
   simple_attestations_aggregation protocols ;
-  prequorum_check_levels protocols
+  prequorum_check_levels protocols ;
+  attestations_aggregation_on_reproposal protocols
