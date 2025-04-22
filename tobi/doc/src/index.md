@@ -11,6 +11,8 @@ after each `git pull`.
 ## How-to guides
 
 - [How to compile and install Tobi](how_to_compile_and_install_Tobi.md)
+- [How to declare a component](how_to_declare_a_component.md)
+- [Troubleshooting component installation](troubleshooting_component_installation.md)
 
 ## Reference
 
