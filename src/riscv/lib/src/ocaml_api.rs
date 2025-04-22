@@ -512,8 +512,12 @@ pub fn octez_riscv_proof_stop_state(_proof: Pointer<Proof>) -> [u8; 32] {
 
 #[ocaml::func]
 #[ocaml::sig("input option -> proof -> input_request option")]
-// Allow some warnings while this method goes through iterations.
-#[allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
+#[expect(
+    unreachable_code,
+    unused_variables,
+    clippy::diverging_sub_expression,
+    reason = "There are some gaps in this method while it is being iterated on"
+)]
 pub unsafe fn octez_riscv_verify_proof(
     proof: Pointer<Proof>,
     input: Option<Input>,

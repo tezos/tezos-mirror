@@ -82,7 +82,8 @@ macro_rules! csr_width {
 macro_rules! csr_fields {
     ( $accum:expr;; $group:ident;; $name:ident: $type:ty ) => {
         paste::paste! {
-            #[allow(clippy::reversed_empty_ranges, dead_code)]
+            #[allow(clippy::allow_attributes, reason = "Macro may trigger warnings conditionally in certain contexts")]
+            #[allow(dead_code, reason = "Macro may generate unused code")]
             impl $group {
                 pub const [<$name:upper _OFFSET>]: usize = { $accum };
 
@@ -143,7 +144,9 @@ macro_rules! csr_debug {
 #[doc(hidden)]
 macro_rules! csr_new {
     ( $group:ident;; $( $name:ident: $type:ty ),* ) => {
-        #[allow(clippy::too_many_arguments, dead_code, non_snake_case)]
+        #[allow(clippy::allow_attributes, reason = "Macro may trigger warnings conditionally in certain contexts")]
+        #[allow(clippy::too_many_arguments, reason = "Macro may generate too many arguments")]
+        #[allow(non_snake_case, reason = "Macro may generate non snake case names")]
         impl $group {
             pub fn new(
                 $(

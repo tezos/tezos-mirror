@@ -277,7 +277,14 @@ impl<
 
     /// Handle an exception using the defined Execution Environment.
     // The conditional compilation below causes some warnings.
-    #[cfg_attr(feature = "supervisor", allow(unused_variables, unreachable_code))]
+    #[cfg_attr(
+        feature = "supervisor",
+        expect(
+            unused_variables,
+            unreachable_code,
+            reason = "When the supervisor is enabled we return early and don't use all parameters"
+        )
+    )]
     fn handle_exception(&mut self, hooks: &mut PvmHooks<'_>, exception: EnvironException) -> bool
     where
         M: state_backend::ManagerReadWrite,
@@ -333,7 +340,6 @@ impl<
     /// (a possible case: the privilege mode access violation is treated in EE,
     /// but a page fault is not)
     // The conditional compilation below causes some warnings.
-    #[cfg_attr(feature = "supervisor", allow(unused_variables, unreachable_code))]
     pub(crate) fn eval_max(&mut self, hooks: &mut PvmHooks<'_>, step_bounds: Bound<usize>) -> usize
     where
         M: state_backend::ManagerReadWrite,
@@ -351,6 +357,14 @@ impl<
             return 1;
         }
 
+        #[cfg_attr(
+            feature = "supervisor",
+            expect(
+                unused_variables,
+                unreachable_code,
+                reason = "When the supervisor is enabled we return early and don't use all parameters"
+            )
+        )]
         let steps = self
             .machine_state
             .step_max_handle::<Infallible>(step_bounds, |machine_state, exception| {

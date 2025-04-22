@@ -62,7 +62,7 @@ fn fit_ascii(c: u8) -> u8 {
     }
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 #[derive(Debug, Default)]
 struct Foo {
     a: usize,

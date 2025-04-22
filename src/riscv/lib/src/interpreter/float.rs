@@ -527,7 +527,7 @@ where
 }
 
 /// There are 5 supported rounding modes
-#[allow(clippy::upper_case_acronyms)]
+#[expect(clippy::upper_case_acronyms, reason = "Matches the RISC-V spec")]
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub enum RoundingMode {
     /// Round to Nearest, ties to Even
@@ -577,20 +577,19 @@ impl TryFrom<CSRRepr> for RoundingMode {
     }
 }
 
-#[allow(clippy::from_over_into)]
-impl Into<Round> for RoundingMode {
-    fn into(self) -> Round {
-        match self {
-            Self::RNE => Round::NearestTiesToEven,
-            Self::RTZ => Round::TowardZero,
-            Self::RUP => Round::TowardPositive,
-            Self::RDN => Round::TowardNegative,
-            Self::RMM => Round::NearestTiesToAway,
+impl From<RoundingMode> for Round {
+    fn from(value: RoundingMode) -> Round {
+        match value {
+            RoundingMode::RNE => Round::NearestTiesToEven,
+            RoundingMode::RTZ => Round::TowardZero,
+            RoundingMode::RUP => Round::TowardPositive,
+            RoundingMode::RDN => Round::TowardNegative,
+            RoundingMode::RMM => Round::NearestTiesToAway,
         }
     }
 }
 
-#[allow(unused)]
+#[cfg_attr(not(test), expect(dead_code, reason = "Only used in tests"))]
 pub enum Fflag {
     /// Inexact
     NX = 0,

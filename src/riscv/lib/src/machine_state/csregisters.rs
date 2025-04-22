@@ -50,7 +50,7 @@ pub enum Privilege {
 }
 
 /// CSR index
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types, reason = "Consistent with RISC-V spec")]
 #[derive(
     Debug,
     Clone,
@@ -356,8 +356,10 @@ pub enum CSRegister {
     dscratch1 = 0x7B3,
 }
 
-// We want to allow shifts by 0 for clarity and consistency.
-#[allow(clippy::identity_op)]
+#[expect(
+    clippy::identity_op,
+    reason = "Shifts by 0 are allowed for clarity and consistency"
+)]
 impl CSRegister {
     // Since read-only misa.MXL = 0b10, we have MXLEN = 64 from table 3.1
     const MXLEN: u64 = 64;
@@ -1683,7 +1685,10 @@ impl<M: backend::ManagerClone> Clone for CSRegisters<M> {
 }
 
 #[cfg(test)]
-#[allow(clippy::identity_op)]
+#[expect(
+    clippy::identity_op,
+    reason = "Used for some bit-wise operations to make bit patterns more legible"
+)]
 mod tests {
     use strum::IntoEnumIterator;
 
