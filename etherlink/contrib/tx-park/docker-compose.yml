@@ -57,3 +57,28 @@ services:
         - KERNEL_SET_CODE4=${KERNEL_SET_CODE4:+--set-code ${KERNEL_SET_CODE4}}
         - KERNEL_SET_CODE5=${KERNEL_SET_CODE5:+--set-code ${KERNEL_SET_CODE5}}
         - KERNEL_SET_CODE6=${KERNEL_SET_CODE6:+--set-code ${KERNEL_SET_CODE6}}
+
+  smart-rollup-node-batcher-init:
+    profiles: [batcher]
+    volumes:
+      - smart-rollup-node-batcher:/home/tezos/.tezos-smart-rollup-node-batcher/
+    depends_on:
+      etherlink-image:
+        condition: service_completed_successfully
+    extends:
+      file: ./services/smart-rollup-node.yml
+      service: smart-rollup-node-batcher-init
+
+  smart-rollup-node-batcher:
+    profiles: [batcher]
+    volumes:
+      - smart-rollup-node-batcher:/home/tezos/.tezos-smart-rollup-node-batcher/
+    depends_on:
+      smart-rollup-node-batcher-init:
+        condition: service_completed_successfully
+    extends:
+      file: ./services/smart-rollup-node.yml
+      service: smart-rollup-node-batcher
+
+volumes:
+  smart-rollup-node-batcher:
