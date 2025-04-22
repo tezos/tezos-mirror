@@ -60,12 +60,10 @@ let cargo_home =
    optional arguments. *)
 let before_script ?(take_ownership = false) ?(source_version = false)
     ?(eval_opam = false) ?(init_python_venv = false) ?(install_js_deps = false)
-    ?(datadog_job_info = false) before_script =
+    before_script =
   let toggle t x = if t then [x] else [] in
-  (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
-  toggle datadog_job_info ". ./scripts/ci/datadog_send_job_info.sh"
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2865 *)
-  @ toggle take_ownership "./scripts/ci/take_ownership.sh"
+  toggle take_ownership "./scripts/ci/take_ownership.sh"
   @ toggle source_version ". ./scripts/version.sh"
     (* TODO: this must run in the before_script of all jobs that use the opam environment.
        how to enforce? *)
@@ -941,7 +939,6 @@ let job_datadog_pipeline_trace : tezos_job =
     ~allow_failure:Yes
     ~name:"datadog_pipeline_trace"
     ~image:Images.datadog_ci
-    ~before_script:(before_script ~datadog_job_info:true [])
     ~stage:Stages.start
     [
       "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
@@ -1000,13 +997,8 @@ module Tezt = struct
   let job ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
       ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
       ?(tezt_parallel = 1) ?(tezt_variant = "")
-      ?(before_script =
-        before_script
-          ~source_version:true
-          ~eval_opam:false
-          ~datadog_job_info:true
-          []) ?timeout ?job_select_tezts ~dependencies ?allow_failure () :
-      tezos_job =
+      ?(before_script = before_script ~source_version:true ~eval_opam:false [])
+      ?timeout ?job_select_tezts ~dependencies ?allow_failure () : tezos_job =
     let variables =
       [
         ("JUNIT", "tezt-junit.xml");

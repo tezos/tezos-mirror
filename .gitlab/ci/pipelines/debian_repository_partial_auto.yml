@@ -36,6 +36,7 @@ oc.docker-systemd_tests_debian:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-systemd-tests.Dockerfile
@@ -67,6 +68,7 @@ oc.docker-build-debian-dependencies:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
@@ -105,6 +107,7 @@ oc.build-debian:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -149,6 +152,7 @@ oc.build-debian-old_a:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -193,6 +197,7 @@ oc.build-debian-old_b:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -231,6 +236,8 @@ oc.build-data_packages:
   - oc.docker-build-debian-dependencies
   dependencies: []
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh zcash
@@ -258,6 +265,7 @@ apt_repo_debian_old:
   - oc.build-debian-old_b
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -289,6 +297,7 @@ apt_repo_debian:
   - oc.build-data_packages
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -318,6 +327,7 @@ oc.lintian_debian:
   - oc.build-debian
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - export DEBIAN_FRONTEND=noninteractive
   - apt-get update
@@ -335,6 +345,8 @@ oc.install_bin_debian_bookworm:
   - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
   variables:
@@ -355,6 +367,8 @@ oc.upgrade_bin_debian_bookworm:
   - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/introduction/upgrade-bin-deb.sh debian bookworm
 
@@ -370,6 +384,7 @@ oc.install_bin_debian_bookworm_systemd_test:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
@@ -402,6 +417,7 @@ oc.install_bin_debian_bookworm_systemd_custom_datadir:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
@@ -435,6 +451,7 @@ oc.install_bin_debian_bookworm_systemd_agnostic_baker:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
@@ -469,6 +486,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh

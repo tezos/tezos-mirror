@@ -28,6 +28,7 @@ docker:promote_to_latest:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_promote_to_latest.sh

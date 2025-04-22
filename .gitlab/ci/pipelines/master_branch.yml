@@ -17,7 +17,8 @@ oc.docker:ci:amd64:
   - gcp
   dependencies: []
   timeout: 90 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -37,7 +38,8 @@ oc.docker:rust-toolchain:amd64:
   - gcp
   dependencies: []
   timeout: 60 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
   services:
@@ -56,7 +58,8 @@ oc.docker:ci:arm64:
   - gcp_arm64
   dependencies: []
   timeout: 90 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -97,6 +100,7 @@ oc.build:static-x86_64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -146,6 +150,7 @@ oc.build:static-arm64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -191,6 +196,7 @@ oc.build_arm64-released:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -246,6 +252,7 @@ oc.build_arm64-exp-dev-extra:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -290,6 +297,7 @@ oc.docker:amd64:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_release.sh
@@ -313,6 +321,7 @@ oc.docker:arm64:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_release.sh
@@ -352,6 +361,7 @@ oc.unified_coverage:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
@@ -416,6 +426,7 @@ documentation:odoc:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -465,6 +476,7 @@ documentation:manuals:
   - oc.build:static-x86_64-linux-binaries
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - scripts/ci/documentation:manuals_static.sh
@@ -516,6 +528,7 @@ documentation:docgen:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -571,6 +584,7 @@ documentation:build_all:
   - documentation:docgen
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . $HOME/.venv/bin/activate
   script:
@@ -624,6 +638,7 @@ publish:documentation:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . $HOME/.venv/bin/activate
   - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
@@ -650,6 +665,7 @@ docker:merge_manifests:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_merge_manifests.sh
@@ -681,6 +697,7 @@ publish_kernel_sdk:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk publish-sdk-deps

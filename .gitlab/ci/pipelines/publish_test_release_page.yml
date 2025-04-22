@@ -12,7 +12,8 @@ oc.docker:ci:amd64:
   - gcp
   dependencies: []
   timeout: 90 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -36,6 +37,8 @@ publish:release-page:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/releases/publish_release_page.sh
   variables:

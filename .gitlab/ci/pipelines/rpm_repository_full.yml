@@ -36,6 +36,7 @@ oc.docker-build-rockylinux-dependencies:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
@@ -68,6 +69,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
@@ -102,6 +104,7 @@ oc.build-rockylinux:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -146,6 +149,7 @@ oc.build-rockylinux-data:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -188,6 +192,7 @@ rpm_repo_rockylinux:
   - oc.build-rockylinux-data
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
   script:
@@ -213,6 +218,7 @@ oc.docker-build-fedora-dependencies:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
@@ -246,6 +252,7 @@ oc.docker-systemd-tests-rpm-fedora:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
@@ -281,6 +288,7 @@ oc.build-fedora:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -326,6 +334,7 @@ oc.build-fedora-data:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -369,6 +378,7 @@ rpm_repo_fedora:
   - oc.build-fedora-data
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
   script:
@@ -395,6 +405,8 @@ oc.install_bin_fedora_39.doc:
   - rpm_repo_fedora
   dependencies: []
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/introduction/install-bin-rpm.sh fedora 39
   variables: {}
@@ -416,6 +428,7 @@ oc.install_bin_fedora_39_systemd:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/rpm/rpm-install.sh
@@ -444,6 +457,8 @@ oc.install_bin_rockylinux_9.3.doc:
   - rpm_repo_rockylinux
   dependencies: []
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/introduction/install-bin-rpm.sh rockylinux 9.3
   variables: {}
@@ -465,6 +480,7 @@ oc.install_bin_rockylinux_93_systemd:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/rpm/rpm-install.sh
