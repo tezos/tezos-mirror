@@ -602,7 +602,7 @@ let test_tezlink_manager_key =
   @@ fun {sequencer; _} _protocol ->
   let* res = account_rpc sequencer Constant.bootstrap1 "manager_key" in
   Check.(
-    JSON.(res |> as_string_opt = None)
+    JSON.(res |> as_string_opt = Some Constant.bootstrap1.public_key)
       (option string)
       ~error_msg:"Expected %R but got %L") ;
   unit
