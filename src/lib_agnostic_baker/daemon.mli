@@ -21,11 +21,14 @@
     process.
 *)
 
-type t
+module type AGNOSTIC_DAEMON = sig
+  type t
 
-(** [create ~node_endpoint ~keep_alive] returns a non initialized daemon. *)
-val create : node_endpoint:string -> keep_alive:bool -> t
+  (** [create ~node_endpoint ~keep_alive] returns a non initialized daemon. *)
+  val create : node_endpoint:string -> keep_alive:bool -> t
 
-(** [run daemon] Runs the daemon responsible for the spawn/stop of the
-    baker daemons. *)
-val run : t -> unit tzresult Lwt.t
+  (** [run daemon] Runs the daemon responsible for the spawn/stop of the daemons. *)
+  val run : t -> unit tzresult Lwt.t
+end
+
+module Baker : AGNOSTIC_DAEMON

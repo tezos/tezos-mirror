@@ -56,11 +56,11 @@ let lwt_run ~args () =
   in
   () [@profiler.overwrite may_start_profiler base_dir] ;
   let daemon =
-    Daemon.create
+    Daemon.Baker.create
       ~node_endpoint:(Run_args.get_endpoint args)
       ~keep_alive:(Run_args.keep_alive args)
   in
-  let* (_ : unit) = Daemon.run daemon in
+  let* (_ : unit) = Daemon.Baker.run daemon in
   let*! () = Lwt_utils.never_ending () in
   return_unit
 
