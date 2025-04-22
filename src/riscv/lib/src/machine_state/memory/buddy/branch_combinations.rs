@@ -176,7 +176,7 @@ macro_rules! combined_buddy_branch {
 
         impl<B, M> NewState<M> for $name<B, M>
         where
-            B: NewState<M>,
+            B: Buddy<M>,
             M: ManagerBase,
         {
             fn new(manager: &mut M) -> Self
@@ -234,14 +234,6 @@ macro_rules! combined_buddy_branch {
                 M: ManagerRead,
             {
                 self.0.count_free_end()
-            }
-
-            #[cfg(test)]
-            fn deep_refresh(&mut self)
-            where
-                M: ManagerReadWrite
-            {
-                self.0.deep_refresh()
             }
 
             fn clone(&self) -> Self

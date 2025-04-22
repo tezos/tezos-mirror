@@ -217,14 +217,6 @@ impl<const PAGES: u64, M: ManagerBase> Buddy<M> for BuddyLeaf<PAGES, M> {
         (self.set.read().leading_zeros() as u64).saturating_sub(leading_unused_bits)
     }
 
-    #[cfg(test)]
-    fn deep_refresh(&mut self)
-    where
-        M: ManagerReadWrite,
-    {
-        // There is no extra information to be updated
-    }
-
     fn clone(&self) -> Self
     where
         M: ManagerClone,
