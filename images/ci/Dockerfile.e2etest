@@ -82,6 +82,9 @@ RUN --mount=type=secret,id=npm_token \
     fi \
     && cd /usr/local/lib/ && npm ci
 
+# add config.toml to use https://crates.io/crates/crates-io-proxy
+COPY .cargo/config.toml /root/.cargo/
+
 RUN PATH="/root/.cargo/bin:${PATH}" \
  && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y \
  && RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld" cargo install \
