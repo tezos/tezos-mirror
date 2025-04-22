@@ -1,14 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>$title$</title>
     <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="container">
-        $body$
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  </head>
+  <body>
+    <div id="navbar" class="top-nav">
+      <ul class="nav-root">
+	<li v-for="(item, index) in nav" :key="item.title" class="nav-item">
+          <div :class="{ 'nav-current' : currentPath === item.link }">
+	    <a :href="item.link" class="nav-link" @click="click(index)">{{ item.title }}</a>
+          </div>
+	</li>
+      </ul>
     </div>
-</body>
+    <script>
+      Vue.createApp({
+	  data() {
+	      return {
+		  nav: [
+		      { title: "Octez", link: "/index.html" },
+		      { title: "Grafazos", link: "/grafazos/index.html" },
+		      { title: "Teztale", link: "/teztale/index.html" }
+		  ]
+	      }
+	  },
+	  computed: {
+	      currentPath() {
+		  return window.location.pathname;
+	      }
+	  }
+      }).mount('#navbar');
+    </script>
+    <div class="container">
+      $body$
+    </div>
+  </body>
 </html>
