@@ -38,6 +38,7 @@ use memory::Address;
 use memory::BadMemoryAccess;
 use memory::Memory;
 use memory::MemoryConfig;
+use memory::MemoryGovernanceError;
 use mode::Mode;
 
 use crate::bits::u64;
@@ -683,13 +684,16 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
 }
 
 /// Errors that occur from interacting with the [MachineState]
-#[derive(Debug, derive_more::From, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum MachineError {
     #[error("Error while accessing memory")]
-    MemoryError(BadMemoryAccess),
+    MemoryError(#[from] BadMemoryAccess),
+
+    #[error("Error while govering memory")]
+    MemoryGovernanceError(#[from] MemoryGovernanceError),
 
     #[error("Device tree error: {0}")]
-    DeviceTreeError(vm_fdt::Error),
+    DeviceTreeError(#[from] vm_fdt::Error),
 
     #[error("Memory too small to properly configure the machine")]
     MemoryTooSmall,

@@ -8,6 +8,7 @@ use std::num::TryFromIntError;
 use arbitrary_int::TryNewError;
 
 use crate::machine_state::memory::BadMemoryAccess;
+use crate::machine_state::memory::MemoryGovernanceError;
 use crate::machine_state::registers::XRegisters;
 use crate::machine_state::registers::XValue;
 use crate::machine_state::registers::a0;
@@ -75,8 +76,14 @@ impl From<Infallible> for Error {
 }
 
 impl From<BadMemoryAccess> for Error {
-    fn from(_: BadMemoryAccess) -> Self {
+    fn from(BadMemoryAccess: BadMemoryAccess) -> Self {
         Self::Fault
+    }
+}
+
+impl From<MemoryGovernanceError> for Error {
+    fn from(MemoryGovernanceError: MemoryGovernanceError) -> Self {
+        Self::NoMemory
     }
 }
 

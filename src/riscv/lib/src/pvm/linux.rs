@@ -930,12 +930,18 @@ impl<M: ManagerClone> Clone for SupervisorState<M> {
 #[cfg(test)]
 mod tests {
     use std::array;
+    use std::num::NonZeroU64;
 
     use rand::Rng;
 
+    use super::parameters::AddressHint;
+    use super::parameters::Backend;
+    use super::parameters::Flags;
+    use super::parameters::Visibility;
     use super::*;
     use crate::backend_test;
     use crate::machine_state::memory::M4K;
+    use crate::pvm::linux::error::Error;
 
     /// Default handler for the `on_tezos` parameter of [`SupervisorState::handle_system_call`]
     fn default_on_tezos_handler<MC, M>(core: &mut MachineCoreState<MC, M>) -> bool
@@ -1314,5 +1320,79 @@ mod tests {
             .read::<[u8; 8]>(timezone_ptr)
             .unwrap();
         assert_eq!(timezone, [0u8; 8]);
+    });
+
+    // Check that `mmap` returns `Error::NoMemory` when allocate_and_protect_pages fails.
+    backend_test!(mmap_returns_enomem_when_allocation_fails, F, {
+        type MemLayout = M4K;
+
+        let mut manager = F::manager();
+        let mut machine_state = MachineCoreState::<MemLayout, _>::new(&mut manager);
+        machine_state.reset();
+
+        // Allocate all memory to ensure subsequent allocations will fail
+        machine_state
+            .main_memory
+            .allocate_and_protect_pages(
+                Some(0),
+                MemLayout::TOTAL_BYTES,
+                Permissions::ReadWrite,
+                true,
+            )
+            .unwrap();
+
+        let mut supervisor_state = SupervisorState::new(&mut manager);
+
+        // Set up necessary registers for mmap
+        machine_state
+            .hart
+            .xregisters
+            .write(registers::a4, -1i64 as u64); // NoFileDescriptor
+        machine_state.hart.xregisters.write(registers::a5, 0); // Zero offset
+
+        // Case 1: Test with AddressHint::Hint
+        {
+            let addr = 0; // will be ignored with AddressHint::Hint
+            let length = NonZeroU64::new(PAGE_SIZE.get() * 4).unwrap(); // Arbitrary non-zero size
+            let perms = Permissions::ReadWrite;
+            let flags = Flags {
+                addr_hint: AddressHint::Hint,
+                visibility: Visibility::Private,
+                backend: Backend::None,
+            };
+
+            // Call the function under test
+            let result =
+                supervisor_state.handle_mmap(&mut machine_state, addr.into(), length, perms, flags);
+
+            // Verify we get the expected error
+            assert_eq!(result, Err(Error::NoMemory));
+        }
+
+        // Case 2: Test with AddressHint::Fixed
+        {
+            let addr = PAGE_SIZE.get() * 10; // Some arbitrary page-aligned address
+            let length = NonZeroU64::new(PAGE_SIZE.get() * 4).unwrap();
+            let perms = Permissions::ReadWrite;
+            let flags = Flags {
+                addr_hint: AddressHint::Fixed {
+                    allow_replace: false,
+                },
+                visibility: Visibility::Private,
+                backend: Backend::None,
+            };
+
+            // Call the function under test
+            let result = supervisor_state.handle_mmap(
+                &mut machine_state,
+                VirtAddr::new(addr),
+                length,
+                perms,
+                flags,
+            );
+
+            // Verify we get the expected error
+            assert_eq!(result, Err(Error::NoMemory));
+        }
     });
 }

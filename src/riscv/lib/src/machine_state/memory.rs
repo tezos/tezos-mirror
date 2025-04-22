@@ -11,7 +11,6 @@ mod state;
 use std::num::NonZeroU64;
 
 use tezos_smart_rollup_constants::riscv::SbiError;
-use thiserror::Error;
 
 use super::registers::XValue;
 use crate::state::NewState;
@@ -129,7 +128,8 @@ impl TryFrom<XValue> for Permissions {
 }
 
 /// Something went wrong when accessing the memory
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Error, derive_more::Display)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, thiserror::Error)]
+#[error("Bad memory access")]
 pub struct BadMemoryAccess;
 
 impl From<BadMemoryAccess> for SbiError {
@@ -137,6 +137,11 @@ impl From<BadMemoryAccess> for SbiError {
         SbiError::InvalidAddress
     }
 }
+
+/// Something went wrong when allocating memory or changing permissions
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, thiserror::Error)]
+#[error("Error during memory governance")]
+pub struct MemoryGovernanceError;
 
 /// Instance of memory
 pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
@@ -187,7 +192,7 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         address: Address,
         length: usize,
         perms: Permissions,
-    ) -> Result<(), BadMemoryAccess>
+    ) -> Result<(), MemoryGovernanceError>
     where
         M: ManagerWrite;
 
@@ -198,13 +203,17 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         address_hint: Option<Address>,
         length: usize,
         allow_replace: bool,
-    ) -> Result<Address, BadMemoryAccess>
+    ) -> Result<Address, MemoryGovernanceError>
     where
         M: ManagerReadWrite;
 
     /// Allocate pages for the given address range.
     #[cfg(feature = "supervisor")]
-    fn deallocate_pages(&mut self, address: Address, length: usize) -> Result<(), BadMemoryAccess>
+    fn deallocate_pages(
+        &mut self,
+        address: Address,
+        length: usize,
+    ) -> Result<(), MemoryGovernanceError>
     where
         M: ManagerReadWrite;
 
@@ -216,7 +225,7 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         length: usize,
         perms: Permissions,
         allow_replace: bool,
-    ) -> Result<Address, BadMemoryAccess>
+    ) -> Result<Address, MemoryGovernanceError>
     where
         M: ManagerReadWrite;
 
@@ -226,7 +235,7 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         &mut self,
         address: Address,
         length: usize,
-    ) -> Result<(), BadMemoryAccess>
+    ) -> Result<(), MemoryGovernanceError>
     where
         M: ManagerReadWrite,
     {

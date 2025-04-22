@@ -84,8 +84,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         M: ManagerReadWrite,
     {
         core.main_memory
-            .protect_pages(addr.to_machine_address(), length as usize, perms)
-            .map_err(|_| Error::NoMemory)?;
+            .protect_pages(addr.to_machine_address(), length as usize, perms)?;
 
         // Return 0 to indicate success.
         Ok(0)
