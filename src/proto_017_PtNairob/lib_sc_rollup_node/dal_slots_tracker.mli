@@ -31,11 +31,4 @@
 
     The state of slots per block is persistent.  *)
 
-(** [process_head node_ctxt head] performs the following operations:
-    {ul
-      {li it reads the endorsements for headers published attestation_lag
-      levels preceding [head] from the block metadata, determines which
-      ones the rollup node will download, and stores the results in
-      [Store.Dal_confirmed_slots].}
-    }  *)
-val process_head : Node_context.rw -> Layer1.head -> unit tzresult Lwt.t
+include Protocol_plugin_sig.DAL_SLOTS_TRACKER
