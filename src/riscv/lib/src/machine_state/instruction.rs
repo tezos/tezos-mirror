@@ -805,7 +805,11 @@ macro_rules! impl_r_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.hart.xregisters.$fn(self.rs1.x, self.rs2.x, self.rd.x);
+            core.hart
+                .xregisters
+                .$fn(unsafe { self.rs1.x }, unsafe { self.rs2.x }, unsafe {
+                    self.rd.x
+                });
             Ok(Next(self.width))
         }
     };
@@ -819,7 +823,9 @@ macro_rules! impl_r_type {
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .xregisters
-                .$fn(self.rs1.nzx, self.rs2.nzx, self.rd.nzx);
+                .$fn(unsafe { self.rs1.nzx }, unsafe { self.rs2.nzx }, unsafe {
+                    self.rd.nzx
+                });
             Ok(Next(self.width))
         }
     };
@@ -833,7 +839,9 @@ macro_rules! impl_r_type {
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .xregisters
-                .$fn(self.rs1.x, self.rs2.x, self.rd.nzx);
+                .$fn(unsafe { self.rs1.x }, unsafe { self.rs2.x }, unsafe {
+                    self.rd.nzx
+                });
             Ok(Next(self.width))
         }
     };
@@ -842,7 +850,12 @@ macro_rules! impl_r_type {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-            $impl(icb, self.rs1.nzx, self.rs2.nzx, self.rd.nzx);
+            $impl(
+                icb,
+                unsafe { self.rs1.nzx },
+                unsafe { self.rs2.nzx },
+                unsafe { self.rd.nzx },
+            );
             let pcu = ProgramCounterUpdate::Next(self.width);
             icb.ok(pcu)
         }
@@ -852,7 +865,9 @@ macro_rules! impl_r_type {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-            $impl(icb, self.rs1.x, self.rs2.x, self.rd.nzx);
+            $impl(icb, unsafe { self.rs1.x }, unsafe { self.rs2.x }, unsafe {
+                self.rd.nzx
+            });
             icb.ok(Next(self.width))
         }
     };
@@ -861,7 +876,13 @@ macro_rules! impl_r_type {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-            integer::run_shift(icb, Shift::$shift, self.rs1.nzx, self.rs2.nzx, self.rd.nzx);
+            integer::run_shift(
+                icb,
+                Shift::$shift,
+                unsafe { self.rs1.nzx },
+                unsafe { self.rs2.nzx },
+                unsafe { self.rd.nzx },
+            );
             icb.ok(Next(self.width))
         }
     };
@@ -877,7 +898,7 @@ macro_rules! impl_i_type {
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .xregisters
-                .$fn(self.imm, self.rs1.nzx, self.rd.nzx);
+                .$fn(self.imm, unsafe { self.rs1.nzx }, unsafe { self.rd.nzx });
             Ok(Next(self.width))
         }
     };
@@ -889,7 +910,9 @@ macro_rules! impl_i_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.hart.xregisters.$fn(self.imm, self.rs1.x, self.rd.nzx);
+            core.hart
+                .xregisters
+                .$fn(self.imm, unsafe { self.rs1.x }, unsafe { self.rd.nzx });
             Ok(Next(self.width))
         }
     };
@@ -898,7 +921,9 @@ macro_rules! impl_i_type {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-            $impl(icb, self.imm, self.rs1.nzx, self.rd.nzx);
+            $impl(icb, self.imm, unsafe { self.rs1.nzx }, unsafe {
+                self.rd.nzx
+            });
             icb.ok(Next(self.width))
         }
     };
@@ -907,7 +932,7 @@ macro_rules! impl_i_type {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-            $impl(icb, self.imm, self.rs1.x, self.rd.nzx);
+            $impl(icb, self.imm, unsafe { self.rs1.x }, unsafe { self.rd.nzx });
             icb.ok(Next(self.width))
         }
     };
@@ -916,7 +941,9 @@ macro_rules! impl_i_type {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-            integer::run_shift_immediate(icb, $shift, self.imm, self.rs1.nzx, self.rd.nzx);
+            integer::run_shift_immediate(icb, $shift, self.imm, unsafe { self.rs1.nzx }, unsafe {
+                self.rd.nzx
+            });
             icb.ok(Next(self.width))
         }
     };
@@ -930,7 +957,7 @@ macro_rules! impl_fload_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rd.f)
+            core.$fn(self.imm, unsafe { self.rs1.x }, unsafe { self.rd.f })
                 .map(|_| Next(self.width))
         }
     };
@@ -943,7 +970,7 @@ macro_rules! impl_load_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rd.x)
+            core.$fn(self.imm, unsafe { self.rs1.x }, unsafe { self.rd.x })
                 .map(|_| Next(self.width))
         }
     };
@@ -955,7 +982,7 @@ macro_rules! impl_load_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.$fn(self.imm, self.rs1.nzx, self.rd.nzx)
+            core.$fn(self.imm, unsafe { self.rs1.nzx }, unsafe { self.rd.nzx })
                 .map(|_| Next(self.width))
         }
     };
@@ -969,7 +996,8 @@ macro_rules! impl_cfload_sp_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.$fn(self.imm, self.rd.f).map(|_| Next(self.width))
+            core.$fn(self.imm, unsafe { self.rd.f })
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -982,7 +1010,7 @@ macro_rules! impl_store_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rs2.x)
+            core.$fn(self.imm, unsafe { self.rs1.x }, unsafe { self.rs2.x })
                 .map(|_| Next(self.width))
         }
     };
@@ -991,7 +1019,13 @@ macro_rules! impl_store_type {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-            let res = load_store::run_store(icb, self.imm, self.rs1.nzx, self.rs2.nzx, $width);
+            let res = load_store::run_store(
+                icb,
+                self.imm,
+                unsafe { self.rs1.nzx },
+                unsafe { self.rs2.nzx },
+                $width,
+            );
             I::map(res, |_| Next(self.width))
         }
     };
@@ -1004,7 +1038,7 @@ macro_rules! impl_fstore_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.$fn(self.imm, self.rs1.x, self.rs2.f)
+            core.$fn(self.imm, unsafe { self.rs1.x }, unsafe { self.rs2.f })
                 .map(|_| Next(self.width))
         }
     };
@@ -1019,8 +1053,8 @@ macro_rules! impl_branch {
                 icb,
                 $predicate,
                 self.imm,
-                self.rs1.nzx,
-                self.rs2.nzx,
+                unsafe { self.rs1.nzx },
+                unsafe { self.rs2.nzx },
                 self.width,
             );
             icb.ok(pcu)
@@ -1037,7 +1071,7 @@ macro_rules! impl_branch_compare_zero {
                 icb,
                 $predicate,
                 self.imm,
-                self.rs1.nzx,
+                unsafe { self.rs1.nzx },
                 self.width,
             );
             icb.ok(pcu)
@@ -1053,8 +1087,14 @@ macro_rules! impl_amo_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.$fn(self.rs1.x, self.rs2.x, self.rd.x, self.rl, self.aq)
-                .map(|_| Next(self.width))
+            core.$fn(
+                unsafe { self.rs1.x },
+                unsafe { self.rs2.x },
+                unsafe { self.rd.x },
+                self.rl,
+                self.aq,
+            )
+            .map(|_| Next(self.width))
         }
     };
 }
@@ -1067,7 +1107,7 @@ macro_rules! impl_ci_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.hart.xregisters.$fn(self.imm, self.rd.x);
+            core.hart.xregisters.$fn(self.imm, unsafe { self.rd.x });
             Ok(ProgramCounterUpdate::Next(self.width))
         }
     };
@@ -1079,7 +1119,7 @@ macro_rules! impl_ci_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.hart.xregisters.$fn(self.imm, self.rd.nzx);
+            core.hart.xregisters.$fn(self.imm, unsafe { self.rd.nzx });
             Ok(ProgramCounterUpdate::Next(self.width))
         }
     };
@@ -1088,7 +1128,7 @@ macro_rules! impl_ci_type {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-            $impl(icb, self.imm, self.rd.nzx);
+            $impl(icb, self.imm, unsafe { self.rd.nzx });
             let pcu = ProgramCounterUpdate::Next(self.width);
             icb.ok(pcu)
         }
@@ -1100,7 +1140,7 @@ macro_rules! impl_cr_nz_type {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-            $impl(icb, self.rd.nzx, self.rs2.nzx);
+            $impl(icb, unsafe { self.rd.nzx }, unsafe { self.rs2.nzx });
             let pcu = ProgramCounterUpdate::Next(self.width);
             icb.ok(pcu)
         }
@@ -1115,7 +1155,8 @@ macro_rules! impl_fcss_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.$fn(self.imm, self.rs2.f).map(|_| Next(self.width))
+            core.$fn(self.imm, unsafe { self.rs2.f })
+                .map(|_| Next(self.width))
         }
     };
 }
@@ -1129,7 +1170,7 @@ macro_rules! impl_csr_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
-                .$fn(self.csr, self.rs1.x, self.rd.x)
+                .$fn(self.csr, unsafe { self.rs1.x }, unsafe { self.rd.x })
                 .map(|_| Next(self.width))
         }
     };
@@ -1144,7 +1185,7 @@ macro_rules! impl_csr_imm_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
-                .$fn(self.csr, self.imm as u64, self.rd.x)
+                .$fn(self.csr, self.imm as u64, unsafe { self.rd.x })
                 .map(|_| Next(self.width))
         }
     };
@@ -1159,7 +1200,7 @@ macro_rules! impl_f_x_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
-                .$fn(self.rs1.x, self.rd.f)
+                .$fn(unsafe { self.rs1.x }, unsafe { self.rd.f })
                 .map(|_| Next(self.width))
         }
     };
@@ -1172,7 +1213,7 @@ macro_rules! impl_f_x_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
-                .$fn(self.rs1.x, self.rm, self.rd.f)
+                .$fn(unsafe { self.rs1.x }, self.rm, unsafe { self.rd.f })
                 .map(|_| Next(self.width))
         }
     };
@@ -1187,7 +1228,7 @@ macro_rules! impl_x_f_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
-                .$fn(self.rs1.f, self.rd.x)
+                .$fn(unsafe { self.rs1.f }, unsafe { self.rd.x })
                 .map(|_| Next(self.width))
         }
     };
@@ -1200,7 +1241,7 @@ macro_rules! impl_x_f_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
-                .$fn(self.rs1.f, self.rm, self.rd.x)
+                .$fn(unsafe { self.rs1.f }, self.rm, unsafe { self.rd.x })
                 .map(|_| Next(self.width))
         }
     };
@@ -1215,7 +1256,7 @@ macro_rules! impl_f_r_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
-                .$fn(self.rs1.f, self.rs2.f, self.rd.f)
+                .$fn(unsafe { self.rs1.f }, unsafe { self.rs2.f }, unsafe { self.rd.f })
                 .map(|_| Next(self.width))
         }
     };
@@ -1228,7 +1269,7 @@ macro_rules! impl_f_r_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
-                .$fn(self.rs1.f, self.rs2.f, self.rd.x)
+                .$fn(unsafe { self.rs1.f }, unsafe { self.rs2.f }, unsafe { self.rd.x })
                 .map(|_| Next(self.width))
         }
     };
@@ -1241,7 +1282,7 @@ macro_rules! impl_f_r_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
-                .$fn(self.rs1.f, self.rm, self.rd.f)
+                .$fn(unsafe { self.rs1.f }, self.rm, unsafe { self.rd.f })
                 .map(|_| Next(self.width))
         }
     };
@@ -1254,7 +1295,7 @@ macro_rules! impl_f_r_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
-                .$fn(self.rs1.f, self.rs2.f, $(self.$field,)* self.rd.f)
+                .$fn(unsafe { self.rs1.f }, unsafe { self.rs2.f }, $(self.$field,)* unsafe { self.rd.f })
                 .map(|_| Next(self.width))
         }
     };
@@ -1364,7 +1405,7 @@ impl Args {
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_add_immediate_to_pc<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-        branching::run_add_immediate_to_pc(icb, self.imm, self.rd.nzx);
+        branching::run_add_immediate_to_pc(icb, self.imm, unsafe { self.rd.nzx });
         icb.ok(Next(self.width))
     }
 

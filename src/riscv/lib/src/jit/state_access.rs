@@ -515,7 +515,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         phys_address: X64,
         value: X64,
         width: LoadStoreWidth,
-    ) -> impl Errno<(), MC, JSA> {
+    ) -> impl Errno<(), MC, JSA> + 'static {
         let memory_store = self.memory_store.get_or_insert_with(|| {
             self.module
                 .declare_func_in_func(self.imports.memory_store, builder.func)

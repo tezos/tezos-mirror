@@ -487,7 +487,7 @@ pub unsafe fn octez_riscv_storage_export_snapshot(
     let id = &id.as_ref().0;
     repo.as_ref().0.export_snapshot(id, path).map_err(|e| {
         let s = format!("{e:?}");
-        ocaml::Value::hash_variant(gc, "Msg", Some(s.to_value(gc)))
+        unsafe { ocaml::Value::hash_variant(gc, "Msg", Some(s.to_value(gc))) }
     })
 }
 
@@ -569,7 +569,7 @@ pub unsafe fn octez_riscv_serialise_proof(proof: Pointer<Proof>) -> ocaml::Value
     // Safety: the function needs to return the same `ocaml::Value` as in the signature.
     // In this case, an ocaml bytes value has to be returned.
     let serialisation: Vec<u8> = serialise_proof(proof.as_ref()).collect();
-    ocaml::Value::bytes(serialisation)
+    unsafe { ocaml::Value::bytes(serialisation) }
 }
 
 #[ocaml::func]

@@ -370,9 +370,10 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
             //         must be alive for the duration that any called block
             //         remains valid.
             Some(jcall) => unsafe { jcall.call(core, instr_pc, steps) },
-            None => self
-                .fallback
-                .run_block(core, instr_pc, steps, &mut block_builder.1),
+            None => unsafe {
+                self.fallback
+                    .run_block(core, instr_pc, steps, &mut block_builder.1)
+            },
         }
     }
 
