@@ -407,6 +407,19 @@ module Consensus = struct
            (delegate, slots))
          (as_list rpc_json)
 
+  let get_slots_by_consensus_key ~level client =
+    let* rpc_json =
+      Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
+    in
+    let open JSON in
+    return
+    @@ List.map
+         (fun json ->
+           let consensus_key = json |-> "consensus_key" |> as_string in
+           let slots = json |-> "slots" |> as_list |> List.map as_int in
+           (consensus_key, slots))
+         (as_list rpc_json)
+
   let first_slot ~slots (delegate : Account.key) =
     match List.assoc_opt delegate.public_key_hash slots with
     | Some slots -> List.hd slots
@@ -418,6 +431,32 @@ module Consensus = struct
       @@ RPC.get_chain_block_header ?block ()
     in
     return JSON.(block_header |-> "payload_hash" |> as_string)
+
+  let get_branch ~attested_level client =
+    let block = string_of_int (attested_level - 2) in
+    Client.RPC.call_via_endpoint client @@ RPC.get_chain_block_hash ~block ()
+
+  let preattest_for ~protocol ~slot ~level ~round ~block_payload_hash ?branch
+      delegate client =
+    let preattestation =
+      preattestation ~slot ~level ~round ~block_payload_hash
+    in
+    let* branch =
+      match branch with
+      | Some branch -> return branch
+      | None -> get_branch ~attested_level:level client
+    in
+    inject ~protocol ~branch ~signer:delegate preattestation client
+
+  let attest_for ~protocol ~slot ~level ~round ~block_payload_hash ?branch
+      delegate client =
+    let attestation = attestation ~slot ~level ~round ~block_payload_hash () in
+    let* branch =
+      match branch with
+      | Some branch -> return branch
+      | None -> get_branch ~attested_level:level client
+    in
+    inject ~protocol ~branch ~signer:delegate attestation client
 end
 
 module Anonymous = struct
