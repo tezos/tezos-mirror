@@ -1380,12 +1380,12 @@ module Monitoring_app = struct
     let pp_stake fmt stake_ratio =
       Format.fprintf fmt "`%.2f%%` stake" (stake_ratio *. 100.)
 
-    let display_delegate (`address address, _, _, stake_ratio) =
+    let display_delegate (`address address, _, stake_ratio) =
       Format.asprintf "%a (%a)" pp_delegate address pp_stake stake_ratio
 
     let view_bakers bakers =
       List.map
-        (fun ((_, _, (value, mentions_dal), _) as baker) ->
+        (fun ((_, (value, mentions_dal), _) as baker) ->
           Format.sprintf
             ":black_small_square: %s - %s (%s)"
             (Option.fold
@@ -1463,13 +1463,12 @@ module Monitoring_app = struct
             let baking_ratio =
               float_of_int baking_power /. float_of_int total_baking_power
             in
-            let alias = Hashtbl.find_opt aliases delegate in
-            Lwt.return_some (`address delegate, `alias alias, info, baking_ratio))
+            Lwt.return_some (`address delegate, info, baking_ratio))
           bakers
       in
       let rec classify_bakers mute_bakers dal_on dal_off = function
         | [] -> (mute_bakers, dal_on, dal_off)
-        | ((_, _, (_, dal_endorsement), _) as baker) :: tl -> (
+        | ((_, (_, dal_endorsement), _) as baker) :: tl -> (
             match dal_endorsement with
             | None -> classify_bakers (baker :: mute_bakers) dal_on dal_off tl
             | Some 0. ->
@@ -1480,15 +1479,15 @@ module Monitoring_app = struct
       let ( >> ) cmp1 cmp2 x y =
         match cmp1 x y with 0 -> cmp2 x y | cmp -> cmp
       in
-      let stake_descending (_, _, (_, _), x_stake) (_, _, (_, _), y_stake) =
+      let stake_descending (_, (_, _), x_stake) (_, (_, _), y_stake) =
         Float.compare y_stake x_stake
       in
-      let attestation_rate_ascending (_, _, (x_attestation, _), _)
-          (_, _, (y_attestation, _), _) =
+      let attestation_rate_ascending (_, (x_attestation, _), _)
+          (_, (y_attestation, _), _) =
         Option.compare Float.compare x_attestation y_attestation
       in
-      let dal_mention_perf_ascending (_, _, (_, x_dal_mention), _)
-          (_, _, (_, y_dal_mention), _) =
+      let dal_mention_perf_ascending (_, (_, x_dal_mention), _)
+          (_, (_, y_dal_mention), _) =
         Option.compare Float.compare x_dal_mention y_dal_mention
       in
       let mute_bakers = List.sort stake_descending mute_bakers in
@@ -1515,7 +1514,7 @@ module Monitoring_app = struct
       let agglomerate_infos bakers =
         let nb, stake =
           List.fold_left
-            (fun (nb, stake_acc) (_, _, _, stake_ratio) ->
+            (fun (nb, stake_acc) (_, _, stake_ratio) ->
               (nb + 1, stake_acc +. stake_ratio))
             (0, 0.)
             bakers
