@@ -435,3 +435,17 @@ let () =
     Data_encoding.unit
     (function Incompatible_dal_options -> Some () | _ -> None)
     (fun () -> Incompatible_dal_options)
+
+(* BLS related errors *)
+type error += Signature_aggregation_failure
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"baker.signature_aggregation_failure"
+    ~title:"Signature aggregation failure"
+    ~description:"Signature aggregation failed."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Signature aggregation failed.")
+    Data_encoding.unit
+    (function Signature_aggregation_failure -> Some () | _ -> None)
+    (fun () -> Signature_aggregation_failure)
