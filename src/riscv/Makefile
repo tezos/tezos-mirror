@@ -14,7 +14,7 @@ NATIVE_OPT := --target="$(NATIVE_TARGET)"
 endif
 
 # We don't want to check all features in CI, so we provide this varible to configure it.
-CHECK_FLAGS ?= --features default,inline-jit,supervisor
+CHECK_FLAGS ?= --features default,inline-jit,supervisor,log
 
 # CI needs the ability to toggle some features 
 EXTRA_FLAGS ?=

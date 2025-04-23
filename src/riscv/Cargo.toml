@@ -75,3 +75,13 @@ features = ["serde"]
 [workspace.dependencies.ocaml]
 version = "1.1.0"
 default-features = false
+
+# The dependency alias is used to make it obvious that it should not be used directly. Using it
+# directly may have a surprising impact on performance when logging and tracing are disabled.
+[workspace.dependencies.__tracing_do_not_use_directly]
+package = "tracing"
+version = "0.1.41"
+
+[workspace.dependencies.tracing-subscriber]
+version = "0.3.19"
+features = ["json"]

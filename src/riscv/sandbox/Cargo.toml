@@ -28,8 +28,13 @@ tezos-smart-rollup.workspace = true
 [dependencies.octez-riscv]
 path = "../lib"
 
+[dependencies.tracing-subscriber]
+workspace = true
+optional = true
+
 [features]
 default = []
 inline-jit = []
 metrics = ["octez-riscv/metrics"]
 supervisor = ["octez-riscv/supervisor"]
+log = ["octez-riscv/log", "dep:tracing-subscriber"]

@@ -10,6 +10,7 @@ mod memory;
 mod parameters;
 mod rng;
 
+use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ops::Range;
 
@@ -488,16 +489,79 @@ impl<M: ManagerBase> SupervisorState<M> {
         MC: MemoryConfig,
         M: ManagerReadWrite,
     {
+        // We need to jump to the next instruction. The ECall instruction which triggered this
+        // function is 4 byte wide.
+        let pc = core.hart.pc.read().saturating_add(4);
+        core.hart.pc.write(pc);
+
+        /// Read an argument from a register and interpret it as a system call argument.
+        /// If that fails, log the failure.
+        macro_rules! read_arg {
+            ($system_call:ident, $reg:ident) => {
+                core.hart
+                    .xregisters
+                    .try_read(registers::$reg)
+                    .inspect_err(|err| {
+                        crate::log::warning! {
+                            argument = stringify!($reg),
+                            value = core.hart.xregisters.read(registers::$reg),
+                            error = format!("{err:?}"),
+                            pc,
+                            "{} failed",
+                            stringify!($system_call),
+                        }
+                    })?
+            };
+        }
+
+        /// Log the system call name and its arguments.
+        macro_rules! trace_call {
+            ($system_call:ident $(, $arg:expr)*) => {
+                crate::log::trace! {
+                    "{}{:?}",
+                    stringify!($system_call),
+                    ($(&$arg),*)
+                }
+            };
+        }
+
+        /// Check the result of a system call. If it failed, log the error.
+        macro_rules! check_result {
+            ($system_call:ident, $result:expr) => {{
+                let parameters::SystemCallResultExecution {
+                    result,
+                    control_flow,
+                } = $result
+                    .inspect(|res| {
+                        crate::log::trace! {
+                            result = format!("{res:?}"),
+                            "{} succeeded",
+                            stringify!($system_call),
+                        }
+                    })
+                    .inspect_err(|err| {
+                        crate::log::warning! {
+                            error = format!("{err:?}"),
+                            pc,
+                            "{} failed",
+                            stringify!($system_call),
+                        }
+                    })?
+                    .into();
+                core.hart.xregisters.write(registers::a0, result);
+                control_flow
+            }};
+        }
+
         // `dispatch0!(system_call_no [, optional_arguments_passed_to_handler])`
         // Converts the system call name to the handler
         macro_rules! dispatch0 {
             ($system_call:ty$(, $arg:ident)*) => {{
                 try_blocks::try_block! {
                     paste::paste! {
-                        let result: parameters::SystemCallResultExecution =
-                            self.[<handle_$system_call>]($($arg)*)?.into();
-                        core.hart.xregisters.write(registers::a0, result.result);
-                        result.control_flow
+                        trace_call!($system_call);
+                        let result = self.[<handle_$system_call>]($($arg)*);
+                        check_result!($system_call, result)
                     }
                 }
             }};
@@ -509,11 +573,10 @@ impl<M: ManagerBase> SupervisorState<M> {
             ($system_call:ty$(, $arg:ident)*) => {{
                 try_blocks::try_block! {
                     paste::paste! {
-                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
-                        let result: parameters::SystemCallResultExecution =
-                            self.[<handle_$system_call>]($($arg, )* arg1)?.into();
-                        core.hart.xregisters.write(registers::a0, result.result);
-                        result.control_flow
+                        let arg1 = read_arg!($system_call, a0);
+                        trace_call!($system_call, arg1);
+                        let result = self.[<handle_$system_call>]($($arg,)* arg1);
+                        check_result!($system_call, result)
                     }
                 }
             }};
@@ -525,12 +588,11 @@ impl<M: ManagerBase> SupervisorState<M> {
             ($system_call:ty$(, $arg:ident)*) => {{
                 try_blocks::try_block! {
                     paste::paste! {
-                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
-                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
-                        let result: parameters::SystemCallResultExecution =
-                            self.[<handle_$system_call>]($($arg, )* arg1, arg2)?.into();
-                        core.hart.xregisters.write(registers::a0, result.result);
-                        result.control_flow
+                        let arg1 = read_arg!($system_call, a0);
+                        let arg2 = read_arg!($system_call, a1);
+                        trace_call!($system_call, arg1, arg2);
+                        let result = self.[<handle_$system_call>]($($arg,)* arg1, arg2);
+                        check_result!($system_call, result)
                     }
                 }
             }};
@@ -542,13 +604,12 @@ impl<M: ManagerBase> SupervisorState<M> {
             ($system_call:ty$(, $arg:ident)*) => {{
                 try_blocks::try_block! {
                     paste::paste! {
-                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
-                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
-                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
-                        let result: parameters::SystemCallResultExecution =
-                            self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3)?.into();
-                        core.hart.xregisters.write(registers::a0, result.result);
-                        result.control_flow
+                        let arg1 = read_arg!($system_call, a0);
+                        let arg2 = read_arg!($system_call, a1);
+                        let arg3 = read_arg!($system_call, a2);
+                        trace_call!($system_call, arg1, arg2, arg3);
+                        let result = self.[<handle_$system_call>]($($arg,)* arg1, arg2, arg3);
+                        check_result!($system_call, result)
                     }
                 }
             }};
@@ -560,15 +621,13 @@ impl<M: ManagerBase> SupervisorState<M> {
             ($system_call:ty$(, $arg:ident)*) => {{
                 try_blocks::try_block! {
                     paste::paste! {
-                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
-                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
-                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
-                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
-                        let result: parameters::SystemCallResultExecution =
-                            self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3,
-                            arg4)?.into();
-                        core.hart.xregisters.write(registers::a0, result.result);
-                        result.control_flow
+                        let arg1 = read_arg!($system_call, a0);
+                        let arg2 = read_arg!($system_call, a1);
+                        let arg3 = read_arg!($system_call, a2);
+                        let arg4 = read_arg!($system_call, a3);
+                        trace_call!($system_call, arg1, arg2, arg3, arg4);
+                        let result = self.[<handle_$system_call>]($($arg,)* arg1, arg2, arg3, arg4);
+                        check_result!($system_call, result)
                     }
                 }
             }};
@@ -584,16 +643,14 @@ impl<M: ManagerBase> SupervisorState<M> {
             ($system_call:ty$(, $arg:ident)*) => {{
                 try_blocks::try_block! {
                     paste::paste! {
-                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
-                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
-                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
-                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
-                        let arg5 = core.hart.xregisters.try_read(registers::a4)?;
-                        let result: parameters::SystemCallResultExecution =
-                            self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3, arg4,
-                            arg5)?.into();
-                        core.hart.xregisters.write(registers::a0, result.result);
-                        result.control_flow
+                        let arg1 = read_arg!($system_call, a0);
+                        let arg2 = read_arg!($system_call, a1);
+                        let arg3 = read_arg!($system_call, a2);
+                        let arg4 = read_arg!($system_call, a3);
+                        let arg5 = read_arg!($system_call, a4);
+                        trace_call!($system_call, arg1, arg2, arg3, arg4, arg5);
+                        let result = self.[<handle_$system_call>]($($arg,)* arg1, arg2, arg3, arg4, arg5);
+                        check_result!($system_call, result)
                     }
                 }
             }};
@@ -601,25 +658,19 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         // `dispatch6!(system_call_no [, optional_arguments_passed_to_handler])`
         // Converts the system call name to the handler
-        #[expect(
-            unused_macros,
-            reason = "There is no system call handler with 6 parameters yet"
-        )]
         macro_rules! dispatch6 {
             ($system_call:ty$(, $arg:ident)*) => {{
                 try_blocks::try_block! {
                     paste::paste! {
-                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
-                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
-                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
-                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
-                        let arg5 = core.hart.xregisters.try_read(registers::a4)?;
-                        let arg6 = core.hart.xregisters.try_read(registers::a5)?;
-                        let result: parameters::SystemCallResultExecution =
-                            self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3, arg4, arg5,
-                            arg6)?.into();
-                        core.hart.xregisters.write(registers::a0, result.result);
-                        result.control_flow
+                        let arg1 = read_arg!($system_call, a0);
+                        let arg2 = read_arg!($system_call, a1);
+                        let arg3 = read_arg!($system_call, a2);
+                        let arg4 = read_arg!($system_call, a3);
+                        let arg5 = read_arg!($system_call, a4);
+                        let arg6 = read_arg!($system_call, a5);
+                        trace_call!($system_call, arg1, arg2, arg3, arg4, arg5, arg6);
+                        let result = self.[<handle_$system_call>]($($arg,)* arg1, arg2, arg3, arg4, arg5, arg6);
+                        check_result!($system_call, result)
                     }
                 }
             }};
@@ -635,27 +686,20 @@ impl<M: ManagerBase> SupervisorState<M> {
             ($system_call:ty$(, $arg:ident)*) => {{
                 try_blocks::try_block! {
                     paste::paste! {
-                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
-                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
-                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
-                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
-                        let arg5 = core.hart.xregisters.try_read(registers::a4)?;
-                        let arg6 = core.hart.xregisters.try_read(registers::a5)?;
-                        let arg7 = core.hart.xregisters.try_read(registers::a6)?;
-                        let result: parameters::SystemCallResultExecution =
-                            self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3, arg4, arg5,
-                            arg6)?.into();
-                        core.hart.xregisters.write(registers::a0, result.result);
-                        result.control_flow
+                        let arg1 = read_arg!($system_call, a0);
+                        let arg2 = read_arg!($system_call, a1);
+                        let arg3 = read_arg!($system_call, a2);
+                        let arg4 = read_arg!($system_call, a3);
+                        let arg5 = read_arg!($system_call, a4);
+                        let arg6 = read_arg!($system_call, a5);
+                        let arg7 = read_arg!($system_call, a6);
+                        trace_call!($system_call, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                        let result = self.[<handle_$system_call>]($($arg,)* arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                        check_result!($system_call, result)
                     }
                 }
             }};
         }
-
-        // We need to jump to the next instruction. The ECall instruction which triggered this
-        // function is 4 byte wide.
-        let pc = core.hart.pc.read().saturating_add(4);
-        core.hart.pc.write(pc);
 
         // Programs targeting a Linux kernel pass the system call number in register a7
         let system_call_no = core.hart.xregisters.read(registers::a7);
@@ -667,14 +711,14 @@ impl<M: ManagerBase> SupervisorState<M> {
             WRITEV => dispatch3!(writev, core, hooks),
             PPOLL => dispatch2!(ppoll, core),
             READLINKAT => dispatch0!(readlinkat),
-            EXIT | EXITGROUP => dispatch0!(exit, core),
+            EXIT | EXITGROUP => dispatch1!(exit),
             SET_TID_ADDRESS => dispatch1!(set_tid_address, core),
-            TKILL => dispatch0!(tkill, core),
+            TKILL => dispatch2!(tkill),
             SIGALTSTACK => dispatch2!(sigaltstack, core),
             RT_SIGACTION => dispatch4!(rt_sigaction, core),
             RT_SIGPROCMASK => dispatch4!(rt_sigprocmask, core),
             BRK => dispatch0!(brk),
-            MMAP => dispatch4!(mmap, core),
+            MMAP => dispatch6!(mmap, core),
             MPROTECT => dispatch3!(mprotect, core),
             MUNMAP => dispatch2!(munmap, core),
             MADVISE => dispatch0!(madvise),
@@ -687,29 +731,18 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         match result {
             Err(Error::NoSystemCall) => {
-                let xregisters = &core.hart.xregisters;
-
-                // TODO: RV-413: Don't use `eprintln!`
-                eprintln!("> Unimplemented system call: {system_call_no}");
-                eprintln!("\ta0 = {}", xregisters.read(registers::a0));
-                eprintln!("\ta1 = {}", xregisters.read(registers::a1));
-                eprintln!("\ta2 = {}", xregisters.read(registers::a2));
-                eprintln!("\ta3 = {}", xregisters.read(registers::a3));
-                eprintln!("\ta4 = {}", xregisters.read(registers::a4));
-                eprintln!("\ta5 = {}", xregisters.read(registers::a5));
-                eprintln!("\ta6 = {}", xregisters.read(registers::a6));
-
                 core.hart
                     .xregisters
                     .write_system_call_error(Error::NoSystemCall);
-
                 false
             }
-            Err(e) => {
-                core.hart.xregisters.write_system_call_error(e);
+
+            Err(error) => {
+                core.hart.xregisters.write_system_call_error(error);
                 true
             }
-            Ok(b) => b,
+
+            Ok(continue_eval) => continue_eval,
         }
     }
 
@@ -736,15 +769,11 @@ impl<M: ManagerBase> SupervisorState<M> {
 
     fn handle_exit(
         &mut self,
-        core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> Result<parameters::SystemCallResultExecution, Error>
+        status: parameters::ExitStatus,
+    ) -> Result<parameters::SystemCallResultExecution, Infallible>
     where
         M: ManagerReadWrite,
     {
-        let status = core
-            .hart
-            .xregisters
-            .try_read::<parameters::ExitStatus>(registers::a0)?;
         self.exit_code.write(status.exit_code());
         self.exited.write(true);
 
@@ -830,19 +859,12 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// will return an error if the thread ID is not the main thread ID.
     fn handle_tkill(
         &mut self,
-        core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> Result<parameters::SystemCallResultExecution, Error>
+        _: parameters::MainThreadId,
+        signal: parameters::Signal,
+    ) -> Result<parameters::SystemCallResultExecution, Infallible>
     where
         M: ManagerReadWrite,
     {
-        core.hart
-            .xregisters
-            .try_read::<parameters::MainThreadId>(registers::a0)?;
-        let signal = core
-            .hart
-            .xregisters
-            .try_read::<parameters::Signal>(registers::a1)?;
-
         // Indicate that we have exited
         self.exited.write(true);
 
@@ -942,6 +964,8 @@ mod tests {
     use crate::backend_test;
     use crate::machine_state::memory::M4K;
     use crate::pvm::linux::error::Error;
+    use crate::pvm::linux::parameters::NoFileDescriptor;
+    use crate::pvm::linux::parameters::Zero;
 
     /// Default handler for the `on_tezos` parameter of [`SupervisorState::handle_system_call`]
     fn default_on_tezos_handler<MC, M>(core: &mut MachineCoreState<MC, M>) -> bool
@@ -1362,8 +1386,15 @@ mod tests {
             };
 
             // Call the function under test
-            let result =
-                supervisor_state.handle_mmap(&mut machine_state, addr.into(), length, perms, flags);
+            let result = supervisor_state.handle_mmap(
+                &mut machine_state,
+                addr.into(),
+                length,
+                perms,
+                flags,
+                NoFileDescriptor,
+                Zero,
+            );
 
             // Verify we get the expected error
             assert_eq!(result, Err(Error::NoMemory));
@@ -1389,6 +1420,8 @@ mod tests {
                 length,
                 perms,
                 flags,
+                NoFileDescriptor,
+                Zero,
             );
 
             // Verify we get the expected error

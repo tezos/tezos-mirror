@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use core::num::NonZeroU64;
+use std::fmt;
 
 use arbitrary_int::u7;
 
@@ -15,6 +16,7 @@ use super::error::Error;
 pub const SIGSET_SIZE: u64 = 8;
 
 /// A type coupling the result of the system call with how the program should continue.
+#[derive(Debug, Clone, Copy)]
 pub struct SystemCallResultExecution {
     pub result: u64,
     pub control_flow: bool,
@@ -34,6 +36,7 @@ impl<T: Into<u64>> From<T> for SystemCallResultExecution {
 /// The status of the program upon exit. While the C standard specifies that this should be equal
 /// to EXIT_SUCCESS or EXIT_FAILURE, this is rarely enforced, and can be any int - where `0`
 /// indicates success.
+#[derive(Debug, Clone, Copy)]
 pub struct ExitStatus(u64);
 
 impl From<ExitStatus> for u64 {
@@ -57,6 +60,7 @@ impl ExitStatus {
 
 /// Known to be a valid thread ID. As we currently only support single-thread execution, this will
 /// be the main thread.
+#[derive(Debug, Clone, Copy)]
 pub struct MainThreadId;
 
 impl TryFrom<u64> for MainThreadId {
@@ -72,6 +76,7 @@ impl TryFrom<u64> for MainThreadId {
 }
 
 /// A signal passed to a thread, see `tkill(2)`
+#[derive(Debug, Clone, Copy)]
 pub struct Signal(u7);
 
 impl TryFrom<u64> for Signal {
@@ -93,7 +98,14 @@ impl Signal {
 }
 
 /// An address of a signal action in the VM memory
+#[derive(Clone, Copy)]
 pub struct SignalAction(pub Option<NonZeroU64>);
+
+impl fmt::Debug for SignalAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:#x}", self.0.map(|nz| nz.get()).unwrap_or(0))
+    }
+}
 
 impl From<u64> for SignalAction {
     fn from(value: u64) -> Self {
@@ -109,6 +121,7 @@ impl SignalAction {
 }
 
 /// A valid size of `sigset_t`
+#[derive(Clone, Copy, Debug)]
 pub struct SigsetTSizeEightBytes;
 
 impl TryFrom<u64> for SigsetTSizeEightBytes {
@@ -125,6 +138,7 @@ impl TryFrom<u64> for SigsetTSizeEightBytes {
 }
 
 /// A valid file descriptor, see write(2)
+#[derive(Clone, Copy, Debug)]
 pub enum FileDescriptorWriteable {
     StandardOutput,
     StandardError,
@@ -145,7 +159,21 @@ impl TryFrom<u64> for FileDescriptorWriteable {
 }
 
 /// The number (count) of file descriptors
+#[derive(Clone, Copy)]
 pub struct FileDescriptorCount(u64);
+
+impl FileDescriptorCount {
+    /// Extract the file descriptor count as a [`u64`].
+    pub fn count(&self) -> u64 {
+        self.0
+    }
+}
+
+impl fmt::Debug for FileDescriptorCount {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// Hard limit on the number of file descriptors that a system call can work with
 ///
@@ -168,14 +196,8 @@ impl TryFrom<u64> for FileDescriptorCount {
     }
 }
 
-impl FileDescriptorCount {
-    /// Extract the file descriptor count as a [`u64`].
-    pub fn count(&self) -> u64 {
-        self.0
-    }
-}
-
 /// Definitely zero
+#[derive(Debug, Clone, Copy)]
 pub struct Zero;
 
 impl TryFrom<u64> for Zero {
@@ -191,6 +213,7 @@ impl TryFrom<u64> for Zero {
 }
 
 /// Special file descriptor meaning no file descriptor
+#[derive(Debug, Clone, Copy)]
 pub struct NoFileDescriptor;
 
 impl TryFrom<u64> for NoFileDescriptor {
@@ -206,6 +229,7 @@ impl TryFrom<u64> for NoFileDescriptor {
 }
 
 /// Visibility of a memory mapping
+#[derive(Debug, Clone, Copy)]
 pub enum Visibility {
     /// Only visible to the current task
     Private,
@@ -215,6 +239,7 @@ pub enum Visibility {
 }
 
 /// Backing of a memory mapping
+#[derive(Debug, Clone, Copy)]
 pub enum Backend {
     /// Just memory
     None,
@@ -224,6 +249,7 @@ pub enum Backend {
 }
 
 /// Hint on how to interpret the address argument when memory mapping
+#[derive(Debug, Clone, Copy)]
 pub enum AddressHint {
     /// May ignore the address hint
     Hint,
@@ -233,6 +259,7 @@ pub enum AddressHint {
 }
 
 /// Memory mapping request flags
+#[derive(Debug, Clone)]
 pub struct Flags {
     /// Visibility of the memory mapping
     pub visibility: Visibility,
