@@ -608,12 +608,20 @@ type t = {
   disconnection_state : Disconnect.t option;
   first_level : int;
   teztale : Teztale.t option;
-  mutable aliases : (string, string) Hashtbl.t;
-      (* mapping from baker addresses to their Tzkt aliases (if known)*)
   mutable versions : (string, string) Hashtbl.t;
       (* mapping from baker addresses to their octez versions (if known) *)
   otel : string option;
 }
+
+let aliases =
+  Hashtbl.create
+    50 (* mapping from baker addresses to their Tzkt aliases (if known)*)
+
+let merge_aliases =
+  Option.iter (fun new_aliases ->
+      Hashtbl.iter
+        (fun key alias -> Hashtbl.replace aliases key alias)
+        new_aliases)
 
 let pp_slot_metrics fmt xs =
   let open Format in
@@ -674,7 +682,7 @@ let pp_metrics t
          | None -> Log.info "We lack information about %s" pkh
          | Some {published_slots; attested_slots; _} ->
              let alias =
-               Hashtbl.find_opt t.aliases account.Account.public_key_hash
+               Hashtbl.find_opt aliases account.Account.public_key_hash
                |> Option.value ~default:account.Account.public_key_hash
              in
              Log.info
@@ -714,7 +722,7 @@ let push_metrics t
     } =
   let get_labels public_key_hash =
     let alias =
-      Hashtbl.find_opt t.aliases public_key_hash
+      Hashtbl.find_opt aliases public_key_hash
       |> Option.map (fun alias -> [("alias", alias)])
       |> Option.value ~default:[]
     in
@@ -3302,12 +3310,12 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let disconnection_state =
     Option.map Disconnect.init configuration.disconnect
   in
-  let* aliases =
+  let* init_aliases =
     let accounts = List.map (fun ({account; _} : baker) -> account) bakers in
     Network.aliases ~accounts configuration.network
   in
   let* versions = Network.versions configuration.network in
-  let aliases = Option.value ~default:(Hashtbl.create 0) aliases in
+  merge_aliases init_aliases ;
   let versions = Option.value ~default:(Hashtbl.create 0) versions in
   let otel = Cloud.open_telemetry_endpoint cloud in
   (* Adds monitoring for all agents for octez-dal-node and octez-node
@@ -3329,7 +3337,6 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       disconnection_state;
       first_level;
       teztale;
-      aliases;
       versions;
       otel;
     }
@@ -3354,14 +3361,13 @@ let clean_up t level =
   Hashtbl.remove t.metrics level
 
 let update_bakers_infos t =
-  let* aliases =
+  let* new_aliases =
     let accounts = List.map (fun ({account; _} : baker) -> account) t.bakers in
     Network.aliases ~accounts t.configuration.network
   in
   let* versions = Network.versions t.configuration.network in
-  let aliases = Option.value ~default:t.aliases aliases in
+  merge_aliases new_aliases ;
   let versions = Option.value ~default:t.versions versions in
-  t.aliases <- aliases ;
   t.versions <- versions ;
   Lwt.return_unit
 
