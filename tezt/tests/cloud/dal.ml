@@ -595,7 +595,7 @@ type t = {
   some_node_rpc_endpoint : Endpoint.t;
   (* endpoint to be used for get various information about L1; for testnets, it
      is a public endpoint only if no L1 node is run by the scenario, in contrast
-     to [bootstrap.node_rpp_endpoint] which is a public endpoint when the
+     to [bootstrap.node_rpc_endpoint] which is a public endpoint when the
      '--bootstrap' argument is not provided *)
   bakers : baker list;
   producers : producer list;
