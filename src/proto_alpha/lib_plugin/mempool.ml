@@ -799,75 +799,50 @@ let get_context context ~(head : Tezos_base.Block_header.shell_header) =
   in
   return ctxt
 
+let sources_from_level_and_slot ctxt level slot =
+  let open Lwt_syntax in
+  let* slot_owner = Stake_distribution.slot_owner ctxt level slot in
+  match slot_owner with
+  | Ok
+      ( _ctxt,
+        {
+          delegate;
+          consensus_pkh;
+          consensus_pk = _;
+          companion_pkh = _;
+          companion_pk = _;
+        } ) ->
+      return [delegate; consensus_pkh]
+  | Error _ -> return_nil
+
+let sources_from_aggregate ctxt
+    (consensus_content : consensus_aggregate_content) slots =
+  let open Lwt_syntax in
+  let level = Level.from_raw ctxt consensus_content.level in
+  Lwt_list.fold_left_s
+    (fun acc slot ->
+      let* sources = sources_from_level_and_slot ctxt level slot in
+      return (sources @ acc))
+    []
+    slots
+
 let sources_from_operation ctxt
     ({shell = _; protocol_data = Operation_data {contents; _}} : Main.operation)
     =
   let open Lwt_syntax in
-  let map_pkh_env = List.map Tezos_crypto.Signature.Of_V2.public_key_hash in
   match contents with
   | Single (Failing_noop _) -> return_nil
   | Single (Preattestation consensus_content)
-  | Single (Attestation {consensus_content; dal_content = _}) -> (
+  | Single (Attestation {consensus_content; dal_content = _}) ->
       let level = Level.from_raw ctxt consensus_content.level in
-      let* slot_owner =
-        Stake_distribution.slot_owner ctxt level consensus_content.slot
-      in
-      match slot_owner with
-      | Ok
-          ( _ctxt,
-            {
-              delegate;
-              consensus_pkh;
-              consensus_pk = _;
-              companion_pkh = _;
-              companion_pk = _;
-            } ) ->
-          return @@ map_pkh_env [delegate; consensus_pkh]
-      | Error _ -> return_nil)
+      sources_from_level_and_slot ctxt level consensus_content.slot
   | Single (Preattestations_aggregate {consensus_content; committee}) ->
-      let level = Level.from_raw ctxt consensus_content.level in
-      let* sources =
-        Lwt_list.fold_left_s
-          (fun acc slot ->
-            let* slot_owner = Stake_distribution.slot_owner ctxt level slot in
-            match slot_owner with
-            | Ok
-                ( _ctxt,
-                  {
-                    delegate;
-                    consensus_pkh;
-                    consensus_pk = _;
-                    companion_pkh = _;
-                    companion_pk = _;
-                  } ) ->
-                return (delegate :: consensus_pkh :: acc)
-            | Error _ -> return acc)
-          []
-          committee
-      in
-      return @@ map_pkh_env sources
+      sources_from_aggregate ctxt consensus_content committee
   | Single (Attestations_aggregate {consensus_content; committee}) ->
-      let level = Level.from_raw ctxt consensus_content.level in
-      let* sources =
-        Lwt_list.fold_left_s
-          (fun acc slot ->
-            let* slot_owner = Stake_distribution.slot_owner ctxt level slot in
-            match slot_owner with
-            | Ok
-                ( _ctxt,
-                  {
-                    delegate;
-                    consensus_pkh;
-                    consensus_pk = _;
-                    companion_pkh = _;
-                    companion_pk = _;
-                  } ) ->
-                return (delegate :: consensus_pkh :: acc)
-            | Error _ -> return acc)
-          []
-          (Operation.committee_slots committee)
-      in
-      return @@ map_pkh_env sources
+      sources_from_aggregate
+        ctxt
+        consensus_content
+        (Operation.committee_slots committee)
   | Single (Seed_nonce_revelation _)
   | Single (Double_preattestation_evidence _)
   | Single (Double_attestation_evidence _)
@@ -877,10 +852,10 @@ let sources_from_operation ctxt
   | Single (Vdf_revelation _) ->
       return_nil
   | Single (Proposals {source; _}) | Single (Ballot {source; _}) ->
-      return @@ map_pkh_env [source]
-  | Single (Drain_delegate {delegate; _}) -> return @@ map_pkh_env [delegate]
-  | Single (Manager_operation {source; _}) -> return @@ map_pkh_env [source]
-  | Cons (Manager_operation {source; _}, _) -> return @@ map_pkh_env [source]
+      return [source]
+  | Single (Drain_delegate {delegate; _}) -> return [delegate]
+  | Single (Manager_operation {source; _}) -> return [source]
+  | Cons (Manager_operation {source; _}, _) -> return [source]
 
 module Internal_for_tests = struct
   let default_config_with_clock_drift clock_drift =
