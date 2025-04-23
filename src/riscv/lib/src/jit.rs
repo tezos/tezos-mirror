@@ -33,14 +33,12 @@ use crate::machine_state::instruction::Instruction;
 use crate::machine_state::memory::MemoryConfig;
 use crate::state_backend::hash::Hash;
 use crate::traps::EnvironException;
-use crate::traps::Exception;
 
 /// Alias for the function signature produced by the JIT compilation.
 type JitFn<MC, JSA> = unsafe extern "C" fn(
     &mut MachineCoreState<MC, JSA>,
     u64,
     &mut usize,
-    &mut Option<Exception>,
     &mut Result<(), EnvironException>,
 );
 
@@ -65,8 +63,7 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JCall<MC, JSA> {
         steps: &mut usize,
     ) -> Result<(), EnvironException> {
         let mut res = Ok(());
-        let mut exception = None;
-        (self.fun)(core, pc, steps, &mut exception, &mut res);
+        (self.fun)(core, pc, steps, &mut res);
 
         res
     }
@@ -215,7 +212,6 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
 
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
         self.ctx.func.signature.params.push(AbiParam::new(I64));
-        self.ctx.func.signature.params.push(AbiParam::new(ptr));
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
 

@@ -37,12 +37,45 @@ pub(crate) trait Errno<T, MC: MemoryConfig, JSA: JitStateAccess> {
     fn handle(self, builder: &mut super::Builder<'_, MC, JSA>) -> T;
 }
 
-impl<T, F, MC: MemoryConfig, JSA: JitStateAccess> Errno<T, MC, JSA> for (ir::Value, F)
+/// Helper type for ensuring fallible operations are handled correctly.
+///
+/// The errno is constructed out of three pieces:
+/// - whether or not a failure occurred
+/// - if yes, the pointer to the exception in memory that has been written with the failure kind
+/// - if no, a handler to load any state that was returned in `out-params` that is now safe to
+///   access.
+///
+/// The only way to access the values that will be returned on success, is via the
+/// [`Errno::handle`] method.
+pub(crate) struct ErrnoImpl<T, F>
+where
+    F: FnOnce(&mut FunctionBuilder<'_>) -> T,
+{
+    errno: ir::Value,
+    exception_ptr: ir::Value,
+    on_ok: F,
+}
+
+impl<T, F> ErrnoImpl<T, F>
+where
+    F: FnOnce(&mut FunctionBuilder<'_>) -> T,
+{
+    /// Construct a new `Errno` that must be handled.
+    pub(crate) fn new(errno: ir::Value, exception_ptr: ir::Value, on_ok: F) -> Self {
+        Self {
+            errno,
+            exception_ptr,
+            on_ok,
+        }
+    }
+}
+
+impl<T, F, MC: MemoryConfig, JSA: JitStateAccess> Errno<T, MC, JSA> for ErrnoImpl<T, F>
 where
     F: FnOnce(&mut FunctionBuilder<'_>) -> T,
 {
     fn handle(self, builder: &mut super::Builder<'_, MC, JSA>) -> T {
-        let errno_code = self.0;
+        let errno_code = self.errno;
 
         let on_error = builder.builder.create_block();
         let on_ok = builder.builder.create_block();
@@ -54,18 +87,17 @@ where
 
         let snapshot = builder.dynamic;
 
-        // Exception succesfully handled, we have a new PC and need to complete
-        // the current step.
         builder.builder.switch_to_block(on_error);
-        builder.handle_exception();
+        // Handle the exception in the 'error occurred' block
+        builder.handle_exception(self.exception_ptr);
 
         builder.builder.seal_block(on_error);
 
-        // The exception has to be handled by the environment. Do not complete
-        // the current step; this will be done by the ECall handling mechanism
+        // Go back to the 'no error occurred' block, any returned
+        // values are ok to load
         builder.builder.switch_to_block(on_ok);
         builder.dynamic = snapshot;
 
-        (self.1)(&mut builder.builder)
+        (self.on_ok)(&mut builder.builder)
     }
 }

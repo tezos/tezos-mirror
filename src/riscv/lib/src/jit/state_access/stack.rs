@@ -51,8 +51,11 @@ use cranelift::codegen::ir::Value;
 use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
 
-/// Any value of type `T: Stackable` may be loaded to/from the stack, by JIT-compiled code.
-pub(super) trait Stackable {
+use crate::traps::Exception;
+
+/// Any value of type `T: StackAddressable` may be placed on the stack, and
+/// a pointer to it obtained.
+pub(super) trait StackAddressable {
     /// The underlying 'runtime' type of the value - e.g. a u64/u32 etc.
     ///
     /// Separating these allows us to explicitly use different stack slot kinds, for different
@@ -60,9 +63,6 @@ pub(super) trait Stackable {
     ///
     /// This offers an additional level of type-safety.
     type Underlying: Sized;
-
-    /// The type's representation in Cranelift IR.
-    const IR_TYPE: Type;
 
     /// The size, in bytes, of the underlying value.
     const SIZE: u32 = std::mem::size_of::<Self::Underlying>() as u32;
@@ -89,23 +89,35 @@ pub(super) trait Stackable {
     };
 }
 
+/// Any value of type `T: Stackable` may be loaded to/from the stack, by JIT-compiled code.
+pub(super) trait Stackable: StackAddressable {
+    /// The type's representation in Cranelift IR.
+    const IR_TYPE: Type;
+}
+
 /// Helper definition for storing/loading an address to/from the stack.
 pub(super) struct Address;
 
-impl Stackable for Address {
+impl StackAddressable for Address {
     type Underlying = u64;
+}
 
+impl Stackable for Address {
     const IR_TYPE: Type = I64;
 }
 
+impl StackAddressable for Exception {
+    type Underlying = Exception;
+}
+
 /// Dedicated space on the stack to store a value of the underlying type.
-pub(super) struct Slot<T: Stackable> {
+pub(super) struct Slot<T: StackAddressable> {
     slot: StackSlot,
     ptr_type: Type,
     _pd: PhantomData<T>,
 }
 
-impl<T: Stackable> Slot<T> {
+impl<T: StackAddressable> Slot<T> {
     /// Create a new slot on the stack, to hold a value of the underlying type of T.
     pub(super) fn new(ptr_type: Type, builder: &mut FunctionBuilder<'_>) -> Self {
         let slot = builder.create_sized_stack_slot(T::STACK_SLOT_DATA);
@@ -121,7 +133,9 @@ impl<T: Stackable> Slot<T> {
     pub(super) fn ptr(&self, builder: &mut FunctionBuilder<'_>) -> Value {
         builder.ins().stack_addr(self.ptr_type, self.slot, 0)
     }
+}
 
+impl<T: Stackable> Slot<T> {
     /// Emit IR to store a value to the current stack slot.
     pub(super) fn store(&self, builder: &mut FunctionBuilder<'_>, value: Value) {
         builder.ins().stack_store(value, self.slot, 0);
