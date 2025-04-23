@@ -102,7 +102,8 @@ register_jsa_functions!(
     handle_exception => (JSA::handle_exception::<MC>, AbiCall<4>::args),
     raise_illegal_instruction_exception => (JSA::raise_illegal_instruction_exception, AbiCall<1>::args),
     ecall_from_mode => (JSA::ecall::<MC>, AbiCall<2>::args),
-    memory_store => (JSA::memory_store::<MC>, AbiCall<5>::args)
+    memory_store => (JSA::memory_store::<MC>, AbiCall<5>::args),
+    memory_load => (JSA::memory_load::<MC>, AbiCall::<6>::args)
 );
 
 /// State Access that a JIT-compiled block may use.
@@ -207,7 +208,7 @@ pub trait JitStateAccess: ManagerReadWrite {
         address: u64,
         value: u64,
         width: u8,
-        exception_out: &mut Option<Exception>,
+        exception_out: &mut MaybeUninit<Exception>,
     ) -> bool {
         let Some(width) = LoadStoreWidth::new(width) else {
             panic!("The given width {width} is not a supported LoadStoreWidth");
@@ -216,7 +217,43 @@ pub trait JitStateAccess: ManagerReadWrite {
         match <MachineCoreState<MC, Self> as ICB>::main_memory_store(core, address, value, width) {
             Ok(()) => false,
             Err(exception) => {
-                *exception_out = Some(exception);
+                exception_out.write(exception);
+                true
+            }
+        }
+    }
+
+    /// Load `width` bytes from memory, at the physical address, into lowest `width` bytes of an
+    /// `XValue`, with (un)signed extension.
+    ///
+    /// If the load is successful, `false` is returned to indicate no exception handling is
+    /// necessary.
+    ///
+    /// If the load fails (due to out of bouds etc) then an exception will be written
+    /// to `exception_out` and `true` returned to indicate exception handling will be necessary.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `width` passed is not a supported [`LoadStoreWidth`].
+    extern "C" fn memory_load<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
+        address: u64,
+        width: u8,
+        signed: bool,
+        xval_out: &mut MaybeUninit<XValue>,
+        exception_out: &mut MaybeUninit<Exception>,
+    ) -> bool {
+        let Some(width) = LoadStoreWidth::new(width) else {
+            panic!("The given width {width} is not a supported LoadStoreWidth");
+        };
+
+        match <MachineCoreState<MC, Self> as ICB>::main_memory_load(core, address, signed, width) {
+            Ok(value) => {
+                xval_out.write(value);
+                false
+            }
+            Err(exception) => {
+                exception_out.write(exception);
                 true
             }
         }
@@ -240,6 +277,7 @@ pub(super) struct JsaCalls<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     raise_illegal_instruction_exception: Option<FuncRef>,
     ecall_from_mode: Option<FuncRef>,
     memory_store: Option<FuncRef>,
+    memory_load: Option<FuncRef>,
     _pd: PhantomData<(MC, JSA)>,
 }
 
@@ -261,6 +299,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
             raise_illegal_instruction_exception: None,
             ecall_from_mode: None,
             memory_store: None,
+            memory_load: None,
             _pd: PhantomData,
         }
     }
@@ -430,6 +469,50 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         let errno = builder.inst_results(call)[0];
 
         ErrnoImpl::new(errno, exception_ptr, |_| {})
+    }
+
+    /// Emit the required IR to call `memory_load`.
+    ///
+    /// Returns `errno` - on success, the loaded value is returned.
+    pub(super) fn memory_load(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        core_ptr: Value,
+        phys_address: X64,
+        signed: bool,
+        width: LoadStoreWidth,
+    ) -> impl Errno<X64, MC, JSA> + 'static {
+        let memory_load = self.memory_load.get_or_insert_with(|| {
+            self.module
+                .declare_func_in_func(self.imports.memory_load, builder.func)
+        });
+
+        let exception_slot = stack::Slot::<Exception>::new(self.ptr_type, builder);
+        let exception_ptr = exception_slot.ptr(builder);
+
+        let xval_slot = stack::Slot::<XValue>::new(self.ptr_type, builder);
+        let xval_ptr = xval_slot.ptr(builder);
+
+        let width = builder.ins().iconst(I8, width as u8 as i64);
+        let signed = builder.ins().iconst(I8, signed as i64);
+
+        let call = builder.ins().call(*memory_load, &[
+            core_ptr,
+            phys_address.0,
+            width,
+            signed,
+            xval_ptr,
+            exception_ptr,
+        ]);
+
+        let errno = builder.inst_results(call)[0];
+
+        ErrnoImpl::new(errno, exception_ptr, move |builder| {
+            // Safety: the xval is initialised prior to the call, and is guaranteed to
+            // remain initialised regardless of the result of external call.
+            let xval = unsafe { xval_slot.load(builder) };
+            X64(xval)
+        })
     }
 }
 

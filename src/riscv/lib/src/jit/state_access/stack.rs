@@ -51,6 +51,7 @@ use cranelift::codegen::ir::Value;
 use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
 
+use crate::machine_state::registers::XValue;
 use crate::traps::Exception;
 
 /// Any value of type `T: StackAddressable` may be placed on the stack, and
@@ -103,6 +104,14 @@ impl StackAddressable for Address {
 }
 
 impl Stackable for Address {
+    const IR_TYPE: Type = I64;
+}
+
+impl StackAddressable for XValue {
+    type Underlying = u64;
+}
+
+impl Stackable for XValue {
     const IR_TYPE: Type = I64;
 }
 
