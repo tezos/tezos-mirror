@@ -20,3 +20,5 @@ tezos_data_encoding.workspace = true
 nom.workspace = true
 
 rlp.workspace = true
+mir.workspace = true
+
