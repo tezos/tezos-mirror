@@ -54,6 +54,7 @@ use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XValue;
 use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::owned_backend::Owned;
+use crate::state_backend::proof_backend::ProofGen;
 use crate::traps::EnvironException;
 use crate::traps::Exception;
 
@@ -78,20 +79,25 @@ const MEMORY_STORE: &str = "JSA::memory_store";
 /// - a way of calling those functions from within JIT-compiled code
 pub trait JitStateAccess: ManagerReadWrite {
     /// Update the instruction pc in the state.
-    extern "C" fn pc_write<MC: MemoryConfig>(core: &mut MachineCoreState<MC, Self>, pc: u64);
-
+    extern "C" fn pc_write<MC: MemoryConfig>(core: &mut MachineCoreState<MC, Self>, pc: u64) {
+        core.hart.pc.write(pc)
+    }
     /// Read the value of the given [`NonZeroXRegister`].
     extern "C" fn xregister_read<MC: MemoryConfig>(
         core: &mut MachineCoreState<MC, Self>,
         reg: NonZeroXRegister,
-    ) -> XValue;
+    ) -> XValue {
+        core.hart.xregisters.read_nz(reg)
+    }
 
     /// Write the given value to the given [`NonZeroXRegister`].
     extern "C" fn xregister_write<MC: MemoryConfig>(
         core: &mut MachineCoreState<MC, Self>,
         reg: NonZeroXRegister,
         val: XValue,
-    );
+    ) {
+        core.hart.xregisters.write_nz(reg, val)
+    }
 
     /// Handle an [`Exception`].
     ///
@@ -113,7 +119,20 @@ pub trait JitStateAccess: ManagerReadWrite {
         current_pc: &mut Address,
         exception: &Exception,
         result: &mut Result<(), EnvironException>,
-    ) -> bool;
+    ) -> bool {
+        let res = core.address_on_exception(*exception, *current_pc);
+
+        match res {
+            Err(e) => {
+                *result = Err(e);
+                false
+            }
+            Ok(address) => {
+                *current_pc = address;
+                true
+            }
+        }
+    }
 
     /// Raise an [`Exception::IllegalInstruction`].
     ///
@@ -130,7 +149,15 @@ pub trait JitStateAccess: ManagerReadWrite {
     extern "C" fn ecall<MC: MemoryConfig>(
         core: &mut MachineCoreState<MC, Self>,
         exception_out: &mut MaybeUninit<Exception>,
-    );
+    ) {
+        let exception = match core.hart.mode.read() {
+            Mode::User => Exception::EnvCallFromUMode,
+            Mode::Supervisor => Exception::EnvCallFromSMode,
+            Mode::Machine => Exception::EnvCallFromMMode,
+        };
+
+        exception_out.write(exception);
+    }
 
     /// Store the lowest `width` bytes of the given value to memory, at the physical address.
     ///
@@ -163,59 +190,9 @@ pub trait JitStateAccess: ManagerReadWrite {
     }
 }
 
-impl JitStateAccess for Owned {
-    extern "C" fn pc_write<MC: MemoryConfig>(core: &mut MachineCoreState<MC, Self>, pc: u64) {
-        core.hart.pc.write(pc)
-    }
+impl JitStateAccess for Owned {}
 
-    extern "C" fn xregister_read<MC: MemoryConfig>(
-        core: &mut MachineCoreState<MC, Self>,
-        reg: NonZeroXRegister,
-    ) -> XValue {
-        core.hart.xregisters.read_nz(reg)
-    }
-
-    extern "C" fn xregister_write<MC: MemoryConfig>(
-        core: &mut MachineCoreState<MC, Self>,
-        reg: NonZeroXRegister,
-        val: XValue,
-    ) {
-        core.hart.xregisters.write_nz(reg, val)
-    }
-
-    extern "C" fn handle_exception<MC: MemoryConfig>(
-        core: &mut MachineCoreState<MC, Self>,
-        current_pc: &mut Address,
-        exception: &Exception,
-        result: &mut Result<(), EnvironException>,
-    ) -> bool {
-        let res = core.address_on_exception(*exception, *current_pc);
-
-        match res {
-            Err(e) => {
-                *result = Err(e);
-                false
-            }
-            Ok(address) => {
-                *current_pc = address;
-                true
-            }
-        }
-    }
-
-    extern "C" fn ecall<MC: MemoryConfig>(
-        core: &mut MachineCoreState<MC, Self>,
-        exception_out: &mut MaybeUninit<Exception>,
-    ) {
-        let exception = match core.hart.mode.read() {
-            Mode::User => Exception::EnvCallFromUMode,
-            Mode::Supervisor => Exception::EnvCallFromSMode,
-            Mode::Machine => Exception::EnvCallFromMMode,
-        };
-
-        exception_out.write(exception);
-    }
-}
+impl<M: ManagerReadWrite> JitStateAccess for ProofGen<M> {}
 
 /// Register state access symbols in the builder.
 pub(super) fn register_jsa_symbols<MC: MemoryConfig, JSA: JitStateAccess>(
