@@ -1120,6 +1120,12 @@ let get_metrics t infos_per_level metrics =
   }
 
 module Monitoring_app = struct
+  let pp_delegate fmt delegate_pkh =
+    match Hashtbl.find_opt aliases delegate_pkh with
+    | None -> Format.fprintf fmt "`%s`" delegate_pkh
+    | Some alias ->
+        Format.fprintf fmt "`%s` : `%s`" (String.sub delegate_pkh 0 7) alias
+
   (** [network_to_image_url network] return an image for each monitored network. *)
   let network_to_image_url : Network.t -> string = function
     | `Rionet ->
@@ -1374,16 +1380,8 @@ module Monitoring_app = struct
     let pp_stake fmt stake_ratio =
       Format.fprintf fmt "`%.2f%%` stake" (stake_ratio *. 100.)
 
-    let display_delegate (`address address, `alias alias, _, stake_ratio) =
-      match alias with
-      | None -> Format.asprintf "`%s` (%a)" address pp_stake stake_ratio
-      | Some alias ->
-          Format.asprintf
-            "`%s` : `%s` (%a)"
-            (String.sub address 0 7)
-            alias
-            pp_stake
-            stake_ratio
+    let display_delegate (`address address, _, _, stake_ratio) =
+      Format.asprintf "%a (%a)" pp_delegate address pp_stake stake_ratio
 
     let view_bakers bakers =
       List.map
@@ -1648,9 +1646,11 @@ module Monitoring_app = struct
         let content =
           List.map
             (fun (`delegate delegate, `change change) ->
-              Format.sprintf
-                "▪ `%s` has missed ~%d tez DAL attestation rewards"
-                (String.sub delegate 0 7)
+              Format.asprintf
+                ":black_small_square: %a has missed ~%d tez DAL attestation \
+                 rewards"
+                pp_delegate
+                delegate
                 (change / 100_000))
             lost_dal_rewards
         in
@@ -1726,10 +1726,11 @@ module Monitoring_app = struct
                    `slot_index slot_index,
                    `delegate delegate,
                    `op_hash hash ) ->
-              Format.sprintf
-                "▪ `%s` for attesting slot index `%d` at level `%d`. \
-                 <https://%s.tzkt.io/%s|See online>"
-                (String.sub delegate 0 7)
+              Format.asprintf
+                ":black_small_square: %a for attesting slot index `%d` at \
+                 level `%d`. <https://%s.tzkt.io/%s|See online>"
+                pp_delegate
+                delegate
                 slot_index
                 attestation_level
                 (Network.to_string network)
@@ -1841,19 +1842,20 @@ module Monitoring_app = struct
       let {slack_channel_id; slack_bot_token} = monitor_app_configuration in
       let data =
         let header =
-          Format.sprintf
+          Format.asprintf
             (match transition with
             | Restarted_attesting ->
                 "*[dal-attester-is-back]* On network `%s` at level `%d`, \
-                 delegate `%s` who was under the reward threshold is again \
-                 above threshold. New attestation rate is %.2f%%."
+                 delegate %a who was under the reward threshold is again above \
+                 threshold. New attestation rate is %.2f%%."
             | Stopped_attesting ->
                 "*[dal-attester-dropped]* On network `%s` at level `%d`, \
-                 delegate `%s` DAL attestation rate dropped under the reward \
+                 delegate %a DAL attestation rate dropped under the reward \
                  threshold. New attestation rate is %.2f%%.")
             (Network.to_string network)
             level
-            (String.sub pkh 0 8)
+            pp_delegate
+            pkh
             attestation_percentage
         in
         Format_app.section [header] ()
