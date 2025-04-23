@@ -1334,7 +1334,8 @@ module Monitoring_app = struct
         List.filter_map
           (fun (`slot_index slot_index, attested, published) ->
             view_ratio_attested_over_published (attested, published)
-            |> Option.map (Format.sprintf "▪ `%02d` : %s" slot_index))
+            |> Option.map
+                 (Format.sprintf ":black_small_square: `%02d` : %s" slot_index))
           slot_info
       in
       if List.is_empty slots_info then []
@@ -1370,23 +1371,32 @@ module Monitoring_app = struct
       in
       Lwt.return view
 
+    let pp_stake fmt stake_ratio =
+      Format.fprintf fmt "`%.2f%%` stake" (stake_ratio *. 100.)
+
+    let display_delegate (`address address, `alias alias, _, stake_ratio) =
+      match alias with
+      | None -> Format.asprintf "`%s` (%a)" address pp_stake stake_ratio
+      | Some alias ->
+          Format.asprintf
+            "`%s` : `%s` (%a)"
+            (String.sub address 0 7)
+            alias
+            pp_stake
+            stake_ratio
+
     let view_bakers bakers =
-      let display_delegate address = function
-        | None -> Format.sprintf "`%s`" address
-        | Some alias ->
-            Format.sprintf "`%s` : `%s`" (String.sub address 0 7) alias
-      in
       List.map
-        (fun (`address address, `alias alias, (value, mentions_dal)) ->
+        (fun ((_, _, (value, mentions_dal), _) as baker) ->
           Format.sprintf
-            "▪ %s - %s (%s)"
+            ":black_small_square: %s - %s (%s)"
             (Option.fold
                ~none:"Never was in committee when slots were produced"
                ~some:(fun value -> Format.sprintf "`%.2f%%`" (value *. 100.))
                value)
-            (display_delegate address alias)
+            (display_delegate baker)
             (match mentions_dal with
-            | None -> "Never sent attestation while in DAL committee"
+            | None -> "Never sent attestations while in DAL committee"
             | Some 0. -> "OFF"
             | Some 1. -> "ON"
             | Some x -> Format.sprintf "ACTIVE %.0f%% of the time" (x *. 100.)))
@@ -1490,22 +1500,38 @@ module Monitoring_app = struct
             Lwt.return_some (`address address, `alias alias, info, baking_ratio))
           bakers
       in
-      let sorted_bakers =
-        List.sort
-          (fun (_, _, (x_slot_perf, x_dal_mention_perf), x_stake)
-               (_, _, (y_slot_perf, y_dal_mention_perf), y_stake) ->
-            let cmp = Option.compare Float.compare x_slot_perf y_slot_perf in
-            if cmp = 0 then
-              let cmp =
-                Option.compare
-                  Float.compare
-                  x_dal_mention_perf
-                  y_dal_mention_perf
-              in
-              if cmp = 0 then -Float.compare x_stake y_stake else cmp
-            else cmp)
-          baker_infos
+      let rec classify_bakers mute_bakers dal_on dal_off = function
+        | [] -> (mute_bakers, dal_on, dal_off)
+        | ((_, _, (_, dal_endorsement), _) as baker) :: tl -> (
+            match dal_endorsement with
+            | None -> classify_bakers (baker :: mute_bakers) dal_on dal_off tl
+            | Some 0. ->
+                classify_bakers mute_bakers dal_on (baker :: dal_off) tl
+            | _ -> classify_bakers mute_bakers (baker :: dal_on) dal_off tl)
       in
+      let mute_bakers, dal_on, dal_off = classify_bakers [] [] [] bakers_info in
+      let ( >> ) cmp1 cmp2 x y =
+        match cmp1 x y with 0 -> cmp2 x y | cmp -> cmp
+      in
+      let stake_descending (_, _, (_, _), x_stake) (_, _, (_, _), y_stake) =
+        Float.compare y_stake x_stake
+      in
+      let attestation_rate_ascending (_, _, (x_attestation, _), _)
+          (_, _, (y_attestation, _), _) =
+        Option.compare Float.compare x_attestation y_attestation
+      in
+      let dal_mention_perf_ascending (_, _, (_, x_dal_mention), _)
+          (_, _, (_, y_dal_mention), _) =
+        Option.compare Float.compare x_dal_mention y_dal_mention
+      in
+      let mute_bakers = List.sort stake_descending mute_bakers in
+      let dal_on =
+        List.sort
+          (attestation_rate_ascending >> dal_mention_perf_ascending
+         >> stake_descending)
+          dal_on
+      in
+      let dal_off = List.sort stake_descending dal_off in
       (* `group_by n l` outputs the list of lists with the same elements as `l`
          but with `n` elements per list (except the last one).
          For instance
@@ -1519,10 +1545,47 @@ module Monitoring_app = struct
         in
         bis [] [] n
       in
+      let agglomerate_infos bakers =
+        let nb, stake =
+          List.fold_left
+            (fun (nb, stake_acc) (_, _, _, stake_ratio) ->
+              (nb + 1, stake_acc +. stake_ratio))
+            (0, 0.)
+            bakers
+        in
+        Format.sprintf
+          "They are %d representing %.2f%% of the stake"
+          nb
+          (stake *. 100.)
+      in
+      let display_muted =
+        match mute_bakers with
+        | [] -> []
+        | _ ->
+            group_by
+              20
+              (":alert: *Those bakers never sent attestations while in DAL \
+                committee, this is quite unexpected. They probably have an \
+                issue.*"
+              :: agglomerate_infos mute_bakers
+              :: List.map display_delegate mute_bakers)
+      in
+      let display_on =
+        group_by
+          20
+          (":white_check_mark: *Those bakers sent attestations mentioning DAL.*"
+         :: agglomerate_infos dal_on :: view_bakers dal_on)
+      in
+      let display_off =
+        group_by
+          20
+          (":x: *Those bakers never turned their DAL on.*"
+         :: agglomerate_infos dal_off
+          :: List.map display_delegate dal_off)
+      in
       Lwt.return
-        (["• Baker performance ranked from worst to best:"]
-        :: (* Since Slack message size is limited, we group the bakers by packs of 20. *)
-           group_by 20 (view_bakers sorted_bakers))
+        ((["Details of bakers performance:"] :: display_muted)
+        @ display_on @ display_off)
 
     let fetch_slots_info () =
       let* data =
