@@ -33,7 +33,7 @@ let tests_fibonacci =
           let input = Stdlib.List.init 5 (fun i -> i + 10) in
           let expected = List.map fib input in
           let* output =
-            Tezos_bees.Task_worker.launch_tasks worker "fib" fib input
+            Tezos_bees.Task_worker.launch_tasks_and_wait worker "fib" fib input
           in
           let output = List.filter_map Result.to_option output in
           Assert.equal_list expected output ;
@@ -54,13 +54,21 @@ let tests_reuse =
         let int_input = 0 in
         let int_expected = succ int_input in
         let int_output =
-          Tezos_bees.Task_worker.launch_task worker "succ(int)" succ int_input
+          Tezos_bees.Task_worker.launch_task_and_wait
+            worker
+            "succ(int)"
+            succ
+            int_input
         in
         let str_input = "0" in
         let succ s = int_of_string s |> succ |> string_of_int in
         let str_expected = succ str_input in
         let str_output =
-          Tezos_bees.Task_worker.launch_task worker "succ(str)" succ str_input
+          Tezos_bees.Task_worker.launch_task_and_wait
+            worker
+            "succ(str)"
+            succ
+            str_input
         in
         let* int_output in
         let* str_output in
@@ -70,6 +78,36 @@ let tests_reuse =
   in
   ("Reuse a worker for a different kind of computation", [test])
 
+let tests_on_completion_callback =
+  let test =
+    tztest "on_completion_handler" @@ fun () ->
+    match Tezos_bees.Task_worker.worker "worker" 1 with
+    | Error e -> Lwt_result_syntax.tzfail e
+    | Ok worker ->
+        let r = ref 0 in
+        let noop () = () in
+        let* _ =
+          Tezos_bees.Task_worker.launch_task_and_wait worker "callback" noop ()
+        in
+        Assert.equal !r 0 ;
+        let on_completion () = incr r in
+        let tasks = 2 in
+        let* _ =
+          Tezos_bees.Task_worker.launch_tasks_and_wait
+            ~on_completion
+            worker
+            "callback"
+            noop
+            (Stdlib.List.init tasks (fun _ -> ()))
+        in
+        Assert.equal !r tasks ;
+        Lwt.return_ok ()
+  in
+  ("Run on_completion callback", [test])
+
 let () =
-  Alcotest_lwt.run ~__FILE__ "Task worker" [tests_fibonacci; tests_reuse]
+  Alcotest_lwt.run
+    ~__FILE__
+    "Task worker"
+    [tests_fibonacci; tests_reuse; tests_on_completion_callback]
   |> Lwt_main.run

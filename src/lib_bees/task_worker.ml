@@ -17,9 +17,15 @@ module Name = struct
   let equal = ( = )
 end
 
+type ('param, 'result) task = {
+  name : string;
+  on_completion : ('result -> unit) option;
+  on_request : 'param -> 'result;
+  param : 'param;
+}
+
 module Request = struct
-  type ('a, 'b) t =
-    | Task : (string * ('param -> 'result) * 'param) -> ('result, 'error) t
+  type ('a, 'b) t = Task : ('param, 'result) task -> ('result, 'error) t
 
   type view = string
 
@@ -27,7 +33,7 @@ module Request = struct
 
   let pp = Format.pp_print_string
 
-  let view = function Task (name, _, _) -> "task(" ^ name ^ ")"
+  let view = function Task {name; _} -> "task(" ^ name ^ ")"
 end
 
 module Types = struct
@@ -45,7 +51,8 @@ module Handlers : Worker.EIO_HANDLERS with type self = task_worker = struct
 
   let on_request :
       self -> ('r, 'request_error) Request.t -> ('r, 'request_error) result =
-   fun _ request -> match request with Task (_, f, param) -> Ok (f param)
+   fun _ request ->
+    match request with Task {on_request; param; _} -> Ok (on_request param)
 
   type launch_error
 
@@ -55,7 +62,8 @@ module Handlers : Worker.EIO_HANDLERS with type self = task_worker = struct
      fails. *)
   let on_error _ _ _ _ = Ok ()
 
-  let on_completion _ _ _ _ = ()
+  let on_completion _ req res _ =
+    match req with Request.Task {on_completion = Some f; _} -> f res | _ -> ()
 
   let on_no_request _ = ()
 
@@ -73,9 +81,13 @@ let worker name domains =
   let table = Worker.create_table Queue in
   Worker.launch_eio ~domains table ~name () (module Handlers)
 
-let launch_task worker name func arg =
-  let r = Request.Task (name, func, arg) in
+let launch_task_and_wait worker name on_request ?on_completion param =
+  let r = Request.Task {name; on_request; param; on_completion} in
   Worker.Queue.push_request_and_wait_eio worker r |> Lwt_eio.Promise.await_eio
 
-let launch_tasks worker name func args =
-  Lwt_list.map_p (launch_task worker name func) args
+let launch_tasks_and_wait worker name func ?on_completion args =
+  Lwt_list.map_p (launch_task_and_wait worker name ?on_completion func) args
+
+let launch_task worker name on_request ?on_completion param =
+  let r = Request.Task {name; on_request; param; on_completion} in
+  Worker.Queue.push_request_eio worker r
