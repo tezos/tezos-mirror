@@ -2571,6 +2571,7 @@ let octez_workers =
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_stdlib_unix |> open_;
+        octez_profiler_complex_backends |> open_;
         opentelemetry;
       ]
 
