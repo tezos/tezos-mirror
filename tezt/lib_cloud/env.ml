@@ -99,6 +99,23 @@ let init () =
     Test.fail
       "The tezt-cloud value should be set. Either via the CLI or via the \
        environment variable 'TEZT_CLOUD'" ;
+  (* If using logfile, installs a signal handler to close and reopen the logfile.
+     This allows logrotate to use a better strategy than copytruncate
+     https://incoherency.co.uk/blog/stories/logrotate-copytruncate-race-condition.html
+  *)
+  (if log_rotation <> 0 then
+     match Tezt_core.Cli.Logs.file with
+     | None -> ()
+     | Some logfile ->
+         Log.report "Installing signal handler for SIGHUP" ;
+         let signal_hup_handler signal =
+           if signal = Sys.sighup then (
+             (* TODO: Not sure if set_file is async-signal-safe.
+                Maybe implement a better solution if it causes issues *)
+             Tezt_core.Log.set_file logfile ;
+             Log.report "Logfile was reopened")
+         in
+         Sys.set_signal Sys.sighup (Sys.Signal_handle signal_hup_handler)) ;
   match mode with
   | `Localhost -> Lwt.return_unit
   | `Orchestrator ->
