@@ -17,7 +17,7 @@ pub fn make_stepper_factory<CL: CacheLayouts>() -> impl Fn() -> PvmStepper<'stat
     let (program, initrd) = {
         #[cfg(feature = "supervisor")]
         {
-            let program = fs::read("../assets/jstz-linux-musl").unwrap();
+            let program = fs::read("../assets/jstz").unwrap();
             (program, None::<Vec<u8>>)
         }
 

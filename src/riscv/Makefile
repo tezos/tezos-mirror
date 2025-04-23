@@ -26,7 +26,7 @@ SANDBOX_ENABLE_FEATURES ?=
 NIGHTLY_VERSION = nightly-2025-01-30
 
 .PHONY: build
-build: riscv-dummy.elf riscv-dummy-linux-musl.elf riscv-sandbox
+build: riscv-dummy.elf riscv-sandbox
 	@cargo build --release --workspace $(NATIVE_OPT) $(EXTRA_FLAGS)
 	@make -C jstz build
 
@@ -42,34 +42,20 @@ riscv-sandbox.prof::
 
 riscv-dummy.elf::
 	@make -C dummy_kernel build
-	@ln -f dummy_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy $@
-
-riscv-dummy-linux-musl.elf::
-	@make -C dummy_kernel build-linux-musl
 	@ln -f dummy_kernel/target/riscv64gc-unknown-linux-musl/release/riscv-dummy $@
 
 # Update checked-in binaries
 .PHONY: update-assets
-update-assets: assets/riscv-dummy.elf assets/riscv-dummy-linux-musl.elf assets/jstz assets/jstz-linux-musl
+update-assets: assets/riscv-dummy.elf assets/jstz
 
 # Update the compiled dummy kernel used in CI tests
 assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
 	@make -C dummy_kernel build
-	@cp dummy_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy $@
-	@sha256sum $@ > $@.checksum
-
-assets/riscv-dummy-linux-musl.elf assets/riscv-dummy-linux-musl.elf.checksum::
-	@make -C dummy_kernel build-linux-musl
 	@cp dummy_kernel/target/riscv64gc-unknown-linux-musl/release/riscv-dummy $@
 	@sha256sum $@ > $@.checksum
 
 assets/jstz assets/jstz.checksum::
 	@make -C jstz build-kernel
-	@cp jstz/target/riscv64gc-unknown-hermit/release/jstz $@
-	@sha256sum $@ > $@.checksum
-
-assets/jstz-linux-musl assets/jstz-linux-musl.checksum::
-	@make -C jstz build-kernel-linux-musl
 	@cp jstz/target/riscv64gc-unknown-linux-musl/release/jstz $@
 	@sha256sum $@ > $@.checksum
 
@@ -92,7 +78,6 @@ endif
 	@find . -iname 'rust-toolchain*' -execdir sh -c "rustup show active-toolchain || rustup toolchain install" \; 2>/dev/null
 
 	@make -C jstz build-deps
-	@make -C dummy_kernel build-deps
 
 	# Coverage deps
 	@./scripts/isa-suite-coverage.sh -d
