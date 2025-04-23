@@ -19,8 +19,8 @@ use crate::default::ConstDefault;
 use crate::instruction_context::ICB;
 use crate::machine_state;
 use crate::machine_state::CacheLayouts;
-use crate::machine_state::block_cache::bcall;
-use crate::machine_state::block_cache::bcall::Block;
+use crate::machine_state::block_cache::block;
+use crate::machine_state::block_cache::block::Block;
 use crate::machine_state::csregisters::CSRegister;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::a0;
@@ -153,12 +153,12 @@ const INITIAL_VERSION: u64 = 0;
 type PvmProofGen<'a, MC, CL, M> = Pvm<
     MC,
     CL,
-    bcall::Interpreted<MC, ProofGen<state_backend::Ref<'a, M>>>,
+    block::Interpreted<MC, ProofGen<state_backend::Ref<'a, M>>>,
     ProofGen<state_backend::Ref<'a, M>>,
 >;
 
 /// Proof-generating virtual machine
-pub struct Pvm<MC: MemoryConfig, CL: CacheLayouts, B: bcall::Block<MC, M>, M: ManagerBase> {
+pub struct Pvm<MC: MemoryConfig, CL: CacheLayouts, B: block::Block<MC, M>, M: ManagerBase> {
     pub(crate) machine_state: machine_state::MachineState<MC, CL, B, M>,
     reveal_request: RevealRequest<M>,
     #[cfg(feature = "supervisor")]
@@ -174,7 +174,7 @@ pub struct Pvm<MC: MemoryConfig, CL: CacheLayouts, B: bcall::Block<MC, M>, M: Ma
 impl<
     MC: MemoryConfig,
     CL: machine_state::CacheLayouts,
-    B: bcall::Block<MC, M>,
+    B: block::Block<MC, M>,
     M: state_backend::ManagerBase,
 > Pvm<MC, CL, B, M>
 {
@@ -199,7 +199,7 @@ impl<
 
     /// Bind the block cache to the given allocated state and the given [block builder].
     ///
-    /// [block builder]: bcall::Block::BlockBuilder
+    /// [block builder]: block::Block::BlockBuilder
     pub(crate) fn bind(
         space: state_backend::AllocatedOf<PvmLayout<MC, CL>, M>,
         block_builder: B::BlockBuilder,
@@ -246,7 +246,7 @@ impl<
         M: state_backend::ManagerRead,
     {
         let space = self.struct_ref::<ProofWrapper>();
-        Pvm::bind(space, bcall::InterpretedBlockBuilder)
+        Pvm::bind(space, block::InterpretedBlockBuilder)
     }
 
     /// Reset the PVM.
@@ -493,7 +493,7 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, Verifier>> Pvm<MC, CL, B, 
 impl<
     MC: MemoryConfig,
     CL: CacheLayouts,
-    B: bcall::Block<MC, M> + Clone,
+    B: block::Block<MC, M> + Clone,
     M: state_backend::ManagerClone,
 > Clone for Pvm<MC, CL, B, M>
 {
@@ -549,7 +549,7 @@ mod tests {
     use super::*;
     use crate::backend_test;
     use crate::machine_state::TestCacheLayouts;
-    use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+    use crate::machine_state::block_cache::block::InterpretedBlockBuilder;
     use crate::machine_state::memory;
     use crate::machine_state::memory::M1M;
     use crate::machine_state::memory::Memory;
@@ -569,7 +569,7 @@ mod tests {
     #[test]
     fn test_read_input() {
         type MC = M1M;
-        type B = bcall::Interpreted<MC, Owned>;
+        type B = block::Interpreted<MC, Owned>;
 
         // Setup PVM
         let mut pvm = Pvm::<MC, TestCacheLayouts, B, _>::new(&mut Owned, InterpretedBlockBuilder);
@@ -673,7 +673,7 @@ mod tests {
     #[cfg(not(feature = "supervisor"))]
     fn test_write_debug() {
         type MC = M1M;
-        type B = bcall::Interpreted<MC, Owned>;
+        type B = block::Interpreted<MC, Owned>;
 
         let mut buffer = Vec::new();
         let mut hooks = PvmHooks::new(|c| buffer.push(c));
@@ -725,7 +725,7 @@ mod tests {
             written: [u8; WRITTEN_SIZE],
         )|{
             type MC = M1M;
-            type B = bcall::Interpreted<MC, Owned>;
+            type B = block::Interpreted<MC, Owned>;
 
             let mut buffer = Vec::new();
             let mut hooks = PvmHooks::new(|c| buffer.push(c));
@@ -778,7 +778,7 @@ mod tests {
 
     backend_test!(test_reveal, F, {
         type MC = M1M;
-        type B<F> = bcall::Interpreted<MC, <F as TestBackendFactory>::Manager>;
+        type B<F> = block::Interpreted<MC, <F as TestBackendFactory>::Manager>;
 
         // Setup PVM
         let mut pvm =
@@ -853,7 +853,7 @@ mod tests {
 
     backend_test!(test_reveal_insufficient_buffer_size, F, {
         type MC = M1M;
-        type B<F> = bcall::Interpreted<MC, <F as TestBackendFactory>::Manager>;
+        type B<F> = block::Interpreted<MC, <F as TestBackendFactory>::Manager>;
 
         // Setup PVM
         let mut pvm =

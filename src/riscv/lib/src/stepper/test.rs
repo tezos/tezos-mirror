@@ -22,8 +22,8 @@ use crate::machine_state::MachineError;
 use crate::machine_state::MachineState;
 use crate::machine_state::StepManyResult;
 use crate::machine_state::TestCacheLayouts;
-use crate::machine_state::block_cache::bcall::Block;
-use crate::machine_state::block_cache::bcall::Interpreted;
+use crate::machine_state::block_cache::block::Block;
+use crate::machine_state::block_cache::block::Interpreted;
 use crate::machine_state::memory::M1G;
 #[cfg(feature = "supervisor")]
 use crate::machine_state::memory::Memory;

@@ -4,7 +4,7 @@
 
 use crate::machine_state::CacheLayouts;
 use crate::machine_state::MachineState;
-use crate::machine_state::block_cache::bcall::Block;
+use crate::machine_state::block_cache::block::Block;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::a0;

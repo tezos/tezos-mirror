@@ -9,8 +9,8 @@ use std::io::Write;
 use std::ops::Bound;
 
 use octez_riscv::machine_state::DefaultCacheLayouts;
-use octez_riscv::machine_state::block_cache::bcall;
-use octez_riscv::machine_state::block_cache::bcall::Block;
+use octez_riscv::machine_state::block_cache::block;
+use octez_riscv::machine_state::block_cache::block::Block;
 use octez_riscv::machine_state::memory::M1G;
 use octez_riscv::pvm::PvmHooks;
 use octez_riscv::state_backend::owned_backend::Owned;
@@ -27,11 +27,11 @@ use crate::cli::RunOptions;
 
 /// Inner execution strategy for blocks.
 #[cfg(not(feature = "inline-jit"))]
-type BlockImplInner = bcall::Interpreted<M1G, Owned>;
+type BlockImplInner = block::Interpreted<M1G, Owned>;
 
 /// Inner execution strategy for blocks.
 #[cfg(feature = "inline-jit")]
-type BlockImplInner = bcall::InlineJit<M1G, Owned>;
+type BlockImplInner = block::InlineJit<M1G, Owned>;
 
 /// Executor of blocks
 #[cfg(not(feature = "metrics"))]

@@ -10,10 +10,10 @@ use std::path::PathBuf;
 
 use octez_riscv::jit::JIT;
 use octez_riscv::machine_state::DefaultCacheLayouts;
-use octez_riscv::machine_state::block_cache::bcall::Block;
-use octez_riscv::machine_state::block_cache::bcall::InlineJit;
-use octez_riscv::machine_state::block_cache::bcall::Interpreted;
-use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::block_cache::block::Block;
+use octez_riscv::machine_state::block_cache::block::InlineJit;
+use octez_riscv::machine_state::block_cache::block::Interpreted;
+use octez_riscv::machine_state::block_cache::block::InterpretedBlockBuilder;
 use octez_riscv::machine_state::memory::M64M;
 use octez_riscv::pvm::PvmHooks;
 use octez_riscv::state_backend::owned_backend::Owned;
