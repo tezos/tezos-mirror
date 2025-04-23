@@ -7,8 +7,10 @@
 
 //! Representation for typed Michelson `key` values.
 
+#[cfg(feature = "bls")]
+use tezos_crypto_rs::hash::PublicKeyBls;
 use tezos_crypto_rs::{
-    hash::{HashTrait, PublicKeyBls, PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1},
+    hash::{HashTrait, PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1},
     PublicKeyWithHash,
 };
 
@@ -49,6 +51,7 @@ macro_rules! key_type_and_impls {
     };
 }
 
+#[cfg(feature = "bls")]
 key_type_and_impls! {
     /// Ed25519 public key.
     Ed25519(PublicKeyEd25519),
@@ -58,6 +61,16 @@ key_type_and_impls! {
     P256(PublicKeyP256),
     /// BLS public key.
     Bls(PublicKeyBls),
+}
+
+#[cfg(not(feature = "bls"))]
+key_type_and_impls! {
+    /// Ed25519 public key.
+    Ed25519(PublicKeyEd25519),
+    /// Secp256k1 public key.
+    Secp256k1(PublicKeySecp256k1),
+    /// P256 public key.
+    P256(PublicKeyP256),
 }
 
 impl TryFrom<&[u8]> for Key {
@@ -88,6 +101,7 @@ fn check_size(data: &[u8], min_size: usize, name: &str) -> Result<(), ByteReprEr
 const TAG_ED25519: u8 = 0;
 const TAG_SECP256K1: u8 = 1;
 const TAG_P256: u8 = 2;
+#[cfg(feature = "bls")]
 const TAG_BLS: u8 = 3;
 
 impl Key {
@@ -103,6 +117,7 @@ impl Key {
             Ed25519(hash) => KeyHash::Tz1(hash.pk_hash()),
             Secp256k1(hash) => KeyHash::Tz2(hash.pk_hash()),
             P256(hash) => KeyHash::Tz3(hash.pk_hash()),
+            #[cfg(feature = "bls")]
             Bls(hash) => KeyHash::Tz4(hash.pk_hash()),
         }
     }
@@ -118,6 +133,7 @@ impl ByteReprTrait for Key {
             "edpk" => Ed25519(HashTrait::from_b58check(data)?),
             "sppk" => Secp256k1(HashTrait::from_b58check(data)?),
             "p2pk" => P256(HashTrait::from_b58check(data)?),
+            #[cfg(feature = "bls")]
             "BLpk" => Bls(HashTrait::from_b58check(data)?),
             s => return Err(ByteReprError::UnknownPrefix(s.to_owned())),
         })
@@ -132,6 +148,7 @@ impl ByteReprTrait for Key {
             TAG_ED25519 => Ed25519(HashTrait::try_from_bytes(&bytes[1..])?),
             TAG_SECP256K1 => Secp256k1(HashTrait::try_from_bytes(&bytes[1..])?),
             TAG_P256 => P256(HashTrait::try_from_bytes(&bytes[1..])?),
+            #[cfg(feature = "bls")]
             TAG_BLS => Bls(HashTrait::try_from_bytes(&bytes[1..])?),
             _ => {
                 return Err(ByteReprError::UnknownPrefix(format!(
@@ -148,6 +165,7 @@ impl ByteReprTrait for Key {
             Ed25519(hash) => hash.to_base58_check(),
             Secp256k1(hash) => hash.to_base58_check(),
             P256(hash) => hash.to_base58_check(),
+            #[cfg(feature = "bls")]
             Bls(hash) => hash.to_base58_check(),
         }
     }
@@ -162,6 +180,7 @@ impl ByteReprTrait for Key {
             Ed25519(hash) => go(out, TAG_ED25519, hash),
             Secp256k1(hash) => go(out, TAG_SECP256K1, hash),
             P256(hash) => go(out, TAG_P256, hash),
+            #[cfg(feature = "bls")]
             Bls(hash) => go(out, TAG_BLS, hash),
         }
     }

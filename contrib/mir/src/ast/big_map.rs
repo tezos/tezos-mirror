@@ -485,8 +485,11 @@ impl<'a> TypedValue<'a> {
             ChainId(_) => {}
             Contract(_) => {}
             Timestamp(_) => {}
+            #[cfg(feature = "bls")]
             Bls12381Fr(_) => {}
+            #[cfg(feature = "bls")]
             Bls12381G1(_) => {}
+            #[cfg(feature = "bls")]
             Bls12381G2(_) => {}
             Pair(p) => {
                 p.0.collect_big_maps(put_res);

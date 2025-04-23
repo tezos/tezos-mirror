@@ -23,6 +23,7 @@ use typed_arena::Arena;
 use crate::ast::big_map::{BigMap, LazyStorageError};
 use crate::ast::michelson_address::entrypoint::Direction;
 use crate::ast::*;
+#[cfg(feature = "bls")]
 use crate::bls;
 use crate::context::Ctx;
 use crate::gas::{interpret_cost, OutOfGas};
@@ -253,18 +254,21 @@ fn interpret_one<'a>(
                 let sum = o1.checked_add(o2).ok_or(InterpretError::Overflow)?;
                 stack.push(V::Mutez(sum));
             }
+            #[cfg(feature = "bls")]
             overloads::Add::Bls12381Fr => {
                 let o1 = pop!(V::Bls12381Fr);
                 let o2 = pop!(V::Bls12381Fr);
                 ctx.gas.consume(interpret_cost::ADD_BLS_FR)?;
                 stack.push(V::Bls12381Fr(o1 + o2));
             }
+            #[cfg(feature = "bls")]
             overloads::Add::Bls12381G1 => {
                 let o1 = pop!(V::Bls12381G1);
                 let o2 = pop!(V::Bls12381G1);
                 ctx.gas.consume(interpret_cost::ADD_BLS_G1)?;
                 stack.push(V::new_bls12381_g1(o1.as_ref() + o2.as_ref()));
             }
+            #[cfg(feature = "bls")]
             overloads::Add::Bls12381G2 => {
                 let o1 = pop!(V::Bls12381G2);
                 let o2 = pop!(V::Bls12381G2);
@@ -369,24 +373,28 @@ fn interpret_one<'a>(
                 let res = x1.checked_mul(x2).ok_or(InterpretError::Overflow)?;
                 stack.push(V::Mutez(res));
             }
+            #[cfg(feature = "bls")]
             overloads::Mul::Bls12381G1Bls12381Fr => {
                 ctx.gas.consume(interpret_cost::MUL_BLS_G1)?;
                 let x1 = pop!(V::Bls12381G1);
                 let x2 = pop!(V::Bls12381Fr);
                 stack.push(V::new_bls12381_g1(x1.as_ref() * x2));
             }
+            #[cfg(feature = "bls")]
             overloads::Mul::Bls12381G2Bls12381Fr => {
                 ctx.gas.consume(interpret_cost::MUL_BLS_G2)?;
                 let x1 = pop!(V::Bls12381G2);
                 let x2 = pop!(V::Bls12381Fr);
                 stack.push(V::new_bls12381_g2(x1.as_ref() * x2));
             }
+            #[cfg(feature = "bls")]
             overloads::Mul::Bls12381FrBls12381Fr => {
                 ctx.gas.consume(interpret_cost::MUL_BLS_FR)?;
                 let x1 = pop!(V::Bls12381Fr);
                 let x2 = pop!(V::Bls12381Fr);
                 stack.push(V::Bls12381Fr(x1 * x2));
             }
+            #[cfg(feature = "bls")]
             overloads::Mul::NatBls12381Fr => {
                 let nat = pop!(V::Nat);
                 ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&nat)?)?;
@@ -394,6 +402,7 @@ fn interpret_one<'a>(
                 let x2 = pop!(V::Bls12381Fr);
                 stack.push(V::Bls12381Fr(x1 * x2));
             }
+            #[cfg(feature = "bls")]
             overloads::Mul::IntBls12381Fr => {
                 let int = pop!(V::Int);
                 ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&int)?)?;
@@ -401,6 +410,7 @@ fn interpret_one<'a>(
                 let x2 = pop!(V::Bls12381Fr);
                 stack.push(V::Bls12381Fr(x1 * x2));
             }
+            #[cfg(feature = "bls")]
             overloads::Mul::Bls12381FrNat => {
                 let x1 = pop!(V::Bls12381Fr);
                 let nat = pop!(V::Nat);
@@ -408,6 +418,7 @@ fn interpret_one<'a>(
                 let x2 = bls::Fr::from_big_int(&nat.into());
                 stack.push(V::Bls12381Fr(x1 * x2));
             }
+            #[cfg(feature = "bls")]
             overloads::Mul::Bls12381FrInt => {
                 let x1 = pop!(V::Bls12381Fr);
                 let int = pop!(V::Int);
@@ -579,16 +590,19 @@ fn interpret_one<'a>(
                 ctx.gas.consume(interpret_cost::neg_int(&v)?)?;
                 stack.push(V::Int(-v));
             }
+            #[cfg(feature = "bls")]
             overloads::Neg::Bls12381G1 => {
                 ctx.gas.consume(interpret_cost::NEG_G1)?;
                 let v = irrefutable_match!(&mut stack[0]; V::Bls12381G1).as_mut();
                 *v = -(v as &bls::G1);
             }
+            #[cfg(feature = "bls")]
             overloads::Neg::Bls12381G2 => {
                 ctx.gas.consume(interpret_cost::NEG_G2)?;
                 let v = irrefutable_match!(&mut stack[0]; V::Bls12381G2).as_mut();
                 *v = -(v as &bls::G2);
             }
+            #[cfg(feature = "bls")]
             overloads::Neg::Bls12381Fr => {
                 ctx.gas.consume(interpret_cost::NEG_FR)?;
                 let v = irrefutable_match!(&mut stack[0]; V::Bls12381Fr);
@@ -936,6 +950,7 @@ fn interpret_one<'a>(
                 ctx.gas.consume(interpret_cost::INT_NAT)?;
                 stack.push(V::Int(i.into()));
             }
+            #[cfg(feature = "bls")]
             overloads::Int::Bls12381Fr => {
                 let i = pop!(V::Bls12381Fr);
                 ctx.gas.consume(interpret_cost::INT_BLS_FR)?;
@@ -1723,6 +1738,7 @@ fn interpret_one<'a>(
                 counter,
             ))
         }
+        #[cfg(feature = "bls")]
         I::PairingCheck => {
             let list = pop!(V::List);
             ctx.gas
@@ -1808,6 +1824,7 @@ mod interpreter_tests {
     use crate::ast::big_map::{InMemoryLazyStorage, LazyStorageBulkUpdate};
     use crate::ast::michelson_address as addr;
     use crate::ast::or::Or::Left;
+    #[cfg(feature = "bls")]
     use crate::bls;
     use crate::gas::Gas;
     use chrono::DateTime;
@@ -1937,6 +1954,7 @@ mod interpreter_tests {
     }
 
     #[test]
+    #[cfg(feature = "bls")]
     fn test_add_bls12_381_fr() {
         let mut stack = stk![
             V::Bls12381Fr(bls::Fr::one()),
@@ -1949,6 +1967,7 @@ mod interpreter_tests {
     }
 
     #[test]
+    #[cfg(feature = "bls")]
     fn test_add_bls12_381_g1() {
         let mut stack = stk![
             V::new_bls12381_g1(bls::G1::one()),
@@ -1961,6 +1980,7 @@ mod interpreter_tests {
     }
 
     #[test]
+    #[cfg(feature = "bls")]
     fn test_add_bls12_381_g2() {
         let mut stack = stk![
             V::new_bls12381_g2(bls::G2::one()),
@@ -2510,6 +2530,7 @@ mod interpreter_tests {
     }
 
     #[test]
+    #[cfg(feature = "bls")]
     fn test_int_bls12_381_fr() {
         let mut stack = stk![V::Bls12381Fr(bls::Fr::one())];
         let expected_stack = stk![V::int(1)];
@@ -5679,6 +5700,7 @@ mod interpreter_tests {
     }
 
     #[test]
+    #[cfg(feature = "bls")]
     fn pairing_check() {
         let mut stack = stk![V::List(MichelsonList::from(vec![
             V::new_pair(
@@ -5714,9 +5736,12 @@ mod interpreter_tests {
             assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
         }
 
+        #[cfg(feature = "bls")]
         use crate::bls::*;
+        #[cfg(feature = "bls")]
         use TypedValue as V;
 
+        #[cfg(feature = "bls")]
         macro_rules! test {
             ($overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
                 #[test]
@@ -5729,7 +5754,7 @@ mod interpreter_tests {
 
         // NB: actual bls arithmetic is tested in the bls module, here we only
         // need to check the interpreter works.
-
+        #[cfg(feature = "bls")]
         test!(
             Bls12381G1Bls12381Fr,
             V::new_bls12381_g1(G1::one()),
@@ -5737,6 +5762,7 @@ mod interpreter_tests {
             V::new_bls12381_g1(G1::one()),
         );
 
+        #[cfg(feature = "bls")]
         test!(
             Bls12381G2Bls12381Fr,
             V::new_bls12381_g2(G2::one()),
@@ -5744,6 +5770,7 @@ mod interpreter_tests {
             V::new_bls12381_g2(G2::one()),
         );
 
+        #[cfg(feature = "bls")]
         test!(
             Bls12381FrBls12381Fr,
             V::Bls12381Fr(Fr::one()),
@@ -5751,6 +5778,7 @@ mod interpreter_tests {
             V::Bls12381Fr(Fr::one()),
         );
 
+        #[cfg(feature = "bls")]
         test!(
             NatBls12381Fr,
             V::Nat(1u8.into()),
@@ -5758,6 +5786,7 @@ mod interpreter_tests {
             V::Bls12381Fr(Fr::one()),
         );
 
+        #[cfg(feature = "bls")]
         test!(
             IntBls12381Fr,
             V::Int(1.into()),
@@ -5765,6 +5794,7 @@ mod interpreter_tests {
             V::Bls12381Fr(Fr::one()),
         );
 
+        #[cfg(feature = "bls")]
         test!(
             Bls12381FrNat,
             V::Bls12381Fr(Fr::one()),
@@ -5772,6 +5802,7 @@ mod interpreter_tests {
             V::Bls12381Fr(Fr::one()),
         );
 
+        #[cfg(feature = "bls")]
         test!(
             Bls12381FrInt,
             V::Bls12381Fr(Fr::one()),
@@ -6243,7 +6274,9 @@ mod interpreter_tests {
             assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
         }
 
+        #[cfg(feature = "bls")]
         use crate::bls::*;
+        #[cfg(feature = "bls")]
         use TypedValue as V;
 
         macro_rules! test {
@@ -6259,18 +6292,21 @@ mod interpreter_tests {
         // NB: actual bls arithmetic is tested in the bls module, here we only
         // need to check the interpreter works.
 
+        #[cfg(feature = "bls")]
         test!(
             Bls12381G1,
             V::new_bls12381_g1(G1::one()),
             V::new_bls12381_g1(G1::neg_one()),
         );
 
+        #[cfg(feature = "bls")]
         test!(
             Bls12381G2,
             V::new_bls12381_g2(G2::one()),
             V::new_bls12381_g2(G2::neg_one()),
         );
 
+        #[cfg(feature = "bls")]
         test!(
             Bls12381Fr,
             V::Bls12381Fr(Fr::one()),

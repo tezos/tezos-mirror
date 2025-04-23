@@ -18,8 +18,11 @@ pub enum Add {
     IntNat,
     NatInt,
     MutezMutez,
+    #[cfg(feature = "bls")]
     Bls12381G1,
+    #[cfg(feature = "bls")]
     Bls12381G2,
+    #[cfg(feature = "bls")]
     Bls12381Fr,
     TimestampInt,
     IntTimestamp,
@@ -80,12 +83,19 @@ pub enum Mul {
     IntInt,
     MutezNat,
     NatMutez,
+    #[cfg(feature = "bls")]
     Bls12381G1Bls12381Fr,
+    #[cfg(feature = "bls")]
     Bls12381G2Bls12381Fr,
+    #[cfg(feature = "bls")]
     Bls12381FrBls12381Fr,
+    #[cfg(feature = "bls")]
     NatBls12381Fr,
+    #[cfg(feature = "bls")]
     IntBls12381Fr,
+    #[cfg(feature = "bls")]
     Bls12381FrNat,
+    #[cfg(feature = "bls")]
     Bls12381FrInt,
 }
 
@@ -103,8 +113,11 @@ pub enum EDiv {
 pub enum Neg {
     Nat,
     Int,
+    #[cfg(feature = "bls")]
     Bls12381G1,
+    #[cfg(feature = "bls")]
     Bls12381G2,
+    #[cfg(feature = "bls")]
     Bls12381Fr,
 }
 
@@ -172,6 +185,7 @@ pub enum Concat {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Int {
     Nat,
+    #[cfg(feature = "bls")]
     Bls12381Fr,
     Bytes,
 }
