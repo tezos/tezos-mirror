@@ -9,7 +9,7 @@ let config name = Format.asprintf "/etc/logrotate.d/%s" name
 
 let write_config ~name ~target_file ~max_rotations agent =
   (* Write file locally *)
-  let source = Temp.file (Format.asprintf "%s.logrotate" (Agent.name agent)) in
+  let source = Temp.file (Format.asprintf "%s.logrotate" name) in
   (* Choose a reasonable 300 rotations of 200MB max file
      Files after 300 rotations are deleted
      The rotate is triggered daily or if they are greater than 200MB *)
