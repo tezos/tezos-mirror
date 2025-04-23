@@ -1,3 +1,4 @@
 [env]
-CC_wasm32_unknown_unknown="clang"
-CC_riscv64gc_unknown_hermit="clang"
+CC_wasm32_unknown_unknown = "clang"
+CC_riscv64gc_unknown_hermit = "clang"
+CC_riscv64gc_unknown_linux_musl = "riscv64-unknown-linux-musl-cc"
