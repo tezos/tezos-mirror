@@ -78,6 +78,36 @@ let tests_reuse =
   in
   ("Reuse a worker for a different kind of computation", [test])
 
+let tests_on_completion_callback =
+  let test =
+    tztest "on_completion_handler" @@ fun () ->
+    match Tezos_bees.Task_worker.worker "worker" 1 with
+    | Error e -> Lwt_result_syntax.tzfail e
+    | Ok worker ->
+        let r = ref 0 in
+        let noop () = () in
+        let* _ =
+          Tezos_bees.Task_worker.launch_task_and_wait worker "callback" noop ()
+        in
+        Assert.equal !r 0 ;
+        let on_completion () = incr r in
+        let tasks = 2 in
+        let* _ =
+          Tezos_bees.Task_worker.launch_tasks_and_wait
+            ~on_completion
+            worker
+            "callback"
+            noop
+            (Stdlib.List.init tasks (fun _ -> ()))
+        in
+        Assert.equal !r tasks ;
+        Lwt.return_ok ()
+  in
+  ("Run on_completion callback", [test])
+
 let () =
-  Alcotest_lwt.run ~__FILE__ "Task worker" [tests_fibonacci; tests_reuse]
+  Alcotest_lwt.run
+    ~__FILE__
+    "Task worker"
+    [tests_fibonacci; tests_reuse; tests_on_completion_callback]
   |> Lwt_main.run
