@@ -55,6 +55,9 @@ let fetch_baking_rights client level =
            (round, delegate_pkh))
        JSON.(as_list baking_rights_json)
 
+let fetch_round ?block client =
+  Client.RPC.call client @@ RPC.get_chain_block_helper_round ?block ()
+
 let check_node_version_check_bypass_test =
   Protocol.register_test
     ~__FILE__
@@ -455,6 +458,97 @@ let check_aggregate ~expected_committee aggregate_json =
       pp
       committee
 
+let fetch_consensus_operations ?block client =
+  let* json =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_operations_validation_pass
+         ?block
+         ~validation_pass:0
+         ()
+  in
+  return JSON.(as_list json)
+
+type kind = Attestation | Preattestation
+
+let pp_kind fmt = function
+  | Attestation -> Format.fprintf fmt "attestation"
+  | Preattestation -> Format.fprintf fmt "preattestation"
+
+(** [check_consensus_aux kind ~expected found] fails if the set of delegates in
+   the consensus operations list [found] differs from the set [expected].
+   See [check_consensus_operations]. *)
+let check_consensus_aux kind ~expected found =
+  match (expected, found) with
+  | None, _ -> ()
+  | Some expected, _ ->
+      let sorted_expected = List.sort String.compare expected in
+      let sorted_found =
+        found
+        |> List.map
+             JSON.(
+               fun operation ->
+                 operation |-> "contents" |> as_list |> List.hd |-> "metadata"
+                 |-> "delegate" |> as_string)
+        |> List.sort String.compare
+      in
+      if not (List.equal String.equal sorted_expected sorted_found) then
+        let pp = Format.(pp_print_list ~pp_sep:pp_print_cut pp_print_string) in
+        Test.fail
+          "@[<v 0>Wrong %a set@,@[<v 2>expected:@,%a@]@,@[<v 2>found:@,%a@]@]"
+          pp_kind
+          kind
+          pp
+          sorted_expected
+          pp
+          sorted_found
+
+(** Fetch consensus operations and check that they match the expected contents.
+ *)
+let check_consensus_operations ?expected_aggregated_committee
+    ?expected_preattestations ?expected_attestations ?block client =
+  let* consensus_operations = fetch_consensus_operations ?block client in
+  (* Partition the consensus operations list by kind *)
+  let attestations_aggregates, attestations, preattestations =
+    List.fold_left
+      (fun (attestations_aggregates, attestations, preattestations) operation ->
+        let kind =
+          JSON.(
+            operation |-> "contents" |> as_list |> List.hd |-> "kind"
+            |> as_string)
+        in
+        match kind with
+        | "attestations_aggregate" ->
+            (operation :: attestations_aggregates, attestations, preattestations)
+        | "attestation" | "attestation_with_dal" ->
+            (attestations_aggregates, operation :: attestations, preattestations)
+        | "preattestation" ->
+            (attestations_aggregates, attestations, operation :: preattestations)
+        | _ -> Test.fail "check_consensus_operations: unexpected operation")
+      ([], [], [])
+      consensus_operations
+  in
+  (* Checking attestations_aggregate *)
+  let* () =
+    match (expected_aggregated_committee, attestations_aggregates) with
+    | _, _ :: _ :: _ -> Test.fail "Multiple attestations_aggregate found"
+    | None, _ -> unit
+    | Some _, [] -> Test.fail "No attestations_aggregate found"
+    | Some expected_committee, [attestations_aggregate] ->
+        return @@ check_aggregate ~expected_committee attestations_aggregate
+  in
+  (* Checking attestations *)
+  let () =
+    check_consensus_aux Attestation ~expected:expected_attestations attestations
+  in
+  (* Checking preattestations *)
+  let () =
+    check_consensus_aux
+      Preattestation
+      ~expected:expected_preattestations
+      preattestations
+  in
+  unit
+
 (* [find_aggregate_receipt operations] returns the sole attestations aggregate
    found in [operations]. Fails the test if no such operation exists or if
    more than one if found. *)
@@ -500,6 +594,9 @@ let check_for_non_aggregated_eligible_attestations consensus_operations =
   in
   if has_non_aggregated_eligible_attestations then
     Test.fail "The block contains a non-aggregated eligible attestation"
+
+let public_key_hashes =
+  List.map (fun (account : Account.key) -> account.public_key_hash)
 
 (* Test that the baker aggregates eligible attestations.*)
 let simple_attestations_aggregation =
