@@ -37,7 +37,7 @@ use gdbstub::target::ext::breakpoints::SwBreakpoint;
 use gdbstub::target::ext::breakpoints::SwBreakpointOps;
 use gdbstub::target::ext::exec_file::ExecFile;
 use gdbstub_arch::riscv::reg::RiscvCoreRegs;
-use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::block_cache::block::InterpretedBlockBuilder;
 use octez_riscv::machine_state::memory::BadMemoryAccess;
 use octez_riscv::machine_state::memory::M1G;
 use octez_riscv::machine_state::memory::Memory;

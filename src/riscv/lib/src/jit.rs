@@ -280,9 +280,9 @@ mod tests {
     use crate::backend_test;
     use crate::instruction_context::LoadStoreWidth;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::block_cache::bcall::Block;
-    use crate::machine_state::block_cache::bcall::Interpreted;
-    use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+    use crate::machine_state::block_cache::block::Block;
+    use crate::machine_state::block_cache::block::Interpreted;
+    use crate::machine_state::block_cache::block::InterpretedBlockBuilder;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::memory::Memory;
     use crate::machine_state::memory::MemoryConfig;

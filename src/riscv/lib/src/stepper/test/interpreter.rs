@@ -10,9 +10,9 @@ use std::ops::Bound;
 use goldenfile::Mint;
 use paste::paste;
 
-use crate::machine_state::block_cache::bcall::Block;
-use crate::machine_state::block_cache::bcall::InlineJit;
-use crate::machine_state::block_cache::bcall::Interpreted;
+use crate::machine_state::block_cache::block::Block;
+use crate::machine_state::block_cache::block::InlineJit;
+use crate::machine_state::block_cache::block::Interpreted;
 use crate::machine_state::memory::M1M;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::XRegister;

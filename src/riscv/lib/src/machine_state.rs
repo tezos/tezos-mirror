@@ -24,7 +24,7 @@ use address_translation::PAGE_SIZE;
 use address_translation::translation_cache::TranslationCache;
 use address_translation::translation_cache::TranslationCacheLayout;
 use block_cache::BlockCache;
-use block_cache::bcall::Block;
+use block_cache::block::Block;
 pub use cache_layouts::CacheLayouts;
 pub use cache_layouts::DefaultCacheLayouts;
 pub use cache_layouts::TestCacheLayouts;
@@ -708,8 +708,8 @@ mod tests {
 
     use super::MachineState;
     use super::MachineStateLayout;
-    use super::block_cache::bcall::Interpreted;
-    use super::block_cache::bcall::InterpretedBlockBuilder;
+    use super::block_cache::block::Interpreted;
+    use super::block_cache::block::InterpretedBlockBuilder;
     use super::instruction::Instruction;
     use super::instruction::OpCode;
     use super::instruction::tagged_instruction::TaggedArgs;

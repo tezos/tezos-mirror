@@ -5,7 +5,7 @@
 use std::fs;
 
 use octez_riscv::machine_state::DefaultCacheLayouts;
-use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::block_cache::block::InterpretedBlockBuilder;
 use octez_riscv::machine_state::memory::M64M;
 use octez_riscv::pvm::PvmHooks;
 use octez_riscv::stepper::pvm::PvmStepper;

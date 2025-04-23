@@ -77,14 +77,14 @@
 //! The method of dispatch for Blocks can be one of several mechanisms, the current
 //! default being [`Interpreted`].
 //!
-//! [`Interpreted`]: bcall::Interpreted
+//! [`Interpreted`]: block::Interpreted
 
-pub mod bcall;
+pub mod block;
 pub mod metrics;
 
 use std::marker::PhantomData;
 
-use bcall::Block;
+use block::Block;
 
 use super::MachineCoreState;
 use super::ProgramCounterUpdate;
@@ -947,8 +947,8 @@ mod tests {
     use crate::machine_state::MachineState;
     use crate::machine_state::TestCacheLayouts;
     use crate::machine_state::address_translation::PAGE_SIZE;
-    use crate::machine_state::block_cache::bcall::Interpreted;
-    use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+    use crate::machine_state::block_cache::block::Interpreted;
+    use crate::machine_state::block_cache::block::InterpretedBlockBuilder;
     use crate::machine_state::instruction::Instruction;
     use crate::machine_state::instruction::OpCode;
     use crate::machine_state::instruction::tagged_instruction::TaggedArgs;

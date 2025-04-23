@@ -7,7 +7,7 @@
 use crate::machine_state::AccessType;
 use crate::machine_state::CacheLayouts;
 use crate::machine_state::MachineState;
-use crate::machine_state::block_cache::bcall::Block;
+use crate::machine_state::block_cache::block::Block;
 use crate::machine_state::memory::MemoryConfig;
 use crate::state_backend;
 

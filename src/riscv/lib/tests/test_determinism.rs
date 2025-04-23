@@ -8,7 +8,7 @@ use std::ops::Bound;
 
 use common::*;
 use octez_riscv::machine_state::DefaultCacheLayouts;
-use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::block_cache::block::InterpretedBlockBuilder;
 use octez_riscv::machine_state::memory::M64M;
 use octez_riscv::pvm::PvmLayout;
 use octez_riscv::state_backend::RefOwnedAlloc;

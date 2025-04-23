@@ -25,7 +25,7 @@ use crate::machine_state::CacheLayouts;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::MachineError;
 use crate::machine_state::MachineState;
-use crate::machine_state::block_cache::bcall::Block;
+use crate::machine_state::block_cache::block::Block;
 use crate::machine_state::memory::Address;
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;

@@ -33,7 +33,7 @@ pub(crate) use core::block_metrics;
 pub(crate) use block_metrics;
 
 use super::ICallPlaced;
-use super::bcall::Block;
+use super::block::Block;
 use crate::machine_state::memory::MemoryConfig;
 use crate::state::NewState;
 use crate::state_backend::EnrichedCell;
@@ -52,7 +52,7 @@ pub mod core {
 
     use super::BlockHash;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::block_cache::bcall::Block;
+    use crate::machine_state::block_cache::block::Block;
     use crate::machine_state::instruction::Instruction;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::memory::MemoryConfig;
@@ -341,7 +341,7 @@ impl<B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase> Block<MC, M> for BlockMe
 
     fn struct_ref<'a, F: crate::state_backend::FnManager<crate::state_backend::Ref<'a, M>>>(
         &'a self,
-    ) -> crate::state_backend::AllocatedOf<super::bcall::BlockLayout, F::Output> {
+    ) -> crate::state_backend::AllocatedOf<super::block::BlockLayout, F::Output> {
         self.block.struct_ref::<F>()
     }
 
@@ -361,7 +361,7 @@ impl<B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase> Block<MC, M> for BlockMe
         self.block_hash = BlockHash::Dirty;
     }
 
-    fn bind(allocated: crate::state_backend::AllocatedOf<super::bcall::BlockLayout, M>) -> Self
+    fn bind(allocated: crate::state_backend::AllocatedOf<super::block::BlockLayout, M>) -> Self
     where
         <M as ManagerBase>::ManagerRoot: crate::state_backend::ManagerReadWrite,
     {
