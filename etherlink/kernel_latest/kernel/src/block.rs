@@ -113,7 +113,9 @@ fn on_invalid_transaction<Host: Runtime>(
 }
 
 fn max_gas_per_reboot(limits: &EvmLimits) -> u64 {
-    limits.maximum_gas_limit * 4 / 3
+    // Arbitrarily defined as to give 500k gas in addition to `maximum_gas_limit` in our production
+    // case (i.e., when `maximum_gas_limit` is 30M).
+    limits.maximum_gas_limit * 61 / 60
 }
 
 fn can_fit_in_reboot(
@@ -121,8 +123,6 @@ fn can_fit_in_reboot(
     used_gas_in_run: U256,
     tx_gas_limit: u64,
 ) -> bool {
-    // This is arbitrary, let's accept to execute at most 4/3 of the maximum gas allowed per
-    // transaction in a single reboot
     let max_gas_per_reboot = U256::from(max_gas_per_reboot(limits));
     used_gas_in_run + U256::from(tx_gas_limit) <= max_gas_per_reboot
 }
@@ -1651,7 +1651,7 @@ mod tests {
         host.reboot_left().expect("should be some reboot left");
 
         let mut chain_config = dummy_evm_config(EVMVersion::current_test_config());
-        chain_config.limits_mut().maximum_gas_limit = 300_000;
+        chain_config.limits_mut().maximum_gas_limit = 560_000;
         let mut configuration = dummy_configuration();
 
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
@@ -1741,7 +1741,7 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(&mut host, proposals);
 
         let mut chain_config = dummy_evm_config(EVMVersion::current_test_config());
-        chain_config.limits_mut().maximum_gas_limit = 300_000;
+        chain_config.limits_mut().maximum_gas_limit = 560_000;
         let mut configuration = dummy_configuration();
 
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
