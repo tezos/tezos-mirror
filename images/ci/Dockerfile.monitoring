@@ -14,16 +14,16 @@ RUN apk update && apk add --no-cache npm
 # NPM_REGISTRY_DOMAIN and NPM_REGISTRY are set in the GitLab CI/CD
 ARG NPM_REGISTRY_DOMAIN
 ARG NPM_REGISTRY
-COPY datadog/package.json datadog/package-lock.json /usr/local/lib/
+COPY datadog/package.json datadog/package-lock.json /usr/local/lib/datadog/
 # hadolint ignore=DL3003
 RUN --mount=type=secret,id=npm_token \
     if [ -n "$NPM_REGISTRY" ] ; then \
       npm set registry "$NPM_REGISTRY" && \
       npm set //"${NPM_REGISTRY_DOMAIN}":_authToken="$(cat /run/secrets/npm_token)"; \
     fi \
-    && cd /usr/local/lib/ && npm ci
+    && cd /usr/local/lib/datadog && npm ci
 
 USER tezos
 ENV USER=tezos
-ENV PATH=/usr/local/lib/node_modules/.bin:$PATH
+ENV PATH=/usr/local/lib/datadog/node_modules/.bin:$PATH
 WORKDIR /home/tezos
