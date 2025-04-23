@@ -783,6 +783,16 @@ module Consensus = struct
     let*? () = check_payload_hash kind expected_payload_hash bph in
     return_unit
 
+  let check_dal_content vi level slot consensus_key = function
+    | None -> return_unit
+    | Some {attestation} ->
+        Dal_apply.validate_attestation
+          vi.ctxt
+          level
+          slot
+          consensus_key
+          attestation
+
   let check_attestation vi ~check_signature
       (operation : Kind.attestation operation) =
     let open Lwt_result_syntax in
@@ -823,15 +833,11 @@ module Consensus = struct
     in
     let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     let* () =
-      Option.fold
-        ~none:return_unit
-        ~some:(fun dal ->
-          Dal_apply.validate_attestation
-            vi.ctxt
-            consensus_content.level
-            consensus_content.slot
-            consensus_key
-            dal.attestation)
+      check_dal_content
+        vi
+        consensus_content.level
+        consensus_content.slot
+        consensus_key
         dal_content
     in
     let*? () =
@@ -1319,7 +1325,7 @@ module Consensus = struct
         (* Retreive public keys and compute total voting power *)
         let* public_keys, total_voting_power =
           List.fold_left_es
-            (fun (public_keys, total_voting_power) slot ->
+            (fun (public_keys, total_voting_power) (slot, dal) ->
               (* Lookup the slot owner *)
               let*? consensus_key, power, _ =
                 get_delegate_details
@@ -1330,11 +1336,12 @@ module Consensus = struct
               let* () =
                 check_delegate_is_not_forbidden info.ctxt consensus_key.delegate
               in
+              let* () = check_dal_content info level slot consensus_key dal in
               match consensus_key.consensus_pk with
               | Bls pk -> return (pk :: public_keys, power + total_voting_power)
               | _ -> tzfail Validate_errors.Consensus.Non_bls_key_in_aggregate)
             ([], 0)
-            (Operation.tmp_to_old_committee committee)
+            committee
         in
         (* Fail on empty committee *)
         let*? () =
