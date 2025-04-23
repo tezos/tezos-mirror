@@ -838,8 +838,8 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
     ?cache ?id_tokens ?interruptible ?(dependencies = Staged [])
     ?(image_dependencies = []) ?services ?variables ?rules
     ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag ?(cpu = Normal) ?git_strategy
-    ?coverage ?retry ?parallel ?description ~__POS__ ?image ?template ~stage
-    ~name script : tezos_job =
+    ?coverage ?retry ?parallel ?description ?(dev_infra = false) ~__POS__ ?image
+    ?template ~stage ~name script : tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag =
     match (arch, tag, cpu) with
@@ -852,14 +852,16 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
     | None, Some _, High
     | Some _, None, High
     | None, None, High ->
-        Gcp_high_cpu
+        if dev_infra then Gcp_high_cpu_dev else Gcp_high_cpu
     | Some _, Some _, Very_high
     | None, Some _, Very_high
     | Some _, None, Very_high
     | None, None, Very_high ->
-        Gcp_very_high_cpu
+        if dev_infra then Gcp_very_high_cpu_dev else Gcp_very_high_cpu
     | Some arch, None, Normal -> (
-        match arch with Amd64 -> Gcp | Arm64 -> Gcp_arm64)
+        match arch with
+        | Amd64 -> if dev_infra then Gcp_dev else Gcp
+        | Arm64 -> Gcp_arm64)
     | None, Some tag, Normal -> tag
     | None, None, Normal ->
         (* By default, we assume Amd64 runners as given by the [gcp] tag. *)
@@ -1408,7 +1410,7 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
 let job_docker_authenticated ?(skip_docker_initialization = false)
     ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies
     ?image_dependencies ?arch ?tag ?allow_failure ?parallel ?timeout ?retry
-    ?description ~__POS__ ~stage ~name script : tezos_job =
+    ?description ?dev_infra ~__POS__ ~stage ~name script : tezos_job =
   let docker_version = "24.0.7" in
   job
     ?rules
@@ -1422,6 +1424,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ?timeout
     ?retry
     ?description
+    ?dev_infra
     ~__POS__
     ~image:Images_external.docker
     ~variables:
