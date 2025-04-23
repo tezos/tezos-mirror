@@ -1426,31 +1426,85 @@ module Monitoring_app = struct
       in
       loop [] (n, l)
 
-    let fetch_bakers_info network =
-      let* bakers = Network.delegates network in
+    let get_current_cycle endpoint =
+      let* json =
+        RPC_core.call
+          endpoint
+          (RPC_core.make
+             GET
+             ["chains"; "main"; "blocks"; "head"; "helpers"; "current_level"]
+             Fun.id)
+      in
+      JSON.(json |-> "cycle" |> as_int) |> Lwt.return
+
+    let get_bakers_with_staking_power endpoint cycle =
+      let* json =
+        RPC_core.call
+          endpoint
+          (RPC_core.make
+             GET
+             [
+               "chains";
+               "main";
+               "blocks";
+               "head";
+               "context";
+               "raw";
+               "json";
+               "cycle";
+               string_of_int cycle;
+               "selected_stake_distribution";
+             ]
+             Fun.id)
+      in
+      let bakers_with_pow = JSON.(json |> as_list) in
+      Lwt.return
+      @@ List.map
+           JSON.(
+             fun baker_with_pow ->
+               let active_stake = baker_with_pow |-> "active_stake" in
+               let frozen_stake = active_stake |-> "frozen" |> as_int in
+               let delegated_stake = active_stake |-> "delegated" |> as_int in
+               ( baker_with_pow |-> "baker" |> as_string,
+                 frozen_stake + delegated_stake ))
+           bakers_with_pow
+
+    let fetch_bakers_info endpoint =
+      let* cycle = get_current_cycle endpoint in
+      let* bakers = get_bakers_with_staking_power endpoint cycle in
+      let total_baking_power =
+        List.fold_left (fun acc (_, pow) -> acc + pow) 0 bakers
+      in
       let* bakers_info =
-        match bakers with
-        | None -> Lwt.return_nil
-        | Some bakers ->
-            Lwt_list.filter_map_p
-              (fun (alias, address, _) ->
-                let* info =
-                  fetch_baker_info
-                    ~origin:(Format.sprintf "fetch_baker_info.%s" address)
-                    ~tz1:address
-                in
-                Lwt.return_some (`address address, `alias alias, info))
-              bakers
+        Lwt_list.filter_map_p
+          (fun (address, baking_power) ->
+            let* info =
+              fetch_baker_info
+                ~origin:(Format.sprintf "fetch_baker_info.%s" address)
+                ~tz1:address
+            in
+            let baking_ratio =
+              float_of_int baking_power /. float_of_int total_baking_power
+            in
+            let alias = Hashtbl.find_opt aliases address in
+            Lwt.return_some (`address address, `alias alias, info, baking_ratio))
+          bakers
       in
       let sorted_bakers =
         List.sort
-          (fun (_, _, (x_slot, x_dal_endorsement))
-               (_, _, (y_slot, y_dal_endorsement)) ->
-            let cmp =
-              Option.compare Float.compare x_dal_endorsement y_dal_endorsement
-            in
-            if cmp = 0 then Option.compare Float.compare x_slot y_slot else -cmp)
-          bakers_info
+          (fun (_, _, (x_slot_perf, x_dal_mention_perf), x_stake)
+               (_, _, (y_slot_perf, y_dal_mention_perf), y_stake) ->
+            let cmp = Option.compare Float.compare x_slot_perf y_slot_perf in
+            if cmp = 0 then
+              let cmp =
+                Option.compare
+                  Float.compare
+                  x_dal_mention_perf
+                  y_dal_mention_perf
+              in
+              if cmp = 0 then -Float.compare x_stake y_stake else cmp
+            else cmp)
+          baker_infos
       in
       (* `group_by n l` outputs the list of lists with the same elements as `l`
          but with `n` elements per list (except the last one).
@@ -1479,7 +1533,8 @@ module Monitoring_app = struct
       in
       Lwt.return (view_slot_info data)
 
-    let action ~slack_bot_token ~slack_channel_id ~configuration () =
+    let action ~slack_bot_token ~slack_channel_id ~configuration endpoint () =
+      let* endpoint in
       let network = configuration.network in
       let title_info =
         Format.sprintf
@@ -1511,7 +1566,7 @@ module Monitoring_app = struct
             ()
       in
       let* thread_id = post_message ~slack_channel_id ~slack_bot_token data in
-      let* bakers_info = fetch_bakers_info network in
+      let* bakers_info = fetch_bakers_info endpoint in
       Lwt_list.iter_s
         (fun to_post ->
           let data =
@@ -1530,12 +1585,12 @@ module Monitoring_app = struct
        time (summer months), Paris switches to Central European Summer
        Time (CEST), which is UTC+2.
     *)
-    let tasks ~configuration =
+    let tasks ~configuration endpoint =
       match configuration.monitor_app_configuration with
       | None -> []
       | Some {slack_bot_token; slack_channel_id; _} ->
           let action () =
-            action ~slack_bot_token ~slack_channel_id ~configuration ()
+            action ~slack_bot_token ~slack_channel_id ~configuration endpoint ()
           in
           [
             Chronos.task ~name:"network-overview" ~tm:"0 0-23/6 * * *" ~action ();
@@ -3705,6 +3760,7 @@ let register (module Cli : Scenarios_cli.Dal) =
            | Etherlink_producer _ -> default_vm_configuration ~name
            | Reverse_proxy -> default_vm_configuration ~name)
   in
+  let endpoint, resolver_endpoint = Lwt.wait () in
   Cloud.register
   (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)
     ~vms
@@ -3743,7 +3799,7 @@ let register (module Cli : Scenarios_cli.Dal) =
       | Some fundraiser_key -> ["--fundraiser"; fundraiser_key])
     ~__FILE__
     ~title:"DAL node benchmark"
-    ~tasks:(Monitoring_app.Tasks.tasks ~configuration)
+    ~tasks:(Monitoring_app.Tasks.tasks ~configuration endpoint)
     ~tags:[]
     (fun cloud ->
       toplog "Creating the agents" ;
@@ -3768,5 +3824,6 @@ let register (module Cli : Scenarios_cli.Dal) =
         Lwt.return agent
       in
       let* t = init ~configuration etherlink_configuration cloud next_agent in
+      Lwt.wakeup resolver_endpoint t.some_node_rpc_endpoint ;
       toplog "Starting main loop" ;
       loop t (t.first_level + 1))
