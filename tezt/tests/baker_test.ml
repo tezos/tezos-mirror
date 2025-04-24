@@ -42,6 +42,9 @@ let log_step counter msg =
 let bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5 =
   Constant.(bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5)
 
+let public_key_hashes =
+  List.map (fun (account : Account.key) -> account.public_key_hash)
+
 (* [fetch_baking_rights client lvl] calls the baking_rights RPC and returns the
    result as an association list. The list associates each round number with the
    public key hash of the delegate holding baking rights for that round. *)
@@ -445,7 +448,9 @@ let force_apply_from_round =
 (* [check_aggregate ~expected_committee aggregate_json] fails if the set of
    committee members in [aggregate_json] differs from [expected_committee]. *)
 let check_aggregate ~expected_committee aggregate_json =
-  let expected_committee = List.sort String.compare expected_committee in
+  let expected_committee =
+    public_key_hashes expected_committee |> List.sort String.compare
+  in
   let contents = JSON.(aggregate_json |-> "contents" |> as_list |> List.hd) in
   let committee =
     JSON.(contents |-> "metadata" |-> "committee" |> as_list)
@@ -484,7 +489,9 @@ let check_consensus_aux kind ~expected found =
   match (expected, found) with
   | None, _ -> ()
   | Some expected, _ ->
-      let sorted_expected = List.sort String.compare expected in
+      let sorted_expected =
+        public_key_hashes expected |> List.sort String.compare
+      in
       let sorted_found =
         found
         |> List.map
@@ -598,9 +605,6 @@ let check_for_non_aggregated_eligible_attestations consensus_operations =
   if has_non_aggregated_eligible_attestations then
     Test.fail "The block contains a non-aggregated eligible attestation"
 
-let public_key_hashes =
-  List.map (fun (account : Account.key) -> account.public_key_hash)
-
 (* Test that the baker aggregates eligible attestations.*)
 let simple_attestations_aggregation =
   Protocol.register_test
@@ -650,13 +654,7 @@ let simple_attestations_aggregation =
     |> List.append [b1; b2; b3]
   in
   (* Expected committee that should be found in attestations aggregate *)
-  let expected_committee =
-    [
-      bootstrap1.public_key_hash;
-      bootstrap2.public_key_hash;
-      bootstrap3.public_key_hash;
-    ]
-  in
+  let expected_committee = [bootstrap1; bootstrap2; bootstrap3] in
   (* Testing the "bake for" command *)
   log_step 4 "Bake for until level 8" ;
   (* Waiting for level 8 ensures that the bls consensus keys are activated *)
@@ -950,8 +948,8 @@ let attestations_aggregation_on_reproposal =
   let* _ = Node.wait_for_level node 6 in
   let* () =
     check_consensus_operations
-      ~expected_aggregated_committee:(public_key_hashes [bootstrap1])
-      ~expected_attestations:(public_key_hashes [bootstrap5])
+      ~expected_aggregated_committee:[bootstrap1]
+      ~expected_attestations:[bootstrap5]
       client
   in
   (* The baker running bootstrap5 doesn't have enough voting power to progress
@@ -985,9 +983,8 @@ let attestations_aggregation_on_reproposal =
   let* _ = Node.wait_for_branch_switch ~level:6 node in
   let* () =
     check_consensus_operations
-      ~expected_aggregated_committee:
-        (public_key_hashes [bootstrap1; bootstrap2])
-      ~expected_attestations:(public_key_hashes [bootstrap4; bootstrap5])
+      ~expected_aggregated_committee:[bootstrap1; bootstrap2]
+      ~expected_attestations:[bootstrap4; bootstrap5]
       client
   in
   Log.info "Preattesting the latest block at level 6 with bootstrap1 & 2" ;
@@ -1048,12 +1045,9 @@ let attestations_aggregation_on_reproposal =
   let* _ = Node.wait_for_branch_switch ~level:6 node in
   let* () =
     check_consensus_operations
-      ~expected_aggregated_committee:
-        (public_key_hashes [bootstrap1; bootstrap2; bootstrap3])
-      ~expected_attestations:
-        (public_key_hashes [bootstrap4; bootstrap5; bootstrap6])
-      ~expected_preattestations:
-        (public_key_hashes [bootstrap1; bootstrap2; bootstrap4; bootstrap5])
+      ~expected_aggregated_committee:[bootstrap1; bootstrap2; bootstrap3]
+      ~expected_attestations:[bootstrap4; bootstrap5; bootstrap6]
+      ~expected_preattestations:[bootstrap1; bootstrap2; bootstrap4; bootstrap5]
       client
   in
   unit
