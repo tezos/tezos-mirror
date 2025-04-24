@@ -1925,7 +1925,7 @@ module Block = struct
         round : Round.t;
       }
     | Insufficient_locked_round_evidence of {
-        voting_power : int;
+        total_attesting_power : int;
         consensus_threshold : int;
       }
 
@@ -2020,20 +2020,23 @@ module Block = struct
       ~id:"validate.block.insufficient_locked_round_evidence"
       ~title:"Insufficient locked round evidence"
       ~description:"Insufficient locked round evidence."
-      ~pp:(fun ppf (voting_power, consensus_threshold) ->
+      ~pp:(fun ppf (total_attesting_power, consensus_threshold) ->
         Format.fprintf
           ppf
           "The provided locked round evidence is not sufficient: provided %d \
-           voting power but was expecting at least %d."
-          voting_power
+           total attesting power but was expecting at least %d."
+          total_attesting_power
           consensus_threshold)
       Data_encoding.(
-        obj2 (req "voting_power" int31) (req "consensus_threshold" int31))
+        obj2
+          (req "total_attesting_power" int31)
+          (req "consensus_threshold" int31))
       (function
-        | Insufficient_locked_round_evidence {voting_power; consensus_threshold}
-          ->
-            Some (voting_power, consensus_threshold)
+        | Insufficient_locked_round_evidence
+            {total_attesting_power; consensus_threshold} ->
+            Some (total_attesting_power, consensus_threshold)
         | _ -> None)
-      (fun (voting_power, consensus_threshold) ->
-        Insufficient_locked_round_evidence {voting_power; consensus_threshold})
+      (fun (total_attesting_power, consensus_threshold) ->
+        Insufficient_locked_round_evidence
+          {total_attesting_power; consensus_threshold})
 end
