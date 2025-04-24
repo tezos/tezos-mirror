@@ -29,6 +29,11 @@ let run_vdf (module Plugin : Protocol_plugin_sig.S) (pidfile, keep_alive) cctxt
   Configuration.may_lock_pidfile pidfile @@ fun () ->
   Plugin.Baker_commands_helpers.run_vdf_daemon ~cctxt ~keep_alive
 
+let run_accuser (module Plugin : Protocol_plugin_sig.S)
+    (pidfile, preserved_levels, keep_alive) cctxt =
+  Configuration.may_lock_pidfile pidfile @@ fun () ->
+  Plugin.Accuser_commands_helpers.run ~cctxt ~preserved_levels ~keep_alive
+
 let baker_commands ?plugin () =
   let open Configuration in
   let open Tezos_clic in
@@ -67,5 +72,13 @@ let baker_commands ?plugin () =
       (prefixes ["run"; "vdf"] @@ stop)
       (match plugin with
       | Some plugin -> run_vdf plugin
+      | None -> fun _ _ -> Lwt_result_syntax.return_unit);
+    command
+      ~group
+      ~desc:"Launch the accuser daemon"
+      (args3 pidfile_arg preserved_levels_arg keep_alive_arg)
+      (prefixes ["run"; "accuser"] @@ stop)
+      (match plugin with
+      | Some plugin -> run_accuser plugin
       | None -> fun _ _ -> Lwt_result_syntax.return_unit);
   ]

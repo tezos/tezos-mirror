@@ -13,6 +13,8 @@ type error += Block_vote_file_not_found of string
 
 type error += Bad_minimal_fees of string
 
+type error += Bad_preserved_levels of string
+
 let () =
   register_error_kind
     `Permanent
@@ -41,7 +43,21 @@ let () =
       Format.fprintf ppf "invalid minimal fees '%s'" literal)
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_minimal_fees parameter -> Some parameter | _ -> None)
-    (fun parameter -> Bad_minimal_fees parameter)
+    (fun parameter -> Bad_minimal_fees parameter) ;
+  register_error_kind
+    `Permanent
+    ~id:"badPreservedLevelsArg"
+    ~title:"Bad -preserved-levels arg"
+    ~description:"invalid number of levels in -preserved-levels"
+    ~pp:(fun ppf literal ->
+      Format.fprintf
+        ppf
+        "Bad argument value for -preserved_levels. Expected a positive \
+         integer, but given '%s'"
+        literal)
+    Data_encoding.(obj1 (req "parameter" string))
+    (function Bad_preserved_levels parameter -> Some parameter | _ -> None)
+    (fun parameter -> Bad_preserved_levels parameter)
 
 (* Primitive argument parsers *)
 let string_parameter =
@@ -364,6 +380,21 @@ let sources_param =
        ~desc:
          "name of the delegate owning the attestation/baking right or name of \
           the consensus key signing on the delegate's behalf")
+
+let preserved_levels_arg =
+  let open Lwt_result_syntax in
+  Tezos_clic.default_arg
+    ~long:"preserved-levels"
+    ~placeholder:"threshold"
+    ~doc:"Number of effective levels kept in the accuser's memory"
+    ~default:"200"
+    (Tezos_clic.parameter
+       (fun (_cctxt : Tezos_client_base.Client_context.full) s ->
+         try
+           let preserved_levels = int_of_string s in
+           if preserved_levels < 0 then tzfail (Bad_preserved_levels s)
+           else return preserved_levels
+         with _ -> tzfail (Bad_preserved_levels s)))
 
 type t = {
   pidfile : string option;
