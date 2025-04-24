@@ -39,6 +39,9 @@ let log_step counter msg =
   let prefix = "step" ^ string_of_int counter in
   Log.info ~color ~prefix msg
 
+let bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5 =
+  Constant.(bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5)
+
 (* [fetch_baking_rights client lvl] calls the baking_rights RPC and returns the
    result as an association list. The list associates each round number with the
    public key hash of the delegate holding baking rights for that round. *)
@@ -638,9 +641,6 @@ let simple_attestations_aggregation =
   let* b2 = Client.gen_keys ~sig_alg:"bls" client in
   let* b3 = Client.gen_keys ~sig_alg:"bls" client in
   log_step 4 "Use them as consensus keys for some delegates" ;
-  let bootstrap1, bootstrap2, bootstrap3 =
-    Constant.(bootstrap1, bootstrap2, bootstrap3)
-  in
   let* () = Client.update_consensus_key ~src:bootstrap1.alias ~pk:b1 client in
   let* () = Client.update_consensus_key ~src:bootstrap2.alias ~pk:b2 client in
   let* () = Client.update_consensus_key ~src:bootstrap3.alias ~pk:b3 client in
@@ -888,9 +888,6 @@ let attestations_aggregation_on_reproposal =
       ()
   in
   let* _ = Node.wait_for_level node 1 in
-  let bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5 =
-    Constant.(bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5)
-  in
   (* Setup bootstrap6 as an additional delegate *)
   let* bootstrap6 = Client.show_address ~alias:"bootstrap6" client in
   Log.info
