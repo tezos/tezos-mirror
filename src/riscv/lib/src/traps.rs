@@ -30,6 +30,10 @@ use crate::machine_state::memory::Address;
 
 /// RISC-V Exceptions (also known as synchronous exceptions)
 #[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug, Clone, Copy)]
+#[expect(
+    clippy::enum_variant_names,
+    reason = "Some variants share the same prefix but in this case the prefix cannot be omitted"
+)]
 pub enum EnvironException {
     EnvCallFromUMode,
     EnvCallFromSMode,

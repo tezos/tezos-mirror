@@ -7,6 +7,7 @@ use std::fmt;
 
 macro_rules! bits_builtin {
     ($t:tt, $size:expr) => {
+        #[allow(clippy::allow_attributes, reason = "As the macro generates methods regardless of whether they're used or not, we need to be able to silence some warnings")]
         pub mod $t {
             /// Creates a bitmask from a range of bits for a strict subset of a value.
             /// Panics if the range covers the whole value.
@@ -20,6 +21,7 @@ macro_rules! bits_builtin {
             }
 
             /// Creates a bitmask from a range of bits.
+            #[allow(dead_code)]
             #[inline(always)]
             pub const fn mask(start: usize, end: usize) -> $t {
                 if start == $size - 1 && end == 0 {
@@ -43,6 +45,7 @@ macro_rules! bits_builtin {
             }
 
             /// Sets [bit] in `v` to `value`.
+            #[allow(dead_code)]
             #[inline(always)]
             pub const fn set_bit(v: $t, bit: usize, value: bool) -> $t {
                 let mask = 1 << bit;
@@ -52,6 +55,7 @@ macro_rules! bits_builtin {
             /// Replaces a strict subset of bits of `v` with `bits`.
             /// If `bits` is larger than the range, the highest bits will be truncated.
             /// Panics if the range covers the whole value.
+            #[allow(dead_code)]
             #[inline(always)]
             pub const fn replace_subset(v: $t, start: usize, end: usize, bits: $t) -> $t {
                 let mask = mask_subset(start, end);

@@ -97,9 +97,6 @@ pub struct LoadResult<'a> {
     /// Address at which the entrypoint of the program is located
     pub entry: u64,
 
-    /// Index of the last written byte in memory after loading the ELF
-    pub last_written: u64,
-
     /// Raw program headers
     pub program_headers: ProgramHeaders<'a>,
 }
@@ -128,8 +125,6 @@ pub fn load_elf_nonreloc<'a>(
         .flat_map(|headers| headers.iter())
         .filter(|header| header.p_type == PT_LOAD);
 
-    let mut last_written = 0;
-
     // Capacity of 4 should cover most cases:
     //  .text => rx
     //  .rodata => r
@@ -151,27 +146,14 @@ pub fn load_elf_nonreloc<'a>(
             let num_zeroes = segment.p_memsz.saturating_sub(segment.p_filesz);
             mem.set_zero(first_zero, num_zeroes)?;
         }
-
-        last_written = segment.p_paddr + segment.p_memsz;
     }
 
     let program_headers = extract_program_headers(&elf.ehdr, contents, permissions);
 
     Ok(LoadResult {
         entry: elf.ehdr.e_entry,
-        last_written,
         program_headers,
     })
-}
-
-/// Required memory size for loading.
-pub fn mem_size(phs: &[ProgramHeader]) -> usize {
-    let phs = phs.iter().filter(|ph| ph.p_type == PT_LOAD);
-
-    let min = phs.clone().map(|ph| ph.p_vaddr).min();
-    let max = phs.map(|ph| ph.p_vaddr + ph.p_memsz).max();
-
-    min.and_then(|min| max.map(|max| max - min)).unwrap_or(0) as usize
 }
 
 /// Load a relocatable ELF file at the given `start` address. `elf` is the partially parsed
@@ -187,8 +169,6 @@ pub fn load_elf_reloc<'a>(
         .into_iter()
         .flat_map(|headers| headers.iter())
         .filter(|header| header.p_type == PT_LOAD);
-
-    let mut last_written = start;
 
     // Capacity of 4 should cover most cases:
     //  .text => rx
@@ -212,8 +192,6 @@ pub fn load_elf_reloc<'a>(
             let num_zeroes = segment.p_memsz.saturating_sub(segment.p_filesz);
             mem.set_zero(first_zero, num_zeroes)?;
         }
-
-        last_written = start + segment.p_vaddr + segment.p_memsz;
     }
 
     let mut relas_addr = None;
@@ -253,7 +231,6 @@ pub fn load_elf_reloc<'a>(
 
     Ok(LoadResult {
         entry: elf.ehdr.e_entry + start,
-        last_written,
         program_headers,
     })
 }
