@@ -196,6 +196,9 @@ module Node = struct
                         Node.snapshot_import ~no_check:true node "snapshot_file"
                       in
                       let () = toplog "Snapshot import succeeded." in
+                      let* _ =
+                        Process.wait (Process.spawn "rm" ["snapshot_file"])
+                      in
                       Lwt.return_unit
                     with _ ->
                       (* Failing to import the snapshot could happen on a
