@@ -179,6 +179,8 @@ module Accountability = struct
 end
 
 module Dal_dependent_signing = struct
+  let weight t = Z.succ (to_z t)
+
   (* Computes [((to_z t) + 1) * companion + consensus].
 
      The purpose of the [+ 1] is to guarantee that the result is
@@ -192,7 +194,7 @@ module Dal_dependent_signing = struct
   let aggregate ~subgroup_check ~aggregate_opt ~aggregate_weighted_opt
       ~consensus ~companion t =
     let subgroup_check = Some subgroup_check in
-    let z = Z.succ (to_z t) in
+    let z = weight t in
     let weighted_companion_opt =
       if Z.equal z Z.one then
         (* Small optimization for the [t = empty] case. *)

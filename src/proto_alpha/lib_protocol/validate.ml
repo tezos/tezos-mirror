@@ -1042,41 +1042,54 @@ module Consensus = struct
         };
     }
 
-  let check_attestations_aggregate_signature info public_keys
+  let check_attestations_aggregate_signature info pks weighted_pks
       ({shell; protocol_data = {contents = Single content; signature}} :
         Kind.attestations_aggregate Operation.t) =
-    let open Lwt_result_syntax in
+    let open Result_syntax in
     let (Attestations_aggregate {consensus_content; _}) = content in
     let {level; round; block_payload_hash} : consensus_aggregate_content =
       consensus_content
     in
-    (* We disable subgroup check (for better performances) since public keys are
-       retreived from the context and assumed valid. *)
-    match Bls.aggregate_public_key_opt ~subgroup_check:false public_keys with
-    | None ->
-        (* This is never supposed to happen since keys are assumed valid. *)
-        tzfail Validate_errors.Consensus.Public_key_aggregation_failure
-    | Some public_keys_aggregate ->
-        (* Reconstructing an attestation to match the content signed by each
-           delegate. Fields slot and dal_content are filled with dummy values as
-           they are not part of the signed payload *)
-        let consensus_content =
-          {slot = Slot.zero; level; round; block_payload_hash}
-        in
-        let contents =
-          Single (Attestation {consensus_content; dal_content = None})
-        in
-        let attestation : Kind.attestation operation =
-          {shell; protocol_data = {contents; signature}}
-        in
-        let*? () =
-          Operation.check_signature
-            info.ctxt
-            (Bls public_keys_aggregate)
-            info.chain_id
-            attestation
-        in
-        return_unit
+    let aggregated_pk_opt =
+      (* We disable subgroup check (for better performances) since
+         public keys are retreived from the context and assumed
+         valid. *)
+      let subgroup_check = false in
+      if List.is_empty weighted_pks then
+        Bls.aggregate_public_key_opt ~subgroup_check pks
+      else
+        Option.bind
+          (Bls.aggregate_public_key_weighted_opt ~subgroup_check weighted_pks)
+        @@ fun aggregated_weighted_pks ->
+        Bls.aggregate_public_key_opt
+          ~subgroup_check
+          (aggregated_weighted_pks :: pks)
+    in
+    let* aggregated_pk =
+      match aggregated_pk_opt with
+      | Some aggregated_pk -> return aggregated_pk
+      | None ->
+          (* This is never supposed to happen since keys are assumed
+             valid. *)
+          tzfail Validate_errors.Consensus.Public_key_aggregation_failure
+    in
+    let attestation : Kind.attestation operation =
+      (* Reconstructing an attestation to match the content signed by
+         each delegate. Fields 'slot' and 'dal_content' are filled with
+         dummy values as they are not part of the signed payload *)
+      let consensus_content =
+        {slot = Slot.zero; level; round; block_payload_hash}
+      in
+      let contents =
+        Single (Attestation {consensus_content; dal_content = None})
+      in
+      {shell; protocol_data = {contents; signature}}
+    in
+    Operation.check_signature
+      info.ctxt
+      (Bls aggregated_pk)
+      info.chain_id
+      attestation
 
   let check_preattestations_aggregate_signature info public_keys
       ({shell; protocol_data = {contents = Single content; signature}} :
@@ -1322,10 +1335,13 @@ module Consensus = struct
             consensus_info
             {level; round; block_payload_hash; slot = Slot.zero}
         in
-        (* Retreive public keys and compute total attesting power *)
-        let* public_keys, total_attesting_power =
+        (* Retrieve public keys that will later be aggregated (keys
+           with weight 1 are put in [pks]; keys with a different
+           weight are put in [weighted_pks]) and compute total attesting
+           power. *)
+        let* pks, weighted_pks, total_attesting_power =
           List.fold_left_es
-            (fun (public_keys, total_attesting_power) (slot, dal) ->
+            (fun (pks, weighted_pks, total_power) (slot, dal) ->
               (* Lookup the slot owner *)
               let*? consensus_key, attesting_power, _dal_power =
                 get_delegate_details
@@ -1337,24 +1353,43 @@ module Consensus = struct
                 check_delegate_is_not_forbidden info.ctxt consensus_key.delegate
               in
               let* () = check_dal_content info level slot consensus_key dal in
+              let total_power = attesting_power + total_power in
               match consensus_key.consensus_pk with
-              | Bls pk ->
-                  return
-                    (pk :: public_keys, total_attesting_power + attesting_power)
+              | Bls consensus_pk -> (
+                  let pks = consensus_pk :: pks in
+                  match (dal, consensus_key.companion_pk) with
+                  | None, _ -> return (pks, weighted_pks, total_power)
+                  | Some {attestation = dal_attestation}, Some companion_pk ->
+                      let weight =
+                        Dal.Attestation.Dal_dependent_signing.weight
+                          dal_attestation
+                      in
+                      if Z.(equal weight one) then
+                        return (companion_pk :: pks, weighted_pks, total_power)
+                      else
+                        let weighted_pks =
+                          (weight, companion_pk) :: weighted_pks
+                        in
+                        return (pks, weighted_pks, total_power)
+                  | Some _, None ->
+                      tzfail
+                        (Missing_companion_key_for_bls_dal
+                           (Consensus_key.pkh consensus_key)))
               | _ -> tzfail Validate_errors.Consensus.Non_bls_key_in_aggregate)
-            ([], 0)
+            ([], [], 0)
             committee
         in
         (* Fail on empty committee *)
         let*? () =
           error_when
-            (List.is_empty public_keys)
+            (List.is_empty pks)
             Validate_errors.Consensus.Empty_aggregation_committee
         in
         (* Check signature *)
-        let* () =
+        let*? () =
+          let open Result_syntax in
           if check_signature then
-            check_attestations_aggregate_signature info public_keys op
+            check_attestations_aggregate_signature info pks weighted_pks op
           else return_unit
         in
         (* Check for conflicts and register the aggregate and its underlying
