@@ -100,11 +100,11 @@ let register_with_conversion ~service ~impl ~convert_output dir =
 
 let register ~service ~impl dir = Tezos_rpc.Directory.register dir service impl
 
-(* TODO *)
-type tezlink_rpc_context = {
-  block : Tezos_shell_services.Block_services.block;
-  chain : Tezos_shell_services.Chain_services.chain;
-}
+type block = Tezos_shell_services.Block_services.block
+
+type chain = Tezos_shell_services.Chain_services.chain
+
+type tezlink_rpc_context = {block : block; chain : chain}
 
 (** Builds a [tezlink_rpc_context] from paths parameters. *)
 let make_env (chain : Tezos_shell_services.Chain_services.chain)
@@ -230,12 +230,18 @@ module Imported_services = struct
         Protocol_types.Alpha_context.Constants.t )
       Tezos_rpc.Service.t =
     import_service Constants_services.all
+
+  let chain_id :
+      ([`GET], chain, chain, unit, unit, Chain_id.t) Tezos_rpc.Service.t =
+    import_service Tezos_shell_services.Chain_services.S.chain_id
 end
+
+let chain_directory_path = Tezos_shell_services.Chain_services.path
 
 let block_directory_path =
   Tezos_rpc.Path.subst2
   @@ Tezos_rpc.Path.prefix
-       Tezos_shell_services.Chain_services.path
+       chain_directory_path
        Tezos_shell_services.Block_services.path
 
 let protocols () = Lwt_result_syntax.return Tezlink_protocols.current
@@ -274,6 +280,23 @@ let build_block_dir (module Backend : Tezlink_backend_sig.S) =
        ~impl:(fun {block; chain} () () -> Backend.constants chain block)
        ~convert_output:Tezlink_constants.convert
 
+let register_chain_services ~l2_chain_id
+    (module Backend : Tezlink_backend_sig.S) base_dir =
+  let dir =
+    Tezos_rpc.Directory.empty
+    |> register_with_conversion
+         ~service:Imported_services.chain_id
+         ~impl:(fun chain () () ->
+           Lwt_result_syntax.return (l2_chain_id, chain))
+         ~convert_output:(fun (l2_chain_id, chain) ->
+           Result_syntax.return
+           @@ Protocol_types.tezlink_to_tezos_chain_id_exn ~l2_chain_id chain)
+    |> Tezos_rpc.Directory.map (fun ((), chain) -> Lwt.return chain)
+  in
+  Tezos_rpc.Directory.merge
+    base_dir
+    (Tezos_rpc.Directory.prefix chain_directory_path dir)
+
 (** Builds the root directory. *)
 let build_dir ~l2_chain_id backend =
   let helper_dir = build_block_dir backend in
@@ -288,6 +311,7 @@ let build_dir ~l2_chain_id backend =
     root_directory
     Imported_services.version
     (fun () () () -> version ())
+  |> register_chain_services ~l2_chain_id backend
 
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
