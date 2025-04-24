@@ -7,7 +7,7 @@
 (*****************************************************************************)
 
 open Cohttp_lwt_unix
-open Agnostic_baker_errors
+open Errors
 
 (* RPC helper functions *)
 

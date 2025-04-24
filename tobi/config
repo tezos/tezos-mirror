@@ -47,6 +47,7 @@ internal-devtools: devtools/tztop
 internal-devtools_proto-context-du: devtools/proto_context_du
 kaitai: client-libs/kaitai-ocaml/src, client-libs/kaitai-ocaml/test
 kaitai-of-data-encoding: client-libs/lib_kaitai_of_data_encoding, client-libs/lib_kaitai_of_data_encoding/test
+octez-accuser: src/bin_agnostic_accuser
 octez-accuser-PsQuebec: src/proto_021_PsQuebec/bin_accuser
 octez-accuser-PsRiotum: src/proto_022_PsRiotum/bin_accuser
 octez-accuser-alpha: src/proto_alpha/bin_accuser

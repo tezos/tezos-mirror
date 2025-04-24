@@ -8600,6 +8600,40 @@ let _octez_agnostic_baker =
       @ protocol_deps)
     ~linkall:true
 
+let _octez_agnostic_accuser =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+  let protocol_deps =
+    let deps_for_protocol protocol =
+      let is_optional =
+        match (Protocol.status protocol, Protocol.number protocol) with
+        | Active, V _ -> false
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) -> true
+      in
+      let targets = List.filter_map Fun.id [Protocol.agnostic_baker protocol] in
+      if is_optional then List.map optional targets else targets
+    in
+    List.map deps_for_protocol Protocol.all |> List.flatten
+  in
+  public_exe
+    "octez-accuser"
+    ~path:"src/bin_agnostic_accuser"
+    ~internal_name:"main_agnostic_accuser"
+    ~synopsis:"Tezos: `octez-accuser` binary for denunciation"
+    ~preprocess
+    ~preprocessor_deps
+    ~release_status:Released
+    ~with_macos_security_framework:true
+    ~deps:
+      ([
+         bls12_381_archive;
+         octez_base |> open_ ~m:"TzPervasives" |> open_;
+         octez_base_unix |> open_;
+         octez_client_base_unix |> open_;
+         octez_agnostic_baker_lib |> open_;
+       ]
+      @ protocol_deps)
+    ~linkall:true
+
 let _octez_client =
   let protocol_deps =
     let deps_for_protocol protocol =

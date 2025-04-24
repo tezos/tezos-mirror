@@ -132,6 +132,7 @@ main() {
     protocol_without_number=$(echo "$protocol" | tr -d "\-[0-9]")
     local_baker="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_baker/main_baker_$protocol_underscore.exe"
     local_agnostic_baker="$bin_dir/../../_build/default/src/bin_agnostic_baker/main_agnostic_baker.exe"
+    local_agnostic_accuser="$bin_dir/../../_build/default/src/bin_agnostic_accuser/main_agnostic_accuser.exe"
     local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
     local_sc_rollup_node="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_sc_rollup_node/main_sc_rollup_node_$protocol_underscore.exe"
     parameters_file="$bin_dir/../../_build/default/src/proto_$protocol_underscore/lib_parameters/sandbox-parameters.json"
@@ -145,6 +146,7 @@ main() {
 
     baker="$local_baker --base-dir $client_dir --endpoint $endpoint"
     agnostic_baker="$local_agnostic_baker --base-dir $client_dir --endpoint $endpoint"
+    agnostic_accuser="$local_agnostic_accuser --base-dir $client_dir --endpoint $endpoint"
     accuser="$local_accuser --base-dir $client_dir --endpoint $endpoint"
     sc_rollup_node="$local_sc_rollup_node --base-dir $client_dir --endpoint $endpoint"
 
@@ -155,6 +157,10 @@ main() {
     echo '#!/bin/sh' > "$client_dir"/bin/octez-agnostic-baker
     echo "exec $agnostic_baker \"\$@\"" >> "$client_dir"/bin/octez-agnostic-baker
     chmod +x "$client_dir"/bin/octez-agnostic-baker
+
+    echo '#!/bin/sh' > "$client_dir"/bin/octez-accuser
+    echo "exec $agnostic_accuser \"\$@\"" >> "$client_dir"/bin/octez-accuser
+    chmod +x "$client_dir"/bin/octez-accuser
 
     echo '#!/bin/sh' > "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
     echo "exec $sc_rollup_node \"\$@\" --data-dir $rollup_node_dir" >> "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"

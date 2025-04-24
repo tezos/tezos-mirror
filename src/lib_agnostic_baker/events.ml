@@ -7,56 +7,59 @@
 
 include Internal_event.Simple
 
-let section = ["agnostic-baker"]
+let section = ["agnostic-agent"]
 
 let alternative_color = Internal_event.Green
 
 (* Notice *)
-let starting_baker =
-  declare_1
+let starting_agent =
+  declare_2
     ~section
     ~alternative_color
     ~level:Notice
-    ~name:"starting_baker"
-    ~msg:"starting baker for protocol {proto}"
+    ~name:"starting_agent"
+    ~msg:"starting {agent} for protocol {proto}"
+    ("agent", string)
     ("proto", Protocol_hash.encoding)
-    ~pp1:Protocol_hash.pp_short
+    ~pp2:Protocol_hash.pp_short
 
-let baker_running =
-  declare_1
+let agent_running =
+  declare_2
     ~section
     ~alternative_color
     ~level:Notice
-    ~name:"baker_running"
-    ~msg:"baker for protocol {proto} is now running"
+    ~name:"agent_running"
+    ~msg:"{agent} for protocol {proto} is now running"
+    ("agent", string)
     ("proto", Protocol_hash.encoding)
-    ~pp1:Protocol_hash.pp_short
+    ~pp2:Protocol_hash.pp_short
 
-let stopping_baker =
-  declare_1
+let stopping_agent =
+  declare_2
     ~section
     ~level:Notice
-    ~name:"stopping_baker"
-    ~msg:"stopping baker for protocol {proto}"
+    ~name:"stopping_agent"
+    ~msg:"stopping {agent} for protocol {proto}"
+    ("agent", string)
     ("proto", Protocol_hash.encoding)
-    ~pp1:Protocol_hash.pp_short
+    ~pp2:Protocol_hash.pp_short
 
 let starting_daemon =
-  declare_0
+  declare_1
     ~section
     ~alternative_color
     ~level:Notice
     ~name:"starting_daemon"
-    ~msg:"agnostic baker started"
-    ()
+    ~msg:"agnostic {agent} started"
+    ("agent", string)
 
 let stopping_daemon =
-  declare_0
+  declare_1
     ~section
     ~level:Notice
     ~name:"stopping_daemon"
-    ~msg:"stopping agnostic daemon"
-    ()
+    ~msg:"stopping agnostic {agent} daemon"
+    ("agent", string)
 
 let protocol_encountered =
   declare_2
@@ -69,16 +72,17 @@ let protocol_encountered =
     ("proto_hash", Protocol_hash.encoding)
     ~pp2:Protocol_hash.pp_short
 
-let become_old_baker =
-  declare_2
+let become_old_agent =
+  declare_3
     ~section
     ~level:Notice
-    ~name:"become_old_baker"
+    ~name:"become_old_agent"
     ~msg:
-      "The old baker for protocol {proto_hash} will be shut down at level \
+      "The old {agent} for protocol {proto_hash} will be shut down at level \
        {level_to_kill}."
+    ("agent", string)
     ("proto_hash", Protocol_hash.encoding)
-    ~pp1:Protocol_hash.pp_short
+    ~pp2:Protocol_hash.pp_short
     ("level_to_kill", int31)
 
 let waiting_for_active_protocol =
@@ -109,7 +113,7 @@ let cannot_connect =
     ~section
     ~alternative_color
     ~level:Error
-    ~name:"agnostic_baker_cannot_connect"
+    ~name:"cannot_connect"
     ~msg:"Cannot connect to node. {message}"
     ~pp1:Format.pp_print_string
     ("message", Data_encoding.string)

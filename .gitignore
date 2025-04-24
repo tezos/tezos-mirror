@@ -62,6 +62,7 @@ __pycache__
 /safety-checker
 /octez-teztale-archiver
 /octez-teztale-server
+/octez-accuser
 /octez-agnostic-baker
 /octez-teztale-snitch
 

@@ -82,3 +82,23 @@ let baker_commands ?plugin () =
       | Some plugin -> run_accuser plugin
       | None -> fun _ _ -> Lwt_result_syntax.return_unit);
   ]
+
+let accuser_commands ?plugin () =
+  let open Configuration in
+  let open Tezos_clic in
+  let group =
+    {
+      name = "delegate.accuser";
+      title = "Commands related to the agnostic accuser daemon.";
+    }
+  in
+  [
+    command
+      ~group
+      ~desc:"Launch the accuser daemon"
+      (args3 pidfile_arg preserved_levels_arg keep_alive_arg)
+      (prefix "run" @@ stop)
+      (match plugin with
+      | Some plugin -> run_accuser plugin
+      | None -> fun _ _ -> Lwt_result_syntax.return_unit);
+  ]

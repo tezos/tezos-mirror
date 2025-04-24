@@ -100,6 +100,8 @@ let octez_baker_rio =
 let octez_baker_alpha =
   Uses.make ~tag:"baker_alpha" ~path:"./octez-baker-alpha" ()
 
+let octez_accuser = Uses.make ~tag:"accuser" ~path:"./octez-accuser" ()
+
 let yes_wallet =
   Uses.make
     ~tag:"yes_wallet"
