@@ -31,5 +31,6 @@ ocaml-build.workspace = true
 
 [features]
 default = ["ocaml/default"]
-# `ci` must be activated in isolation. Activating it in conjuction with `default` causes build errors.
+# `ci` should be activated in isolation. Activating it in conjuction with `default` may cause build
+# errors.
 ci = ["ocaml/without-ocamlopt", "ocaml-sys/without-ocamlopt", "ocaml/derive"]
