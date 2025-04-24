@@ -443,3 +443,5 @@ val pp_time_between_blocks : Format.formatter -> time_between_blocks -> unit
 val describe : unit -> unit
 
 val pp_print_json : data_dir:string -> Format.formatter -> t -> unit
+
+val observer_evm_node_endpoint : supported_network -> string

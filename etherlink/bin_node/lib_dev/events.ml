@@ -202,6 +202,16 @@ let replay_csv_available =
     ~level:Notice
     ("path", Data_encoding.string)
 
+let replicate_transaction_dropped =
+  Internal_event.Simple.declare_2
+    ~section
+    ~name:"replicate_transaction_dropped"
+    ~msg:"transaction {hash} was dropped because it is now invalid ({reason})"
+    ~level:Warning
+    ~pp1:Ethereum_types.pp_hash
+    ("hash", Ethereum_types.hash_encoding)
+    ("reason", Data_encoding.string)
+
 type kernel_log_kind = Application | Simulation
 
 type kernel_log_level = Debug | Info | Error | Fatal
@@ -532,3 +542,6 @@ let import_finished () = emit import_finished ()
 
 let import_snapshot_archive_in_progress ~archive_name ~elapsed_time =
   emit import_snapshot_archive_in_progress (archive_name, elapsed_time)
+
+let replicate_transaction_dropped hash reason =
+  emit replicate_transaction_dropped (hash, reason)

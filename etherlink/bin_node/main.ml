@@ -76,6 +76,11 @@ module Params = struct
   let endpoint =
     Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
 
+  let optional_endpoint =
+    Tezos_clic.parameter (fun _ uri ->
+        let open Lwt_result_syntax in
+        if uri = "" then return_none else return_some (Uri.of_string uri))
+
   let event_level =
     Tezos_clic.parameter (fun _ value ->
         Lwt.return_ok (Internal_event.Level.of_string_exn value))
@@ -554,6 +559,18 @@ let evm_node_endpoint_arg =
     ~placeholder:"url"
     ~doc:"The address of an EVM node to connect to."
     Params.evm_node_endpoint
+
+let replicate_arg =
+  Tezos_clic.arg_or_switch
+    ~pp_default:(fun fmt ->
+      Format.fprintf fmt "the official relay endpoint if --network is used")
+    ~long:"replicate"
+    ~placeholder:"url"
+    ~default:""
+    ~doc:
+      "Replicate a chain in real time from the EVM node whose address is \
+       provided."
+    Params.optional_endpoint
 
 let evm_node_private_endpoint_arg =
   Tezos_clic.arg
@@ -2266,7 +2283,7 @@ let fund_arg =
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.eth_address
 
 let sandbox_config_args =
-  Tezos_clic.args13
+  Tezos_clic.args14
     preimages_arg
     preimages_endpoint_arg
     native_execution_policy_arg
@@ -2280,6 +2297,7 @@ let sandbox_config_args =
     (supported_network_arg ())
     init_from_snapshot_arg
     fund_arg
+    replicate_arg
 
 let sequencer_command =
   let open Tezos_clic in
@@ -2406,7 +2424,8 @@ let sandbox_command =
              password_filename,
              network,
              init_from_snapshot,
-             funded_addresses ) )
+             funded_addresses,
+             main_endpoint ) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -2419,6 +2438,18 @@ let sandbox_command =
         Option.value ~default:Uri.empty rollup_node_endpoint
       in
       let kernel = kernel_from_args network kernel in
+      let* parent_chain =
+        match (main_endpoint, network) with
+        | Some (Some endpoint), _ -> return_some endpoint
+        | Some None, Some network ->
+            return_some
+              (Uri.of_string (Configuration.observer_evm_node_endpoint network))
+        | Some None, None ->
+            failwith
+              "Cannot infer which EVM node to use to fetch blueprints. Use \
+               --network or add an endpoint as the argument of --replicate."
+        | None, _ -> return_none
+      in
       let sandbox_config =
         Evm_node_lib_dev.Sequencer.
           {
@@ -2427,6 +2458,7 @@ let sandbox_command =
             init_from_snapshot;
             network;
             funded_addresses = Option.value ~default:[] funded_addresses;
+            parent_chain;
           }
       in
       let config_file = config_filename ~data_dir config_file in

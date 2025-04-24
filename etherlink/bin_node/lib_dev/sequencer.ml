@@ -12,6 +12,7 @@ type sandbox_config = {
   init_from_snapshot : string option;
   network : Configuration.supported_network option;
   funded_addresses : Ethereum_types.address list;
+  parent_chain : Uri.t option;
 }
 
 let install_finalizer_seq server_public_finalizer server_private_finalizer
@@ -30,32 +31,79 @@ let install_finalizer_seq server_public_finalizer server_private_finalizer
   let* () = Signals_publisher.shutdown () in
   return_unit
 
-let loop_sequencer (sequencer_config : Configuration.sequencer) =
+let loop_sequencer backend
+    (module Tx_container : Services_backend_sig.Tx_container) ?sandbox_config
+    time_between_blocks =
   let open Lwt_result_syntax in
-  let time_between_blocks = sequencer_config.time_between_blocks in
-  match time_between_blocks with
-  | Nothing ->
-      (* Bind on a never-resolved promise ensures this call never returns,
-         meaning no block will ever be produced. *)
-      let task, _resolver = Lwt.task () in
-      let*! () = task in
-      return_unit
-  | Time_between_blocks time_between_blocks ->
-      let rec loop last_produced_block =
-        let now = Misc.now () in
-        (* We force if the last produced block is older than [time_between_blocks]. *)
-        let force =
-          let diff = Time.Protocol.(diff now last_produced_block) in
-          diff >= Int64.of_float time_between_blocks
-        in
-        let* has_produced_block =
-          Block_producer.produce_block ~force ~timestamp:now
-        and* () = Lwt.map Result.ok @@ Lwt_unix.sleep 0.5 in
-        match has_produced_block with
-        | `Block_produced _nb_transactions -> loop now
-        | `No_block -> loop last_produced_block
+  match sandbox_config with
+  | Some {parent_chain = Some evm_node_endpoint; _} ->
+      let*! head = Evm_context.head_info () in
+      Blueprints_follower.start
+        ~ping_tx_pool:false
+        ~time_between_blocks
+        ~evm_node_endpoint
+        ~next_blueprint_number:head.next_blueprint_number
+      @@ fun (Qty number) blueprint ->
+      let*! {next_blueprint_number = Qty expected_number; _} =
+        Evm_context.head_info ()
       in
-      loop Misc.(now ())
+      if Compare.Z.(number = expected_number) then
+        let events =
+          Evm_events.of_parts
+            blueprint.delayed_transactions
+            blueprint.kernel_upgrade
+        in
+        let* () = Evm_context.apply_evm_events events in
+        let*? all_txns =
+          Blueprint_decoder.transactions blueprint.blueprint.payload
+        in
+        let txns = List.filter_map snd all_txns in
+        let* () =
+          List.iter_es
+            (fun raw_tx ->
+              let* res = Validate.is_tx_valid backend ~mode:Stateless raw_tx in
+              match res with
+              | Ok (next_nonce, txn_obj) ->
+                  let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
+                  let* _ = Tx_container.add ~next_nonce txn_obj ~raw_tx in
+                  return_unit
+              | Error reason ->
+                  let hash = Ethereum_types.hash_raw_tx raw_tx in
+                  let*! () = Events.replicate_transaction_dropped hash reason in
+                  return_unit)
+            txns
+        in
+        let* _ =
+          Block_producer.produce_block
+            ~force:true
+            ~timestamp:blueprint.blueprint.timestamp
+        in
+        return `Continue
+      else return (`Restart_from (Ethereum_types.Qty expected_number))
+  | _ -> (
+      match time_between_blocks with
+      | Configuration.Nothing ->
+          (* Bind on a never-resolved promise ensures this call never returns,
+             meaning no block will ever be produced. *)
+          let task, _resolver = Lwt.task () in
+          let*! () = task in
+          return_unit
+      | Time_between_blocks time_between_blocks ->
+          let rec loop last_produced_block =
+            let now = Misc.now () in
+            (* We force if the last produced block is older than [time_between_blocks]. *)
+            let force =
+              let diff = Time.Protocol.(diff now last_produced_block) in
+              diff >= Int64.of_float time_between_blocks
+            in
+            let* has_produced_block =
+              Block_producer.produce_block ~force ~timestamp:now
+            and* () = Lwt.map Result.ok @@ Lwt_unix.sleep 0.5 in
+            match has_produced_block with
+            | `Block_produced _nb_transactions -> loop now
+            | `No_block -> loop last_produced_block
+          in
+          loop Misc.(now ()))
 
 let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel ?sandbox_config () =
@@ -342,5 +390,11 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       finalizer_private_server
       finalizer_rpc_process
   in
-  let* () = loop_sequencer sequencer_config in
+  let* () =
+    loop_sequencer
+      backend
+      tx_container
+      ?sandbox_config
+      sequencer_config.time_between_blocks
+  in
   return_unit

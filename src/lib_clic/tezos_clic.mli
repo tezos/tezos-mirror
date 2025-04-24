@@ -141,6 +141,7 @@ val arg_or_switch :
   long:string ->
   placeholder:string ->
   default:string ->
+  ?pp_default:(Format.formatter -> unit) ->
   ('a, 'ctx) parameter ->
   ('a option, 'ctx) arg
 
