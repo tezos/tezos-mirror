@@ -506,7 +506,7 @@ let check_consensus_aux kind ~expected found =
           sorted_found
 
 (** Fetch consensus operations and check that they match the expected contents.
- *)
+    Defaults to "head" if no [block] is provided. *)
 let check_consensus_operations ?expected_aggregated_committee
     ?expected_preattestations ?expected_attestations ?block client =
   let* consensus_operations = fetch_consensus_operations ?block client in
