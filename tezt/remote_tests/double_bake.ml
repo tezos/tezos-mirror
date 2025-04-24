@@ -113,6 +113,8 @@ let double_bake =
   in
   let endpoint_3 = Client.(Node node_3) in
   let* client_3 = Client.init ~endpoint:endpoint_3 () in
+  (* Need to know the protocol for the agnostic accuser to start. *)
+  let* () = Client.activate_protocol ~protocol client_3 in
   let* accuser_3 = Accuser.init node_3 in
   let denunciation = wait_for_denunciation accuser_3 in
   let denunciation_injection =
