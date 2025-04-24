@@ -15,7 +15,7 @@ mod kernel_loader;
 pub mod log;
 pub mod machine_state;
 pub mod parser;
-pub mod program;
+mod program;
 pub mod pvm;
 mod range_utils;
 mod state;
