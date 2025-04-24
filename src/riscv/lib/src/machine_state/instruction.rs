@@ -214,9 +214,9 @@ pub enum OpCode {
     SetLessThanUnsigned,
     AddWord,
     SubWord,
-    Sllw,
-    Srlw,
-    Sraw,
+    X32ShiftLeft,
+    X32ShiftRightSigned,
+    X32ShiftRightUnsigned,
 
     // RV64I I-type instructions
     Addi,
@@ -227,9 +227,9 @@ pub enum OpCode {
     ShiftLeftImmediate,
     ShiftRightImmediateUnsigned,
     ShiftRightImmediateSigned,
-    Slliw,
-    Srliw,
-    Sraiw,
+    X32ShiftLeftImm,
+    X32ShiftRightImmSigned,
+    X32ShiftRightImmUnsigned,
     SetLessThanImmediateSigned,
     SetLessThanImmediateUnsigned,
     X8LoadSigned,
@@ -446,9 +446,9 @@ impl OpCode {
             Self::SetLessThanUnsigned => Args::run_set_less_than_unsigned,
             Self::AddWord => Args::run_add_word,
             Self::SubWord => Args::run_sub_word,
-            Self::Sllw => Args::run_sllw,
-            Self::Srlw => Args::run_srlw,
-            Self::Sraw => Args::run_sraw,
+            Self::X32ShiftLeft => Args::run_x32_shift_left,
+            Self::X32ShiftRightUnsigned => Args::run_x32_shift_right_unsigned,
+            Self::X32ShiftRightSigned => Args::run_x32_shift_right_signed,
             Self::Addi => Args::run_addi,
             Self::AddWordImmediate => Args::run_add_word_immediate,
             Self::Xori => Args::run_xori,
@@ -457,9 +457,9 @@ impl OpCode {
             Self::ShiftLeftImmediate => Args::run_shift_left_immediate,
             Self::ShiftRightImmediateUnsigned => Args::run_shift_right_immediate_unsigned,
             Self::ShiftRightImmediateSigned => Args::run_shift_right_immediate_signed,
-            Self::Slliw => Args::run_slliw,
-            Self::Srliw => Args::run_srliw,
-            Self::Sraiw => Args::run_sraiw,
+            Self::X32ShiftLeftImm => Args::run_x32_shift_left_imm,
+            Self::X32ShiftRightImmUnsigned => Args::run_x32_shift_right_imm_unsigned,
+            Self::X32ShiftRightImmSigned => Args::run_x32_shift_right_imm_signed,
             Self::SetLessThanImmediateSigned => Args::run_set_less_than_immediate_signed,
             Self::SetLessThanImmediateUnsigned => Args::run_set_less_than_immediate_unsigned,
             Self::X8LoadSigned => Args::run_x8_load_signed,
@@ -683,12 +683,12 @@ impl OpCode {
             Self::ShiftLeftImmediate => Some(Args::run_shift_left_immediate),
             Self::ShiftRightImmediateUnsigned => Some(Args::run_shift_right_immediate_unsigned),
             Self::ShiftRightImmediateSigned => Some(Args::run_shift_right_immediate_signed),
-            Self::Sllw => Some(Args::run_sllw),
-            Self::Srlw => Some(Args::run_srlw),
-            Self::Sraw => Some(Args::run_sraw),
-            Self::Slliw => Some(Args::run_slliw),
-            Self::Srliw => Some(Args::run_srliw),
-            Self::Sraiw => Some(Args::run_sraiw),
+            Self::X32ShiftLeft => Some(Args::run_x32_shift_left),
+            Self::X32ShiftRightUnsigned => Some(Args::run_x32_shift_right_unsigned),
+            Self::X32ShiftRightSigned => Some(Args::run_x32_shift_right_signed),
+            Self::X32ShiftLeftImm => Some(Args::run_x32_shift_left_imm),
+            Self::X32ShiftRightImmUnsigned => Some(Args::run_x32_shift_right_imm_unsigned),
+            Self::X32ShiftRightImmSigned => Some(Args::run_x32_shift_right_imm_signed),
 
             // Stores
             Self::Sdnz => Some(Args::run_sdnz),
@@ -883,6 +883,31 @@ macro_rules! impl_r_type {
                 unsafe { self.rs2.nzx },
                 unsafe { self.rd.nzx },
             );
+            icb.ok(Next(self.width))
+        }
+    };
+}
+
+macro_rules! impl_x32_shift_type {
+    ($shift: ident, $fn: ident, reg) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            let rs1 = unsafe { self.rs1.x };
+            let rs2 = unsafe { self.rs2.x };
+            let rd = unsafe { self.rd.nzx };
+            integer::run_x32_shift(icb, Shift::$shift, rs1, rs2, rd);
+            icb.ok(Next(self.width))
+        }
+    };
+
+    ($shift: ident, $fn: ident, imm) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            let rs1 = unsafe { self.rs1.nzx };
+            let rd = unsafe { self.rd.nzx };
+            integer::run_x32_shift_immediate(icb, Shift::$shift, rs1, self.imm, rd);
             icb.ok(Next(self.width))
         }
     };
@@ -1327,9 +1352,9 @@ impl Args {
     );
     impl_r_type!(integer::run_add_word, run_add_word, non_zero_rd);
     impl_r_type!(integer::run_sub_word, run_sub_word, non_zero_rd);
-    impl_r_type!(integer::run_sllw, run_sllw, non_zero_rd);
-    impl_r_type!(integer::run_srlw, run_srlw, non_zero_rd);
-    impl_r_type!(integer::run_sraw, run_sraw, non_zero_rd);
+    impl_x32_shift_type!(Left, run_x32_shift_left, reg);
+    impl_x32_shift_type!(RightUnsigned, run_x32_shift_right_unsigned, reg);
+    impl_x32_shift_type!(RightSigned, run_x32_shift_right_signed, reg);
 
     // RV64I I-type instructions
     impl_i_type!(integer::run_addi, run_addi, non_zero);
@@ -1344,9 +1369,9 @@ impl Args {
     impl_i_type!(run_shift_left_immediate, Shift::Left);
     impl_i_type!(run_shift_right_immediate_unsigned, Shift::RightUnsigned);
     impl_i_type!(run_shift_right_immediate_signed, Shift::RightSigned);
-    impl_i_type!(integer::run_slliw, run_slliw, non_zero_rd);
-    impl_i_type!(integer::run_srliw, run_srliw, non_zero_rd);
-    impl_i_type!(integer::run_sraiw, run_sraiw, non_zero_rd);
+    impl_x32_shift_type!(Left, run_x32_shift_left_imm, imm);
+    impl_x32_shift_type!(RightUnsigned, run_x32_shift_right_imm_unsigned, imm);
+    impl_x32_shift_type!(RightSigned, run_x32_shift_right_imm_signed, imm);
     impl_i_type!(
         integer::run_set_less_than_immediate_signed,
         run_set_less_than_immediate_signed,
@@ -1641,9 +1666,24 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::Subw(args) => {
                 Instruction::new_sub_word(args.rd, args.rs1, args.rs2, InstrWidth::Uncompressed)
             }
-            InstrCacheable::Sllw(args) => Instruction::from_ic_sllw(args),
-            InstrCacheable::Srlw(args) => Instruction::from_ic_srlw(args),
-            InstrCacheable::Sraw(args) => Instruction::from_ic_sraw(args),
+            InstrCacheable::Sllw(args) => Instruction::new_x32_shift_left(
+                args.rd,
+                args.rs1,
+                args.rs2,
+                InstrWidth::Uncompressed,
+            ),
+            InstrCacheable::Srlw(args) => Instruction::new_x32_shift_right_unsigned(
+                args.rd,
+                args.rs1,
+                args.rs2,
+                InstrWidth::Uncompressed,
+            ),
+            InstrCacheable::Sraw(args) => Instruction::new_x32_shift_right_signed(
+                args.rd,
+                args.rs1,
+                args.rs2,
+                InstrWidth::Uncompressed,
+            ),
 
             // RV64I I-type instructions
             InstrCacheable::Addi(args) => Instruction::from_ic_addi(args),
@@ -1659,9 +1699,13 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::Slli(args) => Instruction::from_ic_slli(args),
             InstrCacheable::Srli(args) => Instruction::from_ic_srli(args),
             InstrCacheable::Srai(args) => Instruction::from_ic_srai(args),
-            InstrCacheable::Slliw(args) => Instruction::from_ic_slliw(args),
-            InstrCacheable::Srliw(args) => Instruction::from_ic_srliw(args),
-            InstrCacheable::Sraiw(args) => Instruction::from_ic_sraiw(args),
+            InstrCacheable::Slliw(args) => Instruction::from_ic_x32_shift_left_immediate(args),
+            InstrCacheable::Srliw(args) => {
+                Instruction::from_ic_x32_shift_right_immediate_unsigned(args)
+            }
+            InstrCacheable::Sraiw(args) => {
+                Instruction::from_ic_x32_shift_right_immediate_signed(args)
+            }
             InstrCacheable::Slti(args) => {
                 Instruction::new_set_less_than_immediate_signed(args.rd, args.rs1, args.imm)
             }

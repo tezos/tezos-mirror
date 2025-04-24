@@ -1716,6 +1716,28 @@ mod tests {
                 .build()
         };
 
+        let shift_reg_word =
+            |constructor: fn(NonZeroXRegister, XRegister, XRegister, InstrWidth) -> I,
+             lhs: (XRegister, i64),
+             rhs: (XRegister, i64),
+             expected: u64|
+             -> Scenario<F> {
+                ScenarioBuilder::default()
+                    .set_setup_hook(setup_hook!(core, F, {
+                        core.hart.xregisters.write(lhs.0, lhs.1 as u64);
+                        core.hart.xregisters.write(rhs.0, rhs.1 as u64);
+                    }))
+                    .set_instructions(&[constructor(x2, lhs.0, rhs.0, Compressed)])
+                    .set_assert_hook(assert_hook!(core, F, {
+                        assert_eq!(
+                            expected,
+                            core.hart.xregisters.read_nz(x2),
+                            "Expected {expected} for Shift* lhs: {lhs:?}, rhs: {rhs:?}"
+                        )
+                    }))
+                    .build()
+            };
+
         let scenarios: &[Scenario<F>] = &[
             shift_reg(I::new_shift_left, (x1, 1), (x3, 1), 2),
             shift_reg(I::new_shift_left, (x1, 1), (x3, 63), 0x8000_0000_0000_0000),
@@ -1747,29 +1769,79 @@ mod tests {
             ),
             shift_reg(I::new_shift_right_signed, (x1, !0), (x3, 126), !0),
             shift_reg(I::new_shift_right_signed, (x1, -8), (x3, 2), -2_i64 as u64),
-            // SLLW tests (Shift Left Logical Word)
-            shift_reg(I::new_sllw, (x1, 1), (x3, 1), 2),
-            shift_reg(I::new_sllw, (x1, 1), (x3, 31), 0xFFFF_FFFF_8000_0000),
-            shift_reg(I::new_sllw, (x1, 2), (x3, 31), 0),
-            shift_reg(I::new_sllw, (x1, 1), (x3, 95), 0xFFFF_FFFF_8000_0000),
-            // SRLW tests (Shift Right Logical Word)
-            shift_reg(I::new_srlw, (x1, 2), (x3, 1), 1),
-            shift_reg(I::new_srlw, (x1, 0x80000000), (x3, 31), 1),
-            shift_reg(I::new_srlw, (x1, 1), (x3, 31), 0),
-            shift_reg(I::new_srlw, (x1, 0x80000000), (x3, 95), 1),
-            // SRAW tests (Shift Right Arithmetic Word)
-            shift_reg(I::new_sraw, (x1, 2), (x3, 1), 1),
-            shift_reg(
-                I::new_sraw,
-                (x1, 0x80000000),
-                (x3, 31),
+            // X32ShiftLeft tests
+            shift_reg_word(
+                I::new_x32_shift_left,
+                (XRegister::x1, 1),
+                (XRegister::x3, 1),
+                2,
+            ),
+            shift_reg_word(
+                I::new_x32_shift_left,
+                (XRegister::x1, 1),
+                (XRegister::x3, 31),
+                0xFFFF_FFFF_8000_0000,
+            ),
+            shift_reg_word(
+                I::new_x32_shift_left,
+                (XRegister::x1, 2),
+                (XRegister::x3, 31),
+                0,
+            ),
+            shift_reg_word(
+                I::new_x32_shift_left,
+                (XRegister::x1, 1),
+                (XRegister::x3, 95),
+                0xFFFF_FFFF_8000_0000,
+            ),
+            // X32ShiftRightUnsigned tests
+            shift_reg_word(
+                I::new_x32_shift_right_unsigned,
+                (XRegister::x1, 2),
+                (XRegister::x3, 1),
+                1,
+            ),
+            shift_reg_word(
+                I::new_x32_shift_right_unsigned,
+                (XRegister::x1, 0x80000000),
+                (XRegister::x3, 31),
+                1,
+            ),
+            shift_reg_word(
+                I::new_x32_shift_right_unsigned,
+                (XRegister::x1, 1),
+                (XRegister::x3, 31),
+                0,
+            ),
+            shift_reg_word(
+                I::new_x32_shift_right_unsigned,
+                (XRegister::x1, 0x80000000),
+                (XRegister::x3, 95),
+                1,
+            ),
+            // X32ShiftRightSigned tests
+            shift_reg_word(
+                I::new_x32_shift_right_signed,
+                (XRegister::x1, 2),
+                (XRegister::x3, 1),
+                1,
+            ),
+            shift_reg_word(
+                I::new_x32_shift_right_signed,
+                (XRegister::x1, 0x80000000),
+                (XRegister::x3, 31),
                 0xFFFF_FFFF_FFFF_FFFF,
             ),
-            shift_reg(I::new_sraw, (x1, 0x40000000), (x3, 31), 0),
-            shift_reg(
-                I::new_sraw,
-                (x1, 0x80000000),
-                (x3, 95),
+            shift_reg_word(
+                I::new_x32_shift_right_signed,
+                (XRegister::x1, 0x40000000),
+                (XRegister::x3, 31),
+                0,
+            ),
+            shift_reg_word(
+                I::new_x32_shift_right_signed,
+                (XRegister::x1, 0x80000000),
+                (XRegister::x3, 95),
                 0xFFFF_FFFF_FFFF_FFFF,
             ),
         ];
@@ -1844,18 +1916,38 @@ mod tests {
                 2,
                 -2_i64 as u64,
             ),
-            // SLLIW tests (Shift Left Logical Immediate Word)
-            shift_imm(I::new_slliw, (x1, 1), 1, 2),
-            shift_imm(I::new_slliw, (x1, 1), 31, 0xFFFF_FFFF_8000_0000),
-            shift_imm(I::new_slliw, (x1, 2), 31, 0),
-            // SRLIW tests (Shift Right Logical Immediate Word)
-            shift_imm(I::new_srliw, (x1, 2), 1, 1),
-            shift_imm(I::new_srliw, (x1, 0x80000000), 31, 1),
-            shift_imm(I::new_srliw, (x1, 1), 31, 0),
-            // SRAIW tests (Shift Right Arithmetic Immediate Word)
-            shift_imm(I::new_sraiw, (x1, 2), 1, 1),
-            shift_imm(I::new_sraiw, (x1, 0x80000000), 31, 0xFFFF_FFFF_FFFF_FFFF),
-            shift_imm(I::new_sraiw, (x1, 0x40000000), 31, 0),
+            // X32ShiftLeftImmediate tests
+            shift_imm(I::new_x32_shift_left_immediate, (x1, 1), 1, 2),
+            shift_imm(
+                I::new_x32_shift_left_immediate,
+                (x1, 1),
+                31,
+                0xFFFF_FFFF_8000_0000,
+            ),
+            shift_imm(I::new_x32_shift_left_immediate, (x1, 2), 31, 0),
+            // X32ShiftRightImmediateUnsigned tests
+            shift_imm(I::new_x32_shift_right_immediate_unsigned, (x1, 2), 1, 1),
+            shift_imm(
+                I::new_x32_shift_right_immediate_unsigned,
+                (x1, 0x80000000),
+                31,
+                1,
+            ),
+            shift_imm(I::new_x32_shift_right_immediate_unsigned, (x1, 1), 31, 0),
+            // X32ShiftRightImmediateSigned tests
+            shift_imm(I::new_x32_shift_right_immediate_signed, (x1, 2), 1, 1),
+            shift_imm(
+                I::new_x32_shift_right_immediate_signed,
+                (x1, 0x80000000),
+                31,
+                0xFFFF_FFFF_FFFF_FFFF,
+            ),
+            shift_imm(
+                I::new_x32_shift_right_immediate_signed,
+                (x1, 0x40000000),
+                31,
+                0,
+            ),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

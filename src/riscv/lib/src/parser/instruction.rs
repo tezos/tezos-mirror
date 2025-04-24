@@ -319,8 +319,17 @@ pub enum InstrCacheable {
     /// `SUBW` - Perform `val(rs1) - val(rs2)` but only on lowest 32 bits
     /// and store the sign-extended result in `rd`
     Subw(NonZeroRdRTypeArgs),
+    /// `SLLW` - Shift left logically only lowest 32 bits in rs1
+    /// by shift_amount = val(rs2)\[4:0\] saving the result in rd
+    /// (zeros are shifted in the lower bits)
     Sllw(NonZeroRdRTypeArgs),
+    /// `SRLW` - Shift right logically only the lowest 32 bits in rs1
+    /// by shift_amount = val(rs2)\[4:0\] saving the result in rd
+    /// (zeros are shifted in the upper bits)
     Srlw(NonZeroRdRTypeArgs),
+    /// `SRAW` - Shift right arithmeticallly only the lowest 32 bits bits in rs1
+    /// by shift_amount = val(rs1)\[4:0\] saving the result in rd
+    /// (sign-bits are shifted in the upper bits)
     Sraw(NonZeroRdRTypeArgs),
 
     // RV64I I-type instructions
@@ -345,8 +354,14 @@ pub enum InstrCacheable {
     ///
     /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SRAI
     Srai(NonZeroRdITypeArgs),
+    /// `SLLIW` - Shift left logically only on lower 32 bits
+    /// (zeros are shifted in the lower bits)
     Slliw(NonZeroRdITypeArgs),
+    /// `SRLIW` - Shift right logically only on lower 32 bits
+    /// (zeros are shifted in the upper bits)
     Srliw(NonZeroRdITypeArgs),
+    /// `SRAIW` - Shift right arithmetically only on lower 32 bits
+    /// (sign-bits are shifted in the upper bits)
     Sraiw(NonZeroRdITypeArgs),
     Slti(NonZeroRdITypeArgs),
     Sltiu(NonZeroRdITypeArgs),

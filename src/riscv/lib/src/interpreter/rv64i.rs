@@ -8,7 +8,6 @@
 
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory;
-use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
 use crate::state_backend as backend;
 use crate::traps::Exception;
