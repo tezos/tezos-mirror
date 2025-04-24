@@ -38,7 +38,9 @@ Available services:
       - GET /p2p/gossipsub/mesh
           Get the mesh of the peer. Concretely, the RPC returns a list of
           topics, where each topic is associated to the remote peers with
-          which the current node shares a full connection (on that topic). 
+          which the current node shares a full connection (on that topic).
+          Optional arguments allow to restrict the output to a given delegate
+          or slot index. 
       - GET /p2p/gossipsub/message_cache
           Get the number of message ids in the message cache, grouped by
           heartbeat tick and topic. 
