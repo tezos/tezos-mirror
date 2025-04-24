@@ -640,45 +640,32 @@ let simple_attestations_aggregation =
   in
   log_step 2 "Wait for level 1" ;
   let* _ = Node.wait_for_level node 1 in
-  log_step 3 "Generate bls keys" ;
-  let* b1 = Client.gen_keys ~sig_alg:"bls" client in
-  let* b2 = Client.gen_keys ~sig_alg:"bls" client in
-  let* b3 = Client.gen_keys ~sig_alg:"bls" client in
-  log_step 4 "Use them as consensus keys for some delegates" ;
-  let* () = Client.update_consensus_key ~src:bootstrap1.alias ~pk:b1 client in
-  let* () = Client.update_consensus_key ~src:bootstrap2.alias ~pk:b2 client in
-  let* () = Client.update_consensus_key ~src:bootstrap3.alias ~pk:b3 client in
+  log_step 3 "Generate fresh BLS consensus keys for bootstrap1 to bootstrap3" ;
+  let* b1 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap1 client in
+  let* b2 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap2 client in
+  let* b3 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap3 client in
   let delegates =
     Account.Bootstrap.keys |> Array.to_list
-    |> List.map (fun (account : Account.key) -> account.Account.alias)
     |> List.append [b1; b2; b3]
+    |> List.map (fun (account : Account.key) -> account.Account.alias)
   in
   (* Expected committee that should be found in attestations aggregate *)
-  let expected_committee = [bootstrap1; bootstrap2; bootstrap3] in
+  let expected_aggregated_committee = [bootstrap1; bootstrap2; bootstrap3] in
+  (* Expected attestations that should be found non-aggregated *)
+  let expected_attestations = [bootstrap4; bootstrap5] in
   (* Testing the "bake for" command *)
   log_step 4 "Bake for until level 8" ;
-  (* Waiting for level 8 ensures that the bls consensus keys are activated *)
+  (* Baking until level 8 ensures that the BLS consensus keys are activated *)
   let* () = Client.bake_for_and_wait ~count:7 ~keys:delegates client in
-  log_step 5 "Fetch latest block consensus operations" ;
-  let* consensus_operations =
-    let* json =
-      Client.RPC.call client
-      @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
-    in
-    return JSON.(as_list json)
+  log_step 5 "Check consensus operations" ;
+  let* () =
+    check_consensus_operations
+      ~expected_aggregated_committee
+      ~expected_attestations
+      client
   in
-  log_step
-    6
-    "Check that it doesn't contain any non-aggregated eligible attestation" ;
-  let () =
-    check_for_non_aggregated_eligible_attestations consensus_operations
-  in
-  log_step 7 "Check that it contains an aggregate" ;
-  let aggregate_json = find_aggregate_receipt consensus_operations in
-  log_step 8 "Check that the aggregate contains the expected attestations" ;
-  let () = check_aggregate ~expected_committee aggregate_json in
   (* Testing the "bake for" command with minimal timestamp *)
-  log_step 9 "Bake for with minimal timestamp until level 10" ;
+  log_step 6 "Bake for with minimal timestamp until level 10" ;
   let* () =
     Client.bake_for_and_wait
       ~minimal_timestamp:true
@@ -686,46 +673,24 @@ let simple_attestations_aggregation =
       ~keys:delegates
       client
   in
-  log_step 10 "Fetch latest block consensus operations" ;
-  let* consensus_operations =
-    let* json =
-      Client.RPC.call client
-      @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
-    in
-    return JSON.(as_list json)
+  log_step 7 "Check consensus operations" ;
+  let* () =
+    check_consensus_operations
+      ~expected_aggregated_committee
+      ~expected_attestations
+      client
   in
-  log_step
-    11
-    "Check that it doesn't contain any non-aggregated eligible attestation" ;
-  let () =
-    check_for_non_aggregated_eligible_attestations consensus_operations
-  in
-  log_step 12 "Check that it contains an aggregate" ;
-  let aggregate_json = find_aggregate_receipt consensus_operations in
-  log_step 13 "Check that the aggregate contains the expected attestations" ;
-  let () = check_aggregate ~expected_committee aggregate_json in
-  log_step 14 "Start a baker and bake until level 12" ;
   (* Testing the baker automaton *)
+  log_step 8 "Start a baker and wait until level 12" ;
   let* _baker = Agnostic_baker.init ~delegates node client in
   let* _ = Node.wait_for_level node 12 in
-  log_step 15 "Fetch latest block consensus operations" ;
-  let* consensus_operations =
-    let* json =
-      Client.RPC.call client
-      @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
-    in
-    return JSON.(as_list json)
+  log_step 9 "Check consensus operations" ;
+  let* () =
+    check_consensus_operations
+      ~expected_aggregated_committee
+      ~expected_attestations
+      client
   in
-  log_step
-    16
-    "Check that it doesn't contain any non-aggregated eligible attestation" ;
-  let () =
-    check_for_non_aggregated_eligible_attestations consensus_operations
-  in
-  log_step 17 "Check that it contains an aggregate" ;
-  let _ = find_aggregate_receipt consensus_operations in
-  log_step 18 "Check that the aggregate contains the expected attestations" ;
-  let () = check_aggregate ~expected_committee aggregate_json in
   unit
 
 let prequorum_check_levels =
