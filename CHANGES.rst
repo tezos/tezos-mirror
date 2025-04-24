@@ -241,6 +241,10 @@ DAL node
   from the layer 1 node (MR :gl:`!17284`). Profile encoding has been modified
   (MR :gl:`!17200`).
 
+- RPC ``GET /p2p/gossipsub/mesh`` now accepts 2 optional flags ``slot_index`` and
+  ``delegate`` which restrict the output mesh to topics related to specified slot index
+  or delegate pkh (MR :gl:`!17770`).
+
 Protocol
 ~~~~~~~~
 

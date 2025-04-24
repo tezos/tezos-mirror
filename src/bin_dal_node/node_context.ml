@@ -257,11 +257,19 @@ module P2P = struct
     Gossipsub.Transport_layer.patch_peer transport_layer peer acl
 
   module Gossipsub = struct
-    let get_mesh {gs_worker; _} =
+    let get_mesh ?slot_index ?delegate {gs_worker; _} =
       let open Gossipsub.Worker in
       let state = state gs_worker in
+      let keep Types.Topic.{slot_index = idx; pkh} =
+        Option.fold slot_index ~none:true ~some:(Int.equal idx)
+        && Option.fold
+             delegate
+             ~none:true
+             ~some:(Signature.Public_key_hash.equal pkh)
+      in
       GS.Topic.Map.fold
-        (fun topic peers acc -> (topic, GS.Peer.Set.elements peers) :: acc)
+        (fun topic peers acc ->
+          if keep topic then (topic, GS.Peer.Set.elements peers) :: acc else acc)
         state.mesh
         []
 

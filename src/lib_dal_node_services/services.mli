@@ -329,7 +329,9 @@ module P2P : sig
       ; output : (Types.Topic.t * Types.Peer.t list) list
       ; prefix : unit
       ; params : unit
-      ; query : unit >
+      ; query :
+          < delegate : Signature.public_key_hash option
+          ; slot_index : Types.slot_index option > >
       service
 
     val get_topics :
