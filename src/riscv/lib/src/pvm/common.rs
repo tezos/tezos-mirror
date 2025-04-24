@@ -80,6 +80,16 @@ impl Default for PvmHooks<'_> {
     }
 }
 
+/// Type of input that can be passed to the PVM
+pub enum PvmInput<'a> {
+    InboxMessage {
+        inbox_level: u32,
+        message_counter: u64,
+        payload: &'a [u8],
+    },
+    Reveal(&'a [u8]),
+}
+
 #[cfg(feature = "supervisor")]
 struct_layout! {
     pub struct PvmLayout<MC, CL> {
@@ -150,7 +160,7 @@ const INITIAL_VERSION: u64 = 0;
 /// Proof generator for the PVM.
 ///
 /// Uses the interpreted block backend by default.
-type PvmProofGen<'a, MC, CL, M> = Pvm<
+pub(crate) type PvmProofGen<'a, MC, CL, M> = Pvm<
     MC,
     CL,
     block::Interpreted<MC, ProofGen<state_backend::Ref<'a, M>>>,
@@ -402,9 +412,25 @@ impl<
         )
     }
 
-    /// Provide input. Returns `false` if the machine state is not expecting
-    /// input.
-    pub(crate) fn provide_input(&mut self, level: u32, counter: u32, payload: &[u8]) -> bool
+    /// Provide input. Returns `false` if the machine state is not expecting input.
+    pub(crate) fn provide_input(&mut self, input: PvmInput) -> bool
+    where
+        M: state_backend::ManagerReadWrite,
+    {
+        // TODO RV-615: Remove `as u32` conversion
+        match input {
+            PvmInput::InboxMessage {
+                inbox_level,
+                message_counter,
+                payload,
+            } => self.provide_inbox_message(inbox_level, message_counter as u32, payload),
+            PvmInput::Reveal(reveal_data) => self.provide_reveal_response(reveal_data),
+        }
+    }
+
+    /// Provide an inbox message. Returns `false` if the machine state is not
+    /// expecting a message.
+    pub(crate) fn provide_inbox_message(&mut self, level: u32, counter: u32, payload: &[u8]) -> bool
     where
         M: state_backend::ManagerReadWrite,
     {
@@ -629,7 +655,7 @@ mod tests {
         let counter = rand::random();
         let mut payload = [0u8; BUFFER_LEN + 10];
         payload.try_fill(&mut thread_rng()).unwrap();
-        assert!(pvm.provide_input(level, counter, &payload));
+        assert!(pvm.provide_inbox_message(level, counter, &payload));
 
         // The status should switch from WaitingForInput to Evaluating
         assert_eq!(pvm.status(), PvmStatus::Evaluating);

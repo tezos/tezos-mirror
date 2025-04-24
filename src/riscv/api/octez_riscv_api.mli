@@ -9,7 +9,7 @@ type state
 type mut_state
 type id
 type status = Evaluating | Waiting_for_input | Waiting_for_reveal
-type input = Inbox_message of int32 * int64 * bytes | Reveal of bytes
+type input = Inbox_message of {inbox_level: int32; message_counter: int64; payload: bytes} | Reveal of bytes
 type input_request = No_input_required | Initial | First_after of int32 * int64 | Needs_reveal of bytes
 type output_info = {message_index : int64; outbox_level : int32}
 type output = {info : output_info; encoded_message : bytes}
@@ -49,8 +49,8 @@ external octez_riscv_mut_get_message_counter: mut_state -> int64 = "octez_riscv_
 external octez_riscv_storage_export_snapshot: repo -> id -> string -> (unit, [`Msg of string]) result = "octez_riscv_storage_export_snapshot"
 external octez_riscv_proof_start_state: proof -> bytes = "octez_riscv_proof_start_state"
 external octez_riscv_proof_stop_state: proof -> bytes = "octez_riscv_proof_stop_state"
-external octez_riscv_verify_proof: input option -> proof -> input_request option = "octez_riscv_verify_proof"
 external octez_riscv_produce_proof: input option -> state -> proof option = "octez_riscv_produce_proof"
+external octez_riscv_verify_proof: input option -> proof -> input_request option = "octez_riscv_verify_proof"
 external octez_riscv_serialise_proof: proof -> bytes = "octez_riscv_serialise_proof"
 external octez_riscv_deserialise_proof: bytes -> (proof, string) Result.t = "octez_riscv_deserialise_proof"
 external octez_riscv_output_info_of_output_proof: output_proof -> output_info = "octez_riscv_output_info_of_output_proof"

@@ -138,7 +138,7 @@ impl<MC: MemoryConfig, CL: CacheLayouts> PvmStepper<'_, MC, CL, Owned> {
         let mut proof_stepper = self.start_proof_mode();
 
         proof_stepper.try_step().then(|| {
-            let refs = proof_stepper.pvm.struct_ref::<FnManagerIdent>();
+            let refs = proof_stepper.struct_ref();
             let merkle_proof = PvmLayout::<MC, CL>::to_merkle_tree(refs)
                 .expect("Obtaining the Merkle tree of a proof-gen state should not fail")
                 .to_merkle_proof()
@@ -174,7 +174,9 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>
 
             PvmStatus::WaitingForInput => match self.inbox.next() {
                 Some((level, counter, payload)) => {
-                    let success = self.pvm.provide_input(level, counter, payload.as_slice());
+                    let success =
+                        self.pvm
+                            .provide_inbox_message(level, counter, payload.as_slice());
 
                     if success {
                         StepperStatus::Running { steps: 1 }
