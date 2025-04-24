@@ -39,6 +39,7 @@ pub type IcbFnResult<I> = <I as ICB>::IResult<ProgramCounterUpdate<<I as ICB>::X
 
 /// Instruction Context Builder contains operations required to
 /// execute RISC-V instructions.
+#[expect(clippy::upper_case_acronyms, reason = "ICB looks cooler than Icb")]
 pub trait ICB {
     /// A 64-bit value stored in [`XRegisters`].
     ///

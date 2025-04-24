@@ -8,7 +8,7 @@ mod bits;
 mod cache_utils;
 mod default;
 mod devicetree;
-pub mod instruction_context;
+mod instruction_context;
 mod interpreter;
 pub mod jit;
 pub mod kernel_loader;
