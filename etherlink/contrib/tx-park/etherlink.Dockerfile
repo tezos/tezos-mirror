@@ -171,6 +171,7 @@ FROM kernel_setup_builder AS builder
 COPY --from=kernel_builder /build/root_hash /build/app/root_hash
 COPY --from=kernel_builder /build/installer.hex /build/app/installer.hex
 COPY --from=kernel_builder /build/wasm_2_0_0/ /build/app/wasm_2_0_0/
+COPY etherlink/contrib/tx-park/config/ /build/app/config/
 
 WORKDIR /build
 

@@ -80,5 +80,30 @@ services:
       file: ./services/smart-rollup-node.yml
       service: smart-rollup-node-batcher
 
+  octez-evm-node-sequencer-init:
+    profiles: [sequencer]
+    volumes:
+      - octez-evm-node-sequencer:/home/tezos/.octez-evm-node-sequencer/
+    depends_on:
+      etherlink-image:
+        condition: service_completed_successfully
+    extends:
+      file: ./services/octez-evm-node.yml
+      service: octez-evm-node-sequencer-init
+
+  octez-evm-node-sequencer:
+    profiles: [sequencer]
+    volumes:
+      - octez-evm-node-sequencer:/home/tezos/.octez-evm-node-sequencer/
+    depends_on:
+      octez-evm-node-sequencer-init:
+        condition: service_completed_successfully
+      smart-rollup-node-batcher:
+        condition: service_healthy
+    extends:
+      file: ./services/octez-evm-node.yml
+      service: octez-evm-node-sequencer
+
 volumes:
   smart-rollup-node-batcher:
+  octez-evm-node-sequencer:
