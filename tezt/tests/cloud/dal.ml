@@ -1732,7 +1732,7 @@ module Monitoring_app = struct
                as 100% attestation rate. *)
             if cycle_position < 20 then unit
             else
-              let endpoint = t.bootstrap.node_rpc_endpoint in
+              let endpoint = t.some_node_rpc_endpoint in
               let treat_delegate pkh =
                 let* infos =
                   RPC_core.call endpoint
@@ -1818,7 +1818,7 @@ end
 
 let get_infos_per_level t ~level ~metadata =
   let client = t.bootstrap.client in
-  let endpoint = t.bootstrap.node_rpc_endpoint in
+  let endpoint = t.some_node_rpc_endpoint in
   let etherlink_operators =
     match t.etherlink with
     | None -> []
@@ -1904,7 +1904,7 @@ let get_infos_per_level t ~level ~metadata =
         ~cycle
         ~level
         ~operations
-        ~endpoint:t.bootstrap.node_rpc_endpoint
+        ~endpoint:t.some_node_rpc_endpoint
     in
     let* () = check_for_recently_missed_a_lot t ~level ~metadata in
     unit
@@ -3143,17 +3143,6 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       (List.combine bakers_agents configuration.bakers)
   in
   let bakers = fresh_bakers @ bakers_with_secret_keys in
-  let* constants =
-    RPC_core.call
-      bootstrap.node_rpc_endpoint
-      (RPC.get_chain_block_context_constants_parametric ())
-  in
-  let time_between_blocks =
-    JSON.(constants |-> "minimal_block_delay" |> as_int)
-  in
-  let* parameters =
-    Dal_common.Parameters.from_endpoint bootstrap.node_rpc_endpoint
-  in
   let () = toplog "Init: initializting producers and observers" in
   let* producers =
     Lwt_list.mapi_p
@@ -3215,18 +3204,6 @@ let init ~(configuration : configuration) etherlink_configuration cloud
         in
         none
   in
-
-  let infos = Hashtbl.create 101 in
-  let metrics = Hashtbl.create 101 in
-  let* first_level =
-    match configuration.network with
-    | `Sandbox -> Lwt.return 1
-    | _ -> Network.get_level bootstrap.node_rpc_endpoint
-  in
-  Hashtbl.replace metrics first_level default_metrics ;
-  let disconnection_state =
-    Option.map Disconnect.init configuration.disconnect
-  in
   let some_node_rpc_endpoint =
     obtain_some_node_rpc_endpoint
       bootstrap_agent
@@ -3236,6 +3213,28 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       producers
       observers
       etherlink
+  in
+  let* constants =
+    RPC_core.call
+      some_node_rpc_endpoint
+      (RPC.get_chain_block_context_constants_parametric ())
+  in
+  let time_between_blocks =
+    JSON.(constants |-> "minimal_block_delay" |> as_int)
+  in
+  let* parameters =
+    Dal_common.Parameters.from_endpoint some_node_rpc_endpoint
+  in
+  let infos = Hashtbl.create 101 in
+  let metrics = Hashtbl.create 101 in
+  let* first_level =
+    match configuration.network with
+    | `Sandbox -> Lwt.return 1
+    | _ -> Network.get_level some_node_rpc_endpoint
+  in
+  Hashtbl.replace metrics first_level default_metrics ;
+  let disconnection_state =
+    Option.map Disconnect.init configuration.disconnect
   in
   let* aliases =
     let accounts = List.map (fun ({account; _} : baker) -> account) bakers in
@@ -3273,7 +3272,7 @@ let wait_for_level t level =
   match t.bootstrap.node with
   | None ->
       let rec loop () =
-        let* head_level = Network.get_level t.bootstrap.node_rpc_endpoint in
+        let* head_level = Network.get_level t.some_node_rpc_endpoint in
         if head_level >= level then Lwt.return_unit
         else
           let* () = Lwt_unix.sleep 4. in
@@ -3343,7 +3342,7 @@ let on_new_level t level ~metadata =
   Lwt.return t
 
 let on_new_cycle t ~level =
-  let endpoint = t.bootstrap.node_rpc_endpoint in
+  let endpoint = t.some_node_rpc_endpoint in
   let last_block_of_prev_cycle = string_of_int (level - 1) in
   let* metadata =
     RPC_core.call endpoint
@@ -3354,7 +3353,7 @@ let on_new_cycle t ~level =
 
 let on_new_block t ~level =
   let* () = wait_for_level t level in
-  let endpoint = t.bootstrap.node_rpc_endpoint in
+  let endpoint = t.some_node_rpc_endpoint in
   let block = string_of_int level in
   let* metadata =
     RPC_core.call endpoint @@ RPC.get_chain_block_metadata_raw ~block ()
@@ -3374,7 +3373,7 @@ let ensure_enough_funds t i =
       (* Producer key is assumed to have enough money. We simply check that it is the case,
          but do not refund it. *)
       let* balance =
-        RPC_core.call t.bootstrap.node_rpc_endpoint
+        RPC_core.call t.some_node_rpc_endpoint
         @@ RPC.get_chain_block_context_contract_balance
              ~id:producer.account.public_key_hash
              ()
@@ -3385,7 +3384,7 @@ let ensure_enough_funds t i =
       else Lwt.return_unit
   | _ ->
       let* balance =
-        RPC_core.call t.bootstrap.node_rpc_endpoint
+        RPC_core.call t.some_node_rpc_endpoint
         @@ RPC.get_chain_block_context_contract_balance
              ~id:producer.account.public_key_hash
              ()
