@@ -872,7 +872,7 @@ let websocket_checks config =
       Internal_event.Simple.emit Event.buggy_dream_websocket () |> Lwt_result.ok
   | _ -> Lwt_result_syntax.return_unit
 
-let make_event_config ~verbosity ?daily_logs_path () =
+let make_event_config ~verbosity ?daily_logs_path ?daily_log_basename () =
   let open Tezos_event_logging.Internal_event in
   let open Tezos_base_unix.Internal_event_unix in
   let open Tezos_base.Internal_event_config in
@@ -894,6 +894,9 @@ let make_event_config ~verbosity ?daily_logs_path () =
           ("rpc_server", Some Fatal);
         ]
       in
+      let daily_log_file =
+        Option.value ~default:"daily" daily_log_basename ^ ".log"
+      in
       let uri =
         make_config_uri
           ~create_dirs:true
@@ -903,18 +906,27 @@ let make_event_config ~verbosity ?daily_logs_path () =
           ~chmod:0o640
           ~section_prefixes:daily_logs_section_prefixes
           ~advertise_levels:true
-          (`Path Filename.Infix.(daily_logs_path // "daily.log"))
+          (`Path Filename.Infix.(daily_logs_path // daily_log_file))
       in
       add_uri_to_config uri config
   | None -> config
 
-let init_logs ~daily_logs ~data_dir configuration =
+let init_logs ~daily_logs ?rpc_mode_port ~data_dir configuration =
   let open Tezos_base_unix.Internal_event_unix in
   let daily_logs_path =
     if daily_logs then Some Filename.Infix.(data_dir // "daily_logs") else None
   in
+  let daily_log_basename =
+    Option.map
+      (fun port -> "rpc-" ^ string_of_int port ^ "-daily")
+      rpc_mode_port
+  in
   let config =
-    make_event_config ~verbosity:configuration.verbose ?daily_logs_path ()
+    make_event_config
+      ~verbosity:configuration.verbose
+      ?daily_logs_path
+      ?daily_log_basename
+      ()
   in
   init ~config ()
 
@@ -1192,7 +1204,9 @@ let rpc_command =
           read_write_config
           ~finalized_view
       in
-      let*! () = init_logs ~daily_logs:true ~data_dir config in
+      let*! () =
+        init_logs ~daily_logs:true ~rpc_mode_port:rpc_port ~data_dir config
+      in
       let* () = websocket_checks config in
       let*! () = Internal_event.Simple.emit Event.event_starting "rpc" in
       Evm_node_lib_dev.Rpc.main
