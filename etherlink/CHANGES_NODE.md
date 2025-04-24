@@ -44,7 +44,9 @@ you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
 
 - The daily logs of the experimental RPC node are written in the same
-  directory but in a different files. (!17836)
+  directory but in a different file. (!17836)
+- RPC node now logs the transaction it forwards when using the private
+  inject endpoint of its local node. (!17836)
 
 ## Version 0.22 (2025-04-14)
 

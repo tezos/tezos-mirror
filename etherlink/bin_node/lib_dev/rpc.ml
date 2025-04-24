@@ -62,12 +62,22 @@ let container_forward_request ~public_endpoint ~private_endpoint ~keep_alive :
   (module struct
     let rpc_error =
       Internal_event.Simple.declare_2
-        ~section:(Events.section @ ["local_node_rpc"])
-        ~name:"local_node_rpc"
+        ~section:Events.section
+        ~name:"local_node_rpc_failure"
         ~msg:"local node failed answering {rpc} with {message}"
         ~level:Error
         ("rpc", Data_encoding.string)
         ("message", Data_encoding.string)
+
+    let forwarding_transaction =
+      Internal_event.Simple.declare_1
+        ~section:Events.section
+        ~name:"forwarding_error"
+        ~msg:"forwarding transaction {tx_hash} to local node"
+        ~level:Info
+        ~pp1:(fun fmt Ethereum_types.(Hash (Hex h)) ->
+          Format.fprintf fmt "%10s" h)
+        ("tx_hash", Ethereum_types.hash_encoding)
 
     let get_or_emit_error ~rpc_name res =
       let open Lwt_result_syntax in
@@ -96,7 +106,12 @@ let container_forward_request ~public_endpoint ~private_endpoint ~keep_alive :
           (*we return the known next_nonce instead of failing *)
           return next_nonce
 
-    let add ~next_nonce:_ tx_object ~raw_tx =
+    let add ~next_nonce:_ (tx_object : Ethereum_types.legacy_transaction_object)
+        ~raw_tx =
+      let open Lwt_syntax in
+      let* () =
+        Internal_event.Simple.emit forwarding_transaction tx_object.hash
+      in
       Injector.inject_transaction
         ~keep_alive
         ~base:private_endpoint
