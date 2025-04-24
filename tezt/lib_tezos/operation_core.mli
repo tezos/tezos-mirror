@@ -312,6 +312,10 @@ module Consensus : sig
       the owned slot list *)
   val get_slots : level:int -> Client.t -> (string * int list) list Lwt.t
 
+  (** Same as [get_slots] but maps a consensus key to the owned slot list. *)
+  val get_slots_by_consensus_key :
+    level:int -> Client.t -> (string * int list) list Lwt.t
+
   (** Returns the first slot of the provided delegate in the [slots]
       association list that describes all attestation rights at some level.
 
@@ -321,6 +325,35 @@ module Consensus : sig
   (** Calls the [GET /chains/<chain>/blocks/<block>/header] RPC and
       extracts the head block's payload hash from the result. *)
   val get_block_payload_hash : ?block:string -> Client.t -> string Lwt.t
+
+  (** Calls the [GET /chains/main/blocks/<block>/hash] RPC with
+      <block> = [attested_level] - 2. The returned block hash can be used as the
+      branch field of a consensus operation for [attested_level]. *)
+  val get_branch : attested_level:int -> Client.t -> string Lwt.t
+
+  (** Forge and inject a preattestation for the given account. *)
+  val preattest_for :
+    protocol:Protocol.t ->
+    slot:int ->
+    level:int ->
+    round:int ->
+    block_payload_hash:string ->
+    ?branch:string ->
+    Account.key ->
+    Client.t ->
+    [`OpHash of string] Lwt.t
+
+  (** Forge and inject an attestation for the given account. *)
+  val attest_for :
+    protocol:Protocol.t ->
+    slot:int ->
+    level:int ->
+    round:int ->
+    block_payload_hash:string ->
+    ?branch:string ->
+    Account.key ->
+    Client.t ->
+    [`OpHash of string] Lwt.t
 end
 
 module Anonymous : sig

@@ -795,6 +795,20 @@ let wait_for_disconnections node disconnections =
   let* () = wait_for_ready node in
   waiter
 
+let wait_for_branch_switch ?level ?hash node =
+  wait_for
+    node
+    "branch_switch.v0"
+    JSON.(
+      fun json ->
+        let level' = json |-> "level" |> as_int in
+        let hash' = json |-> "view" |-> "hash" |> as_string in
+        if
+          Option.fold ~none:true ~some:(Int.equal level') level
+          && Option.fold ~none:true ~some:(String.equal hash') hash
+        then Some (level', hash')
+        else None)
+
 let enable_external_rpc_process =
   match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
   | Some "EXTENDED_RPC_TESTS" -> true

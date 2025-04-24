@@ -624,6 +624,11 @@ val wait_for_connections : t -> int -> unit Lwt.t
     [n] ["disconnection"] Chain validator events. *)
 val wait_for_disconnections : t -> int -> unit Lwt.t
 
+(** Waits for the node to switch branches.
+    Resolves when the new branch matches [hash] and [level], if provided. *)
+val wait_for_branch_switch :
+  ?level:int -> ?hash:string -> t -> (int * string) Lwt.t
+
 (** Raw events. *)
 type event = {name : string; value : JSON.t; timestamp : float}
 
