@@ -13,7 +13,7 @@
 //! dispatching every time an instruction is run.
 
 mod constructors;
-pub mod tagged_instruction;
+pub(crate) mod tagged_instruction;
 
 use std::fmt;
 use std::fmt::Debug;

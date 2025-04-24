@@ -77,7 +77,7 @@ pub mod hash;
 mod layout;
 pub mod owned_backend;
 pub mod proof_backend;
-pub mod proof_layout;
+mod proof_layout;
 mod region;
 mod trans;
 pub mod verify_backend;
@@ -483,21 +483,10 @@ pub(crate) mod test_helpers {
 }
 
 #[cfg(test)]
-pub mod tests {
-    use self::owned_backend::Owned;
+mod tests {
     use super::*;
     use crate::backend_test;
     use crate::state::NewState;
-
-    /// Run `f` twice against two different randomised backends and see if the
-    /// resulting backend state is the same afterwards.
-    pub fn test_determinism<L, T>(_f: T)
-    where
-        L: Layout,
-        T: Fn(AllocatedOf<L, Owned>),
-    {
-        // TODO: RV-46: This test will be re-introduced but customised for initialisation testing.
-    }
 
     backend_test!(test_example, F, {
         struct Example<M: ManagerBase> {

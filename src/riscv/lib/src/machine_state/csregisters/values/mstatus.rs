@@ -265,8 +265,8 @@ impl<M: ManagerBase> MStatusValue<M> {
 
         let effect_sie = mstatus.sie.write(value.sie());
         let effect_mie = mstatus.mie.write(value.mie());
-        debug_assert_eq!(effect_sie, Some(CSREffect::XIE));
-        debug_assert_eq!(effect_mie, Some(CSREffect::XIE));
+        debug_assert_eq!(effect_sie, Some(CSREffect::Xie));
+        debug_assert_eq!(effect_mie, Some(CSREffect::Xie));
 
         mstatus.spie.write(value.spie());
         mstatus.ube.write(value.ube());
@@ -286,7 +286,7 @@ impl<M: ManagerBase> MStatusValue<M> {
         mstatus.sbe.write(value.sbe());
         mstatus.mbe.write(value.mbe());
 
-        Some(CSREffect::XIE)
+        Some(CSREffect::Xie)
     }
 
     /// Replace mstatus with `value` given in 64 bit representation
@@ -300,8 +300,8 @@ impl<M: ManagerBase> MStatusValue<M> {
 
         let (sie, effect_sie) = mstatus.sie.replace(value.sie());
         let (mie, effect_mie) = mstatus.mie.replace(value.mie());
-        debug_assert_eq!(effect_sie, Some(CSREffect::XIE));
-        debug_assert_eq!(effect_mie, Some(CSREffect::XIE));
+        debug_assert_eq!(effect_sie, Some(CSREffect::Xie));
+        debug_assert_eq!(effect_mie, Some(CSREffect::Xie));
 
         let spie = mstatus.spie.replace(value.spie());
         let ube = mstatus.ube.replace(value.ube());
@@ -352,6 +352,6 @@ impl<M: ManagerBase> MStatusValue<M> {
         )
         .to_bits();
 
-        (old_value, Some(CSREffect::XIE))
+        (old_value, Some(CSREffect::Xie))
     }
 }

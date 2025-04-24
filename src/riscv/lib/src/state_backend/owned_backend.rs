@@ -343,7 +343,7 @@ impl ManagerClone for Owned {
 }
 
 #[cfg(test)]
-pub mod test_helpers {
+pub(crate) mod test_helpers {
     use super::*;
     use crate::state_backend::Cell;
     use crate::state_backend::Cells;

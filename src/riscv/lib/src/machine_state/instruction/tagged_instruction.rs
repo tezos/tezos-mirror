@@ -238,7 +238,7 @@ impl From<Instruction> for TaggedInstruction {
 pub enum TaggedRegister {
     X(XRegister),
     F(FRegister),
-    NZX(NonZeroXRegister),
+    NonZeroX(NonZeroXRegister),
 }
 
 impl From<XRegister> for TaggedRegister {
@@ -255,7 +255,7 @@ impl From<FRegister> for TaggedRegister {
 
 impl From<NonZeroXRegister> for TaggedRegister {
     fn from(value: NonZeroXRegister) -> Self {
-        TaggedRegister::NZX(value)
+        TaggedRegister::NonZeroX(value)
     }
 }
 
@@ -276,7 +276,7 @@ impl TaggedRegister {
 
     fn unwrap_nzx(self) -> Result<NonZeroXRegister, TaggedError> {
         match self {
-            Self::NZX(nzx) => Ok(nzx),
+            Self::NonZeroX(nzx) => Ok(nzx),
             _ => Err(TaggedError::UnwrapNZX(self)),
         }
     }
@@ -301,9 +301,9 @@ pub struct TaggedArgs {
 
 impl ConstDefault for TaggedArgs {
     const DEFAULT: Self = Self {
-        rd: TaggedRegister::NZX(NonZeroXRegister::x1),
-        rs1: TaggedRegister::NZX(NonZeroXRegister::x1),
-        rs2: TaggedRegister::NZX(NonZeroXRegister::x1),
+        rd: TaggedRegister::NonZeroX(NonZeroXRegister::x1),
+        rs1: TaggedRegister::NonZeroX(NonZeroXRegister::x1),
+        rs2: TaggedRegister::NonZeroX(NonZeroXRegister::x1),
         imm: 0,
         csr: CSRegister::fflags,
         rs3f: FRegister::f0,

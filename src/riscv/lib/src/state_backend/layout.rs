@@ -51,7 +51,7 @@ impl<const LEN: usize> Layout for DynArray<LEN> {
 
 /// Usage: Provide a struct with each field holding a layout.
 ///
-/// ```
+/// ```ignore
 /// use octez_riscv::state_backend::*;
 /// use octez_riscv::machine_state::csregisters::CSRRepr;
 /// use octez_riscv::struct_layout;

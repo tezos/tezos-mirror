@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 mod common;
-pub mod linux;
+pub(crate) mod linux;
 pub mod node_pvm;
 mod reveals;
 mod sbi;
