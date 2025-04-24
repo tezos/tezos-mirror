@@ -11,7 +11,7 @@ mod devicetree;
 mod instruction_context;
 mod interpreter;
 pub mod jit;
-pub mod kernel_loader;
+mod kernel_loader;
 pub mod log;
 pub mod machine_state;
 pub mod parser;
