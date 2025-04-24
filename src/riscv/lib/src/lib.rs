@@ -6,7 +6,7 @@
 mod array_utils;
 mod bits;
 mod cache_utils;
-pub mod default;
+mod default;
 pub mod devicetree;
 pub mod instruction_context;
 mod interpreter;
