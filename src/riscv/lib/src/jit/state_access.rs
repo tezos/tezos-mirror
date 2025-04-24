@@ -20,24 +20,22 @@
 //! [function builder]: cranelift::frontend::FunctionBuilderContext
 //! [direct function call]: cranelift::codegen::ir::InstBuilder::call
 
+mod abi;
 mod stack;
 
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 
-use cranelift::codegen::ir::AbiParam;
+use abi::AbiCall;
 use cranelift::codegen::ir::FuncRef;
 use cranelift::codegen::ir::InstBuilder;
-use cranelift::codegen::ir::Signature;
 use cranelift::codegen::ir::Type;
 use cranelift::codegen::ir::Value;
 use cranelift::codegen::ir::types::I8;
-use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
 use cranelift_jit::JITBuilder;
 use cranelift_jit::JITModule;
 use cranelift_module::FuncId;
-use cranelift_module::Linkage;
 use cranelift_module::Module;
 use cranelift_module::ModuleResult;
 
@@ -58,19 +56,54 @@ use crate::state_backend::proof_backend::ProofGen;
 use crate::traps::EnvironException;
 use crate::traps::Exception;
 
-const PC_WRITE_SYMBOL: &str = "JSA::pc_write";
+macro_rules! register_jsa_functions {
+    ($($name:ident => ($field:path, $fn:path)),* $(,)?) => {
+        /// Register state access symbols in the builder.
+        pub(super) fn register_jsa_symbols<MC: MemoryConfig, JSA: JitStateAccess>(
+            builder: &mut JITBuilder,
+        ) {
+            $(builder.symbol(stringify!($field), $field as *const u8);)*
+        }
 
-const XREG_READ_SYMBOL: &str = "JSA::xreg_read";
+        /// Identifications of globally imported [`JitStateAccess`] methods.
+        pub(super) struct JsaImports<MC: MemoryConfig, JSA: JitStateAccess> {
+            $(
+                pub $name: FuncId,
+            )*
+            _pd: PhantomData<(MC, JSA)>,
+        }
 
-const XREG_WRITE_SYMBOL: &str = "JSA::xreg_write";
+        impl<MC: MemoryConfig, JSA: JitStateAccess> JsaImports<MC, JSA> {
+            /// Register external functions within the JIT Module.
+            pub(super) fn declare_in_module(module: &mut JITModule) -> ModuleResult<Self> {
+                let ptr_type = module.target_config().pointer_type();
+                let call_conv = module.target_config().default_call_conv;
 
-const HANDLE_EXCEPTION: &str = "JSA::handle_exception";
+                $(
+                    let abi = $fn($field);
+                    let $name = abi.declare_function(module, stringify!($field), ptr_type, call_conv)?;
+                )*
 
-const RAISE_ILLEGAL_INSTRUCTION_EXCEPTION: &str = "JSA::raise_illegal_instruction_exception";
+                Ok(Self {
+                    $(
+                        $name,
+                    )*
+                    _pd: PhantomData,
+                })
+            }
+        }
+    };
+}
 
-const ECALL_FROM_MODE: &str = "JSA::ecall_from_mode";
-
-const MEMORY_STORE: &str = "JSA::memory_store";
+register_jsa_functions!(
+    pc_write => (JSA::pc_write::<MC>, AbiCall<2>::args),
+    xreg_read => (JSA::xregister_read::<MC>, AbiCall<2>::args),
+    xreg_write => (JSA::xregister_write::<MC>, AbiCall<3>::args),
+    handle_exception => (JSA::handle_exception::<MC>, AbiCall<4>::args),
+    raise_illegal_instruction_exception => (JSA::raise_illegal_instruction_exception, AbiCall<1>::args),
+    ecall_from_mode => (JSA::ecall::<MC>, AbiCall<2>::args),
+    memory_store => (JSA::memory_store::<MC>, AbiCall<5>::args)
+);
 
 /// State Access that a JIT-compiled block may use.
 ///
@@ -193,146 +226,6 @@ pub trait JitStateAccess: ManagerReadWrite {
 impl JitStateAccess for Owned {}
 
 impl<M: ManagerReadWrite> JitStateAccess for ProofGen<M> {}
-
-/// Register state access symbols in the builder.
-pub(super) fn register_jsa_symbols<MC: MemoryConfig, JSA: JitStateAccess>(
-    builder: &mut JITBuilder,
-) {
-    builder.symbol(
-        PC_WRITE_SYMBOL,
-        <JSA as JitStateAccess>::pc_write::<MC> as *const u8,
-    );
-
-    builder.symbol(
-        XREG_READ_SYMBOL,
-        <JSA as JitStateAccess>::xregister_read::<MC> as *const u8,
-    );
-
-    builder.symbol(
-        XREG_WRITE_SYMBOL,
-        <JSA as JitStateAccess>::xregister_write::<MC> as *const u8,
-    );
-
-    builder.symbol(
-        HANDLE_EXCEPTION,
-        <JSA as JitStateAccess>::handle_exception::<MC> as *const u8,
-    );
-
-    builder.symbol(
-        RAISE_ILLEGAL_INSTRUCTION_EXCEPTION,
-        <JSA as JitStateAccess>::raise_illegal_instruction_exception as *const u8,
-    );
-
-    builder.symbol(
-        ECALL_FROM_MODE,
-        <JSA as JitStateAccess>::ecall::<MC> as *const u8,
-    );
-
-    builder.symbol(
-        MEMORY_STORE,
-        <JSA as JitStateAccess>::memory_store::<MC> as *const u8,
-    );
-}
-
-/// Identifications of globally imported [`JitStateAccess`] methods.
-pub(super) struct JsaImports<MC: MemoryConfig, JSA: JitStateAccess> {
-    pc_write: FuncId,
-    xreg_read: FuncId,
-    xreg_write: FuncId,
-    handle_exception: FuncId,
-    raise_illegal_instruction_exception: FuncId,
-    ecall_from_mode: FuncId,
-    memory_store: FuncId,
-    _pd: PhantomData<(MC, JSA)>,
-}
-
-impl<MC: MemoryConfig, JSA: JitStateAccess> JsaImports<MC, JSA> {
-    /// Register external functions within the JIT Module.
-    pub(super) fn declare_in_module(module: &mut JITModule) -> ModuleResult<Self> {
-        let call_conv = module.target_config().default_call_conv;
-
-        let ptr = module.target_config().pointer_type();
-        let ptr = AbiParam::new(ptr);
-
-        let address = AbiParam::new(I64);
-
-        let xreg = AbiParam::new(I8);
-        let xvalue = AbiParam::new(I64);
-
-        // PC
-        let pc_write_sig = Signature {
-            params: vec![ptr, address],
-            returns: vec![],
-            call_conv,
-        };
-        let pc_write = module.declare_function(PC_WRITE_SYMBOL, Linkage::Import, &pc_write_sig)?;
-
-        // NonZeroXRegisters
-        let xregister_read_sig = Signature {
-            params: vec![ptr, xreg],
-            returns: vec![xvalue],
-            call_conv,
-        };
-        let xreg_read =
-            module.declare_function(XREG_READ_SYMBOL, Linkage::Import, &xregister_read_sig)?;
-
-        let xregister_write_sig = Signature {
-            params: vec![ptr, xreg, xvalue],
-            returns: vec![],
-            call_conv,
-        };
-        let xreg_write =
-            module.declare_function(XREG_WRITE_SYMBOL, Linkage::Import, &xregister_write_sig)?;
-
-        // Error Handling
-        let handle_exception_sig = Signature {
-            params: vec![ptr, ptr, ptr, ptr],
-            returns: vec![AbiParam::new(I8)],
-            call_conv,
-        };
-        let handle_exception =
-            module.declare_function(HANDLE_EXCEPTION, Linkage::Import, &handle_exception_sig)?;
-
-        let raise_illegal_exception_sig = Signature {
-            params: vec![ptr],
-            returns: vec![],
-            call_conv,
-        };
-        let raise_illegal_instruction_exception = module.declare_function(
-            RAISE_ILLEGAL_INSTRUCTION_EXCEPTION,
-            Linkage::Import,
-            &raise_illegal_exception_sig,
-        )?;
-
-        let ecall_from_mode_sig = Signature {
-            params: vec![ptr, ptr],
-            returns: vec![],
-            call_conv,
-        };
-        let ecall_from_mode =
-            module.declare_function(ECALL_FROM_MODE, Linkage::Import, &ecall_from_mode_sig)?;
-
-        // Memory
-        let memory_store_sig = Signature {
-            params: vec![ptr, address, xvalue, AbiParam::new(I8), ptr],
-            returns: vec![AbiParam::new(I8)],
-            call_conv,
-        };
-        let memory_store =
-            module.declare_function(MEMORY_STORE, Linkage::Import, &memory_store_sig)?;
-
-        Ok(Self {
-            pc_write,
-            xreg_read,
-            xreg_write,
-            handle_exception,
-            raise_illegal_instruction_exception,
-            ecall_from_mode,
-            memory_store,
-            _pd: PhantomData,
-        })
-    }
-}
 
 /// References to locally imported [`JitStateAccess`] methods, used to directly call
 /// these accessor methods in the JIT-compilation context.
