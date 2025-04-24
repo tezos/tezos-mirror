@@ -47,7 +47,7 @@ Run commands:
       [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--network <network>]
       [--init-from-snapshot [snapshot url]] [--fund <0x...>]
-      [--replicate [url]]
+      [--replicate [url]] [--disable-da-fees]
     Start the EVM node in sandbox mode. The sandbox mode is a sequencer-like
     mode that produces blocks with a fake key and no rollup node connection.
     --data-dir <data-dir>: The path to the EVM node data directory.
@@ -129,6 +129,7 @@ Run commands:
     --replicate [url]: Replicate a chain in real time from the EVM node whose
       address is provided.
       Defaults to `the official relay endpoint if --network is used`.
+    --disable-da-fees: Disable DA fees for this replay.
   
   run proxy [--data-dir <data-dir>] [--config-file <path>]
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
