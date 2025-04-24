@@ -22,4 +22,4 @@ pub mod state;
 pub mod state_backend;
 pub mod stepper;
 pub mod storage;
-pub mod traps;
+mod traps;
