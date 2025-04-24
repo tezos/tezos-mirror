@@ -559,52 +559,6 @@ let check_consensus_operations ?expected_aggregated_committee
   in
   unit
 
-(* [find_aggregate_receipt operations] returns the sole attestations aggregate
-   found in [operations]. Fails the test if no such operation exists or if
-   more than one if found. *)
-let find_aggregate_receipt consensus_operations =
-  let aggregates =
-    List.filter
-      (fun json ->
-        let kind =
-          JSON.(
-            json |-> "contents" |> as_list |> List.hd |-> "kind" |> as_string)
-        in
-        kind = "attestations_aggregate")
-      consensus_operations
-  in
-  match aggregates with
-  | [] -> Test.fail "The block doesn't contain any attestations aggregate"
-  | _ :: _ :: _ ->
-      Test.fail
-        "Multiple attestation aggregates found, but only one is expected"
-  | [json] -> json
-
-(* [check_for_non_aggregated_eligible_attestations operations] fails the test if
-   [operations] contains a non-aggregated attestation that is eligible for
-   aggregation. *)
-let check_for_non_aggregated_eligible_attestations consensus_operations =
-  let is_tz4 = String.starts_with ~prefix:"tz4" in
-  let has_non_aggregated_eligible_attestations =
-    List.exists
-      (fun json ->
-        let kind =
-          JSON.(
-            json |-> "contents" |> as_list |> List.hd |-> "kind" |> as_string)
-        in
-        if kind = "attestation" then
-          let consensus_key =
-            JSON.(
-              json |-> "contents" |> as_list |> List.hd |-> "metadata"
-              |-> "consensus_key" |> as_string)
-          in
-          is_tz4 consensus_key
-        else false)
-      consensus_operations
-  in
-  if has_non_aggregated_eligible_attestations then
-    Test.fail "The block contains a non-aggregated eligible attestation"
-
 (* Test that the baker aggregates eligible attestations.*)
 let simple_attestations_aggregation =
   Protocol.register_test
