@@ -259,7 +259,6 @@ type t = {
   consensus_rights_delay : int;
   blocks_preservation_cycles : int;
   delegate_parameters_activation_delay : int;
-  tolerated_inactivity_period : int;
   tolerated_inactivity_period_high : int;
   tolerated_inactivity_period_low : int;
   tolerated_inactivity_period_threshold : int;
@@ -570,7 +569,6 @@ let encoding =
       ( ( ( c.consensus_rights_delay,
             c.blocks_preservation_cycles,
             c.delegate_parameters_activation_delay,
-            c.tolerated_inactivity_period,
             c.tolerated_inactivity_period_high,
             c.tolerated_inactivity_period_low,
             c.tolerated_inactivity_period_threshold ),
@@ -618,7 +616,6 @@ let encoding =
     (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
                delegate_parameters_activation_delay,
-               tolerated_inactivity_period,
                tolerated_inactivity_period_high,
                tolerated_inactivity_period_low,
                tolerated_inactivity_period_threshold ),
@@ -668,7 +665,6 @@ let encoding =
         consensus_rights_delay;
         blocks_preservation_cycles;
         delegate_parameters_activation_delay;
-        tolerated_inactivity_period;
         tolerated_inactivity_period_high;
         tolerated_inactivity_period_low;
         tolerated_inactivity_period_threshold;
@@ -717,11 +713,10 @@ let encoding =
       })
     (merge_objs
        (merge_objs
-          (obj7
+          (obj6
              (req "consensus_rights_delay" uint8)
              (req "blocks_preservation_cycles" uint8)
              (req "delegate_parameters_activation_delay" uint8)
-             (req "tolerated_inactivity_period" uint8)
              (req "tolerated_inactivity_period_high" uint8)
              (req "tolerated_inactivity_period_low" uint8)
              (req "tolerated_inactivity_period_threshold" uint8))
