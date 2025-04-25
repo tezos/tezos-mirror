@@ -14,6 +14,7 @@ oc.docker:jsonnet:amd64:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_jsonnet_build.sh
@@ -35,6 +36,7 @@ build_grafazos_dashboards:
   - oc.docker:jsonnet:amd64
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - cd grafazos/
   - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
   script:
@@ -57,5 +59,7 @@ gitlab:release:
   - build_grafazos_dashboards
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./grafazos/scripts/releases/create_gitlab_release.sh

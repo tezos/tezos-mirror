@@ -834,8 +834,8 @@ let enc_git_strategy = function
   | Clone -> "clone"
   | No_strategy -> "none"
 
-let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
-    ?id_tokens ?interruptible ?(dependencies = Staged [])
+let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
+    ?cache ?id_tokens ?interruptible ?(dependencies = Staged [])
     ?(image_dependencies = []) ?services ?variables ?rules
     ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag ?(cpu = Normal) ?git_strategy
     ?coverage ?retry ?parallel ?description ~__POS__ ?image ?template ~stage
@@ -972,7 +972,9 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       after_script;
       allow_failure;
       artifacts;
-      before_script;
+      (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
+      before_script =
+        Some (". ./scripts/ci/datadog_send_job_info.sh" :: before_script);
       cache;
       id_tokens;
       image = Option.map Image.image image;

@@ -36,6 +36,7 @@ oc.install-homebrew:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - apt-get update && apt-get install -y git curl
   - ./scripts/packaging/homebrew_install.sh
   - eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
@@ -53,6 +54,8 @@ oc.build-homebrew:
   - gcp
   dependencies: []
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/ci/install-gsutil.sh
   - apt-get update && apt-get install -y git curl
@@ -70,6 +73,8 @@ oc.install-homebrew-macosx:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/packaging/homebrew_install.sh
   - eval $(/opt/homebrew/bin/brew shellenv)

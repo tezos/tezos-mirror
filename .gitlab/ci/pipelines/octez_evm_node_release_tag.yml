@@ -15,7 +15,8 @@ oc.docker:ci:amd64:
   - gcp
   dependencies: []
   timeout: 90 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -35,7 +36,8 @@ oc.docker:ci:arm64:
   - gcp_arm64
   dependencies: []
   timeout: 90 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -89,6 +91,7 @@ oc.build:static-arm64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -133,6 +136,7 @@ oc.build:static-x86_64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -169,6 +173,7 @@ oc.docker:amd64:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_release.sh
@@ -190,6 +195,7 @@ oc.docker:arm64:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_release.sh
@@ -213,6 +219,7 @@ docker:merge_manifests:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_merge_manifests.sh
@@ -235,5 +242,7 @@ gitlab:octez-evm-node-release:
   - oc.build:static-arm64-linux-binaries
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/ci/create_gitlab_octez_evm_node_release.sh

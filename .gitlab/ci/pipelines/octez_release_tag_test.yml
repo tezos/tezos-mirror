@@ -17,7 +17,8 @@ oc.docker:ci:amd64:
   - gcp
   dependencies: []
   timeout: 90 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -37,7 +38,8 @@ oc.docker:ci:arm64:
   - gcp_arm64
   dependencies: []
   timeout: 90 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -93,6 +95,7 @@ oc.build:static-x86_64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -143,6 +146,7 @@ oc.build:static-arm64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -175,6 +179,7 @@ oc.docker:amd64:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_release.sh
@@ -198,6 +203,7 @@ oc.docker:arm64:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_release.sh
@@ -218,6 +224,8 @@ oc.install-release-homebrew:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/ci/install-gsutil.sh
   - apt install -y git build-essential
@@ -242,6 +250,7 @@ docker:merge_manifests:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_merge_manifests.sh
@@ -266,6 +275,8 @@ gitlab:release:
   - oc.install-release-homebrew
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
   - ./scripts/ci/gitlab-release.sh
@@ -292,6 +303,7 @@ oc.docker-build-debian-dependencies:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
@@ -332,6 +344,7 @@ oc.build-debian:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -378,6 +391,7 @@ oc.build-debian-old_a:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -424,6 +438,7 @@ oc.build-debian-old_b:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -464,6 +479,8 @@ oc.build-data_packages:
   - oc.docker-build-debian-dependencies
   dependencies: []
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh zcash
@@ -491,6 +508,7 @@ apt_repo_debian_old:
   - oc.build-debian-old_b
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -522,6 +540,7 @@ apt_repo_debian:
   - oc.build-data_packages
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -548,6 +567,7 @@ oc.docker-build-ubuntu-dependencies:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
@@ -588,6 +608,7 @@ oc.build-ubuntu:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -634,6 +655,7 @@ oc.build-ubuntu-old_a:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -680,6 +702,7 @@ oc.build-ubuntu-old_b:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -724,6 +747,7 @@ apt_repo_ubuntu_old:
   - oc.build-ubuntu-old_b
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -755,6 +779,7 @@ apt_repo_ubuntu:
   - oc.build-data_packages
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
@@ -781,6 +806,7 @@ oc.docker-build-rockylinux-dependencies:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
@@ -813,6 +839,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
@@ -847,6 +874,7 @@ oc.build-rockylinux:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -891,6 +919,7 @@ oc.build-rockylinux-data:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -933,6 +962,7 @@ rpm_repo_rockylinux:
   - oc.build-rockylinux-data
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
   script:
@@ -958,6 +988,7 @@ oc.docker-build-fedora-dependencies:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
@@ -991,6 +1022,7 @@ oc.docker-systemd-tests-rpm-fedora:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
@@ -1026,6 +1058,7 @@ oc.build-fedora:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -1071,6 +1104,7 @@ oc.build-fedora-data:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -1114,6 +1148,7 @@ rpm_repo_fedora:
   - oc.build-fedora-data
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
   script:
@@ -1141,6 +1176,7 @@ docker:promote_to_latest:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_promote_to_latest.sh
@@ -1159,6 +1195,8 @@ opam:release:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/ci/opam-release.sh --dry-run
 
@@ -1179,6 +1217,8 @@ publish:release-page:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/releases/publish_release_page.sh
   variables:
