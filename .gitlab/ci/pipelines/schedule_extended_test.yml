@@ -1343,7 +1343,7 @@ opam:all_2:
       - octez-protocol-016-PtMumbai-libs
       - octez-protocol-000-Ps9mPmXa-libs
       - octez-injector
-      - octez-agnostic-baker-lib
+      - octez-baker-lib
 
 opam:all_1:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1658,7 +1658,7 @@ opam:exec_1:
       - octez-client
       - octez-baker-PsRiotum
       - octez-baker-PsQuebec
-      - octez-agnostic-baker
+      - octez-baker
       - octez-accuser-PsRiotum
       - octez-accuser-PsQuebec
       - octez-accuser

@@ -5661,7 +5661,7 @@ let _octez_scoru_wasm_fast_tests =
 let octez_agnostic_baker_lib =
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   public_lib
-    "octez-agnostic-baker-lib"
+    "octez-baker-lib"
     ~path:"src/lib_agnostic_baker"
     ~internal_name:"octez_agnostic_baker"
     ~synopsis:"Octez: library for Agnostic Baker"
@@ -8580,10 +8580,10 @@ let _octez_agnostic_baker =
     List.map deps_for_protocol Protocol.all |> List.flatten
   in
   public_exe
-    "octez-agnostic-baker"
+    "octez-baker"
     ~path:"src/bin_agnostic_baker"
     ~internal_name:"main_agnostic_baker"
-    ~synopsis:"Tezos: `octez-agnostic-baker` binary for baking"
+    ~synopsis:"Tezos: `octez-baker` binary for baking"
     ~preprocess
     ~preprocessor_deps
     ~release_status:Released

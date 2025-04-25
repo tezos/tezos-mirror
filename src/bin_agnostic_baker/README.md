@@ -17,7 +17,7 @@ To run the agnostic baker, the command line syntax is similar to the one
 for the protocol-dependent baking binaries:
 
 ```bash
-./octez-agnostic-baker [OCTEZ-BAKER-COMMANDS]
+./octez-baker [OCTEZ-BAKER-COMMANDS]
 ```
 
 The `[OCTEZ-BAKER-COMMANDS]` list consists of all the arguments that can be used

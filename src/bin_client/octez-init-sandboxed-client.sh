@@ -154,9 +154,9 @@ main() {
     echo "exec $baker \"\$@\"" >> "$client_dir"/bin/octez-baker-"$protocol_without_number"
     chmod +x "$client_dir"/bin/octez-baker-"$protocol_without_number"
 
-    echo '#!/bin/sh' > "$client_dir"/bin/octez-agnostic-baker
-    echo "exec $agnostic_baker \"\$@\"" >> "$client_dir"/bin/octez-agnostic-baker
-    chmod +x "$client_dir"/bin/octez-agnostic-baker
+    echo '#!/bin/sh' > "$client_dir"/bin/octez-baker
+    echo "exec $agnostic_baker \"\$@\"" >> "$client_dir"/bin/octez-baker
+    chmod +x "$client_dir"/bin/octez-baker
 
     echo '#!/bin/sh' > "$client_dir"/bin/octez-accuser
     echo "exec $agnostic_accuser \"\$@\"" >> "$client_dir"/bin/octez-accuser

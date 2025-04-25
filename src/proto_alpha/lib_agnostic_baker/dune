@@ -11,7 +11,7 @@
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.baking
   octez-protocol-alpha-libs.baking-commands
-  octez-agnostic-baker-lib)
+  octez-baker-lib)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

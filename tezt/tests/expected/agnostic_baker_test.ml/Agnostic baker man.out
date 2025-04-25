@@ -1,14 +1,14 @@
 
-./octez-agnostic-baker
+./octez-baker
 Usage:
-  octez-agnostic-baker [global options] command [command options]
-  octez-agnostic-baker --help (for global options)
-  octez-agnostic-baker [global options] command --help (for command options)
-  octez-agnostic-baker --version (for version information)
+  octez-baker [global options] command [command options]
+  octez-baker --help (for global options)
+  octez-baker [global options] command --help (for command options)
+  octez-baker --version (for version information)
 
 To browse the documentation:
-  octez-agnostic-baker [global options] man (for a list of commands)
-  octez-agnostic-baker [global options] man -v 3 (for the full manual)
+  octez-baker [global options] man (for a list of commands)
+  octez-baker [global options] man -v 3 (for the full manual)
 
 Global options (must come before the command):
   -d --base-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
@@ -51,16 +51,16 @@ Global options (must come before the command):
   --log-coloring <true|false>: Enable or disable light coloring in default
     stdout logs. Coloring is enabled by default.
 
-./octez-agnostic-baker --help
+./octez-baker --help
 Usage:
-  octez-agnostic-baker [global options] command [command options]
-  octez-agnostic-baker --help (for global options)
-  octez-agnostic-baker [global options] command --help (for command options)
-  octez-agnostic-baker --version (for version information)
+  octez-baker [global options] command [command options]
+  octez-baker --help (for global options)
+  octez-baker [global options] command --help (for command options)
+  octez-baker --version (for version information)
 
 To browse the documentation:
-  octez-agnostic-baker [global options] man (for a list of commands)
-  octez-agnostic-baker [global options] man -v 3 (for the full manual)
+  octez-baker [global options] man (for a list of commands)
+  octez-baker [global options] man -v 3 (for the full manual)
 
 Global options (must come before the command):
   -d --base-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
@@ -103,16 +103,16 @@ Global options (must come before the command):
   --log-coloring <true|false>: Enable or disable light coloring in default
     stdout logs. Coloring is enabled by default.
 
-./octez-agnostic-baker man
+./octez-baker man
 Usage:
-  octez-agnostic-baker [global options] command [command options]
-  octez-agnostic-baker --help (for global options)
-  octez-agnostic-baker [global options] command --help (for command options)
-  octez-agnostic-baker --version (for version information)
+  octez-baker [global options] command [command options]
+  octez-baker --help (for global options)
+  octez-baker [global options] command --help (for command options)
+  octez-baker --version (for version information)
 
 To browse the documentation:
-  octez-agnostic-baker [global options] man (for a list of commands)
-  octez-agnostic-baker [global options] man -v 3 (for the full manual)
+  octez-baker [global options] man (for a list of commands)
+  octez-baker [global options] man -v 3 (for the full manual)
 
 Global options (must come before the command):
   -d --base-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)

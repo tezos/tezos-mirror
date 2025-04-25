@@ -14,7 +14,7 @@ depends: [
   "octez-rust-deps" { = version }
   "bls12-381" { = version }
   "octez-shell-libs" { = version }
-  "octez-agnostic-baker-lib" { = version }
+  "octez-baker-lib" { = version }
   "octez-protocol-021-PsQuebec-libs" { = version }
   "octez-protocol-022-PsRiotum-libs" { = version }
 ]
