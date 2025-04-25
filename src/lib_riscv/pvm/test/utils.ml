@@ -18,3 +18,11 @@ let read_riscv_dummy_kernel () =
   read_riscv_kernel
     (project_root // "src/riscv/assets/riscv-dummy.elf")
     (project_root // "src/riscv/assets/riscv-dummy.elf.checksum")
+
+let read_riscv_jstz_kernel () =
+  read_riscv_kernel
+    (project_root // "src/riscv/assets/jstz")
+    (project_root // "src/riscv/assets/jstz.checksum")
+
+let read_riscv_jstz_proof_first_step () =
+  read_file (project_root // "src/riscv/lib/tests/expected/jstz/proof_initial")

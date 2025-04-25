@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021-2025 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2025 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
@@ -5049,6 +5049,7 @@ let _octez_riscv_pvm_test =
       [
         "../../../riscv/assets/riscv-dummy.elf";
         "../../../riscv/assets/riscv-dummy.elf.checksum";
+        "../../../riscv/lib/tests/expected/jstz/proof_initial";
       ]
     ~deps:
       [
