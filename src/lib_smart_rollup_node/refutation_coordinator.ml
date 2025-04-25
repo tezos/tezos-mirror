@@ -30,9 +30,14 @@ module Pkh_table = Signature.Public_key_hash.Table
 
 type state = {node_ctxt : Node_context.rw; pending_opponents : unit Pkh_table.t}
 
-let untracked_conflicts opponent_players conflicts =
+let untracked_conflicts opponents conflicts =
   List.filter
-    (fun conflict -> not @@ Pkh_map.mem conflict.Game.other opponent_players)
+    (fun conflict ->
+      not
+      @@ List.mem
+           ~equal:Signature.Public_key_hash.equal
+           conflict.Game.other
+           opponents)
     conflicts
 
 (* Transform the list of ongoing games [(Game.t * pkh * pkh) list]
@@ -77,12 +82,10 @@ let on_process Layer1.{level; _} state =
           in
           (* Map of opponents the node is playing against to the corresponding
              player worker *)
-          let opponent_players =
-            Pkh_map.of_seq @@ List.to_seq @@ Player.current_games ()
-          in
+          let opponents = Player.current_games () in
           (* Conflicts for which we need to start new refutation players.
              Some of these might be ongoing. *)
-          let new_conflicts = untracked_conflicts opponent_players conflicts in
+          let new_conflicts = untracked_conflicts opponents conflicts in
           (* L1 ongoing games *)
           let* ongoing_games =
             Plugin.Refutation_game_helpers.get_ongoing_games
@@ -107,20 +110,20 @@ let on_process Layer1.{level; _} state =
           in
           let*! () =
             (* Play one step of the refutation game in every remaining player *)
-            Pkh_map.iter_p
-              (fun opponent worker ->
+            List.iter_p
+              (fun opponent ->
                 match Pkh_map.find opponent ongoing_game_map with
                 | Some game ->
                     Pkh_table.remove state.pending_opponents opponent ;
-                    Player.play worker game ~level
+                    Player.play opponent game ~level
                 | None ->
                     (* Kill finished players: those who don't aren't
                        playing against pending opponents that don't have
                        ongoing games in the L1 *)
                     if not @@ Pkh_table.mem state.pending_opponents opponent
-                    then Player.shutdown worker
+                    then Player.shutdown opponent
                     else Lwt.return_unit)
-              opponent_players
+              opponents
           in
           return_unit)
 
@@ -245,10 +248,7 @@ let shutdown () =
       return_unit
   | Ok w ->
       (* Shut down all current refutation players *)
-      let games = Player.current_games () in
-      let* () =
-        List.iter_s (fun (_opponent, player) -> Player.shutdown player) games
-      in
+      let* () = Player.current_games () |> List.iter_s Player.shutdown in
       Worker.shutdown w
 
 let worker_status () =

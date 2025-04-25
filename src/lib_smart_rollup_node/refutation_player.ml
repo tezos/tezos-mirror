@@ -194,9 +194,10 @@ let init_and_play node_ctxt ~self ~conflict ~game ~level =
   in
   return_unit
 
-let current_games () =
-  List.map
-    (fun (_name, worker) -> ((Worker.state worker).opponent, worker))
-    (Worker.list table)
+let play opponent game ~level =
+  Worker.find_opt table opponent |> Option.iter_s (fun w -> play w game ~level)
 
-let shutdown = Worker.shutdown
+let current_games () =
+  List.map (fun (opponent, _worker) -> opponent) (Worker.list table)
+
+let shutdown name = Worker.find_opt table name |> Option.iter_s Worker.shutdown

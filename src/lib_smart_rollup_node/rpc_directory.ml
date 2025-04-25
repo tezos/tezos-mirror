@@ -146,7 +146,7 @@ let () =
   in
   let refutation_player_workers =
     Refutation_player.current_games ()
-    |> List.map (fun (opponent, _w) ->
+    |> List.map (fun opponent ->
            ( Format.asprintf
                "refutation_player (against %a)"
                Signature.Public_key_hash.pp
