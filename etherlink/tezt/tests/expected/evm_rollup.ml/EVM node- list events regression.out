@@ -233,6 +233,14 @@ blueprint_publisher_shutdown:
     { /* blueprint_publisher_shutdown version 0 */
       "blueprint_publisher_shutdown.v0": any }
   
+blueprints_follower_failed:
+  description: blueprint follower failed with {trace}
+  level: fatal
+  section: evm_node.dev
+  json format:
+    { /* blueprints_follower_failed version 0 */
+      "blueprints_follower_failed.v0": any }
+  
 blueprints_publisher_request_failed:
   description: request {view} failed: {errors}
   level: error
@@ -2167,6 +2175,14 @@ blueprint_invalid_applied:
       /* Positive big number
          Decimal representation of a positive big number */
       string
+  
+blueprints_follower_failed:
+  description: blueprint follower failed with {trace}
+  level: fatal
+  section: evm_node.dev
+  json format:
+    { /* blueprints_follower_failed version 0 */
+      "blueprints_follower_failed.v0": any }
   
 blueprints_publisher_request_failed:
   description: request {view} failed: {errors}

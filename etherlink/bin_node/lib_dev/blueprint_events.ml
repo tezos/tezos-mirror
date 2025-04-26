@@ -158,6 +158,15 @@ let worker_request_failed =
     ("errors", Events.trace_encoding)
     ~pp2:Error_monad.pp_print_trace
 
+let follower_failed =
+  declare_1
+    ~section
+    ~name:"blueprints_follower_failed"
+    ~msg:"blueprint follower failed with {trace}"
+    ~level:Fatal
+    ~pp1:Error_monad.pp_print_trace
+    ("trace", Events.trace_encoding)
+
 let publisher_is_ready () = emit publisher_ready ()
 
 let publisher_shutdown () = emit publisher_shutdown ()
@@ -221,3 +230,5 @@ let unexpected_blueprint_from_remote_node ~received:Ethereum_types.(Qty level)
 
 let worker_request_failed request_view errs =
   emit worker_request_failed (request_view, errs)
+
+let follower_failed trace = emit follower_failed trace

@@ -25,6 +25,10 @@
   will fails. Now when submitting multiple time the same transaction,
   the first occurrence that could succeed does. (!17740)
 
+### Execution changes
+
+- Exits with 103 when the node fails to follow the head of its upstream node.
+  (!17857)
 
 ### Storage changes
 

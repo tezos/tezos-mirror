@@ -146,7 +146,8 @@ module Blueprints_sequence = struct
     else make_with_chunks ~next_blueprint_number evm_node_endpoint
 end
 
-let rec catchup ~next_blueprint_number ~first_connection params =
+let rec catchup ~next_blueprint_number ~first_connection params :
+    Empty.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   Metrics.start_bootstrapping () ;
 
@@ -238,10 +239,21 @@ and stream_loop (Qty next_blueprint_number) params stream =
 
 let start ?(ping_tx_pool = true) ~time_between_blocks ~evm_node_endpoint
     ~next_blueprint_number on_new_blueprint =
-  catchup
-    ~next_blueprint_number
-    ~first_connection:true
-    {time_between_blocks; evm_node_endpoint; on_new_blueprint; ping_tx_pool}
+  let open Lwt_result_syntax in
+  let*! res =
+    catchup
+      ~next_blueprint_number
+      ~first_connection:true
+      {time_between_blocks; evm_node_endpoint; on_new_blueprint; ping_tx_pool}
+  in
+  (* The blueprint follower should never fail. If it does, we better exit with
+     an error. *)
+  match res with
+  | Ok _ -> .
+  | Error err ->
+      let*! () = Blueprint_events.follower_failed err in
+      Lwt_exit.exit_and_raise
+        Node_error.exit_code_when_error_blueprints_follower
 
 (* {Note keep_alive}
 

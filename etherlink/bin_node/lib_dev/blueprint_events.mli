@@ -81,3 +81,5 @@ val unexpected_blueprint_from_remote_node :
     blueprints_publisher worker encountered errors [errs]. *)
 val worker_request_failed :
   Blueprints_publisher_types.Request.view -> Error_monad.tztrace -> unit Lwt.t
+
+val follower_failed : tztrace -> unit Lwt.t
