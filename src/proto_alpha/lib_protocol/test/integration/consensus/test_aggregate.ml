@@ -85,19 +85,21 @@ let find_aggregate_result receipt =
   | Some res -> res
   | None -> Test.fail "No aggregate result found"
 
-(* [check_attestations_aggregate_result ~committee result] verifies that
-   [result] has the following properties:
-   - [balance_update] is empty;
-   - [voting_power] equals the sum of slots owned by attesters in [committee];
-   - the public key hashes in [result] committee match those of [committee]. *)
-let check_attestations_aggregate_result ~committee
-    (result :
-      Alpha_context.Kind.attestations_aggregate
-      Tezos_protocol_alpha__Protocol.Apply_results.contents_result) =
+type 'kind aggregate =
+  | Preattestation : Alpha_context.Kind.preattestations_aggregate aggregate
+  | Attestation : Alpha_context.Kind.attestations_aggregate aggregate
+
+let check_aggregate_result (type kind) (kind : kind aggregate) ~committee
+    (result : kind Tezos_protocol_alpha__Protocol.Apply_results.contents_result)
+    =
   let open Lwt_result_syntax in
-  match result with
-  | Attestations_aggregate_result
-      {balance_updates; committee = resulting_committee; consensus_power} ->
+  match (kind, result) with
+  | ( Preattestation,
+      Preattestations_aggregate_result
+        {balance_updates; committee = resulting_committee; consensus_power} )
+  | ( Attestation,
+      Attestations_aggregate_result
+        {balance_updates; committee = resulting_committee; consensus_power} ) ->
       (* Check balance updates *)
       let* () =
         match balance_updates with
@@ -150,6 +152,28 @@ let check_attestations_aggregate_result ~committee
           committee_pkhs
           pp
           resulting_committee_pkhs
+
+(* [check_preattestations_aggregate_result ~committee result] verifies that
+   [result] has the following properties:
+   - [balance_update] is empty;
+   - [voting_power] equals the sum of slots owned by attesters in [committee];
+   - the public key hashes in [result] committee match those of [committee]. *)
+let check_preattestations_aggregate_result ~committee
+    (result :
+      Alpha_context.Kind.preattestations_aggregate
+      Tezos_protocol_alpha__Protocol.Apply_results.contents_result) =
+  check_aggregate_result Preattestation ~committee result
+
+(* [check_attestations_aggregate_result ~committee result] verifies that
+   [result] has the following properties:
+   - [balance_update] is empty;
+   - [voting_power] equals the sum of slots owned by attesters in [committee];
+   - the public key hashes in [result] committee match those of [committee]. *)
+let check_attestations_aggregate_result ~committee
+    (result :
+      Alpha_context.Kind.attestations_aggregate
+      Tezos_protocol_alpha__Protocol.Apply_results.contents_result) =
+  check_aggregate_result Attestation ~committee result
 
 (* [find_attester_with_bls_key attesters] returns the first attester with a BLS
    key, if any. *)
