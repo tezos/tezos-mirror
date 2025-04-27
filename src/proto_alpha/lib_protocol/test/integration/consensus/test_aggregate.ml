@@ -404,6 +404,7 @@ let test_empty_committee () =
   let* _genesis, block =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
   in
+  (* Crafting an attestations_aggregate with an empty committee *)
   let* consensus_content =
     let* attestation = Op.raw_attestation block in
     match attestation.protocol_data with
@@ -418,8 +419,36 @@ let test_empty_committee () =
   in
   let signature = Some Signature.(of_bls Signature.Bls.zero) in
   let operation = Op.pack_operation (B block) signature (Single contents) in
+  (* Baking with the attestations_aggregate and expecting an error *)
   let*! res = Block.bake ~operation block in
-  Assert.proto_error ~loc:__LOC__ res empty_aggregation_committee
+  let* () = Assert.proto_error ~loc:__LOC__ res empty_aggregation_committee in
+  (* Crafting a preattestations_aggregate with an empty committee *)
+  let* consensus_content =
+    let* block = Block.bake block in
+    let* preattestation = Op.raw_preattestation block in
+    match preattestation.protocol_data with
+    | {contents = Single (Preattestation consensus_content); _} ->
+        let Alpha_context.{level; round; block_payload_hash; slot = _} =
+          consensus_content
+        in
+        return Alpha_context.{level; round; block_payload_hash}
+  in
+  let contents =
+    Alpha_context.Preattestations_aggregate {consensus_content; committee = []}
+  in
+  let operation = Op.pack_operation (B block) signature (Single contents) in
+  (* Baking with the preattestations_aggregate and expecting an error *)
+  let round_zero = Alpha_context.Round.zero in
+  let*! res =
+    Block.bake
+      ~policy:(By_round 1)
+      ~payload_round:(Some round_zero)
+      ~locked_round:(Some round_zero)
+      ~operation
+      block
+  in
+  let* () = Assert.proto_error ~loc:__LOC__ res empty_aggregation_committee in
+  return_unit
 
 let tests =
   [
