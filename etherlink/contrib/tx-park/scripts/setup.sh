@@ -100,29 +100,25 @@ else
   BATCHER3_SK="$CURRENT_BATCHER3_SK"
 fi
 
-ADMIN_BALANCE=$(curl -s https://api.ghostnet.tzkt.io/v1/accounts/"$ADMIN_PK"/balance)
-if [[ $ADMIN_BALANCE -lt 5000000 ]]; then
-  notice "fund the rollup admin account with 5 tez"
-  npx @tacoinfra/get-tez "$ADMIN_PK" --amount 5 --network ghostnet
-fi
+check_and_fund() {
+  local account_name=$1
+  local pk=$2
+  local amount=$3
 
-BATCHER1_BALANCE=$(curl -s https://api.ghostnet.tzkt.io/v1/accounts/"$BATCHER1_PK"/balance)
-if [[ $BATCHER1_BALANCE -lt 5000000 ]]; then
-  notice "fund the rollup batcher account 1 with 5 tez"
-  npx @tacoinfra/get-tez "$BATCHER1_PK" --amount 5 --network ghostnet
-fi
+  local balance
 
-BATCHER2_BALANCE=$(curl -s https://api.ghostnet.tzkt.io/v1/accounts/"$BATCHER2_PK"/balance)
-if [[ $BATCHER2_BALANCE -lt 5000000 ]]; then
-  notice "fund the rollup batcher account 2 with 5 tez"
-  npx @tacoinfra/get-tez "$BATCHER2_PK" --amount 5 --network ghostnet
-fi
+  balance=$(curl -s "https://api.ghostnet.tzkt.io/v1/accounts/$pk/balance")
 
-BATCHER3_BALANCE=$(curl -s https://api.ghostnet.tzkt.io/v1/accounts/"$BATCHER3_PK"/balance)
-if [[ $BATCHER3_BALANCE -lt 5000000 ]]; then
-  notice "fund the rollup batcher account 3 with 5 tez"
-  npx @tacoinfra/get-tez "$BATCHER3_PK" --amount 5 --network ghostnet
-fi
+  if [[ $balance -lt 5000000 ]]; then
+    notice "funding the $account_name account with $amount tez"
+    npx @tacoinfra/get-tez "$pk" --amount "$amount" --network ghostnet
+  fi
+}
+
+check_and_fund "rollup admin" "$ADMIN_PK" 5
+check_and_fund "rollup batcher account 1" "$BATCHER1_PK" 5
+check_and_fund "rollup batcher account 2" "$BATCHER2_PK" 5
+check_and_fund "rollup batcher account 3" "$BATCHER3_PK" 5
 
 TMP_FILE=$(mktemp -p "$TMP_DIR")
 
