@@ -261,6 +261,42 @@ let test_attestations_aggregate_with_a_single_delegate () =
   let result = find_attestations_aggregate_result receipt in
   check_attestations_aggregate_result ~committee:[attester] result
 
+let test_preattestations_aggregate_with_a_single_delegate () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* block' = Block.bake block in
+  let* attesters = Context.get_attesters (B block') in
+  (* Find an attester with a BLS consensus key. *)
+  let attester, slot =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (find_attester_with_bls_key attesters)
+  in
+  let* operation =
+    let* preattestation =
+      Op.raw_preattestation
+        ~delegate:attester.RPC.Validators.delegate
+        ~slot
+        block'
+    in
+    return
+    @@ WithExceptions.Option.get ~loc:__LOC__
+    @@ Op.aggregate_preattestations [preattestation]
+  in
+  let* _, (_, receipt) =
+    let round_zero = Alpha_context.Round.zero in
+    Block.bake_with_metadata
+      ~policy:(By_round 1)
+      ~payload_round:(Some round_zero)
+      ~locked_round:(Some round_zero)
+      ~operation
+      block
+  in
+  let result = find_preattestations_aggregate_result receipt in
+  check_preattestations_aggregate_result ~committee:[attester] result
+
 let test_attestations_aggregate_with_multiple_delegates () =
   let open Lwt_result_syntax in
   let* _genesis, block =
@@ -460,6 +496,10 @@ let tests =
       "test_aggregate_feature_flag_disabled"
       `Quick
       test_aggregate_feature_flag_disabled;
+    Tztest.tztest
+      "test_preattestations_aggregate_with_a_single_delegate"
+      `Quick
+      test_preattestations_aggregate_with_a_single_delegate;
     Tztest.tztest
       "test_attestations_aggregate_with_a_single_delegate"
       `Quick
