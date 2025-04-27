@@ -68,6 +68,23 @@ let empty_aggregation_committee = function
   | Validate_errors.Consensus.Empty_aggregation_committee -> true
   | _ -> false
 
+let find_preattestations_aggregate_result receipt =
+  let result_opt =
+    List.find_map
+      (function
+        | Tezos_protocol_alpha__Protocol.Apply_results.Operation_metadata
+            {
+              contents =
+                Single_result (Preattestations_aggregate_result _ as result);
+            } ->
+            Some result
+        | _ -> None)
+      receipt
+  in
+  match result_opt with
+  | Some res -> res
+  | None -> Test.fail "No preattestations aggregate result found"
+
 let find_attestations_aggregate_result receipt =
   let result_opt =
     List.find_map
