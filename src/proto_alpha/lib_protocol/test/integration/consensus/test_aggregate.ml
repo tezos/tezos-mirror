@@ -68,7 +68,7 @@ let empty_aggregation_committee = function
   | Validate_errors.Consensus.Empty_aggregation_committee -> true
   | _ -> false
 
-let find_aggregate_result receipt =
+let find_attestations_aggregate_result receipt =
   let result_opt =
     List.find_map
       (function
@@ -83,7 +83,7 @@ let find_aggregate_result receipt =
   in
   match result_opt with
   | Some res -> res
-  | None -> Test.fail "No aggregate result found"
+  | None -> Test.fail "No attestations aggregate result found"
 
 type 'kind aggregate =
   | Preattestation : Alpha_context.Kind.preattestations_aggregate aggregate
@@ -241,7 +241,7 @@ let test_attestations_aggregate_with_a_single_delegate () =
     WithExceptions.Option.get ~loc:__LOC__ (Op.aggregate [attestation])
   in
   let* _, (_, receipt) = Block.bake_with_metadata ~operation block in
-  let result = find_aggregate_result receipt in
+  let result = find_attestations_aggregate_result receipt in
   check_attestations_aggregate_result ~committee:[attester] result
 
 let test_attestations_aggregate_with_multiple_delegates () =
@@ -267,7 +267,7 @@ let test_attestations_aggregate_with_multiple_delegates () =
   let* _, (_, receipt) =
     Block.bake_with_metadata ~operation:aggregation block
   in
-  let result = find_aggregate_result receipt in
+  let result = find_attestations_aggregate_result receipt in
   let delegates = List.map fst bls_delegates_with_slots in
   check_attestations_aggregate_result ~committee:delegates result
 
