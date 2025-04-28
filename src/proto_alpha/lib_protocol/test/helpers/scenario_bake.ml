@@ -215,7 +215,7 @@ let check_issuance_rpc block : unit tzresult Lwt.t =
   in
   return_unit
 
-let attest_all_ =
+let attest_all_ previous_block =
   let open Lwt_result_syntax in
   fun (block, state) ->
     let* rights = Plugin.RPC.Attestation_rights.get Block.rpc_ctxt block in
@@ -250,14 +250,20 @@ let attest_all_ =
     in
     let* ops =
       List.map_es
-        (fun (delegate, slot) -> Op.attestation ~delegate ~slot block)
+        (fun (delegate, slot) ->
+          let* consensus_key_info =
+            Context.Delegate.consensus_key (B previous_block) delegate
+          in
+          let consensus_key = consensus_key_info.active in
+          let* consensus_key = Account.find consensus_key.consensus_key_pkh in
+          Op.attestation ~delegate:consensus_key.pkh ~slot block)
         dlgs
     in
     let state = State.add_pending_operations ops state in
     return (block, state)
 
 (* Does not produce a new block *)
-let attest_all = exec attest_all_
+let attest_all previous_block = exec (attest_all_ previous_block)
 
 let check_ai_launch_cycle_is_zero ~loc block =
   let open Lwt_result_syntax in
@@ -405,7 +411,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
       return @@ apply_new_cycle new_future_current_cycle state)
   in
   let* block, state =
-    if state.force_attest_all then attest_all_ (block, state)
+    if state.force_attest_all then attest_all_ previous_block (block, state)
     else return (block, state)
   in
   return (block, state)
