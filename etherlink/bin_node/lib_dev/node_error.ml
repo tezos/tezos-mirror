@@ -11,6 +11,8 @@ let exit_code_when_out_of_sync = 101
 
 let exit_code_when_flushed_blueprint = 102
 
+let exit_code_when_error_blueprints_follower = 103
+
 type error_source = [`Node | `Kernel]
 
 let error_source_encoding =
