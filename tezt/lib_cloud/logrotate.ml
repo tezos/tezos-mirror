@@ -7,7 +7,7 @@
 
 let config name = Format.asprintf "/etc/logrotate.d/%s" name
 
-let write_config ~name ~pidfile ~target_file ~max_rotations agent =
+let write_config ~name ?pidfile ~target_file ~max_rotations agent =
   let open Jingoo in
   let template =
     {|{{ target_file }} {
@@ -25,13 +25,17 @@ let write_config ~name ~pidfile ~target_file ~max_rotations agent =
   su root root
 # Maximum number of rotations before removing the oldests.
   rotate {{ max_rotation }}
-# Send a signal to process in order it to reload
+# Send a signal to process in order to reload it
   postrotate
-      # Check if pidfile exist
+      {% if has_pidfile -%}
       if [ -f {{ pidfile }} ]; then
           # Send SIGHUP to pid in order to force reopen its logfile
           kill -HUP $(cat {{ pidfile }})
       fi
+      {%- else -%}
+      # No pidfile is provided, send to *ALL* processes whose name is "{{ name }}".
+      pkill -HUP {{ name }}
+      {%- endif %}
   endscript
 }
 |}
@@ -43,8 +47,10 @@ let write_config ~name ~pidfile ~target_file ~max_rotations agent =
       ~models:
         [
           ("target_file", Jg_types.Tstr target_file);
+          ("name", Jg_types.Tstr name);
           ("max_rotation", Jg_types.Tint max_rotations);
-          ("pidfile", Jg_types.Tstr pidfile);
+          ("has_pidfile", Jg_types.Tbool (Option.is_some pidfile));
+          ("pidfile", Jg_types.Tstr (Option.value ~default:"" pidfile));
         ]
   in
   Log.info "Teztcloud.Logrotate: applying template: done" ;
