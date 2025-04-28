@@ -196,6 +196,10 @@ val originate_forward_smart_contract :
     kind [kind]. *)
 val default_boot_sector_of : kind:string -> string
 
+(** [default_boot_sector_uses_of ~kind] returns the list of things that are needed to produce the
+    default boot sector for [kind]. *)
+val default_boot_sector_uses_of : kind:string -> Uses.t list
+
 val last_cemented_commitment_hash_with_level :
   sc_rollup:string -> Client.t -> (string * int) Lwt.t
 

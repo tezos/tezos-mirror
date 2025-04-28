@@ -186,6 +186,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
   let uses protocol =
     (Constant.octez_smart_rollup_node :: Option.to_list preimages_dir)
     @ uses protocol
+    @ Sc_rollup_helpers.default_boot_sector_uses_of ~kind
   in
   register_test
     ~kind
@@ -259,10 +260,11 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
 
    - Rollup addresses are fully determined by operation hashes and origination nonce.
 *)
-let test_origination ~kind =
+let test_origination ~kind ?boot_sector =
   test_l1_scenario
     ~regression:true
     ~hooks
+    ?boot_sector
     {
       variant = None;
       tags = ["origination"];
@@ -4816,6 +4818,7 @@ let test_rpcs ~kind
     ?(boot_sector = Sc_rollup_helpers.default_boot_sector_of ~kind)
     ?kernel_debug_log ?preimages_dir =
   test_full_scenario
+    ~uses:(fun _protocol -> default_boot_sector_uses_of ~kind)
     ~regression:true
     ?kernel_debug_log
     ~hooks
@@ -7042,7 +7045,7 @@ let register_riscv ~protocols =
   let preimages_dir =
     Uses.make ~tag:kind ~path:"src/riscv/assets/preimages" ()
   in
-  test_origination ~kind protocols ;
+  test_origination ~kind ~boot_sector protocols ;
   test_rpcs ~kind ~boot_sector protocols ~kernel_debug_log:true ~preimages_dir ;
   test_rollup_node_boots_into_initial_state protocols ~kind ;
   test_rollup_node_advances_pvm_state

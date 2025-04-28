@@ -35,8 +35,6 @@ use pointer_apply::apply_mut;
 use sha2::Digest;
 use sha2::Sha256;
 
-const HERMIT_LOADER: &[u8] = include_bytes!("../../assets/hermit-loader");
-
 type OcamlFallible<T> = Result<T, ocaml::Error>;
 
 #[ocaml::sig]
@@ -425,32 +423,20 @@ pub fn octez_riscv_install_boot_sector(
     // can also be passed in the origination string:
     // "kernel:<path to kernel>:<kernel checksum>[:<path to loader>:<loader checksum>]"
     // Any string not matching this format will be treated as an actual kernel to be installed.
-    let install_loader_and_kernel = |pvm: &mut NodePvm, boot_sector| {
-        if let Ok(s) = str::from_utf8(boot_sector) {
-            let parts: Vec<&str> = s.split(':').collect();
-            match parts.as_slice() {
-                ["kernel", kernel_path, kernel_checksum] => {
-                    let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
-                    return pvm.install_boot_sector(HERMIT_LOADER, &kernel);
-                }
-                [
-                    "kernel",
-                    kernel_path,
-                    kernel_checksum,
-                    loader_path,
-                    loader_checksum,
-                ] => {
-                    let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
-                    let loader = read_boot_sector_binary(loader_path, loader_checksum);
-                    return pvm.install_boot_sector(&loader, &kernel);
-                }
-                _ => (),
+    let install_kernel = |pvm: &mut NodePvm| {
+        if let Ok(boot_sector) = str::from_utf8(boot_sector) {
+            let parts: Vec<&str> = boot_sector.split(':').collect();
+            if let ["kernel", kernel_path, kernel_checksum] = parts.as_slice() {
+                let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
+                return pvm.install_boot_sector(&kernel);
+            } else {
+                return pvm.install_boot_sector(boot_sector.as_bytes());
             }
         }
-        pvm.install_boot_sector(HERMIT_LOADER, boot_sector);
+        pvm.install_boot_sector(boot_sector);
     };
 
-    apply_imm(state, |pvm| install_loader_and_kernel(pvm, boot_sector)).0
+    apply_imm(state, install_kernel).0
 }
 
 #[ocaml::func]
