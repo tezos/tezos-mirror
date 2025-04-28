@@ -1780,14 +1780,11 @@ module Anonymous = struct
         level1
     in
     let level = Level.from_raw vi.ctxt level1 in
-    let committee_size = Constants.consensus_committee_size vi.ctxt in
-    let*? slot1 = Round.to_slot round1 ~committee_size in
-    let* ctxt, consensus_key1 =
-      Stake_distribution.slot_owner vi.ctxt level slot1
+    let* ctxt, _, consensus_key1 =
+      Stake_distribution.baking_rights_owner vi.ctxt level ~round:round1
     in
-    let*? slot2 = Round.to_slot round2 ~committee_size in
-    let* ctxt, consensus_key2 =
-      Stake_distribution.slot_owner ctxt level slot2
+    let* ctxt, _, consensus_key2 =
+      Stake_distribution.baking_rights_owner ctxt level ~round:round2
     in
     let delegate1, delegate2 =
       (consensus_key1.delegate, consensus_key2.delegate)

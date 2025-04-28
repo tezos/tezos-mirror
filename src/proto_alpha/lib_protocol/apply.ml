@@ -2522,9 +2522,9 @@ let punish_double_baking ctxt ~operation_hash (bh1 : Block_header.t)
   let round1 = Fitness.round bh1_fitness in
   let*? raw_level = Raw_level.of_int32 bh1.shell.level in
   let level = Level.from_raw ctxt raw_level in
-  let committee_size = Constants.consensus_committee_size ctxt in
-  let*? slot1 = Round.to_slot round1 ~committee_size in
-  let* ctxt, consensus_pk1 = Stake_distribution.slot_owner ctxt level slot1 in
+  let* ctxt, _, consensus_pk1 =
+    Stake_distribution.baking_rights_owner ctxt level ~round:round1
+  in
   punish_delegate
     ctxt
     ~operation_hash
