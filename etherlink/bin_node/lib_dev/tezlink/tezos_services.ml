@@ -408,7 +408,7 @@ let check_block =
   let open Result_syntax in
   function
   | `Level l -> return (`Level l)
-  | `Head 0 -> return `Head
+  | `Head offset -> return (`Head (Int32.of_int offset))
   | block ->
       tzfail
         (Unsupported_block_parameter

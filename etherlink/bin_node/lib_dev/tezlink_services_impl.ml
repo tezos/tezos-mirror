@@ -35,17 +35,34 @@ module type Backend = sig
 end
 
 module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
-  type block_param = [`Head | `Level of int32]
+  type block_param = [`Head of int32 | `Level of int32]
 
   let shell_block_param_to_block_number =
     let open Lwt_result_syntax in
+    let compute_offset (Ethereum_types.Qty block_number) offset =
+      let result = Int32.sub (Z.to_int32 block_number) offset in
+      return (max 0l result)
+    in
     function
-    | `Head ->
-        let* (Qty current_block_number) =
+    | `Head offset ->
+        let* current_block_number =
           Backend.block_param_to_block_number (Block_parameter Latest)
         in
-        return current_block_number
-    | `Level l -> return (Z.of_int32 l)
+        compute_offset current_block_number offset
+    | `Level l -> return l
+
+  let shell_block_param_to_eth_block_param =
+    let open Lwt_result_syntax in
+    function
+    | `Head 0l ->
+        return
+        @@ Ethereum_types.Block_parameter.Block_parameter
+             Ethereum_types.Block_parameter.Latest
+    | block ->
+        let* num = shell_block_param_to_block_number block in
+        return
+        @@ Ethereum_types.Block_parameter.Block_parameter
+             (Number (Ethereum_types.quantity_of_z (Z.of_int32 num)))
 
   let current_level chain block ~offset =
     let open Lwt_result_syntax in
@@ -60,7 +77,7 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
     let* block_number = shell_block_param_to_block_number block in
 
     let constants = Tezlink_constants.all_constants in
-    let level = Z.to_int32 (Z.add block_number (Z.of_int32 offset)) in
+    let level = Int32.add block_number offset in
     return
       Tezos_types.
         {
@@ -76,13 +93,7 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
 
   let read ~block p =
     let open Lwt_result_syntax in
-    let block =
-      match block with
-      | `Head -> Ethereum_types.Block_parameter.(Block_parameter Latest)
-      | `Level l ->
-          Ethereum_types.Block_parameter.(
-            Block_parameter (Number (Qty (Z.of_int32 l))))
-    in
+    let* block = shell_block_param_to_eth_block_param block in
     let* state = Backend.get_state ~block () in
     Backend.read state p
 
@@ -122,7 +133,7 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
     let open Lwt_result_syntax in
     let `Main = chain in
     let* block_number = shell_block_param_to_block_number block in
-    Backend.tez_nth_block block_number
+    Backend.tez_nth_block (Z.of_int32 block_number)
 
   (* TODO: #7963 Support Observer Mode
      Here the catchup mechanism to fetch blueprints is not taken into account as
