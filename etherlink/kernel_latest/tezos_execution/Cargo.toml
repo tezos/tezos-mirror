@@ -12,6 +12,7 @@ license = "MIT"
 
 tezos_crypto_rs.workspace = true
 hex.workspace = true
+num-bigint.workspace = true
 
 
 tezos-evm-runtime.workspace = true
@@ -22,3 +23,4 @@ tezos_data_encoding.workspace = true
 
 primitive-types.workspace = true
 tezos-smart-rollup.workspace = true
+tezos_tezlink.workspace = true

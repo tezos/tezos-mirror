@@ -2394,6 +2394,7 @@ name = "tezos-execution-latest"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "num-bigint",
  "primitive-types",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup",
@@ -2401,6 +2402,7 @@ dependencies = [
  "tezos-storage-latest",
  "tezos_crypto_rs",
  "tezos_data_encoding",
+ "tezos_tezlink_latest",
 ]
 
 [[package]]
