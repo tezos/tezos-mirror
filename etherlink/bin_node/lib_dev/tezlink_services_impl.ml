@@ -32,6 +32,8 @@ module type Backend = sig
     Ethereum_types.quantity tzresult Lwt.t
 
   val tez_nth_block : Z.t -> L2_types.Tezos_block.t tzresult Lwt.t
+
+  val nth_block_hash : Z.t -> Ethereum_types.block_hash option tzresult Lwt.t
 end
 
 module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
@@ -145,4 +147,11 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
     in
     let* block = Backend.tez_nth_block current_block_number in
     return (block.hash, block.timestamp)
+
+  let block_hash chain block =
+    let open Lwt_result_syntax in
+    let `Main = chain in
+    let* number = shell_block_param_to_block_number block in
+
+    Backend.nth_block_hash (Z.of_int32 number)
 end

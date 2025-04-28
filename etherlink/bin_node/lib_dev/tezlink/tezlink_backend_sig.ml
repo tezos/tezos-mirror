@@ -32,4 +32,7 @@ module type S = sig
 
   val bootstrapped :
     unit -> (Ethereum_types.block_hash * Time.Protocol.t) tzresult Lwt.t
+
+  val block_hash :
+    [`Main] -> block_param -> Ethereum_types.block_hash option tzresult Lwt.t
 end

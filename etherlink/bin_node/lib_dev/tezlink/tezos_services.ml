@@ -69,11 +69,11 @@ module Protocol_types = struct
       else invalid_arg "Cycle_repr.of_int32_exn"
   end
 
-  let tezlink_to_tezos_chain_id_exn ~l2_chain_id _chain =
+  let tezlink_to_tezos_chain_id ~l2_chain_id _chain =
     let (L2_types.Chain_id l2_chain_id) = l2_chain_id in
     let bytes = Bytes.make 4 '\000' in
     l2_chain_id |> Z.to_int32 |> Bytes.set_int32_be bytes 0 ;
-    Chain_id.of_bytes_exn bytes
+    Chain_id.of_bytes bytes
 
   module Protocol_data = struct
     let get_mock_protocol_data =
@@ -85,32 +85,35 @@ module Protocol_types = struct
   end
 
   let ethereum_to_tezos_block_hash hash =
-    hash |> Ethereum_types.block_hash_to_bytes |> Block_hash.of_string_exn
+    hash |> Ethereum_types.block_hash_to_bytes |> Block_hash.of_string
 
   module Block_header = struct
     let tezlink_block_to_shell_header (block : L2_types.Tezos_block.t) :
-        Block_header.shell_header =
+        Block_header.shell_header tzresult =
+      let open Result_syntax in
       let open Mock in
-      let predecessor = ethereum_to_tezos_block_hash block.parent_hash in
-      {
-        level = block.level;
-        proto_level;
-        predecessor;
-        timestamp = block.timestamp;
-        validation_passes;
-        operations_hash;
-        fitness;
-        context;
-      }
+      let* predecessor = ethereum_to_tezos_block_hash block.parent_hash in
+      return
+        Block_header.
+          {
+            level = block.level;
+            proto_level;
+            predecessor;
+            timestamp = block.timestamp;
+            validation_passes;
+            operations_hash;
+            fitness;
+            context;
+          }
 
     let tezlink_block_to_block_header ~l2_chain_id
         ((block : L2_types.Tezos_block.t), chain) :
         Block_services.block_header tzresult =
       let open Result_syntax in
-      let chain_id = tezlink_to_tezos_chain_id_exn ~l2_chain_id chain in
+      let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
       let* protocol_data = Protocol_data.get_mock_protocol_data in
-      let hash = ethereum_to_tezos_block_hash block.hash in
-      let shell = tezlink_block_to_shell_header block in
+      let* hash = ethereum_to_tezos_block_hash block.hash in
+      let* shell = tezlink_block_to_shell_header block in
       let block_header : Block_services.block_header =
         {chain_id; hash; shell; protocol_data}
       in
@@ -184,6 +187,12 @@ let import_service s = Tezos_rpc.Service.subst0 s
 
 let register_with_conversion ~service ~impl ~convert_output dir =
   Tezos_rpc.Directory.register dir service (wrap convert_output impl)
+
+let opt_register_with_conversion ~service ~impl ~convert_output dir =
+  Tezos_rpc.Directory.opt_register
+    dir
+    service
+    (wrap (Option.map_e convert_output) impl)
 
 let register ~service ~impl dir = Tezos_rpc.Directory.register dir service impl
 
@@ -330,6 +339,16 @@ module Imported_services = struct
       Tezos_rpc.Service.t =
     import_service Constants_services.all
 
+  let hash :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context,
+        unit,
+        unit,
+        Block_hash.t )
+      Tezos_rpc.Service.t =
+    import_service Block_services.S.hash
+
   let chain_id :
       ([`GET], chain, chain, unit, unit, Chain_id.t) Tezos_rpc.Service.t =
     import_service Tezos_shell_services.Chain_services.S.chain_id
@@ -468,6 +487,13 @@ let register_block_services ~l2_chain_id
          ~convert_output:
            (Protocol_types.Block_header.tezlink_block_to_block_header
               ~l2_chain_id)
+    |> opt_register_with_conversion
+         ~service:Imported_services.hash
+         ~impl:(fun {block; chain} () () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           Backend.block_hash chain block)
+         ~convert_output:Protocol_types.ethereum_to_tezos_block_hash
   in
   Tezos_rpc.Directory.prefix
     block_directory_path
@@ -485,8 +511,7 @@ let register_chain_services ~l2_chain_id
          ~impl:(fun chain () () ->
            Lwt_result_syntax.return (l2_chain_id, chain))
          ~convert_output:(fun (l2_chain_id, chain) ->
-           Result_syntax.return
-           @@ Protocol_types.tezlink_to_tezos_chain_id_exn ~l2_chain_id chain)
+           Protocol_types.tezlink_to_tezos_chain_id ~l2_chain_id chain)
     |> Tezos_rpc.Directory.map (fun ((), chain) -> Lwt.return chain)
   in
   Tezos_rpc.Directory.merge
@@ -503,8 +528,9 @@ let build_dir ~l2_chain_id backend =
        ~service:Imported_services.bootstrapped
        ~impl:(fun () () () -> Backend.bootstrapped ())
        ~convert_output:(fun (input_hash, input_time) ->
-         Result_syntax.return
-           (Protocol_types.ethereum_to_tezos_block_hash input_hash, input_time))
+         let open Result_syntax in
+         let* hash = Protocol_types.ethereum_to_tezos_block_hash input_hash in
+         return (hash, input_time))
   |> register ~service:Imported_services.version ~impl:(fun () () () ->
          version ())
 
