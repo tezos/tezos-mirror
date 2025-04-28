@@ -209,7 +209,15 @@ module Maintenance = struct
     Test.register
       ~__FILE__
       ~title:"p2p-maintenance-disabled"
-      ~tags:[team; "p2p"; "node"; "maintenance"]
+      ~tags:
+        [
+          team;
+          "p2p";
+          "node";
+          "maintenance";
+          (* Uses about 1.7GB of memory. *)
+          Tag.memory_3k;
+        ]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
@@ -325,7 +333,15 @@ module Maintenance = struct
     Test.register
       ~__FILE__
       ~title:"p2p-maintenance-init-expected_connections"
-      ~tags:[team; "p2p"; "node"; "maintenance"; Tag.memory_4k]
+      ~tags:
+        [
+          team;
+          "p2p";
+          "node";
+          "maintenance";
+          (* Uses about 4.8GB of memory. *)
+          Tag.memory_4k;
+        ]
     @@ fun () ->
     (* Connections values evaluated from --connections option. *)
     let min_connections = expected_connections / 2 in
@@ -591,7 +607,15 @@ module Swap = struct
     Test.register
       ~__FILE__
       ~title:"p2p-swap-disable"
-      ~tags:[team; "p2p"; "node"; "swap"; Tag.memory_4k]
+      ~tags:
+        [
+          team;
+          "p2p";
+          "node";
+          "swap";
+          (* Uses about 3.4GB of memory. *)
+          Tag.memory_4k;
+        ]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
@@ -1400,7 +1424,15 @@ module Peer_discovery = struct
     Test.register
       ~__FILE__
       ~title:"p2p-peer-discovery"
-      ~tags:[team; "p2p"; "node"; "peer_discovery"]
+      ~tags:
+        [
+          team;
+          "p2p";
+          "node";
+          "peer_discovery";
+          (* Uses about 1.7GB of memory. *)
+          Tag.memory_3k;
+        ]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
@@ -1417,7 +1449,15 @@ module Peer_discovery = struct
     Test.register
       ~__FILE__
       ~title:"p2p-peer-discovery-disable"
-      ~tags:[team; "p2p"; "node"; "peer_discovery"]
+      ~tags:
+        [
+          team;
+          "p2p";
+          "node";
+          "peer_discovery";
+          (* Uses about 1.7GB of memory. *)
+          Tag.memory_3k;
+        ]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->

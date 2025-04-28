@@ -93,7 +93,10 @@ module Demo_counter = struct
     unit
 
   let register () =
-    Test.register ~__FILE__ ~title:"demo_counter" ~tags:["demo_counter"]
+    Test.register
+      ~__FILE__
+      ~title:"demo_counter"
+      ~tags:["demo_counter"; (* Uses about 1.1GB of memory. *) Tag.memory_3k]
     @@ fun () ->
     let* node = Node.init [Synchronisation_threshold 0] in
     let* client = Client.init ~endpoint:(Node node) () in
@@ -155,7 +158,10 @@ module Demo_noops = struct
           (JSON.encode_u protocol_data)
 
   let register () =
-    Test.register ~__FILE__ ~title:"demo_noops" ~tags:["demo_noops"]
+    Test.register
+      ~__FILE__
+      ~title:"demo_noops"
+      ~tags:["demo_noops"; (* Uses about 1.1GB of memory. *) Tag.memory_3k]
     @@ fun () ->
     let* node = Node.init [Synchronisation_threshold 0] in
     let* client = Client.init ~endpoint:(Node node) () in
