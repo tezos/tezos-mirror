@@ -29,6 +29,8 @@
 
 - Exits with 103 when the node fails to follow the head of its upstream node.
   (!17857)
+- Fixes an issue where the node would hang when the upstream EVM node endpoint
+  returned a 502 Bad Gateway error in observer or RPC mode. (!17856)
 
 ### Storage changes
 
