@@ -377,7 +377,11 @@ type cpu =
 
     - The [cpu] parameter specifies the CPU allocation for the job,
       allowing it to run on a GCP GitLab runner with normal, high,
-      or very high CPU capacity. *)
+      or very high CPU capacity.
+
+    - The [dev_infra] parameter allows to run the job on the dev infrastructure.
+      This parameter is used for tests only and should not be merged in
+      production.*)
 
 val job :
   ?arch:arch ->
@@ -401,6 +405,7 @@ val job :
   ?retry:Gitlab_ci.Types.retry ->
   ?parallel:Gitlab_ci.Types.parallel ->
   ?description:string ->
+  ?dev_infra:bool ->
   __POS__:string * int * int * int ->
   ?image:Image.t ->
   ?template:Gitlab_ci.Types.template ->
@@ -500,6 +505,7 @@ val job_docker_authenticated :
   ?timeout:Gitlab_ci.Types.time_interval ->
   ?retry:Gitlab_ci.Types.retry ->
   ?description:string ->
+  ?dev_infra:bool ->
   __POS__:string * int * int * int ->
   stage:Stage.t ->
   name:string ->
