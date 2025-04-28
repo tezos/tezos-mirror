@@ -13,6 +13,7 @@ type sandbox_config = {
   network : Configuration.supported_network option;
   funded_addresses : Ethereum_types.address list;
   parent_chain : Uri.t option;
+  disable_da_fees : bool;
 }
 
 let install_finalizer_seq server_public_finalizer server_private_finalizer
@@ -150,7 +151,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
   let* () =
     match sandbox_config with
-    | Some {public_key = pk; funded_addresses; _} ->
+    | Some {public_key = pk; funded_addresses; disable_da_fees; _} ->
         let* () = Evm_context.patch_sequencer_key pk in
         let new_balance =
           Ethereum_types.quantity_of_z Z.(of_int 10_000 * pow (of_int 10) 18)
@@ -176,6 +177,14 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
                   Evm_context.patch_kernel kernel
               | _ -> return_unit)
             kernel
+        in
+        let* () =
+          when_ disable_da_fees @@ fun () ->
+          Evm_context.patch_state
+            ~key:"/evm/world_state/fees/da_fee_per_byte"
+            ~value:
+              Ethereum_types.(encode_u256_le (Qty Z.zero) |> String.of_bytes)
+            ()
         in
         return_unit
     | None -> return_unit
