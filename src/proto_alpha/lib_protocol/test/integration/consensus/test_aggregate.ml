@@ -324,6 +324,42 @@ let test_attestations_aggregate_with_multiple_delegates () =
   let delegates = List.map fst bls_delegates_with_slots in
   check_attestations_aggregate_result ~committee:delegates result
 
+let test_preattestations_aggregate_with_multiple_delegates () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* block' = Block.bake block in
+  let* attesters = Context.get_attesters (B block') in
+  (* Filter delegates with BLS keys that have at least one slot *)
+  let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
+  let* preattestations =
+    List.map_es
+      (fun (delegate, slot) ->
+        Op.raw_preattestation
+          ~delegate:delegate.RPC.Validators.delegate
+          ~slot
+          block')
+      bls_delegates_with_slots
+  in
+  let operation =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (Op.aggregate_preattestations preattestations)
+  in
+  let* _, (_, receipt) =
+    let round_zero = Alpha_context.Round.zero in
+    Block.bake_with_metadata
+      ~policy:(By_round 1)
+      ~payload_round:(Some round_zero)
+      ~locked_round:(Some round_zero)
+      ~operation
+      block
+  in
+  let result = find_preattestations_aggregate_result receipt in
+  let delegates = List.map fst bls_delegates_with_slots in
+  check_preattestations_aggregate_result ~committee:delegates result
+
 let test_attestations_aggregate_invalid_signature () =
   let open Lwt_result_syntax in
   let* _genesis, block =
@@ -504,6 +540,10 @@ let tests =
       "test_attestations_aggregate_with_a_single_delegate"
       `Quick
       test_attestations_aggregate_with_a_single_delegate;
+    Tztest.tztest
+      "test_preattestations_aggregate_with_multiple_delegates"
+      `Quick
+      test_preattestations_aggregate_with_multiple_delegates;
     Tztest.tztest
       "test_attestations_aggregate_with_multiple_delegates"
       `Quick
