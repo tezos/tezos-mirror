@@ -23,7 +23,7 @@ type multichain_sequencer_setup = {
   sc_rollup_node : Sc_rollup_node.t;
   observers : Evm_node.t list;
   sequencer : Evm_node.t;
-  proxys : Evm_node.t list;
+  proxies : Evm_node.t list;
   l1_contracts : l1_contracts;
   boot_sector : string;
   kernel : Uses.t;

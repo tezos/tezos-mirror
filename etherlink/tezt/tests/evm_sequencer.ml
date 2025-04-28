@@ -1867,14 +1867,14 @@ let test_multichain_produceBlock =
     ~time_between_blocks:Nothing
     ~tags:[Tag.flaky; "evm"; "multichain"; "produce_block"]
     ~title:"RPC method produceBlock in a multichain environment"
-  @@ fun {sequencer; observers; sc_rollup_node; client; proxys; _} _protocol ->
+  @@ fun {sequencer; observers; sc_rollup_node; client; proxies; _} _protocol ->
   let* start_block_number = block_number_multichain observers in
   let*@ _ = produce_block sequencer in
   let* () =
     Lwt_list.iter_s
       (fun proxy ->
         bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ())
-      proxys
+      proxies
   in
   let* new_block_number = block_number_multichain observers in
   Check.((Int32.succ start_block_number = new_block_number) int32)
@@ -4787,7 +4787,7 @@ let test_flushed_blueprint_reorg_late =
     Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
 
-  (* Produce a few l2 blocks (speculative execution) after seing delayed tx *)
+  (* Produce a few l2 blocks (speculative execution) after seeing delayed tx *)
   let* () =
     repeat 4 (fun _ ->
         let*@ _ =
@@ -4920,7 +4920,7 @@ let test_flushed_blueprint_reorg_done_late =
     Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
 
-  (* Produce a few l2 blocks (speculative execution) after seing delayed tx *)
+  (* Produce a few l2 blocks (speculative execution) after seeing delayed tx *)
   let* () =
     repeat 4 (fun _ ->
         let*@ _ =
@@ -5495,7 +5495,7 @@ let test_flushed_blueprint_reorg_upgrade =
   (* We mark at which level the delayed inbox was flushed. *)
   let* flushed_delayed_inbox_level = Client.level client in
 
-  (* produce a few l2 blocks (speculative execution) after seing delayed tx *)
+  (* produce a few l2 blocks (speculative execution) after seeing delayed tx *)
   let* () =
     repeat 4 (fun _ ->
         let*@ _ =
@@ -5887,7 +5887,7 @@ let test_force_kernel_upgrade_too_early =
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
   let*@ new_proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
   Check.((sequencer_kernelVersion = new_proxy_kernelVersion) string)
-    ~error_msg:"The force kernel ugprade should have failed" ;
+    ~error_msg:"The force kernel upgrade should have failed" ;
   unit
 
 (** This tests the situation where the kernel does not produce blocks but
@@ -5936,7 +5936,7 @@ let test_force_kernel_upgrade =
     ~error_msg:"Kernel versions should be the same at start up" ;
 
   (* Activation timestamp is 1 day before the genesis. Therefore, it can
-     be forced immediatly. *)
+     be forced immediately. *)
   let activation_timestamp = "2020-01-09T00:00:00Z" in
   (* Sends the upgrade to L1 and sequencer. *)
   let* _root_hash =
@@ -6260,7 +6260,7 @@ let test_timestamp_from_the_future =
   let*@ (_ : int) = produce_block ~timestamp:accepted_timestamp sequencer in
   let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
 
-  (* Producing a block 5:30 minutes after the L1 timetamp will be accepted by
+  (* Producing a block 5:30 minutes after the L1 timestamp will be accepted by
      the sequencer and not the rollup node. *)
   let* current_l1_timestamp = l1_timestamp client in
   let refused_timestamp =
@@ -6388,8 +6388,8 @@ let test_sequencer_upgrade =
   let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.((previous_proxy_head.hash = proxy_head.hash) string)
     ~error_msg:
-      "The proxy should not have progessed because no block have been produced \
-       by the current sequencer." ;
+      "The proxy should not have progressed because no block have been \
+       produced by the current sequencer." ;
   (* Check that even the evm-node sequencer itself refuses the blocks as they do
      not respect the sequencer's signature. *)
   let* () =
@@ -7011,7 +7011,7 @@ let test_blueprint_is_limited_in_size =
      blueprint or the second, as it depends how the tx_pool sorts the
      transactions (by caller address). We need to check that either the previous
      block or the next block contains transactions, which puts in evidence that
-     the batch has been splitted into two consecutive blueprints.
+     the batch has been split into two consecutive blueprints.
   *)
   let check_block_size block_number =
     let*@ block =
@@ -7908,7 +7908,7 @@ let test_trace_transaction_call =
     | Ok trace -> check_trace false None transaction_receipt trace
     | Error _ -> Test.fail "Trace transaction shouldn't have failed"
   in
-  (* The second test will disable every tracing options and call `get`, thats
+  (* The second test will disable every tracing options and call `get`, which
      returns a value, so that we can check that it returns the correct value in
      the end. *)
   let* transaction_hash =
@@ -8917,7 +8917,7 @@ let test_miner =
   let r2 = JSON.(r2 |-> "result" |> as_string) in
   Check.is_true
     (r1 = r2 && r2 = rpc_coinbase)
-    ~error_msg:"Expected all coinbase adresses to be equal" ;
+    ~error_msg:"Expected all coinbase addresses to be equal" ;
 
   unit
 
@@ -10284,7 +10284,7 @@ let test_batch_limit_size_rpc =
     Evm_node.run ~extra_arguments:["--rpc-batch-limit"; "5"] sequencer
   in
   let all_txs = read_tx_from_file () in
-  (* Considering the choosen limit (5), we prepare two batches of transactions.
+  (* Considering the chosen limit (5), we prepare two batches of transactions.
      The first one with the first three transactions of our tx file, the second
      one with the 10 ones that comes after.*)
   let below_limit_txs =
@@ -10309,7 +10309,7 @@ let test_batch_limit_size_rpc =
   if not has_failed then
     Test.fail "Large batch exceeding the limit should have failed." ;
 
-  (* We restart the sequencer, and explicitely lift the limit. *)
+  (* We restart the sequencer, and explicitly lift the limit. *)
   let* () = Evm_node.terminate sequencer in
   let* () =
     Evm_node.run ~extra_arguments:["--rpc-batch-limit"; "unlimited"] sequencer
@@ -11984,7 +11984,7 @@ let test_tx_queue =
 
   (* Test start here *)
   Log.info
-    "Sending %d transactions to the observer and check after each submition \
+    "Sending %d transactions to the observer and check after each submission \
      that the tx can be retrieved"
     nb_txs ;
   let* hashes =
