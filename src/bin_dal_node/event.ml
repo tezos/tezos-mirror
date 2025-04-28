@@ -190,17 +190,7 @@ open struct
       ("info", Data_encoding.string)
       ("endpoint", Data_encoding.string)
 
-  let failed_to_persist_profiles =
-    declare_2
-      ~section
-      ~prefix_name_with_section:true
-      ~name:"failed_to_persist_profiles"
-      ~msg:"failed to persist the profiles to the config file"
-      ~level:Error
-      ("profiles", Types.profile_encoding)
-      ("error", Error_monad.trace_encoding)
-
-  let fetched_slot =
+  let reconstructed_slot =
     declare_2
       ~section
       ~prefix_name_with_section:true
@@ -934,30 +924,19 @@ open struct
       ("error", trace_encoding)
 
   let trap_check_failure =
-    declare_3
+    declare_4
       ~section
       ~prefix_name_with_section:true
       ~name:"trap_check_failure"
       ~msg:
         "An error occurred when checking the trap for published level \
-         {published_level}, slot index {slot_index}, shard index {shard_index}"
+         {published_level}, slot index {slot_index}, shard index {shard_index} \
+         and delegate {delegate}"
       ~level:Warning
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
-
-  let trap_registration_fail =
-    declare_3
-      ~section
-      ~prefix_name_with_section:true
-      ~name:"trap_registration_fail"
-      ~msg:
-        "An error occurred when checking if the shard for delegate {delegate}, \
-         slot index {slot_index} and shard index {shard_index} is a trap"
-      ~level:Warning
       ("delegate", Signature.Public_key_hash.encoding)
-      ("slot_index", Data_encoding.int31)
-      ("shard_index", Data_encoding.int31)
 
   let registered_pkh_not_a_delegate =
     declare_1
@@ -1072,10 +1051,8 @@ let emit_resolved_bootstrap_points_total ~number =
 let emit_fetched_l1_info_success ~requested_info ~endpoint =
   emit fetched_l1_info_success (requested_info, endpoint)
 
-let emit_failed_to_persist_profiles ~profiles ~error =
-  emit failed_to_persist_profiles (profiles, error)
-
-let emit_fetched_slot ~size ~shards = emit fetched_slot (size, shards)
+let emit_reconstructed_slot ~size ~shards =
+  emit reconstructed_slot (size, shards)
 
 let emit_layer1_node_new_head ~hash ~level ~fitness =
   emit layer1_node_new_head (hash, level, fitness)
@@ -1265,13 +1242,9 @@ let emit_trap_injection_failure ~delegate ~published_level ~attested_level
     trap_injection_failure
     (delegate, published_level, attested_level, slot_index, shard_index, error)
 
-let emit_trap_check_failure ~published_level ~slot_index ~shard_index =
-  emit trap_check_failure (published_level, slot_index, shard_index)
-
-let emit_dont_wait__trap_registration_fail ~delegate ~slot_index ~shard_index =
-  emit__dont_wait__use_with_care
-    trap_registration_fail
-    (delegate, slot_index, shard_index)
+let emit_trap_check_failure ~published_level ~slot_index ~shard_index ~delegate
+    =
+  emit trap_check_failure (published_level, slot_index, shard_index, delegate)
 
 let emit_registered_pkh_not_a_delegate ~pkh =
   emit registered_pkh_not_a_delegate pkh
