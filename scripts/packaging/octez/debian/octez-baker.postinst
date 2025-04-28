@@ -49,7 +49,7 @@ configure)
       echo "RUNTIME_OPTS=\"--keep-alive --dal-node $DALURL\"" >> /etc/default/octez-baker
       ;;
     false)
-      echo "RUNTIME_OPTS=--keep-alive --without-dal" >> /etc/default/octez-baker
+      echo "RUNTIME_OPTS=\"--keep-alive --without-dal\"" >> /etc/default/octez-baker
       ;;
     esac
 
