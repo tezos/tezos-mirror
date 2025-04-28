@@ -595,7 +595,7 @@ type t = {
   some_node_rpc_endpoint : Endpoint.t;
   (* endpoint to be used for get various information about L1; for testnets, it
      is a public endpoint only if no L1 node is run by the scenario, in contrast
-     to [bootstrap.node_rpp_endpoint] which is a public endpoint when the
+     to [bootstrap.node_rpc_endpoint] which is a public endpoint when the
      '--bootstrap' argument is not provided *)
   bakers : baker list;
   producers : producer list;
@@ -608,12 +608,20 @@ type t = {
   disconnection_state : Disconnect.t option;
   first_level : int;
   teztale : Teztale.t option;
-  mutable aliases : (string, string) Hashtbl.t;
-      (* mapping from baker addresses to their Tzkt aliases (if known)*)
   mutable versions : (string, string) Hashtbl.t;
       (* mapping from baker addresses to their octez versions (if known) *)
   otel : string option;
 }
+
+let aliases =
+  Hashtbl.create
+    50 (* mapping from baker addresses to their Tzkt aliases (if known)*)
+
+let merge_aliases =
+  Option.iter (fun new_aliases ->
+      Hashtbl.iter
+        (fun key alias -> Hashtbl.replace aliases key alias)
+        new_aliases)
 
 let pp_slot_metrics fmt xs =
   let open Format in
@@ -674,7 +682,7 @@ let pp_metrics t
          | None -> Log.info "We lack information about %s" pkh
          | Some {published_slots; attested_slots; _} ->
              let alias =
-               Hashtbl.find_opt t.aliases account.Account.public_key_hash
+               Hashtbl.find_opt aliases account.Account.public_key_hash
                |> Option.value ~default:account.Account.public_key_hash
              in
              Log.info
@@ -714,7 +722,7 @@ let push_metrics t
     } =
   let get_labels public_key_hash =
     let alias =
-      Hashtbl.find_opt t.aliases public_key_hash
+      Hashtbl.find_opt aliases public_key_hash
       |> Option.map (fun alias -> [("alias", alias)])
       |> Option.value ~default:[]
     in
@@ -1326,7 +1334,8 @@ module Monitoring_app = struct
         List.filter_map
           (fun (`slot_index slot_index, attested, published) ->
             view_ratio_attested_over_published (attested, published)
-            |> Option.map (Format.sprintf "▪ `%02d` : %s" slot_index))
+            |> Option.map
+                 (Format.sprintf ":black_small_square: `%02d` : %s" slot_index))
           slot_info
       in
       if List.is_empty slots_info then []
@@ -1362,23 +1371,32 @@ module Monitoring_app = struct
       in
       Lwt.return view
 
+    let pp_stake fmt stake_ratio =
+      Format.fprintf fmt "`%.2f%%` stake" (stake_ratio *. 100.)
+
+    let display_delegate (`address address, `alias alias, _, stake_ratio) =
+      match alias with
+      | None -> Format.asprintf "`%s` (%a)" address pp_stake stake_ratio
+      | Some alias ->
+          Format.asprintf
+            "`%s` : `%s` (%a)"
+            (String.sub address 0 7)
+            alias
+            pp_stake
+            stake_ratio
+
     let view_bakers bakers =
-      let display_delegate address = function
-        | None -> Format.sprintf "`%s`" address
-        | Some alias ->
-            Format.sprintf "`%s` : `%s`" (String.sub address 0 7) alias
-      in
       List.map
-        (fun (`address address, `alias alias, (value, mentions_dal)) ->
+        (fun ((_, _, (value, mentions_dal), _) as baker) ->
           Format.sprintf
-            "▪ %s - %s (%s)"
+            ":black_small_square: %s - %s (%s)"
             (Option.fold
                ~none:"Never was in committee when slots were produced"
                ~some:(fun value -> Format.sprintf "`%.2f%%`" (value *. 100.))
                value)
-            (display_delegate address alias)
+            (display_delegate baker)
             (match mentions_dal with
-            | None -> "Never sent attestation while in DAL committee"
+            | None -> "Never sent attestations while in DAL committee"
             | Some 0. -> "OFF"
             | Some 1. -> "ON"
             | Some x -> Format.sprintf "ACTIVE %.0f%% of the time" (x *. 100.)))
@@ -1418,32 +1436,71 @@ module Monitoring_app = struct
       in
       loop [] (n, l)
 
-    let fetch_bakers_info network =
-      let* bakers = Network.delegates network in
+    let get_current_cycle endpoint =
+      let* {cycle; _} =
+        RPC_core.call endpoint (RPC.get_chain_block_helper_current_level ())
+      in
+      Lwt.return cycle
+
+    let get_bakers_with_staking_power endpoint cycle =
+      RPC_core.call endpoint (RPC.get_stake_distribution ~cycle ())
+
+    let fetch_bakers_info endpoint =
+      let* cycle = get_current_cycle endpoint in
+      let* bakers = get_bakers_with_staking_power endpoint cycle in
+      let total_baking_power =
+        List.fold_left
+          (fun acc RPC.{baking_power; _} -> acc + baking_power)
+          0
+          bakers
+      in
       let* bakers_info =
-        match bakers with
-        | None -> Lwt.return_nil
-        | Some bakers ->
-            Lwt_list.filter_map_p
-              (fun (alias, address, _) ->
-                let* info =
-                  fetch_baker_info
-                    ~origin:(Format.sprintf "fetch_baker_info.%s" address)
-                    ~tz1:address
-                in
-                Lwt.return_some (`address address, `alias alias, info))
-              bakers
-      in
-      let sorted_bakers =
-        List.sort
-          (fun (_, _, (x_slot, x_dal_endorsement))
-               (_, _, (y_slot, y_dal_endorsement)) ->
-            let cmp =
-              Option.compare Float.compare x_dal_endorsement y_dal_endorsement
+        Lwt_list.filter_map_p
+          (fun RPC.{delegate; baking_power} ->
+            let* info =
+              fetch_baker_info
+                ~origin:(Format.sprintf "fetch_baker_info.%s" delegate)
+                ~tz1:delegate
             in
-            if cmp = 0 then Option.compare Float.compare x_slot y_slot else -cmp)
-          bakers_info
+            let baking_ratio =
+              float_of_int baking_power /. float_of_int total_baking_power
+            in
+            let alias = Hashtbl.find_opt aliases delegate in
+            Lwt.return_some (`address delegate, `alias alias, info, baking_ratio))
+          bakers
       in
+      let rec classify_bakers mute_bakers dal_on dal_off = function
+        | [] -> (mute_bakers, dal_on, dal_off)
+        | ((_, _, (_, dal_endorsement), _) as baker) :: tl -> (
+            match dal_endorsement with
+            | None -> classify_bakers (baker :: mute_bakers) dal_on dal_off tl
+            | Some 0. ->
+                classify_bakers mute_bakers dal_on (baker :: dal_off) tl
+            | _ -> classify_bakers mute_bakers (baker :: dal_on) dal_off tl)
+      in
+      let mute_bakers, dal_on, dal_off = classify_bakers [] [] [] bakers_info in
+      let ( >> ) cmp1 cmp2 x y =
+        match cmp1 x y with 0 -> cmp2 x y | cmp -> cmp
+      in
+      let stake_descending (_, _, (_, _), x_stake) (_, _, (_, _), y_stake) =
+        Float.compare y_stake x_stake
+      in
+      let attestation_rate_ascending (_, _, (x_attestation, _), _)
+          (_, _, (y_attestation, _), _) =
+        Option.compare Float.compare x_attestation y_attestation
+      in
+      let dal_mention_perf_ascending (_, _, (_, x_dal_mention), _)
+          (_, _, (_, y_dal_mention), _) =
+        Option.compare Float.compare x_dal_mention y_dal_mention
+      in
+      let mute_bakers = List.sort stake_descending mute_bakers in
+      let dal_on =
+        List.sort
+          (attestation_rate_ascending >> dal_mention_perf_ascending
+         >> stake_descending)
+          dal_on
+      in
+      let dal_off = List.sort stake_descending dal_off in
       (* `group_by n l` outputs the list of lists with the same elements as `l`
          but with `n` elements per list (except the last one).
          For instance
@@ -1457,10 +1514,47 @@ module Monitoring_app = struct
         in
         bis [] [] n
       in
+      let agglomerate_infos bakers =
+        let nb, stake =
+          List.fold_left
+            (fun (nb, stake_acc) (_, _, _, stake_ratio) ->
+              (nb + 1, stake_acc +. stake_ratio))
+            (0, 0.)
+            bakers
+        in
+        Format.sprintf
+          "They are %d representing %.2f%% of the stake"
+          nb
+          (stake *. 100.)
+      in
+      let display_muted =
+        match mute_bakers with
+        | [] -> []
+        | _ ->
+            group_by
+              20
+              (":alert: *Those bakers never sent attestations while in DAL \
+                committee, this is quite unexpected. They probably have an \
+                issue.*"
+              :: agglomerate_infos mute_bakers
+              :: List.map display_delegate mute_bakers)
+      in
+      let display_on =
+        group_by
+          20
+          (":white_check_mark: *Those bakers sent attestations mentioning DAL.*"
+         :: agglomerate_infos dal_on :: view_bakers dal_on)
+      in
+      let display_off =
+        group_by
+          20
+          (":x: *Those bakers never turned their DAL on.*"
+         :: agglomerate_infos dal_off
+          :: List.map display_delegate dal_off)
+      in
       Lwt.return
-        (["• Baker performance ranked from worst to best:"]
-        :: (* Since Slack message size is limited, we group the bakers by packs of 20. *)
-           group_by 20 (view_bakers sorted_bakers))
+        ((["Details of bakers performance:"] :: display_muted)
+        @ display_on @ display_off)
 
     let fetch_slots_info () =
       let* data =
@@ -1471,7 +1565,8 @@ module Monitoring_app = struct
       in
       Lwt.return (view_slot_info data)
 
-    let action ~slack_bot_token ~slack_channel_id ~configuration () =
+    let action ~slack_bot_token ~slack_channel_id ~configuration endpoint () =
+      let* endpoint in
       let network = configuration.network in
       let title_info =
         Format.sprintf
@@ -1503,7 +1598,7 @@ module Monitoring_app = struct
             ()
       in
       let* thread_id = post_message ~slack_channel_id ~slack_bot_token data in
-      let* bakers_info = fetch_bakers_info network in
+      let* bakers_info = fetch_bakers_info endpoint in
       Lwt_list.iter_s
         (fun to_post ->
           let data =
@@ -1522,12 +1617,12 @@ module Monitoring_app = struct
        time (summer months), Paris switches to Central European Summer
        Time (CEST), which is UTC+2.
     *)
-    let tasks ~configuration =
+    let tasks ~configuration endpoint =
       match configuration.monitor_app_configuration with
       | None -> []
       | Some {slack_bot_token; slack_channel_id; _} ->
           let action () =
-            action ~slack_bot_token ~slack_channel_id ~configuration ()
+            action ~slack_bot_token ~slack_channel_id ~configuration endpoint ()
           in
           [
             Chronos.task ~name:"network-overview" ~tm:"0 0-23/6 * * *" ~action ();
@@ -3302,12 +3397,12 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let disconnection_state =
     Option.map Disconnect.init configuration.disconnect
   in
-  let* aliases =
+  let* init_aliases =
     let accounts = List.map (fun ({account; _} : baker) -> account) bakers in
     Network.aliases ~accounts configuration.network
   in
   let* versions = Network.versions configuration.network in
-  let aliases = Option.value ~default:(Hashtbl.create 0) aliases in
+  merge_aliases init_aliases ;
   let versions = Option.value ~default:(Hashtbl.create 0) versions in
   let otel = Cloud.open_telemetry_endpoint cloud in
   (* Adds monitoring for all agents for octez-dal-node and octez-node
@@ -3329,7 +3424,6 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       disconnection_state;
       first_level;
       teztale;
-      aliases;
       versions;
       otel;
     }
@@ -3354,14 +3448,13 @@ let clean_up t level =
   Hashtbl.remove t.metrics level
 
 let update_bakers_infos t =
-  let* aliases =
+  let* new_aliases =
     let accounts = List.map (fun ({account; _} : baker) -> account) t.bakers in
     Network.aliases ~accounts t.configuration.network
   in
   let* versions = Network.versions t.configuration.network in
-  let aliases = Option.value ~default:t.aliases aliases in
+  merge_aliases new_aliases ;
   let versions = Option.value ~default:t.versions versions in
-  t.aliases <- aliases ;
   t.versions <- versions ;
   Lwt.return_unit
 
@@ -3699,6 +3792,7 @@ let register (module Cli : Scenarios_cli.Dal) =
            | Etherlink_producer _ -> default_vm_configuration ~name
            | Reverse_proxy -> default_vm_configuration ~name)
   in
+  let endpoint, resolver_endpoint = Lwt.wait () in
   Cloud.register
   (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)
     ~vms
@@ -3737,7 +3831,7 @@ let register (module Cli : Scenarios_cli.Dal) =
       | Some fundraiser_key -> ["--fundraiser"; fundraiser_key])
     ~__FILE__
     ~title:"DAL node benchmark"
-    ~tasks:(Monitoring_app.Tasks.tasks ~configuration)
+    ~tasks:(Monitoring_app.Tasks.tasks ~configuration endpoint)
     ~tags:[]
     (fun cloud ->
       toplog "Creating the agents" ;
@@ -3762,5 +3856,6 @@ let register (module Cli : Scenarios_cli.Dal) =
         Lwt.return agent
       in
       let* t = init ~configuration etherlink_configuration cloud next_agent in
+      Lwt.wakeup resolver_endpoint t.some_node_rpc_endpoint ;
       toplog "Starting main loop" ;
       loop t (t.first_level + 1))
