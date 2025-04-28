@@ -2375,6 +2375,9 @@ impl From<&InstrCacheable> for Instruction {
                 Instruction::new_nop(InstrWidth::Compressed)
             }
 
+            // Interrupt-Management
+            InstrCacheable::Wfi => Instruction::new_nop(InstrWidth::Uncompressed),
+
             InstrCacheable::Ecall => Instruction::new_ecall(),
         }
     }

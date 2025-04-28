@@ -952,7 +952,6 @@ mod tests {
     use crate::machine_state::instruction::tagged_instruction::TaggedRegister;
     use crate::machine_state::memory;
     use crate::machine_state::memory::M4K;
-    use crate::machine_state::mode::Mode;
     use crate::machine_state::registers::XRegister;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::nz;
@@ -1357,7 +1356,6 @@ mod tests {
         // Encoding of ECALL instruction
         const ECALL: u32 = 0b1110011;
 
-        state.core.hart.mode.write(Mode::Machine);
         state.core.hart.pc.write(0);
         state
             .core
@@ -1366,7 +1364,7 @@ mod tests {
             .unwrap();
 
         let result = state.step();
-        assert_eq!(result, Err(EnvironException::EnvCallFromMMode));
+        assert_eq!(result, Err(EnvironException::EnvCall));
     }
 
     /// The initialised block cache has an entry for address 0. The block at address 0 happens to

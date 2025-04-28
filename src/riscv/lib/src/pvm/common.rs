@@ -588,8 +588,7 @@ mod tests {
         assert_eq!(pvm.status(), PvmStatus::Evaluating);
 
         // Handle the ECALL successfully
-        let outcome =
-            pvm.handle_exception(&mut Default::default(), EnvironException::EnvCallFromUMode);
+        let outcome = pvm.handle_exception(&mut Default::default(), EnvironException::EnvCall);
         assert!(!outcome);
 
         // After the ECALL we should be waiting for input
@@ -688,7 +687,7 @@ mod tests {
                 .xregisters
                 .write(a2, written.len() as u64);
 
-            pvm.handle_exception(&mut hooks, EnvironException::EnvCallFromUMode);
+            pvm.handle_exception(&mut hooks, EnvironException::EnvCall);
 
             // Drop `hooks` to regain access to the mutable references it kept
             mem::drop(hooks);
@@ -739,8 +738,7 @@ mod tests {
         assert_eq!(pvm.status(), PvmStatus::Evaluating);
 
         // Handle the ECALL successfully
-        let outcome =
-            pvm.handle_exception(&mut Default::default(), EnvironException::EnvCallFromUMode);
+        let outcome = pvm.handle_exception(&mut Default::default(), EnvironException::EnvCall);
         assert!(!outcome);
 
         // After the ECALL we should be waiting for reveal
@@ -816,8 +814,7 @@ mod tests {
         assert_eq!(pvm.status(), PvmStatus::Evaluating);
 
         // Handle the ECALL successfully
-        let outcome =
-            pvm.handle_exception(&mut Default::default(), EnvironException::EnvCallFromUMode);
+        let outcome = pvm.handle_exception(&mut Default::default(), EnvironException::EnvCall);
         assert!(!outcome);
 
         // After the ECALL we should be waiting for reveal

@@ -30,14 +30,8 @@ use crate::machine_state::memory::Address;
 
 /// RISC-V Exceptions (also known as synchronous exceptions)
 #[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug, Clone, Copy)]
-#[expect(
-    clippy::enum_variant_names,
-    reason = "Some variants share the same prefix but in this case the prefix cannot be omitted"
-)]
 pub enum EnvironException {
-    EnvCallFromUMode,
-    EnvCallFromSMode,
-    EnvCallFromMMode,
+    EnvCall,
 }
 
 impl EnvironException {
@@ -49,9 +43,7 @@ impl EnvironException {
         // can only be broken with explicit type annotations which is annoying.
 
         match self {
-            Self::EnvCallFromUMode => Exception::EnvCallFromUMode,
-            Self::EnvCallFromSMode => Exception::EnvCallFromSMode,
-            Self::EnvCallFromMMode => Exception::EnvCallFromMMode,
+            Self::EnvCall => Exception::EnvCall,
         }
     }
 }
@@ -61,9 +53,7 @@ impl TryFrom<&Exception> for EnvironException {
 
     fn try_from(value: &Exception) -> Result<Self, Self::Error> {
         match value {
-            Exception::EnvCallFromUMode => Ok(EnvironException::EnvCallFromUMode),
-            Exception::EnvCallFromSMode => Ok(EnvironException::EnvCallFromSMode),
-            Exception::EnvCallFromMMode => Ok(EnvironException::EnvCallFromMMode),
+            Exception::EnvCall => Ok(EnvironException::EnvCall),
             Exception::Breakpoint
             | Exception::IllegalInstruction
             | Exception::InstructionAccessFault(_)
@@ -89,9 +79,7 @@ pub enum Exception {
     LoadAccessFault(Address),
     /// `StoreAccessFault(addr)` where `addr` is the faulting store address
     StoreAMOAccessFault(Address),
-    EnvCallFromUMode,
-    EnvCallFromSMode,
-    EnvCallFromMMode,
+    EnvCall,
     InstructionPageFault(Address),
     LoadPageFault(Address),
     StoreAMOPageFault(Address),
@@ -118,11 +106,9 @@ impl From<Exception> for SbiError {
             | Exception::LoadPageFault(_)
             | Exception::StoreAMOAccessFault(_)
             | Exception::StoreAMOPageFault(_) => SbiError::InvalidAddress,
-            Exception::IllegalInstruction
-            | Exception::Breakpoint
-            | Exception::EnvCallFromUMode
-            | Exception::EnvCallFromSMode
-            | Exception::EnvCallFromMMode => SbiError::Failed,
+            Exception::IllegalInstruction | Exception::Breakpoint | Exception::EnvCall => {
+                SbiError::Failed
+            }
         }
     }
 }
@@ -205,9 +191,7 @@ impl TrapContext for Exception {
             Exception::Breakpoint => 3,
             Exception::LoadAccessFault(_) => 5,
             Exception::StoreAMOAccessFault(_) => 7,
-            Exception::EnvCallFromUMode => 8,
-            Exception::EnvCallFromSMode => 9,
-            Exception::EnvCallFromMMode => 11,
+            Exception::EnvCall => 8,
             Exception::InstructionPageFault(_) => 12,
             Exception::LoadPageFault(_) => 13,
             Exception::StoreAMOPageFault(_) => 15,
@@ -220,11 +204,7 @@ impl TrapContext for Exception {
 
     fn xtval(&self) -> CSRRepr {
         match self {
-            Exception::IllegalInstruction
-            | Exception::Breakpoint
-            | Exception::EnvCallFromUMode
-            | Exception::EnvCallFromSMode
-            | Exception::EnvCallFromMMode => 0,
+            Exception::IllegalInstruction | Exception::Breakpoint | Exception::EnvCall => 0,
             Exception::InstructionAccessFault(addr) => *addr,
             Exception::LoadAccessFault(addr) => *addr,
             Exception::StoreAMOAccessFault(addr) => *addr,

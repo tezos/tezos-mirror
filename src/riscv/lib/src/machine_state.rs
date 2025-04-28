@@ -228,11 +228,6 @@ macro_rules! run_syscall_instr {
     ($state: ident, $run_fn: ident) => {{ Err($state.hart.$run_fn()) }};
 }
 
-/// Runs a xret instruction (mret, sret, mnret)
-macro_rules! run_xret_instr {
-    ($state: ident, $run_fn: ident) => {{ $state.hart.$run_fn().map(Set) }};
-}
-
 /// Runs a no-arguments instruction (wfi, fenceI)
 macro_rules! run_no_args_instr {
     ($state: ident, $instr: ident, $run_fn: ident) => {{
@@ -353,7 +348,6 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
         M: backend::ManagerReadWrite,
     {
         use ProgramCounterUpdate::Next;
-        use ProgramCounterUpdate::Set;
 
         let core = &mut self.core;
 
@@ -367,12 +361,10 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
 
             // Privileged instructions
             // Trap-Return
-            InstrUncacheable::Mret => run_xret_instr!(core, run_mret),
-            InstrUncacheable::Sret => run_xret_instr!(core, run_sret),
+            InstrUncacheable::Mret => Err(Exception::IllegalInstruction),
+            InstrUncacheable::Sret => Err(Exception::IllegalInstruction),
             // Currently not implemented instruction (part of Smrnmi extension)
             InstrUncacheable::Mnret => Err(Exception::IllegalInstruction),
-            // Interrupt-Management
-            InstrUncacheable::Wfi => run_no_args_instr!(core, instr, run_wfi),
             // Supervisor Memory-Management
             InstrUncacheable::SFenceVma { asid, vaddr } => {
                 self.core.run_sfence_vma(*asid, *vaddr)?;
@@ -528,7 +520,6 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
         &mut self,
         program: &Program<MC>,
         initrd: Option<&[u8]>,
-        mode: mode::Mode,
     ) -> Result<(), MachineError>
     where
         M: backend::ManagerReadWrite,
@@ -571,9 +562,6 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
 
         // Point DTB boot argument (a1) at the written device tree
         self.core.hart.xregisters.write(registers::a1, dtb_addr);
-
-        // Start in supervisor mode
-        self.core.hart.mode.write(mode);
 
         // Make sure to forward all exceptions and interrupts to supervisor mode
         self.core
@@ -637,7 +625,6 @@ mod tests {
     use crate::machine_state::memory::M8K;
     use crate::machine_state::memory::Memory;
     use crate::machine_state::memory::PAGE_SIZE;
-    use crate::machine_state::mode::Mode;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::nz;
@@ -736,12 +723,11 @@ mod tests {
             state.core.hart.csregisters.write(CSRegister::mtvec, mtvec_addr | 1);
 
             // TEST: Raise ECALL exception ==>> environment exception
-            state.core.hart.mode.write(Mode::Machine);
             state.core.hart.pc.write(init_pc_addr);
             state.core.main_memory.write_instruction_unchecked(init_pc_addr, ECALL).unwrap();
             let e = state.step()
                 .expect_err("should raise Environment Exception");
-            assert_eq!(e, EnvironException::EnvCallFromMMode);
+            assert_eq!(e, EnvironException::EnvCall);
             prop_assert_eq!(state.core.hart.pc.read(), init_pc_addr);
         });
     });
@@ -770,8 +756,7 @@ mod tests {
 
             // TEST: Raise exception, (and no interrupt before) take trap from M-mode to M-mode
             // (test no delegation takes place, even if delegation is on, traps never lower privilege)
-            let medeleg_val = (1 << Exception::IllegalInstruction.exception_code()) | (1 << Exception::EnvCallFromSMode.exception_code()) | (1 << Exception::EnvCallFromMMode.exception_code()) | (1 << Exception::Breakpoint.exception_code());
-            state.core.hart.mode.write(Mode::Machine);
+            let medeleg_val = (1 << Exception::IllegalInstruction.exception_code()) | (1 << Exception::Breakpoint.exception_code());
             state.core.hart.pc.write(init_pc_addr);
             state.core.hart.csregisters.write(CSRegister::medeleg, medeleg_val);
 
@@ -780,7 +765,6 @@ mod tests {
             // pc should be mtvec_addr since exceptions aren't offset (by VECTORED mode)
             // even in VECTORED mode, only interrupts
             let mstatus: MStatus = state.core.hart.csregisters.read(CSRegister::mstatus);
-            assert_eq!(state.core.hart.mode.read(), Mode::Machine);
             assert_eq!(state.core.hart.pc.read(), mtvec_addr);
             assert_eq!(mstatus.mpp(), xstatus::MPPValue::Machine);
             assert_eq!(state.core.hart.csregisters.read::<CSRRepr>(CSRegister::mepc), init_pc_addr);
@@ -811,8 +795,7 @@ mod tests {
             state.core.hart.csregisters.write(CSRegister::stvec, stvec_addr | 1);
 
             let bad_address = memory::FIRST_ADDRESS.wrapping_sub((pc_addr_offset + 10) * 4);
-            let medeleg_val = (1 << Exception::IllegalInstruction.exception_code()) | (1 << Exception::EnvCallFromSMode.exception_code()) | (1 << Exception::EnvCallFromMMode.exception_code()) | (1 << Exception::InstructionAccessFault(bad_address).exception_code());
-            state.core.hart.mode.write(Mode::User);
+            let medeleg_val = (1 << Exception::IllegalInstruction.exception_code()) | (1 << Exception::InstructionAccessFault(bad_address).exception_code());
             state.core.hart.pc.write(bad_address);
             state.core.hart.csregisters.write(CSRegister::medeleg, medeleg_val);
 
@@ -820,7 +803,6 @@ mod tests {
             // pc should be stvec_addr since exceptions aren't offsetted
             // even in VECTORED mode, only interrupts
             let mstatus: MStatus = state.core.hart.csregisters.read(CSRegister::mstatus);
-            assert_eq!(state.core.hart.mode.read(), Mode::Supervisor);
             assert_eq!(state.core.hart.pc.read(), stvec_addr);
             assert_eq!(mstatus.spp(), xstatus::SPPValue::User);
             assert_eq!(state.core.hart.csregisters.read::<CSRRepr>(CSRegister::sepc), bad_address);
@@ -995,7 +977,6 @@ mod tests {
         let phys_addr = start_ram + PAGE_SIZE.get() - 6;
 
         state.core.hart.pc.write(phys_addr);
-        state.core.hart.mode.write(Mode::Machine);
 
         for offset in 0..3 {
             state
@@ -1139,7 +1120,6 @@ mod tests {
         // Write the instructions to the beginning of the main memory and point the program
         // counter at the first instruction.
         state.core.hart.pc.write(phys_addr);
-        state.core.hart.mode.write(Mode::Machine);
 
         // block A
         state

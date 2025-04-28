@@ -9,7 +9,6 @@
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::hart_state::HartState;
 use crate::machine_state::memory;
-use crate::machine_state::mode::Mode;
 use crate::parser::instruction::FenceSet;
 use crate::state_backend as backend;
 use crate::traps::Exception;
@@ -25,11 +24,7 @@ where
 
     /// `ECALL` instruction
     pub fn run_ecall(&self) -> Exception {
-        match self.mode.read() {
-            Mode::User => Exception::EnvCallFromUMode,
-            Mode::Supervisor => Exception::EnvCallFromSMode,
-            Mode::Machine => Exception::EnvCallFromMMode,
-        }
+        Exception::EnvCall
     }
 }
 
@@ -60,15 +55,8 @@ mod tests {
     use crate::interpreter::integer::run_andi;
     use crate::interpreter::integer::run_or;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::csregisters::CSRRepr;
-    use crate::machine_state::csregisters::CSRegister;
-    use crate::machine_state::csregisters::xstatus::MPPValue;
-    use crate::machine_state::csregisters::xstatus::MStatus;
-    use crate::machine_state::csregisters::xstatus::SPPValue;
     use crate::machine_state::hart_state::HartState;
-    use crate::machine_state::memory::Address;
     use crate::machine_state::memory::M4K;
-    use crate::machine_state::mode::Mode;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::a2;
@@ -153,85 +141,9 @@ mod tests {
     });
 
     backend_test!(test_ecall, F, {
-        let mut state = HartState::new(&mut F::manager());
+        let state = HartState::new(&mut F::manager());
 
-        let mode_exc = [
-            (Mode::User, Exception::EnvCallFromUMode),
-            (Mode::Supervisor, Exception::EnvCallFromSMode),
-            (Mode::Machine, Exception::EnvCallFromMMode),
-        ];
-
-        for (mode, expected_e) in mode_exc {
-            state.mode.write(mode);
-            let instr_res = state.run_ecall();
-            assert!(instr_res == expected_e);
-        }
-    });
-
-    backend_test!(test_xret, F, {
-        proptest!(|(
-            curr_pc in any::<Address>(),
-            mepc in any::<Address>(),
-            sepc in any::<Address>(),
-        )| {
-            let mut state = HartState::new(&mut F::manager());
-
-            // 4-byte align
-            let mepc = mepc & !0b11;
-            let sepc = sepc & !0b11;
-
-            // TEST: TSR trapping
-            state.reset(curr_pc);
-            state.csregisters.write(CSRegister::mepc, mepc);
-            state.csregisters.write(CSRegister::sepc, sepc);
-
-            assert_eq!(state.csregisters.read::<CSRRepr>(CSRegister::sepc), sepc);
-            assert_eq!(state.csregisters.read::<CSRRepr>(CSRegister::mepc), mepc);
-
-            let mstatus: MStatus = state.csregisters.read(CSRegister::mstatus);
-            let mstatus = mstatus.with_tsr(true);
-            state.csregisters.write(CSRegister::mstatus, mstatus);
-            assert_eq!(state.run_sret(), Err(Exception::IllegalInstruction));
-
-            // set TSR back to 0
-            let mstatus = mstatus.with_tsr(false);
-            state.csregisters.write(CSRegister::mstatus, mstatus);
-
-            // TEST: insuficient privilege mode
-            state.mode.write(Mode::User);
-            assert_eq!(state.run_sret(), Err(Exception::IllegalInstruction));
-
-            // TEST: Use SRET from M-mode, check SPP, SIE, SPIE, MPRV
-            state.mode.write(Mode::Machine);
-            let mstatus = state.csregisters.read::<MStatus>(CSRegister::mstatus).with_sie(true);
-            let mstatus = mstatus.with_spp(SPPValue::User);
-            state.csregisters.write(CSRegister::mstatus, mstatus);
-
-            // check pc address
-            assert_eq!(state.run_sret(), Ok(sepc));
-            // check fields
-            let mstatus: MStatus = state.csregisters.read(CSRegister::mstatus);
-            assert!(mstatus.spie());
-            assert!(!mstatus.sie());
-            assert!(!mstatus.mprv());
-            assert_eq!(mstatus.spp(), SPPValue::User);
-            assert_eq!(state.mode.read(), Mode::User);
-
-            // TEST: Call MRET from M-mode, with MPRV true, and MPP Machine to see if MPRV stays the same.
-            let mstatus = mstatus.with_mpie(true);
-            let mstatus = mstatus.with_mpp(MPPValue::Machine);
-            let mstatus = mstatus.with_mprv(true);
-            state.csregisters.write(CSRegister::mstatus, mstatus);
-            state.mode.write(Mode::Machine);
-            // check pc address
-            assert_eq!(state.run_mret(), Ok(mepc));
-            // check fields
-            let mstatus: MStatus = state.csregisters.read(CSRegister::mstatus);
-            assert!(mstatus.mpie());
-            assert!(mstatus.mie());
-            assert!(mstatus.mprv());
-            assert_eq!(mstatus.mpp(), MPPValue::User);
-            assert_eq!(state.mode.read(), Mode::Machine);
-        });
+        let instr_res = state.run_ecall();
+        assert!(instr_res == Exception::EnvCall);
     });
 }

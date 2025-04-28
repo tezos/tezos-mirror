@@ -107,6 +107,7 @@ pub enum CSRegister {
     hpmcounter30 = 0xC1E,
     hpmcounter31 = 0xC1F,
 
+    // TODO: Remove everything in CSRegisters that requires privilieged access
     // Supervisor Trap Setup
     sstatus = 0x100,
     sie = 0x104,
@@ -1303,8 +1304,8 @@ pub type Result<R> = core::result::Result<R, Exception>;
 /// Throws [`Exception::IllegalInstruction`] in case of insufficient privilege.
 /// Section 2.1 - privileged spec
 #[inline(always)]
-fn check_privilege(reg: CSRegister, mode: Mode) -> Result<()> {
-    if mode.privilege() < reg.privilege() {
+fn check_privilege(reg: CSRegister) -> Result<()> {
+    if Privilege::Unprivileged < reg.privilege() {
         return Err(Exception::IllegalInstruction);
     }
 
@@ -1349,8 +1350,7 @@ fn check_fs_access(csr: CSRegister, fs_field: ExtensionValue) -> Result<()> {
 ///
 /// Examples of checks: Privilege checks, SATP trapping
 pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl ManagerRead>) -> Result<()> {
-    let mode = hart_state.mode.read();
-    check_privilege(csr, mode)?;
+    check_privilege(csr)?;
     let mstatus = hart_state.csregisters.mstatus();
     let tvm = mstatus.tvm.read();
     check_satp_access(csr, tvm)?;
@@ -1552,7 +1552,7 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
     }
 
     /// Determine the mode where this trap would go to.
-    pub fn get_trap_mode<TC: TrapContext>(&self, trap_source: &TC, current_mode: Mode) -> TrapMode
+    pub fn get_trap_mode<TC: TrapContext>(&self, trap_source: &TC) -> TrapMode
     where
         M: backend::ManagerRead,
     {
@@ -1592,19 +1592,15 @@ impl<M: backend::ManagerBase> CSRegisters<M> {
         // is already done by get_pending_interrupt()
         // only checking if delegation takes place is left.
 
-        if current_mode <= Mode::Supervisor {
-            let deleg = match TC::kind() {
-                TrapKind::Interrupt => CSRegister::mideleg,
-                TrapKind::Exception => CSRegister::medeleg,
-            };
-            let deleg_val: CSRRepr = self.read(deleg);
+        let deleg = match TC::kind() {
+            TrapKind::Interrupt => CSRegister::mideleg,
+            TrapKind::Exception => CSRegister::medeleg,
+        };
+        let deleg_val: CSRRepr = self.read(deleg);
 
-            match u64::bit(deleg_val, trap_source.exception_code() as usize) {
-                true => TrapMode::Supervisor,
-                false => TrapMode::Machine,
-            }
-        } else {
-            TrapMode::Machine
+        match u64::bit(deleg_val, trap_source.exception_code() as usize) {
+            true => TrapMode::Supervisor,
+            false => TrapMode::Machine,
         }
     }
 
@@ -1697,36 +1693,11 @@ mod tests {
     use crate::machine_state::csregisters::CSRRepr;
     use crate::machine_state::csregisters::CSRegister;
     use crate::machine_state::csregisters::CSRegisters;
-    use crate::machine_state::csregisters::Exception;
     use crate::machine_state::csregisters::values::CSRValue;
     use crate::machine_state::csregisters::xstatus::MStatus;
-    use crate::machine_state::mode::Mode;
     use crate::state::NewState;
     use crate::traps::Interrupt;
     use crate::traps::TrapContext;
-
-    #[test]
-    fn test_privilege_access() {
-        use crate::machine_state::csregisters::CSRegister as csreg;
-        use crate::machine_state::csregisters::check_privilege as check;
-
-        let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
-
-        // Access Machine registers
-        assert!(check(csreg::mstatus, Mode::Machine).is_ok());
-        assert!(check(csreg::medeleg, Mode::Supervisor).is_err_and(is_illegal_instr));
-        assert!(check(csreg::mcause, Mode::User).is_err_and(is_illegal_instr));
-
-        // Access Supervisor registers
-        assert!(check(csreg::sip, Mode::Machine).is_ok());
-        assert!(check(csreg::scontext, Mode::Supervisor).is_ok());
-        assert!(check(csreg::stval, Mode::User).is_err_and(is_illegal_instr));
-
-        // Access User registers
-        assert!(check(csreg::cycle, Mode::Machine).is_ok());
-        assert!(check(csreg::frm, Mode::Supervisor).is_ok());
-        assert!(check(csreg::fcsr, Mode::User).is_ok());
-    }
 
     #[test]
     fn test_read_write_access() {

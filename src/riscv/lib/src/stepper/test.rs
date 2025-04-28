@@ -144,9 +144,7 @@ impl<MC: MemoryConfig, B: Block<MC, Owned>> TestStepper<MC, TestCacheLayouts, B>
             .protect_pages(0, MC::TOTAL_BYTES, Permissions::ReadWriteExec)
             .unwrap();
 
-        stepper
-            .machine_state
-            .setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
+        stepper.machine_state.setup_boot(&elf_program, initrd)?;
 
         Ok((stepper, elf_program.parsed()))
     }
@@ -200,7 +198,7 @@ impl<MC: MemoryConfig, B: Block<MC, Owned>> Stepper for TestStepper<MC, TestCach
             .machine_state
             .step_max_handle(steps, |machine_state, exc| {
                 self.posix_state
-                    .handle_call(machine_state, exc)
+                    .handle_call(machine_state)
                     .map_err(|message| (exc, message))
             });
         self.handle_step_result(result)

@@ -719,7 +719,7 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 }
                 F7_8 => match (rs1_bits(instr), rs2_bits(instr)) {
                     (RS1_0, RS2_2) => return Instr::Uncacheable(Sret),
-                    (RS1_0, RS2_5) => return Instr::Uncacheable(Wfi),
+                    (RS1_0, RS2_5) => return Instr::Cacheable(Wfi),
                     _ => Unknown { instr },
                 },
                 F7_24 => match (rs1_bits(instr), rs2_bits(instr)) {
