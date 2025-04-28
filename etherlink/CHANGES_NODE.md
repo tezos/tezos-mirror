@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased
+## Version 0.23 (2025-04-28)
+
+This release of the EVM node brings improvements to the robustness, notably
+with more graceful exits on connection issues which are experienced by end users
+and partners. It also brings additional options to the sandbox mode which allows
+the development team to better test and evaluate the features of the upcoming D
+kernel.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
 
 ### Breaking changes
 
@@ -8,12 +17,6 @@
   In addition to supporting root hash prefixed by `0x` (something the previous
   command was rejecting), `download kernel` also accept known kernel names
   (currently, `bifrost`, `calypso` and `calypso2`). (!17696)
-
-### Configuration changes
-
-### RPCs changes
-
-### Metrics changes
 
 ### Command-line interface changes
 
@@ -35,10 +38,6 @@
 - Fixes an issue where the node would hang when the upstream EVM node endpoint
   returned a 502 Bad Gateway error in observer or RPC mode. (!17856)
 
-### Storage changes
-
-### Documentation changes
-
 ### Experimental features changes
 
 *No guarantees are provided regarding backward compatibility of experimental
@@ -53,7 +52,7 @@ you start using them, you probably want to use `octez-evm-node check config
 
 ## Version 0.22 (2025-04-14)
 
-This releases of the EVM node adds support for executing natively the Calypso2
+This release of the EVM node adds support for executing natively the Calypso2
 kernel (the update which was activated on mainnet on block 10,453,254). This
 will improve performance for computationally intensive RPCs like `eth_call`
 (where the native execution is used by default).
