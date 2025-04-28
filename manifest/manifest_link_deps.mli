@@ -41,16 +41,28 @@ end
 (** Module holding the logic of handling the linking dependencies provided in the
     [link_deps] argument of manifest targets. *)
 module LinkDeps : functor (TU : TargetUtilsSig) -> sig
-  (** When generating a manifest target with the given [kind], [deps], [link_deps] compute
-      the resulting [deps], [link_deps] taking into account unification of linking dependencies
-      and type of target (e.g. library/executable) *)
-  val compute_deps :
-    target_kind:TU.target_kind ->
-    target_deps:TU.target list ->
-    link_deps:t list ->
-    TU.target list * t list
+  (** Describes which target options can be modified by applying the rules for linking dependencies *)
+  type computed_options = {
+    deps : TU.target list;
+    link_deps : t list;
+    inline_tests_libraries : TU.target option list option;
+    inline_tests_link_flags : string list option;
+  }
 
-  (** Register an internal target as implementing a list of link deps.
+  (** Generate a manifest target with the given [kind], [deps], [link_deps] and inline tests options
+      compute the resulting [deps], [link_deps] and inline tests options taking into account 
+      unification of linking dependencies and type of target (e.g. library/executable) *)
+  val compute_opts :
+    kind:TU.target_kind ->
+    deps:TU.target list ->
+    link_deps:t list ->
+    inline_tests:'a option ->
+    inline_tests_libraries:TU.target option list option ->
+    inline_tests_link_flags:string list option ->
+    computed_options
+
+  (** Register an internal target and associated options corresponding to a list of link deps.
       Returns the same list of link deps to be used in end-user manifest targets. *)
-  val register_target : t list -> TU.target -> t list
+  val register_archive :
+    t list -> ?inline_tests_link_flags:string list -> TU.target -> t list
 end

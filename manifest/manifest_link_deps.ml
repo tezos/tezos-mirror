@@ -63,29 +63,74 @@ module LinkDeps (TU : TargetUtilsSig) = struct
   module Key = Set.Make (LinkTypes)
   module Dep_map = Map.Make (Key)
 
-  let registered_mappings : TU.target Dep_map.t ref = ref Dep_map.empty
+  let registered_mappings : (TU.target * string list option) Dep_map.t ref =
+    ref Dep_map.empty
 
   let target_implementing_archive archive =
-    Dep_map.find_opt archive !registered_mappings
+    match Dep_map.find_opt archive !registered_mappings with
+    | None -> (None, None)
+    | Some (target, link_deps) -> (Some target, Some link_deps)
 
-  let insert_mapping link_deps target =
+  let insert_mapping link_deps inline_tests_link_flags target =
     let key = Key.of_list link_deps in
-    let archive = target_implementing_archive key in
-    match archive with
-    | Some old_target ->
+    match target_implementing_archive key with
+    | Some old_target, _ ->
         print_string @@ "WARNING: Trying to register target "
         ^ TU.debug_name target
         ^ " for a linking deps set. However, that set is already registered by \
            target: " ^ TU.debug_name old_target
-    | None -> registered_mappings := Dep_map.add key target !registered_mappings
+    | None, _ ->
+        registered_mappings :=
+          Dep_map.add key (target, inline_tests_link_flags) !registered_mappings
 
   module RustDeps = struct end
 
-  (** For an executable, obtain the linking libraries required given by the distinct linking dependencies. *)
-  let executable_deps_of link_deps =
-    link_deps |> Key.of_list |> target_implementing_archive |> Option.to_list
+  type computed_options = {
+    deps : TU.target list;
+    link_deps : t list;
+    inline_tests_libraries : TU.target option list option;
+    inline_tests_link_flags : string list option;
+  }
 
-  let compute_deps ~target_kind:kind ~target_deps:deps ~link_deps =
+  let compute_inline archive inline_tests inline_tests_libraries
+      inline_tests_link_flags =
+    (* This check is needed in order to not add inline_tests options for targets
+       which do not define inline_tests, causing a crash in later checks in the manifest *)
+    if Option.is_none inline_tests then
+      (inline_tests_libraries, inline_tests_link_flags)
+    else
+      let inline_tests_link_flags : string list =
+        Option.value ~default:[] inline_tests_link_flags
+      in
+      let inline_tests_libraries =
+        Option.value ~default:[] inline_tests_libraries
+      in
+      let target, link_flags = target_implementing_archive archive in
+      let link_flags =
+        link_flags |> Option.join |> Option.to_list |> List.flatten
+      in
+      ( Some (inline_tests_libraries @ [target]),
+        Some (inline_tests_link_flags @ link_flags) )
+
+  let compute_link_deps kind link_deps deps =
+    let reduced_link_deps =
+      deps
+      |> List.filter_map TU.get_internal
+      |> List.map TU.get_link_deps |> List.flatten |> List.append link_deps
+      |> List.sort_uniq compare
+    in
+    let archive = Key.of_list reduced_link_deps in
+    (* Only need to add to concrete dependencies if target is an executable *)
+    let deps =
+      if TU.is_internal_kind_lib kind then deps
+      else
+        let target, _ = target_implementing_archive archive in
+        Option.to_list target @ deps
+    in
+    (deps, reduced_link_deps, archive)
+
+  let compute_opts ~kind ~deps ~link_deps ~inline_tests ~inline_tests_libraries
+      ~inline_tests_link_flags =
     let is_linking_dep t =
       Option.is_some @@ Option.join
       @@ Option.map LinkTypes.rust_lib_of_path
@@ -102,23 +147,17 @@ module LinkDeps (TU : TargetUtilsSig) = struct
             (TU.debug_name d)
             (TU.debug_kind kind))
       deps ;
-    let all_link_deps =
-      deps
-      |> List.filter_map TU.get_internal
-      |> List.map TU.get_link_deps |> List.flatten |> List.append link_deps
-      |> List.sort_uniq compare
+    let deps, link_deps, rust_lib = compute_link_deps kind link_deps deps in
+    let inline_tests_libraries, inline_tests_link_flags =
+      compute_inline
+        rust_lib
+        inline_tests
+        inline_tests_libraries
+        inline_tests_link_flags
     in
-    let deps =
-      if TU.is_internal_kind_lib kind then
-        (* For a library, nothing needs to be added *)
-        deps
-      else
-        (* For an executable, compute minimum set of dependencies to add to satisfy linking requirements *)
-        executable_deps_of all_link_deps @ deps
-    in
-    (deps, all_link_deps)
+    {deps; link_deps; inline_tests_libraries; inline_tests_link_flags}
 
-  let register_target link_deps target =
-    insert_mapping link_deps target ;
+  let register_archive link_deps ?inline_tests_link_flags target =
+    insert_mapping link_deps inline_tests_link_flags target ;
     link_deps
 end
