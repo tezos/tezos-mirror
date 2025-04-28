@@ -7,14 +7,16 @@
 
 let config name = Format.asprintf "/etc/logrotate.d/%s" name
 
-let write_config ~name ?pidfile ?max_rotations ~target_file agent =
+let write_config ~name ?pidfile ?max_rotations ?max_size ~target_file agent =
   let open Jingoo in
   let template =
     {|{{ target_file }} {
 # Rotates logs every day
   daily
-# Rotates the log when it reaches 200 megabytes, even if not time for rotation
-  maxsize 200M
+{% if has_max_size %}
+# Rotates the log when it reaches {{ max_size }} kbytes, even if not time for rotation
+  maxsize {{ max_size }}k
+{% endif %}
 # Skips rotation if the log file is empty
   notifempty
 # Doesn't produce an error if the log file is missing
@@ -52,6 +54,8 @@ let write_config ~name ?pidfile ?max_rotations ~target_file agent =
           ("name", Jg_types.Tstr name);
           ("has_max_rotation", Jg_types.Tbool (Option.is_some max_rotations));
           ("max_rotation", Jg_types.Tint (Option.value ~default:0 max_rotations));
+          ("has_max_size", Jg_types.Tbool (Option.is_some max_size));
+          ("max_size", Jg_types.Tint (Option.value ~default:0 max_size));
           ("has_pidfile", Jg_types.Tbool (Option.is_some pidfile));
           ("pidfile", Jg_types.Tstr (Option.value ~default:"" pidfile));
         ]
