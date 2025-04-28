@@ -45,7 +45,10 @@ let test_weeklynet_migration_parameters =
   in
   let base_path = "tezt" // "tests" // "weeklynet_configs" in
   let last_snapshotted_protocol_parameters_path =
-    base_path // "last_snapshotted_protocol.json"
+    Uses.make
+      ~tag:"last_snapshotted_protocol_json"
+      ~path:(base_path // "last_snapshotted_protocol.json")
+      ()
   in
 
   let migration_level = 4 in
@@ -73,7 +76,7 @@ let test_weeklynet_migration_parameters =
           Test.fail
             "Failed to activate protocol %s, inconsistent parameter file in %s"
             (Protocol.hash migrate_from)
-            last_snapshotted_protocol_parameters_path
+            (Uses.path last_snapshotted_protocol_parameters_path)
     in
     Log.info "Protocol %s activated" (Protocol.hash migrate_from) ;
     (* Bake until migration *)
@@ -124,11 +127,12 @@ let test_weeklynet_migration_parameters =
     ~title:"weeklynet regression test"
     ~tags:
       [team; "protocol"; "migration"; "sandbox"; "parameter_file"; "weeklynet"]
+    ~uses:(fun _protocol -> [last_snapshotted_protocol_parameters_path])
     ~supports:Protocol.(From_protocol (number Alpha))
   @@ fun migrate_to ->
   let* client, __POS_OF__node =
     perform_migration
-      ~parameter_file:last_snapshotted_protocol_parameters_path
+      ~parameter_file:(Uses.path last_snapshotted_protocol_parameters_path)
       ~migrate_to
   in
 
@@ -142,15 +146,17 @@ let test_weeklynet_migration_parameters =
 (** Test that the activation of the alpha protocol is successful using weeklynet
     parameters. *)
 let test_weeklynet_alpha_activation () =
+  let base_path = "tezt" // "tests" // "weeklynet_configs" in
+  let alpha_parameters_path =
+    Uses.make ~tag:"alpha_json" ~path:(base_path // "alpha.json") ()
+  in
   Test.register
     ~__FILE__
     ~title:"activate alpha from weeklynet parameters"
+    ~uses:[alpha_parameters_path]
     ~tags:
       [team; "protocol"; "activation"; "sandbox"; "parameter_file"; "weeklynet"]
   @@ fun () ->
-  let base_path = "tezt" // "tests" // "weeklynet_configs" in
-  let alpha_parameters_path = base_path // "alpha.json" in
-
   Log.info "Node starting" ;
   let* node = Node.init [Node.Synchronisation_threshold 0; Private_mode] in
   let* client = Client.(init ~endpoint:(Node node) ()) in
@@ -160,7 +166,7 @@ let test_weeklynet_alpha_activation () =
     Client.spawn_activate_protocol
       ~protocol:Protocol.Alpha
       client
-      ~parameter_file:alpha_parameters_path
+      ~parameter_file:(Uses.path alpha_parameters_path)
   in
   let* activation_result = Process.wait activate_protocol in
   let () =
@@ -170,7 +176,7 @@ let test_weeklynet_alpha_activation () =
         Test.fail
           "Failed to activate protocol %s, inconsistent parameter file in %s"
           (Protocol.hash Alpha)
-          alpha_parameters_path
+          (Uses.path alpha_parameters_path)
   in
   Log.info "Protocol %s activated" (Protocol.hash Alpha) ;
   Lwt.return_unit
