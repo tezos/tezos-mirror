@@ -23,6 +23,8 @@ use crate::state_backend::hash::Hash;
 use crate::storage::DIGEST_SIZE;
 use crate::storage::HashError;
 
+pub mod deserialiser;
+
 /// Structure of a proof transitioning from state A to state B.
 ///
 /// The proof needs to be able to:
