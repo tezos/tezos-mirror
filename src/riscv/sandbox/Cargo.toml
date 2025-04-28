@@ -33,8 +33,7 @@ workspace = true
 optional = true
 
 [features]
-default = ["supervisor"]
+default = []
 inline-jit = []
 metrics = ["octez-riscv/metrics"]
-supervisor = ["octez-riscv/supervisor"]
 log = ["octez-riscv/log", "dep:tracing-subscriber"]

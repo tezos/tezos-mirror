@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 // When the Supervisor is enabled, most of this module is not used.
-#![cfg_attr(feature = "supervisor", allow(dead_code))]
+#![expect(dead_code)]
 
 use std::cmp::min;
 
