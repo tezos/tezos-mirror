@@ -9,7 +9,7 @@ For a higher-level overview of the most salient new features see the
 `announcement blog <https://research-development.nomadic-labs.com/blog.html>`__.
 
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
-branch of Octez and the full documentation in :doc:`this page <../alpha/index>`..
+branch of Octez and the full documentation in :doc:`this page <../alpha/index>`.
 
 Environment Version
 -------------------

@@ -9,7 +9,7 @@ For a higher-level overview of the most salient new features see the
 `Quebec announcement <https://research-development.nomadic-labs.com/quebec-announcement.html>`__.
 
 The code can be found in directory :src:`src/proto_021_PsQuebec` of the ``master``
-branch of Octez and the full documentation in :doc:`this page <../active/index>`.
+branch of Octez.
 
 Environment Version
 -------------------
