@@ -2878,6 +2878,24 @@ module Dal : sig
     val record_attestation : context -> tb_slot:Slot.t -> t -> context
 
     val attestations : context -> t Slot.Map.t
+
+    module Dal_dependent_signing : sig
+      (** See {!Dal_attestation_repr.Dal_dependent_signing.aggregate_pk}. *)
+      val aggregate_pk :
+        subgroup_check:bool ->
+        consensus_pk:Bls.Public_key.t ->
+        companion_pk:Bls.Public_key.t ->
+        t ->
+        Bls.Public_key.t option
+
+      (** See {!Dal_attestation_repr.Dal_dependent_signing.aggregate_sig}. *)
+      val aggregate_sig :
+        subgroup_check:bool ->
+        consensus_sig:Bls.t ->
+        companion_sig:Bls.t ->
+        t ->
+        Bls.t option
+    end
   end
 
   type slot_id = {published_level : Raw_level.t; index : Slot_index.t}

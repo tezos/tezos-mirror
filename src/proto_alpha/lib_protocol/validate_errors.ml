@@ -129,6 +129,7 @@ module Consensus = struct
         conflict : operation_conflict;
       }
     | Consensus_operation_not_allowed
+    | Missing_companion_key_for_bls_dal of Consensus_key.t
     | Aggregate_disabled
     | Aggregate_in_mempool
     | Aggregate_not_implemented
@@ -362,6 +363,16 @@ module Consensus = struct
       Data_encoding.empty
       (function Consensus_operation_not_allowed -> Some () | _ -> None)
       (fun () -> Consensus_operation_not_allowed) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.missing_companion_key_for_bls_dal"
+      ~title:"Missing companion key for DAL attestation with BLS"
+      ~description:
+        "The consensus key is a BLS key but is missing a companion key, so it \
+         cannot issue a DAL attestation"
+      Data_encoding.(obj1 (req "consensus_key" Consensus_key.encoding))
+      (function Missing_companion_key_for_bls_dal x -> Some x | _ -> None)
+      (fun x -> Missing_companion_key_for_bls_dal x) ;
     register_error_kind
       `Permanent
       ~id:"validate.aggregate_operation_not_allowed_in_mempool"

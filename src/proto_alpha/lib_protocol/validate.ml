@@ -826,12 +826,52 @@ module Consensus = struct
         dal_content
     in
     let*? () =
+      let open Result_syntax in
       if check_signature then
-        Operation.check_signature
-          vi.ctxt
-          consensus_key.consensus_pk
-          vi.chain_id
-          operation
+        let* dal_dependent_pk =
+          match (consensus_key.Consensus_key.consensus_pk, dal_content) with
+          | Bls consensus_bls_pk, Some {attestation = dal_attestation}
+            when Constants.aggregate_attestation vi.ctxt -> (
+              match consensus_key.companion_pk with
+              | None ->
+                  tzfail
+                    (Missing_companion_key_for_bls_dal
+                       (Consensus_key.pkh consensus_key))
+              | Some companion_pk -> (
+                  let dal_dependent_bls_pk_opt =
+                    Dal.Attestation.Dal_dependent_signing.aggregate_pk
+                      ~subgroup_check:false
+                        (* We disable subgroup check (for better
+                           performances) because the context only
+                           contains valid consensus and companion
+                           keys. *)
+                      ~consensus_pk:consensus_bls_pk
+                      ~companion_pk
+                      dal_attestation
+                  in
+                  match dal_dependent_bls_pk_opt with
+                  | None ->
+                      tzfail
+                        Validate_errors.Consensus.Public_key_aggregation_failure
+                  | Some dal_dependent_bls_pk ->
+                      return
+                        (Signature.Bls dal_dependent_bls_pk
+                          : Signature.Public_key.t)))
+          | _ ->
+              (* When the feature flag is not set or the consensus key
+                 is non-BLS, we use the old behavior: the signed
+                 content (which includes the dal_content if any) is
+                 signed by the consensus key alone.
+
+                 When the dal_content is None (even with enabled
+                 feature flag and BLS consensus key), it is
+                 represented by [dal_dependent_pk =
+                 consensus_pk]. Notably, this allows a BLS consensus
+                 key without any associated companion key to still
+                 issue an attestation without DAL. *)
+              return consensus_key.consensus_pk
+        in
+        Operation.check_signature vi.ctxt dal_dependent_pk vi.chain_id operation
       else ok_unit
     in
     return voting_power

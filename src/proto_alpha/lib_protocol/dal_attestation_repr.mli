@@ -137,3 +137,34 @@ module Accountability : sig
     Dal_slot_index_repr.t ->
     attestation_status
 end
+
+(** {!type-t}-dependent combination of public keys or signatures. *)
+module Dal_dependent_signing : sig
+  (** Encodes the {!type-t} argument into a specific combination of
+      [consensus_pk] and [companion_pk].
+
+      If [subgroup_check] is set, also checks whether the points are
+      in the appropriate subgroup.
+
+      Returns [None] if the deserialization of points fails or the
+      subgroup check fails -- this cannot happen when the provided
+      keys are valid BLS keys.
+
+      Guarantees that the resulting key is different from both
+      [consensus_pk] and [companion_pk]. *)
+  val aggregate_pk :
+    subgroup_check:bool ->
+    consensus_pk:Bls.Public_key.t ->
+    companion_pk:Bls.Public_key.t ->
+    t ->
+    Bls.Public_key.t option
+
+  (** Computes the same {!type-t}-dependent combination as
+      {!aggregate_pk}, but with signatures instead of public keys. *)
+  val aggregate_sig :
+    subgroup_check:bool ->
+    consensus_sig:Bls.t ->
+    companion_sig:Bls.t ->
+    t ->
+    Bls.t option
+end
