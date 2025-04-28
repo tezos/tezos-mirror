@@ -829,6 +829,15 @@ let push_metrics t
       ~name:"tezt_dal_attestation_sent"
       (if value then 1. else 0.)
   in
+  let push_metric_out_attestation_sent ~labels () =
+    Cloud.push_metric
+      t.cloud
+      ~help:"The baker sent an attestation while out of the DAL committee"
+      ~typ:`Gauge
+      ~labels
+      ~name:"tezt_attestation_sent_when_out_of_dal_committee"
+      1.
+  in
   Hashtbl.iter
     (fun (PKH public_key_hash)
          {attested_slots; published_slots; in_committee; attestation_with_dal} ->
@@ -837,7 +846,9 @@ let push_metrics t
         push_attested ~labels attested_slots ;
         push_published ~labels published_slots ;
         push_dal_attestation_sent ~labels attestation_with_dal)
-      else ())
+      else
+        let labels = get_labels public_key_hash in
+        push_metric_out_attestation_sent ~labels ())
     ratio_attested_commitments_per_baker ;
   Hashtbl.iter
     (fun slot_index value ->
@@ -1196,9 +1207,9 @@ module Monitoring_app = struct
 
   let pp_delegate fmt delegate_pkh =
     match Hashtbl.find_opt aliases delegate_pkh with
-    | None -> Format.fprintf fmt "`%s`" delegate_pkh
+    | None -> Format.fprintf fmt "%s" delegate_pkh
     | Some alias ->
-        Format.fprintf fmt "`%s` : `%s`" (String.sub delegate_pkh 0 7) alias
+        Format.fprintf fmt "%s : %-26s" (String.sub delegate_pkh 0 7) alias
 
   (** [network_to_image_url network] return an image for each monitored network. *)
   let network_to_image_url : Network.t -> string = function
@@ -1458,27 +1469,67 @@ module Monitoring_app = struct
       Lwt.return (ratio_view, bandwidth_view)
 
     let pp_stake fmt stake_ratio =
-      Format.fprintf fmt "`%.2f%%` stake" (stake_ratio *. 100.)
+      Format.fprintf fmt "%.2f%% stake" (stake_ratio *. 100.)
 
-    let display_delegate (`address address, _, stake_ratio) =
-      Format.asprintf "%a (%a)" pp_delegate address pp_stake stake_ratio
+    type baker_attestation_numbers = {
+      (* The rate of attested/attestable slots for this baker.
+         An attestatble slot is a published slot for which the baker is in
+         the DAL committee at attestation level.
+      *)
+      slot_attestation_rate : float option;
+      (* The rate of attestation_with_dal when the baker is in the DAL committee.
+         This ratio is especially useful for small bakers which are rarely in
+         the DAL committee, hence have very few opportunities to attest slots
+         when publication is quite rare.
+      *)
+      dal_content_rate : float option;
+      (* This boolean is true if the baker sent at least one attestation while
+         out of the DAL committee. This is useful to detect bakers who attest
+         but have a broken DAL setup preventing them to send attestations while
+         in DAL committee.
+      *)
+      attests_while_out_of_dal_committee : bool;
+    }
 
-    let view_bakers bakers =
-      List.map
-        (fun ((_, (value, mentions_dal), _) as baker) ->
-          Format.sprintf
-            ":black_small_square: %s - %s (%s)"
-            (Option.fold
-               ~none:"Never was in committee when slots were produced"
-               ~some:(fun value -> Format.sprintf "`%.2f%%`" (value *. 100.))
-               value)
-            (display_delegate baker)
-            (match mentions_dal with
-            | None -> "Never sent attestations while in DAL committee"
-            | Some 0. -> "OFF"
-            | Some 1. -> "ON"
-            | Some x -> Format.sprintf "ACTIVE %.0f%% of the time" (x *. 100.)))
-        bakers
+    type baker_infos = {
+      address : public_key_hash;
+      attest_infos : baker_attestation_numbers;
+      stake_fraction : float;
+    }
+
+    let pp_baker_light fmt {address = PKH delegate_pkh; stake_fraction; _} =
+      Format.fprintf
+        fmt
+        "%a (%a)"
+        pp_delegate
+        delegate_pkh
+        pp_stake
+        stake_fraction
+
+    let pp_baker_dal_status fmt baker =
+      Format.fprintf
+        fmt
+        "%a (%s)"
+        pp_baker_light
+        baker
+        (match baker.attest_infos.dal_content_rate with
+        | None -> "Never sent attestations while in DAL committee"
+        | Some 0. -> "OFF"
+        | Some 1. -> "ON"
+        | Some x -> Format.sprintf "ACTIVE %.0f%% of the time" (x *. 100.))
+
+    let pp_bakers_all_infos fmt baker =
+      Format.fprintf
+        fmt
+        "%s - %a"
+        (Option.fold
+           ~none:"Never was in committee when slots were produced"
+           ~some:(fun value ->
+             let percentage = value *. 100. in
+             Format.sprintf "%.2f%%" percentage)
+           baker.attest_infos.slot_attestation_rate)
+        pp_baker_dal_status
+        baker
 
     let fetch_baker_info ~tz1 ~origin =
       let query =
@@ -1501,13 +1552,31 @@ module Monitoring_app = struct
           tz1
           report_interval
       in
-      let* dal_attestation_ratio =
+      let* dal_content_rate =
         fetch ~decoder:decoder_prometheus_float ~query ~origin
       in
-      match (attested, published) with
-      | None, _ | _, None | _, Some 0. -> return (None, dal_attestation_ratio)
-      | Some attested, Some published ->
-          return (Some (attested /. published), dal_attestation_ratio)
+      let query =
+        Format.sprintf
+          "sum_over_time(tezt_attestation_sent_when_out_of_dal_committee{attester=\"%s\"}[6h])"
+          tz1
+      in
+      let* out_attestations =
+        fetch ~decoder:decoder_prometheus_float ~query ~origin
+      in
+      let attests_while_out_of_dal_committee =
+        Option.is_some out_attestations
+      in
+      let slot_attestation_rate =
+        match (attested, published) with
+        | None, _ | _, None | _, Some 0. -> None
+        | Some attested, Some published -> Some (attested /. published)
+      in
+      return
+        {
+          slot_attestation_rate;
+          dal_content_rate;
+          attests_while_out_of_dal_committee;
+        }
 
     let get_current_cycle endpoint =
       let* {cycle; _} =
@@ -1517,6 +1586,15 @@ module Monitoring_app = struct
 
     let get_bakers_with_staking_power endpoint cycle =
       RPC_core.call endpoint (RPC.get_stake_distribution ~cycle ())
+
+    type classified_bakers = {
+      mute_bakers : baker_infos list;
+      muted_by_dal : baker_infos list;
+      dal_zero : baker_infos list;
+      dal_on : baker_infos list;
+      no_shards : baker_infos list;
+      dal_off : baker_infos list;
+    }
 
     let fetch_bakers_info endpoint =
       let* cycle = get_current_cycle endpoint in
@@ -1530,42 +1608,106 @@ module Monitoring_app = struct
       let* bakers_info =
         Lwt_list.filter_map_p
           (fun RPC.{delegate; baking_power} ->
-            let* info =
+            let* attest_infos =
               fetch_baker_info
                 ~origin:(Format.sprintf "fetch_baker_info.%s" delegate)
                 ~tz1:delegate
             in
-            let baking_ratio =
+            let stake_fraction =
               float_of_int baking_power /. float_of_int total_baking_power
             in
-            Lwt.return_some (`address delegate, info, baking_ratio))
+            Lwt.return_some
+              {address = PKH delegate; attest_infos; stake_fraction})
           bakers
       in
-      let rec classify_bakers mute_bakers dal_on dal_off = function
-        | [] -> (mute_bakers, dal_on, dal_off)
-        | ((_, (_, dal_endorsement), _) as baker) :: tl -> (
-            match dal_endorsement with
-            | None -> classify_bakers (baker :: mute_bakers) dal_on dal_off tl
+      let rec classify_bakers already_classified = function
+        | [] -> already_classified
+        | ({attest_infos; _} as baker) :: tl -> (
+            match attest_infos.dal_content_rate with
+            | None ->
+                if attest_infos.attests_while_out_of_dal_committee then
+                  classify_bakers
+                    {
+                      already_classified with
+                      muted_by_dal = baker :: already_classified.muted_by_dal;
+                    }
+                    tl
+                else
+                  classify_bakers
+                    {
+                      already_classified with
+                      mute_bakers = baker :: already_classified.mute_bakers;
+                    }
+                    tl
             | Some 0. ->
-                classify_bakers mute_bakers dal_on (baker :: dal_off) tl
-            | _ -> classify_bakers mute_bakers (baker :: dal_on) dal_off tl)
+                classify_bakers
+                  {
+                    already_classified with
+                    dal_off = baker :: already_classified.dal_off;
+                  }
+                  tl
+            | _ -> (
+                match attest_infos.slot_attestation_rate with
+                | None ->
+                    classify_bakers
+                      {
+                        already_classified with
+                        no_shards = baker :: already_classified.no_shards;
+                      }
+                      tl
+                | Some 0. ->
+                    classify_bakers
+                      {
+                        already_classified with
+                        dal_zero = baker :: already_classified.dal_zero;
+                      }
+                      tl
+                | _ ->
+                    classify_bakers
+                      {
+                        already_classified with
+                        dal_on = baker :: already_classified.dal_on;
+                      }
+                      tl))
       in
-      let mute_bakers, dal_on, dal_off = classify_bakers [] [] [] bakers_info in
+      let {mute_bakers; muted_by_dal; dal_zero; dal_on; no_shards; dal_off} =
+        classify_bakers
+          {
+            mute_bakers = [];
+            muted_by_dal = [];
+            dal_zero = [];
+            dal_on = [];
+            no_shards = [];
+            dal_off = [];
+          }
+          bakers_info
+      in
       let ( >> ) cmp1 cmp2 x y =
         match cmp1 x y with 0 -> cmp2 x y | cmp -> cmp
       in
-      let stake_descending (_, (_, _), x_stake) (_, (_, _), y_stake) =
-        Float.compare y_stake x_stake
+      let stake_descending x y =
+        Float.compare y.stake_fraction x.stake_fraction
       in
-      let attestation_rate_ascending (_, (x_attestation, _), _)
-          (_, (y_attestation, _), _) =
-        Option.compare Float.compare x_attestation y_attestation
+      let attestation_rate_ascending x y =
+        Option.compare
+          Float.compare
+          x.attest_infos.slot_attestation_rate
+          y.attest_infos.slot_attestation_rate
       in
-      let dal_mention_perf_ascending (_, (_, x_dal_mention), _)
-          (_, (_, y_dal_mention), _) =
-        Option.compare Float.compare x_dal_mention y_dal_mention
+      let dal_mention_perf_ascending x y =
+        Option.compare
+          Float.compare
+          x.attest_infos.dal_content_rate
+          y.attest_infos.dal_content_rate
       in
       let mute_bakers = List.sort stake_descending mute_bakers in
+      let muted_by_dal = List.sort stake_descending muted_by_dal in
+      let dal_zero =
+        List.sort (stake_descending >> dal_mention_perf_ascending) dal_zero
+      in
+      let no_shards =
+        List.sort (stake_descending >> dal_mention_perf_ascending) no_shards
+      in
       let dal_on =
         List.sort
           (attestation_rate_ascending >> dal_mention_perf_ascending
@@ -1589,8 +1731,8 @@ module Monitoring_app = struct
       let agglomerate_infos bakers =
         let nb, stake =
           List.fold_left
-            (fun (nb, stake_acc) (_, _, stake_ratio) ->
-              (nb + 1, stake_acc +. stake_ratio))
+            (fun (nb, stake_acc) {stake_fraction; _} ->
+              (nb + 1, stake_acc +. stake_fraction))
             (0, 0.)
             bakers
         in
@@ -1599,34 +1741,62 @@ module Monitoring_app = struct
           nb
           (stake *. 100.)
       in
+      let encapsulate_in_code_block strings = ("```" :: strings) @ ["```"] in
+      let display catch_phrase printer bakers =
+        if bakers = [] then []
+        else
+          [catch_phrase; agglomerate_infos bakers]
+          :: List.map
+               encapsulate_in_code_block
+               (group_by 20 (List.map (Format.asprintf "%a" printer) bakers))
+      in
       let display_muted =
-        match mute_bakers with
-        | [] -> []
-        | _ ->
-            group_by
-              20
-              (":alert: *Those bakers never sent attestations while in DAL \
-                committee, this is quite unexpected. They probably have an \
-                issue.*"
-              :: agglomerate_infos mute_bakers
-              :: List.map display_delegate mute_bakers)
+        display
+          ":alert: *Those bakers never sent attestations.*"
+          pp_baker_light
+          mute_bakers
+      in
+      let display_muted_by_DAL =
+        display
+          ":alert: *Those bakers never sent attestation while in DAL \
+           committee, however they sent attestations when they are out of it. \
+           This is quite unexpected. They probably have an issue.*"
+          pp_baker_light
+          muted_by_dal
+      in
+      let display_zero =
+        display
+          ":triangular_flag_on_post: *Those bakers have a broken DAL node. \
+           They send attestations with a DAL content, but do not attest any \
+           slots.*"
+          pp_baker_dal_status
+          dal_zero
       in
       let display_on =
-        group_by
-          20
-          (":white_check_mark: *Those bakers sent attestations mentioning DAL.*"
-         :: agglomerate_infos dal_on :: view_bakers dal_on)
+        display
+          ":white_check_mark: *Those bakers sent attestations with a DAL \
+           content.*"
+          pp_bakers_all_infos
+          dal_on
       in
       let display_off =
-        group_by
-          20
-          (":x: *Those bakers never turned their DAL on.*"
-         :: agglomerate_infos dal_off
-          :: List.map display_delegate dal_off)
+        display
+          ":x: *Those bakers never turned their DAL on.*"
+          pp_baker_light
+          dal_off
+      in
+      let display_no_shards =
+        display
+          ":microscope: *Those bakers seems to have a working DAL node, but \
+           never were in committee when slots were produced, hence we cannot \
+           say much about how well it works.*"
+          pp_baker_light
+          no_shards
       in
       Lwt.return
-        ((["Details of bakers performance:"] :: display_muted)
-        @ display_on @ display_off)
+        ((["Details of bakers performance:"] :: display_muted_by_DAL)
+        @ display_zero @ display_on @ display_no_shards @ display_off
+        @ display_muted)
 
     let fetch_slots_info () =
       let* data =
@@ -1922,11 +2092,11 @@ module Monitoring_app = struct
             (match transition with
             | Restarted_attesting ->
                 "*[dal-attester-is-back]* On network `%s` at level `%d`, \
-                 delegate %a who was under the reward threshold is again above \
-                 threshold. New attestation rate is %.2f%%."
+                 delegate `%a` who was under the reward threshold is again \
+                 above threshold. New attestation rate is %.2f%%."
             | Stopped_attesting ->
                 "*[dal-attester-dropped]* On network `%s` at level `%d`, \
-                 delegate %a DAL attestation rate dropped under the reward \
+                 delegate `%a` DAL attestation rate dropped under the reward \
                  threshold. New attestation rate is %.2f%%.")
             (Network.to_string network)
             level
