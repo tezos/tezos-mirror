@@ -431,6 +431,56 @@ let test_preattestations_aggregate_invalid_signature () =
       in
       Assert.proto_error ~loc:__LOC__ res signature_invalid_error
 
+let test_preattestations_aggregate_non_bls_delegate () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* block' = Block.bake block in
+  let* attesters = Context.get_attesters (B block') in
+  (* Find an attester with a non-BLS consensus key. *)
+  let attester, slot =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (find_attester_with_non_bls_key attesters)
+  in
+  (* Craft a preattestation for this attester to retreive a signature and a
+     triplet {level, round, block_payload_hash} *)
+  let* {shell; protocol_data = {contents; signature}} =
+    Op.raw_preattestation
+      ~delegate:attester.RPC.Validators.delegate
+      ~slot
+      block'
+  in
+  match contents with
+  | Single (Preattestation consensus_content) ->
+      let {level; round; block_payload_hash; _} :
+          Alpha_context.consensus_content =
+        consensus_content
+      in
+      (* Craft an aggregate including the attester slot and signature *)
+      let consensus_content : Alpha_context.consensus_aggregate_content =
+        {level; round; block_payload_hash}
+      in
+      let contents : _ Alpha_context.contents_list =
+        Single
+          (Preattestations_aggregate {consensus_content; committee = [slot]})
+      in
+      let operation : operation =
+        {shell; protocol_data = Operation_data {contents; signature}}
+      in
+      (* Bake a block containing this aggregate and expect an error *)
+      let*! res =
+        let round_zero = Alpha_context.Round.zero in
+        Block.bake
+          ~policy:(By_round 1)
+          ~payload_round:(Some round_zero)
+          ~locked_round:(Some round_zero)
+          ~operation
+          block
+      in
+      Assert.proto_error ~loc:__LOC__ res non_bls_in_aggregate
+
 let test_attestations_aggregate_non_bls_delegate () =
   let open Lwt_result_syntax in
   let* _genesis, block =
@@ -595,6 +645,10 @@ let tests =
       "test_attestations_aggregate_invalid_signature"
       `Quick
       test_attestations_aggregate_invalid_signature;
+    Tztest.tztest
+      "test_preattestations_aggregate_non_bls_delegate"
+      `Quick
+      test_preattestations_aggregate_non_bls_delegate;
     Tztest.tztest
       "test_attestations_aggregate_non_bls_delegate"
       `Quick
