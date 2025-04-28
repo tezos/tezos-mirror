@@ -1646,11 +1646,11 @@ module Monitoring_app = struct
           List.map
             (fun (`delegate delegate, `change change) ->
               Format.asprintf
-                ":black_small_square: %a has missed ~%d tez DAL attestation \
+                ":black_small_square: %a has missed ~%.1f tez DAL attestation \
                  rewards"
                 pp_delegate
                 delegate
-                (change / 100_000))
+                (float_of_int change /. 1_000_000.))
             lost_dal_rewards
         in
         Format_app.section (header :: content) ()
