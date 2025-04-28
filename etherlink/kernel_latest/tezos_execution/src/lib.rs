@@ -160,6 +160,7 @@ pub fn apply_operation<Host: Runtime>(
             let manager_result = produce_operation_result(reveal_result);
             OperationResultSum::Reveal(manager_result)
         }
+        OperationContent::Transfer { .. } => todo!(),
     };
 
     Ok(receipt)

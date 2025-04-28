@@ -14,23 +14,32 @@ use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{HashType, UnknownSignature};
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
-    enc::{BinError, BinResult, BinWriter},
-    nom::{error::DecodeError, NomError, NomReader, NomResult},
+    enc::{self as tezos_enc, BinError, BinResult, BinWriter},
+    nom::{self as tezos_nom, error::DecodeError, NomError, NomReader, NomResult},
 };
-use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup::types::PublicKeyHash;
+use tezos_smart_rollup::types::{Contract, PublicKey};
 
 #[derive(PartialEq, Debug)]
 pub enum OperationContent {
-    Reveal { pk: PublicKey },
+    Reveal {
+        pk: PublicKey,
+    },
+    Transfer {
+        amount: Narith,
+        destination: Contract,
+    },
 }
 
 pub const REVEAL_TAG: u8 = 107_u8;
+
+pub const TRANSFER_TAG: u8 = 108_u8;
 
 impl OperationContent {
     pub fn tag(&self) -> u8 {
         match self {
             Self::Reveal { pk: _ } => REVEAL_TAG,
+            Self::Transfer { .. } => TRANSFER_TAG,
         }
     }
 
@@ -40,7 +49,21 @@ impl OperationContent {
                 let (array, pk) = PublicKey::nom_read(bytes)?;
                 NomResult::Ok((array, Self::Reveal { pk }))
             }
-            _ => Err(nom::Err::Error(NomError::invalid_tag(
+            TRANSFER_TAG => {
+                let (input, amount) = Narith::nom_read(bytes)?;
+                let (input, destination) = Contract::nom_read(input)?;
+                // TODO: parameter should be a Michelson expr, for now just use unit
+                let (input, _parameter) =
+                    tezos_nom::optional_field(|input| Ok((input, ())))(input)?;
+                NomResult::Ok((
+                    input,
+                    Self::Transfer {
+                        amount,
+                        destination,
+                    },
+                ))
+            }
+            _ => Err(nom::Err::Error(tezos_nom::NomError::invalid_tag(
                 bytes,
                 tag.to_string(),
             ))),
@@ -54,6 +77,18 @@ impl BinWriter for OperationContent {
         match self {
             Self::Reveal { pk } => {
                 pk.bin_write(data)?;
+                Ok(())
+            }
+            Self::Transfer {
+                amount,
+                destination,
+            } => {
+                amount.bin_write(data)?;
+                destination.bin_write(data)?;
+                // TODO: parameter should be a Michelson expr, for now just use unit
+                let closure: for<'a> fn(&(), &'a mut Vec<u8>) -> BinResult =
+                    |_, _| Ok(());
+                tezos_enc::optional_field(closure)(&None, data)?;
                 Ok(())
             }
         }
