@@ -22,6 +22,7 @@ mkdir -p %{buildroot}/usr/share/octez-baker
 install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-baker-P* %{buildroot}/usr/bin/
 install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-baker %{buildroot}/usr/bin/
 install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-accuser-P* %{buildroot}/usr/bin/
+install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-accuser %{buildroot}/usr/bin/
 install -m 0755 $HOME/rpmbuild/SPECS/scripts/wait-for-node-up.sh %{buildroot}/usr/share/octez-baker/
 install -m 0755 $HOME/rpmbuild/SPECS/scripts/systemd-octez-bakers.sh %{buildroot}/usr/share/octez-baker/
 install -D -m 644 $HOME/rpmbuild/SPECS/manpages/octez-baker.1 %{buildroot}%{_mandir}/man1/octez-baker.1
@@ -32,12 +33,14 @@ install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-accuser@.service %{buil
 install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker@.service %{buildroot}/usr/lib/systemd/system/octez-baker@.service
 install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.service %{buildroot}/usr/lib/systemd/system/octez-baker.service
 install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-agnostic-baker.service %{buildroot}/usr/lib/systemd/system/octez-baker.octez-agnostic-baker.service
+install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-agnostic-accuser.service %{buildroot}/usr/lib/systemd/system/octez-baker.octez-agnostic-accuser.service
 install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.octez-accuser.default %{buildroot}/etc/default/octez-accuser
 install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.default %{buildroot}/etc/default/octez-baker
 %files
 /usr/bin/octez-baker-*
 /usr/bin/octez-baker
 /usr/bin/octez-accuser-*
+/usr/bin/octez-accuser
 /usr/share/octez-baker/wait-for-node-up.sh
 /usr/share/octez-baker/systemd-octez-bakers.sh
 %{_mandir}/man1/octez-baker.1*
@@ -46,6 +49,7 @@ install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.default %{buildroot}/etc/def
 /usr/lib/systemd/system/octez-baker@.service
 /usr/lib/systemd/system/octez-baker.service
 /usr/lib/systemd/system/octez-baker.octez-agnostic-baker.service
+/usr/lib/systemd/system/octez-baker.octez-agnostic-accuser.service
 /etc/default/octez-accuser
 /etc/default/octez-baker
 %postun
