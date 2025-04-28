@@ -445,6 +445,7 @@ let aggregate_attestations eligible_attestations =
       with
       | Some signature ->
           let contents =
+            let committee = Operation.tmp_of_old_committee committee in
             Single (Attestations_aggregate {consensus_content; committee})
           in
           let protocol_data = {contents; signature = Some (Bls signature)} in
@@ -550,7 +551,9 @@ let aggregate_attestations_on_reproposal consensus_operations =
       (* The proposal already contains an aggregate.
          We must incorporate additional attestations *)
       (* Build the set of aggregated slots for a logarithmic presence lookup *)
-      let aggregated_slots = SlotSet.of_list committee in
+      let aggregated_slots =
+        SlotSet.of_list (Operation.committee_slots committee)
+      in
       (* Gather slots and signatures incorporating fresh attestations. *)
       let committee, signatures =
         List.fold_left
@@ -561,7 +564,7 @@ let aggregate_attestations_on_reproposal consensus_operations =
               when not (SlotSet.mem consensus_content.slot aggregated_slots) ->
                 (consensus_content.slot :: slots, signature :: signatures)
             | _ -> acc)
-          (committee, [signature])
+          (Operation.tmp_to_old_committee committee, [signature])
           eligible_attestations
       in
       (* We disable the subgroup check for better performance, as operations
@@ -571,6 +574,7 @@ let aggregate_attestations_on_reproposal consensus_operations =
       with
       | Some signature ->
           let contents =
+            let committee = Operation.tmp_of_old_committee committee in
             Single (Attestations_aggregate {consensus_content; committee})
           in
           let protocol_data = {contents; signature = Some (Bls signature)} in

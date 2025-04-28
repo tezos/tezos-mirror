@@ -4740,7 +4740,7 @@ and _ contents =
       -> Kind.preattestations_aggregate contents
   | Attestations_aggregate : {
       consensus_content : consensus_aggregate_content;
-      committee : Slot.t list;
+      committee : (Slot.t * dal_content option) list;
     }
       -> Kind.attestations_aggregate contents
   | Seed_nonce_revelation : {
@@ -5172,6 +5172,13 @@ module Operation : sig
   val of_list : packed_contents list -> packed_contents_list tzresult
 
   val to_list : packed_contents_list -> packed_contents list
+
+  (** See {!Operation_repr.committee_slots}. *)
+  val committee_slots : (Slot.t * dal_content option) list -> Slot.t list
+
+  val tmp_to_old_committee : (Slot.t * dal_content option) list -> Slot.t list
+
+  val tmp_of_old_committee : Slot.t list -> (Slot.t * dal_content option) list
 end
 
 (** This module re-exports definitions from {!Stake_storage},

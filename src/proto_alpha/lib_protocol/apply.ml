@@ -2558,7 +2558,10 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
           (Constants.aggregate_attestation ctxt)
           Validate_errors.Consensus.(Aggregate_disabled)
       in
-      record_attestations_aggregate ctxt mode committee
+      record_attestations_aggregate
+        ctxt
+        mode
+        (Operation.tmp_to_old_committee committee)
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       let* ctxt = Nonce.reveal ctxt level nonce in
