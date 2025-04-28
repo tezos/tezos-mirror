@@ -2331,6 +2331,15 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
       in
       return (ctxt, mk_preattestation_result consensus_key 0 (* Fake power. *))
 
+let record_dal_content ctxt slot ~dal_power = function
+  | None -> Result.return ctxt
+  | Some {attestation} ->
+      Dal_apply.apply_attestation
+        ctxt
+        ~tb_slot:slot
+        attestation
+        ~power:dal_power
+
 let record_attestation ctxt (mode : mode) (consensus : consensus_content)
     (dal : dal_content option) :
     (context * Kind.attestation contents_result_list) tzresult Lwt.t =
@@ -2354,17 +2363,7 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
       let*? ctxt =
         Consensus.record_attestation ctxt ~initial_slot:consensus.slot ~power
       in
-      let*? ctxt =
-        Option.fold
-          ~none:(Result_syntax.return ctxt)
-          ~some:(fun dal ->
-            Dal_apply.apply_attestation
-              ctxt
-              ~tb_slot:consensus.slot
-              dal.attestation
-              ~power:dal_power)
-          dal
-      in
+      let*? ctxt = record_dal_content ctxt consensus.slot ~dal_power dal in
       return (ctxt, mk_attestation_result consensus_key power)
   | Partial_construction _ ->
       (* In mempool mode, attestations are allowed for various levels
@@ -2380,7 +2379,7 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
       in
       return (ctxt, mk_attestation_result consensus_key 0 (* Fake power. *))
 
-let record_attestations_aggregate ctxt (mode : mode) (committee : Slot.t list) :
+let record_attestations_aggregate ctxt (mode : mode) committee :
     (context * Kind.attestations_aggregate contents_result_list) tzresult Lwt.t
     =
   let open Lwt_result_syntax in
@@ -2390,13 +2389,14 @@ let record_attestations_aggregate ctxt (mode : mode) (committee : Slot.t list) :
       let*? ctxt, committee, consensus_power =
         let open Result_syntax in
         List.fold_left_e
-          (fun (ctxt, consensus_keys, consensus_power) slot ->
-            let* {delegate; consensus_pkh; _}, power, _ =
+          (fun (ctxt, consensus_keys, consensus_power) (slot, dal) ->
+            let* {delegate; consensus_pkh; _}, power, dal_power =
               find_in_slot_map slot slot_map
             in
             let* ctxt =
               Consensus.record_attestation ctxt ~initial_slot:slot ~power
             in
+            let* ctxt = record_dal_content ctxt slot ~dal_power dal in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return (ctxt, key :: consensus_keys, power + consensus_power))
           (ctxt, [], 0)
@@ -2558,10 +2558,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
           (Constants.aggregate_attestation ctxt)
           Validate_errors.Consensus.(Aggregate_disabled)
       in
-      record_attestations_aggregate
-        ctxt
-        mode
-        (Operation.tmp_to_old_committee committee)
+      record_attestations_aggregate ctxt mode committee
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       let* ctxt = Nonce.reveal ctxt level nonce in
