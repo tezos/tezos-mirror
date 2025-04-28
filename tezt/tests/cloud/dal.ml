@@ -535,12 +535,21 @@ type public_key_hash = string
 
 type commitment_info = {commitment : string; publisher_pkh : string}
 
+type dal_status = With_DAL of Z.t | Without_DAL | Out_of_committee
+
 type per_level_info = {
   level : int;
   published_commitments : (int, commitment_info) Hashtbl.t;
-  attestations : (public_key_hash, Z.t option) Hashtbl.t;
+  attestations : (public_key_hash, dal_status) Hashtbl.t;
   attested_commitments : Z.t;
   etherlink_operator_balance_sum : Tez.t;
+}
+
+type per_baker_dal_summary = {
+  published_slots : int;
+  attested_slots : int;
+  in_committee : bool;
+  attestation_with_dal : bool;
 }
 
 type metrics = {
@@ -559,7 +568,7 @@ type metrics = {
   ratio_attested_commitments : float;
   ratio_published_commitments_last_level : float;
   ratio_attested_commitments_per_baker :
-    (public_key_hash, float option) Hashtbl.t;
+    (public_key_hash, per_baker_dal_summary) Hashtbl.t;
   etherlink_operator_balance_sum : Tez.t;
 }
 
@@ -634,6 +643,10 @@ let pp_metrics t
       ratio_attested_commitments_per_baker;
       etherlink_operator_balance_sum;
     } =
+  let pp_ratio fmt (num, div) =
+    if div = 0 then Format.fprintf fmt "Not a number: %d/0" num
+    else Format.fprintf fmt "%.2f" (float_of_int num *. 100. /. float_of_int div)
+  in
   (match level_first_commitment_published with
   | None -> ()
   | Some level_first_commitment_published ->
@@ -654,24 +667,22 @@ let pp_metrics t
   Log.info
     "Ratio published commitments last level: %f"
     ratio_published_commitments_last_level ;
-  t.bakers |> List.to_seq
-  |> Seq.iter (fun {account; stake; _} ->
-         match
-           Hashtbl.find_opt
-             ratio_attested_commitments_per_baker
-             account.Account.public_key_hash
-         with
-         | None -> Log.info "No ratio for %s" account.Account.public_key_hash
-         | Some ratio ->
+  t.bakers
+  |> List.iter (fun {account; stake; _} ->
+         let pkh = account.Account.public_key_hash in
+         match Hashtbl.find_opt ratio_attested_commitments_per_baker pkh with
+         | None -> Log.info "We lack information about %s" pkh
+         | Some {published_slots; attested_slots; _} ->
              let alias =
                Hashtbl.find_opt t.aliases account.Account.public_key_hash
                |> Option.value ~default:account.Account.public_key_hash
              in
              Log.info
-               "Ratio for %s (with stake %d): %s"
+               "Ratio for %s (with stake %d): %a"
                alias
                stake
-               (Option.fold ~none:"none" ~some:string_of_float ratio)) ;
+               pp_ratio
+               (attested_slots, published_slots)) ;
   Log.info
     "Sum of balances of the Etherlink operator: %s tez"
     (Tez.to_string etherlink_operator_balance_sum) ;
@@ -701,32 +712,57 @@ let push_metrics t
       ratio_attested_commitments_per_baker;
       etherlink_operator_balance_sum;
     } =
-  Hashtbl.to_seq ratio_attested_commitments_per_baker
-  |> Seq.iter (fun (public_key_hash, ratio_opt) ->
-         match ratio_opt with
-         | None -> ()
-         | Some value ->
-             (* Highly unoptimised since this is done everytime the metric is updated. *)
-             let alias =
-               Hashtbl.find_opt t.aliases public_key_hash
-               |> Option.map (fun alias -> [("alias", alias)])
-               |> Option.value ~default:[]
-             in
-             let version =
-               Hashtbl.find_opt t.versions public_key_hash
-               |> Option.map (fun version -> [("version", version)])
-               |> Option.value ~default:[]
-             in
-             let labels = [("attester", public_key_hash)] @ alias @ version in
-             Cloud.push_metric
-               t.cloud
-               ~help:
-                 "Ratio between the number of attested and expected \
-                  commitments per baker"
-               ~typ:`Gauge
-               ~labels
-               ~name:"tezt_dal_commitments_attested_ratio"
-               value) ;
+  let get_labels public_key_hash =
+    let alias =
+      Hashtbl.find_opt t.aliases public_key_hash
+      |> Option.map (fun alias -> [("alias", alias)])
+      |> Option.value ~default:[]
+    in
+    let version =
+      Hashtbl.find_opt t.versions public_key_hash
+      |> Option.map (fun version -> [("version", version)])
+      |> Option.value ~default:[]
+    in
+    [("attester", public_key_hash)] @ alias @ version
+  in
+  let push_attested ~labels value =
+    Cloud.push_metric
+      t.cloud
+      ~help:"Number of attested commitments per baker"
+      ~typ:`Gauge
+      ~labels
+      ~name:"tezt_dal_commitments_attested"
+      (float_of_int value)
+  in
+  let push_published ~labels value =
+    Cloud.push_metric
+      t.cloud
+      ~help:"Number of published commitments per baker"
+      ~typ:`Gauge
+      ~labels
+      ~name:"tezt_dal_commitments_published"
+      (float_of_int value)
+  in
+  let push_dal_attestation_sent ~labels value =
+    Cloud.push_metric
+      t.cloud
+      ~help:
+        "Did the baker sent a DAL attestation when they had the opportunity to"
+      ~typ:`Gauge
+      ~labels
+      ~name:"tezt_dal_attestation_sent"
+      (if value then 1. else 0.)
+  in
+  Hashtbl.iter
+    (fun public_key_hash
+         {attested_slots; published_slots; in_committee; attestation_with_dal} ->
+      if in_committee then (
+        let labels = get_labels public_key_hash in
+        push_attested ~labels attested_slots ;
+        push_published ~labels published_slots ;
+        push_dal_attestation_sent ~labels attestation_with_dal)
+      else ())
+    ratio_attested_commitments_per_baker ;
   Hashtbl.iter
     (fun slot_index value ->
       let labels = [("slot_index", string_of_int slot_index)] in
@@ -951,11 +987,7 @@ let update_published_and_attested_commitments_per_slot t per_level_info
           total_attested_commitments_per_slot )
 
 let update_ratio_attested_commitments_per_baker t per_level_info =
-  let default () =
-    Hashtbl.to_seq_keys per_level_info.attestations
-    |> Seq.map (fun key -> (key, None))
-    |> Hashtbl.of_seq
-  in
+  let default () = Hashtbl.create 0 in
   let published_level =
     published_level_of_attested_level t per_level_info.level
   in
@@ -975,35 +1007,35 @@ let update_ratio_attested_commitments_per_baker t per_level_info =
         default ()
     | Some published_level_info ->
         (* Retrieves the number of published commitments *)
-        let number_of_published_commitments =
-          float (Hashtbl.length published_level_info.published_commitments)
+        let published_slots =
+          Hashtbl.length published_level_info.published_commitments
         in
         let table = Hashtbl.(create (length per_level_info.attestations)) in
-        Hashtbl.to_seq_keys per_level_info.attestations
-        |> Seq.filter_map (fun public_key_hash ->
-               let bitset =
-                 match
-                   Hashtbl.find_opt per_level_info.attestations public_key_hash
-                 with
-                 | None -> (* No attestation in block *) None
-                 | Some (Some z) when number_of_published_commitments = 0. ->
-                     (* Attestation with DAL payload but no slot were published. *)
-                     if z = Z.zero then Some 1.
-                     else (
-                       Log.error
-                         "Wow wow wait! It seems an invariant is broken. \
-                          Either on the test side, or on the DAL node side" ;
-                       None)
-                 | Some (Some z) ->
-                     (* Attestation with DAL payload *)
-                     Some
-                       (float (Z.popcount z) /. number_of_published_commitments)
-                 | Some None ->
-                     (* Attestation without DAL payload: may be due to no
-                        DAL rights. *)
-                     None
-               in
-               Some (public_key_hash, bitset))
+        Hashtbl.to_seq per_level_info.attestations
+        |> Seq.map (fun (public_key_hash, status) ->
+               ( public_key_hash,
+                 match status with
+                 | With_DAL z ->
+                     {
+                       published_slots;
+                       attested_slots = Z.popcount z;
+                       in_committee = true;
+                       attestation_with_dal = true;
+                     }
+                 | Out_of_committee ->
+                     {
+                       published_slots;
+                       attested_slots = 0;
+                       in_committee = false;
+                       attestation_with_dal = false;
+                     }
+                 | Without_DAL ->
+                     {
+                       published_slots;
+                       attested_slots = 0;
+                       in_committee = true;
+                       attestation_with_dal = false;
+                     } ))
         |> Hashtbl.add_seq table ;
         table
 
@@ -1245,6 +1277,7 @@ module Monitoring_app = struct
       let open Format in
       match (attested, published) with
       | Some 0., Some 0. -> None
+      | None, None -> None
       | Some attested, Some 0. ->
           let s = sprintf "`unk` (`%d`/`0`)" (Int.of_float attested) in
           Some s
@@ -1263,9 +1296,6 @@ module Monitoring_app = struct
               (Int.of_float attested)
               (Int.of_float published)
           in
-          Some s
-      | None, None ->
-          let s = sprintf "`unk` (`?`/`?`)" in
           Some s
 
     let fetch_slot_info ~slot_index =
@@ -1333,25 +1363,52 @@ module Monitoring_app = struct
       Lwt.return view
 
     let view_bakers bakers =
+      let display_delegate address = function
+        | None -> Format.sprintf "`%s`" address
+        | Some alias ->
+            Format.sprintf "`%s` : `%s`" (String.sub address 0 7) alias
+      in
       List.map
-        (fun (`address address, `alias alias, v) ->
+        (fun (`address address, `alias alias, (value, mentions_dal)) ->
           Format.sprintf
-            "▪ `%s` - `%s` : `%s`"
+            "▪ %s - %s (%s)"
             (Option.fold
-               ~none:"unk"
-               ~some:(fun v -> Format.sprintf "%.2f%%" (v *. 100.))
-               v)
-            (String.sub address 0 7)
-            (Option.value ~default:"no alias" alias))
+               ~none:"Never was in committee when slots were produced"
+               ~some:(fun value -> Format.sprintf "`%.2f%%`" (value *. 100.))
+               value)
+            (display_delegate address alias)
+            (match mentions_dal with
+            | None -> "Never sent attestation while in DAL committee"
+            | Some 0. -> "OFF"
+            | Some 1. -> "ON"
+            | Some x -> Format.sprintf "ACTIVE %.0f%% of the time" (x *. 100.)))
         bakers
 
-    let fetch_baker_info ~tz1 =
+    let fetch_baker_info ~tz1 ~origin =
       let query =
         Format.sprintf
-          "avg_over_time(tezt_dal_commitments_attested_ratio{attester=\"%s\"}[6h])"
+          "sum_over_time(tezt_dal_commitments_attested{attester=\"%s\"}[6h])"
           tz1
       in
-      fetch ~decoder:decoder_prometheus_float ~query
+      let* attested = fetch ~decoder:decoder_prometheus_float ~query ~origin in
+      let query =
+        Format.sprintf
+          "sum_over_time(tezt_dal_commitments_published{attester=\"%s\"}[6h])"
+          tz1
+      in
+      let* published = fetch ~decoder:decoder_prometheus_float ~query ~origin in
+      let query =
+        Format.sprintf
+          "avg_over_time(tezt_dal_attestation_sent{attester=\"%s\"}[6h])"
+          tz1
+      in
+      let* dal_attestation_ratio =
+        fetch ~decoder:decoder_prometheus_float ~query ~origin
+      in
+      match (attested, published) with
+      | None, _ | _, None | _, Some 0. -> return (None, dal_attestation_ratio)
+      | Some attested, Some published ->
+          return (Some (attested /. published), dal_attestation_ratio)
 
     (* fixme: use the stdlib List.take once we use OCaml 5.3 *)
     let take n l =
@@ -1379,7 +1436,12 @@ module Monitoring_app = struct
       in
       let sorted_bakers =
         List.sort
-          (fun (_, _, x) (_, _, y) -> Option.compare Float.compare x y)
+          (fun (_, _, (x_slot, x_dal_endorsement))
+               (_, _, (y_slot, y_dal_endorsement)) ->
+            let cmp =
+              Option.compare Float.compare x_dal_endorsement y_dal_endorsement
+            in
+            if cmp = 0 then Option.compare Float.compare x_slot y_slot else -cmp)
           bakers_info
       in
       (* `group_by n l` outputs the list of lists with the same elements as `l`
@@ -1867,19 +1929,23 @@ let get_infos_per_level t ~level ~metadata =
       operation |-> "contents" |=> 0 |-> "metadata" |-> "delegate" |> as_string)
   in
   let get_dal_attestation operation =
-    JSON.(
-      operation |-> "contents" |=> 0 |-> "dal_attestation" |> as_string
-      |> Z.of_string |> Option.some)
+    let first_slot =
+      JSON.(operation |-> "contents" |=> 0 |-> "slot" |> as_int)
+    in
+    if first_slot >= 512 then Out_of_committee
+    else if is_dal_attestation operation then
+      With_DAL
+        JSON.(
+          operation |-> "contents" |=> 0 |-> "dal_attestation" |> as_string
+          |> Z.of_string)
+    else Without_DAL
   in
   let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
   let attestations =
     consensus_operations |> List.to_seq
     |> Seq.map (fun operation ->
            let public_key_hash = get_public_key_hash operation in
-           let dal_attestation =
-             if is_dal_attestation operation then get_dal_attestation operation
-             else None
-           in
+           let dal_attestation = get_dal_attestation operation in
            (public_key_hash, dal_attestation))
     |> Hashtbl.of_seq
   in
