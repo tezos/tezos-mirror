@@ -9210,6 +9210,27 @@ let _tezt_manual_tests =
         yes_wallet_lib;
       ]
 
+let _tezt_eio_benchmarks =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+  private_exe
+    "test"
+    ~opam:""
+    ~path:"tezt/manual_tests/eio_benchmarks"
+    ~bisect_ppx:No
+    ~with_macos_security_framework:true
+    ~preprocess
+    ~preprocessor_deps
+    ~linkall:true
+    ~deps:
+      [
+        bls12_381_archive;
+        bls12_381;
+        octez_profiler_backends;
+        octez_crypto;
+        octez_bees;
+        octez_client_base_unix;
+      ]
+
 let _tezt_remote_tests =
   private_exe
     "main"
