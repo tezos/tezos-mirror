@@ -392,6 +392,45 @@ let test_attestations_aggregate_invalid_signature () =
       in
       Assert.proto_error ~loc:__LOC__ res signature_invalid_error
 
+let test_preattestations_aggregate_invalid_signature () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* block' = Block.bake block in
+  let* attesters = Context.get_attesters (B block) in
+  (* Find an attester with a BLS consensus key. *)
+  let attester, _ =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (find_attester_with_bls_key attesters)
+  in
+  (* Craft a preattestations_aggregate with this delegate *)
+  let* aggregate =
+    Op.preattestations_aggregate ~committee:[attester.consensus_key] block'
+  in
+  (* Swap the aggregate signature for Signature.Bls.zero *)
+  match aggregate.protocol_data with
+  | Operation_data {contents; _} ->
+      let aggregate_with_incorrect_signature =
+        {
+          aggregate with
+          protocol_data =
+            Operation_data {contents; signature = Some (Bls Signature.Bls.zero)};
+        }
+      in
+      (* Bake a block containing this operation and expect an error *)
+      let*! res =
+        let round_zero = Alpha_context.Round.zero in
+        Block.bake
+          ~policy:(By_round 1)
+          ~payload_round:(Some round_zero)
+          ~locked_round:(Some round_zero)
+          ~operation:aggregate_with_incorrect_signature
+          block
+      in
+      Assert.proto_error ~loc:__LOC__ res signature_invalid_error
+
 let test_attestations_aggregate_non_bls_delegate () =
   let open Lwt_result_syntax in
   let* _genesis, block =
@@ -548,6 +587,10 @@ let tests =
       "test_attestations_aggregate_with_multiple_delegates"
       `Quick
       test_attestations_aggregate_with_multiple_delegates;
+    Tztest.tztest
+      "test_preattestations_aggregate_invalid_signature"
+      `Quick
+      test_preattestations_aggregate_invalid_signature;
     Tztest.tztest
       "test_attestations_aggregate_invalid_signature"
       `Quick
