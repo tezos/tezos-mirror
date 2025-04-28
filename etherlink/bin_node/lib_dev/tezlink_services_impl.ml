@@ -24,38 +24,6 @@ module Path = struct
   let counter contract = account contract ^ "/counter"
 end
 
-let balance read chain c =
-  let `Main = chain in
-
-  Durable_storage.inspect_durable_and_decode_default
-    ~default:Tezos_types.Tez.zero
-    read
-    (Path.balance c)
-    (Data_encoding.Binary.of_bytes_exn Tez.encoding)
-
-let manager_key read chain c =
-  (* TODO: #7831 !17664
-     Support non-default chain and block parameters. *)
-  let `Main = chain in
-
-  Durable_storage.inspect_durable_and_decode_opt
-    read
-    (Path.manager_key c)
-    (Data_encoding.Binary.of_bytes_exn Signature.V1.Public_key.encoding)
-
-let counter read chain c =
-  (* TODO: #7831 !17664
-     Support non-default chain and block parameters. *)
-  let `Main = chain in
-
-  Durable_storage.inspect_durable_and_decode_default
-  (* FIXME: #7960
-     This default should be the global counter *)
-    ~default:Z.one
-    read
-    (Path.counter c)
-    (Data_encoding.Binary.of_bytes_exn Data_encoding.z)
-
 module type Backend = sig
   include Durable_storage.READER
 
@@ -118,11 +86,37 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
     let* state = Backend.get_state ~block () in
     Backend.read state p
 
-  let balance chain block = balance (read ~block) chain
+  let balance chain block c =
+    let `Main = chain in
 
-  let manager_key chain block = manager_key (read ~block) chain
+    Durable_storage.inspect_durable_and_decode_default
+      ~default:Tezos_types.Tez.zero
+      (read ~block)
+      (Path.balance c)
+      (Data_encoding.Binary.of_bytes_exn Tez.encoding)
 
-  let counter chain block = counter (read ~block) chain
+  let manager_key chain block c =
+    (* TODO: #7831 !17664
+       Support non-default chain and block parameters. *)
+    let `Main = chain in
+
+    Durable_storage.inspect_durable_and_decode_opt
+      (read ~block)
+      (Path.manager_key c)
+      (Data_encoding.Binary.of_bytes_exn Signature.V1.Public_key.encoding)
+
+  let counter chain block c =
+    (* TODO: #7831 !17664
+       Support non-default chain and block parameters. *)
+    let `Main = chain in
+
+    Durable_storage.inspect_durable_and_decode_default
+    (* FIXME: #7960
+       This default should be the global counter *)
+      ~default:Z.one
+      (read ~block)
+      (Path.counter c)
+      (Data_encoding.Binary.of_bytes_exn Data_encoding.z)
 
   let header chain block =
     let open Lwt_result_syntax in
