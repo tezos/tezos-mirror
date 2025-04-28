@@ -526,8 +526,8 @@ module Consensus = struct
       [Partial_validation] modes.
 
       Return the slot owner's consensus key and voting power. *)
-  let check_preexisting_block_preattestation vi consensus_info block_info
-      {level; round; block_payload_hash = bph; slot} =
+  let check_preexisting_block_preattestation vi block_info
+      {level; round; block_payload_hash = bph; slot = _} =
     let open Lwt_result_syntax in
     let*? locked_round =
       match block_info.locked_round with
@@ -543,16 +543,13 @@ module Consensus = struct
     let*? () = check_round kind locked_round round in
     let expected_payload_hash = block_info.header_contents.payload_hash in
     let*? () = check_payload_hash kind expected_payload_hash bph in
-    let*? consensus_key, voting_power, _dal_power =
-      get_delegate_details consensus_info.preattestation_slot_map kind slot
-    in
-    return (consensus_key, voting_power)
+    return_unit
 
   (** Preattestation checks for Construction mode.
 
       Return the slot owner's consensus key and voting power. *)
-  let check_constructed_block_preattestation vi consensus_info cons_info
-      {level; round; block_payload_hash = bph; slot} =
+  let check_constructed_block_preattestation vi cons_info
+      {level; round; block_payload_hash = bph; slot = _} =
     let open Lwt_result_syntax in
     let expected_payload_hash = cons_info.header_contents.payload_hash in
     let*? () =
@@ -571,10 +568,7 @@ module Consensus = struct
        however check that all preattestations have the same round in
        [check_construction_preattestation_round_consistency] further below. *)
     let*? () = check_payload_hash kind expected_payload_hash bph in
-    let*? consensus_key, voting_power, _dal_power =
-      get_delegate_details consensus_info.preattestation_slot_map kind slot
-    in
-    return (consensus_key, voting_power)
+    return_unit
 
   (** Preattestation/attestation checks for Mempool mode.
 
@@ -635,7 +629,6 @@ module Consensus = struct
           slot
       in
       return (consensus_key, 0 (* Fake voting power *))
-
   (* We do not check that the frozen deposits are positive because this
      only needs to be true in the context of a block that actually
      contains the operation, which may not be the same as the current
@@ -655,17 +648,33 @@ module Consensus = struct
     let* consensus_key, voting_power =
       match vi.mode with
       | Application block_info | Partial_validation block_info ->
-          check_preexisting_block_preattestation
-            vi
-            consensus_info
-            block_info
-            consensus_content
+          let* () =
+            check_preexisting_block_preattestation
+              vi
+              block_info
+              consensus_content
+          in
+          let*? consensus_key, voting_power, _dal_power =
+            get_delegate_details
+              consensus_info.preattestation_slot_map
+              Preattestation
+              consensus_content.slot
+          in
+          return (consensus_key, voting_power)
       | Construction construction_info ->
-          check_constructed_block_preattestation
-            vi
-            consensus_info
-            construction_info
-            consensus_content
+          let* () =
+            check_constructed_block_preattestation
+              vi
+              construction_info
+              consensus_content
+          in
+          let*? consensus_key, voting_power, _dal_power =
+            get_delegate_details
+              consensus_info.preattestation_slot_map
+              Preattestation
+              consensus_content.slot
+          in
+          return (consensus_key, voting_power)
       | Mempool ->
           check_mempool_consensus
             vi
@@ -1063,6 +1072,40 @@ module Consensus = struct
         in
         return_unit
 
+  let check_preattestations_aggregate_signature info public_keys
+      ({shell; protocol_data = {contents = Single content; signature}} :
+        Kind.preattestations_aggregate Operation.t) =
+    let open Lwt_result_syntax in
+    let (Preattestations_aggregate {consensus_content; _}) = content in
+    let {level; round; block_payload_hash} : consensus_aggregate_content =
+      consensus_content
+    in
+    (* We disable subgroup check (for better performances) since public keys are
+       retreived from the context and assumed valid. *)
+    match Bls.aggregate_public_key_opt ~subgroup_check:false public_keys with
+    | None ->
+        (* This is never supposed to happen since keys are assumed valid. *)
+        tzfail Validate_errors.Consensus.Public_key_aggregation_failure
+    | Some public_keys_aggregate ->
+        (* Reconstructing an attestation to match the content signed by each
+           delegate. The field slot is filled with a dummy value as its not part
+           of the signed payload *)
+        let consensus_content =
+          {slot = Slot.zero; level; round; block_payload_hash}
+        in
+        let contents = Single (Preattestation consensus_content) in
+        let preattestation : Kind.preattestation operation =
+          {shell; protocol_data = {contents; signature}}
+        in
+        let*? () =
+          Operation.check_signature
+            info.ctxt
+            (Bls public_keys_aggregate)
+            info.chain_id
+            preattestation
+        in
+        return_unit
+
   let handle_attestations_aggregate_conflicts
       {info; operation_state; block_state} oph
       ({shell; protocol_data = {contents = Single content; _}} :
@@ -1104,6 +1147,140 @@ module Consensus = struct
         (Operation.committee_slots committee)
     in
     return {info; operation_state; block_state}
+
+  let handle_preattestations_aggregate_conflicts
+      {info; operation_state; block_state} oph
+      ({shell; protocol_data = {contents = Single content; _}} :
+        Kind.preattestations_aggregate operation) =
+    let open Lwt_result_syntax in
+    (* Check for preattestations conflicts and register each operation in the
+       operation state *)
+    let (Preattestations_aggregate {consensus_content; committee}) = content in
+    let {level; round; block_payload_hash} : consensus_aggregate_content =
+      consensus_content
+    in
+    let* operation_state =
+      List.fold_left_es
+        (fun operation_state slot ->
+          let preattestation : Kind.preattestation operation =
+            let consensus_content = {slot; level; round; block_payload_hash} in
+            let contents = Single (Preattestation consensus_content) in
+            {shell; protocol_data = {contents; signature = None}}
+          in
+          let*? () =
+            check_preattestation_conflict operation_state oph preattestation
+            |> wrap_preattestation_conflict
+          in
+          let operation_state =
+            add_preattestation operation_state oph preattestation
+          in
+          return operation_state)
+        operation_state
+        committee
+    in
+    return {info; operation_state; block_state}
+
+  let validate_preattestations_aggregate ~check_signature info operation_state
+      block_state oph
+      ({protocol_data = {contents = Single content; _}; _} as op :
+        Kind.preattestations_aggregate operation) =
+    let open Lwt_result_syntax in
+    match info.mode with
+    | Mempool ->
+        (* Aggregate operations are built at baking time and should not be
+           propagated between mempools. *)
+        tzfail Validate_errors.Consensus.Aggregate_in_mempool
+    | Application _ | Partial_validation _ | Construction _ ->
+        let*? () =
+          (* Aggregates are currently under feature flag *)
+          error_unless
+            (Constants.aggregate_attestation info.ctxt)
+            Validate_errors.Consensus.Aggregate_disabled
+        in
+        let*? consensus_info =
+          Option.value_e
+            ~error:(trace_of_error Consensus_operation_not_allowed)
+            info.consensus_info
+        in
+        let (Preattestations_aggregate {consensus_content; committee}) =
+          content
+        in
+        let {level; round; block_payload_hash} : consensus_aggregate_content =
+          consensus_content
+        in
+        let* () =
+          (* uses a dummy slot value in the following checks *)
+          match info.mode with
+          | Application block_info | Partial_validation block_info ->
+              check_preexisting_block_preattestation
+                info
+                block_info
+                {level; round; block_payload_hash; slot = Slot.zero}
+          | Construction construction_info ->
+              let* () =
+                check_constructed_block_preattestation
+                  info
+                  construction_info
+                  {level; round; block_payload_hash; slot = Slot.zero}
+              in
+              let*? () =
+                check_construction_preattestation_round_consistency
+                  info
+                  block_state
+                  {level; round; block_payload_hash; slot = Slot.zero}
+              in
+              return_unit
+          | Mempool -> return_unit
+        in
+        (* Retrieve public keys and compute total voting power *)
+        let* public_keys, voting_power =
+          List.fold_left_es
+            (fun (public_keys, total_voting_power) slot ->
+              (* Lookup the slot owner *)
+              let*? consensus_key, power, _ =
+                get_delegate_details
+                  consensus_info.preattestation_slot_map
+                  Preattestation
+                  slot
+              in
+              let* () =
+                check_delegate_is_not_forbidden info.ctxt consensus_key.delegate
+              in
+              match consensus_key.consensus_pk with
+              | Bls pk -> return (pk :: public_keys, power + total_voting_power)
+              | _ -> tzfail Validate_errors.Consensus.Non_bls_key_in_aggregate)
+            ([], 0)
+            committee
+        in
+        (* Fail on empty committee *)
+        let*? () =
+          error_when
+            (List.is_empty public_keys)
+            Validate_errors.Consensus.Empty_aggregation_committee
+        in
+        (* Check signature *)
+        let* () =
+          if check_signature then
+            check_preattestations_aggregate_signature info public_keys op
+          else return_unit
+        in
+        (* Check for conflicts and registers the preattestations in the
+           validation state *)
+        let* validation_state =
+          handle_preattestations_aggregate_conflicts
+            {info; operation_state; block_state}
+            oph
+            op
+        in
+        (* Update voting power (uses a dummy slot value) *)
+        let block_state =
+          may_update_locked_round_evidence
+            block_state
+            info.mode
+            {level; round; block_payload_hash; slot = Slot.zero}
+            voting_power
+        in
+        return {validation_state with block_state}
 
   let validate_attestations_aggregate ~check_signature info operation_state
       block_state oph
@@ -3371,7 +3548,13 @@ let validate_operation ?(check_signature = true)
             oph
             operation
       | Single (Preattestations_aggregate _) ->
-          tzfail Validate_errors.Consensus.Aggregate_not_implemented
+          Consensus.validate_preattestations_aggregate
+            ~check_signature
+            info
+            operation_state
+            block_state
+            oph
+            operation
       | Single (Attestations_aggregate _) ->
           Consensus.validate_attestations_aggregate
             ~check_signature
