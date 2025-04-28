@@ -11,8 +11,8 @@ use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_tezlink::{
     operation::{ManagerOperation, Operation, OperationContent},
     operation_result::{
-        produce_operation_result, ApplyOperationError, OperationError,
-        OperationResultSum, Reveal, RevealSuccess, ValidityError,
+        produce_operation_result, ApplyOperationError, ContentResult, OperationError,
+        OperationResult, OperationResultSum, Reveal, RevealSuccess, ValidityError,
     },
 };
 use thiserror::Error;
@@ -160,7 +160,12 @@ pub fn apply_operation<Host: Runtime>(
             let manager_result = produce_operation_result(reveal_result);
             OperationResultSum::Reveal(manager_result)
         }
-        OperationContent::Transfer { .. } => todo!(),
+        OperationContent::Transfer { .. } => {
+            OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![],
+                result: ContentResult::Failed(vec![]),
+            })
+        }
     };
 
     Ok(receipt)

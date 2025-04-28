@@ -68,6 +68,46 @@ pub struct RevealContent {
     pk: PublicKey,
 }
 
+#[derive(PartialEq, Debug, Clone)]
+pub struct Empty;
+
+impl BinWriter for Empty {
+    fn bin_write(&self, _: &mut Vec<u8>) -> tezos_enc::BinResult {
+        Ok(())
+    }
+}
+
+impl NomReader<'_> for Empty {
+    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
+        Ok((input, Self))
+    }
+}
+
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
+pub struct TransferSuccess {
+    pub storage: Option<Empty>,
+    pub lazy_storage_diff: Option<Empty>,
+    pub balance_updates: Vec<BalanceUpdate>,
+    pub ticket_receipt: Vec<Empty>,
+    pub originated_contracts: Vec<Empty>,
+    pub consumed_gas: Narith,
+    pub storage_size: Narith,
+    pub paid_storage_size_diff: Narith,
+    pub allocated_destination_contract: bool,
+}
+
+/// Empty struct to implement [OperationKind] trait for Transfer
+#[derive(PartialEq, Debug)]
+pub struct Transfer;
+
+impl OperationKind for Transfer {
+    type Success = TransferSuccess;
+
+    fn kind() -> Self {
+        Self
+    }
+}
+
 impl OperationKind for Reveal {
     type Success = RevealSuccess;
 
@@ -110,6 +150,7 @@ pub struct OperationResult<M: OperationKind> {
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub enum OperationResultSum {
     Reveal(OperationResult<Reveal>),
+    Transfer(OperationResult<Transfer>),
 }
 
 pub fn produce_operation_result<M: OperationKind>(
