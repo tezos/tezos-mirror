@@ -1159,10 +1159,15 @@ module Encoding = struct
                (varopt "signature" Signature.encoding)))
 
   let dal_content_encoding =
-    obj1 (req "dal_attestation" Dal_attestation_repr.encoding)
+    conv
+      (fun {attestation} -> attestation)
+      (fun attestation -> {attestation})
+      Dal_attestation_repr.encoding
 
   let consensus_content_with_dal_encoding =
-    merge_objs consensus_content_encoding dal_content_encoding
+    merge_objs
+      consensus_content_encoding
+      (obj1 (req "dal_attestation" dal_content_encoding))
 
   (* Precondition: [dal_content = None]. *)
   let attestation_encoding_proj
@@ -1177,10 +1182,10 @@ module Encoding = struct
       (Attestation {consensus_content; dal_content}) =
     match dal_content with
     | None -> assert false
-    | Some dal_content -> (consensus_content, dal_content.attestation)
+    | Some dal_content -> (consensus_content, dal_content)
 
-  let attestation_with_dal_encoding_inj (consensus_content, attestation) =
-    Attestation {consensus_content; dal_content = Some {attestation}}
+  let attestation_with_dal_encoding_inj (consensus_content, dal_content) =
+    Attestation {consensus_content; dal_content = Some dal_content}
 
   let attestation_case =
     Case
@@ -1251,7 +1256,12 @@ module Encoding = struct
   let attestations_aggregate_encoding =
     obj2
       (req "consensus_content" consensus_aggregate_content_encoding)
-      (req "committee" (list Slot_repr.encoding))
+      (req
+         "committee"
+         (list
+            (obj2
+               (req "slot" Slot_repr.encoding)
+               (opt "dal_attestation" dal_content_encoding))))
 
   let attestations_aggregate_case =
     Case
@@ -1264,13 +1274,9 @@ module Encoding = struct
           | Contents (Attestations_aggregate _ as op) -> Some op | _ -> None);
         proj =
           (fun (Attestations_aggregate {consensus_content; committee}) ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/7935
-               Take dal_content into account. *)
-            let committee = tmp_to_old_committee committee in
             (consensus_content, committee));
         inj =
           (fun (consensus_content, committee) ->
-            let committee = tmp_of_old_committee committee in
             Attestations_aggregate {consensus_content; committee});
       }
 

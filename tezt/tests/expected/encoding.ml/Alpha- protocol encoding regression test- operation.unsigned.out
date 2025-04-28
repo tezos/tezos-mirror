@@ -73,17 +73,28 @@
         "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG"
       },
       "committee": [
-        0,
-        23,
-        51,
-        893
+        {
+          "slot": 0
+        },
+        {
+          "slot": 23,
+          "dal_attestation": "2048"
+        },
+        {
+          "slot": 51,
+          "dal_attestation": "0"
+        },
+        {
+          "slot": 893,
+          "dal_attestation": "1"
+        }
       ]
     }
   ]
 }'
-0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81f0000053300000000000000000000000000000000000000000000000000000000000000000000000000000008000000170033037d
+0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81f00000533000000000000000000000000000000000000000000000000000000000000000000000000000000100000000017ff80200033ff00037dff01
 
-./octez-codec decode alpha.operation.unsigned from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81f0000053300000000000000000000000000000000000000000000000000000000000000000000000000000008000000170033037d
+./octez-codec decode alpha.operation.unsigned from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81f00000533000000000000000000000000000000000000000000000000000000000000000000000000000000100000000017ff80200033ff00037dff01
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "attestations_aggregate",
@@ -91,7 +102,10 @@
           { "level": 1331, "round": 0,
             "block_payload_hash":
               "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" },
-        "committee": [ 0, 23, 51, 893 ] } ] }
+        "committee":
+          [ { "slot": 0 }, { "slot": 23, "dal_attestation": "2048" },
+            { "slot": 51, "dal_attestation": "0" },
+            { "slot": 893, "dal_attestation": "1" } ] } ] }
 
 ./octez-codec encode alpha.operation.unsigned from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",

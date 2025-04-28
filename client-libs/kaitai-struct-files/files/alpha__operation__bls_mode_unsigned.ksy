@@ -420,7 +420,31 @@ types:
     - id: committee
       type: committee
       size: len_committee
+  committee_1:
+    seq:
+    - id: committee_entries
+      type: committee_entries_0
+      repeat: eos
+  committee_2:
+    seq:
+    - id: len_committee
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: committee
+      type: committee_1
+      size: len_committee
   committee_entries:
+    seq:
+    - id: slot
+      type: u2be
+    - id: dal_attestation_tag
+      type: u1
+      enum: bool
+    - id: dal_attestation
+      type: z
+      if: (dal_attestation_tag == bool::true)
+  committee_entries_0:
     seq:
     - id: committee_elt
       type: u2be
@@ -908,7 +932,7 @@ types:
     - id: consensus_content
       type: consensus_content
     - id: committee
-      type: committee_0
+      type: committee_2
   price:
     seq:
     - id: id
