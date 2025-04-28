@@ -10013,8 +10013,15 @@ let test_finalized_view_forward_txn =
   in
   let txns = (* respect transaction order *) List.rev txns in
 
-  (* Inject the transactions. *)
-  let* _ = batch_n_transactions ~evm_node:finalized_observer txns in
+  let* _ =
+    Lwt_list.map_s
+      (fun txn ->
+        let add_txn = Evm_node.wait_for_tx_queue_add_transaction sequencer in
+        let* _ = batch_n_transactions ~evm_node:finalized_observer [txn]
+        and* _ = add_txn in
+        unit)
+      txns
+  in
 
   (* Create a block as we have created transactions, check they all
      contain one transaction. This
