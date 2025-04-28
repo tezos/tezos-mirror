@@ -11,8 +11,17 @@ let run_baker ~configuration ~baking_mode ~sources ~cctxt =
   let baking_mode = Baker_args_parser.parse_baking_mode baking_mode in
   let* sources = Baker_args_parser.parse_sources sources in
   let cctxt = new Protocol_client_context.wrap_full cctxt in
-  Baking_commands.run_baker args baking_mode sources cctxt
+  Baking_commands.run_baker
+    ~recommend_agnostic_baker:false
+    args
+    baking_mode
+    sources
+    cctxt
 
 let run_vdf_daemon ~cctxt ~keep_alive =
   let cctxt = new Protocol_client_context.wrap_full cctxt in
-  Client_daemon.VDF.run cctxt ~chain:cctxt#chain ~keep_alive
+  Client_daemon.VDF.run
+    ~recommend_agnostic_baker:false
+    cctxt
+    ~chain:cctxt#chain
+    ~keep_alive
