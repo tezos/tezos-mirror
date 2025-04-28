@@ -487,7 +487,7 @@ let partition_consensus_operations_on_reproposal consensus_operations =
       | ( Single (Attestations_aggregate {consensus_content; committee}),
           Some (Bls signature) ) ->
           let aggregate_opt =
-            Some (shell, consensus_content, committee, signature)
+            Some (shell, consensus_content, committee, signature, operation)
           in
           (aggregate_opt, eligible_attestations, other_operations)
       | _ ->
@@ -517,32 +517,21 @@ let aggregate_attestations_on_proposal attestations =
 
 module SlotSet : Set.S with type elt = Slot.t = Set.Make (Slot)
 
-(* [aggregate_attestations_on_reproposal consensus_operations] replaces all
-   eligible attestations from [consensus_operations] by a single
-   Attestations_aggregate. Attestations are assumed to target the same shell,
-   level, round and block_payload_hash. *)
-let aggregate_attestations_on_reproposal consensus_operations =
+let aggregate_attestations_on_reproposal aggregate_opt eligible_attestations =
   let open Result_syntax in
-  let aggregate_opt, eligible_attestations, other_operations =
-    partition_consensus_operations_on_reproposal consensus_operations
-  in
   match (aggregate_opt, eligible_attestations) with
-  | None, [] -> return other_operations
-  | None, _ :: _ -> (
+  | None, [] -> return_none
+  | None, _ :: _ ->
       (* The proposal did not contain an aggregate. Since additional eligible
          attestations are available, we must aggregate them and include the
          result in the reproposal. *)
-      let* aggregate_opt = aggregate_attestations eligible_attestations in
-      match aggregate_opt with
-      | Some attestations_aggregate ->
-          return (attestations_aggregate :: other_operations)
-      | None -> return other_operations)
-  | Some _, [] -> return consensus_operations
-  | Some (shell, consensus_content, committee, signature), _ :: _ -> (
+      aggregate_attestations eligible_attestations
+  | Some (_, _, _, _, operation), [] -> return_some operation
+  | Some (shell, consensus_content, committee, signature, _), _ :: _ -> (
       (* The proposal already contains an aggregate.
          We must incorporate additional attestations *)
-      (* Build the set of aggregated slots for a logarithmic presence lookup *)
       let aggregated_slots =
+        (* Build the set of aggregated slots for a logarithmic presence lookup *)
         SlotSet.of_list (Operation.committee_slots committee)
       in
       (* Gather slots and signatures incorporating fresh attestations. *)
@@ -573,8 +562,25 @@ let aggregate_attestations_on_reproposal consensus_operations =
           let attestations_aggregate =
             {shell; protocol_data = Operation_data protocol_data}
           in
-          return (attestations_aggregate :: other_operations)
+          return_some attestations_aggregate
       | None -> tzfail Baking_errors.Signature_aggregation_failure)
+
+(* [aggregate_consensus_operations_on_reproposal consensus_operations] replaces all
+   eligible attestations from [consensus_operations] by a single
+   Attestations_aggregate. Attestations are assumed to target the same shell,
+   level, round and block_payload_hash. *)
+let aggregate_consensus_operations_on_reproposal consensus_operations =
+  let open Result_syntax in
+  let aggregate_opt, eligible_attestations, other_operations =
+    partition_consensus_operations_on_reproposal consensus_operations
+  in
+  let* attestations_aggregate_opt =
+    aggregate_attestations_on_reproposal aggregate_opt eligible_attestations
+  in
+  match attestations_aggregate_opt with
+  | Some attestations_aggregate ->
+      return @@ (attestations_aggregate :: other_operations)
+  | None -> return other_operations
 
 (* [forge] a new [unsigned_block] in accordance with [simulation_kind] and
    [simulation_mode] *)
@@ -606,7 +612,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
     | Apply {ordered_pool; payload_hash} ->
         if constants.aggregate_attestation then
           let*? consensus =
-            aggregate_attestations_on_reproposal ordered_pool.consensus
+            aggregate_consensus_operations_on_reproposal ordered_pool.consensus
           in
           let ordered_pool = {ordered_pool with consensus} in
           return (Apply {ordered_pool; payload_hash})
