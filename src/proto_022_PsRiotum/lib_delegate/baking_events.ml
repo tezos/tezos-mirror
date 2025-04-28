@@ -590,6 +590,14 @@ module Node_rpc = struct
       ~msg:"error while monitoring valid proposals {trace}"
       ~pp1:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
+
+  let chain_id =
+    declare_1
+      ~section
+      ~name:"node_chain_id"
+      ~level:Info
+      ~msg:"Running baker with chain id: {chain_id}"
+      ("chain_id", Chain_id.encoding)
 end
 
 module Delegates = struct
