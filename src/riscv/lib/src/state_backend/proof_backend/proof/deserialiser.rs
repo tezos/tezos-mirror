@@ -145,3 +145,205 @@ pub trait FromProof {
 
     fn from_proof<D: Deserialiser>(de: D) -> Result<D::Suspended<Self::Output>>;
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::Deserialiser;
+    use super::DeserialiserNode;
+    use super::Partial;
+    use super::Result;
+    use super::Suspended;
+    use crate::state_backend::ProofTree;
+    use crate::state_backend::proof_backend::proof::MerkleProof;
+    use crate::state_backend::proof_backend::proof::MerkleProofLeaf;
+    use crate::state_backend::proof_backend::proof::deserialise_owned::ProofTreeDeserialiser;
+    use crate::state_backend::proof_backend::proof::deserialiser::DeserError;
+    use crate::storage::Hash;
+
+    fn create_computation<D: Deserialiser>(
+        proof: D,
+    ) -> Result<<D as Deserialiser>::Suspended<i32>> {
+        // The tree structure:
+        // Node (root)
+        // ├── Leaf (type: Hash)
+        // └── Node
+        //     └── Leaf (type: i32)
+
+        // Computation: return the value of the nested leaf
+
+        let ctx = proof.into_node()?;
+        let r = ctx
+            .next_branch(|br_proof| br_proof.into_leaf::<Hash>())?
+            .map(|(_node_parse, br)| br)
+            .next_branch(|br_proof| {
+                br_proof
+                    .into_node()?
+                    .next_branch(|pr| pr.into_leaf::<i32>())?
+                    .map(|(_node_parse, br)| br)
+                    .done()
+            })?
+            .done()?;
+
+        Ok(r.map(|(_left, right)| match right {
+            Partial::Absent => 0,
+            // This blinded hash can be of the nested leaf or the root
+            Partial::Blinded(_hash) => -1,
+            Partial::Present(nr) => nr,
+        }))
+    }
+
+    fn create_computation_2<D: Deserialiser>(
+        proof: D,
+    ) -> Result<<D as Deserialiser>::Suspended<i32>> {
+        // The tree structure
+        // Node (root)
+        // ├── Leaf 1 (type: i32)
+        // ├── Leaf 2 (type: i32)
+        // ├── Leaf 3 (type: i32)
+        // └── Leaf 4 (type: i32)
+
+        // Computation: sum the non-blinded leaves
+
+        let mut ctx = proof
+            .into_node()?
+            .map(|data| data.map_present(|_| Vec::<i32>::new()));
+
+        for _ in 0..4 {
+            ctx = ctx
+                .next_branch(|br_proof| br_proof.into_leaf::<i32>())?
+                .map(|(acc, val)| {
+                    acc.map_present(|mut acc| {
+                        if let Partial::Present(val) = val {
+                            acc.push(val);
+                        }
+                        acc
+                    })
+                })
+        }
+
+        Ok(ctx.done()?.map(|data| match data {
+            Partial::Absent => 0,
+            Partial::Blinded(_hash) => -1,
+            Partial::Present(data) => data.into_iter().sum(),
+        }))
+    }
+
+    #[test]
+    fn test_absent_computation() {
+        // Root is absent already
+        let proof: ProofTreeDeserialiser = ProofTree::Absent.into();
+        let comp_fn = create_computation(proof).unwrap();
+        assert_eq!(comp_fn.into_result(), 0);
+
+        // We expect to get the Absent case since the father of the nested node is blinded
+        let merkle_proof = MerkleProof::Node(vec![
+            MerkleProof::Leaf(MerkleProofLeaf::Read(
+                // Note, this is a Read leaf, not a blinded one
+                Hash::blake2b_hash_bytes(&[0, 1, 2])
+                    .unwrap()
+                    .as_ref()
+                    .to_vec(),
+            )),
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(
+                Hash::blake2b_hash_bytes(&[3, 4, 5]).unwrap(),
+            )),
+        ]);
+        let proof: ProofTreeDeserialiser = ProofTree::Present(&merkle_proof).into();
+        let comp_fn = create_computation(proof).unwrap();
+        assert_eq!(comp_fn.into_result(), 0);
+    }
+
+    #[test]
+    fn test_blind_computation() {
+        // The nested leaf is blinded
+        let absent_shape = MerkleProof::Node(vec![
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(
+                Hash::blake2b_hash_bytes(&[0, 1, 2]).unwrap(),
+            )),
+            MerkleProof::Node(vec![MerkleProof::Leaf(MerkleProofLeaf::Blind(
+                Hash::blake2b_hash_bytes(&[0, 1, 2]).unwrap(),
+            ))]),
+        ]);
+        let comp_fn =
+            create_computation::<ProofTreeDeserialiser>(ProofTree::Present(&absent_shape).into());
+
+        let res = comp_fn.unwrap().into_result();
+
+        assert_eq!(res, -1);
+
+        // For computation_2, the provided merkle proof will resolve as blinded
+        // since root is blinded
+        let merkle_proof = MerkleProof::Leaf(MerkleProofLeaf::Blind(
+            Hash::blake2b_hash_bytes(&[6, 7, 8]).unwrap(),
+        ));
+        let proof: ProofTreeDeserialiser = ProofTree::Present(&merkle_proof).into();
+        let comp_fn = create_computation_2(proof).unwrap();
+        assert_eq!(comp_fn.into_result(), -1);
+    }
+
+    #[test]
+    fn test_bad_structure() {
+        let bad_shape_1 = MerkleProof::Node(vec![]);
+        let bad_shape_2 = MerkleProof::Node(vec![
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(
+                Hash::blake2b_hash_bytes(&[0, 1, 2]).unwrap(),
+            )),
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(
+                Hash::blake2b_hash_bytes(&[0, 1, 2]).unwrap(),
+            )),
+            MerkleProof::Node(vec![]),
+            MerkleProof::Node(vec![]),
+            MerkleProof::Node(vec![]),
+        ]);
+        let bad_shape_3 = MerkleProof::Node(vec![
+            MerkleProof::Node(vec![]),
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(
+                Hash::blake2b_hash_bytes(&[0, 1, 2]).unwrap(),
+            )),
+        ]);
+        // Tree is missing branches
+        let comp_fn =
+            create_computation::<ProofTreeDeserialiser>(ProofTree::Present(&bad_shape_1).into());
+        assert!(comp_fn.is_err_and(|e| matches!(e, DeserError::BadNumberOfBranches { .. })));
+        let comp_fn =
+            create_computation::<ProofTreeDeserialiser>(ProofTree::Present(&bad_shape_2).into());
+        // First 2 children of root are ok in shape (blinded) but the total number of children does not correspond
+        // Ideally, we would like to have expected: 2, got: 5, but the implemenetation for `ProofTreeDeserialiser`
+        // does not track this information (the original number of chilren)
+        assert!(comp_fn.is_err_and(|e| {
+            println!("{e:?}");
+            matches!(e, DeserError::BadNumberOfBranches {
+                expected: 0,
+                got: 3
+            })
+        }));
+        let comp_fn =
+            create_computation::<ProofTreeDeserialiser>(ProofTree::Present(&bad_shape_3).into());
+        // The first child is a node, but is expected to be a leaf
+        assert!(comp_fn.is_err_and(|e| matches!(e, DeserError::UnexpectedNode)));
+    }
+
+    #[test]
+    fn test_absent_node_parsing() {}
+
+    #[test]
+    fn test_valid_computation() {
+        let merkleproof = MerkleProof::Node(vec![
+            MerkleProof::Leaf(MerkleProofLeaf::Read(
+                0x140A_0000_i32.to_le_bytes().to_vec(),
+            )),
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(
+                Hash::blake2b_hash_bytes(&[3, 4, 5]).unwrap(),
+            )),
+            MerkleProof::Leaf(MerkleProofLeaf::Read(0xC0005_i32.to_le_bytes().to_vec())),
+            MerkleProof::Leaf(MerkleProofLeaf::Blind(
+                Hash::blake2b_hash_bytes(&[9, 10, 11]).unwrap(),
+            )),
+        ]);
+
+        let proof: ProofTreeDeserialiser = ProofTree::Present(&merkleproof).into();
+        let comp_fn = create_computation_2(proof).unwrap();
+        assert_eq!(comp_fn.into_result(), 0x140A_0000 + 0xC0005);
+    }
+}
