@@ -235,23 +235,23 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
 
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
 
-  let* chain_family =
+  let* l2_chain_id, chain_family =
     match (config.experimental_features.l2_chains, enable_multichain) with
-    | None, false -> return EVM
+    | None, false -> return (None, EVM)
     | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
-    | Some [_], false ->
+    | Some [l2_chain], false ->
         let*! () = Events.multichain_node_singlechain_kernel () in
-        return EVM
+        return (Some l2_chain.chain_id, EVM)
     | Some [l2_chain], true ->
-        let* chain_family =
-          Evm_ro_context.read_chain_family ro_ctxt l2_chain.chain_id
-        in
-        if l2_chain.chain_family = chain_family then return chain_family
+        let chain_id = l2_chain.chain_id in
+        let* chain_family = Evm_ro_context.read_chain_family ro_ctxt chain_id in
+        if l2_chain.chain_family = chain_family then
+          return (Some chain_id, chain_family)
         else
           tzfail
             (Node_error.Mismatched_chain_family
                {
-                 chain_id = l2_chain.chain_id;
+                 chain_id;
                  node_family = l2_chain.chain_family;
                  kernel_family = chain_family;
                })
@@ -260,6 +260,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
 
   let* finalizer_public_server =
     Rpc_server.start_public_server
+      ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
       ~data_dir

@@ -268,8 +268,8 @@ let build_block_dir (module Backend : Tezlink_backend_sig.S) =
        ~impl:(fun {block; chain} () () -> Backend.constants chain block)
        ~convert_output:Tezlink_constants.convert
 
-(** Builds the root director. *)
-let build_dir backend =
+(** Builds the root directory. *)
+let build_dir ~l2_chain_id backend =
   let helper_dir = build_block_dir backend in
   let root_directory =
     Tezos_rpc.Directory.prefix
@@ -286,8 +286,8 @@ let build_dir backend =
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
 (* module entrypoint *)
-let register_tezlink_services backend =
-  let directory = build_dir backend in
+let register_tezlink_services ~l2_chain_id backend =
+  let directory = build_dir ~l2_chain_id backend in
   let directory =
     Tezos_rpc.Directory.register_describe_directory_service
       directory

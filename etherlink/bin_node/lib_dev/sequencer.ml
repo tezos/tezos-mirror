@@ -364,6 +364,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
   let* finalizer_public_server =
     Rpc_server.start_public_server
+      ~l2_chain_id:None
       ~evm_services:
         Evm_ro_context.(
           evm_services_methods ro_ctxt sequencer_config.time_between_blocks)
