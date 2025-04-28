@@ -19,7 +19,8 @@
 
 - Adds `--private-rpc-port` to `run observer` to enable the private RPC server
   from command-line. (!17762)
-
+- Adds `--replicate` to `run sandbox` to provide an easy way to make local
+  tests on a local endpoint with realistic traffic. (!17845)
 - Previously when submitting the same transaction multiple times, if
   the first fails to be included by the sequencer then all following
   will fails. Now when submitting multiple time the same transaction,

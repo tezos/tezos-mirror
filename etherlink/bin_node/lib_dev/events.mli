@@ -171,3 +171,7 @@ val import_finished : unit -> unit Lwt.t
     explicitly mentions the time elapsed since the extraction started. *)
 val import_snapshot_archive_in_progress :
   archive_name:string -> elapsed_time:Time.System.Span.t -> unit Lwt.t
+
+(** [replicate_transaction_dropped hash reason] advertises that the transaction
+    [hash] was dropped because it is now invalid in the sandbox. *)
+val replicate_transaction_dropped : Ethereum_types.hash -> string -> unit Lwt.t

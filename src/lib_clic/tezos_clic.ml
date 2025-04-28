@@ -110,6 +110,7 @@ type ('a, 'ctx) arg =
       placeholder : string;
       kind : ('p, 'ctx) parameter;
       default : string;
+      pp_default : (Format.formatter -> unit) option;
     }
       -> ('p option, 'ctx) arg
   | Switch : {label : label; doc : string} -> (bool, 'ctx) arg
@@ -258,7 +259,15 @@ let rec print_options_detailed :
         placeholder
         print_desc
         doc
-  | ArgDefSwitch {label; placeholder; doc; default; _} ->
+  | ArgDefSwitch {label; placeholder; doc; default; pp_default; _} ->
+      let pp_default =
+        match pp_default with
+        | Some pp -> fun fmt _s -> pp fmt
+        | None -> Format.pp_print_string
+      in
+      let doc =
+        Format.asprintf "%s\nDefaults to `%a`." doc pp_default default
+      in
       Format.fprintf
         ppf
         "@[<hov 2>@{<opt>%a [%s]@}: %a@]"
@@ -266,7 +275,7 @@ let rec print_options_detailed :
         label
         placeholder
         print_desc
-        (doc ^ "\nDefaults to `" ^ default ^ "`.")
+        doc
   | Switch {label; doc} ->
       Format.fprintf
         ppf
@@ -886,8 +895,9 @@ let default_arg ~doc ?short ~long ~placeholder ~default ?pp_default ?env kind =
   DefArg
     {doc; placeholder; label = {long; short}; kind; env; default; pp_default}
 
-let arg_or_switch ~doc ?short ~long ~placeholder ~default kind =
-  ArgDefSwitch {doc; placeholder; label = {long; short}; kind; default}
+let arg_or_switch ~doc ?short ~long ~placeholder ~default ?pp_default kind =
+  ArgDefSwitch
+    {doc; placeholder; label = {long; short}; kind; default; pp_default}
 
 let map_arg ~f:converter spec = Map {spec; converter}
 
