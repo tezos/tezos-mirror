@@ -30,6 +30,42 @@ module Events = Baking_events.Actions
 
 module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
+type error +=
+  | Unexpected_signature_type of Signature.t
+  | Missing_bls_companion_key_for_dal of Baking_state.Key.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Baking_actions.unexpected_signature_type"
+    ~title:"Unexpected signature type"
+    ~description:"Signature should be a BLS signature."
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "Signature should be a BLS signature %a."
+        Signature.pp
+        s)
+    Data_encoding.(obj1 (req "signature" Signature.encoding))
+    (function Unexpected_signature_type s -> Some s | _ -> None)
+    (fun s -> Unexpected_signature_type s) ;
+  register_error_kind
+    `Permanent
+    ~id:"Baking_actions.Missing_bls_companion_key_for_dal"
+    ~title:"Missing a BLS companion key for DAL attestations"
+    ~description:
+      "The consensus key is a BLS key but is missing a companion key, so it \
+       cannot sign a DAL attestation."
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "Expected a BLS companion key for the consensus key %a."
+        Baking_state.Key.pp
+        s)
+    Data_encoding.(obj1 (req "consensus_key" Baking_state.Key.encoding))
+    (function Missing_bls_companion_key_for_dal ck -> Some ck | _ -> None)
+    (fun ck -> Missing_bls_companion_key_for_dal ck)
+
 module Operations_source = struct
   type error +=
     | Failed_operations_fetch of {
@@ -690,15 +726,59 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
   let unsigned_operation_bytes =
     Data_encoding.Binary.to_bytes_exn encoding unsigned_operation
   in
-  let sk_uri = delegate.consensus_key.secret_key_uri in
-  let* signature =
+  let sk_consensus_uri = delegate.consensus_key.secret_key_uri in
+  let* consensus_sig =
     sign
       ?timeout:global_state.config.remote_calls_timeout
       ~signing_request
       cctxt
       ~watermark
-      sk_uri
+      sk_consensus_uri
       unsigned_operation_bytes
+  in
+  let* signature =
+    if not bls_mode then return consensus_sig
+    else
+      match dal_content with
+      | None -> return consensus_sig
+      | Some {attestation = dal_attestation} -> (
+          let* companion_key =
+            match delegate.companion_key with
+            | None ->
+                tzfail
+                  (Missing_bls_companion_key_for_dal delegate.consensus_key)
+            | Some companion_key -> return companion_key
+          in
+          let sk_companion_uri = companion_key.secret_key_uri in
+          let* companion_sig =
+            sign
+              ?timeout:global_state.config.remote_calls_timeout
+              ~signing_request
+              cctxt
+              ~watermark
+              sk_companion_uri
+              unsigned_operation_bytes
+          in
+          match (consensus_sig, companion_sig) with
+          (* This if-else branch is for BLS mode so both signatures
+             should be BLS signatures *)
+          | Signature.Bls consensus_sig, Signature.Bls companion_sig -> (
+              let dal_dependent_bls_sig_opt =
+                Alpha_context.Dal.Attestation.Dal_dependent_signing
+                .aggregate_sig
+                  ~subgroup_check:false
+                  ~consensus_sig
+                  ~companion_sig
+                  dal_attestation
+              in
+              match dal_dependent_bls_sig_opt with
+              | None -> tzfail Baking_errors.Signature_aggregation_failure
+              | Some dal_dependent_bls_sig_opt ->
+                  return (Signature.Bls dal_dependent_bls_sig_opt : Signature.t)
+              )
+          | Signature.Bls _, _ ->
+              tzfail (Unexpected_signature_type companion_sig)
+          | _ -> tzfail (Unexpected_signature_type consensus_sig))
   in
   let protocol_data = Operation_data {contents; signature = Some signature} in
   let signed_operation : Operation.packed = {shell; protocol_data} in

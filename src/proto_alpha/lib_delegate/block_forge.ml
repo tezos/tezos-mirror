@@ -26,19 +26,6 @@
 open Protocol
 open Alpha_context
 
-type error += Signature_aggregation_failure
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"Block_forge.signature_aggregation_failure"
-    ~title:"Signature aggregation failure"
-    ~description:"Signature aggregation failed."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Signature aggregation failed.")
-    Data_encoding.unit
-    (function Signature_aggregation_failure -> Some () | _ -> None)
-    (fun () -> Signature_aggregation_failure)
-
 type unsigned_block = {
   unsigned_block_header : Block_header.t;
   operations : Tezos_base.Operation.t list list;
@@ -450,7 +437,7 @@ let aggregate_attestations eligible_attestations =
           in
           let protocol_data = {contents; signature = Some (Bls signature)} in
           return (Some {shell; protocol_data = Operation_data protocol_data})
-      | None -> tzfail Signature_aggregation_failure)
+      | None -> tzfail Baking_errors.Signature_aggregation_failure)
 
 (* [partition_consensus_operations_on_proposal operations] partitions consensus
    operations as follows :
@@ -582,7 +569,7 @@ let aggregate_attestations_on_reproposal consensus_operations =
             {shell; protocol_data = Operation_data protocol_data}
           in
           return (attestations_aggregate :: other_operations)
-      | None -> tzfail Signature_aggregation_failure)
+      | None -> tzfail Baking_errors.Signature_aggregation_failure)
 
 (* [forge] a new [unsigned_block] in accordance with [simulation_kind] and
    [simulation_mode] *)
