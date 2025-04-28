@@ -985,11 +985,11 @@ let get_previous_protocol_constants ctxt =
              context."
       | Some constants -> return constants)
 
-(* Start of code to remove at r022 automatic protocol snapshot *)
+(* Start of code to remove at next automatic protocol snapshot *)
 
-(* Please add here any code that should be removed at the r022 automatic protocol snapshot *)
+(* Please add here any code that should be removed at the next automatic protocol snapshot *)
 
-(* End of code to remove at r022 automatic protocol snapshot *)
+(* End of code to remove at next automatic protocol snapshot *)
 
 (* You should ensure that if the type `Constants_parametric_repr.t` is
    different from `Constants_parametric_previous_repr.t` or the value of these

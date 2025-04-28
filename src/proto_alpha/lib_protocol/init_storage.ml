@@ -122,9 +122,9 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   let* ctxt = Adaptive_issuance_storage.set_adaptive_issuance_enable ctxt in
   Storage.Pending_migration.remove ctxt
 
-(* Start of code to remove at r022 automatic protocol snapshot *)
+(* Start of code to remove at next automatic protocol snapshot *)
 
-(* Please add here any code that should be removed at the r022 automatic protocol snapshot *)
+(* Please add here any code that should be removed at the next automatic protocol snapshot *)
 let update_delegate_sampler_state_value_type_from_R_to_S ctxt =
   let open Lwt_result_syntax in
   Storage.Delegate_sampler_state_up_to_R.fold
@@ -148,7 +148,7 @@ let update_delegate_sampler_state_value_type_from_R_to_S ctxt =
       let* ctxt = Storage.Delegate_sampler_state.update ctxt cycle sampler in
       return ctxt)
 
-(* End of code to remove at r022 automatic protocol snapshot *)
+(* End of code to remove at next automatic protocol snapshot *)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
