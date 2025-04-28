@@ -1437,67 +1437,36 @@ module Monitoring_app = struct
       loop [] (n, l)
 
     let get_current_cycle endpoint =
-      let* json =
-        RPC_core.call
-          endpoint
-          (RPC_core.make
-             GET
-             ["chains"; "main"; "blocks"; "head"; "helpers"; "current_level"]
-             Fun.id)
+      let* {cycle; _} =
+        RPC_core.call endpoint (RPC.get_chain_block_helper_current_level ())
       in
-      JSON.(json |-> "cycle" |> as_int) |> Lwt.return
+      Lwt.return cycle
 
     let get_bakers_with_staking_power endpoint cycle =
-      let* json =
-        RPC_core.call
-          endpoint
-          (RPC_core.make
-             GET
-             [
-               "chains";
-               "main";
-               "blocks";
-               "head";
-               "context";
-               "raw";
-               "json";
-               "cycle";
-               string_of_int cycle;
-               "selected_stake_distribution";
-             ]
-             Fun.id)
-      in
-      let bakers_with_pow = JSON.(json |> as_list) in
-      Lwt.return
-      @@ List.map
-           JSON.(
-             fun baker_with_pow ->
-               let active_stake = baker_with_pow |-> "active_stake" in
-               let frozen_stake = active_stake |-> "frozen" |> as_int in
-               let delegated_stake = active_stake |-> "delegated" |> as_int in
-               ( baker_with_pow |-> "baker" |> as_string,
-                 frozen_stake + delegated_stake ))
-           bakers_with_pow
+      RPC_core.call endpoint (RPC.get_stake_distribution ~cycle ())
 
     let fetch_bakers_info endpoint =
       let* cycle = get_current_cycle endpoint in
       let* bakers = get_bakers_with_staking_power endpoint cycle in
       let total_baking_power =
-        List.fold_left (fun acc (_, pow) -> acc + pow) 0 bakers
+        List.fold_left
+          (fun acc RPC.{baking_power; _} -> acc + baking_power)
+          0
+          bakers
       in
       let* bakers_info =
         Lwt_list.filter_map_p
-          (fun (address, baking_power) ->
+          (fun RPC.{delegate; baking_power} ->
             let* info =
               fetch_baker_info
-                ~origin:(Format.sprintf "fetch_baker_info.%s" address)
-                ~tz1:address
+                ~origin:(Format.sprintf "fetch_baker_info.%s" delegate)
+                ~tz1:delegate
             in
             let baking_ratio =
               float_of_int baking_power /. float_of_int total_baking_power
             in
-            let alias = Hashtbl.find_opt aliases address in
-            Lwt.return_some (`address address, `alias alias, info, baking_ratio))
+            let alias = Hashtbl.find_opt aliases delegate in
+            Lwt.return_some (`address delegate, `alias alias, info, baking_ratio))
           bakers
       in
       let rec classify_bakers mute_bakers dal_on dal_off = function

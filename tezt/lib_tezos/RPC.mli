@@ -1443,3 +1443,8 @@ val nonexistent_path : JSON.t t
     [block] defaults to ["head"]. *)
 val get_chain_block_context_denunciations :
   ?chain:string -> ?block:string -> unit -> JSON.t t
+
+type baker_with_power = {delegate : string; baking_power : int}
+
+val get_stake_distribution :
+  ?chain:string -> ?block:string -> cycle:int -> unit -> baker_with_power list t

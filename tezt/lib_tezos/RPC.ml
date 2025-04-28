@@ -1945,3 +1945,34 @@ let nonexistent_path = make GET ["nonexistent"; "path"] Fun.id
 let get_chain_block_context_denunciations ?(chain = "main") ?(block = "head") ()
     =
   make GET ["chains"; chain; "blocks"; block; "context"; "denunciations"] Fun.id
+
+type baker_with_power = {delegate : string; baking_power : int}
+
+let get_stake_distribution ?(chain = "main") ?(block = "head") ~cycle () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "raw";
+      "json";
+      "cycle";
+      string_of_int cycle;
+      "selected_stake_distribution";
+    ]
+  @@ fun json ->
+  let bakers_with_pow = JSON.(json |> as_list) in
+  List.map
+    JSON.(
+      fun baker_with_pow ->
+        let active_stake = baker_with_pow |-> "active_stake" in
+        let frozen_stake = active_stake |-> "frozen" |> as_int in
+        let delegated_stake = active_stake |-> "delegated" |> as_int in
+        {
+          delegate = baker_with_pow |-> "baker" |> as_string;
+          baking_power = frozen_stake + delegated_stake;
+        })
+    bakers_with_pow
