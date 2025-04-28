@@ -116,53 +116,6 @@ where
     MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
-    /// Loads a double-word (8 bytes) starting from address given by: `imm`.
-    ///
-    /// Relevant opcodes:
-    /// - `LD`
-    pub fn run_ld(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
-        let value: i64 = self.read_from_bus(imm, rs1)?;
-        // i64 as u64 is a no-op
-        self.hart.xregisters.write(rd, value as u64);
-        Ok(())
-    }
-
-    /// Loads a word (4 bytes) starting from address given by: val(rs1) + imm
-    /// NOTE: For RV64I the value is sign-extended to 64 bits
-    ///
-    /// Relevant opcodes:
-    /// - `LW`
-    pub fn run_lw(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
-        let value: i32 = self.read_from_bus(imm, rs1)?;
-        // i32 as u64 sign-extends to 64 bits
-        self.hart.xregisters.write(rd, value as u64);
-        Ok(())
-    }
-
-    /// Loads a half-word (2 bytes) starting from address given by: val(rs1) + imm
-    /// sign-extending the result
-    ///
-    /// Relevant opcodes:
-    /// - `LH`
-    pub fn run_lh(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
-        let value: i16 = self.read_from_bus(imm, rs1)?;
-        // i16 as u64 sign-extends to 64 bits
-        self.hart.xregisters.write(rd, value as u64);
-        Ok(())
-    }
-
-    /// Loads a single byte from the address given by: `val(rs1) + imm` and
-    /// sign-extending the result
-    ///
-    /// Relevant opcodes:
-    /// - `LB`
-    pub fn run_lb(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
-        let value: i8 = self.read_from_bus(imm, rs1)?;
-        // i8 as u64 sign-extends to 64 bits
-        self.hart.xregisters.write(rd, value as u64);
-        Ok(())
-    }
-
     /// `LWU` I-type instruction
     ///
     /// Loads a word (4 bytes) starting from address given by: val(rs1) + imm
@@ -245,6 +198,8 @@ mod tests {
     use proptest::proptest;
 
     use crate::backend_test;
+    use crate::instruction_context::LoadStoreWidth;
+    use crate::interpreter::load_store::run_load;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::a0;
@@ -493,10 +448,10 @@ mod tests {
 
                 match signed {
                     true => {
-                        state.run_ld(0, t0, t4)?;
-                        state.run_lw(8, t0, t3)?;
-                        state.run_lh(12, t0, t2)?;
-                        state.run_lb(14, t0, t1)?;
+                        run_load(&mut *state, 0, t0, t4, true, LoadStoreWidth::Double)?;
+                        run_load(&mut *state, 8, t0, t3, true, LoadStoreWidth::Word)?;
+                        run_load(&mut *state, 12, t0, t2, true, LoadStoreWidth::Half)?;
+                        run_load(&mut *state, 14, t0, t1, true, LoadStoreWidth::Byte)?;
                         assert_eq!(state.hart.xregisters.read(t4), v_4);
                         // Converting the expected result we are also checking the sign-extension behaviour
                         assert_eq!(state.hart.xregisters.read(t3), v_3 as i32 as u64);
@@ -505,10 +460,10 @@ mod tests {
                         Ok(())
                     },
                     false => {
-                        state.run_ld(0, t0, t4)?;
-                        state.run_lwu(8, t0, t3)?;
-                        state.run_lhu(12, t0, t2)?;
-                        state.run_lbu(14, t0, t1)?;
+                        run_load(&mut *state, 0, t0, t4, true, LoadStoreWidth::Double)?;
+                        run_load(&mut *state, 8, t0, t3, false, LoadStoreWidth::Word)?;
+                        run_load(&mut *state, 12, t0, t2, false, LoadStoreWidth::Half)?;
+                        run_load(&mut *state, 14, t0, t1, false, LoadStoreWidth::Byte)?;
                         assert_eq!(state.hart.xregisters.read(t4), v_4);
                         // Converting the expected result we are also checking the sign-extension behaviour
                         assert_eq!(state.hart.xregisters.read(t3), v_3 as u64);

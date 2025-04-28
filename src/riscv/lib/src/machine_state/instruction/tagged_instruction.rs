@@ -397,13 +397,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | BranchLessThanOrEqualZero
         | BranchGreaterThanZero
         | JalrImm
-        | Ldnz
         | Sdnz
-        | Lwnz
         | Swnz
-        | Lhnz
         | Shnz
-        | Lbnz
         | Sbnz
         | Nop
         | ECall
