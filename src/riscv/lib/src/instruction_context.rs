@@ -11,7 +11,6 @@ pub(super) mod arithmetic;
 
 use arithmetic::Arithmetic;
 
-use crate::machine_state::AccessType;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Args;
@@ -297,16 +296,14 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
         value: Self::XValue,
         width: LoadStoreWidth,
     ) -> Self::IResult<()> {
-        let phys_address = self.translate(address, AccessType::Store)?;
-
         let res = match width {
-            LoadStoreWidth::Byte => self.main_memory.write::<u8>(phys_address, value as u8),
-            LoadStoreWidth::Half => self.main_memory.write::<u16>(phys_address, value as u16),
-            LoadStoreWidth::Word => self.main_memory.write::<u32>(phys_address, value as u32),
-            LoadStoreWidth::Double => self.main_memory.write::<u64>(phys_address, value),
+            LoadStoreWidth::Byte => self.main_memory.write::<u8>(address, value as u8),
+            LoadStoreWidth::Half => self.main_memory.write::<u16>(address, value as u16),
+            LoadStoreWidth::Word => self.main_memory.write::<u32>(address, value as u32),
+            LoadStoreWidth::Double => self.main_memory.write::<u64>(address, value),
         };
 
-        res.map_err(|_: BadMemoryAccess| Exception::StoreAMOAccessFault(phys_address))
+        res.map_err(|_: BadMemoryAccess| Exception::StoreAMOAccessFault(address))
     }
 
     #[inline(always)]
@@ -316,34 +313,29 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
         signed: bool,
         width: LoadStoreWidth,
     ) -> Self::IResult<Self::XValue> {
-        let phys_address = self.translate(address, AccessType::Load)?;
-
         let res = match (signed, width) {
-            (true, LoadStoreWidth::Byte) => self
-                .main_memory
-                .read::<u8>(phys_address)
-                .map(|v| v as i8 as u64),
+            (true, LoadStoreWidth::Byte) => {
+                self.main_memory.read::<u8>(address).map(|v| v as i8 as u64)
+            }
             (true, LoadStoreWidth::Half) => self
                 .main_memory
-                .read::<u16>(phys_address)
+                .read::<u16>(address)
                 .map(|v| v as i16 as u64),
             (true, LoadStoreWidth::Word) => self
                 .main_memory
-                .read::<u32>(phys_address)
+                .read::<u32>(address)
                 .map(|v| v as i32 as u64),
-            (_, LoadStoreWidth::Double) => self.main_memory.read::<u64>(phys_address),
-            (false, LoadStoreWidth::Byte) => {
-                self.main_memory.read::<u8>(phys_address).map(|v| v as u64)
-            }
+            (_, LoadStoreWidth::Double) => self.main_memory.read::<u64>(address),
+            (false, LoadStoreWidth::Byte) => self.main_memory.read::<u8>(address).map(|v| v as u64),
             (false, LoadStoreWidth::Half) => {
-                self.main_memory.read::<u16>(phys_address).map(|v| v as u64)
+                self.main_memory.read::<u16>(address).map(|v| v as u64)
             }
             (false, LoadStoreWidth::Word) => {
-                self.main_memory.read::<u32>(phys_address).map(|v| v as u64)
+                self.main_memory.read::<u32>(address).map(|v| v as u64)
             }
         };
 
-        res.map_err(|_: BadMemoryAccess| Exception::LoadAccessFault(phys_address))
+        res.map_err(|_: BadMemoryAccess| Exception::LoadAccessFault(address))
     }
 }
 

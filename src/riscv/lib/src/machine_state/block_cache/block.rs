@@ -249,6 +249,10 @@ impl<MC: MemoryConfig, M: ManagerClone> Clone for Interpreted<MC, M> {
 ///
 /// Internally, this may be interpreted, just-in-time compiled, or do
 /// additional work over just execution.
+#[expect(
+    improper_ctypes_definitions,
+    reason = "The receiving functions know the layout of the referenced types"
+)]
 pub type DispatchFn<D, MC, M> = unsafe extern "C" fn(
     &mut Jitted<D, MC, M>,
     &mut MachineCoreState<MC, M>,

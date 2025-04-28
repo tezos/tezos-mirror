@@ -10,7 +10,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use enum_tag::EnumTag;
-use octez_riscv::machine_state::AccessType;
 use octez_riscv::machine_state::memory::Address;
 use octez_riscv::machine_state::memory::Memory;
 use octez_riscv::parser::instruction::Instr;
@@ -42,12 +41,9 @@ where
 {
     let machine_state = stepper.machine_state();
     let get_half_instr = |raw_pc: Address| -> Result<u16, InstrGetError> {
-        let pc = machine_state
-            .translate_without_cache(raw_pc, AccessType::Instruction)
-            .or(Err(InstrGetError::Translation))?;
         machine_state
             .main_memory
-            .read(pc)
+            .read(raw_pc)
             .or(Err(InstrGetError::Parse))
     };
     let pc = machine_state.hart.pc.read();

@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::machine_state::AccessType;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory;
 use crate::machine_state::memory::BadMemoryAccess;
@@ -22,8 +21,6 @@ where
         &mut self,
         address: u64,
     ) -> Result<T, Exception> {
-        let address = self.translate(address, AccessType::Load)?;
-
         self.main_memory
             .read(address)
             .map_err(|_: BadMemoryAccess| Exception::LoadAccessFault(address))
@@ -45,8 +42,6 @@ where
         address: u64,
         value: T,
     ) -> Result<(), Exception> {
-        let address = self.translate(address, AccessType::Store)?;
-
         self.main_memory
             .write(address, value)
             .map_err(|_: BadMemoryAccess| Exception::StoreAMOAccessFault(address))

@@ -4,7 +4,6 @@
 
 //! Implementation of Zifencei extension for RISC-V
 
-use crate::machine_state::AccessType;
 use crate::machine_state::CacheLayouts;
 use crate::machine_state::MachineState;
 use crate::machine_state::block_cache::block::Block;
@@ -21,9 +20,6 @@ where
     /// Execute a `fence.i` instruction.
     #[inline(always)]
     pub fn run_fencei(&mut self) {
-        self.core
-            .translation_cache
-            .invalidate([AccessType::Instruction]);
         self.block_cache.invalidate();
     }
 }
