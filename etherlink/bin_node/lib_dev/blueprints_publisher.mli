@@ -18,7 +18,6 @@ val start :
   keep_alive:bool ->
   drop_duplicate:bool ->
   order_enabled:bool ->
-  tx_queue_enabled:bool ->
   tx_container:(module Services_backend_sig.Tx_container) ->
   unit ->
   unit tzresult Lwt.t
