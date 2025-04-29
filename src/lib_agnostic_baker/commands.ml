@@ -5,36 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let run_with_local_node (module Plugin : Protocol_plugin_sig.S) args
-    local_data_dir_path sources cctxt =
-  let baking_mode = Some local_data_dir_path in
-  let configuration = Configuration.create_config args in
-  Plugin.Baker_commands_helpers.run_baker
-    ~configuration
-    ~baking_mode
-    ~sources
-    ~cctxt
-
-let run_remotely (module Plugin : Protocol_plugin_sig.S) args sources cctxt =
-  let baking_mode = None in
-  let configuration = Configuration.create_config args in
-  Plugin.Baker_commands_helpers.run_baker
-    ~configuration
-    ~baking_mode
-    ~sources
-    ~cctxt
-
-let run_vdf (module Plugin : Protocol_plugin_sig.S) (pidfile, keep_alive) cctxt
-    =
-  Configuration.may_lock_pidfile pidfile @@ fun () ->
-  Plugin.Baker_commands_helpers.run_vdf_daemon ~cctxt ~keep_alive
-
-let run_accuser (module Plugin : Protocol_plugin_sig.S)
-    (pidfile, preserved_levels, keep_alive) cctxt =
-  Configuration.may_lock_pidfile pidfile @@ fun () ->
-  Plugin.Accuser_commands_helpers.run ~cctxt ~preserved_levels ~keep_alive
-
-let baker_commands ?plugin () =
+let baker_commands =
   let open Configuration in
   let open Tezos_clic in
   let group =
@@ -54,36 +25,54 @@ let baker_commands ?plugin () =
            ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
            directory_parameter
       @@ sources_param)
-      (match plugin with
-      | Some plugin -> run_with_local_node plugin
-      | None -> fun _ _ _ _ -> Lwt_result_syntax.return_unit);
+      (fun args data_dir sources cctxt ->
+        let node_endpoint = Run_args.get_endpoint (Array.to_list Sys.argv) in
+        let args = Configuration.create_config args in
+        Daemon.Baker.run
+          ~node_endpoint
+          ~keep_alive:args.keep_alive
+          ~command:(Daemon.Run_with_local_node {data_dir; args; sources})
+          cctxt);
     command
       ~group
       ~desc:"Launch the baker daemon using RPCs only."
       baker_args
       (prefixes ["run"; "remotely"] @@ sources_param)
-      (match plugin with
-      | Some plugin -> run_remotely plugin
-      | None -> fun _ _ _ -> Lwt_result_syntax.return_unit);
+      (fun args sources cctxt ->
+        let node_endpoint = Run_args.get_endpoint (Array.to_list Sys.argv) in
+        let args = Configuration.create_config args in
+        Daemon.Baker.run
+          ~node_endpoint
+          ~keep_alive:args.keep_alive
+          ~command:(Daemon.Run_remotely {args; sources})
+          cctxt);
     command
       ~group
       ~desc:"Launch the VDF daemon"
       (args2 pidfile_arg keep_alive_arg)
       (prefixes ["run"; "vdf"] @@ stop)
-      (match plugin with
-      | Some plugin -> run_vdf plugin
-      | None -> fun _ _ -> Lwt_result_syntax.return_unit);
+      (fun (pidfile, keep_alive) cctxt ->
+        let node_endpoint = Run_args.get_endpoint (Array.to_list Sys.argv) in
+        Daemon.Baker.run
+          ~node_endpoint
+          ~keep_alive
+          ~command:(Daemon.Run_vdf {pidfile; keep_alive})
+          cctxt);
     command
       ~group
       ~desc:"Launch the accuser daemon"
       (args3 pidfile_arg preserved_levels_arg keep_alive_arg)
       (prefixes ["run"; "accuser"] @@ stop)
-      (match plugin with
-      | Some plugin -> run_accuser plugin
-      | None -> fun _ _ -> Lwt_result_syntax.return_unit);
+      (fun (pidfile, preserved_levels, keep_alive) cctxt ->
+        let node_endpoint = Run_args.get_endpoint (Array.to_list Sys.argv) in
+        Daemon.Baker.run
+          ~node_endpoint
+          ~keep_alive
+          ~command:(Daemon.Run_accuser {pidfile; preserved_levels; keep_alive})
+          cctxt);
   ]
 
-let accuser_commands ?plugin () =
+let accuser_commands =
   let open Configuration in
   let open Tezos_clic in
   let group =
@@ -98,7 +87,11 @@ let accuser_commands ?plugin () =
       ~desc:"Launch the accuser daemon"
       (args3 pidfile_arg preserved_levels_arg keep_alive_arg)
       (prefix "run" @@ stop)
-      (match plugin with
-      | Some plugin -> run_accuser plugin
-      | None -> fun _ _ -> Lwt_result_syntax.return_unit);
+      (fun (pidfile, preserved_levels, keep_alive) cctxt ->
+        let node_endpoint = Run_args.get_endpoint (Array.to_list Sys.argv) in
+        Daemon.Accuser.run
+          ~node_endpoint
+          ~keep_alive
+          ~command:(Daemon.Run_accuser {pidfile; preserved_levels; keep_alive})
+          cctxt);
   ]
