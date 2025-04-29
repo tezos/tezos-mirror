@@ -835,7 +835,8 @@ module Consensus = struct
                  included in an Attestations_aggregate, even when it is the only
                  one in the quorum. *)
               let hash = Operation.hash operation in
-              tzfail (Unaggregated_eligible_attestation hash)
+              tzfail
+                (Unaggregated_eligible_operation {kind = Attestation; hash})
           | _ -> return (consensus_key, attesting_power))
       | Mempool ->
           check_mempool_consensus
