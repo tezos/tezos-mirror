@@ -399,26 +399,31 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
 (* [aggregate_attestations attestations] aggregate [attestations] in a
    single Attestations_aggregate operation. Each operation in [attestations] is
    assumed to be eligible for aggregation, meaning that it :
-   - must include a BLS signature
-   - must not include DAL content *)
+   - must include a BLS signature *)
 let aggregate_attestations eligible_attestations =
   let open Result_syntax in
   let aggregate =
     List.fold_left
       (fun acc ({shell; protocol_data} : Kind.attestation Operation.t) ->
-        match (protocol_data.contents, protocol_data.signature) with
-        | ( Single (Attestation {consensus_content; dal_content = None}),
-            Some (Bls signature) ) -> (
-            let {slot; level; round; block_payload_hash} = consensus_content in
-            match acc with
-            | None ->
-                let consensus_content = {level; round; block_payload_hash} in
-                Some (shell, consensus_content, [slot], [signature])
-            | Some (shell, consensus_content, committee, signatures) ->
-                let committee = slot :: committee in
-                let signatures = signature :: signatures in
-                Some (shell, consensus_content, committee, signatures))
-        | _, _ -> assert false)
+        let (Single (Attestation {consensus_content; dal_content})) =
+          protocol_data.contents
+        in
+        let signature =
+          match protocol_data.signature with
+          | Some (Bls signature) -> signature
+          | _ -> assert false
+          (* Should not happen because the precondition stipulates
+             that eligible attestations only have BLS signatures. *)
+        in
+        let {slot; level; round; block_payload_hash} = consensus_content in
+        match acc with
+        | None ->
+            let consensus_content = {level; round; block_payload_hash} in
+            Some (shell, consensus_content, [(slot, dal_content)], [signature])
+        | Some (shell, consensus_content, committee, signatures) ->
+            let committee = (slot, dal_content) :: committee in
+            let signatures = signature :: signatures in
+            Some (shell, consensus_content, committee, signatures))
       None
       eligible_attestations
   in
@@ -432,7 +437,6 @@ let aggregate_attestations eligible_attestations =
       with
       | Some signature ->
           let contents =
-            let committee = Operation.tmp_of_old_committee committee in
             Single (Attestations_aggregate {consensus_content; committee})
           in
           let protocol_data = {contents; signature = Some (Bls signature)} in
@@ -451,7 +455,7 @@ let partition_consensus_operations_on_proposal consensus_operations =
         Prioritized_operation.packed operation
       in
       match (protocol_data.contents, protocol_data.signature) with
-      | Single (Attestation {dal_content = None; _}), Some (Bls _) ->
+      | Single (Attestation _), Some (Bls _) ->
           let attestation : Kind.attestation Operation.t =
             {shell; protocol_data}
           in
@@ -547,11 +551,13 @@ let aggregate_attestations_on_reproposal consensus_operations =
           (fun ((slots, signatures) as acc)
                ({protocol_data; _} : Kind.attestation operation) ->
             match (protocol_data.contents, protocol_data.signature) with
-            | Single (Attestation {consensus_content; _}), Some (Bls signature)
+            | ( Single (Attestation {consensus_content; dal_content}),
+                Some (Bls signature) )
               when not (SlotSet.mem consensus_content.slot aggregated_slots) ->
-                (consensus_content.slot :: slots, signature :: signatures)
+                ( (consensus_content.slot, dal_content) :: slots,
+                  signature :: signatures )
             | _ -> acc)
-          (Operation.tmp_to_old_committee committee, [signature])
+          (committee, [signature])
           eligible_attestations
       in
       (* We disable the subgroup check for better performance, as operations
@@ -561,7 +567,6 @@ let aggregate_attestations_on_reproposal consensus_operations =
       with
       | Some signature ->
           let contents =
-            let committee = Operation.tmp_of_old_committee committee in
             Single (Attestations_aggregate {consensus_content; committee})
           in
           let protocol_data = {contents; signature = Some (Bls signature)} in
