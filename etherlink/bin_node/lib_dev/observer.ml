@@ -140,6 +140,8 @@ let container_forward_tx ~keep_alive ~evm_node_endpoint :
     let lock_transactions () = Lwt_result_syntax.return_unit
 
     let unlock_transactions () = Lwt_result_syntax.return_unit
+
+    let is_locked () = Lwt_result_syntax.return_false
   end)
 
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync

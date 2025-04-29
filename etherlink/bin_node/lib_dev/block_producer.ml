@@ -311,9 +311,7 @@ let produce_block ~chain_family ~uses_tx_queue ~cctxt ~smart_rollup_address
     ~(tx_container : (module Services_backend_sig.Tx_container)) =
   let open Lwt_result_syntax in
   let (module Tx_container) = tx_container in
-  let* is_locked =
-    if uses_tx_queue then Tx_queue.is_locked () else Tx_pool.is_locked ()
-  in
+  let* is_locked = Tx_container.is_locked () in
   if is_locked then
     let*! () = Block_producer_events.production_locked () in
     return `No_block

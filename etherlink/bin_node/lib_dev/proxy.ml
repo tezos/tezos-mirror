@@ -53,6 +53,8 @@ let container_forward_tx ~evm_node_endpoint ~keep_alive :
     let lock_transactions () = Lwt_result_syntax.return_unit
 
     let unlock_transactions () = Lwt_result_syntax.return_unit
+
+    let is_locked () = Lwt_result_syntax.return_false
   end)
 
 let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)

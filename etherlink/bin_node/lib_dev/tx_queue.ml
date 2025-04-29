@@ -1033,11 +1033,6 @@ let start ~config ~keep_alive () =
   let*! () = Tx_queue_events.is_ready () in
   return_unit
 
-let is_locked () =
-  let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Is_locked |> handle_request_error
-
 let pop_transactions ~validate_tx ~initial_validation_state =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
@@ -1131,4 +1126,9 @@ module Tx_container = struct
 
   let unlock_transactions () =
     bind_worker @@ fun w -> push_request w Unlock_transactions
+
+  let is_locked () =
+    let open Lwt_result_syntax in
+    let*? worker = Lazy.force worker in
+    Worker.Queue.push_request_and_wait worker Is_locked |> handle_request_error
 end

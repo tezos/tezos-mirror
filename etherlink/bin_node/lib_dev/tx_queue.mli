@@ -33,9 +33,6 @@ val start :
   unit ->
   unit tzresult Lwt.t
 
-(** [is_locked] checks if the queue is locked. *)
-val is_locked : unit -> bool tzresult Lwt.t
-
 (** [pop_transactions ~validate_tx ~initial_validation_state] pops as
     many transactions as possible from the queue, validating them with
     [validate_tx]. If [validate_tx] returns [`Keep validation_state]
