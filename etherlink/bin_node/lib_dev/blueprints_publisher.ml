@@ -108,8 +108,6 @@ module Worker = struct
 
   let on_cooldown worker = 0 < current_cooldown worker
 
-  let tx_queue_enabled worker = (state worker).tx_queue_enabled
-
   let tx_container worker = (state worker).tx_container
 
   let decrement_cooldown worker =
@@ -326,8 +324,8 @@ module Handlers = struct
             Worker.decrement_cooldown self ;
             (* If there is no lag or the worker just needs to republish we
                unlock the transaction pool in case it was locked. *)
-            if Worker.tx_queue_enabled self then Tx_queue.unlock_transactions ()
-            else Tx_pool.unlock_transactions ())
+            let (module Tx_container) = Worker.tx_container self in
+            Tx_container.unlock_transactions ())
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =

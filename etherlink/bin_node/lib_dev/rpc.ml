@@ -144,6 +144,8 @@ let container_forward_request ~public_endpoint ~private_endpoint ~keep_alive :
       Lwt_result_syntax.return_unit
 
     let lock_transactions () = Lwt_result_syntax.return_unit
+
+    let unlock_transactions () = Lwt_result_syntax.return_unit
   end)
 
 let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint

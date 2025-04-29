@@ -868,12 +868,6 @@ let pop_and_inject_transactions_lazy () =
       in
       return_unit
 
-let unlock_transactions () =
-  let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Request.Unlock_transactions
-  |> handle_request_error
-
 let is_locked () =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
@@ -976,5 +970,11 @@ module Tx_container = struct
     let open Lwt_result_syntax in
     let*? worker = Lazy.force worker in
     Worker.Queue.push_request_and_wait worker Request.Lock_transactions
+    |> handle_request_error
+
+  let unlock_transactions () =
+    let open Lwt_result_syntax in
+    let*? worker = Lazy.force worker in
+    Worker.Queue.push_request_and_wait worker Request.Unlock_transactions
     |> handle_request_error
 end
