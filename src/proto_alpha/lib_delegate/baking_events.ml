@@ -208,8 +208,8 @@ module State_transitions = struct
       ("level", Data_encoding.int32)
       ~pp3:Round.pp
       ("next_round", Round.encoding)
-      ~pp4:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp4:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
 
   let new_head_while_waiting_for_qc =
     declare_0
@@ -404,8 +404,8 @@ module State_transitions = struct
       ~name:"preparing_fresh_block"
       ~level:Info
       ~msg:"preparing fresh block for {delegate} at round {round}"
-      ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp1:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
       ~pp2:Round.pp
       ("round", Round.encoding)
 
@@ -471,8 +471,8 @@ module State_transitions = struct
       ~msg:
         "discarding outdated preattestation for {delegate} at level {level}, \
          round {round}"
-      ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp1:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
       ~pp3:Round.pp
@@ -486,8 +486,8 @@ module State_transitions = struct
       ~msg:
         "discarding outdated attestation for {delegate} at level {level}, \
          round {round}"
-      ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp1:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
       ~pp3:Round.pp
@@ -502,8 +502,8 @@ module State_transitions = struct
         "discarding preattestation for {delegate} with payload {payload} at \
          level {level}, round {round} where the prequorum was locked on a \
          different payload {state_payload}."
-      ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp1:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
       ~pp2:Block_payload_hash.pp
       ("payload", Block_payload_hash.encoding)
       ~pp3:pp_int32
@@ -521,8 +521,8 @@ module State_transitions = struct
       ~msg:
         "discarding attestation for {delegate} at level {level}, round {round} \
          where no prequorum was reached."
-      ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp1:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
       ~pp3:Round.pp
@@ -537,8 +537,8 @@ module State_transitions = struct
         "discarding attestation for {delegate} with payload {payload} at level \
          {level}, round {round} where the prequorum was on a different payload \
          {state_payload}."
-      ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp1:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
       ~pp2:Block_payload_hash.pp
       ("payload", Block_payload_hash.encoding)
       ~pp3:pp_int32
@@ -623,11 +623,12 @@ module Delegates = struct
         Format.fprintf
           ppf
           "@[<v 2>@,%a@]"
-          Format.(pp_print_list ~pp_sep:pp_print_cut Baking_state.Key.pp)
+          Format.(pp_print_list ~pp_sep:pp_print_cut Baking_state_types.Key.pp)
           delegates)
       ( "delegates",
         Data_encoding.list
-          Baking_state.Key.consensus_key_without_sk_encoding__cannot_decode )
+          Baking_state_types.Key
+          .consensus_key_without_sk_encoding__cannot_decode )
 end
 
 module Scheduling = struct
@@ -680,8 +681,8 @@ module Scheduling = struct
       ("round", Round.encoding)
       ~pp3:Timestamp.pp
       ("timestamp", Timestamp.encoding)
-      ~pp4:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp4:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
 
   let waiting_end_of_round =
     declare_3
@@ -849,8 +850,8 @@ module Actions = struct
          {round} -- {trace}"
       ~pp1:Baking_state.pp_consensus_vote_kind
       ("vote_kind", Baking_state.consensus_vote_kind_encoding)
-      ~pp2:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp2:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
       ~pp3:pp_int32
       ("level", Data_encoding.int32)
       ~pp4:Round.pp
@@ -864,7 +865,7 @@ module Actions = struct
       ~name:"failed_to_get_attestations"
       ~level:Error
       ~msg:"unable to get DAL attestation for {delegate} -- {trace}"
-      ("delegate", Baking_state.Delegate_id.encoding)
+      ("delegate", Baking_state_types.Delegate_id.encoding)
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
@@ -874,7 +875,7 @@ module Actions = struct
       ~name:"failed_to_get_attestations_in_time"
       ~level:Error
       ~msg:"unable to get DAL attestation for {delegate} in time"
-      ("delegate", Baking_state.Delegate_id.encoding)
+      ("delegate", Baking_state_types.Delegate_id.encoding)
 
   let failed_to_inject_consensus_vote =
     declare_3
@@ -884,8 +885,8 @@ module Actions = struct
       ~msg:"failed to inject {vote_kind} for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_vote_kind
       ("vote_kind", Baking_state.consensus_vote_kind_encoding)
-      ~pp2:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp2:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
       ~pp3:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
@@ -895,8 +896,8 @@ module Actions = struct
       ~name:"failed_to_forge_block"
       ~level:Error
       ~msg:"failed to forge block for {delegate} -- {trace}"
-      ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp1:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
@@ -923,8 +924,8 @@ module Actions = struct
       ("vote_kind", Baking_state.consensus_vote_kind_encoding)
       ~pp2:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
-      ~pp3:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp3:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
       ~pp4:pp_int32
       ("level", Data_encoding.int32)
       ~pp5:Round.pp
@@ -939,7 +940,7 @@ module Actions = struct
         "ready to attach DAL attestation for level {attestation_level}, round \
          {round}, with bitset {bitset} for {delegate} to attest slots \
          published at level {published_level}"
-      ("delegate", Baking_state.Delegate_id.encoding)
+      ("delegate", Baking_state_types.Delegate_id.encoding)
       ~pp2:Z.pp_print
       ("bitset", Data_encoding.n)
       ("published_level", Data_encoding.int32)
@@ -952,7 +953,7 @@ module Actions = struct
       ~name:"not_in_dal_committee"
       ~level:Notice
       ~msg:"{delegate} has no assigned DAL shards at level {attestation_level}"
-      ("delegate", Baking_state.Delegate_id.encoding)
+      ("delegate", Baking_state_types.Delegate_id.encoding)
       ("attestation_level", Data_encoding.int32)
 
   let synchronizing_round =
@@ -973,10 +974,10 @@ module Actions = struct
         "prepare forging block at level {level}, round {round} for {delegate}"
       ~pp1:pp_int32
       ~pp2:Round.pp
-      ~pp3:Baking_state.Delegate.pp
+      ~pp3:Baking_state_types.Delegate.pp
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state_types.Delegate.encoding)
 
   let forging_block =
     declare_4
@@ -988,10 +989,10 @@ module Actions = struct
          apply: {force_apply})"
       ~pp1:pp_int32
       ~pp2:Round.pp
-      ~pp3:Baking_state.Delegate.pp
+      ~pp3:Baking_state_types.Delegate.pp
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state_types.Delegate.encoding)
       ("force_apply", Data_encoding.bool)
 
   let delayed_block_injection =
@@ -1008,8 +1009,8 @@ module Actions = struct
       ~pp2:pp_int32
       ("round", Round.encoding)
       ~pp3:Round.pp
-      ("delegate", Baking_state.Delegate.encoding)
-      ~pp4:Baking_state.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
+      ~pp4:Baking_state_types.Delegate.pp
 
   let injecting_block =
     declare_3
@@ -1019,10 +1020,10 @@ module Actions = struct
       ~msg:"injecting block at level {level}, round {round} for {delegate}"
       ~pp1:pp_int32
       ~pp2:Round.pp
-      ~pp3:Baking_state.Delegate.pp
+      ~pp3:Baking_state_types.Delegate.pp
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state_types.Delegate.encoding)
 
   let block_injected =
     declare_5
@@ -1036,7 +1037,7 @@ module Actions = struct
       ~pp1:Block_hash.pp
       ~pp2:pp_int32
       ~pp3:Round.pp
-      ~pp4:Baking_state.Delegate.pp
+      ~pp4:Baking_state_types.Delegate.pp
       ~pp5:
         (Format.pp_print_option
            (fun fmt Baking_state.{manager_operation_number; total_fees} ->
@@ -1049,7 +1050,7 @@ module Actions = struct
       ("block", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state_types.Delegate.encoding)
       ( "manager_operations_infos",
         Data_encoding.option Baking_state.manager_operations_infos_encoding )
 
@@ -1072,8 +1073,8 @@ module Actions = struct
       ~msg:"signing {vote_kind} for {delegate}"
       ~pp1:Baking_state.pp_consensus_vote_kind
       ("vote_kind", Baking_state.consensus_vote_kind_encoding)
-      ~pp2:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ~pp2:Baking_state_types.Delegate.pp
+      ("delegate", Baking_state_types.Delegate.encoding)
 
   let invalid_json_file =
     declare_1
@@ -1143,8 +1144,8 @@ module Actions = struct
       ~msg:
         "The following delegates have no attesting rights at level {level}: \
          {delegates}"
-      ~pp1:(Format.pp_print_list Baking_state.Key.pp)
-      ("delegates", Data_encoding.list Baking_state.Key.encoding)
+      ~pp1:(Format.pp_print_list Baking_state_types.Key.pp)
+      ("delegates", Data_encoding.list Baking_state_types.Key.encoding)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
 

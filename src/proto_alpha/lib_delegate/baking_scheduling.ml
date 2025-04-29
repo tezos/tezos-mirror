@@ -26,6 +26,7 @@
 open Protocol.Alpha_context
 module Events = Baking_events.Scheduling
 open Baking_state
+open Baking_state_types
 
 module Profiler = struct
   include (val Profiler.wrap Baking_profiler.baker_profiler)

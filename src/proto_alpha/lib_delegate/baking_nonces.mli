@@ -48,7 +48,7 @@ val load :
 val generate_seed_nonce :
   ?timeout:float ->
   Baking_configuration.nonce_config ->
-  Baking_state.Key.t ->
+  Baking_state_types.Key.t ->
   Raw_level.t ->
   (Nonce_hash.t * Nonce.t) tzresult Lwt.t
 

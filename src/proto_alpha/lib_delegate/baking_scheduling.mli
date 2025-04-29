@@ -81,7 +81,7 @@ val run :
   ?constants:Constants.t ->
   chain:Chain_services.chain ->
   Baking_configuration.t ->
-  Baking_state.Key.t list ->
+  Baking_state_types.Key.t list ->
   unit tzresult Lwt.t
 
 (** {2 Functions only needed for the baking_lib} *)
@@ -94,7 +94,9 @@ val sleep_until : Time.Protocol.t -> unit Lwt.t option
     own delegates; also returns the corresponding delegate. Or returns [None] if
     no such round exists. *)
 val first_potential_round_at_next_level :
-  state -> earliest_round:Round.t -> (Round.t * Baking_state.Delegate.t) option
+  state ->
+  earliest_round:Round.t ->
+  (Round.t * Baking_state_types.Delegate.t) option
 
 (** [compute_next_potential_baking_time state] From the current [state], the
     function returns an optional association pair, which consists of the next
@@ -145,7 +147,7 @@ val create_initial_state :
   Operation_worker.t ->
   current_proposal:proposal ->
   ?constants:Constants.t ->
-  Baking_state.Key.t list ->
+  Baking_state_types.Key.t list ->
   state tzresult Lwt.t
 
 (** [automaton_loop ?stop_on_event baking_configuration on_error loop_state
