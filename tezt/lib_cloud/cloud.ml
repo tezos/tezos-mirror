@@ -324,7 +324,7 @@ let attach agent =
     let cmd, args =
       Runner.wrap_with_ssh
         runner
-        (Runner.Shell.cmd [] "stdbuf" ["-oL"; "tail"; "-f"; "screenlog.0"])
+        (Runner.Shell.cmd [] "stdbuf" ["-oL"; "tail"; "-F"; "screenlog.0"])
     in
     let _p =
       Process.spawn ~hooks cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
@@ -372,7 +372,7 @@ let attach agent =
   let cmd, args =
     Runner.wrap_with_ssh
       runner
-      (Runner.Shell.cmd [] "stdbuf" ["-oL"; "tail"; "-f"; "screenlog.0"])
+      (Runner.Shell.cmd [] "stdbuf" ["-oL"; "tail"; "-F"; "screenlog.0"])
   in
   let logger =
     Lwt.catch
