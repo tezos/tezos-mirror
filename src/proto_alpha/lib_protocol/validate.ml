@@ -73,6 +73,7 @@ type consensus_state = {
   preattestations_seen : Operation_hash.t Consensus_conflict_map.t;
   attestations_seen : Operation_hash.t Consensus_conflict_map.t;
   attestations_aggregate_seen : Operation_hash.t option;
+  preattestations_aggregate_seen : Operation_hash.t option;
 }
 
 let consensus_conflict_map_encoding =
@@ -95,22 +96,36 @@ let consensus_state_encoding =
               preattestations_seen;
               attestations_seen;
               attestations_aggregate_seen;
+              preattestations_aggregate_seen;
             } ->
-         (preattestations_seen, attestations_seen, attestations_aggregate_seen))
+         ( preattestations_seen,
+           attestations_seen,
+           attestations_aggregate_seen,
+           preattestations_aggregate_seen ))
        (fun ( preattestations_seen,
               attestations_seen,
-              attestations_aggregate_seen ) ->
-         {preattestations_seen; attestations_seen; attestations_aggregate_seen})
-       (obj3
+              attestations_aggregate_seen,
+              preattestations_aggregate_seen ) ->
+         {
+           preattestations_seen;
+           attestations_seen;
+           attestations_aggregate_seen;
+           preattestations_aggregate_seen;
+         })
+       (obj4
           (req "preattestations_seen" consensus_conflict_map_encoding)
           (req "attestations_seen" consensus_conflict_map_encoding)
-          (req "attestations_aggregate_seen" (option Operation_hash.encoding)))
+          (req "attestations_aggregate_seen" (option Operation_hash.encoding))
+          (req
+             "preattestations_aggregate_seen"
+             (option Operation_hash.encoding)))
 
 let empty_consensus_state =
   {
     preattestations_seen = Consensus_conflict_map.empty;
     attestations_seen = Consensus_conflict_map.empty;
     attestations_aggregate_seen = None;
+    preattestations_aggregate_seen = None;
   }
 
 type voting_state = {
