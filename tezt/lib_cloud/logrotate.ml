@@ -70,7 +70,7 @@ let write_config ~name ?pidfile ?max_rotations ?max_size ~target_file agent =
   let destination = config name in
   Log.info
     "Teztcloud.Logrotate: uploading %s to %s:%s"
-    target_file
+    source
     (Agent.name agent)
     destination ;
   let* _ = Agent.copy agent ~source ~destination in
