@@ -264,15 +264,17 @@ pub fn apply_operation<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
+    use num_bigint::BigInt;
     use tezos_crypto_rs::hash::UnknownSignature;
+    use tezos_data_encoding::types::{Narith, Zarith};
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
     use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
     use tezos_tezlink::{
         block::TezBlock,
         operation::{ManagerOperation, Operation, OperationContent},
         operation_result::{
-            ContentResult, OperationResult, OperationResultSum, RevealError,
-            RevealSuccess,
+            Balance, BalanceUpdate, ContentResult, OperationResult, OperationResultSum,
+            RevealError, RevealSuccess, TransferError, TransferSuccess,
         },
     };
 
@@ -281,13 +283,17 @@ mod tests {
         apply_operation, context, OperationError, ValidityError,
     };
 
-    fn make_reveal_operation(
+    const BOOTSTRAP_1: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+
+    const BOOTSTRAP_2: &str = "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN";
+
+    fn make_operation(
         fee: u64,
         counter: u64,
         gas_limit: u64,
         storage_limit: u64,
         source: PublicKeyHash,
-        pk: PublicKey,
+        content: OperationContent,
     ) -> Operation {
         let branch = TezBlock::genesis_block_hash();
         // No need a real signature for now
@@ -298,12 +304,52 @@ mod tests {
                 source,
                 fee: fee.into(),
                 counter: counter.into(),
-                operation: OperationContent::Reveal { pk },
+                operation: content,
                 gas_limit: gas_limit.into(),
                 storage_limit: storage_limit.into(),
             },
             signature,
         }
+    }
+
+    fn make_reveal_operation(
+        fee: u64,
+        counter: u64,
+        gas_limit: u64,
+        storage_limit: u64,
+        source: PublicKeyHash,
+        pk: PublicKey,
+    ) -> Operation {
+        make_operation(
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            source,
+            OperationContent::Reveal { pk },
+        )
+    }
+
+    fn make_transfer_operation(
+        fee: u64,
+        counter: u64,
+        gas_limit: u64,
+        storage_limit: u64,
+        source: PublicKeyHash,
+        amount: Narith,
+        destination: Contract,
+    ) -> Operation {
+        make_operation(
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            source,
+            OperationContent::Transfer {
+                amount,
+                destination,
+            },
+        )
     }
 
     // This function setups an account that will pass the validity checks
@@ -338,7 +384,7 @@ mod tests {
     fn apply_operation_empty_account() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
             .expect("PublicKeyHash b58 conversion should have succeed");
 
         let pk = PublicKey::from_b58check(
@@ -367,7 +413,7 @@ mod tests {
     fn apply_operation_cant_pay_fees() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
             .expect("PublicKeyHash b58 conversion should have succeed");
 
         let _ = init_account(&mut host, &src);
@@ -399,7 +445,7 @@ mod tests {
     fn apply_operation_invalid_counter() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
             .expect("PublicKeyHash b58 conversion should have succeed");
 
         let _ = init_account(&mut host, &src);
@@ -431,7 +477,7 @@ mod tests {
     fn apply_reveal_operation_on_already_revealed_account() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
             .expect("PublicKeyHash b58 conversion should have succeed");
 
         let mut account = init_account(&mut host, &src);
@@ -469,7 +515,7 @@ mod tests {
     fn apply_reveal_operation_with_an_inconsistent_manager() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
             .expect("PublicKeyHash b58 conversion should have succeed");
 
         let mut account = init_account(&mut host, &src);
@@ -509,7 +555,7 @@ mod tests {
     fn apply_reveal_operation_with_an_inconsistent_public_key() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
             .expect("PublicKeyHash b58 conversion should have succeed");
 
         // Even if we don't use it we need to init the account
@@ -542,7 +588,7 @@ mod tests {
     fn apply_reveal_operation() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
             .expect("PublicKeyHash b58 conversion should have succeed");
 
         let account = init_account(&mut host, &src);
@@ -578,5 +624,123 @@ mod tests {
             .expect("Read manager should have succeed");
 
         assert_eq!(manager, Manager::Revealed(pk));
+    }
+
+    // Test an invalid transfer operation, source has not enough balance to fullfil the Transfer
+    #[test]
+    fn apply_transfer_with_not_enough_balance() {
+        let mut host = MockKernelHost::default();
+
+        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
+            .expect("PublicKeyHash b58 conversion should have succeed");
+
+        let dest = PublicKeyHash::from_b58check(BOOTSTRAP_2)
+            .expect("PublicKeyHash b58 conversion should have succeed");
+
+        // Setup accounts with 50 mutez in their balance
+        let source = init_account(&mut host, &src);
+        let destination = init_account(&mut host, &dest);
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src,
+            100_u64.into(),
+            Contract::Implicit(dest),
+        );
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), &operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Failed(vec![OperationError::Apply(
+                TransferError::BalanceTooLow {
+                    contract: Contract::from_b58check(BOOTSTRAP_1).unwrap(),
+                    balance: 50_u64.into(),
+                    amount: 100_u64.into(),
+                }
+                .into(),
+            )]),
+        });
+
+        // Verify that source and destination balances are unchanged
+        assert_eq!(source.balance(&host).unwrap(), 50_u64.into());
+        assert_eq!(destination.balance(&host).unwrap(), 50_u64.into());
+
+        assert_eq!(receipt, expected_receipt);
+    }
+
+    // Bootstrap 1 successfully transfer 30 mutez to Bootstrap 2
+    #[test]
+    fn apply_successful_transfer() {
+        let mut host = MockKernelHost::default();
+
+        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
+            .expect("PublicKeyHash b58 conversion should have succeed");
+
+        let dest = PublicKeyHash::from_b58check(BOOTSTRAP_2)
+            .expect("PublicKeyHash b58 conversion should have succeed");
+
+        // Setup accounts with 50 mutez in their balance
+        let source = init_account(&mut host, &src);
+        let destination = init_account(&mut host, &dest);
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src,
+            30_u64.into(),
+            Contract::Implicit(dest),
+        );
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), &operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(TransferSuccess {
+                storage: None,
+                lazy_storage_diff: None,
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(
+                            Contract::from_b58check(BOOTSTRAP_1).unwrap(),
+                        ),
+                        changes: Zarith(BigInt::from_biguint(
+                            num_bigint::Sign::Minus,
+                            30_u64.into(),
+                        )),
+                    },
+                    BalanceUpdate {
+                        balance: Balance::Account(
+                            Contract::from_b58check(BOOTSTRAP_2).unwrap(),
+                        ),
+                        changes: Zarith(BigInt::from_biguint(
+                            num_bigint::Sign::Plus,
+                            30_u64.into(),
+                        )),
+                    },
+                ],
+                ticket_receipt: vec![],
+                originated_contracts: vec![],
+                consumed_gas: 0_u64.into(),
+                storage_size: 0_u64.into(),
+                paid_storage_size_diff: 0_u64.into(),
+                allocated_destination_contract: true,
+            }),
+        });
+
+        // Verify that source and destination balances changed
+        assert_eq!(source.balance(&host).unwrap(), 20_u64.into());
+        assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
+
+        assert_eq!(receipt, expected_receipt);
     }
 }
