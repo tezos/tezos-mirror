@@ -482,10 +482,10 @@ let pp_kind fmt = function
   | Attestation -> Format.fprintf fmt "attestation"
   | Preattestation -> Format.fprintf fmt "preattestation"
 
-(** [check_consensus_aux kind ~expected found] fails if the set of delegates in
-   the consensus operations list [found] differs from the set [expected].
-   See [check_consensus_operations]. *)
-let check_consensus_aux kind ~expected found =
+(* [check_non_aggregated_consensus_operations kind ~expected found] fails if the
+   set of delegates in the consensus operations list [found] differs from the
+   set [expected]. See [check_consensus_operations]. *)
+let check_non_aggregated_consensus_operations kind ~expected found =
   match (expected, found) with
   | None, _ -> ()
   | Some expected, _ ->
@@ -512,15 +512,55 @@ let check_consensus_aux kind ~expected found =
           pp
           sorted_found
 
+let check_aggregated_consensus_operation kind ~expected found =
+  match (expected, found) with
+  | _, _ :: _ :: _ -> Test.fail "Multiple %as_aggregate found" pp_kind kind
+  | None, _ -> ()
+  | Some _, [] -> Test.fail "No %as_aggregate found" pp_kind kind
+  | Some expected_committee, [aggregate_json] ->
+      let expected_committee =
+        public_key_hashes expected_committee |> List.sort String.compare
+      in
+      let contents =
+        JSON.(aggregate_json |-> "contents" |> as_list |> List.hd)
+      in
+      let committee =
+        JSON.(contents |-> "metadata" |-> "committee" |> as_list)
+        |> List.map JSON.(fun json -> json |-> "delegate" |> as_string)
+        |> List.sort String.compare
+      in
+      if not (List.equal String.equal committee expected_committee) then
+        let pp = Format.(pp_print_list ~pp_sep:pp_print_cut pp_print_string) in
+        Test.fail
+          "@[<v 0>Wrong %a commitee@,\
+           @[<v 2>expected:@,\
+           %a@]@,\
+           @[<v 2>found:@,\
+           %a@]@]"
+          pp_kind
+          kind
+          pp
+          expected_committee
+          pp
+          committee
+
 (** Fetch consensus operations and check that they match the expected contents.
     Defaults to "head" if no [block] is provided. *)
-let check_consensus_operations ?expected_aggregated_committee
-    ?expected_preattestations ?expected_attestations ?block client =
+let check_consensus_operations ?expected_attestations_committee
+    ?expected_preattestations_committee ?expected_preattestations
+    ?expected_attestations ?block client =
   let* consensus_operations = fetch_consensus_operations ?block client in
   (* Partition the consensus operations list by kind *)
-  let attestations_aggregates, attestations, preattestations =
+  let ( attestations_aggregates,
+        preattestations_aggregates,
+        attestations,
+        preattestations ) =
     List.fold_left
-      (fun (attestations_aggregates, attestations, preattestations) operation ->
+      (fun ( attestations_aggregates,
+             preattestations_aggregates,
+             attestations,
+             preattestations )
+           operation ->
         let kind =
           JSON.(
             operation |-> "contents" |> as_list |> List.hd |-> "kind"
@@ -528,31 +568,53 @@ let check_consensus_operations ?expected_aggregated_committee
         in
         match kind with
         | "attestations_aggregate" ->
-            (operation :: attestations_aggregates, attestations, preattestations)
+            ( operation :: attestations_aggregates,
+              preattestations_aggregates,
+              attestations,
+              preattestations )
+        | "preattestations_aggregate" ->
+            ( attestations_aggregates,
+              operation :: preattestations_aggregates,
+              attestations,
+              preattestations )
         | "attestation" | "attestation_with_dal" ->
-            (attestations_aggregates, operation :: attestations, preattestations)
+            ( attestations_aggregates,
+              preattestations_aggregates,
+              operation :: attestations,
+              preattestations )
         | "preattestation" ->
-            (attestations_aggregates, attestations, operation :: preattestations)
+            ( attestations_aggregates,
+              preattestations_aggregates,
+              attestations,
+              operation :: preattestations )
         | _ -> Test.fail "check_consensus_operations: unexpected operation")
-      ([], [], [])
+      ([], [], [], [])
       consensus_operations
   in
   (* Checking attestations_aggregate *)
-  let* () =
-    match (expected_aggregated_committee, attestations_aggregates) with
-    | _, _ :: _ :: _ -> Test.fail "Multiple attestations_aggregate found"
-    | None, _ -> unit
-    | Some _, [] -> Test.fail "No attestations_aggregate found"
-    | Some expected_committee, [attestations_aggregate] ->
-        return @@ check_aggregate ~expected_committee attestations_aggregate
+  let () =
+    check_aggregated_consensus_operation
+      Attestation
+      ~expected:expected_attestations_committee
+      attestations_aggregates
+  in
+  (* Checking attestations_aggregate *)
+  let () =
+    check_aggregated_consensus_operation
+      Preattestation
+      ~expected:expected_preattestations_committee
+      preattestations_aggregates
   in
   (* Checking attestations *)
   let () =
-    check_consensus_aux Attestation ~expected:expected_attestations attestations
+    check_non_aggregated_consensus_operations
+      Attestation
+      ~expected:expected_attestations
+      attestations
   in
   (* Checking preattestations *)
   let () =
-    check_consensus_aux
+    check_non_aggregated_consensus_operations
       Preattestation
       ~expected:expected_preattestations
       preattestations
@@ -604,7 +666,7 @@ let simple_attestations_aggregation =
     |> List.map (fun (account : Account.key) -> account.Account.alias)
   in
   (* Expected committee that should be found in attestations aggregate *)
-  let expected_aggregated_committee = [bootstrap1; bootstrap2; bootstrap3] in
+  let expected_attestations_committee = [bootstrap1; bootstrap2; bootstrap3] in
   (* Expected attestations that should be found non-aggregated *)
   let expected_attestations = [bootstrap4; bootstrap5] in
   (* Testing the "bake for" command *)
@@ -614,7 +676,7 @@ let simple_attestations_aggregation =
   log_step 5 "Check consensus operations" ;
   let* () =
     check_consensus_operations
-      ~expected_aggregated_committee
+      ~expected_attestations_committee
       ~expected_attestations
       client
   in
@@ -630,7 +692,7 @@ let simple_attestations_aggregation =
   log_step 7 "Check consensus operations" ;
   let* () =
     check_consensus_operations
-      ~expected_aggregated_committee
+      ~expected_attestations_committee
       ~expected_attestations
       client
   in
@@ -641,7 +703,7 @@ let simple_attestations_aggregation =
   log_step 9 "Check consensus operations" ;
   let* () =
     check_consensus_operations
-      ~expected_aggregated_committee
+      ~expected_attestations_committee
       ~expected_attestations
       client
   in
@@ -867,7 +929,7 @@ let attestations_aggregation_on_reproposal =
   let* _ = Node.wait_for_level node 6 in
   let* () =
     check_consensus_operations
-      ~expected_aggregated_committee:[bootstrap1]
+      ~expected_attestations_committee:[bootstrap1]
       ~expected_attestations:[bootstrap5]
       client
   in
@@ -902,7 +964,7 @@ let attestations_aggregation_on_reproposal =
   let* _ = Node.wait_for_branch_switch ~level:6 node in
   let* () =
     check_consensus_operations
-      ~expected_aggregated_committee:[bootstrap1; bootstrap2]
+      ~expected_attestations_committee:[bootstrap1; bootstrap2]
       ~expected_attestations:[bootstrap4; bootstrap5]
       client
   in
@@ -964,9 +1026,10 @@ let attestations_aggregation_on_reproposal =
   let* _ = Node.wait_for_branch_switch ~level:6 node in
   let* () =
     check_consensus_operations
-      ~expected_aggregated_committee:[bootstrap1; bootstrap2; bootstrap3]
+      ~expected_attestations_committee:[bootstrap1; bootstrap2; bootstrap3]
+      ~expected_preattestations_committee:[bootstrap1; bootstrap2]
       ~expected_attestations:[bootstrap4; bootstrap5; bootstrap6]
-      ~expected_preattestations:[bootstrap1; bootstrap2; bootstrap4; bootstrap5]
+      ~expected_preattestations:[bootstrap4; bootstrap5]
       client
   in
   unit
