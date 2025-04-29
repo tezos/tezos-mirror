@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Bin_evm_node
-    Invocation:   dune exec etherlink/bin_evm_node/test/test_ethbloom.exe
+    Invocation:   dune exec etherlink/bin_node/test/test_blueprint_roundtrip.exe
     Subject:      Tests for Blueprints producer and decoder
 *)
 
