@@ -85,11 +85,8 @@ function print_and_exit() {
     echo "git reset --hard HEAD~${commits}"
   fi
 
-  log_green "To cleanup other created files"
-  echo "rm -rf src/proto_${protocol_target}"
-  echo "rm -rf docs/${label}"
-  echo "rm -rf src/proto_${version}_${short_hash}"
-  echo "rm -rf src/proto_${version}"
+  log_green "To cleanup other created files after reset --hard"
+  echo "rm -rf src/proto_${protocol_target} docs/${label} src/proto_${version}_${short_hash} src/proto_${version}"
   echo "exiting..."
   exit 1
 }
@@ -780,7 +777,7 @@ function copy_source() {
   ## add protocol as active before alpha in parameters.ml
   if ! grep -q "${long_hash}" src/lib_agnostic_baker/parameters.ml; then
     ## look for "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" and add "${longhash};"
-    sed -i.old -e "/ \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\" /a \"${long_hash}\"; " src/lib_agnostic_baker/parameters.ml
+    sed -i.old "/ \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\"/i\"${long_hash}\"; " src/lib_agnostic_baker/parameters.ml
     ocamlformat -i src/lib_agnostic_baker/parameters.ml
     commit "src: add protocol to agnostic_baker"
   fi
