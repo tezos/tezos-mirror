@@ -5,6 +5,28 @@ stages:
 - images
 - build
 - publish_release_gitlab
+- publish_release
+
+oc.docker:ci:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 90 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - ./images/ci_create_ci_images.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
 
 oc.docker:jsonnet:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -63,3 +85,33 @@ gitlab:release:
   - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./grafazos/scripts/releases/create_gitlab_release.sh
+
+publish:release-page:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: publish_release
+  tags:
+  - gcp
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
+  - build_grafazos_dashboards
+  dependencies:
+  - oc.docker:ci:amd64
+  - build_grafazos_dashboards
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - ./grafazos/scripts/releases/publish_release_page.sh
+  variables:
+    S3_BUCKET: release-page-test.nomadic-labs.com
+    DISTRIBUTION_ID: E19JF46UG3Z747
+    AWS_ACCESS_KEY_ID: ${AWS_KEY_RELEASE_PUBLISH}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_RELEASE_PUBLISH}
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - ./index.md
+    - index.html
