@@ -303,11 +303,25 @@ module Deposits = struct
        log_blockNumber, log_removed)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       |sql}
+
+    let unclaimed =
+      (unit ->* deposit)
+      @@ {sql|
+      SELECT
+       nonce, proxy, ticket_hash, receiver, amount
+      FROM deposits
+      where exec_transactionHash IS NULL
+      ORDER BY nonce DESC
+      |sql}
   end
 
   let store ?conn db deposit log_info =
     with_connection db conn @@ fun conn ->
     Sqlite.Db.exec conn Q.insert (deposit, log_info)
+
+  let get_unclaimed ?conn db =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.unclaimed ()
 end
 
 module Pointers = struct
