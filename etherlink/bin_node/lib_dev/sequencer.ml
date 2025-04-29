@@ -250,6 +250,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~order_enabled:
         configuration.experimental_features.blueprints_publisher_order_enabled
       ~tx_queue_enabled:(Configuration.is_tx_queue_enabled configuration)
+      ~tx_container
       ()
   in
   let* () =

@@ -19,6 +19,7 @@ type parameters = {
   drop_duplicate : bool;
   order_enabled : bool;
   tx_queue_enabled : bool;
+  tx_container : (module Services_backend_sig.Tx_container);
 }
 
 type state = {
@@ -40,6 +41,7 @@ type state = {
       (** Do not try to catch-up if [cooldown] is not equal to 0 *)
   enable_dal : bool;
   tx_queue_enabled : bool;
+  tx_container : (module Services_backend_sig.Tx_container);
 }
 
 module Types = struct
@@ -261,6 +263,7 @@ module Handlers = struct
          drop_duplicate;
          order_enabled;
          tx_queue_enabled;
+         tx_container;
        } :
         Types.parameters) =
     let open Lwt_result_syntax in
@@ -291,6 +294,7 @@ module Handlers = struct
         enable_dal = Option.is_some dal_slots;
         order_enabled;
         tx_queue_enabled;
+        tx_container;
       }
 
   let on_request :
@@ -349,7 +353,8 @@ let table = Worker.create_table Queue
 let worker_promise, worker_waker = Lwt.task ()
 
 let start ~blueprints_range ~rollup_node_endpoint ~config ~latest_level_seen
-    ~keep_alive ~drop_duplicate ~order_enabled ~tx_queue_enabled () =
+    ~keep_alive ~drop_duplicate ~order_enabled ~tx_queue_enabled ~tx_container
+    () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -364,6 +369,7 @@ let start ~blueprints_range ~rollup_node_endpoint ~config ~latest_level_seen
         drop_duplicate;
         order_enabled;
         tx_queue_enabled;
+        tx_container;
       }
       (module Handlers)
   in
