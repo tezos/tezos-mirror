@@ -62,8 +62,10 @@ let conflicting_consensus_operation ?kind = function
       Option.fold ~none:true ~some:(fun kind -> kind = kind') kind
   | _ -> false
 
-let unaggregated_eligible_attestation = function
-  | Validate_errors.Consensus.Unaggregated_eligible_attestation _ -> true
+let unaggregated_eligible_attestation ?kind = function
+  | Validate_errors.Consensus.Unaggregated_eligible_operation {kind = kind'; _}
+    ->
+      Option.fold ~none:true ~some:(fun kind -> kind = kind') kind
   | _ -> false
 
 let empty_aggregation_committee = function
@@ -588,7 +590,13 @@ let test_eligible_attestation_must_be_aggregated () =
       let* _ = Incremental.finalize_block inc in
       (* Operation is invalid in a block *)
       let*! res = Block.bake ~operation block in
-      Assert.proto_error ~loc:__LOC__ res unaggregated_eligible_attestation
+      Assert.proto_error
+        ~loc:__LOC__
+        res
+        (unaggregated_eligible_attestation
+           ~kind:Validate_errors.Consensus.Attestation)
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7827
+         Also test this behaviour for attestations with DAL contents. *)
   | _ -> assert false
 
 let test_empty_committee () =
