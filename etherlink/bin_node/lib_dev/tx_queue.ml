@@ -1048,13 +1048,6 @@ let clear () =
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait w Clear |> handle_request_error
 
-let shutdown () =
-  let open Lwt_result_syntax in
-  bind_worker @@ fun w ->
-  let*! () = Tx_queue_events.shutdown () in
-  let*! () = Worker.shutdown w in
-  return_unit
-
 let lock_transactions () =
   bind_worker @@ fun w -> push_request w Lock_transactions
 
@@ -1129,4 +1122,11 @@ module Tx_container = struct
     let open Lwt_result_syntax in
     let*? w = Lazy.force worker in
     Worker.Queue.push_request_and_wait w Content |> handle_request_error
+
+  let shutdown () =
+    let open Lwt_result_syntax in
+    bind_worker @@ fun w ->
+    let*! () = Tx_queue_events.shutdown () in
+    let*! () = Worker.shutdown w in
+    return_unit
 end

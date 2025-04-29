@@ -36,10 +36,6 @@ val start :
   unit ->
   unit tzresult Lwt.t
 
-(** [shutdown ()] stops the tx queue, waiting for the ongoing request
-    to be processed. *)
-val shutdown : unit -> unit tzresult Lwt.t
-
 (** [clear ()] removes the tx queue data but keeps the allocated space *)
 val clear : unit -> unit tzresult Lwt.t
 

@@ -18,7 +18,8 @@ type sandbox_config = {
 }
 
 let install_finalizer_seq server_public_finalizer server_private_finalizer
-    finalizer_rpc_process =
+    finalizer_rpc_process
+    (module Tx_container : Services_backend_sig.Tx_container) =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
@@ -27,7 +28,7 @@ let install_finalizer_seq server_public_finalizer server_private_finalizer
   let* () = Option.iter_s (fun f -> f ()) finalizer_rpc_process in
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
-  let* () = Tx_pool.shutdown () in
+  let* () = Tx_container.shutdown () in
   let* () = Evm_events_follower.shutdown () in
   let* () = Blueprints_publisher.shutdown () in
   let* () = Signals_publisher.shutdown () in
@@ -416,6 +417,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       finalizer_public_server
       finalizer_private_server
       finalizer_rpc_process
+      tx_container
   in
   let* () =
     loop_sequencer

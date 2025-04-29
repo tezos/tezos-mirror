@@ -34,12 +34,13 @@ let spawn_main ~exposed_port ~protected_endpoint ?private_endpoint ~data_dir ()
   let finalizer () = Lwt.return process#terminate in
   finalizer
 
-let install_finalizer_rpc server_public_finalizer =
+let install_finalizer_rpc server_public_finalizer
+    (module Tx_container : Services_backend_sig.Tx_container) =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
   let* () = server_public_finalizer () in
-  Misc.unwrap_error_monad @@ fun () -> Tx_pool.shutdown ()
+  Misc.unwrap_error_monad @@ fun () -> Tx_container.shutdown ()
 
 let set_metrics_level (ctxt : Evm_ro_context.t) =
   let open Lwt_result_syntax in
@@ -132,6 +133,8 @@ let container_forward_request ~public_endpoint ~private_endpoint ~keep_alive :
     let content () =
       Lwt_result.return
         Ethereum_types.{pending = AddressMap.empty; queued = AddressMap.empty}
+
+    let shutdown () = Lwt_result_syntax.return_unit
   end)
 
 let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
@@ -255,7 +258,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   in
 
   let (_ : Lwt_exit.clean_up_callback_id) =
-    install_finalizer_rpc server_public_finalizer
+    install_finalizer_rpc server_public_finalizer tx_container
   in
 
   let* () =

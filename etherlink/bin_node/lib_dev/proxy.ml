@@ -7,14 +7,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let install_finalizer server_finalizer =
+let install_finalizer server_finalizer
+    (module Tx_container : Services_backend_sig.Tx_container) =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
   let* () = server_finalizer () in
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
-  let* () = Tx_pool.shutdown () in
+  let* () = Tx_container.shutdown () in
   Evm_context.shutdown ()
 
 let container_forward_tx ~evm_node_endpoint ~keep_alive :
@@ -39,6 +40,8 @@ let container_forward_tx ~evm_node_endpoint ~keep_alive :
     let content () =
       Lwt_result.return
         Ethereum_types.{pending = AddressMap.empty; queued = AddressMap.empty}
+
+    let shutdown () = Lwt_result_syntax.return_unit
   end)
 
 let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
@@ -222,7 +225,7 @@ let main
       ((module Rollup_node_rpc), smart_rollup_address)
   in
   let (_ : Lwt_exit.clean_up_callback_id) =
-    install_finalizer server_finalizer
+    install_finalizer server_finalizer tx_container
   in
   let wait, _resolve = Lwt.wait () in
   let* () = wait in

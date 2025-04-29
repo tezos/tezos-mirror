@@ -25,10 +25,6 @@ type parameters = {
 (** [start parameters] starts the tx-pool *)
 val start : parameters -> unit tzresult Lwt.t
 
-(** [shutdown ()] stops the tx-pool, waiting for the ongoing request
-    to be processed. *)
-val shutdown : unit -> unit tzresult Lwt.t
-
 (** [pop_transactions chain_family maximum_cumulative_size] pops as much
     valid transactions as possible from the pool, until their cumulative
     size exceeds `maximum_cumulative_size`. If the pool is locked or node

@@ -810,13 +810,6 @@ let start parameters =
   let+ worker = Worker.launch table () parameters (module Handlers) in
   Lwt.wakeup worker_waker worker
 
-let shutdown () =
-  let open Lwt_result_syntax in
-  bind_worker @@ fun w ->
-  let*! () = Tx_pool_events.shutdown () in
-  let*! () = Worker.shutdown w in
-  return_unit
-
 let add transaction_object raw_tx =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
@@ -970,4 +963,11 @@ module Tx_container = struct
          legacy_tx_object)
 
   let content = get_tx_pool_content
+
+  let shutdown () =
+    let open Lwt_result_syntax in
+    bind_worker @@ fun w ->
+    let*! () = Tx_pool_events.shutdown () in
+    let*! () = Worker.shutdown w in
+    return_unit
 end
