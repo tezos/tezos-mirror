@@ -198,7 +198,7 @@ let test_aggregate_feature_flag_disabled () =
     ~mempool_error:aggregate_in_mempool_error
     Aggregate
 
-let test_aggregate_attestation_with_a_single_bls_attestation () =
+let test_attestations_aggregate_with_a_single_delegate () =
   let open Lwt_result_syntax in
   let* _genesis, block =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
@@ -220,7 +220,7 @@ let test_aggregate_attestation_with_a_single_bls_attestation () =
   let result = find_aggregate_result receipt in
   check_attestations_aggregate_result ~committee:[attester] result
 
-let test_aggregate_attestation_with_multiple_bls_attestations () =
+let test_attestations_aggregate_with_multiple_delegates () =
   let open Lwt_result_syntax in
   let* _genesis, block =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
@@ -247,7 +247,7 @@ let test_aggregate_attestation_with_multiple_bls_attestations () =
   let delegates = List.map fst bls_delegates_with_slots in
   check_attestations_aggregate_result ~committee:delegates result
 
-let test_aggregate_attestation_invalid_signature () =
+let test_attestations_aggregate_invalid_signature () =
   let open Lwt_result_syntax in
   let* _genesis, block =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
@@ -279,7 +279,7 @@ let test_aggregate_attestation_invalid_signature () =
       in
       Assert.proto_error ~loc:__LOC__ res signature_invalid_error
 
-let test_aggregate_attestation_non_bls_delegate () =
+let test_attestations_aggregate_non_bls_delegate () =
   let open Lwt_result_syntax in
   let* _genesis, block =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
@@ -320,7 +320,7 @@ let test_aggregate_attestation_non_bls_delegate () =
       let*! res = Block.bake ~operation:aggregate block in
       Assert.proto_error ~loc:__LOC__ res non_bls_in_aggregate
 
-let test_multiple_aggregations_per_block_forbidden () =
+let test_multiple_aggregates_per_block_forbidden () =
   let open Lwt_result_syntax in
   let* _genesis, block =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
@@ -339,7 +339,7 @@ let test_multiple_aggregations_per_block_forbidden () =
   let*! res = Block.bake ~operations:aggregates block in
   Assert.proto_error ~loc:__LOC__ res conflicting_consensus_operation
 
-let eligible_attestation_must_be_aggregated () =
+let test_eligible_attestation_must_be_aggregated () =
   let open Lwt_result_syntax in
   let* _genesis, block =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
@@ -391,30 +391,30 @@ let tests =
       `Quick
       test_aggregate_feature_flag_disabled;
     Tztest.tztest
-      "test_aggregate_attestation_with_a_single_bls_attestation"
+      "test_attestations_aggregate_with_a_single_delegate"
       `Quick
-      test_aggregate_attestation_with_a_single_bls_attestation;
+      test_attestations_aggregate_with_a_single_delegate;
     Tztest.tztest
-      "test_aggregate_attestation_with_multiple_bls_attestations"
+      "test_attestations_aggregate_with_multiple_delegates"
       `Quick
-      test_aggregate_attestation_with_multiple_bls_attestations;
+      test_attestations_aggregate_with_multiple_delegates;
     Tztest.tztest
-      "test_aggregate_attestation_invalid_signature"
+      "test_attestations_aggregate_invalid_signature"
       `Quick
-      test_aggregate_attestation_invalid_signature;
+      test_attestations_aggregate_invalid_signature;
     Tztest.tztest
-      "test_aggregate_attestation_non_bls_delegate"
+      "test_attestations_aggregate_non_bls_delegate"
       `Quick
-      test_aggregate_attestation_non_bls_delegate;
+      test_attestations_aggregate_non_bls_delegate;
     Tztest.tztest
-      "test_multiple_aggregations_per_block_forbidden"
+      "test_multiple_aggregates_per_block_forbidden"
       `Quick
-      test_multiple_aggregations_per_block_forbidden;
+      test_multiple_aggregates_per_block_forbidden;
     Tztest.tztest
-      "eligible_attestation_must_be_aggregated"
+      "test_eligible_attestation_must_be_aggregated"
       `Quick
-      eligible_attestation_must_be_aggregated;
-    Tztest.tztest "empty committee" `Quick test_empty_committee;
+      test_eligible_attestation_must_be_aggregated;
+    Tztest.tztest "test_empty_committee" `Quick test_empty_committee;
   ]
 
 let () =
