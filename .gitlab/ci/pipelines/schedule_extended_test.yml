@@ -3179,7 +3179,7 @@ tezt:
     TESTS: /ci_disabled && /memory_3k && /memory_4k && /time_sensitive && /slow &&
       /cloud && /flaky
     TEZT_RETRY: "1"
-    TEZT_PARALLEL: "3"
+    TEZT_PARALLEL: "4"
     TEZT_NO_NPX: "true"
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
