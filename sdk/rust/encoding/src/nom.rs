@@ -18,7 +18,7 @@ use nom::{
 use num_bigint::{BigInt, BigUint, Sign};
 pub use tezos_data_encoding_derive::NomReader;
 
-use crate::types::{Mutez, Zarith};
+use crate::types::{Narith, Zarith};
 
 use self::error::{BoundedEncodingKind, DecodeError, DecodeErrorKind};
 
@@ -225,7 +225,7 @@ impl NomReader<'_> for Zarith {
     }
 }
 
-impl NomReader<'_> for Mutez {
+impl NomReader<'_> for Narith {
     fn nom_read(bytes: &[u8]) -> NomResult<Self> {
         map(n_bignum, |big_uint| {
             BigInt::from_biguint(Sign::Plus, big_uint).into()

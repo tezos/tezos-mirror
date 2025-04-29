@@ -86,10 +86,13 @@ impl From<&Zarith> for BigInt {
 has_encoding!(Zarith, ZARITH_ENCODING, { Encoding::Z });
 
 /// Mutez number
-#[derive(Clone, Debug)]
-pub struct Mutez(pub num_bigint::BigInt);
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Narith(pub num_bigint::BigInt);
 
-impl<'de> Deserialize<'de> for Mutez {
+#[deprecated = "Mutez has been replaced by Narith, which has identical semantics for encoding & decoding"]
+pub type Mutez = Narith;
+
+impl<'de> Deserialize<'de> for Narith {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -109,7 +112,7 @@ impl<'de> Deserialize<'de> for Mutez {
     }
 }
 
-impl Serialize for Mutez {
+impl Serialize for Narith {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -123,43 +126,43 @@ impl Serialize for Mutez {
     }
 }
 
-impl From<num_bigint::BigInt> for Mutez {
+impl From<num_bigint::BigInt> for Narith {
     fn from(from: num_bigint::BigInt) -> Self {
-        Mutez(from)
+        Narith(from)
     }
 }
 
-impl From<Mutez> for num_bigint::BigInt {
-    fn from(from: Mutez) -> Self {
+impl From<Narith> for num_bigint::BigInt {
+    fn from(from: Narith) -> Self {
         from.0
     }
 }
 
-impl From<&num_bigint::BigInt> for Mutez {
+impl From<&num_bigint::BigInt> for Narith {
     fn from(from: &num_bigint::BigInt) -> Self {
-        Mutez(from.clone())
+        Narith(from.clone())
     }
 }
 
-impl From<&Mutez> for num_bigint::BigInt {
-    fn from(from: &Mutez) -> Self {
+impl From<&Narith> for num_bigint::BigInt {
+    fn from(from: &Narith) -> Self {
         from.0.clone()
     }
 }
 
-impl From<Mutez> for BigInt {
-    fn from(source: Mutez) -> Self {
+impl From<Narith> for BigInt {
+    fn from(source: Narith) -> Self {
         Self(source.0)
     }
 }
 
-impl From<&Mutez> for BigInt {
-    fn from(source: &Mutez) -> Self {
+impl From<&Narith> for BigInt {
+    fn from(source: &Narith) -> Self {
         Self(source.0.clone())
     }
 }
 
-has_encoding!(Mutez, MUTEZ_ENCODING, { Encoding::Mutez });
+has_encoding!(Narith, NARITH_ENCODING, { Encoding::N });
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct SizedBytes<const SIZE: usize>(pub [u8; SIZE]);

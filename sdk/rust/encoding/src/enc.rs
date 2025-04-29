@@ -6,7 +6,7 @@ use std::convert::TryFrom;
 use std::fmt;
 
 use crate::bit_utils::BitReverse;
-use crate::types::{Mutez, Zarith};
+use crate::types::{Narith, Zarith};
 
 use num_bigint::BigUint;
 pub use tezos_data_encoding_derive::BinWriter;
@@ -318,7 +318,7 @@ mod integers {
 
 pub use integers::*;
 
-impl BinWriter for Mutez {
+impl BinWriter for Narith {
     fn bin_write(&self, out: &mut Vec<u8>) -> BinResult {
         n_bignum(self.0.magnitude(), out)
     }
@@ -543,7 +543,7 @@ mod test {
     }
 
     #[test]
-    fn mutez() {
+    fn narith() {
         let data = [
             ("0", "00"),
             ("1", "01"),
@@ -561,12 +561,12 @@ mod test {
             ("10001", "818004"),
         ];
 
-        use super::{BinWriter, Mutez};
+        use super::{BinWriter, Narith};
         use num_traits::FromPrimitive;
 
         for (hex, enc) in data {
             let num = num_bigint::BigInt::from_u64(u64::from_str_radix(hex, 16).unwrap()).unwrap();
-            let num = Mutez(num);
+            let num = Narith(num);
             let mut bytes = vec![];
             num.bin_write(&mut bytes).unwrap();
             assert_eq!(enc, hex::encode(bytes));

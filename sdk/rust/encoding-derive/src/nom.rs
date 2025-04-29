@@ -59,7 +59,7 @@ fn generate_nom_read(encoding: &Encoding) -> TokenStream {
         Encoding::ShortDynamic(encoding, span) => generate_short_dynamic_nom_read(encoding, *span),
         Encoding::Dynamic(size, encoding, span) => generate_dynamic_nom_read(size, encoding, *span),
         Encoding::Zarith(span) => quote_spanned!(*span=> tezos_data_encoding::nom::zarith),
-        Encoding::MuTez(span) => quote_spanned!(*span=> tezos_data_encoding::nom::mutez),
+        Encoding::Narith(span) => quote_spanned!(*span=> tezos_data_encoding::nom::narith),
     }
 }
 
