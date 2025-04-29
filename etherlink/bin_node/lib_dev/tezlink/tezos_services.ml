@@ -9,6 +9,49 @@ include Tezlink_imports
 
 type level = Tezos_types.level
 
+(* Provides mock values necessary for constructing L1 types that contain fields
+    that are either irrelevant to the L2 or are not yet supported. *)
+module Mock = struct
+  let proto_level = 1
+
+  let validation_passes = 4
+
+  (* TODO #7866
+     When blocks are populated, this mock value will be unnecessary,
+     being replaced by actual data. *)
+  let operations_hash =
+    Operation_list_list_hash.of_bytes_exn (Bytes.make 32 '\000')
+
+  let fitness = [Bytes.make 32 '\255']
+
+  (* TODO #7866
+     When blocks are populated, this mock value will be unnecessary,
+     being replaced by actual data. *)
+  let context = Context_hash.of_bytes_exn (Bytes.make 32 '\255')
+
+  let contents : Imported_protocol.Block_header_repr.contents =
+    {
+      payload_hash = Imported_protocol.Block_payload_hash.zero;
+      payload_round = Imported_protocol.Round_repr.zero;
+      seed_nonce_hash = None;
+      proof_of_work_nonce =
+        Bytes.make
+          Imported_protocol.Constants_repr.proof_of_work_nonce_size
+          '\000';
+      per_block_votes =
+        {
+          liquidity_baking_vote = Per_block_vote_pass;
+          adaptive_issuance_vote = Per_block_vote_pass;
+        };
+    }
+
+  let signature : Imported_protocol.Alpha_context.signature =
+    Unknown (Bytes.make Tezos_crypto.Signature.Ed25519.size '\000')
+
+  let protocol_data : Imported_protocol.Block_header_repr.protocol_data =
+    {contents; signature}
+end
+
 (* Module importing, amending, and converting, protocol types. Those types
    might be difficult to actually build, so we define conversion function from
    local types to protocol types. *)
@@ -31,6 +74,50 @@ module Protocol_types = struct
     let bytes = Bytes.make 4 '\000' in
     l2_chain_id |> Z.to_int32 |> Bytes.set_int32_be bytes 0 ;
     Chain_id.of_bytes_exn bytes
+
+  module Protocol_data = struct
+    let get_mock_protocol_data =
+      Tezos_types.convert_using_serialization
+        ~name:"protocol_data"
+        ~dst:Tezlink_imports.Imported_protocol.block_header_data_encoding
+        ~src:Imported_protocol.Block_header_repr.protocol_data_encoding
+        Mock.protocol_data
+  end
+
+  let ethereum_to_tezos_block_hash hash =
+    hash |> Ethereum_types.block_hash_to_bytes |> Block_hash.of_string_exn
+
+  module Block_header = struct
+    let tezlink_block_to_shell_header (block : L2_types.Tezos_block.t) :
+        Block_header.shell_header =
+      let open Mock in
+      let (Ethereum_types.Qty number) = block.number in
+      let (Ethereum_types.Qty timestamp) = block.timestamp in
+      let predecessor = ethereum_to_tezos_block_hash block.parent_hash in
+      {
+        level = Z.to_int32 number;
+        proto_level;
+        predecessor;
+        timestamp = Time.Protocol.of_seconds @@ Z.to_int64 timestamp;
+        validation_passes;
+        operations_hash;
+        fitness;
+        context;
+      }
+
+    let _tezlink_block_to_block_header ~l2_chain_id
+        ((block : L2_types.Tezos_block.t), chain) :
+        Block_services.block_header tzresult =
+      let open Result_syntax in
+      let chain_id = tezlink_to_tezos_chain_id_exn ~l2_chain_id chain in
+      let* protocol_data = Protocol_data.get_mock_protocol_data in
+      let hash = ethereum_to_tezos_block_hash block.hash in
+      let shell = tezlink_block_to_shell_header block in
+      let block_header : Block_services.block_header =
+        {chain_id; hash; shell; protocol_data}
+      in
+      return block_header
+  end
 
   module Level = struct
     type t = Alpha_context.Level.t
