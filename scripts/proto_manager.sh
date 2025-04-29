@@ -1224,6 +1224,27 @@ function update_tezt_tests() {
     commit "tezt: copy ${protocol_source} regression files"
   fi
 
+  # add new protocol baker
+  # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
+  awk -v source="$protocol_source" -v target="$protocol_target" '
+$0 ~ "let octez_baker_" source " =" {
+  orig1 = $0
+  getline
+  orig2 = $0
+  print gensub(source, target, "g", orig1)
+  print gensub(source, target, "g", orig2)
+  print ""
+  print orig1
+  print orig2
+  next
+}
+1
+' tezt/lib_tezos/constant.ml > tezt/lib_tezos/constant.ml.tmp
+  mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+
+  ocamlformat -i tezt/lib_tezos/constant.ml
+  commit_if_changes "tezt: add unused ${protocol_target} baker"
+
   # mkdir -p "tezt/tests/expected/check_proto_${label}_changes.ml"
   # rm -rf /tmp/tezos_proto_snapshot
   # mkdir -p /tmp/tezos_proto_snapshot
