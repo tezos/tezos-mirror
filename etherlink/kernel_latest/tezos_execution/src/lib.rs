@@ -11,8 +11,8 @@ use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_tezlink::{
     operation::{ManagerOperation, Operation, OperationContent},
     operation_result::{
-        produce_operation_result, ApplyOperationError, ContentResult, OperationError,
-        OperationResult, OperationResultSum, Reveal, RevealSuccess, ValidityError,
+        produce_operation_result, ContentResult, OperationError, OperationResult,
+        OperationResultSum, Reveal, RevealError, RevealSuccess, ValidityError,
     },
 };
 use thiserror::Error;
@@ -85,25 +85,20 @@ fn reveal<Host: Runtime>(
 
     let expected_hash = match manager {
         Manager::Revealed(pk) => {
-            return Ok(Err(ApplyOperationError::PreviouslyRevealedKey(pk).into()))
+            return Ok(Err(RevealError::PreviouslyRevealedKey(pk).into()))
         }
         Manager::NotRevealed(pkh) => pkh,
     };
 
     // Ensure that the source of the operation is equal to the retrieved hash.
     if &expected_hash != provided_hash {
-        return Ok(Err(
-            ApplyOperationError::InconsistentHash(expected_hash).into()
-        ));
+        return Ok(Err(RevealError::InconsistentHash(expected_hash).into()));
     }
 
     // Check the public key
     let pkh_from_pk = public_key.pk_hash();
     if expected_hash != pkh_from_pk {
-        return Ok(Err(ApplyOperationError::InconsistentPublicKey(
-            expected_hash,
-        )
-        .into()));
+        return Ok(Err(RevealError::InconsistentPublicKey(expected_hash).into()));
     }
 
     // Set the public key as the manager
@@ -180,7 +175,7 @@ mod tests {
         block::TezBlock,
         operation::{ManagerOperation, Operation, OperationContent},
         operation_result::{
-            ApplyOperationError, ContentResult, OperationResult, OperationResultSum,
+            ContentResult, OperationResult, OperationResultSum, RevealError,
             RevealSuccess,
         },
     };
@@ -366,7 +361,7 @@ mod tests {
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
             result: ContentResult::Failed(vec![OperationError::Apply(
-                ApplyOperationError::PreviouslyRevealedKey(pk),
+                RevealError::PreviouslyRevealedKey(pk).into(),
             )]),
         });
         assert_eq!(receipt, expected_receipt);
@@ -406,7 +401,7 @@ mod tests {
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
             result: ContentResult::Failed(vec![OperationError::Apply(
-                ApplyOperationError::InconsistentHash(inconsistent_pkh),
+                RevealError::InconsistentHash(inconsistent_pkh).into(),
             )]),
         });
 
@@ -439,7 +434,7 @@ mod tests {
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
             result: ContentResult::Failed(vec![OperationError::Apply(
-                ApplyOperationError::InconsistentPublicKey(src),
+                RevealError::InconsistentPublicKey(src).into(),
             )]),
         });
 

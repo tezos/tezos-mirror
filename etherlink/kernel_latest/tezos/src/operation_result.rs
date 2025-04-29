@@ -6,8 +6,12 @@
 
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
 /// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::sequence::preceded;
 use std::fmt::Debug;
 use tezos_data_encoding::enc as tezos_enc;
+use tezos_data_encoding::enc::u8;
 use tezos_data_encoding::nom as tezos_nom;
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::types::Zarith;
@@ -24,10 +28,96 @@ pub enum ValidityError {
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
-pub enum ApplyOperationError {
+pub enum RevealError {
     PreviouslyRevealedKey(PublicKey),
     InconsistentHash(PublicKeyHash),
     InconsistentPublicKey(PublicKeyHash),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum TransferError {
+    BalanceTooLow {
+        contract: Contract,
+        balance: Narith,
+        amount: Narith,
+    },
+    UnspendableContract(Contract),
+}
+
+impl BinWriter for TransferError {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
+        match self {
+            Self::BalanceTooLow {
+                contract,
+                balance,
+                amount,
+            } => {
+                u8(&0_u8, output)?;
+                contract.bin_write(output)?;
+                balance.bin_write(output)?;
+                amount.bin_write(output)?;
+                Ok(())
+            }
+            Self::UnspendableContract(contract) => {
+                u8(&1_u8, output)?;
+                contract.bin_write(output)?;
+                Ok(())
+            }
+        }
+    }
+}
+
+impl NomReader<'_> for TransferError {
+    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
+        let balance_too_low_parser = preceded(tag(0_u8.to_be_bytes()), |input| {
+            let (input, contract) = Contract::nom_read(input)?;
+            let (input, balance) = Narith::nom_read(input)?;
+            let (input, amount) = Narith::nom_read(input)?;
+            Ok((
+                input,
+                Self::BalanceTooLow {
+                    contract,
+                    balance,
+                    amount,
+                },
+            ))
+        });
+        let unspendable_contract_parser = preceded(tag(1_u8.to_be_bytes()), |input| {
+            let (input, contract) = Contract::nom_read(input)?;
+            Ok((input, Self::UnspendableContract(contract)))
+        });
+        alt((balance_too_low_parser, unspendable_contract_parser))(input)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+pub enum ApplyOperationError {
+    Reveal(RevealError),
+    Transfer(TransferError),
+}
+
+impl From<RevealError> for ApplyOperationError {
+    fn from(value: RevealError) -> Self {
+        Self::Reveal(value)
+    }
+}
+
+impl From<TransferError> for ApplyOperationError {
+    fn from(value: TransferError) -> Self {
+        Self::Transfer(value)
+    }
+}
+
+impl From<RevealError> for OperationError {
+    fn from(value: RevealError) -> Self {
+        Self::Apply(value.into())
+    }
+}
+
+impl From<TransferError> for OperationError {
+    fn from(value: TransferError) -> Self {
+        Self::Apply(value.into())
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
