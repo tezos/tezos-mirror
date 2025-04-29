@@ -3,16 +3,19 @@
 // SPDX-License-Identifier: MIT
 
 use account_storage::{Manager, TezlinkImplicitAccount};
+use num_bigint::BigInt;
+use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::{base58::FromBase58CheckError, PublicKeyWithHash};
-use tezos_data_encoding::types::Narith;
+use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
+use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::{
     operation::{ManagerOperation, Operation, OperationContent},
     operation_result::{
-        produce_operation_result, ContentResult, OperationError, OperationResult,
-        OperationResultSum, Reveal, RevealError, RevealSuccess, ValidityError,
+        produce_operation_result, Balance, BalanceUpdate, OperationError,
+        OperationResultSum, Reveal, RevealError, RevealSuccess, TransferError,
+        TransferSuccess, ValidityError,
     },
 };
 use thiserror::Error;
@@ -20,6 +23,8 @@ use thiserror::Error;
 extern crate alloc;
 pub mod account_storage;
 pub mod context;
+
+type ExecutionResult<A> = Result<Result<A, OperationError>, ApplyKernelError>;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ApplyKernelError {
@@ -79,7 +84,7 @@ fn reveal<Host: Runtime>(
     provided_hash: &PublicKeyHash,
     account: &mut TezlinkImplicitAccount,
     public_key: &PublicKey,
-) -> Result<Result<RevealSuccess, OperationError>, ApplyKernelError> {
+) -> ExecutionResult<RevealSuccess> {
     log!(host, Debug, "Applying a reveal operation");
     let manager = account.manager(host)?;
 
@@ -109,6 +114,95 @@ fn reveal<Host: Runtime>(
     Ok(Ok(RevealSuccess {
         consumed_gas: 0_u64.into(),
     }))
+}
+
+/// Function to apply a transfer by modifying balances of both account
+fn apply_transfer<Host: Runtime>(
+    host: &mut Host,
+    context: &context::Context,
+    src: &Contract,
+    amount: &Narith,
+    dest: &Contract,
+) -> ExecutionResult<bool> {
+    let mut source = TezlinkImplicitAccount::from_contract(context, src)?;
+    let src_balance = source.balance(host)?;
+
+    let new_source_balance = match src_balance.0.checked_sub(&amount.0) {
+        None => {
+            log!(host, Debug, "Balance is too low");
+            let error = TransferError::BalanceTooLow {
+                contract: src.clone(),
+                balance: src_balance,
+                amount: amount.clone(),
+            };
+            return Ok(Err(error.into()));
+        }
+        Some(new_source_balance) => new_source_balance,
+    };
+
+    // Allocate the destination (does nothing if it's already allocated)
+    let was_allocated = TezlinkImplicitAccount::allocate(host, context, dest)?;
+
+    let mut destination = TezlinkImplicitAccount::from_contract(context, dest)?;
+
+    let dest_balance = destination.balance(host)?;
+
+    let new_destination_balance = &dest_balance.0 + &amount.0;
+
+    // Set the new balance for source and destination
+    source.set_balance(host, &new_source_balance.into())?;
+    destination.set_balance(host, &new_destination_balance.into())?;
+
+    Ok(Ok(was_allocated))
+}
+
+/// Function to handle the transfer case of a manager operation
+fn transfer<Host: Runtime>(
+    host: &mut Host,
+    context: &context::Context,
+    src: &PublicKeyHash,
+    amount: &Narith,
+    dest: &Contract,
+) -> ExecutionResult<TransferSuccess> {
+    log!(host, Debug, "Applying a transfer operation");
+
+    let src = Contract::Implicit(src.clone());
+
+    // Apply the transfer and return if the destination was already allocated
+    let allocated_destination_contract =
+        match apply_transfer(host, context, &src, amount, dest)? {
+            Err(err) => return Ok(Err(err)),
+            Ok(result) => result,
+        };
+
+    // Construct the transfer result
+    let source_update = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
+    let dest_update = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
+
+    let balance_updates = vec![
+        BalanceUpdate {
+            balance: Balance::Account(src.clone()),
+            changes: Zarith(source_update),
+        },
+        BalanceUpdate {
+            balance: Balance::Account(dest.clone()),
+            changes: Zarith(dest_update),
+        },
+    ];
+
+    let success = TransferSuccess {
+        storage: None,
+        lazy_storage_diff: None,
+        balance_updates,
+        ticket_receipt: vec![],
+        originated_contracts: vec![],
+        consumed_gas: 0_u64.into(),
+        storage_size: 0_u64.into(),
+        paid_storage_size_diff: 0_u64.into(),
+        allocated_destination_contract,
+    };
+
+    Ok(Ok(success))
 }
 
 pub fn apply_operation<Host: Runtime>(
@@ -155,11 +249,13 @@ pub fn apply_operation<Host: Runtime>(
             let manager_result = produce_operation_result(reveal_result);
             OperationResultSum::Reveal(manager_result)
         }
-        OperationContent::Transfer { .. } => {
-            OperationResultSum::Transfer(OperationResult {
-                balance_updates: vec![],
-                result: ContentResult::Failed(vec![]),
-            })
+        OperationContent::Transfer {
+            amount,
+            destination,
+        } => {
+            let transfer_result = transfer(host, context, source, amount, destination)?;
+            let manager_result = produce_operation_result(transfer_result);
+            OperationResultSum::Transfer(manager_result)
         }
     };
 
