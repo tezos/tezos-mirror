@@ -137,6 +137,8 @@ let container_forward_tx ~keep_alive ~evm_node_endpoint :
 
     let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
       Lwt_result_syntax.return_unit
+
+    let lock_transactions () = Lwt_result_syntax.return_unit
   end)
 
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync

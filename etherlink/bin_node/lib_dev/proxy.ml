@@ -49,6 +49,8 @@ let container_forward_tx ~evm_node_endpoint ~keep_alive :
 
     let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
       Lwt_result_syntax.return_unit
+
+    let lock_transactions () = Lwt_result_syntax.return_unit
   end)
 
 let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)

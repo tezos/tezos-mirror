@@ -868,12 +868,6 @@ let pop_and_inject_transactions_lazy () =
       in
       return_unit
 
-let lock_transactions () =
-  let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Request.Lock_transactions
-  |> handle_request_error
-
 let unlock_transactions () =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
@@ -977,4 +971,10 @@ module Tx_container = struct
 
   let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
     Lwt_result_syntax.return_unit
+
+  let lock_transactions () =
+    let open Lwt_result_syntax in
+    let*? worker = Lazy.force worker in
+    Worker.Queue.push_request_and_wait worker Request.Lock_transactions
+    |> handle_request_error
 end

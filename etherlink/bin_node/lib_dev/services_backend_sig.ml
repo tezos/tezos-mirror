@@ -238,4 +238,9 @@ module type Tx_container = sig
     [tick_interval] seconds. *)
   val tx_queue_beacon :
     evm_node_endpoint:endpoint -> tick_interval:float -> unit tzresult Lwt.t
+
+  (** [lock_transactions] locks the transactions in the queue, new
+    transactions can be added but nothing can be retrieved with
+    {!pop_transactions}. *)
+  val lock_transactions : unit -> unit tzresult Lwt.t
 end

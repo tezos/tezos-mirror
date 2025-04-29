@@ -110,6 +110,8 @@ module Worker = struct
 
   let tx_queue_enabled worker = (state worker).tx_queue_enabled
 
+  let tx_container worker = (state worker).tx_container
+
   let decrement_cooldown worker =
     let current = current_cooldown worker in
     if on_cooldown worker then set_cooldown worker (current - 1) else ()
@@ -167,8 +169,8 @@ module Worker = struct
     match rollup_is_lagging_behind self with
     | No_lag | Needs_republish -> return_unit
     | Needs_lock ->
-        if tx_queue_enabled self then Tx_queue.lock_transactions ()
-        else Tx_pool.lock_transactions ()
+        let (module Tx_container) = tx_container self in
+        Tx_container.lock_transactions ()
 
   let catch_up worker =
     let open Lwt_result_syntax in

@@ -1033,9 +1033,6 @@ let start ~config ~keep_alive () =
   let*! () = Tx_queue_events.is_ready () in
   return_unit
 
-let lock_transactions () =
-  bind_worker @@ fun w -> push_request w Lock_transactions
-
 let unlock_transactions () =
   bind_worker @@ fun w -> push_request w Unlock_transactions
 
@@ -1131,4 +1128,7 @@ module Tx_container = struct
       loop ()
     in
     loop ()
+
+  let lock_transactions () =
+    bind_worker @@ fun w -> push_request w Lock_transactions
 end
