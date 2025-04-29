@@ -85,12 +85,18 @@ let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
   | Michelson ->
       error_with "Proxy.container_forward_tx not implemented for Tezlink"
 
-let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
-    ~(tx_container :
-       L2_types.evm_chain_family Services_backend_sig.tx_container)
-    ~smart_rollup_address =
+let tx_queue_pop_and_inject (type f)
+    (module Rollup_node_rpc : Services_backend_sig.S)
+    ~(tx_container : f Services_backend_sig.tx_container) ~smart_rollup_address
+    =
   let open Lwt_result_syntax in
-  let (Evm_tx_container (module Tx_container)) = tx_container in
+  let*? (module Tx_container) =
+    let open Result_syntax in
+    match tx_container with
+    | Evm_tx_container m -> return m
+    | Michelson_tx_container _ ->
+        error_with "Unsupported: Tezlink + Tx_queue + Proxy mode"
+  in
   let maximum_cumulative_size =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
       Sequencer_blueprint.maximum_chunks_per_l1_level
@@ -199,7 +205,7 @@ let main
         config.experimental_features.enable_tx_queue )
     with
     | true, None, Some tx_queue_config ->
-        let start, tx_container = Tx_queue.tx_container ~chain_family:EVM in
+        let start, tx_container = Tx_queue.tx_container ~chain_family in
         let* () =
           start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
         in
@@ -226,14 +232,14 @@ let main
                 chain_family = Ex_chain_family chain_family;
               }
         in
-        let*? tx_container = Tx_pool.tx_container ~chain_family:EVM in
+        let*? tx_container = Tx_pool.tx_container ~chain_family in
         return (Some Tx_pool.pop_and_inject_transactions_lazy, tx_container)
     | enable_send_raw_transaction, evm_node_endpoint, _ ->
         let evm_node_endpoint =
           if enable_send_raw_transaction then evm_node_endpoint else None
         in
         let*? tx_container =
-          container_forward_tx ~chain_family:EVM ~evm_node_endpoint ~keep_alive
+          container_forward_tx ~chain_family ~evm_node_endpoint ~keep_alive
         in
         return (None, tx_container)
   in

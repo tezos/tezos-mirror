@@ -21,13 +21,19 @@ open Ethereum_types
     into a forced blueprint. The sequencer has performed a reorganization and
     starts submitting blocks from the new branch.
 *)
-let on_new_blueprint
-    (tx_container : L2_types.evm_chain_family Services_backend_sig.tx_container)
-    evm_node_endpoint next_blueprint_number
+let on_new_blueprint (type f)
+    (tx_container : f Services_backend_sig.tx_container) evm_node_endpoint
+    next_blueprint_number
     (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
      blueprint_with_events) =
   let open Lwt_result_syntax in
-  let (Evm_tx_container (module Tx_container)) = tx_container in
+  let*? (module Tx_container) =
+    let open Result_syntax in
+    match tx_container with
+    | Evm_tx_container m -> return m
+    | Michelson_tx_container _ ->
+        error_with "Observer mode is not supported for Tezlink"
+  in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
   if Z.(equal level number) then
@@ -220,11 +226,18 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       init_from_snapshot
   in
 
+  let* l2_chain_id, Ex_chain_family chain_family =
+    match config.experimental_features.l2_chains with
+    | None -> return (None, L2_types.Ex_chain_family EVM)
+    | Some [l2_chain] -> return (Some l2_chain.chain_id, l2_chain.chain_family)
+    | _ -> tzfail Node_error.Unexpected_multichain
+  in
+
   let*? start_tx_container, tx_container, ping_tx_pool =
     let open Result_syntax in
     match config.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
-        let start, tx_container = Tx_queue.tx_container ~chain_family:EVM in
+        let start, tx_container = Tx_queue.tx_container ~chain_family in
         return
           ( (fun ~tx_pool_parameters:_ ->
               start ~config:tx_queue_config ~keep_alive:config.keep_alive ()),
@@ -234,7 +247,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
         if config.finalized_view then
           let* tx_container =
             container_forward_tx
-              ~chain_family:EVM
+              ~chain_family
               ~keep_alive:config.keep_alive
               ~evm_node_endpoint
           in
@@ -243,7 +256,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
               tx_container,
               false )
         else
-          let* tx_container = Tx_pool.tx_container ~chain_family:EVM in
+          let* tx_container = Tx_pool.tx_container ~chain_family in
           return (Tx_pool.start, tx_container, true)
   in
 
@@ -273,8 +286,10 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint
   in
 
+  (* Check that the multichain configuration is consistent with the
+     kernel config. *)
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-  let* l2_chain_id, Ex_chain_family chain_family =
+  let* _l2_chain_id, _chain_family =
     let (module Backend) = observer_backend in
     Backend.single_chain_id_and_family ~config ~enable_multichain
   in
