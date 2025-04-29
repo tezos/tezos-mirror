@@ -470,30 +470,65 @@ let partition_consensus_operations_on_proposal consensus_operations =
 (* [partition_consensus_operations_on_reproposal consensus_operations] partitions
    [consensus_operations] as follows :
    - an optional Attestations_aggregate
-   - a list that contains all tz4 attestations eligible for aggregation
+   - an optional Preattestations_aggregate
+   - a list of attestations eligible for aggregation
+   - a list of preattestations eligible for aggregation
    - a list containing all other remaining consensus operations *)
 let partition_consensus_operations_on_reproposal consensus_operations =
   List.fold_left
-    (fun (aggregate_opt, eligible_attestations, other_operations) operation ->
+    (fun ( attestations_aggregate_opt,
+           preattestations_aggregate_opt,
+           eligible_attestations,
+           eligible_preattestations,
+           other_operations )
+         operation ->
       let {shell; protocol_data = Operation_data protocol_data} = operation in
       let {contents; signature} = protocol_data in
       match (contents, signature) with
+      | Single (Preattestation _), Some (Bls _) ->
+          let op : Kind.preattestation Operation.t = {shell; protocol_data} in
+          let eligible_preattestations = op :: eligible_preattestations in
+          ( attestations_aggregate_opt,
+            preattestations_aggregate_opt,
+            eligible_attestations,
+            eligible_preattestations,
+            other_operations )
       | Single (Attestation {dal_content = None; _}), Some (Bls _) ->
-          let operation : Kind.attestation Operation.t =
-            {shell; protocol_data}
-          in
-          let eligible_attestations = operation :: eligible_attestations in
-          (aggregate_opt, eligible_attestations, other_operations)
-      | ( Single (Attestations_aggregate {consensus_content; committee}),
+          let op : Kind.attestation Operation.t = {shell; protocol_data} in
+          let eligible_attestations = op :: eligible_attestations in
+          ( attestations_aggregate_opt,
+            preattestations_aggregate_opt,
+            eligible_attestations,
+            eligible_preattestations,
+            other_operations )
+      | ( Single (Preattestations_aggregate {consensus_content; committee}),
           Some (Bls signature) ) ->
-          let aggregate_opt =
+          let preattestations_aggregate_opt =
             Some (shell, consensus_content, committee, signature, operation)
           in
-          (aggregate_opt, eligible_attestations, other_operations)
+          ( attestations_aggregate_opt,
+            preattestations_aggregate_opt,
+            eligible_attestations,
+            eligible_preattestations,
+            other_operations )
+      | ( Single (Attestations_aggregate {consensus_content; committee}),
+          Some (Bls signature) ) ->
+          let attestations_aggregate_opt =
+            Some (shell, consensus_content, committee, signature, operation)
+          in
+          ( attestations_aggregate_opt,
+            preattestations_aggregate_opt,
+            eligible_attestations,
+            eligible_preattestations,
+            other_operations )
       | _ ->
           let other_operations = operation :: other_operations in
-          (aggregate_opt, eligible_attestations, other_operations))
-    (None, [], [])
+          ( attestations_aggregate_opt,
+            preattestations_aggregate_opt,
+            eligible_attestations,
+            eligible_preattestations,
+            other_operations ))
+    (None, None, [], [], [])
     consensus_operations
 
 (* [aggregate_attestations_on_proposal attestations] replaces all eligible
@@ -571,11 +606,17 @@ let aggregate_attestations_on_reproposal aggregate_opt eligible_attestations =
    level, round and block_payload_hash. *)
 let aggregate_consensus_operations_on_reproposal consensus_operations =
   let open Result_syntax in
-  let aggregate_opt, eligible_attestations, other_operations =
+  let ( attestations_aggregate_opt,
+        _preattestations_aggregate_opt,
+        eligible_attestations,
+        _eligible_preattestations,
+        other_operations ) =
     partition_consensus_operations_on_reproposal consensus_operations
   in
   let* attestations_aggregate_opt =
-    aggregate_attestations_on_reproposal aggregate_opt eligible_attestations
+    aggregate_attestations_on_reproposal
+      attestations_aggregate_opt
+      eligible_attestations
   in
   match attestations_aggregate_opt with
   | Some attestations_aggregate ->
