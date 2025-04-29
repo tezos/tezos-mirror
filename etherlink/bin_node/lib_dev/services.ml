@@ -558,7 +558,7 @@ let dispatch_request ~websocket
             build_with_input ~f module_ parameters
         | Generic_block_number.Method ->
             let f (_ : unit option) =
-              let chain_family =
+              let (Ex_chain_family chain_family) =
                 Configuration.retrieve_chain_family
                   ~l2_chains:config.experimental_features.l2_chains
               in

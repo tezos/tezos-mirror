@@ -181,7 +181,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   let rpc_backend = Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint in
 
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ctxt in
-  let* l2_chain_id, chain_family =
+  let* l2_chain_id, Ex_chain_family chain_family =
     let (module Backend) = rpc_backend in
     Backend.single_chain_id_and_family ~config ~enable_multichain
   in
@@ -223,7 +223,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
               tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
               tx_pool_tx_per_addr_limit =
                 Int64.to_int config.tx_pool_tx_per_addr_limit;
-              chain_family;
+              chain_family = Ex_chain_family chain_family;
             }
         in
         return
@@ -248,6 +248,9 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     }
   in
 
+  let rpc_server_family =
+    Rpc_types.Single_chain_node_rpc_server (Ex_chain_family chain_family)
+  in
   let* server_public_finalizer =
     Rpc_server.start_public_server
       ~l2_chain_id
@@ -255,7 +258,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       ~evm_services:
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)
       ~data_dir
-      ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
+      ~rpc_server_family
       Minimal
       rpc_config
       tx_container

@@ -163,7 +163,7 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
   let*? () = Rpc_types.check_rpc_server_config rpc_server_family config in
   let* register_tezos_services =
     match rpc_server_family with
-    | Rpc_types.Single_chain_node_rpc_server L2_types.Michelson ->
+    | Rpc_types.Single_chain_node_rpc_server (Ex_chain_family Michelson) ->
         let (module Backend : Services_backend_sig.S), _ = ctxt in
         let* l2_chain_id =
           match l2_chain_id with
@@ -174,7 +174,7 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
         @@ Tezos_services.register_tezlink_services
              ~l2_chain_id
              (module Backend.Tezlink)
-    | Single_chain_node_rpc_server L2_types.EVM
+    | Single_chain_node_rpc_server (Ex_chain_family EVM)
     | Multichain_sequencer_rpc_server ->
         return @@ Evm_directory.empty config.experimental_features.rpc_server
   in

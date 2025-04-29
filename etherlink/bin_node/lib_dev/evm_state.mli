@@ -79,7 +79,7 @@ val current_block_height :
 
 (** Same as {!current_block_height} for the block hash. *)
 val current_block_hash :
-  chain_family:L2_types.chain_family ->
+  chain_family:_ L2_types.chain_family ->
   t ->
   Ethereum_types.block_hash tzresult Lwt.t
 
@@ -103,7 +103,7 @@ val apply_blueprint :
   ?log_file:string ->
   ?profile:Configuration.profile_mode ->
   data_dir:string ->
-  chain_family:L2_types.chain_family ->
+  chain_family:_ L2_types.chain_family ->
   config:Wasm_debugger.config ->
   native_execution_policy:Configuration.native_execution_policy ->
   t ->
@@ -140,7 +140,7 @@ val get_delayed_inbox_item :
     and all durable storage information stored for [block], if this function is
     called they need to be store elsewhere, mainly it consists in transactions. *)
 val clear_block_storage :
-  L2_types.chain_family -> 'transaction_object L2_types.block -> t -> t Lwt.t
+  _ L2_types.chain_family -> 'transaction_object L2_types.block -> t -> t Lwt.t
 
 (** [storage_version tree] returns the current storage version set by the
     kernel. This storage version is used by the EVM node to determine whether a

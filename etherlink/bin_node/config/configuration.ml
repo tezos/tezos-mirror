@@ -73,7 +73,7 @@ let chain_id_encoding : L2_types.chain_id Data_encoding.t =
 
 type l2_chain = {
   chain_id : L2_types.chain_id;
-  chain_family : L2_types.chain_family;
+  chain_family : L2_types.ex_chain_family;
 }
 
 type tx_queue = {
@@ -265,7 +265,7 @@ let is_tx_queue_enabled {experimental_features = {enable_tx_queue; _}; _} =
 let retrieve_chain_family ~l2_chains =
   match l2_chains with
   | Some [l2_chain] -> l2_chain.chain_family
-  | None -> L2_types.EVM
+  | None -> L2_types.Ex_chain_family EVM
   | _ -> assert false
 
 let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =

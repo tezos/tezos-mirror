@@ -142,7 +142,7 @@ module Chain_id :
 module Chain_family :
   METHOD
     with type input = L2_types.chain_id
-     and type output = L2_types.chain_family
+     and type output = L2_types.ex_chain_family
 
 module Accounts :
   METHOD with type input = unit and type output = Ethereum_types.address list

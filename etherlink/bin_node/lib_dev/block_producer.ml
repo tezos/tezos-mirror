@@ -10,7 +10,7 @@ type parameters = {
   smart_rollup_address : string;
   sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
-  chain_family : L2_types.chain_family;
+  chain_family : L2_types.ex_chain_family;
   tx_container : (module Services_backend_sig.Tx_container);
 }
 
@@ -216,7 +216,7 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
         in
         return `Drop
 
-let pop_valid_tx ~chain_family
+let pop_valid_tx (type f) ~(chain_family : f L2_types.chain_family)
     ~(tx_container : (module Services_backend_sig.Tx_container))
     (head_info : Evm_context.head) ~maximum_cumulative_size =
   let open Lwt_result_syntax in
@@ -385,7 +385,7 @@ module Handlers = struct
           smart_rollup_address;
           sequencer_key;
           maximum_number_of_chunks;
-          chain_family;
+          chain_family = Ex_chain_family chain_family;
           tx_container;
         } =
           state

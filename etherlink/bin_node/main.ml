@@ -1059,7 +1059,7 @@ let add_tezlink_to_node_configuration tezlink_chain_id configuration =
              [
                {
                  chain_id = Chain_id Z.(of_int tezlink_chain_id);
-                 chain_family = Michelson;
+                 chain_family = Ex_chain_family Michelson;
                };
              ]);
       spawn_rpc =
@@ -2114,7 +2114,7 @@ let make_l2_kernel_config_command =
            set_account_code,
            world_state_path,
            l2_chain_id,
-           l2_chain_family )
+           Ex_chain_family l2_chain_family )
          output
          () ->
       let* l2_chain_id =

@@ -93,7 +93,7 @@ val chain_id : supported_network -> L2_types.chain_id
 
 type l2_chain = {
   chain_id : L2_types.chain_id;
-  chain_family : L2_types.chain_family;
+  chain_family : L2_types.ex_chain_family;
 }
 
 type tx_queue = {
@@ -228,7 +228,7 @@ val is_tx_queue_enabled : t -> bool
 
   This function will be removed when multichain is implemented *)
 val retrieve_chain_family :
-  l2_chains:l2_chain list option -> L2_types.chain_family
+  l2_chains:l2_chain list option -> L2_types.ex_chain_family
 
 val history_mode_encoding : history_mode Data_encoding.t
 

@@ -164,7 +164,7 @@ let main
       then
         (* The finalized view of the proxy mode and the multichain feature are not compatible. *)
         tzfail (Node_error.Proxy_finalize_with_multichain `Node)
-      else return (None, L2_types.EVM)
+      else return (None, L2_types.Ex_chain_family EVM)
     else
       let* enable_multichain = Rollup_node_rpc.is_multichain_enabled () in
       Rollup_node_rpc.single_chain_id_and_family ~config ~enable_multichain

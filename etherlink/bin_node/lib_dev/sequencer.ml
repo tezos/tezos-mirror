@@ -288,7 +288,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let* () =
     if status = Created then
       (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-      let chain_family =
+      let (Ex_chain_family chain_family) =
         Configuration.retrieve_chain_family
           ~l2_chains:configuration.experimental_features.l2_chains
       in
@@ -320,7 +320,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
 
   let backend = Evm_ro_context.ro_backend ro_ctxt configuration in
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-  let* l2_chain_id, chain_family =
+  let* l2_chain_id, Ex_chain_family chain_family =
     let (module Backend) = backend in
     Backend.single_chain_id_and_family ~config:configuration ~enable_multichain
   in
@@ -341,7 +341,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
             tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
             tx_pool_tx_per_addr_limit =
               Int64.to_int configuration.tx_pool_tx_per_addr_limit;
-            chain_family;
+            chain_family = Ex_chain_family chain_family;
           }
   in
   Metrics.init
@@ -355,7 +355,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         smart_rollup_address = smart_rollup_address_b58;
         sequencer_key = sequencer_config.sequencer;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
-        chain_family;
+        chain_family = Ex_chain_family chain_family;
         tx_container;
       }
   in
@@ -385,7 +385,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~data_dir
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
-         else Rpc_types.Single_chain_node_rpc_server EVM)
+         else Rpc_types.Single_chain_node_rpc_server (Ex_chain_family EVM))
       (* When the tx_queue is enabled the validation is done in the
          block_producer instead of in the RPC. This allows for a more
          accurate validation as it's delayed up to when the block is
@@ -399,7 +399,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     Rpc_server.start_private_server
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
-         else Rpc_types.Single_chain_node_rpc_server EVM)
+         else Rpc_types.Single_chain_node_rpc_server (Ex_chain_family EVM))
       ~block_production:`Single_node
       configuration
       tx_container

@@ -10,7 +10,7 @@ type parameters = {
   smart_rollup_address : string;
   sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
-  chain_family : L2_types.chain_family;
+  chain_family : L2_types.ex_chain_family;
   tx_container : (module Services_backend_sig.Tx_container);
 }
 

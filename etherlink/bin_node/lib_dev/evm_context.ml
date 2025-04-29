@@ -257,7 +257,9 @@ module State = struct
     Evm_store.use store @@ fun conn ->
     let* latest = Evm_store.Context_hashes.find_latest conn in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-    let chain_family = Configuration.retrieve_chain_family ~l2_chains in
+    let (Ex_chain_family chain_family) =
+      Configuration.retrieve_chain_family ~l2_chains
+    in
     match latest with
     | Some (Qty latest_blueprint_number, checkpoint) ->
         let*! context = Irmin_context.checkout_exn index checkpoint in
@@ -483,7 +485,7 @@ module State = struct
     (* Update mutable session values. *)
     let next_blueprint_number = Ethereum_types.Qty.next l2_level in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-    let chain_family =
+    let (Ex_chain_family chain_family) =
       Configuration.retrieve_chain_family
         ~l2_chains:ctxt.configuration.experimental_features.l2_chains
     in
@@ -521,7 +523,7 @@ module State = struct
       if not ctxt.legacy_block_storage then
         Evm_store.Blocks.find_hash_of_number conn (Qty number)
       else
-        let chain_family =
+        let (Ex_chain_family chain_family) =
           Configuration.retrieve_chain_family
             ~l2_chains:ctxt.configuration.experimental_features.l2_chains
         in
@@ -719,7 +721,7 @@ module State = struct
     let time_processed = ref Ptime.Span.zero in
 
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-    let chain_family =
+    let (Ex_chain_family chain_family) =
       Configuration.retrieve_chain_family
         ~l2_chains:ctxt.configuration.experimental_features.l2_chains
     in
@@ -1214,7 +1216,7 @@ module State = struct
     (* Prepare an event list to be reapplied on current head *)
     let events = Evm_events.of_parts delayed_transactions lost_upgrade in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-    let chain_family =
+    let (Ex_chain_family chain_family) =
       Configuration.retrieve_chain_family
         ~l2_chains:ctxt.configuration.experimental_features.l2_chains
     in
@@ -1761,7 +1763,7 @@ module State = struct
             if not ctxt.legacy_block_storage then
               Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
             else
-              let chain_family =
+              let (Ex_chain_family chain_family) =
                 Configuration.retrieve_chain_family
                   ~l2_chains:ctxt.configuration.experimental_features.l2_chains
               in
@@ -2208,7 +2210,7 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
   let* evm_events =
     get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state
   in
-  let chain_family =
+  let (Ex_chain_family chain_family) =
     Configuration.retrieve_chain_family
       ~l2_chains:configuration.Configuration.experimental_features.l2_chains
   in

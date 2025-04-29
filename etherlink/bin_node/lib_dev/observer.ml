@@ -231,7 +231,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   in
 
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-  let* l2_chain_id, chain_family =
+  let* l2_chain_id, Ex_chain_family chain_family =
     let (module Backend) = observer_backend in
     Backend.single_chain_id_and_family ~config ~enable_multichain
   in
@@ -254,7 +254,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
               tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
               tx_pool_tx_per_addr_limit =
                 Int64.to_int config.tx_pool_tx_per_addr_limit;
-              chain_family;
+              chain_family = Ex_chain_family chain_family;
             }
   in
 
@@ -263,13 +263,16 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~tx_pool_size_info:Tx_pool.size_info
     ~smart_rollup_address ;
 
+  let rpc_server_family =
+    Rpc_types.Single_chain_node_rpc_server (Ex_chain_family chain_family)
+  in
   let* finalizer_public_server =
     Rpc_server.start_public_server
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
       ~data_dir
-      ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
+      ~rpc_server_family
       Minimal
       config
       tx_container
@@ -277,7 +280,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
-      ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
+      ~rpc_server_family
       config
       tx_container
       (observer_backend, smart_rollup_address)
