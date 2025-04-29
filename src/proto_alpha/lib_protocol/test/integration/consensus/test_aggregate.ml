@@ -574,6 +574,40 @@ let test_multiple_aggregates_per_block_forbidden () =
     (conflicting_consensus_operation
        ~kind:Validate_errors.Consensus.Preattestations_aggregate)
 
+let test_eligible_preattestation_must_be_aggregated () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* block' = Block.bake block in
+  let* attesters = Context.get_attesters (B block') in
+  let attester = find_attester_with_bls_key attesters in
+  match attester with
+  | Some (attester, _) ->
+      let* operation =
+        Op.preattestation ~delegate:attester.consensus_key block'
+      in
+      (* Operation is valid in the Mempool *)
+      let* inc = Incremental.begin_construction ~mempool_mode:true block in
+      let* inc = Incremental.add_operation inc operation in
+      let* _ = Incremental.finalize_block inc in
+      (* Operation is invalid in a block *)
+      let*! res =
+        let round_zero = Alpha_context.Round.zero in
+        Block.bake
+          ~policy:(By_round 1)
+          ~payload_round:(Some round_zero)
+          ~locked_round:(Some round_zero)
+          ~operation
+          block
+      in
+      Assert.proto_error
+        ~loc:__LOC__
+        res
+        (unaggregated_eligible_attestation
+           ~kind:Validate_errors.Consensus.Preattestation)
+  | _ -> assert false
+
 let test_eligible_attestation_must_be_aggregated () =
   let open Lwt_result_syntax in
   let* _genesis, block =
@@ -696,6 +730,10 @@ let tests =
       "test_multiple_aggregates_per_block_forbidden"
       `Quick
       test_multiple_aggregates_per_block_forbidden;
+    Tztest.tztest
+      "test_eligible_preattestation_must_be_aggregated"
+      `Quick
+      test_eligible_preattestation_must_be_aggregated;
     Tztest.tztest
       "test_eligible_attestation_must_be_aggregated"
       `Quick
