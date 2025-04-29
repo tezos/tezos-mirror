@@ -188,7 +188,7 @@ let main
         config.experimental_features.enable_tx_queue )
     with
     | true, None, Some tx_queue_config ->
-        let start, tx_container = Tx_queue.tx_container in
+        let start, tx_container = Tx_queue.tx_container ~chain_family:EVM in
         let* () =
           start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
         in

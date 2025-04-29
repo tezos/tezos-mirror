@@ -24,17 +24,18 @@
           [callback] is called with [`Dropped].}} *)
 type callback = [`Accepted | `Confirmed | `Dropped | `Refused] -> unit Lwt.t
 
-(** [tx_container] is a pair [(start, container)] where
+(** [tx_container ~chain_family] is a pair [(start, container)] where
     [start ~config ~max_transaction_batch_length ()] starts the
     worker, meaning it is possible to call {!inject}, {!confirm} and
     {!beacon} and [container] is a wrapper of the Tx_queue to be
     compatible with the Tx_container signature for the services. *)
 val tx_container :
+  chain_family:'f L2_types.chain_family ->
   (config:Configuration.tx_queue ->
   keep_alive:bool ->
   unit ->
   unit tzresult Lwt.t)
-  * L2_types.evm_chain_family Services_backend_sig.tx_container
+  * 'f Services_backend_sig.tx_container
 
 (**/*)
 

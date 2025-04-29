@@ -209,7 +209,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   let start_tx_container, tx_container, ping_tx_pool =
     match config.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
-        let start, tx_container = Tx_queue.tx_container in
+        let start, tx_container = Tx_queue.tx_container ~chain_family:EVM in
         ( (fun ~tx_pool_parameters:_ ->
             start ~config:tx_queue_config ~keep_alive:config.keep_alive ()),
           tx_container,

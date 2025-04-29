@@ -1209,9 +1209,23 @@ module Eth_tx_container =
       let chain_name = "etherlink"
     end)
 
-let tx_container =
-  ( Eth_tx_container.start,
-    Services_backend_sig.Evm_tx_container (module Eth_tx_container) )
+module Tezlink_tx_container =
+  Tx_container
+    (Tx_queue_types.Tezlink_operation)
+    (struct
+      let chain_name = "tezlink"
+    end)
+
+let tx_container (type f) ~(chain_family : f L2_types.chain_family) :
+    _ * f Services_backend_sig.tx_container =
+  match chain_family with
+  | EVM ->
+      ( Eth_tx_container.start,
+        Services_backend_sig.Evm_tx_container (module Eth_tx_container) )
+  | Michelson ->
+      ( Tezlink_tx_container.start,
+        Services_backend_sig.Michelson_tx_container
+          (module Tezlink_tx_container) )
 
 module Internal_for_tests = struct
   module Nonce_bitset = Nonce_bitset

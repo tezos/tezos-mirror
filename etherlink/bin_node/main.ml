@@ -1583,7 +1583,7 @@ let init_from_rollup_node_command =
       let* configuration = Cli.create_or_read_config ~data_dir config_file in
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       let _start_tx_queue, tx_container =
-        Evm_node_lib_dev.Tx_queue.tx_container
+        Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
       in
       Evm_node_lib_dev.Evm_context.init_from_rollup_node
         ~configuration
@@ -1801,7 +1801,7 @@ let patch_kernel_command =
       let configuration = {configuration with observer = None} in
       if force then
         let _start_tx_queue, tx_container =
-          Evm_node_lib_dev.Tx_queue.tx_container
+          Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
         in
         let* _status =
           Evm_context.start
@@ -3065,7 +3065,7 @@ let patch_state_command =
            to interact with an upstream EVM node. *)
         let configuration = {configuration with observer = None} in
         let _start_tx_queue, tx_container =
-          Evm_node_lib_dev.Tx_queue.tx_container
+          Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
         in
         let* _status =
           Evm_context.start

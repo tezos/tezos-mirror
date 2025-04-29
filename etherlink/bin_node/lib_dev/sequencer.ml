@@ -188,7 +188,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let start_tx_container, tx_container =
     match configuration.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
-        let start, tx_container = Tx_queue.tx_container in
+        let start, tx_container = Tx_queue.tx_container ~chain_family:EVM in
         ( (fun ~tx_pool_parameters:_ ->
             start
               ~config:tx_queue_config

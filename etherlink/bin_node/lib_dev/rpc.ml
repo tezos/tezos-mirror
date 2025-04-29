@@ -214,7 +214,9 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
 
         return (false, forward_request)
     | None, Some tx_queue_config ->
-        let start, tx_container = Tx_queue.tx_container in
+        let start, tx_container =
+          Tx_queue.tx_container ~chain_family:L2_types.EVM
+        in
         let* () =
           start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
         in
