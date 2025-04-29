@@ -908,7 +908,8 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
       ~data_dir
       ~irmin_cache_size
       ?log_kernel_debug_file
-      Read_write
+      ~store_access:Read_write
+      ~context_access:Read_write
       l1_ctxt
       genesis_info
       ~lcc

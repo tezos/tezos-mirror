@@ -114,7 +114,7 @@ module type S = sig
     (int * Outbox_message.summary) list Lwt.t
 
   val produce_serialized_output_proof :
-    Node_context.rw ->
+    _ Node_context.rw_context ->
     Context.pvmstate ->
     outbox_level:int32 ->
     message_index:int ->

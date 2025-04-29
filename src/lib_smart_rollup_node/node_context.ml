@@ -91,7 +91,7 @@ type sync_info = {
 type 'a t = {
   config : Configuration.t;
   cctxt : Client_context.full;
-  degraded : ('a, bool) Reference.t;
+  degraded : bool Reference.rw;
   dal_cctxt : Dal_node_client.cctxt option;
   data_dir : string;
   l1_ctxt : Layer1.t;
@@ -101,21 +101,26 @@ type 'a t = {
   kind : Kind.t;
   unsafe_patches : Pvm_patches.t;
   lockfile : Lwt_unix.file_descr;
-  store : 'a store;
-  context : 'a Context.t;
-  lcc : ('a, lcc) Reference.t;
-  lpc : ('a, Commitment.t option) Reference.t;
-  private_info : ('a, private_info option) Reference.t;
+  store : 'store store;
+  context : 'context Context.t;
+  lcc : lcc Reference.rw;
+  lpc : Commitment.t option Reference.rw;
+  private_info : private_info option Reference.rw;
   kernel_debug_logger : debug_logger;
   finaliser : unit -> unit Lwt.t;
   current_protocol : current_protocol Reference.rw;
   global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
   sync : sync_info;
 }
+  constraint 'a = < store : 'store ; context : 'context >
 
-type rw = [`Read | `Write] t
+type rw = < store : [`Read | `Write] ; context : [`Read | `Write] > t
 
-type ro = [`Read] t
+type ro = < store : [`Read] ; context : [`Read] > t
+
+type 'a rw_store = < store : [`Read | `Write] ; context : 'a > t
+
+type 'a rw_context = < store : 'a ; context : [`Read | `Write] > t
 
 let get_operator node_ctxt purpose =
   Purpose.find_operator purpose node_ctxt.config.operators
@@ -198,16 +203,18 @@ let dal_supported node_ctxt =
   node_ctxt.dal_cctxt <> None
   && (Reference.get node_ctxt.current_protocol).constants.dal.feature_enable
 
-let readonly (node_ctxt : _ t) =
+let readonly (node_ctxt : _ t) : ro =
   {
     node_ctxt with
-    degraded = Reference.readonly node_ctxt.degraded;
-    store = Store.readonly node_ctxt.store;
     context = Context.readonly node_ctxt.context;
-    lcc = Reference.readonly node_ctxt.lcc;
-    lpc = Reference.readonly node_ctxt.lpc;
-    private_info = Reference.readonly node_ctxt.private_info;
+    store = Store.readonly node_ctxt.store;
   }
+
+let readonly_store (node_ctxt : _ t) =
+  {node_ctxt with store = Store.readonly node_ctxt.store}
+
+let readonly_context (node_ctxt : _ t) =
+  {node_ctxt with context = Context.readonly node_ctxt.context}
 
 (** Abstraction over store  *)
 

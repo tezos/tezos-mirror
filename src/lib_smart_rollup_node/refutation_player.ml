@@ -28,7 +28,7 @@ open Refutation_game
 
 module Types = struct
   type state = {
-    node_ctxt : Node_context.rw;
+    node_ctxt : Store_sigs.ro Node_context.rw_context;
     state_cache : Pvm_plugin_sig.state_cache;
     self : Signature.public_key_hash;
     opponent : Signature.public_key_hash;
@@ -39,7 +39,7 @@ module Types = struct
   }
 
   type parameters = {
-    node_ctxt : Node_context.rw;
+    node_ctxt : Store_sigs.ro Node_context.rw_context;
     self : Signature.public_key_hash;
     conflict : Octez_smart_rollup.Game.conflict;
   }
@@ -141,7 +141,7 @@ let init node_ctxt ~self ~conflict =
     @@ Worker.launch
          table
          conflict.other
-         {node_ctxt; self; conflict}
+         {node_ctxt = Node_context.readonly_store node_ctxt; self; conflict}
          (module Handlers)
   in
   let () = Lwt.wakeup worker_waker worker in

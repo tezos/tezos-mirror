@@ -89,7 +89,7 @@ val index : 'a t -> 'a t
 val close : 'a t -> unit Lwt.t
 
 (** [readonly index] returns a read-only version of the index. *)
-val readonly : [> `Read] t -> [`Read] t
+val readonly : _ t -> [`Read] t
 
 (** [checkout ctxt hash] checkouts the content that corresponds to the commit
     hash [hash] in the repository [ctxt] and returns the corresponding

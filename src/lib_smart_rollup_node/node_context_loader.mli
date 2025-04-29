@@ -41,7 +41,8 @@ val init :
   irmin_cache_size:int ->
   ?log_kernel_debug_file:string ->
   ?last_whitelist_update:Z.t * Int32.t ->
-  'a Store_sigs.mode ->
+  store_access:([< `Read | `Write > `Read] as 'store) Store_sigs.mode ->
+  context_access:([< `Read | `Write > `Read] as 'context) Store_sigs.mode ->
   Layer1.t ->
   genesis_info ->
   lcc:lcc ->
@@ -49,7 +50,7 @@ val init :
   Kind.t ->
   current_protocol ->
   Configuration.t ->
-  'a t tzresult Lwt.t
+  < store : 'store ; context : 'context > t tzresult Lwt.t
 
 (** Closes the store, context and Layer 1 monitor. *)
 val close : _ t -> unit tzresult Lwt.t
@@ -62,11 +63,11 @@ module For_snapshots : sig
   val create_node_context :
     #Client_context.full ->
     current_protocol ->
-    ([< `Read | `Write > `Read] as 'a) Store.t ->
-    'a Context.t ->
+    'store Store.t ->
+    'context Context.t ->
     data_dir:string ->
     apply_unsafe_patches:bool ->
-    'a t tzresult Lwt.t
+    < store : 'store ; context : 'context > t tzresult Lwt.t
 end
 
 (**/**)
@@ -80,9 +81,9 @@ module Internal_for_tests : sig
     current_protocol ->
     data_dir:string ->
     Kind.t ->
-    Store_sigs.rw t tzresult Lwt.t
+    rw tzresult Lwt.t
 
   (** Create a dummy context to generate OpenAPI specification. *)
   val openapi_context :
-    #Client_context.full -> Protocol_hash.t -> Store_sigs.rw t tzresult Lwt.t
+    #Client_context.full -> Protocol_hash.t -> rw tzresult Lwt.t
 end

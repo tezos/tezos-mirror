@@ -43,9 +43,7 @@ val with_node_context :
   Kind.t ->
   Protocol_hash.t ->
   boot_sector:string ->
-  ([`Read | `Write] Node_context.t ->
-  genesis:Sc_rollup_block.t ->
-  'a tzresult Lwt.t) ->
+  (Node_context.rw -> genesis:Sc_rollup_block.t -> 'a tzresult Lwt.t) ->
   'a tzresult Lwt.t
 
 (** {2 Building L2 Chains} *)
@@ -54,16 +52,14 @@ val with_node_context :
     rollup/kernel needs to be provided. The newly created L2 block is
     returned. *)
 val add_l2_genesis_block :
-  [`Read | `Write] Node_context.t ->
-  boot_sector:string ->
-  Sc_rollup_block.t tzresult Lwt.t
+  Node_context.rw -> boot_sector:string -> Sc_rollup_block.t tzresult Lwt.t
 
 (** [append_l2_block node_ctxt ?is_first_block messages] creates and append
     an L2 block containing the [messages] given in argument. The block is added
     on top of the last L2 block in the chain (i.e. the head known by the node),
     and is returned. *)
 val append_l2_block :
-  [`Read | `Write] Node_context.t ->
+  Node_context.rw ->
   ?is_first_block:bool ->
   string list ->
   Sc_rollup_block.t tzresult Lwt.t
@@ -72,25 +68,21 @@ val append_l2_block :
     are batches in [message_batches]. Each block contain a batch of
     messages. The portion of the chain that was added is returned. *)
 val append_l2_blocks :
-  [`Read | `Write] Node_context.t ->
-  string list list ->
-  Sc_rollup_block.t list tzresult Lwt.t
+  Node_context.rw -> string list list -> Sc_rollup_block.t list tzresult Lwt.t
 
 (** [append_dummy_l2_chain node_ctxt ~length] append [length] L2 blocks with an
     arbitrary content to the chain. The portion of the chain that was added is
     returned. This function is useful for quickly building long(er) L2 chains
     for the tests. *)
 val append_dummy_l2_chain :
-  [`Read | `Write] Node_context.t ->
-  length:int ->
-  Sc_rollup_block.t list tzresult Lwt.t
+  Node_context.rw -> length:int -> Sc_rollup_block.t list tzresult Lwt.t
 
 (** [add_l2_block node_ctxt ?is_first_block ~predecessor_l2_block messages]
     creates and append an L2 block containing the [messages] given in
     argument. The block is added on top [predecessor_l2_block], set as the new
     head of the chain and it is returned. *)
 val add_l2_block :
-  [`Read | `Write] Node_context.t ->
+  Node_context.rw ->
   ?is_first_block:bool ->
   predecessor_l2_block:Sc_rollup_block.t ->
   string list ->
@@ -124,9 +116,7 @@ val alcotest :
   Kind.t ->
   Protocol_hash.t ->
   boot_sector:string ->
-  ([`Read | `Write] Node_context.t ->
-  genesis:Sc_rollup_block.t ->
-  unit tzresult Lwt.t) ->
+  (Node_context.rw -> genesis:Sc_rollup_block.t -> unit tzresult Lwt.t) ->
   unit Alcotest_lwt.test_case
 
 (** Build an alcotest test case that executes with node context initialized with
