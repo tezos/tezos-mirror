@@ -2880,6 +2880,9 @@ module Dal : sig
     val attestations : context -> t Slot.Map.t
 
     module Dal_dependent_signing : sig
+      (** See {!Dal_attestation_repr.Dal_dependent_signing.weight}. *)
+      val weight : t -> Z.t
+
       (** See {!Dal_attestation_repr.Dal_dependent_signing.aggregate_pk}. *)
       val aggregate_pk :
         subgroup_check:bool ->

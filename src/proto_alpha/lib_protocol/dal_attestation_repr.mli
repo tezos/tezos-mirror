@@ -140,8 +140,13 @@ end
 
 (** {!type-t}-dependent combination of public keys or signatures. *)
 module Dal_dependent_signing : sig
-  (** Encodes the {!type-t} argument into a specific combination of
-      [consensus_pk] and [companion_pk].
+  (** Encodes a {!type-t} into an integer that can be used as a weight
+      for the companion key when signing an attestation with DAL.
+
+      Post-condition: the output is strictly positive. *)
+  val weight : t -> Z.t
+
+  (** Efficiently computes [consensus_pk + (weight t) * companion_pk].
 
       If [subgroup_check] is set, also checks whether the points are
       in the appropriate subgroup.

@@ -297,7 +297,7 @@ module Block : sig
         round : Round.t;
       }
     | Insufficient_locked_round_evidence of {
-        voting_power : int;
+        total_attesting_power : int;
         consensus_threshold : int;
       }
 end
