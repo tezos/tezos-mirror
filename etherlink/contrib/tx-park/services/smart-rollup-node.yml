@@ -1,0 +1,38 @@
+services:
+  smart-rollup-node-batcher-init:
+    image: tx-park/etherlink:${PROJECT_USER}.${PROJECT_NAME}
+    user: root
+    entrypoint:
+      - sh
+      - -c
+      - |
+        mkdir -p /home/tezos/.tezos-smart-rollup-node-batcher/wasm_2_0_0/
+        cp -r /build/app/installer.hex /home/tezos/.tezos-smart-rollup-node-batcher/installer.hex
+        cp -r /build/app/wasm_2_0_0/* /home/tezos/.tezos-smart-rollup-node-batcher/wasm_2_0_0/
+        chown -R tezos:tezos /home/tezos/.tezos-smart-rollup-node-batcher/
+
+  smart-rollup-node-batcher:
+    image: tx-park/etherlink:${PROJECT_USER}.${PROJECT_NAME}
+    command: >
+      octez-smart-rollup-node --base-dir client --endpoint ${SRN_ENDPOINT} run batcher for smart_rollup
+      with operators
+      batching:rollup-batcher1 batching:rollup-batcher2 batching:rollup-batcher3
+      --data-dir /home/tezos/.tezos-smart-rollup-node-batcher/
+      ${SRN_ACL_OVERRIDE:+--acl-override ${SRN_ACL_OVERRIDE}}
+      --boot-sector-file /home/tezos/.tezos-smart-rollup-node-batcher/installer.hex
+      ${SRN_CORS_HEADERS:+--cors-headers ${SRN_CORS_HEADERS}}
+      ${SRN_CORS_ORIGINS:+--cors-origins ${SRN_CORS_ORIGINS}}
+      ${SRN_DAL_NODE:+--dal-node ${SRN_DAL_NODE}}
+      ${SRN_HISTORY_MODE:+--history-mode ${SRN_HISTORY_MODE}}
+      ${SRN_LOG_KERNEL_DEBUG+--log-kernel-debug}
+      --metrics-addr ${SRN_METRICS_ADDR}
+      ${SRN_PRE_IMAGES_ENDPOINT:+--pre-images-endpoint ${SRN_PRE_IMAGES_ENDPOINT}}
+      --rpc-addr ${SRN_RPC_ADDR}
+      --rpc-port ${SRN_RPC_PORT}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-c", "curl -s http://${SRN_RPC_ADDR}:${SRN_RPC_PORT}/health | jq -e '.healthy == true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

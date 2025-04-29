@@ -168,8 +168,8 @@ RUN smart-rollup-installer get-reveal-installer\
 
 FROM kernel_setup_builder AS builder
 
-COPY --from=kernel_builder /build/root_hash /build/root_hash
-COPY --from=kernel_builder /build/installer.hex /build/installer.hex
+COPY --from=kernel_builder /build/root_hash /build/app/root_hash
+COPY --from=kernel_builder /build/installer.hex /build/app/installer.hex
 COPY --from=kernel_builder /build/wasm_2_0_0/ /build/app/wasm_2_0_0/
 
 WORKDIR /build
@@ -177,4 +177,4 @@ WORKDIR /build
 RUN octez-client -d client -E https://rpc.tzkt.io/ghostnet originate smart rollup smart_rollup \
     from rollup-admin of kind wasm_2_0_0 \
     of type '(or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes)' \
-    with kernel file:installer.hex --burn-cap 2
+    with kernel file:app/installer.hex --burn-cap 2
