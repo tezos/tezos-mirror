@@ -437,7 +437,10 @@ let () =
     (fun () -> Incompatible_dal_options)
 
 (* BLS related errors *)
-type error += Signature_aggregation_failure
+type error +=
+  | Signature_aggregation_failure
+  | Unexpected_signature_type of Signature.t
+  | Missing_bls_companion_key_for_dal of Baking_state_types.Key.t
 
 let () =
   register_error_kind
@@ -448,4 +451,34 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Signature aggregation failed.")
     Data_encoding.unit
     (function Signature_aggregation_failure -> Some () | _ -> None)
-    (fun () -> Signature_aggregation_failure)
+    (fun () -> Signature_aggregation_failure) ;
+  register_error_kind
+    `Permanent
+    ~id:"Baking_actions.unexpected_signature_type"
+    ~title:"Unexpected signature type"
+    ~description:"Signature should be a BLS signature."
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "Signature should be a BLS signature %a."
+        Signature.pp
+        s)
+    Data_encoding.(obj1 (req "signature" Signature.encoding))
+    (function Unexpected_signature_type s -> Some s | _ -> None)
+    (fun s -> Unexpected_signature_type s) ;
+  register_error_kind
+    `Permanent
+    ~id:"Baking_actions.Missing_bls_companion_key_for_dal"
+    ~title:"Missing a BLS companion key for DAL attestations"
+    ~description:
+      "The consensus key is a BLS key but is missing a companion key, so it \
+       cannot sign a DAL attestation."
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "Expected a BLS companion key for the consensus key %a."
+        Baking_state_types.Key.pp
+        s)
+    Data_encoding.(obj1 (req "consensus_key" Baking_state_types.Key.encoding))
+    (function Missing_bls_companion_key_for_dal ck -> Some ck | _ -> None)
+    (fun ck -> Missing_bls_companion_key_for_dal ck)
