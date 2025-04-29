@@ -51,7 +51,8 @@ let sequencer_key =
           "unencrypted:edsk4AHKqBSzpkmZ39EMBJ2Tm1SHu6JUYTnp5vApYPR6cvr9iqbELa")
 
 let zero_hash =
-  Evm_node_lib_dev_encoding.Ethereum_types.block_hash_of_string "0x000000"
+  Evm_node_lib_dev_encoding.Ethereum_types.decode_block_hash
+  @@ Bytes.make 32 '\000'
 
 let smart_rollup_address =
   Tezos_crypto.Hashed.Smart_rollup_address.(zero |> to_string)
