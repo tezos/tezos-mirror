@@ -40,5 +40,7 @@ riscv: src/riscv/assets/preimages
 riscv: src/riscv/assets/riscv-dummy.elf
 riscv: src/riscv/assets/riscv-dummy.elf.checksum
 riscv: tezt/tests/riscv-tests/jstz-inbox.json
+alpha_json: tezt/tests/weeklynet_configs/alpha.json
+last_snapshotted_protocol_json: tezt/tests/weeklynet_configs/last_snapshotted_protocol.json
 tx_kernel: tx_kernel.wasm
 tx_kernel_dal: tx_kernel_dal.wasm
