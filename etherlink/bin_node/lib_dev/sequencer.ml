@@ -389,7 +389,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~data_dir
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
-         else Rpc_types.Single_chain_node_rpc_server (Ex_chain_family EVM))
+         else Rpc_types.Single_chain_node_rpc_server EVM)
       (* When the tx_queue is enabled the validation is done in the
          block_producer instead of in the RPC. This allows for a more
          accurate validation as it's delayed up to when the block is
@@ -403,7 +403,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     Rpc_server.start_private_server
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
-         else Rpc_types.Single_chain_node_rpc_server (Ex_chain_family EVM))
+         else Rpc_types.Single_chain_node_rpc_server EVM)
       ~block_production:`Single_node
       configuration
       tx_container

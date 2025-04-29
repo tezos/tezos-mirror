@@ -161,7 +161,7 @@ let main
     | Some _base -> Validate.Minimal
     | None -> Validate.Full
   in
-  let* l2_chain_id, chain_family =
+  let* l2_chain_id, Ex_chain_family chain_family =
     if finalized_view then
       if
         (* When finalized_view is set, it's too early to request the
@@ -208,7 +208,7 @@ let main
               tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
               tx_pool_tx_per_addr_limit =
                 Int64.to_int config.tx_pool_tx_per_addr_limit;
-              chain_family;
+              chain_family = Ex_chain_family chain_family;
             }
         in
         return

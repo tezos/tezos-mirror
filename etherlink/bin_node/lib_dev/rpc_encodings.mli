@@ -378,7 +378,7 @@ type map_result =
   | Disabled
 
 val map_method_name :
-  rpc_server_family:Rpc_types.rpc_server_family ->
+  rpc_server_family:_ Rpc_types.rpc_server_family ->
   restrict:Configuration.restricted_rpcs ->
   string ->
   map_result

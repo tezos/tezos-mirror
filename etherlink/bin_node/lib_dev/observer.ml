@@ -265,9 +265,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~tx_pool_size_info:Tx_pool.size_info
     ~smart_rollup_address ;
 
-  let rpc_server_family =
-    Rpc_types.Single_chain_node_rpc_server (Ex_chain_family chain_family)
-  in
+  let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let* finalizer_public_server =
     Rpc_server.start_public_server
       ~l2_chain_id

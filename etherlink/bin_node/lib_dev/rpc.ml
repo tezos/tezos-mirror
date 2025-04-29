@@ -250,9 +250,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     }
   in
 
-  let rpc_server_family =
-    Rpc_types.Single_chain_node_rpc_server (Ex_chain_family chain_family)
-  in
+  let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let* server_public_finalizer =
     Rpc_server.start_public_server
       ~l2_chain_id

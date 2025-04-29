@@ -488,8 +488,9 @@ let process_trace_result trace =
       rpc_error (Rpc_errors.internal_error msg)
 
 let dispatch_request (type f) ~websocket
-    (rpc_server_family : Rpc_types.rpc_server_family) (rpc : Configuration.rpc)
-    (validation : Validate.validation_mode) (config : Configuration.t)
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) (validation : Validate.validation_mode)
+    (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
@@ -1052,8 +1053,8 @@ let dispatch_request (type f) ~websocket
   Lwt.return JSONRPC.{value; id}
 
 let dispatch_private_request (type f) ~websocket
-    (rpc_server_family : Rpc_types.rpc_server_family) (rpc : Configuration.rpc)
-    (config : Configuration.t)
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
@@ -1253,7 +1254,7 @@ let empty_stream =
 
 let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
 
-let dispatch_websocket (rpc_server_family : Rpc_types.rpc_server_family)
+let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) validation config tx_container ctx
     (input : JSONRPC.request) =
   let open Lwt_syntax in
@@ -1314,9 +1315,10 @@ let dispatch_websocket (rpc_server_family : Rpc_types.rpc_server_family)
       in
       websocket_response_of_response response
 
-let dispatch_private_websocket (rpc_server_family : Rpc_types.rpc_server_family)
-    ~block_production (rpc : Configuration.rpc) config tx_container ctx
-    (input : JSONRPC.request) =
+let dispatch_private_websocket
+    (rpc_server_family : _ Rpc_types.rpc_server_family) ~block_production
+    (rpc : Configuration.rpc) config tx_container ctx (input : JSONRPC.request)
+    =
   let open Lwt_syntax in
   let+ response =
     dispatch_private_request
@@ -1344,7 +1346,7 @@ let generic_dispatch ~service_name (rpc : Configuration.rpc) config tx_container
         input
       |> Lwt_result.ok)
 
-let dispatch_public (type f) (rpc_server_family : Rpc_types.rpc_server_family)
+let dispatch_public (type f) (rpc_server_family : _ Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) validation config
     (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_dispatch
@@ -1357,7 +1359,8 @@ let dispatch_public (type f) (rpc_server_family : Rpc_types.rpc_server_family)
     Path.root
     (dispatch_request ~websocket:false rpc_server_family rpc validation)
 
-let dispatch_private (type f) (rpc_server_family : Rpc_types.rpc_server_family)
+let dispatch_private (type f)
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) ~block_production config
     (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_dispatch
@@ -1387,9 +1390,9 @@ let generic_websocket_dispatch (config : Configuration.t) tx_container ctx dir
         (dispatch_websocket config tx_container ctx)
 
 let dispatch_websocket_public (type f)
-    (rpc_server_family : Rpc_types.rpc_server_family) (rpc : Configuration.rpc)
-    validation config (tx_container : f Services_backend_sig.tx_container) ctx
-    dir =
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) validation config
+    (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_websocket_dispatch
     config
     tx_container
@@ -1399,8 +1402,8 @@ let dispatch_websocket_public (type f)
     (dispatch_websocket rpc_server_family rpc validation)
 
 let dispatch_websocket_private (type f)
-    (rpc_server_family : Rpc_types.rpc_server_family) (rpc : Configuration.rpc)
-    ~block_production config
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) ~block_production config
     (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_websocket_dispatch
     config
