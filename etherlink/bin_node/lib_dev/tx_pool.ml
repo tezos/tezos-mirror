@@ -971,6 +971,8 @@ module Tx_container = struct
     let*! () = Worker.shutdown w in
     return_unit
 
+  let clear () = Lwt_result_syntax.return_unit
+
   let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
 
   let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =

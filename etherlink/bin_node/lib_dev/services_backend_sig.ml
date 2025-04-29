@@ -227,6 +227,9 @@ module type Tx_container = sig
     to be processed. *)
   val shutdown : unit -> unit tzresult Lwt.t
 
+  (** [clear ()] removes the container data but keeps the allocated space *)
+  val clear : unit -> unit tzresult Lwt.t
+
   (** Trigger a tick in the [Tx_queue]. *)
   val tx_queue_tick : evm_node_endpoint:endpoint -> unit tzresult Lwt.t
 

@@ -474,8 +474,8 @@ module State = struct
     let*! evm_state = Irmin_context.PVMState.get context in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
     let* () =
-      when_ (Configuration.is_tx_queue_enabled ctxt.configuration)
-      @@ Tx_queue.clear
+      let (module Tx_container) = ctxt.tx_container in
+      Tx_container.clear ()
     in
     (* Clear the store. *)
     let* () = Evm_store.reset_after conn ~l2_level in

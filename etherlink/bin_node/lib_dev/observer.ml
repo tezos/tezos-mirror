@@ -131,6 +131,8 @@ let container_forward_tx ~keep_alive ~evm_node_endpoint :
 
     let shutdown () = Lwt_result_syntax.return_unit
 
+    let clear () = Lwt_result_syntax.return_unit
+
     let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
 
     let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
