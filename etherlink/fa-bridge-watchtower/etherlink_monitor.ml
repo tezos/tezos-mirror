@@ -862,7 +862,7 @@ end
 let start db ~config ~notify_ws_change ~first_block =
   let open Lwt_result_syntax in
   let evm_node_endpoint = config.Config.evm_node_endpoint in
-  let tx_queue_endpoint = ref (Tx_queue.Rpc evm_node_endpoint) in
+  let tx_queue_endpoint = ref (Services_backend_sig.Rpc evm_node_endpoint) in
   let run () =
     let*! ws_client =
       Websocket_client.connect
@@ -870,7 +870,7 @@ let start db ~config ~notify_ws_change ~first_block =
         Media_type.json
         (Uri.with_path evm_node_endpoint (Uri.path evm_node_endpoint ^ "/ws"))
     in
-    tx_queue_endpoint := Tx_queue.Websocket ws_client ;
+    tx_queue_endpoint := Services_backend_sig.Websocket ws_client ;
     notify_ws_change ws_client ;
     let* () = init_db_pointers db ws_client ~first_block in
     let* chain_id = get_chain_id ws_client in
@@ -904,7 +904,8 @@ let start db ~config ~notify_ws_change ~first_block =
   let rec tx_queue_beacon () =
     let open Lwt_syntax in
     let* res =
-      protect @@ fun () -> Tx_queue.tick ~evm_node_endpoint:!tx_queue_endpoint
+      protect @@ fun () ->
+      Tx_queue.Tx_container.tx_queue_tick ~evm_node_endpoint:!tx_queue_endpoint
     in
     let* () =
       match res with

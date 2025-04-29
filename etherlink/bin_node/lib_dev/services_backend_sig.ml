@@ -191,6 +191,9 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   let l2_levels_of_l1_level = Backend.l2_levels_of_l1_level
 end
 
+(** Inject transactions with either RPCs or on a websocket connection. *)
+type endpoint = Rpc of Uri.t | Websocket of Websocket_client.t
+
 (** [Tx_container] is the signature of the module that deals with
     storing and forwarding transactions. the module type is used by
     {!Services.dispatch_request} to request informations about pending
@@ -223,4 +226,13 @@ module type Tx_container = sig
   (** [shutdown ()] stops the tx container, waiting for the ongoing request
     to be processed. *)
   val shutdown : unit -> unit tzresult Lwt.t
+
+  (** Trigger a tick in the [Tx_queue]. *)
+  val tx_queue_tick : evm_node_endpoint:endpoint -> unit tzresult Lwt.t
+
+  (** [tx_queue_beacon ~evm_node_endpoint ~tick_interval] is a never fulfilled
+    promise which triggers a tick in the [Tx_queue] every
+    [tick_interval] seconds. *)
+  val tx_queue_beacon :
+    evm_node_endpoint:endpoint -> tick_interval:float -> unit tzresult Lwt.t
 end

@@ -46,7 +46,9 @@ type request = {
 }
 
 (** Inject transactions with either RPCs or on a websocket connection. *)
-type endpoint = Rpc of Uri.t | Websocket of Websocket_client.t
+type endpoint = Services_backend_sig.endpoint =
+  | Rpc of Uri.t
+  | Websocket of Websocket_client.t
 
 (** [Nonce_bitset] registers known nonces from transactions that went
     through the tx_queue from a specific sender address. With this
@@ -1024,18 +1026,6 @@ let push_request worker request =
   let*! (pushed : bool) = Worker.Queue.push_request worker request in
   if not pushed then tzfail Tx_queue_is_closed else return_unit
 
-let tick ~evm_node_endpoint =
-  bind_worker @@ fun w -> push_request w (Tick {evm_node_endpoint})
-
-let beacon ~evm_node_endpoint ~tick_interval =
-  let open Lwt_result_syntax in
-  let rec loop () =
-    let* () = tick ~evm_node_endpoint in
-    let*! () = Lwt_unix.sleep tick_interval in
-    loop ()
-  in
-  loop ()
-
 let start ~config ~keep_alive () =
   let open Lwt_result_syntax in
   let* worker = Worker.launch table () {config; keep_alive} (module Handlers) in
@@ -1129,4 +1119,16 @@ module Tx_container = struct
     let*! () = Tx_queue_events.shutdown () in
     let*! () = Worker.shutdown w in
     return_unit
+
+  let tx_queue_tick ~evm_node_endpoint =
+    bind_worker @@ fun w -> push_request w (Tick {evm_node_endpoint})
+
+  let tx_queue_beacon ~evm_node_endpoint ~tick_interval =
+    let open Lwt_result_syntax in
+    let rec loop () =
+      let* () = tx_queue_tick ~evm_node_endpoint in
+      let*! () = Lwt_unix.sleep tick_interval in
+      loop ()
+    in
+    loop ()
 end

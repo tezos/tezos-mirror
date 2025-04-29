@@ -130,6 +130,11 @@ let container_forward_tx ~keep_alive ~evm_node_endpoint :
       Lwt_result.return {pending = AddressMap.empty; queued = AddressMap.empty}
 
     let shutdown () = Lwt_result_syntax.return_unit
+
+    let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
+
+    let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
+      Lwt_result_syntax.return_unit
   end)
 
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
@@ -352,10 +357,9 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     and* () =
       Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
     and* () =
-      if Configuration.is_tx_queue_enabled config then
-        Tx_queue.beacon
-          ~evm_node_endpoint:(Rpc evm_node_endpoint)
-          ~tick_interval:0.05
-      else return_unit
+      let (module Tx_container) = tx_container in
+      Tx_container.tx_queue_beacon
+        ~evm_node_endpoint:(Rpc evm_node_endpoint)
+        ~tick_interval:0.05
     in
     return_unit

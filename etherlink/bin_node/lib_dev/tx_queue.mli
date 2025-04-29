@@ -24,9 +24,6 @@
           [callback] is called with [`Dropped].}} *)
 type callback = [`Accepted | `Confirmed | `Dropped | `Refused] -> unit Lwt.t
 
-(** Inject transactions with either RPCs or on a websocket connection. *)
-type endpoint = Rpc of Uri.t | Websocket of Websocket_client.t
-
 (** [start ~config ~max_transaction_batch_length ()] starts the
     worker, meaning it is possible to call {!inject}, {!confirm} and
     {!beacon}. *)
@@ -38,16 +35,6 @@ val start :
 
 (** [clear ()] removes the tx queue data but keeps the allocated space *)
 val clear : unit -> unit tzresult Lwt.t
-
-
-(** Trigger a tick in the [Tx_queue]. *)
-val tick : evm_node_endpoint:endpoint -> unit tzresult Lwt.t
-
-(** [beacon ~evm_node_endpoint ~tick_interval] is a never fulfilled
-    promise which triggers a tick in the [Tx_queue] every
-    [tick_interval] seconds. *)
-val beacon :
-  evm_node_endpoint:endpoint -> tick_interval:float -> unit tzresult Lwt.t
 
 (** [lock_transactions] locks the transactions in the queue, new
     transactions can be added but nothing can be retrieved with
