@@ -56,8 +56,10 @@ let non_bls_in_aggregate = function
   | Validate_errors.Consensus.Non_bls_key_in_aggregate -> true
   | _ -> false
 
-let conflicting_consensus_operation = function
-  | Validate_errors.Consensus.Conflicting_consensus_operation _ -> true
+let conflicting_consensus_operation ?kind = function
+  | Validate_errors.Consensus.Conflicting_consensus_operation {kind = kind'; _}
+    ->
+      Option.fold ~none:true ~some:(fun kind -> kind = kind') kind
   | _ -> false
 
 let unaggregated_eligible_attestation = function
@@ -530,7 +532,7 @@ let test_multiple_aggregates_per_block_forbidden () =
   let* attesters = Context.get_attesters (B block) in
   (* Filter delegates with BLS keys that have at least one slot *)
   let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
-  (* Craft one aggregate per attester *)
+  (* Craft one attestations_aggregate per attester *)
   let* aggregates =
     List.map_es
       (fun ((delegate : RPC.Validators.t), _) ->
@@ -539,7 +541,36 @@ let test_multiple_aggregates_per_block_forbidden () =
   in
   (* Bake a block containing the multiple aggregates and expect an error *)
   let*! res = Block.bake ~operations:aggregates block in
-  Assert.proto_error ~loc:__LOC__ res conflicting_consensus_operation
+  let* () =
+    Assert.proto_error
+      ~loc:__LOC__
+      res
+      (conflicting_consensus_operation
+         ~kind:Validate_errors.Consensus.Attestations_aggregate)
+  in
+  (* Craft one preattestations_aggregate per attester *)
+  let* block' = Block.bake block in
+  let* aggregates =
+    List.map_es
+      (fun ((delegate : RPC.Validators.t), _) ->
+        Op.preattestations_aggregate ~committee:[delegate.consensus_key] block')
+      bls_delegates_with_slots
+  in
+  (* Bake a block containing the multiple aggregates and expect an error *)
+  let round_zero = Alpha_context.Round.zero in
+  let*! res =
+    Block.bake
+      ~policy:(By_round 1)
+      ~payload_round:(Some round_zero)
+      ~locked_round:(Some round_zero)
+      ~operations:aggregates
+      block
+  in
+  Assert.proto_error
+    ~loc:__LOC__
+    res
+    (conflicting_consensus_operation
+       ~kind:Validate_errors.Consensus.Preattestations_aggregate)
 
 let test_eligible_attestation_must_be_aggregated () =
   let open Lwt_result_syntax in
