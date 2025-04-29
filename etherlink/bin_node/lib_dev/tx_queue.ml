@@ -1139,3 +1139,5 @@ module Tx_container = struct
 end
 
 let start = Tx_container.start
+
+let tx_container = Services_backend_sig.Evm_tx_container (module Tx_container)

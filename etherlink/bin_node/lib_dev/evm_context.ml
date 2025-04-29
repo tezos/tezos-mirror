@@ -18,6 +18,9 @@ type head = {
   pending_upgrade : Evm_events.Upgrade.t option;
 }
 
+type ex_tx_container =
+  | Ex_tx_container : _ Services_backend_sig.tx_container -> ex_tx_container
+
 type parameters = {
   configuration : Configuration.t;
   kernel_path : Wasm_debugger.kernel option;
@@ -26,7 +29,7 @@ type parameters = {
   store_perm : Sqlite.perm;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
   snapshot_url : string option;
-  tx_container : (module Services_backend_sig.Tx_container);
+  tx_container : ex_tx_container;
 }
 
 type session_state = {
@@ -49,7 +52,7 @@ type t = {
   session : session_state;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
   legacy_block_storage : bool;
-  tx_container : (module Services_backend_sig.Tx_container);
+  tx_container : ex_tx_container;
 }
 
 let is_sequencer t = Option.is_some t.sequencer_wallet
@@ -476,7 +479,10 @@ module State = struct
     let*! evm_state = Irmin_context.PVMState.get context in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
     let* () =
-      let (module Tx_container) = ctxt.tx_container in
+      let (Ex_tx_container tx_container) = ctxt.tx_container in
+      let (module Tx_container) =
+        Services_backend_sig.tx_container_module tx_container
+      in
       Tx_container.clear ()
     in
     (* Clear the store. *)
@@ -1427,7 +1433,7 @@ module State = struct
 
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
       ?smart_rollup_address ~store_perm ?sequencer_wallet ?snapshot_url
-      ~tx_container () =
+      ~(tx_container : _ Services_backend_sig.tx_container) () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1541,7 +1547,7 @@ module State = struct
         store;
         sequencer_wallet;
         legacy_block_storage;
-        tx_container;
+        tx_container = Ex_tx_container tx_container;
       }
     in
 
@@ -1837,7 +1843,7 @@ module Handlers = struct
         store_perm;
         sequencer_wallet;
         snapshot_url;
-        tx_container;
+        tx_container = Ex_tx_container tx_container;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -2020,7 +2026,7 @@ let worker_wait_for_request req =
 
 let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
     ~store_perm ?sequencer_wallet ?snapshot_url
-    ~(tx_container : (module Services_backend_sig.Tx_container)) () =
+    ~(tx_container : _ Services_backend_sig.tx_container) () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -2035,7 +2041,7 @@ let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
         store_perm;
         sequencer_wallet;
         snapshot_url;
-        tx_container;
+        tx_container = Ex_tx_container tx_container;
       }
       (module Handlers)
   in

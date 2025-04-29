@@ -21,12 +21,13 @@ open Ethereum_types
     into a forced blueprint. The sequencer has performed a reorganization and
     starts submitting blocks from the new branch.
 *)
-let on_new_blueprint (tx_container : (module Services_backend_sig.Tx_container))
+let on_new_blueprint
+    (tx_container : L2_types.evm_chain_family Services_backend_sig.tx_container)
     evm_node_endpoint next_blueprint_number
     (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
      blueprint_with_events) =
   let open Lwt_result_syntax in
-  let (module Tx_container) = tx_container in
+  let (Evm_tx_container (module Tx_container)) = tx_container in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
   if Z.(equal level number) then
@@ -95,10 +96,13 @@ let on_new_blueprint (tx_container : (module Services_backend_sig.Tx_container))
     in
     return (`Restart_from next_blueprint_number)
 
-let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
-    finalizer_private_server finalizer_rpc_process
-    (module Tx_container : Services_backend_sig.Tx_container) =
+let install_finalizer_observer ~rollup_node_tracking
+    ~(tx_container : _ Services_backend_sig.tx_container)
+    finalizer_public_server finalizer_private_server finalizer_rpc_process =
   let open Lwt_syntax in
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
+  in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
   let* () = finalizer_public_server () in
@@ -111,43 +115,45 @@ let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
 let container_forward_tx ~keep_alive ~evm_node_endpoint :
-    (module Services_backend_sig.Tx_container) =
-  (module struct
-    let nonce ~next_nonce _address = Lwt_result.return next_nonce
+    L2_types.evm_chain_family Services_backend_sig.tx_container =
+  Services_backend_sig.Evm_tx_container
+    (module struct
+      let nonce ~next_nonce _address = Lwt_result.return next_nonce
 
-    let add ~next_nonce:_ _tx_object ~raw_tx =
-      Injector.send_raw_transaction
-        ~keep_alive
-        ~base:evm_node_endpoint
-        ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
+      let add ~next_nonce:_ _tx_object ~raw_tx =
+        Injector.send_raw_transaction
+          ~keep_alive
+          ~base:evm_node_endpoint
+          ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
 
-    let find _hash = Lwt_result.return None
+      let find _hash = Lwt_result.return None
 
-    let content () =
-      Lwt_result.return {pending = AddressMap.empty; queued = AddressMap.empty}
+      let content () =
+        Lwt_result.return
+          {pending = AddressMap.empty; queued = AddressMap.empty}
 
-    let shutdown () = Lwt_result_syntax.return_unit
+      let shutdown () = Lwt_result_syntax.return_unit
 
-    let clear () = Lwt_result_syntax.return_unit
+      let clear () = Lwt_result_syntax.return_unit
 
-    let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
+      let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
 
-    let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
-      Lwt_result_syntax.return_unit
+      let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
+        Lwt_result_syntax.return_unit
 
-    let lock_transactions () = Lwt_result_syntax.return_unit
+      let lock_transactions () = Lwt_result_syntax.return_unit
 
-    let unlock_transactions () = Lwt_result_syntax.return_unit
+      let unlock_transactions () = Lwt_result_syntax.return_unit
 
-    let is_locked () = Lwt_result_syntax.return_false
+      let is_locked () = Lwt_result_syntax.return_false
 
-    let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
-      Lwt_result_syntax.return_unit
+      let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
+        Lwt_result_syntax.return_unit
 
-    let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
-        ~initial_validation_state:_ =
-      Lwt_result_syntax.return_nil
-  end)
+      let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
+          ~initial_validation_state:_ =
+        Lwt_result_syntax.return_nil
+    end)
 
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot () =
@@ -188,9 +194,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
 
   let tx_container, ping_tx_pool =
     match config.experimental_features.enable_tx_queue with
-    | Some _tx_queue_config ->
-        ( (module Tx_queue.Tx_container : Services_backend_sig.Tx_container),
-          false )
+    | Some _tx_queue_config -> (Tx_queue.tx_container, false)
     | None ->
         if config.finalized_view then
           let tx_container =
@@ -199,9 +203,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
               ~evm_node_endpoint
           in
           (tx_container, false)
-        else
-          ( (module Tx_pool.Tx_container : Services_backend_sig.Tx_container),
-            true )
+        else (Tx_pool.tx_container, true)
   in
 
   let* _loaded =
@@ -338,7 +340,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       finalizer_public_server
       finalizer_private_server
       finalizer_rpc_process
-      tx_container
+      ~tx_container
   in
 
   let*! next_blueprint_number = Evm_context.next_blueprint_number () in
@@ -359,7 +361,9 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     and* () =
       Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
     and* () =
-      let (module Tx_container) = tx_container in
+      let (module Tx_container) =
+        Services_backend_sig.tx_container_module tx_container
+      in
       Tx_container.tx_queue_beacon
         ~evm_node_endpoint:(Rpc evm_node_endpoint)
         ~tick_interval:0.05

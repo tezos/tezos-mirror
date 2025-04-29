@@ -18,10 +18,12 @@ type sandbox_config = {
   tezlink : int option;
 }
 
-let install_finalizer_seq server_public_finalizer server_private_finalizer
-    finalizer_rpc_process
-    (module Tx_container : Services_backend_sig.Tx_container) =
+let install_finalizer_seq ~(tx_container : _ Services_backend_sig.tx_container)
+    server_public_finalizer server_private_finalizer finalizer_rpc_process =
   let open Lwt_syntax in
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
+  in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
   let* () = server_public_finalizer () in
@@ -36,9 +38,11 @@ let install_finalizer_seq server_public_finalizer server_private_finalizer
   return_unit
 
 let loop_sequencer multichain backend
-    (module Tx_container : Services_backend_sig.Tx_container) ?sandbox_config
-    time_between_blocks =
+    ~(tx_container :
+       L2_types.evm_chain_family Services_backend_sig.tx_container)
+    ?sandbox_config time_between_blocks =
   let open Lwt_result_syntax in
+  let (Evm_tx_container (module Tx_container)) = tx_container in
   match sandbox_config with
   | Some {parent_chain = Some evm_node_endpoint; _} ->
       let*! head = Evm_context.head_info () in
@@ -170,11 +174,11 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
   let* tx_container =
     match configuration.experimental_features.enable_tx_queue with
-    | Some _tx_queue_config ->
-        return
-          (module Tx_queue.Tx_container : Services_backend_sig.Tx_container)
-    | None ->
-        return (module Tx_pool.Tx_container : Services_backend_sig.Tx_container)
+    | Some _tx_queue_config -> return Tx_queue.tx_container
+    | None -> return Tx_pool.tx_container
+  in
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
   in
   let* status, smart_rollup_address_typed =
     Evm_context.start
@@ -429,13 +433,13 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       finalizer_public_server
       finalizer_private_server
       finalizer_rpc_process
-      tx_container
+      ~tx_container
   in
   let* () =
     loop_sequencer
       enable_multichain
       backend
-      tx_container
+      ~tx_container
       ?sandbox_config
       sequencer_config.time_between_blocks
   in

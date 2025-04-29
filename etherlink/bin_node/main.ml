@@ -1555,7 +1555,7 @@ let init_from_rollup_node_command =
         ~omit_delayed_tx_events
         ~data_dir
         ~rollup_node_data_dir
-        ~tx_container:(module Evm_node_lib_dev.Tx_queue.Tx_container)
+        ~tx_container:Evm_node_lib_dev.Tx_queue.tx_container
         ())
 
 let dump_to_rlp_command =
@@ -1770,7 +1770,7 @@ let patch_kernel_command =
             ~configuration
             ~data_dir
             ~store_perm:Read_write
-            ~tx_container:(module Evm_node_lib_dev.Tx_queue.Tx_container)
+            ~tx_container:Evm_node_lib_dev.Tx_queue.tx_container
             ()
         in
         Evm_context.patch_kernel ?block_number (On_disk kernel_path)
@@ -3015,7 +3015,7 @@ let patch_state_command =
             ~configuration
             ~data_dir
             ~store_perm:Read_write
-            ~tx_container:(module Evm_node_lib_dev.Tx_queue.Tx_container)
+            ~tx_container:Evm_node_lib_dev.Tx_queue.tx_container
             ()
         in
         Evm_context.patch_state ?block_number ~key ~value ()

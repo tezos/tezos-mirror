@@ -35,7 +35,7 @@ val start :
 
 (** wrapper of the Tx_queue to be compatible with the Tx_container
     signature for the services. *)
-module Tx_container : Services_backend_sig.Tx_container
+val tx_container : L2_types.evm_chain_family Services_backend_sig.tx_container
 
 (**/*)
 

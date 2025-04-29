@@ -7,9 +7,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let install_finalizer server_finalizer
-    (module Tx_container : Services_backend_sig.Tx_container) =
+let install_finalizer ~(tx_container : _ Services_backend_sig.tx_container)
+    server_finalizer =
   let open Lwt_syntax in
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
+  in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
   let* () = server_finalizer () in
@@ -19,55 +22,58 @@ let install_finalizer server_finalizer
   Evm_context.shutdown ()
 
 let container_forward_tx ~evm_node_endpoint ~keep_alive :
-    (module Services_backend_sig.Tx_container) =
-  (module struct
-    let nonce ~next_nonce _address = Lwt_result.return next_nonce
+    L2_types.evm_chain_family Services_backend_sig.tx_container =
+  Services_backend_sig.Evm_tx_container
+    (module struct
+      let nonce ~next_nonce _address = Lwt_result.return next_nonce
 
-    let add ~next_nonce:_ _tx_object ~raw_tx =
-      match evm_node_endpoint with
-      | Some evm_node_endpoint ->
-          Injector.send_raw_transaction
-            ~keep_alive
-            ~base:evm_node_endpoint
-            ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
-      | None ->
-          Lwt.return_ok
-          @@ Error
-               "the node is in read-only mode, it doesn't accept transactions"
+      let add ~next_nonce:_ _tx_object ~raw_tx =
+        match evm_node_endpoint with
+        | Some evm_node_endpoint ->
+            Injector.send_raw_transaction
+              ~keep_alive
+              ~base:evm_node_endpoint
+              ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
+        | None ->
+            Lwt.return_ok
+            @@ Error
+                 "the node is in read-only mode, it doesn't accept transactions"
 
-    let find _hash = Lwt_result.return None
+      let find _hash = Lwt_result.return None
 
-    let content () =
-      Lwt_result.return
-        Ethereum_types.{pending = AddressMap.empty; queued = AddressMap.empty}
+      let content () =
+        Lwt_result.return
+          Ethereum_types.{pending = AddressMap.empty; queued = AddressMap.empty}
 
-    let shutdown () = Lwt_result_syntax.return_unit
+      let shutdown () = Lwt_result_syntax.return_unit
 
-    let clear () = Lwt_result_syntax.return_unit
+      let clear () = Lwt_result_syntax.return_unit
 
-    let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
+      let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
 
-    let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
-      Lwt_result_syntax.return_unit
+      let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
+        Lwt_result_syntax.return_unit
 
-    let lock_transactions () = Lwt_result_syntax.return_unit
+      let lock_transactions () = Lwt_result_syntax.return_unit
 
-    let unlock_transactions () = Lwt_result_syntax.return_unit
+      let unlock_transactions () = Lwt_result_syntax.return_unit
 
-    let is_locked () = Lwt_result_syntax.return_false
+      let is_locked () = Lwt_result_syntax.return_false
 
-    let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
-        ~initial_validation_state:_ =
-      Lwt_result_syntax.return_nil
+      let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
+          ~initial_validation_state:_ =
+        Lwt_result_syntax.return_nil
 
-    let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
-      Lwt_result_syntax.return_unit
-  end)
+      let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
+        Lwt_result_syntax.return_unit
+    end)
 
 let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
-    (module Tx_container : Services_backend_sig.Tx_container)
+    ~(tx_container :
+       L2_types.evm_chain_family Services_backend_sig.tx_container)
     ~smart_rollup_address =
   let open Lwt_result_syntax in
+  let (Evm_tx_container (module Tx_container)) = tx_container in
   let maximum_cumulative_size =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
       Sequencer_blueprint.maximum_chunks_per_l1_level
@@ -182,15 +188,13 @@ let main
             ~keep_alive:config.keep_alive
             ()
         in
-        let tx_container =
-          (module Tx_queue.Tx_container : Services_backend_sig.Tx_container)
-        in
+        let tx_container = Tx_queue.tx_container in
         return
         @@ ( Some
                (fun () ->
                  tx_queue_pop_and_inject
                    (module Rollup_node_rpc)
-                   tx_container
+                   ~tx_container
                    ~smart_rollup_address),
              tx_container )
     | true, None, None ->
@@ -208,8 +212,7 @@ let main
             }
         in
         return
-          ( Some Tx_pool.pop_and_inject_transactions_lazy,
-            (module Tx_pool.Tx_container : Services_backend_sig.Tx_container) )
+          (Some Tx_pool.pop_and_inject_transactions_lazy, Tx_pool.tx_container)
     | enable_send_raw_transaction, evm_node_endpoint, _ ->
         let evm_node_endpoint =
           if enable_send_raw_transaction then evm_node_endpoint else None
@@ -234,7 +237,7 @@ let main
       ((module Rollup_node_rpc), smart_rollup_address)
   in
   let (_ : Lwt_exit.clean_up_callback_id) =
-    install_finalizer server_finalizer tx_container
+    install_finalizer server_finalizer ~tx_container
   in
   let wait, _resolve = Lwt.wait () in
   let* () = wait in

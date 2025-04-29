@@ -267,3 +267,45 @@ module type Tx_container = sig
     initial_validation_state:'a ->
     (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 end
+
+(** ['f tx_container] is a GADT parametrized by the same type argument
+    as [L2_types.chain_family]. It is useful to statically guarantee
+    that the launched tx-container uses types compatible with the
+    chain's chain family. *)
+
+type 'f tx_container =
+  | Evm_tx_container :
+      (module Tx_container)
+      -> L2_types.evm_chain_family tx_container
+  | Michelson_tx_container :
+      (module Tx_container)
+      -> L2_types.michelson_chain_family tx_container
+
+(** Some functions of the Tx_container module, such as [add], have
+    interfaces which actually depend on the chain family but many
+    others, such as [clear] don't.
+
+    In the former case, we usually know statically the type of the
+    chain family and hence of the tx-container and we can for example
+    invoke [add] as follows:
+
+    {[
+      let Evm_tx_container (module Tx_container) = tx_container in
+      let** hash = Tx_container.add ~next_nonce ~raw_tx tx_obj in
+    ]}
+
+    In the latter case, statically knowing the type of the chain
+    family is not required and the following [tx_container_module]
+    function can be used to get a [Tx_container] module:
+
+    {[
+      let (module Tx_container) = Services_backend_sig.tx_container_module tx_container in
+      let* () = Tx_container.clear () in
+    ]}
+
+
+*)
+let tx_container_module (type f) (tx_container : f tx_container) =
+  match tx_container with
+  | Evm_tx_container m -> (m :> (module Tx_container))
+  | Michelson_tx_container m -> m

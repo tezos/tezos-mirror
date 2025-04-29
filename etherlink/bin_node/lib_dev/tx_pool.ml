@@ -985,3 +985,5 @@ module Tx_container = struct
       ~initial_validation_state:_ =
     pop_transactions ~maximum_cumulative_size
 end
+
+let tx_container = Services_backend_sig.Evm_tx_container (module Tx_container)

@@ -34,9 +34,12 @@ let spawn_main ~exposed_port ~protected_endpoint ?private_endpoint ~data_dir ()
   let finalizer () = Lwt.return process#terminate in
   finalizer
 
-let install_finalizer_rpc server_public_finalizer
-    (module Tx_container : Services_backend_sig.Tx_container) =
+let install_finalizer_rpc ~(tx_container : _ Services_backend_sig.tx_container)
+    server_public_finalizer =
   let open Lwt_syntax in
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
+  in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
   let* () = server_public_finalizer () in
@@ -59,103 +62,107 @@ let set_metrics_confirmed_levels (ctxt : Evm_ro_context.t) =
   | None -> ()
 
 let container_forward_request ~public_endpoint ~private_endpoint ~keep_alive :
-    (module Services_backend_sig.Tx_container) =
-  (module struct
-    let rpc_error =
-      Internal_event.Simple.declare_2
-        ~section:Events.section
-        ~name:"local_node_rpc_failure"
-        ~msg:"local node failed answering {rpc} with {message}"
-        ~level:Error
-        ("rpc", Data_encoding.string)
-        ("message", Data_encoding.string)
+    L2_types.evm_chain_family Services_backend_sig.tx_container =
+  Services_backend_sig.Evm_tx_container
+    (module struct
+      let rpc_error =
+        Internal_event.Simple.declare_2
+          ~section:Events.section
+          ~name:"local_node_rpc_failure"
+          ~msg:"local node failed answering {rpc} with {message}"
+          ~level:Error
+          ("rpc", Data_encoding.string)
+          ("message", Data_encoding.string)
 
-    let forwarding_transaction =
-      Internal_event.Simple.declare_1
-        ~section:Events.section
-        ~name:"forward_transaction"
-        ~msg:"forwarding transaction {tx_hash} to local node"
-        ~level:Info
-        ~pp1:(fun fmt Ethereum_types.(Hash (Hex h)) ->
-          Format.fprintf fmt "%10s" h)
-        ("tx_hash", Ethereum_types.hash_encoding)
+      let forwarding_transaction =
+        Internal_event.Simple.declare_1
+          ~section:Events.section
+          ~name:"forward_transaction"
+          ~msg:"forwarding transaction {tx_hash} to local node"
+          ~level:Info
+          ~pp1:(fun fmt Ethereum_types.(Hash (Hex h)) ->
+            Format.fprintf fmt "%10s" h)
+          ("tx_hash", Ethereum_types.hash_encoding)
 
-    let get_or_emit_error ~rpc_name res =
-      let open Lwt_result_syntax in
-      match res with
-      | Ok res -> return_some res
-      | Error msg ->
-          let*! () = Internal_event.Simple.emit rpc_error (rpc_name, msg) in
-          return_none
+      let get_or_emit_error ~rpc_name res =
+        let open Lwt_result_syntax in
+        match res with
+        | Ok res -> return_some res
+        | Error msg ->
+            let*! () = Internal_event.Simple.emit rpc_error (rpc_name, msg) in
+            return_none
 
-    let nonce ~next_nonce address =
-      let open Lwt_result_syntax in
-      let* res =
-        Injector.get_transaction_count
+      let nonce ~next_nonce address =
+        let open Lwt_result_syntax in
+        let* res =
+          Injector.get_transaction_count
+            ~keep_alive
+            ~base:public_endpoint
+            address
+            (* The function [nonce] is only ever called when
+               requesting the nonce for the pending block. It's
+               safe to assume the pending block. *)
+            Ethereum_types.Block_parameter.(Block_parameter Pending)
+        in
+        let* nonce = get_or_emit_error ~rpc_name:"get_transaction_count" res in
+        match nonce with
+        | Some nonce -> return nonce
+        | None ->
+            (*we return the known next_nonce instead of failing *)
+            return next_nonce
+
+      let add ~next_nonce:_
+          (tx_object : Ethereum_types.legacy_transaction_object) ~raw_tx =
+        let open Lwt_syntax in
+        let* () =
+          Internal_event.Simple.emit forwarding_transaction tx_object.hash
+        in
+        Injector.inject_transaction
           ~keep_alive
-          ~base:public_endpoint
-          address
-          (* The function [nonce] is only ever called when
-             requesting the nonce for the pending block. It's
-             safe to assume the pending block. *)
-          Ethereum_types.Block_parameter.(Block_parameter Pending)
-      in
-      let* nonce = get_or_emit_error ~rpc_name:"get_transaction_count" res in
-      match nonce with
-      | Some nonce -> return nonce
-      | None ->
-          (*we return the known next_nonce instead of failing *)
-          return next_nonce
+          ~base:private_endpoint
+          ~tx_object
+          ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
 
-    let add ~next_nonce:_ (tx_object : Ethereum_types.legacy_transaction_object)
-        ~raw_tx =
-      let open Lwt_syntax in
-      let* () =
-        Internal_event.Simple.emit forwarding_transaction tx_object.hash
-      in
-      Injector.inject_transaction
-        ~keep_alive
-        ~base:private_endpoint
-        ~tx_object
-        ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
+      let find hash =
+        let open Lwt_result_syntax in
+        let* res =
+          Injector.get_transaction_by_hash
+            ~keep_alive
+            ~base:public_endpoint
+            hash
+        in
+        let* tx_object =
+          get_or_emit_error ~rpc_name:"get_transaction_by_hash" res
+        in
+        let tx_object = Option.join tx_object in
+        return tx_object
 
-    let find hash =
-      let open Lwt_result_syntax in
-      let* res =
-        Injector.get_transaction_by_hash ~keep_alive ~base:public_endpoint hash
-      in
-      let* tx_object =
-        get_or_emit_error ~rpc_name:"get_transaction_by_hash" res
-      in
-      let tx_object = Option.join tx_object in
-      return tx_object
+      let content () =
+        Lwt_result.return
+          Ethereum_types.{pending = AddressMap.empty; queued = AddressMap.empty}
 
-    let content () =
-      Lwt_result.return
-        Ethereum_types.{pending = AddressMap.empty; queued = AddressMap.empty}
+      let shutdown () = Lwt_result_syntax.return_unit
 
-    let shutdown () = Lwt_result_syntax.return_unit
+      let clear () = Lwt_result_syntax.return_unit
 
-    let clear () = Lwt_result_syntax.return_unit
+      let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
 
-    let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
+      let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
+        Lwt_result_syntax.return_unit
 
-    let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
-      Lwt_result_syntax.return_unit
+      let lock_transactions () = Lwt_result_syntax.return_unit
 
-    let lock_transactions () = Lwt_result_syntax.return_unit
+      let unlock_transactions () = Lwt_result_syntax.return_unit
 
-    let unlock_transactions () = Lwt_result_syntax.return_unit
+      let is_locked () = Lwt_result_syntax.return_false
 
-    let is_locked () = Lwt_result_syntax.return_false
+      let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
+        Lwt_result_syntax.return_unit
 
-    let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
-      Lwt_result_syntax.return_unit
-
-    let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
-        ~initial_validation_state:_ =
-      Lwt_result_syntax.return_nil
-  end)
+      let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
+          ~initial_validation_state:_ =
+        Lwt_result_syntax.return_nil
+    end)
 
 let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     ~(config : Configuration.t) () =
@@ -206,10 +213,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
             ~keep_alive:config.keep_alive
             ()
         in
-        return
-          ( false,
-            (module Tx_queue.Tx_container : Services_backend_sig.Tx_container)
-          )
+        return (false, Tx_queue.tx_container)
     | None, None ->
         let* () =
           Tx_pool.start
@@ -226,9 +230,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
               chain_family = Ex_chain_family chain_family;
             }
         in
-        return
-          ( true,
-            (module Tx_pool.Tx_container : Services_backend_sig.Tx_container) )
+        return (true, Tx_pool.tx_container)
   in
 
   let* () = set_metrics_level ctxt in
@@ -266,7 +268,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   in
 
   let (_ : Lwt_exit.clean_up_callback_id) =
-    install_finalizer_rpc server_public_finalizer tx_container
+    install_finalizer_rpc server_public_finalizer ~tx_container
   in
 
   let* () =
@@ -276,7 +278,9 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
 
   let* next_blueprint_number = Evm_ro_context.next_blueprint_number ctxt in
   let* () =
-    let (module Tx_container) = tx_container in
+    let (module Tx_container) =
+      Services_backend_sig.tx_container_module tx_container
+    in
     Tx_container.tx_queue_beacon
       ~evm_node_endpoint:(Rpc evm_node_endpoint)
       ~tick_interval:0.05

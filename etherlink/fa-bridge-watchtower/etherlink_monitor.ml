@@ -54,6 +54,8 @@ end
 module Tx_queue = struct
   include Tx_queue
 
+  let (Services_backend_sig.Evm_tx_container tx_container) = tx_container
+
   let ( let**? ) v f =
     let open Lwt_result_syntax in
     match v with Ok v -> f v | Error err -> return (Error err)
@@ -61,6 +63,7 @@ module Tx_queue = struct
   (* as found in etherlink/bin_floodgate/tx_queue.ml *)
   let transfer ctx ?to_ ?(value = Z.zero) ~data () =
     let open Lwt_result_syntax in
+    let (module Tx_container) = tx_container in
     let (Ethereum_types.Qty nonce as qnonce) = ctx.nonce in
     let txn = Craft.transfer ctx ~nonce ?to_ ~value ~data () in
     let tx_raw = Ethereum_types.hex_to_bytes txn in
@@ -704,8 +707,9 @@ let handle_confirmed_txs {db; ws_client; _}
                  (nonce, exec.transactionHash, exec.blockNumber)
              in
              let* () = Db.Deposits.set_claimed db nonce exec in
+             let (module Tx_container) = Tx_queue.tx_container in
              let* () =
-               Tx_queue.Tx_container.confirm_transactions
+               Tx_container.confirm_transactions
                  ~clear_pending_queue_after:false
                  ~confirmed_txs:(Seq.cons tx_hash Seq.empty)
              in
@@ -738,7 +742,8 @@ let claim_deposits ctx =
       in
       ctx.nonce <- nonce ;
       (* Clear queue because we reinject all missing claims. *)
-      let* () = Tx_queue.Tx_container.clear () in
+      let (module Tx_container) = Tx_queue.tx_container in
+      let* () = Tx_container.clear () in
       List.iter_es
         (fun deposit ->
           let (Qty deposit_id) = deposit.Db.nonce in
@@ -892,9 +897,10 @@ let start db ~config ~notify_ws_change ~first_block =
   in
   let rec tx_queue_beacon () =
     let open Lwt_syntax in
+    let (module Tx_container) = Tx_queue.tx_container in
     let* res =
       protect @@ fun () ->
-      Tx_queue.Tx_container.tx_queue_tick ~evm_node_endpoint:!tx_queue_endpoint
+      Tx_container.tx_queue_tick ~evm_node_endpoint:!tx_queue_endpoint
     in
     let* () =
       match res with

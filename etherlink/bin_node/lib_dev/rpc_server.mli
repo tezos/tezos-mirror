@@ -32,7 +32,7 @@ val start_private_server :
   rpc_server_family:Rpc_types.rpc_server_family ->
   ?block_production:block_production ->
   Configuration.t ->
-  (module Services_backend_sig.Tx_container) ->
+  _ Services_backend_sig.tx_container ->
   (module Services_backend_sig.S) * 'a ->
   finalizer tzresult Lwt.t
 
@@ -52,6 +52,6 @@ val start_public_server :
   ?data_dir:string ->
   Validate.validation_mode ->
   Configuration.t ->
-  (module Services_backend_sig.Tx_container) ->
+  _ Services_backend_sig.tx_container ->
   (module Services_backend_sig.S) * 'a ->
   finalizer tzresult Lwt.t
