@@ -251,34 +251,39 @@ let version () =
   Lwt_result_syntax.return Tezlink_version.mock
 
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
-let build_block_dir (module Backend : Tezlink_backend_sig.S) =
-  let dir : tezlink_rpc_context Tezos_rpc.Directory.t =
+let register_block_services (module Backend : Tezlink_backend_sig.S) base_dir =
+  let dir =
     Tezos_rpc.Directory.empty
+    |> register_with_conversion
+         ~service:Imported_services.current_level
+         ~impl:(fun {block; chain} query () ->
+           Backend.current_level chain block ~offset:query.offset)
+         ~convert_output:Protocol_types.Level.convert
+    |> register ~service:Imported_services.protocols ~impl:(fun _ _ () ->
+           protocols ())
+    |> register
+         ~service:Imported_services.balance
+         ~impl:(fun ({chain; block}, contract) _ _ ->
+           Backend.balance chain block contract)
+    |> register_with_conversion
+         ~service:Imported_services.manager_key
+         ~impl:(fun ({chain; block}, contract) _ _ ->
+           Backend.manager_key chain block contract)
+         ~convert_output:(function
+           | None -> Result.return_none
+           | Some pk ->
+               Result.map Option.some @@ Protocol_types.Public_key.convert pk)
+    |> register_with_conversion
+         ~service:Imported_services.constants
+         ~impl:(fun {block; chain} () () -> Backend.constants chain block)
+         ~convert_output:Tezlink_constants.convert
   in
-  dir
-  |> register_with_conversion
-       ~service:Imported_services.current_level
-       ~impl:(fun {block; chain} query () ->
-         Backend.current_level chain block ~offset:query.offset)
-       ~convert_output:Protocol_types.Level.convert
-  |> register ~service:Imported_services.protocols ~impl:(fun _ _ () ->
-         protocols ())
-  |> register
-       ~service:Imported_services.balance
-       ~impl:(fun ({chain; block}, contract) _ _ ->
-         Backend.balance chain block contract)
-  |> register_with_conversion
-       ~service:Imported_services.manager_key
-       ~impl:(fun ({chain; block}, contract) _ _ ->
-         Backend.manager_key chain block contract)
-       ~convert_output:(function
-         | None -> Result.return_none
-         | Some pk ->
-             Result.map Option.some @@ Protocol_types.Public_key.convert pk)
-  |> register_with_conversion
-       ~service:Imported_services.constants
-       ~impl:(fun {block; chain} () () -> Backend.constants chain block)
-       ~convert_output:Tezlink_constants.convert
+  Tezos_rpc.Directory.prefix
+    block_directory_path
+    (Tezos_rpc.Directory.map
+       (fun (((), chain), block) -> make_env chain block)
+       dir)
+  |> Tezos_rpc.Directory.merge base_dir
 
 let register_chain_services ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) base_dir =
@@ -299,19 +304,11 @@ let register_chain_services ~l2_chain_id
 
 (** Builds the root directory. *)
 let build_dir ~l2_chain_id backend =
-  let helper_dir = build_block_dir backend in
-  let root_directory =
-    Tezos_rpc.Directory.prefix
-      block_directory_path
-      (Tezos_rpc.Directory.map
-         (fun (((), chain), block) -> make_env chain block)
-         helper_dir)
-  in
-  Tezos_rpc.Directory.register
-    root_directory
-    Imported_services.version
-    (fun () () () -> version ())
+  Tezos_rpc.Directory.empty
+  |> register_block_services backend
   |> register_chain_services ~l2_chain_id backend
+  |> register ~service:Imported_services.version ~impl:(fun () () () ->
+         version ())
 
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
