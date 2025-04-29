@@ -1941,7 +1941,7 @@ let worker_wait_for_request req =
   return_ res
 
 let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
-    ~store_perm ?sequencer_wallet ?snapshot_url () =
+    ~store_perm ?sequencer_wallet ?snapshot_url ~tx_container:_ () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -2115,7 +2115,7 @@ let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})
 
 let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
-    ~rollup_node_data_dir () =
+    ~rollup_node_data_dir ~tx_container () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* irmin_context, evm_state, finalized_level =
@@ -2134,6 +2134,7 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
       ~data_dir
       ~smart_rollup_address
       ~store_perm:`Read_write
+      ~tx_container
       ()
   in
   worker_wait_for_request

@@ -139,6 +139,14 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           init_from_snapshot
     | None -> Result.return_none
   in
+  let* tx_container =
+    match configuration.experimental_features.enable_tx_queue with
+    | Some _tx_queue_config ->
+        return
+          (module Tx_queue.Tx_container : Services_backend_sig.Tx_container)
+    | None ->
+        return (module Tx_pool.Tx_container : Services_backend_sig.Tx_container)
+  in
   let* status, smart_rollup_address_typed =
     Evm_context.start
       ~configuration
@@ -148,6 +156,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~store_perm:`Read_write
       ~sequencer_wallet:(sequencer_config.sequencer, cctxt)
       ?snapshot_url
+      ~tx_container
       ()
   in
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
@@ -277,31 +286,24 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
 
   let backend = Evm_ro_context.ro_backend ro_ctxt configuration in
-  let* tx_container =
+  let* () =
     match configuration.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
-        let* () =
-          Tx_queue.start
-            ~config:tx_queue_config
-            ~keep_alive:configuration.keep_alive
-            ()
-        in
-        return
-          (module Tx_queue.Tx_container : Services_backend_sig.Tx_container)
+        Tx_queue.start
+          ~config:tx_queue_config
+          ~keep_alive:configuration.keep_alive
+          ()
     | None ->
-        let* () =
-          Tx_pool.start
-            {
-              backend;
-              smart_rollup_address = smart_rollup_address_b58;
-              mode = Sequencer;
-              tx_timeout_limit = configuration.tx_pool_timeout_limit;
-              tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
-              tx_pool_tx_per_addr_limit =
-                Int64.to_int configuration.tx_pool_tx_per_addr_limit;
-            }
-        in
-        return (module Tx_pool.Tx_container : Services_backend_sig.Tx_container)
+        Tx_pool.start
+          {
+            backend;
+            smart_rollup_address = smart_rollup_address_b58;
+            mode = Sequencer;
+            tx_timeout_limit = configuration.tx_pool_timeout_limit;
+            tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
+            tx_pool_tx_per_addr_limit =
+              Int64.to_int configuration.tx_pool_tx_per_addr_limit;
+          }
   in
   Metrics.init
     ~mode:"sequencer"
