@@ -121,9 +121,10 @@ let install_finalizer_observer ~rollup_node_tracking
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
-let container_forward_tx ~keep_alive ~evm_node_endpoint :
-    L2_types.evm_chain_family Services_backend_sig.tx_container =
-  Services_backend_sig.Evm_tx_container
+let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
+    ~keep_alive ~evm_node_endpoint :
+    f Services_backend_sig.tx_container tzresult =
+  let (module Tx_container) =
     (module struct
       type address = Ethereum_types.address
 
@@ -166,7 +167,17 @@ let container_forward_tx ~keep_alive ~evm_node_endpoint :
       let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
           ~initial_validation_state:_ =
         Lwt_result_syntax.return_nil
-    end)
+    end : Services_backend_sig.Tx_container
+      with type address = Ethereum_types.address
+       and type legacy_transaction_object =
+         Ethereum_types.legacy_transaction_object
+       and type transaction_object = Transaction_object.t)
+  in
+  let open Result_syntax in
+  match chain_family with
+  | EVM -> return @@ Services_backend_sig.Evm_tx_container (module Tx_container)
+  | Michelson ->
+      error_with "Observer.container_forward_tx not implemented for Tezlink"
 
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot () =
@@ -221,11 +232,15 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
             false )
     | None ->
         if config.finalized_view then
+          let* tx_container =
+            container_forward_tx
+              ~chain_family:EVM
+              ~keep_alive:config.keep_alive
+              ~evm_node_endpoint
+          in
           return
             ( (fun ~tx_pool_parameters:_ -> Lwt_result_syntax.return_unit),
-              container_forward_tx
-                ~keep_alive:config.keep_alive
-                ~evm_node_endpoint,
+              tx_container,
               false )
         else
           let* tx_container = Tx_pool.tx_container ~chain_family:EVM in
