@@ -2412,6 +2412,53 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
          propagated between mempools.*)
       tzfail Validate_errors.Consensus.Aggregate_in_mempool
 
+let record_preattestations_aggregate ctxt (mode : mode)
+    (content : consensus_aggregate_content) (committee : Slot.t list) :
+    (context * Kind.preattestations_aggregate contents_result_list) tzresult
+    Lwt.t =
+  let open Lwt_result_syntax in
+  match mode with
+  | Application _ | Full_construction _ ->
+      let round = content.round in
+      let ctxt =
+        match mode with
+        | Full_construction _ -> (
+            match Consensus.get_preattestations_quorum_round ctxt with
+            | None -> Consensus.set_preattestations_quorum_round ctxt round
+            | Some _ -> ctxt)
+        | Application _ | Partial_construction _ -> ctxt
+      in
+      let slot_map = Consensus.allowed_preattestations ctxt in
+      (* Accumulate the list of delegates and the total attesting power *)
+      let*? ctxt, committee, consensus_power =
+        let open Result_syntax in
+        List.fold_left_e
+          (fun (ctxt, consensus_keys, consensus_power) slot ->
+            let* {delegate; consensus_pkh; _}, power, _dal_power =
+              find_in_slot_map slot slot_map
+            in
+            let* ctxt =
+              Consensus.record_preattestation
+                ctxt
+                ~initial_slot:slot
+                ~power
+                round
+            in
+            let key = ({delegate; consensus_pkh} : Consensus_key.t) in
+            return (ctxt, key :: consensus_keys, power + consensus_power))
+          (ctxt, [], 0)
+          committee
+      in
+      let result =
+        Preattestations_aggregate_result
+          {balance_updates = []; committee; consensus_power}
+      in
+      return (ctxt, Single_result result)
+  | Partial_construction _ ->
+      (* Attestations_aggregate are built at baking time and shouldn't be
+         propagated between mempools.*)
+      tzfail Validate_errors.Consensus.Aggregate_in_mempool
+
 let apply_manager_contents_list ctxt ~payload_producer chain_id
     ~gas_cost_for_sig_check fees_updated_contents_list =
   let open Lwt_syntax in
@@ -2550,8 +2597,13 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       record_preattestation ctxt mode consensus_content
   | Single (Attestation {consensus_content; dal_content}) ->
       record_attestation ctxt mode consensus_content dal_content
-  | Single (Preattestations_aggregate _) ->
-      tzfail Validate_errors.Consensus.Aggregate_not_implemented
+  | Single (Preattestations_aggregate {consensus_content; committee}) ->
+      let*? () =
+        error_unless
+          (Constants.aggregate_attestation ctxt)
+          Validate_errors.Consensus.(Aggregate_disabled)
+      in
+      record_preattestations_aggregate ctxt mode consensus_content committee
   | Single (Attestations_aggregate {committee; _}) ->
       let*? () =
         error_unless
