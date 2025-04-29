@@ -12,6 +12,7 @@ type parameters = {
   maximum_number_of_chunks : int;
   uses_tx_queue : bool;
   chain_family : L2_types.chain_family;
+  tx_container : (module Services_backend_sig.Tx_container);
 }
 
 (* The size of a delayed transaction is overapproximated to the maximum size
@@ -306,8 +307,10 @@ let head_info_and_delayed_transactions ~with_delayed_transactions
 
 let produce_block ~chain_family ~uses_tx_queue ~cctxt ~smart_rollup_address
     ~sequencer_key ~force ~timestamp ~maximum_number_of_chunks
-    ~with_delayed_transactions =
+    ~with_delayed_transactions
+    ~(tx_container : (module Services_backend_sig.Tx_container)) =
   let open Lwt_result_syntax in
+  let (module Tx_container) = tx_container in
   let* is_locked =
     if uses_tx_queue then Tx_queue.is_locked () else Tx_pool.is_locked ()
   in
@@ -371,6 +374,7 @@ module Handlers = struct
           maximum_number_of_chunks;
           uses_tx_queue;
           chain_family;
+          tx_container;
         } =
           state
         in
@@ -384,6 +388,7 @@ module Handlers = struct
           ~timestamp
           ~maximum_number_of_chunks
           ~with_delayed_transactions
+          ~tx_container
 
   type launch_error = error trace
 

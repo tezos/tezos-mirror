@@ -323,6 +323,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
         uses_tx_queue = Configuration.is_tx_queue_enabled configuration;
         chain_family;
+        tx_container;
       }
   in
   let* () =
