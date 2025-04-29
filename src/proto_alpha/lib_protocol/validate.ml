@@ -843,11 +843,11 @@ module Consensus = struct
               Attestation
               consensus_content.slot
           in
-          match (consensus_key.consensus_pk, dal_content) with
-          | Bls _, None when Constants.aggregate_attestation vi.ctxt ->
-              (* An attestation signed by a tz4 without DAL content must be
-                 included in an Attestations_aggregate, even when it is the only
-                 one in the quorum. *)
+          match consensus_key.consensus_pk with
+          | Bls _ when Constants.aggregate_attestation vi.ctxt ->
+              (* An attestation with a BLS signature must be included in an
+                 Attestations_aggregate, even if there is only one in the block.
+              *)
               let hash = Operation.hash operation in
               tzfail
                 (Unaggregated_eligible_operation {kind = Attestation; hash})
