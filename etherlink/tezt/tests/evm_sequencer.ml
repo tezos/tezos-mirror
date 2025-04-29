@@ -441,7 +441,8 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
-let register_tezlink_test ~title ~tags scenario protocols =
+let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts scenario
+    protocols =
   register_all
     ~enable_tx_queue:Evm_node.(Enable false)
       (*Tx queue is not yet compatible with tezlink *)
@@ -453,6 +454,7 @@ let register_tezlink_test ~title ~tags scenario protocols =
         {
           (Evm_node.default_l2_setup ~l2_chain_id:12) with
           l2_chain_family = "Michelson";
+          tez_bootstrap_accounts;
         };
       ]
     ~use_multichain:Register_with_feature
@@ -565,6 +567,7 @@ let test_tezlink_balance =
   register_tezlink_test
     ~title:"Test of the balance rpc"
     ~tags:["rpc"; "balance"]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
   (* call the balance rpc and parse the result *)
   let endpoint =
@@ -574,11 +577,18 @@ let test_tezlink_balance =
           {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
 
-  let* res =
+  let* valid_res =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
   in
   Check.(
-    (Tez.to_mutez res = 3800000000000) int ~error_msg:"Expected %R but got %L") ;
+    (Tez.to_mutez valid_res = 3800000000000)
+      int
+      ~error_msg:"Expected %R but got %L") ;
+
+  let* invalid_res =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
+  in
+  Check.((Tez.to_mutez invalid_res = 0) int ~error_msg:"Expected %R but got %L") ;
   unit
 
 let account_rpc sequencer account key =
@@ -599,10 +609,16 @@ let test_tezlink_manager_key =
   register_tezlink_test
     ~title:"Test of the manager_key rpc"
     ~tags:["rpc"; "manager_key"]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
-  let* res = account_rpc sequencer Constant.bootstrap1 "manager_key" in
+  let* valid_res = account_rpc sequencer Constant.bootstrap1 "manager_key" in
   Check.(
-    JSON.(res |> as_string_opt = Some Constant.bootstrap1.public_key)
+    JSON.(valid_res |> as_string_opt = Some Constant.bootstrap1.public_key)
+      (option string)
+      ~error_msg:"Expected %R but got %L") ;
+  let* invalid_res = account_rpc sequencer Constant.bootstrap2 "manager_key" in
+  Check.(
+    JSON.(invalid_res |> as_string_opt = None)
       (option string)
       ~error_msg:"Expected %R but got %L") ;
   unit
@@ -611,9 +627,13 @@ let test_tezlink_counter =
   register_tezlink_test
     ~title:"Test of the counter rpc"
     ~tags:["evm"; "rpc"; "counter"]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
-  let* res = account_rpc sequencer Constant.bootstrap1 "counter" in
-  Check.(JSON.(res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
+  let* valid_res = account_rpc sequencer Constant.bootstrap1 "counter" in
+  Check.(JSON.(valid_res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
+  let* invalid_res = account_rpc sequencer Constant.bootstrap2 "counter" in
+  Check.(
+    JSON.(invalid_res |> as_int = 1) int ~error_msg:"Expected %R but got %L") ;
   unit
 
 let test_tezlink_version =
