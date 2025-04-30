@@ -31,7 +31,8 @@
   lwt-canceler
   lwt-exit
   uri
-  memtrace)
+  memtrace
+  octez-baker-lib)
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (library_flags (:standard -linkall))
@@ -51,7 +52,8 @@
   -open Tezos_rpc_http_client
   -open Tezos_context_ops
   -open Tezos_rpc_http
-  -open Tezos_crypto_dal)
+  -open Tezos_crypto_dal
+  -open Octez_agnostic_baker)
  (modules (:standard \ Baking_commands Baking_commands_registration)))
 
 (rule
