@@ -4460,6 +4460,9 @@ let test_observer_reorg_on_blueprint_stream =
       "Observer tracking a rollup node reorganizes after blueprint on stream"
     ~use_dal:Register_without_feature
     ~use_threshold_encryption:Register_without_feature
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -4697,6 +4700,9 @@ let test_flushed_blueprint_reorg_late =
     ~title:"Flush delayed inbox event leads to reorg, including late delayed tx"
     ~use_dal:Register_without_feature
     ~use_threshold_encryption:Register_without_feature
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -4827,6 +4833,9 @@ let test_flushed_blueprint_reorg_done_late =
        too late"
     ~use_dal:Register_without_feature
     ~use_threshold_encryption:Register_without_feature
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -5393,6 +5402,9 @@ let test_flushed_blueprint_reorg_upgrade =
         "at";
       ]
     ~title:"Flush delayed inbox event leads to reorg, including upgrade"
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {
            client;
            l1_contracts;
@@ -10845,6 +10857,9 @@ let test_websocket_newHeads_event =
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~websockets:true
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {sequencer; observer; _} _protocol ->
   let scenario evm_node =
     let* websocket = Evm_node.open_websocket evm_node in
