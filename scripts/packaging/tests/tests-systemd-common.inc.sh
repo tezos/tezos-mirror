@@ -50,10 +50,18 @@ else
   done
 fi
 
-for logfile in /var/log/tezos/accuser-P*.log; do
-  proto=$(basename "$logfile" | sed -E 's/accuser-(P[^.]+).log/\1/')
-  systemctl status "octez-accuser@$proto.service"
-  echo "Log: $logfile"
+if [ "${AGNOSTIC_BAKER:-}" = "true" ]; then
+  systemctl status octez-agnostic-baker.service
+
+  echo "Log: /var/log/tezos/accuser.log"
   echo "-----------------------"
-  tail "$logfile"
-done
+  tail /var/log/tezos/accuser.log
+else
+  for logfile in /var/log/tezos/accuser-P*.log; do
+    proto=$(basename "$logfile" | sed -E 's/accuser-(P[^.]+).log/\1/')
+    systemctl status "octez-accuser@$proto.service"
+    echo "Log: $logfile"
+    echo "-----------------------"
+    tail "$logfile"
+  done
+fi
