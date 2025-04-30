@@ -9,6 +9,145 @@
 open Filename.Infix
 include Sqlite
 
+module Legacy_encodings = struct
+  open Ethereum_types
+
+  let block_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             number;
+             hash;
+             parent;
+             nonce;
+             sha3Uncles;
+             logsBloom;
+             transactionRoot;
+             stateRoot;
+             receiptRoot;
+             miner;
+             difficulty;
+             totalDifficulty;
+             extraData;
+             size;
+             gasLimit;
+             gasUsed;
+             timestamp;
+             transactions;
+             uncles;
+             baseFeePerGas;
+             prevRandao;
+             withdrawals = _;
+             withdrawalsRoot = _;
+             blobGasUsed = _;
+             excessBlobGas = _;
+             parentBeaconBlockRoot = _;
+           } ->
+        ( ( ( number,
+              hash,
+              parent,
+              nonce,
+              sha3Uncles,
+              logsBloom,
+              transactionRoot,
+              stateRoot,
+              receiptRoot,
+              miner ),
+            ( difficulty,
+              totalDifficulty,
+              extraData,
+              size,
+              gasLimit,
+              gasUsed,
+              timestamp,
+              transactions,
+              uncles,
+              baseFeePerGas ) ),
+          prevRandao ))
+      (fun ( ( ( number,
+                 hash,
+                 parent,
+                 nonce,
+                 sha3Uncles,
+                 logsBloom,
+                 transactionRoot,
+                 stateRoot,
+                 receiptRoot,
+                 miner ),
+               ( difficulty,
+                 totalDifficulty,
+                 extraData,
+                 size,
+                 gasLimit,
+                 gasUsed,
+                 timestamp,
+                 transactions,
+                 uncles,
+                 baseFeePerGas ) ),
+             prevRandao ) ->
+        {
+          number;
+          hash;
+          parent;
+          nonce;
+          sha3Uncles;
+          logsBloom;
+          transactionRoot;
+          stateRoot;
+          receiptRoot;
+          miner;
+          difficulty;
+          totalDifficulty;
+          extraData;
+          size;
+          gasLimit;
+          gasUsed;
+          baseFeePerGas;
+          timestamp;
+          transactions;
+          uncles;
+          prevRandao;
+          withdrawals = None;
+          withdrawalsRoot = None;
+          blobGasUsed = None;
+          excessBlobGas = None;
+          parentBeaconBlockRoot = None;
+        })
+      (merge_objs
+         (merge_objs
+            (obj10
+               (req "number" quantity_encoding)
+               (req "hash" block_hash_encoding)
+               (req "parentHash" block_hash_encoding)
+               (req "nonce" hex_encoding)
+               (req "sha3Uncles" hash_encoding)
+               (req "logsBloom" hex_encoding)
+               (req "transactionsRoot" hash_encoding)
+               (req "stateRoot" hash_encoding)
+               (req "receiptsRoot" hash_encoding)
+               (req "miner" hex_encoding))
+            (obj10
+               (req "difficulty" quantity_encoding)
+               (req "totalDifficulty" quantity_encoding)
+               (req "extraData" hex_encoding)
+               (req "size" quantity_encoding)
+               (req "gasLimit" quantity_encoding)
+               (req "gasUsed" quantity_encoding)
+               (req "timestamp" quantity_encoding)
+               (req
+                  "transactions"
+                  (block_transactions_encoding
+                     legacy_transaction_object_encoding))
+               (req "uncles" (list hash_encoding))
+               (opt "baseFeePerGas" quantity_encoding)))
+         (obj1
+            (* [mixHash] has been replaced by [prevRandao] internally in the
+               Paris EVM version, but every public RPC endpoints we have been
+               testing keep using [mixHash] in their JSON encoding (probably for
+               backward compatibility). *)
+            (opt "mixHash" block_hash_encoding)))
+end
+
 type levels = {l1_level : int32; current_number : Ethereum_types.quantity}
 
 type finalized_levels = {
@@ -119,9 +258,21 @@ module Q = struct
           (Format.asprintf
              "Not a valid block payload: %a"
              Data_encoding.Binary.pp_read_error)
-          (Data_encoding.Binary.of_string
-             Ethereum_types.(block_encoding legacy_transaction_object_encoding)
-             bytes))
+          (* The block encoding in Ethereum_types was modified in a patch
+             without taking into account backward compatibility.
+
+             As a consequence, it is possible for a block to be serialized
+             with the previous encoding. We fallback to this legacy encoding
+             just in case. *)
+          (Result.bind_error
+             (Data_encoding.Binary.of_string
+                Ethereum_types.(
+                  block_encoding legacy_transaction_object_encoding)
+                bytes)
+             (fun _ ->
+               Data_encoding.Binary.of_string
+                 Legacy_encodings.block_encoding
+                 bytes)))
       string
 
   let timestamp =

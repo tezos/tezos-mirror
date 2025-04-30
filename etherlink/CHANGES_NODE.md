@@ -1,27 +1,18 @@
 # Changelog
 
-## Unreleased
+## Version 0.24 (2025-04-30)
 
-### Breaking changes
+This is a hot fix release to address a regression in the `eth_getBlockBy*`
+family of RPCs. Providers having updated to version 0.21 and higher are
+encouraged to upgrade in order to restore full services.
 
-### Configuration changes
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
 
 ### RPCs changes
 
-### Metrics changes
-
-### Execution changes
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
+- Fixes the `eth_getBlockBy*` family of RPCs being unable to return blocks
+  recorded with a version older than 0.21. (!17899)
 
 ## Version 0.23 (2025-04-28)
 
