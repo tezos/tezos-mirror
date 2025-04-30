@@ -249,7 +249,12 @@ module Address_nonce = struct
     | None -> return next_nonce
 end
 
-module Tx_container (Tx : Tx_queue_types.L2_transaction) = struct
+module Tx_container
+    (Tx : Tx_queue_types.L2_transaction)
+    (ChainName : sig
+      val chain_name : string
+    end) =
+struct
   module Transaction_objects = struct
     open Ethereum_types
     module S = String.Hashtbl
@@ -359,7 +364,7 @@ module Tx_container (Tx : Tx_queue_types.L2_transaction) = struct
 
     let encoding = Data_encoding.unit
 
-    let base = ["evm_node_worker"; "tx_queue"]
+    let base = ["evm_node_worker"; "tx_queue"; ChainName.chain_name]
 
     let pp _fmt () = ()
 
@@ -1056,7 +1061,7 @@ module Tx_container (Tx : Tx_queue_types.L2_transaction) = struct
   let () =
     register_error_kind
       `Permanent
-      ~id:"tx_queue_is_closed"
+      ~id:(Format.sprintf "tx_queue_%s_is_closed" ChainName.chain_name)
       ~title:"Tx_queue_is_closed"
       ~description:"Failed to add a request to the Tx queue, it's closed."
       Data_encoding.unit
@@ -1197,7 +1202,12 @@ module Tx_container (Tx : Tx_queue_types.L2_transaction) = struct
     return_unit
 end
 
-module Eth_tx_container = Tx_container (Tx_queue_types.Eth_transaction_object)
+module Eth_tx_container =
+  Tx_container
+    (Tx_queue_types.Eth_transaction_object)
+    (struct
+      let chain_name = "etherlink"
+    end)
 
 let start = Eth_tx_container.start
 
