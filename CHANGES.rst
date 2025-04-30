@@ -91,6 +91,9 @@ Baker
 Agnostic Baker
 --------------
 
+- Add ``run accuser`` command to replicate the behaviour of the accuser.
+  (MR :gl:`!17767`)
+
 - Enables ``advertises_level`` in baker logs by default, logs are prefixed by
   the logging level. It can be disabled by setting ``"log" : { advertises_level
   : false }`` in the client configuration. (MR :gl:`!17737`)
@@ -131,6 +134,13 @@ the README from ``src/bin_agnostic_baker``.
 
 Accuser
 -------
+
+Agnostic Accuser
+----------------
+
+- Add ``octez-accuser`` agnostic accuser binary. This behaves in a similar way
+  to the agnostic baker binary, automatically switching the underlying accuser
+  process at protocol migration. (MR :gl:`!17738`)
 
 Proxy Server
 ------------
