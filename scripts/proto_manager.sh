@@ -1226,7 +1226,8 @@ function update_tezt_tests() {
 
   # add new protocol baker
   # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
-  awk -v source="$protocol_source" -v target="$protocol_target" '
+  if [[ ${is_snapshot} == false ]]; then
+    awk -v source="$protocol_source" -v target="$protocol_target" '
 $0 ~ "let octez_baker_" source " =" {
   orig1 = $0
   getline
@@ -1240,7 +1241,22 @@ $0 ~ "let octez_baker_" source " =" {
 }
 1
 ' tezt/lib_tezos/constant.ml > tezt/lib_tezos/constant.ml.tmp
-  mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+    mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+  else
+    lowercase_shorthash=$(echo "$short_hash" | tr '[:upper:]' '[:lower:]')
+    awk -v source="$protocol_source" -v short_hash="$short_hash" -v lowercase_shorthash="$lowercase_shorthash" '
+$0 ~ "let octez_baker_" source " =" {
+  print                  # line 1: unchanged
+  getline                # go to line 2
+  gsub("baker_" source, "baker_" lowercase_shorthash)
+  gsub("./octez-baker-" source , "./octez-baker-" short_hash)
+  print
+  next
+}
+1
+' tezt/lib_tezos/constant.ml > tezt/lib_tezos/constant.ml.tmp
+    mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+  fi
 
   ocamlformat -i tezt/lib_tezos/constant.ml
   commit_if_changes "tezt: add unused ${protocol_target} baker"
