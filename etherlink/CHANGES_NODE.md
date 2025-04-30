@@ -7,6 +7,8 @@
 ### Configuration changes
 
 ### RPCs changes
+- `eth_call` does not returns the `data` field when it's empty if it
+  fails during the execution. (!17893)
 
 ### Metrics changes
 

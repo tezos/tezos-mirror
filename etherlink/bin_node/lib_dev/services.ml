@@ -777,10 +777,14 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
               | Ok (Ok {value = None; gas_used = _}) ->
                   rpc_ok (hash_of_string "")
               | Ok (Error reason) ->
-                  rpc_error
-                  @@ Rpc_errors.transaction_rejected
-                       "execution reverted"
-                       (Some reason)
+                  if reason = Hash (Hex "") then
+                    rpc_error
+                    @@ Rpc_errors.transaction_rejected "execution reverted" None
+                  else
+                    rpc_error
+                    @@ Rpc_errors.transaction_rejected
+                         "execution reverted"
+                         (Some reason)
               | Error reason ->
                   rpc_error (Rpc_errors.transaction_rejected reason None)
             in
