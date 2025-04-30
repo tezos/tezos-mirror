@@ -1,13 +1,7 @@
 # This file was automatically generated, do not edit.
 # Edit file ci/bin/main.ml instead.
 
-workflow:
-  rules:
-  - if: $foo != "bar" || $foo == "bar"
-    when: always
-
 stages:
-- start
 - images
 - build
 
@@ -31,27 +25,6 @@ oc.docker:ci:amd64:
   artifacts:
     reports:
       dotenv: ci_image_tag.env
-
-oc.docker:jsonnet:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  script:
-  - ./scripts/ci/docker_jsonnet_build.sh
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-  artifacts:
-    reports:
-      dotenv: jsonnet_image_tag.env
 
 oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -77,129 +50,6 @@ oc.docker:ci:arm64:
     max: 1
     when:
     - runner_system_failure
-
-datadog_pipeline_trace:
-  image: datadog/ci:v2.44.0
-  stage: start
-  tags:
-  - gcp
-  dependencies: []
-  allow_failure: true
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  script:
-  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
-  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
-    --tags mr_number:$CI_MERGE_REQUEST_IID
-
-build_grafazos_dashboards:
-  image: ${jsonnet_image_name}:${jsonnet_image_tag}
-  stage: build
-  tags:
-  - gcp
-  dependencies:
-  - oc.docker:jsonnet:amd64
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - cd grafazos/
-  - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
-  script:
-  - make
-  artifacts:
-    name: grafazos-dashboards
-    expire_in: 1 day
-    paths:
-    - grafazos/output/**/*.json
-    when: on_success
-
-build-layer1-profiling:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_very_high_cpu
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - scripts/slim-mode.sh on
-  - make build OCTEZ_EXECUTABLES?=octez-node
-  - mkdir -p octez-binaries/x86_64/
-  - mv octez-node octez-binaries/x86_64/
-  after_script:
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    TEZOS_PPX_PROFILER: profiling
-    PROFILE: static
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-  artifacts:
-    expire_in: never
-    paths:
-    - ./octez-binaries/x86_64/octez-node
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
-
-teztale.build:static-arm64:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_arm64
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make teztale
-  after_script:
-  - mkdir -p ./teztale-binaries/arm64
-  - mv octez-teztale-* ./teztale-binaries/arm64/
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    PROFILE: static
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-  artifacts:
-    name: teztale-binaries
-    expire_in: never
-    paths:
-    - teztale-binaries/arm64/octez-teztale-*
-    when: on_success
 
 teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -240,4 +90,45 @@ teztale.build:static-x86_64:
     expire_in: never
     paths:
     - teztale-binaries/x86_64/octez-teztale-*
+    when: on_success
+
+teztale.build:static-arm64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_arm64
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make teztale
+  after_script:
+  - mkdir -p ./teztale-binaries/arm64
+  - mv octez-teztale-* ./teztale-binaries/arm64/
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    PROFILE: static
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    name: teztale-binaries
+    expire_in: never
+    paths:
+    - teztale-binaries/arm64/octez-teztale-*
     when: on_success

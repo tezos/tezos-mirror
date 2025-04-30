@@ -42,3 +42,4 @@ let job_build ?rules ?(expire_in = Gitlab_ci.Types.(Duration (Days 1))) ~arch ()
         "mv octez-teztale-* ./teztale-binaries/" ^ arch_string ^ "/";
       ]
     ["make teztale"]
+  |> enable_cargo_cache |> enable_sccache

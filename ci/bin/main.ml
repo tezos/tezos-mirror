@@ -148,6 +148,8 @@ let () =
   in
   (* Matches Grafazos release tags, e.g. [grafazos-v1.2]. *)
   let grafazos_release_tag_re = "/^grafazos-v\\d+\\.\\d+$/" in
+  (* Matches Teztale release tags, e.g. [teztale-v1.2]. *)
+  let teztale_release_tag_re = "/^teztale-v\\d+\\.\\d+$/" in
   let open Rules in
   let open Pipeline in
   (* Matches either Octez release tags or Octez beta release tags,
@@ -162,7 +164,8 @@ let () =
       Predefined_vars.ci_commit_tag != null
       && (not has_any_octez_release_tag)
       && (not (has_tag_match octez_evm_node_release_tag_re))
-      && not (has_tag_match grafazos_release_tag_re))
+      && (not (has_tag_match grafazos_release_tag_re))
+      && not (has_tag_match teztale_release_tag_re))
   in
   let release_description =
     "\n\n\
@@ -235,6 +238,17 @@ let () =
     ~description:
       "Test release pipeline for Grafazos.\n\n\
        This pipeline checks that 'grafazos_release_tag' pipelines work as \
+       intended, without publishing any release. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
+  (* TODO: We should be able to register this pipeline in [teztale/ci]. *)
+  register
+    "teztale_release_tag_test"
+    If.(not_on_tezos_namespace && push && has_tag_match teztale_release_tag_re)
+    ~jobs:(Teztale.Release.jobs ~test:true ())
+    ~description:
+      "Test release pipeline for Teztale.\n\n\
+       This pipeline checks that 'teztale_release_tag' pipelines work as \
        intended, without publishing any release. Developers or release \
        managers can create this pipeline by pushing a tag to a fork of \
        'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;

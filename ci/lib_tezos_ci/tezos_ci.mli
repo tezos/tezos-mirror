@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2023-2024 Nomadic Labs. <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -169,6 +169,51 @@ module Pipeline : sig
       error message is printed. *)
   val describe_pipeline : string -> unit
 end
+
+(** Add variable enabling sccache.
+
+    This function should be applied to jobs that build rust files and
+    which has a configured sccache Gitlab CI cache.
+
+    - [key] and [path] configure the key under which the cache is
+    stored, and the path that will be cached. By default, the [key]
+    contains the name of the job, thus scoping the cache to all
+    instances of that job. By default, [path] is the folder
+    ["$CI_PROJECT_DIR/_sccache"], and this function also sets the
+    environment dir [SCCACHE_DIR] such that sccache stores its caches
+    there.
+
+    - [cache_size] sets the environment variable [SCCACHE_CACHE_SIZE]
+    that configures the maximum size of the cache.
+
+    - [error_log], [idle_timeout] and [log] sets the environment
+    variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
+    [SCCACHE_LOG] respectively. See the sccache documentation for more
+    information on these variables. *)
+val enable_sccache :
+  ?key:string ->
+  ?error_log:string ->
+  ?idle_timeout:string ->
+  ?log:string ->
+  ?path:string ->
+  ?cache_size:string ->
+  tezos_job ->
+  tezos_job
+
+(** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
+
+    This function should only be applied to jobs that have a GitLab CI
+    cache for [CARGO_HOME], as enabled through [enable_cache_cargo] (that
+    function calls this function, so there is no need to apply both).
+    Exceptions can be made for jobs that must have CARGO_HOME set to
+    something different than {!cargo_home}. *)
+val enable_networked_cargo : tezos_job -> tezos_job
+
+(** Adds a GitLab CI cache for the CARGO_HOME folder.
+
+    More precisely, we only cache the non-SCM dependencies in the
+    sub-directory [registry/cache]. *)
+val enable_cargo_cache : tezos_job -> tezos_job
 
 (** A facility for registering images for [image:] keywords.
 
