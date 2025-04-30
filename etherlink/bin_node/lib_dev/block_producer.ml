@@ -262,7 +262,6 @@ let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
         ~maximum_cumulative_size:remaining_cumulative_size
     else
       Tx_pool.pop_transactions
-        ~chain_family
         ~maximum_cumulative_size:remaining_cumulative_size
   in
   let n = List.length transactions_and_objects + List.length delayed_hashes in

@@ -31,7 +31,6 @@ val start : parameters -> unit tzresult Lwt.t
     size exceeds `maximum_cumulative_size`. If the pool is locked or node
     in tezlink mode, returns no transactions. *)
 val pop_transactions :
-  chain_family:L2_types.chain_family ->
   maximum_cumulative_size:int ->
   (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 
