@@ -120,7 +120,7 @@ The number of callbacks is confusing. So let’s take a closer look to
 :src:`src/lib_rpc_http/RPC_middleware.ml`:
 
 - Cohttp runs a server. So a connection request received from
-  Client/Baker/Indexer/ arrives at Cohttp and then passed to Resto via 
+  Client/Baker/Indexer/ arrives at Cohttp and then passed to Resto via
   ``make_transform_callback``.
 
 - Resto passes the callback to Cohttp at server start to deal with a connection
@@ -199,7 +199,7 @@ In this HTTP response format, the server sends a series of chunks with
 size headers and separators (see link). The server closes the connection
 only once all the chunks have been sent.
 
-.. mermaid:: 
+.. mermaid::
 
    sequenceDiagram
        participant client as client
@@ -231,7 +231,7 @@ OkStream
 :literal:`\`OkStream` is for returning not one single value but a
 sequence of different values that a variable can have in the
 ``octez-node``. E.g., the RPC entry point
-`/monitor/heads/<chain_id> <https://tezos.gitlab.io/shell/rpc.html#get-monitor-heads-chain-id>`__
+`/monitor/heads/\<chain_id\> <https://octez.tezos.com/docs/shell/rpc.html#get-monitor-applied-blocks>`__
 sends a sequence of blocks, one for each time the node changes head on
 the chain passed as parameter.
 

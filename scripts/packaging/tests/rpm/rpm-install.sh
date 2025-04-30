@@ -21,7 +21,7 @@ while [ "$(systemctl is-system-running)" = "offline" ]; do
   sleep 1
 done
 
-# Update and install the config-mananger plugin
+# Update and install the config-manager plugin
 dnf -y update
 dnf -y install dnf-plugins-core
 
