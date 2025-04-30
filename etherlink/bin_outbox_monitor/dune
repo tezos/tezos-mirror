@@ -19,7 +19,6 @@
   re
   octez-l2-libs.sqlite
   octez-evm-node-libs.evm_node_lib_dev_encoding
-  octez-evm-node-libs.evm_node_lib_dev_client
   octez-evm-node-libs.evm_node_lib_dev
   octez-l2-libs.smart-rollup)
  (link_flags
@@ -32,7 +31,6 @@
   -open Tezos_rpc_http
   -open Octez_sqlite
   -open Evm_node_lib_dev_encoding
-  -open Evm_node_lib_dev_client
   -open Evm_node_lib_dev))
 
 (rule
