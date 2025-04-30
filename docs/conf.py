@@ -66,6 +66,13 @@ pushfeedback_message_placeholder = (
 )
 pushfeedback_email_placeholder = 'Email/Slack (optional)'
 pushfeedback_modal_title = 'Provide feedback'
+pushfeedback_footer_text = (
+    "For information about providing feedback"
+    " and the kinds of feedback that we are interested in, see"
+    " <a href='https://octez.tezos.com/docs/developer/contributing.html"
+    "#providing-feedback-on-documentation'"
+    " target='_blank'>Providing feedback on documentation</a>."
+)
 
 
 # Add any paths that contain templates here, relative to this directory.
