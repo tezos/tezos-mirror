@@ -79,4 +79,4 @@ while read -r version rc latest announcement; do
 done <<< "$(printf "%s\n" "${versions[@]}")"
 
 echo "Generating html file."
-pandoc index.md -s --template="./docs/release_page/template.html" --metadata title="Octez Releases" -o index.html
+pandoc index.md -s --template="./docs/release_page/template.html" --metadata title="Octez Releases" --css=style.css -o index.html
