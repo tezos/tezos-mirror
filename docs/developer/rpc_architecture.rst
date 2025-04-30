@@ -231,7 +231,7 @@ OkStream
 :literal:`\`OkStream` is for returning not one single value but a
 sequence of different values that a variable can have in the
 ``octez-node``. E.g., the RPC entry point
-:ref:`/monitor/heads/\<chain_id\> <GET_--monitor--heads--chain_id>`
+`/monitor/heads/\<chain_id\> <https://octez.tezos.com/docs/shell/rpc.html#get-monitor-applied-blocks>`__
 sends a sequence of blocks, one for each time the node changes head on
 the chain passed as parameter.
 
