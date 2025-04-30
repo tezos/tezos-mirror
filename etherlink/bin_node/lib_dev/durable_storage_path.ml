@@ -36,6 +36,8 @@ let da_fee_per_byte = World_state.make "/fees/da_fee_per_byte"
 
 let kernel_version = EVM.make "/kernel_version"
 
+let kernel_verbosity = EVM.make "/logging_verbosity"
+
 let storage_version = EVM.make "/storage_version"
 
 let kernel_root_hash = EVM.make "/kernel_root_hash"

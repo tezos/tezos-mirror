@@ -14,6 +14,7 @@ type sandbox_config = {
   funded_addresses : Ethereum_types.address list;
   parent_chain : Uri.t option;
   disable_da_fees : bool;
+  kernel_verbosity : Events.kernel_log_level option;
 }
 
 let install_finalizer_seq server_public_finalizer server_private_finalizer
@@ -151,7 +152,14 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
   let* () =
     match sandbox_config with
-    | Some {public_key = pk; funded_addresses; disable_da_fees; _} ->
+    | Some
+        {
+          public_key = pk;
+          funded_addresses;
+          disable_da_fees;
+          kernel_verbosity;
+          _;
+        } ->
         let* () = Evm_context.patch_sequencer_key pk in
         let new_balance =
           Ethereum_types.quantity_of_z Z.(of_int 10_000 * pow (of_int 10) 18)
@@ -177,6 +185,15 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
                   Evm_context.patch_kernel kernel
               | _ -> return_unit)
             kernel
+        in
+        let* () =
+          Option.iter_es
+            (fun kernel_verbosity ->
+              Evm_context.patch_state
+                ~key:Durable_storage_path.kernel_verbosity
+                ~value:(Events.string_from_kernel_log_level kernel_verbosity)
+                ())
+            kernel_verbosity
         in
         let* () =
           when_ disable_da_fees @@ fun () ->

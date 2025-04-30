@@ -216,6 +216,15 @@ type kernel_log_kind = Application | Simulation
 
 type kernel_log_level = Debug | Info | Error | Fatal
 
+let string_from_kernel_log_level level =
+  let level_verbosity =
+    match level with Debug -> 3 | Info -> 2 | Error -> 1 | Fatal -> 0
+  in
+  let value = Bytes.make 1 '\000' in
+  Bytes.set_uint8 value 0 level_verbosity ;
+  (* Safe because the initial pointer to the bytes is lost *)
+  Bytes.unsafe_to_string value
+
 let kernel_log_kind_to_string = function
   | Application -> "application"
   | Simulation -> "simulation"
