@@ -210,6 +210,15 @@ module Event = struct
       ("error", Data_encoding.string)
       ~pp1:Format.pp_print_string
 
+  let tx_queue_beacon_error =
+    declare_1
+      ~section
+      ~name:"tx_queue_beacon_error"
+      ~msg:"Tx queue beacon error: {error}"
+      ~level:Error
+      ("error", Data_encoding.string)
+      ~pp1:Format.pp_print_string
+
   let injection_error =
     declare_1
       ~section
@@ -220,12 +229,13 @@ module Event = struct
       ~pp1:Format.pp_print_string
 
   let new_etherlink_head =
-    declare_1
+    declare_2
       ~section
       ~name:"new_etherlink_head"
-      ~msg:"New etherlink head {level}"
+      ~msg:"New etherlink head {level} ({txs} txs)"
       ~level:Notice
       ("level", Db.quantity_hum_encoding)
+      ("txs", Data_encoding.int31)
       ~pp1:Ethereum_types.pp_quantity
 
   let catch_up =
@@ -594,7 +604,12 @@ let claim_deposits ctx =
 let on_new_block ctx ~catch_up (b : _ Ethereum_types.block) =
   let open Lwt_result_syntax in
   let open Ethereum_types in
-  let*! () = Event.(emit new_etherlink_head) b.number in
+  let nb_txs =
+    match b.transactions with
+    | TxHash l -> List.length l
+    | TxFull l -> List.length l
+  in
+  let*! () = Event.(emit new_etherlink_head) (b.number, nb_txs) in
   (* Process logs for this block *)
   let* () = get_logs ctx ~from_block:b.number ~to_block:b.number in
   (* Notify tx queue and register claimed deposits in DB *)
@@ -725,7 +740,16 @@ let start db ~evm_node_endpoint ~first_block ~secret_key ~max_fee_per_gas
     loop ()
   in
   let rec tx_queue_beacon () =
-    let* () = Tx_queue.tick ~evm_node_endpoint:!tx_queue_endpoint in
+    let open Lwt_syntax in
+    let* res =
+      protect @@ fun () -> Tx_queue.tick ~evm_node_endpoint:!tx_queue_endpoint
+    in
+    let* () =
+      match res with
+      | Ok () -> return_unit
+      | Error e ->
+          Format.kasprintf Event.(emit tx_queue_error) "%a" pp_print_trace e
+    in
     let*! () = Lwt_unix.sleep 0.05 in
     tx_queue_beacon ()
   in
@@ -741,5 +765,5 @@ let start db ~evm_node_endpoint ~first_block ~secret_key ~max_fee_per_gas
       ~keep_alive:true
       ()
   in
-  let* done_ = loop ~first:true () and* () = tx_queue_beacon () in
-  return done_
+  Lwt.dont_wait tx_queue_beacon ignore ;
+  loop ~first:true ()
