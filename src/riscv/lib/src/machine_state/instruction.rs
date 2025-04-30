@@ -702,6 +702,12 @@ impl OpCode {
             Self::Shnz => Some(Args::run_shnz),
             Self::Sbnz => Some(Args::run_sbnz),
 
+            // Loads
+            Self::Ldnz => Some(Args::run_ldnz),
+            Self::Lwnz => Some(Args::run_lwnz),
+            Self::Lhnz => Some(Args::run_lhnz),
+            Self::Lbnz => Some(Args::run_lbnz),
+
             // Errors
             Self::Unknown => Some(Args::run_illegal),
             Self::ECall => Some(Args::run_ecall),
@@ -975,15 +981,19 @@ macro_rules! impl_load_type {
         }
     };
 
-    ($fn: ident, non_zero) => {
+    ($fn: ident, $width: expr, $signed: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            core.$fn(self.imm, unsafe { self.rs1.nzx }, unsafe { self.rd.nzx })
-                .map(|_| Next(self.width))
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            let res = load_store::run_load(
+                icb,
+                self.imm,
+                unsafe { self.rs1.nzx },
+                unsafe { self.rd.nzx },
+                $signed,
+                $width,
+            );
+            I::map(res, |_| Next(self.width))
         }
     };
 }
@@ -1360,10 +1370,10 @@ impl Args {
     impl_load_type!(run_lhu);
     impl_load_type!(run_lwu);
     impl_load_type!(run_ld);
-    impl_load_type!(run_ldnz, non_zero);
-    impl_load_type!(run_lwnz, non_zero);
-    impl_load_type!(run_lhnz, non_zero);
-    impl_load_type!(run_lbnz, non_zero);
+    impl_load_type!(run_ldnz, LoadStoreWidth::Double, true);
+    impl_load_type!(run_lwnz, LoadStoreWidth::Word, true);
+    impl_load_type!(run_lhnz, LoadStoreWidth::Half, true);
+    impl_load_type!(run_lbnz, LoadStoreWidth::Byte, true);
 
     // RV64I S-type instructions
     impl_store_type!(run_sb);

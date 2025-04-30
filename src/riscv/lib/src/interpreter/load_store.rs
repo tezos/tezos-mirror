@@ -57,6 +57,33 @@ pub fn run_store<I: ICB>(
     icb.main_memory_store(address, value, width)
 }
 
+/// Loads a value from the address starting at `val(rs1) + imm`.
+///
+/// Only `width` bytes are read from memory and then extended to the full register size
+/// using the appropriate signed/unsigned extension.
+///
+/// The result is written to `rd`.
+#[inline(always)]
+pub fn run_load<I: ICB>(
+    icb: &mut I,
+    imm: i64,
+    rs1: NonZeroXRegister,
+    rd: NonZeroXRegister,
+    signed: bool,
+    width: LoadStoreWidth,
+) -> I::IResult<()> {
+    let base_address = icb.xregister_read_nz(rs1);
+    let offset = icb.xvalue_of_imm(imm);
+
+    let address = base_address.add(offset, icb);
+
+    let value = icb.main_memory_load(address, signed, width);
+    I::and_then(value, |value| {
+        icb.xregister_write_nz(rd, value);
+        icb.ok(())
+    })
+}
+
 #[cfg(test)]
 mod test {
     use proptest::arbitrary::any;

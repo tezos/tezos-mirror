@@ -391,6 +391,25 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
 
         Some(())
     }
+
+    fn main_memory_load(
+        &mut self,
+        phys_address: Self::XValue,
+        signed: bool,
+        width: LoadStoreWidth,
+    ) -> Self::IResult<Self::XValue> {
+        let errno = self.jsa_call.memory_load(
+            &mut self.builder,
+            self.core_ptr_val,
+            phys_address,
+            signed,
+            width,
+        );
+
+        let res = errno.handle(self);
+
+        Some(res)
+    }
 }
 
 impl From<Predicate> for IntCC {

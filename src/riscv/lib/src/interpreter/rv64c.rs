@@ -34,20 +34,13 @@ where
 #[cfg(test)]
 mod tests {
     use proptest::arbitrary::any;
-    use proptest::prop_assert;
     use proptest::prop_assert_eq;
     use proptest::proptest;
 
     use crate::backend_test;
-    use crate::machine_state::MachineCoreState;
     use crate::machine_state::hart_state::HartState;
-    use crate::machine_state::memory::M4K;
-    use crate::machine_state::registers::a3;
-    use crate::machine_state::registers::a4;
     use crate::machine_state::registers::nz;
-    use crate::machine_state::registers::t0;
     use crate::state::NewState;
-    use crate::traps::Exception;
 
     backend_test!(test_caddiw, F, {
         proptest!(|(
@@ -65,51 +58,6 @@ mod tests {
                 state.xregisters.read_nz(nz::a0),
                 r_val.wrapping_add(i_val) as i32 as i64 as u64
             );
-        });
-    });
-
-    backend_test!(test_run_cldsp_clwsp, F, {
-        let state = MachineCoreState::<M4K, _>::new(&mut F::manager());
-        let state_cell = std::cell::RefCell::new(state);
-
-        proptest!(|(
-            v_d in any::<u64>(),
-            v_w in any::<u32>(),
-        )|
-        {
-            let mut state = state_cell.borrow_mut();
-            state.reset();
-            state.main_memory.set_all_readable_writeable();
-
-            let mut perform_test = |offset: u64| -> Result<(), Exception> {
-
-                state.hart.xregisters.write(a4, v_d);
-                state.hart.xregisters.write(a3, v_w as u64);
-
-                // t0 will hold the "global" offset of all loads / stores we are going to make
-                state.hart.xregisters.write(t0, offset);
-
-                state.run_sd(0, t0, a4)?;
-                state.run_sw(8, t0, a3)?;
-
-                state.run_ldnz(offset as i64, nz::sp, nz::t4)?;
-                state.run_lwnz((offset + 8) as i64, nz::sp, nz::t3)?;
-                assert_eq!(state.hart.xregisters.read_nz(nz::t4), v_d);
-                assert_eq!(state.hart.xregisters.read_nz(nz::t3), v_w as i32 as u64);
-
-                Ok(())
-            };
-
-            let invalid_offset = 0u64.wrapping_sub(1024);
-            let aligned_offset = 512;
-
-            // Out of bounds loads / stores
-            prop_assert!(perform_test(invalid_offset).is_err_and(|e|
-                matches!(e, Exception::StoreAMOAccessFault(_))
-            ));
-
-            // Aligned loads / stores
-            prop_assert!(perform_test(aligned_offset).is_ok());
         });
     });
 }

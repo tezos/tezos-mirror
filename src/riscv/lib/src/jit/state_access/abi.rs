@@ -21,6 +21,8 @@ use cranelift_module::ModuleResult;
 use crate::machine_state::registers::NonZeroXRegister;
 
 /// This struct is used to produce and declare function signatures for external function calls.
+///
+/// It is generic over the number of parameters `T` and the return type of the function call.
 pub(super) struct AbiCall<const T: usize> {
     params: [CraneliftRepr; T],
     ret: Option<CraneliftRepr>,
@@ -91,6 +93,10 @@ impl AbiCall<4> {
 
 impl AbiCall<5> {
     impl_abicall!(A1, A2, A3, A4, A5);
+}
+
+impl AbiCall<6> {
+    impl_abicall!(A1, A2, A3, A4, A5, A6);
 }
 
 /// Holds the IR representation of a function parameter's type, which is needed for

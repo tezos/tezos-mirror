@@ -137,6 +137,16 @@ pub trait ICB {
         width: LoadStoreWidth,
     ) -> Self::IResult<()>;
 
+    /// Read value from main memory, at the given address.
+    ///
+    /// The value is truncated to the width given by [`LoadStoreWidth`].
+    fn main_memory_load(
+        &mut self,
+        phys_address: Self::XValue,
+        signed: bool,
+        width: LoadStoreWidth,
+    ) -> Self::IResult<Self::XValue>;
+
     // ----------------
     // Provided Methods
     // ----------------
@@ -297,6 +307,43 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
         };
 
         res.map_err(|_: BadMemoryAccess| Exception::StoreAMOAccessFault(phys_address))
+    }
+
+    #[inline(always)]
+    fn main_memory_load(
+        &mut self,
+        address: Self::XValue,
+        signed: bool,
+        width: LoadStoreWidth,
+    ) -> Self::IResult<Self::XValue> {
+        let phys_address = self.translate(address, AccessType::Load)?;
+
+        let res = match (signed, width) {
+            (true, LoadStoreWidth::Byte) => self
+                .main_memory
+                .read::<u8>(phys_address)
+                .map(|v| v as i8 as u64),
+            (true, LoadStoreWidth::Half) => self
+                .main_memory
+                .read::<u16>(phys_address)
+                .map(|v| v as i16 as u64),
+            (true, LoadStoreWidth::Word) => self
+                .main_memory
+                .read::<u32>(phys_address)
+                .map(|v| v as i32 as u64),
+            (_, LoadStoreWidth::Double) => self.main_memory.read::<u64>(phys_address),
+            (false, LoadStoreWidth::Byte) => {
+                self.main_memory.read::<u8>(phys_address).map(|v| v as u64)
+            }
+            (false, LoadStoreWidth::Half) => {
+                self.main_memory.read::<u16>(phys_address).map(|v| v as u64)
+            }
+            (false, LoadStoreWidth::Word) => {
+                self.main_memory.read::<u32>(phys_address).map(|v| v as u64)
+            }
+        };
+
+        res.map_err(|_: BadMemoryAccess| Exception::LoadAccessFault(phys_address))
     }
 }
 

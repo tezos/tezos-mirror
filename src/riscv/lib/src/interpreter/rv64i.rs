@@ -116,25 +116,6 @@ where
     MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
-    /// Loads a double-word (8 bytes) starting from address given by: `val(rs1) + imm`
-    /// where `rs1` and `rd` are NonZeroXRegisters.
-    ///
-    /// Relevant opcodes:
-    /// - `LD`
-    /// - `C.LD`
-    /// - `C.LDSP`
-    pub fn run_ldnz(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        rd: NonZeroXRegister,
-    ) -> Result<(), Exception> {
-        let value: i64 = self.read_from_bus_nz(imm, rs1)?;
-        // i64 as u64 is a no-op
-        self.hart.xregisters.write_nz(rd, value as u64);
-        Ok(())
-    }
-
     /// Loads a double-word (8 bytes) starting from address given by: `imm`.
     ///
     /// Relevant opcodes:
@@ -158,24 +139,6 @@ where
         Ok(())
     }
 
-    /// Loads a word (4 bytes) starting from address given by: val(rs1) + imm
-    /// NOTE: For RV64I the value is sign-extended to 64 bits
-    ///
-    /// Relevant opcodes:
-    /// - `LW`
-    /// - `C.LW`
-    pub fn run_lwnz(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        rd: NonZeroXRegister,
-    ) -> Result<(), Exception> {
-        let value: i32 = self.read_from_bus_nz(imm, rs1)?;
-        // i32 as u64 sign-extends to 64 bits
-        self.hart.xregisters.write_nz(rd, value as u64);
-        Ok(())
-    }
-
     /// Loads a half-word (2 bytes) starting from address given by: val(rs1) + imm
     /// sign-extending the result
     ///
@@ -188,23 +151,6 @@ where
         Ok(())
     }
 
-    /// Loads a half-word (2 bytes) starting from address given by: val(rs1) + imm
-    /// sign-extending the result but where `rs1` and `rd` are NonZeroXRegisters.
-    ///
-    /// Relevant opcodes:
-    /// - `LH`
-    pub fn run_lhnz(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        rd: NonZeroXRegister,
-    ) -> Result<(), Exception> {
-        let value: i16 = self.read_from_bus_nz(imm, rs1)?;
-        // i16 as u64 sign-extends to 64 bits
-        self.hart.xregisters.write_nz(rd, value as u64);
-        Ok(())
-    }
-
     /// Loads a single byte from the address given by: `val(rs1) + imm` and
     /// sign-extending the result
     ///
@@ -214,23 +160,6 @@ where
         let value: i8 = self.read_from_bus(imm, rs1)?;
         // i8 as u64 sign-extends to 64 bits
         self.hart.xregisters.write(rd, value as u64);
-        Ok(())
-    }
-
-    /// Loads a single byte from the address given by: `val(rs1) + imm` and
-    /// sign-extending the result but where `rs1` and `rd` are NonZeroXRegisters.
-    ///
-    /// Relevant opcodes:
-    /// - `LB`
-    pub fn run_lbnz(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        rd: NonZeroXRegister,
-    ) -> Result<(), Exception> {
-        let value: i8 = self.read_from_bus_nz(imm, rs1)?;
-        // i8 as u64 sign-extends to 64 bits
-        self.hart.xregisters.write_nz(rd, value as u64);
         Ok(())
     }
 
