@@ -12,6 +12,8 @@ use super::Permissions;
 use super::buddy::Buddy;
 #[cfg(feature = "supervisor")]
 use super::protection::PagePermissions;
+#[cfg(feature = "supervisor")]
+use crate::machine_state::memory::PAGE_SIZE;
 use crate::state_backend::DynCells;
 use crate::state_backend::Elem;
 use crate::state_backend::ManagerBase;
@@ -349,7 +351,11 @@ where
 
         // Zero initialise in 8-byte chunks. Using larger writes first, means we do fewer writes
         // altogether. This speeds things up.
-        let mut remaining = length;
+        // As we allocate in multiples of pages, we must also clear in multiples of pages.
+        let mut remaining = length
+            .div_ceil(PAGE_SIZE.get() as usize)
+            .saturating_mul(PAGE_SIZE.get() as usize);
+
         while remaining >= 8 {
             remaining -= 8;
             let address = (address as usize).saturating_add(remaining);
