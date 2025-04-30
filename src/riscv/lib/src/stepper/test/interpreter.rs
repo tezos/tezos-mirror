@@ -10,9 +10,10 @@ use std::ops::Bound;
 use goldenfile::Mint;
 use paste::paste;
 
+use crate::jit::JIT;
 use crate::machine_state::block_cache::block::Block;
-use crate::machine_state::block_cache::block::InlineJit;
 use crate::machine_state::block_cache::block::Interpreted;
+use crate::machine_state::block_cache::block::Jitted;
 use crate::machine_state::memory::M1M;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::XRegister;
@@ -94,7 +95,7 @@ fn interpret_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegis
 /// For the JIT, we run it twice - the first run to build up the blocks, and the
 /// second to run with these blocks already compiled (so that we actually use them).
 fn inline_jit_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegister, u64)]) {
-    type BlockImpl = InlineJit<M1M, Owned>;
+    type BlockImpl = Jitted<JIT<M1M, Owned>, M1M, Owned>;
 
     let block_builder = Default::default();
     let block_builder =

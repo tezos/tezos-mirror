@@ -31,7 +31,7 @@ type BlockImplInner = block::Interpreted<M1G, Owned>;
 
 /// Inner execution strategy for blocks.
 #[cfg(feature = "inline-jit")]
-type BlockImplInner = block::InlineJit<M1G, Owned>;
+type BlockImplInner = block::Jitted<octez_riscv::jit::JIT<M1G, Owned>, M1G, Owned>;
 
 /// Executor of blocks
 #[cfg(not(feature = "metrics"))]
