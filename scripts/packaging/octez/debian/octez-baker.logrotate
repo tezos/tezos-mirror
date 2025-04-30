@@ -16,6 +16,15 @@
     minsize 1M
 }
 
+/var/log/tezos/baker.log{
+    daily
+    # we use copytruncate to avoid stopping node.
+    copytruncate
+    rotate 5
+    compress
+    minsize 1M
+}
+
 /var/log/tezos/accuser.log{
     daily
     # we use copytruncate to avoid stopping node.
