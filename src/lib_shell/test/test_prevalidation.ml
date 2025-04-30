@@ -547,7 +547,7 @@ let () =
       set_bounding_state state (bounding_ophmap_before, bounding_outcome)
     in
     let*! state, returned_op, classification, replacements =
-      P.add_operation state P.default_config op
+      P.legacy_add_operation state P.default_config op
     in
     (* Check the classification. *)
     (match (proto_outcome, bounding_outcome) with
@@ -652,7 +652,7 @@ let () =
     List.fold_left_s
       (fun state op ->
         let*! state, _op, _classification, _replacement =
-          P.add_operation state P.default_config op
+          P.legacy_add_operation state P.default_config op
         in
         Lwt.return state)
       state

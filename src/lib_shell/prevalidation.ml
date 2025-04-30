@@ -1,27 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
-(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* Copyright (c) 2018-2025 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -80,8 +62,20 @@ module type T = sig
     * Prevalidator_classification.classification
     * replacements
 
-  val add_operation :
-    t -> config -> protocol_operation operation -> add_result Lwt.t
+  type valid_operation
+
+  val validate_operation :
+    t ->
+    protocol_operation operation ->
+    (valid_operation, Prevalidator_classification.classification) Lwt_result.t
+
+  val add_valid_operation : t -> config -> valid_operation -> add_result
+
+  val legacy_add_operation :
+    t ->
+    config ->
+    protocol_operation Shell_operation.operation ->
+    add_result Lwt.t
 
   val remove_operation : t -> Operation_hash.t -> t
 
@@ -207,6 +201,8 @@ module MakeAbstract
 
   type add_result = t * operation * classification * replacements
 
+  type valid_operation = operation
+
   let classification_of_trace trace =
     match classify_trace trace with
     | Branch -> `Branch_refused trace
@@ -214,8 +210,26 @@ module MakeAbstract
     | Temporary -> `Branch_delayed trace
     | Outdated -> `Outdated trace
 
-  (* Wrapper around [Proto.Mempool.add_operation]. *)
-  let proto_add_operation ~conflict_handler state op :
+  let convert_from_proto_add_error = function
+    | Proto.Mempool.Validation_error trace -> trace
+    | Add_conflict _ ->
+        (* This cannot happen because we provide a [conflict_handler] to
+           [Proto.Mempool.add_operation] and [Proto.Mempool.add_valid_operation].
+           See documentation in [lib_protocol_environment/sigs/v<num>/updater.mli]
+           with [num >= 7]. *)
+        assert false
+
+  (** Wrapper around [Proto.Mempool.add_valid_operation]. *)
+  let proto_add_valid_operation ~conflict_handler state (op : valid_operation) :
+      (Proto.Mempool.t * Proto.Mempool.add_result) tzresult =
+    Proto.Mempool.add_valid_operation
+      ~conflict_handler
+      state.mempool
+      (op.hash, op.protocol)
+    |> Result.map_error convert_from_proto_add_error
+
+  (** Wrapper around [Proto.Mempool.add_operation]. *)
+  let proto_add_operation ~conflict_handler state (op : valid_operation) :
       (Proto.Mempool.t * Proto.Mempool.add_result) tzresult Lwt.t =
     Proto.Mempool.add_operation
       ~check_signature:(not op.signature_checked)
@@ -223,14 +237,7 @@ module MakeAbstract
       state.validation_info
       state.mempool
       (op.hash, op.protocol)
-    |> Lwt_result.map_error (function
-           | Proto.Mempool.Validation_error trace -> trace
-           | Add_conflict _ ->
-               (* This cannot happen because we provide a [conflict_handler] to
-                  [Proto.Mempool.add_operation]. See documentation in
-                  [lib_protocol_environment/sigs/v<num>/updater.mli]
-                  with [num >= 7]. *)
-               assert false)
+    |> Lwt_result.map_error convert_from_proto_add_error
 
   (* Analyse the output of [Proto.Mempool.add_operation] to extract
      the potential replaced operation or return the appropriate error. *)
@@ -312,21 +319,9 @@ module MakeAbstract
       ~new_operation:op.protocol
       ~replacements
 
-  (* Implements [add_operation] but inside the [tzresult] monad. *)
-  let add_operation_result state (filter_config, bounding_config) op =
-    let open Lwt_result_syntax in
-    let conflict_handler = Proto.Plugin.conflict_handler filter_config in
-    let* mempool, proto_add_result =
-      proto_add_operation ~conflict_handler state op
-    in
-    (* The operation might still be rejected because of a conflict
-       with a previously validated operation, or if the mempool is
-       full and the operation does not have enough fees. Nevertheless,
-       the successful call to [Proto.Mempool.add_operation] guarantees
-       that the operation is individually valid, in particular its
-       signature is correct. We record this so that any future
-       signature check can be skipped. *)
-    let valid_op = record_successful_signature_check op in
+  (** Implements [add_operation] but inside the [tzresult] monad. *)
+  let add_operation_result_aux state (filter_config, bounding_config)
+      (op : valid_operation) mempool proto_add_result =
     let res =
       catch_e @@ fun () ->
       let open Result_syntax in
@@ -364,22 +359,85 @@ module MakeAbstract
           all_replacements
       in
       let state = {state with mempool; bounding_state; conflict_map} in
-      return (state, valid_op, `Validated, all_replacements)
+      Ok (state, op, `Validated, all_replacements)
     in
     match res with
-    | Ok add_result -> return add_result
+    | Ok add_result -> Ok add_result
     | Error trace ->
         (* When [res] is an error, we convert it to an [add_result]
            here (instead of letting [add_operation] do it below) so
            that we can return the updated [valid_op]. *)
-        return (state, valid_op, classification_of_trace trace, [])
+        Ok (state, op, classification_of_trace trace, [])
 
-  let add_operation state config op : add_result Lwt.t =
+  let add_valid_operation_result state (filter_config, bounding_config)
+      (op : valid_operation) =
+    let open Result_syntax in
+    let conflict_handler = Proto.Plugin.conflict_handler filter_config in
+    let* mempool, proto_add_result =
+      proto_add_valid_operation ~conflict_handler state op
+    in
+    let* state, op, classification, todo =
+      add_operation_result_aux
+        state
+        (filter_config, bounding_config)
+        op
+        mempool
+        proto_add_result
+    in
+    Ok (state, record_successful_signature_check op, classification, todo)
+
+  let add_operation_result state (filter_config, bounding_config)
+      (op : valid_operation) =
+    let open Lwt_result_syntax in
+    let conflict_handler = Proto.Plugin.conflict_handler filter_config in
+    let* mempool, proto_add_result =
+      proto_add_operation ~conflict_handler state op
+    in
+    let*? state, op, classification, todo =
+      add_operation_result_aux
+        state
+        (filter_config, bounding_config)
+        op
+        mempool
+        proto_add_result
+    in
+    return (state, record_successful_signature_check op, classification, todo)
+
+  let validate_operation state op =
+    let open Lwt_syntax in
+    let* res =
+      Proto.Mempool.partial_op_validation
+        ~check_signature:(not op.signature_checked)
+        state.validation_info
+        op.protocol
+    in
+    match res with
+    | Ok checks -> (
+        match List.iter_e (fun check -> check ()) checks with
+        | Error trace -> Lwt.return_error (classification_of_trace trace)
+        | Ok () ->
+            (* The operation might still be rejected because of a conflict
+               with a previously validated operation, or if the mempool is
+               full and the operation does not have enough fees. Nevertheless,
+               the successful call to [Proto.Mempool.add_operation] guarantees
+               that the operation is individually valid, in particular its
+               signature is correct. We record this so that any future
+               signature check can be skipped. *)
+            let op = record_successful_signature_check op in
+            Lwt.return_ok op)
+    | Error trace -> Lwt.return_error (classification_of_trace trace)
+
+  let legacy_add_operation state config op : add_result Lwt.t =
     let open Lwt_syntax in
     let* res = protect (fun () -> add_operation_result state config op) in
     match res with
     | Ok add_result -> return add_result
     | Error trace -> return (state, op, classification_of_trace trace, [])
+
+  let add_valid_operation state config op : add_result =
+    match add_valid_operation_result state config op with
+    | Ok add_result -> add_result
+    | Error trace -> (state, op, classification_of_trace trace, [])
 
   let remove_operation state oph =
     let mempool = Proto.Mempool.remove_operation state.mempool oph in

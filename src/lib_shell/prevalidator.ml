@@ -1,26 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* Copyright (c) 2018-2025 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -454,7 +436,17 @@ module Make_s
       | Low _ -> "classify_operation : manager"
     in
     (let* v_state, op, classification, replacements =
-       Prevalidation_t.add_operation validation_state config op
+       (* Protocols before V15 env do not implement
+          [partial_op_validation]/[add_valid_operation] *)
+       if Protocol.compare_version Proto.environment_version V15 < 0 then
+         Prevalidation_t.legacy_add_operation validation_state config op
+       else
+         let* res = Prevalidation_t.validate_operation validation_state op in
+         match res with
+         | Ok op ->
+             Lwt.return
+               (Prevalidation_t.add_valid_operation validation_state config op)
+         | Error res -> Lwt.return (validation_state, op, res, [])
      in
      let to_replace =
        List.filter_map
