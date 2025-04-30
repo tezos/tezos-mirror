@@ -45,7 +45,14 @@ let loop (t : ('msg, 'conn) inner_state) =
   let open Lwt_result_syntax in
   let open P2p_answerer in
   let*! () = Lwt.pause () in
-  let*! r = protect ~canceler:t.canceler (fun () -> P2p_socket.read t.conn) in
+  let*! r =
+    protect
+      ~canceler:t.canceler
+      ~on_error:(function
+        | Exn Lwt.Canceled :: trace -> fail (TzTrace.cons Canceled trace)
+        | err -> fail err)
+      (fun () -> P2p_socket.read t.conn)
+  in
   match r with
   | Ok (_, Bootstrap) -> (
       Prometheus.Counter.inc_one P2p_metrics.Messages.bootstrap_received ;
