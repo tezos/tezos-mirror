@@ -12,6 +12,8 @@ use super::Permissions;
 use super::buddy::Buddy;
 #[cfg(feature = "supervisor")]
 use super::protection::PagePermissions;
+#[cfg(feature = "supervisor")]
+use crate::machine_state::memory::PAGE_SIZE;
 use crate::state_backend::DynCells;
 use crate::state_backend::Elem;
 use crate::state_backend::ManagerBase;
@@ -349,7 +351,11 @@ where
 
         // Zero initialise in 8-byte chunks. Using larger writes first, means we do fewer writes
         // altogether. This speeds things up.
-        let mut remaining = length;
+        // As we allocate in multiples of pages, we must also clear in multiples of pages.
+        let mut remaining = length
+            .div_ceil(PAGE_SIZE.get() as usize)
+            .saturating_mul(PAGE_SIZE.get() as usize);
+
         while remaining >= 8 {
             remaining -= 8;
             let address = (address as usize).saturating_add(remaining);
@@ -393,6 +399,42 @@ pub mod tests {
         assert!(OwnedM4K::check_bounds(4096, 1, ()).is_err());
         assert!(OwnedM4K::check_bounds(2 * 4096, 1, ()).is_err());
     }
+
+    // This test verifies that memory is fully zeroed up to the page boundary, not just the
+    // requested length, when allocating memory.
+    #[cfg(feature = "supervisor")]
+    backend_test!(test_memory_fully_zeroed_on_allocation, F, {
+        use crate::machine_state::memory::PAGE_SIZE;
+        use crate::machine_state::memory::Permissions;
+
+        let mut manager = F::manager();
+        let mut memory = <<M4K as MemoryConfig>::State<_>>::new(&mut manager);
+
+        // Write a pattern to ensure memory contains non-zero values
+        for i in 0..PAGE_SIZE.get() {
+            memory.data.write(i as usize, 0xFFu8);
+        }
+
+        // Request size that's not a multiple of page size
+        let requested_size = (PAGE_SIZE.get() as usize) - 100;
+        let address = memory
+            .allocate_and_protect_pages(None, requested_size, Permissions::ReadWrite, false)
+            .expect("Memory allocation should succeed");
+
+        // Verify that memory is zeroed for the entire page, not just the requested length
+        for i in 0..PAGE_SIZE.get() {
+            let offset = i as usize;
+            let value = memory.data.read::<u8>((address as usize) + offset);
+            assert_eq!(
+                value,
+                0,
+                "Memory at offset {} (address: {:#x}) should be zero, found {:#x}",
+                offset,
+                address + i,
+                value
+            );
+        }
+    });
 
     backend_test!(test_endianess, F, {
         let mut manager = F::manager();
