@@ -89,10 +89,12 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         builder.switch_to_block(entry_block);
         builder.seal_block(entry_block);
 
-        let core_ptr_val = builder.block_params(entry_block)[0];
-        let pc_val = X64(builder.block_params(entry_block)[1]);
-        let steps_ptr_val = builder.block_params(entry_block)[2];
-        let result_ptr_val = builder.block_params(entry_block)[3];
+        // first param ignored
+        let core_ptr_val = builder.block_params(entry_block)[1];
+        let pc_val = X64(builder.block_params(entry_block)[2]);
+        let steps_ptr_val = builder.block_params(entry_block)[3];
+        let result_ptr_val = builder.block_params(entry_block)[4];
+        // last param ignored
 
         Self {
             ptr,

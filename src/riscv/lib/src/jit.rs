@@ -9,6 +9,7 @@ mod builder;
 pub mod state_access;
 
 use std::collections::HashMap;
+use std::ffi::c_void;
 
 use cranelift::codegen::CodegenError;
 use cranelift::codegen::ir::types::I64;
@@ -35,48 +36,28 @@ use crate::state_backend::hash::Hash;
 use crate::traps::EnvironException;
 
 /// Alias for the function signature produced by the JIT compilation.
-type JitFn<MC, JSA> = unsafe extern "C" fn(
+///
+/// This must have the same Abi as [`Dispatch`], which is used by
+/// the block dispatch mechanism in the block cache.
+///
+/// The JitFn does not inspect the first and last parameters here, however.
+/// These parameters are needed by the initial dispatch mechanism to enable
+/// JIT-compilation & hot-swapping. To avoid over-specifying these parameters here
+/// (which can among other things cause type-checking issues), we replace the parameters
+/// with pointers to `c_void` - which in the C abi map to the same parameter type as the
+/// thin-references to the actual variables passed.
+///
+/// [`Dispatch`]: crate::machine_state::block_cache::block::Dispatch
+pub type JitFn<MC, JSA> = unsafe extern "C" fn(
+    // ignored
+    *const c_void,
     &mut MachineCoreState<MC, JSA>,
     u64,
     &mut usize,
     &mut Result<(), EnvironException>,
+    // ignored
+    *const c_void,
 );
-
-/// A jit-compiled function that can be [called] over [`MachineCoreState`].
-///
-/// [called]: Self::call
-pub struct JCall<MC: MemoryConfig, JSA: JitStateAccess> {
-    fun: JitFn<MC, JSA>,
-}
-
-impl<MC: MemoryConfig, JSA: JitStateAccess> JCall<MC, JSA> {
-    /// Run the jit-compiled function over the state.
-    ///
-    /// # Safety
-    ///
-    /// When calling, the [JIT] that compiled this function *must*
-    /// still be alive.
-    pub unsafe fn call(
-        &self,
-        core: &mut MachineCoreState<MC, JSA>,
-        pc: u64,
-        steps: &mut usize,
-    ) -> Result<(), EnvironException> {
-        let mut res = Ok(());
-
-        unsafe {
-            (self.fun)(core, pc, steps, &mut res);
-        }
-
-        res
-    }
-}
-
-impl<MC: MemoryConfig, JSA: JitStateAccess> Clone for JCall<MC, JSA> {
-    fn clone(&self) -> Self {
-        Self { fun: self.fun }
-    }
-}
 
 /// Errors that may arise from the initialisation of the JIT.
 #[derive(Debug, Error)]
@@ -115,7 +96,7 @@ pub struct JIT<MC: MemoryConfig, JSA: JitStateAccess> {
     jsa_imports: JsaImports<MC, JSA>,
 
     /// Cache of compilation results.
-    cache: HashMap<Hash, Option<JCall<MC, JSA>>>,
+    cache: HashMap<Hash, Option<JitFn<MC, JSA>>>,
 }
 
 impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
@@ -155,13 +136,13 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
     ///
     /// Not all instructions are currently supported. For blocks containing
     /// unsupported instructions, `None` will be returned.
-    pub fn compile(&mut self, instr: &[Instruction]) -> Option<JCall<MC, JSA>> {
+    pub fn compile(&mut self, instr: &[Instruction]) -> Option<JitFn<MC, JSA>> {
         let Ok(hash) = Hash::blake2b_hash(instr) else {
             return None;
         };
 
         if let Some(compilation_result) = self.cache.get(&hash) {
-            return compilation_result.clone();
+            return *compilation_result;
         }
 
         let mut builder = self.start();
@@ -170,6 +151,7 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
             let Some(lower) = i.opcode.to_lowering() else {
                 builder.fail();
                 self.clear();
+                self.cache.insert(hash, None);
                 return None;
             };
 
@@ -213,9 +195,14 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
     fn start(&mut self) -> Builder<'_, MC, JSA> {
         let ptr = self.module.target_config().pointer_type();
 
+        // first param ignored
+        self.ctx.func.signature.params.push(AbiParam::new(ptr));
+        // params
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
         self.ctx.func.signature.params.push(AbiParam::new(I64));
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
+        self.ctx.func.signature.params.push(AbiParam::new(ptr));
+        // last param ignored
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
 
         let builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
@@ -225,16 +212,15 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
     }
 
     /// Finalise and cache the function under construction.
-    fn produce_function(&mut self, hash: &Hash) -> JCall<MC, JSA> {
+    fn produce_function(&mut self, hash: &Hash) -> JitFn<MC, JSA> {
         let name = hex::encode(hash);
 
         let fun = self.finalise(&name);
-        let jcall = JCall { fun };
 
-        self.cache.insert(*hash, Some(jcall.clone()));
+        self.cache.insert(*hash, Some(fun));
         block_metrics!(hash = hash, record_jitted);
 
-        JCall { fun }
+        fun
     }
 
     /// Finalise the function currently under construction.
@@ -277,6 +263,8 @@ impl<MC: MemoryConfig, M: JitStateAccess> Default for JIT<MC, M> {
 
 #[cfg(test)]
 mod tests {
+    use std::ptr::null;
+
     use Instruction as I;
 
     use super::*;
@@ -381,10 +369,19 @@ mod tests {
                     interpreted_bb,
                 )
             };
-            let jitted_res = unsafe {
+
+            let mut jitted_res = Ok(());
+            unsafe {
                 // # Safety - the block builder is alive for at least
                 //            the duration of the `run` function.
-                fun.call(&mut jitted, initial_pc, &mut jitted_steps)
+                (fun)(
+                    null(),
+                    &mut jitted,
+                    initial_pc,
+                    &mut jitted_steps,
+                    &mut jitted_res,
+                    null(),
+                )
             };
 
             // Assert state equality.
@@ -1629,10 +1626,19 @@ mod tests {
             let fun = jit
                 .compile(instructions(&block).as_slice())
                 .expect("Compilation of subsequent functions should succeed");
-            let jitted_res = unsafe {
+
+            let mut jitted_res = Ok(());
+            unsafe {
                 // # Safety - the jit is not dropped until after we
                 //            exit the block.
-                fun.call(&mut jitted, initial_pc, &mut jitted_steps)
+                (fun)(
+                    null(),
+                    &mut jitted,
+                    initial_pc,
+                    &mut jitted_steps,
+                    &mut jitted_res,
+                    null(),
+                )
             };
 
             assert!(jitted_res.is_ok());

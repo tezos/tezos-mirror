@@ -11,8 +11,8 @@ use super::CACHE_INSTR;
 use super::ICallPlaced;
 use super::run_instr;
 use crate::default::ConstDefault;
-use crate::jit::JCall;
 use crate::jit::JIT;
+use crate::jit::JitFn;
 use crate::jit::state_access::JitStateAccess;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
@@ -248,13 +248,14 @@ impl<MC: MemoryConfig, M: ManagerClone> Clone for Interpreted<MC, M> {
 ///
 /// Internally, this may be interpreted, just-in-time compiled, or do
 /// additional work over just execution.
-type Dispatch<MC, M> = unsafe fn(
+pub type Dispatch<MC, M> = unsafe extern "C" fn(
     &mut InlineJit<MC, M>,
     &mut MachineCoreState<MC, M>,
     Address,
     &mut usize,
+    &mut Result<(), EnvironException>,
     &mut <InlineJit<MC, M> as Block<MC, M>>::BlockBuilder,
-) -> Result<(), EnvironException>;
+);
 
 /// Blocks that are compiled to native code for execution, when possible.
 ///
@@ -264,7 +265,6 @@ type Dispatch<MC, M> = unsafe fn(
 /// Blocks are compiled upon calling [`Block::run_block`], in a *stop the world* fashion.
 pub struct InlineJit<MC: MemoryConfig, M: JitStateAccess> {
     fallback: Interpreted<MC, M>,
-    jit_fn: Option<JCall<MC, M>>,
     dispatch: Dispatch<MC, M>,
 }
 
@@ -280,13 +280,14 @@ impl<MC: MemoryConfig, M: JitStateAccess> InlineJit<MC, M> {
     ///
     /// This ensures that the builder in question is guaranteed to be alive, for at least as long
     /// as this block may be run via [`Block::run_block`].
-    unsafe fn run_block_interpreted(
+    unsafe extern "C" fn run_block_interpreted(
         &mut self,
         core: &mut MachineCoreState<MC, M>,
         instr_pc: Address,
         steps: &mut usize,
+        result: &mut Result<(), EnvironException>,
         block_builder: &mut <Self as Block<MC, M>>::BlockBuilder,
-    ) -> Result<(), EnvironException> {
+    ) {
         // trigger JIT compilation
         let instr = self
             .fallback
@@ -296,17 +297,22 @@ impl<MC: MemoryConfig, M: JitStateAccess> InlineJit<MC, M> {
             .map(|i| i.read_stored())
             .collect::<Vec<_>>();
 
-        self.jit_fn = block_builder.0.compile(&instr);
+        let fun = match block_builder.0.compile(&instr) {
+            Some(jitfn) => {
+                // Safety: the two function signatures are identical, apart from the first and
+                // last parameters. These are both pointers, and ignored by the JitFn.
+                //
+                // It's therefore safe to cast these to thin-pointers to any type.
+                unsafe { std::mem::transmute::<JitFn<MC, M>, Dispatch<MC, M>>(jitfn) }
+            }
+            None => Self::run_block_not_compiled,
+        };
 
-        if self.jit_fn.is_some() {
-            self.dispatch = Self::run_block_compiled;
-        } else {
-            self.dispatch = Self::run_block_not_compiled;
-        }
+        self.dispatch = fun;
 
         // Safety: the block builder passed to this function is always the same for the
         // lifetime of the block
-        unsafe { (self.dispatch)(self, core, instr_pc, steps, block_builder) }
+        unsafe { (fun)(self, core, instr_pc, steps, result, block_builder) }
     }
 
     /// Run a block where JIT-compilation has been attempted, but failed for any reason.
@@ -317,40 +323,19 @@ impl<MC: MemoryConfig, M: JitStateAccess> InlineJit<MC, M> {
     ///
     /// This ensures that the builder in question is guaranteed to be alive, for at least as long
     /// as this block may be run via [`Block::run_block`].
-    unsafe fn run_block_not_compiled(
+    unsafe extern "C" fn run_block_not_compiled(
         &mut self,
         core: &mut MachineCoreState<MC, M>,
         instr_pc: Address,
         steps: &mut usize,
+        result: &mut Result<(), EnvironException>,
         block_builder: &mut <Self as Block<MC, M>>::BlockBuilder,
-    ) -> Result<(), EnvironException> {
-        // Safety: this function is always safe to call
-        unsafe {
+    ) {
+        *result = unsafe {
+            // Safety: this function is always safe to call
             self.fallback
                 .run_block(core, instr_pc, steps, &mut block_builder.1)
-        }
-    }
-
-    /// Run a block using the result of JIT-compilation, where this has been successful.
-    ///
-    /// # SAFETY
-    ///
-    /// The `block_builder` must be the same every time this function is called.
-    ///
-    /// This ensures that the builder in question is guaranteed to be alive, for at least as long
-    /// as this block may be run via [`Block::run_block`].
-    unsafe fn run_block_compiled(
-        &mut self,
-        core: &mut MachineCoreState<MC, M>,
-        instr_pc: Address,
-        steps: &mut usize,
-        _block_builder: &mut <Self as Block<MC, M>>::BlockBuilder,
-    ) -> Result<(), EnvironException> {
-        let fun = self.jit_fn.as_ref().unwrap();
-
-        // Safety: the block builder passed to this function is always the same for the
-        // lifetime of the block
-        unsafe { fun.call(core, instr_pc, steps) }
+        };
     }
 }
 
@@ -361,7 +346,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> NewState<M> for InlineJit<MC, M> {
     {
         Self {
             fallback: Interpreted::new(manager),
-            jit_fn: None,
             dispatch: Self::run_block_interpreted,
         }
     }
@@ -375,7 +359,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         M: ManagerWrite,
     {
         self.dispatch = Self::run_block_interpreted;
-        self.jit_fn = None;
         self.fallback.start_block()
     }
 
@@ -384,7 +367,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         M: ManagerWrite,
     {
         self.dispatch = Self::run_block_interpreted;
-        self.jit_fn = None;
         self.fallback.invalidate()
     }
 
@@ -393,7 +375,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         M: ManagerReadWrite,
     {
         self.dispatch = Self::run_block_interpreted;
-        self.jit_fn = None;
         self.fallback.reset()
     }
 
@@ -402,7 +383,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         M: ManagerReadWrite,
     {
         self.dispatch = Self::run_block_interpreted;
-        self.jit_fn = None;
         self.fallback.push_instr(instr)
     }
 
@@ -416,7 +396,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     fn bind(allocated: AllocatedOf<BlockLayout, M>) -> Self {
         Self {
             fallback: Interpreted::bind(allocated),
-            jit_fn: None,
             dispatch: Self::run_block_interpreted,
         }
     }
@@ -443,7 +422,13 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerReadWrite,
     {
-        unsafe { (self.dispatch)(self, core, instr_pc, steps, block_builder) }
+        let mut result = Ok(());
+
+        // Safety: the block builder is always the same instance, guarantee-ing that any
+        // jit-compiled function is still alive.
+        unsafe { (self.dispatch)(self, core, instr_pc, steps, &mut result, block_builder) };
+
+        result
     }
 
     fn num_instr(&self) -> usize
@@ -458,7 +443,6 @@ impl<MC: MemoryConfig, M: JitStateAccess + ManagerClone> Clone for InlineJit<MC,
     fn clone(&self) -> Self {
         Self {
             fallback: self.fallback.clone(),
-            jit_fn: None,
             dispatch: Self::run_block_interpreted,
         }
     }
