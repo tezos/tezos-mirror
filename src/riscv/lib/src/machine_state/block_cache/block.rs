@@ -4,8 +4,10 @@
 // SPDX-License-Identifier: MIT
 
 //! Switching of execution strategy for blocks.
-//!
-//! Currently just for interperation only, but will expand to cover JIT.
+
+mod dispatch;
+
+use dispatch::DispatchTarget;
 
 use super::CACHE_INSTR;
 use super::ICallPlaced;
@@ -248,7 +250,7 @@ impl<MC: MemoryConfig, M: ManagerClone> Clone for Interpreted<MC, M> {
 ///
 /// Internally, this may be interpreted, just-in-time compiled, or do
 /// additional work over just execution.
-pub type Dispatch<MC, M> = unsafe extern "C" fn(
+pub type DispatchFn<MC, M> = unsafe extern "C" fn(
     &mut InlineJit<MC, M>,
     &mut MachineCoreState<MC, M>,
     Address,
@@ -265,7 +267,7 @@ pub type Dispatch<MC, M> = unsafe extern "C" fn(
 /// Blocks are compiled upon calling [`Block::run_block`], in a *stop the world* fashion.
 pub struct InlineJit<MC: MemoryConfig, M: JitStateAccess> {
     fallback: Interpreted<MC, M>,
-    dispatch: Dispatch<MC, M>,
+    dispatch: DispatchTarget<MC, M>,
 }
 
 impl<MC: MemoryConfig, M: JitStateAccess> InlineJit<MC, M> {
@@ -303,12 +305,12 @@ impl<MC: MemoryConfig, M: JitStateAccess> InlineJit<MC, M> {
                 // last parameters. These are both pointers, and ignored by the JitFn.
                 //
                 // It's therefore safe to cast these to thin-pointers to any type.
-                unsafe { std::mem::transmute::<JitFn<MC, M>, Dispatch<MC, M>>(jitfn) }
+                unsafe { std::mem::transmute::<JitFn<MC, M>, DispatchFn<MC, M>>(jitfn) }
             }
             None => Self::run_block_not_compiled,
         };
 
-        self.dispatch = fun;
+        self.dispatch.set(fun);
 
         // Safety: the block builder passed to this function is always the same for the
         // lifetime of the block
@@ -346,7 +348,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> NewState<M> for InlineJit<MC, M> {
     {
         Self {
             fallback: Interpreted::new(manager),
-            dispatch: Self::run_block_interpreted,
+            dispatch: DispatchTarget::default(),
         }
     }
 }
@@ -358,7 +360,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerWrite,
     {
-        self.dispatch = Self::run_block_interpreted;
+        self.dispatch.reset();
         self.fallback.start_block()
     }
 
@@ -366,7 +368,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerWrite,
     {
-        self.dispatch = Self::run_block_interpreted;
+        self.dispatch.reset();
         self.fallback.invalidate()
     }
 
@@ -374,7 +376,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerReadWrite,
     {
-        self.dispatch = Self::run_block_interpreted;
+        self.dispatch.reset();
         self.fallback.reset()
     }
 
@@ -382,7 +384,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerReadWrite,
     {
-        self.dispatch = Self::run_block_interpreted;
+        self.dispatch.reset();
         self.fallback.push_instr(instr)
     }
 
@@ -396,7 +398,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     fn bind(allocated: AllocatedOf<BlockLayout, M>) -> Self {
         Self {
             fallback: Interpreted::bind(allocated),
-            dispatch: Self::run_block_interpreted,
+            dispatch: DispatchTarget::default(),
         }
     }
 
@@ -424,9 +426,11 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     {
         let mut result = Ok(());
 
+        let fun = self.dispatch.get();
+
         // Safety: the block builder is always the same instance, guarantee-ing that any
         // jit-compiled function is still alive.
-        unsafe { (self.dispatch)(self, core, instr_pc, steps, &mut result, block_builder) };
+        unsafe { (fun)(self, core, instr_pc, steps, &mut result, block_builder) };
 
         result
     }
@@ -443,7 +447,7 @@ impl<MC: MemoryConfig, M: JitStateAccess + ManagerClone> Clone for InlineJit<MC,
     fn clone(&self) -> Self {
         Self {
             fallback: self.fallback.clone(),
-            dispatch: Self::run_block_interpreted,
+            dispatch: DispatchTarget::default(),
         }
     }
 }
