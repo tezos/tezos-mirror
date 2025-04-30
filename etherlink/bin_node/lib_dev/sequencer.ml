@@ -308,6 +308,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
             tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
             tx_pool_tx_per_addr_limit =
               Int64.to_int configuration.tx_pool_tx_per_addr_limit;
+            chain_family;
           }
   in
   Metrics.init

@@ -231,6 +231,7 @@ type parameters = {
   tx_timeout_limit : int64;
   tx_pool_addr_limit : int;
   tx_pool_tx_per_addr_limit : int;
+  chain_family : L2_types.chain_family;
 }
 
 module Types = struct
@@ -244,6 +245,7 @@ module Types = struct
     tx_pool_addr_limit : int;
     tx_pool_tx_per_addr_limit : int;
     mutable locked : bool;
+    chain_family : L2_types.chain_family;
   }
 
   type nonrec parameters = parameters
@@ -741,6 +743,7 @@ module Handlers = struct
          tx_timeout_limit;
          tx_pool_addr_limit;
          tx_pool_tx_per_addr_limit;
+         chain_family;
        } :
         Types.parameters) =
     let state =
@@ -755,6 +758,7 @@ module Handlers = struct
           tx_pool_addr_limit;
           tx_pool_tx_per_addr_limit;
           locked = false;
+          chain_family;
         }
     in
     Lwt_result_syntax.return state

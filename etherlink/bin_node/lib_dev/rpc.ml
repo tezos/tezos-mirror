@@ -213,6 +213,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
               tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
               tx_pool_tx_per_addr_limit =
                 Int64.to_int config.tx_pool_tx_per_addr_limit;
+              chain_family;
             }
         in
         return

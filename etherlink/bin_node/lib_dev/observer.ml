@@ -246,6 +246,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
               tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
               tx_pool_tx_per_addr_limit =
                 Int64.to_int config.tx_pool_tx_per_addr_limit;
+              chain_family;
             }
   in
 
