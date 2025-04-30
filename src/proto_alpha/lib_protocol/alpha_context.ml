@@ -629,7 +629,11 @@ module Stake_distribution = struct
 
   let slot_owner = Delegate_sampler.slot_owner
 
+  let stake_info = Delegate_sampler.stake_info
+
   let load_sampler_for_cycle = Delegate_sampler.load_sampler_for_cycle
+
+  let load_stake_info_for_cycle = Delegate_sampler.load_stake_info_for_cycle
 
   let get_total_frozen_stake ctxt cycle =
     let open Lwt_result_syntax in

@@ -206,12 +206,19 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
        [slot_owner] itself). *)
     let cycle = (Level.current ctxt).cycle in
     let* ctxt = Stake_distribution.load_sampler_for_cycle ctxt cycle in
+    let* ctxt = Stake_distribution.load_stake_info_for_cycle ctxt cycle in
     (* If the cycle has changed between the grandparent level and the
        current level, we also initialize the sampler for that
        cycle. That way, all three allowed levels are covered. *)
     match Level.pred ctxt predecessor_level with
     | Some gp_level when Cycle.(gp_level.cycle <> cycle) ->
-        Stake_distribution.load_sampler_for_cycle ctxt gp_level.cycle
+        let* ctxt =
+          Stake_distribution.load_sampler_for_cycle ctxt gp_level.cycle
+        in
+        let* ctxt =
+          Stake_distribution.load_stake_info_for_cycle ctxt gp_level.cycle
+        in
+        return ctxt
     | Some _ | None -> return ctxt
 
 let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
