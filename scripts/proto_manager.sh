@@ -542,6 +542,19 @@ function sanity_check_before_script() {
   esac
 }
 
+# Recompute the different protocol and version names
+function recompute_names() {
+  if [[ ${is_snapshot} == true ]]; then
+    new_protocol_name="${version}_${short_hash}"
+    new_tezos_protocol="${version}-${short_hash}"
+    new_versioned_name="${version}_${label}"
+  else
+    new_protocol_name="${version}"
+    new_tezos_protocol="${version}"
+    new_versioned_name="${label}"
+  fi
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -555,15 +568,7 @@ function update_hashes() {
     log_magenta "Long hash computed: ${long_hash}"
     log_magenta "Short hash: ${short_hash}"
     log_cyan "Updating protocol name and version variables"
-    if [[ ${is_snapshot} == true ]]; then
-      new_protocol_name="${version}_${short_hash}"
-      new_tezos_protocol="${version}-${short_hash}"
-      new_versioned_name="${version}_${label}"
-    else
-      new_protocol_name="${version}"
-      new_tezos_protocol="${version}"
-      new_versioned_name="${label}"
-    fi
+    recompute_names
   else
     log_magenta "Can't find src/proto_${version}/lib_protocol"
     exit 1
@@ -673,6 +678,8 @@ function copy_source() {
       rm -f proto_to_hash.txt
       commit_no_hooks "src: add vanity nonce"
     fi
+    # recompute the protocol and version names, in case it has changed
+    recompute_names
   fi
   cd "src/proto_${version}/lib_protocol"
   # replace fake hash with real hash, this file doesn't influence the hash
