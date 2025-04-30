@@ -114,12 +114,8 @@ impl<'a> ContractScript<'a> {
         ctx: &mut Ctx<'a>,
     ) -> Result<TypedValue<'a>, TcError> {
         let parsed_annotation = match annotation {
-            None => {
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME)
-            }
-            Some(ann) => {
-                ann
-            }
+            None => FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+            Some(ann) => ann,
         };
         if let Some((annotation_path, annotation_type)) = self.annotations.get(&parsed_annotation) {
             typecheck_value(&parameter, ctx, annotation_type)?;
@@ -135,11 +131,7 @@ impl<'a> ContractScript<'a> {
                     }
                 }
             }
-            Ok(typecheck_value(
-                &result,
-                ctx,
-                &self.parameter,
-            )?)
+            Ok(typecheck_value(&result, ctx, &self.parameter)?)
         } else {
             Err(TcError::NoSuchEntrypoint(Entrypoint::try_from(
                 parsed_annotation,

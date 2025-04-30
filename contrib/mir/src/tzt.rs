@@ -15,21 +15,21 @@ use std::collections::HashMap;
 use std::fmt;
 use typed_arena::Arena;
 
+use crate::ast::big_map::{BigMapId, InMemoryLazyStorage, MapInfo};
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
 use crate::ast::*;
-use crate::ast::big_map::{BigMapId,InMemoryLazyStorage, MapInfo};
 use crate::context::*;
-use crate::interpreter::*;
 use crate::gas;
+use crate::interpreter::*;
 use crate::irrefutable_match::irrefutable_match;
+use crate::lexer::Prim;
 use crate::parser::spanned_lexer;
 use crate::parser::Parser;
 use crate::stack::*;
 use crate::syntax::tztTestEntitiesParser;
 use crate::typechecker::*;
 use crate::tzt::expectation::*;
-use crate::lexer::Prim;
 
 /// Test's input stack represented as a [Vec] of pairs of type and typechecked
 /// value. The top of the stack is the _leftmost_ element.
@@ -192,9 +192,9 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_self: Option<Micheline> = None;
         let mut m_other_contracts: Option<Vec<(Micheline, Micheline)>> = None;
         let mut m_big_maps: Option<Vec<(Micheline, Micheline, Micheline, Micheline)>> = None;
-        let mut m_now : Option<BigInt> = None;
-        let mut m_source : Option<Micheline> = None;
-        let mut m_sender : Option<Micheline> = None;
+        let mut m_now: Option<BigInt> = None;
+        let mut m_source: Option<Micheline> = None;
+        let mut m_sender: Option<Micheline> = None;
 
         // This would hold the untypechecked, expected output value. This is because If the self
         // and parameters values are specified, then we need to fetch them and populate the context
@@ -291,14 +291,16 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             None => None,
         };
 
-        let big_maps  = match m_big_maps {
+        let big_maps = match m_big_maps {
             Some(bm) => {
                 let mut a = BTreeMap::new();
                 for (idx, key_ty, val_ty, elts) in bm {
-                    let idx = BigMapId(irrefutable_match!(
+                    let idx = BigMapId(
+                        irrefutable_match!(
                         typecheck_value(&idx, &mut Ctx::default(), &Type::Int)?;
                         TypedValue::Int)
-                    .clone());
+                        .clone(),
+                    );
                     let key_ty = parse_ty(&mut Ctx::default(), &key_ty)?;
                     let val_ty = parse_ty(&mut Ctx::default(), &val_ty)?;
                     let elts = match elts {
@@ -322,11 +324,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                         })
                         .collect::<Result<BTreeMap<_, _>, _>>()?;
 
-                    a.insert(idx, MapInfo::new(
-                        descr,
-                        key_ty,
-                        val_ty,
-                    ));
+                    a.insert(idx, MapInfo::new(descr, key_ty, val_ty));
                 }
                 let storage = InMemoryLazyStorage::with_big_maps(a);
                 Some(storage)
@@ -352,18 +350,15 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         };
 
         // Now we can set the input stack.
-        let m_input =
-            match input_stk_backup {
-                Some(stk) => {
-                    Some(typecheck_stack(
-                        stk,
-                        self_addr.clone().map(|x| (x, parameter.clone())),
-                        other_contracts.clone(),
-                        big_maps.clone(),
-                    )?)
-                },
-                None => None,
-            };
+        let m_input = match input_stk_backup {
+            Some(stk) => Some(typecheck_stack(
+                stk,
+                self_addr.clone().map(|x| (x, parameter.clone())),
+                other_contracts.clone(),
+                big_maps.clone(),
+            )?),
+            None => None,
+        };
 
         Ok(TztTest {
             code: m_code.ok_or("code section not found in test")?,
@@ -541,14 +536,8 @@ pub fn run_tzt_test<'a>(
         .self_addr
         .clone()
         .unwrap_or(Ctx::default().self_address);
-    ctx.source = test
-        .source
-        .clone()
-        .unwrap_or(Ctx::default().source);
-    ctx.sender = test
-        .sender
-        .clone()
-        .unwrap_or(Ctx::default().sender);
+    ctx.source = test.source.clone().unwrap_or(Ctx::default().source);
+    ctx.sender = test.sender.clone().unwrap_or(Ctx::default().sender);
 
     populate_ctx_with_known_contracts(
         &mut ctx,

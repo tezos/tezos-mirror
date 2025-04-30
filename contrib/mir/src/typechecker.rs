@@ -2654,20 +2654,26 @@ fn typecheck_map_common<'a, V, F>(
 where
     F: Fn(&Micheline<'a>, &mut Ctx) -> Result<V, TcError>,
 {
-    ctx.gas
-        .consume(gas::tc_cost::construct_map(key_type.size_for_gas(), vs.len())?)?;
+    ctx.gas.consume(gas::tc_cost::construct_map(
+        key_type.size_for_gas(),
+        vs.len(),
+    )?)?;
 
     let ctx_cell = std::cell::RefCell::new(ctx);
-    let tc_elt = |mich: &Micheline<'a>, local_ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
-        match mich {
-            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
-                let k = typecheck_value(k_expr, local_ctx, key_type)?;
-                let v = check_parse_value(v_expr, local_ctx)?;
-                Ok((k, v))
+    let tc_elt =
+        |mich: &Micheline<'a>, local_ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
+            match mich {
+                Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
+                    let k = typecheck_value(k_expr, local_ctx, key_type)?;
+                    let v = check_parse_value(v_expr, local_ctx)?;
+                    Ok((k, v))
+                }
+                _ => Err(TcError::InvalidEltForMap(
+                    format!("{mich:?}"),
+                    map_ty.clone(),
+                )),
             }
-            _ => Err(TcError::InvalidEltForMap(format!("{mich:?}"), map_ty.clone())),
-        }
-    };
+        };
 
     // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
     // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
@@ -2714,7 +2720,10 @@ fn typecheck_big_map<'a>(
                     Ok(Some(v))
                 }
                 Micheline::App(Prim::None, [], _) => Ok(None),
-                _ => Err(TcError::InvalidEltForMap(format!("{val_expr:?}"), map_ty.clone())),
+                _ => Err(TcError::InvalidEltForMap(
+                    format!("{val_expr:?}"),
+                    map_ty.clone(),
+                )),
             }
         } else {
             typecheck_value(val_expr, local_ctx, value_type).map(Some)
