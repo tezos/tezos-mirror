@@ -200,6 +200,9 @@ val block_encoding :
   'transaction_object Data_encoding.t ->
   'transaction_object block Data_encoding.t
 
+val block_transactions_encoding :
+  'a Data_encoding.t -> 'a block_transactions Data_encoding.t
+
 type transaction_log = {
   address : address;
   topics : hash list;
