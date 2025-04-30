@@ -1120,6 +1120,12 @@ let get_metrics t infos_per_level metrics =
   }
 
 module Monitoring_app = struct
+  let pp_delegate fmt delegate_pkh =
+    match Hashtbl.find_opt aliases delegate_pkh with
+    | None -> Format.fprintf fmt "`%s`" delegate_pkh
+    | Some alias ->
+        Format.fprintf fmt "`%s` : `%s`" (String.sub delegate_pkh 0 7) alias
+
   (** [network_to_image_url network] return an image for each monitored network. *)
   let network_to_image_url : Network.t -> string = function
     | `Rionet ->
@@ -1374,20 +1380,12 @@ module Monitoring_app = struct
     let pp_stake fmt stake_ratio =
       Format.fprintf fmt "`%.2f%%` stake" (stake_ratio *. 100.)
 
-    let display_delegate (`address address, `alias alias, _, stake_ratio) =
-      match alias with
-      | None -> Format.asprintf "`%s` (%a)" address pp_stake stake_ratio
-      | Some alias ->
-          Format.asprintf
-            "`%s` : `%s` (%a)"
-            (String.sub address 0 7)
-            alias
-            pp_stake
-            stake_ratio
+    let display_delegate (`address address, _, stake_ratio) =
+      Format.asprintf "%a (%a)" pp_delegate address pp_stake stake_ratio
 
     let view_bakers bakers =
       List.map
-        (fun ((_, _, (value, mentions_dal), _) as baker) ->
+        (fun ((_, (value, mentions_dal), _) as baker) ->
           Format.sprintf
             ":black_small_square: %s - %s (%s)"
             (Option.fold
@@ -1465,13 +1463,12 @@ module Monitoring_app = struct
             let baking_ratio =
               float_of_int baking_power /. float_of_int total_baking_power
             in
-            let alias = Hashtbl.find_opt aliases delegate in
-            Lwt.return_some (`address delegate, `alias alias, info, baking_ratio))
+            Lwt.return_some (`address delegate, info, baking_ratio))
           bakers
       in
       let rec classify_bakers mute_bakers dal_on dal_off = function
         | [] -> (mute_bakers, dal_on, dal_off)
-        | ((_, _, (_, dal_endorsement), _) as baker) :: tl -> (
+        | ((_, (_, dal_endorsement), _) as baker) :: tl -> (
             match dal_endorsement with
             | None -> classify_bakers (baker :: mute_bakers) dal_on dal_off tl
             | Some 0. ->
@@ -1482,15 +1479,15 @@ module Monitoring_app = struct
       let ( >> ) cmp1 cmp2 x y =
         match cmp1 x y with 0 -> cmp2 x y | cmp -> cmp
       in
-      let stake_descending (_, _, (_, _), x_stake) (_, _, (_, _), y_stake) =
+      let stake_descending (_, (_, _), x_stake) (_, (_, _), y_stake) =
         Float.compare y_stake x_stake
       in
-      let attestation_rate_ascending (_, _, (x_attestation, _), _)
-          (_, _, (y_attestation, _), _) =
+      let attestation_rate_ascending (_, (x_attestation, _), _)
+          (_, (y_attestation, _), _) =
         Option.compare Float.compare x_attestation y_attestation
       in
-      let dal_mention_perf_ascending (_, _, (_, x_dal_mention), _)
-          (_, _, (_, y_dal_mention), _) =
+      let dal_mention_perf_ascending (_, (_, x_dal_mention), _)
+          (_, (_, y_dal_mention), _) =
         Option.compare Float.compare x_dal_mention y_dal_mention
       in
       let mute_bakers = List.sort stake_descending mute_bakers in
@@ -1517,7 +1514,7 @@ module Monitoring_app = struct
       let agglomerate_infos bakers =
         let nb, stake =
           List.fold_left
-            (fun (nb, stake_acc) (_, _, _, stake_ratio) ->
+            (fun (nb, stake_acc) (_, _, stake_ratio) ->
               (nb + 1, stake_acc +. stake_ratio))
             (0, 0.)
             bakers
@@ -1648,10 +1645,12 @@ module Monitoring_app = struct
         let content =
           List.map
             (fun (`delegate delegate, `change change) ->
-              Format.sprintf
-                "▪ `%s` has missed ~%d tez DAL attestation rewards"
-                (String.sub delegate 0 7)
-                (change / 100_000))
+              Format.asprintf
+                ":black_small_square: %a has missed ~%.1f tez DAL attestation \
+                 rewards"
+                pp_delegate
+                delegate
+                (float_of_int change /. 1_000_000.))
             lost_dal_rewards
         in
         Format_app.section (header :: content) ()
@@ -1726,10 +1725,11 @@ module Monitoring_app = struct
                    `slot_index slot_index,
                    `delegate delegate,
                    `op_hash hash ) ->
-              Format.sprintf
-                "▪ `%s` for attesting slot index `%d` at level `%d`. \
-                 <https://%s.tzkt.io/%s|See online>"
-                (String.sub delegate 0 7)
+              Format.asprintf
+                ":black_small_square: %a for attesting slot index `%d` at \
+                 level `%d`. <https://%s.tzkt.io/%s|See online>"
+                pp_delegate
+                delegate
                 slot_index
                 attestation_level
                 (Network.to_string network)
@@ -1841,19 +1841,20 @@ module Monitoring_app = struct
       let {slack_channel_id; slack_bot_token} = monitor_app_configuration in
       let data =
         let header =
-          Format.sprintf
+          Format.asprintf
             (match transition with
             | Restarted_attesting ->
                 "*[dal-attester-is-back]* On network `%s` at level `%d`, \
-                 delegate `%s` who was under the reward threshold is again \
-                 above threshold. New attestation rate is %.2f%%."
+                 delegate %a who was under the reward threshold is again above \
+                 threshold. New attestation rate is %.2f%%."
             | Stopped_attesting ->
                 "*[dal-attester-dropped]* On network `%s` at level `%d`, \
-                 delegate `%s` DAL attestation rate dropped under the reward \
+                 delegate %a DAL attestation rate dropped under the reward \
                  threshold. New attestation rate is %.2f%%.")
             (Network.to_string network)
             level
-            (String.sub pkh 0 8)
+            pp_delegate
+            pkh
             attestation_percentage
         in
         Format_app.section [header] ()
