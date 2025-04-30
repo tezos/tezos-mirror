@@ -10,6 +10,10 @@ a:hover {
     color: rgb(0, 83, 173);
 }
 
+:root {
+    --feedback-modal-footer-link: #0D61FF;
+}
+
 /* sidebar
  * ------
  */
