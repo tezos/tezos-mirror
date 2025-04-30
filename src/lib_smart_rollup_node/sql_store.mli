@@ -219,6 +219,11 @@ module Protocols : sig
   val last : ?conn:Sqlite.conn -> _ t -> proto_info option tzresult Lwt.t
 end
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/7952
+
+   Remove Dal_slots_headers and Dal_slots_statuses tables.
+*)
+
 (** Published slot headers per block hash, stored as a list of bindings from
     [Dal_slot_index.t] to [Dal.Slot.t]. The encoding function converts this list
     into a [Dal.Slot_index.t]-indexed map. *)
