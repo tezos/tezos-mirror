@@ -201,6 +201,24 @@ module Event = struct
       ("error", Data_encoding.string)
       ~pp1:Format.pp_print_string
 
+  let tx_queue_error =
+    declare_1
+      ~section
+      ~name:"tx_queue_error"
+      ~msg:"Tx queue error: {error}"
+      ~level:Error
+      ("error", Data_encoding.string)
+      ~pp1:Format.pp_print_string
+
+  let injection_error =
+    declare_1
+      ~section
+      ~name:"injection_error"
+      ~msg:"Injection error: {error}"
+      ~level:Error
+      ("error", Data_encoding.string)
+      ~pp1:Format.pp_print_string
+
   let new_etherlink_head =
     declare_1
       ~section
@@ -379,8 +397,16 @@ let claim ctx ~deposit_id =
   let data =
     Efunc_core.Evm.encode ~name:"claim" [`uint 256] [`int deposit_id]
   in
-  let _ : (unit, string) result tzresult Lwt.t =
-    Tx_queue.transfer ctx ~nonce ~to_:precompiled_contract_address ~data ()
+  let _ : unit Lwt.t =
+    let open Lwt_syntax in
+    let* res =
+      Tx_queue.transfer ctx ~nonce ~to_:precompiled_contract_address ~data ()
+    in
+    match res with
+    | Ok (Ok ()) -> return_unit
+    | Error trace ->
+        Format.kasprintf Event.(emit tx_queue_error) "%a" pp_print_trace trace
+    | Ok (Error error) -> Event.(emit injection_error) error
   in
   return_unit
 
