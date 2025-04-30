@@ -95,15 +95,9 @@ takes precedence for determining which key to activate at the start of
 cycle ``n + CONSENSUS_KEY_ACTIVATION_DELAY + 1``.
 
 Note that both the manager key and the consensus key give total
-control over the delegate's spendable balance: indeed, the consensus
-key may sign a ``Drain_delegate`` operation to transfer the delegate's
-spendable balance to an arbitrary account. In :doc:`relevant
-RPCs<../api/openapi>` like
-``/chains/main/blocks/head/helpers/baking_rights``, both the
-delegate's manager and consensus keys are listed.
-
-See :ref:`this page<consensus_key>` for further important details,
-notably client commands that are helpful for handling consensus keys.
+control over the delegate's spendable balance.
+See :ref:`this page<consensus_key_details>` for further important details,
+including client commands that are helpful for handling consensus keys.
 
 
 Active and passive delegates

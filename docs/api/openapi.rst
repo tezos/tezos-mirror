@@ -57,19 +57,6 @@ Their OpenAPI specification can be found at:
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Quebec RPCs
------------
-
-The OpenAPI specifications for RPCs which are specific to the Quebec (``PtQuebec``)
-protocol can be found at:
-
-- :src:`docs/api/quebec-openapi.json` (version 22.0)
-
-The OpenAPI specifications for RPCs which are related to the mempool
-and specific to the Quebec protocol can be found at:
-
-- :src:`docs/api/quebec-mempool-openapi.json` (version 22.0)
-
 Rio RPCs
 --------
 
@@ -105,14 +92,6 @@ protocol in use. Their specification is given in the sections below.
 seen in the field ``.info.version`` within each file.)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
-
-Quebec RPCs
------------
-
-The OpenAPI specifications for the RPCs of the smart rollup node for the Quebec
-(``PtQuebec``) protocol can be found at:
-
-- :src:`docs/api/quebec-smart-rollup-node-openapi.json` (version 22.0)
 
 Rio RPCs
 --------

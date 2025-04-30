@@ -256,7 +256,7 @@ However, this setup **does not guarantee confidentiality**: an eavesdropper can
 see the transactions that you sign (on a public blockchain this may be less of a concern).
 In order to avoid that, you can use the ``https`` scheme or a tunnel to encrypt your traffic.
 
-.. _consensus_key:
+.. _consensus_key_details:
 
 Consensus Key
 -------------
@@ -275,9 +275,12 @@ for example, a cloud platform providing hosted Key Management Systems (KMS) wher
 generated within the system and can never be downloaded by the operator. The delegate can designate
 such a KMS key as its consensus key. Shall they lose access to the cloud platform for any reason, they can simply switch to a new key.
 
-However, both the delegate key and the consensus key give total control over the delegate's funds: indeed, the consensus key may sign a
-Drain operation to transfer the delegate's free balance to an arbitrary account.
-
+However, both the delegate key and the consensus key give total control over the delegate's funds: indeed, the consensus
+key may sign a ``Drain_delegate`` operation to transfer the delegate's
+spendable balance to an arbitrary account. In :doc:`relevant
+RPCs<../api/openapi>` like
+``/chains/main/blocks/head/helpers/baking_rights``, both the
+delegate's manager and consensus keys are listed.
 As a consequence, the consensus key should be treated with equal care as the manager key.
 
 Registering a Consensus Key
@@ -313,7 +316,7 @@ In your baker's command, replace the delegate's manager key alias with the conse
 
    octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
 
-While transitioning from the delegate's manager key, it is possible to pass the alias for both delegate's manager key and consensus key.
+While :ref:`transitioning from the delegate's manager key <consensus_key>`, it is possible to pass the alias for both delegate's manager key and consensus key.
 The delegate will seamlessly keep baking when the transition happens::
 
    octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> <delegate_key_alias> --liquidity-baking-toggle-vote pass

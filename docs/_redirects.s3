@@ -22,6 +22,7 @@
 /nairobi/* /active/:splat 301
 /oxford/* /active/:splat 301
 /paris/* /active/:splat 301
+/quebec/* /active/:splat 301
 /api/cli-commands.html /shell/cli-commands.html 301
 /api/rpc.html /shell/rpc.html 301
 /developer/protocol_environment.html /shell/protocol_environment.html 301

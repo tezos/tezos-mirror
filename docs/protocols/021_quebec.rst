@@ -5,11 +5,11 @@ This page lists the changes brought by protocol Quebec with respect
 to Paris (see :ref:`naming_convention`).
 For the list of changes brought by Paris with respect to Oxford, see :doc:`../protocols/020_paris`.
 
-For a higher-level overview of the most salient new features see the 
+For a higher-level overview of the most salient new features see the
 `Quebec announcement <https://research-development.nomadic-labs.com/quebec-announcement.html>`__.
 
 The code can be found in directory :src:`src/proto_021_PsQuebec` of the ``master``
-branch of Octez and the full documentation in :doc:`this page <../active/index>`.
+branch of Octez.
 
 Environment Version
 -------------------
@@ -46,12 +46,12 @@ No changes.
 Adaptive Issuance
 -----------------
 
-- Added the :ref:`Adaptive Maximum<adaptive_maximum_quebec>` system,
+- Added the :ref:`Adaptive Maximum<adaptive_maximum>` system,
   that imposes a new bound on the issuance as a function of the staked
   ratio. (MRs :gl:`!13519`, :gl:`!14635`)
 
 - Changed the semantics of the
-  :ref:`min-delegated-in-current-cycle<min_delegated_quebec>` used to
+  :ref:`min-delegated-in-current-cycle<min_delegated>` used to
   compute baking rights. It now only considers the minimum in between
   blocks. (MR :gl:`!13945`)
 

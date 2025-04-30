@@ -26,11 +26,13 @@ This document presents the definition of the :ref:`adaptive slashing
 function<adaptive_slashing_fn_rio>` implementing this idea, as well as the
 :ref:`new forbidden period<new_forbidden_period_rio>`.
 
+.. _adaptive_slashing_fn:
 .. _adaptive_slashing_fn_rio:
 
 Adaptive Slashing Function
 ==========================
 
+.. _adaptive_slashing_informal:
 .. _adaptive_slashing_informal_rio:
 
 Informal presentation
@@ -85,6 +87,7 @@ takes more than 2 cycles to complete the unstaking process. This
 ensures that the baker can't decrease their at-stake funds after being
 denunciated and before facing penalties.
 
+.. _formal_adaptive_slashing:
 .. _formal_adaptive_slashing_rio:
 
 A formal definition of slashing function for double-attestations
@@ -124,6 +127,7 @@ where :math:`(b, B) \in C` means that:
 * :math:`C` is the last cycle of the denunciation period for
   :math:`B`.
 
+.. _new_forbidden_period:
 .. _new_forbidden_period_rio:
 
 New definition for the forbidden period
