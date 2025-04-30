@@ -56,6 +56,10 @@ let container_forward_tx ~evm_node_endpoint ~keep_alive :
 
     let is_locked () = Lwt_result_syntax.return_false
 
+    let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
+        ~initial_validation_state:_ =
+      Lwt_result_syntax.return_nil
+
     let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
       Lwt_result_syntax.return_unit
   end)
@@ -75,7 +79,10 @@ let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
     else return (`Keep new_size)
   in
   let* popped_txs =
-    Tx_queue.pop_transactions ~initial_validation_state ~validate_tx
+    Tx_container.pop_transactions
+      ~maximum_cumulative_size
+      ~initial_validation_state
+      ~validate_tx
   in
   let*! hashes =
     Rollup_node_rpc.inject_transactions

@@ -143,6 +143,10 @@ let container_forward_tx ~keep_alive ~evm_node_endpoint :
 
     let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
       Lwt_result_syntax.return_unit
+
+    let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
+        ~initial_validation_state:_ =
+      Lwt_result_syntax.return_nil
   end)
 
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync

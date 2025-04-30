@@ -217,14 +217,17 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
         in
         return `Drop
 
-let tx_queue_pop_valid_tx ~chain_family (head_info : Evm_context.head)
-    ~maximum_cumulative_size =
+let pop_valid_tx ~chain_family
+    ~(tx_container : (module Services_backend_sig.Tx_container))
+    (head_info : Evm_context.head) ~maximum_cumulative_size =
   let open Lwt_result_syntax in
+  let (module Tx_container) = tx_container in
   (* Skip validation if chain_family is Michelson. *)
   match chain_family with
   | L2_types.Michelson ->
       let initial_validation_state = () in
-      Tx_queue.pop_transactions
+      Tx_container.pop_transactions
+        ~maximum_cumulative_size
         ~validate_tx:(fun () _ _ -> return (`Keep ()))
         ~initial_validation_state
   | EVM ->
@@ -253,7 +256,8 @@ let tx_queue_pop_valid_tx ~chain_family (head_info : Evm_context.head)
               addr_nonce = String.Map.empty;
             } )
       in
-      Tx_queue.pop_transactions
+      Tx_container.pop_transactions
+        ~maximum_cumulative_size
         ~validate_tx:(validate_tx ~maximum_cumulative_size)
         ~initial_validation_state
 
@@ -261,8 +265,8 @@ let tx_queue_pop_valid_tx ~chain_family (head_info : Evm_context.head)
     pool or if [force] is true. *)
 let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
     ~sequencer_key ~force ~timestamp ~delayed_hashes ~remaining_cumulative_size
-    ~uses_tx_queue ~(tx_container : (module Services_backend_sig.Tx_container))
-    head_info =
+    ~uses_tx_queue:_
+    ~(tx_container : (module Services_backend_sig.Tx_container)) head_info =
   let open Lwt_result_syntax in
   let (module Tx_container) = tx_container in
   let* transactions_and_objects =
@@ -270,13 +274,11 @@ let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
        enough space for the smallest transaction. *)
     if remaining_cumulative_size <= minimum_ethereum_transaction_size then
       return []
-    else if uses_tx_queue then
-      tx_queue_pop_valid_tx
-        ~chain_family
-        head_info
-        ~maximum_cumulative_size:remaining_cumulative_size
     else
-      Tx_pool.pop_transactions
+      pop_valid_tx
+        ~chain_family
+        ~tx_container
+        head_info
         ~maximum_cumulative_size:remaining_cumulative_size
   in
   let n = List.length transactions_and_objects + List.length delayed_hashes in

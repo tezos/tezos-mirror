@@ -33,25 +33,6 @@ val start :
   unit ->
   unit tzresult Lwt.t
 
-(** [pop_transactions ~validate_tx ~initial_validation_state] pops as
-    many transactions as possible from the queue, validating them with
-    [validate_tx]. If [validate_tx] returns [`Keep validation_state]
-    then the evaluated transaction is popped, else if it returns
-    [`Drop], it's considered invalid and it's callback is called with
-    [`Refused]. If [validate_tx] returns [`Stop] then the caller has
-    enough transactions.
-
-    If the tx_queue is locked (c.f. {!lock_transactions} then returns
-    the empty list. *)
-val pop_transactions :
-  validate_tx:
-    ('a ->
-    string ->
-    Ethereum_types.legacy_transaction_object ->
-    [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t) ->
-  initial_validation_state:'a ->
-  (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
-
 (** wrapper of the Tx_queue to be compatible with the Tx_container
     signature for the services. *)
 module Tx_container : Services_backend_sig.Tx_container

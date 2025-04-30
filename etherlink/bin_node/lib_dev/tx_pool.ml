@@ -977,4 +977,8 @@ module Tx_container = struct
 
   let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
     clear_popped_transactions ()
+
+  let pop_transactions ~maximum_cumulative_size ~validate_tx:_
+      ~initial_validation_state:_ =
+    pop_transactions ~maximum_cumulative_size
 end

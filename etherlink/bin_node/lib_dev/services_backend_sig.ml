@@ -305,4 +305,20 @@ module type Tx_container = sig
     clear_pending_queue_after:bool ->
     confirmed_txs:Ethereum_types.hash Seq.t ->
     unit tzresult Lwt.t
+
+  (** The Tx_pool pops transactions until the sum of the sizes of the
+      popped transactions reaches maximum_cumulative_size; it ignores
+      the [validate_tx] and [initial_validation_state] arguments, The
+      Tx_queue however ignores [maximum_cumulative_size] and instead
+      uses [validate_tx] to pop valid transactions until either `Drop
+      or `Stop is returned. *)
+  val pop_transactions :
+    maximum_cumulative_size:int ->
+    validate_tx:
+      ('a ->
+      string ->
+      Ethereum_types.legacy_transaction_object ->
+      [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t) ->
+    initial_validation_state:'a ->
+    (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 end
