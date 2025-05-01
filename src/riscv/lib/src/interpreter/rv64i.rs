@@ -17,39 +17,6 @@ where
     MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
-    /// `LWU` I-type instruction
-    ///
-    /// Loads a word (4 bytes) starting from address given by: val(rs1) + imm
-    /// zero-extending the result
-    pub fn run_lwu(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
-        let value: u32 = self.read_from_bus(imm, rs1)?;
-        // u32 as u64 zero-extends to 64 bits
-        self.hart.xregisters.write(rd, value as u64);
-        Ok(())
-    }
-
-    /// `LHU` I-type instruction
-    ///
-    /// Loads a half-word (2 bytes) starting from address given by: val(rs1) + imm
-    /// zero-extending the result
-    pub fn run_lhu(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
-        let value: u16 = self.read_from_bus(imm, rs1)?;
-        // u16 as u64 zero-extends to 64 bits
-        self.hart.xregisters.write(rs2, value as u64);
-        Ok(())
-    }
-
-    /// `LBU` I-type instruction
-    ///
-    /// Loads a single byte from the address given by: val(rs1) + imm
-    /// zero-extending the result
-    pub fn run_lbu(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
-        let value: u8 = self.read_from_bus(imm, rs1)?;
-        // u8 as u64 zero-extends to 64 bits
-        self.hart.xregisters.write(rs2, value as u64);
-        Ok(())
-    }
-
     /// Stores a double-word (8 bytes from rs2) to the address starting at: `val(rs1) + imm`
     ///
     /// Relevant opcodes:

@@ -871,6 +871,20 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lwu`].
+    pub(crate) fn new_lwu(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Lwu,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sw`].
     pub(crate) fn new_sw(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
         Self {
@@ -923,6 +937,20 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lhu`].
+    pub(crate) fn new_lhu(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Lhu,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sh`].
     pub(crate) fn new_sh(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
         Self {
@@ -965,6 +993,20 @@ impl Instruction {
     ) -> Self {
         Self {
             opcode: OpCode::X8LoadSigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lbu`].
+    pub(crate) fn new_lbu(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Lbu,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),

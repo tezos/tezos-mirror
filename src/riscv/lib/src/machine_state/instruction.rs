@@ -67,7 +67,6 @@ use crate::parser::instruction::FRArgs;
 use crate::parser::instruction::FRegToXRegArgs;
 use crate::parser::instruction::FRegToXRegArgsWithRounding;
 use crate::parser::instruction::FStoreArgs;
-use crate::parser::instruction::ITypeArgs;
 use crate::parser::instruction::InstrCacheable;
 use crate::parser::instruction::InstrRoundingMode;
 use crate::parser::instruction::InstrWidth;
@@ -699,8 +698,11 @@ impl OpCode {
             // Loads
             Self::X64LoadSigned => Some(Args::run_x64_load_signed),
             Self::X32LoadSigned => Some(Args::run_x32_load_signed),
+            Self::Lwu => Some(Args::run_lwu),
             Self::X16LoadSigned => Some(Args::run_x16_load_signed),
+            Self::Lhu => Some(Args::run_lhu),
             Self::X8LoadSigned => Some(Args::run_x8_load_signed),
+            Self::Lbu => Some(Args::run_lbu),
 
             // Errors
             Self::Unknown => Some(Args::run_illegal),
@@ -1382,9 +1384,9 @@ impl Args {
         run_set_less_than_immediate_unsigned,
         non_zero_rd
     );
-    impl_load_type!(run_lbu);
-    impl_load_type!(run_lhu);
-    impl_load_type!(run_lwu);
+    impl_load_type!(run_lbu, LoadStoreWidth::Byte, false);
+    impl_load_type!(run_lhu, LoadStoreWidth::Half, false);
+    impl_load_type!(run_lwu, LoadStoreWidth::Word, false);
     impl_load_type!(run_x64_load_signed, LoadStoreWidth::Double, true);
     impl_load_type!(run_x32_load_signed, LoadStoreWidth::Word, true);
     impl_load_type!(run_x16_load_signed, LoadStoreWidth::Half, true);
@@ -1730,18 +1732,15 @@ impl From<&InstrCacheable> for Instruction {
                 args.imm,
                 InstrWidth::Uncompressed,
             ),
-            InstrCacheable::Lbu(args) => Instruction {
-                opcode: OpCode::Lbu,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
-            InstrCacheable::Lhu(args) => Instruction {
-                opcode: OpCode::Lhu,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
-            InstrCacheable::Lwu(args) => Instruction {
-                opcode: OpCode::Lwu,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Lbu(args) => {
+                Instruction::new_lbu(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            InstrCacheable::Lhu(args) => {
+                Instruction::new_lhu(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            InstrCacheable::Lwu(args) => {
+                Instruction::new_lwu(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed)
+            }
             InstrCacheable::Ld(args) => Instruction::new_x64_load_signed(
                 args.rd,
                 args.rs1,
@@ -2349,18 +2348,6 @@ impl From<&NonZeroRdRTypeArgs> for Args {
             rs2: value.rs2.into(),
             width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
-        }
-    }
-}
-
-impl ITypeArgs {
-    fn to_args(self, width: InstrWidth) -> Args {
-        Args {
-            rd: self.rd.into(),
-            rs1: self.rs1.into(),
-            imm: self.imm,
-            width,
-            ..Args::DEFAULT
         }
     }
 }

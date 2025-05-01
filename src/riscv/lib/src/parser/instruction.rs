@@ -374,8 +374,14 @@ pub enum InstrCacheable {
     /// `LW` - Loads a word (4 bytes) starting from address given by: val(rs1) + imm
     /// NOTE: For RV64I the value is sign-extended to 64 bits.
     Lw(ITypeArgs),
+    /// `LBU` - Loads a single byte from the address given by: `val(rs1) + imm`,
+    /// zero-extending the result.
     Lbu(ITypeArgs),
+    /// `LHU` - Loads a half-word (2 bytes) starting from address given by: `val(rs1) + imm`,
+    /// zero-extending the result.
     Lhu(ITypeArgs),
+    /// `LWU` - Loads a word (4 bytes) starting from address given by: `val(rs1) + imm`,
+    /// zero-extending the result.
     Lwu(ITypeArgs),
     /// `LD` - Loads a double-word (8 bytes) starting
     /// from address given by: `val(rs1) + imm`.
