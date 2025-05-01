@@ -1414,14 +1414,13 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt
       in
       cleanup @@ Int32.succ level
   in
+  let start_level = Int32.succ last_processed_level in
+  let end_level = last_level_for_cleaning in
+  let levels_to_clean_up = Int32.(succ @@ sub end_level start_level) in
   let*! () =
-    Event.emit_start_catchup
-      ~start_level:last_processed_level
-      ~end_level:last_level_for_cleaning
-      ~levels_to_clean_up:
-        Int32.(sub last_level_for_cleaning last_processed_level)
+    Event.emit_start_catchup ~start_level ~end_level ~levels_to_clean_up
   in
-  cleanup (Int32.succ last_processed_level)
+  cleanup start_level
 
 let clean_up_store_and_catch_up ctxt cctxt ~last_processed_level
     ~first_seen_level head_level proto_parameters =
