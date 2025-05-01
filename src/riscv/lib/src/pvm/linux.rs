@@ -390,13 +390,17 @@ where
     }
 
     /// Check if the supervised process has requested an exit.
-    pub fn has_exited(&self) -> Option<u64>
-    where
-        M: ManagerRead,
-    {
-        if self.system_state.exited.read() {
-            let code = self.system_state.exit_code.read();
-            return Some(code);
+    ///
+    /// # Safety
+    ///
+    /// This function should only be used as an optimization to terminate the PVM stepper early.
+    /// Do not use this result in production PVM contexts as it may cause state divergence.
+    /// The return value depends on internal state that is not tracked by the PVM state,
+    /// which means different PVM implementations could return different values for the
+    /// same input state.
+    pub(crate) unsafe fn has_exited(&self) -> Option<u64> {
+        if self.system_state.exited {
+            return Some(self.system_state.exit_code);
         }
 
         None
@@ -406,8 +410,6 @@ where
 struct_layout! {
     pub struct SupervisorStateLayout {
         tid_address: Atom<VirtAddr>,
-        exited: Atom<bool>,
-        exit_code: Atom<u64>,
         program: Atom<Range<VirtAddr>>,
         heap: Atom<Range<VirtAddr>>,
         stack_guard: Atom<Range<VirtAddr>>,
@@ -420,10 +422,10 @@ pub struct SupervisorState<M: ManagerBase> {
     tid_address: Cell<VirtAddr, M>,
 
     /// Has the process exited?
-    exited: Cell<bool, M>,
+    exited: bool,
 
     /// Exit code for when the process exited
-    exit_code: Cell<u64, M>,
+    exit_code: u64,
 
     /// Program in memory
     program: Cell<Range<VirtAddr>, M>,
@@ -443,8 +445,8 @@ impl<M: ManagerBase> SupervisorState<M> {
     {
         SupervisorState {
             tid_address: Cell::new(manager),
-            exited: Cell::new(manager),
-            exit_code: Cell::new(manager),
+            exited: false,
+            exit_code: 0,
             program: Cell::new(manager),
             heap: Cell::new(manager),
             stack_guard: Cell::new(manager),
@@ -455,8 +457,8 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub fn bind(space: AllocatedOf<SupervisorStateLayout, M>) -> Self {
         SupervisorState {
             tid_address: space.tid_address,
-            exited: space.exited,
-            exit_code: space.exit_code,
+            exited: false,
+            exit_code: 0,
             program: space.program,
             stack_guard: space.stack_guard,
             heap: space.heap,
@@ -470,8 +472,6 @@ impl<M: ManagerBase> SupervisorState<M> {
     ) -> AllocatedOf<SupervisorStateLayout, F::Output> {
         SupervisorStateLayoutF {
             tid_address: self.tid_address.struct_ref::<F>(),
-            exited: self.exited.struct_ref::<F>(),
-            exit_code: self.exit_code.struct_ref::<F>(),
             program: self.program.struct_ref::<F>(),
             stack_guard: self.stack_guard.struct_ref::<F>(),
             heap: self.heap.struct_ref::<F>(),
@@ -774,8 +774,8 @@ impl<M: ManagerBase> SupervisorState<M> {
     where
         M: ManagerReadWrite,
     {
-        self.exit_code.write(status.exit_code());
-        self.exited.write(true);
+        self.exit_code = status.exit_code();
+        self.exited = true;
 
         Ok(parameters::SystemCallResultExecution {
             result: status.exit_code(),
@@ -866,9 +866,8 @@ impl<M: ManagerBase> SupervisorState<M> {
         M: ManagerReadWrite,
     {
         // Indicate that we have exited
-        self.exited.write(true);
-
-        self.exit_code.write(signal.exit_code());
+        self.exited = true;
+        self.exit_code = signal.exit_code();
 
         // Return 0 as an indicator of success, even if this might not actually be used
         Ok(parameters::SystemCallResultExecution {
@@ -940,8 +939,8 @@ impl<M: ManagerClone> Clone for SupervisorState<M> {
     fn clone(&self) -> Self {
         Self {
             tid_address: self.tid_address.clone(),
-            exited: self.exited.clone(),
-            exit_code: self.exit_code.clone(),
+            exited: self.exited,
+            exit_code: self.exit_code,
             program: self.program.clone(),
             stack_guard: self.stack_guard.clone(),
             heap: self.heap.clone(),
