@@ -35,10 +35,12 @@ use crate::state_backend::FnManagerIdent;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ProofLayout;
 use crate::state_backend::ProofTree;
+use crate::state_backend::Ref;
 use crate::state_backend::owned_backend::Owned;
 use crate::state_backend::proof_backend::ProofGen;
 use crate::state_backend::proof_backend::ProofWrapper;
 use crate::state_backend::proof_backend::proof::MerkleProof;
+use crate::state_backend::proof_backend::proof::Proof;
 use crate::state_backend::verify_backend::Verifier;
 use crate::storage::Hash;
 use crate::storage::HashError;
@@ -504,6 +506,22 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, Owned>> Pvm<MC, CL, B, Own
     pub(crate) fn hash(&self) -> Result<Hash, HashError> {
         let refs = self.struct_ref::<FnManagerIdent>();
         PvmLayout::<MC, CL>::state_hash(refs)
+    }
+}
+
+impl<'a, MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, ProofGen<Ref<'a, Owned>>>>
+    Pvm<MC, CL, B, ProofGen<Ref<'a, Owned>>>
+{
+    /// Produce a proof.
+    pub(crate) fn to_proof(&self) -> Result<Proof, HashError> {
+        let refs = self.struct_ref::<FnManagerIdent>();
+        let merkle_proof = PvmLayout::<MC, CL>::to_merkle_tree(refs)?.to_merkle_proof()?;
+
+        let refs = self.struct_ref::<FnManagerIdent>();
+        let final_hash = PvmLayout::<MC, CL>::state_hash(refs)?;
+        let proof = Proof::new(merkle_proof, final_hash);
+
+        Ok(proof)
     }
 }
 

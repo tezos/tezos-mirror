@@ -21,7 +21,6 @@ use crate::pvm::common::PvmStatus;
 use crate::state::NewState;
 use crate::state_backend;
 use crate::state_backend::AllocatedOf;
-use crate::state_backend::CommitmentLayout;
 use crate::state_backend::FnManagerIdent;
 use crate::state_backend::ProofLayout;
 use crate::state_backend::ProofTree;
@@ -190,15 +189,8 @@ impl NodePvm {
             }
         }
 
-        let refs = proof_state.struct_ref::<FnManagerIdent>();
-        let merkle_proof = NodePvmLayout::to_merkle_tree(refs)
-            .ok()?
-            .to_merkle_proof()
-            .ok()?;
-
-        let refs = proof_state.struct_ref::<FnManagerIdent>();
-        let final_hash = NodePvmLayout::state_hash(refs).ok()?;
-        Some(Proof::new(merkle_proof, final_hash))
+        let proof = proof_state.to_proof().ok()?;
+        Some(proof)
     }
 }
 
