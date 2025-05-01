@@ -1965,19 +1965,19 @@ mod tests {
         let scenarios: &[Scenario<F>] = &[
             // check loads - differing imm value to ensure both
             // aligned & unaligned loads are supported
-            valid_load(I::new_ld, 8, XREG_VALUE),
-            valid_load(I::new_ld, 5, XREG_VALUE),
-            valid_load(I::new_lw, 4, XREG_VALUE as i32 as u64),
-            valid_load(I::new_lw, 3, XREG_VALUE as i32 as u64),
-            valid_load(I::new_lh, 2, XREG_VALUE as i16 as u64),
-            valid_load(I::new_lh, 1, XREG_VALUE as i16 as u64),
+            valid_load(I::new_x64_load_signed, 8, XREG_VALUE),
+            valid_load(I::new_x64_load_signed, 5, XREG_VALUE),
+            valid_load(I::new_x32_load_signed, 4, XREG_VALUE as i32 as u64),
+            valid_load(I::new_x32_load_signed, 3, XREG_VALUE as i32 as u64),
+            valid_load(I::new_x16_load_signed, 2, XREG_VALUE as i16 as u64),
+            valid_load(I::new_x16_load_signed, 1, XREG_VALUE as i16 as u64),
             // byte load always aligned
-            valid_load(I::new_lb, 0, XREG_VALUE as i8 as u64),
+            valid_load(I::new_x8_load_signed, 0, XREG_VALUE as i8 as u64),
             // invalid loads: out of bounds
-            invalid_load(I::new_ld, LoadStoreWidth::Double),
-            invalid_load(I::new_lw, LoadStoreWidth::Word),
-            invalid_load(I::new_lh, LoadStoreWidth::Half),
-            invalid_load(I::new_lb, LoadStoreWidth::Byte),
+            invalid_load(I::new_x64_load_signed, LoadStoreWidth::Double),
+            invalid_load(I::new_x32_load_signed, LoadStoreWidth::Word),
+            invalid_load(I::new_x16_load_signed, LoadStoreWidth::Half),
+            invalid_load(I::new_x8_load_signed, LoadStoreWidth::Byte),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

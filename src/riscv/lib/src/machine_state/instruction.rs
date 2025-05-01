@@ -233,13 +233,13 @@ pub enum OpCode {
     Sraiw,
     SetLessThanImmediateSigned,
     SetLessThanImmediateUnsigned,
-    Lb,
-    Lh,
-    Lw,
+    X8LoadSigned,
+    X16LoadSigned,
+    X32LoadSigned,
     Lbu,
     Lhu,
     Lwu,
-    Ld,
+    X64LoadSigned,
 
     // RV64I S-type instructions
     Sb,
@@ -463,13 +463,13 @@ impl OpCode {
             Self::Sraiw => Args::run_sraiw,
             Self::SetLessThanImmediateSigned => Args::run_set_less_than_immediate_signed,
             Self::SetLessThanImmediateUnsigned => Args::run_set_less_than_immediate_unsigned,
-            Self::Lb => Args::run_lb,
-            Self::Lh => Args::run_lh,
-            Self::Lw => Args::run_lw,
+            Self::X8LoadSigned => Args::run_x8_load_signed,
+            Self::X16LoadSigned => Args::run_x16_load_signed,
+            Self::X32LoadSigned => Args::run_x32_load_signed,
             Self::Lbu => Args::run_lbu,
             Self::Lhu => Args::run_lhu,
             Self::Lwu => Args::run_lwu,
-            Self::Ld => Args::run_ld,
+            Self::X64LoadSigned => Args::run_x64_load_signed,
             Self::Sb => Args::run_sb,
             Self::Sbnz => Args::run_sbnz,
             Self::Sh => Args::run_sh,
@@ -692,10 +692,10 @@ impl OpCode {
             Self::Sbnz => Some(Args::run_sbnz),
 
             // Loads
-            Self::Ld => Some(Args::run_ld),
-            Self::Lw => Some(Args::run_lw),
-            Self::Lh => Some(Args::run_lh),
-            Self::Lb => Some(Args::run_lb),
+            Self::X64LoadSigned => Some(Args::run_x64_load_signed),
+            Self::X32LoadSigned => Some(Args::run_x32_load_signed),
+            Self::X16LoadSigned => Some(Args::run_x16_load_signed),
+            Self::X8LoadSigned => Some(Args::run_x8_load_signed),
 
             // Errors
             Self::Unknown => Some(Args::run_illegal),
@@ -1355,10 +1355,10 @@ impl Args {
     impl_load_type!(run_lbu);
     impl_load_type!(run_lhu);
     impl_load_type!(run_lwu);
-    impl_load_type!(run_ld, LoadStoreWidth::Double, true);
-    impl_load_type!(run_lw, LoadStoreWidth::Word, true);
-    impl_load_type!(run_lh, LoadStoreWidth::Half, true);
-    impl_load_type!(run_lb, LoadStoreWidth::Byte, true);
+    impl_load_type!(run_x64_load_signed, LoadStoreWidth::Double, true);
+    impl_load_type!(run_x32_load_signed, LoadStoreWidth::Word, true);
+    impl_load_type!(run_x16_load_signed, LoadStoreWidth::Half, true);
+    impl_load_type!(run_x8_load_signed, LoadStoreWidth::Byte, true);
 
     // RV64I S-type instructions
     impl_store_type!(run_sb);
@@ -1681,15 +1681,24 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::Sltiu(args) => {
                 Instruction::new_set_less_than_immediate_unsigned(args.rd, args.rs1, args.imm)
             }
-            InstrCacheable::Lb(args) => {
-                Instruction::new_lb(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed)
-            }
-            InstrCacheable::Lh(args) => {
-                Instruction::new_lh(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed)
-            }
-            InstrCacheable::Lw(args) => {
-                Instruction::new_lw(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed)
-            }
+            InstrCacheable::Lb(args) => Instruction::new_x8_load_signed(
+                args.rd,
+                args.rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
+            InstrCacheable::Lh(args) => Instruction::new_x16_load_signed(
+                args.rd,
+                args.rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
+            InstrCacheable::Lw(args) => Instruction::new_x32_load_signed(
+                args.rd,
+                args.rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
             InstrCacheable::Lbu(args) => Instruction {
                 opcode: OpCode::Lbu,
                 args: args.to_args(InstrWidth::Uncompressed),
@@ -1702,9 +1711,12 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Lwu,
                 args: args.to_args(InstrWidth::Uncompressed),
             },
-            InstrCacheable::Ld(args) => {
-                Instruction::new_ld(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed)
-            }
+            InstrCacheable::Ld(args) => Instruction::new_x64_load_signed(
+                args.rd,
+                args.rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
             // RV64I S-type instructions
             InstrCacheable::Sb(args) => Instruction::from_ic_sb(args),
             InstrCacheable::Sh(args) => Instruction::from_ic_sh(args),
@@ -2153,7 +2165,7 @@ impl From<&InstrCacheable> for Instruction {
             // RV32C compressed instructions
             InstrCacheable::CLw(args) => {
                 debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
-                Instruction::new_lw(
+                Instruction::new_x32_load_signed(
                     args.rd.into(),
                     args.rs1.into(),
                     args.imm,
@@ -2162,7 +2174,12 @@ impl From<&InstrCacheable> for Instruction {
             }
             InstrCacheable::CLwsp(args) => {
                 debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
-                Instruction::new_lw(args.rd_rs1.into(), sp, args.imm, InstrWidth::Compressed)
+                Instruction::new_x32_load_signed(
+                    args.rd_rs1.into(),
+                    sp,
+                    args.imm,
+                    InstrWidth::Compressed,
+                )
             }
             InstrCacheable::CSw(args) => {
                 debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
@@ -2216,7 +2233,7 @@ impl From<&InstrCacheable> for Instruction {
             // RV64C compressed instructions
             InstrCacheable::CLd(args) => {
                 debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
-                Instruction::new_ld(
+                Instruction::new_x64_load_signed(
                     args.rd.into(),
                     args.rs1.into(),
                     args.imm,
@@ -2225,7 +2242,12 @@ impl From<&InstrCacheable> for Instruction {
             }
             InstrCacheable::CLdsp(args) => {
                 debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
-                Instruction::new_ld(args.rd_rs1.into(), sp, args.imm, InstrWidth::Compressed)
+                Instruction::new_x64_load_signed(
+                    args.rd_rs1.into(),
+                    sp,
+                    args.imm,
+                    InstrWidth::Compressed,
+                )
             }
             InstrCacheable::CSd(args) => {
                 debug_assert!(args.imm >= 0 && args.imm % 8 == 0);

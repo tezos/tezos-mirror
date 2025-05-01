@@ -686,10 +686,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Ld`].
-    pub(crate) fn new_ld(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64LoadSigned`].
+    pub(crate) fn new_x64_load_signed(
+        rd: XRegister,
+        rs1: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Ld,
+            opcode: OpCode::X64LoadSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -733,10 +738,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lw`].
-    pub(crate) fn new_lw(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32LoadSigned`].
+    pub(crate) fn new_x32_load_signed(
+        rd: XRegister,
+        rs1: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Lw,
+            opcode: OpCode::X32LoadSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -780,10 +790,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lh`].
-    pub(crate) fn new_lh(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X16LoadSigned`].
+    pub(crate) fn new_x16_load_signed(
+        rd: XRegister,
+        rs1: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Lh,
+            opcode: OpCode::X16LoadSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -827,10 +842,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lb`].
-    pub(crate) fn new_lb(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X8LoadSigned`].
+    pub(crate) fn new_x8_load_signed(
+        rd: XRegister,
+        rs1: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Lb,
+            opcode: OpCode::X8LoadSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
