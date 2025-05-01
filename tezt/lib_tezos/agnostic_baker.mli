@@ -78,12 +78,6 @@ val liquidity_baking_vote_of_string_opt : string -> liquidity_baking_vote option
     Returns the path to the file that was written. *)
 val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
 
-(** Protocol status values. *)
-type protocol_status = Active | Frozen | Ignore
-
-(** Returns the protocol status given the full protocol value. *)
-val protocol_status : Protocol.t -> protocol_status
-
 (** Number of extra levels to keep the old baker alive before shutting it down.
    This extra time is used to avoid halting the chain in cases such as
    reorganization or high round migration blocks. *)
