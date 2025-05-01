@@ -1346,19 +1346,15 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
       let*! () = Event.emit_end_catchup () in
       return_unit
   in
-  let*! () =
-    let levels_to_clean_up =
-      Int32.(succ @@ sub head_level last_processed_level)
+  let start_level = Int32.succ last_processed_level in
+  let end_level = target_level head_level in
+  let levels_to_clean_up = Int32.(succ @@ sub end_level last_processed_level) in
+  if levels_to_clean_up > 0l then
+    let*! () =
+      Event.emit_start_catchup ~start_level ~end_level ~levels_to_clean_up
     in
-    if levels_to_clean_up > 0l then
-      Event.emit_start_catchup
-        ~start_level:last_processed_level
-        ~end_level:head_level
-        ~levels_to_clean_up
-    else Lwt.return_unit
-  in
-  let* () = do_clean_up last_processed_level head_level in
-  return_unit
+    do_clean_up last_processed_level head_level
+  else return_unit
 
 let clean_up_store_and_catch_up_for_no_refutation_support ctxt
     ~last_processed_level head_level proto_parameters =
