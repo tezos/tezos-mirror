@@ -89,16 +89,16 @@ let rewrite rewriters t =
   List.fold_left
     (fun expr rewriter ->
       match rewriter.Rewriter.action with
-      | Rewriter.Aggregate | Rewriter.Aggregate_f | Rewriter.Aggregate_s
-      | Rewriter.Record_f | Rewriter.Record_s | Rewriter.Span | Rewriter.Span_f
-      | Rewriter.Span_s ->
+      | Rewriter.Aggregate_f | Rewriter.Aggregate_s | Rewriter.Record_f
+      | Rewriter.Record_s | Rewriter.Span_f | Rewriter.Span_s ->
           add_wrapping_function
             expr
             (Rewriter.to_fully_qualified_lident_expr rewriter loc)
             loc
             rewriter.key
       (* Functions that have a ~verbosity parameter *)
-      | Rewriter.Mark | Rewriter.Record | Rewriter.Stamp ->
+      | Rewriter.Aggregate | Rewriter.Mark | Rewriter.Record | Rewriter.Span
+      | Rewriter.Stamp ->
           add_unit_function
             ~verbosity:true
             expr
