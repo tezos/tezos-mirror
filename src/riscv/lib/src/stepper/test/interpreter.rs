@@ -167,8 +167,19 @@ test_case!(test_suite_rv64mi_p_zicntr, "rv64mi-p-zicntr");
 
 // RV64-SI
 test_case!(test_suite_rv64si_p_csr, "rv64si-p-csr");
-test_case!(test_suite_rv64si_p_dirty, "rv64si-p-dirty", Mode::Machine);
 test_case!(
+    // This test requires dirtiness bits to be updated in the page tables (via satp). The
+    // supervising PVM does not do that, as those page translation tables are no longer the way to
+    // translate memory addresses.
+    #[ignore],
+    test_suite_rv64si_p_dirty,
+    "rv64si-p-dirty",
+    Mode::Machine
+);
+test_case!(
+    // This test requires address translation page tables (satp) to be respected. Since switching
+    // to the Supervising PVM, where that is not the case, this test is not relevant anymore.
+    #[ignore],
     test_suite_rv64si_p_icache_alias,
     "rv64si-p-icache-alias",
     Mode::Machine
