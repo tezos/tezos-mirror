@@ -458,67 +458,50 @@ let filter_address = Ethereum_types.Filter.Vec [Deposit.address]
 (* TODO: add filters on ticket hash and proxy for known contracts. *)
 let filter_topics = [Some (Ethereum_types.Filter.One Deposit.topic)]
 
-(** Retrieve log events that happened between [from_block] and [to_block] and
-    register them in the DB. Uses a recursive strategy to handle the case where
-    there are too many logs in the requested range.
+(** Retrieve log events that happened in [block] and register them in the
+    DB. Uses a recursive strategy to handle the case where there are too many
+    logs in the requested range.
 
-    @param from_block Starting block number (inclusive)
-    @param to_block Ending block number (inclusive)
+    @param ctx Context with websocket client
+    @param block Block number in which to look for log events
 *)
-let rec get_logs ?(n = 1) ctx ~from_block ~to_block =
+let rec get_logs ?(n = 1) ctx ~block =
   let open Lwt_result_syntax in
   let open Ethereum_types in
-  let Qty from_z, Qty to_z = (from_block, to_block) in
-  if Z.Compare.(from_z > to_z) then
-    (* There are no blocks for which to fetch logs *)
-    return_unit
-  else
-    (* Query logs for the specified block range *)
-    let*! logs =
-      Websocket_client.send_jsonrpc
-        ctx.ws_client
-        (Call
-           ( (module Rpc_encodings.Get_logs),
-             Filter.
-               {
-                 from_block = Some (Number from_block);
-                 to_block = Some (Number to_block);
-                 address = Some filter_address;
-                 topics = Some filter_topics;
-                 block_hash = None;
-               } ))
-    in
-    match logs with
-    | Ok logs ->
-        (* Process each log in the range *)
-        List.iter_es
-          (function
-            | Filter.Block_filter _ | Pending_transaction_filter _ ->
-                return_unit
-            | Log log -> handle_one_log ctx log)
-          logs
-    | Error (Filter_helpers.Too_many_logs {limit} :: _ as e)
-      when Z.equal from_z to_z ->
-        (* If we're querying a single block and it has too many logs, this is a
-           fatal error - the node's max_nb_logs config needs to be increased *)
-        fail
-          (TzTrace.cons
-             (Too_many_deposits_in_one_block {block = from_block; limit})
-             e)
-    | Error (Filter_helpers.Too_many_logs _ :: _) ->
-        (* If there are too many logs in the range, split it in half and try
-           each half separately. This handles cases where the total number of
-           logs exceeds the node's limit but each half is within bounds. *)
-        let middle = Z.ediv (Z.add from_z to_z) (Z.of_int 2) in
-        let* () = get_logs ctx ~from_block ~to_block:(Qty middle) in
-        get_logs ctx ~from_block:(Qty (Z.succ middle)) ~to_block
-    | Error _ when n < 10 ->
-        (* It's possible for the `getLogs` request to fail if the receipt has not
-           been stored yet. We retry at most 10 times to allow for the node to
-           compute it. *)
-        let*! () = Lwt_unix.sleep (0.1 *. float n) in
-        get_logs ~n:(n + 1) ctx ~from_block ~to_block
-    | Error e -> fail e
+  (* Query logs for the specified block range *)
+  let*! logs =
+    Websocket_client.send_jsonrpc
+      ctx.ws_client
+      (Call
+         ( (module Rpc_encodings.Get_logs),
+           Filter.
+             {
+               from_block = Some (Number block);
+               to_block = Some (Number block);
+               address = Some filter_address;
+               topics = Some filter_topics;
+               block_hash = None;
+             } ))
+  in
+  match logs with
+  | Ok logs ->
+      (* Process each log in the range *)
+      List.iter_es
+        (function
+          | Filter.Block_filter _ | Pending_transaction_filter _ -> return_unit
+          | Log log -> handle_one_log ctx log)
+        logs
+  | Error (Filter_helpers.Too_many_logs {limit} :: _ as e) ->
+      (* If we're querying a single block and it has too many logs, this is a
+         fatal error - the node's max_nb_logs config needs to be increased *)
+      fail (TzTrace.cons (Too_many_deposits_in_one_block {block; limit}) e)
+  | Error _ when n < 10 ->
+      (* It's possible for the `getLogs` request to fail if the receipt has not
+         been stored yet. We retry at most 10 times to allow for the node to
+         compute it. *)
+      let*! () = Lwt_unix.sleep (0.1 *. float n) in
+      get_logs ~n:(n + 1) ctx ~block
+  | Error e -> fail e
 
 let claim_selector =
   (Efunc_core.Evm.method_id ~name:"claim" [`uint 256] :> string)
@@ -611,7 +594,7 @@ let on_new_block ctx ~catch_up (b : _ Ethereum_types.block) =
   in
   let*! () = Event.(emit new_etherlink_head) (b.number, nb_txs) in
   (* Process logs for this block *)
-  let* () = get_logs ctx ~from_block:b.number ~to_block:b.number in
+  let* () = get_logs ctx ~block:b.number in
   (* Notify tx queue and register claimed deposits in DB *)
   let* () = handle_confirmed_txs ctx b in
   let* () = Db.Pointers.L2_head.set ctx.db b.number in
