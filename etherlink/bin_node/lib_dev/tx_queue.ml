@@ -1048,11 +1048,6 @@ let clear () =
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait w Clear |> handle_request_error
 
-let content () =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait w Content |> handle_request_error
-
 let shutdown () =
   let open Lwt_result_syntax in
   bind_worker @@ fun w ->
@@ -1130,5 +1125,8 @@ module Tx_container = struct
          Transaction_object.from_store_transaction_object
          legacy_tx_object)
 
-  let content = content
+  let content () =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    Worker.Queue.push_request_and_wait w Content |> handle_request_error
 end
