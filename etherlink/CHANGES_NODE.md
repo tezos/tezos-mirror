@@ -30,6 +30,10 @@ features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
 
+- The event for the rpc mode when forwarding transaction was
+  incorrectly named "forwarding_error`. It's now renamed
+  "forward_transaction".(!17910)
+
 ## Version 0.24 (2025-04-30)
 
 This is a hot fix release to address a regression in the `eth_getBlockBy*`
