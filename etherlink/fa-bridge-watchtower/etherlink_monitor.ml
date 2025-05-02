@@ -192,6 +192,34 @@ module Event = struct
       ~pp3:Ethereum_types.pp_quantity
       ~pp4:Ethereum_types.pp_quantity
 
+  let claiming_deposit_status_fail =
+    declare_3
+      ~section
+      ~name:"claiming_deposit_status_fail"
+      ~msg:
+        "Claiming deposit {nonce} transaction {transactionHash} failed with \
+         status error {status}"
+      ~level:Warning
+      ("nonce", Db.quantity_hum_encoding)
+      ("transactionHash", Ethereum_types.hash_encoding)
+      ("status", Db.quantity_hum_encoding)
+      ~pp1:Ethereum_types.pp_quantity
+      ~pp2:Ethereum_types.pp_hash
+      ~pp3:Ethereum_types.pp_quantity
+
+  let claiming_deposit_receipt_not_found =
+    declare_2
+      ~section
+      ~name:"claiming_deposit_receipt_not_found"
+      ~msg:
+        "Claiming deposit {nonce} transaction {transactionHash} receipt not \
+         found"
+      ~level:Warning
+      ("nonce", Db.quantity_hum_encoding)
+      ("transactionHash", Ethereum_types.hash_encoding)
+      ~pp1:Ethereum_types.pp_quantity
+      ~pp2:Ethereum_types.pp_hash
+
   let parsing_error =
     declare_1
       ~section
@@ -535,6 +563,16 @@ let handle_confirmed_txs {db; ws_client; _}
        when Ethereum_types.Address.compare to_ Deposit.address = 0
             && is_claim_input input -> (
          let tx_hash = Transaction_object.hash tx in
+         let input =
+           Hex.to_string (`Hex input) |> WithExceptions.Option.get ~loc:__LOC__
+         in
+         let input_rope = Rope.of_string input in
+         let value = Efunc_core.Evm.decode_value (`uint 256) (input_rope, 4) in
+         let nonce =
+           match value with
+           | `int v -> Ethereum_types.quantity_of_z v
+           | _ -> assert false
+         in
          let* receipt =
            Websocket_client.send_jsonrpc
              ws_client
@@ -543,19 +581,6 @@ let handle_confirmed_txs {db; ws_client; _}
          match receipt with
          (* when "status": "0x1" *)
          | Some {status = Qty z; _} when Z.equal z Z.one ->
-             let input =
-               Hex.to_string (`Hex input)
-               |> WithExceptions.Option.get ~loc:__LOC__
-             in
-             let input_rope = Rope.of_string input in
-             let value =
-               Efunc_core.Evm.decode_value (`uint 256) (input_rope, 4)
-             in
-             let nonce =
-               match value with
-               | `int v -> Ethereum_types.quantity_of_z v
-               | _ -> assert false
-             in
              let exec =
                Db.
                  {
@@ -575,7 +600,16 @@ let handle_confirmed_txs {db; ws_client; _}
              let* () = Db.Deposits.set_claimed db nonce exec in
              let* () = Tx_queue.confirm tx_hash in
              return_unit
-         | None | Some _ -> return_unit)
+         | Some {status; _} ->
+             let*! () =
+               Event.(emit claiming_deposit_status_fail) (nonce, tx_hash, status)
+             in
+             return_unit
+         | None ->
+             let*! () =
+               Event.(emit claiming_deposit_receipt_not_found) (nonce, tx_hash)
+             in
+             return_unit)
      | None | Some _ -> return_unit
 
 let claim_deposits ctx =
