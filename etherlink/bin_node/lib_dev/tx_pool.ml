@@ -974,4 +974,7 @@ module Tx_container = struct
     let*? worker = Lazy.force worker in
     Worker.Queue.push_request_and_wait worker Request.Is_locked
     |> handle_request_error
+
+  let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
+    clear_popped_transactions ()
 end

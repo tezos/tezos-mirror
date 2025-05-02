@@ -248,8 +248,10 @@ let tx_queue_pop_valid_tx ~chain_family:_ (head_info : Evm_context.head)
     pool or if [force] is true. *)
 let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
     ~sequencer_key ~force ~timestamp ~delayed_hashes ~remaining_cumulative_size
-    ~uses_tx_queue head_info =
+    ~uses_tx_queue ~(tx_container : (module Services_backend_sig.Tx_container))
+    head_info =
   let open Lwt_result_syntax in
+  let (module Tx_container) = tx_container in
   let* transactions_and_objects =
     (* Low key optimization to avoid even checking the txpool if there is not
        enough space for the smallest transaction. *)
@@ -277,11 +279,9 @@ let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
         head_info
     in
     let* () =
-      if uses_tx_queue then
-        Tx_queue.confirm_transactions
-          ~clear_pending_queue_after:true
-          ~confirmed_txs
-      else Tx_pool.clear_popped_transactions ()
+      Tx_container.confirm_transactions
+        ~clear_pending_queue_after:true
+        ~confirmed_txs
     in
     return (`Block_produced n)
   else return `No_block
@@ -350,6 +350,7 @@ let produce_block ~chain_family ~uses_tx_queue ~cctxt ~smart_rollup_address
         ~delayed_hashes
         ~remaining_cumulative_size
         ~uses_tx_queue
+        ~tx_container
         head_info
 
 module Handlers = struct

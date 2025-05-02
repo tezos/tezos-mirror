@@ -55,9 +55,13 @@ let container_forward_tx ~evm_node_endpoint ~keep_alive :
     let unlock_transactions () = Lwt_result_syntax.return_unit
 
     let is_locked () = Lwt_result_syntax.return_false
+
+    let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
+      Lwt_result_syntax.return_unit
   end)
 
 let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
+    (module Tx_container : Services_backend_sig.Tx_container)
     ~smart_rollup_address =
   let open Lwt_result_syntax in
   let maximum_cumulative_size =
@@ -87,7 +91,7 @@ let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
       return_unit
   | Ok hashes ->
       let* () =
-        Tx_queue.confirm_transactions
+        Tx_container.confirm_transactions
           ~clear_pending_queue_after:true
           ~confirmed_txs:(List.to_seq hashes)
       in
@@ -171,14 +175,17 @@ let main
             ~keep_alive:config.keep_alive
             ()
         in
+        let tx_container =
+          (module Tx_queue.Tx_container : Services_backend_sig.Tx_container)
+        in
         return
         @@ ( Some
                (fun () ->
                  tx_queue_pop_and_inject
                    (module Rollup_node_rpc)
+                   tx_container
                    ~smart_rollup_address),
-             (module Tx_queue.Tx_container : Services_backend_sig.Tx_container)
-           )
+             tx_container )
     | true, None, None ->
         let* () =
           Tx_pool.start

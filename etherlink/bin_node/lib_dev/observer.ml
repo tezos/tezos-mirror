@@ -21,10 +21,12 @@ open Ethereum_types
     into a forced blueprint. The sequencer has performed a reorganization and
     starts submitting blocks from the new branch.
 *)
-let on_new_blueprint config evm_node_endpoint next_blueprint_number
+let on_new_blueprint (tx_container : (module Services_backend_sig.Tx_container))
+    evm_node_endpoint next_blueprint_number
     (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
      blueprint_with_events) =
   let open Lwt_result_syntax in
+  let (module Tx_container) = tx_container in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
   if Z.(equal level number) then
@@ -61,11 +63,9 @@ let on_new_blueprint config evm_node_endpoint next_blueprint_number
                blueprint.")
     | Ok confirmed_txs ->
         let* () =
-          if Configuration.is_tx_queue_enabled config then
-            Tx_queue.confirm_transactions
-              ~clear_pending_queue_after:false
-              ~confirmed_txs
-          else return_unit
+          Tx_container.confirm_transactions
+            ~clear_pending_queue_after:false
+            ~confirmed_txs
         in
         return `Continue
     | Error (Node_error.Diverged {must_exit = false; _} :: _) ->
@@ -140,6 +140,9 @@ let container_forward_tx ~keep_alive ~evm_node_endpoint :
     let unlock_transactions () = Lwt_result_syntax.return_unit
 
     let is_locked () = Lwt_result_syntax.return_false
+
+    let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
+      Lwt_result_syntax.return_unit
   end)
 
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
@@ -341,7 +344,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
         ~time_between_blocks
         ~evm_node_endpoint
         ~next_blueprint_number
-        (on_new_blueprint config evm_node_endpoint)
+        (on_new_blueprint tx_container evm_node_endpoint)
     and* () =
       Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
     and* () =

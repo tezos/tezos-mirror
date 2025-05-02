@@ -296,4 +296,13 @@ module type Tx_container = sig
 
   (** [is_locked] checks if the queue is locked. *)
   val is_locked : unit -> bool tzresult Lwt.t
+
+  (** [confirm_transactions ~clear_pending_queue_after ~confirmed_txs]
+      confirms [confirmed_txs] hash. If [clear_pending_queue_after]
+      then any other pending transactions in the tx_queue are
+      dropped. *)
+  val confirm_transactions :
+    clear_pending_queue_after:bool ->
+    confirmed_txs:Ethereum_types.hash Seq.t ->
+    unit tzresult Lwt.t
 end

@@ -52,14 +52,6 @@ val pop_transactions :
   initial_validation_state:'a ->
   (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 
-(** [confirm_transactions ~clear_pending_queue_after ~confirmed_txs]
-    confirms [confirmed_txs] hash. If [drop_unconfirmed] then any
-    other pending transactions in the tx_queue are dropped. *)
-val confirm_transactions :
-  clear_pending_queue_after:bool ->
-  confirmed_txs:Ethereum_types.hash Seq.t ->
-  unit tzresult Lwt.t
-
 (** wrapper of the Tx_queue to be compatible with the Tx_container
     signature for the services. *)
 module Tx_container : Services_backend_sig.Tx_container

@@ -148,6 +148,9 @@ let container_forward_request ~public_endpoint ~private_endpoint ~keep_alive :
     let unlock_transactions () = Lwt_result_syntax.return_unit
 
     let is_locked () = Lwt_result_syntax.return_false
+
+    let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
+      Lwt_result_syntax.return_unit
   end)
 
 let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
