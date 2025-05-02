@@ -1103,7 +1103,7 @@ mod tests {
             })
             .unwrap(),
             Instruction::try_from(TaggedInstruction {
-                opcode: OpCode::Sw,
+                opcode: OpCode::X32Store,
                 args: TaggedArgs {
                     rd: ra.into(),
                     rs1: a0.into(),

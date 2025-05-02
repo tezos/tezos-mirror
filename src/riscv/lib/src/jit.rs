@@ -2021,19 +2021,19 @@ mod tests {
         let scenarios: &[Scenario<F>] = &[
             // check stores - differing imm value to ensure both
             // aligned & unaligned stores are supported
-            valid_store(I::new_sd, 8, XREG_VALUE),
-            valid_store(I::new_sd, 5, XREG_VALUE),
-            valid_store(I::new_sw, 4, XREG_VALUE as u32 as u64),
-            valid_store(I::new_sw, 3, XREG_VALUE as u32 as u64),
-            valid_store(I::new_sh, 2, XREG_VALUE as u16 as u64),
-            valid_store(I::new_sh, 1, XREG_VALUE as u16 as u64),
+            valid_store(I::new_x64_store, 8, XREG_VALUE),
+            valid_store(I::new_x64_store, 5, XREG_VALUE),
+            valid_store(I::new_x32_store, 4, XREG_VALUE as u32 as u64),
+            valid_store(I::new_x32_store, 3, XREG_VALUE as u32 as u64),
+            valid_store(I::new_x16_store, 2, XREG_VALUE as u16 as u64),
+            valid_store(I::new_x16_store, 1, XREG_VALUE as u16 as u64),
             // byte load always aligned
-            valid_store(I::new_sb, 0, XREG_VALUE as u8 as u64),
+            valid_store(I::new_x8_store, 0, XREG_VALUE as u8 as u64),
             // invalid stores: out of bounds
-            invalid_store(I::new_sd, LoadStoreWidth::Double),
-            invalid_store(I::new_sw, LoadStoreWidth::Word),
-            invalid_store(I::new_sh, LoadStoreWidth::Half),
-            invalid_store(I::new_sb, LoadStoreWidth::Byte),
+            invalid_store(I::new_x64_store, LoadStoreWidth::Double),
+            invalid_store(I::new_x32_store, LoadStoreWidth::Word),
+            invalid_store(I::new_x16_store, LoadStoreWidth::Half),
+            invalid_store(I::new_x8_store, LoadStoreWidth::Byte),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

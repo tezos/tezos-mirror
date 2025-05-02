@@ -816,10 +816,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sd`].
-    pub(crate) fn new_sd(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64Store`].
+    pub(crate) fn new_x64_store(
+        rs1: XRegister,
+        rs2: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Sd,
+            opcode: OpCode::X64Store,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -868,10 +873,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sw`].
-    pub(crate) fn new_sw(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32Store`].
+    pub(crate) fn new_x32_store(
+        rs1: XRegister,
+        rs2: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Sw,
+            opcode: OpCode::X32Store,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -920,10 +930,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sh`].
-    pub(crate) fn new_sh(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X16Store`].
+    pub(crate) fn new_x16_store(
+        rs1: XRegister,
+        rs2: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Sh,
+            opcode: OpCode::X16Store,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -972,10 +987,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sb`].
-    pub(crate) fn new_sb(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X8Store`].
+    pub(crate) fn new_x8_store(
+        rs1: XRegister,
+        rs2: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Sb,
+            opcode: OpCode::X8Store,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
