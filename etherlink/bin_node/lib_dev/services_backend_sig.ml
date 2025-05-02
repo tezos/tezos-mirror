@@ -4,37 +4,6 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
-
-(** [Tx_container] is the signature of the module that deals with
-    storing and forwarding transactions. the module type is used by
-    {!Services.dispatch_request} to request informations about pending
-    transactions. *)
-module type Tx_container = sig
-  (** [nonce ~next_nonce address] must returns the next gap nonce
-      available. *)
-  val nonce :
-    next_nonce:Ethereum_types.quantity ->
-    Ethereum_types.address ->
-    Ethereum_types.quantity tzresult Lwt.t
-
-  (** [add ~next_nonce tx_object raw_tx] returns the next gap nonce
-      available based on the pending transaction of the tx_container.
-      [next_nonce] is the next expected nonce found in the backend. *)
-  val add :
-    next_nonce:Ethereum_types.quantity ->
-    Ethereum_types.legacy_transaction_object ->
-    raw_tx:Ethereum_types.hex ->
-    (Ethereum_types.hash, string) result tzresult Lwt.t
-
-  (** [find hash] returns the transaction_object found in tx
-      container. *)
-  val find : Ethereum_types.hash -> Transaction_object.t option tzresult Lwt.t
-
-  (** [content ()] returns all the transactions found in tx
-      container. *)
-  val content : unit -> Ethereum_types.txpool tzresult Lwt.t
-end
-
 module type S = sig
   module Reader : Durable_storage.READER
 
@@ -220,4 +189,34 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   let list_l1_l2_levels = Backend.list_l1_l2_levels
 
   let l2_levels_of_l1_level = Backend.l2_levels_of_l1_level
+end
+
+(** [Tx_container] is the signature of the module that deals with
+    storing and forwarding transactions. the module type is used by
+    {!Services.dispatch_request} to request informations about pending
+    transactions. *)
+module type Tx_container = sig
+  (** [nonce ~next_nonce address] must returns the next gap nonce
+      available. *)
+  val nonce :
+    next_nonce:Ethereum_types.quantity ->
+    Ethereum_types.address ->
+    Ethereum_types.quantity tzresult Lwt.t
+
+  (** [add ~next_nonce tx_object raw_tx] returns the next gap nonce
+      available based on the pending transaction of the tx_container.
+      [next_nonce] is the next expected nonce found in the backend. *)
+  val add :
+    next_nonce:Ethereum_types.quantity ->
+    Ethereum_types.legacy_transaction_object ->
+    raw_tx:Ethereum_types.hex ->
+    (Ethereum_types.hash, string) result tzresult Lwt.t
+
+  (** [find hash] returns the transaction_object found in tx
+      container. *)
+  val find : Ethereum_types.hash -> Transaction_object.t option tzresult Lwt.t
+
+  (** [content ()] returns all the transactions found in tx
+      container. *)
+  val content : unit -> Ethereum_types.txpool tzresult Lwt.t
 end
