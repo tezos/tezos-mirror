@@ -72,7 +72,7 @@ let container_forward_request ~public_endpoint ~private_endpoint ~keep_alive :
     let forwarding_transaction =
       Internal_event.Simple.declare_1
         ~section:Events.section
-        ~name:"forwarding_error"
+        ~name:"forward_transaction"
         ~msg:"forwarding transaction {tx_hash} to local node"
         ~level:Info
         ~pp1:(fun fmt Ethereum_types.(Hash (Hex h)) ->
