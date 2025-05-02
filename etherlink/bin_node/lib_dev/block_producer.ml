@@ -10,7 +10,6 @@ type parameters = {
   smart_rollup_address : string;
   sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
-  uses_tx_queue : bool;
   chain_family : L2_types.chain_family;
   tx_container : (module Services_backend_sig.Tx_container);
 }
@@ -265,7 +264,6 @@ let pop_valid_tx ~chain_family
     pool or if [force] is true. *)
 let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
     ~sequencer_key ~force ~timestamp ~delayed_hashes ~remaining_cumulative_size
-    ~uses_tx_queue:_
     ~(tx_container : (module Services_backend_sig.Tx_container)) head_info =
   let open Lwt_result_syntax in
   let (module Tx_container) = tx_container in
@@ -319,9 +317,8 @@ let head_info_and_delayed_transactions ~with_delayed_transactions
   let*! head_info = Evm_context.head_info () in
   return (head_info, delayed_hashes, remaining_cumulative_size)
 
-let produce_block ~chain_family ~uses_tx_queue ~cctxt ~smart_rollup_address
-    ~sequencer_key ~force ~timestamp ~maximum_number_of_chunks
-    ~with_delayed_transactions
+let produce_block ~chain_family ~cctxt ~smart_rollup_address ~sequencer_key
+    ~force ~timestamp ~maximum_number_of_chunks ~with_delayed_transactions
     ~(tx_container : (module Services_backend_sig.Tx_container)) =
   let open Lwt_result_syntax in
   let (module Tx_container) = tx_container in
@@ -364,7 +361,6 @@ let produce_block ~chain_family ~uses_tx_queue ~cctxt ~smart_rollup_address
         ~force
         ~delayed_hashes
         ~remaining_cumulative_size
-        ~uses_tx_queue
         ~tx_container
         head_info
 
@@ -385,14 +381,12 @@ module Handlers = struct
           smart_rollup_address;
           sequencer_key;
           maximum_number_of_chunks;
-          uses_tx_queue;
           chain_family;
           tx_container;
         } =
           state
         in
         produce_block
-          ~uses_tx_queue
           ~chain_family
           ~cctxt
           ~smart_rollup_address
