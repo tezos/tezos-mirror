@@ -401,10 +401,6 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | BranchLessThanOrEqualZero
         | BranchGreaterThanZero
         | JalrImm
-        | Sdnz
-        | Swnz
-        | Shnz
-        | Sbnz
         | Nop
         | ECall
         | Unknown => ArgsShape::NZXSrcNZXDest,

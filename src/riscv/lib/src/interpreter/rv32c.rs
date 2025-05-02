@@ -7,10 +7,7 @@
 //!
 //! U:C-16
 
-use crate::machine_state::MachineCoreState;
 use crate::machine_state::hart_state::HartState;
-use crate::machine_state::memory;
-use crate::machine_state::registers::XRegister;
 use crate::state_backend as backend;
 use crate::traps::Exception;
 
@@ -23,24 +20,6 @@ where
     /// Equivalent to `EBREAK`.
     pub fn run_cebreak(&self) -> Exception {
         Exception::Breakpoint
-    }
-}
-
-impl<MC, M> MachineCoreState<MC, M>
-where
-    MC: memory::MemoryConfig,
-    M: backend::ManagerReadWrite,
-{
-    /// `C.SW` CS-type compressed instruction
-    ///
-    /// Stores a 32-bit value in register `rs2` to memory. It computes
-    /// an effective address by adding the immediate to the base address
-    /// in register `rs1`.
-    /// The immediate is obtained by zero-extending and scaling by 4 the
-    /// offset encoded in the instruction (see U:C-16.3).
-    pub fn run_csw(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
-        debug_assert!(imm >= 0 && imm % 4 == 0);
-        self.run_sw(imm, rs1, rs2)
     }
 }
 

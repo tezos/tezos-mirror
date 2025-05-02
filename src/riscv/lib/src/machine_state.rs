@@ -638,9 +638,10 @@ mod tests {
     use crate::machine_state::memory::Memory;
     use crate::machine_state::memory::PAGE_SIZE;
     use crate::machine_state::mode::Mode;
-    use crate::machine_state::registers::NonZeroXRegister;
+    use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::nz;
+    use crate::machine_state::registers::ra;
     use crate::machine_state::registers::t0;
     use crate::machine_state::registers::t1;
     use crate::machine_state::registers::t2;
@@ -1102,13 +1103,13 @@ mod tests {
             })
             .unwrap(),
             Instruction::try_from(TaggedInstruction {
-                opcode: OpCode::Swnz,
+                opcode: OpCode::Sw,
                 args: TaggedArgs {
-                    rs1: nz::a0.into(),
-                    rs2: nz::a1.into(),
+                    rd: ra.into(),
+                    rs1: a0.into(),
+                    rs2: a1.into(),
                     imm: 0,
                     width: InstrWidth::Compressed,
-                    rd: TaggedRegister::NZX(NonZeroXRegister::x1),
                     ..TaggedArgs::DEFAULT
                 },
             })
