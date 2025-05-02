@@ -68,6 +68,26 @@ type key_kind = Protocol.Operation_repr.consensus_key_kind =
   | Consensus
   | Companion
 
+let check_error_invalid_consensus_key_update_active ~loc ~pkh errs =
+  Assert.expect_error ~loc errs (function
+      | [
+          Protocol.Delegate_consensus_key.Invalid_consensus_key_update_active
+            err_pkh;
+        ]
+        when Signature.Public_key_hash.equal pkh err_pkh ->
+          true
+      | _ -> false)
+
+let check_error_invalid_consensus_key_update_another_delegate ~loc ~pkh errs =
+  Assert.expect_error ~loc errs (function
+      | [
+          Protocol.Delegate_consensus_key
+          .Invalid_consensus_key_update_another_delegate err_pkh;
+        ]
+        when Signature.Public_key_hash.equal pkh err_pkh ->
+          true
+      | _ -> false)
+
 let check_ck_status ~loc ~ck ~registered_for (status : key_status)
     (kind : key_kind) : (t, t) scenarios =
   let open Lwt_result_syntax in
@@ -314,23 +334,15 @@ let test_register_other_accounts_as_ck =
   (* Both victims start with themselves as their own consensus_keys *)
   --> assert_failure
         ~loc:__LOC__
-        ~expected_error:(fun _ err ->
-          Error_helpers.check_error_constructor_name
-            ~loc:__LOC__
-            ~expected:
-              Protocol.Delegate_consensus_key
-              .Invalid_consensus_key_update_active
-            err)
+        ~expected_error:(fun (_block, state) err ->
+          let pkh = (State.find_account "victim_1" state).pkh in
+          check_error_invalid_consensus_key_update_active ~loc:__LOC__ ~pkh err)
         (update_consensus_key ~ck_name:"victim_1" "delegate")
   --> assert_failure
         ~loc:__LOC__
-        ~expected_error:(fun _ err ->
-          Error_helpers.check_error_constructor_name
-            ~loc:__LOC__
-            ~expected:
-              Protocol.Delegate_consensus_key
-              .Invalid_consensus_key_update_active
-            err)
+        ~expected_error:(fun (_block, state) err ->
+          let pkh = (State.find_account "victim_2" state).pkh in
+          check_error_invalid_consensus_key_update_active ~loc:__LOC__ ~pkh err)
         (update_companion_key ~ck_name:"victim_2" "delegate")
   (* ... So we give them other consensus keys.
      Note that the algo is not defined, so it is chosen at random. *)
@@ -338,94 +350,25 @@ let test_register_other_accounts_as_ck =
   --> update_consensus_key ~ck_name:"consensus_key_1" "victim_1"
   --> add_account "consensus_key_2"
   --> update_consensus_key ~ck_name:"consensus_key_2" "victim_2"
-  (* We do not need to wait to steal the newly available keys *)
-  --> update_consensus_key ~ck_name:"victim_1" "delegate"
-  --> update_companion_key ~ck_name:"victim_2" "delegate"
-  (* Check that everything is as expected:
-     - both victims have themselves as active consensus keys,
-       and have a pending companion key each
-     - The delegate has two keys pending
-     - After the consensus rights delay, all pendings become active,
-       and the victims do not use their own keys as consensus keys. *)
-  --> check_ck_status
+  (* We cannot steal the newly available keys *)
+  --> assert_failure
         ~loc:__LOC__
-        ~ck:"victim_1"
-        ~registered_for:"victim_1"
-        Active
-        Consensus
-  --> check_ck_status
+        ~expected_error:(fun (_block, state) err ->
+          let pkh = (State.find_account "victim_1" state).pkh in
+          check_error_invalid_consensus_key_update_another_delegate
+            ~loc:__LOC__
+            ~pkh
+            err)
+        (update_consensus_key ~ck_name:"victim_1" "delegate")
+  --> assert_failure
         ~loc:__LOC__
-        ~ck:"victim_2"
-        ~registered_for:"victim_2"
-        Active
-        Consensus
-  --> check_ck_status
-        ~loc:__LOC__
-        ~ck:"consensus_key_1"
-        ~registered_for:"victim_1"
-        Pending
-        Consensus
-  --> check_ck_status
-        ~loc:__LOC__
-        ~ck:"consensus_key_2"
-        ~registered_for:"victim_2"
-        Pending
-        Consensus
-  --> check_ck_status
-        ~loc:__LOC__
-        ~ck:"victim_1"
-        ~registered_for:"delegate"
-        Pending
-        Consensus
-  --> check_ck_status
-        ~loc:__LOC__
-        ~ck:"victim_2"
-        ~registered_for:"delegate"
-        Pending
-        Companion
-  (* Activation *)
-  --> wait_n_cycles (consensus_rights_delay + 1)
-  --> check_ck_status
-        ~loc:__LOC__
-        ~ck:"victim_1"
-        ~registered_for:"victim_1"
-        Unregistered
-        Consensus
-  --> check_ck_status
-        ~loc:__LOC__
-        ~ck:"victim_2"
-        ~registered_for:"victim_2"
-        Unregistered
-        Consensus
-  --> check_ck_status
-        ~loc:__LOC__
-        ~ck:"consensus_key_1"
-        ~registered_for:"victim_1"
-        Active
-        Consensus
-  --> check_ck_status
-        ~loc:__LOC__
-        ~ck:"consensus_key_2"
-        ~registered_for:"victim_2"
-        Active
-        Consensus
-  --> check_ck_status
-        ~loc:__LOC__
-        ~ck:"victim_1"
-        ~registered_for:"delegate"
-        Active
-        Consensus
-  --> check_ck_status
-        ~loc:__LOC__
-        ~ck:"victim_2"
-        ~registered_for:"delegate"
-        Active
-        Companion
-  (* Bake a cycle, for fun. Note that for each block, the RPCs also check for the complete
-     status of registration of consensus and companion keys, and all delegates attest
-     with their active consensus key. In this new cycle, the newly activated keys are thus
-     used for the first time. *)
-  --> next_cycle
+        ~expected_error:(fun (_block, state) err ->
+          let pkh = (State.find_account "victim_2" state).pkh in
+          check_error_invalid_consensus_key_update_another_delegate
+            ~loc:__LOC__
+            ~pkh
+            err)
+        (update_companion_key ~ck_name:"victim_2" "delegate")
 
 let test_self_register_as_companion =
   let consensus_rights_delay =
@@ -445,13 +388,9 @@ let test_self_register_as_companion =
      if it is already itself its own consensus key *)
   --> assert_failure
         ~loc:__LOC__
-        ~expected_error:(fun _ err ->
-          Error_helpers.check_error_constructor_name
-            ~loc:__LOC__
-            ~expected:
-              Protocol.Delegate_consensus_key
-              .Invalid_consensus_key_update_active
-            err)
+        ~expected_error:(fun (_block, state) err ->
+          let pkh = (State.find_account delegate state).pkh in
+          check_error_invalid_consensus_key_update_active ~loc:__LOC__ ~pkh err)
         (update_companion_key ~ck_name:delegate delegate)
   (* We can change that *)
   --> add_account "consensus_key"
@@ -506,13 +445,9 @@ let test_self_register_as_companion =
      room for a new companion in its storage. *)
   --> assert_failure
         ~loc:__LOC__
-        ~expected_error:(fun _ err ->
-          Error_helpers.check_error_constructor_name
-            ~loc:__LOC__
-            ~expected:
-              Protocol.Delegate_consensus_key
-              .Invalid_consensus_key_update_active
-            err)
+        ~expected_error:(fun (_block, state) err ->
+          let pkh = (State.find_account delegate state).pkh in
+          check_error_invalid_consensus_key_update_active ~loc:__LOC__ ~pkh err)
         (update_consensus_key ~ck_name:delegate delegate)
   --> add_account ~algo:Bls "companion_key"
   --> update_companion_key ~ck_name:"companion_key" delegate
@@ -600,11 +535,9 @@ let test_register_same_key_multiple_times =
                   && err_kind = Consensus
               | _ -> false)
         else
-          Error_helpers.check_error_constructor_name
+          check_error_invalid_consensus_key_update_active
             ~loc:__LOC__
-            ~expected:
-              Protocol.Delegate_consensus_key
-              .Invalid_consensus_key_update_active
+            ~pkh:ck.pkh
             err)
       (update_consensus_key ~ck_name:ck delegate)
     --> assert_failure
@@ -630,11 +563,9 @@ let test_register_same_key_multiple_times =
                       && err_kind = Companion
                   | _ -> false)
             else
-              Error_helpers.check_error_constructor_name
+              check_error_invalid_consensus_key_update_active
                 ~loc:__LOC__
-                ~expected:
-                  Protocol.Delegate_consensus_key
-                  .Invalid_consensus_key_update_active
+                ~pkh:ck.pkh
                 err)
           (update_companion_key ~ck_name:ck delegate)
   in
@@ -984,12 +915,11 @@ let test_fail_already_registered =
         (fun kind ->
           assert_failure
             ~loc:__LOC__
-            ~expected_error:(fun _ err ->
-              Error_helpers.check_error_constructor_name
+            ~expected_error:(fun (_block, state) err ->
+              let pkh = (State.find_account "ck" state).pkh in
+              check_error_invalid_consensus_key_update_active
                 ~loc:__LOC__
-                ~expected:
-                  Protocol.Delegate_consensus_key
-                  .Invalid_consensus_key_update_active
+                ~pkh
                 err)
             (update_key ~kind ~ck_name:"ck" delegate))
         [("update consensus", Consensus); ("update companion", Companion)]

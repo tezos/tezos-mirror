@@ -147,7 +147,9 @@ let test_consensus_key_storage () =
   let* () =
     let*! err = Consensus_key.register_update ctxt del1.pkh del2.pk in
     Assert.proto_error ~loc:__LOC__ err (function
-        | Delegate_consensus_key.Invalid_consensus_key_update_active -> true
+        | Delegate_consensus_key.Invalid_consensus_key_update_active pkh
+          when Signature.Public_key_hash.equal del2.pkh pkh ->
+            true
         | _ -> false)
   in
   let* ctxt = Consensus_key.register_update ctxt del1.pkh a1.pk in
@@ -161,10 +163,20 @@ let test_consensus_key_storage () =
   let* () =
     let*! err = Consensus_key.register_update ctxt del2.pkh a1.pk in
     Assert.proto_error ~loc:__LOC__ err (function
-        | Delegate_consensus_key.Invalid_consensus_key_update_active -> true
+        | Delegate_consensus_key.Invalid_consensus_key_update_active pkh
+          when Signature.Public_key_hash.equal a1.pkh pkh ->
+            true
         | _ -> false)
   in
-  let* ctxt = Consensus_key.register_update ctxt del2.pkh del1.pk in
+  let* () =
+    let*! err = Consensus_key.register_update ctxt del2.pkh del1.pk in
+    Assert.proto_error ~loc:__LOC__ err (function
+        | Delegate_consensus_key.Invalid_consensus_key_update_another_delegate
+            pkh
+          when Signature.Public_key_hash.equal del1.pkh pkh ->
+            true
+        | _ -> false)
+  in
   let* () =
     Assert.active_keys
       ~__LOC__
@@ -173,7 +185,6 @@ let test_consensus_key_storage () =
       [
         (0, del1.pk);
         (1, del1.pk);
-        (2, del1.pk);
         (2, del1.pk);
         (3, del1.pk);
         (4, a1.pk);
@@ -202,7 +213,6 @@ let test_consensus_key_storage () =
       del1.pkh
       [
         (1, del1.pk);
-        (2, del1.pk);
         (2, del1.pk);
         (3, del1.pk);
         (4, a1.pk);
