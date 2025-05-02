@@ -26,6 +26,7 @@ type parameters = {
   store_perm : [`Read_only | `Read_write];
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
   snapshot_url : string option;
+  tx_container : (module Services_backend_sig.Tx_container);
 }
 
 type session_state = {
@@ -48,6 +49,7 @@ type t = {
   session : session_state;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
   legacy_block_storage : bool;
+  tx_container : (module Services_backend_sig.Tx_container);
 }
 
 let is_sequencer t = Option.is_some t.sequencer_wallet
@@ -1362,7 +1364,8 @@ module State = struct
   let on_disk_kernel = function Wasm_debugger.On_disk _ -> true | _ -> false
 
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
-      ?smart_rollup_address ~store_perm ?sequencer_wallet ?snapshot_url () =
+      ?smart_rollup_address ~store_perm ?sequencer_wallet ?snapshot_url
+      ~tx_container () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1476,6 +1479,7 @@ module State = struct
         store;
         sequencer_wallet;
         legacy_block_storage;
+        tx_container;
       }
     in
 
@@ -1761,6 +1765,7 @@ module Handlers = struct
         store_perm;
         sequencer_wallet;
         snapshot_url;
+        tx_container;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -1772,6 +1777,7 @@ module Handlers = struct
         ~store_perm
         ?sequencer_wallet
         ?snapshot_url
+        ~tx_container
         ()
     in
     Lwt.wakeup execution_config_waker @@ (ctxt.data_dir, pvm_config ctxt) ;
@@ -1941,7 +1947,8 @@ let worker_wait_for_request req =
   return_ res
 
 let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
-    ~store_perm ?sequencer_wallet ?snapshot_url ~tx_container:_ () =
+    ~store_perm ?sequencer_wallet ?snapshot_url
+    ~(tx_container : (module Services_backend_sig.Tx_container)) () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -1956,6 +1963,7 @@ let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
         store_perm;
         sequencer_wallet;
         snapshot_url;
+        tx_container;
       }
       (module Handlers)
   in
