@@ -168,7 +168,6 @@ impl InboxBuilder {
             current_level: 0,
             current_id: 0,
             levels: self.levels,
-            none_counter: 0,
         }
     }
 }
@@ -185,14 +184,6 @@ pub struct Inbox {
     current_level: u32,
     current_id: u32,
     levels: LinkedList<LinkedList<Vec<u8>>>,
-    none_counter: usize,
-}
-
-impl Inbox {
-    /// Count the number of nones that have been returned by the inbox so far.
-    pub fn none_count(&self) -> usize {
-        self.none_counter
-    }
 }
 
 impl Iterator for Inbox {
@@ -200,7 +191,6 @@ impl Iterator for Inbox {
 
     fn next(&mut self) -> Option<Self::Item> {
         let Some(level) = self.levels.front_mut() else {
-            self.none_counter += 1;
             return None;
         };
 

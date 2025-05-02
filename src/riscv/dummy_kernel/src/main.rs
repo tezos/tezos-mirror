@@ -122,10 +122,4 @@ pub fn entry(host: &mut impl Runtime) {
             msg => debug_msg!(host, "{:#?}\n", msg),
         }
     }
-
-    // Drain the inbox, making the sandbox stop. This command should not be
-    // reachable from both the rollup node and the sandbox. It is needed as a
-    // temporary workaround for RV-540: Divergence between rollup node and
-    // sandbox behaviour.
-    while host.read_input().map(|msg| msg.is_some()).unwrap_or(true) {}
 }

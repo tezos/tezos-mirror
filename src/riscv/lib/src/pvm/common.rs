@@ -348,18 +348,6 @@ impl<
         steps
     }
 
-    /// Respond to a request for input with no input. Returns `false` in case the
-    /// machine wasn't expecting any input, otherwise returns `true`.
-    pub(crate) fn provide_no_input(&mut self) -> bool
-    where
-        M: state_backend::ManagerReadWrite,
-    {
-        sbi::provide_no_input(
-            &mut self.status,
-            &mut self.machine_state.core.hart.xregisters,
-        )
-    }
-
     /// Provide input. Returns `false` if the machine state is not expecting input.
     pub(crate) fn provide_input(&mut self, input: PvmInput) -> bool
     where

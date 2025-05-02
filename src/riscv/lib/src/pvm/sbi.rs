@@ -95,27 +95,6 @@ where
     }
 }
 
-/// Respond to a request for input with no input. Returns `false` in case the
-/// machine wasn't expecting any input, otherwise returns `true`.
-pub fn provide_no_input<S, M>(status: &mut S, xregisters: &mut XRegisters<M>) -> bool
-where
-    S: CellReadWrite<Value = PvmStatus>,
-    M: ManagerWrite,
-{
-    // This method should only do something when we're waiting for input.
-    match status.read() {
-        PvmStatus::WaitingForInput => {}
-        _ => return false,
-    }
-
-    // We're evaluating again after this.
-    status.write(PvmStatus::Evaluating);
-
-    // Inform the caller that there is no more input by returning "bytes written" (a0) as 0.
-    sbi_return1(xregisters, 0);
-    true
-}
-
 /// Provide input information to the machine. Returns `false` in case the
 /// machine wasn't expecting any input, otherwise returns `true`.
 pub fn provide_input<S, MC, M>(
