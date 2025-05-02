@@ -2283,7 +2283,7 @@ let fund_arg =
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.eth_address
 
 let sandbox_config_args =
-  Tezos_clic.args15
+  Tezos_clic.args16
     preimages_arg
     preimages_endpoint_arg
     native_execution_policy_arg
@@ -2299,6 +2299,7 @@ let sandbox_config_args =
     fund_arg
     replicate_arg
     disable_da_fees_arg
+    kernel_verbosity_arg
 
 let sequencer_command =
   let open Tezos_clic in
@@ -2427,7 +2428,8 @@ let sandbox_command =
              init_from_snapshot,
              funded_addresses,
              main_endpoint,
-             disable_da_fees ) )
+             disable_da_fees,
+             kernel_verbosity ) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -2462,6 +2464,7 @@ let sandbox_command =
             funded_addresses = Option.value ~default:[] funded_addresses;
             parent_chain;
             disable_da_fees;
+            kernel_verbosity;
           }
       in
       let config_file = config_filename ~data_dir config_file in

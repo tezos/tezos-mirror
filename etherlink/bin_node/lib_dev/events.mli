@@ -94,6 +94,8 @@ type kernel_log_kind = Application | Simulation
 
 type kernel_log_level = Debug | Info | Error | Fatal
 
+val string_from_kernel_log_level : kernel_log_level -> string
+
 (** Logs kernel log [Debug]. *)
 val event_kernel_log :
   level:kernel_log_level -> kind:kernel_log_kind -> msg:string -> unit Lwt.t

@@ -24,6 +24,8 @@ val da_fee_per_byte : path
 
 val kernel_version : path
 
+val kernel_verbosity : path
+
 val storage_version : path
 
 val kernel_root_hash : path

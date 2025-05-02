@@ -10,6 +10,13 @@
 
 ### Metrics changes
 
+### Command-line interface changes
+
+- Adds `--kernel-verbosity` to `run sandbox` to control the level of logs
+  emitted by the kernel. Note that printing kernel logs to the standard output
+  still requires to set the `RUST_LOG` environment variable to
+  `octez_evm_node_wasm_runtime::write_debug=trace`. (!17909)
+
 ### Execution changes
 
 ### Storage changes

@@ -22,20 +22,12 @@ let patch_kernel ~kernel evm_state =
   in
   return evm_state
 
-let level_verbosity = function
-  | Events.Debug -> 3
-  | Info -> 2
-  | Error -> 1
-  | Fatal -> 0
-
 let patch_verbosity ~kernel_verbosity evm_state =
   let open Lwt_result_syntax in
-  let value = Bytes.make 1 '\000' in
-  Bytes.set_uint8 value 0 (level_verbosity kernel_verbosity) ;
   let*! evm_state =
     Evm_state.modify
-      ~key:"/evm/logging_verbosity"
-      ~value:(Bytes.to_string value)
+      ~key:Durable_storage_path.kernel_verbosity
+      ~value:(Events.string_from_kernel_log_level kernel_verbosity)
       evm_state
   in
   return evm_state
