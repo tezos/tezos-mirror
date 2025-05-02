@@ -14,7 +14,6 @@ use super::PvmLayout;
 use crate::machine_state::TestCacheLayouts;
 use crate::machine_state::block_cache::block::Interpreted;
 use crate::machine_state::block_cache::block::InterpretedBlockBuilder;
-use crate::machine_state::mode::Mode;
 use crate::program::Program;
 use crate::pvm::common::PvmHooks;
 use crate::pvm::common::PvmInput;
@@ -116,16 +115,13 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
         self.with_backend(|pvm| pvm.reveal_request())
     }
 
-    pub fn install_boot_sector(&mut self, loader: &[u8], kernel: &[u8])
+    pub fn install_boot_sector(&mut self, kernel: &[u8])
     where
         M: state_backend::ManagerReadWrite,
     {
         self.with_backend_mut(|pvm| {
-            let program = Program::<NodePvmMemConfig>::from_elf(loader)
-                .expect("Could not parse Hermit loader");
-            pvm.machine_state
-                .setup_boot(&program, Some(kernel), Mode::Supervisor)
-                .unwrap()
+            let program = Program::from_elf(kernel).unwrap();
+            pvm.setup_linux_process(&program).unwrap()
         })
     }
 

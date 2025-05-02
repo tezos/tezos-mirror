@@ -271,13 +271,29 @@ let prepare_installer_kernel ?output ?runner ~preimages_dir ?config installee =
     ?config
     (Uses.path installee)
 
+let riscv_dummy_kernel =
+  Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf" ()
+
+let riscv_dummy_kernel_checksum =
+  Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf.checksum" ()
+
 let default_boot_sector_of ~kind =
   match kind with
   | "arith" -> ""
   | "wasm_2_0_0" -> Constant.wasm_echo_kernel_boot_sector
-  | "riscv" -> ""
+  | "riscv" ->
+      let checksum =
+        Uses.path riscv_dummy_kernel_checksum
+        |> read_file |> String.split_on_char ' ' |> List.hd
+      in
+      "kernel:" ^ Uses.path riscv_dummy_kernel ^ ":" ^ checksum
   | kind ->
       Format.kasprintf Stdlib.invalid_arg "default_boot_sector_of: %s" kind
+
+let default_boot_sector_uses_of ~kind =
+  match kind with
+  | "riscv" -> [riscv_dummy_kernel; riscv_dummy_kernel_checksum]
+  | _ -> []
 
 let make_parameter name = function
   | None -> []

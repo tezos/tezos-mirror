@@ -28,7 +28,7 @@ fn capture_debug_log(mint: &mut goldenfile::Mint) -> PvmHooks<'_> {
     hooks
 }
 
-#[cfg(not(feature = "supervisor"))]
+#[cfg(feature = "supervisor")]
 #[test]
 fn regression_frozen_jstz() {
     test_regression(
@@ -41,17 +41,6 @@ fn regression_frozen_jstz() {
 
 #[cfg(feature = "supervisor")]
 #[test]
-fn regression_frozen_jstz_linux_musl() {
-    test_regression(
-        "tests/expected/jstz-linux-musl",
-        "../assets/jstz-linux-musl",
-        "../assets/regression-inbox.json",
-        true,
-    )
-}
-
-#[cfg(not(feature = "supervisor"))]
-#[test]
 fn regression_frozen_dummy_kernel() {
     test_regression(
         "tests/expected/dummy",
@@ -63,32 +52,10 @@ fn regression_frozen_dummy_kernel() {
 
 #[cfg(feature = "supervisor")]
 #[test]
-fn regression_frozen_dummy_kernel_linux_musl() {
-    test_regression(
-        "tests/expected/dummy-linux-musl",
-        "../assets/riscv-dummy-linux-musl.elf",
-        "../assets/dummy-kernel-inbox.json",
-        true,
-    )
-}
-
-#[cfg(not(feature = "supervisor"))]
-#[test]
 fn regression_dummy_kernel() {
     test_regression(
-        "tests/expected/dummy_volatile",
+        "tests/expected/dummy-volatile",
         "../riscv-dummy.elf",
-        "../assets/dummy-kernel-inbox.json",
-        false,
-    )
-}
-
-#[cfg(feature = "supervisor")]
-#[test]
-fn regression_dummy_kernel_linux_musl() {
-    test_regression(
-        "tests/expected/dummy-linux-musl-volatile",
-        "../riscv-dummy-linux-musl.elf",
         "../assets/dummy-kernel-inbox.json",
         false,
     )

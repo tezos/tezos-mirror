@@ -1,4 +1,4 @@
 [toolchain]
-channel = "1.80.1"
+channel = "1.86.0"
 components = ["rustfmt", "clippy"]
-targets = ["riscv64gc-unknown-hermit"]
+targets = ["riscv64gc-unknown-linux-musl"]

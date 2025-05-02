@@ -7,8 +7,6 @@ ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target "$(NATIVE_TARGET)"
 endif
 
-RUST_VERSION_SUPERVISED := 1.84.1
-
 INBOX_FILE ?= $(shell mktemp)
 
 .PHONY: all
@@ -20,10 +18,6 @@ print-native-target:
 
 .PHONY: build-deps
 build-deps:
-	@exec ../scripts/install-rust-std-hermit.sh
-	@rustup toolchain install $(RUST_VERSION_SUPERVISED)
-	@rustup component add rustfmt clippy
-	@rustup target add --toolchain $(RUST_VERSION_SUPERVISED) riscv64gc-unknown-linux-musl
 ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
@@ -42,10 +36,6 @@ build-kernel-static:
 .PHONY: build-kernel-native
 build-kernel-native:
 	@INBOX_FILE=$(INBOX_FILE) cargo build -p jstz --release --features static-inbox $(NATIVE_OPT)
-
-.PHONY: build-kernel-linux-musl
-build-kernel-linux-musl:
-	@cargo +$(RUST_VERSION_SUPERVISED) build --target=riscv64gc-unknown-linux-musl --package jstz --release
 
 .PHONY: test
 test:
