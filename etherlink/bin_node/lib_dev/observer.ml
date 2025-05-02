@@ -8,14 +8,6 @@
 
 open Ethereum_types
 
-let confirm_txs config confirmed_txs =
-  let open Lwt_result_syntax in
-  if Configuration.is_tx_queue_enabled config then
-    Tx_queue.confirm_transactions
-      ~clear_pending_queue_after:false
-      ~confirmed_txs
-  else return_unit
-
 (** [on_new_blueprint evm_node_endpoint next_blueprint_number
     blueprint] applies evm events found in the blueprint, then applies
     the blueprint itself.
@@ -67,8 +59,14 @@ let on_new_blueprint config evm_node_endpoint next_blueprint_number
             failwith
               "Could not recover from failing to apply latest received \
                blueprint.")
-    | Ok tx_hashes ->
-        let* () = confirm_txs config tx_hashes in
+    | Ok confirmed_txs ->
+        let* () =
+          if Configuration.is_tx_queue_enabled config then
+            Tx_queue.confirm_transactions
+              ~clear_pending_queue_after:false
+              ~confirmed_txs
+          else return_unit
+        in
         return `Continue
     | Error (Node_error.Diverged {must_exit = false; _} :: _) ->
         (* If we have diverged, but should keep the node alive. This happens
