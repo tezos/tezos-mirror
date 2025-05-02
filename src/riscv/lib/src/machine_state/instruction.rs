@@ -234,9 +234,9 @@ pub enum OpCode {
     X8LoadSigned,
     X16LoadSigned,
     X32LoadSigned,
-    Lbu,
-    Lhu,
-    Lwu,
+    X8LoadUnsigned,
+    X16LoadUnsigned,
+    X32LoadUnsigned,
     X64LoadSigned,
 
     // RV64I S-type instructions
@@ -464,9 +464,9 @@ impl OpCode {
             Self::X8LoadSigned => Args::run_x8_load_signed,
             Self::X16LoadSigned => Args::run_x16_load_signed,
             Self::X32LoadSigned => Args::run_x32_load_signed,
-            Self::Lbu => Args::run_lbu,
-            Self::Lhu => Args::run_lhu,
-            Self::Lwu => Args::run_lwu,
+            Self::X8LoadUnsigned => Args::run_x8_load_unsigned,
+            Self::X16LoadUnsigned => Args::run_x16_load_unsigned,
+            Self::X32LoadUnsigned => Args::run_x32_load_unsigned,
             Self::X64LoadSigned => Args::run_x64_load_signed,
             Self::Sb => Args::run_sb,
             Self::Sbnz => Args::run_sbnz,
@@ -698,11 +698,11 @@ impl OpCode {
             // Loads
             Self::X64LoadSigned => Some(Args::run_x64_load_signed),
             Self::X32LoadSigned => Some(Args::run_x32_load_signed),
-            Self::Lwu => Some(Args::run_lwu),
+            Self::X32LoadUnsigned => Some(Args::run_x32_load_unsigned),
             Self::X16LoadSigned => Some(Args::run_x16_load_signed),
-            Self::Lhu => Some(Args::run_lhu),
+            Self::X16LoadUnsigned => Some(Args::run_x16_load_unsigned),
             Self::X8LoadSigned => Some(Args::run_x8_load_signed),
-            Self::Lbu => Some(Args::run_lbu),
+            Self::X8LoadUnsigned => Some(Args::run_x8_load_unsigned),
 
             // Errors
             Self::Unknown => Some(Args::run_illegal),
@@ -1384,9 +1384,9 @@ impl Args {
         run_set_less_than_immediate_unsigned,
         non_zero_rd
     );
-    impl_load_type!(run_lbu, LoadStoreWidth::Byte, false);
-    impl_load_type!(run_lhu, LoadStoreWidth::Half, false);
-    impl_load_type!(run_lwu, LoadStoreWidth::Word, false);
+    impl_load_type!(run_x8_load_unsigned, LoadStoreWidth::Byte, false);
+    impl_load_type!(run_x16_load_unsigned, LoadStoreWidth::Half, false);
+    impl_load_type!(run_x32_load_unsigned, LoadStoreWidth::Word, false);
     impl_load_type!(run_x64_load_signed, LoadStoreWidth::Double, true);
     impl_load_type!(run_x32_load_signed, LoadStoreWidth::Word, true);
     impl_load_type!(run_x16_load_signed, LoadStoreWidth::Half, true);
@@ -1732,15 +1732,24 @@ impl From<&InstrCacheable> for Instruction {
                 args.imm,
                 InstrWidth::Uncompressed,
             ),
-            InstrCacheable::Lbu(args) => {
-                Instruction::new_lbu(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed)
-            }
-            InstrCacheable::Lhu(args) => {
-                Instruction::new_lhu(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed)
-            }
-            InstrCacheable::Lwu(args) => {
-                Instruction::new_lwu(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed)
-            }
+            InstrCacheable::Lbu(args) => Instruction::new_x8_load_unsigned(
+                args.rd,
+                args.rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
+            InstrCacheable::Lhu(args) => Instruction::new_x16_load_unsigned(
+                args.rd,
+                args.rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
+            InstrCacheable::Lwu(args) => Instruction::new_x32_load_unsigned(
+                args.rd,
+                args.rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
             InstrCacheable::Ld(args) => Instruction::new_x64_load_signed(
                 args.rd,
                 args.rs1,

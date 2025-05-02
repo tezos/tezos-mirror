@@ -871,10 +871,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lwu`].
-    pub(crate) fn new_lwu(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32LoadUnsigned`].
+    pub(crate) fn new_x32_load_unsigned(
+        rd: XRegister,
+        rs1: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Lwu,
+            opcode: OpCode::X32LoadUnsigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -937,10 +942,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lhu`].
-    pub(crate) fn new_lhu(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X16LoadUnsigned`].
+    pub(crate) fn new_x16_load_unsigned(
+        rd: XRegister,
+        rs1: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Lhu,
+            opcode: OpCode::X16LoadUnsigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -1003,10 +1013,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lbu`].
-    pub(crate) fn new_lbu(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X8LoadUnsigned`].
+    pub(crate) fn new_x8_load_unsigned(
+        rd: XRegister,
+        rs1: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Lbu,
+            opcode: OpCode::X8LoadUnsigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
