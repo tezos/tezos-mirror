@@ -1048,12 +1048,6 @@ let clear () =
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait w Clear |> handle_request_error
 
-let nonce ~next_nonce address =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait w (Nonce {next_nonce; address})
-  |> handle_request_error
-
 let content () =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
@@ -1099,7 +1093,11 @@ module Internal_for_tests = struct
 end
 
 module Tx_container = struct
-  let nonce = nonce
+  let nonce ~next_nonce address =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    Worker.Queue.push_request_and_wait w (Nonce {next_nonce; address})
+    |> handle_request_error
 
   let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
       (tx_object : Ethereum_types.legacy_transaction_object) txn =
