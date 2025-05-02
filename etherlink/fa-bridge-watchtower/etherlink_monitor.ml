@@ -533,38 +533,50 @@ let handle_confirmed_txs {db; ws_client; _}
      match Transaction_object.to_ tx with
      | Some to_
        when Ethereum_types.Address.compare to_ Deposit.address = 0
-            && is_claim_input input ->
+            && is_claim_input input -> (
          let tx_hash = Transaction_object.hash tx in
-         let input =
-           Hex.to_string (`Hex input) |> WithExceptions.Option.get ~loc:__LOC__
+         let* receipt =
+           Websocket_client.send_jsonrpc
+             ws_client
+             (Call ((module Rpc_encodings.Get_transaction_receipt), tx_hash))
          in
-         let input_rope = Rope.of_string input in
-         let value = Efunc_core.Evm.decode_value (`uint 256) (input_rope, 4) in
-         let nonce =
-           match value with
-           | `int v -> Ethereum_types.quantity_of_z v
-           | _ -> assert false
-         in
-         let exec =
-           Db.
-             {
-               transactionHash = tx_hash;
-               transactionIndex = Qty (Z.of_int index);
-               blockHash = b.hash;
-               blockNumber = b.number;
-             }
-         in
-         let*! () =
-           Event.(emit claimed_deposit)
-             ( nonce,
-               exec.transactionHash,
-               exec.transactionIndex,
-               exec.blockNumber )
-         in
-         let* () = Db.Deposits.set_claimed db nonce exec in
-         let* () = Tx_queue.confirm tx_hash in
-         return_unit
-     | _ -> return_unit
+         match receipt with
+         (* when "status": "0x1" *)
+         | Some {status = Qty z; _} when Z.equal z Z.one ->
+             let input =
+               Hex.to_string (`Hex input)
+               |> WithExceptions.Option.get ~loc:__LOC__
+             in
+             let input_rope = Rope.of_string input in
+             let value =
+               Efunc_core.Evm.decode_value (`uint 256) (input_rope, 4)
+             in
+             let nonce =
+               match value with
+               | `int v -> Ethereum_types.quantity_of_z v
+               | _ -> assert false
+             in
+             let exec =
+               Db.
+                 {
+                   transactionHash = tx_hash;
+                   transactionIndex = Qty (Z.of_int index);
+                   blockHash = b.hash;
+                   blockNumber = b.number;
+                 }
+             in
+             let*! () =
+               Event.(emit claimed_deposit)
+                 ( nonce,
+                   exec.transactionHash,
+                   exec.transactionIndex,
+                   exec.blockNumber )
+             in
+             let* () = Db.Deposits.set_claimed db nonce exec in
+             let* () = Tx_queue.confirm tx_hash in
+             return_unit
+         | None | Some _ -> return_unit)
+     | None | Some _ -> return_unit
 
 let claim_deposits ctx =
   let open Lwt_result_syntax in
