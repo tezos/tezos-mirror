@@ -37,7 +37,7 @@ use crate::traps::EnvironException;
 
 /// Alias for the function signature produced by the JIT compilation.
 ///
-/// This must have the same Abi as [`Dispatch`], which is used by
+/// This must have the same Abi as [`DispatchFn`], which is used by
 /// the block dispatch mechanism in the block cache.
 ///
 /// The JitFn does not inspect the first and last parameters here, however.
@@ -47,7 +47,7 @@ use crate::traps::EnvironException;
 /// with pointers to `c_void` - which in the C abi map to the same parameter type as the
 /// thin-references to the actual variables passed.
 ///
-/// [`Dispatch`]: crate::machine_state::block_cache::block::Dispatch
+/// [`DispatchFn`]: crate::machine_state::block_cache::block::DispatchFn
 pub type JitFn<MC, JSA> = unsafe extern "C" fn(
     // ignored
     *const c_void,
