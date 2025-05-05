@@ -25,6 +25,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* To avoid shadowing the module with the [Gas_price] module defining the
+   [eth_gasPrice] RPC. *)
+module G = Gas_price
 open Tezos_rpc
 open Rpc_encodings
 open Batch
@@ -581,8 +584,39 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             build_with_input ~f module_ parameters
         | Gas_price.Method ->
             let f (_ : unit option) =
-              let* base_fee = Backend_rpc.base_fee_per_gas () in
-              rpc_ok base_fee
+              (* We want `eth_gasPrice` to give a result that makes it very
+                 unlikely that the transaction is refused by the sequencer
+                 because of a gas price variation. As a consequence, we will
+                 over-approximate the variation of the gas price by computing
+                 the next gas price with these two inputs:
+
+                   – Arbitrary double the backlog
+                   – As if the block of inclusion is done in the very same
+                     second as the latest block
+
+                 This should lead `eth_gasPrice` to provide an
+                 over-approximation when the gas price is not the default one,
+                 but still keep the output of `eth_gasPrice` to the minimal one
+                 when the chain is not overloaded.
+
+                 In order to avoid approximating too much, we cap the gas price
+                 increase to 33% of what it was before. For a current gas price
+                 of 1.5Gwei, the result of `eth_gasPrice` cannot be larger than
+                 2 Gwei (¾ * 1.5). *)
+              let* minimum = Backend_rpc.minimum_base_fee_per_gas () in
+              let* (Qty latest_price) = Backend_rpc.base_fee_per_gas () in
+              let* backlog = Backend_rpc.backlog () in
+              let* storage_version = Backend_rpc.storage_version () in
+              let base_fee =
+                let open Z in
+                min
+                  (latest_price * of_int 4 / of_int 3)
+                  (G.price_from_backlog
+                     ~version:storage_version
+                     ~minimum
+                     (backlog * of_int 2))
+              in
+              rpc_ok (Qty base_fee)
             in
             build ~f module_ parameters
         | Get_transaction_count.Method ->

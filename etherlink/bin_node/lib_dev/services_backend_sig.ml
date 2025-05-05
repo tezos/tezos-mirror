@@ -86,6 +86,19 @@ module type S = sig
   (** [base_fee_per_gas ()] returns base fee defined by the rollup. *)
   val base_fee_per_gas : unit -> Ethereum_types.quantity tzresult Lwt.t
 
+  (** [backlog ()] returns the current backlog of the chain, used to determine
+      the base fee per gas for the next block. *)
+  val backlog : unit -> Z.t tzresult Lwt.t
+
+  (** [storage_version ()] returns the latest storage version known to the
+      current kernel. This can be used to determine which features are and are
+      not supported. *)
+  val storage_version : unit -> int tzresult Lwt.t
+
+  (** [minimum_base_fee_per_gas ()] returns the floor price for one unit of
+      gas. *)
+  val minimum_base_fee_per_gas : unit -> Z.t tzresult Lwt.t
+
   (** [kernel_version ()] returns the internal kernel version (i.e the
       commit hash where the kernel was compiled). *)
   val kernel_version : unit -> string tzresult Lwt.t

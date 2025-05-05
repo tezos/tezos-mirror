@@ -8,6 +8,9 @@
 
 ### RPCs changes
 
+- Changes `eth_gasPrice` to make it more resilient to gas price changes. The
+  RPC will now anticipate gas price increases. (!17921)
+
 ### Metrics changes
 
 ### Command-line interface changes
