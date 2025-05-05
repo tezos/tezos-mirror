@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Primitives
 open Test_helpers
 open Rpc.Syntax
 
@@ -120,7 +121,7 @@ let register ~title ~registered ~tx_per_call =
   in
 
   Lwt_list.iter_s
-    (fun (contract, calls) ->
+    (fun ({contract; constructor_arg; calls} : contract_info) ->
       let* ({label; abi; bin; _} : Solidity_contracts.contract) = contract in
       let* () = Eth_cli.add_abi ~label ~abi () in
       let wait_for = Evm_node.wait_for_tx_queue_add_transaction sequencer in
@@ -130,6 +131,7 @@ let register ~title ~registered ~tx_per_call =
           ~endpoint:(Evm_node.endpoint sequencer)
           ~abi
           ~bin
+          ?args:constructor_arg
           ()
       in
       let* _ = wait_for in
