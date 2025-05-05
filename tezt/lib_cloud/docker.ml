@@ -55,7 +55,8 @@ let pull ?image_name ?alias ?(tag = "latest") ~registry_uri () =
 let network ~command ~network_name =
   Process.spawn ~color "docker" (["network"] @ [command] @ [network_name])
 
-let run ?(rm = false) ?name ?network ?publish_ports image args =
+let run ?runner ?(rm = false) ?name ?network ?publish_ports ?volumes image args
+    =
   let publish_ports =
     match publish_ports with
     | None -> []
@@ -67,12 +68,23 @@ let run ?(rm = false) ?name ?network ?publish_ports image args =
   in
   let name = match name with None -> [] | Some name -> ["--name"; name] in
   let rm = if rm then ["--rm"] else [] in
+  let volumes =
+    match volumes with
+    | None -> []
+    | Some volumes ->
+        let arg_of_volume (host, container) =
+          ["-v"; Format.asprintf "%s:%s" host container]
+        in
+        List.map arg_of_volume volumes |> List.flatten
+  in
   (* [init] can be used to ensure signals are forwarded properly to
      the entrypoint run by the container. *)
   Process.spawn
+    ?runner
     ~color
     "docker"
-    (["run"] @ rm @ name @ macos_platform_arg @ network @ publish_ports
+    (["run"] @ rm @ name @ macos_platform_arg @ volumes @ network
+   @ publish_ports
     @ [Format.asprintf "%s" image]
     @ args)
 
