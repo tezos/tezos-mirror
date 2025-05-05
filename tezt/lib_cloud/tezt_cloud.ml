@@ -42,7 +42,9 @@ let register_docker_push ~tags =
     ~__FILE__
     ~title:"Push the dockerfile to the GCP registry"
     ~tags:("docker" :: "push" :: tags)
-  @@ fun _cloud -> Jobs.docker_build ~push:true ()
+  @@ fun _cloud ->
+  let* ssh_public_key = Ssh.public_key () in
+  Jobs.docker_build ~push:true ~ssh_public_key ()
 
 let register_docker_build ~tags =
   Cloud.register
@@ -50,7 +52,9 @@ let register_docker_build ~tags =
     ~__FILE__
     ~title:"Build the dockerfile"
     ~tags:("docker" :: "build" :: tags)
-  @@ fun _cloud -> Jobs.docker_build ~push:false ()
+  @@ fun _cloud ->
+  let* ssh_public_key = Ssh.public_key () in
+  Jobs.docker_build ~push:false ~ssh_public_key ()
 
 let register_deploy_docker_registry ~tags =
   Cloud.register

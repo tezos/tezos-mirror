@@ -592,6 +592,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
           deployement = None;
         }
   | Some configurations -> (
+      let* ssh_public_key = Ssh.public_key () in
       let sorted_names =
         configurations
         |> List.map (fun Agent.Configuration.{name; _} -> name)
@@ -635,14 +636,16 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
             orchestrator ?alerts ?tasks deployement f
         | `Localhost ->
             (* The scenario is executed locally and the VM are on the host machine. *)
-            let* () = Jobs.docker_build ~push:false () in
+            let* () = Jobs.docker_build ~push:false ~ssh_public_key () in
             let* deployement = Deployement.deploy ~configurations in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
         | `Cloud ->
             (* The scenario is executed locally and the VMs are on the cloud. *)
             let* () = Jobs.deploy_docker_registry () in
-            let* () = Jobs.docker_build ~push:Env.push_docker () in
+            let* () =
+              Jobs.docker_build ~push:Env.push_docker ~ssh_public_key ()
+            in
             let* deployement = Deployement.deploy ~configurations in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
@@ -651,7 +654,9 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
             let* proxy_running = try_reattach () in
             if not proxy_running then
               let* () = Jobs.deploy_docker_registry () in
-              let* () = Jobs.docker_build ~push:Env.push_docker () in
+              let* () =
+                Jobs.docker_build ~push:Env.push_docker ~ssh_public_key ()
+              in
               let* deployement = Deployement.deploy ~configurations in
               let* () = ensure_ready deployement in
               init_proxy ?proxy_files ?proxy_args deployement
