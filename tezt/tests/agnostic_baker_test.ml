@@ -212,8 +212,14 @@ let test_keep_alive =
     ~uses:(fun _ -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol ~protocol `Client () in
+  (* Provide a delegate with no voting power to avoid baking blocks with the baker
+     and the client simultaneously. *)
   let baker =
-    Agnostic_baker.create ~node_version_check_bypass:true node client
+    Agnostic_baker.create
+      ~delegates:[Constant.activator.public_key_hash]
+      ~node_version_check_bypass:true
+      node
+      client
   in
   let* () = Node.terminate node in
   (* Start the baker with no node running and no [--keep-alive], it crashes. *)
@@ -226,23 +232,38 @@ let test_keep_alive =
   let* () = Agnostic_baker.run ~extra_arguments:["--keep-alive"] baker
   and* () = wait_for_cannot_connect in
   (* Start the node. *)
-  let* () = Node.run node [] and* () = Node.wait_for_ready node in
+  let f_wait_for_chain_id () =
+    (* This is an event emitted by the baker lib. *)
+    Agnostic_baker.wait_for baker "node_chain_id.v0" (fun _json -> Some ())
+  in
+  let wait_for_chain_id = f_wait_for_chain_id () in
+  let* () = Node.run node []
+  and* () = Node.wait_for_ready node
+  and* () = wait_for_chain_id in
   (* Bake a block, the baker is connected so it'll see it. *)
-  let wait_baker_proposal =
+  let f_wait_baker_proposal () =
     (* This is an event emitted by the baker lib. *)
     Agnostic_baker.wait_for baker "new_valid_proposal.v0" (fun _json -> Some ())
   in
-  let wait_period_status =
+  let f_wait_period_status () =
     (* This is an event emitted by the agnostic baker. *)
     Agnostic_baker.wait_for baker "period_status.v0" (fun _json -> Some ())
   in
+  let wait_baker_proposal = f_wait_baker_proposal () in
+  let wait_period_status = f_wait_period_status () in
   let* () = Client.bake_for_and_wait client
   and* () = wait_baker_proposal
   and* () = wait_period_status in
   (* Kill the node now that they are connected, the baker will stay alive. *)
   let* () = Node.terminate node and* () = wait_for_cannot_connect in
   (* Redo the procedure, restart the node and wait for the block events. *)
-  let* () = Node.run node [] and* () = Node.wait_for_ready node in
+  let wait_for_chain_id = f_wait_for_chain_id () in
+  let* () = Node.run node []
+  and* () = Node.wait_for_ready node
+  and* () = wait_for_chain_id in
+
+  let wait_baker_proposal = f_wait_baker_proposal () in
+  let wait_period_status = f_wait_period_status () in
   let* () = Client.bake_for_and_wait client
   and* () = wait_baker_proposal
   and* () = wait_period_status in

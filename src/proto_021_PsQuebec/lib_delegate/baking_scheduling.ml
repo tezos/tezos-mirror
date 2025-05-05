@@ -982,6 +982,7 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let*! () = Events.emit Baking_events.Node_rpc.chain_id chain_id in
   let* constants =
     match constants with
     | Some c -> return c
