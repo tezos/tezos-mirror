@@ -533,7 +533,7 @@ let partition_consensus_operations_on_reproposal consensus_operations =
             eligible_attestations,
             eligible_preattestations,
             other_operations )
-      | Single (Attestation {dal_content = None; _}), Some (Bls _) ->
+      | Single (Attestation _), Some (Bls _) ->
           let op : Kind.attestation Operation.t = {shell; protocol_data} in
           let eligible_attestations = op :: eligible_attestations in
           ( attestations_aggregate_opt,
