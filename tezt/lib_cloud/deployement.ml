@@ -296,6 +296,154 @@ module Remote = struct
       Lwt.return_unit)
 end
 
+(* Deployment on a SSH reachable host. At this moment, it is expected to be a
+   debian bookworm, and apt must be executable by the user connecting with sudo.
+   At this moment, this deployment launches a proxy mode docker. *)
+module Ssh_host = struct
+  type t = {point : string * string * int; agents : Agent.t list}
+
+  let deploy_proxy runner =
+    let configuration = Proxy.make_config () in
+    let next_available_port =
+      let cpt = ref 30_000 in
+      fun () ->
+        incr cpt ;
+        !cpt
+    in
+    let name = configuration.name in
+    let* docker_image =
+      Agent.Configuration.uri_of_docker_image configuration.vm.docker_image
+    in
+    (* Remove any existing proxy first *)
+    let* () = Docker.rm ~runner ~force:true name |> Process.check in
+    (* Prepare the arguments for docker run *)
+    let ssh_listening_port = next_available_port () in
+    let guest_port = string_of_int ssh_listening_port in
+    let publish_ports = (guest_port, guest_port, guest_port, guest_port) in
+    let volumes =
+      [
+        ("/var/run/docker.sock", "/var/run/docker.sock");
+        ("/tmp/prometheus", "/tmp/prometheus");
+        ("/tmp/website", "/tmp/website");
+        ("/tmp/grafana", "/tmp/grafana");
+        ("/tmp/alert_manager", "/tmp/alert_manager");
+        ("/tmp/otel", "/tmp/otel");
+      ]
+    in
+    let* () =
+      Docker.run
+        ~runner
+        ~rm:true
+        ~detach:true
+        ~network:"host"
+        ~volumes
+        ~publish_ports
+        ~name
+        docker_image
+        ["-D"; "-p"; guest_port]
+      |> Process.check
+    in
+    let agent =
+      Agent.make
+        ~vm_name:None
+        ~configuration
+        ~next_available_port
+        ~point:(Runner.address (Some runner), ssh_listening_port)
+        ~ssh_id:(Env.ssh_private_key_filename ())
+        ~process_monitor:None
+        ()
+    in
+    Lwt.return agent
+
+  let _deploy ~user ~host ~port ~(configurations : Agent.Configuration.t list)
+      () =
+    let proxy_runner =
+      Runner.create ~ssh_user:"root" ~ssh_port:port ~address:host ()
+    in
+    (* Deploys the proxy *)
+    let* proxy = deploy_proxy proxy_runner in
+    (* Deploys all agents *)
+    let* agents =
+      Lwt_list.mapi_p
+        (fun i (configuration : Agent.Configuration.t) ->
+          let* docker_image =
+            Agent.Configuration.uri_of_docker_image
+              configuration.vm.docker_image
+          in
+          let ssh_port = Agent.next_available_port proxy in
+          (* FIXME move this constants elsewhere *)
+          let base_port = 30_050 in
+          let range = 50 in
+          let runner =
+            Runner.create ~ssh_user:user ~ssh_port:port ~address:host ()
+          in
+          let publish_ports =
+            ( string_of_int (base_port + (i * range)),
+              string_of_int (base_port + ((i + 1) * range) - 1),
+              string_of_int (base_port + (i * range)),
+              string_of_int (base_port + ((i + 1) * range) - 1) )
+          in
+          let* () =
+            Docker.run
+              ~runner
+              ~detach:true
+              ~publish_ports
+              ~network:"host"
+              ~name:configuration.name
+              docker_image
+              [
+                "--entrypoint";
+                "/usr/bin/sshd";
+                "-D";
+                "-p";
+                string_of_int ssh_port;
+                "-e";
+              ]
+            |> Process.check
+          in
+          let () =
+            Log.warn
+              "Deployed agent: %s on (%s, %d)"
+              configuration.name
+              host
+              ssh_port
+          in
+          let agent =
+            Agent.make
+              ~vm_name:None
+              ~configuration
+              ~next_available_port:
+                (let cpt = ref (base_port + (i * range)) in
+                 fun () ->
+                   incr cpt ;
+                   !cpt)
+              ~process_monitor:None
+              ~point:(host, ssh_port)
+              ~ssh_id:(Env.ssh_private_key_filename ())
+              ()
+          in
+          Lwt.return agent)
+        configurations
+    in
+    let agents = proxy :: agents in
+    Lwt.return {point = (user, host, port); agents}
+
+  let _agents t = t.agents
+
+  let _terminate {point; agents} =
+    let _user, host, port = point in
+    let* () =
+      Lwt_list.iter_p
+        (fun agent ->
+          let name = Agent.name agent in
+          let runner = Runner.create ~ssh_port:port ~address:host () in
+          let* _ = Docker.rm ~runner name |> Process.check in
+          Lwt.return_unit)
+        agents
+    in
+    Lwt.return_unit
+end
+
 (* Infrastructure to deploy locally using Docker *)
 module Localhost = struct
   type t = {
