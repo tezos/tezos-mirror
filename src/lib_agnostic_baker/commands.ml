@@ -26,10 +26,8 @@ let baker_commands =
            directory_parameter
       @@ sources_param)
       (fun args data_dir sources cctxt ->
-        let node_endpoint = Run_args.get_endpoint (Array.to_list Sys.argv) in
         let args = Configuration.create_config args in
         Daemon.Baker.run
-          ~node_endpoint
           ~keep_alive:args.keep_alive
           ~command:(Daemon.Run_with_local_node {data_dir; args; sources})
           cctxt);
@@ -39,10 +37,8 @@ let baker_commands =
       baker_args
       (prefixes ["run"; "remotely"] @@ sources_param)
       (fun args sources cctxt ->
-        let node_endpoint = Run_args.get_endpoint (Array.to_list Sys.argv) in
         let args = Configuration.create_config args in
         Daemon.Baker.run
-          ~node_endpoint
           ~keep_alive:args.keep_alive
           ~command:(Daemon.Run_remotely {args; sources})
           cctxt);
@@ -52,9 +48,7 @@ let baker_commands =
       (args2 pidfile_arg keep_alive_arg)
       (prefixes ["run"; "vdf"] @@ stop)
       (fun (pidfile, keep_alive) cctxt ->
-        let node_endpoint = Run_args.get_endpoint (Array.to_list Sys.argv) in
         Daemon.Baker.run
-          ~node_endpoint
           ~keep_alive
           ~command:(Daemon.Run_vdf {pidfile; keep_alive})
           cctxt);
@@ -64,9 +58,7 @@ let baker_commands =
       (args3 pidfile_arg preserved_levels_arg keep_alive_arg)
       (prefixes ["run"; "accuser"] @@ stop)
       (fun (pidfile, preserved_levels, keep_alive) cctxt ->
-        let node_endpoint = Run_args.get_endpoint (Array.to_list Sys.argv) in
         Daemon.Baker.run
-          ~node_endpoint
           ~keep_alive
           ~command:(Daemon.Run_accuser {pidfile; preserved_levels; keep_alive})
           cctxt);
@@ -88,9 +80,7 @@ let accuser_commands =
       (args3 pidfile_arg preserved_levels_arg keep_alive_arg)
       (prefix "run" @@ stop)
       (fun (pidfile, preserved_levels, keep_alive) cctxt ->
-        let node_endpoint = Run_args.get_endpoint (Array.to_list Sys.argv) in
         Daemon.Accuser.run
-          ~node_endpoint
           ~keep_alive
           ~command:(Daemon.Run_accuser {pidfile; preserved_levels; keep_alive})
           cctxt);

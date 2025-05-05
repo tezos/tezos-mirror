@@ -22,7 +22,6 @@ module type AGNOSTIC_DAEMON = sig
   type command
 
   val run :
-    node_endpoint:string ->
     keep_alive:bool ->
     command:command ->
     Tezos_client_base.Client_context.full ->
@@ -429,11 +428,11 @@ module Make_daemon (Agent : AGENT) :
         Agnostic_baker_profiler.init profiler_maker
     | None -> ()
 
-  let run ~node_endpoint ~keep_alive ~command cctxt =
+  let run ~keep_alive ~command cctxt =
     let open Lwt_result_syntax in
     let state =
       {
-        node_endpoint;
+        node_endpoint = Uri.to_string cctxt#base;
         current_baker = None;
         old_baker = None;
         keep_alive;
