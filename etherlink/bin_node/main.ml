@@ -889,7 +889,7 @@ let websocket_checks config =
       Internal_event.Simple.emit Event.buggy_dream_websocket () |> Lwt_result.ok
   | _ -> Lwt_result_syntax.return_unit
 
-let make_event_config ~verbosity ?daily_logs_path ?daily_log_basename () =
+let make_event_config ~verbosity ?daily_logs_path () =
   let open Tezos_event_logging.Internal_event in
   let open Tezos_base_unix.Internal_event_unix in
   let open Tezos_base.Internal_event_config in
@@ -911,9 +911,7 @@ let make_event_config ~verbosity ?daily_logs_path ?daily_log_basename () =
           ("rpc_server", Some Fatal);
         ]
       in
-      let daily_log_file =
-        Option.value ~default:"daily" daily_log_basename ^ ".log"
-      in
+      let daily_log_file = "daily.log" in
       let uri =
         make_config_uri
           ~create_dirs:true
@@ -931,19 +929,17 @@ let make_event_config ~verbosity ?daily_logs_path ?daily_log_basename () =
 let init_logs ~daily_logs ?rpc_mode_port ~data_dir configuration =
   let open Tezos_base_unix.Internal_event_unix in
   let daily_logs_path =
-    if daily_logs then Some Filename.Infix.(data_dir // "daily_logs") else None
-  in
-  let daily_log_basename =
-    Option.map
-      (fun port -> "rpc-" ^ string_of_int port ^ "-daily")
-      rpc_mode_port
+    if daily_logs then
+      match rpc_mode_port with
+      | Some port ->
+          Some
+            Filename.Infix.(
+              data_dir // ("daily_logs_rpc_" ^ string_of_int port))
+      | None -> Some Filename.Infix.(data_dir // "daily_logs")
+    else None
   in
   let config =
-    make_event_config
-      ~verbosity:configuration.verbose
-      ?daily_logs_path
-      ?daily_log_basename
-      ()
+    make_event_config ~verbosity:configuration.verbose ?daily_logs_path ()
   in
   init ~config ()
 

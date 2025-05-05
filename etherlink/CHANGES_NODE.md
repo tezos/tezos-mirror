@@ -36,6 +36,13 @@ you start using them, you probably want to use `octez-evm-node check config
 - The event for the rpc mode when forwarding transaction was
   incorrectly named "forwarding_error`. It's now renamed
   "forward_transaction".(!17910)
+- The daily logs of the experimental RPC node are written in a
+  different directory prefixed by "rpc-<port>", and not in the same
+  log directory as the main node. Since V0.23 the daily log of the rpc
+  node was written in the same directory, because how dailylogs works
+  the log of the main node "dailylog-<date>.log" were deleted. If you
+  used an rpc EVM node v0.22 or later, please delete files prefixed
+  with "rpc-<port>-" from "<evm-node-datadir>/dailylogs/". (!17923)
 
 ## Version 0.24 (2025-04-30)
 
