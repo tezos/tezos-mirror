@@ -32,7 +32,6 @@ use crate::pvm::PvmLayout;
 use crate::pvm::PvmStatus;
 use crate::range_utils::bound_saturating_sub;
 use crate::state_backend::AllocatedOf;
-use crate::state_backend::CommitmentLayout;
 use crate::state_backend::FnManagerIdent;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerReadWrite;
@@ -137,18 +136,10 @@ impl<MC: MemoryConfig, CL: CacheLayouts> PvmStepper<'_, MC, CL, Owned> {
         // Step using the proof mode stepper in order to obtain the proof
         let mut proof_stepper = self.start_proof_mode();
 
-        proof_stepper.try_step().then(|| {
-            let refs = proof_stepper.struct_ref();
-            let merkle_proof = PvmLayout::<MC, CL>::to_merkle_tree(refs)
-                .expect("Obtaining the Merkle tree of a proof-gen state should not fail")
-                .to_merkle_proof()
-                .expect("Converting a Merkle tree to a compressed Merkle proof should not fail");
+        proof_stepper.try_step().then_some(())?;
 
-            let refs = proof_stepper.struct_ref();
-            let final_hash = PvmLayout::<MC, CL>::state_hash(refs)
-                .expect("Obtaining the final hash of the proof-gen state should not fail");
-            Proof::new(merkle_proof, final_hash)
-        })
+        let proof = proof_stepper.pvm.to_proof().ok()?;
+        Some(proof)
     }
 }
 
