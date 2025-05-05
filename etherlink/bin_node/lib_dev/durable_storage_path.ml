@@ -32,6 +32,8 @@ let chain_id = EVM.make "/chain_id"
 
 let minimum_base_fee_per_gas = World_state.make "/fees/minimum_base_fee_per_gas"
 
+let backlog = World_state.make "/fees/backlog"
+
 let da_fee_per_byte = World_state.make "/fees/da_fee_per_byte"
 
 let kernel_version = EVM.make "/kernel_version"

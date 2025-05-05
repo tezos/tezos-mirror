@@ -322,6 +322,21 @@ let base_fee_per_gas read =
         "Attempted to get the base fee per gas from a block which does not \
          have one."
 
+let backlog read =
+  let open Lwt_result_syntax in
+  let+ read_result = read Durable_storage_path.backlog in
+  match read_result with
+  | Some backlog_bytes ->
+      Z.of_int64_unsigned
+        Data_encoding.(Binary.of_bytes_exn Little_endian.int64 backlog_bytes)
+  | None -> Z.zero
+
+let minimum_base_fee_per_gas read =
+  inspect_durable_and_decode
+    read
+    Durable_storage_path.minimum_base_fee_per_gas
+    Helpers.decode_z_le
+
 let kernel_version read =
   inspect_durable_and_decode
     read
@@ -459,6 +474,21 @@ module Make (Reader : READER) = struct
     let open Lwt_result_syntax in
     let* read = read_with_state () in
     base_fee_per_gas read
+
+  let backlog () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    backlog read
+
+  let minimum_base_fee_per_gas () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    minimum_base_fee_per_gas read
+
+  let storage_version () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    storage_version read
 
   let kernel_version () =
     let open Lwt_result_syntax in
