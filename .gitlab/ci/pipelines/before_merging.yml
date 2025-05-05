@@ -2632,6 +2632,7 @@ test_kernels:
     - kernels.mk
     - sdk/rust/**/*
     - src/kernel_*/**/*
+    - src/riscv/**/*
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64

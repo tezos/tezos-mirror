@@ -520,7 +520,8 @@ let changeset_test_kernels =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
-    @ make ["kernels.mk"; "src/kernel_*/**/*"; "sdk/rust/**/*"])
+    @ make
+        ["kernels.mk"; "src/kernel_*/**/*"; "src/riscv/**/*"; "sdk/rust/**/*"])
 
 let changeset_test_etherlink_kernel =
   Changeset.(
