@@ -74,6 +74,7 @@ module Consensus = struct
     | Preattestation
     | Attestation
     | Attestations_aggregate
+    | Preattestations_aggregate
 
   let consensus_operation_kind_encoding =
     Data_encoding.string_enum
@@ -81,12 +82,15 @@ module Consensus = struct
         ("Preattestation", Preattestation);
         ("Attestation", Attestation);
         ("Attestations_aggregate", Attestations_aggregate);
+        ("Preattestations_aggregate", Preattestations_aggregate);
       ]
 
   let consensus_operation_kind_pp fmt = function
     | Preattestation -> Format.fprintf fmt "Preattestation"
     | Attestation -> Format.fprintf fmt "Attestation"
     | Attestations_aggregate -> Format.fprintf fmt "Attestations_aggregate"
+    | Preattestations_aggregate ->
+        Format.fprintf fmt "Preattestations_aggregate"
 
   (** Errors for preattestation and attestation. *)
   type error +=

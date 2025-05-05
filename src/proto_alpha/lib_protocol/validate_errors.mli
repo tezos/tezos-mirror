@@ -39,6 +39,7 @@ module Consensus : sig
     | Preattestation
     | Attestation
     | Attestations_aggregate
+    | Preattestations_aggregate
 
   (** Errors for preattestations and attestations. *)
   type error +=

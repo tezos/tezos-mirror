@@ -73,6 +73,7 @@ type consensus_state = {
   preattestations_seen : Operation_hash.t Consensus_conflict_map.t;
   attestations_seen : Operation_hash.t Consensus_conflict_map.t;
   attestations_aggregate_seen : Operation_hash.t option;
+  preattestations_aggregate_seen : Operation_hash.t option;
 }
 
 let consensus_conflict_map_encoding =
@@ -95,22 +96,36 @@ let consensus_state_encoding =
               preattestations_seen;
               attestations_seen;
               attestations_aggregate_seen;
+              preattestations_aggregate_seen;
             } ->
-         (preattestations_seen, attestations_seen, attestations_aggregate_seen))
+         ( preattestations_seen,
+           attestations_seen,
+           attestations_aggregate_seen,
+           preattestations_aggregate_seen ))
        (fun ( preattestations_seen,
               attestations_seen,
-              attestations_aggregate_seen ) ->
-         {preattestations_seen; attestations_seen; attestations_aggregate_seen})
-       (obj3
+              attestations_aggregate_seen,
+              preattestations_aggregate_seen ) ->
+         {
+           preattestations_seen;
+           attestations_seen;
+           attestations_aggregate_seen;
+           preattestations_aggregate_seen;
+         })
+       (obj4
           (req "preattestations_seen" consensus_conflict_map_encoding)
           (req "attestations_seen" consensus_conflict_map_encoding)
-          (req "attestations_aggregate_seen" (option Operation_hash.encoding)))
+          (req "attestations_aggregate_seen" (option Operation_hash.encoding))
+          (req
+             "preattestations_aggregate_seen"
+             (option Operation_hash.encoding)))
 
 let empty_consensus_state =
   {
     preattestations_seen = Consensus_conflict_map.empty;
     attestations_seen = Consensus_conflict_map.empty;
     attestations_aggregate_seen = None;
+    preattestations_aggregate_seen = None;
   }
 
 type voting_state = {
@@ -1167,11 +1182,43 @@ module Consensus = struct
     in
     return {info; operation_state; block_state}
 
+  let check_preattestations_aggregate_conflict vs oph =
+    match vs.consensus_state.preattestations_aggregate_seen with
+    | None -> ok_unit
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
+
+  let wrap_preattestations_aggregate_conflict = function
+    | Ok () -> ok_unit
+    | Error conflict ->
+        result_error
+          Validate_errors.Consensus.(
+            Conflicting_consensus_operation
+              {kind = Preattestations_aggregate; conflict})
+
+  let add_preattestations_aggregate operation_state oph =
+    {
+      operation_state with
+      consensus_state =
+        {
+          operation_state.consensus_state with
+          preattestations_aggregate_seen = Some oph;
+        };
+    }
+
   let handle_preattestations_aggregate_conflicts
       {info; operation_state; block_state} oph
       ({shell; protocol_data = {contents = Single content; _}} :
         Kind.preattestations_aggregate operation) =
     let open Lwt_result_syntax in
+    (* Check that no other Preattestations_aggregate operation was previously
+       recorded in the operation state *)
+    let*? () =
+      check_preattestations_aggregate_conflict operation_state oph
+      |> wrap_preattestations_aggregate_conflict
+    in
+    (* Record the aggregate in the operation state *)
+    let operation_state = add_preattestations_aggregate operation_state oph in
     (* Check for preattestations conflicts and register each operation in the
        operation state *)
     let (Preattestations_aggregate {consensus_content; committee}) = content in
