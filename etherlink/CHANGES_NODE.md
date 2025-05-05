@@ -1,17 +1,21 @@
 # Changelog
 
-## Unreleased
+## Version 0.25 (2025-05-05)
 
-### Breaking changes
+This is a hot fix release to improve end-user experience with `eth_gasPrice` and
+fix an issue with daily logs rotation.
 
-### Configuration changes
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+If you used an EVM node v0.22 or later using the experimental RPC mode please
+delete the log files prefixed with `rpc-<port>-` from
+`<evm-node-datadir>/dailylogs/`.
 
 ### RPCs changes
 
 - Changes `eth_gasPrice` to make it more resilient to gas price changes. The
   RPC will now anticipate gas price increases. (!17921)
-
-### Metrics changes
 
 ### Command-line interface changes
 
@@ -19,12 +23,6 @@
   emitted by the kernel. Note that printing kernel logs to the standard output
   still requires to set the `RUST_LOG` environment variable to
   `octez_evm_node_wasm_runtime::write_debug=trace`. (!17909)
-
-### Execution changes
-
-### Storage changes
-
-### Documentation changes
 
 ### Experimental features changes
 
@@ -34,15 +32,15 @@ you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
 
 - The event for the rpc mode when forwarding transaction was
-  incorrectly named "forwarding_error`. It's now renamed
-  "forward_transaction".(!17910)
+  incorrectly named `forwarding_error`. It's now renamed
+  `forward_transaction`. (!17910)
 - The daily logs of the experimental RPC node are written in a
-  different directory prefixed by "rpc-<port>", and not in the same
-  log directory as the main node. Since V0.23 the daily log of the rpc
-  node was written in the same directory, because how dailylogs works
-  the log of the main node "dailylog-<date>.log" were deleted. If you
-  used an rpc EVM node v0.22 or later, please delete files prefixed
-  with "rpc-<port>-" from "<evm-node-datadir>/dailylogs/". (!17923)
+  different directory prefixed by `rpc-<port>`, and not in the same
+  log directory as the main node. Since v0.23 the daily logs of the RPC
+  node was written in the same directory, and the log files of the main node
+  `dailylog-<date>.log` were incorrectly deleted on rotation. If you
+  used an RPC EVM node v0.22 or later, please delete files prefixed
+  with `rpc-<port>-` from `<evm-node-datadir>/dailylogs/`. (!17923)
 
 ## Version 0.24 (2025-04-30)
 
