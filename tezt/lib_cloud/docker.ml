@@ -78,7 +78,13 @@ let run ?(rm = false) ?name ?network ?publish_ports image args =
 
 let kill container_name = Process.spawn ~color "docker" ["kill"; container_name]
 
-let rm container_name = Process.spawn ~color "docker" ["rm"; container_name]
+let rm ?runner ?(force = false) container_name =
+  Log.info "Docker.rm '%s'" container_name ;
+  Process.spawn
+    ?runner
+    ~color
+    "docker"
+    (["rm"] @ (if force then ["--force"] else []) @ [container_name])
 
 let cp container_name ~kind ~source ~destination =
   match kind with

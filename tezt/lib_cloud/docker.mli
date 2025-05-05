@@ -61,7 +61,7 @@ val run :
 val kill : string -> Process.t
 
 (** [rm] is an alias for [docker rm]. *)
-val rm : string -> Process.t
+val rm : ?runner:Runner.t -> ?force:bool -> string -> Process.t
 
 (** [cp] is an alias for [docker cp]. *)
 val cp :
