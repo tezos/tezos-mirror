@@ -135,6 +135,22 @@ pub enum EthereumError {
     Tracer(#[from] tracer::Error),
 }
 
+#[macro_export]
+macro_rules! impl_wrap_error {
+    ($source:path) => {
+        impl From<$source> for EthereumError {
+            fn from(e: $source) -> Self {
+                EthereumError::WrappedError(std::borrow::Cow::from(format!("{:?}", e)))
+            }
+        }
+    };
+}
+
+impl_wrap_error!(tezos_smart_rollup_host::path::PathError);
+impl_wrap_error!(tezos_smart_rollup_host::runtime::RuntimeError);
+impl_wrap_error!(rlp::DecoderError);
+impl_wrap_error!(evm::ExitError);
+
 fn trace_outcome<Host: Runtime>(
     handler: EvmHandler<Host>,
     is_success: bool,

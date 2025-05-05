@@ -1345,12 +1345,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         #[cfg(feature = "benchmark-opcodes")]
         benchmarks::start_precompile_section(self.host, address, &input);
 
-        if let Err(err) = self.reentrancy_guard.begin_precompile_call(&address) {
-            return Ok((
-                ExitReason::Fatal(evm::ExitFatal::CallErrorAsFatal(err)),
-                None,
-                vec![],
-            ));
+        if let Err(reason) = self.reentrancy_guard.begin_precompile_call(&address) {
+            return Ok((ExitReason::Revert(ExitRevert::Reverted), None, reason));
         }
 
         let precompile_execution_result = self.precompiles.execute(

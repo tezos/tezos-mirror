@@ -126,6 +126,18 @@ alloy_sol_types::sol! {
     );
 }
 
+#[derive(Debug, PartialEq)]
+pub struct SystemFaDeposit {
+    /// Original ticket transfer amount
+    pub amount: U256,
+    /// Final deposit receiver address on L2
+    pub receiver: H160,
+    /// Optional proxy contract address on L2 (ERC wrapper)
+    pub proxy: Option<H160>,
+    /// Digest of the pair (ticketer address + ticket content)
+    pub ticket_hash: H256,
+}
+
 /// Withdrawal structure parsed from the precompile calldata
 #[derive(Debug, PartialEq)]
 pub struct FaWithdrawal {

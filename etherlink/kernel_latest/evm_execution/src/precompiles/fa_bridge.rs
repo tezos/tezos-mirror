@@ -10,10 +10,13 @@
 //! This is a stateful precompile:
 //!     * Alters ticket table (changes balance)
 //!     * Increments outbox counter
+use crate::fa_bridge::claim_fa_deposit;
 use crate::fa_bridge::withdrawal::FaFastWithdrawal;
 use crate::fa_bridge::FaWithdrawalKind::{Fast, Standard};
 use crate::fast_fa_withdrawals_enabled;
+use crate::utilities::alloy::alloy_to_u256;
 use crate::EthereumError;
+use alloy_sol_types::SolEvent;
 use evm::{Context, Handler, Transfer};
 use primitive_types::{H160, U256};
 use tezos_evm_runtime::runtime::Runtime;
@@ -79,15 +82,16 @@ macro_rules! precompile_outcome_error {
     };
 }
 
-/// FA bridge precompile entrypoint.
-#[allow(unused)]
-pub fn fa_bridge_precompile<Host: Runtime>(
+alloy_sol_types::sol! {
+    event SolClaimInput (
+        uint256 deposit_id,
+    );
+}
+
+pub fn guard_withdrawals<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
-    context: &Context,
-    is_static: bool,
-    transfer: Option<Transfer>,
-) -> Result<PrecompileOutcome, EthereumError> {
+) -> Option<PrecompileOutcome> {
     // We register the cost of the precompile early to prevent cases where inner proxy call
     // consumes more ticks than allowed.
     let estimated_ticks = FA_WITHDRAWAL_PRECOMPILE_TICKS_SLOPE * (input.len() as u64)
@@ -98,15 +102,23 @@ pub fn fa_bridge_precompile<Host: Runtime>(
     // and added FA withdrawal cost (spam prevention measure).
     let estimated_gas_cost = estimate_gas_cost(estimated_ticks, handler.gas_price());
     if handler.record_cost(estimated_gas_cost).is_err() {
-        return Ok(precompile_outcome_error!(
+        return Some(precompile_outcome_error!(
             "FA withdrawal: gas limit too low"
         ));
     }
 
+    None
+}
+
+pub fn guard_invalid_call(
+    context: &Context,
+    is_static: bool,
+    transfer: Option<Transfer>,
+) -> Option<PrecompileOutcome> {
     if is_static {
         // It is a STATICCALL that prevents storage modification
         // see https://eips.ethereum.org/EIPS/eip-214
-        return Ok(precompile_outcome_error!(
+        return Some(precompile_outcome_error!(
             "FA withdrawal: static call not allowed"
         ));
     }
@@ -114,7 +126,7 @@ pub fn fa_bridge_precompile<Host: Runtime>(
     if context.address != FA_BRIDGE_PRECOMPILE_ADDRESS {
         // It is a DELEGATECALL or CALLCODE (deprecated) which can be impersonating
         // see https://eips.ethereum.org/EIPS/eip-7
-        return Ok(precompile_outcome_error!(
+        return Some(precompile_outcome_error!(
             "FA withdrawal: delegate call not allowed"
         ));
     }
@@ -124,15 +136,35 @@ pub fn fa_bridge_precompile<Host: Runtime>(
         .map(|t| !t.value.is_zero())
         .unwrap_or(true)
     {
-        return Ok(precompile_outcome_error!(
+        return Some(precompile_outcome_error!(
             "FA withdrawal: unexpected value transfer {:?}",
             transfer
         ));
     }
 
+    None
+}
+
+/// FA bridge precompile entrypoint.
+#[allow(unused)]
+pub fn fa_bridge_precompile<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    input: &[u8],
+    context: &Context,
+    is_static: bool,
+    transfer: Option<Transfer>,
+) -> Result<PrecompileOutcome, EthereumError> {
+    if let Some(outcome) = guard_invalid_call(context, is_static, transfer) {
+        return Ok(outcome);
+    }
+
     match input {
         // "withdraw"'s selector | 4 first bytes of keccak256("withdraw(address,bytes,uint256,bytes22,bytes)")
         [0x80, 0xfc, 0x1f, 0xe3, input_data @ ..] => {
+            if let Some(outcome) = guard_withdrawals(handler, input) {
+                return Ok(outcome);
+            }
+
             // Withdrawal initiator is the precompile caller.
             // NOTE that since we deny delegate calls, it can either be EOA or
             // a smart contract that calls the precompile directly (e.g. AA wallet).
@@ -151,6 +183,10 @@ pub fn fa_bridge_precompile<Host: Runtime>(
 
         // "fast withdrawal"'s selector | 4 first bytes of keccak256("fa_fast_withdraw(address,bytes,uint256,bytes22,bytes,string,bytes)")
         [0xff, 0xf7, 0xca, 0x5f, input_data @ ..] => {
+            if let Some(outcome) = guard_withdrawals(handler, input) {
+                return Ok(outcome);
+            }
+
             if !fast_fa_withdrawals_enabled(handler.host) {
                 return Ok(precompile_outcome_error!(
                     "Fast FA withdrawal: parsing failed w/ `The fast FA withdrawal
@@ -174,6 +210,18 @@ pub fn fa_bridge_precompile<Host: Runtime>(
                 }
             }
         }
+        // "claim"'s selector | 4 first bytes of keccak256("claim(uint256)")
+        [0x37, 0x96, 0x07, 0xf5, input_data @ ..] => {
+            match SolClaimInput::abi_decode_data(input_data, true) {
+                Err(err) => Ok(precompile_outcome_error!(
+                    "Claim FA deposit: parsing failed w/ `{err}`"
+                )),
+                Ok(deposit_id) => {
+                    let id = alloy_to_u256(&deposit_id.0);
+                    claim_fa_deposit(handler, id)
+                }
+            }
+        }
         _ => Ok(precompile_outcome_error!(
             "FA withdrawal: unexpected selector"
         )),
@@ -182,7 +230,7 @@ pub fn fa_bridge_precompile<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use std::{borrow::Cow, str::FromStr};
+    use std::str::FromStr;
 
     use alloy_sol_types::SolCall;
     use evm::ExitError;
@@ -548,11 +596,19 @@ mod tests {
             false,
             false,
         );
+
+        /// Raw encoding of "Call to target contract failed" revert output from 'ReentrancyTester.sol'
+        pub const CALL_TO_TARGET_CONTRACT_FAILED: [u8; 100] = [
+            8, 195, 121, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 67, 97, 108, 108,
+            32, 116, 111, 32, 116, 97, 114, 103, 101, 116, 32, 99, 111, 110, 116, 114,
+            97, 99, 116, 32, 102, 97, 105, 108, 101, 100, 0, 0,
+        ];
+
         assert_eq!(
             outcome.result,
-            ExecutionResult::FatalError(evm::ExitFatal::CallErrorAsFatal(
-                ExitError::Other(Cow::from("Circular calls are not allowed"))
-            ))
+            ExecutionResult::CallReverted(CALL_TO_TARGET_CONTRACT_FAILED.to_vec())
         );
 
         let outcome = execute_precompile(

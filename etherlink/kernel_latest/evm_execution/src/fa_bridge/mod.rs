@@ -33,19 +33,26 @@
 //! using the transactional Eth account storage, so that they are discarded
 //! in case of a revert/failure.
 
-use std::borrow::Cow;
-
+use crate::account_storage::EthereumAccount;
 use crate::fa_bridge::withdrawal::FaFastWithdrawal;
 use crate::fa_bridge::withdrawal::FaWithdrawalMethods;
 use crate::handler::trace_call;
 use crate::withdrawal_counter::WithdrawalCounter;
 use deposit::FaDeposit;
+use deposit::FaDepositWithProxy;
 use enum_dispatch::enum_dispatch;
 use evm::CallScheme;
 use evm::Capture;
+use evm::ExitRevert;
 use evm::{Config, ExitReason};
+use host::path;
+use host::path::OwnedPath;
+use host::path::RefPath;
+use host::runtime::RuntimeError;
 use primitive_types::H256;
 use primitive_types::{H160, U256};
+use rlp::Decodable;
+use rlp::Rlp;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::Log;
 use tezos_evm_logging::{
@@ -77,22 +84,7 @@ mod tests;
 #[cfg(any(test, feature = "fa_bridge_testing"))]
 pub mod test_utils;
 
-/// Gas limit for calling "deposit" method of the proxy contract call.
-/// Since we cannot control a particular destination,
-/// we need to make sure there's no DoS attack vector.
-///
-/// Current value reflects roughly the fees paid on L1 for initiating
-/// the deposit. Since only smart contracts can mint tickets and send
-/// internal inbox messages, the lower bound for a single deposit is
-/// approximately 0.0005ꜩ; assuming current price per L2 gas of 1 Gwei
-/// the equivalent amount of gas is 0.0005 * 10^18 / 10^9 = 500_000
-///
-/// Multiplying by two to enable more involved proxy contract implementations.
-///
-/// /!\ Note that if the EVM gas changes over future upgrades, we might break
-/// compatibility with contract relying on this gas limit. If the EVM consumes
-/// more gas in the future, we need to increase this gas limit as well. /!\
-pub const FA_DEPOSIT_PROXY_GAS_LIMIT: u64 = 1_000_000;
+pub const FA_DEPOSIT_QUEUE_GAS_LIMIT: u64 = 0;
 
 /// Overapproximation of the amount of ticks for updating
 /// the global ticket table and emitting deposit event.
@@ -130,6 +122,73 @@ pub enum FaWithdrawalKind {
     Fast(FaFastWithdrawal),
 }
 
+const DEPOSIT_QUEUE_TABLE: RefPath = RefPath::assert_from(b"/deposits_table");
+
+fn deposit_path(
+    system: &EthereumAccount,
+    withdrawal_id: &U256,
+) -> Result<OwnedPath, EthereumError> {
+    path::concat(
+        &system.custom_path(&DEPOSIT_QUEUE_TABLE)?,
+        &RefPath::assert_from(format!("/{}", withdrawal_id).as_bytes()),
+    )
+    .map_err(EthereumError::from)
+}
+
+fn read_deposit_from_queue<Host: Runtime>(
+    host: &Host,
+    system: &EthereumAccount,
+    deposit_id: &U256,
+) -> Result<Option<FaDepositWithProxy>, EthereumError> {
+    let deposit_path = deposit_path(system, deposit_id)?;
+    let raw_deposit = host.store_read_all(&deposit_path);
+
+    match raw_deposit {
+        Ok(bytes) => FaDepositWithProxy::decode(&Rlp::new(&bytes))
+            .map(Some)
+            .map_err(EthereumError::from),
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(other) => Err(EthereumError::from(other)),
+    }
+}
+
+fn remove_deposit<Host>(
+    host: &mut Host,
+    system: &EthereumAccount,
+    withdrawal_id: &U256,
+) -> Result<(), EthereumError>
+where
+    Host: Runtime,
+{
+    host.store_delete_value(&deposit_path(system, withdrawal_id)?)
+        .map_err(EthereumError::from)
+}
+
+fn precompile_outcome_from_deposit_result<Host>(
+    host: &mut Host,
+    result: Result<(ExitReason, Option<H160>, Vec<u8>), EthereumError>,
+) -> Result<PrecompileOutcome, EthereumError>
+where
+    Host: Runtime,
+{
+    result
+        .inspect_err(|err| {
+            // This is really problematic but should never happen; the ticket has been lost.
+            // Needs an update to unlock.
+            log!(
+                host,
+                Error,
+                "FA deposit failed: couldn't even move the tickets into the ticket table {err:?}"
+            );
+        })
+        .map(|(exit_status, _, output)| PrecompileOutcome {
+            exit_status,
+            output,
+            withdrawals: vec![],
+            estimated_ticks: 0,
+        })
+}
+
 /// Executes FA deposit.
 ///
 /// From the EVM perspective this is a "system contract" call,
@@ -141,7 +200,7 @@ pub enum FaWithdrawalKind {
 /// account storage transaction, and we can open one.
 #[allow(clippy::too_many_arguments)]
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn execute_fa_deposit<'a, Host: Runtime>(
+pub fn queue_fa_deposit<'a, Host: Runtime>(
     host: &'a mut Host,
     block: &'a BlockConstants,
     evm_account_storage: &'a mut EthereumAccountStorage,
@@ -150,9 +209,8 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
     caller: H160,
     deposit: &FaDeposit,
     tracer_input: Option<TracerInput>,
-    gas_limit: u64,
-) -> Result<ExecutionOutcome, EthereumError> {
-    log!(host, Info, "Going to execute a {}", deposit.display());
+) -> Result<(ExecutionOutcome, Option<U256>), EthereumError> {
+    log!(host, Info, "Going to queue a {}", deposit.display());
 
     let mut handler = EvmHandler::<'_, Host>::new(
         host,
@@ -170,18 +228,63 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
             is_static: false,
             is_creation: false,
         },
-        Some(gas_limit),
+        Some(FA_DEPOSIT_QUEUE_GAS_LIMIT),
     )?;
 
-    // It's ok if internal proxy call fails, we will update the ticket table anyways.
-    let ticket_owner = if let Some(proxy) = deposit.proxy {
-        // We create an intermediate transaction layer to be able to revert what's
-        // done inside the proxy if it's meant to revert.
-        // The rest of the FA deposit logic remains the same.
+    if let Some(deposit) = deposit.to_fa_deposit_with_proxy() {
+        // Updating the ticket table in accordance with the ownership.
+        let mut system = handler.get_or_create_account(SYSTEM_ACCOUNT_ADDRESS)?;
+        let withdrawal_id =
+            system.withdrawal_counter_get_and_increment(handler.borrow_host())?;
 
-        // Create a new transaction layer with 63/64 of the remaining gas.
-        let gas_limit = handler.nested_call_gas_limit(Some(gas_limit));
+        let deposit_path = deposit_path(&system, &withdrawal_id)?;
 
+        handler
+            .host
+            .store_write_all(&deposit_path, &deposit.to_rlp_bytes())?;
+
+        handler.add_log(deposit.queued_log(&withdrawal_id))?;
+
+        let res = Ok((
+            ExitReason::Succeed(evm::ExitSucceed::Returned),
+            None,
+            Vec::new(),
+        ));
+
+        handler
+            .end_initial_transaction(res)
+            .map(|outcome| (outcome, Some(withdrawal_id)))
+    } else {
+        let deposit_res = inner_execute_deposit(&mut handler, deposit.receiver, deposit);
+
+        // Even if the proxy fails, we can't revert the transaction: we need the
+        // tickets to be moved in the ticket table.
+        if let Err(ref ticket_err) = deposit_res {
+            // This is really problematic: the ticket has been lost. Will need
+            // an update to unlock.
+            log!(
+                handler.borrow_host(),
+                Error,
+                "FA deposit failed: couldn't even move the tickets into the \
+                ticket table {ticket_err:?}"
+            );
+        }
+
+        handler
+            .end_initial_transaction(deposit_res)
+            .map(|outcome| (outcome, None))
+    }
+}
+
+#[cfg_attr(feature = "benchmark", inline(never))]
+pub fn claim_fa_deposit<Host: Runtime>(
+    handler: &mut EvmHandler<Host>,
+    deposit_id: U256,
+) -> Result<PrecompileOutcome, EthereumError> {
+    let system = handler.get_or_create_account(SYSTEM_ACCOUNT_ADDRESS)?;
+
+    if let Some(deposit) = read_deposit_from_queue(handler.host, &system, &deposit_id)? {
+        let gas_limit = handler.nested_call_gas_limit(None);
         if let Err(err) = handler.record_cost(gas_limit.unwrap_or_default()) {
             log!(
                 handler.host,
@@ -192,98 +295,101 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
                 gas_limit
             );
 
-            deposit.receiver
-        } else {
-            handler.begin_inter_transaction(
-                CallContext {
-                    is_static: false,
-                    is_creation: false,
-                },
-                gas_limit,
-            )?;
+            return Ok(PrecompileOutcome {
+                exit_status: ExitReason::Error(evm::ExitError::OutOfGas),
+                withdrawals: vec![],
+                estimated_ticks: 0,
+                output: vec![],
+            });
+        }
 
-            let gas_before = handler.gas_used();
-            let inner_result =
-                inner_execute_proxy(&mut handler, caller, proxy, deposit.calldata());
-            let gas_after = handler.gas_used();
+        handler.begin_inter_transaction(
+            CallContext {
+                is_static: false,
+                is_creation: false,
+            },
+            gas_limit,
+        )?;
 
-            // If proxy contract call succeeded, proxy becomes the owner, otherwise we fall back and
-            // set the receiver as the owner instead—except if the proxy ran out of ticks and the
-            // transaction is retriable.
-            let ticket_owner = match &inner_result {
-                Ok((exit_reason, _, _)) if exit_reason.is_succeed() => proxy,
-                Ok((exit_reason, _, _)) => {
-                    log!(
-                        handler.borrow_host(),
-                        Debug,
-                        "FA deposit: proxy call failed w/ {:?}",
-                        exit_reason
-                    );
-                    deposit.receiver
-                }
-                Err(err) => {
-                    log!(
-                    handler.borrow_host(),
-                    Error,
-                    "FA deposit: proxy call hard failed w/ {:?}, fallback to receiver: {}",
-                    err,
-                    deposit.receiver
-                );
-                    deposit.receiver
-                }
-            };
+        let gas_before = handler.gas_used();
 
-            let proxy_res = handler.end_inter_transaction::<EthereumError>(inner_result);
+        // {Note system address}
+        // For backward compatibility, we need to lie about the caller of the transaction.
+        // This is because the proxy contract already originated to the existing network
+        // assume they are called by the system address, as it was the workflow in the
+        // previous version of the bridge.
+        let inner_result = inner_execute_proxy(
+            handler,
+            SYSTEM_ACCOUNT_ADDRESS,
+            deposit.proxy,
+            deposit.calldata(),
+        );
+        let gas_after = handler.gas_used();
 
-            if let Capture::Exit((ref reason, _, ref output)) = proxy_res {
+        let proxy_res = handler.end_inter_transaction::<EthereumError>(inner_result);
+
+        match proxy_res {
+            Capture::Exit((exit_status, _, output)) => {
                 trace_call(
-                    &mut handler,
+                    handler,
                     CallScheme::Call,
-                    proxy,
+                    // Put here for backward compatibility, see {Note system address}
+                    SYSTEM_ACCOUNT_ADDRESS,
                     U256::zero(),
                     gas_after - gas_before,
                     deposit.calldata(),
-                    // It’s a simple call, so the context address and the address of the code being
-                    // executed are the same
-                    proxy,
-                    proxy,
+                    deposit.proxy,
+                    deposit.proxy,
                     gas_limit,
-                    output,
-                    reason,
+                    &output,
+                    &exit_status,
                 );
-            }
 
-            ticket_owner
+                if exit_status.is_succeed() {
+                    log!(handler.host, Debug, "Proxy call succeeded (FA bridge)");
+                    let deposit_res = inner_execute_deposit(
+                        handler,
+                        deposit.proxy,
+                        &deposit.to_fa_deposit(),
+                    );
+                    remove_deposit(handler.host, &system, &deposit_id)?;
+                    precompile_outcome_from_deposit_result(handler.host, deposit_res)
+                } else if exit_status.is_out_of_gas() {
+                    Ok(PrecompileOutcome {
+                        exit_status,
+                        withdrawals: vec![],
+                        output,
+                        estimated_ticks: 0,
+                    })
+                } else {
+                    // The proxy call failed, and it was not because of a lack of gas (which an attacker could trigger by
+                    // claiming it with a gas limit voluntarily too low)
+                    log!(
+                        handler.host,
+                        Info,
+                        "Proxy call failed with {:?}",
+                        exit_status
+                    );
+                    let deposit_res = inner_execute_deposit(
+                        handler,
+                        deposit.receiver,
+                        &deposit.to_fa_deposit(),
+                    );
+                    remove_deposit(handler.host, &system, &deposit_id)?;
+                    precompile_outcome_from_deposit_result(handler.host, deposit_res)
+                }
+            }
+            Capture::Trap(err) => Err(err),
         }
     } else {
-        // Proxy contract is not specified
-        deposit.receiver
-    };
-
-    // Deposit execution might fail because of the balance overflow
-    // so we need to rollback the entire transaction in that case.
-    let deposit_res = inner_execute_deposit(&mut handler, ticket_owner, deposit);
-
-    // Even if the proxy fails, we can't revert the transaction: we need the
-    // tickets to be moved in the ticket table.
-    if let Err(ref ticket_err) = deposit_res {
-        // This is really problematic: the ticket has been lost. Will need
-        // an update to unlock.
-        log!(
-            handler.borrow_host(),
-            Error,
-            "FA deposit failed: couldn't even move the tickets into the \
-                ticket table {ticket_err:?}"
-        );
+        // The deposit is absent from the queue, meaning it is no longer possible to execute it
+        Ok(PrecompileOutcome {
+            exit_status: ExitReason::Revert(ExitRevert::Reverted),
+            withdrawals: vec![],
+            output: vec![],
+            estimated_ticks: 0,
+        })
     }
-
-    let mut outcome = handler.end_initial_transaction(deposit_res)?;
-
-    // Adjust resource consumption to account for the outer transaction
-    outcome.gas_used += config.gas_transaction_call;
-    outcome.estimated_ticks_used += FA_DEPOSIT_EXECUTE_TICKS;
-
-    Ok(outcome)
 }
 
 /// Execute the FA withdrawal within an execution layer. It aborts as soon as possible
@@ -294,12 +400,13 @@ fn execute_layered_fa_withdrawal<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     caller: H160,
     withdrawal: FaWithdrawalKind,
-) -> Result<(ExitReason, Option<Withdrawal>), EthereumError> {
+) -> Result<(ExitReason, Option<Withdrawal>, Vec<u8>), EthereumError> {
     if let Some(withdrawal_id) = inner_execute_withdrawal(handler, &withdrawal)? {
         let mut exit_status = ExitReason::Succeed(evm::ExitSucceed::Stopped);
+        let mut output = Vec::new();
         if withdrawal.ticket_owner() != withdrawal.sender() {
             // If the proxy call fails we need to rollback the entire transaction
-            (exit_status, _, _) = inner_execute_proxy(
+            (exit_status, _, output) = inner_execute_proxy(
                 handler,
                 caller,
                 withdrawal.ticket_owner(),
@@ -309,6 +416,7 @@ fn execute_layered_fa_withdrawal<Host: Runtime>(
         Ok((
             exit_status,
             Some(withdrawal.into_outbox_message(withdrawal_id)),
+            output,
         ))
     } else {
         let (exit_status, _, _): CreateOutcome = create_outcome_error!(
@@ -317,7 +425,7 @@ fn execute_layered_fa_withdrawal<Host: Runtime>(
             withdrawal.ticket_hash(),
             withdrawal.ticket_owner()
         );
-        Ok((exit_status, None))
+        Ok((exit_status, None, Vec::new()))
     }
 }
 
@@ -373,7 +481,7 @@ pub fn execute_fa_withdrawal<Host: Runtime>(
         // on the result.
         let (end_inter_transaction_result, withdrawals) =
             match execute_layered_fa_withdrawal(handler, caller, withdrawal) {
-                Ok((exit_status, withdrawal_opt)) => {
+                Ok((exit_status, withdrawal_opt, output)) => {
                     let withdrawals = match withdrawal_opt {
                         Some(withdrawal) => vec![withdrawal],
                         None => vec![],
@@ -382,7 +490,7 @@ pub fn execute_fa_withdrawal<Host: Runtime>(
                         handler.end_inter_transaction::<EthereumError>(Ok((
                             exit_status,
                             None,
-                            vec![],
+                            output,
                         ))),
                         withdrawals,
                     )
@@ -395,11 +503,11 @@ pub fn execute_fa_withdrawal<Host: Runtime>(
         // Transforms the transaction clean up result into a Sputnik call exit
         // type.
         match end_inter_transaction_result {
-            evm::Capture::Exit((exit_status, _, _)) => {
+            evm::Capture::Exit((exit_status, _, output)) => {
                 Ok(PrecompileOutcome {
                     exit_status,
                     withdrawals,
-                    output: vec![],
+                    output,
                     // Precompile and inner proxy calls have already registered their costs
                     estimated_ticks: 0,
                 })
@@ -433,9 +541,7 @@ fn inner_execute_deposit<Host: Runtime>(
         &ticket_owner,
         deposit.amount,
     )? {
-        handler
-            .add_log(deposit.event_log(&ticket_owner))
-            .map_err(|e| EthereumError::WrappedError(Cow::from(format!("{:?}", e))))?;
+        handler.add_log(deposit.event_log(&ticket_owner))?;
         Ok((
             ExitReason::Succeed(evm::ExitSucceed::Returned),
             None,
@@ -467,9 +573,7 @@ fn inner_execute_withdrawal<Host: Runtime>(
     )? {
         let withdrawal_id =
             system.withdrawal_counter_get_and_increment(handler.borrow_host())?;
-        handler
-            .add_log(withdrawal.event_log(withdrawal_id))
-            .map_err(|e| EthereumError::WrappedError(Cow::from(format!("{:?}", e))))?;
+        handler.add_log(withdrawal.event_log(withdrawal_id))?;
 
         Ok(Some(withdrawal_id))
     } else {

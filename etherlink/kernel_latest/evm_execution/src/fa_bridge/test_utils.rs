@@ -37,8 +37,9 @@ use crate::{
 };
 
 use super::{
+    claim_fa_deposit,
     deposit::{ticket_hash, FaDeposit},
-    execute_fa_deposit, execute_fa_withdrawal,
+    execute_fa_withdrawal, queue_fa_deposit,
     ticket_table::{ticket_balance_path, TicketTable},
     withdrawal::FaWithdrawal,
 };
@@ -158,8 +159,9 @@ pub fn run_fa_deposit(
 ) -> ExecutionOutcome {
     let block = dummy_block_constants();
     let precompiles = precompile_set::<MockKernelHost>(enable_fa_withdrawals);
+    let config = EVMVersion::current_test_config();
 
-    execute_fa_deposit(
+    let (outcome, nonce) = queue_fa_deposit(
         host,
         &block,
         evm_account_storage,
@@ -168,9 +170,48 @@ pub fn run_fa_deposit(
         *caller,
         deposit,
         None,
-        gas_limit,
     )
-    .expect("Failed to execute deposit")
+    .expect("Failed to queue deposit");
+
+    if !outcome.is_success() {
+        return outcome;
+    }
+
+    if let Some(nonce) = nonce {
+        // We now need to claim it
+
+        let mut handler = EvmHandler::new(
+            host,
+            evm_account_storage,
+            *caller,
+            &block,
+            &config,
+            &precompiles,
+            U256::from(21000),
+            None,
+        );
+
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                Some(gas_limit),
+            )
+            .unwrap();
+
+        let res = claim_fa_deposit(&mut handler, nonce);
+
+        let execution_result = match res {
+            Ok(outcome) => Ok((outcome.exit_status, None, outcome.output)),
+            Err(err) => Err(err),
+        };
+
+        handler.end_initial_transaction(execution_result).unwrap()
+    } else {
+        outcome
+    }
 }
 
 /// Create FA deposit given ticket and proxy address (optional)

@@ -8,6 +8,8 @@ use evm::ExitError;
 use primitive_types::{H160, U256};
 use tezos_evm_runtime::runtime::MockKernelHost;
 
+pub const FA_DEPOSIT_PROXY_GAS_LIMIT: u64 = 1_000_000;
+
 use crate::{
     account_storage::{account_path, init_account_storage},
     fa_bridge::{
@@ -19,7 +21,6 @@ use crate::{
             kernel_wrapper, run_fa_deposit, ticket_balance_add, ticket_balance_get,
             token_wrapper, withdrawal_counter_next,
         },
-        FA_DEPOSIT_PROXY_GAS_LIMIT,
     },
     handler::ExecutionResult,
 };
