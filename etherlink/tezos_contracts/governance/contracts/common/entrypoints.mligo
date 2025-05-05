@@ -19,7 +19,7 @@ let new_proposal
     let (proposers, total_voting_power, real_voting_power) =
        Voting.filter_proposers potential_proposers proposal_period storage.config in
     let _ = Validation.assert_voting_power_positive total_voting_power in
-    let _ = assert_with_error (Set.size proposers > 0n) Errors.upvoting_limit_exceeded in
+    let _ = Assert.Error.assert (Set.size proposers > 0n) Errors.upvoting_limit_exceeded in
     let updated_period = Voting.add_new_proposal_and_upvote payload proposers real_voting_power proposal_period in
     let operations = match finished_voting with
         | Some event_payload -> [Events.create_voting_finished_event_operation event_payload]
@@ -44,7 +44,7 @@ let upvote_proposal
     let (upvoters, total_voting_power, protocol_already_upvoted_addresses) =
           Voting.filter_upvoters payload potential_upvoters proposal_period storage.config in
     let _ = Validation.assert_voting_power_positive total_voting_power in
-    let _ = assert_with_error (Map.size upvoters > 0n) (if protocol_already_upvoted_addresses then Errors.proposal_already_upvoted else Errors.upvoting_limit_exceeded) in
+    let _ = Assert.Error.assert (Map.size upvoters > 0n) (if protocol_already_upvoted_addresses then Errors.proposal_already_upvoted else Errors.upvoting_limit_exceeded) in
     let new_voting_context =
             (Map.fold
             (fun (period,(upvoter,voting_power)) ->
@@ -76,7 +76,7 @@ let vote
     let potential_voters = Voting.get_delegates storage.config.delegation_contract in
     let (voters, total_voting_power) = Voting.filter_voters potential_voters voting_context in
     let _ = Validation.assert_voting_power_positive total_voting_power in
-    let _ = assert_with_error (Map.size voters > 0n) Errors.promotion_already_voted in
+    let _ = Assert.Error.assert (Map.size voters > 0n) Errors.promotion_already_voted in
     let new_voting_context =
             (Map.fold
             (fun (period,(voter,voting_power)) ->
@@ -105,10 +105,10 @@ let trigger_rollup_upgrade
     let { voting_context; finished_voting; last_winner = last_winner_opt } = Voting.get_voting_state storage in
     let last_winner = Option.value_with_error Errors.last_winner_not_found last_winner_opt  in
     let last_winner_trigger_history = last_winner.trigger_history in
-    let _ = assert_with_error (not Big_map.mem rollup_address last_winner.trigger_history) Errors.upgrade_for_address_already_triggered in
+    let _ = Assert.Error.assert (not Big_map.mem rollup_address last_winner.trigger_history) Errors.upgrade_for_address_already_triggered in
     let rollup_entry = Rollup.get_entry rollup_address in
     let upgrade_params = Rollup.get_upgrade_params (pack_payload last_winner.payload) in
-    let upgrade_operation = Tezos.transaction upgrade_params 0tez rollup_entry in
+    let upgrade_operation = Tezos.Next.Operation.transaction upgrade_params 0tez rollup_entry in
     let operations = match finished_voting with
         | Some event_payload -> [Events.create_voting_finished_event_operation event_payload]
         | None -> [] in

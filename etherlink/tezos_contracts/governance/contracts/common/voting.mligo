@@ -228,7 +228,7 @@ let assert_upvoting_allowed
     let upvotes_count = match Big_map.find_opt voter upvoters_upvotes_count with
         | Some count -> count
         | None -> 0n in
-    assert_with_error (upvotes_count < config.upvoting_limit) Errors.upvoting_limit_exceeded
+    Assert.Error.assert (upvotes_count < config.upvoting_limit) Errors.upvoting_limit_exceeded
 
 
 [@inline]
@@ -292,7 +292,7 @@ let add_new_proposal_and_upvote
         (proposal_period : pt Storage.proposal_period_t)
         : pt Storage.period_t =
     let upvoters_upvotes_count = proposal_period.upvoters_upvotes_count in
-    let _ = assert_with_error (not Big_map.mem payload proposal_period.proposals) Errors.proposal_already_created in
+    let _ = Assert.Error.assert (not Big_map.mem payload proposal_period.proposals) Errors.proposal_already_created in
     let value = {
         proposers = proposers;
         upvotes_voting_power = voting_power;
@@ -330,7 +330,7 @@ let assert_proposal_not_already_upvoted
         (payload : pt)
         (upvoters_proposals : pt Storage.upvoters_proposals_t)
         : unit =
-    assert_with_error (not Big_map.mem (upvoter, payload) upvoters_proposals) Errors.proposal_already_upvoted
+    Assert.Error.assert (not Big_map.mem (upvoter, payload) upvoters_proposals) Errors.proposal_already_upvoted
 
 let filter_proposers
    (type pt)
@@ -439,7 +439,7 @@ let vote_promotion
         (voting_power : nat)
         (promotion_period : pt Storage.promotion_period_t)
         : pt Storage.period_t =
-    let _ = assert_with_error (not Big_map.mem voter promotion_period.voters) Errors.promotion_already_voted in
+    let _ = Assert.Error.assert (not Big_map.mem voter promotion_period.voters) Errors.promotion_already_voted in
     let updated_promotion_period = if vote = Constants.yea
         then { promotion_period with yea_voting_power = promotion_period.yea_voting_power + voting_power }
         else if vote = Constants.nay 

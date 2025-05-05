@@ -1,4 +1,4 @@
-LIGO_COMPILER = docker run --rm -v "${PWD}":"${PWD}" -w "${PWD}" ligolang/ligo:1.4.0
+LIGO_COMPILER = docker run --rm -v "${PWD}":"${PWD}" -w "${PWD}" ligolang/ligo:1.9.2
 
 compile:
 	rm -r -f ./build 

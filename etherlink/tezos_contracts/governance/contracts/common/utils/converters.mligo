@@ -70,11 +70,11 @@ let address_to_key_hash
     *)
     let address_packed = Bytes.pack address in
     let address_type = Bytes.sub 6n 1n address_packed in
-    let _ = assert_with_error (address_type = 0x00) Errors.not_implicit_address in
+    let _ = Assert.Error.assert (address_type = 0x00) Errors.not_implicit_address in
     let length = 0x00000015 in
     let key_hash_packed = Bytes.concats [(Bytes.sub 0n 2n address_packed); length; (Bytes.sub 7n 21n address_packed)] in
     let key_hash = Option.value_with_error Errors.failed_to_cast_address_to_key_hash (Bytes.unpack key_hash_packed) in
-    let _ = assert_with_error (Tezos.address (Tezos.implicit_account key_hash) = address) Errors.key_hash_not_equal_to_source_address in
+    let _ = Assert.Error.assert (Tezos.address (Tezos.implicit_account key_hash) = address) Errors.key_hash_not_equal_to_source_address in
     key_hash
 
 (*
@@ -84,3 +84,4 @@ let address_to_key_hash
   Option.value_with_error Errors.failed_to_cast_address_to_key_hash
   ([%Michelson ({| { IS_IMPLICIT_ACCOUNT } |} : address -> key_hash option )] address)
 *)
+   
