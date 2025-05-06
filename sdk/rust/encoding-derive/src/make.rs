@@ -490,10 +490,7 @@ fn make_tag<'a>(
         }
         syn::Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
             let ty = &fields.unnamed.first().unwrap().ty;
-            match ty {
-                syn::Type::Path(type_path) => Encoding::Path(&type_path.path),
-                _ => return Err(error_spanned(ty, "Unsupported type for enum variant")),
-            }
+            make_type_encoding(ty, meta)?
         }
         syn::Fields::Unnamed(fields) => {
             return Err(error_spanned(fields, "Only single field is supported"))
