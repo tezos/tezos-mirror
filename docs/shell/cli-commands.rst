@@ -38,28 +38,6 @@ This is the manual page of the command line tool ``octez-signer``. See :ref:`sig
          :file: ../api/octez-signer.html
 
 
-.. _benchmark_tool_manual:
-
-Benchmark tool manual
-=====================
-
-This is the manual page of the command line tool ``octez-snoop``. See :doc:`../developer/snoop` for a general description of this tool.
-
-.. raw:: html
-         :file: ../api/octez-snoop.html
-
-
-.. _codec_manual:
-
-Codec manual
-============
-
-This is the manual page of the command line tool ``octez-codec``. See :ref:`octez-codec` for a general description of this tool.
-
-.. raw:: html
-         :file: ../api/octez-codec.html
-
-
 .. _node_manual:
 
 Node manual
@@ -94,6 +72,28 @@ This is the manual page of the :doc:`../shell/smart_rollup_node`.
 
 .. raw:: html
          :file: ../api/octez-smart-rollup-node.html
+
+.. _benchmark_tool_manual:
+
+Benchmark tool manual
+=====================
+
+This is the manual page of the command line tool ``octez-snoop``. See :doc:`../developer/snoop` for a general description of this tool.
+
+.. raw:: html
+         :file: ../api/octez-snoop.html
+
+
+.. _codec_manual:
+
+Codec manual
+============
+
+This is the manual page of the command line tool ``octez-codec``. See :ref:`octez-codec` for a general description of this tool.
+
+.. raw:: html
+         :file: ../api/octez-codec.html
+
 
 Protocol-dependent tools
 ========================
