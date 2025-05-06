@@ -693,6 +693,20 @@ module Consensus = struct
             Preattestation
             consensus_content
     in
+    let* () =
+      match vi.mode with
+      | Application _ | Partial_validation _ | Construction _ -> (
+          match consensus_key.consensus_pk with
+          | Bls _ when Constants.aggregate_attestation vi.ctxt ->
+              (* A preattestation with a BLS signature must be included in a
+                 Preattestations_aggregate, even if there is only one in the
+                 block. *)
+              let hash = Operation.hash operation in
+              tzfail
+                (Unaggregated_eligible_operation {kind = Preattestation; hash})
+          | _ -> return_unit)
+      | Mempool -> return_unit
+    in
     let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
     let*? () =
       if check_signature then
@@ -829,13 +843,14 @@ module Consensus = struct
               Attestation
               consensus_content.slot
           in
-          match (consensus_key.consensus_pk, dal_content) with
-          | Bls _, None when Constants.aggregate_attestation vi.ctxt ->
-              (* An attestation signed by a tz4 without DAL content must be
-                 included in an Attestations_aggregate, even when it is the only
-                 one in the quorum. *)
+          match consensus_key.consensus_pk with
+          | Bls _ when Constants.aggregate_attestation vi.ctxt ->
+              (* An attestation with a BLS signature must be included in an
+                 Attestations_aggregate, even if there is only one in the block.
+              *)
               let hash = Operation.hash operation in
-              tzfail (Unaggregated_eligible_attestation hash)
+              tzfail
+                (Unaggregated_eligible_operation {kind = Attestation; hash})
           | _ -> return (consensus_key, attesting_power))
       | Mempool ->
           check_mempool_consensus

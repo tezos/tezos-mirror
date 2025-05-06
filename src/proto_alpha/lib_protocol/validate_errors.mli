@@ -89,7 +89,10 @@ module Consensus : sig
     | Aggregate_not_implemented
     | Non_bls_key_in_aggregate
     | Public_key_aggregation_failure
-    | Unaggregated_eligible_attestation of Operation_hash.t
+    | Unaggregated_eligible_operation of {
+        kind : consensus_operation_kind;
+        hash : Operation_hash.t;
+      }
     | Empty_aggregation_committee
 end
 

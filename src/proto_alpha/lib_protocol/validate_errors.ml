@@ -139,7 +139,10 @@ module Consensus = struct
     | Aggregate_not_implemented
     | Non_bls_key_in_aggregate
     | Public_key_aggregation_failure
-    | Unaggregated_eligible_attestation of Operation_hash.t
+    | Unaggregated_eligible_operation of {
+        kind : consensus_operation_kind;
+        hash : Operation_hash.t;
+      }
     | Empty_aggregation_committee
 
   let () =
@@ -436,16 +439,22 @@ module Consensus = struct
       ~id:"validate.unaggregated_eligible_attestation"
       ~title:"Unaggregated eligible attestation"
       ~description:"An eligible attestation was found unaggregated"
-      ~pp:(fun ppf hash ->
+      ~pp:(fun ppf (kind, hash) ->
         Format.fprintf
           ppf
-          "Attestation %a should have been aggregated."
+          "%a %a should have been aggregated."
+          consensus_operation_kind_pp
+          kind
           Operation_hash.pp
           hash)
-      Data_encoding.(obj1 (req "hash" Operation_hash.encoding))
+      Data_encoding.(
+        obj2
+          (req "kind" consensus_operation_kind_encoding)
+          (req "hash" Operation_hash.encoding))
       (function
-        | Unaggregated_eligible_attestation hash -> Some hash | _ -> None)
-      (fun hash -> Unaggregated_eligible_attestation hash) ;
+        | Unaggregated_eligible_operation {kind; hash} -> Some (kind, hash)
+        | _ -> None)
+      (fun (kind, hash) -> Unaggregated_eligible_operation {kind; hash}) ;
     register_error_kind
       `Permanent
       ~id:"validate.empty_aggregation_committee"
