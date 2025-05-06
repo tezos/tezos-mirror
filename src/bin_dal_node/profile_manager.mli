@@ -43,12 +43,12 @@ val is_bootstrap_profile : t -> bool
     proofs. *)
 val is_prover_profile : t -> bool
 
-(** [is_empty profile] returns [true] if it is an [Operator] profile
+(** [is_empty profile] returns [true] if it is a [Controller] profile
     which is empty. *)
 val is_empty : t -> bool
 
-(** [is_attester_only_profile profile] returns [true] if the node has an
-    operator profile, with at least one attester role and no producer nor
+(** [is_attester_only_profile profile] returns [true] if the node is in
+    controller mode, with at least one attester role and no producer nor
     observer roles. *)
 val is_attester_only_profile : t -> bool
 
@@ -68,8 +68,8 @@ val bootstrap : unresolved_profile
 
 val random_observer : unresolved_profile
 
-(** [operator op] returns an operator with the profile described by [op] *)
-val operator : Operator_profile.t -> unresolved_profile
+(** [controller profiles] returns an unresolved profile matching [profiles] *)
+val controller : Controller_profiles.t -> unresolved_profile
 
 (** Merge the two sets of profiles. In case of incompatibility (that is, case
    [Bootstrap] vs the other kinds), the profiles from [higher_prio] take
@@ -79,20 +79,20 @@ val merge_profiles :
   higher_prio:unresolved_profile ->
   unresolved_profile
 
-(** [add_and_register_operator_profile t ~number_of_slots gs_worker
-    operator_profile] adds the new [operator_profile] to [t]. It registers any
-    new attester profile within [operator_profile] with gossipsub, that is, it
+(** [add_and_register_controller_profiles t ~number_of_slots gs_worker
+    controller_profile] adds the new [controller_profiles] to [t]. It registers any
+    new attester profile within [controller_profiles] with gossipsub, that is, it
     instructs the [gs_worker] to join the corresponding topics.
 
     If the current profile [t] is a bootstrap profile, it will return [None] as
-    bootstrap profiles are incompatible with operator profiles.
+    bootstrap profiles are incompatible with controller profiles.
 
     It assumes the current profile is not a random observer. *)
-val add_and_register_operator_profile :
+val add_and_register_controller_profiles :
   t ->
   number_of_slots:int ->
   Gossipsub.Worker.t ->
-  Operator_profile.t ->
+  Controller_profiles.t ->
   t option
 
 (** [register_profile t ~number_of_slots gs_worker] does the following:
@@ -107,10 +107,11 @@ val add_and_register_operator_profile :
     The function returns the updated profile. *)
 val register_profile : t -> number_of_slots:int -> Gossipsub.Worker.t -> t
 
-(** Checks that each producer profile only refers to slot indexes strictly
-    smaller than [number_of_slots]. This may not be the case when the profile
-    context is first built because there is no information about the number of
-    slots. Returns an [Invalid_slot_index] error if the check fails. *)
+(** Checks that each producer (operator or observer) profile only refers to slot
+    indexes strictly smaller than [number_of_slots]. This may not be the case
+    when the profile context is first built because there is no information
+    about the number of slots. Returns an [Invalid_slot_index] error if the
+    check fails. *)
 val validate_slot_indexes : t -> number_of_slots:int -> unit tzresult
 
 (** [on_new_head t ~number_of_slots gs_worker committee] performs profile-related
@@ -127,11 +128,11 @@ val get_profiles : t -> Types.profile
 
 (** Returns the number of previous blocks for which the node should keep the
     shards in the storage, depending on the profile of the node (3 months for
-    observer & slot producer, twice attestation lag for attester) *)
+    operators, twice attestation lag for observers and attesters.) *)
 val get_attested_data_default_store_period : t -> Types.proto_parameters -> int
 
 (** Resolves a profile by either returning it unchanged (for bootstrap
-    and operator profiles) or generating a new observer profile for
+    and controller profiles) or generating a new observer profile for
     random observer profile. The random slot is selected within the
     DAL slots range defined by the protocol parameters.
 

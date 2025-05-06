@@ -585,7 +585,7 @@ let run_scenario network kind scenario =
     Dal_node.init_config
       ~peers:dal_peers
       ~expected_pow:26.
-      ~producer_profiles:key_indices
+      ~operator_profiles:key_indices
       ~attester_profiles:[network_baker]
       dal_node
   in

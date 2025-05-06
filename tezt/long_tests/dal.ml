@@ -119,11 +119,11 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
   let* () = Node.wait_for_ready node in
   return (node, client)
 
-let start_dal_node l1_node ?(producer_profiles = []) ?(attester_profiles = [])
+let start_dal_node l1_node ?(operator_profiles = []) ?(attester_profiles = [])
     () =
   let dal_node = Dal_node.create ~node:l1_node () in
   let* _dir =
-    Dal_node.init_config dal_node ~producer_profiles ~attester_profiles
+    Dal_node.init_config dal_node ~operator_profiles ~attester_profiles
   in
   let* () = Dal_node.run dal_node ~wait_ready:true in
   return dal_node
@@ -216,7 +216,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
       ~dal_bootstrap_peer:dal_node1
       ()
   in
-  let* dal_node2 = start_dal_node node2 ~producer_profiles:[slot_index] () in
+  let* dal_node2 = start_dal_node node2 ~operator_profiles:[slot_index] () in
   let client1 = Client.with_dal_node client1 ~dal_node:dal_node2 in
   let*! () = Client.reveal ~src:Constant.bootstrap2.alias client2 in
   let* () = Client.bake_for_and_wait client1 in

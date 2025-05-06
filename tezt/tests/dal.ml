@@ -594,14 +594,14 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
   let* () = bake_for tezos_client in
   f rollup_address sc_rollup_node
 
-let make_dal_node ?name ?peers ?attester_profiles ?producer_profiles
+let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
     ?bootstrap_profile ?history_mode tezos_node =
   let dal_node = Dal_node.create ?name ~node:tezos_node () in
   let* () =
     Dal_node.init_config
       ?peers
       ?attester_profiles
-      ?producer_profiles
+      ?operator_profiles
       ?bootstrap_profile
       ?history_mode
       dal_node
@@ -609,13 +609,13 @@ let make_dal_node ?name ?peers ?attester_profiles ?producer_profiles
   let* () = Dal_node.run ~event_level:`Debug dal_node ~wait_ready:true in
   return dal_node
 
-let with_dal_node ?peers ?attester_profiles ?producer_profiles
+let with_dal_node ?peers ?attester_profiles ?operator_profiles
     ?bootstrap_profile ?history_mode tezos_node f key =
   let* dal_node =
     make_dal_node
       ?peers
       ?attester_profiles
-      ?producer_profiles
+      ?operator_profiles
       ?bootstrap_profile
       ?history_mode
       tezos_node
@@ -676,7 +676,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?number_of_slots ?attestation_lag ?attestation_threshold ?traps_fraction
     ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
     ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
-    ?event_sections_levels ?producer_profiles ?history_mode ?prover
+    ?event_sections_levels ?operator_profiles ?history_mode ?prover
     ?l1_history_mode variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
@@ -692,7 +692,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       let l1_history_mode =
-        match (l1_history_mode, producer_profiles) with
+        match (l1_history_mode, operator_profiles) with
         | Some mode, _ -> mode
         | None, Some (_ :: _) -> Default_with_refutation
         | _ -> Default_without_refutation
@@ -719,7 +719,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
-      with_dal_node ?bootstrap_profile ?producer_profiles ?history_mode node
+      with_dal_node ?bootstrap_profile ?operator_profiles ?history_mode node
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
@@ -729,7 +729,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?(pvm_name = "arith") ?(dal_enable = true) ?incentives_enable
     ?dal_rewards_weight ?commitment_period ?challenge_window
     ?minimal_block_delay ?delay_increment_per_round ?activation_timestamp
-    ?bootstrap_profile ?producer_profiles ?smart_rollup_timeout_period_in_blocks
+    ?bootstrap_profile ?operator_profiles ?smart_rollup_timeout_period_in_blocks
     ?(regression = true) ?prover ?attestation_threshold ?l1_history_mode variant
     scenario =
   let description = "Testing DAL rollup and node with L1" in
@@ -748,7 +748,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       let l1_history_mode =
-        match (l1_history_mode, producer_profiles) with
+        match (l1_history_mode, operator_profiles) with
         | Some mode, _ -> mode
         | None, Some (_ :: _) -> Default_with_refutation
         | _ -> Default_without_refutation
@@ -776,7 +776,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         ~protocol
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
-      with_dal_node ?bootstrap_profile ?producer_profiles node
+      with_dal_node ?bootstrap_profile ?operator_profiles node
       @@ fun key dal_node ->
       ( with_fresh_rollup ~pvm_name ~dal_node
       @@ fun sc_rollup_address sc_rollup_node ->
@@ -2772,18 +2772,20 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   let profile1 = Dal_RPC.Attester Constant.bootstrap1.public_key_hash in
   let profile2 = Dal_RPC.Attester Constant.bootstrap2.public_key_hash in
   (* We start with empty profile list *)
-  let* () = check_profiles ~__LOC__ dal_node ~expected:(Operator []) in
+  let* () = check_profiles ~__LOC__ dal_node ~expected:(Controller []) in
   (* Adding [Attester] profile with pkh that is not encoded as
      [Tezos_crypto.Signature.Public_key_hash.encoding] should fail. *)
   let* () = check_bad_attester_pkh_encoding (Attester "This is invalid PKH") in
   (* Test adding duplicate profiles stores profile only once *)
   let* () = patch_profile_rpc profile1 in
   let* () = patch_profile_rpc profile1 in
-  let* () = check_profiles ~__LOC__ dal_node ~expected:(Operator [profile1]) in
+  let* () =
+    check_profiles ~__LOC__ dal_node ~expected:(Controller [profile1])
+  in
   (* Test adding multiple profiles *)
   let* () = patch_profile_rpc profile2 in
   let* () =
-    check_profiles ~__LOC__ dal_node ~expected:(Operator [profile1; profile2])
+    check_profiles ~__LOC__ dal_node ~expected:(Controller [profile1; profile2])
   in
   (* Test that the patched profiles are persisted after restart using SIGTERM. *)
   let* () = Dal_node.terminate dal_node in
@@ -2791,7 +2793,7 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   let* () = Dal_node.run dal_node ~wait_ready:true in
 
   let* () =
-    check_profiles ~__LOC__ dal_node ~expected:(Operator [profile1; profile2])
+    check_profiles ~__LOC__ dal_node ~expected:(Controller [profile1; profile2])
   in
   (* Test whether the patched profiles persist after a restart using SIGSTOP
      (that is, even if we stop the DAL node abruptly). *)
@@ -2804,7 +2806,7 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   check_profiles
     ~__LOC__
     dal_node
-    ~expected:(Operator [profile1; profile2; profile3])
+    ~expected:(Controller [profile1; profile2; profile3])
 
 (* Check that result of the DAL node's
    GET /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices
@@ -3307,7 +3309,7 @@ let create_additional_nodes ~extra_node_operators rollup_address l1_node
 
      So, we initialize its value to [dal_node]. *)
   let dal_node_producer = Dal_node.create ~node:l1_node () in
-  let* () = Dal_node.init_config ~producer_profiles:[0] dal_node_producer in
+  let* () = Dal_node.init_config ~operator_profiles:[0] dal_node_producer in
   let* () = Dal_node.run dal_node_producer in
   let connect_dal_node_to = ref dal_node in
   let* nodes =
@@ -3373,7 +3375,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   Log.info "[e2e.startup] current level is %d@." current_level ;
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let bootstrap_dal_node = Dal_node.create ~node:l1_node () in
-  let producer_profiles = [slot_index] in
+  let operator_profiles = [slot_index] in
   let* () =
     Dal_node.init_config
       ~peers:[Dal_node.listen_addr dal_node]
@@ -3395,12 +3397,12 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
              | Some _ ->
                  Dal_node.init_config
                    ~peers:[bootstrap_dal_node_p2p_endpoint]
-                   ~producer_profiles
+                   ~operator_profiles
                    fresh_dal_node
              | None ->
                  Dal_node.init_config
                    ~peers:[bootstrap_dal_node_p2p_endpoint]
-                   ~observer_profiles:producer_profiles
+                   ~observer_profiles:operator_profiles
                    fresh_dal_node
            in
            let* () = Dal_node.run ~event_level:`Debug fresh_dal_node in
@@ -3437,7 +3439,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   let* () =
     Dal_node.init_config
       ~peers:[bootstrap_dal_node_p2p_endpoint]
-      ~producer_profiles
+      ~operator_profiles
       producer_dal_node
   in
   let* () = Dal_node.run ~event_level:`Debug producer_dal_node in
@@ -3624,14 +3626,14 @@ let register_end_to_end_tests ~protocols =
         List.init num_extra_nodes (fun _index -> None)
       in
       let slot_index = 5 in
-      let producer_profiles = [slot_index] in
+      let operator_profiles = [slot_index] in
       let tags =
         ["e2e"; network; Tag.memory_4k]
         @ (match constants with Constants_mainnet -> [Tag.slow] | _ -> [])
         @ tags
       in
       scenario_with_all_nodes
-        ~producer_profiles
+        ~operator_profiles
         ~custom_constants:constants
         ~slot_size:(1 lsl 17)
         ~page_size:4096
@@ -4257,7 +4259,7 @@ let test_baker_registers_profiles _protocol _parameters _cryptobox l1_node
      the baker behavior changes in this respect, the constant may need
      adjusting. *)
   let* () = Lwt_unix.sleep 2.0 in
-  check_profiles ~__LOC__ dal_node ~expected:(Operator profiles)
+  check_profiles ~__LOC__ dal_node ~expected:(Controller profiles)
 
 (** This helper funciton terminates dal_node2 and dal_node3 (in addition to
     those in [extra_nodes_to_restart]), and restart them after creating two
@@ -4310,7 +4312,7 @@ let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
   let* dal_node3 =
     make_dal_node
       ~peers:[Dal_node.listen_addr dal_node1]
-      ~producer_profiles:[0]
+      ~operator_profiles:[0]
       node
   in
   (* Here, we observe a first nodes connection via bootstrap nodes thanks to
@@ -4342,7 +4344,7 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
   let* dal_node3 =
     make_dal_node
       ~peers:[Dal_node.listen_addr dal_node1]
-      ~producer_profiles:[0]
+      ~operator_profiles:[0]
       node
   in
   let* () =
@@ -4426,7 +4428,7 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 
 (* Adapted from sc_rollup.ml *)
 let test_l1_migration_scenario ?(tags = []) ?(uses = []) ~migrate_from
-    ~migrate_to ~migration_level ~scenario ~description ?producer_profiles
+    ~migrate_to ~migration_level ~scenario ~description ?operator_profiles
     ?attestation_lag ?attestation_threshold ?number_of_slots ?number_of_shards
     ?slot_size ?page_size ?redundancy_factor ?traps_fraction
     ?consensus_committee_size ?blocks_per_cycle ?minimal_block_delay
@@ -4483,7 +4485,7 @@ let test_l1_migration_scenario ?(tags = []) ?(uses = []) ~migrate_from
   let* () = Node.wait_for_ready node in
 
   let dal_node = Dal_node.create ~node () in
-  let* () = Dal_node.init_config ?producer_profiles dal_node in
+  let* () = Dal_node.init_config ?operator_profiles dal_node in
   let* () = Dal_node.run dal_node ~wait_ready:true in
 
   scenario ~migration_level dal_parameters client node dal_node
@@ -4581,7 +4583,7 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
     let* () =
       Dal_node.init_config
         ~peers:[dal_node_p2p_endpoint]
-        ~producer_profiles:[slot_index]
+        ~operator_profiles:[slot_index]
         accuser
     in
     let* () = Dal_node.run accuser ~wait_ready:true in
@@ -4610,7 +4612,7 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
     ~description
     ~uses:[Constant.octez_agnostic_baker]
     ~activation_timestamp:Now
-    ~producer_profiles:[slot_index]
+    ~operator_profiles:[slot_index]
     ~minimal_block_delay:
       (* to be sure there is enough time to published slots *)
       "2"
@@ -4627,15 +4629,15 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
     ~migrate_to
     ()
 
-let test_producer_profile _protocol _dal_parameters _cryptobox _node _client
+let test_operator_profile _protocol _dal_parameters _cryptobox _node _client
     dal_node =
   let index = 0 in
-  let* () = Dal_RPC.(call dal_node (patch_profiles [Producer index])) in
+  let* () = Dal_RPC.(call dal_node (patch_profiles [Operator index])) in
   let* () =
     check_profiles
       ~__LOC__
       dal_node
-      ~expected:Dal_RPC.(Operator [Producer index])
+      ~expected:Dal_RPC.(Controller [Operator index])
   in
   unit
 
@@ -4883,14 +4885,14 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   Log.info "Bootstrap DAL node is running" ;
 
   let producer = Dal_node.create ~name:"producer" ~node () in
-  let* () = Dal_node.init_config ~producer_profiles:[index] ~peers producer in
+  let* () = Dal_node.init_config ~operator_profiles:[index] ~peers producer in
   let* () = Dal_node.run ~wait_ready:true producer in
   let* producer_peer_id = peer_id producer in
   let* () =
     check_profiles
       ~__LOC__
       producer
-      ~expected:Dal_RPC.(Operator [Producer index])
+      ~expected:Dal_RPC.(Controller [Operator index])
   in
   Log.info "Slot producer DAL node is running" ;
 
@@ -4940,7 +4942,8 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
     check_profiles
       ~__LOC__
       attester
-      ~expected:Dal_RPC.(Operator (List.map (fun pkh -> Attester pkh) all_pkhs))
+      ~expected:
+        Dal_RPC.(Controller (List.map (fun pkh -> Attester pkh) all_pkhs))
   in
   (* We need to bake some blocks until the L1 node notifies the
      attester DAL nodes that some L1 block is final and they have DAL
@@ -5256,7 +5259,7 @@ module History_rpcs = struct
     let description = "commitments history RPCs" in
     scenario_with_layer1_and_dal_nodes
       ~tags
-      ~producer_profiles:[3; 15]
+      ~operator_profiles:[3; 15]
       description
       scenario
       protocols
@@ -5296,7 +5299,7 @@ module History_rpcs = struct
       ~scenario:(fun ~migration_level -> scenario ~migrate_to ~migration_level)
       ~tags
       ~description
-      ~producer_profiles:[slot_index] (* use the same parameters as Alpha *)
+      ~operator_profiles:[slot_index] (* use the same parameters as Alpha *)
       ~consensus_committee_size:512
       ~attestation_lag:8
       ~number_of_slots:32
@@ -5526,7 +5529,7 @@ module Amplification = struct
     in
     let slot_producer = Dal_node.create ~name:"producer" ~node () in
     let* () =
-      Dal_node.init_config ~producer_profiles:[slot_index] ~peers slot_producer
+      Dal_node.init_config ~operator_profiles:[slot_index] ~peers slot_producer
     in
     (* Promise which will be resolved once the slot producer will be
        connected to all the other DAL nodes (all attesters + observer
@@ -5548,7 +5551,7 @@ module Amplification = struct
       check_profiles
         ~__LOC__
         slot_producer
-        ~expected:Dal_RPC.(Operator [Producer slot_index])
+        ~expected:Dal_RPC.(Controller [Operator slot_index])
     in
     let* slot_producer_peer_id = Dal_node.read_identity slot_producer in
     info "Slot producer DAL node is running" ;
@@ -5557,7 +5560,7 @@ module Amplification = struct
       check_profiles
         ~__LOC__
         observer
-        ~expected:Dal_RPC.(Operator [Observer slot_index])
+        ~expected:Dal_RPC.(Controller [Observer slot_index])
     in
     let* observer_peer_id = Dal_node.read_identity observer in
     info "Observer DAL node is running" ;
@@ -5569,7 +5572,7 @@ module Amplification = struct
              check_profiles
                ~__LOC__
                attester.dal_node
-               ~expected:Dal_RPC.(Operator [Attester attester.pkh]))
+               ~expected:Dal_RPC.(Controller [Attester attester.pkh]))
            all_attesters
     in
     info "Attesters are running" ;
@@ -5583,19 +5586,19 @@ module Amplification = struct
     let already_seen_slots =
       Array.init number_of_slots (fun index -> slot_index <> index)
     in
-    (* Wait for a GRAFT message between an attester and either a the
-       producer the observer, in any direction. *)
-    let check_graft_promise (producer_or_observer, peer_id) attester =
+    (* Wait for a GRAFT message between an attester and either an operator
+       (legacy producer) or an observer, in any direction. *)
+    let check_graft_promise (operator_or_observer, peer_id) attester =
       let graft_from_attester_promise =
         let* attester_peer_id = attester_peer_id attester in
         check_events_with_topic
           ~event_with_topic:(Graft attester_peer_id)
-          producer_or_observer
+          operator_or_observer
           ~num_slots:number_of_slots
           ~already_seen_slots
           attester.pkh
       in
-      let graft_from_producer_or_observer_promise =
+      let graft_from_operator_or_observer_promise =
         check_events_with_topic
           ~event_with_topic:(Graft peer_id)
           attester.dal_node
@@ -5604,7 +5607,7 @@ module Amplification = struct
           attester.pkh
       in
       Lwt.pick
-        [graft_from_attester_promise; graft_from_producer_or_observer_promise]
+        [graft_from_attester_promise; graft_from_operator_or_observer_promise]
     in
     (* We don't care if the slot producer establishes full connections
        with the DAL nodes it is about to ban so we only wait for the
@@ -5865,14 +5868,14 @@ module Amplification = struct
     Log.info "Bootstrap DAL node is running" ;
 
     let producer = Dal_node.create ~name:"producer" ~node () in
-    let* () = Dal_node.init_config ~producer_profiles:[index] ~peers producer in
+    let* () = Dal_node.init_config ~operator_profiles:[index] ~peers producer in
     let* () = Dal_node.run ~wait_ready:true producer in
     let* producer_peer_id = peer_id producer in
     let* () =
       check_profiles
         ~__LOC__
         producer
-        ~expected:Dal_RPC.(Operator [Producer index])
+        ~expected:Dal_RPC.(Controller [Operator index])
     in
     Log.info "Slot producer DAL node is running" ;
 
@@ -5884,7 +5887,7 @@ module Amplification = struct
       check_profiles
         ~__LOC__
         observer
-        ~expected:Dal_RPC.(Operator [Observer index])
+        ~expected:Dal_RPC.(Controller [Observer index])
     in
     Log.info "Observer DAL node is running" ;
 
@@ -6163,7 +6166,7 @@ module Garbage_collection = struct
     let slot_producer = Dal_node.create ~name:"producer" ~node () in
     Dal_node.log_events slot_producer ;
     let* () =
-      Dal_node.init_config ~producer_profiles:[slot_index] ~peers slot_producer
+      Dal_node.init_config ~operator_profiles:[slot_index] ~peers slot_producer
     in
     (* Promise which will be resolved once the slot producer will be
        connected to all the other DAL nodes (attester + bootstrap). *)
@@ -6177,7 +6180,7 @@ module Garbage_collection = struct
       check_profiles
         ~__LOC__
         slot_producer
-        ~expected:Dal_RPC.(Operator [Producer slot_index])
+        ~expected:Dal_RPC.(Controller [Operator slot_index])
     in
     Log.info "Slot producer DAL node is running" ;
 
@@ -6186,7 +6189,7 @@ module Garbage_collection = struct
         ~__LOC__
         attester
         ~expected:
-          (Dal_RPC.Operator
+          (Dal_RPC.Controller
              (List.map (fun pkh -> Dal_RPC.Attester pkh) bootstrap_pkhs))
     in
 
@@ -6385,7 +6388,7 @@ module Garbage_collection = struct
 
     let slot_producer = Dal_node.create ~name:"producer" ~node () in
     let* () =
-      Dal_node.init_config ~producer_profiles:[slot_index] ~peers slot_producer
+      Dal_node.init_config ~operator_profiles:[slot_index] ~peers slot_producer
     in
     (* Promise which will be resolved once the slot producer will be
        connected to all the other DAL nodes (attester + observer
@@ -6407,7 +6410,7 @@ module Garbage_collection = struct
       check_profiles
         ~__LOC__
         slot_producer
-        ~expected:Dal_RPC.(Operator [Producer slot_index])
+        ~expected:Dal_RPC.(Controller [Operator slot_index])
     in
     Log.info "Slot producer DAL node is running" ;
 
@@ -6415,7 +6418,7 @@ module Garbage_collection = struct
       check_profiles
         ~__LOC__
         observer
-        ~expected:Dal_RPC.(Operator [Observer slot_index])
+        ~expected:Dal_RPC.(Controller [Observer slot_index])
     in
     Log.info "Observer DAL node is running" ;
 
@@ -6424,7 +6427,7 @@ module Garbage_collection = struct
         ~__LOC__
         attester
         ~expected:
-          (Dal_RPC.Operator
+          (Dal_RPC.Controller
              (List.map (fun pkh -> Dal_RPC.Attester pkh) bootstrap_pkhs))
     in
     Log.info "Attester DAL node is running" ;
@@ -6646,7 +6649,7 @@ module Garbage_collection = struct
         let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
         let lag = dal_parameters.attestation_lag in
         let dal_node = Dal_node.create ~node () in
-        let* () = Dal_node.init_config ~producer_profiles:[1] dal_node in
+        let* () = Dal_node.init_config ~operator_profiles:[1] dal_node in
         let* () = Dal_node.run dal_node ~wait_ready:true in
         Log.info
           "The first level with stored cells is 1 + lag = %d. We bake till \
@@ -7038,14 +7041,14 @@ let test_rpc_get_connections _protocol dal_parameters _cryptobox node client
   Log.info "Bootstrap DAL node is running" ;
 
   let producer = Dal_node.create ~name:"producer" ~node () in
-  let* () = Dal_node.init_config ~producer_profiles:[index] ~peers producer in
+  let* () = Dal_node.init_config ~operator_profiles:[index] ~peers producer in
   let* () = Dal_node.run ~wait_ready:true producer in
   let* producer_peer_id = peer_id producer in
   let* () =
     check_profiles
       ~__LOC__
       producer
-      ~expected:Dal_RPC.(Operator [Producer index])
+      ~expected:Dal_RPC.(Controller [Operator index])
   in
   Log.info "Slot producer DAL node is running" ;
 
@@ -7057,7 +7060,7 @@ let test_rpc_get_connections _protocol dal_parameters _cryptobox node client
     check_profiles
       ~__LOC__
       observer
-      ~expected:Dal_RPC.(Operator [Observer index])
+      ~expected:Dal_RPC.(Controller [Observer index])
   in
   Log.info "Observer DAL node is running" ;
 
@@ -7596,13 +7599,13 @@ module Refutations = struct
     let honest_operator_key = Constant.bootstrap5.public_key_hash in
     (* We have two DAL nodes in producer mode *)
     let* honest_dal_node =
-      make_dal_node ~name:"dal-honest" ~peers:[] ~producer_profiles:[0; 1] node
+      make_dal_node ~name:"dal-honest" ~peers:[] ~operator_profiles:[0; 1] node
     in
     let* faulty_dal_node =
       make_dal_node
         ~name:"dal-faulty"
         ~peers:[Dal_node.listen_addr honest_dal_node]
-        ~producer_profiles:[0; 1]
+        ~operator_profiles:[0; 1]
         node
     in
 
@@ -8082,14 +8085,14 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
 
   let producer = Dal_node.create ~name:"producer" ~node () in
   let* () =
-    Dal_node.init_config ~producer_profiles:[slot_index] ~peers producer
+    Dal_node.init_config ~operator_profiles:[slot_index] ~peers producer
   in
   let* () = Dal_node.run ~wait_ready:true producer in
   let* () =
     check_profiles
       ~__LOC__
       producer
-      ~expected:Dal_RPC.(Operator [Producer slot_index])
+      ~expected:Dal_RPC.(Controller [Operator slot_index])
   in
   Log.info "Slot producer DAL node is running" ;
 
@@ -8696,7 +8699,7 @@ let test_producer_attester (_protocol : Protocol.t)
   let slot_size = dal_params.cryptobox.slot_size in
   log_step "Declaration of a producer" ;
   let producer_node = Dal_node.create ~name:"producer" ~node () in
-  let* () = Dal_node.init_config ~producer_profiles:[index] producer_node in
+  let* () = Dal_node.init_config ~operator_profiles:[index] producer_node in
   let* () = Dal_node.run ~wait_ready:true producer_node in
   log_step "Two blocks are baked, because why not" ;
   let* () = bake_for ~count:2 client in
@@ -8778,7 +8781,7 @@ let test_attester_did_not_attest (_protocol : Protocol.t)
   let slot_size = dal_params.cryptobox.slot_size in
   log_step "Declaration of a producer" ;
   let producer_node = Dal_node.create ~name:"producer" ~node () in
-  let* () = Dal_node.init_config ~producer_profiles:[index] producer_node in
+  let* () = Dal_node.init_config ~operator_profiles:[index] producer_node in
   let* () = Dal_node.run ~wait_ready:true producer_node in
   log_step "Declaration of an attester" ;
   let attester_node = Dal_node.create ~name:"attester" ~node () in
@@ -10229,24 +10232,24 @@ let register ~protocols =
   (* Tests with layer1 and dal nodes *)
   scenario_with_layer1_and_dal_nodes
     ~number_of_slots:1
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     ~traps_fraction:Q.one
     "faulty DAL node entrapment"
     test_e2e_trap_faulty_dal_node
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   test_dal_node_startup protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     "dal node slot management"
     test_dal_node_slot_management
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6]
+    ~operator_profiles:[0; 1; 2; 3; 4; 5; 6]
     "dal node slot headers tracking"
     test_dal_node_slots_headers_tracking
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     "dal node shard fetching and slot reconstruction"
     test_dal_node_rebuild_from_shards
     protocols ;
@@ -10258,12 +10261,12 @@ let register ~protocols =
     test_dal_node_rpc_list
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     "dal node POST /slots"
     test_dal_node_test_post_slot
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     "dal node GET /levels/<level>/slots/<index>/content"
     test_dal_node_test_get_level_slot_content
     protocols ;
@@ -10281,13 +10284,13 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     "dal node GET \
      /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
-    ~producer_profiles:[0; 1; 2]
+    ~operator_profiles:[0; 1; 2]
     test_dal_node_get_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~attestation_threshold:100
     ~number_of_slots:8
-    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
+    ~operator_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
     "dal attester with bake for"
     test_attester_with_bake_for
     protocols ;
@@ -10297,13 +10300,13 @@ let register ~protocols =
     ~attestation_lag:16
     ~activation_timestamp:Now
     ~number_of_slots:8
-    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
+    ~operator_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
     "dal attester with baker daemon"
     test_attester_with_daemon
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["snapshot"; "import"]
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     "dal node import snapshot"
     test_dal_node_import_snapshot
     protocols ;
@@ -10323,14 +10326,14 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["gossipsub"]
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     "GS valid messages exchange"
     test_dal_node_gs_valid_messages_exchange
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["gossipsub"]
     "GS invalid messages exchange"
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     test_dal_node_gs_invalid_messages_exchange
     protocols ;
   scenario_with_layer1_and_dal_nodes
@@ -10378,10 +10381,10 @@ let register ~protocols =
     test_peers_reconnection
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["producer"; "profile"]
-    "producer profile"
+    ~tags:["operator"; "profile"]
+    "operator profile"
     ~prover:false
-    test_producer_profile
+    test_operator_profile
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["attestation"; "p2p"; Tag.memory_3k]
@@ -10416,7 +10419,7 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["gc"; "simple"; Tag.memory_3k]
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     ~number_of_slots:1
     "garbage collection of shards for producer"
     Garbage_collection.test_gc_simple_producer
@@ -10449,7 +10452,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~tags:["crawler"; "reconnection"]
     "DAL node crawler reconnects to L1 without crashing (producer case)"
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     test_dal_node_crawler_reconnects_to_l1
     protocols ;
   scenario_with_layer1_and_dal_nodes
@@ -10461,7 +10464,7 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~number_of_slots:1
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     ~regression:true
     "attesters receive DAL rewards"
     test_attesters_receive_dal_rewards
@@ -10470,7 +10473,7 @@ let register ~protocols =
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~tags:["restart"]
     ~activation_timestamp:Now
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     ~l1_history_mode:(Custom (Rolling (Some 5)))
     "restart DAL node (producer)"
     test_restart_dal_node
@@ -10486,17 +10489,17 @@ let register ~protocols =
 
   (* Tests with all nodes *)
   scenario_with_all_nodes
-    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6]
+    ~operator_profiles:[0; 1; 2; 3; 4; 5; 6]
     "rollup_node_downloads_slots"
     rollup_node_stores_dal_slots
     protocols ;
   scenario_with_all_nodes
-    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6]
+    ~operator_profiles:[0; 1; 2; 3; 4; 5; 6]
     "rollup_node_applies_dal_pages"
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
   scenario_with_all_nodes
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     "test reveal_dal_page in fast exec wasm pvm"
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
@@ -10513,7 +10516,7 @@ let register ~protocols =
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.tx_kernel_dal])
     ~pvm_name:"wasm_2_0_0"
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     ~number_of_shards:256
     ~slot_size:(1 lsl 15)
     ~redundancy_factor:8
@@ -10529,7 +10532,7 @@ let register ~protocols =
     ~slot_size:2048
     ~page_size:256
     ~number_of_shards:64
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
     Tx_kernel_e2e.test_echo_kernel_e2e
     protocols ;
 
@@ -10554,7 +10557,7 @@ let register ~protocols =
     ~pvm_name:"wasm_2_0_0"
     ~commitment_period:5
     rollup_node_injects_dal_slots
-    ~producer_profiles:[0]
+    ~operator_profiles:[0]
       (* It it sufficient for a single baker here to receive some shards here to
          declare the slot available. Otherwise the test might be flaky as we
          bake with a timestamp in the past. *)
@@ -10567,7 +10570,7 @@ let register ~protocols =
     ~pvm_name:"wasm_2_0_0"
     ~commitment_period:5
     rollup_batches_and_publishes_optimal_dal_slots
-    ~producer_profiles:[0; 1; 2]
+    ~operator_profiles:[0; 1; 2]
       (* It it sufficient for a single baker to receive some shards here to
          declare the slot available. Otherwise the test might be flaky as we
          bake with a timestamp in the past. *)

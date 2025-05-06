@@ -280,12 +280,12 @@ module Node = struct
 end
 
 module Profile_handlers = struct
-  let patch_profiles ctxt () operator_profiles =
+  let patch_profiles ctxt () controller_profiles =
     let open Lwt_result_syntax in
     let gs_worker = Node_context.get_gs_worker ctxt in
     call_handler1 (fun () ->
         let* () =
-          Node_context.warn_if_attesters_not_delegates ctxt operator_profiles
+          Node_context.warn_if_attesters_not_delegates ctxt controller_profiles
           |> lwt_map_error (fun e -> `Other e)
         in
         let* proto_parameters =
@@ -295,11 +295,11 @@ module Profile_handlers = struct
         in
         let number_of_slots = proto_parameters.Types.number_of_slots in
         match
-          Profile_manager.add_and_register_operator_profile
+          Profile_manager.add_and_register_controller_profiles
             (Node_context.get_profile_ctxt ctxt)
             ~number_of_slots
             gs_worker
-            operator_profiles
+            controller_profiles
         with
         | None -> fail @@ Errors.(other [Profile_incompatibility])
         | Some pctxt ->

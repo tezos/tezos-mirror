@@ -355,7 +355,7 @@ let test_dal_publish_commitment =
     ~protocol
     ~dal_enable:true
   @@ fun parameters cryptobox node client ->
-  Dal.with_dal_node ~producer_profiles:[0] node @@ fun _key dal_node ->
+  Dal.with_dal_node ~operator_profiles:[0] node @@ fun _key dal_node ->
   test protocol parameters cryptobox node client dal_node
 
 (* inspired by test_cont_refute_pre_migration from tests/sc_rollup_migration.ml *)

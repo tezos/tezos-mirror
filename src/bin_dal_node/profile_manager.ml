@@ -57,48 +57,49 @@ let unresolved_encoding =
         (function () -> Empty);
     ]
 
-let empty = Types.Operator Operator_profile.empty
+let empty = Types.Controller Controller_profiles.empty
 
 let bootstrap = Profile Types.Bootstrap
 
 let random_observer = Random_observer
 
-let operator operator_profile = Profile (Types.Operator operator_profile)
+let controller controller_profile =
+  Profile (Types.Controller controller_profile)
 
 let is_bootstrap_profile = function
   | Types.Bootstrap -> true
-  | Operator _ -> false
+  | Controller _ -> false
 
 let is_prover_profile = function
   | Types.Bootstrap -> false
-  | Types.Operator p -> Operator_profile.(has_observer p || has_producer p)
+  | Types.Controller p -> Controller_profiles.(has_observer p || has_operator p)
 
 let is_empty = function
   | Types.Bootstrap -> false
-  | Types.Operator operator_profile ->
-      Operator_profile.is_empty operator_profile
+  | Types.Controller controller_profiles ->
+      Controller_profiles.is_empty controller_profiles
 
 let is_attester_only_profile = function
   | Types.Bootstrap -> false
-  | Types.Operator p -> Operator_profile.(attester_only p)
+  | Types.Controller p -> Controller_profiles.(attester_only p)
 
 let can_publish_on_slot_index slot_index = function
   | Types.Bootstrap -> false
-  | Types.Operator p ->
-      Operator_profile.(can_publish_on_slot_index slot_index p)
+  | Types.Controller p ->
+      Controller_profiles.(can_publish_on_slot_index slot_index p)
 
 let merge_profiles ~lower_prio ~higher_prio =
   match (lower_prio, higher_prio) with
-  | Profile (Operator op1), Profile (Operator op2) ->
-      Profile (Operator (Operator_profile.merge op1 op2))
+  | Profile (Controller c1), Profile (Controller c2) ->
+      Profile (Controller (Controller_profiles.merge c1 c2))
   | lower_prio, Empty -> lower_prio
   | _ -> higher_prio
 
-let add_and_register_operator_profile t ~number_of_slots gs_worker
-    (operator_profile : Operator_profile.t) =
+let add_and_register_controller_profiles t ~number_of_slots gs_worker
+    (controller_profiles : Controller_profiles.t) =
   match t with
   | Types.Bootstrap -> None
-  | Operator operator_sets ->
+  | Controller controller_sets ->
       let on_new_attester pkh =
         List.iter
           (fun slot_index ->
@@ -107,31 +108,33 @@ let add_and_register_operator_profile t ~number_of_slots gs_worker
       in
       Some
         Types.(
-          Operator
-            (Operator_profile.merge
+          Controller
+            (Controller_profiles.merge
                ~on_new_attester
-               operator_sets
-               operator_profile))
+               controller_sets
+               controller_profiles))
 
 let resolve_profile t ~number_of_slots =
   match t with
   | Profile t -> t
   | Random_observer ->
       let slot_index = Random.int number_of_slots in
-      let operator_profile = Operator_profile.make ~observers:[slot_index] () in
-      Types.Operator operator_profile
+      let controller_profile =
+        Controller_profiles.make ~observers:[slot_index] ()
+      in
+      Types.Controller controller_profile
   | Empty -> empty
 
 let register_profile t ~number_of_slots gs_worker =
   match t with
   | Types.Bootstrap -> t
-  | Operator operator_profile -> (
+  | Controller controller_profile -> (
       let t_opt =
-        add_and_register_operator_profile
+        add_and_register_controller_profiles
           empty
           ~number_of_slots
           gs_worker
-          operator_profile
+          controller_profile
       in
       match t_opt with
       | Some t -> t
@@ -145,15 +148,23 @@ let validate_slot_indexes t ~number_of_slots =
   let open Result_syntax in
   match t with
   | Types.Bootstrap -> return_unit
-  | Operator o -> (
-      match Operator_profile.producer_slot_out_of_bounds number_of_slots o with
+  | Controller c -> (
+      match
+        Controller_profiles.operator_slot_out_of_bounds number_of_slots c
+      with
       | Some slot_index ->
           tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
-      | None -> return_unit)
+      | None -> (
+          match
+            Controller_profiles.observer_slot_out_of_bounds number_of_slots c
+          with
+          | Some slot_index ->
+              tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
+          | None -> return_unit))
 
 (* TODO https://gitlab.com/tezos/tezos/-/issues/5934
    We need a mechanism to ease the tracking of newly added/removed topics. *)
-let join_topics_for_operator gs_worker committee slots =
+let join_topics_for_controller gs_worker committee slots =
   List.iter
     (fun slot_index ->
       Signature.Public_key_hash.Map.iter
@@ -182,21 +193,21 @@ let on_new_head t ~number_of_slots gs_worker committee =
   match t with
   | Types.Bootstrap ->
       join_topics_for_bootstrap ~number_of_slots gs_worker committee
-  | Operator op ->
-      (* The topics associated to observers and producers can change
+  | Controller c ->
+      (* The topics associated to observers and operators can change
          if there new active bakers. However, for attesters, new slots
          are not created on new head, only on a new protocol. *)
-      let slots = Operator_profile.get_all_slot_indexes op in
-      join_topics_for_operator gs_worker committee slots
+      let slots = Controller_profiles.get_all_slot_indexes c in
+      join_topics_for_controller gs_worker committee slots
 
 let get_profiles t =
   match t with
   | Types.Bootstrap -> Types.Bootstrap
-  | Operator profiles -> Operator profiles
+  | Controller profiles -> Controller profiles
 
 let supports_refutations t =
   match get_profiles t with
-  | Operator op -> Operator_profile.(has_producer op)
+  | Controller c -> Controller_profiles.(has_operator c)
   | Bootstrap -> false
 
 (* Returns the period relevant for a refutation game. With a block time of 10
@@ -218,18 +229,18 @@ let get_attested_data_default_store_period t proto_parameters =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7772
      This period should be zero. *)
   let bootstrap_node_period = 2 * proto_parameters.attestation_lag in
-  (* For observability purpose, we aim for a non-slot producer profile
+  (* For observability purpose, we aim for a non-slot operator profile
      to keep shards for about 10 minutes.
      150 blocks is 10 minutes on Ghostnet, 20 minutes on Mainnet. *)
   let default_period = 150 in
   let supports_refutations_bis, period =
     match get_profiles t with
-    | Operator op ->
-        let has_producer = Operator_profile.(has_producer op) in
+    | Controller c ->
+        let has_operator = Controller_profiles.(has_operator c) in
         let period =
-          if has_producer then refutation_game_period else default_period
+          if has_operator then refutation_game_period else default_period
         in
-        (has_producer, period)
+        (has_operator, period)
     | Bootstrap -> (false, bootstrap_node_period)
   in
   (* This is just to keep this function synced with {!supports_refutations}. *)

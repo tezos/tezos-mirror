@@ -283,7 +283,7 @@ open struct
       ~msg:
         "the crawler failed to fetch the block {type} at level {level} (for \
          last_notified_level {last_notified}): {error}\n\
-         If you're a rollup producer or observer, you may be not be able to \
+         If you're a rollup operator or observer, you may be not be able to \
          defend your rollup commitments involving DAL inputs in a refutation \
          game."
       ~level:Warning

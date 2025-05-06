@@ -185,16 +185,16 @@ module RPC : sig
   type commitment = string
 
   (** Profiles that operate on shards/slots. *)
-  type operator_profile =
+  type controller_profile =
     | Attester of string
-    | Producer of int
+    | Operator of int
     | Observer of int
 
-  (** List of operator profiles.  *)
-  type operator_profiles = operator_profile list
+  (** List of controller profiles.  *)
+  type controller_profiles = controller_profile list
 
   (* Profiles tracked by the DAL node. *)
-  type profile = Bootstrap | Operator of operator_profiles
+  type profile = Bootstrap | Controller of controller_profiles
 
   (** Information contained in a slot header fetched from the DAL node. *)
   type slot_header = {
@@ -240,7 +240,7 @@ module RPC : sig
 
   (**  Call RPC "PATCH /profiles" to update the list of profiles tracked by
          the DAL node. *)
-  val patch_profiles : operator_profiles -> unit RPC_core.t
+  val patch_profiles : controller_profiles -> unit RPC_core.t
 
   (**  Call RPC "GET /profiles" to retrieve the list of profiles tracked by
          the DAL node. *)

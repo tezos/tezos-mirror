@@ -97,7 +97,7 @@ let spawn_command dal_node =
     dal_node.path
 
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
-    ?(attester_profiles = []) ?(producer_profiles = [])
+    ?(attester_profiles = []) ?(operator_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
     dal_node =
   spawn_command dal_node
@@ -127,11 +127,11 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          "--observer-profiles";
          String.concat "," (List.map string_of_int observer_profiles);
        ])
-  @ (if producer_profiles = [] then []
+  @ (if operator_profiles = [] then []
      else
        [
-         "--producer-profiles";
-         String.concat "," (List.map string_of_int producer_profiles);
+         "--operator-profiles";
+         String.concat "," (List.map string_of_int operator_profiles);
        ])
   @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
   @
@@ -142,7 +142,7 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
   | Some (Custom i) -> ["--history-mode"; string_of_int i]
 
 let spawn_config_update ?(peers = []) ?(attester_profiles = [])
-    ?(producer_profiles = []) ?(observer_profiles = [])
+    ?(operator_profiles = []) ?(observer_profiles = [])
     ?(bootstrap_profile = false) ?history_mode dal_node =
   spawn_command dal_node @@ ["config"; "update"]
   @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
@@ -154,11 +154,11 @@ let spawn_config_update ?(peers = []) ?(attester_profiles = [])
          "--observer-profiles";
          String.concat "," (List.map string_of_int observer_profiles);
        ])
-  @ (if producer_profiles = [] then []
+  @ (if operator_profiles = [] then []
      else
        [
-         "--producer-profiles";
-         String.concat "," (List.map string_of_int producer_profiles);
+         "--operator-profiles";
+         String.concat "," (List.map string_of_int operator_profiles);
        ])
   @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
   @
@@ -178,14 +178,14 @@ module Config_file = struct
   let update dal_node update = read dal_node |> update |> write dal_node
 end
 
-let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
+let init_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
     ?observer_profiles ?bootstrap_profile ?history_mode dal_node =
   let process =
     spawn_config_init
       ?expected_pow
       ?peers
       ?attester_profiles
-      ?producer_profiles
+      ?operator_profiles
       ?observer_profiles
       ?bootstrap_profile
       ?history_mode
@@ -193,13 +193,13 @@ let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
   in
   Process.check process
 
-let update_config ?peers ?attester_profiles ?producer_profiles
+let update_config ?peers ?attester_profiles ?operator_profiles
     ?observer_profiles ?bootstrap_profile ?history_mode dal_node =
   let process =
     spawn_config_update
       ?peers
       ?attester_profiles
-      ?producer_profiles
+      ?operator_profiles
       ?observer_profiles
       ?bootstrap_profile
       ?history_mode

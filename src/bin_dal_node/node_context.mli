@@ -184,10 +184,10 @@ val fetch_committee :
 (** [version ctxt] returns the current version of the node *)
 val version : t -> Types.Version.t
 
-(** Emit a warning for each public key hash in the given operator profile (if
+(** Emit a warning for each public key hash in the given controller profiles (if
     any) that is not that of a L1-registered delegate. *)
 val warn_if_attesters_not_delegates :
-  t -> Operator_profile.t -> unit tzresult Lwt.t
+  t -> Controller_profiles.t -> unit tzresult Lwt.t
 
 (** Module for P2P-related accessors.  *)
 module P2P : sig

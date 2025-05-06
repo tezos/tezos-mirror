@@ -950,9 +950,10 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
     let*! () =
       match profiles with
       | Tezos_dal_node_services.Types.Bootstrap -> warn ()
-      | Operator operator_profile ->
+      | Controller controller_profile ->
           let attesters =
-            Tezos_dal_node_services.Operator_profile.attesters operator_profile
+            Tezos_dal_node_services.Controller_profiles.attesters
+              controller_profile
           in
           if Tezos_crypto.Signature.Public_key_hash.Set.is_empty attesters then
             warn ()

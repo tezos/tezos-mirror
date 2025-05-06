@@ -295,7 +295,7 @@ let get_protocol_parameters :
 
 let patch_profiles :
     < meth : [`PATCH]
-    ; input : Operator_profile.t
+    ; input : Controller_profiles.t
     ; output : unit
     ; prefix : unit
     ; params : unit
@@ -307,7 +307,7 @@ let patch_profiles :
        not take the bootstrap profile as it is incompatible with other \
        profiles."
     ~query:Tezos_rpc.Query.empty
-    ~input:Operator_profile.encoding
+    ~input:Controller_profiles.encoding
     ~output:Data_encoding.unit
     Tezos_rpc.Path.(open_root / "profiles")
 

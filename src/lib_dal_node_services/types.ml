@@ -345,7 +345,7 @@ type slot_header = {
   status : header_status;
 }
 
-type profile = Bootstrap | Operator of Operator_profile.t
+type profile = Bootstrap | Controller of Controller_profiles.t
 
 type with_proof = {with_proof : bool}
 
@@ -468,11 +468,11 @@ let profile_encoding =
         (Tag 2)
         (obj2
            (req "kind" (constant "controller"))
-           (req "controller_profiles" Operator_profile.encoding))
+           (req "controller_profiles" Controller_profiles.encoding))
         (function
-          | Operator operator_profiles -> Some ((), operator_profiles)
+          | Controller controller_profiles -> Some ((), controller_profiles)
           | _ -> None)
-        (function (), operator_profiles -> Operator operator_profiles);
+        (function (), controller_profiles -> Controller controller_profiles);
     ]
 
 let with_proof_encoding =
