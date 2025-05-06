@@ -11,7 +11,7 @@ protocol=$(head -1 script-inputs/active_protocol_versions_without_number)
 # This logic must be kept in sync with the script in
 # ./scripts/ci/create_debian_repo.sh
 
-# The prefix used for these packages in the repository. E.g. 'next'
+# The prefix used for these packages in the repository. E.g. 'old'
 if [ -n "$PREFIX" ]; then
   PREFIX=${PREFIX}/
 else
@@ -77,11 +77,10 @@ else
 fi
 
 # [ preeseed octez ]
-if [ -z "$PREFIX" ]; then
-  # preseed octez-node for debconf. Notice we set purge_warning to yes,
-  # to make the `autopurge` pass and remove all the node data at the end of this
-  # script.
-  cat << EOF > preseed.cfg
+# preseed octez-node for debconf. Notice we set purge_warning to yes,
+# to make the `autopurge` pass and remove all the node data at the end of this
+# script.
+cat << EOF > preseed.cfg
 octez-node octez-node/configure boolean true
 octez-node octez-node/history-mode string full
 octez-node octez-node/network string mainnet
@@ -90,12 +89,11 @@ octez-node octez-node/snapshot-import boolean false
 octez-node octez-node/snapshot-no-check boolean true
 debconf debconf/frontend select Noninteractive
 EOF
-  # preseed the package
-  sudo debconf-set-selections preseed.cfg
+# preseed the package
+sudo debconf-set-selections preseed.cfg
 
-  # check the package configuration
-  sudo debconf-get-selections | grep octez
-fi
+# check the package configuration
+sudo debconf-get-selections | grep octez
 
 # [install tezos]
 apt-get install -y octez-client
@@ -105,13 +103,7 @@ apt-get install -y octez-baker
 apt-get install -y octez-dal-node
 
 # [install octez additional packages]
-if [ -z "$PREFIX" ]; then
-  # [install octez NEXT packages]
-  apt-get install -y octez-smart-rollup-node
-else
-  # [install octez current packages]
-  apt-get install -y octez-smartrollup
-fi
+apt-get install -y octez-smart-rollup-node
 
 # [test executables]
 octez-client --version
@@ -123,30 +115,27 @@ octez-node --version
 apt-get autopurge -y octez-node octez-client octez-baker octez-dal-node
 
 # [check autopurge]
-set +x
 
-if [ -z "$PREFIX" ]; then
-  # check the package configuration
-  sudo debconf-get-selections | if grep -q octez; then
-    echo "Leftovers in debconf db"
-    sudo debconf-get-selections | grep -q octez
-    exit 1
-  fi
+# check the package configuration
+sudo debconf-get-selections | if grep -q octez; then
+  echo "Leftovers in debconf db"
+  sudo debconf-get-selections | grep -q octez
+  exit 1
+fi
 
-  printf "Check if the user tezos was removed:"
-  if id tezos > /dev/null 2>&1; then
-    echo "Tezos user not correctly removed"
-    id tezos
-    exit 1
-  else
-    echo "Ok."
-  fi
+printf "Check if the user tezos was removed:"
+if id tezos > /dev/null 2>&1; then
+  echo "Tezos user not correctly removed"
+  id tezos
+  exit 1
+else
+  echo "Ok."
+fi
 
-  printf "Check if the datadir was correctly removed:"
-  if [ -e /var/tezos ]; then
-    echo "Datadir /var/tezos not correctly removed"
-    ls -la /var/tezos
-  else
-    echo "Ok."
-  fi
+printf "Check if the datadir was correctly removed:"
+if [ -e /var/tezos ]; then
+  echo "Datadir /var/tezos not correctly removed"
+  ls -la /var/tezos
+else
+  echo "Ok."
 fi
