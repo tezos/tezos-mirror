@@ -780,6 +780,46 @@ let test_tezlink_header =
        ~chain_id
        ~current_timestamp:(Some current_timestamp)
 
+let test_tezlink_bootstrapped =
+  register_tezlink_test
+    ~title:"Test of the bootstrapped rpc"
+    ~tags:["rpc"; "bootstrapped"]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let current_timestamp =
+    Tezos_base.Time.(
+      System.now () |> System.to_protocol |> Protocol.to_notation)
+  in
+  let*@ n = Rpc.produce_block ~timestamp:current_timestamp sequencer in
+  let* () = Evm_node.wait_for_blueprint_applied sequencer n in
+  let* block =
+    Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block_header ()
+  in
+  let* rpc_bootstrapped =
+    let path = "/tezlink/monitor/bootstrapped" in
+    let* res =
+      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    return @@ JSON.parse ~origin:"curl_bootstrapped" res
+  in
+  Check.(
+    JSON.(
+      rpc_bootstrapped |-> "block" |> as_string = (block |-> "hash" |> as_string))
+      string
+      ~error_msg:"Check block_hash is latest, Expected %R but got %L") ;
+  Check.(
+    JSON.(
+      rpc_bootstrapped |-> "timestamp" |> as_string
+      = (block |-> "timestamp" |> as_string))
+      string
+      ~error_msg:"Check timestamp is latest, Expected %R but got %L") ;
+  unit
+
 let test_make_l2_kernel_installer_config chain_family =
   Protocol.register_test
     ~__FILE__
@@ -13592,4 +13632,5 @@ let () =
   test_tezlink_constants [Alpha] ;
   test_tezlink_produceBlock [Alpha] ;
   test_tezlink_chain_id [Alpha] ;
+  test_tezlink_bootstrapped [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha]
