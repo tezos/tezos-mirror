@@ -339,11 +339,12 @@ pub enum ArgsShape {
 pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
     use OpCode::*;
     match opcode {
-        Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw | Sd | Lrw | Scw | Amoswapw
-        | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw | Amomaxw | Amominuw | Amomaxuw | Lrd
-        | Scd | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind | Amomaxd | Amominud
-        | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw | Mulh | Mulhsu
-        | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci => ArgsShape::XSrcXDest,
+        X8LoadSigned | X16LoadSigned | X32LoadSigned | Lbu | Lhu | Lwu | X64LoadSigned | Sb
+        | Sh | Sw | Sd | Lrw | Scw | Amoswapw | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw
+        | Amomaxw | Amominuw | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd | Amoxord | Amoandd
+        | Amoord | Amomind | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw | Remuw | Div
+        | Divu | Divw | Divuw | Mulh | Mulhsu | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi
+        | Csrrsi | Csrrci => ArgsShape::XSrcXDest,
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -397,13 +398,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | BranchLessThanOrEqualZero
         | BranchGreaterThanZero
         | JalrImm
-        | Ldnz
         | Sdnz
-        | Lwnz
         | Swnz
-        | Lhnz
         | Shnz
-        | Lbnz
         | Sbnz
         | Nop
         | ECall

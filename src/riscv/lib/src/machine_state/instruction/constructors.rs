@@ -686,29 +686,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Ld`].
-    pub(crate) fn new_ld(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
-        Self {
-            opcode: OpCode::Ld,
-            args: Args {
-                rd: rd.into(),
-                rs1: rs1.into(),
-                imm,
-                width,
-                ..Args::DEFAULT
-            },
-        }
-    }
-
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Ldnz`].
-    pub(crate) fn new_ldnz(
-        rd: NonZeroXRegister,
-        rs1: NonZeroXRegister,
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64LoadSigned`].
+    pub(crate) fn new_x64_load_signed(
+        rd: XRegister,
+        rs1: XRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Ldnz,
+            opcode: OpCode::X64LoadSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -752,29 +738,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lw`].
-    pub(crate) fn new_lw(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
-        Self {
-            opcode: OpCode::Lw,
-            args: Args {
-                rd: rd.into(),
-                rs1: rs1.into(),
-                imm,
-                width,
-                ..Args::DEFAULT
-            },
-        }
-    }
-
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lwnz`].
-    pub(crate) fn new_lwnz(
-        rd: NonZeroXRegister,
-        rs1: NonZeroXRegister,
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32LoadSigned`].
+    pub(crate) fn new_x32_load_signed(
+        rd: XRegister,
+        rs1: XRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Lwnz,
+            opcode: OpCode::X32LoadSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -818,29 +790,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lh`].
-    pub(crate) fn new_lh(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
-        Self {
-            opcode: OpCode::Lh,
-            args: Args {
-                rd: rd.into(),
-                rs1: rs1.into(),
-                imm,
-                width,
-                ..Args::DEFAULT
-            },
-        }
-    }
-
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lhnz`].
-    pub(crate) fn new_lhnz(
-        rd: NonZeroXRegister,
-        rs1: NonZeroXRegister,
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X16LoadSigned`].
+    pub(crate) fn new_x16_load_signed(
+        rd: XRegister,
+        rs1: XRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Lhnz,
+            opcode: OpCode::X16LoadSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -884,29 +842,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lb`].
-    pub(crate) fn new_lb(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
-        Self {
-            opcode: OpCode::Lb,
-            args: Args {
-                rd: rd.into(),
-                rs1: rs1.into(),
-                imm,
-                width,
-                ..Args::DEFAULT
-            },
-        }
-    }
-
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lbnz`].
-    pub(crate) fn new_lbnz(
-        rd: NonZeroXRegister,
-        rs1: NonZeroXRegister,
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X8LoadSigned`].
+    pub(crate) fn new_x8_load_signed(
+        rd: XRegister,
+        rs1: XRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Lbnz,
+            opcode: OpCode::X8LoadSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -1644,19 +1588,6 @@ impl Instruction {
         }
     }
 
-    /// Convert [`InstrCacheable::Ld`] according to whether register is non-zero.
-    ///
-    /// [`InstrCacheable::Ld`]: crate::parser::instruction::InstrCacheable::Ld
-    pub(super) fn from_ic_ld(args: &ITypeArgs) -> Instruction {
-        use XRegisterParsed as X;
-        match (split_x0(args.rd), split_x0(args.rs1)) {
-            (X::NonZero(rd), X::NonZero(rs1)) => {
-                Instruction::new_ldnz(rd, rs1, args.imm, InstrWidth::Uncompressed)
-            }
-            _ => Instruction::new_ld(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed),
-        }
-    }
-
     /// Convert [`InstrCacheable::Sd`] according to whether registers are non-zero.
     ///
     /// [`InstrCacheable::Sd`]: crate::parser::instruction::InstrCacheable::Sd
@@ -1679,19 +1610,6 @@ impl Instruction {
         match split_x0(args.rs2) {
             X::NonZero(rs2) => Instruction::new_sdnz(nz::sp, rs2, args.imm, InstrWidth::Compressed),
             X::X0 => Instruction::new_sd(sp, x0, args.imm, InstrWidth::Compressed),
-        }
-    }
-
-    /// Convert [`InstrCacheable::Lw`] according to whether register is non-zero.
-    ///
-    /// [`InstrCacheable::Lw`]: crate::parser::instruction::InstrCacheable::Lw
-    pub(super) fn from_ic_lw(args: &ITypeArgs) -> Instruction {
-        use XRegisterParsed as X;
-        match (split_x0(args.rd), split_x0(args.rs1)) {
-            (X::NonZero(rd), X::NonZero(rs1)) => {
-                Instruction::new_lwnz(rd, rs1, args.imm, InstrWidth::Uncompressed)
-            }
-            _ => Instruction::new_lw(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed),
         }
     }
 
@@ -1720,19 +1638,6 @@ impl Instruction {
         }
     }
 
-    /// Convert [`InstrCacheable::Lh`] according to whether register is non-zero.
-    ///
-    /// [`InstrCacheable::Lh`]: crate::parser::instruction::InstrCacheable::Lh
-    pub(super) fn from_ic_lh(args: &ITypeArgs) -> Instruction {
-        use XRegisterParsed as X;
-        match (split_x0(args.rd), split_x0(args.rs1)) {
-            (X::NonZero(rd), X::NonZero(rs1)) => {
-                Instruction::new_lhnz(rd, rs1, args.imm, InstrWidth::Uncompressed)
-            }
-            _ => Instruction::new_lh(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed),
-        }
-    }
-
     /// Convert [`InstrCacheable::Sh`] according to whether registers are non-zero.
     ///
     /// [`InstrCacheable::Sh`]: crate::parser::instruction::InstrCacheable::Sh
@@ -1743,19 +1648,6 @@ impl Instruction {
                 Instruction::new_shnz(rs1, rs2, args.imm, InstrWidth::Uncompressed)
             }
             _ => Instruction::new_sh(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
-        }
-    }
-
-    /// Convert [`InstrCacheable::Lb`] according to whether register is non-zero.
-    ///
-    /// [`InstrCacheable::Lb`]: crate::parser::instruction::InstrCacheable::Lb
-    pub(super) fn from_ic_lb(args: &ITypeArgs) -> Instruction {
-        use XRegisterParsed as X;
-        match (split_x0(args.rd), split_x0(args.rs1)) {
-            (X::NonZero(rd), X::NonZero(rs1)) => {
-                Instruction::new_lbnz(rd, rs1, args.imm, InstrWidth::Uncompressed)
-            }
-            _ => Instruction::new_lb(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed),
         }
     }
 

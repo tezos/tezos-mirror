@@ -1911,10 +1911,10 @@ mod tests {
     });
 
     backend_test!(test_load, F, {
-        use crate::machine_state::registers::NonZeroXRegister::*;
+        use crate::machine_state::registers::NonZeroXRegister as NZ;
+        use crate::machine_state::registers::XRegister::*;
 
-        type ConstructLoadFn =
-            fn(rd: NonZeroXRegister, rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> I;
+        type ConstructLoadFn = fn(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> I;
 
         const MEMORY_SIZE: u64 = M4K::TOTAL_BYTES as u64;
 
@@ -1928,13 +1928,13 @@ mod tests {
                         .unwrap();
                 }))
                 .set_instructions(&[
-                    I::new_li(x1, LOAD_ADDRESS_BASE as i64, InstrWidth::Compressed),
+                    I::new_li(NZ::x1, LOAD_ADDRESS_BASE as i64, InstrWidth::Compressed),
                     new_load(x2, x1, imm as i64, InstrWidth::Uncompressed),
                     I::new_nop(InstrWidth::Compressed),
                 ])
                 .set_expected_steps(3)
                 .set_assert_hook(assert_hook!(core, F, {
-                    let value: u64 = core.hart.xregisters.read_nz(x2);
+                    let value: u64 = core.hart.xregisters.read(x2);
                     assert_eq!(value, expected, "Found {value:x}, expected {expected:x}");
                 }))
                 .build()
@@ -1947,14 +1947,14 @@ mod tests {
 
             ScenarioBuilder::default()
                 .set_instructions(&[
-                    I::new_li(x1, load_address_base as i64, InstrWidth::Compressed),
+                    I::new_li(NZ::x1, load_address_base as i64, InstrWidth::Compressed),
                     new_load(x2, x1, load_address_offset as i64, InstrWidth::Uncompressed),
                     I::new_nop(InstrWidth::Compressed),
                 ])
                 // the load will fail due to being out of bounds
                 .set_expected_steps(2)
                 .set_assert_hook(assert_hook!(core, F, {
-                    let value: u64 = core.hart.xregisters.read_nz(x2);
+                    let value: u64 = core.hart.xregisters.read(x2);
                     assert_eq!(value, 0, "Found {value:x}, but expected load to fail");
                 }))
                 .build()
@@ -1965,19 +1965,19 @@ mod tests {
         let scenarios: &[Scenario<F>] = &[
             // check loads - differing imm value to ensure both
             // aligned & unaligned loads are supported
-            valid_load(I::new_ldnz, 8, XREG_VALUE),
-            valid_load(I::new_ldnz, 5, XREG_VALUE),
-            valid_load(I::new_lwnz, 4, XREG_VALUE as i32 as u64),
-            valid_load(I::new_lwnz, 3, XREG_VALUE as i32 as u64),
-            valid_load(I::new_lhnz, 2, XREG_VALUE as i16 as u64),
-            valid_load(I::new_lhnz, 1, XREG_VALUE as i16 as u64),
+            valid_load(I::new_x64_load_signed, 8, XREG_VALUE),
+            valid_load(I::new_x64_load_signed, 5, XREG_VALUE),
+            valid_load(I::new_x32_load_signed, 4, XREG_VALUE as i32 as u64),
+            valid_load(I::new_x32_load_signed, 3, XREG_VALUE as i32 as u64),
+            valid_load(I::new_x16_load_signed, 2, XREG_VALUE as i16 as u64),
+            valid_load(I::new_x16_load_signed, 1, XREG_VALUE as i16 as u64),
             // byte load always aligned
-            valid_load(I::new_lbnz, 0, XREG_VALUE as i8 as u64),
+            valid_load(I::new_x8_load_signed, 0, XREG_VALUE as i8 as u64),
             // invalid loads: out of bounds
-            invalid_load(I::new_ldnz, LoadStoreWidth::Double),
-            invalid_load(I::new_lwnz, LoadStoreWidth::Word),
-            invalid_load(I::new_lhnz, LoadStoreWidth::Half),
-            invalid_load(I::new_lbnz, LoadStoreWidth::Byte),
+            invalid_load(I::new_x64_load_signed, LoadStoreWidth::Double),
+            invalid_load(I::new_x32_load_signed, LoadStoreWidth::Word),
+            invalid_load(I::new_x16_load_signed, LoadStoreWidth::Half),
+            invalid_load(I::new_x8_load_signed, LoadStoreWidth::Byte),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
