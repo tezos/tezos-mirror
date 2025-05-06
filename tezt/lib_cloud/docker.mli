@@ -52,6 +52,7 @@ val run :
   ?runner:Runner.t ->
   ?rm:bool ->
   ?name:string ->
+  ?detach:bool ->
   ?network:string ->
   ?publish_ports:string * string * string * string ->
   ?volumes:(string * string) list ->
