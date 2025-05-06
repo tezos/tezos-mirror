@@ -24,8 +24,8 @@ val baker_args :
     * Q.t
     * int option
     * bool
-    * string option
-    * string option
+    * Per_block_votes.per_block_vote option
+    * Per_block_votes.per_block_vote option
     * string option
     * Uri.t option
     * Uri.t option
@@ -58,8 +58,8 @@ type t = {
   minimal_nanotez_per_byte : Q.t;
   force_apply_from_round : int option;
   keep_alive : bool;
-  liquidity_baking_vote : string option;
-  adaptive_issuance_vote : string option;
+  liquidity_baking_vote : Per_block_votes.per_block_vote option;
+  adaptive_issuance_vote : Per_block_votes.per_block_vote option;
   per_block_vote_file : string option;
   extra_operations : Uri.t option;
   dal_node_endpoint : Uri.t option;
@@ -78,8 +78,8 @@ val create_config :
   * Q.t
   * int option
   * bool
-  * string option
-  * string option
+  * Per_block_votes.per_block_vote option
+  * Per_block_votes.per_block_vote option
   * string option
   * Uri.t option
   * Uri.t option
@@ -88,3 +88,9 @@ val create_config :
   * Q.t option
   * Q.t option ->
   t
+
+type per_block_votes_config = {
+  vote_file : string option;
+  liquidity_baking_vote : Per_block_votes.per_block_vote;
+  adaptive_issuance_vote : Per_block_votes.per_block_vote;
+}

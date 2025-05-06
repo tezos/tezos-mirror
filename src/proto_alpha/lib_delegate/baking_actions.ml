@@ -360,16 +360,48 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   in
   (* Prioritize reading from the [vote_file] if it exists. *)
   let*! {liquidity_baking_vote; adaptive_issuance_vote} =
+    let of_protocol = function
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_on ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_on
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_off ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_off
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_pass
+    in
+    let to_protocol = function
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_on ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_off ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_off
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_pass ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
+    in
     let default =
       Protocol.Alpha_context.Per_block_votes.
         {liquidity_baking_vote; adaptive_issuance_vote}
     in
     match vote_file with
     | Some per_block_vote_file ->
-        Per_block_vote_file.read_per_block_votes_no_fail
-          ~default
-          ~per_block_vote_file
-        [@profiler.record_s {verbosity = Info} "read per block votes file"]
+        let default =
+          Octez_agnostic_baker.Per_block_votes.
+            {
+              liquidity_baking_vote = of_protocol liquidity_baking_vote;
+              adaptive_issuance_vote = of_protocol adaptive_issuance_vote;
+            }
+        in
+        let*! Octez_agnostic_baker.Per_block_votes.
+                {liquidity_baking_vote; adaptive_issuance_vote} =
+          (Per_block_vote_file.read_per_block_votes_no_fail
+             ~default
+             ~per_block_vote_file
+           [@profiler.record_s {verbosity = Info} "read per block votes file"])
+        in
+        Lwt.return
+          Protocol.Alpha_context.Per_block_votes.
+            {
+              liquidity_baking_vote = to_protocol liquidity_baking_vote;
+              adaptive_issuance_vote = to_protocol adaptive_issuance_vote;
+            }
     | None -> Lwt.return default
   in
   let*! () =

@@ -19,6 +19,11 @@ type error +=
       baker_commit_info : Tezos_version.Octez_node_version.commit_info option;
     }
   | Node_version_malformatted of string
+  | Block_vote_file_not_found of string
+  | Block_vote_file_invalid of string
+  | Block_vote_file_wrong_content of string
+  | Block_vote_file_missing_liquidity_baking_toggle_vote of string
+  | Missing_vote_on_startup
 
 let () =
   Error_monad.register_error_kind
@@ -143,4 +148,108 @@ let () =
         version)
     Data_encoding.(obj1 (req "provided_version" string))
     (function Node_version_malformatted v -> Some v | _ -> None)
-    (fun v -> Node_version_malformatted v)
+    (fun v -> Node_version_malformatted v) ;
+  register_error_kind
+    `Permanent
+    ~id:"Per_block_vote_file.block_vote_file_not_found"
+    ~title:
+      "The provided block vote file path does not point to an existing file."
+    ~description:
+      "A block vote file path was provided on the command line but the path \
+       does not point to an existing file."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[The provided block vote file path \"%s\" does not point to an \
+         existing file.@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function
+      | Block_vote_file_not_found file_path -> Some file_path | _ -> None)
+    (fun file_path -> Block_vote_file_not_found file_path) ;
+  register_error_kind
+    `Permanent
+    ~id:"Per_block_vote_file.block_vote_file_invalid"
+    ~title:
+      "The provided block vote file path does not point to a valid JSON file."
+    ~description:
+      "A block vote file path was provided on the command line but the path \
+       does not point to a valid JSON file."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[The provided block vote file path \"%s\" does not point to a valid \
+         JSON file. The file exists but its content is not valid JSON.@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function Block_vote_file_invalid file_path -> Some file_path | _ -> None)
+    (fun file_path -> Block_vote_file_invalid file_path) ;
+  register_error_kind
+    `Permanent
+    ~id:"Per_block_vote_file.block_vote_file_wrong_content"
+    ~title:"The content of the provided block vote file is unexpected."
+    ~description:
+      "The block vote file is valid JSON but its content is not the expected \
+       one."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[The provided block vote file \"%s\" is a valid JSON file but its \
+         content is unexpected. Expecting a JSON file containing \
+         '{\"liquidity_baking_toggle_vote\": value1, \
+         \"adaptive_issuance_vote\": value2}' or '{\"adaptive_issuance_vote\": \
+         value1, \"liquidity_baking_toggle_vote\": value2}', where value1 is \
+         one of \"on\", \"off\", or \"pass\" and value2 is one of \"on\", \
+         \"off\", or \"pass\", or '{\"liquidity_baking_toggle_vote\": value}' \
+         where value is one of \"on\", \"off\", or \"pass\".@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function
+      | Block_vote_file_wrong_content file_path -> Some file_path | _ -> None)
+    (fun file_path -> Block_vote_file_wrong_content file_path) ;
+  register_error_kind
+    `Permanent
+    ~id:
+      "Per_block_vote_file.block_vote_file_missing_liquidity_baking_toggle_vote"
+    ~title:
+      "In the provided block vote file, no entry for liquidity baking toggle \
+       vote was found"
+    ~description:
+      "In the provided block vote file, no entry for liquidity baking toggle \
+       vote was found."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[In the provided block vote file \"%s\", the \
+         \"liquidity_baking_toggle_vote\" field is missing. Expecting a JSON \
+         file containing '{\"liquidity_baking_toggle_vote\": value1, \
+         \"adaptive_issuance_vote\": value2}' or '{\"adaptive_issuance_vote\": \
+         value1, \"liquidity_baking_toggle_vote\": value2}', where value1 is \
+         one of \"on\", \"off\", or \"pass\" and value2 is one of \"on\", \
+         \"off\", or \"pass\", or '{\"liquidity_baking_toggle_vote\": value}' \
+         where value is one of \"on\", \"off\", or \"pass\".@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function
+      | Block_vote_file_missing_liquidity_baking_toggle_vote file_path ->
+          Some file_path
+      | _ -> None)
+    (fun file_path ->
+      Block_vote_file_missing_liquidity_baking_toggle_vote file_path) ;
+  register_error_kind
+    `Permanent
+    ~id:"Per_block_vote_file.missing_vote_on_startup"
+    ~title:"Missing vote on startup"
+    ~description:
+      "No CLI flag, file path, or votes file in default location provided on \
+       startup"
+    ~pp:(fun fmt () ->
+      Format.fprintf
+        fmt
+        "Missing liquidity baking toggle vote, please use either the \
+         --liquidity-baking-toggle-vote option, or the --votefile option or a \
+         votes file in the default location: per_block_votes.json in the \
+         current working directory or in the baker directory.")
+    Data_encoding.empty
+    (function Missing_vote_on_startup -> Some () | _ -> None)
+    (fun () -> Missing_vote_on_startup)

@@ -48,8 +48,6 @@
     the config in order to check for updated votes.
 *)
 
-open Protocol.Alpha_context
-
 (** Default vote file name that should be looked up when the baker
     starts. *)
 val default_vote_json_filename : string
@@ -74,4 +72,7 @@ val load_per_block_votes_config :
   default_liquidity_baking_vote:Per_block_votes.per_block_vote option ->
   default_adaptive_issuance_vote:Per_block_votes.per_block_vote option ->
   per_block_vote_file:string option ->
-  Baking_configuration.per_block_votes_config tzresult Lwt.t
+  Configuration.per_block_votes_config tzresult Lwt.t
+
+val lookup_default_vote_file_path :
+  Tezos_client_base.Client_context.full -> string option Lwt.t

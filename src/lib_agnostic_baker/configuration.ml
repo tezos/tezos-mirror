@@ -9,31 +9,13 @@
     created. An argument of this type will be passed to the main running
     function of the agnostic baker. *)
 
-type error += Block_vote_file_not_found of string
+open Errors
 
 type error += Bad_minimal_fees of string
 
 type error += Bad_preserved_levels of string
 
 let () =
-  register_error_kind
-    `Permanent
-    ~id:"agnostic_baker.configuration.block_vote_file_not_found"
-    ~title:
-      "The provided block vote file path does not point to an existing file."
-    ~description:
-      "A block vote file path was provided on the command line but the path \
-       does not point to an existing file."
-    ~pp:(fun ppf file_path ->
-      Format.fprintf
-        ppf
-        "@[The provided block vote file path \"%s\" does not point to an \
-         existing file.@]"
-        file_path)
-    Data_encoding.(obj1 (req "file_path" string))
-    (function
-      | Block_vote_file_not_found file_path -> Some file_path | _ -> None)
-    (fun file_path -> Block_vote_file_not_found file_path) ;
   register_error_kind
     `Permanent
     ~id:"agnostic_baker.configuration.badMinimalFeesArg"
@@ -80,7 +62,9 @@ let per_block_vote_parameter =
   Tezos_clic.parameter
     ~autocomplete:(fun _ctxt -> return ["on"; "off"; "pass"])
     (fun (_cctxt : Tezos_client_base.Client_context.full) -> function
-      | ("on" | "off" | "pass") as s -> return s
+      | "on" -> return Per_block_votes.Per_block_vote_on
+      | "off" -> return Per_block_votes.Per_block_vote_off
+      | "pass" -> return Per_block_votes.Per_block_vote_pass
       | s ->
           failwith
             "unexpected vote: %s, expected either \"on\", \"off\", or \"pass\"."
@@ -395,8 +379,8 @@ type t = {
   minimal_nanotez_per_byte : Q.t;
   force_apply_from_round : int option;
   keep_alive : bool;
-  liquidity_baking_vote : string option;
-  adaptive_issuance_vote : string option;
+  liquidity_baking_vote : Per_block_votes.per_block_vote option;
+  adaptive_issuance_vote : Per_block_votes.per_block_vote option;
   per_block_vote_file : string option;
   extra_operations : Uri.t option;
   dal_node_endpoint : Uri.t option;
@@ -444,3 +428,9 @@ let create_config
     pre_emptive_forge_time;
     remote_calls_timeout;
   }
+
+type per_block_votes_config = {
+  vote_file : string option;
+  liquidity_baking_vote : Per_block_votes.per_block_vote;
+  adaptive_issuance_vote : Per_block_votes.per_block_vote;
+}
