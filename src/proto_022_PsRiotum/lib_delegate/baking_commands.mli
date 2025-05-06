@@ -25,6 +25,11 @@
 
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
+val get_delegates :
+  Protocol_client_context.full ->
+  Environment.Signature.public_key_hash trace ->
+  Baking_state.Consensus_key.t list tzresult Lwt.t
+
 val run_baker :
   ?recommend_agnostic_baker:bool ->
   string option

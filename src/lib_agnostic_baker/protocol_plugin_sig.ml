@@ -16,11 +16,22 @@ module type BAKER_COMMANDS_HELPERS = sig
       plugin, but the structure of the list of arguments will not grow or shrink, to
       prevent incompatibilities at migrations. *)
   val run_baker :
-    configuration:Configuration.t ->
-    baking_mode:string option ->
-    sources:Tezos_crypto.Signature.public_key_hash list ->
-    cctxt:Tezos_client_base.Client_context.full ->
-    unit Error_monad.tzresult Lwt.t
+    Tezos_client_base.Client_context.full ->
+    ?dal_node_rpc_ctxt:Tezos_rpc.Context.generic ->
+    ?minimal_fees:int64 ->
+    ?minimal_nanotez_per_gas_unit:Q.t ->
+    ?minimal_nanotez_per_byte:Q.t ->
+    ?votes:Configuration.per_block_votes_config ->
+    ?extra_operations:Uri.t ->
+    ?pre_emptive_forge_time:Q.t ->
+    ?force_apply_from_round:int ->
+    ?remote_calls_timeout:Q.t ->
+    ?context_path:string ->
+    ?state_recorder:bool ->
+    chain:Shell_services.chain ->
+    keep_alive:bool ->
+    Signature.V_latest.public_key_hash list ->
+    unit tzresult Lwt.t
 
   val run_vdf_daemon :
     cctxt:Tezos_client_base.Client_context.full ->
