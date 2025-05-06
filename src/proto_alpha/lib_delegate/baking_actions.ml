@@ -668,26 +668,37 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     | Bls _ -> global_state.constants.parametric.aggregate_attestation
     | _ -> false
   in
-  let Contents_list contents, companion_key_opt =
+  let* Contents_list contents, companion_key_opt =
     match vote_kind with
     | Preattestation ->
-        (Contents_list (Single (Preattestation vote_consensus_content)), None)
+        return
+          (Contents_list (Single (Preattestation vote_consensus_content)), None)
     | Attestation ->
-        let dal_content, companion_key_opt =
-          if not bls_mode then (dal_content, None)
+        let* dal_content, companion_key_opt =
+          if not bls_mode then return (dal_content, None)
           else
             match dal_content with
-            | None -> (dal_content, None)
+            | None -> return (dal_content, None)
             | Some _ -> (
                 match delegate.companion_key with
-                | None -> (* TODO: warning *) (None, None)
-                | Some companion_key -> (dal_content, Some companion_key))
+                | None ->
+                    let*! () =
+                      Events.(
+                        emit
+                          missing_companion_key_for_dal_with_bls
+                          ( delegate.delegate_id,
+                            Raw_level.to_int32 vote_consensus_content.level ))
+                    in
+                    return (None, None)
+                | Some companion_key -> return (dal_content, Some companion_key)
+                )
         in
-        ( Contents_list
-            (Single
-               (Attestation
-                  {consensus_content = vote_consensus_content; dal_content})),
-          companion_key_opt )
+        return
+          ( Contents_list
+              (Single
+                 (Attestation
+                    {consensus_content = vote_consensus_content; dal_content})),
+            companion_key_opt )
   in
   let signing_request =
     match vote_kind with
