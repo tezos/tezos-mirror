@@ -409,7 +409,7 @@ let generate_deterministic_nonce ?timeout secret_key_uri data =
 
 let generate_seed_nonce ?timeout
     (nonce_config : Baking_configuration.nonce_config)
-    (delegate : Baking_state.Key.t) level =
+    (delegate : Baking_state_types.Key.t) level =
   let open Lwt_result_syntax in
   let* nonce =
     match nonce_config with

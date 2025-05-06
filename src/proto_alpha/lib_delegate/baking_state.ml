@@ -26,127 +26,9 @@
 open Protocol
 open Alpha_context
 open Baking_errors
+open Baking_state_types
 
 module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
-
-module Key_id = struct
-  type t = Signature.Public_key_hash.t
-
-  let to_pkh pkh = pkh
-
-  let compare = Signature.Public_key_hash.compare
-
-  let encoding = Signature.Public_key_hash.encoding
-
-  let pp = Signature.Public_key_hash.pp
-
-  module Table = Signature.Public_key_hash.Table
-end
-
-module Key = struct
-  (** A consensus key (aka, a validator) is identified by its alias name, its
-    public key, its public key hash, and its secret key. *)
-  type t = {
-    alias : string option;
-    id : Key_id.t;
-    public_key : Signature.Public_key.t;
-    secret_key_uri : Client_keys.sk_uri;
-  }
-
-  let make ~alias ~public_key ~public_key_hash ~secret_key_uri =
-    {alias; public_key; id = public_key_hash; secret_key_uri}
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {alias; public_key; id; secret_key_uri} ->
-        (alias, public_key, id, Uri.to_string (secret_key_uri :> Uri.t)))
-      (fun (alias, public_key, id, secret_key_uri) ->
-        {
-          alias;
-          public_key;
-          id;
-          secret_key_uri =
-            (match Client_keys.make_sk_uri (Uri.of_string secret_key_uri) with
-            | Ok sk -> sk
-            | Error e -> Format.kasprintf Stdlib.failwith "%a" pp_print_trace e);
-        })
-      (obj4
-         (req "alias" (option string))
-         (req "public_key" Signature.Public_key.encoding)
-         (req "public_key_hash" Signature.Public_key_hash.encoding)
-         (req "secret_key_uri" string))
-
-  let consensus_key_without_sk_encoding__cannot_decode =
-    let open Data_encoding in
-    conv
-      (fun {alias; public_key; id; _} -> (alias, public_key, id))
-      (fun (_alias, _public_key, _id) ->
-        Stdlib.failwith "Unexpected secret key")
-      (obj3
-         (req "alias" (option string))
-         (req "public_key" Signature.Public_key.encoding)
-         (req "public_key_hash" Signature.Public_key_hash.encoding))
-
-  let pp fmt {alias; id; _} =
-    match alias with
-    | None -> Format.fprintf fmt "%a" Signature.Public_key_hash.pp id
-    | Some alias ->
-        Format.fprintf fmt "%s (%a)" alias Signature.Public_key_hash.pp id
-end
-
-module Delegate_id = struct
-  type t = Signature.public_key_hash
-
-  let of_pkh pkh = pkh
-
-  let to_pkh pkh = pkh
-
-  let equal = Signature.Public_key_hash.equal
-
-  let encoding = Signature.Public_key_hash.encoding
-
-  let pp = Signature.Public_key_hash.pp
-end
-
-module Delegate = struct
-  type t = {
-    consensus_key : Key.t;
-    companion_key : Key.t option;
-    delegate_id : Delegate_id.t;
-  }
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {consensus_key; companion_key; delegate_id} ->
-        (consensus_key, delegate_id, companion_key))
-      (fun (consensus_key, delegate_id, companion_key) ->
-        {consensus_key; delegate_id; companion_key})
-      (obj3
-         (req "consensus_key" Key.encoding)
-         (req "delegate" Delegate_id.encoding)
-         (opt "companion_key" Key.encoding))
-
-  let pp fmt {consensus_key; delegate_id; companion_key} =
-    let str_companion_key =
-      match companion_key with
-      | Some companion_key ->
-          Format.asprintf " with companion key %a" Key.pp companion_key
-      | None -> ""
-    in
-    if Signature.Public_key_hash.equal consensus_key.id delegate_id then
-      Format.fprintf fmt "%a%s" Key.pp consensus_key str_companion_key
-    else
-      Format.fprintf
-        fmt
-        "%a%s@,on behalf of %a"
-        Key.pp
-        consensus_key
-        str_companion_key
-        Delegate_id.pp
-        delegate_id
-end
 
 type validation_mode = Node | Local of Abstract_context_index.t
 
@@ -663,7 +545,7 @@ type global_state = {
   (* the validation mode used by the baker*)
   validation_mode : validation_mode;
   (* the delegates on behalf of which the baker is running *)
-  delegates : Key.t list;
+  delegates : Baking_state_types.Key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
@@ -1080,10 +962,11 @@ let may_load_attestable_data state =
 
 module DelegateSet = struct
   include Set.Make (struct
-    type t = Key.t
+    type t = Baking_state_types.Key.t
 
-    let compare Key.{id = pkh; _} Key.{id = pkh'; _} =
-      Signature.Public_key_hash.compare pkh pkh'
+    let compare Baking_state_types.Key.{id = pkh; _}
+        Baking_state_types.Key.{id = pkh'; _} =
+      Baking_state_types.Key_id.compare pkh pkh'
   end)
 
   let find_pkh pkh s =
@@ -1091,7 +974,11 @@ module DelegateSet = struct
     try
       iter
         (fun ({id; _} as delegate) ->
-          if Signature.Public_key_hash.equal pkh id then raise (Found delegate)
+          if
+            Signature.Public_key_hash.equal
+              pkh
+              (Baking_state_types.Key_id.to_pkh id)
+          then raise (Found delegate)
           else ())
         s ;
       None
@@ -1125,7 +1012,11 @@ let delegate_slots attesting_rights delegates =
               let attesting_slot =
                 {
                   delegate =
-                    {consensus_key; delegate_id = delegate; companion_key};
+                    {
+                      consensus_key;
+                      delegate_id = Delegate_id.of_pkh delegate;
+                      companion_key;
+                    };
                   first_slot;
                   attesting_power;
                 }
@@ -1251,7 +1142,7 @@ let pp_global_state fmt {chain_id; config; validation_mode; delegates; _} =
     config
     pp_validation_mode
     validation_mode
-    Format.(pp_print_list Key.pp)
+    Format.(pp_print_list Baking_state_types.Key.pp)
     delegates
 
 let pp_option pp fmt = function

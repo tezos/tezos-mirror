@@ -114,7 +114,8 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
   let*! () =
     cctxt#message
       "@[<v 2>Preattesting for:@ %a@]"
-      Format.(pp_print_list ~pp_sep:pp_print_space Baking_state.Delegate.pp)
+      Format.(
+        pp_print_list ~pp_sep:pp_print_space Baking_state_types.Delegate.pp)
       (List.map
          (fun ({delegate; _} : unsigned_consensus_vote) -> delegate)
          consensus_batch.unsigned_consensus_votes)
@@ -154,7 +155,8 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let*! () =
     cctxt#message
       "@[<v 2>Attesting for:@ %a@]"
-      Format.(pp_print_list ~pp_sep:pp_print_space Baking_state.Delegate.pp)
+      Format.(
+        pp_print_list ~pp_sep:pp_print_space Baking_state_types.Delegate.pp)
       (List.map
          (fun ({delegate; _} : unsigned_consensus_vote) -> delegate)
          consensus_batch.unsigned_consensus_votes)

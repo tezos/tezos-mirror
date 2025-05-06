@@ -43,21 +43,29 @@ val load :
 val may_sign_block :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegate:Baking_state.Key_id.t ->
+  delegate:Baking_state_types.Key_id.t ->
   level:int32 ->
   round:Round.t ->
   bool tzresult Lwt.t
 
 val may_sign_preattestation :
-  t -> delegate:Baking_state.Key_id.t -> level:int32 -> round:Round.t -> bool
+  t ->
+  delegate:Baking_state_types.Key_id.t ->
+  level:int32 ->
+  round:Round.t ->
+  bool
 
 val may_sign_attestation :
-  t -> delegate:Baking_state.Key_id.t -> level:int32 -> round:Round.t -> bool
+  t ->
+  delegate:Baking_state_types.Key_id.t ->
+  level:int32 ->
+  round:Round.t ->
+  bool
 
 val record_block :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegate:Baking_state.Key_id.t ->
+  delegate:Baking_state_types.Key_id.t ->
   level:int32 ->
   round:Round.t ->
   unit tzresult Lwt.t
@@ -65,7 +73,7 @@ val record_block :
 val record_preattestation :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegate:Baking_state.Key_id.t ->
+  delegate:Baking_state_types.Key_id.t ->
   level:int32 ->
   round:Round.t ->
   unit tzresult Lwt.t
@@ -73,7 +81,7 @@ val record_preattestation :
 val record_attestation :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegate:Baking_state.Key_id.t ->
+  delegate:Baking_state_types.Key_id.t ->
   level:int32 ->
   round:Round.t ->
   unit tzresult Lwt.t
@@ -82,7 +90,7 @@ val record_all_preattestations :
   t ->
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegates:Baking_state.Key_id.t list ->
+  delegates:Baking_state_types.Key_id.t list ->
   level:int32 ->
   round:Round.t ->
   unit tzresult Lwt.t
@@ -91,7 +99,7 @@ val record_all_attestations :
   t ->
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegates:Baking_state.Key_id.t list ->
+  delegates:Baking_state_types.Key_id.t list ->
   level:int32 ->
   round:Round.t ->
   unit tzresult Lwt.t

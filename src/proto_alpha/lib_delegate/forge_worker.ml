@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 open Baking_state
+open Baking_state_types
 open Protocol
 open Alpha_context
 
@@ -16,7 +17,7 @@ end
 
 module Delegate_signing_queue = struct
   type t = {
-    delegate : Baking_state.Delegate.t;
+    delegate : Baking_state_types.Delegate.t;
     task_stream : (unit -> unit Lwt.t) Lwt_stream.t;
     push : (unit -> unit Lwt.t) option -> unit;
     worker : unit Lwt.t;
@@ -101,7 +102,7 @@ let get_or_create_queue worker delegate =
   match
     Key_id.Table.find_opt
       worker.delegate_signing_queues
-      delegate.Baking_state.Delegate.consensus_key.id
+      delegate.Baking_state_types.Delegate.consensus_key.id
   with
   | None ->
       let queue = Delegate_signing_queue.create delegate in

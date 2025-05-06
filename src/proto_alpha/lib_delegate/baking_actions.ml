@@ -26,13 +26,14 @@
 open Protocol
 open Alpha_context
 open Baking_state
+open Baking_state_types
 module Events = Baking_events.Actions
 
 module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
 type error +=
   | Unexpected_signature_type of Signature.t
-  | Missing_bls_companion_key_for_dal of Baking_state.Key.t
+  | Missing_bls_companion_key_for_dal of Baking_state_types.Key.t
 
 let () =
   register_error_kind
@@ -60,9 +61,9 @@ let () =
       Format.fprintf
         ppf
         "Expected a BLS companion key for the consensus key %a."
-        Baking_state.Key.pp
+        Baking_state_types.Key.pp
         s)
-    Data_encoding.(obj1 (req "consensus_key" Baking_state.Key.encoding))
+    Data_encoding.(obj1 (req "consensus_key" Baking_state_types.Key.encoding))
     (function Missing_bls_companion_key_for_dal ck -> Some ck | _ -> None)
     (fun ck -> Missing_bls_companion_key_for_dal ck)
 
@@ -1044,7 +1045,7 @@ let compute_round (proposal : proposal) round_durations =
 let notice_delegates_without_slots all_delegates delegate_slots level =
   let delegates_without_slots =
     List.filter
-      (fun {Baking_state.Key.id; _} ->
+      (fun {Baking_state_types.Key.id; _} ->
         not
         @@ List.exists
              (fun ({delegate = {consensus_key; _}; _} : delegate_slot) ->
