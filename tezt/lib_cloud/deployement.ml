@@ -375,6 +375,83 @@ module Ssh_host = struct
       Process.spawn ~runner "apt-get" ["install"; "-y"; "docker.io"; "libev4"]
       |> Process.check
     in
+    let* project = Env.project_id () in
+    (* Generate locally an access token to access to gcp docker registry *)
+    let* iam_key_filename =
+      let service_account_name = Format.asprintf "%s-id" Env.tezt_cloud in
+      let* service_account =
+        (* FIXME: service_account_fullname is strictly bound to dal team and should
+           be configured and stored in a tezt-cloud ~/.config directory.
+           Here, preserving backward compatibility with terraform naming *)
+        let service_account_fullname =
+          Format.asprintf "%s-id@nl-dal.iam.gserviceaccount.com" Env.tezt_cloud
+        in
+        (* Delete service account if exists. Do not fail if it does not *)
+        let* _ =
+          Process.spawn
+            "gcloud"
+            ["iam"; "service-accounts"; "delete"; service_account_fullname]
+          |> Process.wait
+        in
+        let* () =
+          Process.spawn
+            "gcloud"
+            [
+              "iam";
+              "service-accounts";
+              "create";
+              "--project";
+              project;
+              service_account_name;
+              "--display-name";
+              service_account_name;
+            ]
+          |> Process.check
+        in
+        Lwt.return service_account_fullname
+      in
+      Log.report "waiting for the iam account to become valid" ;
+      let* () = Lwt_unix.sleep 3.0 in
+      let iam_key_filename = "/tmp/iam-keys" in
+      let* () =
+        Process.spawn
+          "gcloud"
+          [
+            "iam";
+            "service-accounts";
+            "keys";
+            "create";
+            iam_key_filename;
+            "--iam-account";
+            service_account;
+            "--project";
+            project;
+          ]
+        |> Process.check
+      in
+      Log.report "waiting for the iam key to become valid" ;
+      let* () = Lwt_unix.sleep 3.0 in
+      let* () =
+        Process.spawn
+          "gcloud"
+          [
+            "artifacts";
+            "repositories";
+            "add-iam-policy-binding";
+            Format.asprintf "%s-docker-registry" Env.tezt_cloud;
+            "--location";
+            "europe-west1";
+            "--member";
+            Format.asprintf "serviceAccount:%s" service_account;
+            "--role";
+            "roles/artifactregistry.reader";
+          ]
+        |> Process.check
+      in
+      Log.report "waiting for the iam key binding to become valid" ;
+      let* () = Lwt_unix.sleep 3.0 in
+      Lwt.return iam_key_filename
+    in
     (* Upload the key to the host via ssh *)
     let* () =
       Process.run
@@ -382,6 +459,25 @@ module Ssh_host = struct
         (["-i"; Env.ssh_private_key_filename (); iam_key_filename]
         @ (if port <> 22 then ["-p"; string_of_int port] else [])
         @ [Format.asprintf "%s@%s:%s" user host iam_key_filename])
+    in
+    let* () =
+      let rec retry () =
+        let* status =
+          Process.spawn
+            ~runner
+            "sh"
+            [
+              "-c";
+              Format.asprintf
+                "cat %s | docker login -u _json_key --password-stdin  \
+                 https://europe-west1-docker.pkg.dev"
+                iam_key_filename;
+            ]
+          |> Process.wait
+        in
+        match status with WEXITED 0 -> Lwt.return_unit | _ -> retry ()
+      in
+      retry ()
     in
     Lwt.return_unit
 
