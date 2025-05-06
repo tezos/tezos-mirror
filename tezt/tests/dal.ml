@@ -9159,9 +9159,10 @@ let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
 
         - a) retrieves the balance updates for the last block of
              the third cycle and verifies that:
-           - Multiple DAL attesting rewards were minted
-           - Exactly one delegate (the [faulty_delegate]) lost DAL
-             attesting rewards
+             - Multiple DAL attesting rewards were minted.
+             - The delegates that lost the DAL rewards are the [faulty_delegate]
+             and the ones that lost the consensus attesting rewards because they
+             haven't revealed nonces.
 
         - b) retrieves the [faulty_delegate] DAL participation at the
              end of the third cycle, minus one block (i.e "head~1")
@@ -9172,8 +9173,8 @@ let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
              - it is denounced,
              - its expected DAL rewards are [0].
 *)
-let test_e2e_trap_faulty_dal_node _protocol dal_parameters _cryptobox node
-    client dal_node =
+let test_e2e_trap_faulty_dal_node protocol dal_parameters _cryptobox node client
+    dal_node =
   let* proto_params =
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
@@ -9311,16 +9312,32 @@ let test_e2e_trap_faulty_dal_node _protocol dal_parameters _cryptobox node
            |> String.equal "lost DAL attesting rewards")
       balance_updates
   in
-  Check.(List.length lost_dal_rewards = 1)
+  let lost_consensus_rewards =
+    (* filter those that lost consensus attesting rewards because they haven't
+       revealed their nonces *)
+    List.filter
+      (fun json ->
+        JSON.(json |-> "kind" |> as_string) |> String.equal "burned"
+        && JSON.(json |-> "category" |> as_string)
+           |> String.equal "lost attesting rewards"
+        && (not JSON.(json |-> "participation" |> as_bool))
+        && JSON.(json |-> "revelation" |> as_bool))
+      balance_updates
+  in
+  let get_delegates =
+    List.map (fun json -> JSON.(json |-> "delegate" |> as_string))
+  in
+  let sort_unique = List.sort_uniq String.compare in
+  let losing_delegates = sort_unique @@ get_delegates lost_dal_rewards in
+  let expected_to_lose_delegates =
+    if Protocol.number protocol >= 023 then
+      sort_unique (faulty_delegate :: get_delegates lost_consensus_rewards)
+    else [faulty_delegate]
+  in
+  Check.(expected_to_lose_delegates = losing_delegates)
     ~__LOC__
-    Check.int
-    ~error_msg:"Expected %R lost DAL reward, got %L" ;
-  let json = List.hd lost_dal_rewards in
-  let losing_delegate = JSON.(json |-> "delegate" |> as_string) in
-  Check.(faulty_delegate = losing_delegate)
-    ~__LOC__
-    Check.string
-    ~error_msg:"Unexpected delegate to lose DAL rewards (got %R expected %L)" ;
+    Check.(list string)
+    ~error_msg:"Unexpected delegates to lose DAL rewards (got %R expected %L)" ;
   let* faulty_delegate_dal_participation =
     Node.RPC.call node
     @@ RPC.get_chain_block_context_delegate_dal_participation
