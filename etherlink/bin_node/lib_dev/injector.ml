@@ -52,6 +52,12 @@ let inject_transaction_request tx_object raw_tx =
     ~input_encoding:Inject_transaction.input_encoding
     (tx_object, raw_tx)
 
+let inject_tezlink_operation_request op raw_op =
+  construct_rpc_call
+    ~method_:Inject_tezlink_operation.method_
+    ~input_encoding:Inject_tezlink_operation.input_encoding
+    (op, raw_op)
+
 let send_raw_transaction ~keep_alive ~base ~raw_tx =
   call_rpc_service
     ~keep_alive
@@ -67,6 +73,14 @@ let inject_transaction ~keep_alive ~base ~tx_object ~raw_tx =
     ~path:Resto.Path.(root / "private")
     (inject_transaction_request tx_object raw_tx)
     Inject_transaction.output_encoding
+
+let inject_tezlink_operation ~keep_alive ~base ~op ~raw_op =
+  call_rpc_service
+    ~keep_alive
+    ~base
+    ~path:Resto.Path.(root / "private")
+    (inject_tezlink_operation_request op raw_op)
+    Inject_tezlink_operation.output_encoding
 
 let get_transaction_count_request address block_param =
   construct_rpc_call

@@ -69,6 +69,17 @@ module Operation = struct
     raw : bytes;
   }
 
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {source; counter; op; raw} -> (source, counter, op, raw))
+      (fun (source, counter, op, raw) -> {source; counter; op; raw})
+      (tup4
+         Signature.V1.Public_key_hash.encoding
+         z
+         (dynamic_size Tezlink_imports.Alpha_context.Operation.encoding)
+         bytes)
+
   let hash_operation {source = _; counter = _; op; raw = _} =
     let hash = ImportedOperation.hash_packed op in
     let (`Hex hex) = Operation_hash.to_hex hash in

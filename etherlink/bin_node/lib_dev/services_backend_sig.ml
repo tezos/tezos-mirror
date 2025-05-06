@@ -288,7 +288,8 @@ type 'f tx_container =
           and type transaction_object = Transaction_object.t)
       -> L2_types.evm_chain_family tx_container
   | Michelson_tx_container :
-      (module Tx_container)
+      (module Tx_container
+         with type legacy_transaction_object = Tezos_types.Operation.t)
       -> L2_types.michelson_chain_family tx_container
 
 (** Some functions of the Tx_container module, such as [add], have
@@ -318,4 +319,4 @@ type 'f tx_container =
 let tx_container_module (type f) (tx_container : f tx_container) =
   match tx_container with
   | Evm_tx_container m -> (m :> (module Tx_container))
-  | Michelson_tx_container m -> m
+  | Michelson_tx_container m -> (m :> (module Tx_container))

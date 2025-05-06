@@ -234,11 +234,13 @@ let container_forward_request (type f) ~(chain_family : f L2_types.chain_family)
                         "TODO: implement get_transaction_count in the Tezlink \
                          case (using counter RPC)"
 
-                    let inject_transaction ~keep_alive:_ ~base:_ ~tx_object:_
-                        ~raw_tx:_ =
-                      failwith
-                        "TODO: implement inject_transaction in the Tezlink \
-                         case (using injection/operation RPC)"
+                    let inject_transaction ~keep_alive ~base ~tx_object ~raw_tx
+                        =
+                      Injector.inject_tezlink_operation
+                        ~keep_alive
+                        ~base
+                        ~op:tx_object
+                        ~raw_op:(Bytes.of_string raw_tx)
 
                     let get_transaction_by_hash ~keep_alive:_ ~base:_ _ =
                       failwith
