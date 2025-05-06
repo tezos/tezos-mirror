@@ -49,9 +49,14 @@ let debian_package_release_matrix = function
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
 let ubuntu_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["jammy"]); ("TAGS", ["gcp"])]]
+  | Partial -> [[("RELEASE", ["jammy"]); ("TAGS", ["gcp_very_high_cpu"])]]
   | Full | Release ->
-      [[("RELEASE", ["noble"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+      [
+        [
+          ("RELEASE", ["noble"; "jammy"]);
+          ("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"]);
+        ];
+      ]
 
 let archs_variables pipeline =
   let amd64 = List.map Tezos_ci.arch_to_string_alt [Amd64] in
