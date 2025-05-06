@@ -589,7 +589,7 @@ oc.docker-build-ubuntu-dependencies:
       - noble
       - jammy
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-ubuntu:
@@ -636,7 +636,7 @@ oc.build-ubuntu:
       - noble
       - jammy
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-ubuntu-old_a:
@@ -683,7 +683,7 @@ oc.build-ubuntu-old_a:
       - noble
       - jammy
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-ubuntu-old_b:
@@ -730,7 +730,7 @@ oc.build-ubuntu-old_b:
       - noble
       - jammy
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 apt_repo_ubuntu_old:
