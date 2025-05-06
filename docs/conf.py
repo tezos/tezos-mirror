@@ -48,6 +48,7 @@ extensions = [
     'sphinx_sitemap',
     'sphinx_pushfeedback',
     'sphinxcontrib.mermaid',
+    'sphinx_biel',
 ]
 
 # mermaid_verbose = True
@@ -74,6 +75,17 @@ pushfeedback_footer_text = (
     " target='_blank'>Providing feedback on documentation</a>."
 )
 
+# biel.ai
+biel_project = 'w30c27l8fg'
+biel_header_title = 'Tezos documentation chatbot (beta)'
+biel_version = 'latest'
+biel_button_position = 'center-right'
+biel_footer_text = (
+    "AI-generated answers may contain errors. "
+    + "Verify the information before use. For more information, see "
+    + "<a href='https://docs.tezos.com/overview/chatbot' target='_blank'>"
+    + "Using the chatbot</a>."
+)
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -167,7 +179,7 @@ html_theme_options = {
         },
         {
             "name": "Documentation map",
-            "url": "https://docs.tezos.com/overview/resources"
+            "url": "https://docs.tezos.com/overview/resources/"
             "#documentation-map",
             "icon": "_static/map.png",
             "type": "local",
