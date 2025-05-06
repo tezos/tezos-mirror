@@ -8,6 +8,10 @@
 //! Currently, this is only 'inline' jit, but will soon be expanded to 'outline' jit also;
 //! where 'outline' means any JIT compilation occurs in a separate thread.
 
+use std::marker::PhantomData;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+
 use super::DispatchFn;
 use super::Jitted;
 use crate::jit::JIT;
@@ -20,7 +24,13 @@ use crate::machine_state::memory::MemoryConfig;
 ///
 /// This is the target used for compilation - see [`DispatchCompiler::compile`].
 pub struct DispatchTarget<D: DispatchCompiler<MC, M>, MC: MemoryConfig, M: JitStateAccess> {
-    fun: std::cell::Cell<DispatchFn<D, MC, M>>,
+    /// Function pointer stored as an atomic usize.
+    ///
+    /// This will allow the `fun` to be updated from a background thread.
+    /// See <https://doc.rust-lang.org/std/primitive.fn.html#casting-to-and-from-integers> for
+    /// considerations taken whilst converting pointer <--> usize.
+    fun: AtomicUsize,
+    _pd: PhantomData<(D, MC, M)>,
 }
 
 impl<D: DispatchCompiler<MC, M>, MC: MemoryConfig, M: JitStateAccess> DispatchTarget<D, MC, M> {
@@ -31,12 +41,24 @@ impl<D: DispatchCompiler<MC, M>, MC: MemoryConfig, M: JitStateAccess> DispatchTa
 
     /// Set the dispatch target to use the given `block_run` function.
     pub fn set(&self, fun: DispatchFn<D, MC, M>) {
-        self.fun.set(fun);
+        // casting a function pointer as usize is ok to do.
+        let fun = fun as usize;
+
+        // store using Release ordering - any subsequent loading with Acquire will see the new ptr.
+        self.fun.store(fun, Ordering::Release);
     }
 
     /// Get the dispatch target's current `block_run` function.
     pub fn get(&self) -> DispatchFn<D, MC, M> {
-        self.fun.get()
+        // load using Acquire ordering - so that it will see the previous store which was with
+        // Release.
+        let fun = self.fun.load(Ordering::Acquire);
+
+        // to avoid problematic integer -> pointer conversion, we must cast it as a pointer first.
+        let fun = fun as *const ();
+
+        // Safety: the pointer is indeed a function pointer with an ABI matching `DispatchFn`.
+        unsafe { std::mem::transmute::<*const (), DispatchFn<D, MC, M>>(fun) }
     }
 }
 
@@ -45,7 +67,8 @@ impl<D: DispatchCompiler<MC, M>, MC: MemoryConfig, M: JitStateAccess> Default
 {
     fn default() -> Self {
         Self {
-            fun: std::cell::Cell::new(Jitted::run_block_interpreted),
+            fun: AtomicUsize::new(Jitted::<D, MC, M>::run_block_interpreted as usize),
+            _pd: PhantomData,
         }
     }
 }
@@ -76,9 +99,14 @@ impl<MC: MemoryConfig, M: JitStateAccess> DispatchCompiler<MC, M> for JIT<MC, M>
         let fun = match self.compile(&instr) {
             Some(jitfn) => {
                 // Safety: the two function signatures are identical, apart from the first and
-                // last parameters. These are both pointers, and ignored by the JitFn.
+                // last parameters. These are both thin-pointers, and ignored by the JitFn.
                 //
-                // It's therefore safe to cast these to thin-pointers to any type.
+                // It's therefore safe to cast this function pointer to an identical ABI, where
+                // this first and last parameter are thin-references to any value. This is the
+                // case for both `Jitted` and `Jitted::BlockBuilder` which are both Sized.
+                //
+                // See <https://doc.rust-lang.org/std/primitive.fn.html#abi-compatibility> for more
+                // information on ABI compatability.
                 unsafe { std::mem::transmute::<JitFn<MC, M>, DispatchFn<Self, MC, M>>(jitfn) }
             }
             None => Jitted::run_block_not_compiled,

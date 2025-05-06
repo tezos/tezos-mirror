@@ -46,7 +46,10 @@ pub type BlockLayout = (Atom<u8>, [Atom<Instruction>; CACHE_INSTR]);
 pub trait Block<MC: MemoryConfig, M: ManagerBase>: NewState<M> {
     /// Block construction may require additional state not kept in storage,
     /// this is then passed as a parameter to [`Block::run_block`].
-    type BlockBuilder: Default;
+    ///
+    /// `Sized` bound is required to ensure any reference to `BlockBuilder` will be thin -
+    /// see [`DispatchFn`].
+    type BlockBuilder: Default + Sized;
 
     /// Bind the block to the given allocated state.
     fn bind(allocated: AllocatedOf<BlockLayout, M>) -> Self
@@ -249,6 +252,8 @@ impl<MC: MemoryConfig, M: ManagerClone> Clone for Interpreted<MC, M> {
 ///
 /// Internally, this may be interpreted, just-in-time compiled, or do
 /// additional work over just execution.
+///
+/// The first and last parameters must be thin-references, for ABI-compatability reasons.
 #[expect(
     improper_ctypes_definitions,
     reason = "The receiving functions know the layout of the referenced types"
