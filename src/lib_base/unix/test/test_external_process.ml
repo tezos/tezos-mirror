@@ -273,3 +273,59 @@ let () =
   Log.info "Shutting down external process" ;
   let*! () = Process.close process in
   return_unit
+
+let () =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"External process: test hypervisor race condition"
+    ~tags:["external_process"; "hypervisor"; "race"]
+  @@ fun () ->
+  lift
+  @@
+  let open Lwt_result_syntax in
+  let* process = Process.init () ~process_path:Sys.executable_name in
+  let* a, _ = Process.send_request process (Echo {x = 1; sleep = 0.}) in
+  Tezt.Check.((a = 1) int) ~error_msg:"First request answered %L instead of %R" ;
+  Log.info
+    "Restart external process through hypervisor and send message at the same \
+     time" ;
+  let* () =
+    Lwt_unix.with_timeout 10. @@ fun () -> Process.restart_hypervisee process
+  and* b, _ =
+    Lwt_unix.with_timeout 10. @@ fun () ->
+    Process.send_request process (Echo {x = 2; sleep = 0.})
+  in
+  Tezt.Check.((b = 2) int)
+    ~error_msg:"Request after restart answered %L instead of %R" ;
+  Log.info "Shutting down external process" ;
+  let*! () = Process.close process in
+  return_unit
+
+let () =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"External process: test hypervisor race condition 2"
+    ~tags:["external_process"; "hypervisor"; "race"]
+  @@ fun () ->
+  lift
+  @@
+  let open Lwt_result_syntax in
+  let* process = Process.init () ~process_path:Sys.executable_name in
+  let* a, _ = Process.send_request process (Echo {x = 1; sleep = 0.}) in
+  Tezt.Check.((a = 1) int) ~error_msg:"First request answered %L instead of %R" ;
+  Log.info "Killing external process" ;
+  Unix.kill (Process.pid process) Sys.sigkill ;
+  Log.info
+    "Send message to dead external process and restart through hypervisor at \
+     the same time" ;
+  let* b, _ =
+    Lwt_unix.with_timeout 10. @@ fun () ->
+    Process.send_request process (Echo {x = 2; sleep = 0.})
+  and* () =
+    Lwt_unix.with_timeout 10. @@ fun () -> Process.restart_hypervisee process
+  in
+  Tezt.Check.((b = 2) int)
+    ~error_msg:"Request after restart answered %L instead of %R" ;
+  Log.info "Shutting down external process" ;
+  let*! () = Process.close process in
+  return_unit
