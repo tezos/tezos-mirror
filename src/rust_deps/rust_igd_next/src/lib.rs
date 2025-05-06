@@ -5,8 +5,16 @@
 use std::{error::Error, net::SocketAddr, str::FromStr, time::*};
 
 use igd_next::{self, SearchError, SearchOptions};
+use ocaml::{Pointer, Runtime, Value};
 
+#[ocaml::sig]
 pub struct Gateway(igd_next::Gateway);
+
+unsafe impl ocaml::ToValue for Gateway {
+    fn to_value(&self, rt: &Runtime) -> Value {
+        Pointer::alloc(self.0.clone()).to_value(rt)
+    }
+}
 
 // TODO: classify the errors
 fn parse_addr(addr: &str) -> Result<SocketAddr, String> {
@@ -24,6 +32,10 @@ fn parse_timeout(timeout: f64) -> Result<Duration, String> {
 /// - Timeout for a single search response (defaults to 5s)
 ///
 /// The default options should suffice in most cases.
+#[ocaml::func]
+#[ocaml::sig(
+    "bind_addr:string option -> broadcast_address: string option -> timeout:float option -> single_search_timeout: float option -> (gateway, string) result"
+)]
 pub fn search_gateway(
     bind_addr: Option<&str>,
     broadcast_address: Option<&str>,
