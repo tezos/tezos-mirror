@@ -368,6 +368,13 @@ module Ssh_host = struct
         ()
     in
     let user = "root" in
+    (* Installs docker *)
+    Log.report "Installing docker" ;
+    let* () = Process.spawn ~runner "apt-get" ["update"] |> Process.check in
+    let* () =
+      Process.spawn ~runner "apt-get" ["install"; "-y"; "docker.io"; "libev4"]
+      |> Process.check
+    in
     (* Upload the key to the host via ssh *)
     let* () =
       Process.run
