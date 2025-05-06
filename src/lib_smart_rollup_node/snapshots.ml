@@ -51,11 +51,10 @@ let check_store_version store_dir =
   let* store_version = Store_version.read_version_file ~dir:store_dir in
   let*? () =
     match store_version with
-    | None -> error_with "Unversionned store, cannot produce snapshot."
+    | None -> Ok ()
     | Some v when v <> Store.version ->
         error_with
-          "Incompatible store version %a, expected %a. Cannot produce \
-           snapshot. Please restart your rollup node to migrate."
+          "Incompatible store version %a, expected %a. Cannot produce snapshot."
           Store_version.pp
           v
           Store_version.pp
@@ -117,7 +116,6 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir =
   in
   let*? () = Context.Version.check metadata.context_version in
   let* store = Store.init Read_only ~data_dir in
-  let store = Store.Normal store in
   let* head = get_head store in
   let level = head.Sc_rollup_block.header.level in
   let* (module Plugin) =
@@ -499,7 +497,6 @@ let with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches
   let context_dir = Configuration.default_context_dir data_dir in
   let* () = check_store_version store_dir in
   let* store = Store.init Read_write ~data_dir in
-  let store = Store.Normal store in
   let* head = get_head store in
   let* (module Plugin) =
     Protocol_plugins.proto_plugin_for_level_with_store store head.header.level
@@ -596,7 +593,6 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
   (* Load context and stores in read-only to run checks. *)
   let* () = check_store_version store_dir in
   let* store = Store.init Read_only ~data_dir:dest in
-  let store = Store.Normal store in
   let* head = get_head store in
   let* (module Plugin) =
     Protocol_plugins.proto_plugin_for_level_with_store store head.header.level
@@ -821,7 +817,6 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
   let*! () = Lwt_utils_unix.create_dir tmp_context_dir in
   let context_dir = Configuration.default_context_dir data_dir in
   let* store = Store.init Read_only ~data_dir in
-  let store = Store.Normal store in
   let* metadata = Metadata.read_metadata_file ~dir:data_dir in
   let*? metadata =
     match metadata with
@@ -888,7 +883,6 @@ let pre_import_checks cctxt ~no_checks ~data_dir (snapshot_header : Header.t) =
   let open Lwt_result_syntax in
   (* Load stores in read-only to make simple checks. *)
   let* store = Store.init Read_write ~data_dir in
-  let store = Store.Normal store in
   let* metadata = Metadata.read_metadata_file ~dir:data_dir in
   let* history_mode = Store.State.History_mode.get store in
   let* head = Store.L2_blocks.find_head store in
@@ -971,7 +965,6 @@ let correct_history_mode ~data_dir (snapshot_header : Header.t)
   | Some Archive, Archive | Some Full, Full -> return_unit
   | Some Full, Archive ->
       let* store = Store.init Read_write ~data_dir in
-      let store = Store.Normal store in
       Store.State.History_mode.set store Full
 
 let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
@@ -1004,15 +997,7 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
     try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
   in
   List.iter rm Store.extra_sqlite_files ;
-  let* () =
-    let* metadata = Metadata.read_metadata_file ~dir:data_dir in
-    let*? metadata =
-      match metadata with
-      | Some m -> Ok m
-      | None -> error_with "No rollup node metadata in snapshot."
-    in
-    Store_migration.maybe_run_migration metadata Store.version ~data_dir
-  in
+  let* () = check_store_version (Configuration.default_storage_dir data_dir) in
   let* () = maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches in
   let* () =
     correct_history_mode ~data_dir snapshot_header original_history_mode
