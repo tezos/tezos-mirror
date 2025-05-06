@@ -1481,6 +1481,45 @@ let test_tezlink_raw_json_cycle =
       ~error_msg:"Unexpected random_seed field") ;
   unit
 
+let test_tezlink_transfer =
+  let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
+  register_tezlink_test
+    ~title:"Test Tezlink transfer"
+    ~tags:["kernel"; "transfer"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let amount = Tez.one in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* balance1 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  let* balance2 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
+  in
+  Check.(
+    (Tez.to_mutez balance1
+    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount)
+      int)
+    ~error_msg:"Wrong balance for bootstrap1: exptected %R, actual %L" ;
+  Check.((Tez.to_mutez balance2 = Tez.to_mutez amount) int)
+    ~error_msg:"Wrong balance for bootstrap2: exptected %R, actual %L" ;
+  unit
+
 module Protocol = struct
   include Protocol
 
@@ -14108,6 +14147,7 @@ let () =
   test_tezlink_raw_json_cycle [Alpha] ;
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
+  test_tezlink_transfer [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;
   test_tezlink_block_info [Alpha] ;
   test_tezlink_storage [Alpha] ;
