@@ -986,6 +986,80 @@ let get_previous_protocol_constants ctxt =
 
 (* Please add here any code that should be removed at the next automatic protocol snapshot *)
 
+let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~new_blocks_per_cycle
+    ~new_blocks_per_commitment ~prev_blocks_per_commitment =
+  let open Lwt_result_syntax in
+  let* cycle_eras = get_cycle_eras ctxt in
+  let*? new_cycle_eras =
+    Level_repr.update_cycle_eras
+      cycle_eras
+      ~level
+      ~prev_blocks_per_cycle
+      ~new_blocks_per_cycle
+      ~prev_blocks_per_commitment
+      ~new_blocks_per_commitment
+  in
+  set_cycle_eras ctxt new_cycle_eras
+
+type delays = {
+  blocks_per_cycle : int32;
+  delegate_parameters_activation_delay : int;
+  cycles_per_voting_period : int32;
+  blocks_per_commitment : int32;
+  nonce_revelation_threshold : int32;
+  vdf_difficulty : int64;
+}
+
+let new_constants_four_hours_cycles ~preserve_duration_in_days
+    ~previous_minimal_block_delay ~minimal_block_delay
+    ~(previous_delays : delays) : delays =
+  let previous_minimal_block_delay_sec =
+    Period_repr.to_seconds previous_minimal_block_delay
+  in
+  let minimal_block_delay_sec = Period_repr.to_seconds minimal_block_delay in
+  let blocks_per_cycle =
+    Int64.(to_int32 (div (mul 4L 3600L) minimal_block_delay_sec))
+  in
+  let blocks_per_commitment = Int32.(div blocks_per_cycle 128l) in
+  let nonce_revelation_threshold = Int32.(div (div blocks_per_cycle 2l) 6l) in
+  (* keeping half of the cycle for VDF result revelation and as margin to finish VDF computation *)
+  (* Then 1/6th to reveal nonces, 5/6th to compute VDF *)
+  let vdf_difficulty =
+    Int64.(
+      mul
+        (mul
+           (mul minimal_block_delay_sec 5L)
+           (of_int32 nonce_revelation_threshold))
+        200_000L)
+  in
+  let preserve_duration cst =
+    if not preserve_duration_in_days then cst
+    else
+      Int64.(
+        to_int32
+        @@ div
+             (mul
+                (mul (of_int32 cst) previous_minimal_block_delay_sec)
+                (of_int32 previous_delays.blocks_per_cycle))
+             (mul minimal_block_delay_sec (of_int32 blocks_per_cycle)))
+  in
+  let delegate_parameters_activation_delay =
+    Int32.to_int
+    @@ preserve_duration
+         (Int32.of_int previous_delays.delegate_parameters_activation_delay)
+  in
+  let cycles_per_voting_period =
+    preserve_duration previous_delays.cycles_per_voting_period
+  in
+  {
+    blocks_per_cycle;
+    delegate_parameters_activation_delay;
+    cycles_per_voting_period;
+    blocks_per_commitment;
+    nonce_revelation_threshold;
+    vdf_difficulty;
+  }
+
 (* End of code to remove at next automatic protocol snapshot *)
 
 (* You should ensure that if the type `Constants_parametric_repr.t` is
@@ -1499,59 +1573,110 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             dal_rewards_weight;
           }
         in
-        let constants =
-          let ({
-                 consensus_rights_delay;
-                 blocks_preservation_cycles;
-                 delegate_parameters_activation_delay;
-                 tolerated_inactivity_period;
-                 blocks_per_cycle;
-                 blocks_per_commitment;
-                 nonce_revelation_threshold;
-                 cycles_per_voting_period;
-                 hard_gas_limit_per_operation;
-                 hard_gas_limit_per_block;
-                 proof_of_work_threshold;
-                 minimal_stake;
-                 minimal_frozen_stake;
-                 vdf_difficulty;
-                 origination_size;
-                 max_operations_time_to_live;
-                 issuance_weights = _;
-                 cost_per_byte;
-                 hard_storage_limit_per_operation;
-                 quorum_min;
-                 quorum_max;
-                 min_proposal_quorum;
-                 liquidity_baking_subsidy;
-                 liquidity_baking_toggle_ema_threshold;
-                 minimal_block_delay;
-                 delay_increment_per_round;
-                 consensus_committee_size;
-                 consensus_threshold_size;
-                 minimal_participation_ratio;
-                 limit_of_delegation_over_baking;
-                 percentage_of_frozen_deposits_slashed_per_double_baking;
-                 max_slashing_per_block;
-                 max_slashing_threshold;
-                 (* The `testnet_dictator` should absolutely be None on mainnet *)
-                 testnet_dictator;
-                 initial_seed;
-                 cache_script_size;
-                 cache_stake_distribution_cycles;
-                 cache_sampler_state_cycles;
-                 dal = _;
-                 sc_rollup = _;
-                 zk_rollup = _;
-                 adaptive_issuance = _;
-                 direct_ticket_spending_enable;
-                 aggregate_attestation = _;
-                 allow_tz4_delegate_enable = _;
-                 all_bakers_attest_activation_level;
-               }
-                : Previous.t) =
-            c
+        let ({
+               consensus_rights_delay;
+               blocks_preservation_cycles;
+               delegate_parameters_activation_delay;
+               tolerated_inactivity_period;
+               blocks_per_cycle;
+               blocks_per_commitment;
+               nonce_revelation_threshold;
+               cycles_per_voting_period;
+               hard_gas_limit_per_operation;
+               hard_gas_limit_per_block;
+               proof_of_work_threshold;
+               minimal_stake;
+               minimal_frozen_stake;
+               vdf_difficulty;
+               origination_size;
+               max_operations_time_to_live;
+               issuance_weights = _;
+               cost_per_byte;
+               hard_storage_limit_per_operation;
+               quorum_min;
+               quorum_max;
+               min_proposal_quorum;
+               liquidity_baking_subsidy;
+               liquidity_baking_toggle_ema_threshold;
+               minimal_block_delay;
+               delay_increment_per_round;
+               consensus_committee_size;
+               consensus_threshold_size;
+               minimal_participation_ratio;
+               limit_of_delegation_over_baking;
+               percentage_of_frozen_deposits_slashed_per_double_baking;
+               max_slashing_per_block;
+               max_slashing_threshold;
+               (* The `testnet_dictator` should absolutely be None on mainnet *)
+               testnet_dictator;
+               initial_seed;
+               cache_script_size;
+               cache_stake_distribution_cycles;
+               cache_sampler_state_cycles;
+               dal = _;
+               sc_rollup = _;
+               zk_rollup = _;
+               adaptive_issuance = _;
+               direct_ticket_spending_enable;
+               aggregate_attestation = _;
+               allow_tz4_delegate_enable = _;
+               all_bakers_attest_activation_level;
+             }
+              : Previous.t) =
+          c
+        in
+        let is_new_constants =
+          (* This check is used to trigger the constant changes at
+             migration on this protocol for mainnet and ghostnet with
+             blocks_per_cycle = 10800l *)
+          Compare.Int32.(c.blocks_per_cycle = 10800l)
+        in
+        let {
+          blocks_per_cycle;
+          delegate_parameters_activation_delay;
+          cycles_per_voting_period;
+          blocks_per_commitment;
+          nonce_revelation_threshold;
+          vdf_difficulty;
+        } =
+          let previous_delays =
+            {
+              blocks_per_cycle;
+              blocks_per_commitment;
+              delegate_parameters_activation_delay;
+              cycles_per_voting_period;
+              nonce_revelation_threshold;
+              vdf_difficulty;
+            }
           in
+          if is_new_constants then
+            (* we keep the same duration in days for the
+               [cycles_per_voting_period] and
+               [delegate_parameters_activation_delay] protocol
+               constants on mainnet *)
+            let preserve_duration_in_days =
+              Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 8L)
+            in
+            (* [minimal_block_delay] is the same for proto S and T *)
+            new_constants_four_hours_cycles
+              ~preserve_duration_in_days
+              ~previous_minimal_block_delay:c.minimal_block_delay
+              ~minimal_block_delay:c.minimal_block_delay
+              ~previous_delays
+          else previous_delays
+        in
+        let* ctxt =
+          if is_new_constants then
+            update_cycle_eras
+              ctxt
+              level
+              ~prev_blocks_per_cycle:c.blocks_per_cycle
+              ~new_blocks_per_cycle:blocks_per_cycle
+              ~prev_blocks_per_commitment:c.blocks_per_commitment
+              ~new_blocks_per_commitment:blocks_per_commitment
+          else return ctxt
+        in
+        let constants =
           {
             Constants_parametric_repr.consensus_rights_delay;
             blocks_preservation_cycles;
@@ -1603,7 +1728,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           }
         in
         let*! ctxt = add_constants ctxt constants in
-
         return (ctxt, Some c)
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in
