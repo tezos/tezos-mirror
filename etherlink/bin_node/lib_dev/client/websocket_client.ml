@@ -415,7 +415,7 @@ let connect ?monitoring media uri =
 
 let disconnect {conn; _} = disconnect conn
 
-let send_jsonrpc_request_helper client (request : JSONRPC.request) =
+let send_jsonrpc_request client (request : JSONRPC.request) =
   let open Lwt_result_syntax in
   let message = client.media.construct JSONRPC.request_encoding request in
   let opcode = if client.binary then Websocket.Frame.Opcode.Binary else Text in
@@ -454,7 +454,7 @@ let send_jsonrpc :
         id = Some id;
       }
   in
-  let+ response = send_jsonrpc_request_helper client request in
+  let+ response = send_jsonrpc_request client request in
   Data_encoding.Json.destruct M.output_encoding response
 
 let subscribe client (kind : Ethereum_types.Subscription.kind) =
