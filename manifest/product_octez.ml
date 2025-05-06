@@ -571,6 +571,7 @@ let octez_rust_deps, lib_wasmer_riscv =
                 [S "source_tree"; S ".cargo"];
                 [S "source_tree"; S "../rustzcash_deps"];
                 [S "source_tree"; S "wasmer-3.3.0"];
+                [S "source_tree"; S "rust_igd_next"];
                 [S "source_tree"; S "src"];
                 [S "source_tree"; S "../riscv"];
                 [S "source_tree"; S "../kernel_sdk"];

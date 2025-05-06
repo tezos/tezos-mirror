@@ -1,0 +1,14 @@
+[package]
+name = "rust_igd_next"
+version = "0.1.0"
+edition = "2024"
+
+[build]
+rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
+
+[dependencies]
+ocaml = "*"
+igd-next = "0.16.1"
+
+[build-dependencies]
+ocaml-build = { version = "1.0.0", features = ["dune"] }
