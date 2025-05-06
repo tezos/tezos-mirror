@@ -25,13 +25,16 @@ Available services:
       Assess the health of the RPC server 
   + tezlink/
     + chains/<chain_id>/blocks/<block_id>/
-      - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/constants
-          All constants 
-      - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/balance
-          The spendable balance of a contract (in mutez), also known as
-          liquid balance. Corresponds to tez owned by the contract that are
-          neither staked, nor in unstaked requests, nor in frozen bonds.
-          Identical to the 'spendable' RPC. 
+      + context/
+        - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/constants
+            All constants 
+        - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/balance
+            The spendable balance of a contract (in mutez), also known as
+            liquid balance. Corresponds to tez owned by the contract that are
+            neither staked, nor in unstaked requests, nor in frozen bonds.
+            Identical to the 'spendable' RPC. 
+        - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/manager_key
+            Access the manager of an implicit contract. 
       - GET /tezlink/chains/<chain_id>/blocks/<block_id>/helpers/current_level
           Returns the level of the interrogated block, or the one of a block
           located `offset` blocks after it in the chain. For instance, the
@@ -78,13 +81,16 @@ Warning:
 Available services:
   
   + chains/<chain_id>/blocks/<block_id>/
-    - GET /chains/<chain_id>/blocks/<block_id>/context/constants
-        All constants 
-    - GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/balance
-        The spendable balance of a contract (in mutez), also known as liquid
-        balance. Corresponds to tez owned by the contract that are neither
-        staked, nor in unstaked requests, nor in frozen bonds. Identical to
-        the 'spendable' RPC. 
+    + context/
+      - GET /chains/<chain_id>/blocks/<block_id>/context/constants
+          All constants 
+      - GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/balance
+          The spendable balance of a contract (in mutez), also known as
+          liquid balance. Corresponds to tez owned by the contract that are
+          neither staked, nor in unstaked requests, nor in frozen bonds.
+          Identical to the 'spendable' RPC. 
+      - GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/manager_key
+          Access the manager of an implicit contract. 
     - GET /chains/<chain_id>/blocks/<block_id>/helpers/current_level
         Returns the level of the interrogated block, or the one of a block
         located `offset` blocks after it in the chain. For instance, the next

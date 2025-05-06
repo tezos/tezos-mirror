@@ -19,4 +19,10 @@ module type S = sig
 
   val balance :
     [> `Main] -> [> `Head of 'a] -> Contract.t -> Tez.t tzresult Lwt.t
+
+  val manager_key :
+    [> `Main] ->
+    [> `Head of 'a] ->
+    Contract.t ->
+    Signature.public_key option tzresult Lwt.t
 end
