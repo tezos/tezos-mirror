@@ -61,23 +61,45 @@ let set_metrics_confirmed_levels (ctxt : Evm_ro_context.t) =
       Metrics.set_l1_level ~level:l1_level
   | None -> ()
 
-module Forward_container (C : sig
-  val public_endpoint : Uri.t
+module Forward_container
+    (Tx : Tx_queue_types.L2_transaction)
+    (C : sig
+      val public_endpoint : Uri.t
 
-  val private_endpoint : Uri.t
+      val private_endpoint : Uri.t
 
-  val keep_alive : bool
-end) :
+      val keep_alive : bool
+    end)
+    (Injector : sig
+      val get_transaction_count :
+        keep_alive:bool ->
+        base:Uri.t ->
+        Tx.address ->
+        Ethereum_types.Block_parameter.extended ->
+        (Ethereum_types.quantity, string) result tzresult Lwt.t
+
+      val inject_transaction :
+        keep_alive:bool ->
+        base:Uri.t ->
+        tx_object:Tx.legacy ->
+        raw_tx:string ->
+        (Ethereum_types.hash, string) result tzresult Lwt.t
+
+      val get_transaction_by_hash :
+        keep_alive:bool ->
+        base:Uri.t ->
+        Ethereum_types.hash ->
+        (Tx.t option, string) result tzresult Lwt.t
+    end) :
   Services_backend_sig.Tx_container
-    with type address = Ethereum_types.address
-     and type legacy_transaction_object =
-      Ethereum_types.legacy_transaction_object
-     and type transaction_object = Transaction_object.t = struct
-  type address = Ethereum_types.address
+    with type address = Tx.address
+     and type legacy_transaction_object = Tx.legacy
+     and type transaction_object = Tx.t = struct
+  type address = Tx.address
 
-  type legacy_transaction_object = Ethereum_types.legacy_transaction_object
+  type legacy_transaction_object = Tx.legacy
 
-  type transaction_object = Transaction_object.t
+  type transaction_object = Tx.t
 
   let rpc_error =
     Internal_event.Simple.declare_2
@@ -125,11 +147,12 @@ end) :
         (*we return the known next_nonce instead of failing *)
         return next_nonce
 
-  let add ~next_nonce:_ (tx_object : Ethereum_types.legacy_transaction_object)
-      ~raw_tx =
+  let add ~next_nonce:_ (tx_object : Tx.legacy) ~raw_tx =
     let open Lwt_syntax in
     let* () =
-      Internal_event.Simple.emit forwarding_transaction tx_object.hash
+      Internal_event.Simple.emit
+        forwarding_transaction
+        (Tx.hash_of_tx_object tx_object)
     in
     Injector.inject_transaction
       ~keep_alive:C.keep_alive
@@ -178,16 +201,50 @@ end) :
     Lwt_result_syntax.return_nil
 end
 
-let container_forward_request ~public_endpoint ~private_endpoint ~keep_alive :
-    L2_types.evm_chain_family Services_backend_sig.tx_container =
-  Services_backend_sig.Evm_tx_container
-    (module Forward_container (struct
-      let public_endpoint = public_endpoint
+let container_forward_request (type f) ~(chain_family : f L2_types.chain_family)
+    ~public_endpoint ~private_endpoint ~keep_alive :
+    f Services_backend_sig.tx_container =
+  match chain_family with
+  | EVM ->
+      Services_backend_sig.Evm_tx_container
+        (module Forward_container
+                  (Tx_queue_types.Eth_transaction_object)
+                  (struct
+                    let public_endpoint = public_endpoint
 
-      let private_endpoint = private_endpoint
+                    let private_endpoint = private_endpoint
 
-      let keep_alive = keep_alive
-    end))
+                    let keep_alive = keep_alive
+                  end)
+                  (Injector))
+  | Michelson ->
+      Services_backend_sig.Michelson_tx_container
+        (module Forward_container
+                  (Tx_queue_types.Tezlink_operation)
+                  (struct
+                    let public_endpoint = public_endpoint
+
+                    let private_endpoint = private_endpoint
+
+                    let keep_alive = keep_alive
+                  end)
+                  (struct
+                    let get_transaction_count ~keep_alive:_ ~base:_ _ _ =
+                      failwith
+                        "TODO: implement get_transaction_count in the Tezlink \
+                         case (using counter RPC)"
+
+                    let inject_transaction ~keep_alive:_ ~base:_ ~tx_object:_
+                        ~raw_tx:_ =
+                      failwith
+                        "TODO: implement inject_transaction in the Tezlink \
+                         case (using injection/operation RPC)"
+
+                    let get_transaction_by_hash ~keep_alive:_ ~base:_ _ =
+                      failwith
+                        "TODO: implement get_transaction_by_hash in the \
+                         Tezlink case"
+                  end))
 
 let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     ~(config : Configuration.t) () =
@@ -229,6 +286,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     | Some private_endpoint, _ ->
         let forward_request =
           container_forward_request
+            ~chain_family:L2_types.EVM
             ~keep_alive:config.keep_alive
             ~public_endpoint:evm_node_endpoint
             ~private_endpoint
