@@ -69,6 +69,9 @@ $(BUILDDIR)/octezdoc.txt: $(BUILDDIR)/index.html
 # Binary non-protocol specific manuals for clic binaries.
 api/%.html:
 	@../$* man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/$*.html
+# separate case for baker by now, because $* expands to octez-baker- in above rule
+api/octez-baker.html:
+	@../octez-baker man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 # Binary non-protocol specific manuals for cmdliner binaries.
 api/octez-node.txt:
@@ -92,6 +95,7 @@ manuals: \
 	 api/octez-snoop.html \
 	 api/octez-smart-rollup-node.html \
 	 api/octez-node.txt \
+	 api/octez-baker.html \
 	 api/octez-dal-node.txt \
 	 api/octez-dal-node-config-init.txt
 

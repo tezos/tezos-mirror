@@ -73,6 +73,20 @@ This is the manual page of the :doc:`../shell/smart_rollup_node`.
 .. raw:: html
          :file: ../api/octez-smart-rollup-node.html
 
+.. _baker_manual:
+
+Baker manual
+============
+
+This is the manual page of the baker command line tool. See :ref:`baker_run` for a general description of this tool.
+
+.. note::
+	This unique baker executable is meant to replace the protocol-specific bakers for all the protocols it supports, such as :ref:`octez-baker-PsRiotum <baker_manual_rio>` and :ref:`octez-baker-alpha <baker_manual_alpha>`.
+
+
+.. raw:: html
+         :file: ../api/octez-baker.html
+
 .. _benchmark_tool_manual:
 
 Benchmark tool manual
