@@ -118,17 +118,3 @@ val alcotest :
   boot_sector:string ->
   (Node_context.rw -> genesis:Sc_rollup_block.t -> unit tzresult Lwt.t) ->
   unit Alcotest_lwt.test_case
-
-(** Build an alcotest test case that executes with node context initialized with
-    a chain of size [chain_size] in the previous (V4) store in order to run
-    store migration tests. *)
-val store_migration_alcotest :
-  ?name:string ->
-  Alcotest_lwt.speed_level ->
-  ?constants:Rollup_constants.protocol_constants ->
-  Kind.t ->
-  Protocol_hash.t ->
-  boot_sector:string ->
-  chain_size:int ->
-  (Node_context.rw -> Sc_rollup_block.t list -> unit tzresult Lwt.t) ->
-  unit Alcotest_lwt.test_case

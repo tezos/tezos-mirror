@@ -82,9 +82,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     }
   in
   let* () = update_metadata metadata ~data_dir in
-  let* store =
-    Node_context.Node_store.init_with_migration store_access metadata ~data_dir
-  in
+  let* store = Node_context.Node_store.init store_access ~data_dir in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
   in
@@ -363,18 +361,7 @@ module Internal_for_tests = struct
     in
     let* lockfile = lock ~data_dir in
     let genesis_info = {level = 0l; commitment_hash = Commitment.Hash.zero} in
-    let metadata =
-      Metadata.
-        {
-          rollup_address;
-          context_version = Context.Version.version;
-          kind;
-          genesis_info;
-        }
-    in
-    let* store =
-      Node_context.Node_store.init_with_migration Read_write metadata ~data_dir
-    in
+    let* store = Node_context.Node_store.init Read_write ~data_dir in
     let*? (module Plugin : Protocol_plugin_sig.S) =
       Protocol_plugins.proto_plugin_for_protocol current_protocol.hash
     in
