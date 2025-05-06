@@ -269,7 +269,10 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       Configuration.is_tx_queue_enabled config
       && Option.is_none evm_node_private_endpoint
       (* Only start the beacon when the tx_queue is started. *)
-    then Tx_queue.beacon ~evm_node_endpoint ~tick_interval:0.05
+    then
+      Tx_queue.beacon
+        ~evm_node_endpoint:(Rpc evm_node_endpoint)
+        ~tick_interval:0.05
     else return_unit
   and* () =
     Blueprints_follower.start

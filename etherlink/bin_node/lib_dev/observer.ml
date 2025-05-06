@@ -350,7 +350,9 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
     and* () =
       if Configuration.is_tx_queue_enabled config then
-        Tx_queue.beacon ~evm_node_endpoint ~tick_interval:0.05
+        Tx_queue.beacon
+          ~evm_node_endpoint:(Rpc evm_node_endpoint)
+          ~tick_interval:0.05
       else return_unit
     in
     return_unit
