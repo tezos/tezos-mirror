@@ -16,6 +16,56 @@ type ctx = {
   gas_limit : Z.t;
 }
 
+module Craft = struct
+  let prepare_and_forge_tx
+      {max_fee_per_gas; sk; gas_limit; chain_id = L2_types.Chain_id chain_id; _}
+      ?to_ ?data ~nonce ~value () =
+    let open Efunc_core in
+    let unsigned =
+      Eth.
+        {
+          ti_max_priority_fee = Z.succ max_fee_per_gas;
+          ti_max_fee = max_fee_per_gas;
+          ti_value = value;
+          ti_data = data;
+          ti_chain_id = Z.to_int chain_id;
+          ti_nonce = Z.to_int nonce;
+          ti_gas_limit = Z.to_int gas_limit;
+          ti_access_list = [];
+          ti_signature = None;
+          ti_to = to_;
+          ti_max_fee_per_blob_gas = None;
+          ti_blob_versioned_hashes = [];
+          ti_blobs = [];
+        }
+    in
+    let ti_signature =
+      Some (Crypto.sign sk (Rope.to_string (Forge.transaction unsigned)))
+    in
+    Evm.of_rope @@ Forge.transaction {unsigned with ti_signature}
+
+  let transfer ctx ~nonce ?to_ ?data ~value () =
+    let txn = prepare_and_forge_tx ctx ?to_ ?data ~value ~nonce () in
+    Ethereum_types.Hex (txn :> string)
+end
+
+module Tx_queue = struct
+  include Tx_queue
+
+  let ( let**? ) v f =
+    let open Lwt_result_syntax in
+    match v with Ok v -> f v | Error err -> return (Error err)
+
+  (* as found in etherlink/bin_floodgate/tx_queue.ml *)
+  let transfer ctx ?to_ ?(value = Z.zero) ~nonce ~data () =
+    let txn = Craft.transfer ctx ~nonce ?to_ ~value ~data () in
+    let tx_raw = Ethereum_types.hex_to_bytes txn in
+    let hash = Ethereum_types.hash_raw_tx tx_raw in
+    let**? tx = Transaction.decode tx_raw in
+    let**? tx_object = Transaction.to_transaction_object ~hash tx in
+    inject tx_object txn ~next_nonce:(Ethereum_types.Qty nonce)
+end
+
 module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
 
 let system_address =
@@ -107,6 +157,40 @@ module Event = struct
            l.transactionHash,
            l.transactionIndex,
            l.blockNumber )
+
+  let unclaimed_deposits =
+    declare_1
+      ~section
+      ~name:"unclaimed_deposits"
+      ~msg:"There are {number} unclaimed deposits"
+      ~level:Notice
+      ("number", Data_encoding.int31)
+
+  let claiming_deposit =
+    declare_1
+      ~section
+      ~name:"claiming_deposit"
+      ~msg:"Claiming deposit {nonce}"
+      ~level:Notice
+      ("nonce", Db.quantity_hum_encoding)
+      ~pp1:Ethereum_types.pp_quantity
+
+  let claimed_deposit =
+    declare_4
+      ~section
+      ~name:"claimed_deposit"
+      ~msg:
+        "Claimed deposit {nonce} in transaction \
+         {transactionHash}({transactionIndex}) of block {blockNumber}"
+      ~level:Notice
+      ("nonce", Db.quantity_hum_encoding)
+      ("transactionHash", Ethereum_types.hash_encoding)
+      ("transactionIndex", Db.quantity_hum_encoding)
+      ("blockNumber", Db.quantity_hum_encoding)
+      ~pp1:Ethereum_types.pp_quantity
+      ~pp2:Ethereum_types.pp_hash
+      ~pp3:Ethereum_types.pp_quantity
+      ~pp4:Ethereum_types.pp_quantity
 
   let parsing_error =
     declare_1
@@ -281,6 +365,25 @@ let parse_log (log : Ethereum_types.transaction_log) =
   let* deposit_data = Deposit.decode_event_data log in
   return (parsed_log_to_db log deposit_data)
 
+let precompiled_contract_address = Efunc_core.Private.a Deposit.address_hex
+
+let claim ctx ~deposit_id =
+  let open Lwt_result_syntax in
+  let* (Ethereum_types.Qty nonce) =
+    Websocket_client.send_jsonrpc
+      ctx.ws_client
+      (Call
+         ( (module Rpc_encodings.Get_transaction_count),
+           (ctx.public_key, Block_parameter Latest) ))
+  in
+  let data =
+    Efunc_core.Evm.encode ~name:"claim" [`uint 256] [`int deposit_id]
+  in
+  let _ : (unit, string) result tzresult Lwt.t =
+    Tx_queue.transfer ctx ~nonce ~to_:precompiled_contract_address ~data ()
+  in
+  return_unit
+
 let handle_one_log {ws_client; db; _} (log : Ethereum_types.transaction_log) =
   let open Lwt_result_syntax in
   let*! () = Event.(emit transaction_log) log in
@@ -432,10 +535,35 @@ let handle_confirmed_txs {db; ws_client; _}
                blockNumber = b.number;
              }
          in
+         let*! () =
+           Event.(emit claimed_deposit)
+             ( nonce,
+               exec.transactionHash,
+               exec.transactionIndex,
+               exec.blockNumber )
+         in
          let* () = Db.Deposits.set_claimed db nonce exec in
          let* () = Tx_queue.confirm tx_hash in
          return_unit
      | _ -> return_unit
+
+let claim_deposits ctx =
+  let open Lwt_result_syntax in
+  let* deposits = Db.Deposits.get_unclaimed ctx.db in
+  let*! () =
+    let number = List.length deposits in
+    if number > 0 then Event.(emit unclaimed_deposits) number
+    else Lwt.return_unit
+  in
+  let* () =
+    List.iter_es
+      (fun deposit ->
+        let (Qty deposit_id) = deposit.Db.nonce in
+        let*! () = Event.(emit claiming_deposit) deposit.Db.nonce in
+        claim ctx ~deposit_id)
+      deposits
+  in
+  return_unit
 
 let on_new_block ctx ~catch_up (b : _ Ethereum_types.block) =
   let open Lwt_result_syntax in
@@ -446,7 +574,7 @@ let on_new_block ctx ~catch_up (b : _ Ethereum_types.block) =
   (* Notify tx queue and register claimed deposits in DB *)
   let* () = handle_confirmed_txs ctx b in
   let* () = Db.Pointers.L2_head.set ctx.db b.number in
-  unless catch_up @@ fun () -> return_unit
+  unless catch_up @@ fun () -> claim_deposits ctx
 
 let rec catch_up ctx ~from_block ~end_block =
   let open Lwt_result_syntax in
