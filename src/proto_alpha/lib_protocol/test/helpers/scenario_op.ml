@@ -70,11 +70,11 @@ let set_delegate_params delegate_name parameters : (t, t) scenarios =
       return (state, [operation]))
 
 (** Add a new account with the given name *)
-let add_account name : (t, t) scenarios =
+let add_account ?algo name : (t, t) scenarios =
   let open Lwt_result_syntax in
   exec_state (fun (_block, state) ->
       Log.info ~color:action_color "[Add account \"%s\"]" name ;
-      let new_account = Account.new_account () in
+      let new_account = Account.new_account ?algo () in
       let pkh = new_account.pkh in
       let contract = Protocol.Alpha_context.Contract.Implicit pkh in
       let account_state =
@@ -92,6 +92,9 @@ let reveal name : (t, t) scenarios =
       let* acc = Account.find account.pkh in
       let* operation =
         Op.revelation ~fee:Protocol.Alpha_context.Tez.zero (B block) acc.pk
+      in
+      let state =
+        State.update_account name {account with revealed = true} state
       in
       return (state, [operation]))
 
@@ -234,6 +237,90 @@ let finalize_unstake src_name : (t, t) scenarios =
       let* operation = finalize_unstake (B block) src.contract in
       let state = State.apply_finalize src_name state in
       return (state, [operation]))
+
+let update_consensus_key_ ?proof_signer ?(force_no_signer = false) ~ck_name
+    src_name (block, state) =
+  let open Lwt_result_syntax in
+  let delegate = State.find_account src_name state in
+  let ck = State.find_account ck_name state in
+  let* {pk = consensus_pk; pkh = consensus_pkh; sk = _} = Account.find ck.pkh in
+  Log.info
+    ~color:action_color
+    "[Update consensus key for \"%s\" to %a]"
+    src_name
+    Signature.Public_key_hash.pp
+    consensus_pkh ;
+  let current_cycle = current_cycle block in
+  let proof_signer =
+    match
+      (force_no_signer, proof_signer, (consensus_pk : Signature.public_key))
+    with
+    | true, _, _ -> None
+    | false, Some proof_signer_name, _ ->
+        Some (State.find_account proof_signer_name state).contract
+    | false, None, Signature.Bls _ ->
+        Some (Protocol.Alpha_context.Contract.Implicit consensus_pkh)
+    | _ -> None
+  in
+  let* operation =
+    Op.update_consensus_key
+      ?proof_signer
+      ~fee:Tez_helpers.zero
+      (B block)
+      delegate.contract
+      consensus_pk
+  in
+  let state =
+    State.apply_update_consensus_key src_name current_cycle consensus_pkh state
+  in
+  return (state, [operation])
+
+let update_consensus_key ?proof_signer ?(force_no_signer = false) ~ck_name
+    src_name : (t, t) scenarios =
+  exec_op
+    (update_consensus_key_ ?proof_signer ~force_no_signer ~ck_name src_name)
+
+let update_companion_key_ ?proof_signer ?(force_no_signer = false) ~ck_name
+    src_name (block, state) =
+  let open Lwt_result_syntax in
+  let delegate = State.find_account src_name state in
+  let ck = State.find_account ck_name state in
+  let* {pk = companion_pk; pkh = companion_pkh; sk = _} = Account.find ck.pkh in
+  Log.info
+    ~color:action_color
+    "[Update companion key for \"%s\" to %a]"
+    src_name
+    Signature.Public_key_hash.pp
+    companion_pkh ;
+  let current_cycle = current_cycle block in
+  let proof_signer =
+    match
+      (force_no_signer, proof_signer, (companion_pk : Signature.public_key))
+    with
+    | true, _, _ -> None
+    | false, Some proof_signer_name, _ ->
+        Some (State.find_account proof_signer_name state).contract
+    | false, None, Signature.Bls _ ->
+        Some (Protocol.Alpha_context.Contract.Implicit companion_pkh)
+    | _ -> None
+  in
+  let* operation =
+    Op.update_companion_key
+      ?proof_signer
+      ~fee:Tez_helpers.zero
+      (B block)
+      delegate.contract
+      companion_pk
+  in
+  let state =
+    State.apply_update_companion_key src_name current_cycle companion_pkh state
+  in
+  return (state, [operation])
+
+let update_companion_key ?proof_signer ?(force_no_signer = false) ~ck_name
+    src_name : (t, t) scenarios =
+  exec_op
+    (update_companion_key_ ?proof_signer ~force_no_signer ~ck_name src_name)
 
 (* ======== Slashing ======== *)
 
@@ -569,5 +656,5 @@ let make_denunciations ?single ?rev ?filter () =
   exec_op (make_denunciations_op ?single ?rev ?filter)
 
 (** Create an account and give an initial balance funded by [funder] *)
-let add_account_with_funds name ~funder amount =
-  add_account name --> transfer funder name amount --> reveal name
+let add_account_with_funds ?algo name ~funder amount =
+  add_account ?algo name --> transfer funder name amount --> reveal name

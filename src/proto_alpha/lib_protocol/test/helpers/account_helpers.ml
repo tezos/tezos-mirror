@@ -26,6 +26,7 @@ module CycleMap = Map.Make (Cycle)
 type account_state = {
   pkh : Signature.Public_key_hash.t;
   contract : Protocol.Alpha_context.Contract.t;
+  revealed : bool;
   delegate : string option;
   parameters : staking_parameters;
   liquid : Tez.t;
@@ -58,22 +59,25 @@ type account_state = {
      When a delegate is initialized or reactivated, we lie on this and
      put extra [consensus_rights_delay] cycles in the future to
      account for its extended grace period *)
-  last_seen_activity : Cycle.t;
+  last_seen_activity : Cycle.t option;
+  consensus_keys : Signature.public_key_hash CycleMap.t;
+  companion_keys : Signature.Bls.Public_key_hash.t CycleMap.t;
 }
 
 let init_account ~name ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
-    ?(bonds = Tez.zero) ?frozen_deposits
+    ?(bonds = Tez.zero) ?frozen_deposits ?(revealed = false)
     ?(unstaked_frozen = Unstaked_frozen.zero)
     ?(unstaked_finalizable = Unstaked_finalizable.zero)
     ?(staking_delegator_numerator = Z.zero)
     ?(staking_delegate_denominator = Z.zero) ?(frozen_rights = CycleMap.empty)
-    ?(slashed_cycles = []) ?(last_seen_activity = Cycle.root) () =
+    ?(slashed_cycles = []) ?last_seen_activity () =
   let frozen_deposits =
     Option.value frozen_deposits ~default:(Frozen_tez.init Tez.zero name name)
   in
   {
     pkh;
     contract;
+    revealed;
     delegate;
     parameters;
     liquid;
@@ -86,6 +90,8 @@ let init_account ~name ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     frozen_rights;
     slashed_cycles;
     last_seen_activity;
+    consensus_keys = CycleMap.empty;
+    companion_keys = CycleMap.empty;
   }
 
 type account_map = account_state String.Map.t
@@ -119,6 +125,7 @@ let balance_of_account account_name (account_map : account_map) =
       {
         pkh = _;
         contract = _;
+        revealed = _;
         delegate;
         parameters = _;
         liquid;
@@ -131,6 +138,8 @@ let balance_of_account account_name (account_map : account_map) =
         frozen_rights = _;
         slashed_cycles = _;
         last_seen_activity = _;
+        consensus_keys = _;
+        companion_keys = _;
       } ->
       let balance =
         {
@@ -552,23 +561,50 @@ let current_total_frozen_deposits_with_limits account_state =
     account_state.frozen_deposits
 
 let update_activity account constants current_cycle =
-  if Cycle.(account.last_seen_activity >= current_cycle) then account
-  else if
-    (* When a delegate is initialized or reactivated (either from
-       [set_delegate] or participating in the consensus again), we put
-       extra [consensus_rights_delay] cycles in the future to account
-       for its extended grace period *)
-    Cycle.(succ account.last_seen_activity < current_cycle)
-  then
-    {
-      account with
-      last_seen_activity =
-        Cycle.add
-          current_cycle
-          constants
-            .Protocol.Alpha_context.Constants.Parametric.consensus_rights_delay;
-    }
-  else {account with last_seen_activity = current_cycle}
+  match account.last_seen_activity with
+  | None ->
+      {
+        account with
+        last_seen_activity =
+          Some
+            (Cycle.add
+               current_cycle
+               constants
+                 .Protocol.Alpha_context.Constants.Parametric
+                  .consensus_rights_delay);
+      }
+  | Some activity_cycle ->
+      if
+        (* When a delegate is initialized or reactivated (either from
+           [set_delegate] or participating in the consensus again), we put
+           extra [consensus_rights_delay] cycles in the future to account
+           for its extended grace period *)
+        Cycle.(
+          add
+            activity_cycle
+            constants
+              .Protocol.Alpha_context.Constants.Parametric
+               .tolerated_inactivity_period
+          < current_cycle)
+      then
+        {
+          account with
+          last_seen_activity =
+            Some
+              Cycle.(
+                max
+                  activity_cycle
+                  (add
+                     current_cycle
+                     constants
+                       .Protocol.Alpha_context.Constants.Parametric
+                        .consensus_rights_delay));
+        }
+      else
+        {
+          account with
+          last_seen_activity = Some Cycle.(max activity_cycle current_cycle);
+        }
 
 let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
     ~new_balance compare =
@@ -602,3 +638,110 @@ let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
       "Test_scenario_autostaking.assert_balance_evolution: account %s not found"
       name ;
     assert false)
+
+let current_consensus_key account current_cycle =
+  CycleMap.find_last_opt
+    (fun cycle -> Cycle.(cycle <= current_cycle))
+    account.consensus_keys
+  |> Option.fold ~none:account.pkh ~some:snd
+
+let current_companion_key account current_cycle =
+  CycleMap.find_last_opt
+    (fun cycle -> Cycle.(cycle <= current_cycle))
+    account.companion_keys
+  |> Option.map snd
+
+let latest_consensus_key account =
+  CycleMap.max_binding_opt account.consensus_keys
+  |> Option.value ~default:(Cycle.root, account.pkh)
+
+let latest_companion_key account =
+  CycleMap.max_binding_opt account.companion_keys
+  |> Option.fold ~none:(Cycle.root, None) ~some:(fun (cycle, pkh) ->
+         (cycle, Some pkh))
+
+let pp_ck_map pkh_pp fmt map =
+  Format.pp_print_list
+    (fun out (c, pkh) -> Format.fprintf out "(%a, %a)" Cycle.pp c pkh_pp pkh)
+    fmt
+    (CycleMap.bindings map
+    |> List.sort (fun (c1, _) (c2, _) -> Cycle.compare c1 c2))
+
+let assert_CKs ~loc ctxt current_cycle account_name account_map =
+  let open Lwt_result_syntax in
+  match String.Map.find account_name account_map with
+  | None -> fail_account_not_found "assert_CKs" account_name
+  | Some account -> (
+      match account.delegate with
+      | Some delegate when String.equal delegate account_name ->
+          Log.debug
+            "Consensus and companion history for %s:@.consensus: \
+             %a@.companion: %a"
+            account_name
+            (pp_ck_map Signature.Public_key_hash.pp)
+            account.consensus_keys
+            (pp_ck_map Signature.Bls.Public_key_hash.pp)
+            account.companion_keys ;
+          let* info = Context.Delegate.info ctxt account.pkh in
+          let {
+            Delegate_services.active_consensus_key;
+            active_companion_key;
+            pending_consensus_keys;
+            pending_companion_keys;
+            _;
+          } =
+            info
+          in
+          let* () =
+            Assert.equal
+              ~loc
+              Signature.Public_key_hash.equal
+              "consensus_key"
+              Signature.Public_key_hash.pp
+              active_consensus_key
+              (current_consensus_key account current_cycle)
+          in
+          let* () =
+            Assert.equal
+              ~loc
+              (Option.equal Signature.Bls.Public_key_hash.equal)
+              "companion_key"
+              (Format.pp_print_option Signature.Bls.Public_key_hash.pp)
+              active_companion_key
+              (current_companion_key account current_cycle)
+          in
+          let consensus_bindings = CycleMap.bindings account.consensus_keys in
+          let* () =
+            Assert.is_true
+              ~loc
+              (List.for_all
+                 (Fun.flip
+                    (List.mem ~equal:(fun (a, b) (c, d) ->
+                         Cycle.equal a c && Signature.Public_key_hash.equal b d))
+                    consensus_bindings)
+                 pending_consensus_keys)
+          in
+          let companion_bindings = CycleMap.bindings account.companion_keys in
+          let* () =
+            Assert.is_true
+              ~loc
+              (List.for_all
+                 (Fun.flip
+                    (List.mem ~equal:(fun (a, b) (c, d) ->
+                         Cycle.equal a c
+                         && Signature.Bls.Public_key_hash.equal b d))
+                    companion_bindings)
+                 pending_companion_keys)
+          in
+          Log.debug
+            "Consensus and companion RPC check OK for %s@.current consensus \
+             key: %a@.current companion key: %a"
+            account_name
+            Signature.Public_key_hash.pp
+            active_consensus_key
+            (Format.pp_print_option Signature.Bls.Public_key_hash.pp)
+            active_companion_key ;
+          return_unit
+      | _ ->
+          (* Account is not a delegate: consensus key is undefined *)
+          return_unit)

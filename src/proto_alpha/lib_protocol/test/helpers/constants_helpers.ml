@@ -120,6 +120,9 @@ module Set = struct
   let direct_ticket_spending_enable direct_ticket_spending_enable (c : t) =
     {c with direct_ticket_spending_enable}
 
+  let allow_tz4_delegate_enable allow_tz4_delegate_enable (c : t) =
+    {c with allow_tz4_delegate_enable}
+
   let issuance_weights issuance_weights (c : t) = {c with issuance_weights}
 
   module Issuance_weights = struct

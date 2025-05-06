@@ -764,19 +764,19 @@ let init2 = init_gen T2
 
 let init3 = init_gen T3
 
-let create_bootstrap_accounts n =
+let create_bootstrap_accounts ?algo n =
   let open Result_syntax in
-  let* accounts = Account.generate_accounts n in
+  let* accounts = Account.generate_accounts ?algo n in
   let contracts =
     List.map (fun a -> Alpha_context.Contract.Implicit Account.(a.pkh)) accounts
   in
   let bootstrap_accounts = Account.make_bootstrap_accounts accounts in
   return (bootstrap_accounts, contracts)
 
-let init_with_constants_gen tup constants =
+let init_with_constants_gen ?algo tup constants =
   let open Lwt_result_syntax in
   let n = tup_n tup in
-  let*? bootstrap_accounts, contracts = create_bootstrap_accounts n in
+  let*? bootstrap_accounts, contracts = create_bootstrap_accounts ?algo n in
   let parameters =
     Tezos_protocol_alpha_parameters.Default_parameters.parameters_of_constants
       ~bootstrap_accounts
@@ -785,8 +785,8 @@ let init_with_constants_gen tup constants =
   let* blk = Block.genesis_with_parameters parameters in
   return (blk, tup_get tup contracts)
 
-let init_with_constants_n constants n =
-  init_with_constants_gen (TList n) constants
+let init_with_constants_n ?algo constants n =
+  init_with_constants_gen ?algo (TList n) constants
 
 let init_with_constants1 = init_with_constants_gen T1
 

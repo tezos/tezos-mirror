@@ -55,12 +55,14 @@ let check_all_balances block state : unit tzresult Lwt.t =
   let*! r1 =
     String.Map.fold_s
       (fun name account acc ->
-        log_debug_balance name account_map ;
-        let* () = log_debug_rpc_balance name (Implicit account.pkh) block in
-        let*! r =
-          assert_balance_check ~loc:__LOC__ (B block) name account_map
-        in
-        Assert.join_errors r acc)
+        if account.revealed then (
+          log_debug_balance name account_map ;
+          let* () = log_debug_rpc_balance name (Implicit account.pkh) block in
+          let*! r =
+            assert_balance_check ~loc:__LOC__ (B block) name account_map
+          in
+          Assert.join_errors r acc)
+        else return_unit)
       account_map
       Result.return_unit
   in
@@ -82,7 +84,7 @@ let check_misc block state : unit tzresult Lwt.t =
   String.Map.fold_s
     (fun name account acc ->
       match account.delegate with
-      | Some x when String.equal x name ->
+      | Some x when String.equal x name && account.revealed ->
           let ufd_state =
             List.map
               (fun ({cycle; current; _} : Unstaked_frozen.r) ->
@@ -150,10 +152,12 @@ let check_misc block state : unit tzresult Lwt.t =
             else Cycle.succ current_cycle
           in
           let deactivated =
-            Cycle.add
-              account.last_seen_activity
-              state.constants.tolerated_inactivity_period
-            < ctxt_cycle
+            match account.last_seen_activity with
+            | None -> assert false (* delegates have a minimum activity cycle *)
+            | Some activity_cycle ->
+                Cycle.(
+                  add activity_cycle state.constants.tolerated_inactivity_period)
+                < ctxt_cycle
           in
           let*! r3 =
             Assert.equal_bool ~loc:__LOC__ deactivated deactivated_rpc
@@ -211,7 +215,7 @@ let check_issuance_rpc block : unit tzresult Lwt.t =
   in
   return_unit
 
-let attest_all_ =
+let attest_all_ previous_block =
   let open Lwt_result_syntax in
   fun (block, state) ->
     let* rights = Plugin.RPC.Attestation_rights.get Block.rpc_ctxt block in
@@ -246,14 +250,20 @@ let attest_all_ =
     in
     let* ops =
       List.map_es
-        (fun (delegate, slot) -> Op.attestation ~delegate ~slot block)
+        (fun (delegate, slot) ->
+          let* consensus_key_info =
+            Context.Delegate.consensus_key (B previous_block) delegate
+          in
+          let consensus_key = consensus_key_info.active in
+          let* consensus_key = Account.find consensus_key.consensus_key_pkh in
+          Op.attestation ~delegate:consensus_key.pkh ~slot block)
         dlgs
     in
     let state = State.add_pending_operations ops state in
     return (block, state)
 
 (* Does not produce a new block *)
-let attest_all = exec attest_all_
+let attest_all previous_block = exec (attest_all_ previous_block)
 
 let check_ai_launch_cycle_is_zero ~loc block =
   let open Lwt_result_syntax in
@@ -289,12 +299,16 @@ let bake ?baker : t -> t tzresult Lwt.t =
   in
   let current_cycle = Block.current_cycle block in
   let* level = Plugin.RPC.current_level Block.rpc_ctxt block in
+  let* next_level =
+    let* ctxt = Context.get_alpha_ctxt (B block) in
+    return (Protocol.Alpha_context.Level.succ ctxt level)
+  in
   assert (Protocol.Alpha_context.Cycle.(level.cycle = Block.current_cycle block)) ;
   Log.info
     ~color:time_color
     "Baking level %d (cycle %ld) with %s"
     (Int32.to_int (Int32.succ Block.(block.header.shell.level)))
-    (Protocol.Alpha_context.Cycle.to_int32 level.cycle)
+    (Protocol.Alpha_context.Cycle.to_int32 next_level.cycle)
     baker_name ;
   let adaptive_issuance_vote =
     if state.force_ai_vote_yes then
@@ -397,9 +411,10 @@ let bake ?baker : t -> t tzresult Lwt.t =
       return @@ apply_new_cycle new_future_current_cycle state)
   in
   let* block, state =
-    if state.force_attest_all then attest_all_ (block, state)
+    if state.force_attest_all then attest_all_ previous_block (block, state)
     else return (block, state)
   in
+  let* () = state.check_finalized_block (block, state) in
   return (block, state)
 
 let rec repeat n f acc =
