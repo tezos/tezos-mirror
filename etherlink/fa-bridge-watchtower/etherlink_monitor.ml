@@ -617,20 +617,25 @@ let monitor_heads ctx =
   in
   return_unit
 
-let init_db_pointers db ws_client =
+let init_db_pointers db ws_client ~first_block =
   let open Lwt_result_syntax in
   let* l2_head = Db.Pointers.L2_head.find db in
   let* () =
     match l2_head with
     | Some _ -> return_unit
-    | None ->
-        (* TODO: log *)
-        let* latest =
-          Websocket_client.send_jsonrpc
-            ws_client
-            (Call ((module Rpc_encodings.Get_block_by_number), (Latest, false)))
-        in
-        Db.Pointers.L2_head.set db latest.number
+    | None -> (
+        match first_block with
+        | Some first_block ->
+            Db.Pointers.L2_head.set db (Ethereum_types.Qty.pred first_block)
+        | None ->
+            (* TODO: log *)
+            let* latest =
+              Websocket_client.send_jsonrpc
+                ws_client
+                (Call
+                   ((module Rpc_encodings.Get_block_by_number), (Latest, false)))
+            in
+            Db.Pointers.L2_head.set db latest.number)
   in
   return_unit
 
@@ -655,7 +660,8 @@ module Public_key = struct
     Ethereum_types.Address (Ethereum_types.hex_of_string addr)
 end
 
-let start db ~evm_node_endpoint ~secret_key ~max_fee_per_gas ~gas_limit =
+let start db ~evm_node_endpoint ~first_block ~secret_key ~max_fee_per_gas
+    ~gas_limit =
   let open Lwt_result_syntax in
   let tx_queue_endpoint = ref (Tx_queue.Rpc evm_node_endpoint) in
   let run () =
@@ -666,7 +672,7 @@ let start db ~evm_node_endpoint ~secret_key ~max_fee_per_gas ~gas_limit =
         (Uri.with_path evm_node_endpoint (Uri.path evm_node_endpoint ^ "/ws"))
     in
     tx_queue_endpoint := Tx_queue.Websocket ws_client ;
-    let* () = init_db_pointers db ws_client in
+    let* () = init_db_pointers db ws_client ~first_block in
     let* chain_id = get_chain_id ws_client in
     let public_key = Public_key.(to_address (from_sk secret_key)) in
     let ctx =

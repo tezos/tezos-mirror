@@ -79,6 +79,16 @@ module Arg = struct
       ~doc:"secret_key"
       ~env:"FA_BRIDGE_WATCHTOWER_SK"
       (Tezos_clic.parameter (fun _ s -> Secret_key.from_hex_string s))
+
+  let first_block =
+    Tezos_clic.arg
+      ~long:"first-block"
+      ~doc:
+        "First block number from which to look at deposits when running for \
+         the first time."
+      ~placeholder:"number"
+    @@ Tezos_clic.parameter (fun _ x ->
+           Lwt_result.return (Ethereum_types.Qty (Z.of_string x)))
 end
 
 let log_config ~verbosity ~data_dir =
@@ -134,9 +144,9 @@ let run_command =
   let open Tezos_clic in
   om_command
     ~desc:"Start FA bridge watchtower"
-    (args2 Arg.evm_node_endpoint Arg.secret_key)
+    (args3 Arg.evm_node_endpoint Arg.secret_key Arg.first_block)
     (prefixes ["run"] @@ stop)
-    (fun {data_dir; verbosity} (evm_node_endpoint, secret_key) _ ->
+    (fun {data_dir; verbosity} (evm_node_endpoint, secret_key, first_block) _ ->
       let secret_key = Stdlib.Option.get secret_key in
       let open Lwt_result_syntax in
       let*! () = log_config ~verbosity ~data_dir in
@@ -144,6 +154,7 @@ let run_command =
       Etherlink_monitor.start
         db
         ~evm_node_endpoint
+        ~first_block
         ~secret_key
         ~max_fee_per_gas:(Z.of_int (1_000_000_000 * 100))
         ~gas_limit:(Z.of_int 1_000_000))
