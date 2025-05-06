@@ -24,7 +24,8 @@ let pp_docker_image fmt = function
 
 let domain agents =
   match Env.mode with
-  | `Orchestrator -> Proxy.get_agent agents |> Agent.point |> Option.get |> fst
+  | `Orchestrator | `Ssh_host _ ->
+      Proxy.get_agent agents |> Agent.point |> Option.get |> fst
   | `Host | `Localhost | `Cloud -> "localhost"
 
 let string_docker_command agent =

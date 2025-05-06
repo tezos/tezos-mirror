@@ -470,7 +470,17 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   in
   let process =
     let args =
+      (* remove "--ssh-host host" from the commande line *)
+      let rec filter_ssh acc args =
+        match args with
+        | [] -> List.rev acc
+        (* FIXME: remove proxy-localhost when agent name bug is fixed *)
+        | "--ssh-host" :: _host :: args ->
+            filter_ssh ("--proxy-localhost" :: "--proxy" :: acc) args
+        | arg :: args -> filter_ssh (arg :: acc) args
+      in
       let args = Sys.argv |> Array.to_list |> List.tl in
+      let args = filter_ssh [] args in
       args @ ["--localhost"; "--tezt-cloud"; Env.tezt_cloud]
       (* [--localhost] will be combined with --proxy, this enables to detect we want to run in [`Orchestrator].
 
@@ -552,7 +562,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
            future." ;
         match Env.mode with
         | `Localhost | `Cloud -> None
-        | `Host | `Orchestrator ->
+        | `Host | `Orchestrator | `Ssh_host (_, _) ->
             (* In Host mode, we want to run a deployment deploying the
                Proxy VM. In orchestrator mode, there is few
                initialisation steps needed. By using [Some []], we
@@ -664,7 +674,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
             let* deployement = Deployement.deploy ~configurations in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
-        | `Host ->
+        | `Host | `Ssh_host _ ->
             (* The scenario is executed remotely. *)
             let* proxy_running = try_reattach () in
             if not proxy_running then
@@ -709,7 +719,7 @@ let agents t =
           in
           [default_agent]
       | agents -> agents)
-  | `Host | `Cloud | `Localhost -> t.agents
+  | `Host | `Cloud | `Localhost | `Ssh_host _ -> t.agents
 
 let write_website t =
   match t.website with

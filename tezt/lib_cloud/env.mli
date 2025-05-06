@@ -31,8 +31,13 @@ val ssh_public_key_filename : ?home:string -> unit -> string
 
   - [`Host]: This mode is run by the host machine that initializes the
     orchestrator running on a VM.
+
+  - [`Ssh_host (host, port)]: This mode is similar to the Orchestrator mode, but
+    on a non-gcp vm. Its purpose is to make an initial provisioning
+    of docker if it is not setup.
 *)
-val mode : [`Localhost | `Cloud | `Orchestrator | `Host]
+val mode :
+  [`Localhost | `Ssh_host of string * int | `Cloud | `Orchestrator | `Host]
 
 (** Equivalent to [Cli.prometheus]. *)
 val prometheus : bool

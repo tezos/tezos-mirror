@@ -187,7 +187,7 @@ module Remote = struct
         let () =
           Log.report
             ~color:Log.Color.FG.green
-            "DNS registrered successfully: '%s'"
+            "DNS registered successfully: '%s'"
             domain
         in
         Lwt.return_unit
@@ -355,8 +355,8 @@ module Ssh_host = struct
     in
     Lwt.return agent
 
-  let _deploy ~user ~host ~port ~(configurations : Agent.Configuration.t list)
-      () =
+  let deploy ~user ~host ~port ~(configurations : Agent.Configuration.t list) ()
+      =
     let proxy_runner =
       Runner.create ~ssh_user:"root" ~ssh_port:port ~address:host ()
     in
@@ -428,9 +428,9 @@ module Ssh_host = struct
     let agents = proxy :: agents in
     Lwt.return {point = (user, host, port); agents}
 
-  let _agents t = t.agents
+  let agents t = t.agents
 
-  let _terminate {point; agents} =
+  let terminate {point; agents} =
     let _user, host, port = point in
     let* () =
       Lwt_list.iter_p
@@ -596,7 +596,10 @@ module Localhost = struct
     else Lwt.return_unit
 end
 
-type t = Remote of Remote.t | Localhost of Localhost.t
+type t =
+  | Remote of Remote.t
+  | Ssh_host of Ssh_host.t
+  | Localhost of Localhost.t
 
 let deploy ~configurations =
   match Env.mode with
@@ -610,15 +613,22 @@ let deploy ~configurations =
       let* remote = Remote.deploy ~proxy:true ~configurations in
       Lwt.return (Remote remote)
   | `Orchestrator -> assert false
+  | `Ssh_host (host, port) ->
+      let* host =
+        Ssh_host.deploy ~user:(Sys.getenv "USER") ~host ~port ~configurations ()
+      in
+      Lwt.return (Ssh_host host)
 
 let agents t =
   match t with
   | Remote remote -> Remote.agents remote
   | Localhost localhost -> Localhost.agents localhost
+  | Ssh_host remote -> Ssh_host.agents remote
 
 let terminate ?exn t =
   match t with
   | Remote remote -> Remote.terminate ?exn remote
   | Localhost localhost -> Localhost.terminate ?exn localhost
+  | Ssh_host remote -> Ssh_host.terminate remote
 
 let of_agents agents = Remote {agents}
