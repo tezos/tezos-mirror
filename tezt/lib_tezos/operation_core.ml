@@ -517,14 +517,22 @@ module Consensus = struct
     inject ~protocol ~branch ~signer:delegate preattestation client
 
   let attest_for ~protocol ~slot ~level ~round ~block_payload_hash ?branch
-      delegate client =
-    let attestation = attestation ~slot ~level ~round ~block_payload_hash () in
+      ?dal_attestation ?companion_key delegate client =
+    let attestation =
+      attestation ?dal_attestation ~slot ~level ~round ~block_payload_hash ()
+    in
     let* branch =
       match branch with
       | Some branch -> return branch
       | None -> get_branch ~attested_level:level client
     in
-    inject ~protocol ~branch ~signer:delegate attestation client
+    inject
+      ~protocol
+      ~branch
+      ?signer_companion:companion_key
+      ~signer:delegate
+      attestation
+      client
 end
 
 module Anonymous = struct

@@ -354,6 +354,8 @@ module Consensus : sig
     round:int ->
     block_payload_hash:string ->
     ?branch:string ->
+    ?dal_attestation:bool array ->
+    ?companion_key:Account.key ->
     Account.key ->
     Client.t ->
     [`OpHash of string] Lwt.t
