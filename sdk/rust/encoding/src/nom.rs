@@ -227,9 +227,7 @@ impl NomReader<'_> for Zarith {
 
 impl NomReader<'_> for Narith {
     fn nom_read(bytes: &[u8]) -> NomResult<Self> {
-        map(n_bignum, |big_uint| {
-            BigInt::from_biguint(Sign::Plus, big_uint).into()
-        })(bytes)
+        map(n_bignum, |big_uint| big_uint.into())(bytes)
     }
 }
 

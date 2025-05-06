@@ -320,7 +320,7 @@ pub use integers::*;
 
 impl BinWriter for Narith {
     fn bin_write(&self, out: &mut Vec<u8>) -> BinResult {
-        n_bignum(self.0.magnitude(), out)
+        n_bignum(&self.0, out)
     }
 }
 
@@ -562,10 +562,9 @@ mod test {
         ];
 
         use super::{BinWriter, Narith};
-        use num_traits::FromPrimitive;
 
         for (hex, enc) in data {
-            let num = num_bigint::BigInt::from_u64(u64::from_str_radix(hex, 16).unwrap()).unwrap();
+            let num: num_bigint::BigUint = u64::from_str_radix(hex, 16).unwrap().into();
             let num = Narith(num);
             let mut bytes = vec![];
             num.bin_write(&mut bytes).unwrap();
