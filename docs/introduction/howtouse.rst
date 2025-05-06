@@ -18,7 +18,7 @@ After a successful compilation, you should have the following binaries:
 - ``octez-node``: the Octez daemon itself (see `Node`_);
 - ``octez-client``: a command-line client and basic wallet (see `Client`_);
 - ``octez-admin-client``: administration tool for the node (see :ref:`octez-admin-client`);
-- ``octez-{baker,accuser}-*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
+- ``octez-{baker,accuser}*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
 - ``octez-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
 - ``octez-smart-rollup-node``: executable for using and running a smart rollup node as Layer 2 (see :doc:`../shell/smart_rollup_node`);
@@ -27,12 +27,15 @@ After a successful compilation, you should have the following binaries:
 - ``octez-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
 - ``octez-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
 
-The daemons other than the node are suffixed with the name of the protocol they are
+Some of the daemons other than the node are suffixed with the name of the protocol they are
 bound to.
 More precisely, the suffix consists of the first 8 characters of the protocol hash; except for protocol Alpha, for which the suffix is simply ``-alpha``.
 For instance, ``octez-baker-PsQuebec`` is the baker
 for the Quebec protocol, and ``octez-baker-alpha`` is the baker
 of the development protocol.
+However, there is also a unique ``octez-baker`` executable supporting multiple protocols, that you can run instead of the protocol-suffixed bakers.
+When new protocols get proposed or adopted, you just have to upgrade this executable to the newest version, to make sure it supports the latest protocols.
+
 The ``octez-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 
 
@@ -115,7 +118,7 @@ network.
 
 Other than passively observing the network, your node can also inject
 its own new operations when instructed by the ``octez-client`` and even
-send new blocks when guided by the ``octez-baker-*``.
+send new blocks when guided by the ``octez-baker``.
 The node has also a view of the multiple chains that may exist
 concurrently and selects the best one based on its fitness (see
 :doc:`../active/consensus`).

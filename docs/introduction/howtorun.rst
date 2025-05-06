@@ -219,9 +219,12 @@ Typically, you run an attester DAL node as follows::
 Once the DAL node runs, we can launch the baker daemon pointing to the standard node directory and
 baking for user "mybaker"::
 
-   octez-baker-<PROTO_HASH> run with local node ~/.tezos-node mybaker --liquidity-baking-toggle-vote pass
+   octez-baker run with local node ~/.tezos-node mybaker --liquidity-baking-toggle-vote pass
 
-where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
+.. note::
+	Previously, you had to run a baker specific for a given protocol, such as ``octez-baker-<PROTO_HASH>``,
+	where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
+	These protocol-specific bakers are still available, but considered deprecated.
 
 Note that:
 
@@ -251,7 +254,8 @@ Putting together all the above instructions, you may want to quickly start a bak
     If you are worried about the availability of your node when it is its turn to bake/attest, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
     **Never** use the same account on two daemons.
 
-However, it is safe (and actually necessary) to temporarily run two bakers just before a protocol activation: the baker for the protocol being replaced and the baker for the protocol to be activated.
+However, if you are using the deprecated protocol-suffixed executables, it is safe (and actually necessary) to temporarily run two bakers just before a protocol activation: the baker for the protocol being replaced and the baker for the protocol to be activated.
+This is no longer necessary with the unique ``octez-baker`` executable.
 
 
 .. note::
@@ -321,14 +325,14 @@ If you are running the baker Docker image, you can watch the baker logs with
     docker ps
 
 If your container is running, its name will appear in the last column.
-For instance, if the name is ``mainnet_baker-PsQuebec``, you can
+For instance, if the name is ``mainnet_baker``, you can
 view recent logs with::
 
-    docker logs mainnet_baker-PsQuebec
+    docker logs mainnet_baker
 
 If you want to keep watching logs, use ``-f``::
 
-    docker logs mainnet_baker-PsQuebec -f
+    docker logs mainnet_baker -f
 
 This allows you to know if you baked.
 You should see lines such as::

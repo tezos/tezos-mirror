@@ -77,11 +77,11 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
    Leave the DAL node process running.
 
 #. In a new terminal window, start or restart a baking daemon as usual, but tell it to connect to the DAL node by passing the ``--dal-node`` argument with the host name and RPC port of the DAL node.
-   The DAL node accepts RPC calls on port 10732 by default, so the command might look like this example, where ``<PROTO_HASH>`` is the short hash of the current protocol of the network:
+   The DAL node accepts RPC calls on port 10732 by default, so the command might look like this example:
 
    .. code-block:: shell
 
-      octez-baker-<PROTO_HASH> run with local node "$HOME/.tezos-node" bob --liquidity-baking-toggle-vote pass --dal-node http://127.0.0.1:10732
+      octez-baker run with local node "$HOME/.tezos-node" bob --liquidity-baking-toggle-vote pass --dal-node http://127.0.0.1:10732
 
    The baker daemon connects to the DAL node and attests to the availability of DAL data as well as its usual layer 1 baking function.
 

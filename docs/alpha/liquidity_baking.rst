@@ -72,7 +72,7 @@ are two command-line options affecting toggle vote. The
 value to be used in each block. Note that this option must be placed
 **after** ``run`` on the command-line. Moreover, the path of a JSON
 file can be given to the ``--votefile <path>`` option
-e.g. ``octez-baker-<protocol codename> run with local node
+e.g. ``octez-baker run with local node
 ~/.tezos-node alice --liquidity-baking-toggle-vote on --votefile
 "per_block_votes.json"``, or placed in a default location:
 ``per_block_votes.json`` in the current working directory **or** in

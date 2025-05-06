@@ -333,12 +333,12 @@ Baking With a Consensus Key
 
 In your baker's command, replace the delegate's manager key alias with the consensus key alias::
 
-   octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
+   octez-baker run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
 
 While :ref:`transitioning from the delegate's manager key <consensus_key>`, it is possible to pass the alias for both delegate's manager key and consensus key.
 The delegate will seamlessly keep baking when the transition happens::
 
-   octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> <delegate_key_alias> --liquidity-baking-toggle-vote pass
+   octez-baker run with local node ~/.tezos-node <consensus_key_alias> <delegate_key_alias> --liquidity-baking-toggle-vote pass
 
 Draining a Manager's Account With its Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
