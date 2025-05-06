@@ -62,19 +62,6 @@ Description: Skip node initialization
  .
  And setting the desidered storage mode and network.
 
-Template: octez-node/upgrade_note_current
-Type: note
-Description: Important upgrade information
- This package has been upgraded to a new version. Please note that
- some changes have been made that may affect your usage of the
- package.
- .
- In particular this new version now uses systemd to manage the Octez Node
- life-cycle instead of a plain system V init script. Also the default values
- in /etc/default/octez-node have been revised and updated.
- .
- Please review the release notes for more information.
-
 Template: octez-node/snapshot-import
 Type: boolean
 Default: true
