@@ -663,15 +663,42 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     | Preattestation -> Operation.(to_watermark (Preattestation chain_id))
     | Attestation -> Operation.(to_watermark (Attestation chain_id))
   in
-  let (Contents_list contents) =
+  let bls_mode =
+    match delegate.consensus_key.public_key with
+    | Bls _ -> global_state.constants.parametric.aggregate_attestation
+    | _ -> false
+  in
+  let* Contents_list contents, companion_key_opt =
     match vote_kind with
     | Preattestation ->
-        Contents_list (Single (Preattestation vote_consensus_content))
+        return
+          (Contents_list (Single (Preattestation vote_consensus_content)), None)
     | Attestation ->
-        Contents_list
-          (Single
-             (Attestation
-                {consensus_content = vote_consensus_content; dal_content}))
+        let* dal_content, companion_key_opt =
+          if not bls_mode then return (dal_content, None)
+          else
+            match dal_content with
+            | None -> return (dal_content, None)
+            | Some _ -> (
+                match delegate.companion_key with
+                | None ->
+                    let*! () =
+                      Events.(
+                        emit
+                          missing_companion_key_for_dal_with_bls
+                          ( delegate.delegate_id,
+                            Raw_level.to_int32 vote_consensus_content.level ))
+                    in
+                    return (None, None)
+                | Some companion_key -> return (dal_content, Some companion_key)
+                )
+        in
+        return
+          ( Contents_list
+              (Single
+                 (Attestation
+                    {consensus_content = vote_consensus_content; dal_content})),
+            companion_key_opt )
   in
   let signing_request =
     match vote_kind with
@@ -679,11 +706,6 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     | Attestation -> `Attestation
   in
   let unsigned_operation = (shell, Contents_list contents) in
-  let bls_mode =
-    match delegate.consensus_key.public_key with
-    | Bls _ -> global_state.constants.parametric.aggregate_attestation
-    | _ -> false
-  in
   let encoding =
     if bls_mode then Operation.bls_mode_unsigned_encoding
     else Operation.unsigned_encoding
@@ -702,49 +724,44 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
       unsigned_operation_bytes
   in
   let* signature =
-    if not bls_mode then return consensus_sig
-    else
-      match dal_content with
-      | None -> return consensus_sig
-      | Some {attestation = dal_attestation} -> (
-          let* companion_key =
-            match delegate.companion_key with
-            | None ->
-                tzfail
-                  (Baking_errors.Missing_bls_companion_key_for_dal
-                     delegate.consensus_key)
-            | Some companion_key -> return companion_key
-          in
-          let sk_companion_uri = companion_key.secret_key_uri in
-          let* companion_sig =
-            sign
-              ?timeout:global_state.config.remote_calls_timeout
-              ~signing_request
-              cctxt
-              ~watermark
-              sk_companion_uri
-              unsigned_operation_bytes
-          in
-          match (consensus_sig, companion_sig) with
-          (* This if-else branch is for BLS mode so both signatures
-             should be BLS signatures *)
-          | Signature.Bls consensus_sig, Signature.Bls companion_sig -> (
-              let dal_dependent_bls_sig_opt =
-                Alpha_context.Dal.Attestation.Dal_dependent_signing
-                .aggregate_sig
-                  ~subgroup_check:false
-                  ~consensus_sig
-                  ~companion_sig
-                  dal_attestation
-              in
-              match dal_dependent_bls_sig_opt with
-              | None -> tzfail Baking_errors.Signature_aggregation_failure
-              | Some dal_dependent_bls_sig_opt ->
-                  return (Signature.Bls dal_dependent_bls_sig_opt : Signature.t)
-              )
-          | Signature.Bls _, _ ->
-              tzfail (Baking_errors.Unexpected_signature_type companion_sig)
-          | _ -> tzfail (Baking_errors.Unexpected_signature_type consensus_sig))
+    match (dal_content, companion_key_opt) with
+    | None, None -> return consensus_sig
+    | None, Some _ ->
+        (* should not be possible by construction of
+           companion_key_opt *)
+        return consensus_sig
+    | Some _, None ->
+        (* dal_content has been discarded from contents *)
+        return consensus_sig
+    | Some {attestation = dal_attestation}, Some companion_key -> (
+        let sk_companion_uri = companion_key.secret_key_uri in
+        let* companion_sig =
+          sign
+            ?timeout:global_state.config.remote_calls_timeout
+            ~signing_request
+            cctxt
+            ~watermark
+            sk_companion_uri
+            unsigned_operation_bytes
+        in
+        match (consensus_sig, companion_sig) with
+        (* This if-else branch is for BLS mode so both signatures
+           should be BLS signatures *)
+        | Signature.Bls consensus_sig, Signature.Bls companion_sig -> (
+            let dal_dependent_bls_sig_opt =
+              Alpha_context.Dal.Attestation.Dal_dependent_signing.aggregate_sig
+                ~subgroup_check:false
+                ~consensus_sig
+                ~companion_sig
+                dal_attestation
+            in
+            match dal_dependent_bls_sig_opt with
+            | None -> tzfail Baking_errors.Signature_aggregation_failure
+            | Some dal_dependent_bls_sig ->
+                return (Signature.Bls dal_dependent_bls_sig : Signature.t))
+        | Signature.Bls _, _ ->
+            tzfail (Baking_errors.Unexpected_signature_type companion_sig)
+        | _ -> tzfail (Baking_errors.Unexpected_signature_type consensus_sig))
   in
   let protocol_data = Operation_data {contents; signature = Some signature} in
   let signed_operation : Operation.packed = {shell; protocol_data} in

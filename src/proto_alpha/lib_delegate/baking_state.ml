@@ -799,6 +799,17 @@ module Events = struct
       ~level:Warning
       ~msg:"found an outdated or corrupted baking state: discarding it"
       ()
+
+  let companion_key_is_not_in_wallet =
+    declare_2
+      ~section:[Protocol.name; "baker"; "delegates"]
+      ~name:"companion_key_is_not_in_wallet"
+      ~level:Error
+      ~msg:
+        "Companion key {companion_key} is not provided in the wallet but \
+         registered in the protocol for {delegate}"
+      ("delegate", Baking_state_types.Delegate_id.encoding)
+      ("companion_key", Environment.Bls.Public_key_hash.encoding)
 end
 
 type state_data = {
@@ -986,9 +997,10 @@ module DelegateSet = struct
 end
 
 let delegate_slots attesting_rights delegates =
+  let open Lwt_syntax in
   let own_delegates = DelegateSet.of_list delegates in
-  let own_delegate_first_slots, own_delegate_slots, all_delegate_voting_power =
-    List.fold_left
+  let* own_delegate_first_slots, own_delegate_slots, all_delegate_voting_power =
+    Lwt_list.fold_left_s
       (fun (own_list, own_map, all_map) slot ->
         let {
           Plugin.RPC.Validators.consensus_key;
@@ -1002,12 +1014,25 @@ let delegate_slots attesting_rights delegates =
         let first_slot = Stdlib.List.hd slots in
         let attesting_power = List.length slots in
         let all_map = SlotMap.add first_slot attesting_power all_map in
-        let own_list, own_map =
+        let* own_list, own_map =
           match DelegateSet.find_pkh consensus_key own_delegates with
           | Some consensus_key ->
-              let companion_key =
-                Option.bind companion_key (fun companion_key ->
-                    DelegateSet.find_pkh (Bls companion_key) own_delegates)
+              let* companion_key =
+                match companion_key with
+                | None -> return None
+                | Some companion_key -> (
+                    match
+                      DelegateSet.find_pkh (Bls companion_key) own_delegates
+                    with
+                    | None ->
+                        let* () =
+                          Events.(
+                            emit
+                              companion_key_is_not_in_wallet
+                              (Delegate_id.of_pkh delegate, companion_key))
+                        in
+                        return None
+                    | Some companion_key -> return (Some companion_key))
               in
               let attesting_slot =
                 {
@@ -1021,23 +1046,26 @@ let delegate_slots attesting_rights delegates =
                   attesting_power;
                 }
               in
-              ( attesting_slot :: own_list,
-                List.fold_left
-                  (fun own_map slot -> SlotMap.add slot attesting_slot own_map)
-                  own_map
-                  slots )
-          | None -> (own_list, own_map)
+              return
+                ( attesting_slot :: own_list,
+                  List.fold_left
+                    (fun own_map slot ->
+                      SlotMap.add slot attesting_slot own_map)
+                    own_map
+                    slots )
+          | None -> return (own_list, own_map)
         in
-        (own_list, own_map, all_map))
+        return (own_list, own_map, all_map))
       ([], SlotMap.empty, SlotMap.empty)
       attesting_rights
   in
-  Delegate_slots.
-    {
-      own_delegates = own_delegate_first_slots;
-      own_delegate_slots;
-      all_delegate_voting_power;
-    }
+  return
+    Delegate_slots.
+      {
+        own_delegates = own_delegate_first_slots;
+        own_delegate_slots;
+        all_delegate_voting_power;
+      }
 
 let compute_delegate_slots (cctxt : Protocol_client_context.full)
     ?(block = `Head 0) ~level ~chain delegates =
@@ -1050,7 +1078,7 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
        ~levels:[level]
      [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
   in
-  let delegate_slots =
+  let*! delegate_slots =
     (delegate_slots
        attesting_rights
        delegates [@profiler.record_f {verbosity = Debug} "delegate_slots"])

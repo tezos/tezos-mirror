@@ -956,6 +956,18 @@ module Actions = struct
       ("delegate", Baking_state_types.Delegate_id.encoding)
       ("attestation_level", Data_encoding.int32)
 
+  let missing_companion_key_for_dal_with_bls =
+    declare_2
+      ~section
+      ~name:"missing_companion_key_for_dal_with_bls"
+      ~level:Warning
+      ~msg:
+        "Cannot issue an attestation with DAL because the BLS consensus key \
+         has no corresponding companion key. Crafting the attestation without \
+         DAL at level {attestation_level} for {delegate}"
+      ("delegate", Baking_state_types.Delegate_id.encoding)
+      ("attestation_level", Data_encoding.int32)
+
   let synchronizing_round =
     declare_1
       ~section
