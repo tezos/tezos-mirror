@@ -174,13 +174,12 @@ let check_not_tz4 : Signature.Public_key.t -> unit tzresult =
 
 let check_is_not_another_delegate ctxt pkh delegate =
   let open Lwt_result_syntax in
-  let*! is_a_delegate = Storage.Delegates.mem ctxt pkh in
-  let is_another_delegate =
-    is_a_delegate && not (Signature.Public_key_hash.equal pkh delegate)
-  in
-  fail_when
-    is_another_delegate
-    (Invalid_consensus_key_update_another_delegate pkh)
+  if Signature.Public_key_hash.equal pkh delegate then return_unit
+  else
+    let*! is_another_delegate = Storage.Delegates.mem ctxt pkh in
+    fail_when
+      is_another_delegate
+      (Invalid_consensus_key_update_another_delegate pkh)
 
 let set_unused = Storage.Consensus_keys.remove
 
