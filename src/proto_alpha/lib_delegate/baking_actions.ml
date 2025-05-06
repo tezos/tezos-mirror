@@ -31,42 +31,6 @@ module Events = Baking_events.Actions
 
 module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
-type error +=
-  | Unexpected_signature_type of Signature.t
-  | Missing_bls_companion_key_for_dal of Baking_state_types.Key.t
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"Baking_actions.unexpected_signature_type"
-    ~title:"Unexpected signature type"
-    ~description:"Signature should be a BLS signature."
-    ~pp:(fun ppf s ->
-      Format.fprintf
-        ppf
-        "Signature should be a BLS signature %a."
-        Signature.pp
-        s)
-    Data_encoding.(obj1 (req "signature" Signature.encoding))
-    (function Unexpected_signature_type s -> Some s | _ -> None)
-    (fun s -> Unexpected_signature_type s) ;
-  register_error_kind
-    `Permanent
-    ~id:"Baking_actions.Missing_bls_companion_key_for_dal"
-    ~title:"Missing a BLS companion key for DAL attestations"
-    ~description:
-      "The consensus key is a BLS key but is missing a companion key, so it \
-       cannot sign a DAL attestation."
-    ~pp:(fun ppf s ->
-      Format.fprintf
-        ppf
-        "Expected a BLS companion key for the consensus key %a."
-        Baking_state_types.Key.pp
-        s)
-    Data_encoding.(obj1 (req "consensus_key" Baking_state_types.Key.encoding))
-    (function Missing_bls_companion_key_for_dal ck -> Some ck | _ -> None)
-    (fun ck -> Missing_bls_companion_key_for_dal ck)
-
 module Operations_source = struct
   type error +=
     | Failed_operations_fetch of {
@@ -747,7 +711,8 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
             match delegate.companion_key with
             | None ->
                 tzfail
-                  (Missing_bls_companion_key_for_dal delegate.consensus_key)
+                  (Baking_errors.Missing_bls_companion_key_for_dal
+                     delegate.consensus_key)
             | Some companion_key -> return companion_key
           in
           let sk_companion_uri = companion_key.secret_key_uri in
@@ -778,8 +743,8 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
                   return (Signature.Bls dal_dependent_bls_sig_opt : Signature.t)
               )
           | Signature.Bls _, _ ->
-              tzfail (Unexpected_signature_type companion_sig)
-          | _ -> tzfail (Unexpected_signature_type consensus_sig))
+              tzfail (Baking_errors.Unexpected_signature_type companion_sig)
+          | _ -> tzfail (Baking_errors.Unexpected_signature_type consensus_sig))
   in
   let protocol_data = Operation_data {contents; signature = Some signature} in
   let signed_operation : Operation.packed = {shell; protocol_data} in
