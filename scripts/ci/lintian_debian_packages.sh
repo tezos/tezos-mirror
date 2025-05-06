@@ -34,13 +34,11 @@ shift
 RELEASES=$*
 
 for release in $RELEASES; do # unstable, jammy, focal ...
-  for file in packages/"${DISTRIBUTION}/${release}"/*.deb; do
-    (
-      echo "Lintian package $file"
-      lintian "$file" --tag-display-limit 0 --verbose --allow-root
-    ) &
-  done
-  wait
+  find "packages/${DISTRIBUTION}/${release}" -name '*amd64.deb' |
+    parallel -j4 '
+      echo "Lintian package {}"
+      lintian "{}" --tag-display-limit 0 --verbose --allow-root
+    '
 done
 
 if [ ${#FAILED_FILES[@]} -ne 0 ]; then

@@ -614,7 +614,7 @@ oc.lintian_debian:
   - . ./scripts/version.sh
   - export DEBIAN_FRONTEND=noninteractive
   - apt-get update
-  - apt-get install lintian -y
+  - apt-get install lintian parallel -y
   script:
   - ./scripts/ci/lintian_debian_packages.sh debian bookworm
   variables: {}
@@ -805,7 +805,7 @@ oc.lintian_ubuntu:
   - . ./scripts/version.sh
   - export DEBIAN_FRONTEND=noninteractive
   - apt-get update
-  - apt-get install lintian -y
+  - apt-get install lintian parallel -y
   script:
   - ./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble
   variables: {}
