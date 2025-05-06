@@ -129,4 +129,15 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
     let `Main = chain in
     let* block_number = shell_block_param_to_block_number block in
     Backend.tez_nth_block block_number
+
+  (* TODO: #7963 Support Observer Mode
+     Here the catchup mechanism to fetch blueprints is not taken into account as
+     the observer mode is not supported yet *)
+  let bootstrapped () =
+    let open Lwt_result_syntax in
+    let* (Qty current_block_number) =
+      Backend.block_param_to_block_number (Block_parameter Latest)
+    in
+    let* block = Backend.tez_nth_block current_block_number in
+    return (block.hash, block.timestamp)
 end

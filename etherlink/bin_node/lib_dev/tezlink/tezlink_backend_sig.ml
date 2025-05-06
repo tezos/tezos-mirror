@@ -29,4 +29,7 @@ module type S = sig
     [`Main] -> block_param -> Tezos_types.Contract.t -> Z.t tzresult Lwt.t
 
   val header : [`Main] -> block_param -> L2_types.Tezos_block.t tzresult Lwt.t
+
+  val bootstrapped :
+    unit -> (Ethereum_types.block_hash * Time.Protocol.t) tzresult Lwt.t
 end
