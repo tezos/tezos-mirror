@@ -377,6 +377,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | ShiftLeft
         | ShiftRightUnsigned
         | ShiftRightSigned
+        | X32ShiftLeftImm
+        | X32ShiftRightImmUnsigned
+        | X32ShiftRightImmSigned
         | Jal
         | J
         | JrImm
@@ -409,12 +412,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         AddWordImmediate
         | AddWord
         | SubWord
-        | Sllw
-        | Srlw
-        | Sraw
-        | Slliw
-        | Srliw
-        | Sraiw
+        | X32ShiftLeft
+        | X32ShiftRightUnsigned
+        | X32ShiftRightSigned
         | SetLessThanSigned
         | SetLessThanUnsigned
         | SetLessThanImmediateSigned

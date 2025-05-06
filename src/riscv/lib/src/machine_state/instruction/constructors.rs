@@ -316,6 +316,120 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32ShiftLeft`].
+    pub(crate) fn new_x32_shift_left(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X32ShiftLeft,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32ShiftRightUnsigned`].
+    pub(crate) fn new_x32_shift_right_unsigned(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X32ShiftRightUnsigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32ShiftRightSigned`].
+    pub(crate) fn new_x32_shift_right_signed(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X32ShiftRightSigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32ShiftLeftImm`].
+    pub(crate) fn new_x32_shift_left_immediate(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X32ShiftLeftImm,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32ShiftRightImmUnsigned`].
+    pub(crate) fn new_x32_shift_right_immediate_unsigned(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X32ShiftRightImmUnsigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32ShiftRightImmSigned`].
+    pub(crate) fn new_x32_shift_right_immediate_signed(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X32ShiftRightImmSigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
     /// [`OpCode::SetLessThanSigned`].
     pub(crate) fn new_set_less_than_signed(
@@ -1331,6 +1445,64 @@ impl Instruction {
                 rd_rs1,
                 args.imm,
                 InstrWidth::Compressed,
+            ),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Slliw`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Slliw`]: crate::parser::instruction::InstrCacheable::Slliw
+    pub(super) fn from_ic_x32_shift_left_immediate(args: &NonZeroRdITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rs1) {
+            // Shifting 0 by any amount is 0.
+            X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            // For non-zero rs1, perform the actual shift operation
+            X::NonZero(rs1) => Instruction::new_x32_shift_left_immediate(
+                args.rd,
+                rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Srliw`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Srliw`]: crate::parser::instruction::InstrCacheable::Srliw
+    pub(super) fn from_ic_x32_shift_right_immediate_unsigned(
+        args: &NonZeroRdITypeArgs,
+    ) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rs1) {
+            // Shifting 0 by any amount is 0.
+            X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            // For non-zero rs1, perform the actual shift operation
+            X::NonZero(rs1) => Instruction::new_x32_shift_right_immediate_unsigned(
+                args.rd,
+                rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Sraiw`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Sraiw`]: crate::parser::instruction::InstrCacheable::Sraiw
+    pub(super) fn from_ic_x32_shift_right_immediate_signed(
+        args: &NonZeroRdITypeArgs,
+    ) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rs1) {
+            // Shifting 0 by any amount is 0.
+            X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            // For non-zero rs1, perform the actual shift operation
+            X::NonZero(rs1) => Instruction::new_x32_shift_right_immediate_signed(
+                args.rd,
+                rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
             ),
         }
     }

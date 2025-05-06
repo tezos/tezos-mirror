@@ -350,6 +350,52 @@ pub fn run_shift_immediate(
     icb.xregister_write_nz(rd, result);
 }
 
+/// Shift only lowest 32 bits in `rs1` by `shift_amount = val(rs2)\[5:0\]` in the method specified by `shift`
+/// saving the result in `rd`.
+pub fn run_x32_shift(
+    icb: &mut impl ICB,
+    shift: Shift,
+    rs1: XRegister,
+    rs2: XRegister,
+    rd: NonZeroXRegister,
+) {
+    let lhs = icb.xregister_read(rs1);
+    let shift_amount = icb.xregister_read(rs2);
+    let shift_amount = shift_amount.and(icb.xvalue_of_imm(0b1_1111), icb);
+    let shift_amount = icb.narrow(shift_amount);
+
+    let lhs = icb.narrow(lhs);
+
+    let result = lhs.shift(shift, shift_amount, icb);
+
+    let result = icb.extend_signed(result);
+
+    icb.xregister_write_nz(rd, result);
+}
+
+/// Shift only lowest 32 bits in `rs1` by `shift_amount = imm` in the method specified by `shift`
+/// saving the result in `rd`.
+pub fn run_x32_shift_immediate(
+    icb: &mut impl ICB,
+    shift: Shift,
+    rs1: NonZeroXRegister,
+    imm: i64,
+    rd: NonZeroXRegister,
+) {
+    let lhs = icb.xregister_read_nz(rs1);
+    let shift_amount = icb.xvalue_of_imm(imm);
+    let shift_amount = shift_amount.and(icb.xvalue_of_imm(0b1_1111), icb);
+    let shift_amount = icb.narrow(shift_amount);
+
+    let lhs = icb.narrow(lhs);
+
+    let result = lhs.shift(shift, shift_amount, icb);
+
+    let result = icb.extend_signed(result);
+
+    icb.xregister_write_nz(rd, result);
+}
+
 #[cfg(test)]
 mod tests {
     use proptest::arbitrary::any;
@@ -364,9 +410,11 @@ mod tests {
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::a2;
+    use crate::machine_state::registers::a3;
     use crate::machine_state::registers::nz;
     use crate::machine_state::registers::t0;
     use crate::machine_state::registers::t1;
+    use crate::machine_state::registers::t2;
     use crate::machine_state::registers::t3;
     use crate::state::NewState;
 
@@ -678,6 +726,177 @@ mod tests {
             0b1101_0101,
             a1,
             0x1AA0_0000
+        );
+    });
+
+    macro_rules! test_shift_word_imm_instr {
+        ($state:ident, $shift:expr, $imm:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr
+        ) => {
+            $state.hart.xregisters.write_nz(nz::$rs1, $r1_val);
+            run_x32_shift_immediate(&mut $state, $shift, nz::$rs1, $imm, nz::$rd);
+            let new_val = $state.hart.xregisters.read($rd);
+            assert_eq!(new_val, $expected_val);
+        };
+    }
+
+    macro_rules! test_shift_word_reg_instr {
+        ($state:ident, $shift:expr,
+            $rs2:ident, $r2_val:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr
+        ) => {
+            $state.hart.xregisters.write($rs2, $r2_val);
+            $state.hart.xregisters.write($rs1, $r1_val);
+            run_x32_shift(&mut $state, $shift, $rs1, $rs2, nz::$rd);
+            let new_val = $state.hart.xregisters.read($rd);
+            assert_eq!(new_val, $expected_val);
+        };
+    }
+
+    macro_rules! test_both_shift_word_instr {
+        ($state:ident, $shift:expr,
+            $rs2:ident, $r2_val:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr
+        ) => {
+            test_shift_word_imm_instr!($state, $shift, $r2_val, $rs1, $r1_val, $rd, $expected_val);
+            test_shift_word_reg_instr!(
+                $state,
+                $shift,
+                $rs2,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val
+            );
+        };
+    }
+
+    backend_test!(test_shift_word, F, {
+        let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
+
+        test_both_shift_word_instr!(
+            state,
+            Shift::Left,
+            t0,
+            0,
+            a0,
+            0xEDDD_1234_ABEF,
+            a1,
+            0x1234_ABEF
+        );
+        test_both_shift_word_instr!(
+            state,
+            Shift::RightUnsigned,
+            t0,
+            0,
+            a0,
+            0x1234_ABEF,
+            a0,
+            0x1234_ABEF
+        );
+        test_both_shift_word_instr!(
+            state,
+            Shift::RightSigned,
+            a2,
+            0,
+            a0,
+            0xFFFF_DEAD_1234_ABEF,
+            a1,
+            0x1234_ABEF
+        );
+        test_both_shift_word_instr!(
+            state,
+            Shift::Left,
+            a3,
+            20,
+            a0,
+            0x1F0B_FFFF,
+            a0,
+            0xFFFF_FFFF_FFF0_0000
+        );
+        test_both_shift_word_instr!(
+            state,
+            Shift::RightUnsigned,
+            t0,
+            10,
+            a0,
+            0x44_1234_ABEF,
+            a1,
+            0x4_8D2A
+        );
+        test_both_shift_word_instr!(
+            state,
+            Shift::RightUnsigned,
+            a1,
+            16,
+            t0,
+            -1_i64 as u64,
+            a0,
+            0xFFFF
+        );
+        test_both_shift_word_instr!(
+            state,
+            Shift::RightSigned,
+            a1,
+            10,
+            a0,
+            0xFFFF_F0FF_FFF0_FF00,
+            a0,
+            0xFFFF_FFFF_FFFF_FC3F
+        );
+        test_both_shift_word_instr!(
+            state,
+            Shift::Left,
+            t0,
+            31,
+            a0,
+            0x1234_ABEF,
+            a0,
+            0xFFFF_FFFF_8000_0000
+        );
+        test_both_shift_word_instr!(
+            state,
+            Shift::RightSigned,
+            t2,
+            31,
+            a0,
+            0x8234_ABEF,
+            a1,
+            0xFFFF_FFFF_FFFF_FFFF
+        );
+        test_shift_word_reg_instr!(
+            state,
+            Shift::Left,
+            a1,
+            0b1001_0101,
+            a1,
+            0b1001_0101,
+            a2,
+            0x12A0_0000
+        );
+        test_shift_word_reg_instr!(
+            state,
+            Shift::Left,
+            a1,
+            0b1001_0101,
+            a2,
+            0b1101_0101,
+            a1,
+            0x1AA0_0000
+        );
+        test_shift_word_reg_instr!(
+            state,
+            Shift::Left,
+            a1,
+            0b0100_1101_0101,
+            a1,
+            0b0100_1101_0101,
+            a1,
+            0xFFFF_FFFF_9AA0_0000
         );
     });
 }
