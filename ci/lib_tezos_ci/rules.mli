@@ -73,6 +73,13 @@ val schedule_extended_rpc_tests : If.t
     [TZ_SCHEDULE_KIND] set to [EXTENDED_VALIDATION_TESTS]. *)
 val schedule_extended_validation_tests : If.t
 
+(** A rule that is true for scheduled extended baker with remote node test
+    pipelines.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_BAKER_REMOTE_MODE_TESTS]. *)
+val schedule_extended_baker_remote_mode_tests : If.t
+
 (** A rule that is true for scheduled release tests.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and

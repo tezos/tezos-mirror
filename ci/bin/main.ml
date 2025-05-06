@@ -326,6 +326,15 @@ let () =
        This scheduled pipeline exercices the full tezt tests suites, but with \
        Octez nodes configured to use single-process validation." ;
   register
+    "schedule_extended_baker_remote_mode_test"
+    schedule_extended_baker_remote_mode_tests
+    ~jobs:
+      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
+    ~description:
+      "Scheduled run of all tezt tests with baker using remote node, weekly on \
+       'master'.\n\n\
+       This scheduled pipeline exercices the full tezt tests suites." ;
+  register
     "schedule_master_test_release"
     schedule_test_release
     ~jobs:(Release_tag.octez_jobs ~test:true Schedule_test)
