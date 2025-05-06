@@ -2101,16 +2101,24 @@ mod tests {
             valid_load(I::new_x64_load_signed, 8, XREG_VALUE),
             valid_load(I::new_x64_load_signed, 5, XREG_VALUE),
             valid_load(I::new_x32_load_signed, 4, XREG_VALUE as i32 as u64),
+            valid_load(I::new_x32_load_unsigned, 4, XREG_VALUE as u32 as u64),
             valid_load(I::new_x32_load_signed, 3, XREG_VALUE as i32 as u64),
+            valid_load(I::new_x32_load_unsigned, 3, XREG_VALUE as u32 as u64),
             valid_load(I::new_x16_load_signed, 2, XREG_VALUE as i16 as u64),
+            valid_load(I::new_x16_load_unsigned, 2, XREG_VALUE as u16 as u64),
             valid_load(I::new_x16_load_signed, 1, XREG_VALUE as i16 as u64),
+            valid_load(I::new_x16_load_unsigned, 1, XREG_VALUE as u16 as u64),
             // byte load always aligned
             valid_load(I::new_x8_load_signed, 0, XREG_VALUE as i8 as u64),
+            valid_load(I::new_x8_load_unsigned, 0, XREG_VALUE as u8 as u64),
             // invalid loads: out of bounds
             invalid_load(I::new_x64_load_signed, LoadStoreWidth::Double),
             invalid_load(I::new_x32_load_signed, LoadStoreWidth::Word),
+            invalid_load(I::new_x32_load_unsigned, LoadStoreWidth::Word),
             invalid_load(I::new_x16_load_signed, LoadStoreWidth::Half),
+            invalid_load(I::new_x16_load_unsigned, LoadStoreWidth::Half),
             invalid_load(I::new_x8_load_signed, LoadStoreWidth::Byte),
+            invalid_load(I::new_x8_load_unsigned, LoadStoreWidth::Byte),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

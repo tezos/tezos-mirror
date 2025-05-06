@@ -871,6 +871,25 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32LoadUnsigned`].
+    pub(crate) fn new_x32_load_unsigned(
+        rd: XRegister,
+        rs1: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X32LoadUnsigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sw`].
     pub(crate) fn new_sw(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
         Self {
@@ -923,6 +942,25 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X16LoadUnsigned`].
+    pub(crate) fn new_x16_load_unsigned(
+        rd: XRegister,
+        rs1: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X16LoadUnsigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sh`].
     pub(crate) fn new_sh(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
         Self {
@@ -965,6 +1003,25 @@ impl Instruction {
     ) -> Self {
         Self {
             opcode: OpCode::X8LoadSigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X8LoadUnsigned`].
+    pub(crate) fn new_x8_load_unsigned(
+        rd: XRegister,
+        rs1: XRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X8LoadUnsigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),

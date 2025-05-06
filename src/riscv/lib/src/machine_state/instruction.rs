@@ -67,7 +67,6 @@ use crate::parser::instruction::FRArgs;
 use crate::parser::instruction::FRegToXRegArgs;
 use crate::parser::instruction::FRegToXRegArgsWithRounding;
 use crate::parser::instruction::FStoreArgs;
-use crate::parser::instruction::ITypeArgs;
 use crate::parser::instruction::InstrCacheable;
 use crate::parser::instruction::InstrRoundingMode;
 use crate::parser::instruction::InstrWidth;
@@ -235,9 +234,9 @@ pub enum OpCode {
     X8LoadSigned,
     X16LoadSigned,
     X32LoadSigned,
-    Lbu,
-    Lhu,
-    Lwu,
+    X8LoadUnsigned,
+    X16LoadUnsigned,
+    X32LoadUnsigned,
     X64LoadSigned,
 
     // RV64I S-type instructions
@@ -465,9 +464,9 @@ impl OpCode {
             Self::X8LoadSigned => Args::run_x8_load_signed,
             Self::X16LoadSigned => Args::run_x16_load_signed,
             Self::X32LoadSigned => Args::run_x32_load_signed,
-            Self::Lbu => Args::run_lbu,
-            Self::Lhu => Args::run_lhu,
-            Self::Lwu => Args::run_lwu,
+            Self::X8LoadUnsigned => Args::run_x8_load_unsigned,
+            Self::X16LoadUnsigned => Args::run_x16_load_unsigned,
+            Self::X32LoadUnsigned => Args::run_x32_load_unsigned,
             Self::X64LoadSigned => Args::run_x64_load_signed,
             Self::Sb => Args::run_sb,
             Self::Sbnz => Args::run_sbnz,
@@ -699,8 +698,11 @@ impl OpCode {
             // Loads
             Self::X64LoadSigned => Some(Args::run_x64_load_signed),
             Self::X32LoadSigned => Some(Args::run_x32_load_signed),
+            Self::X32LoadUnsigned => Some(Args::run_x32_load_unsigned),
             Self::X16LoadSigned => Some(Args::run_x16_load_signed),
+            Self::X16LoadUnsigned => Some(Args::run_x16_load_unsigned),
             Self::X8LoadSigned => Some(Args::run_x8_load_signed),
+            Self::X8LoadUnsigned => Some(Args::run_x8_load_unsigned),
 
             // Errors
             Self::Unknown => Some(Args::run_illegal),
@@ -1382,9 +1384,9 @@ impl Args {
         run_set_less_than_immediate_unsigned,
         non_zero_rd
     );
-    impl_load_type!(run_lbu);
-    impl_load_type!(run_lhu);
-    impl_load_type!(run_lwu);
+    impl_load_type!(run_x8_load_unsigned, LoadStoreWidth::Byte, false);
+    impl_load_type!(run_x16_load_unsigned, LoadStoreWidth::Half, false);
+    impl_load_type!(run_x32_load_unsigned, LoadStoreWidth::Word, false);
     impl_load_type!(run_x64_load_signed, LoadStoreWidth::Double, true);
     impl_load_type!(run_x32_load_signed, LoadStoreWidth::Word, true);
     impl_load_type!(run_x16_load_signed, LoadStoreWidth::Half, true);
@@ -1730,18 +1732,24 @@ impl From<&InstrCacheable> for Instruction {
                 args.imm,
                 InstrWidth::Uncompressed,
             ),
-            InstrCacheable::Lbu(args) => Instruction {
-                opcode: OpCode::Lbu,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
-            InstrCacheable::Lhu(args) => Instruction {
-                opcode: OpCode::Lhu,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
-            InstrCacheable::Lwu(args) => Instruction {
-                opcode: OpCode::Lwu,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Lbu(args) => Instruction::new_x8_load_unsigned(
+                args.rd,
+                args.rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
+            InstrCacheable::Lhu(args) => Instruction::new_x16_load_unsigned(
+                args.rd,
+                args.rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
+            InstrCacheable::Lwu(args) => Instruction::new_x32_load_unsigned(
+                args.rd,
+                args.rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
             InstrCacheable::Ld(args) => Instruction::new_x64_load_signed(
                 args.rd,
                 args.rs1,
@@ -2349,18 +2357,6 @@ impl From<&NonZeroRdRTypeArgs> for Args {
             rs2: value.rs2.into(),
             width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
-        }
-    }
-}
-
-impl ITypeArgs {
-    fn to_args(self, width: InstrWidth) -> Args {
-        Args {
-            rd: self.rd.into(),
-            rs1: self.rs1.into(),
-            imm: self.imm,
-            width,
-            ..Args::DEFAULT
         }
     }
 }
