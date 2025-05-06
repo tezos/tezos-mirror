@@ -13,11 +13,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- Nothing.
+- Add `types::Narith`, which wraps a `BigUint`.
+- Deprecate `types::Mutez`. It is left as a type-alias to `types::Narith`.
+  *NB* The internally wrapped type is changed from `BigInt` to `BigUint` as a result.
+- Add `#[encoding]` attribute support for enum fields, in addition to struct fields.
 
 ### Fixed
 
-- Nothing.
+- Fix `short_dynamic` function in `encoding` - was incorrectly using `dynamic` internally.
 
 ### Security
 
