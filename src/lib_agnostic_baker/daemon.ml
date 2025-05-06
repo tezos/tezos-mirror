@@ -81,10 +81,10 @@ module Baker_agent : AGENT with type command = baker_command = struct
           ~sources
           ~cctxt
     | Run_vdf {pidfile; keep_alive} ->
-        Configuration.may_lock_pidfile pidfile @@ fun () ->
+        Command_run.may_lock_pidfile pidfile @@ fun () ->
         Plugin.Baker_commands_helpers.run_vdf_daemon ~cctxt ~keep_alive
     | Run_accuser {pidfile; preserved_levels; keep_alive} ->
-        Configuration.may_lock_pidfile pidfile @@ fun () ->
+        Command_run.may_lock_pidfile pidfile @@ fun () ->
         Plugin.Accuser_commands_helpers.run ~cctxt ~preserved_levels ~keep_alive
 
   let init_sapling_params = true
@@ -105,7 +105,7 @@ module Accuser_agent : AGENT with type command = accuser_command = struct
   let run_command (module Plugin : Protocol_plugin_sig.S) cctxt command =
     match command with
     | Run_accuser {pidfile; preserved_levels; keep_alive} ->
-        Configuration.may_lock_pidfile pidfile @@ fun () ->
+        Command_run.may_lock_pidfile pidfile @@ fun () ->
         Plugin.Accuser_commands_helpers.run ~cctxt ~preserved_levels ~keep_alive
 
   let init_sapling_params = false

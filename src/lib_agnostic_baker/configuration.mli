@@ -8,11 +8,6 @@
 val pidfile_arg :
   (string option, Tezos_client_base.Client_context.full) Tezos_clic.arg
 
-val may_lock_pidfile :
-  string option ->
-  (unit -> 'a Error_monad.tzresult Lwt.t) ->
-  'a Error_monad.tzresult Lwt.t
-
 val keep_alive_arg :
   (bool, Tezos_client_base.Client_context.full) Tezos_clic.arg
 

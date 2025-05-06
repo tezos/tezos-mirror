@@ -97,16 +97,6 @@ let pidfile_arg =
     (Tezos_clic.parameter
        (fun (_cctxt : Tezos_client_base.Client_context.full) s -> return s))
 
-let may_lock_pidfile pidfile_opt f =
-  match pidfile_opt with
-  | None -> f ()
-  | Some pidfile ->
-      Tezos_stdlib_unix.Lwt_lock_file.with_lock
-        ~when_locked:
-          (`Fail (Exn (Failure ("Failed to create the pidfile: " ^ pidfile))))
-        ~filename:pidfile
-        f
-
 let node_version_check_bypass_arg :
     (bool, Tezos_client_base.Client_context.full) Tezos_clic.arg =
   Tezos_clic.switch
