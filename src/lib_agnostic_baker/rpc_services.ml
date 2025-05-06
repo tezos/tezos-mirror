@@ -103,3 +103,11 @@ let get_current_period ~node_addr =
       let* kind = get_string_field ~name:"kind" voting_period in
       let+ remaining = get_int_field ~name:"remaining" json in
       (kind, remaining))
+
+let get_dal_health dal_node_rpc_ctxt =
+  Tezos_rpc.Context.make_call
+    Tezos_dal_node_services.Services.health
+    dal_node_rpc_ctxt
+    ()
+    ()
+    ()

@@ -33,3 +33,8 @@ val get_next_protocol_hash : node_addr:string -> Protocol_hash.t tzresult Lwt.t
     - [remaining] is the number of blocks remaining until the end of the voting period. *)
 
 val get_current_period : node_addr:string -> (string * int) tzresult Lwt.t
+
+(** [get_dal_health ctxt] calls the DAL node RPC 'GET /health' *)
+val get_dal_health :
+  Tezos_rpc.Context.generic ->
+  Tezos_dal_node_services.Types.Health.t tzresult Lwt.t

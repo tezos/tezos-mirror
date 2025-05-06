@@ -320,39 +320,6 @@ let () =
     (fun (chain, block_hash, length) ->
       Unexpected_empty_block_list {chain; block_hash; length})
 
-(* DAL node related errors *)
-
-type error += No_dal_node_endpoint | Incompatible_dal_options
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"Client_commands.no_dal_node_endpoint"
-    ~title:"Missing_dal_node_argument"
-    ~description:"Explicit DAL node configuration is required."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Please connect a running DAL node using '--dal-node <endpoint>'. If \
-         you do not want to run a DAL node, you have to opt-out using \
-         '--without-dal'.")
-    Data_encoding.unit
-    (function No_dal_node_endpoint -> Some () | _ -> None)
-    (fun () -> No_dal_node_endpoint) ;
-  register_error_kind
-    `Permanent
-    ~id:"Client_commands.incompatible_dal_options"
-    ~title:"Incompatible_dal_options"
-    ~description:"'--dal-node' and '--without-dal' are incompatible."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "'--dal-node <endpoint>' and '--without-dal' are incompatible. Please \
-         do not pass '--without-dal' option.")
-    Data_encoding.unit
-    (function Incompatible_dal_options -> Some () | _ -> None)
-    (fun () -> Incompatible_dal_options)
-
 (* BLS related errors *)
 type error +=
   | Signature_aggregation_failure
