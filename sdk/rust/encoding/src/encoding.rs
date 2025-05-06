@@ -231,7 +231,7 @@ impl Encoding {
         Encoding::List(Box::new(encoding))
     }
 
-    /// Utility function to construct [Encoding::List] without the need
+    /// Utility function to construct [Encoding::BoundedList] without the need
     /// to manually create new [Box].
     #[inline]
     pub fn bounded_list(max: usize, encoding: Encoding) -> Encoding {
@@ -245,7 +245,7 @@ impl Encoding {
         Encoding::Sized(bytes_sz, Box::new(encoding))
     }
 
-    /// Utility function to construct [Encoding::Sized] without the need
+    /// Utility function to construct [Encoding::Bounded] without the need
     /// to manually create new [Box].
     #[inline]
     pub fn bounded(max: usize, encoding: Encoding) -> Encoding {
@@ -263,7 +263,7 @@ impl Encoding {
     /// to manually create new [Box].
     #[inline]
     pub fn short_dynamic(encoding: Encoding) -> Encoding {
-        Encoding::Dynamic(Box::new(encoding))
+        Encoding::ShortDynamic(Box::new(encoding))
     }
 
     /// Utility function to construct [Encoding::Dynamic] without the need
@@ -273,7 +273,7 @@ impl Encoding {
         Encoding::Dynamic(Box::new(encoding))
     }
 
-    /// Utility function to construct [Encoding::Dynamic] without the need
+    /// Utility function to construct [Encoding::BoundedDynamic] without the need
     /// to manually create new [Box].
     #[inline]
     pub fn bounded_dynamic(max: usize, encoding: Encoding) -> Encoding {
