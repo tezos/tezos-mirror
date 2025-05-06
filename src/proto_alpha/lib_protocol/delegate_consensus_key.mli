@@ -34,8 +34,9 @@
 type error +=
   | Invalid_consensus_key_update_noop of
       (Cycle_repr.t * Operation_repr.consensus_key_kind)
-  | Invalid_consensus_key_update_active
+  | Invalid_consensus_key_update_active of Signature.Public_key_hash.t
   | Invalid_consensus_key_update_tz4 of Bls.Public_key.t
+  | Invalid_consensus_key_update_another_delegate of Signature.Public_key_hash.t
 
 (** The public key of a consensus key and the associated delegate. *)
 type pk = Raw_context.consensus_pk = {
