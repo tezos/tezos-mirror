@@ -28,7 +28,7 @@
   -open Tezos_error_monad
   -open Tezos_test_helpers
   -open Octez_alcotezt)
- (modules test_unix_error test_syslog test_event_loop))
+ (modules test_unix_error test_syslog test_event_loop test_external_process))
 
 (executable
  (name main)
