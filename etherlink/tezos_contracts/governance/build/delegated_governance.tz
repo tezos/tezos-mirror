@@ -1,0 +1,129 @@
+{ parameter (pair address bool (option (set address))) ;
+  storage (big_map address (map address (pair bool (option (set address))))) ;
+  code { UNPAIR ;
+         UNPAIR 3 ;
+         PUSH string "TEZ_IN_TRANSACTION_DISALLOWED" ;
+         PUSH mutez 0 ;
+         AMOUNT ;
+         COMPARE ;
+         EQ ;
+         IF { DROP } { FAILWITH } ;
+         SENDER ;
+         DUP ;
+         PACK ;
+         PUSH bytes 0x00 ;
+         DUP 2 ;
+         PUSH nat 1 ;
+         PUSH nat 6 ;
+         SLICE ;
+         IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
+         COMPARE ;
+         EQ ;
+         IF {} { PUSH string "NOT_IMPLICIT_ADDRESS" ; FAILWITH } ;
+         PUSH bytes 0x ;
+         NIL bytes ;
+         DUP 3 ;
+         PUSH nat 21 ;
+         PUSH nat 7 ;
+         SLICE ;
+         IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
+         CONS ;
+         PUSH bytes 0x00000015 ;
+         CONS ;
+         DIG 2 ;
+         PUSH nat 2 ;
+         PUSH nat 0 ;
+         SLICE ;
+         IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
+         CONS ;
+         NIL bytes ;
+         SWAP ;
+         ITER { CONS } ;
+         ITER { CONCAT } ;
+         UNPACK key_hash ;
+         PUSH string "FAILED_TO_CAST_ADDRESS_TO_KEY_HASH" ;
+         SWAP ;
+         IF_NONE { FAILWITH } { SWAP ; DROP } ;
+         PUSH string "KEY_HASH_NOT_EQUAL_TO_SOURCE_ADDRESS" ;
+         DUP 3 ;
+         DUP 3 ;
+         IMPLICIT_ACCOUNT ;
+         ADDRESS ;
+         COMPARE ;
+         EQ ;
+         IF { DROP } { FAILWITH } ;
+         VOTING_POWER ;
+         PUSH nat 0 ;
+         SWAP ;
+         COMPARE ;
+         GT ;
+         IF {} { PUSH string "NO_VOTING_POWER" ; FAILWITH } ;
+         DUP 5 ;
+         DUP 3 ;
+         GET ;
+         IF_NONE { EMPTY_MAP address (pair bool (option (set address))) } {} ;
+         DIG 4 ;
+         IF_NONE
+           { DUP 4 ;
+             IF { NONE (set address) ; DIG 4 ; PAIR ; SOME }
+                { DIG 3 ; DROP ; NONE (pair bool (option (set address))) } }
+           { SOME ; DIG 4 ; PAIR ; SOME } ;
+         DIG 2 ;
+         UPDATE ;
+         DIG 2 ;
+         PUSH nat 0 ;
+         DUP 3 ;
+         SIZE ;
+         COMPARE ;
+         EQ ;
+         IF { SWAP ; DROP ; NONE (map address (pair bool (option (set address)))) }
+            { SWAP ; SOME } ;
+         DIG 2 ;
+         UPDATE ;
+         NIL operation ;
+         PAIR } ;
+  view "is_delegate"
+       (pair address address (option address))
+       bool
+       { UNPAIR ;
+         UNPAIR 3 ;
+         DIG 3 ;
+         SWAP ;
+         GET ;
+         IF_NONE
+           { DROP 2 ; PUSH bool False }
+           { SWAP ;
+             GET ;
+             SWAP ;
+             IF_NONE
+               { IF_NONE { PUSH bool False } { DROP ; PUSH bool True } }
+               { SWAP ;
+                 IF_NONE
+                   { DROP ; PUSH bool False }
+                   { UNPAIR ;
+                     IF { IF_NONE { DROP ; PUSH bool True } { SWAP ; MEM } }
+                        { IF_NONE { DROP ; PUSH bool True } { SWAP ; MEM ; NOT } } } } } } ;
+  view "list_delegates"
+       (pair address (option address))
+       (list address)
+       { UNPAIR ;
+         UNPAIR ;
+         DIG 2 ;
+         SWAP ;
+         GET ;
+         SWAP ;
+         IF_NONE
+           { IF_NONE { NIL address } { NIL address ; SWAP ; ITER { CAR ; CONS } } }
+           { SWAP ;
+             IF_NONE
+               { DROP ; NIL address }
+               { NIL address ;
+                 SWAP ;
+                 ITER { UNPAIR ;
+                        SWAP ;
+                        UNPAIR ;
+                        IF { IF_NONE { CONS } { DUP 4 ; MEM ; IF { CONS } { DROP } } }
+                           { IF_NONE { CONS } { DUP 4 ; MEM ; IF { DROP } { CONS } } } } ;
+                 SWAP ;
+                 DROP } } } }
+

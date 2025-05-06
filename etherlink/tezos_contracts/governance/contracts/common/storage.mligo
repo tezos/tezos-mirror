@@ -51,11 +51,17 @@ type config_t = {
         Minimum ratio of cumulated stake of Yea ballots to the cumulated stake 
         of Yea and Nay ballots to consider the proposal as a voting winner
     *)
-    promotion_supermajority : nat;      
+    promotion_supermajority : nat;
+    (*
+        The address of the contract managing the delegation of rights.
+	This contract must at least have a view called "list_delegates"
+	of type : address * address option -> address list
+    *)
+    delegation_contract : address;
 }
 
 type proposal_t = {
-    proposer : key_hash;
+    proposers : key_hash set;
     upvotes_voting_power : nat;
 }
 
