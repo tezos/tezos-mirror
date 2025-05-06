@@ -21,6 +21,11 @@
   instead of estimated ticks. (!17630)
 - The EVM now uses a cache for contract code/hash/size which improves time
   performances on the execution side. (!17716)
+- Updates the Layer 1 governance contracts to take into account Rio new cycle
+  duration. (!17943)
+    - [`KT1XdSAYGXrUDE1U5GNqUKKscLWrMhzyjNeh` for the regular upgrade governance][kgov]
+    - [`KT1D1fRgZVdjTj5sUZKcSTPPnuR7LRxVYnDL` for the security upgrade governance][sgov]
+    - [`KT1NnH9DCAoY1pfPNvb9cw9XPKQnHAFYFHXa` for the sequencer governance][sqgov]
 
 ### Bug fixes
 
