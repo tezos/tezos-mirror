@@ -68,23 +68,24 @@ type key_kind = Protocol.Operation_repr.consensus_key_kind =
   | Consensus
   | Companion
 
-let check_error_invalid_consensus_key_update_active ~loc ~pkh errs =
+let check_error_invalid_consensus_key_update_active ~loc ~pkh ~kind errs =
   Assert.expect_error ~loc errs (function
       | [
           Protocol.Delegate_consensus_key.Invalid_consensus_key_update_active
-            err_pkh;
+            (err_pkh, err_kind);
         ]
-        when Signature.Public_key_hash.equal pkh err_pkh ->
+        when Signature.Public_key_hash.equal pkh err_pkh && kind = err_kind ->
           true
       | _ -> false)
 
-let check_error_invalid_consensus_key_update_another_delegate ~loc ~pkh errs =
+let check_error_invalid_consensus_key_update_another_delegate ~loc ~pkh ~kind
+    errs =
   Assert.expect_error ~loc errs (function
       | [
           Protocol.Delegate_consensus_key
-          .Invalid_consensus_key_update_another_delegate err_pkh;
+          .Invalid_consensus_key_update_another_delegate (err_pkh, err_kind);
         ]
-        when Signature.Public_key_hash.equal pkh err_pkh ->
+        when Signature.Public_key_hash.equal pkh err_pkh && kind = err_kind ->
           true
       | _ -> false)
 
@@ -336,13 +337,21 @@ let test_register_other_accounts_as_ck =
         ~loc:__LOC__
         ~expected_error:(fun (_block, state) err ->
           let pkh = (State.find_account "victim_1" state).pkh in
-          check_error_invalid_consensus_key_update_active ~loc:__LOC__ ~pkh err)
+          check_error_invalid_consensus_key_update_active
+            ~loc:__LOC__
+            ~pkh
+            ~kind:Consensus
+            err)
         (update_consensus_key ~ck_name:"victim_1" "delegate")
   --> assert_failure
         ~loc:__LOC__
         ~expected_error:(fun (_block, state) err ->
           let pkh = (State.find_account "victim_2" state).pkh in
-          check_error_invalid_consensus_key_update_active ~loc:__LOC__ ~pkh err)
+          check_error_invalid_consensus_key_update_active
+            ~loc:__LOC__
+            ~pkh
+            ~kind:Companion
+            err)
         (update_companion_key ~ck_name:"victim_2" "delegate")
   (* ... So we give them other consensus keys.
      Note that the algo is not defined, so it is chosen at random. *)
@@ -358,6 +367,7 @@ let test_register_other_accounts_as_ck =
           check_error_invalid_consensus_key_update_another_delegate
             ~loc:__LOC__
             ~pkh
+            ~kind:Consensus
             err)
         (update_consensus_key ~ck_name:"victim_1" "delegate")
   --> assert_failure
@@ -367,6 +377,7 @@ let test_register_other_accounts_as_ck =
           check_error_invalid_consensus_key_update_another_delegate
             ~loc:__LOC__
             ~pkh
+            ~kind:Companion
             err)
         (update_companion_key ~ck_name:"victim_2" "delegate")
 
@@ -390,7 +401,11 @@ let test_self_register_as_companion =
         ~loc:__LOC__
         ~expected_error:(fun (_block, state) err ->
           let pkh = (State.find_account delegate state).pkh in
-          check_error_invalid_consensus_key_update_active ~loc:__LOC__ ~pkh err)
+          check_error_invalid_consensus_key_update_active
+            ~loc:__LOC__
+            ~pkh
+            ~kind:Companion
+            err)
         (update_companion_key ~ck_name:delegate delegate)
   (* We can change that *)
   --> add_account "consensus_key"
@@ -447,7 +462,11 @@ let test_self_register_as_companion =
         ~loc:__LOC__
         ~expected_error:(fun (_block, state) err ->
           let pkh = (State.find_account delegate state).pkh in
-          check_error_invalid_consensus_key_update_active ~loc:__LOC__ ~pkh err)
+          check_error_invalid_consensus_key_update_active
+            ~loc:__LOC__
+            ~pkh
+            ~kind:Consensus
+            err)
         (update_consensus_key ~ck_name:delegate delegate)
   --> add_account ~algo:Bls "companion_key"
   --> update_companion_key ~ck_name:"companion_key" delegate
@@ -538,6 +557,7 @@ let test_register_same_key_multiple_times =
           check_error_invalid_consensus_key_update_active
             ~loc:__LOC__
             ~pkh:ck.pkh
+            ~kind:Consensus
             err)
       (update_consensus_key ~ck_name:ck delegate)
     --> assert_failure
@@ -566,6 +586,7 @@ let test_register_same_key_multiple_times =
               check_error_invalid_consensus_key_update_active
                 ~loc:__LOC__
                 ~pkh:ck.pkh
+                ~kind:Companion
                 err)
           (update_companion_key ~ck_name:ck delegate)
   in
@@ -839,11 +860,12 @@ let test_forbidden_tz4 =
               Assert.expect_error ~loc:__LOC__ err (function
                   | [
                       Protocol.Delegate_consensus_key
-                      .Invalid_consensus_key_update_tz4 err_ck_bls_pk;
+                      .Invalid_consensus_key_update_tz4 (err_ck_bls_pk, err_kind);
                     ] ->
-                      Signature.Public_key.equal
-                        (Bls err_ck_bls_pk)
-                        ck_account.pk
+                      kind = err_kind
+                      && Signature.Public_key.equal
+                           (Bls err_ck_bls_pk)
+                           ck_account.pk
                   | _ -> false))
             (update_key ~kind ~ck_name:"ck" "delegate"))
         [("update consensus", Consensus); ("update companion", Companion)]
@@ -920,6 +942,7 @@ let test_fail_already_registered =
               check_error_invalid_consensus_key_update_active
                 ~loc:__LOC__
                 ~pkh
+                ~kind
                 err)
             (update_key ~kind ~ck_name:"ck" delegate))
         [("update consensus", Consensus); ("update companion", Companion)]
