@@ -144,10 +144,10 @@ This sequence of operations was run:
     Delegate: [PUBLIC_KEY_HASH]
     Destination: [PUBLIC_KEY_HASH]
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ3761999.152219
-      [PUBLIC_KEY_HASH] ... +ꜩ3761999.152219
-      [PUBLIC_KEY_HASH] ... -ꜩ37999.991436
-      [PUBLIC_KEY_HASH] ... +ꜩ37999.991436
+      [PUBLIC_KEY_HASH] ... -ꜩ3761998.945648
+      [PUBLIC_KEY_HASH] ... +ꜩ3761998.945648
+      [PUBLIC_KEY_HASH] ... -ꜩ37999.989349
+      [PUBLIC_KEY_HASH] ... +ꜩ37999.989349
 
 
 ./octez-client --wait none drain delegate bootstrap3 to tezt_5 with tezt_1
@@ -164,8 +164,8 @@ This sequence of operations was run:
     Delegate: [PUBLIC_KEY_HASH]
     Destination: [PUBLIC_KEY_HASH]
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ3762000.20629
-      [PUBLIC_KEY_HASH] ... +ꜩ3762000.20629
-      [PUBLIC_KEY_HASH] ... -ꜩ38000.002083
-      [PUBLIC_KEY_HASH] ... +ꜩ38000.002083
+      [PUBLIC_KEY_HASH] ... -ꜩ3761999.999718
+      [PUBLIC_KEY_HASH] ... +ꜩ3761999.999718
+      [PUBLIC_KEY_HASH] ... -ꜩ37999.999997
+      [PUBLIC_KEY_HASH] ... +ꜩ37999.999997
 
