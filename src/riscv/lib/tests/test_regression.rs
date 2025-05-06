@@ -28,7 +28,6 @@ fn capture_debug_log(mint: &mut goldenfile::Mint) -> PvmHooks<'_> {
     hooks
 }
 
-#[cfg(feature = "supervisor")]
 #[test]
 fn regression_frozen_jstz() {
     test_regression(
@@ -39,7 +38,6 @@ fn regression_frozen_jstz() {
     )
 }
 
-#[cfg(feature = "supervisor")]
 #[test]
 fn regression_frozen_dummy_kernel() {
     test_regression(
@@ -50,7 +48,6 @@ fn regression_frozen_dummy_kernel() {
     )
 }
 
-#[cfg(feature = "supervisor")]
 #[test]
 fn regression_dummy_kernel() {
     test_regression(
@@ -97,19 +94,8 @@ fn test_regression_for_block<B: Block<M64M, Owned>>(
 
     let (result, initial_hash, final_hash) = {
         // We need to read the kernel in any case
-        let kernel = fs::read(kernel_path)
+        let program = fs::read(kernel_path)
             .expect("Failed to read kernel from disk. Try running `make build`.");
-
-        #[cfg(not(feature = "supervisor"))]
-        let program = fs::read("../assets/hermit-loader").unwrap();
-
-        #[cfg(not(feature = "supervisor"))]
-        let initrd = Some(kernel);
-
-        #[cfg(feature = "supervisor")]
-        let program = kernel;
-
-        #[cfg(feature = "supervisor")]
         let initrd = None::<Vec<u8>>;
 
         let inbox = {

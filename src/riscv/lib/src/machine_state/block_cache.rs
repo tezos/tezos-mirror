@@ -88,15 +88,15 @@ use block::Block;
 
 use super::MachineCoreState;
 use super::ProgramCounterUpdate;
-use super::address_translation::PAGE_OFFSET_WIDTH;
 use super::instruction::Instruction;
 use super::instruction::RunInstr;
 use super::memory::Address;
 use super::memory::MemoryConfig;
 use crate::cache_utils::FenceCounter;
 use crate::cache_utils::Sizes;
-use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::machine_state::instruction::Args;
+use crate::machine_state::memory::OFFSET_MASK;
+use crate::machine_state::memory::PAGE_SIZE;
 use crate::parser::instruction::InstrWidth;
 use crate::state::NewState;
 use crate::state_backend;
@@ -119,9 +119,6 @@ use crate::storage::Hash;
 use crate::storage::HashError;
 use crate::traps::EnvironException;
 use crate::traps::Exception;
-
-/// Mask for getting the offset within a page
-const PAGE_OFFSET_MASK: usize = (1 << PAGE_OFFSET_WIDTH) - 1;
 
 /// The maximum number of instructions that may be contained in a block.
 pub const CACHE_INSTR: usize = 20;
@@ -693,7 +690,7 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
 
         // If the instruction is at the start of the page, we _must_ start a new block,
         // as we cannot allow blocks to cross page boundaries.
-        if phys_addr & PAGE_OFFSET_MASK as u64 == 0 || phys_addr != next_addr {
+        if phys_addr & OFFSET_MASK == 0 || phys_addr != next_addr {
             self.reset_to(phys_addr);
         }
 
@@ -712,8 +709,8 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
         );
 
         // ensure uncompressed does not cross page boundaries
-        const END_OF_PAGE: Address = PAGE_SIZE - 2;
-        if phys_addr % PAGE_SIZE == END_OF_PAGE {
+        const END_OF_PAGE: Address = PAGE_SIZE.get() - 2;
+        if phys_addr % PAGE_SIZE.get() == END_OF_PAGE {
             return;
         }
 
@@ -721,7 +718,7 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
 
         // If the instruction is at the start of the page, we _must_ start a new block,
         // as we cannot allow blocks to cross page boundaries.
-        if phys_addr & PAGE_OFFSET_MASK as u64 == 0 || phys_addr != next_addr {
+        if phys_addr & OFFSET_MASK == 0 || phys_addr != next_addr {
             self.reset_to(phys_addr);
         }
 
@@ -780,7 +777,7 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
         let possible_block = BCL::entry(&self.entries, next_phys_addr);
         let adjacent_block_found = possible_block.address.read() == next_phys_addr
             && possible_block.fence_counter.read() == fence_counter
-            && next_phys_addr & PAGE_OFFSET_MASK as u64 != 0
+            && next_phys_addr & OFFSET_MASK != 0
             && possible_block.block.num_instr() + new_len <= CACHE_INSTR;
 
         if adjacent_block_found {
@@ -946,7 +943,6 @@ mod tests {
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineState;
     use crate::machine_state::TestCacheLayouts;
-    use crate::machine_state::address_translation::PAGE_SIZE;
     use crate::machine_state::block_cache::block::Interpreted;
     use crate::machine_state::block_cache::block::InterpretedBlockBuilder;
     use crate::machine_state::instruction::Instruction;
@@ -1111,7 +1107,7 @@ mod tests {
         })
         .unwrap();
 
-        let phys_addr = PAGE_SIZE - 10;
+        let phys_addr = PAGE_SIZE.get() - 10;
 
         for offset in 0..10 {
             state.push_instr_compressed(phys_addr + offset * 2, compressed);

@@ -48,7 +48,6 @@ tempfile.workspace = true
 goldenfile.workspace = true
 
 [features]
-default = ["supervisor"]
-supervisor = []
+default = []
 metrics = []
 log = ["dep:__tracing_do_not_use_directly"]

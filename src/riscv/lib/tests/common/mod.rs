@@ -14,20 +14,8 @@ use rand::seq::SliceRandom;
 use tezos_smart_rollup_utils::inbox::InboxBuilder;
 
 pub fn make_stepper_factory<CL: CacheLayouts>() -> impl Fn() -> PvmStepper<'static, M64M, CL> {
-    let (program, initrd) = {
-        #[cfg(feature = "supervisor")]
-        {
-            let program = fs::read("../assets/jstz").unwrap();
-            (program, None::<Vec<u8>>)
-        }
-
-        #[cfg(not(feature = "supervisor"))]
-        {
-            let program = fs::read("../assets/hermit-loader").unwrap();
-            let initrd = fs::read("../assets/jstz").unwrap();
-            (program, Some(initrd))
-        }
-    };
+    let program = fs::read("../assets/jstz").unwrap();
+    let initrd = None::<Vec<u8>>;
 
     let mut inbox = InboxBuilder::new();
     inbox

@@ -2,9 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use strum::IntoEnumIterator;
-
-use crate::machine_state::AccessType;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::csregisters::CSRegister;
 use crate::machine_state::csregisters::effects::handle_csr_effect;
@@ -116,9 +113,6 @@ where
     /// Section 5.2.1: It is always legal to over-fence.
     #[inline(always)]
     pub fn run_sfence_vma(&mut self, _asid: XRegister, _vaddr: XRegister) -> Result<(), Exception> {
-        // Invalidate all cached address translations.
-        self.translation_cache.invalidate(AccessType::iter());
-
         let mode = self.hart.mode.read();
         let tvm = self.hart.csregisters.mstatus().tvm.read();
 

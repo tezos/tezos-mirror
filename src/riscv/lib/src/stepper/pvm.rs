@@ -95,20 +95,8 @@ impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts>
 
         let program = Program::<MC>::from_elf(program)?;
 
-        #[cfg(feature = "supervisor")]
-        {
-            pvm.setup_linux_process(&program)?;
-            assert!(initrd.is_none(), "initrd is not supported");
-        }
-
-        #[cfg(not(feature = "supervisor"))]
-        {
-            pvm.machine_state.setup_boot(
-                &program,
-                initrd,
-                crate::machine_state::mode::Mode::Supervisor,
-            )?;
-        }
+        pvm.setup_linux_process(&program)?;
+        assert!(initrd.is_none(), "initrd is not supported");
 
         let reveal_request_response_map =
             RevealRequestResponseMap::new(rollup_address, origination_level, preimages_dir);
@@ -149,7 +137,6 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>
     /// Non-continuing variant of [`Stepper::step_max`]
     fn step_max_once(&mut self, steps: Bound<usize>) -> StepperStatus {
         // SAFETY: We're in a stepper context where divergence (e.g. early exit) is allowed.
-        #[cfg(feature = "supervisor")]
         unsafe {
             if let Some(exit_code) = self.pvm.has_exited() {
                 return StepperStatus::Exited {

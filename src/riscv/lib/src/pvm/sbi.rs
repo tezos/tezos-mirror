@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-// When the Supervisor is enabled, most of this module is not used.
-#![cfg_attr(feature = "supervisor", allow(dead_code))]
+#![expect(
+    dead_code,
+    reason = "Most functions are not used with the supervising PVM"
+)]
 
 use std::cmp::min;
 
@@ -31,7 +33,6 @@ use tezos_smart_rollup_constants::riscv::SbiError;
 use super::PvmHooks;
 use super::PvmStatus;
 use super::reveals::RevealRequest;
-use crate::machine_state::AccessType;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
@@ -145,12 +146,6 @@ where
         let arg_level_addr = machine.hart.xregisters.read(a2);
         let arg_counter_addr = machine.hart.xregisters.read(a3);
 
-        // The argument addresses are virtual addresses. We need to translate them to
-        // physical addresses.
-        let phys_buffer_addr = machine.translate(arg_buffer_addr, AccessType::Store)?;
-        let phys_level_addr = machine.translate(arg_level_addr, AccessType::Store)?;
-        let phys_counter_addr = machine.translate(arg_counter_addr, AccessType::Store)?;
-
         // The SBI caller expects the payload to be returned at [phys_dest_addr]
         // with at maximum [max_buffer_size] bytes written.
         let max_buffer_size = payload.len().min(arg_buffer_size as usize).min(
@@ -161,9 +156,9 @@ where
 
         machine
             .main_memory
-            .write_all(phys_buffer_addr, &payload[..max_buffer_size])?;
-        machine.main_memory.write(phys_level_addr, level)?;
-        machine.main_memory.write(phys_counter_addr, counter)?;
+            .write_all(arg_buffer_addr, &payload[..max_buffer_size])?;
+        machine.main_memory.write(arg_level_addr, level)?;
+        machine.main_memory.write(arg_counter_addr, counter)?;
 
         // At the moment, this case is unlikely to occur because we cap [max_buffer_size] at
         // [MAX_INPUT_MESSAGE_SIZE].
@@ -203,14 +198,9 @@ where
             min(arg_buffer_size as usize, reveal_data.len()),
         );
 
-        // The argument address is a virtual address. We need to translate it to
-        // a physical address.
-        let phys_dest_addr = machine.translate(arg_buffer_addr, AccessType::Store)?;
-
-        // TODO: RV-425 Cross-page memory accesses are not translated correctly
         machine
             .main_memory
-            .write_all(phys_dest_addr, &reveal_data[..memory_write_size])?;
+            .write_all(arg_buffer_addr, &reveal_data[..memory_write_size])?;
 
         Ok(memory_write_size as u64)
     });
@@ -240,21 +230,17 @@ where
     let arg_msg_len = machine.hart.xregisters.read(a2);
     let arg_sig_addr = machine.hart.xregisters.read(a3);
 
-    let sk_addr = machine.translate(arg_sk_addr, AccessType::Load)?;
-    let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
-    let sig_addr = machine.translate(arg_sig_addr, AccessType::Store)?;
-
     let mut sk_bytes = [0u8; 32];
-    machine.main_memory.read_all(sk_addr, &mut sk_bytes)?;
+    machine.main_memory.read_all(arg_sk_addr, &mut sk_bytes)?;
     let sk = SigningKey::try_from(sk_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
     sk_bytes.fill(0);
 
     let mut msg_bytes = vec![0; arg_msg_len as usize];
-    machine.main_memory.read_all(msg_addr, &mut msg_bytes)?;
+    machine.main_memory.read_all(arg_msg_addr, &mut msg_bytes)?;
 
     let sig = sk.sign(msg_bytes.as_slice());
     let sig_bytes: [u8; 64] = sig.to_bytes();
-    machine.main_memory.write_all(sig_addr, &sig_bytes)?;
+    machine.main_memory.write_all(arg_sig_addr, &sig_bytes)?;
 
     Ok(sig_bytes.len() as u64)
 }
@@ -273,18 +259,14 @@ where
     let arg_msg_addr = machine.hart.xregisters.read(a2);
     let arg_msg_len = machine.hart.xregisters.read(a3);
 
-    let pk_addr = machine.translate(arg_pk_addr, AccessType::Load)?;
-    let sig_addr = machine.translate(arg_sig_addr, AccessType::Store)?;
-    let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
-
     let mut pk_bytes = [0u8; 32];
-    machine.main_memory.read_all(pk_addr, &mut pk_bytes)?;
+    machine.main_memory.read_all(arg_pk_addr, &mut pk_bytes)?;
 
     let mut sig_bytes = [0u8; 64];
-    machine.main_memory.read_all(sig_addr, &mut sig_bytes)?;
+    machine.main_memory.read_all(arg_sig_addr, &mut sig_bytes)?;
 
     let mut msg_bytes = vec![0u8; arg_msg_len as usize];
-    machine.main_memory.read_all(msg_addr, &mut msg_bytes)?;
+    machine.main_memory.read_all(arg_msg_addr, &mut msg_bytes)?;
 
     let pk = VerifyingKey::try_from(pk_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
     let sig = Signature::from_slice(sig_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
@@ -306,14 +288,13 @@ where
     let arg_msg_addr = machine.hart.xregisters.read(a1);
     let arg_msg_len = machine.hart.xregisters.read(a2);
 
-    let out_addr = machine.translate(arg_out_addr, AccessType::Store)?;
-    let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
-
     let mut msg_bytes = vec![0u8; arg_msg_len as usize];
-    machine.main_memory.read_all(msg_addr, &mut msg_bytes)?;
+    machine.main_memory.read_all(arg_msg_addr, &mut msg_bytes)?;
 
     let hash = tezos_crypto_rs::blake2b::digest_256(msg_bytes.as_slice());
-    machine.main_memory.write_all(out_addr, hash.as_slice())?;
+    machine
+        .main_memory
+        .write_all(arg_out_addr, hash.as_slice())?;
 
     Ok(hash.len() as u64)
 }
@@ -334,12 +315,9 @@ fn handle_tezos_reveal<S, MC, M>(
 
     let mut buffer = vec![0u8; min(request_size as usize, REVEAL_REQUEST_MAX_SIZE)];
 
-    let Ok(phys_dest_addr) = machine.translate(request_address, AccessType::Store) else {
-        return sbi_return_error(&mut machine.hart.xregisters, SbiError::InvalidAddress);
-    };
     if machine
         .main_memory
-        .read_all(phys_dest_addr, &mut buffer)
+        .read_all(request_address, &mut buffer)
         .is_err()
     {
         return sbi_return_error(&mut machine.hart.xregisters, SbiError::InvalidAddress);

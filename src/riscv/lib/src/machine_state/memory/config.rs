@@ -4,9 +4,7 @@
 
 use super::buddy::BuddyLayout;
 use super::buddy::BuddyLayoutProxy;
-#[cfg(feature = "supervisor")]
 use super::protection::PagePermissions;
-#[cfg(feature = "supervisor")]
 use super::protection::PagePermissionsLayout;
 use super::state::MemoryImpl;
 use crate::state::NewState;
@@ -31,13 +29,6 @@ where
     where
         M: ManagerAlloc,
     {
-        #[cfg(not(feature = "supervisor"))]
-        return MemoryImpl {
-            data: DynCells::new(manager),
-            _pd: std::marker::PhantomData,
-        };
-
-        #[cfg(feature = "supervisor")]
         MemoryImpl {
             data: DynCells::new(manager),
             readable_pages: PagePermissions::new(manager),
@@ -55,10 +46,6 @@ where
 {
     const TOTAL_BYTES: usize = TOTAL_BYTES;
 
-    #[cfg(not(feature = "supervisor"))]
-    type Layout = DynArray<TOTAL_BYTES>;
-
-    #[cfg(feature = "supervisor")]
     type Layout = (
         DynArray<TOTAL_BYTES>,
         PagePermissionsLayout<PAGES>,
@@ -83,13 +70,6 @@ where
             );
         }
 
-        #[cfg(not(feature = "supervisor"))]
-        return MemoryImpl {
-            data: space,
-            _pd: std::marker::PhantomData,
-        };
-
-        #[cfg(feature = "supervisor")]
         MemoryImpl {
             data: space.0,
             readable_pages: PagePermissions::bind(space.1),
@@ -104,10 +84,6 @@ where
         M: ManagerBase,
         F: FnManager<Ref<'a, M>>,
     {
-        #[cfg(not(feature = "supervisor"))]
-        return instance.data.struct_ref::<F>();
-
-        #[cfg(feature = "supervisor")]
         (
             instance.data.struct_ref::<F>(),
             instance.readable_pages.struct_ref::<F>(),

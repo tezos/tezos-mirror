@@ -7,13 +7,10 @@ use std::mem;
 use super::Address;
 use super::BadMemoryAccess;
 use super::Memory;
-#[cfg(feature = "supervisor")]
+use super::PAGE_SIZE;
 use super::Permissions;
 use super::buddy::Buddy;
-#[cfg(feature = "supervisor")]
 use super::protection::PagePermissions;
-#[cfg(feature = "supervisor")]
-use crate::machine_state::memory::PAGE_SIZE;
 use crate::state_backend::DynCells;
 use crate::state_backend::Elem;
 use crate::state_backend::ManagerBase;
@@ -28,25 +25,16 @@ pub struct MemoryImpl<const PAGES: usize, const TOTAL_BYTES: usize, B, M: Manage
     pub(super) data: DynCells<TOTAL_BYTES, M>,
 
     /// Read permissions per page
-    #[cfg(feature = "supervisor")]
     pub(super) readable_pages: PagePermissions<PAGES, M>,
 
     /// Write permissions per page
-    #[cfg(feature = "supervisor")]
     pub(super) writable_pages: PagePermissions<PAGES, M>,
 
     /// Execute permissions per page
-    #[cfg(feature = "supervisor")]
     pub(super) executable_pages: PagePermissions<PAGES, M>,
 
     /// Allocation tracker
-    #[cfg(feature = "supervisor")]
     pub(super) allocated_pages: B,
-
-    /// When the `supervisor` feature is disabled, we need to make use of `B` somehow to make the
-    /// compiler happy
-    #[cfg(not(feature = "supervisor"))]
-    pub(super) _pd: std::marker::PhantomData<B>,
 }
 
 impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M: ManagerBase>
@@ -69,7 +57,6 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M: ManagerBase>
         B: Buddy<M>,
         M: ManagerReadWrite,
     {
-        #[cfg(feature = "supervisor")]
         self.protect_pages(0, TOTAL_BYTES, Permissions::ReadWrite)
             .unwrap();
     }
@@ -89,11 +76,8 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M: ManagerBase>
         Self::check_bounds(address, length, BadMemoryAccess)?;
 
         self.data.write(address as usize, value);
-        #[cfg(feature = "supervisor")]
-        {
-            self.readable_pages.modify_access(address, length, true);
-            self.executable_pages.modify_access(address, length, true);
-        }
+        self.readable_pages.modify_access(address, length, true);
+        self.executable_pages.modify_access(address, length, true);
         Ok(())
     }
 }
@@ -113,7 +97,6 @@ where
         Self::check_bounds(address, mem::size_of::<E>(), BadMemoryAccess)?;
 
         // SAFETY: The bounds check above ensures the access check below is safe
-        #[cfg(feature = "supervisor")]
         unsafe {
             if !self.readable_pages.can_access(address, mem::size_of::<E>()) {
                 return Err(BadMemoryAccess);
@@ -132,7 +115,6 @@ where
         Self::check_bounds(address, mem::size_of::<E>(), BadMemoryAccess)?;
 
         // SAFETY: The bounds check above ensures the access check below is safe
-        #[cfg(feature = "supervisor")]
         unsafe {
             // Checking for executable access is sufficient as that implies read access
             if !self
@@ -154,7 +136,6 @@ where
         Self::check_bounds(address, mem::size_of_val(values), BadMemoryAccess)?;
 
         // SAFETY: The bounds check above ensures the access check below is safe
-        #[cfg(feature = "supervisor")]
         unsafe {
             if !self
                 .readable_pages
@@ -177,7 +158,6 @@ where
         Self::check_bounds(address, mem::size_of::<E>(), BadMemoryAccess)?;
 
         // SAFETY: The bounds check above ensures the access check below is safe
-        #[cfg(feature = "supervisor")]
         unsafe {
             if !self.writable_pages.can_access(address, mem::size_of::<E>()) {
                 return Err(BadMemoryAccess);
@@ -196,7 +176,6 @@ where
         Self::check_bounds(address, mem::size_of_val(values), BadMemoryAccess)?;
 
         // SAFETY: The bounds check above ensures the access check below is safe
-        #[cfg(feature = "supervisor")]
         unsafe {
             if !self
                 .writable_pages
@@ -216,16 +195,10 @@ where
     {
         Self {
             data: self.data.clone(),
-            #[cfg(feature = "supervisor")]
             readable_pages: self.readable_pages.clone(),
-            #[cfg(feature = "supervisor")]
             writable_pages: self.writable_pages.clone(),
-            #[cfg(feature = "supervisor")]
             executable_pages: self.executable_pages.clone(),
-            #[cfg(feature = "supervisor")]
             allocated_pages: self.allocated_pages.clone(),
-            #[cfg(not(feature = "supervisor"))]
-            _pd: std::marker::PhantomData,
         }
     }
 
@@ -251,7 +224,6 @@ where
         }
     }
 
-    #[cfg(feature = "supervisor")]
     fn protect_pages(
         &mut self,
         address: Address,
@@ -273,7 +245,6 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "supervisor")]
     fn deallocate_pages(
         &mut self,
         address: Address,
@@ -294,7 +265,6 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "supervisor")]
     fn allocate_pages(
         &mut self,
         address_hint: Option<Address>,
@@ -330,7 +300,6 @@ where
         .ok_or(super::MemoryGovernanceError)
     }
 
-    #[cfg(feature = "supervisor")]
     fn allocate_and_protect_pages(
         &mut self,
         address_hint: Option<Address>,
@@ -402,7 +371,6 @@ pub mod tests {
 
     // This test verifies that memory is fully zeroed up to the page boundary, not just the
     // requested length, when allocating memory.
-    #[cfg(feature = "supervisor")]
     backend_test!(test_memory_fully_zeroed_on_allocation, F, {
         use crate::machine_state::memory::PAGE_SIZE;
         use crate::machine_state::memory::Permissions;

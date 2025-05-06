@@ -68,7 +68,6 @@ impl Display for SimpleBenchData {
 
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 pub enum InstrGetError {
-    Translation,
     Parse,
 }
 

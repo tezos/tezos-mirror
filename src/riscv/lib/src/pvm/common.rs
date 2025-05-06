@@ -11,7 +11,6 @@ use std::ops::Bound;
 
 use tezos_smart_rollup_constants::riscv::SbiError;
 
-#[cfg(feature = "supervisor")]
 use super::linux;
 use super::reveals::RevealRequest;
 use super::reveals::RevealRequestLayout;
@@ -92,26 +91,11 @@ pub enum PvmInput<'a> {
     Reveal(&'a [u8]),
 }
 
-#[cfg(feature = "supervisor")]
 struct_layout! {
     pub struct PvmLayout<MC, CL> {
         machine_state: machine_state::MachineStateLayout<MC, CL>,
         reveal_request: RevealRequestLayout,
         system_state: linux::SupervisorStateLayout,
-        version: Atom<u64>,
-        tick: Atom<u64>,
-        message_counter: Atom<u64>,
-        level: Atom<u32>,
-        level_is_set: Atom<bool>,
-        status: Atom<PvmStatus>,
-    }
-}
-
-#[cfg(not(feature = "supervisor"))]
-struct_layout! {
-    pub struct PvmLayout<MC, CL> {
-        machine_state: machine_state::MachineStateLayout<MC, CL>,
-        reveal_request: RevealRequestLayout,
         version: Atom<u64>,
         tick: Atom<u64>,
         message_counter: Atom<u64>,
@@ -173,7 +157,6 @@ pub(crate) type PvmProofGen<'a, MC, CL, M> = Pvm<
 pub struct Pvm<MC: MemoryConfig, CL: CacheLayouts, B: block::Block<MC, M>, M: ManagerBase> {
     pub(crate) machine_state: machine_state::MachineState<MC, CL, B, M>,
     reveal_request: RevealRequest<M>,
-    #[cfg(feature = "supervisor")]
     pub(super) system_state: linux::SupervisorState<M>,
     version: Cell<u64, M>,
     pub(crate) tick: Cell<u64, M>,
@@ -198,7 +181,6 @@ impl<
         Self {
             machine_state: machine_state::MachineState::new(manager, block_builder),
             reveal_request: RevealRequest::new(manager),
-            #[cfg(feature = "supervisor")]
             system_state: linux::SupervisorState::new(manager),
             version: Cell::new_with(manager, INITIAL_VERSION),
             status: Cell::new(manager),
@@ -222,7 +204,6 @@ impl<
         Self {
             machine_state: machine_state::MachineState::bind(space.machine_state, block_builder),
             reveal_request: RevealRequest::bind(space.reveal_request),
-            #[cfg(feature = "supervisor")]
             system_state: linux::SupervisorState::bind(space.system_state),
             version: space.version,
             tick: space.tick,
@@ -241,7 +222,6 @@ impl<
         PvmLayoutF {
             machine_state: self.machine_state.struct_ref::<F>(),
             reveal_request: self.reveal_request.struct_ref::<F>(),
-            #[cfg(feature = "supervisor")]
             system_state: self.system_state.struct_ref::<F>(),
             version: self.version.struct_ref::<F>(),
             tick: self.tick.struct_ref::<F>(),
@@ -289,33 +269,16 @@ impl<
 
     /// Handle an exception using the defined Execution Environment.
     // The conditional compilation below causes some warnings.
-    #[cfg_attr(
-        feature = "supervisor",
-        expect(
-            unused_variables,
-            unreachable_code,
-            reason = "When the supervisor is enabled we return early and don't use all parameters"
-        )
-    )]
-    fn handle_exception(&mut self, hooks: &mut PvmHooks<'_>, exception: EnvironException) -> bool
+    fn handle_exception(&mut self, hooks: &mut PvmHooks<'_>, _exception: EnvironException) -> bool
     where
         M: state_backend::ManagerReadWrite,
     {
-        #[cfg(feature = "supervisor")]
-        return handle_system_call(
+        handle_system_call(
             &mut self.machine_state.core,
             &mut self.system_state,
             &mut self.status,
             &mut self.reveal_request,
             hooks,
-        );
-
-        sbi::handle_call(
-            &mut self.status,
-            &mut self.reveal_request,
-            &mut self.machine_state.core,
-            hooks,
-            exception,
         )
     }
 
@@ -369,32 +332,15 @@ impl<
             return 1;
         }
 
-        #[cfg_attr(
-            feature = "supervisor",
-            expect(
-                unused_variables,
-                unreachable_code,
-                reason = "When the supervisor is enabled we return early and don't use all parameters"
-            )
-        )]
         let steps = self
             .machine_state
-            .step_max_handle::<Infallible>(step_bounds, |machine_state, exception| {
-                #[cfg(feature = "supervisor")]
-                return Ok(handle_system_call(
+            .step_max_handle::<Infallible>(step_bounds, |machine_state, _exception| {
+                Ok(handle_system_call(
                     &mut machine_state.core,
                     &mut self.system_state,
                     &mut self.status,
                     &mut self.reveal_request,
                     hooks,
-                ));
-
-                Ok(sbi::handle_call(
-                    &mut self.status,
-                    &mut self.reveal_request,
-                    &mut machine_state.core,
-                    hooks,
-                    exception,
                 ))
             })
             .steps;
@@ -545,7 +491,6 @@ impl<
         Self {
             machine_state: self.machine_state.clone(),
             reveal_request: self.reveal_request.clone(),
-            #[cfg(feature = "supervisor")]
             system_state: self.system_state.clone(),
             version: self.version.clone(),
             tick: self.tick.clone(),
@@ -557,7 +502,6 @@ impl<
     }
 }
 
-#[cfg(feature = "supervisor")]
 fn handle_system_call<MC, M>(
     core: &mut machine_state::MachineCoreState<MC, M>,
     system_state: &mut linux::SupervisorState<M>,
@@ -579,13 +523,10 @@ where
 mod tests {
     use std::mem;
 
-    #[cfg(feature = "supervisor")]
     use proptest::proptest;
     use rand::Fill;
     use rand::thread_rng;
     use tezos_smart_rollup_constants::riscv::REVEAL_REQUEST_MAX_SIZE;
-    #[cfg(not(feature = "supervisor"))]
-    use tezos_smart_rollup_constants::riscv::SBI_CONSOLE_PUTCHAR;
     use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
     use tezos_smart_rollup_constants::riscv::SBI_TEZOS_INBOX_NEXT;
     use tezos_smart_rollup_constants::riscv::SBI_TEZOS_REVEAL;
@@ -603,9 +544,7 @@ mod tests {
     use crate::machine_state::registers::a3;
     use crate::machine_state::registers::a6;
     use crate::machine_state::registers::a7;
-    #[cfg(feature = "supervisor")]
     use crate::pvm::common::tests::memory::Address;
-    #[cfg(feature = "supervisor")]
     use crate::pvm::linux;
     use crate::state_backend::owned_backend::Owned;
     use crate::state_backend::test_helpers::TestBackendFactory;
@@ -714,54 +653,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "supervisor"))]
-    fn test_write_debug() {
-        type MC = M1M;
-        type B = block::Interpreted<MC, Owned>;
-
-        let mut buffer = Vec::new();
-        let mut hooks = PvmHooks::new(|c| buffer.push(c));
-
-        // Setup PVM
-        let mut pvm = Pvm::<MC, TestCacheLayouts, B, _>::new(&mut Owned, InterpretedBlockBuilder);
-        pvm.reset();
-        pvm.machine_state
-            .core
-            .main_memory
-            .set_all_readable_writeable();
-
-        // Prepare subsequent ECALLs to use the SBI_CONSOLE_PUTCHAR extension
-        pvm.machine_state
-            .core
-            .hart
-            .xregisters
-            .write(a7, SBI_CONSOLE_PUTCHAR);
-
-        // Write characters
-        let mut written = Vec::new();
-        for _ in 0..10 {
-            let char: u8 = rand::random();
-            pvm.machine_state
-                .core
-                .hart
-                .xregisters
-                .write(a0, char as u64);
-            written.push(char);
-
-            let outcome = pvm.handle_exception(&mut hooks, EnvironException::EnvCallFromUMode);
-            assert!(outcome, "Unexpected outcome");
-        }
-
-        // Drop `hooks` to regain access to the mutable references it kept
-        mem::drop(hooks);
-
-        // Compare what characters have been passed to the hook versus what we
-        // intended to write
-        assert_eq!(written, buffer);
-    }
-
-    #[test]
-    #[cfg(feature = "supervisor")]
     fn test_write_debug() {
         const WRITTEN_SIZE: usize = 100;
         proptest!(|(

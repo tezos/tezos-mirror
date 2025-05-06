@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-pub mod address_translation;
 pub mod block_cache;
 mod cache_layouts;
 pub mod csregisters;
@@ -19,17 +18,11 @@ extern crate proptest;
 
 use std::ops::Bound;
 
-pub use address_translation::AccessType;
-use address_translation::PAGE_SIZE;
-use address_translation::translation_cache::TranslationCache;
-use address_translation::translation_cache::TranslationCacheLayout;
 use block_cache::BlockCache;
 use block_cache::block::Block;
 pub use cache_layouts::CacheLayouts;
 pub use cache_layouts::DefaultCacheLayouts;
 pub use cache_layouts::TestCacheLayouts;
-use csregisters::CSRRepr;
-use csregisters::CSRegister;
 use csregisters::values::CSRValue;
 use hart_state::HartState;
 use hart_state::HartStateLayout;
@@ -39,7 +32,6 @@ use memory::BadMemoryAccess;
 use memory::Memory;
 use memory::MemoryConfig;
 use memory::MemoryGovernanceError;
-use mode::Mode;
 
 use crate::bits::u64;
 use crate::devicetree;
@@ -62,11 +54,7 @@ use crate::traps::Exception;
 
 /// Layout for the machine 'run state' - which contains everything required for the running of
 /// instructions.
-pub type MachineCoreStateLayout<MC> = (
-    HartStateLayout,
-    <MC as MemoryConfig>::Layout,
-    TranslationCacheLayout,
-);
+pub type MachineCoreStateLayout<MC> = (HartStateLayout, <MC as MemoryConfig>::Layout);
 
 /// The part of the machine state required to run (almost all) instructions.
 ///
@@ -78,7 +66,6 @@ pub type MachineCoreStateLayout<MC> = (
 pub struct MachineCoreState<MC: memory::MemoryConfig, M: backend::ManagerBase> {
     pub hart: HartState<M>,
     pub main_memory: MC::State<M>,
-    pub translation_cache: TranslationCache<M>,
 }
 
 impl<MC: memory::MemoryConfig, M: backend::ManagerBase> MachineCoreState<MC, M> {
@@ -136,7 +123,6 @@ impl<MC: memory::MemoryConfig, M: backend::ManagerBase> MachineCoreState<MC, M> 
         Self {
             hart: HartState::bind(space.0),
             main_memory: MC::bind(space.1),
-            translation_cache: TranslationCache::bind(space.2),
         }
     }
 
@@ -148,7 +134,6 @@ impl<MC: memory::MemoryConfig, M: backend::ManagerBase> MachineCoreState<MC, M> 
         (
             self.hart.struct_ref::<F>(),
             MC::struct_ref::<_, F>(&self.main_memory),
-            self.translation_cache.struct_ref::<F>(),
         )
     }
 
@@ -159,7 +144,6 @@ impl<MC: memory::MemoryConfig, M: backend::ManagerBase> MachineCoreState<MC, M> 
     {
         self.hart.reset(memory::FIRST_ADDRESS);
         self.main_memory.reset();
-        self.translation_cache.reset();
     }
 
     /// Advance [`MachineState`] by executing an [`InstrCacheable`].
@@ -182,7 +166,6 @@ impl<MC: memory::MemoryConfig, M: backend::ManagerBase> NewState<M> for MachineC
         Self {
             hart: HartState::new(manager),
             main_memory: NewState::new(manager),
-            translation_cache: TranslationCache::new(manager),
         }
     }
 }
@@ -192,7 +175,6 @@ impl<MC: memory::MemoryConfig, M: backend::ManagerClone> Clone for MachineCoreSt
         Self {
             hart: self.hart.clone(),
             main_memory: self.main_memory.clone(),
-            translation_cache: self.translation_cache.clone(),
         }
     }
 }
@@ -309,52 +291,6 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
         self.block_cache.reset();
     }
 
-    /// Translate an instruction address.
-    #[inline]
-    fn translate_instr_address(
-        &mut self,
-        mode: Mode,
-        satp: CSRRepr,
-        virt_addr: Address,
-    ) -> Result<Address, Exception>
-    where
-        M: backend::ManagerReadWrite,
-    {
-        // Chapter: P:S-ISA-1.9 & P:M-ISA-1.16
-        // If mtval is written with a nonzero value when a
-        // breakpoint, address-misaligned, access-fault, or page-fault exception
-        // occurs on an instruction fetch, load, or store, then mtval will contain the
-        // faulting virtual address.
-
-        let phys_addr = if let Some(phys_addr) = self.core.translation_cache.try_translate(
-            mode,
-            satp,
-            AccessType::Instruction,
-            virt_addr,
-        ) {
-            phys_addr
-        } else {
-            let phys_addr = self.core.translate_with_prefetch(
-                mode,
-                satp,
-                virt_addr,
-                AccessType::Instruction,
-            )?;
-
-            self.core.translation_cache.cache_translation(
-                mode,
-                satp,
-                AccessType::Instruction,
-                virt_addr,
-                phys_addr,
-            );
-
-            phys_addr
-        };
-
-        Ok(phys_addr)
-    }
-
     /// Fetch the 16 bits of an instruction at the given physical address.
     #[inline(always)]
     fn fetch_instr_halfword(&self, phys_addr: Address) -> Result<u16, Exception>
@@ -374,17 +310,11 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
     /// The spec stipulates translation is performed for each byte respectively.
     /// However, we assume the `raw_pc` is 2-byte aligned.
     #[inline]
-    fn fetch_instr(
-        &mut self,
-        mode: Mode,
-        satp: CSRRepr,
-        virt_addr: Address,
-        phys_addr: Address,
-    ) -> Result<Instr, Exception>
+    fn fetch_instr(&mut self, addr: Address) -> Result<Instr, Exception>
     where
         M: backend::ManagerReadWrite,
     {
-        let first_halfword = self.fetch_instr_halfword(phys_addr)?;
+        let first_halfword = self.fetch_instr_halfword(addr)?;
 
         // The reasons to provide the second half in the lambda is
         // because those bytes may be inaccessible or may trigger an exception when read.
@@ -393,31 +323,19 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
             let instr = parse_compressed_instruction(first_halfword);
             if let Instr::Cacheable(instr) = instr {
                 let instr = Instruction::from(&instr);
-                self.block_cache.push_instr_compressed(phys_addr, instr);
+                self.block_cache.push_instr_compressed(addr, instr);
             }
 
             instr
         } else {
-            let upper = {
-                let next_addr = phys_addr + 2;
-
-                // Optimization to skip an extra address translation lookup:
-                // If the last 2 bytes of the instruction are in the same page
-                // as the first 2 bytes, then we already know the translated address
-                let phys_addr = if next_addr % PAGE_SIZE == 0 {
-                    self.translate_instr_address(mode, satp, virt_addr + 2)?
-                } else {
-                    next_addr
-                };
-
-                self.fetch_instr_halfword(phys_addr)?
-            };
+            let next_addr = addr + 2;
+            let upper = self.fetch_instr_halfword(next_addr)?;
 
             let combined = ((upper as u32) << 16) | (first_halfword as u32);
             let instr = parse_uncompressed_instruction(combined);
             if let Instr::Cacheable(instr) = instr {
                 let instr = Instruction::from(&instr);
-                self.block_cache.push_instr_uncompressed(phys_addr, instr);
+                self.block_cache.push_instr_uncompressed(addr, instr);
             }
 
             instr
@@ -481,17 +399,11 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
     }
 
     /// Fetch & run the instruction located at address `instr_pc`
-    fn run_instr_at(
-        &mut self,
-        current_mode: Mode,
-        satp: CSRRepr,
-        instr_pc: Address,
-        phys_addr: Address,
-    ) -> Result<ProgramCounterUpdate<Address>, Exception>
+    fn run_instr_at(&mut self, addr: Address) -> Result<ProgramCounterUpdate<Address>, Exception>
     where
         M: backend::ManagerReadWrite,
     {
-        self.fetch_instr(current_mode, satp, instr_pc, phys_addr)
+        self.fetch_instr(addr)
             .and_then(|instr| self.run_instr(&instr))
     }
 
@@ -520,22 +432,16 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
             .complete_current_block(&mut self.core, steps, max_steps)?;
 
         'run: while *steps < max_steps {
-            let current_mode = self.core.hart.mode.read();
-
             // Obtain the pc for the next instruction to be executed
             let instr_pc = self.core.hart.pc.read();
-            let satp: CSRRepr = self.core.hart.csregisters.read(CSRegister::satp);
 
-            let res = match self.translate_instr_address(current_mode, satp, instr_pc) {
-                Err(e) => Err(e),
-                Ok(phys_addr) => match self.block_cache.get_block(phys_addr) {
-                    Some(mut block) => {
-                        block.run_block(&mut self.core, instr_pc, steps, max_steps)?;
+            let res = match self.block_cache.get_block(instr_pc) {
+                Some(mut block) => {
+                    block.run_block(&mut self.core, instr_pc, steps, max_steps)?;
 
-                        continue 'run;
-                    }
-                    None => self.run_instr_at(current_mode, satp, instr_pc, phys_addr),
-                },
+                    continue 'run;
+                }
+                None => self.run_instr_at(instr_pc),
             };
 
             self.core.handle_step_result(instr_pc, res)?;
@@ -721,7 +627,6 @@ mod tests {
     use crate::default::ConstDefault;
     use crate::machine_state::DefaultCacheLayouts;
     use crate::machine_state::TestCacheLayouts;
-    use crate::machine_state::address_translation::PAGE_SIZE;
     use crate::machine_state::csregisters::CSRRepr;
     use crate::machine_state::csregisters::CSRegister;
     use crate::machine_state::csregisters::xstatus;
@@ -731,6 +636,7 @@ mod tests {
     use crate::machine_state::memory::M4K;
     use crate::machine_state::memory::M8K;
     use crate::machine_state::memory::Memory;
+    use crate::machine_state::memory::PAGE_SIZE;
     use crate::machine_state::mode::Mode;
     use crate::machine_state::registers::NonZeroXRegister;
     use crate::machine_state::registers::a1;
@@ -1047,262 +953,6 @@ mod tests {
         );
     });
 
-    // Test that the machine state does not behave differently when potential ephermeral state is
-    // reset that may impact instruction address translation caching.
-    #[cfg(not(feature = "supervisor"))] // This only makes sense when PTEs have an effect
-    backend_test!(test_instruction_address_cache, F, {
-        use crate::bits::Bits64;
-        use crate::bits::FixedWidthBits;
-        use crate::machine_state::address_translation::pte::PPNField;
-        use crate::machine_state::address_translation::pte::PageTableEntry;
-        use crate::machine_state::csregisters::satp::Satp;
-        use crate::machine_state::csregisters::satp::TranslationAlgorithm;
-        use crate::machine_state::registers::a0;
-        use crate::parser::instruction::CIBNZTypeArgs;
-
-        // Specify the layout in physcal memory.
-        let main_mem_addr = memory::FIRST_ADDRESS;
-        let code0_addr = main_mem_addr;
-        let code1_addr = code0_addr + 4096;
-        let root_page_table_addr = main_mem_addr + 16384;
-
-        // Initially we'll map the instructions to virtual address 4096.
-        let code_virt_addr = 4096;
-
-        // The root page table will be mapped to virtual address 16384.
-        let root_page_table_virt_addr = 16384;
-
-        // We will use Sv39 translation.
-        let satp = Satp::new(
-            FixedWidthBits::from_bits(root_page_table_addr >> 12),
-            FixedWidthBits::from_bits(0),
-            TranslationAlgorithm::Sv39,
-        );
-
-        // Generate the initial page table.
-        let init_page_table = {
-            let mut root_pt = vec![0u8; 4096];
-
-            // Generate the first page table entry which is used to loop back to the root page
-            // table for addresses where vpn[2] = 0 or vpn[1] = 0. This effectively disables
-            // translation for all VPN indices but the first (index 0).
-            let pte = PageTableEntry::new(
-                true,
-                false,
-                false,
-                false,
-                false,
-                true,
-                true,
-                true,
-                crate::bits::ConstantBits,
-                PPNField::from_bits(root_page_table_addr >> 12),
-                crate::bits::ConstantBits,
-                crate::bits::ConstantBits,
-                crate::bits::ConstantBits,
-            );
-            let pte_bytes = pte.to_bits().to_le_bytes();
-            root_pt[..8].copy_from_slice(&pte_bytes);
-
-            // Generate the page table entry for code block. This maps [code_virt_addr] to
-            // [code0_addr] initially.
-            let pte = PageTableEntry::new(
-                true,
-                true,
-                false,
-                true,
-                false,
-                true,
-                true,
-                true,
-                crate::bits::ConstantBits,
-                PPNField::from_bits(code0_addr >> 12),
-                crate::bits::ConstantBits,
-                crate::bits::ConstantBits,
-                crate::bits::ConstantBits,
-            );
-            let vpn = code_virt_addr >> 12;
-            let pte_offset = (8 * vpn) as usize;
-            let pte_bytes = pte.to_bits().to_le_bytes();
-            root_pt[pte_offset..pte_offset + 8].copy_from_slice(&pte_bytes);
-
-            // Generate the page table entry for the page table itself so we can modify it from
-            // user space. Maps [root_page_table_virt_addr] to [root_page_table_addr].
-            let pte = PageTableEntry::new(
-                true,
-                true,
-                true,
-                false,
-                false,
-                true,
-                true,
-                true,
-                crate::bits::ConstantBits,
-                PPNField::from_bits(root_page_table_addr >> 12),
-                crate::bits::ConstantBits,
-                crate::bits::ConstantBits,
-                crate::bits::ConstantBits,
-            );
-            let vpn = root_page_table_virt_addr >> 12;
-            let pte_offset = (8 * vpn) as usize;
-            let pte_bytes = pte.to_bits().to_le_bytes();
-            root_pt[pte_offset..pte_offset + 8].copy_from_slice(&pte_bytes);
-
-            root_pt
-        };
-
-        // Generate a new PTE that will be used to override the root page table at index 1.
-        // It'll effectively remap [code_virt_addr] from [code0_addr] to [code1_addr].
-        let new_pte = PageTableEntry::new(
-            true,
-            true,
-            false,
-            true,
-            false,
-            true,
-            true,
-            true,
-            crate::bits::ConstantBits,
-            PPNField::from_bits(code1_addr >> 12),
-            crate::bits::ConstantBits,
-            crate::bits::ConstantBits,
-            crate::bits::ConstantBits,
-        );
-
-        // Instructions at [code0_addr].
-        let instrs0 = [
-            0x00533423, // sd t0, 8(t1); change the root page table
-            0x4505,     // c.li a0, 1;   "return" 1
-        ]
-        .into_iter()
-        .flat_map(u32::to_le_bytes)
-        .collect::<Vec<_>>();
-        assert_eq!(parse_block(instrs0.as_slice()), [
-            Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
-                rs1: t1,
-                rs2: t0,
-                imm: 8,
-            })),
-            Instr::Cacheable(InstrCacheable::CLi(CIBNZTypeArgs {
-                rd_rs1: nz::a0,
-                imm: 1
-            })),
-            Instr::Cacheable(InstrCacheable::UnknownCompressed { instr: 0 })
-        ]);
-
-        // Instructions at [code1_addr].
-        let instrs1 = [
-            0x00533423, // sd t0, 8(t1); change the root page table
-            0x4509,     // c.li a0, 2;   "return" 2
-        ]
-        .into_iter()
-        .flat_map(u32::to_le_bytes)
-        .collect::<Vec<_>>();
-        assert_eq!(parse_block(instrs1.as_slice()), [
-            Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
-                rs1: t1,
-                rs2: t0,
-                imm: 8,
-            })),
-            Instr::Cacheable(InstrCacheable::CLi(CIBNZTypeArgs {
-                rd_rs1: nz::a0,
-                imm: 2
-            })),
-            Instr::Cacheable(InstrCacheable::UnknownCompressed { instr: 0 })
-        ]);
-
-        type LocalLayout = MachineStateLayout<M1M, TestCacheLayouts>;
-
-        type BlockRunner<F> = Interpreted<M1M, <F as TestBackendFactory>::Manager>;
-
-        type LocalMachineState<F> =
-            MachineState<M1M, TestCacheLayouts, BlockRunner<F>, <F as TestBackendFactory>::Manager>;
-
-        // Configure the state backend.
-        let base_state = {
-            let mut state = MachineState::<M1M, TestCacheLayouts, BlockRunner<F>, _>::new(
-                &mut F::manager(),
-                InterpretedBlockBuilder,
-            );
-            state.reset();
-            state.core.main_memory.set_all_readable_writeable();
-
-            state
-                .core
-                .main_memory
-                .write_all(root_page_table_addr, &init_page_table)
-                .unwrap();
-            state
-                .core
-                .main_memory
-                .write_all(code0_addr, &instrs0)
-                .unwrap();
-            state
-                .core
-                .main_memory
-                .write_all(code1_addr, &instrs1)
-                .unwrap();
-
-            state.core.hart.pc.write(code_virt_addr);
-
-            state.core.hart.mode.write(Mode::User);
-            state.core.hart.csregisters.write(CSRegister::satp, satp);
-
-            state.core.hart.xregisters.write(t0, new_pte.to_bits());
-            state
-                .core
-                .hart
-                .xregisters
-                .write(t1, root_page_table_virt_addr);
-
-            state
-        };
-
-        // Run 2 steps consecutively against one backend.
-        let state = {
-            let mut state: LocalMachineState<F> = MachineState::bind(
-                copy_via_serde::<LocalLayout, _, _>(&base_state.struct_ref::<FnManagerIdent>()),
-                InterpretedBlockBuilder,
-            );
-
-            state.step().unwrap();
-            state.step().unwrap();
-
-            state
-        };
-
-        // Perform 2 steps separately in another backend by re-binding the state between steps.
-        let alt_state = {
-            let alt_state = {
-                let mut state: LocalMachineState<F> = MachineState::bind(
-                    copy_via_serde::<LocalLayout, _, _>(&base_state.struct_ref::<FnManagerIdent>()),
-                    InterpretedBlockBuilder,
-                );
-                state.step().unwrap();
-                state
-            };
-            {
-                let mut state: LocalMachineState<F> = MachineState::bind(
-                    copy_via_serde::<LocalLayout, _, _>(&alt_state.struct_ref::<FnManagerIdent>()),
-                    InterpretedBlockBuilder,
-                );
-                state.step().unwrap();
-                state
-            }
-        };
-
-        // Both backends should have transitioned to the same state.
-        assert_eq!(state.core.hart.xregisters.read(a0), 1);
-        assert_eq!(
-            state.core.hart.xregisters.read(a0),
-            alt_state.core.hart.xregisters.read(a0)
-        );
-        assert_eq_struct(
-            &state.struct_ref::<FnManagerIdent>(),
-            &alt_state.struct_ref::<FnManagerIdent>(),
-        );
-    });
-
     // Ensure that cloning the machine state does not result in a stack overflow
     backend_test!(test_machine_state_cloneable, F, {
         let state = MachineState::<M1M, DefaultCacheLayouts, Interpreted<M1M, _>, _>::new(
@@ -1341,7 +991,7 @@ mod tests {
 
         // Write the instructions to the beginning of the main memory and point the program
         // counter at the first instruction.
-        let phys_addr = start_ram + PAGE_SIZE - 6;
+        let phys_addr = start_ram + PAGE_SIZE.get() - 6;
 
         state.core.hart.pc.write(phys_addr);
         state.core.hart.mode.write(Mode::Machine);

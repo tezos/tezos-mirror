@@ -4,7 +4,6 @@
 
 mod buddy;
 mod config;
-#[cfg(feature = "supervisor")]
 mod protection;
 mod state;
 
@@ -102,7 +101,6 @@ impl Permissions {
     }
 }
 
-#[cfg(feature = "supervisor")]
 impl TryFrom<XValue> for Permissions {
     type Error = crate::pvm::linux::error::Error;
 
@@ -186,7 +184,6 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         M: ManagerWrite;
 
     /// Protect the pages that belong to the given address range.
-    #[cfg(feature = "supervisor")]
     fn protect_pages(
         &mut self,
         address: Address,
@@ -197,7 +194,6 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         M: ManagerWrite;
 
     /// Allocate pages for the given address range.
-    #[cfg(feature = "supervisor")]
     fn allocate_pages(
         &mut self,
         address_hint: Option<Address>,
@@ -208,7 +204,6 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         M: ManagerReadWrite;
 
     /// Allocate pages for the given address range.
-    #[cfg(feature = "supervisor")]
     fn deallocate_pages(
         &mut self,
         address: Address,
@@ -218,7 +213,6 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         M: ManagerReadWrite;
 
     /// Allocate pages for the given address range and amend the protections for them.
-    #[cfg(feature = "supervisor")]
     fn allocate_and_protect_pages(
         &mut self,
         address_hint: Option<Address>,
@@ -230,7 +224,6 @@ pub trait Memory<M: ManagerBase>: NewState<M> + Sized {
         M: ManagerReadWrite;
 
     /// Free the pages in that address range and make sure the range is no longer accessible.
-    #[cfg(feature = "supervisor")]
     fn deallocate_and_protect_pages(
         &mut self,
         address: Address,

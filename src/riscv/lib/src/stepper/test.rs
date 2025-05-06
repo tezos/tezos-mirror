@@ -25,10 +25,8 @@ use crate::machine_state::TestCacheLayouts;
 use crate::machine_state::block_cache::block::Block;
 use crate::machine_state::block_cache::block::Interpreted;
 use crate::machine_state::memory::M1G;
-#[cfg(feature = "supervisor")]
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
-#[cfg(feature = "supervisor")]
 use crate::machine_state::memory::Permissions;
 use crate::machine_state::mode;
 use crate::program::Program;
@@ -139,7 +137,6 @@ impl<MC: MemoryConfig, B: Block<MC, Owned>> TestStepper<MC, TestCacheLayouts, B>
         // The interpreter needs a program to run.
         let elf_program = Program::<MC>::from_elf(program)?;
 
-        #[cfg(feature = "supervisor")]
         stepper
             .machine_state
             .core
