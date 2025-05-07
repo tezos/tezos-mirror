@@ -189,6 +189,9 @@ Smart Rollup WASM Debugger
 Data Availability Layer (DAL)
 -----------------------------
 
+- Add an option ``--ignore-l1-config-peers`` to run nodes in isolation, without
+  trying to connect to peers provided via L1 config (MR :gl:`!17632`)
+
 DAL node
 ~~~~~~~~
 
