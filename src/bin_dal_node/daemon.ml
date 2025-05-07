@@ -1463,6 +1463,7 @@ let run ~data_dir ~configuration_override =
           profile;
           listen_addr;
           public_addr;
+          ignore_l1_config_peers;
           _;
         } as config) =
     let*! result = Configuration_file.load ~data_dir in
@@ -1477,16 +1478,20 @@ let run ~data_dir ~configuration_override =
   in
   let*! () = Event.emit_configuration_loaded () in
   let cctxt = Rpc_context.make endpoint in
-  let* dal_config = fetch_dal_config cctxt in
   let* network_name = infer_dal_network_name cctxt in
-  let initial_peers_names = points @ dal_config.bootstrap_peers in
+  let* initial_peers_names =
+    if ignore_l1_config_peers then return points
+    else
+      let* dal_config = fetch_dal_config cctxt in
+      return @@ points @ dal_config.bootstrap_peers
+  in
   let*! () =
-    if initial_peers_names = [] then Event.emit_config_error_no_bootstrap ()
+    if initial_peers_names = [] && not ignore_l1_config_peers then
+      Event.emit_config_error_no_bootstrap ()
     else Lwt.return_unit
   in
-  (* Resolve:
-     - [points] from DAL node config file and CLI.
-     - [dal_config.bootstrap_peers] from the L1 network config.
+  (* Resolve [initial_peers_names] from DAL node config file and CLI, and
+     possibly from the L1 network config, if ignore_l1_config_peers is unset.
      Re-resolve every bootstrap_dns_refresh_delay = 5 minutes. *)
   let* get_initial_points =
     let* current_points = resolve initial_peers_names in

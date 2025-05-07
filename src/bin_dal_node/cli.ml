@@ -140,6 +140,11 @@ module Term = struct
       & opt (some endpoint_arg) None
       & info ~docs ~doc ~docv:"URI" ["endpoint"; "E"])
 
+  let ignore_l1_config_peers =
+    let open Cmdliner in
+    let doc = "Ignore the boot(strap) peers provided by L1 config." in
+    Arg.(value & flag & info ~docs ~doc ["ignore-l1-config-peers"])
+
   let attester_profile_printer = Signature.Public_key_hash.pp
 
   let producer_profile_printer = Format.pp_print_int
@@ -365,7 +370,7 @@ module Term = struct
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
        $ operator_profile $ observer_profile $ bootstrap_profile $ peers
        $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
-       $ verbose))
+       $ verbose $ ignore_l1_config_peers))
 end
 
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
@@ -524,12 +529,14 @@ type options = {
   experimental_features : experimental_features;
   fetch_trusted_setup : bool option;
   verbose : bool;
+  ignore_l1_config_peers : bool;
 }
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint metrics_addr attesters operators observers bootstrap_flag peers
-      history_mode service_name service_namespace fetch_trusted_setup verbose =
+      history_mode service_name service_namespace fetch_trusted_setup verbose
+      ignore_l1_config_peers =
     let run profile =
       run
         subcommand
@@ -549,6 +556,7 @@ let make ~run =
           experimental_features = ();
           fetch_trusted_setup;
           verbose;
+          ignore_l1_config_peers;
         }
     in
     let profile =

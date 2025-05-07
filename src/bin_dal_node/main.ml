@@ -43,6 +43,7 @@ let merge
         experimental_features;
         fetch_trusted_setup;
         verbose;
+        ignore_l1_config_peers;
       } configuration =
   let profile =
     match profile with
@@ -81,6 +82,8 @@ let merge
         experimental_features
         configuration.experimental_features;
     verbose = configuration.verbose || verbose;
+    ignore_l1_config_peers =
+      configuration.ignore_l1_config_peers || ignore_l1_config_peers;
   }
 
 let wrap_with_error main_promise =
