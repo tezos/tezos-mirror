@@ -9,12 +9,9 @@ use crate::default::ConstDefault;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
 use crate::machine_state::registers::nz;
-use crate::machine_state::registers::sp;
-use crate::machine_state::registers::x0;
 use crate::parser::XRegisterParsed;
 use crate::parser::instruction::CIBTypeArgs;
 use crate::parser::instruction::CRTypeArgs;
-use crate::parser::instruction::CSSTypeArgs;
 use crate::parser::instruction::ITypeArgs;
 use crate::parser::instruction::InstrWidth;
 use crate::parser::instruction::NonZeroRdITypeArgs;
@@ -819,29 +816,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sd`].
-    pub(crate) fn new_sd(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
-        Self {
-            opcode: OpCode::Sd,
-            args: Args {
-                rs1: rs1.into(),
-                rs2: rs2.into(),
-                imm,
-                width,
-                ..Args::DEFAULT
-            },
-        }
-    }
-
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sdnz`].
-    pub(crate) fn new_sdnz(
-        rs1: NonZeroXRegister,
-        rs2: NonZeroXRegister,
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64Store`].
+    pub(crate) fn new_x64_store(
+        rs1: XRegister,
+        rs2: XRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Sdnz,
+            opcode: OpCode::X64Store,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -890,29 +873,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sw`].
-    pub(crate) fn new_sw(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
-        Self {
-            opcode: OpCode::Sw,
-            args: Args {
-                rs1: rs1.into(),
-                rs2: rs2.into(),
-                imm,
-                width,
-                ..Args::DEFAULT
-            },
-        }
-    }
-
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Swnz`].
-    pub(crate) fn new_swnz(
-        rs1: NonZeroXRegister,
-        rs2: NonZeroXRegister,
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32Store`].
+    pub(crate) fn new_x32_store(
+        rs1: XRegister,
+        rs2: XRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Swnz,
+            opcode: OpCode::X32Store,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -961,29 +930,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sh`].
-    pub(crate) fn new_sh(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
-        Self {
-            opcode: OpCode::Sh,
-            args: Args {
-                rs1: rs1.into(),
-                rs2: rs2.into(),
-                imm,
-                width,
-                ..Args::DEFAULT
-            },
-        }
-    }
-
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Shnz`].
-    pub(crate) fn new_shnz(
-        rs1: NonZeroXRegister,
-        rs2: NonZeroXRegister,
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X16Store`].
+    pub(crate) fn new_x16_store(
+        rs1: XRegister,
+        rs2: XRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Shnz,
+            opcode: OpCode::X16Store,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -1032,29 +987,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sb`].
-    pub(crate) fn new_sb(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
-        Self {
-            opcode: OpCode::Sb,
-            args: Args {
-                rs1: rs1.into(),
-                rs2: rs2.into(),
-                imm,
-                width,
-                ..Args::DEFAULT
-            },
-        }
-    }
-
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sbnz`].
-    pub(crate) fn new_sbnz(
-        rs1: NonZeroXRegister,
-        rs2: NonZeroXRegister,
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X8Store`].
+    pub(crate) fn new_x8_store(
+        rs1: XRegister,
+        rs2: XRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Sbnz,
+            opcode: OpCode::X8Store,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -1814,82 +1755,6 @@ impl Instruction {
             (X::NonZero(rd), X::NonZero(rs1), imm) => {
                 Instruction::new_jalr_imm(rd, rs1, imm, InstrWidth::Uncompressed)
             }
-        }
-    }
-
-    /// Convert [`InstrCacheable::Sd`] according to whether registers are non-zero.
-    ///
-    /// [`InstrCacheable::Sd`]: crate::parser::instruction::InstrCacheable::Sd
-    pub(super) fn from_ic_sd(args: &SBTypeArgs) -> Instruction {
-        use XRegisterParsed as X;
-        match (split_x0(args.rs1), split_x0(args.rs2)) {
-            (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_sdnz(rs1, rs2, args.imm, InstrWidth::Uncompressed)
-            }
-            _ => Instruction::new_sd(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
-        }
-    }
-
-    /// Convert [`InstrCacheable::CSdsp`] according to whether register is non-zero.
-    ///
-    /// [`InstrCacheable::CSdsp`]: crate::parser::instruction::InstrCacheable::CSdsp
-    pub(super) fn from_ic_csdsp(args: &CSSTypeArgs) -> Instruction {
-        use XRegisterParsed as X;
-        debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
-        match split_x0(args.rs2) {
-            X::NonZero(rs2) => Instruction::new_sdnz(nz::sp, rs2, args.imm, InstrWidth::Compressed),
-            X::X0 => Instruction::new_sd(sp, x0, args.imm, InstrWidth::Compressed),
-        }
-    }
-
-    /// Convert [`InstrCacheable::Sw`] according to whether registers are non-zero.
-    ///
-    /// [`InstrCacheable::Sw`]: crate::parser::instruction::InstrCacheable::Sw
-    pub(super) fn from_ic_sw(args: &SBTypeArgs) -> Instruction {
-        use XRegisterParsed as X;
-        match (split_x0(args.rs1), split_x0(args.rs2)) {
-            (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_swnz(rs1, rs2, args.imm, InstrWidth::Uncompressed)
-            }
-            _ => Instruction::new_sw(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
-        }
-    }
-
-    /// Convert [`InstrCacheable::CSwsp`] according to whether register is non-zero.
-    ///
-    /// [`InstrCacheable::CSwsp`]: crate::parser::instruction::InstrCacheable::CSwsp
-    pub(super) fn from_ic_cswsp(args: &CSSTypeArgs) -> Instruction {
-        use XRegisterParsed as X;
-        debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
-        match split_x0(args.rs2) {
-            X::NonZero(rs2) => Instruction::new_swnz(nz::sp, rs2, args.imm, InstrWidth::Compressed),
-            X::X0 => Instruction::new_sw(sp, x0, args.imm, InstrWidth::Compressed),
-        }
-    }
-
-    /// Convert [`InstrCacheable::Sh`] according to whether registers are non-zero.
-    ///
-    /// [`InstrCacheable::Sh`]: crate::parser::instruction::InstrCacheable::Sh
-    pub(super) fn from_ic_sh(args: &SBTypeArgs) -> Instruction {
-        use XRegisterParsed as X;
-        match (split_x0(args.rs1), split_x0(args.rs2)) {
-            (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_shnz(rs1, rs2, args.imm, InstrWidth::Uncompressed)
-            }
-            _ => Instruction::new_sh(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
-        }
-    }
-
-    /// Convert [`InstrCacheable::Sb`] according to whether registers are non-zero.
-    ///
-    /// [`InstrCacheable::Sb`]: crate::parser::instruction::InstrCacheable::Sb
-    pub(super) fn from_ic_sb(args: &SBTypeArgs) -> Instruction {
-        use XRegisterParsed as X;
-        match (split_x0(args.rs1), split_x0(args.rs2)) {
-            (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_sbnz(rs1, rs2, args.imm, InstrWidth::Uncompressed)
-            }
-            _ => Instruction::new_sb(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
         }
     }
 

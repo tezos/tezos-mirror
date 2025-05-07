@@ -1963,10 +1963,11 @@ mod tests {
     });
 
     backend_test!(test_store, F, {
-        use crate::machine_state::registers::NonZeroXRegister::*;
+        use crate::machine_state::registers::NonZeroXRegister as NZ;
+        use crate::machine_state::registers::XRegister::*;
 
         type ConstructStoreFn =
-            fn(rs1: NonZeroXRegister, rs2: NonZeroXRegister, imm: i64, width: InstrWidth) -> I;
+            fn(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> I;
 
         const MEMORY_SIZE: u64 = M4K::TOTAL_BYTES as u64;
         const XREG_VALUE: u64 = 0xFFEEDDCCBBAA9988;
@@ -1976,8 +1977,8 @@ mod tests {
 
             ScenarioBuilder::default()
                 .set_instructions(&[
-                    I::new_li(x1, STORE_ADDRESS_BASE as i64, InstrWidth::Compressed),
-                    I::new_li(x2, XREG_VALUE as i64, InstrWidth::Compressed),
+                    I::new_li(NZ::x1, STORE_ADDRESS_BASE as i64, InstrWidth::Compressed),
+                    I::new_li(NZ::x2, XREG_VALUE as i64, InstrWidth::Compressed),
                     constructor(x1, x2, imm as i64, InstrWidth::Uncompressed),
                     I::new_nop(InstrWidth::Compressed),
                 ])
@@ -1997,8 +1998,8 @@ mod tests {
 
             ScenarioBuilder::default()
                 .set_instructions(&[
-                    I::new_li(x1, store_address_base as i64, InstrWidth::Compressed),
-                    I::new_li(x2, XREG_VALUE as i64, InstrWidth::Compressed),
+                    I::new_li(NZ::x1, store_address_base as i64, InstrWidth::Compressed),
+                    I::new_li(NZ::x2, XREG_VALUE as i64, InstrWidth::Compressed),
                     constructor(
                         x1,
                         x2,
@@ -2020,19 +2021,19 @@ mod tests {
         let scenarios: &[Scenario<F>] = &[
             // check stores - differing imm value to ensure both
             // aligned & unaligned stores are supported
-            valid_store(I::new_sdnz, 8, XREG_VALUE),
-            valid_store(I::new_sdnz, 5, XREG_VALUE),
-            valid_store(I::new_swnz, 4, XREG_VALUE as u32 as u64),
-            valid_store(I::new_swnz, 3, XREG_VALUE as u32 as u64),
-            valid_store(I::new_shnz, 2, XREG_VALUE as u16 as u64),
-            valid_store(I::new_shnz, 1, XREG_VALUE as u16 as u64),
+            valid_store(I::new_x64_store, 8, XREG_VALUE),
+            valid_store(I::new_x64_store, 5, XREG_VALUE),
+            valid_store(I::new_x32_store, 4, XREG_VALUE as u32 as u64),
+            valid_store(I::new_x32_store, 3, XREG_VALUE as u32 as u64),
+            valid_store(I::new_x16_store, 2, XREG_VALUE as u16 as u64),
+            valid_store(I::new_x16_store, 1, XREG_VALUE as u16 as u64),
             // byte load always aligned
-            valid_store(I::new_sbnz, 0, XREG_VALUE as u8 as u64),
+            valid_store(I::new_x8_store, 0, XREG_VALUE as u8 as u64),
             // invalid stores: out of bounds
-            invalid_store(I::new_sdnz, LoadStoreWidth::Double),
-            invalid_store(I::new_swnz, LoadStoreWidth::Word),
-            invalid_store(I::new_shnz, LoadStoreWidth::Half),
-            invalid_store(I::new_sbnz, LoadStoreWidth::Byte),
+            invalid_store(I::new_x64_store, LoadStoreWidth::Double),
+            invalid_store(I::new_x32_store, LoadStoreWidth::Word),
+            invalid_store(I::new_x16_store, LoadStoreWidth::Half),
+            invalid_store(I::new_x8_store, LoadStoreWidth::Byte),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

@@ -970,7 +970,7 @@ mod tests {
         );
 
         let uncompressed = Instruction::try_from(TaggedInstruction {
-            opcode: OpCode::Sd,
+            opcode: OpCode::X64Store,
             args: TaggedArgs {
                 rs1: t1.into(),
                 rs2: t0.into(),
@@ -1208,7 +1208,7 @@ mod tests {
         );
 
         let uncompressed = Instruction::try_from(TaggedInstruction {
-            opcode: OpCode::Sd,
+            opcode: OpCode::X64Store,
             args: TaggedArgs {
                 rs1: t1.into(),
                 rs2: t0.into(),
@@ -1249,7 +1249,7 @@ mod tests {
         );
 
         let uncompressed = Instruction::try_from(TaggedInstruction {
-            opcode: OpCode::Sd,
+            opcode: OpCode::X64Store,
             args: TaggedArgs {
                 rs1: t1.into(),
                 rs2: t0.into(),

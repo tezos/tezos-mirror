@@ -240,10 +240,10 @@ pub enum OpCode {
     X64LoadSigned,
 
     // RV64I S-type instructions
-    Sb,
-    Sh,
-    Sw,
-    Sd,
+    X8Store,
+    X16Store,
+    X32Store,
+    X64Store,
 
     // RV64I B-type instructions
     BranchEqual,
@@ -401,14 +401,6 @@ pub enum OpCode {
     JalrAbsolute,
     /// Same as `Jr` but jumps to `val(rs1) + imm`.
     JrImm,
-    /// Same as Sd but only using NonZeroXRegisters.
-    Sdnz,
-    /// Same as Sw but only using NonZeroXRegisters.
-    Swnz,
-    /// Same as `Sh` but only using NonZeroXRegisters.
-    Shnz,
-    /// Same as `Sb` but only using NonZeroXRegisters.
-    Sbnz,
     /// Jump to `pc + imm` if `val(rs2) < 0`.
     BranchLessThanZero,
     /// Jump to `pc + imm` if `val(rs2) >= 0`.
@@ -468,14 +460,10 @@ impl OpCode {
             Self::X16LoadUnsigned => Args::run_x16_load_unsigned,
             Self::X32LoadUnsigned => Args::run_x32_load_unsigned,
             Self::X64LoadSigned => Args::run_x64_load_signed,
-            Self::Sb => Args::run_sb,
-            Self::Sbnz => Args::run_sbnz,
-            Self::Sh => Args::run_sh,
-            Self::Shnz => Args::run_shnz,
-            Self::Sw => Args::run_sw,
-            Self::Swnz => Args::run_swnz,
-            Self::Sd => Args::run_sd,
-            Self::Sdnz => Args::run_sdnz,
+            Self::X8Store => Args::run_x8_store,
+            Self::X16Store => Args::run_x16_store,
+            Self::X32Store => Args::run_x32_store,
+            Self::X64Store => Args::run_x64_store,
             Self::BranchEqual => Args::run_branch_equal,
             Self::BranchNotEqual => Args::run_branch_not_equal,
             Self::BranchLessThanSigned => Args::run_branch_less_than_signed,
@@ -690,10 +678,10 @@ impl OpCode {
             Self::X32ShiftRightImmSigned => Some(Args::run_x32_shift_right_imm_signed),
 
             // Stores
-            Self::Sdnz => Some(Args::run_sdnz),
-            Self::Swnz => Some(Args::run_swnz),
-            Self::Shnz => Some(Args::run_shnz),
-            Self::Sbnz => Some(Args::run_sbnz),
+            Self::X64Store => Some(Args::run_x64_store),
+            Self::X32Store => Some(Args::run_x32_store),
+            Self::X16Store => Some(Args::run_x16_store),
+            Self::X8Store => Some(Args::run_x8_store),
 
             // Loads
             Self::X64LoadSigned => Some(Args::run_x64_load_signed),
@@ -1053,8 +1041,8 @@ macro_rules! impl_store_type {
             let res = load_store::run_store(
                 icb,
                 self.imm,
-                unsafe { self.rs1.nzx },
-                unsafe { self.rs2.nzx },
+                unsafe { self.rs1.x },
+                unsafe { self.rs2.x },
                 $width,
             );
             I::map(res, |_| Next(self.width))
@@ -1393,14 +1381,10 @@ impl Args {
     impl_load_type!(run_x8_load_signed, LoadStoreWidth::Byte, true);
 
     // RV64I S-type instructions
-    impl_store_type!(run_sb);
-    impl_store_type!(run_sh);
-    impl_store_type!(run_sw);
-    impl_store_type!(run_sd);
-    impl_store_type!(run_sdnz, LoadStoreWidth::Double);
-    impl_store_type!(run_swnz, LoadStoreWidth::Word);
-    impl_store_type!(run_shnz, LoadStoreWidth::Half);
-    impl_store_type!(run_sbnz, LoadStoreWidth::Byte);
+    impl_store_type!(run_x64_store, LoadStoreWidth::Double);
+    impl_store_type!(run_x32_store, LoadStoreWidth::Word);
+    impl_store_type!(run_x16_store, LoadStoreWidth::Half);
+    impl_store_type!(run_x8_store, LoadStoreWidth::Byte);
 
     // Branching instructions
     impl_branch!(run_branch_equal, Predicate::Equal);
@@ -1757,10 +1741,18 @@ impl From<&InstrCacheable> for Instruction {
                 InstrWidth::Uncompressed,
             ),
             // RV64I S-type instructions
-            InstrCacheable::Sb(args) => Instruction::from_ic_sb(args),
-            InstrCacheable::Sh(args) => Instruction::from_ic_sh(args),
-            InstrCacheable::Sw(args) => Instruction::from_ic_sw(args),
-            InstrCacheable::Sd(args) => Instruction::from_ic_sd(args),
+            InstrCacheable::Sb(args) => {
+                Instruction::new_x8_store(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed)
+            }
+            InstrCacheable::Sh(args) => {
+                Instruction::new_x16_store(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed)
+            }
+            InstrCacheable::Sw(args) => {
+                Instruction::new_x32_store(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed)
+            }
+            InstrCacheable::Sd(args) => {
+                Instruction::new_x64_store(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed)
+            }
 
             // RV64I B-type instructions
             InstrCacheable::Beq(args) => Instruction::from_ic_beq(args),
@@ -2222,9 +2214,17 @@ impl From<&InstrCacheable> for Instruction {
             }
             InstrCacheable::CSw(args) => {
                 debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
-                Instruction::new_swnz(args.rs1, args.rs2, args.imm, InstrWidth::Compressed)
+                Instruction::new_x32_store(
+                    args.rs1.into(),
+                    args.rs2.into(),
+                    args.imm,
+                    InstrWidth::Compressed,
+                )
             }
-            InstrCacheable::CSwsp(args) => Instruction::from_ic_cswsp(args),
+            InstrCacheable::CSwsp(args) => {
+                debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
+                Instruction::new_x32_store(sp, args.rs2, args.imm, InstrWidth::Compressed)
+            }
             InstrCacheable::CJ(args) => Instruction::new_j(args.imm, InstrWidth::Compressed),
             InstrCacheable::CJr(args) => Instruction::new_jr(args.rs1, InstrWidth::Compressed),
             InstrCacheable::CJalr(args) => {
@@ -2290,9 +2290,17 @@ impl From<&InstrCacheable> for Instruction {
             }
             InstrCacheable::CSd(args) => {
                 debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
-                Instruction::new_sdnz(args.rs1, args.rs2, args.imm, InstrWidth::Compressed)
+                Instruction::new_x64_store(
+                    args.rs1.into(),
+                    args.rs2.into(),
+                    args.imm,
+                    InstrWidth::Compressed,
+                )
             }
-            InstrCacheable::CSdsp(args) => Instruction::from_ic_csdsp(args),
+            InstrCacheable::CSdsp(args) => {
+                debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
+                Instruction::new_x64_store(sp, args.rs2, args.imm, InstrWidth::Compressed)
+            }
             InstrCacheable::CAddiw(args) => Instruction::new_add_word_immediate(
                 args.rd_rs1,
                 args.rd_rs1.into(),
