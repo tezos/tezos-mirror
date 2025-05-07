@@ -147,10 +147,13 @@ let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
             saved_rate = None;
             burn_rewards;
             pending_operations = [];
+            pending_batch = [];
+            source_batch = None;
             pending_slashes = [];
             double_signings = [];
             force_attest_all;
             check_finalized_block;
+            operation_mode = Bake;
           }
       in
       let* () = check_all_balances block state in

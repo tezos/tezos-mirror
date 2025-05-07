@@ -490,10 +490,11 @@ let bake_until_next_cycle_end_but_one : t -> t tzresult Lwt.t =
 (* ======== Operations ======== *)
 
 (** Bake a single block *)
-let next_block =
-  exec (fun input ->
-      Log.info ~color:action_color "[Next block]" ;
-      bake input)
+let next_block_ input =
+  Log.info ~color:action_color "[Next block]" ;
+  bake input
+
+let next_block = exec next_block_
 
 (** Bake a single block with a specific baker *)
 let next_block_with_baker baker =
@@ -512,12 +513,18 @@ let next_cycle = exec next_cycle_
 (** Executes an operation: f should return a new state and a list of operations, which are then applied *)
 let exec_op f =
   let open Lwt_result_syntax in
-  Action
-    (fun ((block, _state) as input) ->
+  exec (fun ((block, _state) as input) ->
       let* state, ops = f input in
-      let state = State.add_pending_operations ops state in
-      return (block, state))
-  --> next_block
+      match state.operation_mode with
+      | Bake ->
+          let state = State.add_pending_operations ops state in
+          next_block_ (block, state)
+      | Wait ->
+          let state = State.add_pending_operations ops state in
+          return (block, state)
+      | Batch ->
+          let state = State.add_pending_batch ops state in
+          return (block, state))
 
 (** Waiting functions *)
 let wait_n_cycles n = loop n next_cycle
