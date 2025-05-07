@@ -228,6 +228,29 @@ let nth_block read ~full_transaction_object n =
     ~full_transaction_object
     ~number:Durable_storage_path.Block.(Nth n)
 
+let tez_nth_block read n =
+  let open Lwt_result_syntax in
+  let number = Durable_storage_path.Block.(Nth n) in
+  let* (Ethereum_types.Qty level) = block_number read number in
+  let* block_hash_opt =
+    inspect_durable_and_decode_opt
+      read
+      (Durable_storage_path.Indexes.block_by_number (Nth level))
+      decode_block_hash
+  in
+  match block_hash_opt with
+  | None -> failwith "Block %a not found" Z.pp_print level
+  | Some block_hash -> (
+      let* block_opt =
+        inspect_durable_and_decode_opt
+          read
+          (Durable_storage_path.Block.by_hash block_hash)
+          L2_types.Tezos_block.block_from_binary
+      in
+      match block_opt with
+      | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
+      | Some block -> return block)
+
 let nth_block_hash read n =
   let number = Durable_storage_path.Block.(Nth n) in
   inspect_durable_and_decode_opt
@@ -539,6 +562,11 @@ module Make_block_storage (Reader : READER) = struct
     let* read = read_with_state () in
     let+ block = nth_block read ~full_transaction_object n in
     Transaction_object.block_from_legacy block
+
+  let tez_nth_block n =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    tez_nth_block read n
 
   let block_by_hash ~full_transaction_object block_hash =
     let open Lwt_result_syntax in

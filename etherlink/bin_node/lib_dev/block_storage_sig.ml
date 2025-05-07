@@ -21,6 +21,10 @@ module type S = sig
     Z.t ->
     Transaction_object.t Ethereum_types.block tzresult Lwt.t
 
+  (** [tez_nth_block n] returns the [n]th processed and stored tez block.
+    *)
+  val tez_nth_block : Z.t -> L2_types.Tezos_block.t tzresult Lwt.t
+
   (** [block_by_hash ~full_transaction_object hash] returns the block with the
       given [hash].
 

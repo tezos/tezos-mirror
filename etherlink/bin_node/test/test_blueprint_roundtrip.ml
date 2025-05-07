@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Bin_evm_node
-    Invocation:   dune exec etherlink/bin_evm_node/test/test_ethbloom.exe
+    Invocation:   dune exec etherlink/bin_node/test/test_blueprint_roundtrip.exe
     Subject:      Tests for Blueprints producer and decoder
 *)
 
@@ -51,7 +51,8 @@ let sequencer_key =
           "unencrypted:edsk4AHKqBSzpkmZ39EMBJ2Tm1SHu6JUYTnp5vApYPR6cvr9iqbELa")
 
 let zero_hash =
-  Evm_node_lib_dev_encoding.Ethereum_types.block_hash_of_string "0x000000"
+  Evm_node_lib_dev_encoding.Ethereum_types.decode_block_hash
+  @@ Bytes.make 32 '\000'
 
 let smart_rollup_address =
   Tezos_crypto.Hashed.Smart_rollup_address.(zero |> to_string)
@@ -75,6 +76,21 @@ let make_blueprint ~delayed_transactions ~transactions =
   in
   return blueprint
 
+let make_tez_block ~number ~timestamp ~parent_hash () =
+  let block_without_hash =
+    L2_types.Tezos_block.{number; hash = zero_hash; timestamp; parent_hash}
+  in
+  let block_bytes =
+    Bytes.of_string
+    @@ expect_ok "could not encode the tez block"
+    @@ L2_types.Tezos_block.encode_block block_without_hash
+  in
+  let block_hash = Block_hash.hash_bytes [block_bytes] in
+  let hash =
+    Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
+  in
+  return L2_types.Tezos_block.{number; hash; timestamp; parent_hash}
+
 let test_blueprint_roundtrip ~title ~delayed_transactions ~transactions () =
   register ~title:(sf "Blueprint producer decoder roundtrip (%s)" title)
   @@ fun () ->
@@ -97,6 +113,40 @@ let test_blueprint_roundtrip ~title ~delayed_transactions ~transactions () =
     (transactions_decoded = transactions)
       (list string)
       ~error_msg:"Wrong decoded of delayed transactions: got %L instead of %R") ;
+  unit
+
+let test_tez_block_roundtrip ~title ~number ~timestamp ~parent_hash () =
+  register ~title:(sf "Tez block producer decoder roundtrip (%s)" title)
+  @@ fun () ->
+  let* block = make_tez_block ~number ~timestamp ~parent_hash () in
+  let encoding_result =
+    expect_ok "could not encode the tez block"
+    @@ L2_types.Tezos_block.encode_block block
+  in
+  let decoding_result =
+    expect_ok "could not decode the tez block"
+    @@ L2_types.Tezos_block.decode_block encoding_result
+  in
+  Check.(
+    (Z.to_int @@ Ethereum_types.Qty.to_z decoding_result.number
+    = Z.to_int @@ Ethereum_types.Qty.to_z block.number)
+      int
+      ~error_msg:"Wrong decoded of number for block: got %L instead of %R") ;
+  Check.(
+    (Z.to_int @@ Ethereum_types.Qty.to_z decoding_result.timestamp
+    = Z.to_int @@ Ethereum_types.Qty.to_z block.timestamp)
+      int
+      ~error_msg:"Wrong decoded of timestamp for block: got %L instead of %R") ;
+  Check.(
+    (Ethereum_types.block_hash_to_bytes decoding_result.parent_hash
+    = Ethereum_types.block_hash_to_bytes block.parent_hash)
+      string
+      ~error_msg:"Wrong decoded of parent_hash for block: got %L instead of %R") ;
+  Check.(
+    (Ethereum_types.block_hash_to_bytes decoding_result.hash
+    = Ethereum_types.block_hash_to_bytes block.hash)
+      string
+      ~error_msg:"Wrong decoded of hash for block: got %L instead of %R") ;
   unit
 
 let () =
@@ -132,6 +182,20 @@ let () =
     ~title:"large transaction"
     ~delayed_transactions:[Ethereum_types.hash_raw_tx "txntxntxntxn"]
     ~transactions:["txntxntxn"; "txntxntxntxn"; String.make 10_000 't']
+    () ;
+
+  test_tez_block_roundtrip
+    ~title:"all zeros tez block"
+    ~number:(Qty Z.zero)
+    ~timestamp:(Qty Z.zero)
+    ~parent_hash:zero_hash
+    () ;
+
+  test_tez_block_roundtrip
+    ~title:"genesis successor"
+    ~number:(Qty Z.one)
+    ~timestamp:(Qty Z.one)
+    ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
     ()
 
 let () = Test.run ()

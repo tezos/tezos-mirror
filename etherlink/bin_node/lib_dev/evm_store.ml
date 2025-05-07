@@ -275,6 +275,12 @@ module Q = struct
                  bytes)))
       string
 
+  let tezos_block =
+    custom
+      ~encode:L2_types.Tezos_block.encode_block
+      ~decode:L2_types.Tezos_block.decode_block
+      string
+
   let timestamp =
     custom
       ~encode:(fun t -> Ok (Time.Protocol.to_seconds t))
@@ -725,8 +731,16 @@ DO UPDATE SET value = excluded.value
       (t3 level block_hash block ->. unit)
       @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
 
+    let tez_insert =
+      (t3 level block_hash tezos_block ->. unit)
+      @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
+
     let select_with_level =
       (level ->? block) @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+
+    let tez_select_with_level =
+      (level ->? tezos_block)
+      @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
 
     let select_with_hash =
       (block_hash ->? block)
@@ -1402,6 +1416,10 @@ module Blocks = struct
     with_connection store @@ fun conn ->
     Db.exec conn Q.Blocks.insert (block.number, block.hash, block)
 
+  let tez_store store (block : L2_types.Tezos_block.t) =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Blocks.tez_insert (block.number, block.hash, block)
+
   let block_with_objects store block =
     let open Lwt_result_syntax in
     let* rows =
@@ -1457,6 +1475,14 @@ module Blocks = struct
     if full_transaction_object then
       Option.map_es (block_with_objects store) block_opt
     else return (Option.map Transaction_object.block_from_legacy block_opt)
+
+  let tez_find_with_level store level =
+    let open Lwt_result_syntax in
+    let* block_opt =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Blocks.tez_select_with_level level
+    in
+    return block_opt
 
   let find_with_hash ~full_transaction_object store hash =
     let open Lwt_result_syntax in

@@ -499,6 +499,16 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           | None -> failwith "Block %a not found" Z.pp_print level
           | Some block -> return block
 
+        let tez_nth_block level =
+          let open Lwt_result_syntax in
+          Evm_store.use ctxt.store @@ fun conn ->
+          let* block_opt =
+            Evm_store.Blocks.tez_find_with_level conn (Qty level)
+          in
+          match block_opt with
+          | None -> failwith "Block %a not found" Z.pp_print level
+          | Some block -> return block
+
         let block_by_hash ~full_transaction_object hash =
           let open Lwt_result_syntax in
           Evm_store.use ctxt.store @@ fun conn ->
@@ -571,6 +581,11 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
             (* [full_transaction_object] being false, we just return hashes, no
                need to try to reconstruct the transaction objects. *)
             return block
+
+        let tez_nth_block level =
+          let open Lwt_result_syntax in
+          let* block = Block_storage.tez_nth_block level in
+          return block
 
         let block_by_hash ~full_transaction_object hash =
           let open Lwt_result_syntax in

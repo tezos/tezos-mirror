@@ -45,7 +45,7 @@ module Chain_family : sig
 end
 
 module Tezos_block : sig
-  type block = {
+  type t = {
     number : Ethereum_types.quantity;
     hash : Ethereum_types.block_hash;
     timestamp : Ethereum_types.quantity;
@@ -56,10 +56,14 @@ module Tezos_block : sig
 
   val genesis_parent_hash : Ethereum_types.block_hash
 
-  val block_from_binary : bytes -> block
+  val block_from_binary : bytes -> t
+
+  val encode_block : t -> (string, string) result
+
+  val decode_block : string -> (t, string) result
 end
 
-type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.block
+type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.t
 
 val block_hash : 'a block -> Ethereum_types.block_hash
 

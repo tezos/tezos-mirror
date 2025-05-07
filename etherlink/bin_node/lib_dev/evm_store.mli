@@ -132,6 +132,8 @@ module Blocks : sig
     Ethereum_types.legacy_transaction_object Ethereum_types.block ->
     unit tzresult Lwt.t
 
+  val tez_store : conn -> L2_types.Tezos_block.t -> unit tzresult Lwt.t
+
   (** [find_with_level ~full_transaction_object conn level] returns the block
       if it's present in the storage. If [full_transaction_object] is set to true,
       it will also retrieve the transactions objects part of the block. *)
@@ -140,6 +142,13 @@ module Blocks : sig
     conn ->
     Ethereum_types.quantity ->
     Transaction_object.t Ethereum_types.block option tzresult Lwt.t
+
+  (** [tez_find_with_level conn level] returns the block of level [level]
+      if it's present in the storage. *)
+  val tez_find_with_level :
+    conn ->
+    Ethereum_types.quantity ->
+    L2_types.Tezos_block.t option tzresult Lwt.t
 
   (** Same as {!find_with_level} but finds with the block hash instead of block
       number. *)

@@ -242,6 +242,8 @@ let encode_hex (Hex hex) = Hex.to_bytes_exn (`Hex hex)
 
 let decode_block_hash bytes = Block_hash (decode_hex bytes)
 
+let encode_block_hash (Block_hash hash) = encode_hex hash
+
 let decode_address bytes = Address (decode_hex bytes)
 
 let encode_address (Address address) = encode_hex address
