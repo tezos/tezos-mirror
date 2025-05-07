@@ -26,12 +26,20 @@ use crate::cli::CommonOptions;
 use crate::cli::RunOptions;
 
 /// Inner execution strategy for blocks.
-#[cfg(not(feature = "inline-jit"))]
+#[cfg(not(any(feature = "inline-jit", feature = "outline-jit")))]
 type BlockImplInner = block::Interpreted<M1G, Owned>;
 
 /// Inner execution strategy for blocks.
-#[cfg(feature = "inline-jit")]
+#[cfg(all(feature = "inline-jit", not(feature = "outline-jit")))]
 type BlockImplInner = block::Jitted<octez_riscv::jit::JIT<M1G, Owned>, M1G, Owned>;
+
+/// Inner execution strategy for blocks.
+#[cfg(feature = "outline-jit")]
+type BlockImplInner = block::Jitted<
+    octez_riscv::machine_state::block_cache::block::OutlineCompiler<M1G, Owned>,
+    M1G,
+    Owned,
+>;
 
 /// Executor of blocks
 #[cfg(not(feature = "metrics"))]

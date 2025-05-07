@@ -117,3 +117,45 @@ impl<MC: MemoryConfig, M: JitStateAccess> DispatchCompiler<MC, M> for JIT<MC, M>
         fun
     }
 }
+
+/// JIT compiler for blocks that performs compilation in a
+/// background thread.
+pub struct OutlineCompiler<MC: MemoryConfig, M: JitStateAccess> {
+    jit: JIT<MC, M>,
+}
+
+impl<MC: MemoryConfig, M: JitStateAccess> Default for OutlineCompiler<MC, M> {
+    fn default() -> Self {
+        Self {
+            jit: Default::default(),
+        }
+    }
+}
+
+impl<MC: MemoryConfig, M: JitStateAccess> DispatchCompiler<MC, M> for OutlineCompiler<MC, M> {
+    fn compile(
+        &mut self,
+        target: &mut DispatchTarget<Self, MC, M>,
+        instr: Vec<Instruction>,
+    ) -> DispatchFn<Self, MC, M> {
+        let fun = match self.jit.compile(&instr) {
+            Some(jitfn) => {
+                // Safety: the two function signatures are identical, apart from the first and
+                // last parameters. These are both thin-pointers, and ignored by the JitFn.
+                //
+                // It's therefore safe to cast this function pointer to an identical ABI, where
+                // this first and last parameter are thin-references to any value. This is the
+                // case for both `Jitted` and `Jitted::BlockBuilder` which are both Sized.
+                //
+                // See <https://doc.rust-lang.org/std/primitive.fn.html#abi-compatibility> for more
+                // information on ABI compatability.
+                unsafe { std::mem::transmute::<JitFn<MC, M>, DispatchFn<Self, MC, M>>(jitfn) }
+            }
+            None => Jitted::run_block_not_compiled,
+        };
+
+        target.set(fun);
+
+        fun
+    }
+}

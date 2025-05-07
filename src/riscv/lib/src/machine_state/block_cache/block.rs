@@ -9,6 +9,7 @@ mod dispatch;
 
 use dispatch::DispatchCompiler;
 use dispatch::DispatchTarget;
+pub use dispatch::OutlineCompiler;
 
 use super::CACHE_INSTR;
 use super::ICallPlaced;
