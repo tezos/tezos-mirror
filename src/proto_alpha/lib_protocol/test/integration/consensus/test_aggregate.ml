@@ -686,6 +686,119 @@ let test_empty_committee () =
   let* () = Assert.proto_error ~loc:__LOC__ res empty_aggregation_committee in
   return_unit
 
+let test_metadata_committee_is_correctly_ordered () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  (* Craft an attestations_aggregate including at least 3 delegates *)
+  let* attestations, attestation_committee =
+    let* attesters = Context.get_attesters (B block) in
+    let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
+    let committee =
+      List.map
+        (fun (_slot, (delegate : RPC.Validators.t)) -> delegate.consensus_key)
+        bls_delegates_with_slots
+    in
+    assert (List.length committee > 2) ;
+    let* aggregate = Op.attestations_aggregate ~committee block in
+    return (aggregate, bls_delegates_with_slots)
+  in
+  (* Craft a preattestations_aggregate including at least 3 delegates *)
+  let* preattestations, preattestation_committee =
+    let* block' = Block.bake block in
+    let* attesters = Context.get_attesters (B block') in
+    let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
+    let committee =
+      List.map
+        (fun (_slot, (delegate : RPC.Validators.t)) -> delegate.consensus_key)
+        bls_delegates_with_slots
+    in
+    assert (List.length committee > 2) ;
+    let* aggregate = Op.preattestations_aggregate ~committee block' in
+    return (aggregate, bls_delegates_with_slots)
+  in
+  (* Bake a block including both aggregates *)
+  let* _, (_, receipt) =
+    let round_zero = Alpha_context.Round.zero in
+    Block.bake_with_metadata
+      ~policy:(By_round 1)
+      ~payload_round:(Some round_zero)
+      ~locked_round:(Some round_zero)
+      ~operations:[attestations; preattestations]
+      block
+  in
+  (* [check_committees] checks that the operation committee and the operation
+     result committee coincide *)
+  let check_committees ~loc committee result_committee =
+    let result_committee =
+      List.map
+        (fun (key : Alpha_context.Consensus_key.t) -> key.consensus_pkh)
+        result_committee
+    in
+    let* () =
+      Assert.assert_equal_list
+        ~loc
+        Signature.Public_key_hash.equal
+        "committee"
+        Signature.Public_key_hash.pp
+        committee
+        result_committee
+    in
+    return_unit
+  in
+  (* Check that the attestations_aggregate committees coincide *)
+  let* () =
+    let attestations_aggregate_result =
+      find_attestations_aggregate_result receipt
+    in
+    match (attestations.protocol_data, attestations_aggregate_result) with
+    | ( Operation_data
+          {contents = Single (Attestations_aggregate {committee; _}); _},
+        Attestations_aggregate_result {committee = result_committee; _} ) ->
+        let committee =
+          List.map
+            (fun (slot, _) ->
+              let owner =
+                WithExceptions.Option.get ~loc:__LOC__
+                @@ List.assoc
+                     ~equal:Alpha_context.Slot.equal
+                     slot
+                     attestation_committee
+              in
+              owner.consensus_key)
+            committee
+        in
+        check_committees ~loc:__LOC__ committee result_committee
+    | _ -> assert false
+  in
+  (* Check that the preattestations_aggregate committees coincide *)
+  let* () =
+    let preattestations_aggregate_result =
+      find_preattestations_aggregate_result receipt
+    in
+    match (preattestations.protocol_data, preattestations_aggregate_result) with
+    | ( Operation_data
+          {contents = Single (Preattestations_aggregate {committee; _}); _},
+        Preattestations_aggregate_result {committee = result_committee; _} ) ->
+        let committee =
+          List.map
+            (fun slot ->
+              let owner =
+                WithExceptions.Option.get ~loc:__LOC__
+                @@ List.assoc
+                     ~equal:Alpha_context.Slot.equal
+                     slot
+                     preattestation_committee
+              in
+              owner.consensus_key)
+            committee
+        in
+        check_committees ~loc:__LOC__ committee result_committee
+    | _ -> assert false
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -741,6 +854,10 @@ let tests =
       `Quick
       test_eligible_attestation_must_be_aggregated;
     Tztest.tztest "test_empty_committee" `Quick test_empty_committee;
+    Tztest.tztest
+      "test_metadata_committee_is_correctly_ordered"
+      `Quick
+      test_metadata_committee_is_correctly_ordered;
   ]
 
 let () =
