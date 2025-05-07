@@ -7,7 +7,7 @@
 
 let config name = Format.asprintf "/etc/logrotate.d/%s" name
 
-let write_config ~name ?pidfile ~target_file ~max_rotations agent =
+let write_config ~name ?pidfile ?max_rotations ~target_file agent =
   let open Jingoo in
   let template =
     {|{{ target_file }} {
@@ -23,8 +23,10 @@ let write_config ~name ?pidfile ~target_file ~max_rotations agent =
   compress
 # Runs rotation commands with root user and group permissions  daily
   su root root
+{% if has_max_rotation %}
 # Maximum number of rotations before removing the oldests.
   rotate {{ max_rotation }}
+{% endif %}
 # Send a signal to process in order to reload it
   postrotate
       {% if has_pidfile -%}
@@ -48,7 +50,8 @@ let write_config ~name ?pidfile ~target_file ~max_rotations agent =
         [
           ("target_file", Jg_types.Tstr target_file);
           ("name", Jg_types.Tstr name);
-          ("max_rotation", Jg_types.Tint max_rotations);
+          ("has_max_rotation", Jg_types.Tbool (Option.is_some max_rotations));
+          ("max_rotation", Jg_types.Tint (Option.value ~default:0 max_rotations));
           ("has_pidfile", Jg_types.Tbool (Option.is_some pidfile));
           ("pidfile", Jg_types.Tstr (Option.value ~default:"" pidfile));
         ]

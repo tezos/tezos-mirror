@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [write_config name ?pidfile target_file max_rotations agent] will write a
+(** [write_config name ?pidfile ?max_rotations target_file agent] will write a
     logrotate configuration file for the rotation of [target_file].
     [name] is used to identify a logrotate task and is expected to be the
     executable name generating the logs
@@ -19,8 +19,8 @@
 val write_config :
   name:string ->
   ?pidfile:string ->
+  ?max_rotations:int ->
   target_file:string ->
-  max_rotations:int ->
   Agent.t ->
   unit Lwt.t
 
