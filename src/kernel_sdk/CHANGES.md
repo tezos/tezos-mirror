@@ -33,6 +33,7 @@
 - Disable `testing` as default features of the main `sdk` crate.
 - Change `Runtime::store_value_size` to return `PathNotFound` when the input is the path of a directory.
 - Add support for `MichelsonTimestamp` encoding and decoding.
+- Return a dummy value for `Runtime::reboot_left` on RISC-V, as RISC-V kernels do not need to reboot.
 
 ### Installer client/kernel
 
