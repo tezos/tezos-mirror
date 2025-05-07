@@ -286,7 +286,6 @@ module Consensus : sig
   val operation :
     ?branch:string ->
     ?chain_id:string ->
-    ?with_dal:bool ->
     ?signer_companion:Account.key ->
     signer:Account.key ->
     t ->

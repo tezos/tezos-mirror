@@ -433,8 +433,8 @@ module Consensus = struct
             ("block_payload_hash", Ezjsonm.string consensus.block_payload_hash);
           ]
 
-  let operation ?branch ?chain_id ?(with_dal = false) ?signer_companion ~signer
-      consensus_operation client =
+  let operation ?branch ?chain_id ?signer_companion ~signer consensus_operation
+      client =
     let json = `A [json consensus_operation] in
     let* branch =
       match branch with
@@ -449,7 +449,8 @@ module Consensus = struct
     let kind =
       match consensus_operation with
       | CPreattestation _ -> Preattestation
-      | CAttestation _ ->
+      | CAttestation {dal; _} ->
+          let with_dal = Option.is_some dal in
           Attestation {with_dal; companion_key = signer_companion}
     in
     return (make ~branch ~signer ~kind:(Consensus {kind; chain_id}) json)
