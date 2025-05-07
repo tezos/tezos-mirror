@@ -220,7 +220,7 @@ fn retrieve_block_fees<Host: Runtime>(
     Ok(block_fees)
 }
 
-pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
 
     // We always start by doing the migration if needed.
@@ -404,7 +404,7 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
         );
     }
 
-    match main(&mut host) {
+    match run(&mut host) {
         Ok(()) => (),
         Err(err) => {
             log!(&mut host, Fatal, "The kernel produced an error: {:?}", err);
@@ -417,8 +417,8 @@ mod tests {
     use std::str::FromStr;
 
     use crate::fees;
-    use crate::main;
     use crate::parsing::RollupType;
+    use crate::run;
     use crate::storage::{
         read_transaction_receipt_status, store_chain_id, ENABLE_FA_BRIDGE,
     };
@@ -600,8 +600,8 @@ mod tests {
         host.host.add_external(message);
 
         // run kernel twice to get to the stage with block creation:
-        main(&mut host).expect("Kernel error");
-        main(&mut host).expect("Kernel error");
+        run(&mut host).expect("Kernel error");
+        run(&mut host).expect("Kernel error");
 
         // verify outbox is not empty
         let outbox = host.host.outbox_at(level + 1);
@@ -686,9 +686,9 @@ mod tests {
         mock_host.host.add_transfer(payload, &metadata);
 
         // run kernel
-        main(&mut mock_host).expect("Kernel error");
+        run(&mut mock_host).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [1]
-        main(&mut mock_host).expect("Kernel error");
+        run(&mut mock_host).expect("Kernel error");
 
         // reconstruct ticket
         let ticket = FA2_1Ticket::new(
@@ -829,9 +829,9 @@ mod tests {
         mock_host.host.add_external(message);
 
         // run kernel
-        main(&mut mock_host).expect("Kernel error");
+        run(&mut mock_host).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [2]
-        main(&mut mock_host).expect("Kernel error");
+        run(&mut mock_host).expect("Kernel error");
 
         mock_host.host.outbox_at(level + 1)
     }

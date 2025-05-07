@@ -9,6 +9,7 @@ use tezos_smart_rollup_host::{path::Path, runtime::RuntimeError, Error};
 
 const STORE_HASH_SIZE: usize = 32;
 
+#[cfg(not(target_arch = "riscv64"))]
 #[link(wasm_import_module = "smart_rollup_core")]
 extern "C" {
     pub fn __internal_store_get_hash(
@@ -17,6 +18,27 @@ extern "C" {
         dst: *mut u8,
         max_size: usize,
     ) -> i32;
+}
+
+// The RISC-V PVM does not have a `storage_get_hash` host function.
+// To enable compilation to RISC-V, this stand in implementation
+// deterministically returns dummy hash values.
+#[cfg(target_arch = "riscv64")]
+pub unsafe extern "C" fn __internal_store_get_hash(
+    _path: *const u8,
+    _path_len: usize,
+    _dst: *mut u8,
+    _max_size: usize,
+) -> i32 {
+    thread_local! {
+        static COUNTER: std::cell::Cell<i32> = std::cell::Cell::new(0);
+    }
+
+    COUNTER.with(|counter| {
+        let count = counter.get();
+        counter.set(count.wrapping_add(1));
+        count
+    })
 }
 
 pub trait InternalRuntime {
