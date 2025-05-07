@@ -49,10 +49,13 @@ val network : command:string -> network_name:string -> Process.t
 
 (** [run] is an alias for [docker run]. *)
 val run :
+  ?runner:Runner.t ->
   ?rm:bool ->
   ?name:string ->
+  ?detach:bool ->
   ?network:string ->
   ?publish_ports:string * string * string * string ->
+  ?volumes:(string * string) list ->
   string ->
   string list ->
   Process.t
@@ -61,7 +64,7 @@ val run :
 val kill : string -> Process.t
 
 (** [rm] is an alias for [docker rm]. *)
-val rm : string -> Process.t
+val rm : ?runner:Runner.t -> ?force:bool -> string -> Process.t
 
 (** [cp] is an alias for [docker cp]. *)
 val cp :
