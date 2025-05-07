@@ -286,6 +286,23 @@ let build_block_static_directory ~l2_chain_id
            Tezlink_mock.Operation_metadata.operation_metadata op
          in
          return (op, mock_result))
+  |> register
+       ~service:Tezos_services.preapply_operations
+       ~impl:(fun {block; chain} param ops ->
+         let*? _chain = check_chain chain in
+         let*? _block = check_block block in
+         let*? receipts =
+           List.map_e
+             (fun (op : Alpha_context.packed_operation) ->
+               let open Result_syntax in
+               let op = op.protocol_data in
+               let* mock_result =
+                 Tezlink_mock.Operation_metadata.operation_metadata op
+               in
+               return (op, mock_result))
+             ops
+         in
+         Lwt_result_syntax.return (param#version, receipts))
 
 let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
     (module Block_header : HEADER) base_dir =
