@@ -2386,7 +2386,7 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
   match mode with
   | Application _ | Full_construction _ ->
       let slot_map = Consensus.allowed_attestations ctxt in
-      let*? ctxt, committee, consensus_power =
+      let*? ctxt, rev_committee, consensus_power =
         let open Result_syntax in
         List.fold_left_e
           (fun (ctxt, consensus_keys, consensus_power) (slot, dal) ->
@@ -2404,7 +2404,11 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
       in
       let result =
         Attestations_aggregate_result
-          {balance_updates = []; committee; consensus_power}
+          {
+            balance_updates = [];
+            committee = List.rev rev_committee;
+            consensus_power;
+          }
       in
       return (ctxt, Single_result result)
   | Partial_construction _ ->
@@ -2430,7 +2434,7 @@ let record_preattestations_aggregate ctxt (mode : mode)
       in
       let slot_map = Consensus.allowed_preattestations ctxt in
       (* Accumulate the list of delegates and the total attesting power *)
-      let*? ctxt, committee, consensus_power =
+      let*? ctxt, rev_committee, consensus_power =
         let open Result_syntax in
         List.fold_left_e
           (fun (ctxt, consensus_keys, consensus_power) slot ->
@@ -2451,7 +2455,11 @@ let record_preattestations_aggregate ctxt (mode : mode)
       in
       let result =
         Preattestations_aggregate_result
-          {balance_updates = []; committee; consensus_power}
+          {
+            balance_updates = [];
+            committee = List.rev rev_committee;
+            consensus_power;
+          }
       in
       return (ctxt, Single_result result)
   | Partial_construction _ ->

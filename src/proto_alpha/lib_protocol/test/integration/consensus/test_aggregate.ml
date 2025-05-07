@@ -212,11 +212,13 @@ let find_attester_with_non_bls_key =
       | (Ed25519 _ | Secp256k1 _ | P256 _), slot :: _ -> Some (attester, slot)
       | _ -> None)
 
-(* [filter_attesters_with_bls_key attesters] filter attesters with BLS keys. *)
+(* [filter_attesters_with_bls_key attesters] filters attesters with a BLS
+   consensus key and at least one slot, returning a list of
+   (minimal slot, attester) pairs. *)
 let filter_attesters_with_bls_key =
   List.filter_map (fun (attester : RPC.Validators.t) ->
       match (attester.consensus_key, attester.slots) with
-      | Bls _, slot :: _ -> Some (attester, slot)
+      | Bls _, slot :: _ -> Some (slot, attester)
       | _ -> None)
 
 let test_aggregate_feature_flag_enabled () =
@@ -311,7 +313,7 @@ let test_attestations_aggregate_with_multiple_delegates () =
   let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
   let* attestations =
     List.map_es
-      (fun (delegate, slot) ->
+      (fun (slot, delegate) ->
         Op.raw_attestation
           ~delegate:delegate.RPC.Validators.delegate
           ~slot
@@ -325,7 +327,7 @@ let test_attestations_aggregate_with_multiple_delegates () =
     Block.bake_with_metadata ~operation:aggregation block
   in
   let result = find_attestations_aggregate_result receipt in
-  let delegates = List.map fst bls_delegates_with_slots in
+  let delegates = List.map snd bls_delegates_with_slots in
   check_attestations_aggregate_result ~committee:delegates result
 
 let test_preattestations_aggregate_with_multiple_delegates () =
@@ -339,7 +341,7 @@ let test_preattestations_aggregate_with_multiple_delegates () =
   let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
   let* preattestations =
     List.map_es
-      (fun (delegate, slot) ->
+      (fun (slot, delegate) ->
         Op.raw_preattestation
           ~delegate:delegate.RPC.Validators.delegate
           ~slot
@@ -361,7 +363,7 @@ let test_preattestations_aggregate_with_multiple_delegates () =
       block
   in
   let result = find_preattestations_aggregate_result receipt in
-  let delegates = List.map fst bls_delegates_with_slots in
+  let delegates = List.map snd bls_delegates_with_slots in
   check_preattestations_aggregate_result ~committee:delegates result
 
 let test_attestations_aggregate_invalid_signature () =
@@ -537,7 +539,7 @@ let test_multiple_aggregates_per_block_forbidden () =
   (* Craft one attestations_aggregate per attester *)
   let* aggregates =
     List.map_es
-      (fun ((delegate : RPC.Validators.t), _) ->
+      (fun (_, (delegate : RPC.Validators.t)) ->
         Op.attestations_aggregate ~committee:[delegate.consensus_key] block)
       bls_delegates_with_slots
   in
@@ -554,7 +556,7 @@ let test_multiple_aggregates_per_block_forbidden () =
   let* block' = Block.bake block in
   let* aggregates =
     List.map_es
-      (fun ((delegate : RPC.Validators.t), _) ->
+      (fun (_, (delegate : RPC.Validators.t)) ->
         Op.preattestations_aggregate ~committee:[delegate.consensus_key] block')
       bls_delegates_with_slots
   in
@@ -684,6 +686,119 @@ let test_empty_committee () =
   let* () = Assert.proto_error ~loc:__LOC__ res empty_aggregation_committee in
   return_unit
 
+let test_metadata_committee_is_correctly_ordered () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  (* Craft an attestations_aggregate including at least 3 delegates *)
+  let* attestations, attestation_committee =
+    let* attesters = Context.get_attesters (B block) in
+    let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
+    let committee =
+      List.map
+        (fun (_slot, (delegate : RPC.Validators.t)) -> delegate.consensus_key)
+        bls_delegates_with_slots
+    in
+    assert (List.length committee > 2) ;
+    let* aggregate = Op.attestations_aggregate ~committee block in
+    return (aggregate, bls_delegates_with_slots)
+  in
+  (* Craft a preattestations_aggregate including at least 3 delegates *)
+  let* preattestations, preattestation_committee =
+    let* block' = Block.bake block in
+    let* attesters = Context.get_attesters (B block') in
+    let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
+    let committee =
+      List.map
+        (fun (_slot, (delegate : RPC.Validators.t)) -> delegate.consensus_key)
+        bls_delegates_with_slots
+    in
+    assert (List.length committee > 2) ;
+    let* aggregate = Op.preattestations_aggregate ~committee block' in
+    return (aggregate, bls_delegates_with_slots)
+  in
+  (* Bake a block including both aggregates *)
+  let* _, (_, receipt) =
+    let round_zero = Alpha_context.Round.zero in
+    Block.bake_with_metadata
+      ~policy:(By_round 1)
+      ~payload_round:(Some round_zero)
+      ~locked_round:(Some round_zero)
+      ~operations:[attestations; preattestations]
+      block
+  in
+  (* [check_committees] checks that the operation committee and the operation
+     result committee coincide *)
+  let check_committees ~loc committee result_committee =
+    let result_committee =
+      List.map
+        (fun (key : Alpha_context.Consensus_key.t) -> key.consensus_pkh)
+        result_committee
+    in
+    let* () =
+      Assert.assert_equal_list
+        ~loc
+        Signature.Public_key_hash.equal
+        "committee"
+        Signature.Public_key_hash.pp
+        committee
+        result_committee
+    in
+    return_unit
+  in
+  (* Check that the attestations_aggregate committees coincide *)
+  let* () =
+    let attestations_aggregate_result =
+      find_attestations_aggregate_result receipt
+    in
+    match (attestations.protocol_data, attestations_aggregate_result) with
+    | ( Operation_data
+          {contents = Single (Attestations_aggregate {committee; _}); _},
+        Attestations_aggregate_result {committee = result_committee; _} ) ->
+        let committee =
+          List.map
+            (fun (slot, _) ->
+              let owner =
+                WithExceptions.Option.get ~loc:__LOC__
+                @@ List.assoc
+                     ~equal:Alpha_context.Slot.equal
+                     slot
+                     attestation_committee
+              in
+              owner.consensus_key)
+            committee
+        in
+        check_committees ~loc:__LOC__ committee result_committee
+    | _ -> assert false
+  in
+  (* Check that the preattestations_aggregate committees coincide *)
+  let* () =
+    let preattestations_aggregate_result =
+      find_preattestations_aggregate_result receipt
+    in
+    match (preattestations.protocol_data, preattestations_aggregate_result) with
+    | ( Operation_data
+          {contents = Single (Preattestations_aggregate {committee; _}); _},
+        Preattestations_aggregate_result {committee = result_committee; _} ) ->
+        let committee =
+          List.map
+            (fun slot ->
+              let owner =
+                WithExceptions.Option.get ~loc:__LOC__
+                @@ List.assoc
+                     ~equal:Alpha_context.Slot.equal
+                     slot
+                     preattestation_committee
+              in
+              owner.consensus_key)
+            committee
+        in
+        check_committees ~loc:__LOC__ committee result_committee
+    | _ -> assert false
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -739,6 +854,10 @@ let tests =
       `Quick
       test_eligible_attestation_must_be_aggregated;
     Tztest.tztest "test_empty_committee" `Quick test_empty_committee;
+    Tztest.tztest
+      "test_metadata_committee_is_correctly_ordered"
+      `Quick
+      test_metadata_committee_is_correctly_ordered;
   ]
 
 let () =

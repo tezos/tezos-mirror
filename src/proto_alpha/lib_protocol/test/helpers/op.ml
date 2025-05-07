@@ -166,7 +166,10 @@ let aggregate attestations =
   in
   let contents =
     let committee = Operation.tmp_of_old_committee committee in
-    Single (Attestations_aggregate {consensus_content; committee})
+    Single
+      (Attestations_aggregate
+         (* Reverse committee to preserve [attestations] order *)
+         {consensus_content; committee = List.rev committee})
   in
   let protocol_data =
     Operation_data {contents; signature = Some (Bls signature)}
@@ -197,7 +200,10 @@ let aggregate_preattestations preattestations =
     Bls12_381_signature.MinPk.aggregate_signature_opt signatures
   in
   let contents =
-    Single (Preattestations_aggregate {consensus_content; committee})
+    Single
+      (Preattestations_aggregate
+         (* Reverse committee to preserve [preattestations] order *)
+         {consensus_content; committee = List.rev committee})
   in
   let protocol_data =
     Operation_data {contents; signature = Some (Bls signature)}
