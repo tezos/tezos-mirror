@@ -1031,6 +1031,22 @@ let test_fail_companion_not_tz4 =
               | _ -> false))
         (update_key ~kind:Companion ~ck_name:"ck" delegate)
 
+let test_batch =
+  let delegate = "delegate" in
+  init_constants ()
+  --> set S.allow_tz4_delegate_enable true
+  --> begin_test ~force_attest_all:true ["bootstrap"]
+  --> add_account ~algo:Bls delegate
+  --> add_account ~algo:Bls "ck"
+  --> transfer "bootstrap" delegate (Amount (Tez_helpers.of_mutez 100_000_000L))
+  --> fold_tag
+        (fun kind ->
+          batch ~source:delegate --> reveal delegate
+          --> set_delegate delegate (Some delegate)
+          --> update_key ~kind ~ck_name:"ck" delegate
+          --> end_batch ~bake_after:true ())
+        [("update consensus", Consensus); ("update companion", Companion)]
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -1051,6 +1067,7 @@ let tests =
        ("Test fail if no signer", test_fail_no_signer);
        ("Test fail if wrong signer", test_fail_wrong_signer);
        ("Test fail companion not tz4", test_fail_companion_not_tz4);
+       ("Test batch", test_batch);
      ]
 
 let () =
