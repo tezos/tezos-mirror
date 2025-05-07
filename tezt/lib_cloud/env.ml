@@ -99,8 +99,40 @@ let init () =
     Test.fail
       "The tezt-cloud value should be set. Either via the CLI or via the \
        environment variable 'TEZT_CLOUD'" ;
+  (* If using logfile, installs a signal handler to close and reopen the logfile.
+     This allows logrotate to use a better strategy than copytruncate
+     https://incoherency.co.uk/blog/stories/logrotate-copytruncate-race-condition.html
+  *)
+  (if log_rotation <> 0 then
+     match Tezt_core.Cli.Logs.file with
+     | None -> ()
+     | Some logfile ->
+         Log.report "Installing signal handler for SIGHUP" ;
+         let signal_hup_handler signal =
+           if signal = Sys.sighup then (
+             (* TODO: Not sure if set_file is async-signal-safe.
+                Maybe implement a better solution if it causes issues *)
+             Tezt_core.Log.set_file logfile ;
+             Log.report "Logfile was reopened")
+         in
+         Sys.set_signal Sys.sighup (Sys.Signal_handle signal_hup_handler)) ;
   match mode with
-  | `Localhost | `Orchestrator -> Lwt.return_unit
+  | `Localhost -> Lwt.return_unit
+  | `Orchestrator ->
+      (* In orchestrator mode, expose the PID of tezt-cloud in a file as the
+         process can be considered as a daemon
+         It will be useful for logrotate *)
+      let* pidfile =
+        match Unix.getuid () with
+        | 0 -> Lwt.return "/var/run/tezt-cloud.pid"
+        | uid ->
+            Format.asprintf "/var/run/user/%d/tezt-cloud.pid" uid |> Lwt.return
+      in
+      let pid = Unix.getpid () in
+      Log.report "Writing %d to pidfile : %s" pid pidfile ;
+      ( with_open_out pidfile @@ fun fd ->
+        output_string fd (Format.asprintf "%d\n" pid) ) ;
+      Lwt.return_unit
   | `Host | `Cloud ->
       let* project_id = project_id () in
       Log.info "Initializing docker registry..." ;

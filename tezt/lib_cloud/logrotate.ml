@@ -7,19 +7,10 @@
 
 let config name = Format.asprintf "/etc/logrotate.d/%s" name
 
-let write_config ~name ~target_file ~max_rotations agent =
-  (* Write file locally *)
-  let source = Temp.file (Format.asprintf "%s.logrotate" (Agent.name agent)) in
-  (* Choose a reasonable 300 rotations of 200MB max file
-     Files after 300 rotations are deleted
-     The rotate is triggered daily or if they are greater than 200MB *)
-  Base.with_open_out source (fun oc ->
-      output_string
-        oc
-        (Format.asprintf
-           "%s {@\n%s"
-           target_file
-           {|
+let write_config ~name ~pidfile ~target_file ~max_rotations agent =
+  let open Jingoo in
+  let template =
+    {|{{ target_file }} {
 # Rotates logs every day
   daily
 # Rotates the log when it reaches 200 megabytes, even if not time for rotation
@@ -30,13 +21,37 @@ let write_config ~name ~target_file ~max_rotations agent =
   missingok
 # Compresses rotated logs using gzip by default
   compress
-# Copies the log file then truncates the original instead of moving it
-  copytruncate
 # Runs rotation commands with root user and group permissions  daily
   su root root
 # Maximum number of rotations before removing the oldests.
+  rotate {{ max_rotation }}
+# Send a signal to process in order it to reload
+  postrotate
+      # Check if pidfile exist
+      if [ -f {{ pidfile }} ]; then
+          # Send SIGHUP to pid in order to force reopen its logfile
+          kill -HUP $(cat {{ pidfile }})
+      fi
+  endscript
+}
 |}
-        ^ Format.asprintf "  rotate %d\n}\n" max_rotations)) ;
+  in
+  Log.info "Teztcloud.Logrotate: applying template" ;
+  let content =
+    Jg_template.from_string
+      template
+      ~models:
+        [
+          ("target_file", Jg_types.Tstr target_file);
+          ("max_rotation", Jg_types.Tint max_rotations);
+          ("pidfile", Jg_types.Tstr pidfile);
+        ]
+  in
+  Log.info "Teztcloud.Logrotate: applying template: done" ;
+  (* Write file locally *)
+  let source = Temp.file (Format.asprintf "%s.logrotate" name) in
+  (* Output file locally, to upload it *)
+  Base.with_open_out source (fun oc -> output_string oc content) ;
   Log.info "Teztcloud.Logrotate: written configuration for %s" target_file ;
   (* Upload the generated config in the destination /etc/logrotate.d/$name *)
   let destination = config name in

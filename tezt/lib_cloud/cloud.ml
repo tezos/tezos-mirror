@@ -191,6 +191,8 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
             (fun agent ->
               Logrotate.write_config
                 ~name:"tezt-cloud"
+                  (* Use hardcoded name as of now: will not work in localhost mode *)
+                ~pidfile:"/var/run/tezt-cloud.pid"
                 ~target_file
                 ~max_rotations:Env.log_rotation
                 agent)
