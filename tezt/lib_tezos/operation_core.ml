@@ -25,7 +25,9 @@
 
 open Runnable.Syntax
 
-type consensus_kind = Attestation of {with_dal : bool} | Preattestation
+type consensus_kind =
+  | Attestation of {with_dal : bool; companion_key : Account.key option}
+  | Preattestation
 
 type kind =
   | Consensus of {kind : consensus_kind; chain_id : string}
@@ -311,8 +313,9 @@ module Consensus = struct
     let consensus = {slot; level; round; block_payload_hash} in
     match kind with
     | Preattestation -> CPreattestation {consensus}
-    | Attestation {with_dal} ->
+    | Attestation {with_dal; companion_key} ->
         assert (with_dal = false) ;
+        assert (companion_key = None) ;
         CAttestation {consensus; dal = None}
 
   let attestation ~slot ~level ~round ~block_payload_hash ?dal_attestation () =
@@ -336,7 +339,7 @@ module Consensus = struct
 
   let kind_to_string kind =
     match kind with
-    | Attestation {with_dal} ->
+    | Attestation {with_dal; _} ->
         "attestation" ^ if with_dal then "_with_dal" else ""
     | Preattestation -> Format.sprintf "preattestation"
 
@@ -345,7 +348,10 @@ module Consensus = struct
         let with_dal = Option.is_some dal in
         `O
           ([
-             ("kind", Ezjsonm.string (kind_to_string (Attestation {with_dal})));
+             ( "kind",
+               Ezjsonm.string
+                 (kind_to_string (Attestation {with_dal; companion_key = None}))
+             );
              ("slot", Ezjsonm.int consensus.slot);
              ("level", Ezjsonm.int consensus.level);
              ("round", Ezjsonm.int consensus.round);
@@ -369,7 +375,7 @@ module Consensus = struct
             ("block_payload_hash", Ezjsonm.string consensus.block_payload_hash);
           ]
 
-  let operation ?branch ?chain_id ?(with_dal = false) ~signer
+  let operation ?branch ?chain_id ?(with_dal = false) ?signer_companion ~signer
       consensus_operation client =
     let json = `A [json consensus_operation] in
     let* branch =
@@ -385,13 +391,16 @@ module Consensus = struct
     let kind =
       match consensus_operation with
       | CPreattestation _ -> Preattestation
-      | CAttestation _ -> Attestation {with_dal}
+      | CAttestation _ ->
+          Attestation {with_dal; companion_key = signer_companion}
     in
     return (make ~branch ~signer ~kind:(Consensus {kind; chain_id}) json)
 
-  let inject ?request ?force ?branch ?chain_id ?error ~protocol ~signer
-      consensus client =
-    let* op = operation ?branch ?chain_id ~signer consensus client in
+  let inject ?request ?force ?branch ?chain_id ?error ~protocol
+      ?signer_companion ~signer consensus client =
+    let* op =
+      operation ?branch ?chain_id ?signer_companion ~signer consensus client
+    in
     inject ?request ?force ?error ~protocol op client
 
   let get_slots ~level client =
@@ -481,8 +490,10 @@ module Anonymous = struct
       (({kind = op2_kind; _}, _) as op2) =
     match (kind, op1_kind, op2_kind) with
     | ( Double_attestation_evidence,
-        Consensus {kind = Attestation {with_dal = false}; _},
-        Consensus {kind = Attestation {with_dal = false}; _} ) ->
+        Consensus
+          {kind = Attestation {with_dal = false; companion_key = None}; _},
+        Consensus
+          {kind = Attestation {with_dal = false; companion_key = None}; _} ) ->
         Double_consensus_evidence {kind; op1; op2}
     | ( Double_preattestation_evidence,
         Consensus {kind = Preattestation; _},
@@ -509,7 +520,8 @@ module Anonymous = struct
       "double_%s_evidence"
       (Consensus.kind_to_string
          (match kind with
-         | Double_attestation_evidence -> Attestation {with_dal = false}
+         | Double_attestation_evidence ->
+             Attestation {with_dal = false; companion_key = None}
          | Double_preattestation_evidence -> Preattestation))
 
   let denunced_op_json (op, signature) =
@@ -567,7 +579,8 @@ module Anonymous = struct
     inject ?request ?force ?error op client
 
   let as_consensus_kind = function
-    | Double_attestation_evidence -> Attestation {with_dal = false}
+    | Double_attestation_evidence ->
+        Attestation {with_dal = false; companion_key = None}
     | Double_preattestation_evidence -> Preattestation
 
   let arbitrary_block_payload_hash1 =

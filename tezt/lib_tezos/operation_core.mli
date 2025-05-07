@@ -61,7 +61,9 @@ type t
 
 type operation := t
 
-type consensus_kind = Attestation of {with_dal : bool} | Preattestation
+type consensus_kind =
+  | Attestation of {with_dal : bool; companion_key : Account.key option}
+  | Preattestation
 
 (** The kind is necessary because it determines the watermark of an
    operation which is necessary for signing an operation. This type
@@ -285,6 +287,7 @@ module Consensus : sig
     ?branch:string ->
     ?chain_id:string ->
     ?with_dal:bool ->
+    ?signer_companion:Account.key ->
     signer:Account.key ->
     t ->
     Client.t ->
@@ -301,6 +304,7 @@ module Consensus : sig
     ?chain_id:string ->
     ?error:rex ->
     protocol:Protocol.t ->
+    ?signer_companion:Account.key ->
     signer:Account.key ->
     t ->
     Client.t ->
