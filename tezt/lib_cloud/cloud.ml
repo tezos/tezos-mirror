@@ -189,12 +189,23 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
           (* Logrotate: write a configuration file inside each container *)
           Lwt_list.iter_s
             (fun agent ->
+              let* () =
+                Logrotate.write_config
+                  ~name:"tezt-cloud"
+                    (* Use hardcoded name as of now: will not work in localhost mode *)
+                  ~pidfile:"/var/run/tezt-cloud.pid"
+                  ~target_file
+                  ~max_size:204800
+                  ~max_rotations:Env.log_rotation
+                  agent
+              in
               Logrotate.write_config
-                ~name:"tezt-cloud"
-                  (* Use hardcoded name as of now: will not work in localhost mode *)
-                ~pidfile:"/var/run/tezt-cloud.pid"
-                ~target_file
-                ~max_rotations:Env.log_rotation
+              (* Note: the process name seems to be "screen"
+                 when using pgrep or pkill, despite appearing in ps as "SCREEN" *)
+                ~name:"screen"
+                ~target_file:"/root/screenlog.0"
+                ~max_size:100
+                ~max_rotations:1
                 agent)
             agents
         in
@@ -212,7 +223,9 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
       let tm = "0 0-23/4 * * *" in
       let action () =
         Lwt_list.iter_s
-          (fun agent -> Logrotate.run ~name:"tezt-cloud" agent)
+          (fun agent ->
+            let* () = Logrotate.run ~name:"tezt-cloud" agent in
+            Logrotate.run ~name:"screen" agent)
           agents
       in
       let task = Chronos.task ~name ~tm ~action () in
@@ -311,7 +324,7 @@ let attach agent =
     let cmd, args =
       Runner.wrap_with_ssh
         runner
-        (Runner.Shell.cmd [] "stdbuf" ["-oL"; "tail"; "-f"; "screenlog.0"])
+        (Runner.Shell.cmd [] "stdbuf" ["-oL"; "tail"; "-F"; "screenlog.0"])
     in
     let _p =
       Process.spawn ~hooks cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
@@ -359,7 +372,7 @@ let attach agent =
   let cmd, args =
     Runner.wrap_with_ssh
       runner
-      (Runner.Shell.cmd [] "stdbuf" ["-oL"; "tail"; "-f"; "screenlog.0"])
+      (Runner.Shell.cmd [] "stdbuf" ["-oL"; "tail"; "-F"; "screenlog.0"])
   in
   let logger =
     Lwt.catch
