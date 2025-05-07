@@ -114,13 +114,51 @@ let bls_mode_raw t client : Hex.t Lwt.t =
   t.raw <- Some (`Hex inject_bytes) ;
   return (`Hex sign_bytes)
 
-let sign ?protocol ({kind; signer; _} as t) client =
-  let is_tz4 = String.starts_with ~prefix:"tz4" in
+let sign_tz4_attestation_with_dal ~watermark consensus_key companion_key
+    contents bytes =
+  let dal_attestation =
+    let dal_attestation_as_string_opt =
+      JSON.(
+        contents
+        |> annotate ~origin:"operation_core.sign"
+        |> as_list |> List.hd |-> "dal_attestation" |> as_string_opt)
+    in
+    match dal_attestation_as_string_opt with
+    | Some dal_attestation_as_string -> Z.(of_string dal_attestation_as_string)
+    | _ -> failwith "ill-formed attestation with DAL"
+  in
+  let consensus_signature =
+    Account.sign_bytes ~watermark ~signer:consensus_key bytes
+  in
+  let companion_signature =
+    Account.sign_bytes ~watermark ~signer:companion_key bytes
+  in
+  match (consensus_signature, companion_signature) with
+  | Bls consensus, Bls companion -> (
+      let aggregate =
+        Tezos_crypto.Signature.Bls.aggregate_signature_weighted_opt
+          ~subgroup_check:false
+          [(Z.one, consensus); (Z.succ dal_attestation, companion)]
+      in
+      match aggregate with
+      | Some aggregate -> return (Tezos_crypto.Signature.of_bls aggregate)
+      | _ -> failwith "aggregation failure")
+  | _ ->
+      failwith
+        (Format.asprintf
+           "@[<v 2>unexpected non-tz4 signature while signing an attestation \
+            with DAL for keys:@,\
+            consensus = %s@,\
+            companion = %s]"
+           consensus_key.public_key_hash
+           companion_key.public_key_hash)
+
+let sign ?protocol ({kind; signer; contents; _} as t) client =
   match signer with
   | None -> return Tezos_crypto.Signature.zero
   | Some signer -> (
       match kind with
-      | Consensus {kind; chain_id} ->
+      | Consensus {kind; chain_id} -> (
           let chain_id =
             Tezos_crypto.Hashed.Chain_id.to_string
               (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
@@ -132,7 +170,12 @@ let sign ?protocol ({kind; signer; _} as t) client =
             Tezos_crypto.Signature.Custom
               (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
           in
-          let* hex =
+          let is_tz4 = String.starts_with ~prefix:"tz4" in
+          (* Under [aggregate_attestation] feature flag, consensus operations
+             signed by tz4 keys are signed using a specific encoding. Moreover,
+             attestions with DAL have their signature aggregated with the
+             companion key signature. *)
+          let* bls_mode =
             match protocol with
             | Some p
               when Protocol.number p >= 023 && is_tz4 signer.public_key_hash ->
@@ -140,13 +183,28 @@ let sign ?protocol ({kind; signer; _} as t) client =
                   Client.RPC.call_via_endpoint client
                   @@ RPC.get_chain_block_context_constants ()
                 in
-                if JSON.(constants |-> "aggregate_attestation" |> as_bool) then
-                  bls_mode_raw t client
-                else hex ?protocol t client
-            | _ -> hex ?protocol t client
+                return
+                @@ JSON.(constants |-> "aggregate_attestation" |> as_bool)
+            | _ -> return false
+          in
+          let* hex =
+            if bls_mode then bls_mode_raw t client else hex ?protocol t client
           in
           let bytes = Hex.to_bytes hex in
-          return (Account.sign_bytes ~watermark ~signer bytes)
+          match kind with
+          | Attestation {with_dal = true; companion_key = Some companion}
+            when bls_mode ->
+              sign_tz4_attestation_with_dal
+                ~watermark
+                signer
+                companion
+                contents
+                bytes
+          | Attestation {with_dal = true; companion_key = None} when bls_mode ->
+              failwith
+                "unable to sign a tz4 attestation with DAL without companion \
+                 key"
+          | _ -> return (Account.sign_bytes ~watermark ~signer bytes))
       | Anonymous | Voting | Manager ->
           let watermark = Tezos_crypto.Signature.Generic_operation in
           let* hex = hex ?protocol t client in
