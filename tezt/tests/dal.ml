@@ -10490,11 +10490,6 @@ let register ~protocols =
   (* Tests with all nodes *)
   scenario_with_all_nodes
     ~operator_profiles:[0; 1; 2; 3; 4; 5; 6]
-    "rollup_node_downloads_slots"
-    rollup_node_stores_dal_slots
-    protocols ;
-  scenario_with_all_nodes
-    ~operator_profiles:[0; 1; 2; 3; 4; 5; 6]
     "rollup_node_applies_dal_pages"
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
