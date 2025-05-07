@@ -170,18 +170,11 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>
                     }
                 }
 
-                None => {
-                    if self.inbox.none_count() < 2 {
-                        self.pvm.provide_no_input();
-                        StepperStatus::Running { steps: 1 }
-                    } else {
-                        StepperStatus::Exited {
-                            steps: 0,
-                            success: true,
-                            status: "Inbox has been drained".to_owned(),
-                        }
-                    }
-                }
+                None => StepperStatus::Exited {
+                    steps: 0,
+                    success: true,
+                    status: "Inbox has been drained".to_owned(),
+                },
             },
 
             PvmStatus::WaitingForReveal => {
