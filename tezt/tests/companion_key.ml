@@ -124,6 +124,7 @@ let init_node_and_client ~protocol =
       (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
       (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
       (["allow_tz4_delegate_enable"], `Bool true);
+      (["aggregate_attestation"], `Bool true);
     ]
   in
   let* parameter_file =
@@ -242,7 +243,7 @@ let test_update_companion_key_without_consensus_key =
       ~__LOC__
       ~level:(current_level.level + 1)
       delegate
-      ~expected:(Some companion_key_bls.public_key_hash)
+      ~expected:None
       client
   in
   unit

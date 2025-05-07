@@ -4002,7 +4002,9 @@ module Validators = struct
       RPC_service.get_service
         ~description:
           "Retrieves the level, the attestation slots and the public key hash \
-           of each delegate allowed to attest a block.\n\
+           of each delegate allowed to attest a block. Also returns each \
+           delegate's current consensus key, and current companion key when \
+           needed for crafting and validating attestations at this level.\n\
            By default, it provides this information for the next level.\n\
            Parameter `level` can be used to specify the (valid) level(s) in \
            the past or future at which the attestation rights have to be \
@@ -4017,9 +4019,15 @@ module Validators = struct
   let add_attestation_slots_at_level (ctxt, acc) level =
     let open Lwt_result_syntax in
     let+ ctxt, rights = Baking.attesting_rights ctxt level in
+    let aggregate_attestation = Constants.aggregate_attestation ctxt in
     ( ctxt,
       Signature.Public_key_hash.Map.fold
         (fun _pkh {Baking.delegate; consensus_key; companion_key; slots} acc ->
+          let companion_key =
+            match consensus_key with
+            | Bls _ when aggregate_attestation -> companion_key
+            | _ -> None
+          in
           {level = level.level; delegate; consensus_key; companion_key; slots}
           :: acc)
         rights
