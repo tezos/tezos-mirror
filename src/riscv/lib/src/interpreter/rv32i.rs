@@ -10,44 +10,9 @@ use crate::machine_state::MachineCoreState;
 use crate::machine_state::hart_state::HartState;
 use crate::machine_state::memory;
 use crate::machine_state::mode::Mode;
-use crate::machine_state::registers::NonZeroXRegister;
-use crate::machine_state::registers::XRegisters;
 use crate::parser::instruction::FenceSet;
 use crate::state_backend as backend;
 use crate::traps::Exception;
-
-impl<M> XRegisters<M>
-where
-    M: backend::ManagerReadWrite,
-{
-    /// Saves in `rd` the bitwise OR between the value in `rs1` and `imm`
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - `ORI`
-    pub fn run_ori(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
-        let result = self.read_nz(rs1) | (imm as u64);
-        self.write_nz(rd, result)
-    }
-
-    /// Saves in `rd` the bitwise XOR between the value in `rs1` and `imm`
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - `XORI`
-    pub fn run_xori(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
-        let result = self.read_nz(rs1) ^ (imm as u64);
-        self.write_nz(rd, result)
-    }
-
-    /// Saves in `rd` the bitwise XOR between the value in `rs1` and `imm`
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - `XOR`
-    /// - `C.XOR`
-    pub fn run_xor(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
-        let result = self.read_nz(rs1) ^ self.read_nz(rs2);
-        self.write_nz(rd, result)
-    }
-}
 
 impl<M> HartState<M>
 where
@@ -110,7 +75,6 @@ mod tests {
     use crate::machine_state::registers::fa0;
     use crate::machine_state::registers::nz;
     use crate::machine_state::registers::t1;
-    use crate::machine_state::registers::t2;
     use crate::machine_state::registers::t3;
     use crate::parser::instruction::FenceSet;
     use crate::state::NewState;
@@ -132,22 +96,6 @@ mod tests {
             state.hart.xregisters.write(a1, val);
             run_andi(&mut state, positive_imm as i64, nz::a1, nz::a2);
             prop_assert_eq!(state.hart.xregisters.read(a2), val & positive_imm);
-
-            state.hart.xregisters.write(a0, val);
-            state.hart.xregisters.run_ori(negative_imm as i64, nz::a0, nz::a0);
-            prop_assert_eq!(state.hart.xregisters.read(a0), val | negative_imm);
-
-            state.hart.xregisters.write(a0, val);
-            state.hart.xregisters.run_ori(positive_imm as i64, nz::a0, nz::a1);
-            prop_assert_eq!(state.hart.xregisters.read(a1), val | positive_imm);
-
-            state.hart.xregisters.write(t2, val);
-            state.hart.xregisters.run_xori(negative_imm as i64, nz::t2, nz::t2);
-            prop_assert_eq!(state.hart.xregisters.read(t2), val ^ negative_imm);
-
-            state.hart.xregisters.write(t2, val);
-            state.hart.xregisters.run_xori(positive_imm as i64, nz::t2, nz::t1);
-            prop_assert_eq!(state.hart.xregisters.read(t1), val ^ positive_imm);
         })
     });
 
@@ -166,19 +114,12 @@ mod tests {
             run_or(&mut state, nz::t3, nz::a0, nz::a0);
             prop_assert_eq!(state.hart.xregisters.read(a0), v1 | v2);
 
-            state.hart.xregisters.write(t2, v1);
-            state.hart.xregisters.write(t3, v2);
-            state.hart.xregisters.run_xor(nz::t3, nz::t2, nz::t1);
-            prop_assert_eq!(state.hart.xregisters.read(t1), v1 ^ v2);
-
             // Same register
             state.hart.xregisters.write(a0, v1);
             run_and(&mut state, nz::a0, nz::a0, nz::a1);
             prop_assert_eq!(state.hart.xregisters.read(a1), v1);
             run_or(&mut state, nz::a0, nz::a0, nz::a1);
             prop_assert_eq!(state.hart.xregisters.read(a1), v1);
-            state.hart.xregisters.run_xor(nz::a0, nz::a0, nz::a0);
-            prop_assert_eq!(state.hart.xregisters.read(a0), 0);
         });
     });
 

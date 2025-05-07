@@ -203,7 +203,7 @@ pub enum OpCode {
     // RV64I R-type instructions
     Add,
     Sub,
-    Xor,
+    X64Xor,
     Or,
     And,
     ShiftLeft,
@@ -220,8 +220,8 @@ pub enum OpCode {
     // RV64I I-type instructions
     Addi,
     AddWordImmediate,
-    Xori,
-    Ori,
+    X64XorImm,
+    X64OrImm,
     Andi,
     ShiftLeftImmediate,
     ShiftRightImmediateUnsigned,
@@ -427,7 +427,7 @@ impl OpCode {
             Self::Add => Args::run_add,
             Self::Sub => Args::run_sub,
             Self::Neg => Args::run_neg,
-            Self::Xor => Args::run_xor,
+            Self::X64Xor => Args::run_x64_xor,
             Self::Or => Args::run_or,
             Self::And => Args::run_and,
             Self::ShiftLeft => Args::run_shift_left,
@@ -442,8 +442,8 @@ impl OpCode {
             Self::X32ShiftRightSigned => Args::run_x32_shift_right_signed,
             Self::Addi => Args::run_addi,
             Self::AddWordImmediate => Args::run_add_word_immediate,
-            Self::Xori => Args::run_xori,
-            Self::Ori => Args::run_ori,
+            Self::X64XorImm => Args::run_x64_xor_immediate,
+            Self::X64OrImm => Args::run_x64_or_immediate,
             Self::Andi => Args::run_andi,
             Self::ShiftLeftImmediate => Args::run_shift_left_immediate,
             Self::ShiftRightImmediateUnsigned => Args::run_shift_right_immediate_unsigned,
@@ -627,6 +627,9 @@ impl OpCode {
             Self::SubWord => Some(Args::run_sub_word),
             Self::And => Some(Args::run_and),
             Self::Or => Some(Args::run_or),
+            Self::X64OrImm => Some(Args::run_x64_or_immediate),
+            Self::X64Xor => Some(Args::run_x64_xor),
+            Self::X64XorImm => Some(Args::run_x64_xor_immediate),
             Self::Mul => Some(Args::run_mul),
             Self::Li => Some(Args::run_li),
             Self::AddImmediateToPC => Some(Args::run_add_immediate_to_pc),
@@ -1324,7 +1327,7 @@ impl Args {
     // RV64I R-type instructions
     impl_r_type!(integer::run_add, run_add, non_zero);
     impl_r_type!(integer::run_sub, run_sub, non_zero);
-    impl_r_type!(run_xor, non_zero);
+    impl_r_type!(integer::run_x64_xor, run_x64_xor, non_zero);
     impl_r_type!(integer::run_and, run_and, non_zero);
     impl_r_type!(integer::run_or, run_or, non_zero);
     impl_r_type!(run_shift_left, Left);
@@ -1353,8 +1356,16 @@ impl Args {
         run_add_word_immediate,
         non_zero_rd
     );
-    impl_i_type!(run_xori, non_zero);
-    impl_i_type!(run_ori, non_zero);
+    impl_i_type!(
+        integer::run_x64_xor_immediate,
+        run_x64_xor_immediate,
+        non_zero
+    );
+    impl_i_type!(
+        integer::run_x64_or_immediate,
+        run_x64_or_immediate,
+        non_zero
+    );
     impl_i_type!(integer::run_andi, run_andi, non_zero);
     impl_i_type!(run_shift_left_immediate, Shift::Left);
     impl_i_type!(run_shift_right_immediate_unsigned, Shift::RightUnsigned);

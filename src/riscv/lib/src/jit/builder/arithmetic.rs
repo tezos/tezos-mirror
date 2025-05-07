@@ -35,6 +35,11 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> Arithmetic<Builder<'_, MC, JSA>> for
         X64(res)
     }
 
+    fn xor(self, other: Self, icb: &mut Builder<'_, MC, JSA>) -> Self {
+        let res = icb.builder.ins().bxor(self.0, other.0);
+        X64(res)
+    }
+
     fn mul(self, other: Self, icb: &mut Builder<'_, MC, JSA>) -> Self {
         let res = icb.builder.ins().imul(self.0, other.0);
         X64(res)
@@ -71,6 +76,11 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> Arithmetic<Builder<'_, MC, JSA>> for
 
     fn or(self, other: Self, icb: &mut Builder<'_, MC, JSA>) -> Self {
         let res = icb.builder.ins().bor(self.0, other.0);
+        X32(res)
+    }
+
+    fn xor(self, other: Self, icb: &mut Builder<'_, MC, JSA>) -> Self {
+        let res = icb.builder.ins().bxor(self.0, other.0);
         X32(res)
     }
 
