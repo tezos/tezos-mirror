@@ -311,3 +311,34 @@ macro_rules! has_encoding {
         }
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use crate as tezos_data_encoding;
+    use tezos_data_encoding_derive::{BinWriter, NomReader};
+
+    #[derive(Debug, PartialEq, BinWriter, NomReader)]
+    struct Bytes {
+        #[encoding(short_dynamic, list)]
+        data: Vec<u8>,
+    }
+
+    #[test]
+    fn short_dynamic() {
+        let test = Bytes {
+            data: vec![1_u8, 2_u8, 3_u8],
+        };
+        let mut output = Vec::new();
+        crate::enc::BinWriter::bin_write(&test, &mut output)
+            .expect("BinWriting should have succeed");
+
+        // Verify that the size of the encoded data is a short (one byte)
+        assert_eq!(output, vec![3_u8, 1_u8, 2_u8, 3_u8]);
+
+        let (rem, decoded_test) =
+            crate::nom::NomReader::nom_read(&output).expect("NomReading should have succeed");
+        assert!(rem.is_empty());
+
+        assert_eq!(test, decoded_test);
+    }
+}
