@@ -81,6 +81,18 @@ module Protocol_types = struct
         ~dst:encoding
         ~src:Signature.Public_key.encoding
   end
+
+  module Counter = struct
+    type t = Alpha_context.Manager_counter.t
+
+    let encoding = Alpha_context.Manager_counter.encoding_for_RPCs
+
+    let of_z : Z.t -> t tzresult =
+      Tezos_types.convert_using_serialization
+        ~name:"counter"
+        ~dst:encoding
+        ~src:Data_encoding.z
+  end
 end
 
 (** [wrap conversion service_implementation] changes the output type
@@ -221,6 +233,17 @@ module Imported_services = struct
     let open Tezos_rpc in
     Service.subst1 Imported_protocol_plugin.Contract_services.S.manager_key
 
+  let counter :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context * Tezos_types.Contract.t,
+        unit,
+        unit,
+        Protocol_types.Counter.t )
+      Tezos_rpc.Service.t =
+    let open Tezos_rpc in
+    Service.subst1 Imported_protocol_plugin.Contract_services.S.counter
+
   let constants :
       ( [`GET],
         tezlink_rpc_context,
@@ -273,6 +296,11 @@ let register_block_services (module Backend : Tezlink_backend_sig.S) base_dir =
            | None -> Result.return_none
            | Some pk ->
                Result.map Option.some @@ Protocol_types.Public_key.convert pk)
+    |> register_with_conversion
+         ~service:Imported_services.counter
+         ~impl:(fun ({block; chain}, contract) () () ->
+           Backend.counter chain block contract)
+         ~convert_output:Protocol_types.Counter.of_z
     |> register_with_conversion
          ~service:Imported_services.constants
          ~impl:(fun {block; chain} () () -> Backend.constants chain block)

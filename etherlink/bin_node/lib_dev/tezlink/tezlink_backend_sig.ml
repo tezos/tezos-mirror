@@ -25,4 +25,6 @@ module type S = sig
     [> `Head of 'a] ->
     Contract.t ->
     Signature.public_key option tzresult Lwt.t
+
+  val counter : [> `Main] -> [> `Head of 'a] -> Contract.t -> Z.t tzresult Lwt.t
 end

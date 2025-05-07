@@ -21,6 +21,8 @@ module Path = struct
   let balance contract = account contract ^ "/balance"
 
   let manager_key contract = account contract ^ "/manager_key"
+
+  let counter contract = account contract ^ "/counter"
 end
 
 let balance read chain block c =
@@ -45,6 +47,20 @@ let manager_key read chain block c =
     read
     (Path.manager_key c)
     (Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding)
+
+let counter read chain block c =
+  (* TODO: #7831 !17664
+     Support non-default chain and block parameters. *)
+  ignore chain ;
+  ignore block ;
+
+  Durable_storage.inspect_durable_and_decode_default
+  (* FIXME: #7960
+     This default should be the global counter *)
+    ~default:Z.one
+    read
+    (Path.counter c)
+    (Data_encoding.Binary.of_bytes_exn Data_encoding.z)
 
 module type Backend = sig
   include Durable_storage.READER
@@ -162,4 +178,8 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
   (* TODO: #7831 !17664
      we type [chain], even though we don't use it, to satisfy the compiler. *)
   let manager_key (chain : [> `Main]) = manager_key read chain
+
+  (* TODO: #7831 !17664
+     we type [chain], even though we don't use it, to satisfy the compiler. *)
+  let counter (chain : [> `Main]) = counter read chain
 end
