@@ -26,7 +26,7 @@ type multichain_sequencer_setup = {
   sc_rollup_node : Sc_rollup_node.t;
   observers : Evm_node.t list;
   sequencer : Evm_node.t;
-  proxys : Evm_node.t list;
+  proxies : Evm_node.t list;
   l1_contracts : l1_contracts;
   boot_sector : string;
   kernel : Uses.t;
@@ -57,7 +57,7 @@ let multichain_setup_to_single ~(setup : multichain_sequencer_setup) =
   let observer =
     match setup.observers with [observer] -> observer | _ -> assert false
   in
-  let proxy = match setup.proxys with [proxy] -> proxy | _ -> assert false in
+  let proxy = match setup.proxies with [proxy] -> proxy | _ -> assert false in
   {
     node = setup.node;
     client = setup.client;
@@ -639,7 +639,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
      need to bake a block to include it in the inbox, which will
      trigger the installation of the kernel in the rollup. *)
   let* _lvl = Test_helpers.next_rollup_node_level ~sc_rollup_node ~client in
-  let* proxys =
+  let* proxies =
     Lwt_list.map_s
       (fun _l2 ->
         Evm_node.init
@@ -656,7 +656,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       node;
       client;
       sequencer;
-      proxys;
+      proxies;
       observers;
       l1_contracts;
       sc_rollup_address;
