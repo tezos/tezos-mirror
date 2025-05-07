@@ -240,17 +240,17 @@ On macOS and Linux, you can compile and install Octez using Homebrew. If
 Homebrew is not yet installed on your system, please refer to the official
 [Homebrew installation guide](https://brew.sh/) for detailed instructions.
 
-Once Homebrew is set up, follow these steps to install Octez:
+Once Homebrew is set up, follow these steps to install Octez.
 
-Download the Octez formula by executing the following command in your terminal:
+Download the Octez formula by executing the following command in your terminal::
 
     curl -q "https://packages.nomadic-labs.com/homebrew/Formula/octez.rb" -O
 
-For ``RC`` versions, do rather:
+For ``RC`` versions, do rather::
 
     curl -q "https://packages.nomadic-labs.com/homebrew/RC/Formula/octez.rb" -O
 
-Install Octez using the downloaded formula with the following command:
+Install Octez using the downloaded formula with the following command::
 
     brew install -v ./octez.rb
 
