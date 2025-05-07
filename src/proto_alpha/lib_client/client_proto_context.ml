@@ -380,12 +380,13 @@ let build_update_consensus_key cctxt ?fee ?gas_limit ?storage_limit
        operation
 
 let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?fee ~manager_sk ~fee_parameter ?consensus_keys src_pk =
+    ?verbose_signing ?fee ~manager_sk ~fee_parameter ?consensus_keys
+    ?companion_keys src_pk =
   let open Lwt_result_syntax in
   let source = Signature.Public_key.hash src_pk in
   let delegate_op = build_delegate_operation ?fee (Some source) in
-  match consensus_keys with
-  | None -> (
+  match (consensus_keys, companion_keys) with
+  | None, None -> (
       let operation = Annotated_manager_operation.Single_manager delegate_op in
       let* oph, _, op, result =
         Injection.inject_manager_operation
@@ -406,16 +407,16 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
       in
       match Apply_results.pack_contents_list op result with
       | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-          return ((oph, op, result), None))
-  | Some (public_key, secret_key_uri) -> (
+          return ((oph, op, result), []))
+  | Some (public_key, secret_key_uri), None
+  | None, Some (public_key, secret_key_uri) -> (
       let* operation =
+        let kind =
+          if Option.is_some consensus_keys then Operation_repr.Consensus
+          else Companion
+        in
         let+ operation_content =
-          build_update_consensus_key
-            cctxt
-            ~kind:Consensus
-            ?fee
-            ?secret_key_uri
-            public_key
+          build_update_consensus_key cctxt ~kind ?fee ?secret_key_uri public_key
         in
         Annotated_manager_operation.Cons_manager
           ( delegate_op,
@@ -447,7 +448,69 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
           ( (Manager_operation _ as op1),
             res1,
             Single_and_result ((Manager_operation _ as op2), res2) ) ->
-          return ((oph, op1, res1), Some (op2, res2)))
+          return ((oph, op1, res1), [(op2, res2)]))
+  | ( Some (public_key_consensus, secret_key_uri_consensus),
+      Some (public_key_companion, secret_key_uri_companion) ) -> (
+      let* operation =
+        let* operation_consensus =
+          build_update_consensus_key
+            cctxt
+            ~kind:Consensus
+            ?fee
+            ?secret_key_uri:secret_key_uri_consensus
+            public_key_consensus
+        in
+        let* operation_companion =
+          build_update_consensus_key
+            cctxt
+            ~kind:Companion
+            ?fee
+            ?secret_key_uri:secret_key_uri_companion
+            public_key_companion
+        in
+        return
+        @@ Annotated_manager_operation.(
+             Cons_manager
+               ( delegate_op,
+                 Cons_manager
+                   (operation_consensus, Single_manager operation_companion) ))
+      in
+      let* oph, _, op, result =
+        Injection.inject_manager_operation
+          cctxt
+          ~chain
+          ~block
+          ?confirmations
+          ?dry_run
+          ?verbose_signing
+          ~successor_level:true
+          ~source
+          ~fee:(Limit.of_option fee)
+          ~gas_limit:Limit.unknown
+          ~storage_limit:Limit.unknown
+          ~src_pk
+          ~src_sk:manager_sk
+          ~fee_parameter
+          operation
+      in
+      match Apply_results.pack_contents_list op result with
+      | Apply_results.Single_and_result
+          (Manager_operation _, Manager_operation_result _) ->
+          .
+      | Apply_results.Cons_and_result
+          ( Manager_operation _,
+            Manager_operation_result _,
+            Single_and_result (Manager_operation _, Manager_operation_result _)
+          ) ->
+          .
+      | Apply_results.Cons_and_result
+          ( (Manager_operation _ as op1),
+            res1,
+            Cons_and_result
+              ( (Manager_operation _ as op2),
+                res2,
+                Single_and_result ((Manager_operation _ as op3), res3) ) ) ->
+          return ((oph, op1, res1), [(op2, res2); (op3, res3)]))
 
 let update_consensus_or_companion_key ~kind cctxt ~chain ~block ?confirmations
     ?dry_run ?verbose_signing ?simulation ?fee ?secret_key_uri ~public_key
