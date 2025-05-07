@@ -31,6 +31,11 @@ COPY --chown=tezos:tezos .gitconfig /home/tezos/
 # Rust installer script
 COPY --chown=tezos:tezos install-rust.sh /tmp/
 
+# setup kisscache
+COPY --chown=tezos:tezos scripts/kiss-fetch.sh /tmp/
+ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
+ENV OPAMFETCH="/tmp/kiss-fetch.sh"
+
 # hadolint ignore=DL3018,DL3019
 RUN apk update \
 # Do not use apk --no-cache here because opam needs the cache.
@@ -77,11 +82,10 @@ RUN apk update \
     sqlite-dev \
  # Opam from Edge is Opam 2.2
  && apk add --no-cache \
-    opam --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
- # Install Cargo and Rust (more information in the shell script)
- && ./install-rust.sh \
-# Cleanup
- && rm -rf /tmp/*
+    opam --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community
+
+# Install Cargo and Rust (more information in the shell script)
+RUN ./install-rust.sh && rm -rf /tmp/install-rust.sh /tmp/kiss.log
 
 USER tezos
 WORKDIR /home/tezos
@@ -91,10 +95,6 @@ WORKDIR /home/tezos
 COPY --chown=tezos:tezos scripts/create_opam_repo.sh scripts/version.sh octez-deps.opam.locked ./
 
 COPY --chown=tezos:tezos stdcompat.opam.locked ./
-COPY --chown=tezos:tezos scripts/kiss-fetch.sh /tmp/
-
-ENV OPAMFETCH="/tmp/kiss-fetch.sh"
-ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
 
 # Run the script, then clean up; we only need the result of the script (the opam repository).
 RUN ./create_opam_repo.sh \

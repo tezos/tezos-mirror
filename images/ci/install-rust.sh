@@ -40,17 +40,18 @@ x86_64)
   ;;
 esac
 
+KISSCURL=${OPAMFETCH:-curl}
+
 # Download the artefacts
 mkdir -p "$download_dest"
 for package in "${packages[@]}"; do
-    url="$packages_base_url/$arch/$package"
-    dest="$download_dest/$package"
+  url="$packages_base_url/$arch/$package"
 
-    # Download
-    wget -O "$dest" "$url"
+  # Download
+  $KISSCURL -S -s --output-dir "$download_dest" -o "$package" "$url"
 
-    # Verify
-    echo "${checksums[$package]} $dest" | sha256sum -c 
+  # Verify
+  echo "${checksums[$package]} $download_dest/$package" | sha256sum -c
 done
 
 # Install the packages
