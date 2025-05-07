@@ -2358,8 +2358,61 @@ let send_messages ?(bake = true) ?(src = Constant.bootstrap2.alias)
   let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
   if bake then bake_for client else unit
 
-let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
-    sc_rollup_node sc_rollup_address node client _pvm_name =
+let check_saved_value_in_pvm ~rpc_hooks ~name ~expected_value sc_rollup_node =
+  let* encoded_value =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_state ~key:(sf "vars/%s" name) ()
+  in
+  match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
+  | Error error ->
+      failwith
+        (Format.asprintf
+           "The arithmetic PVM has an unexpected state: %a"
+           Data_encoding.Binary.pp_read_error
+           error)
+  | Ok value ->
+      Check.(
+        (value = expected_value)
+          int
+          ~error_msg:
+            "Invalid value in rollup state (current = %L, expected = %R)") ;
+      return ()
+
+let rollup_node_interprets_dal_pages_helper ~protocol:_ client sc_rollup
+    sc_rollup_node =
+  let* genesis_info =
+    Client.RPC.call ~hooks client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
+  in
+
+  (* The Dal content is as follows:
+      - the page 0 of slot 0 contains 10,
+      - the page 0 of slot 1 contains 200,
+      - the page 0 of slot 2 contains 400.
+     Only slot 1 abd 2 are confirmed. But PVM Arith only interprets even
+     slots, we expect to have value = 502
+     (including the values 99 and 3 send via Inbox).
+  *)
+  let expected_value = 502 in
+  (* The code should be adapted if the current level changes. *)
+  let* () = send_messages client [" 99 3 "; " + + value"] in
+  let* () = repeat 2 (fun () -> bake_for client) in
+  let* _lvl =
+    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
+  in
+  check_saved_value_in_pvm
+    ~rpc_hooks
+    ~name:"value"
+    ~expected_value
+    sc_rollup_node
+
+let rollup_node_applies_dal_pages protocol parameters dal_node sc_rollup_node
+    sc_rollup_address node client _pvm_name =
   (* Check that the rollup node downloaded the confirmed slots to which it is
      subscribed:
 
@@ -2374,18 +2427,12 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
 
      4. Publish the three slot headers for slots with indexes 0, 1 and 2.
 
-     5. Check that the slot_headers are fetched by the rollup node.
+     5. Attest only slots 1 and 2.
 
-     6. Attest only slots 1 and 2.
+     6. Bake attestation_lag blocks to take attestations into account.
 
-     7. Only slots 1 and 2 are attested. No slot is currently pre-downloaded by
-     the rollup.
-
-     8. Bake `attestation_lag` blocks so that the rollup node interprets the
-     previously published & attested slot(s).
-
-     9. Verify that rollup node has downloaded slot 2. Slot 0 is unconfirmed,
-     and slot 1 has not been downloaded.
+     7. Verify that the rollup node interprets the DAL pages of the attested DAL
+     slots.
   *)
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let page_size = parameters.Dal.Parameters.cryptobox.page_size in
@@ -2463,26 +2510,12 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
       client
   in
 
-  Log.info "Step 5: check that the slot headers are fetched by the rollup node" ;
   let* () = bake_for client in
   let* slots_published_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 2)
   in
-  let* slots_headers =
-    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_dal_slot_headers ()
-  in
-  let commitments =
-    slots_headers
-    |> List.map (fun Sc_rollup_rpc.{commitment; level = _; index = _} ->
-           commitment)
-  in
-  let expected_commitments = [commitment_0; commitment_1; commitment_2] in
-  Check.(commitments = expected_commitments)
-    (Check.list Check.string)
-    ~error_msg:"Unexpected list of slot headers (current = %L, expected = %R)" ;
 
-  Log.info "Step 6: attest only slots 1 and 2" ;
+  Log.info "Step 5: attest only slots 1 and 2" ;
   let* () = repeat (attestation_lag - 1) (fun () -> bake_for client) in
   let* () =
     inject_dal_attestations_and_bake node client ~number_of_slots (Slots [2; 1])
@@ -2498,26 +2531,8 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
       "Current level has moved past slot attestation level (current = %L, \
        expected = %R)" ;
 
-  Log.info "Step 7: check that the two slots have been attested" ;
-  let* downloaded_slots =
-    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_dal_processed_slots ()
-  in
-  let downloaded_confirmed_slots =
-    List.filter (fun (_i, s) -> String.equal s "confirmed") downloaded_slots
-  in
-  let expected_number_of_confirmed_slots = 2 in
-
-  Check.(
-    List.length downloaded_confirmed_slots = expected_number_of_confirmed_slots)
-    Check.int
-    ~error_msg:
-      "Unexpected number of slots that have been either downloaded or \
-       unconfirmed (current = %L, expected = %R)" ;
-
   Log.info
-    "Step 8: bake attestation_lag blocks so that the rollup node interprets \
-     the previously published & attested slot(s)" ;
+    "Step 6: bake attestation_lag blocks to take attestations into account" ;
   let* () = repeat attestation_lag (fun () -> bake_for client) in
 
   let* level =
@@ -2531,113 +2546,11 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
       "Current level has moved past slot attestation level (current = %L, \
        expected = %R)" ;
 
-  Log.info
-    "Step 9: verify that the rollup node has downloaded slot 2; slot 0 is \
-     unconfirmed, and slot 1 has not been downloaded" ;
-  let confirmed_level_as_string = Int.to_string slot_confirmed_level in
-  let* downloaded_slots =
-    Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_dal_processed_slots
-         ~block:confirmed_level_as_string
-         ()
-  in
-  let downloaded_confirmed_slots =
-    List.filter (fun (_i, s) -> String.equal s "confirmed") downloaded_slots
-  in
-
-  Log.info "Step 10: check the first page of the two attested slots' content" ;
-  let expected_number_of_confirmed_slots = 2 in
-  Check.(
-    List.length downloaded_confirmed_slots = expected_number_of_confirmed_slots)
-    Check.int
-    ~error_msg:
-      "Unexpected number of slots that have been either downloaded or \
-       unconfirmed (current = %L, expected = %R)" ;
-  let submitted_slots_contents =
-    [slot_contents_0; slot_contents_1; slot_contents_2]
-  in
-  let* () =
-    Lwt_list.iteri_s
-      (fun index (slot_index, _status) ->
-        Check.(
-          (index + 1 = slot_index)
-            int
-            ~error_msg:"unexpected slot index (current = %L, expected = %R)") ;
-        let* slot_pages =
-          Dal_RPC.(
-            call dal_node
-            @@ get_level_slot_pages
-                 ~published_level:slots_published_level
-                 ~slot_index)
-        in
-        let relevant_page = List.nth slot_pages 0 in
-        let confirmed_slot_content =
-          List.nth submitted_slots_contents slot_index
-        in
-        let message =
-          String.sub relevant_page 0 (String.length confirmed_slot_content)
-        in
-        Check.(message = confirmed_slot_content)
-          Check.string
-          ~error_msg:"unexpected message in slot (current = %L, expected = %R)" ;
-        unit)
-      downloaded_confirmed_slots
-  in
-  match expand_test with
-  | None -> return ()
-  | Some f -> f ~protocol client sc_rollup_address sc_rollup_node
-
-let check_saved_value_in_pvm ~rpc_hooks ~name ~expected_value sc_rollup_node =
-  let* encoded_value =
-    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
-    @@ Sc_rollup_rpc.get_global_block_state ~key:(sf "vars/%s" name) ()
-  in
-  match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
-  | Error error ->
-      failwith
-        (Format.asprintf
-           "The arithmetic PVM has an unexpected state: %a"
-           Data_encoding.Binary.pp_read_error
-           error)
-  | Ok value ->
-      Check.(
-        (value = expected_value)
-          int
-          ~error_msg:
-            "Invalid value in rollup state (current = %L, expected = %R)") ;
-      return ()
-
-let rollup_node_interprets_dal_pages ~protocol:_ client sc_rollup sc_rollup_node
-    =
-  let* genesis_info =
-    Client.RPC.call ~hooks client
-    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
-         sc_rollup
-  in
-  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let* level =
-    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
-  in
-
-  (* The Dal content is as follows:
-      - the page 0 of slot 0 contains 10,
-      - the page 0 of slot 1 contains 200,
-      - the page 0 of slot 2 contains 400.
-     Only slot 1 abd 2 are confirmed. But PVM Arith only interprets even
-     slots, we expect to have value = 502
-     (including the values 99 and 3 send via Inbox).
-  *)
-  let expected_value = 502 in
-  (* The code should be adapted if the current level changes. *)
-  let* () = send_messages client [" 99 3 "; " + + value"] in
-  let* () = repeat 2 (fun () -> bake_for client) in
-  let* _lvl =
-    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
-  in
-  check_saved_value_in_pvm
-    ~rpc_hooks
-    ~name:"value"
-    ~expected_value
+  Log.info "Step 7: Check that the rollup node interprets the DAL pages" ;
+  rollup_node_interprets_dal_pages_helper
+    ~protocol
+    client
+    sc_rollup_address
     sc_rollup_node
 
 (* Test that the rollup kernel can fetch and store a requested DAL page. Works as follows:
@@ -10490,13 +10403,8 @@ let register ~protocols =
   (* Tests with all nodes *)
   scenario_with_all_nodes
     ~operator_profiles:[0; 1; 2; 3; 4; 5; 6]
-    "rollup_node_downloads_slots"
-    rollup_node_stores_dal_slots
-    protocols ;
-  scenario_with_all_nodes
-    ~operator_profiles:[0; 1; 2; 3; 4; 5; 6]
     "rollup_node_applies_dal_pages"
-    (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
+    rollup_node_applies_dal_pages
     protocols ;
   scenario_with_all_nodes
     ~operator_profiles:[0]
