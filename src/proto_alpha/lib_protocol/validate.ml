@@ -2915,7 +2915,7 @@ module Manager = struct
                {kind = Consensus; source; public_key})
       | (Ed25519 _ | Secp256k1 _ | P256 _), None, Consensus -> return_unit
     else
-      let* () = Delegate.Consensus_key.check_not_tz4 public_key in
+      let* () = Delegate.Consensus_key.check_not_tz4 kind public_key in
       match kind with
       | Companion ->
           result_error

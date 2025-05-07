@@ -26,9 +26,12 @@
 type error +=
   | Invalid_consensus_key_update_noop of
       (Cycle_repr.t * Operation_repr.consensus_key_kind)
-  | Invalid_consensus_key_update_active of Signature.Public_key_hash.t
-  | Invalid_consensus_key_update_tz4 of Bls.Public_key.t
-  | Invalid_consensus_key_update_another_delegate of Signature.Public_key_hash.t
+  | Invalid_consensus_key_update_active of
+      (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
+  | Invalid_consensus_key_update_tz4 of
+      (Bls.Public_key.t * Operation_repr.consensus_key_kind)
+  | Invalid_consensus_key_update_another_delegate of
+      (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
 
 let () =
   register_error_kind
@@ -54,50 +57,62 @@ let () =
     `Permanent
     ~id:"delegate.consensus_key.active"
     ~title:"Active consensus key"
-    ~description:
-      "The delegate consensus key is already used by another delegate"
-    ~pp:(fun ppf pkh ->
+    ~description:"The delegate consensus key is already used"
+    ~pp:(fun ppf (pkh, kind) ->
       Format.fprintf
         ppf
-        "The delegate consensus key %a is already used by another delegate"
+        "The delegate %a key %a is already used as another consensus or \
+         companion key"
+        Operation_repr.pp_consensus_key_kind
+        kind
         Signature.Public_key_hash.pp
         pkh)
     Data_encoding.(
-      obj1 (req "consensus_pkh" Signature.Public_key_hash.encoding))
-    (function Invalid_consensus_key_update_active pkh -> Some pkh | _ -> None)
-    (fun pkh -> Invalid_consensus_key_update_active pkh) ;
+      obj2
+        (req "consensus_pkh" Signature.Public_key_hash.encoding)
+        (req "kind" Operation_repr.consensus_key_kind_encoding))
+    (function Invalid_consensus_key_update_active c -> Some c | _ -> None)
+    (fun c -> Invalid_consensus_key_update_active c) ;
   register_error_kind
     `Permanent
     ~id:"delegate.consensus_key.tz4"
     ~title:"Consensus key cannot be a tz4"
     ~description:"Consensus key cannot be a tz4 (BLS public key)."
-    ~pp:(fun ppf pk ->
+    ~pp:(fun ppf (pk, kind) ->
       Format.fprintf
         ppf
-        "The consensus key %a is forbidden as it is a BLS public key."
+        "The %a key %a is forbidden as it is a BLS public key."
+        Operation_repr.pp_consensus_key_kind
+        kind
         Bls.Public_key_hash.pp
         (Bls.Public_key.hash pk))
-    Data_encoding.(obj1 (req "delegate_pk" Bls.Public_key.encoding))
-    (function Invalid_consensus_key_update_tz4 pk -> Some pk | _ -> None)
-    (fun pk -> Invalid_consensus_key_update_tz4 pk) ;
+    Data_encoding.(
+      obj2
+        (req "delegate_pk" Bls.Public_key.encoding)
+        (req "kind" Operation_repr.consensus_key_kind_encoding))
+    (function Invalid_consensus_key_update_tz4 c -> Some c | _ -> None)
+    (fun c -> Invalid_consensus_key_update_tz4 c) ;
   register_error_kind
     `Permanent
     ~id:"delegate.consensus_key.another_delegate"
     ~title:"Consensus key cannot be another delegate"
     ~description:"Consensus key cannot be another delegate"
-    ~pp:(fun ppf pkh ->
+    ~pp:(fun ppf (pkh, kind) ->
       Format.fprintf
         ppf
-        "The key %a cannot be registered as a consensus key, as it is the \
-         manager key of another registered delegate."
+        "The key %a cannot be registered as a %a key, as it is the manager key \
+         of another registered delegate."
         Signature.Public_key_hash.pp
-        pkh)
+        pkh
+        Operation_repr.pp_consensus_key_kind
+        kind)
     Data_encoding.(
-      obj1 (req "consensus_pkh" Signature.Public_key_hash.encoding))
+      obj2
+        (req "consensus_pkh" Signature.Public_key_hash.encoding)
+        (req "kind" Operation_repr.consensus_key_kind_encoding))
     (function
-      | Invalid_consensus_key_update_another_delegate pkh -> Some pkh
-      | _ -> None)
-    (fun pkh -> Invalid_consensus_key_update_another_delegate pkh)
+      | Invalid_consensus_key_update_another_delegate c -> Some c | _ -> None)
+    (fun c -> Invalid_consensus_key_update_another_delegate c)
 
 type 'a typed_kind =
   | Consensus : Signature.public_key typed_kind
@@ -161,25 +176,25 @@ let pp ppf {delegate; consensus_pkh} =
    companion) that will be active at cycle `current + consensus_rights_delay + 1`.
 *)
 
-let check_unused ctxt pkh =
+let check_unused ctxt kind pkh =
   let open Lwt_result_syntax in
   let*! is_active = Storage.Consensus_keys.mem ctxt pkh in
-  fail_when is_active (Invalid_consensus_key_update_active pkh)
+  fail_when is_active (Invalid_consensus_key_update_active (pkh, kind))
 
-let check_not_tz4 : Signature.Public_key.t -> unit tzresult =
+let check_not_tz4 kind : Signature.Public_key.t -> unit tzresult =
   let open Result_syntax in
   function
-  | Bls pk -> tzfail (Invalid_consensus_key_update_tz4 pk)
+  | Bls pk -> tzfail (Invalid_consensus_key_update_tz4 (pk, kind))
   | Ed25519 _ | Secp256k1 _ | P256 _ -> return_unit
 
-let check_is_not_another_delegate ctxt pkh delegate =
+let check_is_not_another_delegate ctxt kind pkh delegate =
   let open Lwt_result_syntax in
   if Signature.Public_key_hash.equal pkh delegate then return_unit
   else
     let*! is_another_delegate = Storage.Delegates.mem ctxt pkh in
     fail_when
       is_another_delegate
-      (Invalid_consensus_key_update_another_delegate pkh)
+      (Invalid_consensus_key_update_another_delegate (pkh, kind))
 
 let set_unused = Storage.Consensus_keys.remove
 
@@ -188,7 +203,7 @@ let set_used = Storage.Consensus_keys.add
 let init ctxt delegate pk =
   let open Lwt_result_syntax in
   let pkh = Signature.Public_key.hash pk in
-  let* () = check_unused ctxt pkh in
+  let* () = check_unused ctxt Consensus pkh in
   let*! ctxt = set_used ctxt pkh in
   Storage.Contract.Consensus_key.init ctxt (Contract_repr.Implicit delegate) pk
 
@@ -302,8 +317,8 @@ let register_update ctxt delegate pk =
       (Invalid_consensus_key_update_noop (first_active_cycle, Consensus))
   in
   let pkh = Signature.Public_key.hash pk in
-  let* () = check_unused ctxt pkh in
-  let* () = check_is_not_another_delegate ctxt pkh delegate in
+  let* () = check_unused ctxt Consensus pkh in
+  let* () = check_is_not_another_delegate ctxt Consensus pkh delegate in
   let*! ctxt = set_used ctxt pkh in
   let* {consensus_pkh = old_pkh; _} =
     active_pubkey_for_cycle ctxt delegate update_cycle
@@ -338,8 +353,8 @@ let register_update_companion ctxt delegate pk =
   let pkh : Signature.public_key_hash =
     Signature.Bls (Bls.Public_key.hash pk)
   in
-  let* () = check_unused ctxt pkh in
-  let* () = check_is_not_another_delegate ctxt pkh delegate in
+  let* () = check_unused ctxt Companion pkh in
+  let* () = check_is_not_another_delegate ctxt Companion pkh delegate in
   let*! ctxt = set_used ctxt pkh in
   let* {companion_pkh = old_pkh; _} =
     active_pubkey_for_cycle ctxt delegate update_cycle

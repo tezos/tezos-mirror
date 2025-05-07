@@ -2372,7 +2372,8 @@ module Delegate : sig
     context -> public_key_hash -> Cycle.t tzresult Lwt.t
 
   module Consensus_key : sig
-    val check_not_tz4 : Signature.public_key -> unit tzresult
+    val check_not_tz4 :
+      Operation_repr.consensus_key_kind -> Signature.public_key -> unit tzresult
 
     val active_pubkey :
       context -> public_key_hash -> Consensus_key.pk tzresult Lwt.t

@@ -34,9 +34,12 @@
 type error +=
   | Invalid_consensus_key_update_noop of
       (Cycle_repr.t * Operation_repr.consensus_key_kind)
-  | Invalid_consensus_key_update_active of Signature.Public_key_hash.t
-  | Invalid_consensus_key_update_tz4 of Bls.Public_key.t
-  | Invalid_consensus_key_update_another_delegate of Signature.Public_key_hash.t
+  | Invalid_consensus_key_update_active of
+      (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
+  | Invalid_consensus_key_update_tz4 of
+      (Bls.Public_key.t * Operation_repr.consensus_key_kind)
+  | Invalid_consensus_key_update_another_delegate of
+      (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
 
 (** The public key of a consensus key and the associated delegate. *)
 type pk = Raw_context.consensus_pk = {
@@ -62,7 +65,8 @@ val pp : Format.formatter -> t -> unit
 val pkh : pk -> t
 
 (** [check_not_tz4 pk] checks that [pk] is not a BLS address. *)
-val check_not_tz4 : Signature.public_key -> unit tzresult
+val check_not_tz4 :
+  Operation_repr.consensus_key_kind -> Signature.public_key -> unit tzresult
 
 (** Initialize the consensus key when registering a delegate. *)
 val init :
