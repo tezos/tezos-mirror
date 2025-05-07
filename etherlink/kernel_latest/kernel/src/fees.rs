@@ -252,7 +252,7 @@ pub fn tx_execution_gas_limit(
 
     let gas_for_fees = gas_for_fees(
         fees.da_fee_per_byte(),
-        fees.base_fee_per_gas(),
+        fees.minimum_base_fee_per_gas(),
         &tx.data,
         &tx.access_list,
     )?;

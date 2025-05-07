@@ -26,6 +26,8 @@
     - [`KT1XdSAYGXrUDE1U5GNqUKKscLWrMhzyjNeh` for the regular upgrade governance][kgov]
     - [`KT1D1fRgZVdjTj5sUZKcSTPPnuR7LRxVYnDL` for the security upgrade governance][sgov]
     - [`KT1NnH9DCAoY1pfPNvb9cw9XPKQnHAFYFHXa` for the sequencer governance][sqgov]
+- Computes the execution gas assuming a minimum base fee per gas instead of
+  current gas price. The paid DA fees remain unchanged. (!17954)
 
 ### Bug fixes
 
