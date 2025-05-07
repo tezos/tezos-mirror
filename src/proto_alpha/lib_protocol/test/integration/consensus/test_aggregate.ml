@@ -212,11 +212,13 @@ let find_attester_with_non_bls_key =
       | (Ed25519 _ | Secp256k1 _ | P256 _), slot :: _ -> Some (attester, slot)
       | _ -> None)
 
-(* [filter_attesters_with_bls_key attesters] filter attesters with BLS keys. *)
+(* [filter_attesters_with_bls_key attesters] filters attesters with a BLS
+   consensus key and at least one slot, returning a list of
+   (minimal slot, attester) pairs. *)
 let filter_attesters_with_bls_key =
   List.filter_map (fun (attester : RPC.Validators.t) ->
       match (attester.consensus_key, attester.slots) with
-      | Bls _, slot :: _ -> Some (attester, slot)
+      | Bls _, slot :: _ -> Some (slot, attester)
       | _ -> None)
 
 let test_aggregate_feature_flag_enabled () =
@@ -311,7 +313,7 @@ let test_attestations_aggregate_with_multiple_delegates () =
   let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
   let* attestations =
     List.map_es
-      (fun (delegate, slot) ->
+      (fun (slot, delegate) ->
         Op.raw_attestation
           ~delegate:delegate.RPC.Validators.delegate
           ~slot
@@ -325,7 +327,7 @@ let test_attestations_aggregate_with_multiple_delegates () =
     Block.bake_with_metadata ~operation:aggregation block
   in
   let result = find_attestations_aggregate_result receipt in
-  let delegates = List.map fst bls_delegates_with_slots in
+  let delegates = List.map snd bls_delegates_with_slots in
   check_attestations_aggregate_result ~committee:delegates result
 
 let test_preattestations_aggregate_with_multiple_delegates () =
@@ -339,7 +341,7 @@ let test_preattestations_aggregate_with_multiple_delegates () =
   let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
   let* preattestations =
     List.map_es
-      (fun (delegate, slot) ->
+      (fun (slot, delegate) ->
         Op.raw_preattestation
           ~delegate:delegate.RPC.Validators.delegate
           ~slot
@@ -361,7 +363,7 @@ let test_preattestations_aggregate_with_multiple_delegates () =
       block
   in
   let result = find_preattestations_aggregate_result receipt in
-  let delegates = List.map fst bls_delegates_with_slots in
+  let delegates = List.map snd bls_delegates_with_slots in
   check_preattestations_aggregate_result ~committee:delegates result
 
 let test_attestations_aggregate_invalid_signature () =
@@ -537,7 +539,7 @@ let test_multiple_aggregates_per_block_forbidden () =
   (* Craft one attestations_aggregate per attester *)
   let* aggregates =
     List.map_es
-      (fun ((delegate : RPC.Validators.t), _) ->
+      (fun (_, (delegate : RPC.Validators.t)) ->
         Op.attestations_aggregate ~committee:[delegate.consensus_key] block)
       bls_delegates_with_slots
   in
@@ -554,7 +556,7 @@ let test_multiple_aggregates_per_block_forbidden () =
   let* block' = Block.bake block in
   let* aggregates =
     List.map_es
-      (fun ((delegate : RPC.Validators.t), _) ->
+      (fun (_, (delegate : RPC.Validators.t)) ->
         Op.preattestations_aggregate ~committee:[delegate.consensus_key] block')
       bls_delegates_with_slots
   in
