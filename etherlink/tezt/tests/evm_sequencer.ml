@@ -2750,6 +2750,20 @@ let test_fa_reentrant_deposit_reverts =
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
 
+  let* () =
+    Eth_cli.add_abi ~label:"claim" ~abi:(fa_withdrawal_abi_path ()) ()
+  in
+  let claim =
+    Eth_cli.contract_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~abi_label:"claim"
+      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~method_call:(sf {|claim(%d)|} 0)
+  in
+  let produce_block () = Rpc.produce_block sequencer in
+  let* _res = wait_for_application ~produce_block claim in
+
   (* If the call to the proxy fails, the owner of the ticket is the receiver,
      not the proxy.
 
@@ -13145,6 +13159,181 @@ let test_durable_storage_consistency =
   in
   unit
 
+let get_deposit_nonce_from_latest_block evm_node =
+  let*@ block =
+    Rpc.get_block_by_number ~full_tx_objects:true ~block:"latest" evm_node
+  in
+
+  let*@ json =
+    match block.transactions with
+    | Block.Full (tx :: _) ->
+        Rpc.trace_transaction
+          ~transaction_hash:tx.Transaction.hash
+          ~tracer:"callTracer"
+          evm_node
+    | _ -> Test.fail "Inconsistent result"
+  in
+
+  let data =
+    JSON.(json |-> "logs" |> as_list |> List.hd |-> "data" |> as_string)
+  in
+  let cleaned = String.sub data 2 (String.length data - 2) in
+  let nonce_string = String.sub cleaned 0 32 in
+  let nonce = Z.of_string_base 16 nonce_string in
+  return nonce
+
+let expect_failure msg k =
+  Lwt.catch
+    (fun () ->
+      let* _ = k () in
+      Test.fail msg)
+    (fun _ -> unit)
+
+let test_fa_deposit_can_be_claimed =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "fa_deposit"; "claim"]
+    ~time_between_blocks:Nothing
+    ~use_dal:Register_without_feature
+    ~enable_fa_bridge:true
+    ~use_multichain:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+    ~maximum_allowed_ticks:2_000_000_000L
+    ~title:"Claims are operational"
+  @@ fun {
+           client;
+           sequencer;
+           sc_rollup_address;
+           proxy;
+           sc_rollup_node;
+           evm_version;
+           _;
+         }
+             _protocol ->
+  let* l1_contract =
+    Client.originate_contract
+      ~alias:"l1_contract"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap4.public_key_hash
+      ~prg:"etherlink/tezos_contracts/fa_deposit.tz"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+
+  Log.info "%s originated" l1_contract ;
+
+  let* incrementor = Solidity_contracts.incrementor evm_version in
+
+  let* incrementor, _tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:incrementor.abi
+         ~bin:incrementor.bin)
+      sequencer
+  in
+
+  Log.info "Incrementor: %s" incrementor ;
+
+  let* proxy = Solidity_contracts.incrementor_proxy evm_version in
+
+  let* proxy, _tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~args:(sf {|["%s"]|} incrementor)
+         ~abi:proxy.abi
+         ~bin:proxy.bin)
+      sequencer
+  in
+
+  Log.info "Proxy: %s" proxy ;
+
+  let proxy_without_0x = String.sub proxy 2 (String.length proxy - 2) in
+
+  let* () =
+    Client.transfer
+      ~giver:Constant.bootstrap4.public_key_hash
+      ~receiver:l1_contract
+      ~arg:
+        (sf
+           {|Pair 50 (Pair 0x%s%s "%s")|}
+           proxy_without_0x
+           proxy_without_0x
+           sc_rollup_address)
+      ~amount:Tez.zero
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
+
+  let*@ _ = produce_block ~wait_on_blueprint_applied:true sequencer in
+
+  let* nonce = get_deposit_nonce_from_latest_block sequencer in
+
+  let* () =
+    Eth_cli.add_abi ~label:"claim" ~abi:(fa_withdrawal_abi_path ()) ()
+  in
+
+  let claim =
+    Eth_cli.contract_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~abi_label:"claim"
+      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~method_call:(sf {|claim(%d)|} (Z.to_int nonce))
+      ~value:Wei.zero
+  in
+  let produce_block () = Rpc.produce_block sequencer in
+  let* _res = wait_for_application ~produce_block claim in
+
+  let*@ block =
+    Rpc.get_block_by_number ~full_tx_objects:true ~block:"latest" sequencer
+  in
+
+  let*@ _json =
+    match block.transactions with
+    | Block.Full (tx :: _) ->
+        Rpc.trace_transaction
+          ~transaction_hash:tx.Transaction.hash
+          ~tracer:"callTracer"
+          sequencer
+    | _ -> Test.fail "Inconsistent result"
+  in
+
+  let* () =
+    expect_failure "Claiming the same deposit twice should fail" @@ fun () ->
+    Eth_cli.contract_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~abi_label:"claim"
+      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~method_call:(sf {|claim(%d)|} (Z.to_int nonce))
+      ~value:Wei.zero
+      ()
+  in
+
+  let* () =
+    expect_failure "Invalid claim should fail" @@ fun () ->
+    Eth_cli.contract_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~abi_label:"claim"
+      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~method_call:(sf {|claim(42)|})
+      ~value:Wei.zero
+      ()
+  in
+
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -13326,4 +13515,5 @@ let () =
   test_tezlink_version [Alpha] ;
   test_tezlink_constants [Alpha] ;
   test_tezlink_produceBlock [Alpha] ;
-  test_tezlink_chain_id [Alpha]
+  test_tezlink_chain_id [Alpha] ;
+  test_fa_deposit_can_be_claimed [Alpha]

@@ -420,6 +420,18 @@ let delegatecall_delegated =
     ~label:"delegatecall_delegated"
     ~contract:"Delegated"
 
+let incrementor =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/incrementor_proxy.sol")
+    ~label:"incrementor"
+    ~contract:"Incrementor"
+
+let incrementor_proxy =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/incrementor_proxy.sol")
+    ~label:"proxy"
+    ~contract:"Proxy"
+
 module Precompile = struct
   let withdrawal = "0xff00000000000000000000000000000000000001"
 

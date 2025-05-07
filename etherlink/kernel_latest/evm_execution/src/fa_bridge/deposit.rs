@@ -28,17 +28,21 @@
 //! (regardless of the inner proxy contract call result) and can be used for
 //! indexing.
 
+use alloy_primitives::bytes::BytesMut;
 use alloy_sol_types::SolEvent;
 use primitive_types::{H160, H256, U256};
-use rlp::{Encodable, RlpDecodable, RlpEncodable};
+use rlp::{Encodable, RlpDecodable, RlpEncodable, RlpStream};
 use sha3::{Digest, Keccak256};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::Log;
 use tezos_smart_rollup_encoding::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 
-use crate::utilities::{
-    alloy::{h160_to_alloy, u256_to_alloy},
-    bigint_to_u256, keccak256_hash,
+use crate::{
+    precompiles::FA_BRIDGE_PRECOMPILE_ADDRESS,
+    utilities::{
+        alloy::{h160_to_alloy, u256_to_alloy},
+        bigint_to_u256, keccak256_hash,
+    },
 };
 
 use super::error::FaBridgeError;
@@ -47,11 +51,18 @@ use super::error::FaBridgeError;
 /// This is function selector: https://docs.soliditylang.org/en/latest/abi-spec.html#function-selector
 pub const FA_PROXY_DEPOSIT_METHOD_ID: &[u8; 4] = b"\x0e\xfe\x6a\x8b";
 
+pub const FA_CLAIM_METHOD_ID: &[u8; 4] = b"\x37\x96\x07\xf5";
+
 /// Keccak256 of Deposit(uint256,address,address,uint256,uint256,uint256)
 /// This is main topic (non-anonymous event): https://docs.soliditylang.org/en/latest/abi-spec.html#events
 pub const FA_DEPOSIT_EVENT_TOPIC: &[u8; 32] = b"\
     \x7e\xe7\xa1\xde\x9c\x18\xce\x69\x5c\x95\xb8\xb1\x9f\xbd\xf2\x6c\
     \xce\x35\x44\xe3\xca\x9e\x08\xc9\xf4\x87\x77\x67\x83\xd7\x59\x9f";
+
+/// Keccak256 of QueuedDeposit(uint256,address,uint256,uint256,uint256)
+pub const FA_QUEUED_DEPOSIT_EVENT_TOPIC: &[u8; 32] =
+    b"\x27\xa8\x8c\x03\x46\x49\x43\x4b\x9c\x0d\xd0\xbf\x36\xed\x46\x82\
+      \x2c\xad\x64\x27\xda\xb6\x9d\x15\x87\x0d\xa9\x5c\x0e\x06\x9a\xcd";
 
 /// Overapproximation for the typical FA ticket payload (ticketer address and content)
 const TICKET_PAYLOAD_SIZE_HINT: usize = 200;
@@ -67,6 +78,16 @@ alloy_sol_types::sol! {
 alloy_sol_types::sol! {
     event SolDepositEvent (
         address ticket_owner,
+        address receiver,
+        uint256 amount,
+        uint256 inbox_level,
+        uint256 inbox_msg_id,
+    );
+}
+
+alloy_sol_types::sol! {
+    event SolQueuedDepositEvent (
+        uint256 nonce,
         address receiver,
         uint256 amount,
         uint256 inbox_level,
@@ -116,28 +137,6 @@ impl FaDeposit {
         ))
     }
 
-    /// Returns calldata for the proxy (ERC wrapper) contract.
-    ///
-    /// Signature: deposit(address,uint256,uint256)
-    pub fn calldata(&self) -> Vec<u8> {
-        let mut call_data = Vec::with_capacity(100);
-        call_data.extend_from_slice(FA_PROXY_DEPOSIT_METHOD_ID);
-
-        let calldata_ = SolDepositProxyCallData {
-            receiver: h160_to_alloy(&self.receiver),
-            amount: u256_to_alloy(&self.amount).unwrap_or_default(),
-            ticket_hash: u256_to_alloy(&U256::from_big_endian(
-                self.ticket_hash.as_bytes(),
-            ))
-            .unwrap_or_default(),
-        };
-
-        let data = SolDepositProxyCallData::encode_data(&calldata_);
-        call_data.extend_from_slice(&data);
-
-        call_data
-    }
-
     /// Returns log structure for an implicit deposit event.
     ///
     /// This event is added to the outer transaction receipt,
@@ -183,6 +182,104 @@ impl FaDeposit {
             "FA deposit {} of {} for {} via {:?}",
             self.amount, self.ticket_hash, self.receiver, self.proxy
         )
+    }
+
+    pub fn to_fa_deposit_with_proxy(&self) -> Option<FaDepositWithProxy> {
+        self.proxy.map(|proxy| FaDepositWithProxy {
+            amount: self.amount,
+            receiver: self.receiver,
+            proxy,
+            ticket_hash: self.ticket_hash,
+            inbox_level: self.inbox_level,
+            inbox_msg_id: self.inbox_msg_id,
+        })
+    }
+}
+
+/// Deposit structure decoded and encoded to the deposit queue
+#[derive(Debug, PartialEq, Clone, RlpEncodable, RlpDecodable)]
+pub struct FaDepositWithProxy {
+    /// Original ticket transfer amount
+    pub amount: U256,
+    /// Final deposit receiver address on L2
+    pub receiver: H160,
+    /// Optional proxy contract address on L2 (ERC wrapper)
+    pub proxy: H160,
+    /// Digest of the pair (ticketer address + ticket content)
+    pub ticket_hash: H256,
+    /// Inbox level containing the original deposit message
+    pub inbox_level: u32,
+    /// Inbox message id (can be used for tracking and as nonce)
+    pub inbox_msg_id: u32,
+}
+
+impl FaDepositWithProxy {
+    pub fn to_fa_deposit(&self) -> FaDeposit {
+        FaDeposit {
+            amount: self.amount,
+            receiver: self.receiver,
+            proxy: Some(self.proxy),
+            ticket_hash: self.ticket_hash,
+            inbox_level: self.inbox_level,
+            inbox_msg_id: self.inbox_msg_id,
+        }
+    }
+
+    pub fn to_rlp_bytes(&self) -> BytesMut {
+        let mut stream = RlpStream::new();
+        stream.append(self);
+        stream.out()
+    }
+
+    /// Returns calldata for the proxy (ERC wrapper) contract.
+    ///
+    /// Signature: deposit(address,uint256,uint256)
+    pub fn calldata(&self) -> Vec<u8> {
+        let mut call_data = Vec::with_capacity(100);
+        call_data.extend_from_slice(FA_PROXY_DEPOSIT_METHOD_ID);
+
+        let calldata_ = SolDepositProxyCallData {
+            receiver: h160_to_alloy(&self.receiver),
+            amount: u256_to_alloy(&self.amount).unwrap_or_default(),
+            ticket_hash: u256_to_alloy(&U256::from_big_endian(
+                self.ticket_hash.as_bytes(),
+            ))
+            .unwrap_or_default(),
+        };
+
+        let data = SolDepositProxyCallData::encode_data(&calldata_);
+        call_data.extend_from_slice(&data);
+
+        call_data
+    }
+
+    pub fn queued_log(&self, withdrawal_id: &U256) -> Log {
+        let queued_data = SolQueuedDepositEvent {
+            nonce: u256_to_alloy(withdrawal_id).unwrap_or_default(),
+            receiver: h160_to_alloy(&self.receiver),
+            amount: u256_to_alloy(&self.amount).unwrap_or_default(),
+            inbox_level: u256_to_alloy(&U256::from(self.inbox_level)).unwrap_or_default(),
+            inbox_msg_id: u256_to_alloy(&U256::from(self.inbox_msg_id))
+                .unwrap_or_default(),
+        };
+
+        let data = queued_data.encode_data();
+
+        let mut topics_proxy = [0u8; 32];
+        topics_proxy[12..].copy_from_slice(self.proxy.as_bytes());
+
+        Log {
+            // Emitted by the fa bridge precompile contract
+            address: FA_BRIDGE_PRECOMPILE_ADDRESS,
+            // Event ID (non-anonymous) and indexed fields
+            topics: vec![
+                H256(*FA_QUEUED_DEPOSIT_EVENT_TOPIC),
+                self.ticket_hash,
+                H256(topics_proxy),
+            ],
+            // Non-indexed fields
+            data,
+        }
     }
 }
 
@@ -364,7 +461,7 @@ mod tests {
         );
 
         pretty_assertions::assert_eq!(
-            hex::encode(deposit.calldata()),
+            hex::encode(deposit.to_fa_deposit_with_proxy().unwrap().calldata()),
             "0efe6a8b\
             0000000000000000000000000404040404040404040404040404040404040404\
             0000000000000000000000000000000000000000000000000000000000000001\
@@ -405,6 +502,17 @@ mod tests {
             .to_vec()
         );
         assert!(event_log.address.is_zero());
+
+        assert_eq!(
+            FA_CLAIM_METHOD_ID.to_vec(),
+            Keccak256::digest(b"claim(uint256)")[..4].to_vec()
+        );
+
+        assert_eq!(
+            FA_QUEUED_DEPOSIT_EVENT_TOPIC.to_vec(),
+            Keccak256::digest(b"QueuedDeposit(uint256,address,uint256,uint256,uint256)")
+                .to_vec()
+        );
     }
 
     #[test]

@@ -13,9 +13,6 @@
 //!
 //! Read more: https://blog.openzeppelin.com/reentrancy-after-istanbul
 
-use std::borrow::Cow;
-
-use evm::ExitError;
 use primitive_types::H160;
 
 #[derive(Debug)]
@@ -28,6 +25,17 @@ pub struct ReentrancyGuard {
     /// Current call depth (only precompile calls count)
     level: u32,
 }
+
+/// Raw encoding of "Circular calls are not allowed" revert output
+pub const CIRCULAR_CALLS_ARE_NOT_ALLOWED: &[u8; 88] = &[
+    0x08, 0xc3, 0x79, 0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e,
+    0x43, 0x69, 0x72, 0x63, 0x75, 0x6c, 0x61, 0x72, 0x20, 0x63, 0x61, 0x6c, 0x6c, 0x73,
+    0x20, 0x61, 0x72, 0x65, 0x20, 0x6e, 0x6f, 0x74, 0x20, 0x61, 0x6c, 0x6c, 0x6f, 0x77,
+    0x65, 0x64, 0x00, 0x00,
+];
 
 impl ReentrancyGuard {
     /// Create new reentrancy guard from a list of impure precompiles.
@@ -43,12 +51,10 @@ impl ReentrancyGuard {
     ///
     /// If the address belongs to an impure precompile this method AND
     /// this is a circular call then this method will fail with an error.
-    pub fn begin_precompile_call(&mut self, address: &H160) -> Result<(), ExitError> {
+    pub fn begin_precompile_call(&mut self, address: &H160) -> Result<(), Vec<u8>> {
         if self.stoplist.contains(address) {
             if self.enabled_at.is_some() {
-                return Err(ExitError::Other(Cow::from(
-                    "Circular calls are not allowed",
-                )));
+                return Err(CIRCULAR_CALLS_ARE_NOT_ALLOWED.to_vec());
             }
             self.enabled_at = Some(self.level);
         }

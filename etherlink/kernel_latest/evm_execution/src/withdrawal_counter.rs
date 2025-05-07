@@ -22,6 +22,12 @@ use crate::account_storage::{AccountStorageError, EthereumAccount};
 pub const WITHDRAWAL_COUNTER_PATH: RefPath = RefPath::assert_from(b"/withdrawal_counter");
 
 pub trait WithdrawalCounter {
+    #[cfg(test)]
+    fn withdrawal_counter_get(
+        &self,
+        host: &mut impl Runtime,
+    ) -> Result<U256, AccountStorageError>;
+
     /// Returns current withdrawal ID from the storage (or 0 if it's not initialized)
     /// and increments & store the new value (will fail in case of overflow).
     fn withdrawal_counter_get_and_increment(
@@ -31,6 +37,15 @@ pub trait WithdrawalCounter {
 }
 
 impl WithdrawalCounter for EthereumAccount {
+    #[cfg(test)]
+    fn withdrawal_counter_get(
+        &self,
+        host: &mut impl Runtime,
+    ) -> Result<U256, AccountStorageError> {
+        let path = self.custom_path(&WITHDRAWAL_COUNTER_PATH)?;
+        Ok(read_u256_le_default(host, &path, U256::zero())?)
+    }
+
     fn withdrawal_counter_get_and_increment(
         &mut self,
         host: &mut impl Runtime,

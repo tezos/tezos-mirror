@@ -1,0 +1,29 @@
+parameter (pair %default nat (pair bytes address));
+storage unit;
+code { CAR ;
+       UNPAIR ;
+       PUSH (pair nat (option bytes)) (Pair 0 None) ;
+       TICKET ;
+       DIP { UNPAIR } ;
+       IF_NONE { UNIT ; FAILWITH } {} ;
+       SWAP ;
+       PAIR ;
+       LEFT bytes ;
+       LEFT bytes ;
+       SWAP ;
+       CONTRACT (or
+                  (or
+                    (pair %deposit (bytes %routing_info)
+                                   (ticket %ticket (pair nat (option bytes))))
+                    (bytes %b))
+                  (bytes %c)) ;
+       IF_NONE { UNIT ; FAILWITH } {} ;
+       PUSH mutez 0 ;
+       DIG 2 ;
+       TRANSFER_TOKENS ;
+       NIL operation ;
+       SWAP ;
+       CONS ;
+       UNIT ;
+       SWAP ;
+       PAIR }

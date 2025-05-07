@@ -9,7 +9,7 @@ use crate::bridge::Deposit;
 use crate::fees::tx_execution_gas_limit;
 
 use crate::tick_model::constants::BASE_GAS;
-use evm_execution::fa_bridge::{deposit::FaDeposit, FA_DEPOSIT_PROXY_GAS_LIMIT};
+use evm_execution::fa_bridge::{deposit::FaDeposit, FA_DEPOSIT_QUEUE_GAS_LIMIT};
 use evm_execution::EthereumError;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::block::BlockFees;
@@ -151,7 +151,7 @@ impl Transaction {
             TransactionContent::EthereumDelayed(e) => {
                 tx_execution_gas_limit(e, fees, true)
             }
-            TransactionContent::FaDeposit(_) => Ok(FA_DEPOSIT_PROXY_GAS_LIMIT),
+            TransactionContent::FaDeposit(_) => Ok(FA_DEPOSIT_QUEUE_GAS_LIMIT),
         }
     }
 }
