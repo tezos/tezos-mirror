@@ -3167,18 +3167,21 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
   let* _ = Node.wait_for_level node 1 in
   return (node, client)
 
-let spawn_register_key ?hooks ?consensus owner client =
+let spawn_register_key ?hooks ?consensus ?companion owner client =
   spawn_command
     ?hooks
     client
     (["--wait"; "none"; "register"; "key"; owner; "as"; "delegate"]
     @
-    match consensus with
-    | None -> []
-    | Some pk -> ["with"; "consensus"; "key"; pk])
+    match (consensus, companion) with
+    | None, None -> []
+    | Some pk, None -> ["with"; "consensus"; "key"; pk]
+    | None, Some pk -> ["with"; "companion"; "key"; pk]
+    | Some pk1, Some pk2 ->
+        ["with"; "consensus"; "key"; pk1; "and"; "companion"; "key"; pk2])
 
-let register_key ?hooks ?expect_failure ?consensus owner client =
-  spawn_register_key ?hooks ?consensus owner client
+let register_key ?hooks ?expect_failure ?consensus ?companion owner client =
+  spawn_register_key ?hooks ?consensus ?companion owner client
   |> Process.check ?expect_failure
 
 let contract_storage ?hooks ?unparsing_mode address client =
