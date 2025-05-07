@@ -86,6 +86,11 @@ val next_evm_level :
   client:Client.t ->
   unit Lwt.t
 
+(** [check_chain_id ~expected_chain_id ~chain_id] checks that
+    the value received for chain_id is correct using the appropriate
+    type conversions. *)
+val check_chain_id : expected_chain_id:int -> chain_id:string -> unit
+
 (** Path to the directory containing sample inputs. *)
 val kernel_inputs_path : string
 

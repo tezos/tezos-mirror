@@ -46,6 +46,7 @@ val start_private_server :
     performance metrics are enabled. *)
 val start_public_server :
   rpc_server_family:Rpc_types.rpc_server_family ->
+  l2_chain_id:L2_types.chain_id option ->
   ?delegate_health_check_to:Uri.t ->
   ?evm_services:evm_services_methods ->
   ?data_dir:string ->

@@ -101,6 +101,18 @@ let produce_block ?(wait_on_blueprint_applied = true) ?timestamp evm_node =
       match res with Ok () -> return (Ok 0) | Error res -> return (Error res))
   | _ -> assert false
 
+let check_chain_id ~expected_chain_id ~chain_id =
+  let expected_chain_id =
+    let bytes = Bytes.create 4 in
+    Bytes.set_int32_be bytes 0 @@ Int32.of_int expected_chain_id ;
+    bytes |> Tezos_crypto.Hashed.Chain_id.of_bytes_exn
+    |> Tezos_crypto.Hashed.Chain_id.to_b58check
+  in
+  Check.(
+    (chain_id = expected_chain_id)
+      string
+      ~error_msg:"Expected %R as chain_id but got %L")
+
 let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
   | Proxy ->

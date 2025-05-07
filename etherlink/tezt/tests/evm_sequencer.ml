@@ -675,6 +675,27 @@ let test_tezlink_constants =
   in
   unit
 
+let test_tezlink_chain_id =
+  register_tezlink_test
+    ~title:"Test of the chain_id rpc"
+    ~tags:["rpc"; "chain_id"]
+  @@ fun {sequencer; client; l2_chains; _} _protocol ->
+  let expected_chain_id =
+    match l2_chains with
+    | [l2_chain] -> l2_chain.l2_chain_id
+    | _ -> Test.fail ~__LOC__ "Expected one l2 chain"
+  in
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "tezlink"})
+  in
+  let* chain_id =
+    Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_chain_id ()
+  in
+  check_chain_id ~expected_chain_id ~chain_id ;
+  unit
+
 let test_make_l2_kernel_installer_config chain_family =
   Protocol.register_test
     ~__FILE__
@@ -13294,4 +13315,5 @@ let () =
   test_tezlink_protocols [Alpha] ;
   test_tezlink_version [Alpha] ;
   test_tezlink_constants [Alpha] ;
-  test_tezlink_produceBlock [Alpha]
+  test_tezlink_produceBlock [Alpha] ;
+  test_tezlink_chain_id [Alpha]

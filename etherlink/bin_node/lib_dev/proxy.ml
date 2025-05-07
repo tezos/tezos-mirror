@@ -178,7 +178,7 @@ let main
       ~rollup_node_endpoint
       ()
   in
-  let* chain_family =
+  let* l2_chain_id, chain_family =
     if finalized_view then
       if
         (* When finalized_view is set, it's too early to request the
@@ -187,23 +187,25 @@ let main
       then
         (* The finalized view of the proxy mode and the multichain feature are not compatible. *)
         tzfail (Node_error.Proxy_finalize_with_multichain `Node)
-      else return L2_types.EVM
+      else return (None, L2_types.EVM)
     else
       let* enable_multichain = Rollup_node_rpc.is_multichain_enabled () in
       match (config.experimental_features.l2_chains, enable_multichain) with
-      | None, false -> return L2_types.EVM
+      | None, false -> return (None, L2_types.EVM)
       | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
-      | Some [_], false ->
+      | Some [l2_chain], false ->
           let*! () = Events.multichain_node_singlechain_kernel () in
-          return L2_types.EVM
+          return (Some l2_chain.chain_id, L2_types.EVM)
       | Some [l2_chain], true ->
-          let* chain_family = Rollup_node_rpc.chain_family l2_chain.chain_id in
-          if l2_chain.chain_family = chain_family then return chain_family
+          let chain_id = l2_chain.chain_id in
+          let* chain_family = Rollup_node_rpc.chain_family chain_id in
+          if l2_chain.chain_family = chain_family then
+            return (Some chain_id, chain_family)
           else
             tzfail
               (Node_error.Mismatched_chain_family
                  {
-                   chain_id = l2_chain.chain_id;
+                   chain_id;
                    node_family = l2_chain.chain_family;
                    kernel_family = chain_family;
                  })
@@ -213,6 +215,7 @@ let main
   let* server_finalizer =
     Rpc_server.start_public_server
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
+      ~l2_chain_id
       validation_mode
       config
       tx_container

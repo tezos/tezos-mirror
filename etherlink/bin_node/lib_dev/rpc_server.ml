@@ -144,7 +144,7 @@ let monitor_performances ~data_dir =
   Lwt.dont_wait aux (Fun.const ())
 
 let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
-    ?delegate_health_check_to ?evm_services ?data_dir validation
+    ~l2_chain_id ?delegate_health_check_to ?evm_services ?data_dir validation
     (config : Configuration.t) tx_container ctxt =
   let open Lwt_result_syntax in
   let*! can_start_performance_metrics =
@@ -164,16 +164,22 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
           impl.time_between_blocks
   in
   let*? () = Rpc_types.check_rpc_server_config rpc_server_family config in
-  let register_tezos_services =
+  let* register_tezos_services =
     match rpc_server_family with
     | Rpc_types.Single_chain_node_rpc_server L2_types.Michelson ->
         let (module Backend : Services_backend_sig.S), _ = ctxt in
-        Evm_directory.init_from_resto_directory
+        let* l2_chain_id =
+          match l2_chain_id with
+          | Some l2_chain_id -> return l2_chain_id
+          | None -> Backend.chain_id ()
+        in
+        return @@ Evm_directory.init_from_resto_directory
         @@ Tezos_services.register_tezlink_services
+             ~l2_chain_id
              (module Backend.Tezlink_backend)
     | Single_chain_node_rpc_server L2_types.EVM
     | Multichain_sequencer_rpc_server ->
-        Evm_directory.empty config.experimental_features.rpc_server
+        return @@ Evm_directory.empty config.experimental_features.rpc_server
   in
   (* If spawn_rpc is defined, use it as intermediate *)
   let rpc =
