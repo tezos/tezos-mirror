@@ -27,6 +27,9 @@
 open Protocol
 open Alpha_context
 
+(** The operation representation handled most often in test helpers. *)
+type t = Alpha_context.packed_operation
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3181
    Improve documentation of the operation helpers *)
 
@@ -736,3 +739,52 @@ val zk_rollup_update :
   Operation.packed tzresult Lwt.t
 
 module Micheline = Micheline
+
+(** {!Protocol.type-mode}-related helpers *)
+
+(** Which {!Protocol.type-mode} to test. *)
+type tested_mode = Application | Construction | Mempool
+
+(** [check_validation_and_application ~loc ?error ~predecessor
+    tested_mode operation] tests the validation and application of
+    [operation] in [tested_mode].
+
+    - When [tested_mode] is [Application] or [Construction], a block
+      containing [operation] is baked on top of [predecessor] in the
+      specified mode.
+
+    - When [tested_mode] is [Mempool], a mempool is initialized using
+      [predecessor] as head, then {!Incremental.add_operation} is called
+      on [operation].
+
+    When [error] is [None], we check that everything succeeds,
+    otherwise we check that the error identified by [error] is
+    returned.
+*)
+val check_validation_and_application :
+  loc:string ->
+  ?error:(Environment.Error_monad.error -> bool) ->
+  predecessor:Block.t ->
+  tested_mode ->
+  t ->
+  unit tzresult Lwt.t
+
+(** Calls {!check_validation_and_application} on all {!tested_mode}s
+    successively, with respective errors. *)
+val check_validation_and_application_all_modes_different_outcomes :
+  loc:string ->
+  ?application_error:(Environment.Error_monad.error -> bool) ->
+  ?construction_error:(Environment.Error_monad.error -> bool) ->
+  ?mempool_error:(Environment.Error_monad.error -> bool) ->
+  predecessor:Block.t ->
+  t ->
+  unit tzresult Lwt.t
+
+(** Calls {!check_validation_and_application} on all {!tested_mode}s
+    successively, with the same [error] provided for each mode. *)
+val check_validation_and_application_all_modes :
+  loc:string ->
+  ?error:(Environment.Error_monad.error -> bool) ->
+  predecessor:Block.t ->
+  t ->
+  unit tzresult Lwt.t

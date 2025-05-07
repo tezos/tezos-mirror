@@ -27,6 +27,8 @@
 open Protocol
 open Alpha_context
 
+type t = packed_operation
+
 let pack_operation ctxt signature contents =
   let branch = Context.branch ctxt in
   Operation.pack
@@ -1278,3 +1280,68 @@ let zk_rollup_update ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
   sign ctxt account.sk (Context.branch ctxt) to_sign_op
 
 module Micheline = Micheline
+
+type tested_mode = Application | Construction | Mempool
+
+let show_mode = function
+  | Application -> "Application"
+  | Construction -> "Construction"
+  | Mempool -> "Mempool"
+
+let check_validation_and_application ~loc ?error ~predecessor mode operation =
+  let open Lwt_result_syntax in
+  let check_error res =
+    match error with
+    | Some error -> Assert.proto_error ~loc res error
+    | None ->
+        (* assert success *)
+        let*? (_ : Block.t) = res in
+        return_unit
+  in
+  match mode with
+  | Application ->
+      let*! result =
+        Block.bake ~baking_mode:Application ~operation predecessor
+      in
+      check_error result
+  | Construction ->
+      let*! result = Block.bake ~baking_mode:Baking ~operation predecessor in
+      check_error result
+  | Mempool ->
+      let*! res =
+        let* inc =
+          Incremental.begin_construction ~mempool_mode:true predecessor
+        in
+        let* inc = Incremental.add_operation inc operation in
+        (* Finalization doesn't do much in mempool mode, but some RPCs
+           still call it, so we check that it doesn't fail unexpectedly. *)
+        Incremental.finalize_block inc
+      in
+      check_error res
+
+let check_validation_and_application_all_modes_different_outcomes ~loc
+    ?application_error ?construction_error ?mempool_error ~predecessor operation
+    =
+  List.iter_es
+    (fun (mode, error) ->
+      check_validation_and_application
+        ~loc:(Format.sprintf "%s (%s mode)" loc (show_mode mode))
+        ?error
+        ~predecessor
+        mode
+        operation)
+    [
+      (Application, application_error);
+      (Construction, construction_error);
+      (Mempool, mempool_error);
+    ]
+
+let check_validation_and_application_all_modes ~loc ?error ~predecessor
+    operation =
+  check_validation_and_application_all_modes_different_outcomes
+    ~loc
+    ?application_error:error
+    ?construction_error:error
+    ?mempool_error:error
+    ~predecessor
+    operation
