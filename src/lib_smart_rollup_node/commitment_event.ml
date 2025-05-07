@@ -141,6 +141,17 @@ module Simple = struct
       ("error", trace_encoding)
       ~pp3:Outbox_message.pp_summary
 
+  let outbox_message_missing =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_outbox_message_missing"
+      ~msg:
+        "Outbox level {outbox_level} does not contain any message at index \
+         {message_index}. Please report this error."
+      ~level:Error
+      ("outbox_level", Data_encoding.int32)
+      ("message_index", Data_encoding.int31)
+
   module Publisher = struct
     let section = section @ ["publisher"]
 
@@ -202,6 +213,9 @@ let outbox_message_execution_failed ~outbox_level ~message_index message trace =
     emit
       outbox_message_execution_failed
       (outbox_level, message_index, message, trace))
+
+let outbox_message_missing ~outbox_level ~message_index =
+  Simple.(emit outbox_message_missing (outbox_level, message_index))
 
 module Publisher = struct
   let request_failed view worker_status errors =

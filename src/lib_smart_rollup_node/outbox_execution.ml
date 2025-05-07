@@ -245,7 +245,13 @@ let publish_executable_messages (node_ctxt : _ Node_context.t) =
                   List.assoc ~equal:Int.equal message_index outbox
                 in
                 match message with
-                | None -> assert false
+                | None ->
+                    let*! () =
+                      Commitment_event.outbox_message_missing
+                        ~outbox_level
+                        ~message_index
+                    in
+                    return_unit
                 | Some (Whitelist_update _) ->
                     (* Don't execute whitelist updates as this is done by
                        {!publish_execute_whitelist_update_message}. *)

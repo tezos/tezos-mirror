@@ -78,6 +78,9 @@ val outbox_message_execution_failed :
   tztrace ->
   unit Lwt.t
 
+val outbox_message_missing :
+  outbox_level:int32 -> message_index:int -> unit Lwt.t
+
 (** Events emmitted by the Publisher worker *)
 module Publisher : sig
   (** [request_failed view status errors] emits the event that a worker
