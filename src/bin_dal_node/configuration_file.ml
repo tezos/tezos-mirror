@@ -81,6 +81,7 @@ type t = {
   experimental_features : experimental_features;
   fetch_trusted_setup : bool;
   verbose : bool;
+  ignore_l1_config_peers : bool;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -140,6 +141,7 @@ let default =
     experimental_features = default_experimental_features;
     fetch_trusted_setup = default_fetch_trusted_setup;
     verbose = false;
+    ignore_l1_config_peers = false;
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -186,6 +188,7 @@ let encoding : t Data_encoding.t =
            experimental_features;
            fetch_trusted_setup;
            verbose;
+           ignore_l1_config_peers;
          } ->
       ( ( data_dir,
           rpc_addr,
@@ -202,7 +205,8 @@ let encoding : t Data_encoding.t =
           service_namespace,
           experimental_features,
           fetch_trusted_setup,
-          verbose ) ))
+          verbose,
+          ignore_l1_config_peers ) ))
     (fun ( ( data_dir,
              rpc_addr,
              listen_addr,
@@ -218,7 +222,8 @@ let encoding : t Data_encoding.t =
              service_namespace,
              experimental_features,
              fetch_trusted_setup,
-             verbose ) ) ->
+             verbose,
+             ignore_l1_config_peers ) ) ->
       {
         data_dir;
         rpc_addr;
@@ -236,6 +241,7 @@ let encoding : t Data_encoding.t =
         experimental_features;
         fetch_trusted_setup;
         verbose;
+        ignore_l1_config_peers;
       })
     (merge_objs
        (obj8
@@ -279,7 +285,7 @@ let encoding : t Data_encoding.t =
              ~description:"The point for the DAL node metrics server"
              (Encoding.option P2p_point.Id.encoding)
              None))
-       (obj8
+       (obj9
           (dft
              "history_mode"
              ~description:"The history mode for the DAL node"
@@ -316,7 +322,12 @@ let encoding : t Data_encoding.t =
              ~description:
                "Whether to emit details about frequent logging events"
              bool
-             default.verbose)))
+             default.verbose)
+          (dft
+             "ignore_l1_config_peers"
+             ~description:"Ignore the boot(strap) peers provided by L1"
+             bool
+             default.ignore_l1_config_peers)))
 
 module V0 = struct
   type v0_profile =
@@ -439,6 +450,7 @@ module V0 = struct
       experimental_features = default_experimental_features;
       fetch_trusted_setup = true;
       verbose = false;
+      ignore_l1_config_peers = false;
     }
 end
 
@@ -552,6 +564,7 @@ module V1 = struct
       experimental_features;
       fetch_trusted_setup;
       verbose;
+      ignore_l1_config_peers = false;
     }
 end
 

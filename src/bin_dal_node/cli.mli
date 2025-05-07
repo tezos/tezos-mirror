@@ -60,6 +60,8 @@ type options = {
       In case of [None] at init it is considered as yes.*)
   verbose : bool;
       (** Emit events related to connections. Default value is false. *)
+  ignore_l1_config_peers : bool;
+      (** Ignore the boot(strap) peers provided by L1. *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type

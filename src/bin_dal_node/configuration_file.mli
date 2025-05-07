@@ -67,6 +67,8 @@ type t = {
   verbose : bool;
       (** Whether to emit detailed events for frequently received control
           messages from remote peers. *)
+  ignore_l1_config_peers : bool;
+      (** Ignore the boot(strap) peers provided by L1. *)
 }
 
 (** [default] is the default configuration. *)
