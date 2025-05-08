@@ -10,8 +10,11 @@
 
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
+use std::sync::mpsc;
+use std::sync::mpsc::Sender;
 
 use super::DispatchFn;
 use super::Jitted;
@@ -131,41 +134,94 @@ impl<MC: MemoryConfig, M: JitStateAccess> DispatchCompiler<MC, M> for JIT<MC, M>
 /// JIT compiler for blocks that performs compilation in a
 /// background thread.
 pub struct OutlineCompiler<MC: MemoryConfig, M: JitStateAccess> {
-    jit: JIT<MC, M>,
+    // We will not touch the jit from the execution thread, however we must maintain
+    // a reference to it - to ensure it is not dropped before we are done with execution,
+    // even if the background compilation thread panics.
+    #[expect(unused)]
+    jit: Arc<Mutex<JIT<MC, M>>>,
+    sender: Sender<CompilationRequest>,
 }
 
-impl<MC: MemoryConfig, M: JitStateAccess> Default for OutlineCompiler<MC, M> {
-    fn default() -> Self {
-        Self {
-            jit: Default::default(),
-        }
+impl<MC: MemoryConfig + Send, M: JitStateAccess + Send + 'static> OutlineCompiler<MC, M> {
+    fn new() -> Self {
+        let (sender, receiver) = mpsc::channel();
+        let jit: Arc<Mutex<JIT<MC, M>>> = Default::default();
+
+        let compiler = Self {
+            jit: jit.clone(),
+            sender,
+        };
+
+        std::thread::spawn(move || {
+            {
+                let mut jit = jit.lock().expect("Only this thread locks the JIT");
+
+                while let Ok(msg) = receiver.recv() {
+                    if let Some(jitfn) = jit.compile(&msg.instr) {
+                        // Safety: this function will be retrieved as a DispatchFn, rather than a
+                        // JitFn. The two function signatures are identical, apart from the first and
+                        // last parameters. These are both thin-pointers, and ignored by the JitFn.
+                        //
+                        // It's therefore safe to cast this function pointer to an identical ABI, where
+                        // this first and last parameter are thin-references to any value. This is the
+                        // case for both `Jitted` and `Jitted::BlockBuilder` which are both Sized.
+                        //
+                        // See <https://doc.rust-lang.org/std/primitive.fn.html#abi-compatibility> for more
+                        // information on ABI compatability.
+                        msg.fun.store(jitfn as usize, Ordering::Release);
+                    };
+                }
+            }
+            // because we used blocking recv with an asynchronous channel, this only fails when the
+            // other end of the channel has been dropped.
+            //
+            // This means the BlockBuilder has been dropped - and thus execution has stopped.
+            // We are therefore safe to drop the JIT.
+        });
+
+        compiler
     }
 }
 
-impl<MC: MemoryConfig, M: JitStateAccess> DispatchCompiler<MC, M> for OutlineCompiler<MC, M> {
+impl<MC: MemoryConfig + Send, M: JitStateAccess + Send + 'static> Default
+    for OutlineCompiler<MC, M>
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<MC: MemoryConfig + Send, M: JitStateAccess + Send + 'static> DispatchCompiler<MC, M>
+    for OutlineCompiler<MC, M>
+{
     fn compile(
         &mut self,
         target: &mut DispatchTarget<Self, MC, M>,
         instr: Vec<Instruction>,
     ) -> DispatchFn<Self, MC, M> {
-        let fun = match self.jit.compile(&instr) {
-            Some(jitfn) => {
-                // Safety: the two function signatures are identical, apart from the first and
-                // last parameters. These are both thin-pointers, and ignored by the JitFn.
-                //
-                // It's therefore safe to cast this function pointer to an identical ABI, where
-                // this first and last parameter are thin-references to any value. This is the
-                // case for both `Jitted` and `Jitted::BlockBuilder` which are both Sized.
-                //
-                // See <https://doc.rust-lang.org/std/primitive.fn.html#abi-compatibility> for more
-                // information on ABI compatability.
-                unsafe { std::mem::transmute::<JitFn<MC, M>, DispatchFn<Self, MC, M>>(jitfn) }
-            }
-            None => Jitted::run_block_not_compiled,
+        let request = CompilationRequest {
+            instr,
+            fun: target.fun.clone(),
         };
 
-        target.set(fun);
+        // This will always succeed, unless the compilation thread has panicked
+        // (as this would result in the receiving end of the channel being closed).
+        //
+        // If it has, execution must still continue - but everything will fallback
+        // to interpreted mode.
+        //
+        // NB - any blocks already JIT compiled are safe to keep calling, as the
+        // data behind the mutex (the JIT) is kept alive for as long as we maintain
+        // our reference to it, despite the lock itself being poisoned.
+        let _ = self.sender.send(request);
 
+        let fun = Jitted::run_block_not_compiled;
+        target.set(fun);
         fun
     }
+}
+
+struct CompilationRequest {
+    instr: Vec<Instruction>,
+    fun: Arc<AtomicUsize>,
 }
