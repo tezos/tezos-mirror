@@ -6,6 +6,8 @@
 
 use std::mem;
 
+use crate::instruction_context::ICB;
+use crate::instruction_context::LoadStoreWidth;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory;
 use crate::machine_state::registers::XRegister;
@@ -155,4 +157,38 @@ where
     ) -> Result<(), Exception> {
         self.run_amo(rs1, rs2, rd, f, |x| x, |x| x)
     }
+}
+
+/// Generic implementation of any atomic memory operation which works on 64-bit values,
+/// implementing read-modify-write operations for multi-processor synchronisation
+/// (Section 8.4)
+fn run_amo_d<I: ICB>(
+    icb: &mut I,
+    rs1: XRegister,
+    rs2: XRegister,
+    rd: XRegister,
+    f: fn(I::XValue, I::XValue, &mut I) -> I::XValue,
+) -> I::IResult<()> {
+    let address_rs1 = icb.xregister_read(rs1);
+
+    // Handle the case where the address is not aligned.
+    let result = icb.atomic_access_fault_guard(address_rs1, LoadStoreWidth::Double);
+
+    // Continue with the operation if the address is aligned.
+    let val_rs1_result = I::and_then(result, |_| {
+        icb.main_memory_load(address_rs1, false, LoadStoreWidth::Double)
+    });
+
+    // Continue with the operation if the load was successful.
+    I::and_then(val_rs1_result, |val_rs1| {
+        // Apply the binary operation to the loaded value and the value in rs2
+        let val_rs2 = icb.xregister_read(rs2);
+        let res = f(val_rs1, val_rs2, icb);
+
+        // Write the value read fom the address in rs1 in rd
+        icb.xregister_write(rd, val_rs1);
+
+        // Store the resulting value to the address in rs1
+        icb.main_memory_store(address_rs1, res, LoadStoreWidth::Double)
+    })
 }
