@@ -101,3 +101,50 @@ where
         (self.on_ok)(&mut builder.builder)
     }
 }
+
+/// Helper type for producing the required IR for the address alignment check at the beginning
+/// of an atomic operation.
+///
+/// The only way to access the values that will be returned on success, is via the
+/// [`Errno::handle`] method.
+pub(crate) struct AtomicAccessGuard {
+    errno: ir::Value,
+    address: ir::Value,
+}
+
+impl AtomicAccessGuard {
+    /// Construct a new `Errno` that must be handled.
+    pub(crate) fn new(errno: ir::Value, address: ir::Value) -> Self {
+        Self { errno, address }
+    }
+}
+
+impl<MC: MemoryConfig, JSA: JitStateAccess> Errno<(), MC, JSA> for AtomicAccessGuard {
+    fn handle(self, builder: &mut super::Builder<'_, MC, JSA>) {
+        let error_branch = builder.builder.create_block();
+        let fallthrough = builder.builder.create_block();
+
+        builder
+            .builder
+            .ins()
+            .brif(self.errno, error_branch, &[], fallthrough, &[]);
+
+        // both IR blocks need access to the dynamic values at this point in time.
+        // These are modified by the jump to the end block below, and possibly by the
+        // `on_branching` function.
+        let snapshot = builder.dynamic;
+
+        builder.builder.switch_to_block(error_branch);
+
+        let exception_ptr = builder
+            .jsa_call
+            .raise_store_amo_access_fault_exception(&mut builder.builder, self.address);
+        builder.handle_exception(exception_ptr);
+
+        builder.builder.seal_block(error_branch);
+
+        // Restore the dynamic values to the branching point, for the fallthrough block.
+        builder.dynamic = snapshot;
+        builder.builder.switch_to_block(fallthrough)
+    }
+}

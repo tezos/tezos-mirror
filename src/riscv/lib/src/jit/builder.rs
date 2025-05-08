@@ -20,6 +20,7 @@ use cranelift::codegen::ir::condcodes::IntCC;
 use cranelift::codegen::ir::types::I32;
 use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
+use errno::AtomicAccessGuard;
 
 use self::block_state::DynamicValues;
 use self::errno::Errno;
@@ -28,6 +29,8 @@ use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::instruction_context::LoadStoreWidth;
 use crate::instruction_context::Predicate;
+use crate::instruction_context::arithmetic::Arithmetic;
+use crate::instruction_context::comparable::Comparable;
 use crate::jit::builder::block_state::PCUpdate;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::memory::MemoryConfig;
@@ -327,6 +330,26 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
         });
 
         ProgramCounterUpdate::Next(instr_width)
+    }
+
+    fn atomic_access_fault_guard(
+        &mut self,
+        address: Self::XValue,
+        width: LoadStoreWidth,
+    ) -> Self::IResult<()> {
+        let width = self.xvalue_of_imm(width as i64);
+        let remainder = address.modulus(width, self);
+
+        // The steps of taking the comparison are technically not needed, as cranelift will
+        // treat any non-zero value as a take-branch (i.e. raise exception) value, so we could
+        // pass the remainder directly. However for completeness and clarity, we are keeping the
+        // comparison here.
+        let zero = self.xvalue_of_imm(0);
+        let not_aligned = remainder.compare(zero, Predicate::NotEqual, self);
+        let errno = AtomicAccessGuard::new(not_aligned, address.0);
+        errno.handle(self);
+
+        Some(())
     }
 
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value> {

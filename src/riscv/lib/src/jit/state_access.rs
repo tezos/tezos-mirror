@@ -104,6 +104,7 @@ register_jsa_functions!(
     xreg_write => (JSA::xregister_write::<MC>, AbiCall<3>::args),
     handle_exception => (JSA::handle_exception::<MC>, AbiCall<4>::args),
     raise_illegal_instruction_exception => (JSA::raise_illegal_instruction_exception, AbiCall<1>::args),
+    raise_store_amo_access_fault_exception => (JSA::raise_store_amo_access_fault_exception, AbiCall<2>::args),
     ecall_from_mode => (JSA::ecall::<MC>, AbiCall<2>::args),
     memory_store => (JSA::memory_store::<MC>, AbiCall<5>::args),
     memory_load => (JSA::memory_load::<MC>, AbiCall::<6>::args)
@@ -177,6 +178,17 @@ pub trait JitStateAccess: ManagerReadWrite {
     /// assume it is initialised.
     extern "C" fn raise_illegal_instruction_exception(exception_out: &mut MaybeUninit<Exception>) {
         exception_out.write(Exception::IllegalInstruction);
+    }
+
+    /// Raise an [`Exception::StoreAMOAccessFault`].
+    ///
+    /// Writes the instruction to the given exception memory, after which it would be safe to
+    /// assume it is initialised.
+    extern "C" fn raise_store_amo_access_fault_exception(
+        exception_out: &mut MaybeUninit<Exception>,
+        address: u64,
+    ) {
+        exception_out.write(Exception::StoreAMOAccessFault(address));
     }
 
     /// Raise the appropriate environment-call exception given the current machine mode.
@@ -351,6 +363,7 @@ pub struct JsaCalls<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     xreg_write: Option<FuncRef>,
     handle_exception: Option<FuncRef>,
     raise_illegal_instruction_exception: Option<FuncRef>,
+    raise_store_amo_access_fault_exception: Option<FuncRef>,
     ecall_from_mode: Option<FuncRef>,
     memory_store: Option<FuncRef>,
     memory_load: Option<FuncRef>,
@@ -373,6 +386,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
             xreg_write: None,
             handle_exception: None,
             raise_illegal_instruction_exception: None,
+            raise_store_amo_access_fault_exception: None,
             ecall_from_mode: None,
             memory_store: None,
             memory_load: None,
@@ -439,7 +453,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
 
     /// Emit the required IR to call `raise_illegal_exception`.
     ///
-    /// This sets the exception to `Some(_)` with the illegal instruction exception.
+    /// This returns an initialised pointer to the exception.
     pub(super) fn raise_illegal_instruction_exception(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -461,10 +475,37 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         exception_ptr
     }
 
+    /// Emit the required IR to call [`raise_store_amo_access_fault_exception`].
+    ///
+    /// This returns an initialised pointer to the exception.
+    pub(super) fn raise_store_amo_access_fault_exception(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        address: Value,
+    ) -> Value {
+        let exception_slot = stack::Slot::<Exception>::new(self.ptr_type, builder);
+        let exception_ptr = exception_slot.ptr(builder);
+
+        let raise_store_amo_access_fault = self
+            .raise_store_amo_access_fault_exception
+            .get_or_insert_with(|| {
+                self.module.declare_func_in_func(
+                    self.imports.raise_store_amo_access_fault_exception,
+                    builder.func,
+                )
+            });
+
+        builder
+            .ins()
+            .call(*raise_store_amo_access_fault, &[exception_ptr, address]);
+
+        exception_ptr
+    }
+
     /// Emit the required IR to call `ecall`.
     ///
-    /// This sets the exception to `Some(_)` with the appropriate environment call exception for
-    /// the current machine mode.
+    /// This returns an initialised pointer to the appropriate environment
+    /// call exception for the current machine mode.
     pub(super) fn ecall(&mut self, builder: &mut FunctionBuilder<'_>, core_ptr: Value) -> Value {
         let exception_slot = stack::Slot::<Exception>::new(self.ptr_type, builder);
         let exception_ptr = exception_slot.ptr(builder);

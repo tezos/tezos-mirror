@@ -16,6 +16,7 @@ use comparable::Comparable;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Args;
+use crate::machine_state::memory::Address;
 use crate::machine_state::memory::BadMemoryAccess;
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
@@ -87,7 +88,7 @@ pub trait ICB {
 
     /// Branching instruction.
     ///
-    /// If `predicate` is true, the branch will be taken. The PC update
+    /// If `condition` is true, the branch will be taken. The PC update
     /// will be to the address returned by `take_branch`.
     ///
     /// If false, the PC update is to the next instruction.
@@ -106,6 +107,14 @@ pub trait ICB {
 
     /// Raise an [`Exception::IllegalInstruction`] error.
     fn err_illegal_instruction<In>(&mut self) -> Self::IResult<In>;
+
+    /// Raise an [`Exception::StoreAMOAccessFault`] error if `address` is not
+    /// aligned to the given [`LoadStoreWidth`].
+    fn atomic_access_fault_guard(
+        &mut self,
+        address: Self::XValue,
+        width: LoadStoreWidth,
+    ) -> Self::IResult<()>;
 
     /// Map the fallible-value into a fallible-value of a different type.
     fn map<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
@@ -234,6 +243,23 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
             ProgramCounterUpdate::Set(address)
         } else {
             ProgramCounterUpdate::Next(instr_width)
+        }
+    }
+
+    #[inline(always)]
+    fn atomic_access_fault_guard(
+        &mut self,
+        address: Address,
+        width: LoadStoreWidth,
+    ) -> Self::IResult<()> {
+        let width = self.xvalue_of_imm(width as i64);
+        let remainder = address.modulus(width, self);
+        let zero = self.xvalue_of_imm(0);
+
+        if remainder.compare(zero, Predicate::NotEqual, self) {
+            Err(Exception::StoreAMOAccessFault(address))
+        } else {
+            Ok(())
         }
     }
 
