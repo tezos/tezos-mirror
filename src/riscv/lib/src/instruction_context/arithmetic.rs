@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Implementation of arithmetic instructions in interpreted mode.
+//! Arithmetic operations required in the [`ICB`], including implementations for interpreted mode.
 
 use super::ICB;
 use super::Shift;

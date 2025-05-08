@@ -8,6 +8,7 @@ use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
 use crate::instruction_context::Shift;
 use crate::instruction_context::arithmetic::Arithmetic;
+use crate::instruction_context::comparable::Comparable;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
 use crate::parser::SHIFT_BITMASK;
@@ -256,7 +257,7 @@ pub fn run_set_less_than_immediate_signed(
     let lhs = icb.xregister_read(rs1);
     let rhs = icb.xvalue_of_imm(imm);
 
-    let cmp = icb.xvalue_compare(Predicate::LessThanSigned, lhs, rhs);
+    let cmp = lhs.compare(rhs, Predicate::LessThanSigned, icb);
     let res = icb.xvalue_from_bool(cmp);
 
     icb.xregister_write_nz(rd, res);
@@ -276,7 +277,7 @@ pub fn run_set_less_than_immediate_unsigned(
     let lhs = icb.xregister_read(rs1);
     let rhs = icb.xvalue_of_imm(imm);
 
-    let cmp = icb.xvalue_compare(Predicate::LessThanUnsigned, lhs, rhs);
+    let cmp = lhs.compare(rhs, Predicate::LessThanUnsigned, icb);
     let res = icb.xvalue_from_bool(cmp);
 
     icb.xregister_write_nz(rd, res);
@@ -296,7 +297,7 @@ pub fn run_set_less_than_signed(
     let lhs = icb.xregister_read(rs1);
     let rhs = icb.xregister_read(rs2);
 
-    let cmp = icb.xvalue_compare(Predicate::LessThanSigned, lhs, rhs);
+    let cmp = lhs.compare(rhs, Predicate::LessThanSigned, icb);
     let res = icb.xvalue_from_bool(cmp);
 
     icb.xregister_write_nz(rd, res);
@@ -316,7 +317,7 @@ pub fn run_set_less_than_unsigned(
     let lhs = icb.xregister_read(rs1);
     let rhs = icb.xregister_read(rs2);
 
-    let cmp = icb.xvalue_compare(Predicate::LessThanUnsigned, lhs, rhs);
+    let cmp = lhs.compare(rhs, Predicate::LessThanUnsigned, icb);
     let res = icb.xvalue_from_bool(cmp);
 
     icb.xregister_write_nz(rd, res);

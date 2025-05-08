@@ -8,6 +8,7 @@
 use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
 use crate::instruction_context::arithmetic::Arithmetic;
+use crate::instruction_context::comparable::Comparable;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::parser::instruction::InstrWidth;
@@ -194,8 +195,7 @@ pub fn run_branch<I: ICB>(
 ) -> ProgramCounterUpdate<<I as ICB>::XValue> {
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xregister_read_nz(rs2);
-
-    let cond = icb.xvalue_compare(predicate, lhs, rhs);
+    let cond = lhs.compare(rhs, predicate, icb);
 
     icb.branch(cond, imm, width)
 }
@@ -223,8 +223,7 @@ pub fn run_branch_compare_zero<I: ICB>(
 ) -> ProgramCounterUpdate<<I as ICB>::XValue> {
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xvalue_of_imm(0);
-
-    let cond = icb.xvalue_compare(predicate, lhs, rhs);
+    let cond = lhs.compare(rhs, predicate, icb);
 
     icb.branch(cond, imm, width)
 }
