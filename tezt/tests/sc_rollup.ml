@@ -4382,6 +4382,13 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     let* () = Client.bake_for_and_wait client in
     return address
   in
+  let consumed_outputs outbox_level =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_consumed_outputs
+         ~sc_rollup
+         ~outbox_level
+         ()
+  in
   let check_contract_execution address expected_storage =
     Log.info "Check contract execution" ;
     let* storage = Client.contract_storage address client in
@@ -4546,49 +4553,52 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
           return None
     in
     if Option.is_some expected_error then unit
-    else
-      let* () = check_outbox_execution outbox_level [0] `Executable in
-      if auto_execute_outbox then
+    else if auto_execute_outbox then
+      let* consumed = consumed_outputs outbox_level in
+      if consumed = [0] then (* Already executed automatically *)
+        unit
+      else
+        let* () = check_outbox_execution outbox_level [0] `Executable in
         bake_until_execute_outbox_message
           ~at_least:1
           ~timeout:30.
           client
           rollup_node
-      else
-        let* answer = check_expected_outbox () in
-        match answer with
-        | None -> failwith "Unexpected error during proof generation"
-        | Some {commitment_hash; proof} -> (
-            match expected_l1_error with
-            | None ->
-                let* () = check_outbox_execution outbox_level [0] `Executable in
-                let*! () =
-                  Client.Sc_rollup.execute_outbox_message
-                    ~hooks
-                    ~burn_cap:(Tez.of_int 1)
-                    ~rollup:sc_rollup
-                    ~src:src2
-                    ~commitment_hash
-                    ~proof
-                    client
-                in
-                let* () = Client.bake_for_and_wait client in
-                let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
-                let* _ = Client.RPC.call client @@ RPC.get_chain_block () in
-                unit
-                (* Client.bake_for_and_wait client *)
-            | Some msg ->
-                let*? process =
-                  Client.Sc_rollup.execute_outbox_message
-                    ~hooks
-                    ~burn_cap:(Tez.of_int 10)
-                    ~rollup:sc_rollup
-                    ~src:src2
-                    ~commitment_hash
-                    ~proof
-                    client
-                in
-                Process.check_error ~msg process)
+    else
+      let* answer = check_expected_outbox () in
+      match answer with
+      | None -> failwith "Unexpected error during proof generation"
+      | Some {commitment_hash; proof} -> (
+          match expected_l1_error with
+          | None ->
+              let* () = check_outbox_execution outbox_level [0] `Executable in
+              let*! () =
+                Client.Sc_rollup.execute_outbox_message
+                  ~hooks
+                  ~burn_cap:(Tez.of_int 1)
+                  ~rollup:sc_rollup
+                  ~src:src2
+                  ~commitment_hash
+                  ~proof
+                  client
+              in
+              let* () = Client.bake_for_and_wait client in
+              let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+              let* _ = Client.RPC.call client @@ RPC.get_chain_block () in
+              unit
+              (* Client.bake_for_and_wait client *)
+          | Some msg ->
+              let*? process =
+                Client.Sc_rollup.execute_outbox_message
+                  ~hooks
+                  ~burn_cap:(Tez.of_int 10)
+                  ~rollup:sc_rollup
+                  ~src:src2
+                  ~commitment_hash
+                  ~proof
+                  client
+              in
+              Process.check_error ~msg process)
   in
   let* target_contract_address = originate_target_contract () in
   let* _level = Sc_rollup_node.wait_sync ~timeout:30. rollup_node in
@@ -4601,16 +4611,15 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
       source_contract_address
       target_contract_address
   in
-  let consumed_outputs () =
-    Node.RPC.call node
-    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_consumed_outputs
-         ~sc_rollup
-         ~outbox_level
-         ()
+  let* () =
+    if auto_execute_outbox then (* may be already executed automatically *)
+      unit
+    else
+      let* prior_consumed_outputs = consumed_outputs outbox_level in
+      Check.((prior_consumed_outputs = []) (list int))
+        ~error_msg:"Expected empty list found %L for consumed outputs" ;
+      unit
   in
-  let* prior_consumed_outputs = consumed_outputs () in
-  Check.((prior_consumed_outputs = []) (list int))
-    ~error_msg:"Expected empty list found %L for consumed outputs" ;
   let* () =
     trigger_outbox_message_execution
       ?expected_l1_error
@@ -4621,7 +4630,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
   | None ->
       let* () =
         if Option.is_none expected_l1_error then (
-          let* after_consumed_outputs = consumed_outputs () in
+          let* after_consumed_outputs = consumed_outputs outbox_level in
           Check.((after_consumed_outputs = [message_index]) (list int))
             ~error_msg:"Expected %R found %L for consumed outputs" ;
           unit)
