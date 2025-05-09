@@ -544,11 +544,76 @@ let check_aggregated_consensus_operation kind ~expected found =
           pp
           committee
 
+let check_dal ~expected ~attestations_aggregates ~attestations =
+  match expected with
+  | None -> ()
+  | Some expected ->
+      let open JSON in
+      let aggregated_delegates_with_dal =
+        match attestations_aggregates with
+        | _ :: _ :: _ -> Test.fail "Multiple attestations_aggregate found"
+        | [] -> []
+        | [json] ->
+            let contents = json |-> "contents" |> as_list |> List.hd in
+            (* Filter delegates with DAL *)
+            List.fold_left2
+              (fun acc committee_json metadata_json ->
+                match committee_json |-> "dal_attestation" |> as_string_opt with
+                | Some dal_attestation_as_string ->
+                    let delegate = metadata_json |-> "delegate" |> as_string in
+                    (delegate, Z.of_string dal_attestation_as_string) :: acc
+                | None -> acc)
+              []
+              (contents |-> "committee" |> as_list)
+              (contents |-> "metadata" |-> "committee" |> as_list)
+      in
+      let unaggregated_delegates_with_dal =
+        (* Filter attestations with dal *)
+        List.filter_map
+          (fun json ->
+            let contents = json |-> "contents" |> as_list |> List.hd in
+            match contents |-> "dal_attestation" |> as_string_opt with
+            | Some dal_attestation_as_string ->
+                let delegate =
+                  contents |-> "metadata" |-> "delegate" |> as_string
+                in
+                Some (delegate, Z.of_string dal_attestation_as_string)
+            | None -> None)
+          attestations
+      in
+      let delegates_with_dal =
+        aggregated_delegates_with_dal @ unaggregated_delegates_with_dal
+      in
+      let cmp (d, _) (d', _) = String.compare d d' in
+      let sorted_found = List.sort cmp delegates_with_dal in
+      let sorted_expected =
+        List.map
+          (fun (account, dal) -> (account.Account.public_key_hash, dal))
+          expected
+        |> List.sort cmp
+      in
+      let eq (d, dal) (d', dal') = String.equal d d' && Z.equal dal dal' in
+      if not (List.equal eq sorted_found sorted_expected) then
+        let pp_tuple fmt (delegate, dal_attestation) =
+          Format.fprintf fmt "(%s, %a)" delegate Z.pp_print dal_attestation
+        in
+        let pp = Format.(pp_print_list ~pp_sep:pp_print_cut pp_tuple) in
+        Test.fail
+          "@[<v 0>Wrong dal attestation set@,\
+           @[<v 2>expected:@,\
+           %a@]@,\
+           @[<v 2>found:@,\
+           %a@]@]"
+          pp
+          sorted_expected
+          pp
+          sorted_found
+
 (** Fetch consensus operations and check that they match the expected contents.
     Defaults to "head" if no [block] is provided. *)
 let check_consensus_operations ?expected_attestations_committee
     ?expected_preattestations_committee ?expected_preattestations
-    ?expected_attestations ?block client =
+    ?expected_attestations ?expected_dal_attestations ?block client =
   let* consensus_operations = fetch_consensus_operations ?block client in
   (* Partition the consensus operations list by kind *)
   let ( attestations_aggregates,
@@ -618,6 +683,12 @@ let check_consensus_operations ?expected_attestations_committee
       Preattestation
       ~expected:expected_preattestations
       preattestations
+  in
+  let () =
+    check_dal
+      ~expected:expected_dal_attestations
+      ~attestations_aggregates
+      ~attestations
   in
   unit
 
