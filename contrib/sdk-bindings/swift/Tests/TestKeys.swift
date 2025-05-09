@@ -10,6 +10,8 @@ class TestKeys: XCTestCase {
     public static var allTests = [
       ("blpkToTz4", blpkToTz4),
       ("pkToPkh", pkToPkh),
+      ("sigIntoGenericSig", sigIntoGenericSig),
+      ("blsSigFromGenericSig", blsSigFromGenericSig),
       ("verifyP2sig", verifyP2sig),
       ("verifySig", verifySig),
       ("verifyWrongSig", verifyWrongSig),
@@ -33,6 +35,28 @@ class TestKeys: XCTestCase {
         let pkh = pk.pkHash()
         let b58Pkh = pkh.toB58check()
         XCTAssertEqual(b58Pkh, expectedB58Pkh)
+    }
+
+    func sigIntoGenericSig() {
+        // sk: spsk36wmmgfs88ffW7ujgw9wm511zhZUkM4GnsYxhHMD9ZDy1AsKRa
+        // msg: "a"
+        let b58Sig = "sigaeDzBgzkdvQRhYV2YUFpzYGE19bRe62YdZnnodZMDSXD9P97jBro2v8W2o8a1wRxfJEWJpLEbv2W1TM8jKqBdFCCuKcDp"
+        let sig = try! UnknownSignature.fromB58check(data: b58Sig)
+        let genericSig = sig.intoGeneric()
+        XCTAssertEqual(genericSig.toB58check(), b58Sig)
+        let genericSig2 = Signature.fromUnknownSignature(sig: sig)
+        XCTAssertEqual(genericSig2.toB58check(), b58Sig)
+    }
+
+    func blsSigFromGenericSig() {
+        // sk: BLsk2rrqeqLp7ujt4NSCG8W6xDMFDBm6QHoTabeSQ4HjPDewaX4F6k
+        // msg: "a"
+        let b58Sig = "BLsigBcuqVyAuyYiMhPmcf16B8BmvhujB8DPUAmgYb94ixJ9wkraLfxzJpt2eyWMePtzuRNhRWSF4LukEv39LxAi7nGiH83ihKc9jnyhjbLc76QKTs4h1sTzQQEKR15yF9tSyU39iEsyTx"
+        let genericSig = try! Signature.fromB58check(data: b58Sig)
+        let sig = try! BlsSignature.tryFromGeneric(sig: genericSig)
+        XCTAssertEqual(sig.toB58check(), b58Sig)
+        let sig2 = try! genericSig.tryIntoBlsSignature()
+        XCTAssertEqual(sig2.toB58check(), b58Sig)
     }
 
     func verifyP2sig() {

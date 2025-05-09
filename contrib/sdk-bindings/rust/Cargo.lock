@@ -1152,6 +1152,7 @@ dependencies = [
 name = "tezos-bindings"
 version = "0.1.0"
 dependencies = [
+ "paste",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror",

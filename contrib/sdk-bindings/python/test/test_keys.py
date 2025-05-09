@@ -8,6 +8,7 @@ from tezos import (
     PublicKeyBls,
     PublicKey,
     Signature,
+    Ed25519Signature,
     Secp256k1Signature,
     P256Signature,
     forge_message
@@ -32,6 +33,29 @@ def test_pk_to_pkh():
     pkh = pk.pk_hash()
     b58_pkh = pkh.to_b58check()
     assert b58_pkh == expected_b58_pkh
+
+
+def test_edsig_into_generic_sig():
+    # sk: edsk2stcDLHYC5N5AFowvKTvdQ86zuqQCn7QsFBoFJUgYyHL4xSaYB
+    # msg: "a"
+    b58_sig = "edsigtmnB915emZPLVrk7oyuRtZXrYhc2ychu5e7kHHSd7LUmiCReV5C16HCNXxt6hnnWxSKQmHFvuNZzUm5K1BKWBM2vejS4T1"
+    sig = Ed25519Signature.from_b58check(b58_sig)
+    generic_sig = sig.into_generic()
+    assert generic_sig.to_b58check() == b58_sig
+    generic_sig = Signature.from_ed25519_signature(sig)
+    assert generic_sig.to_b58check() == b58_sig
+
+
+def test_spsig_from_generic_sig():
+    # sk: spsk2YJesPtHH4swmdVdJpGXU1NLnpKiq2nicQFEtR5Eyb6i8Lju4z
+    # msg: "a"
+    b58_sig = "sigmstyCA7dwXvY7UXo8mkUG47WPCybhngBYvHokpnReuZdKZwPoXK8aKp4sEZgAhxeJsnNyJ68Q4zdJyJuSw25JTjxgtVpA"
+    expected_b58_sig = "spsig1VhaJFmN7HW4vHUHmHKu8AjVRCzYfmRNf83caYz6EYqH4PDkaNbh5hofmEoejZmpj2cw7w9iZYDiibgRRKcWzWzrW7GA1E"
+    generic_sig = Signature.from_b58check(b58_sig)
+    sig = Secp256k1Signature.try_from_generic(generic_sig)
+    assert sig.to_b58check() == expected_b58_sig
+    sig = generic_sig.try_into_secp256k1_signature()
+    assert sig.to_b58check() == expected_b58_sig
 
 
 def test_verify_p2sig():
