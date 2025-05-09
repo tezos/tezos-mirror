@@ -10,17 +10,13 @@
 
 use crate::{delayed_inbox::DelayedInbox, transaction::Transaction};
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
-use tezos_evm_runtime::runtime::KernelHost;
-use tezos_smart_rollup_core::rollup_host::RollupHost;
+use tezos_evm_runtime::{internal_runtime::InternalRuntime, runtime::KernelHost};
 use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
 
 const DELAYED_INPUT_PATH: RefPath = RefPath::assert_from(b"/__delayed_input");
 
-#[allow(dead_code)]
-#[no_mangle]
-pub extern "C" fn populate_delayed_inbox() {
-    let sdk_host = unsafe { RollupHost::new() };
-    let mut host = KernelHost::init(sdk_host);
+pub fn populate_delayed_inbox<Host: Runtime + InternalRuntime>(sdk_host: &mut Host) {
+    let mut host: KernelHost<Host, &mut Host> = KernelHost::init(sdk_host);
     let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();
     let transaction = Transaction::from_rlp_bytes(&payload).unwrap();
     let mut delayed_inbox = DelayedInbox::new(&mut host).unwrap();

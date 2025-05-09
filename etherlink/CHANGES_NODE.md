@@ -19,6 +19,8 @@
 
 ### Execution changes
 
+- Supports executing Dionysus natively. (!17975 !17976 !17977)
+
 ### Command-line interface changes
 
 - Renames `--bootstrap-account` and `--bootstrap-balance` to
