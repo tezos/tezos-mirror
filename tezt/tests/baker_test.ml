@@ -598,7 +598,7 @@ let check_consensus_operations ?expected_attestations_committee
       ~expected:expected_attestations_committee
       attestations_aggregates
   in
-  (* Checking attestations_aggregate *)
+  (* Checking preattestations_aggregate *)
   let () =
     check_aggregated_consensus_operation
       Preattestation
