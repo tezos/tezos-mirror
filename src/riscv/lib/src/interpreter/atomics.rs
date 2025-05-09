@@ -8,6 +8,7 @@ use std::mem;
 
 use crate::instruction_context::ICB;
 use crate::instruction_context::LoadStoreWidth;
+use crate::instruction_context::arithmetic::Arithmetic;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory;
 use crate::machine_state::registers::XRegister;
@@ -191,4 +192,80 @@ fn run_amo_d<I: ICB>(
         // Store the resulting value to the address in rs1
         icb.main_memory_store(address_rs1, res, LoadStoreWidth::Double)
     })
+}
+
+/// Loads in rd the value from the address in rs1 and stores the result of
+/// adding it to val(rs2) back to the address in rs1.
+#[expect(
+    unused_variables,
+    reason = "The `aq` and `rl` bits specify additional memory constraints 
+    in multi-hart environments so they are currently ignored."
+)]
+pub fn run_amoaddd<I: ICB>(
+    icb: &mut I,
+    rs1: XRegister,
+    rs2: XRegister,
+    rd: XRegister,
+    aq: bool,
+    rl: bool,
+) -> I::IResult<()> {
+    run_amo_d(icb, rs1, rs2, rd, |x, y, icb| x.add(y, icb))
+}
+
+#[cfg(test)]
+mod test {
+    use proptest::prelude::*;
+
+    use crate::backend_test;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::registers::a0;
+    use crate::machine_state::registers::a1;
+    use crate::machine_state::registers::a2;
+
+    macro_rules! test_amo {
+        ($(#[$m:meta])* $name: ident, $instr: path, $f: expr, $align: expr, $t: ty) => {
+            backend_test!($name, F, {
+                use $crate::machine_state::memory::M4K;
+                use $crate::state::NewState;
+
+                let state = MachineCoreState::<M4K, _>::new(&mut F::manager());
+                let state_cell = std::cell::RefCell::new(state);
+
+                proptest!(|(
+                    r1_addr in (0..1023_u64/$align).prop_map(|x| x * $align),
+                    r1_val in any::<u64>(),
+                    r2_val in any::<u64>(),
+                )| {
+                    let mut state = state_cell.borrow_mut();
+                    state.reset();
+                    state.main_memory.set_all_readable_writeable();
+
+                    state.hart.xregisters.write(a0, r1_addr);
+                    state.write_to_bus(0, a0, r1_val)?;
+                    state.hart.xregisters.write(a1, r2_val);
+                    match $instr(&mut *state, a0, a1, a2, false, false) {
+                        Ok(_) => {}
+                        Err(e) => panic!("Error: {:?}", e),
+                    }
+                    let res: $t = state.read_from_address(r1_addr)?;
+
+                    prop_assert_eq!(
+                        state.hart.xregisters.read(a2) as $t, r1_val as $t);
+
+                    let f = $f;
+                    let expected = f(r1_val as $t, r2_val as $t);
+                    prop_assert_eq!(res, expected);
+                })
+            });
+
+        }
+    }
+
+    test_amo!(
+        test_run_amoaddd,
+        super::run_amoaddd,
+        u64::wrapping_add,
+        8,
+        u64
+    );
 }

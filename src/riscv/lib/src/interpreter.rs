@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-mod atomics;
+pub mod atomics;
 pub mod branching;
 mod common_memory;
 pub mod float;

@@ -42,6 +42,7 @@ use crate::instruction_context::IcbLoweringFn;
 use crate::instruction_context::LoadStoreWidth;
 use crate::instruction_context::Predicate;
 use crate::instruction_context::Shift;
+use crate::interpreter::atomics;
 use crate::interpreter::branching;
 use crate::interpreter::integer;
 use crate::interpreter::load_store;
@@ -696,6 +697,9 @@ impl OpCode {
             Self::X8LoadSigned => Some(Args::run_x8_load_signed),
             Self::X8LoadUnsigned => Some(Args::run_x8_load_unsigned),
 
+            // Atomic instructions
+            Self::Amoaddd => Some(Args::run_amoaddd),
+
             // Errors
             Self::Unknown => Some(Args::run_illegal),
             Self::ECall => Some(Args::run_ecall),
@@ -1120,6 +1124,22 @@ macro_rules! impl_amo_type {
             .map(|_| Next(self.width))
         }
     };
+
+    ($impl: path, $fn: ident) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            let res = $impl(
+                icb,
+                unsafe { self.rs1.x },
+                unsafe { self.rs2.x },
+                unsafe { self.rd.x },
+                self.rl,
+                self.aq,
+            );
+            I::map(res, |_| Next(self.width))
+        }
+    };
 }
 
 macro_rules! impl_ci_type {
@@ -1447,7 +1467,7 @@ impl Args {
     impl_amo_type!(run_lrd);
     impl_amo_type!(run_scd);
     impl_amo_type!(run_amoswapd);
-    impl_amo_type!(run_amoaddd);
+    impl_amo_type!(atomics::run_amoaddd, run_amoaddd);
     impl_amo_type!(run_amoxord);
     impl_amo_type!(run_amoandd);
     impl_amo_type!(run_amoord);
@@ -1843,10 +1863,14 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Amoswapd,
                 args: args.into(),
             },
-            InstrCacheable::Amoaddd(args) => Instruction {
-                opcode: OpCode::Amoaddd,
-                args: args.into(),
-            },
+            InstrCacheable::Amoaddd(args) => Instruction::new_amoaddd(
+                args.rd,
+                args.rs1,
+                args.rs2,
+                args.aq,
+                args.rl,
+                InstrWidth::Uncompressed,
+            ),
             InstrCacheable::Amoxord(args) => Instruction {
                 opcode: OpCode::Amoxord,
                 args: args.into(),

@@ -475,7 +475,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         exception_ptr
     }
 
-    /// Emit the required IR to call [`raise_store_amo_access_fault_exception`].
+    /// Emit the required IR to call `raise_store_amo_access_fault_exception`.
     ///
     /// This returns an initialised pointer to the exception.
     pub(super) fn raise_store_amo_access_fault_exception(
