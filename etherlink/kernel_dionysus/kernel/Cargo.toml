@@ -6,7 +6,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = 'evm_kernel'
+name = 'evm_kernel_dionysus'
 version = '0.1.0'
 edition = '2021'
 build = "build.rs"

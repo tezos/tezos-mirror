@@ -37,7 +37,7 @@ endif
 
 .PHONY: build-evm-execution
 build-evm-execution:
-	@cargo build --target wasm32-unknown-unknown --release --package evm-execution-latest
+	@cargo build --target wasm32-unknown-unknown --release --package evm-execution-dionysus
 
 .PHONY: build-evm-evaluation
 build-evm-evaluation:
