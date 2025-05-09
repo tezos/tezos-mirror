@@ -35,5 +35,6 @@ optional = true
 [features]
 default = []
 inline-jit = []
+outline-jit = []
 metrics = ["octez-riscv/metrics"]
 log = ["octez-riscv/log", "dep:tracing-subscriber"]
