@@ -52,14 +52,11 @@ module Contract = struct
 
   let encoding = Tezlink_imports.Alpha_context.Contract.encoding
 
+  let of_implicit c = Tezlink_imports.Alpha_context.Contract.Implicit c
+
   let of_b58check s =
     Tezlink_imports.Imported_env.wrap_tzresult
     @@ Tezlink_imports.Alpha_context.Contract.of_b58check s
-
-  let to_hex c =
-    let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
-    let (`Hex key) = Hex.of_bytes raw_key in
-    key
 end
 
 module Tez = struct

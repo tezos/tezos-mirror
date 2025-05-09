@@ -781,7 +781,7 @@ Kernel commands:
       [--maximum-gas-per-transaction <30000...>]
       [--eth-bootstrap-balance <9999000000000000000000>]
       [--eth-bootstrap-account <0x...>] [--tez-bootstrap-balance <3800000>]
-      [--tez-bootstrap-account <tz1...>] [--set-code <0x...,0x....>]
+      [--tez-bootstrap-account <edp...>] [--set-code <0x...,0x....>]
       [--world-state-path </evm/world_state/<chain_id>>] [--l2-chain-id <1>]
       [--l2-chain-family <EVM>]
     Produce a file containing the part of the kernel configuration
@@ -803,7 +803,7 @@ Kernel commands:
     --tez-bootstrap-balance <3800000>: Balance (in tez) of the tezlink
       bootstrap accounts
       Defaults to `3800000`.
-    --tez-bootstrap-account <tz1...>: Add a tezlink bootstrap account in the
+    --tez-bootstrap-account <edp...>: Add a tezlink bootstrap account in the
       installer config.
     --set-code <0x...,0x....>: Add code to an account in the installer
       config.

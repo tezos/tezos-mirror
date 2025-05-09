@@ -46,7 +46,7 @@ let manager_key read chain block c =
   Durable_storage.inspect_durable_and_decode_opt
     read
     (Path.manager_key c)
-    (Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding)
+    (Data_encoding.Binary.of_bytes_exn Signature.V1.Public_key.encoding)
 
 let counter read chain block c =
   (* TODO: #7831 !17664

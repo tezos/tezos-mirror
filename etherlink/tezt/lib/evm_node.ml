@@ -1910,7 +1910,7 @@ let make_l2_kernel_installer_config ?chain_id ?chain_family
                (fun tez_bootstrap_account ->
                  [
                    "--tez-bootstrap-account";
-                   tez_bootstrap_account.Account.public_key_hash;
+                   tez_bootstrap_account.Account.public_key;
                  ])
                tez_bootstrap_accounts)
     @
