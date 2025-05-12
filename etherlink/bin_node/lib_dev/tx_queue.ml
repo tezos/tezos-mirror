@@ -1036,15 +1036,6 @@ let beacon ~evm_node_endpoint ~tick_interval =
   in
   loop ()
 
-let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
-    (tx_object : Ethereum_types.legacy_transaction_object) txn =
-  let open Lwt_syntax in
-  let* worker = worker_promise in
-  Worker.Queue.push_request_and_wait
-    worker
-    (Inject {next_nonce; payload = txn; tx_object; callback})
-  |> handle_request_error
-
 let start ~config ~keep_alive () =
   let open Lwt_result_syntax in
   let* worker = Worker.launch table () {config; keep_alive} (module Handlers) in
@@ -1114,6 +1105,15 @@ end
 
 module Tx_container = struct
   let nonce = nonce
+
+  let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
+      (tx_object : Ethereum_types.legacy_transaction_object) txn =
+    let open Lwt_syntax in
+    let* worker = worker_promise in
+    Worker.Queue.push_request_and_wait
+      worker
+      (Inject {next_nonce; payload = txn; tx_object; callback})
+    |> handle_request_error
 
   let add ~next_nonce tx_object ~raw_tx =
     let open Lwt_result_syntax in
