@@ -283,7 +283,10 @@ let constants_mainnet : Constants.Parametric.t =
        Last updated in protocol R. *)
     blocks_per_cycle = 10800l;
     blocks_per_commitment = 240l;
-    nonce_revelation_threshold = 960l;
+    (* Duration in levels of the nonce revelation phase (which precedes the VDF
+       phase).
+       Last updated in protocol S. *)
+    nonce_revelation_threshold = 300l;
     (* [cycles_per_voting_period] is the duration of any voting period.
 
        Last updated in protocol R. *)
@@ -296,13 +299,14 @@ let constants_mainnet : Constants.Parametric.t =
     minimal_stake = Tez.(mul_exn one 6_000);
     minimal_frozen_stake = Tez.(mul_exn one 600);
     (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
-       the block time. At the moment it is equal to 8B = 8000 * 5 * .2M with
-          - 8000 ~= 960 * 8 that is nonce_revelation_threshold * block time
-          - .2M  ~= number of modular squaring per second on benchmark machine
+       the block time. At the moment it is equal to 2400M = 2400 * 5 * 0.2M with
+          - 2400 ~= 300 * 8 that is nonce_revelation_threshold * block time
+          - 0.2M  ~= number of modular squaring per second on benchmark machine
          with 2.8GHz CPU
           - 5: security factor (strictly higher than the ratio between highest CPU
-         clock rate and benchmark machine that is 8.43/2.8 ~= 3 *)
-    vdf_difficulty = 8_000_000_000L;
+         clock rate and benchmark machine that is 9.12/2.8 ~= 3.
+       Last updated in protocol S. *)
+    vdf_difficulty = 2_400_000_000L;
     origination_size = 257;
     issuance_weights =
       {
