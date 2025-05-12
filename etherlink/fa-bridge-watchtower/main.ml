@@ -8,9 +8,7 @@
 
 type global = {data_dir : string; verbosity : Internal_event.level}
 
-let default_data_dir = Filename.concat (Sys.getenv "HOME") ".outbox-monitor"
-
-let default_global = {data_dir = default_data_dir; verbosity = Notice}
+let default_global = {data_dir = Config.default_data_dir; verbosity = Notice}
 
 module Parameter = struct
   let endpoint =
@@ -46,17 +44,11 @@ module Arg = struct
   let debug =
     Tezos_clic.switch ~long:"debug" ~doc:"Sets logging level to debug" ()
 
-  let endpoint ~default ~long ~doc =
-    Tezos_clic.default_arg
-      ~default
-      ~long
-      ~doc
-      ~placeholder:"URL"
-      Parameter.endpoint
+  let endpoint ~long ~doc =
+    Tezos_clic.arg ~long ~doc ~placeholder:"URL" Parameter.endpoint
 
   let evm_node_endpoint =
     endpoint
-      ~default:"http://127.0.0.1:8545"
       ~long:"evm-node"
       ~doc:"Endpoint to reach EVM node. Websocket must be available on `/ws`."
 
@@ -68,7 +60,7 @@ module Arg = struct
         (Format.sprintf
            "Directory where data is stored for the FA bridge watchtower.\n\
             Defaults to `%s`."
-           default_data_dir)
+           Config.default_data_dir)
       ~placeholder:"path"
     @@ Tezos_clic.parameter (fun _ x -> Lwt_result.return x)
 
@@ -147,19 +139,20 @@ let run_command =
     (args3 Arg.evm_node_endpoint Arg.secret_key Arg.first_block)
     (prefixes ["run"] @@ stop)
     (fun {data_dir; verbosity} (evm_node_endpoint, secret_key, first_block) _ ->
-      let secret_key = Stdlib.Option.get secret_key in
       let open Lwt_result_syntax in
+      let* loaded_config = Config.load_file ~data_dir in
+      let config = Option.value ~default:Config.default loaded_config in
       let*! () = log_config ~verbosity ~data_dir in
       let* db = Db.init ~data_dir `Read_write in
-      (* TODO: address and port from config, start server only if present. *)
-      let*! _stop = Rpc_server.start db {addr = "0.0.0.0"; port = 4002} in
-      Etherlink_monitor.start
-        db
-        ~evm_node_endpoint
-        ~first_block
-        ~secret_key
-        ~max_fee_per_gas:(Z.of_int (1_000_000_000 * 100))
-        ~gas_limit:(Z.of_int 1_000_000))
+      let config = Config.patch_config config ~secret_key ~evm_node_endpoint in
+      let*! _stop = Option.map_s (Rpc_server.start db) config.rpc in
+      let* () =
+        match (secret_key, config.secret_key) with
+        | Some _, _ | _, Some _ -> return_unit
+        | None, None ->
+            failwith "secret key not provided neither in config, cli nor env"
+      in
+      Etherlink_monitor.start db ~config ~first_block)
 
 let commands = [run_command]
 

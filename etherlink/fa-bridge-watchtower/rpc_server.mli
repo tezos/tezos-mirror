@@ -6,10 +6,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [rpc] represents the configuration for an RPC server with an address and
-    port *)
-type rpc = {addr : string; port : int}
-
 (** [start db rpc] starts an RPC server with the given database and configuration
     and returns a function that can be called to stop the server *)
-val start : Db.t -> rpc -> (unit -> unit Lwt.t) Lwt.t
+val start : Db.t -> Config.rpc -> (unit -> unit Lwt.t) Lwt.t

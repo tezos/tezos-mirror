@@ -6,8 +6,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type rpc = {addr : string; port : int}
-
 module Event = struct
   include Internal_event.Simple
 
@@ -84,7 +82,7 @@ let register meth path ?input_encoding output_encoding handler =
 
 let make_routes db = List.rev_map (fun f -> f db) !routes
 
-let start db {addr; port} =
+let start db Config.{addr; port} =
   let open Lwt_syntax in
   let stop, resolve_stop = Lwt.wait () in
   let shutdown () =

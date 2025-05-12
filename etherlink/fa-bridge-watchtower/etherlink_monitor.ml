@@ -738,9 +738,9 @@ module Public_key = struct
     Ethereum_types.Address (Ethereum_types.hex_of_string addr)
 end
 
-let start db ~evm_node_endpoint ~first_block ~secret_key ~max_fee_per_gas
-    ~gas_limit =
+let start db ~config ~first_block =
   let open Lwt_result_syntax in
+  let evm_node_endpoint = config.Config.evm_node_endpoint in
   let tx_queue_endpoint = ref (Tx_queue.Rpc evm_node_endpoint) in
   let run () =
     let*! ws_client =
@@ -752,17 +752,19 @@ let start db ~evm_node_endpoint ~first_block ~secret_key ~max_fee_per_gas
     tx_queue_endpoint := Tx_queue.Websocket ws_client ;
     let* () = init_db_pointers db ws_client ~first_block in
     let* chain_id = get_chain_id ws_client in
+    (* We checked that it exists in main.ml *)
+    let secret_key = Stdlib.Option.get config.Config.secret_key in
     let public_key = Public_key.(to_address (from_sk secret_key)) in
     let ctx =
       {
         db;
         ws_client;
-        max_fee_per_gas;
+        max_fee_per_gas = Z.of_int64 config.max_fee_per_gas;
         public_key;
         sk = secret_key;
         chain_id;
-        gas_limit;
-        whitelist = None (* TODO: populate from config. *);
+        gas_limit = Z.of_int64 config.gas_limit;
+        whitelist = config.whitelist;
       }
     in
     monitor_heads ctx
