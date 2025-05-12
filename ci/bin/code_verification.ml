@@ -597,7 +597,7 @@ let jobs pipeline_type =
     job_build_dynamic_binaries
       ~__POS__
       ~arch:Amd64
-      ~cpu:High
+      ~cpu:Very_high
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~dependencies:dependencies_needs_start
