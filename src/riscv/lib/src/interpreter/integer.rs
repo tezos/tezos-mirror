@@ -159,6 +159,45 @@ pub fn run_or(
     icb.xregister_write_nz(rd, res);
 }
 
+/// Perform `val(rs1) | imm` and store the result in `rd`
+pub fn run_x64_or_immediate(
+    icb: &mut impl ICB,
+    imm: i64,
+    rs1: NonZeroXRegister,
+    rd: NonZeroXRegister,
+) {
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xvalue_of_imm(imm);
+    let res = lhs.or(rhs, icb);
+    icb.xregister_write_nz(rd, res);
+}
+
+/// Perform `val(rs1) ^ val(rs2)` and store the result in `rd`
+pub fn run_x64_xor(
+    icb: &mut impl ICB,
+    rs1: NonZeroXRegister,
+    rs2: NonZeroXRegister,
+    rd: NonZeroXRegister,
+) {
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xregister_read_nz(rs2);
+    let res = lhs.xor(rhs, icb);
+    icb.xregister_write_nz(rd, res);
+}
+
+/// Perform `val(rs1) ^ imm` and store the result in `rd`
+pub fn run_x64_xor_immediate(
+    icb: &mut impl ICB,
+    imm: i64,
+    rs1: NonZeroXRegister,
+    rd: NonZeroXRegister,
+) {
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xvalue_of_imm(imm);
+    let res = lhs.xor(rhs, icb);
+    icb.xregister_write_nz(rd, res);
+}
+
 /// Add `imm` to val(rs1) and store the result in `rd`
 ///
 /// Relevant RISC-V opcodes:
@@ -898,5 +937,37 @@ mod tests {
             a1,
             0xFFFF_FFFF_9AA0_0000
         );
+    });
+
+    backend_test!(test_bitwise_intruction, F, {
+        proptest!(|(val1 in any::<u64>(), val2 in any::<u64>())| {
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
+
+            // The sign-extension of an immediate on 12 bits has bits 31:11 equal the sign-bit
+            let prefix_mask = 0xFFFF_FFFF_FFFF_F800;
+            let negative_imm = val2 | prefix_mask;
+            let positive_imm = val2 & !prefix_mask;
+
+            state.hart.xregisters.write(a0, val1);
+            run_x64_or_immediate(&mut state, negative_imm as i64, nz::a0, nz::a0);
+            prop_assert_eq!(state.hart.xregisters.read(a0), val1 | negative_imm);
+
+            state.hart.xregisters.write(a0, val1);
+            run_x64_or_immediate(&mut state, positive_imm as i64, nz::a0, nz::a1);
+            prop_assert_eq!(state.hart.xregisters.read(a1), val1 | positive_imm);
+
+            state.hart.xregisters.write(t2, val1);
+            run_x64_xor_immediate(&mut state, negative_imm as i64, nz::t2, nz::t2);
+            prop_assert_eq!(state.hart.xregisters.read(t2), val1 ^ negative_imm);
+
+            state.hart.xregisters.write(t2, val1);
+            run_x64_xor_immediate(&mut state, positive_imm as i64, nz::t2, nz::t1);
+            prop_assert_eq!(state.hart.xregisters.read(t1), val1 ^ positive_imm);
+
+            state.hart.xregisters.write(t2, val1);
+            state.hart.xregisters.write(t3, val2);
+            run_x64_xor(&mut state, nz::t3, nz::t2, nz::t1);
+            prop_assert_eq!(state.hart.xregisters.read(t1), val1 ^ val2);
+        })
     });
 }

@@ -218,15 +218,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Ori`].
-    pub(crate) fn new_ori(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64OrImm`].
+    pub(crate) fn new_x64_or_immediate(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Ori,
+            opcode: OpCode::X64OrImm,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -237,15 +237,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Xori`].
-    pub(crate) fn new_xori(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64XorImm`].
+    pub(crate) fn new_x64_xor_immediate(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Xori,
+            opcode: OpCode::X64XorImm,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -538,15 +538,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Xor`].
-    pub(crate) fn new_xor(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64Xor`].
+    pub(crate) fn new_x64_xor(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Xor,
+            opcode: OpCode::X64Xor,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -1204,6 +1204,27 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Fadds`].
+    /// The fadds instruction has not been lowered yet, and this function is only used for testing.
+    #[cfg(test)]
+    pub(crate) fn new_fadds(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Fadds,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -1345,7 +1366,7 @@ impl Instruction {
             // Bitwise OR with zero is identity: `x | 0 == x`
             X::X0 => Instruction::new_li(args.rd, args.imm, InstrWidth::Uncompressed),
             X::NonZero(rs1) => {
-                Instruction::new_ori(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_x64_or_immediate(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
             }
         }
     }
@@ -1359,7 +1380,7 @@ impl Instruction {
             // Bitwise XOR with zero is identity: `x ^ 0 == x`
             X::X0 => Instruction::new_li(args.rd, args.imm, InstrWidth::Uncompressed),
             X::NonZero(rs1) => {
-                Instruction::new_xori(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_x64_xor_immediate(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
             }
         }
     }
@@ -1576,7 +1597,7 @@ impl Instruction {
                 Instruction::new_mv(args.rd, rs1, InstrWidth::Uncompressed)
             }
             (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_xor(args.rd, rs1, rs2, InstrWidth::Uncompressed)
+                Instruction::new_x64_xor(args.rd, rs1, rs2, InstrWidth::Uncompressed)
             }
         }
     }
@@ -1591,7 +1612,7 @@ impl Instruction {
             // if rs2 is 0, it is the same as moving rs1 to rd, which are the same register.
             (X::X0, _) | (_, X::X0) => Instruction::new_nop(InstrWidth::Compressed),
             (X::NonZero(rd_rs1), X::NonZero(rs2)) => {
-                Instruction::new_xor(rd_rs1, rd_rs1, rs2, InstrWidth::Compressed)
+                Instruction::new_x64_xor(rd_rs1, rd_rs1, rs2, InstrWidth::Compressed)
             }
         }
     }

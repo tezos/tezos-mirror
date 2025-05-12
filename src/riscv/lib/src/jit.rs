@@ -871,6 +871,24 @@ mod tests {
                 ])
                 .set_assert_hook(assert_x1_and_x2_equal)
                 .build(),
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 0xF0F0, Compressed),
+                    I::new_x64_or_immediate(x2, x1, 0x0F0F, Compressed),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(x2), 0xFFFF);
+                }))
+                .build(),
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 0x0000, Compressed),
+                    I::new_x64_or_immediate(x2, x1, 0x5555, Compressed),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(x2), 0x5555);
+                }))
+                .build(),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
@@ -1583,12 +1601,12 @@ mod tests {
         let failure_scenarios: &[&[I]] = &[
             &[
                 // does not currently support lowering.
-                I::new_xori(x1, x1, 13, Uncompressed),
+                I::new_fadds(x1, x1, x1, Uncompressed),
             ],
             &[
                 I::new_nop(Uncompressed),
                 // does not currently support lowering.
-                I::new_xori(x1, x1, 13, Uncompressed),
+                I::new_fadds(x1, x1, x1, Uncompressed),
             ],
         ];
 
@@ -2120,6 +2138,59 @@ mod tests {
             invalid_load(I::new_x16_load_unsigned, LoadStoreWidth::Half),
             invalid_load(I::new_x8_load_signed, LoadStoreWidth::Byte),
             invalid_load(I::new_x8_load_unsigned, LoadStoreWidth::Byte),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_xor, F, {
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        let bitwise_test_xor_immediate =
+            |lhs_reg: NonZeroXRegister, lhs_val: u64, imm: i64, expected: u64| -> Scenario<F> {
+                ScenarioBuilder::default()
+                    .set_setup_hook(setup_hook!(core, F, {
+                        core.hart.xregisters.write_nz(lhs_reg, lhs_val);
+                    }))
+                    .set_instructions(&[I::new_x64_xor_immediate(x2, lhs_reg, imm, Compressed)])
+                    .set_assert_hook(assert_hook!(core, F, {
+                        assert_eq!(core.hart.xregisters.read_nz(x2), expected);
+                    }))
+                    .build()
+            };
+
+        let bitwise_test_xor = |lhs_reg: NonZeroXRegister,
+                                lhs_val: u64,
+                                rhs_reg: NonZeroXRegister,
+                                rhs_val: u64,
+                                expected: u64|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_setup_hook(setup_hook!(core, F, {
+                    core.hart.xregisters.write_nz(lhs_reg, lhs_val);
+                    core.hart.xregisters.write_nz(rhs_reg, rhs_val);
+                }))
+                .set_instructions(&[I::new_x64_xor(x2, lhs_reg, rhs_reg, Compressed)])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(x2), expected);
+                }))
+                .build()
+        };
+
+        let scenarios: &[Scenario<F>] = &[
+            // XOR immediate tests
+            bitwise_test_xor_immediate(x1, 0xF0F0, 0x0F0F, 0xFFFF),
+            bitwise_test_xor_immediate(x1, 0xAAAA, 0x5555, 0xFFFF),
+            bitwise_test_xor_immediate(x1, 0xFFF0, 0x0FFF, 0xF00F),
+            // XOR register tests
+            bitwise_test_xor(x1, 0xF0F0, x3, 0x0F0F, 0xFFFF),
+            bitwise_test_xor(x1, 0xAAAA, x3, 0x5555, 0xFFFF),
+            bitwise_test_xor(x1, 0xFFF0, x3, 0x0FFF, 0xF00F),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

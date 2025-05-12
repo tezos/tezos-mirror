@@ -27,6 +27,9 @@ pub trait Arithmetic<I: ICB + ?Sized>: Copy {
     /// Perform a bitwise or of two **XValues**, returning the new value.
     fn or(self, other: Self, icb: &mut I) -> Self;
 
+    /// Perform a bitwise xor of two **XValues**, returning the new value.
+    fn xor(self, other: Self, icb: &mut I) -> Self;
+
     /// Perform a bitwise multiplication of two **XValues**, returning the new value.
     ///
     /// This behaves identically for both signed & unsigned values.
@@ -54,6 +57,10 @@ impl<I: ICB> Arithmetic<I> for XValue {
 
     fn or(self, other: Self, _: &mut I) -> Self {
         self | other
+    }
+
+    fn xor(self, other: Self, _: &mut I) -> Self {
+        self ^ other
     }
 
     fn mul(self, other: Self, _: &mut I) -> Self {
@@ -88,6 +95,10 @@ impl<I: ICB> Arithmetic<I> for XValue32 {
 
     fn or(self, other: Self, _: &mut I) -> Self {
         self | other
+    }
+
+    fn xor(self, other: Self, _: &mut I) -> Self {
+        self ^ other
     }
 
     fn mul(self, other: Self, _: &mut I) -> Self {

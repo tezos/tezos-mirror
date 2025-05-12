@@ -363,8 +363,8 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Addi
         | Andi
-        | Ori
-        | Xori
+        | X64OrImm
+        | X64XorImm
         | ShiftLeftImmediate
         | ShiftRightImmediateUnsigned
         | ShiftRightImmediateSigned
@@ -375,7 +375,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Neg
         | And
         | Or
-        | Xor
+        | X64Xor
         | ShiftLeft
         | ShiftRightUnsigned
         | ShiftRightSigned
