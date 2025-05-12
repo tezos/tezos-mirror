@@ -276,38 +276,6 @@ let check_history_mode config profile_ctxt proto_parameters =
 let skip_list_offset proto_parameters =
   proto_parameters.Types.attestation_lag + 1
 
-(* This function determines the storage period taking into account the node's
-   [first_seen_level]. Indeed, if the node started for the first time, we do not
-   expect it to store skip list cells (even if it supports refutations) for the
-   entire required period of 3 months, because it will anyway not have the slot
-   pages for this period. Note that this could be further refined by taking into
-   account when the corresponding rollup was originated. *)
-let get_storage_period profile_ctxt proto_parameters head_level first_seen_level
-    =
-  let supports_refutations =
-    Profile_manager.supports_refutations profile_ctxt
-  in
-  let default_storage_period =
-    Profile_manager.get_attested_data_default_store_period
-      profile_ctxt
-      proto_parameters
-  in
-  if supports_refutations then
-    (* This deliberately does not take into account the [last_processed_level]. *)
-    let online_period =
-      match first_seen_level with
-      | None -> 0
-      | Some first_seen_level ->
-          Int32.sub head_level first_seen_level |> Int32.to_int
-    in
-    (* Even if the node was not online previously, or it was online only for a
-       few levels, we still need to store data for the minimal period, defined
-       in [get_attested_data_default_store_period]. TODO: refactor to expose
-       this value. *)
-    let max_period = max (2 * proto_parameters.attestation_lag) online_period in
-    min max_period default_storage_period
-  else default_storage_period
-
 (* This function checks the L1 node stores enough block data for the DAL node to
    function correctly. *)
 let check_l1_history_mode profile_ctxt cctxt proto_parameters head_level
@@ -356,7 +324,11 @@ let check_l1_history_mode profile_ctxt cctxt proto_parameters head_level
          that many levels in the past, because we don't for instance retrieve the
          protocol parameters for such past levels; though we should. *)
       let dal_blocks =
-        get_storage_period profile_ctxt proto_parameters head_level first_level
+        Profile_manager.get_storage_period
+          profile_ctxt
+          proto_parameters
+          ~head_level
+          ~first_seen_level:first_level
         +
         if Profile_manager.supports_refutations profile_ctxt then
           skip_list_offset proto_parameters
@@ -411,7 +383,11 @@ let update_and_register_profiles ctxt =
 let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
     head_level proto_parameters =
   let storage_period =
-    get_storage_period profile_ctxt proto_parameters head_level first_seen_level
+    Profile_manager.get_storage_period
+      profile_ctxt
+      proto_parameters
+      ~head_level
+      ~first_seen_level
   in
   let first_level =
     Int32.max
@@ -480,11 +456,11 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
   let should_store_skip_list_cells ~head_level =
     let profile_ctxt = Node_context.get_profile_ctxt ctxt in
     let period =
-      get_storage_period
+      Profile_manager.get_storage_period
         profile_ctxt
         proto_parameters
-        head_level
-        first_seen_level
+        ~head_level
+        ~first_seen_level
       + skip_list_offset proto_parameters
     in
     let first_level = first_level_for_skip_list_storage period head_level in

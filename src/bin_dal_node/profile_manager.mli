@@ -153,3 +153,28 @@ val load_profile_ctxt : base_dir:string -> t tzresult Lwt.t
     relative to the given [base_dir]. An error is returned in case of an
     IO failure. *)
 val save_profile_ctxt : t -> base_dir:string -> unit tzresult Lwt.t
+
+(** [get_storage_period profile_ctxt proto_parameters ~head_level
+    ~first_seen_level] computes the number of levels of DAL data the node should
+    retain, based on its profile and L1 activity.
+
+    For nodes that support refutations, the returned storage period is the
+    minimum between:
+
+    - the default retention period defined by the profile context, and
+
+    - the number of levels the node has been online (i.e. since
+    [first_seen_level]), capped to ensure at least two attestation lags worth of
+    levels are always retained.
+
+    For nodes that do not support refutations, the returned value is always the
+    default period.
+
+    This function is used to decide how far back attested data should be kept in
+    the store. *)
+val get_storage_period :
+  t ->
+  Types.proto_parameters ->
+  head_level:int32 ->
+  first_seen_level:int32 option ->
+  int
