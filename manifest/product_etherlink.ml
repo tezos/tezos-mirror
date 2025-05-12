@@ -588,6 +588,7 @@ let _fa_bridge_watchtower =
         octez_clic;
         octez_rpc_http |> open_;
         octez_rpc_http_client_unix;
+        octez_stdlib_unix |> open_;
         caqti_lwt;
         crunch;
         re;

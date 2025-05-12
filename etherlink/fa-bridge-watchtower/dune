@@ -15,6 +15,7 @@
   octez-libs.clic
   octez-libs.rpc-http
   octez-libs.rpc-http-client-unix
+  octez-libs.stdlib-unix
   caqti-lwt
   re
   octez-l2-libs.sqlite
@@ -30,6 +31,7 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_rpc_http
+  -open Tezos_stdlib_unix
   -open Octez_sqlite
   -open Evm_node_lib_dev_encoding
   -open Evm_node_lib_dev))
