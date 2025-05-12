@@ -94,63 +94,6 @@ let daemonize handlers =
    return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
-(** [update_timing_shards_received node_ctxt timing slot_id
-   ~number_of_already_stored_shards ~number_of_shards] update the shards timing
-   table values [timing] associated to slot_id [slot_id] and returns the
-   corresponding slot_metrics.
-   This function is intended to be called on each received shard, even
-   duplicates, but uses the [number_of_already_stored_shards] to only update
-   slot_metrics if the count of shards has been incremented.
-   This function execution is expected to be relatively fast: no IO is
-   involved, an update of Vache map is involved *)
-let update_timing_shard_received node_ctxt shards_timing_table slot_id
-    ~number_of_already_stored_shards ~number_of_shards =
-  let now = Unix.gettimeofday () in
-  let open Dal_metrics in
-  let timing =
-    match
-      Dal_metrics.Slot_id_bounded_map.find_opt shards_timing_table slot_id
-    with
-    | None ->
-        (* Note: we expect the entry is None only on the first received shard,
-           while lwt might actually process this code after the second or third
-           shard. This should be rare and the delta between values is pretty
-           minimal *)
-        {
-          time_first_shard = now;
-          duration_enough_shards = None;
-          duration_all_shards = None;
-        }
-    | Some timing ->
-        let is_all_shard_received =
-          number_of_already_stored_shards = number_of_shards
-        in
-        if is_all_shard_received then (
-          let duration = now -. timing.time_first_shard in
-          Dal_metrics.update_amplification_all_shards_received_duration duration ;
-          {timing with duration_all_shards = Some duration})
-        else
-          let cryptobox = Node_context.get_cryptobox node_ctxt in
-          let redundancy_factor =
-            Cryptobox.(parameters cryptobox).redundancy_factor
-          in
-          let is_enough_shard_received =
-            Option.is_none timing.duration_enough_shards
-            && number_of_already_stored_shards
-               >= number_of_shards / redundancy_factor
-          in
-          if is_enough_shard_received then (
-            let duration = now -. timing.time_first_shard in
-            Dal_metrics.update_amplification_enough_shards_received_duration
-              duration ;
-            {timing with duration_enough_shards = Some duration})
-          else timing
-  in
-  let () =
-    Dal_metrics.Slot_id_bounded_map.replace shards_timing_table slot_id timing
-  in
-  timing
-
 let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     node_store node_ctxt amplificator ~verbose =
   let open Gossipsub in
@@ -181,8 +124,8 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
         Store.Shards.count_values node_store slot_id
       in
       let slot_metrics =
-        update_timing_shard_received
-          node_ctxt
+        Dal_metrics.update_timing_shard_received
+          (Node_context.get_cryptobox node_ctxt)
           shards_timing_table
           slot_id
           ~number_of_already_stored_shards

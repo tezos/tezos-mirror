@@ -603,3 +603,44 @@ let sample_time ~sampling_frequency ~to_sample ~metric_updater =
 let collect_gossipsub_metrics gs_worker =
   Prometheus.CollectorRegistry.(register_pre_collect default) (fun () ->
       GS.Stats.collectors_callback gs_worker)
+
+let update_timing_shard_received cryptobox shards_timing_table slot_id
+    ~number_of_already_stored_shards ~number_of_shards =
+  let now = Unix.gettimeofday () in
+  let timing =
+    match Slot_id_bounded_map.find_opt shards_timing_table slot_id with
+    | None ->
+        (* Note: we expect the entry is None only on the first received shard,
+           while lwt might actually process this code after the second or third
+           shard. This should be rare and the delta between values is pretty
+           minimal *)
+        {
+          time_first_shard = now;
+          duration_enough_shards = None;
+          duration_all_shards = None;
+        }
+    | Some timing ->
+        let is_all_shard_received =
+          number_of_already_stored_shards = number_of_shards
+        in
+        if is_all_shard_received then (
+          let duration = now -. timing.time_first_shard in
+          update_amplification_all_shards_received_duration duration ;
+          {timing with duration_all_shards = Some duration})
+        else
+          let redundancy_factor =
+            Cryptobox.(parameters cryptobox).redundancy_factor
+          in
+          let is_enough_shard_received =
+            Option.is_none timing.duration_enough_shards
+            && number_of_already_stored_shards
+               >= number_of_shards / redundancy_factor
+          in
+          if is_enough_shard_received then (
+            let duration = now -. timing.time_first_shard in
+            update_amplification_enough_shards_received_duration duration ;
+            {timing with duration_enough_shards = Some duration})
+          else timing
+  in
+  let () = Slot_id_bounded_map.replace shards_timing_table slot_id timing in
+  timing
