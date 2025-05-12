@@ -9922,6 +9922,8 @@ include
      and type t = signature
 
 val size : t -> int
+
+val pop_verify : Bls.Public_key.t -> Bytes.t -> bool
 end
 # 98 "v15.in.ml"
 

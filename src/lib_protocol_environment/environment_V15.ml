@@ -340,6 +340,8 @@ struct
   module Signature = struct
     include Tezos_crypto.Signature.V2
 
+    let pop_verify = Bls.pop_verify
+
     let check ?watermark pk s bytes =
       (check
          ?watermark

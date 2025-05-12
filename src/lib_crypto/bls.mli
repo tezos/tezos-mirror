@@ -55,3 +55,7 @@ end
 val sign_aug : ?watermark:watermark -> Bls12_381_signature.sk -> watermark -> t
 
 val check_aug : ?watermark:watermark -> Public_key.t -> t -> watermark -> bool
+
+val pop_prove : Bls12_381_signature.sk -> Bytes.t
+
+val pop_verify : Public_key.t -> Bytes.t -> bool

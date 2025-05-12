@@ -350,6 +350,10 @@ let check ?watermark pk signature msg =
   in
   Bls12_381_signature.MinPk.Pop.verify pk msg signature
 
+let pop_prove = Bls12_381_signature.MinPk.Pop.pop_prove
+
+let pop_verify = Bls12_381_signature.MinPk.Pop.pop_verify
+
 (* [seed] must be at least of 32 bytes or [Bls12_381_signature.generate_sk] will
    throw an error. *)
 let generate_key ?seed () =
