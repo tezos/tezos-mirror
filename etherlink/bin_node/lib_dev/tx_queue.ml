@@ -1043,11 +1043,6 @@ let start ~config ~keep_alive () =
   let*! () = Tx_queue_events.is_ready () in
   return_unit
 
-let find txn_hash =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait w (Find {txn_hash}) |> handle_request_error
-
 let clear () =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
@@ -1122,9 +1117,13 @@ module Tx_container = struct
     | Ok () -> return (Ok tx_object.hash)
     | Error errs -> return (Error errs)
 
-  let find hash =
+  let find txn_hash =
     let open Lwt_result_syntax in
-    let* legacy_tx_object = find hash in
+    let* legacy_tx_object =
+      let*? w = Lazy.force worker in
+      Worker.Queue.push_request_and_wait w (Find {txn_hash})
+      |> handle_request_error
+    in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
        We should instrument the TX queue to return the real
        transaction objects. *)
