@@ -8,7 +8,6 @@ ghostnet_kernel: etherlink/kernel_latest/kernel/tests/resources/ghostnet_kernel.
 mainnet_kernel: etherlink/kernel_latest/kernel/tests/resources/mainnet_kernel.wasm
 evm_kernel: evm_kernel.wasm
 accuser: octez-accuser
-accuser_psquebec: octez-accuser-PsQuebec
 accuser_psriotum: octez-accuser-PsRiotum
 accuser_alpha: octez-accuser-alpha
 admin_client: octez-admin-client
