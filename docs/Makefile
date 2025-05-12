@@ -69,7 +69,7 @@ $(BUILDDIR)/octezdoc.txt: $(BUILDDIR)/index.html
 # Binary non-protocol specific manuals for clic binaries.
 api/%.html:
 	@../$* man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/$*.html
-# separate case for baker by now, because $* expands to octez-baker- in above rule
+# separate case for baker for now, because $* expands to octez-baker- in above rule
 api/octez-baker.html:
 	@../octez-baker man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 

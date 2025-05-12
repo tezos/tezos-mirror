@@ -33,8 +33,9 @@ More precisely, the suffix consists of the first 8 characters of the protocol ha
 For instance, ``octez-baker-PsQuebec`` is the baker
 for the Quebec protocol, and ``octez-baker-alpha`` is the baker
 of the development protocol.
-However, there is also a unique ``octez-baker`` executable supporting multiple protocols, that you can run instead of the protocol-suffixed bakers.
-When new protocols get proposed or adopted, you just have to upgrade this executable to the newest version, to make sure it supports the latest protocols.
+However, starting with version 23, there are single baker binaries named ``octez-baker`` and ``octez-accuser``, that you can run instead of the protocol-suffixed binaries.
+They can be used on any protocol that the Octez suite supports, including the current protocol and sometimes a proposed upcoming protocol.
+When new protocols get proposed or adopted, you just have to upgrade these executables to the newest version, to make sure they support the latest protocols.
 
 The ``octez-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 

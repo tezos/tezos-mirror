@@ -224,7 +224,7 @@ baking for user "mybaker"::
 .. note::
 	Previously, you had to run a baker specific for a given protocol, such as ``octez-baker-<PROTO_HASH>``,
 	where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
-	These protocol-specific bakers are still available, but considered deprecated.
+	These protocol-specific bakers are still available for now, but will be deprecated.
 
 Note that:
 
