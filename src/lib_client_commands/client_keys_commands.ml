@@ -329,9 +329,9 @@ let generate_test_keys =
   command
     ~group
     ~desc:"Generate an array of accounts for testing purposes."
-    (args1 alias_prefix_param)
+    (args2 alias_prefix_param sig_algo_arg)
     (prefixes ["stresstest"; "gen"; "keys"] @@ keys_count_param @@ stop)
-    (fun alias_prefix n (cctxt : Client_context.full) ->
+    (fun (alias_prefix, algo) n (cctxt : Client_context.full) ->
       let open Lwt_result_syntax in
       (* By default, the alias prefix matches the bootstrap<idx>
          pattern used in sandboxed mode.*)
@@ -343,9 +343,7 @@ let generate_test_keys =
       let* source_list =
         List.init_es ~when_negative_length:[] n (fun i ->
             let alias = alias_prefix i in
-            let pkh, pk, sk =
-              Signature.generate_key ~algo:Signature.Ed25519 ()
-            in
+            let pkh, pk, sk = Signature.generate_key ~algo () in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let*? sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
             return ({pkh; pk; sk}, pk_uri, sk_uri, alias))
