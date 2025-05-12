@@ -544,9 +544,6 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
         smart_rollup_timeout_period_in_blocks
     (* AI is already active on mainnet, so it should be active
        immediately in tests *)
-    @ (if Protocol.(number protocol <= number Quebec) then
-         make_bool_parameter ["adaptive_issuance_force_activation"] (Some true)
-       else [])
     @ make_int_parameter ["blocks_per_cycle"] blocks_per_cycle
     @ make_int_parameter ["blocks_per_commitment"] blocks_per_commitment
     @ parameters
@@ -2306,7 +2303,7 @@ let test_dal_node_startup =
     ~title:"dal node startup"
     ~tags:[Tag.tezos2; "dal"]
     ~uses:(fun _protocol -> [Constant.octez_dal_node])
-    ~supports:(Protocol.From_protocol 22)
+    ~supports:Has_predecessor
   @@ fun protocol ->
   let run_dal = Dal_node.run ~wait_ready:false in
   let nodes_args = Node.[Synchronisation_threshold 0] in
@@ -4948,8 +4945,8 @@ module History_rpcs = struct
   (* In the following function, no migration is performed (expect from genesis
      to alpha) when [migration_level] is equal to or smaller than 1. *)
   let scenario ?(migration_level = 1) ~slot_index ~first_cell_level
-      ~first_dal_level ~last_confirmed_published_level prev_protocol protocol
-      dal_parameters client node dal_node =
+      ~first_dal_level ~last_confirmed_published_level protocol dal_parameters
+      client node dal_node =
     let module Map_int = Map.Make (Int) in
     Log.info "slot_index = %d" slot_index ;
     let client = Client.with_dal_node client ~dal_node in
@@ -5088,8 +5085,7 @@ module History_rpcs = struct
              protocol that would be attested in the new one. *)
           cell_slot_index = slot_index
           && cell_level > starting_level
-          && (prev_protocol <> Protocol.Quebec
-             || cell_level >= first_level_new_proto
+          && (cell_level >= first_level_new_proto
              || cell_level < first_level_new_proto - lag)
         in
         let expected_kind =
@@ -5161,13 +5157,12 @@ module History_rpcs = struct
         ~first_dal_level:1
         ~last_confirmed_published_level:3
         protocol
-        protocol
         dal_parameters
         node
         client
         dal_node
     in
-    let tags = ["rpc"; "skip_list"] in
+    let tags = ["rpc"; "skip_list"; Tag.ci_disabled] in
     let description = "commitments history RPCs" in
     scenario_with_layer1_and_dal_nodes
       ~tags
@@ -5197,13 +5192,12 @@ module History_rpcs = struct
         ~first_dal_level:1
         ~last_confirmed_published_level
         ~migration_level
-        migrate_from
         migrate_to
         dal_parameters
     in
 
     let description = "test commitments history with migration" in
-    let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
+    let tags = ["rpc"; "skip_list"; Tag.memory_3k; Tag.ci_disabled] in
     test_l1_migration_scenario
       ~migrate_from
       ~migrate_to

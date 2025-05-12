@@ -19,8 +19,8 @@ let to_string = function
   | `Rionet -> "rionet"
 
 let default_protocol : t -> Protocol.t = function
-  | `Mainnet -> Quebec
-  | `Ghostnet -> Quebec
+  | `Mainnet -> R022
+  | `Ghostnet -> R022
   | `Weeklynet _ -> Alpha
   | `Sandbox -> Alpha
   | `Nextnet _ -> failwith "Next is not active"
