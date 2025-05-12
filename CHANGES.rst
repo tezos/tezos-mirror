@@ -25,6 +25,8 @@ be documented here either.
 General
 -------
 
+- Removed binaries for Quebec. (MR :gl:`!17983`)
+
 Node
 ----
 
