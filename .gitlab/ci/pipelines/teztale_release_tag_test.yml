@@ -4,6 +4,7 @@
 stages:
 - images
 - build
+- publish_release_gitlab
 
 oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -132,3 +133,21 @@ teztale.build:static-arm64:
     paths:
     - teztale-binaries/arm64/octez-teztale-*
     when: on_success
+
+gitlab:release:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0
+  stage: publish_release_gitlab
+  tags:
+  - gcp
+  needs:
+  - teztale.build:static-x86_64
+  - teztale.build:static-arm64
+  dependencies:
+  - teztale.build:static-x86_64
+  - teztale.build:static-arm64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - ./teztale/scripts/releases/create_gitlab_release.sh
