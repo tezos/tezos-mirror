@@ -4,10 +4,6 @@ This is a package containing some libraries related to the Tezos 021-PsQuebec pr
 
 It contains the following libraries:
 
-- {{!module-Tezos_021_PsQuebec_test_helpers}Tezos_021_PsQuebec_test_helpers}: Protocol testing framework
-- {{!module-Tezos_agnostic_baker_021_PsQuebec}Tezos_agnostic_baker_021_PsQuebec}: Protocol specific library for the Agnostic Baker
-- {{!module-Tezos_baking_021_PsQuebec}Tezos_baking_021_PsQuebec}: Base library for `tezos-baker/accuser`
-- {{!module-Tezos_baking_021_PsQuebec_commands}Tezos_baking_021_PsQuebec_commands}: Protocol-specific commands for baking
 - {{!module-Tezos_client_021_PsQuebec}Tezos_client_021_PsQuebec}: Protocol specific library for `octez-client`
 - {{!module-Tezos_dal_021_PsQuebec}Tezos_dal_021_PsQuebec}: Protocol specific library for the Data availability Layer
 - {{!module-Tezos_layer2_utils_021_PsQuebec}Tezos_layer2_utils_021_PsQuebec}: Protocol specific library for Layer 2 utils

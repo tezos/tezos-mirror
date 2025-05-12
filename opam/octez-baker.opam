@@ -15,7 +15,6 @@ depends: [
   "bls12-381" { = version }
   "octez-shell-libs" { = version }
   "octez-baker-lib" { = version }
-  "octez-protocol-021-PsQuebec-libs" { = version }
   "octez-protocol-022-PsRiotum-libs" { = version }
 ]
 depopts: [

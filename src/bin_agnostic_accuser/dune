@@ -13,7 +13,6 @@
   octez-libs.base.unix
   octez-shell-libs.client-base-unix
   octez-baker-lib
-  octez-protocol-021-PsQuebec-libs.agnostic-baker
   octez-protocol-022-PsRiotum-libs.agnostic-baker
   (select void_for_linking-octez-protocol-alpha-libs-agnostic-baker from
    (octez-protocol-alpha-libs.agnostic-baker -> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)
