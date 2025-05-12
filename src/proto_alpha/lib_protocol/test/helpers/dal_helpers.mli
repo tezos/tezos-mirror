@@ -186,3 +186,10 @@ end) : sig
   val bad_history_cache :
     __LOC__:string -> 'a tzresult -> 'b -> unit tzresult Lwt.t
 end
+
+(** Builds a {!Alpha_context.type-dal_content} from its integer
+    representation, that is, the sum of powers of two of the indexes
+    of attested slots.
+
+    Raises an exception when the given argument is negative. *)
+val dal_content_of_int : loc:string -> int -> Alpha_context.dal_content

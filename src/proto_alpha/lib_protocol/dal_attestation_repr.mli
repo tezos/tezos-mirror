@@ -177,3 +177,11 @@ module Dal_dependent_signing : sig
     t ->
     Bls.t option
 end
+
+module Internal_for_tests : sig
+  (** Builds a {!type-t} from its integer representation, that is, the
+      sum of powers of two of the indexes of attested slots.
+
+      Returns an error when the given argument is negative. *)
+  val of_z : Z.t -> t tzresult
+end

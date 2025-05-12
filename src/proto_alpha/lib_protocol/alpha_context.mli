@@ -2910,6 +2910,11 @@ module Dal : sig
         t ->
         Bls.t option
     end
+
+    module Internal_for_tests : sig
+      (** See {!Dal_attestation_repr.Internal_for_tests.of_z}. *)
+      val of_z : Z.t -> t tzresult
+    end
   end
 
   type slot_id = {published_level : Raw_level.t; index : Slot_index.t}
