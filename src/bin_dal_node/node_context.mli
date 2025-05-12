@@ -122,6 +122,9 @@ val set_last_finalized_level : t -> int32 -> unit
     the node's last processed level. *)
 val get_last_finalized_level : t -> int32
 
+(** Returns true if and only if the node's profile is bootstrap. *)
+val is_bootstrap_node : t -> bool
+
 (** [get_shards_proofs_precomputation ctxt] returns the shards proof's precomputation. *)
 val get_shards_proofs_precomputation :
   t -> Cryptobox.shards_proofs_precomputation option
