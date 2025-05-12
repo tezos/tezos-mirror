@@ -183,7 +183,10 @@ Smart Rollup node
 - Allow to import snapshots from standard input with ``-``. (MR :gl:`!17463`)
 
 - Retire old store implementation. The rollup node cannot read stores produced
-  by versions < v21.0 anymore. (MR :gl:` !17933`).
+  by versions < v21.0 anymore. (MR :gl:`!17933`)
+
+- Aggregate performance metrics for all child processes (including Irmin
+  GC). (MR :gl:`!17973`)
 
 Smart Rollup WASM Debugger
 --------------------------
