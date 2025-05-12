@@ -540,86 +540,6 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-let uuid_seed = Random.get_state ()
-
-let send_transactions_batch ~evm_node_endpoint ~keep_alive transactions =
-  let open Lwt_result_syntax in
-  let module M = Map.Make (String) in
-  let module Srt = Rpc_encodings.Send_raw_transaction in
-  if Seq.is_empty transactions then return_unit
-  else
-    let rev_batch, callbacks =
-      Seq.fold_left
-        (fun (rev_batch, callbacks) {hash = _; payload; queue_callback} ->
-          let req_id = Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false) in
-          let txn =
-            Rpc_encodings.JSONRPC.
-              {
-                method_ = Srt.method_;
-                parameters =
-                  Some (Data_encoding.Json.construct Srt.input_encoding payload);
-                id = Some (Id_string req_id);
-              }
-          in
-
-          (txn :: rev_batch, M.add req_id queue_callback callbacks))
-        ([], M.empty)
-        transactions
-    in
-    let batch = List.rev rev_batch in
-
-    let*! () = Tx_queue_events.injecting_transactions (List.length batch) in
-
-    let* responses =
-      match evm_node_endpoint with
-      | Rpc base ->
-          let* batch_response =
-            Rollup_services.call_service
-              ~keep_alive
-              ~base
-              (Batch.dispatch_batch_service ~path:Resto.Path.root)
-              ()
-              ()
-              (Batch batch)
-          in
-          return
-            (match batch_response with Singleton r -> [r] | Batch rs -> rs)
-      | Websocket ws_client ->
-          List.map_es
-            (fun req ->
-              let+ resp_json =
-                Websocket_client.send_jsonrpc_request ws_client req
-              in
-              Data_encoding.Json.destruct
-                Rpc_encodings.JSONRPC.response_encoding
-                resp_json)
-            batch
-    in
-
-    let* missed_callbacks =
-      List.fold_left_es
-        (fun callbacks (response : Rpc_encodings.JSONRPC.response) ->
-          match response with
-          | {id = Some (Id_string req); value} -> (
-              match (value, M.find_opt req callbacks) with
-              | value, Some callback ->
-                  let* () =
-                    match value with
-                    | Ok _hash_encoded -> Lwt_result.ok (callback `Accepted)
-                    | Error error ->
-                        let*! () = Tx_queue_events.rpc_error error in
-                        Lwt_result.ok (callback `Refused)
-                  in
-                  return (M.remove req callbacks)
-              | _ -> return callbacks)
-          | _ -> failwith "Inconsistent response from the server")
-        callbacks
-        responses
-    in
-
-    assert (M.is_empty missed_callbacks) ;
-    return_unit
-
 (** clear values and keep the allocated space *)
 let clear
     ({
@@ -691,6 +611,89 @@ module Handlers = struct
   open Request
 
   type self = worker
+
+  let uuid_seed = Random.get_state ()
+
+  let send_transactions_batch ~evm_node_endpoint ~keep_alive transactions =
+    let open Lwt_result_syntax in
+    let module M = Map.Make (String) in
+    let module Srt = Rpc_encodings.Send_raw_transaction in
+    if Seq.is_empty transactions then return_unit
+    else
+      let rev_batch, callbacks =
+        Seq.fold_left
+          (fun (rev_batch, callbacks) {hash = _; payload; queue_callback} ->
+            let req_id =
+              Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false)
+            in
+            let txn =
+              Rpc_encodings.JSONRPC.
+                {
+                  method_ = Srt.method_;
+                  parameters =
+                    Some
+                      (Data_encoding.Json.construct Srt.input_encoding payload);
+                  id = Some (Id_string req_id);
+                }
+            in
+
+            (txn :: rev_batch, M.add req_id queue_callback callbacks))
+          ([], M.empty)
+          transactions
+      in
+      let batch = List.rev rev_batch in
+
+      let*! () = Tx_queue_events.injecting_transactions (List.length batch) in
+
+      let* responses =
+        match evm_node_endpoint with
+        | Rpc base ->
+            let* batch_response =
+              Rollup_services.call_service
+                ~keep_alive
+                ~base
+                (Batch.dispatch_batch_service ~path:Resto.Path.root)
+                ()
+                ()
+                (Batch batch)
+            in
+            return
+              (match batch_response with Singleton r -> [r] | Batch rs -> rs)
+        | Websocket ws_client ->
+            List.map_es
+              (fun req ->
+                let+ resp_json =
+                  Websocket_client.send_jsonrpc_request ws_client req
+                in
+                Data_encoding.Json.destruct
+                  Rpc_encodings.JSONRPC.response_encoding
+                  resp_json)
+              batch
+      in
+
+      let* missed_callbacks =
+        List.fold_left_es
+          (fun callbacks (response : Rpc_encodings.JSONRPC.response) ->
+            match response with
+            | {id = Some (Id_string req); value} -> (
+                match (value, M.find_opt req callbacks) with
+                | value, Some callback ->
+                    let* () =
+                      match value with
+                      | Ok _hash_encoded -> Lwt_result.ok (callback `Accepted)
+                      | Error error ->
+                          let*! () = Tx_queue_events.rpc_error error in
+                          Lwt_result.ok (callback `Refused)
+                    in
+                    return (M.remove req callbacks)
+                | _ -> return callbacks)
+            | _ -> failwith "Inconsistent response from the server")
+          callbacks
+          responses
+      in
+
+      assert (M.is_empty missed_callbacks) ;
+      return_unit
 
   let on_request :
       type r request_error.
