@@ -3006,13 +3006,14 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
   in
   return (client, node1, node2)
 
-let stresstest_gen_keys ?endpoint ?alias_prefix n client =
+let stresstest_gen_keys ?endpoint ?alias_prefix ?sig_algo n client =
   let* output =
     spawn_command
       ?endpoint
       client
       (["stresstest"; "gen"; "keys"; Int.to_string n]
-      @ optional_arg "alias-prefix" Fun.id alias_prefix)
+      @ optional_arg "alias-prefix" Fun.id alias_prefix
+      @ optional_arg "sig" Fun.id sig_algo)
     |> Process.check_and_read_stdout
   in
   let json = JSON.parse ~origin:"stresstest_gen_keys" output in
