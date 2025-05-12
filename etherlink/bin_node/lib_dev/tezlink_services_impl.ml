@@ -4,7 +4,6 @@
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
-
 open Tezos_types
 
 module Path = struct
@@ -68,6 +67,8 @@ module type Backend = sig
   val block_param_to_block_number :
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
+
+  val tez_nth_block : Z.t -> L2_types.Tezos_block.t tzresult Lwt.t
 end
 
 module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
@@ -182,4 +183,18 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
   (* TODO: #7831 !17664
      we type [chain], even though we don't use it, to satisfy the compiler. *)
   let counter (chain : [> `Main]) = counter read chain
+
+  let header chain block =
+    let open Lwt_result_syntax in
+    (* TODO: #7831
+       take chain and block into account
+       For the moment this implementation only supports the main chain and head block, once
+       the rpc support of tezlink is more stable, we can add support for other chains and blocks. *)
+    ignore (chain, block) ;
+
+    let* (Qty block_number) =
+      Backend.block_param_to_block_number (Block_parameter Latest)
+    in
+
+    Backend.tez_nth_block block_number
 end

@@ -113,6 +113,45 @@ let check_chain_id ~expected_chain_id ~chain_id =
       string
       ~error_msg:"Expected %R as chain_id but got %L")
 
+let check_header ~previous_header ~current_header ~chain_id ~current_timestamp =
+  Check.(
+    ((JSON.(current_header |-> "level" |> as_int)
+     - JSON.(previous_header |-> "level" |> as_int))
+    = 1)
+      int)
+    ~error_msg:
+      "The difference in level between consecutive blocks should be %R but got \
+       %L" ;
+
+  Check.(
+    (JSON.(previous_header |-> "hash") = JSON.(current_header |-> "predecessor"))
+      json)
+    ~error_msg:"Expected predecessor hash of current header to be %L but got %R" ;
+
+  (match chain_id with
+  | Some chain_id ->
+      Check.(
+        (JSON.(previous_header |-> "chain_id")
+        = JSON.(current_header |-> "chain_id"))
+          json)
+        ~error_msg:
+          "Expected blocks to be in the same chain, but the current block is \
+           in chain %R, while the previous block is in chain %L" ;
+
+      check_chain_id
+        ~expected_chain_id:chain_id
+        ~chain_id:JSON.(current_header |-> "chain_id" |> as_string)
+  | _ -> ()) ;
+
+  match current_timestamp with
+  | Some current_timestamp ->
+      Check.(
+        (JSON.(current_header |-> "timestamp" |> as_string) = current_timestamp)
+          string)
+        ~error_msg:
+          "Expected the timestamp of the current_block to be %R, but got %L"
+  | _ -> ()
+
 let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
   | Proxy ->

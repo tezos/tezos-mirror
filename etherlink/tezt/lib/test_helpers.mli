@@ -78,6 +78,15 @@ val produce_block :
   Evm_node.t ->
   (int, Rpc.error) result Lwt.t
 
+(** [check_header ~previous_header ~current_header] checks that two
+    consecutive headers are consistent. *)
+val check_header :
+  previous_header:JSON.t ->
+  current_header:JSON.t ->
+  chain_id:int option ->
+  current_timestamp:string option ->
+  unit
+
 (** [next_evm_level ~evm_node ~sc_rollup_node ~client] moves
     [evm_node] to the next L2 level. *)
 val next_evm_level :
