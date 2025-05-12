@@ -487,9 +487,8 @@ let test_tezlink_current_level =
 
   (* verify an answer by the current_level rpc *)
   let check_current_level res expected_level =
-    (* cycle length is hardcoded for now, it won't need an update until RIO is
-       the protocol of tezlink, and it won't be variable for some time *)
-    let cycle_length = 30720 in
+    (* cycle length is hardcoded for now it won't change for some time *)
+    let cycle_length = 10800 in
     Check.(
       JSON.(res |-> "level" |> as_int = expected_level)
         int
@@ -558,7 +557,7 @@ let test_tezlink_protocols =
   Check.(
     JSON.(
       res |-> "protocol" |> as_string
-      = "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg")
+      = "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7")
       string
       ~error_msg:"Expected %R but got %L") ;
   unit
@@ -696,7 +695,7 @@ let test_tezlink_constants =
   let endpoint =
     Client.(
       Foreign_endpoint
-        {(Evm_node.rpc_endpoint_record sequencer) with path = "tezlink"})
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
   let* _ =
     Client.RPC.call ~hooks ~endpoint client
@@ -717,7 +716,7 @@ let test_tezlink_chain_id =
   let endpoint =
     Client.(
       Foreign_endpoint
-        {(Evm_node.rpc_endpoint_record sequencer) with path = "tezlink"})
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
   let* chain_id =
     Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_chain_id ()

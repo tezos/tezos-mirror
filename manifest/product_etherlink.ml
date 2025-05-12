@@ -236,16 +236,16 @@ let evm_node_lib_dev_encoding =
       ]
 
 let evm_node_lib_dev_tezlink =
-  let quebec =
-    List.find (fun proto -> Protocol.short_hash proto = "PsQuebec") Protocol.all
+  let tezlink_target_proto =
+    List.find (fun proto -> Protocol.short_hash proto = "PsRiotum") Protocol.all
   in
   let tezlink_protocol_plugin =
-    match Protocol.plugin quebec with
+    match Protocol.plugin tezlink_target_proto with
     | Some target -> target
     | None -> (* unreachable *) assert false
   in
   let tezlink_protocol_parameters =
-    match Protocol.parameters quebec with
+    match Protocol.parameters tezlink_target_proto with
     | Some target -> target
     | None -> (* unreachable *) assert false
   in

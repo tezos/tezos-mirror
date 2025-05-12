@@ -24,8 +24,8 @@ depends: [
   "re" { >= "1.10.0" }
   "octez-smart-rollup-wasm-debugger-plugin"
   "uuidm" { >= "0.9.9" }
-  "octez-protocol-021-PsQuebec-libs"
-  "tezos-protocol-021-PsQuebec"
+  "octez-protocol-022-PsRiotum-libs"
+  "tezos-protocol-022-PsRiotum"
   "octez-shell-libs"
   "dream" { >= "1.0.0~alpha7" }
   "octez-version"

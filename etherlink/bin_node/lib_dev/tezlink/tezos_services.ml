@@ -225,9 +225,12 @@ module Tezlink_protocols = struct
 
   type protocols = Shell_impl.protocols
 
-  let quebec = Tezos_protocol_021_PsQuebec.Protocol.hash
-
-  let current = Shell_impl.{current_protocol = quebec; next_protocol = quebec}
+  let current =
+    Shell_impl.
+      {
+        current_protocol = Imported_protocol.hash;
+        next_protocol = Imported_protocol.hash;
+      }
 end
 
 (* Copied from src/proto_alpha/lib_protocol/constants_services.ml. *)
@@ -383,10 +386,9 @@ let register_block_services ~l2_chain_id
          ~impl:(fun ({block; chain}, contract) () () ->
            Backend.counter chain block contract)
          ~convert_output:Protocol_types.Counter.of_z
-    |> register_with_conversion
+    |> register
          ~service:Imported_services.constants
          ~impl:(fun {block; chain} () () -> Backend.constants chain block)
-         ~convert_output:Tezlink_constants.convert
     |> register_with_conversion
          ~service:Imported_services.header
          ~impl:(fun {chain; block} () () ->
