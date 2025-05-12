@@ -73,3 +73,26 @@ val initial_plugins :
     [No_plugin_for_proto]. *)
 val resolve_plugin_for_level :
   Rpc_context.t -> level:int32 -> (module Dal_plugin.T) tzresult Lwt.t
+
+(** [get_proto_plugins cctxt profile_ctxt ~last_processed_level
+    ~first_seen_level ~head_level proto_parameters] returns the set of protocol
+    plugins required by the DAL node to operate correctly over its current
+    storage window.
+
+    It computes the first level for which a plugin may be needed based on the
+    DAL node's storage period and whether refutation support is enabled
+    (which requires access to older levels for skip list storage or protocol
+    parameters). The returned plugin map covers the range from this computed
+    first level up to [head_level].
+
+    This function is typically called once at startup after fetching the current
+    [head_level] from L1.
+*)
+val get_proto_plugins :
+  Rpc_context.t ->
+  Profile_manager.t ->
+  last_processed_level:int32 option ->
+  first_seen_level:int32 option ->
+  head_level:int32 ->
+  Types.proto_parameters ->
+  t tzresult Lwt.t
