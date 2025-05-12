@@ -1,21 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-// SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
-
-//! This module defines the host capabilities of the RISC-V PVM with HermitOS. Host capabilities are
-//! accessed via SBI environment calls.
-//!
-//! For the RISC-V PVM, we use the custom SBI extension as defined by [`SBI_FIRMWARE_TEZOS`].
-//!
-//! This means, when we try to get the PVM to do something for us we follow those steps:
-//! - Set register a7 to SBI_FIRMWARE_TEZOS
-//! - Set register a6 to the PVM function identifier (check constants)
-//! - Set registers a0-a5 to transport arguments
-//! - Trigger an ECALL
-//! - Once the PVM returns to us, the results are stored in a0 and/or a1 in addition to the
-//!   out-parameters passed via a0-a5
 
 extern crate alloc;
 extern crate std;
@@ -75,6 +60,60 @@ pub(crate) unsafe fn read_input(
         Ok(result) => result as i32,
         Err(err) => err,
     }
+}
+
+#[inline]
+pub(crate) unsafe fn reveal(
+    request_addr: *const u8,
+    request_len: usize,
+    response_addr: *mut u8,
+    response_max_bytes: usize,
+) -> i32 {
+    let result: isize;
+
+    // SBI call
+    //   extension = SBI_FIRMWARE_TEZOS
+    //   function = SBI_TEZOS_REVEAL
+    core::arch::asm!(
+        "ecall",
+        in("a0") request_addr,
+        in("a1") request_len,
+        in("a2") response_addr,
+        in("a3") response_max_bytes,
+        in("a6") SBI_TEZOS_REVEAL,
+        in("a7") SBI_FIRMWARE_TEZOS,
+        lateout("a0") result,
+    );
+
+    match check_sbi_result(result) {
+        Err(err) => err,
+        Ok(result) => result as i32,
+    }
+}
+
+#[inline]
+pub(crate) unsafe fn reveal_preimage(
+    hash_addr: *const u8,
+    hash_len: usize,
+    destination_addr: *mut u8,
+    max_bytes: usize,
+) -> i32 {
+    let mut payload = vec![0u8; hash_len + 1];
+    hash_addr.copy_to_nonoverlapping(payload.as_mut_ptr().add(1), hash_len);
+
+    reveal(payload.as_ptr(), payload.len(), destination_addr, max_bytes)
+}
+
+#[inline]
+pub(crate) unsafe fn reveal_metadata(buffer: *mut u8, max_bytes: usize) -> i32 {
+    let request_payload = [1u8]; // reveal request tag
+
+    reveal(
+        request_payload.as_ptr(),
+        std::mem::size_of_val(&request_payload),
+        buffer,
+        max_bytes,
+    )
 }
 
 #[inline]
@@ -153,60 +192,6 @@ pub(super) unsafe fn store_copy(
 }
 
 #[inline]
-pub(crate) unsafe fn reveal_preimage(
-    hash_addr: *const u8,
-    hash_len: usize,
-    destination_addr: *mut u8,
-    max_bytes: usize,
-) -> i32 {
-    let mut payload = vec![0u8; hash_len + 1];
-    hash_addr.copy_to_nonoverlapping(payload.as_mut_ptr().add(1), hash_len);
-
-    reveal(payload.as_ptr(), payload.len(), destination_addr, max_bytes)
-}
-
-#[inline]
-pub(crate) unsafe fn reveal(
-    request_addr: *const u8,
-    request_len: usize,
-    response_addr: *mut u8,
-    response_max_bytes: usize,
-) -> i32 {
-    let result: isize;
-
-    // SBI call
-    //   extension = SBI_FIRMWARE_TEZOS
-    //   function = SBI_TEZOS_REVEAL
-    core::arch::asm!(
-        "ecall",
-        in("a0") request_addr,
-        in("a1") request_len,
-        in("a2") response_addr,
-        in("a3") response_max_bytes,
-        in("a6") SBI_TEZOS_REVEAL,
-        in("a7") SBI_FIRMWARE_TEZOS,
-        lateout("a0") result,
-    );
-
-    match check_sbi_result(result) {
-        Err(err) => err,
-        Ok(result) => result as i32,
-    }
-}
-
-#[inline]
 pub(super) unsafe fn store_value_size(_path: *const u8, _path_len: usize) -> i32 {
     unimplemented!()
-}
-
-#[inline]
-pub(crate) unsafe fn reveal_metadata(buffer: *mut u8, max_bytes: usize) -> i32 {
-    let request_payload = [1u8]; // reveal request tag
-
-    reveal(
-        request_payload.as_ptr(),
-        std::mem::size_of_val(&request_payload),
-        buffer,
-        max_bytes,
-    )
 }

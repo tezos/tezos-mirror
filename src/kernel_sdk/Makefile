@@ -20,8 +20,9 @@ ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target "$(NATIVE_TARGET)"
 endif
 
-RISCV_OPTS = --target riscv64gc-unknown-hermit --no-default-features
+RISCV_OPTS = --target riscv64gc-unknown-linux-musl --no-default-features
 RISCV_OPTS_ALPHA = $(RISCV_OPTS) --features proto-alpha
+RISCV_RUSTC_VERSION = 1.86.0
 
 SDK_VERSION := "0.2.2"
 
@@ -52,16 +53,18 @@ publish-check: installer-template
 
 .PHONY: riscv-check
 riscv-check:
-	@cargo check -p tezos-smart-rollup-constants $(RISCV_OPTS)
-	@cargo check -p tezos-smart-rollup-core $(RISCV_OPTS_ALPHA)
-	@cargo check -p tezos-smart-rollup-host $(RISCV_OPTS_ALPHA)
-	@cargo check -p tezos-smart-rollup-debug $(RISCV_OPTS_ALPHA)
-	@cargo check -p tezos-smart-rollup-panic-hook $(RISCV_OPTS_ALPHA)
-	@cargo check -p tezos-smart-rollup-entrypoint $(RISCV_OPTS_ALPHA)
-	@cargo check -p tezos-smart-rollup-encoding $(RISCV_OPTS_ALPHA)
-	# @cargo check -p tezos-smart-rollup-storage $(RISCV_OPTS_ALPHA)
-	@cargo check -p tezos-smart-rollup-mock $(RISCV_OPTS_ALPHA)
-	@cargo check -p tezos-smart-rollup $(RISCV_OPTS_ALPHA)
+	@cargo +${RISCV_RUSTC_VERSION} check -p tezos-smart-rollup-constants $(RISCV_OPTS)
+	@cargo +${RISCV_RUSTC_VERSION} check -p tezos-smart-rollup-core $(RISCV_OPTS_ALPHA)
+	@cargo +${RISCV_RUSTC_VERSION} check -p tezos-smart-rollup-host $(RISCV_OPTS_ALPHA)
+	@cargo +${RISCV_RUSTC_VERSION} check -p tezos-smart-rollup-debug $(RISCV_OPTS_ALPHA)
+	@cargo +${RISCV_RUSTC_VERSION} check -p tezos-smart-rollup-panic-hook $(RISCV_OPTS_ALPHA)
+	@cargo +${RISCV_RUSTC_VERSION} check -p tezos-smart-rollup-entrypoint $(RISCV_OPTS_ALPHA)
+	@cargo +${RISCV_RUSTC_VERSION} check -p tezos-smart-rollup-encoding $(RISCV_OPTS_ALPHA)
+	@cargo +${RISCV_RUSTC_VERSION} check -p tezos-smart-rollup-mock $(RISCV_OPTS_ALPHA)
+	@cargo +${RISCV_RUSTC_VERSION} check -p tezos-smart-rollup $(RISCV_OPTS_ALPHA)
+
+	# Does not work yet:
+	# @cargo +${RISCV_RUSTC_VERSION} check -p tezos-smart-rollup-storage $(RISCV_OPTS_ALPHA)
 
 .PHONY: build
 build: installer-template
@@ -90,8 +93,8 @@ doc:
 
 .PHONY: build-deps
 build-deps:
-	@exec ../riscv/scripts/install-rust-std-hermit.sh
 	@rustup target add wasm32-unknown-unknown $(NATIVE_TARGET)
+	@rustup toolchain install ${RISCV_RUSTC_VERSION} --target riscv64gc-unknown-linux-musl
 
 .PHONY: build-dev-deps
 build-dev-deps: build-deps

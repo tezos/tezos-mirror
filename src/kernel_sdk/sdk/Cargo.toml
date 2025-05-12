@@ -75,14 +75,6 @@ optional = true
 version = "1.0.115"
 optional = true
 
-[target.'cfg(target_os = "hermit")'.dependencies.hermit]
-# TODO: remove pin once patched version of hermit is published
-git = "https://github.com/hermit-os/hermit-rs.git"
-# This is the latest revision we can use at the moment. The 'hermit' crate
-# introduces breaking changes that require Rust 1.74+.
-rev = "01df75880c9be03fe935c3faabd191082d8916a2"
-default-features = false
-
 [build-dependencies.tezos-smart-rollup-build-utils]
 path = "../build-utils"
 

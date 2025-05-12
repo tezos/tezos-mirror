@@ -10,9 +10,6 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(pvm_flavour = "hermit")]
-extern crate hermit;
-
 #[cfg(feature = "utils")]
 #[doc(inline)]
 pub use tezos_smart_rollup_utils as utils;

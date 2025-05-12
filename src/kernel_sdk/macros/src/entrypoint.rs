@@ -34,10 +34,9 @@ pub(crate) fn main_attribute(attr: TokenStream, item: TokenStream) -> TokenStrea
         }
     };
 
-    let hermit_meta = Target::RISCV_HERMIT.to_meta();
-    let riscv_supervising_meta = Target::RISCV_SUPERVISING.to_meta();
-    let hermit_code = quote! {
-        #[cfg(any(#hermit_meta, #riscv_supervising_meta))]
+    let riscv_meta = Target::RISCV.to_meta();
+    let riscv_code = quote! {
+        #[cfg(#riscv_meta)]
         fn main() {
             tezos_smart_rollup::entrypoint::kernel_entrypoint_fn(#fn_name);
         }
@@ -50,7 +49,7 @@ pub(crate) fn main_attribute(attr: TokenStream, item: TokenStream) -> TokenStrea
     let native_code = {
         let native_meta = Target::fallback_meta();
         quote! {
-            // Note: keep this cfg mutual exclusive to the wasm and hermit ones to ensure backwards compatibility
+            // Note: keep this cfg mutual exclusive to the WASM and RISC-V ones to ensure backwards compatibility
             #[cfg(#native_meta)]
             fn main() {
                 tezos_smart_rollup::entrypoint::kernel_entrypoint_fn(#fn_name);
@@ -65,7 +64,7 @@ pub(crate) fn main_attribute(attr: TokenStream, item: TokenStream) -> TokenStrea
         #item
 
         #wasm_code
-        #hermit_code
+        #riscv_code
         #native_code
     };
 
