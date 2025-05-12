@@ -55,10 +55,6 @@ let init_cryptobox config proto_parameters profile =
   | Error (`Fail msg) -> fail [Errors.Cryptobox_initialisation_failed msg]
 
 module Handler = struct
-  let supports_refutations ctxt =
-    let profile = Node_context.get_profile_ctxt ctxt in
-    Profile_manager.supports_refutations profile
-
   (* This function removes from the store the given slot and its
      shards. In case of error, this function emits a warning instead
      of failing. *)
@@ -107,7 +103,7 @@ module Handler = struct
            let* () =
              (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
                 We may want to remove this check. *)
-             if supports_refutations ctxt then
+             if Node_context.supports_refutations ctxt then
                let* res =
                  Store.Skip_list_cells.remove store ~attested_level:oldest_level
                in
@@ -408,7 +404,7 @@ module Handler = struct
       Plugin.block_info cctxt ~block:(`Level block_level) ~metadata:`Never
     in
     let* () =
-      if supports_refutations ctxt then
+      if Node_context.supports_refutations ctxt then
         store_skip_list_cells
           ctxt
           cctxt
@@ -1139,7 +1135,7 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt
 
 let clean_up_store_and_catch_up ctxt cctxt ~last_processed_level
     ~first_seen_level head_level proto_parameters =
-  if Handler.supports_refutations ctxt then
+  if Node_context.supports_refutations ctxt then
     clean_up_store_and_catch_up_for_refutation_support
       ctxt
       cctxt

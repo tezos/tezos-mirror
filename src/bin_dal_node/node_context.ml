@@ -211,6 +211,9 @@ let version {network_name; _} =
 let is_bootstrap_node ctxt =
   get_profile_ctxt ctxt |> Profile_manager.is_bootstrap_profile
 
+let supports_refutations ctxt =
+  get_profile_ctxt ctxt |> Profile_manager.supports_refutations
+
 let warn_if_attesters_not_delegates ctxt controller_profiles =
   let open Lwt_result_syntax in
   let pkh_set = Controller_profiles.attesters controller_profiles in
