@@ -419,9 +419,8 @@ pub fn octez_riscv_install_boot_sector(
     // RISC-V kernels are too large to be originated directly. In order to
     // temporarily bypass this limitation (TODO: RV-109 Port kernel installer to RISC-V)
     // the boot sector is installed by loading it from a path passed at origination
-    // after checking consistency with the provided checksum. Optionally, the Hermit loader
-    // can also be passed in the origination string:
-    // "kernel:<path to kernel>:<kernel checksum>[:<path to loader>:<loader checksum>]"
+    // after checking consistency with the provided checksum.
+    // "kernel:<path to kernel>:<kernel checksum>"
     // Any string not matching this format will be treated as an actual kernel to be installed.
     let install_kernel = |pvm: &mut NodePvm| {
         if let Ok(boot_sector) = str::from_utf8(boot_sector) {
