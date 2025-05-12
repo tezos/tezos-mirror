@@ -101,6 +101,88 @@ let start db Config.{addr; port} =
   let* () = Event.rpc_server_started (addr, port) in
   return shutdown
 
+module Encodings = struct
+  open Data_encoding
+
+  let quantity_hum_encoding =
+    union
+      [
+        case
+          Json_only
+          ~title:"int"
+          int31
+          (fun (Ethereum_types.Qty z) ->
+            if Z.fits_int z then Some (Z.to_int z) else None)
+          (fun i -> Ethereum_types.quantity_of_z (Z.of_int i));
+        case
+          Json_only
+          ~title:"z"
+          z
+          (fun (Ethereum_types.Qty z) -> Some z)
+          (fun z -> Ethereum_types.quantity_of_z z);
+      ]
+
+  let deposit =
+    conv
+      (fun Db.{nonce; proxy; ticket_hash; receiver; amount} ->
+        (nonce, proxy, ticket_hash, receiver, amount))
+      (fun (nonce, proxy, ticket_hash, receiver, amount) ->
+        Db.{nonce; proxy; ticket_hash; receiver; amount})
+    @@ obj5
+         (req "nonce" quantity_hum_encoding)
+         (req "proxy" Ethereum_types.address_encoding)
+         (req "ticket_hash" Ethereum_types.hash_encoding)
+         (req "receiver" Ethereum_types.address_encoding)
+         (req "amount" quantity_hum_encoding)
+
+  let log_info =
+    conv
+      (fun Db.
+             {
+               transactionHash;
+               transactionIndex;
+               logIndex;
+               blockHash;
+               blockNumber;
+               removed;
+             } ->
+        ( transactionHash,
+          transactionIndex,
+          logIndex,
+          blockHash,
+          blockNumber,
+          removed ))
+      (fun ( transactionHash,
+             transactionIndex,
+             logIndex,
+             blockHash,
+             blockNumber,
+             removed ) ->
+        Db.
+          {
+            transactionHash;
+            transactionIndex;
+            logIndex;
+            blockHash;
+            blockNumber;
+            removed;
+          })
+    @@ obj6
+         (req "transactionHash" Ethereum_types.hash_encoding)
+         (req "transactionIndex" quantity_hum_encoding)
+         (req "logIndex" quantity_hum_encoding)
+         (req "blockHash" Ethereum_types.block_hash_encoding)
+         (req "blockNumber" quantity_hum_encoding)
+         (dft "removed" bool false)
+end
+
 let () =
   register Dream.get "/health" Data_encoding.unit @@ fun _ _ ->
   Lwt_result_syntax.return_unit
+
+let () =
+  register
+    Dream.get
+    "/unclaimed"
+    Data_encoding.(list (merge_objs Encodings.deposit Encodings.log_info))
+  @@ fun _ db -> Db.Deposits.get_unclaimed_full db

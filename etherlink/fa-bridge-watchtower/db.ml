@@ -314,6 +314,18 @@ module Deposits = struct
       ORDER BY nonce DESC
       |sql}
 
+    let unclaimed_full =
+      (unit ->* t2 deposit log_info)
+      @@ {sql|
+      SELECT
+       nonce, proxy, ticket_hash, receiver, amount,
+       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
+       log_blockNumber, log_removed
+      FROM deposits
+      where exec_transactionHash IS NULL
+      ORDER BY nonce DESC
+      |sql}
+
     let set_claimed =
       (t2 execution_info level ->. unit)
       @@ {sql|
@@ -335,6 +347,10 @@ module Deposits = struct
   let get_unclaimed ?conn db =
     with_connection db conn @@ fun conn ->
     Sqlite.Db.rev_collect_list conn Q.unclaimed ()
+
+  let get_unclaimed_full ?conn db =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.unclaimed_full ()
 
   let set_claimed ?conn db nonce execution_info =
     with_connection db conn @@ fun conn ->
