@@ -539,7 +539,7 @@ module Handler = struct
      Tenderbake. Note that this means that shard propagation is delayed by two
      levels with respect to the publication level of the corresponding slot
      header. *)
-  let new_finalized_head ctxt cctxt crawler =
+  let on_new_finalized_head ctxt cctxt crawler =
     let open Lwt_result_syntax in
     let stream = Crawler.finalized_heads_stream crawler in
     let rec loop () =
@@ -1479,5 +1479,5 @@ let run ~data_dir ~configuration_override =
   (* Start never-ending monitoring daemons *)
   let version = Tezos_version_value.Bin_version.octez_version_string in
   let*! () = Event.emit_node_is_ready ~network_name ~version in
-  let* () = daemonize [Handler.new_finalized_head ctxt cctxt crawler] in
+  let* () = daemonize [Handler.on_new_finalized_head ctxt cctxt crawler] in
   return_unit
