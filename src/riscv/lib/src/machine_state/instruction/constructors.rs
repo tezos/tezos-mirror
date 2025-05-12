@@ -1194,6 +1194,25 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X32Mul`].
+    pub(crate) fn new_x32_mul(
+        rd: XRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X32Mul,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::ECall`].
     pub(crate) fn new_ecall() -> Self {
         Self {

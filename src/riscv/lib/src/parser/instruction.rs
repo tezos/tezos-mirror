@@ -485,6 +485,8 @@ pub enum InstrCacheable {
     Mulh(RTypeArgs),
     Mulhsu(RTypeArgs),
     Mulhu(RTypeArgs),
+    /// `MULW` - Multiply the lower 32 bits of val(rs1) with the lower 32 bits of val(rs2)
+    /// and store the sign-extended result in `rd`.
     Mulw(RTypeArgs),
 
     // RV64F instructions

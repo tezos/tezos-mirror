@@ -298,7 +298,7 @@ pub enum OpCode {
     Mulh,
     Mulhsu,
     Mulhu,
-    Mulw,
+    X32Mul,
 
     // RV64F instructions
     FclassS,
@@ -515,7 +515,7 @@ impl OpCode {
             Self::Mulh => Args::run_mulh,
             Self::Mulhsu => Args::run_mulhsu,
             Self::Mulhu => Args::run_mulhu,
-            Self::Mulw => Args::run_mulw,
+            Self::X32Mul => Args::run_x32_mul,
             Self::FclassS => Args::run_fclass_s,
             Self::Feqs => Args::run_feq_s,
             Self::Fles => Args::run_fle_s,
@@ -631,6 +631,7 @@ impl OpCode {
             Self::X64Xor => Some(Args::run_x64_xor),
             Self::X64XorImm => Some(Args::run_x64_xor_immediate),
             Self::Mul => Some(Args::run_mul),
+            Self::X32Mul => Some(Args::run_x32_mul),
             Self::Li => Some(Args::run_li),
             Self::AddImmediateToPC => Some(Args::run_add_immediate_to_pc),
             Self::J => Some(Args::run_j),
@@ -1468,7 +1469,7 @@ impl Args {
     impl_r_type!(run_mulh);
     impl_r_type!(run_mulhsu);
     impl_r_type!(run_mulhu);
-    impl_r_type!(run_mulw);
+    impl_r_type!(integer::run_x32_mul, run_x32_mul, non_zero_rd);
 
     // RV64F instructions
     impl_fload_type!(run_flw);
@@ -1921,10 +1922,9 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Mulhu,
                 args: args.into(),
             },
-            InstrCacheable::Mulw(args) => Instruction {
-                opcode: OpCode::Mulw,
-                args: args.into(),
-            },
+            InstrCacheable::Mulw(args) => {
+                Instruction::new_x32_mul(args.rd, args.rs1, args.rs2, InstrWidth::Uncompressed)
+            }
 
             // RV64F instructions
             InstrCacheable::Flw(args) => Instruction {
