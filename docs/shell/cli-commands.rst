@@ -87,6 +87,19 @@ This is the manual page of the baker command line tool. See :ref:`baker_run` for
 .. raw:: html
          :file: ../api/octez-baker.html
 
+.. _accuser_manual:
+
+Accuser manual
+==============
+
+This is the manual page of the accuser command line tool. See :ref:`accuser_run` for a general description of this tool.
+
+.. note::
+	This unique accuser executable is meant to replace the protocol-specific accusers for all the protocols it supports, such as :ref:`octez-accuser-PsRiotum <accuser_manual_rio>` and :ref:`octez-accuser-alpha <accuser_manual_alpha>`.
+
+.. raw:: html
+         :file: ../api/octez-accuser.html
+
 .. _benchmark_tool_manual:
 
 Benchmark tool manual

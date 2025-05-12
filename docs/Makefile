@@ -72,6 +72,8 @@ api/%.html:
 # separate case for baker for now, because $* expands to octez-baker- in above rule
 api/octez-baker.html:
 	@../octez-baker man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+api/octez-accuser.html:
+	@../octez-accuser man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 # Binary non-protocol specific manuals for cmdliner binaries.
 api/octez-node.txt:
@@ -96,6 +98,7 @@ manuals: \
 	 api/octez-smart-rollup-node.html \
 	 api/octez-node.txt \
 	 api/octez-baker.html \
+	 api/octez-accuser.html \
 	 api/octez-dal-node.txt \
 	 api/octez-dal-node-config-init.txt
 

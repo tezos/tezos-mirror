@@ -305,7 +305,12 @@ cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its 
 
 ::
 
-   octez-accuser-alpha run
+   octez-accuser run
+
+.. note::
+	Previously, you had to run an accuser specific for a given protocol, such as ``octez-accuser-<PROTO_HASH>``,
+	where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
+	These protocol-specific accusers are still available for now, but will be deprecated.
 
 The accuser uses the same format of configuration file as the client (see :ref:`client_conf_file`).
 A complete manual page of the accuser is available :ref:`here <accuser_manual>`.
