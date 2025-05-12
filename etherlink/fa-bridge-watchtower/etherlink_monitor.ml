@@ -14,6 +14,7 @@ type ctx = {
   sk : Libsecp256k1.External.Key.secret Libsecp256k1.External.Key.t;
   chain_id : L2_types.chain_id;
   gas_limit : Z.t;
+  whitelist : Ethereum_types.address list option;
 }
 
 module Craft = struct
@@ -68,9 +69,6 @@ end
 
 module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
 
-let system_address =
-  Ethereum_types.Address (Hex "0000000000000000000000000000000000000000")
-
 let kecack_topic s =
   let (`Hex h) =
     Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string s) |> Hex.of_bytes
@@ -97,14 +95,28 @@ let extract_32_end i ?padding data =
   in
   Bytes.sub data start length
 
-let mk_filter address topic =
+(* Helper to convert an Ethereum address to a topic format *)
+let addr_to_topic address =
+  let (Ethereum_types.Address (Hex addr_hex)) = address in
+  let padded_hex = String.make (64 - String.length addr_hex) '0' ^ addr_hex in
+  Ethereum_types.Hash (Hex padded_hex)
+
+let mk_filter address topic whitelist =
+  let topics =
+    [Some (Ethereum_types.Filter.One topic); None (* ignore token hash topic *)]
+    @
+    match whitelist with
+    | None -> []
+    | Some addresses ->
+        let proxy_topics = List.map addr_to_topic addresses in
+        [Some (Or proxy_topics)]
+  in
   let bloom =
     Filter_helpers.make_bloom_address_topics
-      (Some (Vec [system_address; address]))
-      (Some [Some (One topic)])
+      (Some (Single address))
+      (Some topics)
   in
-  Filter_helpers.
-    {bloom; address = [system_address; address]; topics = [Some (One topic)]}
+  Filter_helpers.{bloom; address = [address]; topics}
 
 module Event = struct
   include Internal_event.Simple
@@ -352,7 +364,7 @@ module Deposit = struct
   let topic =
     kecack_topic "QueuedDeposit(uint256,address,uint256,uint256,uint256)"
 
-  let filter = mk_filter address topic
+  let filter whitelist = mk_filter address topic whitelist
 
   let decode_event_data Ethereum_types.{topics; data = Hex hex_data; _} =
     let open Result_syntax in
@@ -481,11 +493,6 @@ let lwt_stream_iter_es f stream =
   in
   loop ()
 
-let filter_address = Ethereum_types.Filter.Vec [Deposit.address]
-
-(* TODO: add filters on ticket hash and proxy for known contracts. *)
-let filter_topics = [Some (Ethereum_types.Filter.One Deposit.topic)]
-
 (** Retrieve log events that happened in [block] and register them in the
     DB. Uses a recursive strategy to handle the case where there are too many
     logs in the requested range.
@@ -497,6 +504,7 @@ let rec get_logs ?(n = 1) ctx ~block =
   let open Lwt_result_syntax in
   let open Ethereum_types in
   (* Query logs for the specified block range *)
+  let filter = Deposit.filter ctx.whitelist in
   let*! logs =
     Websocket_client.send_jsonrpc
       ctx.ws_client
@@ -506,8 +514,8 @@ let rec get_logs ?(n = 1) ctx ~block =
              {
                from_block = Some (Number block);
                to_block = Some (Number block);
-               address = Some filter_address;
-               topics = Some filter_topics;
+               address = Some (Single Deposit.address);
+               topics = Some filter.topics;
                block_hash = None;
              } ))
   in
@@ -754,6 +762,7 @@ let start db ~evm_node_endpoint ~first_block ~secret_key ~max_fee_per_gas
         sk = secret_key;
         chain_id;
         gas_limit;
+        whitelist = None (* TODO: populate from config. *);
       }
     in
     monitor_heads ctx
