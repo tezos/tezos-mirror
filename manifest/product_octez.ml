@@ -7434,7 +7434,7 @@ let hash = Protocol.hash
         ~linkall:true
     in
     let dal =
-      only_if (active && N.(number >= 016)) @@ fun () ->
+      only_if N.(number >= 021) @@ fun () ->
       octez_protocol_lib
         "dal"
         ~internal_name:(sf "tezos_dal_%s" name_dash)
