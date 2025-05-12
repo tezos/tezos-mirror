@@ -533,12 +533,71 @@ module Handler = struct
           finalized_block_hash
     | _ -> return res
 
-  (* Monitor finalized heads and store *finalized* published slot headers
+  (* Process a finalized head and store *finalized* published slot headers
      indexed by block hash. A slot header is considered finalized when it is in
      a block with at least two other blocks on top of it, as guaranteed by
      Tenderbake. Note that this means that shard propagation is delayed by two
      levels with respect to the publication level of the corresponding slot
      header. *)
+  let new_finalized_head ctxt cctxt cryptobox finalized_block_hash
+      finalized_shell_header ~launch_time =
+    let open Lwt_result_syntax in
+    let level = finalized_shell_header.Block_header.level in
+    let () = Node_context.set_last_finalized_level ctxt level in
+    let* () =
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
+         We should use the head level instead. *)
+      Node_context.may_add_plugin
+        ctxt
+        cctxt
+        ~proto_level:finalized_shell_header.proto_level
+        ~block_level:level
+    in
+    let*? proto_parameters =
+      Node_context.get_proto_parameters ctxt ~level:(`Level level)
+    in
+    (* At each potential published_level [level], we prefetch the
+       committee for its corresponding attestation_level (that is:
+       level + attestation_lag - 1). This is in particular used by GS
+       messages ids validation that cannot depend on Lwt. *)
+    let* () =
+      if not proto_parameters.feature_enable then return_unit
+      else
+        let attestation_level =
+          Int32.(
+            pred @@ add level (of_int proto_parameters.Types.attestation_lag))
+        in
+        let* _committee =
+          Node_context.fetch_committee ctxt ~level:attestation_level
+        in
+        return_unit
+    in
+    Gossipsub.Worker.Validate_message_hook.set
+      (Message_validation.gossipsub_app_messages_validation
+         ctxt
+         cryptobox
+         level
+         proto_parameters) ;
+    let*! () = remove_old_level_stored_data proto_parameters ctxt level in
+    let* () =
+      if level = 1l then
+        (* We do not process the block at level 1, as it will not
+           contain DAL information, and it has no round. *)
+        return_unit
+      else
+        try_process_block
+          ~retries:Constants.crawler_retries_on_disconnection
+          ctxt
+          cctxt
+          proto_parameters
+          finalized_shell_header
+          finalized_block_hash
+    in
+    let end_time = Unix.gettimeofday () in
+    Dal_metrics.per_level_processing_time (end_time -. launch_time) ;
+    return_unit
+
+  (* Monitor and process finalized heads. *)
   let on_new_finalized_head ctxt cctxt crawler =
     let open Lwt_result_syntax in
     let stream = Crawler.finalized_heads_stream crawler in
@@ -549,60 +608,15 @@ module Handler = struct
       match next_final_head with
       | None -> Lwt.fail_with "L1 crawler lib shut down"
       | Some (finalized_block_hash, finalized_shell_header) ->
-          let level = finalized_shell_header.level in
-          let () = Node_context.set_last_finalized_level ctxt level in
           let* () =
-            (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
-               We should use the head level instead. *)
-            Node_context.may_add_plugin
+            new_finalized_head
               ctxt
               cctxt
-              ~proto_level:finalized_shell_header.proto_level
-              ~block_level:level
+              cryptobox
+              finalized_block_hash
+              finalized_shell_header
+              ~launch_time
           in
-          let*? proto_parameters =
-            Node_context.get_proto_parameters ctxt ~level:(`Level level)
-          in
-          (* At each potential published_level [level], we prefetch the
-             committee for its corresponding attestation_level (that is:
-             level + attestation_lag - 1). This is in particular used by GS
-             messages ids validation that cannot depend on Lwt. *)
-          let* () =
-            if not proto_parameters.feature_enable then return_unit
-            else
-              let attestation_level =
-                Int32.(
-                  pred
-                  @@ add level (of_int proto_parameters.Types.attestation_lag))
-              in
-              let* _committee =
-                Node_context.fetch_committee ctxt ~level:attestation_level
-              in
-              return_unit
-          in
-          Gossipsub.Worker.Validate_message_hook.set
-            (Message_validation.gossipsub_app_messages_validation
-               ctxt
-               cryptobox
-               level
-               proto_parameters) ;
-          let*! () = remove_old_level_stored_data proto_parameters ctxt level in
-          let* () =
-            if level = 1l then
-              (* We do not process the block at level 1, as it will not
-                 contain DAL information, and it has no round. *)
-              return_unit
-            else
-              try_process_block
-                ~retries:Constants.crawler_retries_on_disconnection
-                ctxt
-                cctxt
-                proto_parameters
-                finalized_shell_header
-                finalized_block_hash
-          in
-          let end_time = Unix.gettimeofday () in
-          Dal_metrics.per_level_processing_time (end_time -. launch_time) ;
           loop ()
     in
     let*! () = Event.emit_layer1_node_tracking_started () in
