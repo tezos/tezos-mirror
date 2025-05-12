@@ -163,7 +163,7 @@ where
 /// Generic implementation of any atomic memory operation which works on 64-bit values,
 /// implementing read-modify-write operations for multi-processor synchronisation
 /// (Section 8.4)
-fn run_amo_d<I: ICB>(
+fn run_x64_atomic<I: ICB>(
     icb: &mut I,
     rs1: XRegister,
     rs2: XRegister,
@@ -201,7 +201,7 @@ fn run_amo_d<I: ICB>(
     reason = "The `aq` and `rl` bits specify additional memory constraints 
     in multi-hart environments so they are currently ignored."
 )]
-pub fn run_amoaddd<I: ICB>(
+pub fn run_x64_atomic_add<I: ICB>(
     icb: &mut I,
     rs1: XRegister,
     rs2: XRegister,
@@ -209,7 +209,7 @@ pub fn run_amoaddd<I: ICB>(
     aq: bool,
     rl: bool,
 ) -> I::IResult<()> {
-    run_amo_d(icb, rs1, rs2, rd, |x, y, icb| x.add(y, icb))
+    run_x64_atomic(icb, rs1, rs2, rd, |x, y, icb| x.add(y, icb))
 }
 
 #[cfg(test)]
@@ -222,7 +222,7 @@ mod test {
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::a2;
 
-    macro_rules! test_amo {
+    macro_rules! test_atomic {
         ($(#[$m:meta])* $name: ident, $instr: path, $f: expr, $align: expr, $t: ty) => {
             backend_test!($name, F, {
                 use $crate::machine_state::memory::M4K;
@@ -261,9 +261,9 @@ mod test {
         }
     }
 
-    test_amo!(
-        test_run_amoaddd,
-        super::run_amoaddd,
+    test_atomic!(
+        test_run_x64_atomic_add,
+        super::run_x64_atomic_add,
         u64::wrapping_add,
         8,
         u64

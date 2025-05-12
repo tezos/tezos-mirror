@@ -277,7 +277,7 @@ pub enum OpCode {
     Lrd,
     Scd,
     Amoswapd,
-    Amoaddd,
+    X64AtomicAdd,
     Amoxord,
     Amoandd,
     Amoord,
@@ -496,7 +496,7 @@ impl OpCode {
             Self::Lrd => Args::run_lrd,
             Self::Scd => Args::run_scd,
             Self::Amoswapd => Args::run_amoswapd,
-            Self::Amoaddd => Args::run_amoaddd,
+            Self::X64AtomicAdd => Args::run_x64_atomic_add,
             Self::Amoxord => Args::run_amoxord,
             Self::Amoandd => Args::run_amoandd,
             Self::Amoord => Args::run_amoord,
@@ -698,7 +698,7 @@ impl OpCode {
             Self::X8LoadUnsigned => Some(Args::run_x8_load_unsigned),
 
             // Atomic instructions
-            Self::Amoaddd => Some(Args::run_amoaddd),
+            Self::X64AtomicAdd => Some(Args::run_x64_atomic_add),
 
             // Errors
             Self::Unknown => Some(Args::run_illegal),
@@ -1467,7 +1467,7 @@ impl Args {
     impl_amo_type!(run_lrd);
     impl_amo_type!(run_scd);
     impl_amo_type!(run_amoswapd);
-    impl_amo_type!(atomics::run_amoaddd, run_amoaddd);
+    impl_amo_type!(atomics::run_x64_atomic_add, run_x64_atomic_add);
     impl_amo_type!(run_amoxord);
     impl_amo_type!(run_amoandd);
     impl_amo_type!(run_amoord);
@@ -1863,7 +1863,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Amoswapd,
                 args: args.into(),
             },
-            InstrCacheable::Amoaddd(args) => Instruction::new_amoaddd(
+            InstrCacheable::Amoaddd(args) => Instruction::new_x64_atomic_add(
                 args.rd,
                 args.rs1,
                 args.rs2,

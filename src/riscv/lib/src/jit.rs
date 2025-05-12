@@ -2249,11 +2249,11 @@ mod tests {
         }
     });
 
-    backend_test!(test_amo_d, F, {
+    backend_test!(test_x64_atomic, F, {
         use crate::machine_state::registers::NonZeroXRegister as NZ;
         use crate::machine_state::registers::XRegister::*;
 
-        type ConstructAmoFn = fn(
+        type ConstructAtomicFn = fn(
             rd: XRegister,
             rs1: XRegister,
             rs2: XRegister,
@@ -2264,19 +2264,19 @@ mod tests {
 
         const MEMORY_SIZE: u64 = M4K::TOTAL_BYTES as u64;
 
-        const AMO_ADDRESS_BASE: u64 = MEMORY_SIZE / 2;
+        const ADDRESS_BASE_ATOMICS: u64 = MEMORY_SIZE / 2;
 
-        let valid_amo_d = |constructor: ConstructAmoFn,
-                           val1: u64,
-                           val2: u64,
-                           fun: fn(u64, u64) -> u64|
+        let valid_x64_atomic = |constructor: ConstructAtomicFn,
+                                val1: u64,
+                                val2: u64,
+                                fun: fn(u64, u64) -> u64|
          -> Scenario<F> {
             ScenarioBuilder::default()
                 .set_setup_hook(setup_hook!(core, F, {
-                    core.main_memory.write(AMO_ADDRESS_BASE, val1).unwrap();
+                    core.main_memory.write(ADDRESS_BASE_ATOMICS, val1).unwrap();
                 }))
                 .set_instructions(&[
-                    I::new_li(NZ::x1, AMO_ADDRESS_BASE as i64, InstrWidth::Compressed),
+                    I::new_li(NZ::x1, ADDRESS_BASE_ATOMICS as i64, InstrWidth::Compressed),
                     I::new_li(NZ::x2, val2 as i64, InstrWidth::Compressed),
                     constructor(x3, x1, x2, false, false, InstrWidth::Uncompressed),
                     I::new_nop(InstrWidth::Compressed),
@@ -2286,26 +2286,28 @@ mod tests {
                     let value: u64 = core.hart.xregisters.read(x3);
                     assert_eq!(value, val1);
 
-                    let res: u64 = core.main_memory.read(AMO_ADDRESS_BASE).unwrap();
+                    let res: u64 = core.main_memory.read(ADDRESS_BASE_ATOMICS).unwrap();
                     let expected = fun(val1, val2);
                     assert_eq!(res, expected, "Found {value:x}, expected {expected:x}");
                 }))
                 .build()
         };
 
-        let invalid_amo_d = |constructor: ConstructAmoFn,
-                             val1: u64,
-                             val2: u64,
-                             fun: fn(u64, u64) -> u64|
+        let invalid_x64_atomic = |constructor: ConstructAtomicFn,
+                                  val1: u64,
+                                  val2: u64,
+                                  fun: fn(u64, u64) -> u64|
          -> Scenario<F> {
             ScenarioBuilder::default()
                 .set_setup_hook(setup_hook!(core, F, {
-                    core.main_memory.write(AMO_ADDRESS_BASE + 4, val1).unwrap();
+                    core.main_memory
+                        .write(ADDRESS_BASE_ATOMICS + 4, val1)
+                        .unwrap();
                 }))
                 .set_instructions(&[
                     I::new_li(
                         NZ::x1,
-                        (AMO_ADDRESS_BASE + 4) as i64,
+                        (ADDRESS_BASE_ATOMICS + 4) as i64,
                         InstrWidth::Compressed,
                     ),
                     I::new_li(NZ::x2, val2 as i64, InstrWidth::Compressed),
@@ -2317,7 +2319,7 @@ mod tests {
                     let value: u64 = core.hart.xregisters.read(x3);
                     assert_eq!(value, 0);
 
-                    let res: u64 = core.main_memory.read(AMO_ADDRESS_BASE + 4).unwrap();
+                    let res: u64 = core.main_memory.read(ADDRESS_BASE_ATOMICS + 4).unwrap();
                     let expected = fun(val1, val2);
                     assert_eq!(res, val1, "Found {value:x}, expected {expected:x}");
                 }))
@@ -2325,8 +2327,8 @@ mod tests {
         };
 
         let scenarios: &[Scenario<F>] = &[
-            valid_amo_d(I::new_amoaddd, 10, 30, u64::wrapping_add),
-            invalid_amo_d(I::new_amoaddd, 10, 30, u64::wrapping_add),
+            valid_x64_atomic(I::new_x64_atomic_add, 10, 30, u64::wrapping_add),
+            invalid_x64_atomic(I::new_x64_atomic_add, 10, 30, u64::wrapping_add),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

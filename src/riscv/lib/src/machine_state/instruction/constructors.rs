@@ -1245,8 +1245,8 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Amoaddd`].
-    pub(crate) fn new_amoaddd(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64AtomicAdd`].
+    pub(crate) fn new_x64_atomic_add(
         rd: XRegister,
         rs1: XRegister,
         rs2: XRegister,
@@ -1255,7 +1255,7 @@ impl Instruction {
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Amoaddd,
+            opcode: OpCode::X64AtomicAdd,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
