@@ -151,6 +151,8 @@ let run_command =
       let open Lwt_result_syntax in
       let*! () = log_config ~verbosity ~data_dir in
       let* db = Db.init ~data_dir `Read_write in
+      (* TODO: address and port from config, start server only if present. *)
+      let*! _stop = Rpc_server.start db {addr = "0.0.0.0"; port = 4002} in
       Etherlink_monitor.start
         db
         ~evm_node_endpoint

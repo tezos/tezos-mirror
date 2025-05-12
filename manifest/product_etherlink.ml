@@ -595,6 +595,7 @@ let _fa_bridge_watchtower =
         evm_node_lib_dev_encoding |> open_;
         evm_node_lib_dev |> open_;
         efunc_core;
+        dream;
       ]
     ~dune:
       Dune.
