@@ -8,6 +8,7 @@
 
 pub(super) mod arithmetic;
 pub(super) mod block_state;
+pub(super) mod comparable;
 pub(super) mod errno;
 
 use cranelift::codegen::ir;
@@ -302,23 +303,6 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
     /// for the block).
     fn pc_read(&mut self) -> Self::XValue {
         self.dynamic.read_pc(&mut self.builder)
-    }
-
-    fn xvalue_compare(
-        &mut self,
-        comparison: crate::instruction_context::Predicate,
-        lhs: Self::XValue,
-        rhs: Self::XValue,
-    ) -> Self::Bool {
-        // icmp returns 1 if the condition holds, 0 if it does not.
-        //
-        // This matches the required semantics of bool - namely that it coerces to XValue with
-        // - true => 1
-        // - false => 0
-        //
-        // See
-        // <https://docs.rs/cranelift-codegen/0.117.2/cranelift_codegen/ir/trait.InstBuilder.html#method.icmp>
-        self.builder.ins().icmp(comparison, lhs.0, rhs.0)
     }
 
     fn branch(

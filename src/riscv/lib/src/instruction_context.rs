@@ -8,8 +8,10 @@
 //! be used for both interpretation and compilation of instructions.
 
 pub(super) mod arithmetic;
+pub(super) mod comparable;
 
 use arithmetic::Arithmetic;
+use comparable::Comparable;
 
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
@@ -43,7 +45,7 @@ pub trait ICB {
     /// A 64-bit value stored in [`XRegisters`].
     ///
     /// [`XRegisters`]: crate::machine_state::registers::XRegisters
-    type XValue: Arithmetic<Self>;
+    type XValue: Arithmetic<Self> + Comparable<Self>;
 
     /// Perform a read to a [`NonZeroXRegister`], with the given value.
     /// This is a specialized version of `xregister_read` that is only used for
@@ -65,7 +67,7 @@ pub trait ICB {
     type Bool;
 
     /// A 32-bit value to be used only in word-width operations.
-    type XValue32: Arithmetic<Self>;
+    type XValue32: Arithmetic<Self> + Comparable<Self>;
 
     /// Convert an [`XValue`] to a [`XValue32`].
     fn narrow(&mut self, value: Self::XValue) -> Self::XValue32;
@@ -75,14 +77,6 @@ pub trait ICB {
 
     /// Zero-extend an [`XValue32`] to an [`XValue`].
     fn extend_unsigned(&mut self, value: Self::XValue32) -> Self::XValue;
-
-    /// Compare two values, given the operation to compare them with.
-    fn xvalue_compare(
-        &mut self,
-        comparison: Predicate,
-        lhs: Self::XValue,
-        rhs: Self::XValue,
-    ) -> Self::Bool;
 
     /// Convert a boolean value to an xvalue.
     ///
@@ -223,16 +217,6 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     }
 
     #[inline(always)]
-    fn xvalue_compare(
-        &mut self,
-        comparison: Predicate,
-        lhs: Self::XValue,
-        rhs: Self::XValue,
-    ) -> Self::Bool {
-        comparison.eval(lhs, rhs)
-    }
-
-    #[inline(always)]
     fn xvalue_from_bool(&mut self, value: Self::Bool) -> Self::XValue {
         value as XValue
     }
@@ -349,23 +333,6 @@ pub enum Predicate {
     GreaterThanSigned,
     GreaterThanOrEqualSigned,
     GreaterThanOrEqualUnsigned,
-}
-
-impl Predicate {
-    /// Run the given comparison operation over the given values.
-    #[inline(always)]
-    fn eval(self, lhs: XValue, rhs: XValue) -> bool {
-        match self {
-            Self::Equal => lhs == rhs,
-            Self::NotEqual => lhs != rhs,
-            Self::LessThanSigned => (lhs as i64) < (rhs as i64),
-            Self::LessThanUnsigned => lhs < rhs,
-            Self::LessThanOrEqualSigned => (lhs as i64) <= (rhs as i64),
-            Self::GreaterThanSigned => (lhs as i64) > (rhs as i64),
-            Self::GreaterThanOrEqualSigned => (lhs as i64) >= (rhs as i64),
-            Self::GreaterThanOrEqualUnsigned => lhs >= rhs,
-        }
-    }
 }
 
 /// The type of shift operation to perform.
