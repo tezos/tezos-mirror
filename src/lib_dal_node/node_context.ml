@@ -40,8 +40,9 @@ type t = {
   transport_layer : Gossipsub.Transport_layer.t;
   mutable profile_ctxt : Profile_manager.t;
   mutable last_finalized_level : int32;
-      (* the highest finalized level the DAL node is aware of (except at start-up, where
-         it is the highest level the node is aware of) *)
+  (* the highest finalized level the DAL node is aware of (except at start-up, where
+     it is the highest level the node is aware of) *)
+  mutable l1_crawler_status : L1_crawler_status.t;
 }
 
 let init config ~network_name profile_ctxt cryptobox
@@ -63,9 +64,14 @@ let init config ~network_name profile_ctxt cryptobox
     transport_layer;
     profile_ctxt;
     last_finalized_level;
+    l1_crawler_status = Unknown;
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
+
+let set_l1_crawler_status ctxt status = ctxt.l1_crawler_status <- status
+
+let get_l1_crawler_status ctxt = ctxt.l1_crawler_status
 
 let may_reconstruct ~reconstruct slot_id t =
   let open Lwt_result_syntax in

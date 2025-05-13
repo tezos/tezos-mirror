@@ -98,6 +98,13 @@ val may_reconstruct :
   t ->
   (bytes, Errors.other) result Lwt.t
 
+(** Returns the status of the L1 crawler currently stored in the node
+    context. *)
+val get_l1_crawler_status : t -> L1_crawler_status.t
+
+(** Updates the status of the L1 crawler with the given value. *)
+val set_l1_crawler_status : t -> L1_crawler_status.t -> unit
+
 (** [get_profile_ctxt ctxt] returns the profile context.  *)
 val get_profile_ctxt : t -> Profile_manager.t
 
