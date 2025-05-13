@@ -28,10 +28,17 @@ RUN scripts/ci/bin_packages_rpm_dependencies.sh
 # the package sccache is not available on ubuntu jammy
 #hadolint ignore=DL3008,DL3009
 RUN ARCH=$(uname -m) && \
+    case "$ARCH" in \
+        x86_64) export PLATFORM="x64" ;; \
+        aarch64) export PLATFORM="arm64" ;; \
+        *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac && \
     curl  -L --output sccache.tgz "https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-$ARCH-unknown-linux-musl.tar.gz" && \
     tar zxvf sccache.tgz && \
     cp "sccache-v0.8.1-$ARCH-unknown-linux-musl/sccache" /usr/local/bin/sccache && \
-    rm -Rf sccache*
+    rm -Rf sccache* && \
+    curl -L --fail "https://github.com/DataDog/datadog-ci/releases/download/v3.4.0/datadog-ci_linux-$PLATFORM" --output "/usr/local/bin/datadog-ci" && \
+    chmod +x /usr/local/bin/datadog-ci
 
 #hadolint ignore=SC2154
 RUN . ./scripts/version.sh && \

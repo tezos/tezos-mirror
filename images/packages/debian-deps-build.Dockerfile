@@ -18,6 +18,12 @@ ENV BLST_PORTABLE=true
 # the package sccache is not available on ubuntu jammy
 #hadolint ignore=DL3008,DL3009
 RUN apt-get update && \
+    ARCH=$(uname -m) && \
+    case "$ARCH" in \
+        x86_64) export PLATFORM="x64" ;; \
+        aarch64) export PLATFORM="arm64" ;; \
+        *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac && \
     apt-get install --no-install-recommends -y bubblewrap \
       rsync git m4 build-essential \
       patch unzip curl wget ca-certificates \
@@ -31,11 +37,12 @@ RUN apt-get update && \
       lintian devscripts && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
-    ARCH=$(uname -m) && \
     curl  -L --output sccache.tgz "https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-$ARCH-unknown-linux-musl.tar.gz" && \
     tar zxvf sccache.tgz && \
     cp "sccache-v0.8.1-$ARCH-unknown-linux-musl/sccache" /usr/local/bin/sccache && \
-    rm -Rf sccache*
+    rm -Rf sccache* && \
+    curl -L --fail "https://github.com/DataDog/datadog-ci/releases/download/v3.4.0/datadog-ci_linux-$PLATFORM" --output "/usr/local/bin/datadog-ci" && \
+    chmod +x /usr/local/bin/datadog-ci
 
 COPY --link scripts/version.sh /root/tezos/scripts/
 
