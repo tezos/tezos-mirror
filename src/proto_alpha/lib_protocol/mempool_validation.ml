@@ -24,15 +24,14 @@
 (*****************************************************************************)
 
 open Alpha_context
-open Validate
 
 type t = {
   predecessor_hash : Block_hash.t;
-  operation_state : operation_conflict_state;
+  operation_state : Validate.operation_conflict_state;
   operations : packed_operation Operation_hash.Map.t;
 }
 
-type validation_info = info
+type validation_info = Validate.info
 
 type add_result = Added | Replaced of {removed : Operation_hash.t} | Unchanged
 
@@ -58,7 +57,7 @@ let encoding : t Data_encoding.t =
          {predecessor_hash; operation_state; operations})
   @@ obj3
        (req "predecessor_hash" Block_hash.encoding)
-       (req "operation_state" operation_conflict_state_encoding)
+       (req "operation_state" Validate.operation_conflict_state_encoding)
        (req
           "operations"
           (Operation_hash.Map.encoding
@@ -66,8 +65,8 @@ let encoding : t Data_encoding.t =
 
 let init ctxt chain_id ~predecessor_level ~predecessor_round ~predecessor_hash :
     validation_info * t =
-  let {info; operation_state; _} =
-    begin_partial_construction
+  let Validate.{info; operation_state; _} =
+    Validate.begin_partial_construction
       ctxt
       chain_id
       ~predecessor_level
@@ -88,7 +87,7 @@ let remove_operation mempool oph =
   | Some {shell; protocol_data = Operation_data protocol_data} ->
       let operations = Operation_hash.Map.remove oph mempool.operations in
       let operation_state =
-        remove_operation mempool.operation_state {shell; protocol_data}
+        Validate.remove_operation mempool.operation_state {shell; protocol_data}
       in
       {mempool with operations; operation_state}
 
@@ -99,17 +98,19 @@ let add_operation ?(check_signature = true)
   let open Lwt_syntax in
   let {shell; protocol_data = Operation_data protocol_data} = packed_op in
   let operation : _ Alpha_context.operation = {shell; protocol_data} in
-  let* checks = check_operation ~check_signature info operation in
+  let* checks = Validate.check_operation ~check_signature info operation in
   let validate_result =
     Result.bind checks (List.iter_e (fun check -> check ()))
   in
   match validate_result with
   | Error err -> Lwt.return_error (Validation_error err)
   | Ok () -> (
-      match check_operation_conflict mempool.operation_state oph operation with
+      match
+        Validate.check_operation_conflict mempool.operation_state oph operation
+      with
       | Ok () ->
           let operation_state =
-            add_valid_operation mempool.operation_state oph operation
+            Validate.add_valid_operation mempool.operation_state oph operation
           in
           let operations =
             Operation_hash.Map.add oph packed_op mempool.operations
@@ -134,7 +135,7 @@ let add_operation ?(check_signature = true)
               | `Replace ->
                   let mempool = remove_operation mempool existing in
                   let operation_state =
-                    add_valid_operation
+                    Validate.add_valid_operation
                       mempool.operation_state
                       new_oph
                       operation
@@ -195,14 +196,20 @@ let merge ?conflict_handler existing_mempool new_mempool =
         in
         let right_op = ({shell; protocol_data} : _ operation) in
         let* conflict =
-          check_operation_conflict mempool_acc.operation_state roph right_op
+          Validate.check_operation_conflict
+            mempool_acc.operation_state
+            roph
+            right_op
           |> handle_conflict packed_right_op
         in
         match conflict with
         | `Do_nothing -> return mempool_acc
         | `Add_new ->
             let operation_state =
-              add_valid_operation mempool_acc.operation_state roph right_op
+              Validate.add_valid_operation
+                mempool_acc.operation_state
+                roph
+                right_op
             in
             let operations =
               Operation_hash.Map.add roph packed_right_op mempool_acc.operations
@@ -211,7 +218,10 @@ let merge ?conflict_handler existing_mempool new_mempool =
         | `Replace loph ->
             let mempool_acc = remove_operation mempool_acc loph in
             let operation_state =
-              add_valid_operation mempool_acc.operation_state roph right_op
+              Validate.add_valid_operation
+                mempool_acc.operation_state
+                roph
+                right_op
             in
             let operations =
               Operation_hash.Map.add roph packed_right_op mempool_acc.operations
