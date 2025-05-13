@@ -126,16 +126,30 @@ let delegate_and_second_slot block =
   in
   return (delegate, slot)
 
+let error_wrong_slot = function
+  | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation {kind; _}
+    when kind = Validate_errors.Consensus.Attestation ->
+      true
+  | _ -> false
+
 (** Test that the mempool accepts attestations with a non-normalized
     slot (that is, a slot that belongs to the delegate but is not the
     delegate's smallest slot) at all three allowed levels for
     attestations (and various rounds). *)
 let test_mempool_second_slot () =
   let open Lwt_result_syntax in
-  let* _genesis, grandparent = init_genesis () in
+  let* genesis, grandparent = init_genesis () in
+  let* error =
+    (* Under [aggregate_attestation] feature flag, consensus operations with
+       non-minimal slots are no longer propagated by mempools anymore. *)
+    let* {parametric = {aggregate_attestation; _}; _} =
+      Context.get_constants (B genesis)
+    in
+    if aggregate_attestation then return_some error_wrong_slot else return_none
+  in
   let* predecessor = Block.bake grandparent ~policy:(By_round 3) in
   let* future_block = Block.bake predecessor ~policy:(By_round 5) in
-  let check_non_smallest_slot_ok loc attested_block =
+  let check_non_smallest_slot loc attested_block =
     let* delegate, slot = delegate_and_second_slot attested_block in
     Consensus_helpers.test_consensus_operation
       ~loc
@@ -143,12 +157,13 @@ let test_mempool_second_slot () =
       ~predecessor
       ~delegate
       ~slot
+      ?error
       Attestation
       Mempool
   in
-  let* () = check_non_smallest_slot_ok __LOC__ grandparent in
-  let* () = check_non_smallest_slot_ok __LOC__ predecessor in
-  check_non_smallest_slot_ok __LOC__ future_block
+  let* () = check_non_smallest_slot __LOC__ grandparent in
+  let* () = check_non_smallest_slot __LOC__ predecessor in
+  check_non_smallest_slot __LOC__ future_block
 
 (** {1 Negative tests}
 
@@ -180,14 +195,15 @@ let test_negative_slot () =
     accepted in mempool mode. *)
 let test_not_smallest_slot () =
   let open Lwt_result_syntax in
-  let* _genesis, b = init_genesis () in
+  let* genesis, b = init_genesis () in
   let* delegate, slot = delegate_and_second_slot b in
-  let error_wrong_slot = function
-    | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
-        {kind; _}
-      when kind = Validate_errors.Consensus.Attestation ->
-        true
-    | _ -> false
+  let* mempool_error =
+    (* Under [aggregate_attestation] feature flag, consensus operations with
+       non-minimal slots are no longer propagated by mempools anymore. *)
+    let* {parametric = {aggregate_attestation; _}; _} =
+      Context.get_constants (B genesis)
+    in
+    if aggregate_attestation then return_some error_wrong_slot else return_none
   in
   Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
@@ -196,7 +212,7 @@ let test_not_smallest_slot () =
     ~slot
     ~application_error:error_wrong_slot
     ~construction_error:error_wrong_slot
-    ?mempool_error:None
+    ?mempool_error
     Attestation
 
 let delegate_and_someone_elses_slot block =
