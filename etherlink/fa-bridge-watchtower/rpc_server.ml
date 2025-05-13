@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type ctx = {config : Config.t; db : Db.t}
+
 module Event = struct
   include Internal_event.Simple
 
@@ -33,9 +35,10 @@ end
 
 let routes = ref []
 
-let register meth path ?input_encoding output_encoding handler =
+let register meth path ?input_encoding ?include_default_fields output_encoding
+    handler =
   let open Lwt_syntax in
-  let route db =
+  let route ctx =
     meth path @@ fun message ->
     let* response =
       let open Lwt_result_syntax in
@@ -56,13 +59,15 @@ let register meth path ?input_encoding output_encoding handler =
             in
             return_some input
       in
-      let*! res = handler input db in
+      let*! res = handler input ctx in
       let* res =
         match res with
         | Error e -> fail (`Handler_error e)
         | Ok res -> return res
       in
-      let resp_json = Data_encoding.Json.construct output_encoding res in
+      let resp_json =
+        Data_encoding.Json.construct ?include_default_fields output_encoding res
+      in
       return (Ezjsonm.value_to_string resp_json)
     in
     match response with
@@ -82,7 +87,7 @@ let register meth path ?input_encoding output_encoding handler =
 
 let make_routes db = List.rev_map (fun f -> f db) !routes
 
-let start db Config.{addr; port} =
+let start db config Config.{addr; port} =
   let open Lwt_syntax in
   let stop, resolve_stop = Lwt.wait () in
   let shutdown () =
@@ -91,7 +96,9 @@ let start db Config.{addr; port} =
   in
   Lwt.dont_wait
     (fun () ->
-      make_routes db |> Dream.router |> Dream.serve ~interface:addr ~port ~stop)
+      make_routes {config; db}
+      |> Dream.router
+      |> Dream.serve ~interface:addr ~port ~stop)
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, _, _) ->
           Logs.err (fun m ->
@@ -181,8 +188,14 @@ let () =
   Lwt_result_syntax.return_unit
 
 let () =
+  register Dream.get "/config" ~include_default_fields:`Always Config.encoding
+  @@ fun _ ctx ->
+  Lwt_result_syntax.return
+    {ctx.config with secret_key = None (* erase secret key from output *)}
+
+let () =
   register
     Dream.get
     "/unclaimed"
     Data_encoding.(list (merge_objs Encodings.deposit Encodings.log_info))
-  @@ fun _ db -> Db.Deposits.get_unclaimed_full db
+  @@ fun _ ctx -> Db.Deposits.get_unclaimed_full ctx.db

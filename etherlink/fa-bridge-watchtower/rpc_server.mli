@@ -6,6 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [start db rpc] starts an RPC server with the given database and configuration
-    and returns a function that can be called to stop the server *)
-val start : Db.t -> Config.rpc -> (unit -> unit Lwt.t) Lwt.t
+(** [start db config rpc] starts an RPC server with the given database and
+    configuration and returns a function that can be called to stop the
+    server *)
+val start : Db.t -> Config.t -> Config.rpc -> (unit -> unit Lwt.t) Lwt.t
