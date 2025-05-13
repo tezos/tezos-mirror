@@ -1445,18 +1445,9 @@ let apply_manager_operation :
                 in
                 Gas.consume ctxt gas_cost_for_sig_check
               in
-              let bytes =
-                match
-                  Data_encoding.Binary.to_bytes_opt
-                    Signature.Public_key.encoding
-                    public_key
-                with
-                | None -> Bytes.empty (* Should never happen *)
-                | Some bytes -> bytes
-              in
               let* () =
                 fail_unless
-                  (Signature.check public_key (Bls proof) bytes)
+                  (Signature.pop_verify bls_public_key (Bls.to_bytes proof))
                   (Validate_errors.Manager
                    .Update_consensus_key_with_incorrect_proof
                      {kind; public_key; proof})

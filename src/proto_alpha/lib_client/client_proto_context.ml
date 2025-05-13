@@ -32,24 +32,6 @@ open Client_proto_contracts
 open Client_keys
 module Alpha_services = Plugin.Alpha_services
 
-type error += Unexpected_proof_of_possession_format of Signature.t
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"client.unexpected_proof_of_possession_format"
-    ~title:"Unexpected proof of possession format"
-    ~description:"Proof of possession should be a BLS signature."
-    ~pp:(fun ppf s ->
-      Format.fprintf
-        ppf
-        "Proof of possession should be a BLS signature (%a)."
-        Signature.pp
-        s)
-    Data_encoding.(obj1 (req "proof_of_possession" Signature.encoding))
-    (function Unexpected_proof_of_possession_format s -> Some s | _ -> None)
-    (fun s -> Unexpected_proof_of_possession_format s)
-
 let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
 
@@ -354,21 +336,14 @@ let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
     ~fee_parameter
     opt_delegate
 
-let build_update_consensus_key cctxt ?fee ?gas_limit ?storage_limit
-    ?secret_key_uri ~kind public_key =
+let build_update_consensus_key ?fee ?gas_limit ?storage_limit ?secret_key_uri
+    ~kind public_key =
   let open Lwt_result_syntax in
   let* proof =
     match ((public_key : Signature.public_key), secret_key_uri) with
-    | Bls _, Some secret_key_uri -> (
-        let bytes =
-          Data_encoding.Binary.to_bytes_exn
-            Signature.Public_key.encoding
-            public_key
-        in
-        let* proof = Client_keys.sign cctxt secret_key_uri bytes in
-        match proof with
-        | Bls proof -> return_some proof
-        | _ -> tzfail (Unexpected_proof_of_possession_format proof))
+    | Bls _, Some secret_key_uri ->
+        let* proof = Client_keys.bls_prove_possession secret_key_uri in
+        return_some proof
     | _ -> return_none
   in
   let operation = Update_consensus_key {public_key; proof; kind} in
@@ -416,7 +391,7 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
           else Companion
         in
         let+ operation_content =
-          build_update_consensus_key cctxt ~kind ?fee ?secret_key_uri public_key
+          build_update_consensus_key ~kind ?fee ?secret_key_uri public_key
         in
         Annotated_manager_operation.Cons_manager
           ( delegate_op,
@@ -454,7 +429,6 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
       let* operation =
         let* operation_consensus =
           build_update_consensus_key
-            cctxt
             ~kind:Consensus
             ?fee
             ?secret_key_uri:secret_key_uri_consensus
@@ -462,7 +436,6 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
         in
         let* operation_companion =
           build_update_consensus_key
-            cctxt
             ~kind:Companion
             ?fee
             ?secret_key_uri:secret_key_uri_companion
@@ -518,7 +491,7 @@ let update_consensus_or_companion_key ~kind cctxt ~chain ~block ?confirmations
   let open Lwt_result_syntax in
   let source = Signature.Public_key.hash src_pk in
   let* operation =
-    build_update_consensus_key cctxt ?fee ?secret_key_uri ~kind public_key
+    build_update_consensus_key ?fee ?secret_key_uri ~kind public_key
   in
   let operation = Annotated_manager_operation.Single_manager operation in
   let* oph, _, op, result =
