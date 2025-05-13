@@ -6,7 +6,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type ctx = {config : Config.t; db : Db.t}
+type ctx = {
+  config : Config.t;
+  db : Db.t;
+  mutable ws_client : Websocket_client.t option;
+}
 
 module Event = struct
   include Internal_event.Simple
@@ -89,16 +93,11 @@ let make_routes db = List.rev_map (fun f -> f db) !routes
 
 let start db config Config.{addr; port} =
   let open Lwt_syntax in
-  let stop, resolve_stop = Lwt.wait () in
-  let shutdown () =
-    Lwt.wakeup_later resolve_stop () ;
-    Lwt.return_unit
-  in
+  let ctx = {config; db; ws_client = None} in
+  let notify_ws_change ws = ctx.ws_client <- Some ws in
   Lwt.dont_wait
     (fun () ->
-      make_routes {config; db}
-      |> Dream.router
-      |> Dream.serve ~interface:addr ~port ~stop)
+      make_routes ctx |> Dream.router |> Dream.serve ~interface:addr ~port)
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, _, _) ->
           Logs.err (fun m ->
@@ -106,7 +105,7 @@ let start db config Config.{addr; port} =
           exit 1
       | exn -> Event.rpc_server_error (Printexc.to_string exn)) ;
   let* () = Event.rpc_server_started (addr, port) in
-  return shutdown
+  return notify_ws_change
 
 module Encodings = struct
   open Data_encoding
@@ -129,18 +128,28 @@ module Encodings = struct
           (fun z -> Ethereum_types.quantity_of_z z);
       ]
 
+  type deposit = {
+    nonce : Ethereum_types.quantity;
+    proxy : Ethereum_types.Address.t;
+    ticket_hash : Ethereum_types.hash;
+    receiver : Ethereum_types.Address.t;
+    amount : float;
+    token : string option;
+  }
+
   let deposit =
     conv
-      (fun Db.{nonce; proxy; ticket_hash; receiver; amount} ->
-        (nonce, proxy, ticket_hash, receiver, amount))
-      (fun (nonce, proxy, ticket_hash, receiver, amount) ->
-        Db.{nonce; proxy; ticket_hash; receiver; amount})
-    @@ obj5
+      (fun {nonce; proxy; ticket_hash; receiver; amount; token} ->
+        (nonce, proxy, ticket_hash, receiver, amount, token))
+      (fun (nonce, proxy, ticket_hash, receiver, amount, token) ->
+        {nonce; proxy; ticket_hash; receiver; amount; token})
+    @@ obj6
          (req "nonce" quantity_hum_encoding)
          (req "proxy" Ethereum_types.address_encoding)
          (req "ticket_hash" Ethereum_types.hash_encoding)
          (req "receiver" Ethereum_types.address_encoding)
-         (req "amount" quantity_hum_encoding)
+         (req "amount" float)
+         (opt "token" string)
 
   let log_info =
     conv
@@ -195,13 +204,23 @@ module Encodings = struct
          (req "blockNumber" quantity_hum_encoding)
 
   let deposit_log =
-    conv
-      (fun Db.{deposit; log_info; claimed} -> ((deposit, log_info), claimed))
-      (fun ((deposit, log_info), claimed) -> Db.{deposit; log_info; claimed})
-    @@ merge_objs
-         (merge_objs deposit log_info)
-         (obj1 (opt "claimed" execution_info))
+    merge_objs
+      (merge_objs deposit log_info)
+      (obj1 (opt "claimed" execution_info))
 end
+
+let deposit_with_token_info ctx Db.{nonce; proxy; ticket_hash; receiver; amount}
+    =
+  let open Lwt_result_syntax in
+  match ctx.ws_client with
+  | None ->
+      let (Ethereum_types.Qty amount) = amount in
+      let amount = Z.to_float amount in
+      return
+        Encodings.{nonce; proxy; ticket_hash; receiver; amount; token = None}
+  | Some ws_client ->
+      let+ amount, token = Token_info.get_for_rpc ws_client proxy amount in
+      Encodings.{nonce; proxy; ticket_hash; receiver; amount; token}
 
 let () =
   register Dream.get "/health" Data_encoding.unit @@ fun _ _ _ ->
@@ -218,11 +237,19 @@ let () =
     Dream.get
     "/unclaimed"
     Data_encoding.(list (merge_objs Encodings.deposit Encodings.log_info))
-  @@ fun _ _ ctx -> Db.Deposits.get_unclaimed_full ctx.db
+  @@ fun _ _ ctx ->
+  let open Lwt_result_syntax in
+  let* deposits = Db.Deposits.get_unclaimed_full ctx.db in
+  List.map_es
+    (fun (deposit, log) ->
+      let+ deposit = deposit_with_token_info ctx deposit in
+      (deposit, log))
+    deposits
 
 let () =
   register Dream.get "/deposits" (Data_encoding.list Encodings.deposit_log)
   @@ fun req _ ctx ->
+  let open Lwt_result_syntax in
   let limit =
     Dream.query req "limit" |> Option.map int_of_string
     |> Option.value ~default:100
@@ -234,6 +261,14 @@ let () =
   let receiver =
     Dream.query req "receiver" |> Option.map Ethereum_types.Address.of_string
   in
-  match receiver with
-  | None -> Db.Deposits.list ctx.db ~limit ~offset
-  | Some receiver -> Db.Deposits.list_by_receiver ctx.db receiver ~limit ~offset
+  let* deposits =
+    match receiver with
+    | None -> Db.Deposits.list ctx.db ~limit ~offset
+    | Some receiver ->
+        Db.Deposits.list_by_receiver ctx.db receiver ~limit ~offset
+  in
+  List.map_es
+    (fun Db.{deposit; log_info; claimed} ->
+      let+ deposit = deposit_with_token_info ctx deposit in
+      ((deposit, log_info), claimed))
+    deposits

@@ -14,7 +14,7 @@ module Tokens_table = Hashtbl.Make (struct
   let hash (Ethereum_types.Address (Hex s)) = Hashtbl.hash s
 end)
 
-type t = {symbol : string; decimals : int option}
+type t = {symbol : string option; decimals : int option}
 
 let tokens = Tokens_table.create 7
 
@@ -93,15 +93,10 @@ let get_fa_info ws_client token_addr =
   | None ->
       let* symbol = get_symbol ws_client token_addr
       and* decimals = get_decimals ws_client token_addr in
-      let symbol =
-        Option.value
-          symbol
-          ~default:(Ethereum_types.Address.to_string token_addr)
-      in
       Tokens_table.replace tokens token_addr {symbol; decimals} ;
       return {symbol; decimals}
 
-let get_for_display ws_client token_addr amount =
+let get_for_display_aux mk_symbol ws_client token_addr amount =
   let open Lwt_result_syntax in
   let* {symbol; decimals} = get_fa_info ws_client token_addr in
   let amount =
@@ -111,4 +106,15 @@ let get_for_display ws_client token_addr amount =
     | None -> amount
     | Some decimals -> amount /. (10. ** float_of_int decimals)
   in
-  return (amount, symbol)
+  return (amount, mk_symbol symbol)
+
+let get_for_display ws_client token_addr amount =
+  get_for_display_aux
+    (fun symbol ->
+      Option.value symbol ~default:(Ethereum_types.Address.to_string token_addr))
+    ws_client
+    token_addr
+    amount
+
+let get_for_rpc ws_client token_addr amount =
+  get_for_display_aux Fun.id ws_client token_addr amount

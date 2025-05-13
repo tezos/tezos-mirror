@@ -7,6 +7,14 @@
 (*****************************************************************************)
 
 (** [start db config rpc] starts an RPC server with the given database and
-    configuration and returns a function that can be called to stop the
-    server *)
-val start : Db.t -> Config.t -> Config.rpc -> (unit -> unit Lwt.t) Lwt.t
+    configuration.
+
+    @param db The SQLite database connection
+    @param config The global application configuration
+    @param rpc The RPC server configuration (address and port)
+    @return A function that takes a websocket client and registers it with the
+      RPC server.  This function can be called when a new websocket connection
+      is established.
+*)
+val start :
+  Sqlite.t -> Config.t -> Config.rpc -> (Websocket_client.t -> unit) Lwt.t

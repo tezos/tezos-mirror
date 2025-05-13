@@ -145,14 +145,18 @@ let run_command =
       let*! () = log_config ~verbosity ~data_dir in
       let* db = Db.init ~data_dir `Read_write in
       let config = Config.patch_config config ~secret_key ~evm_node_endpoint in
-      let*! _stop = Option.map_s (Rpc_server.start db config) config.rpc in
       let* () =
-        match (secret_key, config.secret_key) with
-        | Some _, _ | _, Some _ -> return_unit
-        | None, None ->
+        match config.secret_key with
+        | Some _ -> return_unit
+        | None ->
             failwith "secret key not provided neither in config, cli nor env"
       in
-      Etherlink_monitor.start db ~config ~first_block)
+      let*! notify_ws_change =
+        match config.rpc with
+        | None -> Lwt.return ignore
+        | Some rpc -> Rpc_server.start db config rpc
+      in
+      Etherlink_monitor.start db ~config ~first_block ~notify_ws_change)
 
 let commands = [run_command]
 

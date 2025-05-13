@@ -848,7 +848,7 @@ module Public_key = struct
     Ethereum_types.Address (Ethereum_types.hex_of_string addr)
 end
 
-let start db ~config ~first_block =
+let start db ~config ~notify_ws_change ~first_block =
   let open Lwt_result_syntax in
   let evm_node_endpoint = config.Config.evm_node_endpoint in
   let tx_queue_endpoint = ref (Tx_queue.Rpc evm_node_endpoint) in
@@ -860,6 +860,7 @@ let start db ~config ~first_block =
         (Uri.with_path evm_node_endpoint (Uri.path evm_node_endpoint ^ "/ws"))
     in
     tx_queue_endpoint := Tx_queue.Websocket ws_client ;
+    notify_ws_change ws_client ;
     let* () = init_db_pointers db ws_client ~first_block in
     let* chain_id = get_chain_id ws_client in
     (* We checked that it exists in main.ml *)
