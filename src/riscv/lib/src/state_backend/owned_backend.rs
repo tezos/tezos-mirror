@@ -28,6 +28,15 @@ use super::StaticCopy;
 #[derive(Clone, Copy, Debug)]
 pub struct Owned;
 
+impl Owned {
+    /// Get the byte offset from a pointer to `Owned::Region` to the start of the element at `index`.
+    pub(crate) const fn region_elem_offset<E: 'static, const LEN: usize>(index: usize) -> usize {
+        assert!(index < LEN, "Out of bounds access for region");
+
+        index * std::mem::size_of::<E>()
+    }
+}
+
 impl ManagerBase for Owned {
     type Region<E: 'static, const LEN: usize> = [E; LEN];
 

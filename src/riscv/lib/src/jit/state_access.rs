@@ -27,12 +27,14 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 
 use abi::AbiCall;
+use cranelift::codegen::ir;
 use cranelift::codegen::ir::FuncRef;
 use cranelift::codegen::ir::InstBuilder;
 use cranelift::codegen::ir::Type;
 use cranelift::codegen::ir::Value;
 use cranelift::codegen::ir::types::I8;
 use cranelift::frontend::FunctionBuilder;
+use cranelift::prelude::MemFlags;
 use cranelift_jit::JITBuilder;
 use cranelift_jit::JITModule;
 use cranelift_module::FuncId;
@@ -49,6 +51,7 @@ use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::XRegisters;
 use crate::machine_state::registers::XValue;
 use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::owned_backend::Owned;
@@ -298,7 +301,42 @@ pub trait JitStateAccess: ManagerReadWrite {
     }
 }
 
-impl JitStateAccess for Owned {}
+impl JitStateAccess for Owned {
+    fn ir_xreg_read<MC: MemoryConfig>(
+        _jsa_calls: &mut JsaCalls<'_, MC, Self>,
+        builder: &mut FunctionBuilder<'_>,
+        core_ptr: Value,
+        reg: NonZeroXRegister,
+    ) -> X64 {
+        let offset = std::mem::offset_of!(MachineCoreState<MC, Self>, hart.xregisters)
+            + XRegisters::<Owned>::xregister_offset(reg);
+
+        // memory access corresponds directly to the xregister value
+        // - known to be aligned and non-trapping
+        let val = builder
+            .ins()
+            .load(ir::types::I64, MemFlags::trusted(), core_ptr, offset as i32);
+
+        X64(val)
+    }
+
+    fn ir_xreg_write<MC: MemoryConfig>(
+        _jsa_calls: &mut JsaCalls<'_, MC, Self>,
+        builder: &mut FunctionBuilder<'_>,
+        core_ptr: Value,
+        reg: NonZeroXRegister,
+        value: X64,
+    ) {
+        let offset = std::mem::offset_of!(MachineCoreState<MC, Self>, hart.xregisters)
+            + XRegisters::<Owned>::xregister_offset(reg);
+
+        // memory access corresponds directly to the xregister value
+        // - known to be aligned and non-trapping
+        builder
+            .ins()
+            .store(MemFlags::trusted(), value.0, core_ptr, offset as i32);
+    }
+}
 
 impl<M: ManagerReadWrite> JitStateAccess for ProofGen<M> {}
 

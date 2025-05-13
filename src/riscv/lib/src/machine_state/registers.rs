@@ -13,6 +13,7 @@ use arbitrary_int::u5;
 use crate::default::ConstDefault;
 use crate::machine_state::backend;
 use crate::state::NewState;
+use crate::state_backend::owned_backend::Owned;
 
 /// Integer register index
 #[expect(non_camel_case_types, reason = "Consistent with RISC-V spec")]
@@ -262,6 +263,15 @@ impl<M: backend::ManagerBase> XRegisters<M> {
         for i in 0..31 {
             self.registers.write(i, XValue::default());
         }
+    }
+}
+
+impl XRegisters<Owned> {
+    /// Get the byte offset from a pointer to `XRegisters` to the memory of the value
+    /// stored in the `reg` in question.
+    pub(crate) const fn xregister_offset(reg: NonZeroXRegister) -> usize {
+        std::mem::offset_of!(Self, registers)
+            + backend::Cells::<XValue, 31, Owned>::region_elem_offset(reg as usize)
     }
 }
 
@@ -650,6 +660,7 @@ mod tests {
 
     use super::*;
     use crate::backend_test;
+    use crate::state_backend::ManagerRead;
 
     backend_test!(test_zero, F, {
         let mut registers = XRegisters::new(&mut F::manager());
@@ -747,6 +758,25 @@ mod tests {
         assert_eq!(nzreg.len(), reg.len());
         for i in 0..nzreg.len() {
             assert_eq!(nzreg[i] as u8, reg[i] as u8)
+        }
+    }
+
+    #[test]
+    fn test_xregister_offsets() {
+        let registers = XRegisters::new(&mut Owned);
+        let registers_ptr = (&registers) as *const XRegisters<Owned>;
+
+        for reg in NonZeroXRegister::iter() {
+            let offset = XRegisters::<Owned>::xregister_offset(reg);
+            let val: &XValue = Owned::region_ref(registers.registers.region_ref(), reg as usize);
+
+            // Safety: both pointers are valid
+            let offset_refs = unsafe { (val as *const XValue).byte_offset_from(registers_ptr) };
+
+            assert_eq!(
+                offset_refs, offset as isize,
+                "Calculated offset to elem not equal to offset from references for {reg:?}"
+            );
         }
     }
 }

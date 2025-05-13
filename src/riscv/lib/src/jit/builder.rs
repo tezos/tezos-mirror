@@ -53,7 +53,9 @@ pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     /// The IR-type of pointers on the current native platform
     ptr: Type,
 
-    /// Value representing a pointer to `MachineCoreState<MC, JSA>`
+    /// Value representing a pointer to [`MachineCoreState<MC, JSA>`]
+    ///
+    /// [`MachineCoreState<MC, JSA>`]: crate::machine_state::MachineCoreState
     core_ptr_val: Value,
 
     /// Value representing a pointer to `steps: usize`
