@@ -59,7 +59,7 @@ let register meth path ?input_encoding ?include_default_fields output_encoding
             in
             return_some input
       in
-      let*! res = handler input ctx in
+      let*! res = protect @@ fun () -> handler message input ctx in
       let* res =
         match res with
         | Error e -> fail (`Handler_error e)
@@ -181,15 +181,35 @@ module Encodings = struct
          (req "blockHash" Ethereum_types.block_hash_encoding)
          (req "blockNumber" quantity_hum_encoding)
          (dft "removed" bool false)
+
+  let execution_info =
+    conv
+      (fun Db.{transactionHash; transactionIndex; blockHash; blockNumber} ->
+        (transactionHash, transactionIndex, blockHash, blockNumber))
+      (fun (transactionHash, transactionIndex, blockHash, blockNumber) ->
+        Db.{transactionHash; transactionIndex; blockHash; blockNumber})
+    @@ obj4
+         (req "transactionHash" Ethereum_types.hash_encoding)
+         (req "transactionIndex" quantity_hum_encoding)
+         (req "blockHash" Ethereum_types.block_hash_encoding)
+         (req "blockNumber" quantity_hum_encoding)
+
+  let deposit_log =
+    conv
+      (fun Db.{deposit; log_info; claimed} -> ((deposit, log_info), claimed))
+      (fun ((deposit, log_info), claimed) -> Db.{deposit; log_info; claimed})
+    @@ merge_objs
+         (merge_objs deposit log_info)
+         (obj1 (opt "claimed" execution_info))
 end
 
 let () =
-  register Dream.get "/health" Data_encoding.unit @@ fun _ _ ->
+  register Dream.get "/health" Data_encoding.unit @@ fun _ _ _ ->
   Lwt_result_syntax.return_unit
 
 let () =
   register Dream.get "/config" ~include_default_fields:`Always Config.encoding
-  @@ fun _ ctx ->
+  @@ fun _ _ ctx ->
   Lwt_result_syntax.return
     {ctx.config with secret_key = None (* erase secret key from output *)}
 
@@ -198,4 +218,22 @@ let () =
     Dream.get
     "/unclaimed"
     Data_encoding.(list (merge_objs Encodings.deposit Encodings.log_info))
-  @@ fun _ ctx -> Db.Deposits.get_unclaimed_full ctx.db
+  @@ fun _ _ ctx -> Db.Deposits.get_unclaimed_full ctx.db
+
+let () =
+  register Dream.get "/deposits" (Data_encoding.list Encodings.deposit_log)
+  @@ fun req _ ctx ->
+  let limit =
+    Dream.query req "limit" |> Option.map int_of_string
+    |> Option.value ~default:100
+  in
+  let offset =
+    Dream.query req "offset" |> Option.map int_of_string
+    |> Option.value ~default:0
+  in
+  let receiver =
+    Dream.query req "receiver" |> Option.map Ethereum_types.Address.of_string
+  in
+  match receiver with
+  | None -> Db.Deposits.list ctx.db ~limit ~offset
+  | Some receiver -> Db.Deposits.list_by_receiver ctx.db receiver ~limit ~offset

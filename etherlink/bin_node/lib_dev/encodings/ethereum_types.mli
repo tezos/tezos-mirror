@@ -295,6 +295,8 @@ module Address : sig
   val equal : t -> t -> bool
 
   val to_string : t -> string
+
+  val of_string : string -> t
 end
 
 (** [timestamp_to_bytes timestamp] transforms the timestamp to bytes

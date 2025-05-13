@@ -326,6 +326,33 @@ module Deposits = struct
       ORDER BY nonce DESC
       |sql}
 
+    let list =
+      (t2 int int ->* deposit_log)
+      @@ {sql|
+      SELECT
+       nonce, proxy, ticket_hash, receiver, amount,
+       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
+       log_blockNumber, log_removed,
+       exec_transactionHash, exec_transactionIndex, exec_blockHash,
+       exec_blockNumber
+      FROM deposits
+      ORDER BY nonce DESC LIMIT ? OFFSET ?
+      |sql}
+
+    let list_by_receiver =
+      (t3 address int int ->* deposit_log)
+      @@ {sql|
+      SELECT
+       nonce, proxy, ticket_hash, receiver, amount,
+       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
+       log_blockNumber, log_removed,
+       exec_transactionHash, exec_transactionIndex, exec_blockHash,
+       exec_blockNumber
+      FROM deposits
+      WHERE receiver = ?
+      ORDER BY nonce DESC LIMIT ? OFFSET ?
+      |sql}
+
     let set_claimed =
       (t2 execution_info level ->. unit)
       @@ {sql|
@@ -355,6 +382,14 @@ module Deposits = struct
   let set_claimed ?conn db nonce execution_info =
     with_connection db conn @@ fun conn ->
     Sqlite.Db.exec conn Q.set_claimed (execution_info, nonce)
+
+  let list ?conn db ~limit ~offset =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.list (limit, offset)
+
+  let list_by_receiver ?conn db addr ~limit ~offset =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.list_by_receiver (addr, limit, offset)
 end
 
 module Pointers = struct
