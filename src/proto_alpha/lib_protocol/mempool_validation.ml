@@ -1,25 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2022-2025 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -91,62 +73,70 @@ let remove_operation mempool oph =
       in
       {mempool with operations; operation_state}
 
-let add_operation ?(check_signature = true)
-    ?(conflict_handler : conflict_handler option) info mempool
-    (oph, (packed_op : packed_operation)) :
-    (t * add_result, add_error) result Lwt.t =
-  let open Lwt_syntax in
+let partial_op_validation ?(check_signature = true) info
+    (packed_op : packed_operation) : (unit -> unit tzresult) list tzresult Lwt.t
+    =
   let {shell; protocol_data = Operation_data protocol_data} = packed_op in
   let operation : _ Alpha_context.operation = {shell; protocol_data} in
-  let* checks = Validate.check_operation ~check_signature info operation in
-  let validate_result =
-    Result.bind checks (List.iter_e (fun check -> check ()))
-  in
-  match validate_result with
-  | Error err -> Lwt.return_error (Validation_error err)
-  | Ok () -> (
-      match
-        Validate.check_operation_conflict mempool.operation_state oph operation
-      with
-      | Ok () ->
-          let operation_state =
-            Validate.add_valid_operation mempool.operation_state oph operation
+  Validate.check_operation ~check_signature info operation
+
+let add_valid_operation ?(conflict_handler : conflict_handler option) mempool
+    (oph, (packed_op : packed_operation)) : (t * add_result, add_error) result =
+  let {shell; protocol_data = Operation_data protocol_data} = packed_op in
+  let operation : _ Alpha_context.operation = {shell; protocol_data} in
+  match
+    Validate.check_operation_conflict mempool.operation_state oph operation
+  with
+  | Ok () ->
+      let operation_state =
+        Validate.add_valid_operation mempool.operation_state oph operation
+      in
+      let operations =
+        Operation_hash.Map.add oph packed_op mempool.operations
+      in
+      let result = Added in
+      Ok ({mempool with operation_state; operations}, result)
+  | Error
+      (Validate_errors.Operation_conflict {existing; new_operation = new_oph} as
+       x) -> (
+      match conflict_handler with
+      | Some handler -> (
+          let new_operation = (new_oph, packed_op) in
+          let existing_operation =
+            match Operation_hash.Map.find_opt existing mempool.operations with
+            | None -> assert false
+            | Some op -> (existing, op)
           in
-          let operations =
-            Operation_hash.Map.add oph packed_op mempool.operations
-          in
-          let result = Added in
-          Lwt.return_ok ({mempool with operation_state; operations}, result)
-      | Error
-          (Validate_errors.Operation_conflict
-             {existing; new_operation = new_oph} as x) -> (
-          match conflict_handler with
-          | Some handler -> (
-              let new_operation = (new_oph, packed_op) in
-              let existing_operation =
-                match
-                  Operation_hash.Map.find_opt existing mempool.operations
-                with
-                | None -> assert false
-                | Some op -> (existing, op)
+          match handler ~existing_operation ~new_operation with
+          | `Keep -> Ok (mempool, Unchanged)
+          | `Replace ->
+              let mempool = remove_operation mempool existing in
+              let operation_state =
+                Validate.add_valid_operation
+                  mempool.operation_state
+                  new_oph
+                  operation
               in
-              match handler ~existing_operation ~new_operation with
-              | `Keep -> Lwt.return_ok (mempool, Unchanged)
-              | `Replace ->
-                  let mempool = remove_operation mempool existing in
-                  let operation_state =
-                    Validate.add_valid_operation
-                      mempool.operation_state
-                      new_oph
-                      operation
-                  in
-                  let operations =
-                    Operation_hash.Map.add oph packed_op mempool.operations
-                  in
-                  Lwt.return_ok
-                    ( {mempool with operations; operation_state},
-                      Replaced {removed = existing} ))
-          | None -> Lwt.return_error (Add_conflict x)))
+              let operations =
+                Operation_hash.Map.add oph packed_op mempool.operations
+              in
+              Ok
+                ( {mempool with operations; operation_state},
+                  Replaced {removed = existing} ))
+      | None -> Error (Add_conflict x))
+
+let add_operation ?check_signature ?conflict_handler info mempool (oph, op) :
+    (t * add_result, add_error) result Lwt.t =
+  let open Lwt_syntax in
+  let map_error e = Result.map_error (fun trace -> Validation_error trace) e in
+  let* pending_checks = partial_op_validation ?check_signature info op in
+  match map_error pending_checks with
+  | Error _ as e -> Lwt.return e
+  | Ok pending_checks -> (
+      match List.iter_e (fun check -> check ()) pending_checks with
+      | Error _ as e -> Lwt.return (map_error e)
+      | Ok () ->
+          Lwt.return (add_valid_operation ?conflict_handler mempool (oph, op)))
 
 let merge ?conflict_handler existing_mempool new_mempool =
   let open Result_syntax in
