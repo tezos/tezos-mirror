@@ -1195,6 +1195,23 @@ val update_companion_key :
   t ->
   unit Lwt.t
 
+(** [update_fresh_companion_key delegate client] runs the following commands:
+    [octez-client gen keys] to generate a new key,
+    [octez-client show address] to retrieve the newly generated key <fresh>,
+    and [octez-client update companion key for <delegate> to <fresh>].
+    Returns the newly generated key <fresh>. *)
+val update_fresh_companion_key :
+  ?alias:string ->
+  ?algo:string ->
+  ?hooks:Process_hooks.t ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?expect_failure:bool ->
+  Account.key ->
+  t ->
+  Account.key Lwt.t
+
 (** Run [octez-client drain delegate with consensus key <src>] *)
 val drain_delegate :
   ?hooks:Process.hooks ->

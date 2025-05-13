@@ -544,11 +544,76 @@ let check_aggregated_consensus_operation kind ~expected found =
           pp
           committee
 
+let check_dal ~expected ~attestations_aggregates ~attestations =
+  match expected with
+  | None -> ()
+  | Some expected ->
+      let open JSON in
+      let aggregated_delegates_with_dal =
+        match attestations_aggregates with
+        | _ :: _ :: _ -> Test.fail "Multiple attestations_aggregate found"
+        | [] -> []
+        | [json] ->
+            let contents = json |-> "contents" |> as_list |> List.hd in
+            (* Filter delegates with DAL *)
+            List.fold_left2
+              (fun acc committee_json metadata_json ->
+                match committee_json |-> "dal_attestation" |> as_string_opt with
+                | Some dal_attestation_as_string ->
+                    let delegate = metadata_json |-> "delegate" |> as_string in
+                    (delegate, Z.of_string dal_attestation_as_string) :: acc
+                | None -> acc)
+              []
+              (contents |-> "committee" |> as_list)
+              (contents |-> "metadata" |-> "committee" |> as_list)
+      in
+      let unaggregated_delegates_with_dal =
+        (* Filter attestations with dal *)
+        List.filter_map
+          (fun json ->
+            let contents = json |-> "contents" |> as_list |> List.hd in
+            match contents |-> "dal_attestation" |> as_string_opt with
+            | Some dal_attestation_as_string ->
+                let delegate =
+                  contents |-> "metadata" |-> "delegate" |> as_string
+                in
+                Some (delegate, Z.of_string dal_attestation_as_string)
+            | None -> None)
+          attestations
+      in
+      let delegates_with_dal =
+        aggregated_delegates_with_dal @ unaggregated_delegates_with_dal
+      in
+      let cmp (d, _) (d', _) = String.compare d d' in
+      let sorted_found = List.sort cmp delegates_with_dal in
+      let sorted_expected =
+        List.map
+          (fun (account, dal) -> (account.Account.public_key_hash, dal))
+          expected
+        |> List.sort cmp
+      in
+      let eq (d, dal) (d', dal') = String.equal d d' && Z.equal dal dal' in
+      if not (List.equal eq sorted_found sorted_expected) then
+        let pp_tuple fmt (delegate, dal_attestation) =
+          Format.fprintf fmt "(%s, %a)" delegate Z.pp_print dal_attestation
+        in
+        let pp = Format.(pp_print_list ~pp_sep:pp_print_cut pp_tuple) in
+        Test.fail
+          "@[<v 0>Wrong dal attestation set@,\
+           @[<v 2>expected:@,\
+           %a@]@,\
+           @[<v 2>found:@,\
+           %a@]@]"
+          pp
+          sorted_expected
+          pp
+          sorted_found
+
 (** Fetch consensus operations and check that they match the expected contents.
     Defaults to "head" if no [block] is provided. *)
 let check_consensus_operations ?expected_attestations_committee
     ?expected_preattestations_committee ?expected_preattestations
-    ?expected_attestations ?block client =
+    ?expected_attestations ?expected_dal_attestations ?block client =
   let* consensus_operations = fetch_consensus_operations ?block client in
   (* Partition the consensus operations list by kind *)
   let ( attestations_aggregates,
@@ -598,7 +663,7 @@ let check_consensus_operations ?expected_attestations_committee
       ~expected:expected_attestations_committee
       attestations_aggregates
   in
-  (* Checking attestations_aggregate *)
+  (* Checking preattestations_aggregate *)
   let () =
     check_aggregated_consensus_operation
       Preattestation
@@ -618,6 +683,12 @@ let check_consensus_operations ?expected_attestations_committee
       Preattestation
       ~expected:expected_preattestations
       preattestations
+  in
+  let () =
+    check_dal
+      ~expected:expected_dal_attestations
+      ~attestations_aggregates
+      ~attestations
   in
   unit
 
@@ -826,6 +897,13 @@ let prequorum_check_levels =
   let* _ = Mempool.get_mempool client in
   unit
 
+let z_of_bool_vector dal_attestation =
+  let aux (acc, n) b =
+    let bit = if b then 1 else 0 in
+    (acc lor (bit lsl n), n + 1)
+  in
+  Array.fold_left aux (0, 0) dal_attestation |> fst |> Z.of_int
+
 (* Test that the baker correctly aggregates eligible attestations on reproposals.*)
 let attestations_aggregation_on_reproposal =
   Protocol.register_test
@@ -871,9 +949,37 @@ let attestations_aggregation_on_reproposal =
   let* bootstrap6 = Client.show_address ~alias:"bootstrap6" client in
   Log.info
     "Generate BLS keys and assign them as consensus keys for bootstrap 1 to 3" ;
-  let* ck1 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap1 client in
-  let* ck2 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap2 client in
-  let* ck3 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap3 client in
+  let* consensus_key1 =
+    Client.update_fresh_consensus_key ~algo:"bls" bootstrap1 client
+  in
+  let* consensus_key2 =
+    Client.update_fresh_consensus_key ~algo:"bls" bootstrap2 client
+  in
+  let* consensus_key3 =
+    Client.update_fresh_consensus_key ~algo:"bls" bootstrap3 client
+  in
+  let keys =
+    public_key_hashes
+      [
+        consensus_key1;
+        consensus_key2;
+        consensus_key3;
+        bootstrap1;
+        bootstrap2;
+        bootstrap3;
+        bootstrap4;
+      ]
+  in
+  let* () = Client.bake_for_and_wait ~keys client in
+  let* companion_key1 =
+    Client.update_fresh_companion_key ~algo:"bls" bootstrap1 client
+  in
+  let* companion_key2 =
+    Client.update_fresh_companion_key ~algo:"bls" bootstrap2 client
+  in
+  let* companion_key3 =
+    Client.update_fresh_companion_key ~algo:"bls" bootstrap3 client
+  in
   Log.info "Launch a baker with bootstrap5" ;
   (* Bootstrap5 does not have enough voting power to progress independently. We
      manually inject consensus operations to control the progression of
@@ -885,32 +991,35 @@ let attestations_aggregation_on_reproposal =
       client
   in
   Log.info "Bake until BLS consensus keys are activated" ;
-  let keys =
-    public_key_hashes
-      [ck1; ck2; ck3; bootstrap1; bootstrap2; bootstrap3; bootstrap4]
-  in
-  let* () = Client.bake_for_and_wait ~keys ~count:4 client in
+  let* base_level = Client.bake_for_and_wait_level ~keys ~count:7 client in
   (* BLS consensus keys are now activated. We feed the node with just enough
      consensus operations for the baker to bake a block at level 6. *)
-  let* slots = Operation.Consensus.get_slots_by_consensus_key ~level:5 client in
+  let* slots =
+    Operation.Consensus.get_slots_by_consensus_key ~level:base_level client
+  in
   let* round = fetch_round client in
-  let* branch = Operation.Consensus.get_branch ~attested_level:5 client in
+  let* branch =
+    Operation.Consensus.get_branch ~attested_level:base_level client
+  in
   let* block_payload_hash =
-    Operation.Consensus.get_block_payload_hash ~block:"5" client
+    Operation.Consensus.get_block_payload_hash
+      ~block:(string_of_int base_level)
+      client
   in
   Log.info "Injecting consensus for bootstrap1 at level 5 round %d@." round ;
+  let dal_attestation = Array.init 16 (fun _ -> true) in
   let* () =
     Operation.Consensus.(
-      let slot = first_slot ~slots ck1 in
+      let slot = first_slot ~slots consensus_key1 in
       let* _ =
         preattest_for
           ~protocol
           ~branch
           ~slot
-          ~level:5
+          ~level:base_level
           ~round
           ~block_payload_hash
-          ck1
+          consensus_key1
           client
       in
       let* _ =
@@ -918,15 +1027,17 @@ let attestations_aggregation_on_reproposal =
           ~protocol
           ~branch
           ~slot
-          ~level:5
+          ~level:base_level
           ~round
           ~block_payload_hash
-          ck1
+          ~dal_attestation
+          ~companion_key:companion_key1
+          consensus_key1
           client
       in
       unit)
   in
-  let* _ = Node.wait_for_level node 6 in
+  let* _ = Node.wait_for_level node (base_level + 1) in
   let* () =
     check_consensus_operations
       ~expected_attestations_committee:[bootstrap1]
@@ -945,23 +1056,25 @@ let attestations_aggregation_on_reproposal =
   let* () =
     Lwt_list.iter_s
       Operation.Consensus.(
-        fun (delegate : Account.key) ->
+        fun ((delegate, companion_key) : Account.key * Account.key option) ->
           let slot = first_slot ~slots delegate in
           let* _ =
             attest_for
               ~protocol
               ~branch
               ~slot
-              ~level:5
+              ~level:base_level
               ~round
               ~block_payload_hash
+              ~dal_attestation
+              ?companion_key
               delegate
               client
           in
           unit)
-      [ck2; bootstrap4]
+      [(consensus_key2, Some companion_key2); (bootstrap4, None)]
   in
-  let* _ = Node.wait_for_branch_switch ~level:6 node in
+  let* _ = Node.wait_for_branch_switch ~level:(base_level + 1) node in
   let* () =
     check_consensus_operations
       ~expected_attestations_committee:[bootstrap1; bootstrap2]
@@ -974,10 +1087,14 @@ let attestations_aggregation_on_reproposal =
      preattested payload and only bake reproposals. *)
   let* () =
     let* slots =
-      Operation.Consensus.get_slots_by_consensus_key ~level:6 client
+      Operation.Consensus.get_slots_by_consensus_key
+        ~level:(base_level + 1)
+        client
     in
     let* round = fetch_round client in
-    let* branch = Operation.Consensus.get_branch ~attested_level:6 client in
+    let* branch =
+      Operation.Consensus.get_branch ~attested_level:(base_level + 1) client
+    in
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
@@ -991,14 +1108,14 @@ let attestations_aggregation_on_reproposal =
               ~protocol
               ~branch
               ~slot
-              ~level:6
+              ~level:(base_level + 1)
               ~round
               ~block_payload_hash
               delegate
               client
           in
           unit)
-      [ck1; ck2; bootstrap4]
+      [consensus_key1; consensus_key2; bootstrap4]
   in
   (* Inject additional attestations for level 5. These attestations are expected
      to be included in the coming level 6 reproposals. In particular, bootstrap3
@@ -1007,29 +1124,40 @@ let attestations_aggregation_on_reproposal =
   let* () =
     Lwt_list.iter_s
       Operation.Consensus.(
-        fun (delegate : Account.key) ->
+        fun ((delegate, companion_key) : Account.key * Account.key option) ->
           let slot = first_slot ~slots delegate in
           let* _ =
             attest_for
               ~protocol
               ~branch
               ~slot
-              ~level:5
+              ~level:base_level
               ~round
               ~block_payload_hash
+              ~dal_attestation
+              ?companion_key
               delegate
               client
           in
           unit)
-      [ck3; bootstrap6]
+      [(consensus_key3, Some companion_key3); (bootstrap6, None)]
   in
-  let* _ = Node.wait_for_branch_switch ~level:6 node in
+  let* _ = Node.wait_for_branch_switch ~level:(base_level + 1) node in
+  let dal_attestation_as_int = z_of_bool_vector dal_attestation in
   let* () =
     check_consensus_operations
       ~expected_attestations_committee:[bootstrap1; bootstrap2; bootstrap3]
       ~expected_preattestations_committee:[bootstrap1; bootstrap2]
       ~expected_attestations:[bootstrap4; bootstrap5; bootstrap6]
       ~expected_preattestations:[bootstrap4; bootstrap5]
+      ~expected_dal_attestations:
+        [
+          (bootstrap1, dal_attestation_as_int);
+          (bootstrap2, dal_attestation_as_int);
+          (bootstrap3, dal_attestation_as_int);
+          (bootstrap4, dal_attestation_as_int);
+          (bootstrap6, dal_attestation_as_int);
+        ]
       client
   in
   unit
