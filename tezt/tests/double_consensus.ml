@@ -223,7 +223,7 @@ let double_consensus_wrong_block_payload_hash
   in
   let block_payload_hash = JSON.(header |-> "payload_hash" |> as_string) in
   let op =
-    mk_consensus ~slot:(List.nth slots 2) ~level ~round ~block_payload_hash
+    mk_consensus ~slot:(List.nth slots 0) ~level ~round ~block_payload_hash
   in
   let* oph = get_double_consensus_denounciation_hash consensus_name client in
   let waiter_already_denounced =
