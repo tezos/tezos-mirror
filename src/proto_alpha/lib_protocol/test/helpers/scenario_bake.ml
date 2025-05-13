@@ -248,17 +248,28 @@ let attest_all_ previous_block =
              in
              return (not is_forbidden))
     in
-    let* ops =
-      List.map_es
-        (fun (delegate, slot) ->
+    let* to_aggregate, ops =
+      List.fold_left_es
+        (fun (to_aggregate, regular) (delegate, slot) ->
           let* consensus_key_info =
             Context.Delegate.consensus_key (B previous_block) delegate
           in
           let consensus_key = consensus_key_info.active in
           let* consensus_key = Account.find consensus_key.consensus_key_pkh in
-          Op.attestation ~delegate:consensus_key.pkh ~slot block)
+          let* op =
+            Op.raw_attestation ~delegate:consensus_key.pkh ~slot block
+          in
+          match (state.constants.aggregate_attestation, consensus_key.pk) with
+          | true, Bls _ -> return (op :: to_aggregate, regular)
+          | _ ->
+              return
+                ( to_aggregate,
+                  Protocol.Alpha_context.Operation.pack op :: regular ))
+        ([], [])
         dlgs
     in
+    let aggregated = Op.aggregate to_aggregate in
+    let ops = match aggregated with None -> ops | Some x -> x :: ops in
     let state = State.add_pending_operations ops state in
     return (block, state)
 
