@@ -116,40 +116,51 @@ let double_consensus_wrong_slot
   let* (client, accuser), (branch, level, round, slots, block_payload_hash) =
     double_attestation_init consensus_for consensus_name protocol ()
   in
-  Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
-  let op =
-    mk_consensus ~slot:(List.nth slots 1) ~level ~round ~block_payload_hash
+  (* Under [aggregate_attestation] feature flag, consensus operations with
+     non-minimal slots are not propagated by mempools and no longer denunced. *)
+  let* aggregate_attestation =
+    let* constants =
+      Client.RPC.call_via_endpoint client
+      @@ RPC.get_chain_block_context_constants ()
+    in
+    return JSON.(constants |-> "aggregate_attestation" |> as_bool_opt)
   in
-  let waiter = consensus_waiter accuser in
-  let* _ =
-    Operation.Consensus.inject
-      ~protocol
-      ~branch
-      ~signer:Constant.bootstrap1
-      op
-      client
-  in
-  let* () = waiter in
-  Log.info
-    "Inject another invalid %s and wait for already_denounced event"
-    consensus_name ;
-  let op =
-    mk_consensus ~slot:(List.nth slots 2) ~level ~round ~block_payload_hash
-  in
-  let* oph = get_double_consensus_denounciation_hash consensus_name client in
-  let waiter_already_denounced =
-    double_consensus_already_denounced_waiter accuser oph
-  in
-  let* _ =
-    Operation.Consensus.inject
-      ~protocol
-      ~branch
-      ~signer:Constant.bootstrap1
-      op
-      client
-  in
-  let* () = waiter_already_denounced in
-  unit
+  if aggregate_attestation = Some true then unit
+  else (
+    Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
+    let op =
+      mk_consensus ~slot:(List.nth slots 1) ~level ~round ~block_payload_hash
+    in
+    let waiter = consensus_waiter accuser in
+    let* _ =
+      Operation.Consensus.inject
+        ~protocol
+        ~branch
+        ~signer:Constant.bootstrap1
+        op
+        client
+    in
+    let* () = waiter in
+    Log.info
+      "Inject another invalid %s and wait for already_denounced event"
+      consensus_name ;
+    let op =
+      mk_consensus ~slot:(List.nth slots 2) ~level ~round ~block_payload_hash
+    in
+    let* oph = get_double_consensus_denounciation_hash consensus_name client in
+    let waiter_already_denounced =
+      double_consensus_already_denounced_waiter accuser oph
+    in
+    let* _ =
+      Operation.Consensus.inject
+        ~protocol
+        ~branch
+        ~signer:Constant.bootstrap1
+        op
+        client
+    in
+    let* () = waiter_already_denounced in
+    unit)
 
 let attest_utils =
   ( Client.attest_for,
