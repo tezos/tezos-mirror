@@ -898,7 +898,6 @@ let craft_dal_attestation ?level ?round ?payload_level ~signer ~nb_slots
       in
       let* op =
         Operation.Consensus.operation
-          ~with_dal:true
           ~signer
           (Operation.Consensus.attestation
              ~level
