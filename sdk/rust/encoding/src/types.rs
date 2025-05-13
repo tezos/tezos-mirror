@@ -12,7 +12,6 @@ use crate::has_encoding;
 use crate::nom::NomReader;
 
 use hex::FromHexError;
-use num_bigint::Sign;
 use serde::{Deserialize, Serialize};
 
 /// This is a wrapper for [num_bigint::BigInt] type.
@@ -86,30 +85,30 @@ impl From<&Zarith> for BigInt {
 has_encoding!(Zarith, ZARITH_ENCODING, { Encoding::Z });
 
 /// Mutez number
-#[derive(Clone, Debug)]
-pub struct Mutez(pub num_bigint::BigInt);
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Narith(pub num_bigint::BigUint);
 
-impl<'de> Deserialize<'de> for Mutez {
+#[deprecated = "Mutez has been replaced by Narith, which has identical semantics for encoding & decoding"]
+pub type Mutez = Narith;
+
+impl<'de> Deserialize<'de> for Narith {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         if deserializer.is_human_readable() {
             let string: String = serde::Deserialize::deserialize(deserializer)?;
-            let big_int: num_bigint::BigInt = string
+            let big_uint: num_bigint::BigUint = string
                 .parse()
                 .map_err(|err| serde::de::Error::custom(format!("cannot parse big int: {err}")))?;
-            if big_int.sign() == Sign::Minus {
-                return Err(serde::de::Error::custom("negative number for natural"));
-            }
-            Ok(Self(big_int))
+            Ok(Self(big_uint))
         } else {
             Ok(Self(serde::Deserialize::deserialize(deserializer)?))
         }
     }
 }
 
-impl Serialize for Mutez {
+impl Serialize for Narith {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -123,43 +122,37 @@ impl Serialize for Mutez {
     }
 }
 
-impl From<num_bigint::BigInt> for Mutez {
-    fn from(from: num_bigint::BigInt) -> Self {
-        Mutez(from)
+impl From<num_bigint::BigUint> for Narith {
+    fn from(from: num_bigint::BigUint) -> Self {
+        Narith(from)
     }
 }
 
-impl From<Mutez> for num_bigint::BigInt {
-    fn from(from: Mutez) -> Self {
+impl From<Narith> for num_bigint::BigUint {
+    fn from(from: Narith) -> Self {
         from.0
     }
 }
 
-impl From<&num_bigint::BigInt> for Mutez {
-    fn from(from: &num_bigint::BigInt) -> Self {
-        Mutez(from.clone())
+impl From<&num_bigint::BigUint> for Narith {
+    fn from(from: &num_bigint::BigUint) -> Self {
+        Narith(from.clone())
     }
 }
 
-impl From<&Mutez> for num_bigint::BigInt {
-    fn from(from: &Mutez) -> Self {
+impl From<&Narith> for num_bigint::BigUint {
+    fn from(from: &Narith) -> Self {
         from.0.clone()
     }
 }
 
-impl From<Mutez> for BigInt {
-    fn from(source: Mutez) -> Self {
-        Self(source.0)
+impl From<u64> for Narith {
+    fn from(value: u64) -> Self {
+        Narith(value.into())
     }
 }
 
-impl From<&Mutez> for BigInt {
-    fn from(source: &Mutez) -> Self {
-        Self(source.0.clone())
-    }
-}
-
-has_encoding!(Mutez, MUTEZ_ENCODING, { Encoding::Mutez });
+has_encoding!(Narith, NARITH_ENCODING, { Encoding::N });
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct SizedBytes<const SIZE: usize>(pub [u8; SIZE]);

@@ -50,7 +50,7 @@ fn generate_bin_write(encoding: &Encoding) -> TokenStream {
             generate_dynamic_bin_write(size, encoding, *span)
         }
         Encoding::Zarith(span) => quote_spanned!(*span=> tezos_data_encoding::enc::zarith),
-        Encoding::MuTez(span) => quote_spanned!(*span=> tezos_data_encoding::enc::mutez),
+        Encoding::Narith(span) => quote_spanned!(*span=> tezos_data_encoding::enc::narith),
     }
 }
 

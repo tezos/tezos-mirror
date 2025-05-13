@@ -67,7 +67,7 @@ pub enum Encoding<'a> {
     Bytes(Span),
     Path(&'a syn::Path),
     Zarith(Span),
-    MuTez(Span),
+    Narith(Span),
 
     String(Option<syn::Expr>, Span),
 

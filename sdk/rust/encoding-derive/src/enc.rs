@@ -46,8 +46,8 @@ pub(crate) fn generate_encoding(encoding: &Encoding) -> TokenStream {
         Encoding::Zarith(span) => {
             quote_spanned!(*span=> tezos_data_encoding::encoding::Encoding::Z)
         }
-        Encoding::MuTez(span) => {
-            quote_spanned!(*span=> tezos_data_encoding::encoding::Encoding::Mutez)
+        Encoding::Narith(span) => {
+            quote_spanned!(*span=> tezos_data_encoding::encoding::Encoding::N)
         }
     }
 }

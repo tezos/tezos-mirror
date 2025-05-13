@@ -187,8 +187,10 @@ fn get_basic_encoding_from_meta<'a>(
         Encoding::String(string.param, string.span)
     } else if let Some(zarith) = get_attribute_no_param(meta, &symbol::Z_ARITH)? {
         Encoding::Zarith(zarith.span)
+    } else if let Some(mutez) = get_attribute_no_param(meta, &symbol::N_ARITH)? {
+        Encoding::Narith(mutez.span)
     } else if let Some(mutez) = get_attribute_no_param(meta, &symbol::MU_TEZ)? {
-        Encoding::MuTez(mutez.span)
+        Encoding::Narith(mutez.span)
     } else if let Some(builtin) =
         get_attribute_with_param(meta, &symbol::BUILTIN, Some(&symbol::KIND), true)?
     {
@@ -488,10 +490,7 @@ fn make_tag<'a>(
         }
         syn::Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
             let ty = &fields.unnamed.first().unwrap().ty;
-            match ty {
-                syn::Type::Path(type_path) => Encoding::Path(&type_path.path),
-                _ => return Err(error_spanned(ty, "Unsupported type for enum variant")),
-            }
+            make_type_encoding(ty, meta)?
         }
         syn::Fields::Unnamed(fields) => {
             return Err(error_spanned(fields, "Only single field is supported"))
