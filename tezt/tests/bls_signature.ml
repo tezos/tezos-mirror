@@ -214,6 +214,38 @@ module Local_helpers = struct
     let* op = M.operation [op_manager] client in
     return op
 
+  let mk_reveal_delegation_stake_update_ck_in_batch ~(delegate : Account.key)
+      ~amount ?(delegate_consensus_key : Account.key option) ?proof client =
+    let module M = Operation.Manager in
+    let* counter = M.get_next_counter client ~source:delegate in
+    let reveal = M.reveal delegate in
+    let delegation = M.delegation ~delegate () in
+    let stake =
+      M.call
+        ~dest:delegate.public_key_hash
+        ~amount:(Tez.to_mutez amount)
+        ~entrypoint:"stake"
+        ()
+    in
+    let update_ck =
+      match delegate_consensus_key with
+      | Some delegate_ck ->
+          let update_ck =
+            M.update_consensus_key ~public_key:delegate_ck.public_key ?proof ()
+          in
+          [update_ck]
+      | None -> []
+    in
+    let ops =
+      M.make_batch
+        ~source:delegate
+        ~gas_limit:5300
+        ~counter
+        ([reveal; delegation; stake] @ update_ck)
+    in
+    let* op = M.operation ops client in
+    return op
+
   let create_proof ~(signer : Account.key) =
     let public_key =
       Tezos_crypto.Signature.Public_key.of_b58check_exn signer.public_key
