@@ -280,13 +280,22 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
     }
 
     fn xregister_read_nz(&mut self, reg: NonZeroXRegister) -> Self::XValue {
-        self.jsa_call
-            .xreg_read(&mut self.builder, self.core_ptr_val, reg)
+        JSA::ir_xreg_read(
+            &mut self.jsa_call,
+            &mut self.builder,
+            self.core_ptr_val,
+            reg,
+        )
     }
 
     fn xregister_write_nz(&mut self, reg: NonZeroXRegister, value: Self::XValue) {
-        self.jsa_call
-            .xreg_write(&mut self.builder, self.core_ptr_val, reg, value)
+        JSA::ir_xreg_write(
+            &mut self.jsa_call,
+            &mut self.builder,
+            self.core_ptr_val,
+            reg,
+            value,
+        )
     }
 
     fn xvalue_of_imm(&mut self, imm: i64) -> Self::XValue {
