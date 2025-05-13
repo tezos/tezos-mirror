@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [new_finalized_head ctxt cctxt cryptobox block_hash shell_header
+(** [new_finalized_head ctxt cctxt l1_crawler cryptobox block_hash shell_header
     ~launch_time] processes a new finalized L1 block. It performs cleanup of old
     DAL data, updates the committee cache, re-registers the gossipsub message
     validation hook, and triggers block-level processing (e.g. slot header
@@ -32,6 +32,7 @@
 val new_finalized_head :
   Node_context.t ->
   Rpc_context.t ->
+  Crawler.t ->
   Cryptobox.t ->
   Block_hash.t ->
   Block_header.shell_header ->
