@@ -340,6 +340,22 @@ pub fn run_mul(
     icb.xregister_write_nz(rd, result)
 }
 
+/// Multiply `val(rs1)` with `val(rs2)` and store the lower 32 bits of the result
+/// in register `rd`.
+pub fn run_x32_mul(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+    let lhs = icb.xregister_read(rs1);
+    let lhs = icb.narrow(lhs);
+
+    let rhs = icb.xregister_read(rs2);
+    let rhs = icb.narrow(rhs);
+
+    let result = lhs.mul(rhs, icb);
+
+    let result = icb.extend_signed(result);
+
+    icb.xregister_write_nz(rd, result)
+}
+
 /// Shift bits in `rs1` by `shift_amount = val(rs2)\[5:0\]` in the method specified by `shift`
 /// saving the result in `rd`.
 ///

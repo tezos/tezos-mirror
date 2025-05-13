@@ -899,7 +899,7 @@ mod tests {
         }
     });
 
-    backend_test!(test_mul, F, {
+    backend_test!(test_x64_mul, F, {
         use crate::machine_state::registers::NonZeroXRegister::*;
 
         let scenarios: &[Scenario<F>] = &[
@@ -935,6 +935,54 @@ mod tests {
                     assert_eq!(core.hart.xregisters.read_nz(x2), -800i64 as u64);
                 }))
                 .build(),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_x32_mul, F, {
+        use crate::machine_state::registers::a0;
+        use crate::machine_state::registers::a1;
+        use crate::machine_state::registers::a2;
+
+        let test_x32_mul = |value1: i64,
+                            value2: i64,
+                            expected_result: u64,
+                            instruction_width: InstrWidth|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(nz::a0, value1, instruction_width),
+                    I::new_li(nz::a1, value2, instruction_width),
+                    I::new_x32_mul(a2, a0, a1, instruction_width),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(nz::a2), expected_result);
+                }))
+                .build()
+        };
+
+        let scenarios: &[Scenario<F>] = &[
+            test_x32_mul(10, 5, 50, Uncompressed),
+            // Test that we truncate to 32 bits before sign extending
+            // 2^32 * 2 = 2^33, but truncated to 32 bits = 0
+            test_x32_mul(0x1_0000_0000, 2, 0, Compressed),
+            // Test with negative numbers
+            // -10 * 5 = -50, sign extended to 64 bits
+            test_x32_mul(-10, 5, -50i64 as u64, Compressed),
+            // Test with large 32-bit values that overflow
+            // INT32_MAX * 2 = 0xFFFFFFFE (truncated to 32 bits)
+            // Sign extended to 64 bits: 0xFFFFFFFFFFFFFFFE
+            test_x32_mul(0x7FFFFFFF, 2, -2i64 as u64, Compressed),
+            // Test with values that would produce different results in 32-bit vs 64-bit multiplication
+            // In 32-bit: INT32_MIN * INT32_MIN = 0 (truncated)
+            // In 64-bit: would be 0x4000000000000000
+            test_x32_mul(0x80000000, 0x80000000, 0, Compressed),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
