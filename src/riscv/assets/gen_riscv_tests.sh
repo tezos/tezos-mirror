@@ -39,6 +39,7 @@ autoconf || {
 }
 
 git apply "$self/riscv-tests-entry-0.patch"
+git apply "$self/riscv-tests-setup.patch"
 
 # If this cross-compilation toolchain is in scope, use it.
 # This would be the case in the Nix shell for example.
@@ -52,7 +53,7 @@ fi
   clean_up 1
 }
 
-make -j 8 -C isa rv64ui rv64uc rv64um rv64ua rv64uf rv64ud rv64si rv64mi || {
+make -j 8 -C isa rv64ui rv64uc rv64um rv64ua rv64uf rv64ud || {
   echo "make isa failed" >&2
   clean_up 1
 }
@@ -61,7 +62,7 @@ echo "Copying rv64 binaries from $build_dir/isa to $target_dir"
 
 # The `make` command generates the binaries in `isa/` but that directory also contains objdumps and sub-directories.
 # We only copy those files which are neither.
-for file in isa/rv64*; do
+for file in isa/rv64u*; do
   if [ -f "$file" ]; then
     case "$file" in
     *dump) ;;

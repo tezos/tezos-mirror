@@ -732,53 +732,6 @@ mod tests {
         });
     });
 
-    // This test requires machine-level privileges. Since switching to the Supervising PVM, these
-    // privileges are no longer accessible.
-    backend_test!(
-        #[ignore]
-        test_step_exc_mm,
-        F,
-        {
-            let state = MachineState::<M4K, DefaultCacheLayouts, Interpreted<M4K, _>, _>::new(
-                &mut F::manager(),
-                InterpretedBlockBuilder,
-            );
-
-            let state_cell = std::cell::RefCell::new(state);
-
-            proptest!(|(
-                pc_addr_offset in 0..200_u64,
-                mtvec_offset in 25..35_u64,
-            )| {
-                let mut state = state_cell.borrow_mut();
-                state.reset();
-
-                let init_pc_addr = memory::FIRST_ADDRESS + pc_addr_offset * 4;
-                let mtvec_addr = init_pc_addr + 4 * mtvec_offset;
-                const EBREAK: u64 = (1 << 20) | 0b111_0011;
-
-                // mtvec is in VECTORED mode
-                state.core.hart.csregisters.write(CSRegister::mtvec, mtvec_addr | 1);
-
-                // TEST: Raise exception, (and no interrupt before) take trap from M-mode to M-mode
-                // (test no delegation takes place, even if delegation is on, traps never lower privilege)
-                let medeleg_val = (1 << Exception::IllegalInstruction.exception_code()) | (1 << Exception::Breakpoint.exception_code());
-                state.core.hart.pc.write(init_pc_addr);
-                state.core.hart.csregisters.write(CSRegister::medeleg, medeleg_val);
-
-                state.core.main_memory.write_instruction_unchecked(init_pc_addr, EBREAK).unwrap();
-                state.step().expect("should not raise environment exception");
-                // pc should be mtvec_addr since exceptions aren't offset (by VECTORED mode)
-                // even in VECTORED mode, only interrupts
-                let mstatus: MStatus = state.core.hart.csregisters.read(CSRegister::mstatus);
-                assert_eq!(state.core.hart.pc.read(), mtvec_addr);
-                assert_eq!(mstatus.mpp(), xstatus::MPPValue::Machine);
-                assert_eq!(state.core.hart.csregisters.read::<CSRRepr>(CSRegister::mepc), init_pc_addr);
-                assert_eq!(state.core.hart.csregisters.read::<CSRRepr>(CSRegister::mcause), 3);
-            });
-        }
-    );
-
     backend_test!(test_step_exc_us, F, {
         let state = MachineState::<M4K, DefaultCacheLayouts, Interpreted<M4K, _>, _>::new(
             &mut F::manager(),

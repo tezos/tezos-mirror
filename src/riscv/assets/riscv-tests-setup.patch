@@ -1,0 +1,47 @@
+diff --git i/env/p/riscv_test.h w/env/p/riscv_test.h
+index 7bf35cf..a01a0f4 100644
+--- i/env/p/riscv_test.h
++++ w/env/p/riscv_test.h
+@@ -15,7 +15,6 @@
+ 
+ #define RVTEST_RV64UF                                                   \
+   .macro init;                                                          \
+-  RVTEST_FP_ENABLE;                                                     \
+   .endm
+ 
+ #define RVTEST_RV64UV                                                   \
+@@ -203,34 +202,11 @@ handle_exception:                                                       \
+         j write_tohost;                                                 \
+ reset_vector:                                                           \
+         INIT_XREG;                                                      \
+-        RISCV_MULTICORE_DISABLE;                                        \
+-        INIT_RNMI;                                                      \
+-        INIT_SATP;                                                      \
+-        INIT_PMP;                                                       \
+-        DELEGATE_NO_TRAPS;                                              \
+         li TESTNUM, 0;                                                  \
+-        la t0, trap_vector;                                             \
+-        csrw mtvec, t0;                                                 \
+         CHECK_XLEN;                                                     \
+-        /* if an stvec_handler is defined, delegate exceptions to it */ \
+-        la t0, stvec_handler;                                           \
+-        beqz t0, 1f;                                                    \
+-        csrw stvec, t0;                                                 \
+-        li t0, (1 << CAUSE_LOAD_PAGE_FAULT) |                           \
+-               (1 << CAUSE_STORE_PAGE_FAULT) |                          \
+-               (1 << CAUSE_FETCH_PAGE_FAULT) |                          \
+-               (1 << CAUSE_MISALIGNED_FETCH) |                          \
+-               (1 << CAUSE_USER_ECALL) |                                \
+-               (1 << CAUSE_BREAKPOINT);                                 \
+-        csrw medeleg, t0;                                               \
+-1:      csrwi mstatus, 0;                                               \
+         init;                                                           \
+         EXTRA_INIT;                                                     \
+         EXTRA_INIT_TIMER;                                               \
+-        la t0, 1f;                                                      \
+-        csrw mepc, t0;                                                  \
+-        csrr a0, mhartid;                                               \
+-        mret;                                                           \
+ 1:
+ 
+ //-----------------------------------------------------------------------

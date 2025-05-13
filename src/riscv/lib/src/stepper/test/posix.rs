@@ -6,7 +6,6 @@ use crate::machine_state::CacheLayouts;
 use crate::machine_state::MachineState;
 use crate::machine_state::block_cache::block::Block;
 use crate::machine_state::memory::MemoryConfig;
-use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::a0;
 use crate::machine_state::registers::a7;
 use crate::state::NewState;
@@ -15,13 +14,11 @@ use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
-use crate::state_backend::ManagerWrite;
 
 /// Posix execution environment state
 pub struct PosixState<M: ManagerBase> {
     code: Cell<u64, M>,
     exited: Cell<u8, M>,
-    exit_mode: Cell<Mode, M>,
 }
 
 impl<M: ManagerBase> PosixState<M> {
@@ -39,14 +36,6 @@ impl<M: ManagerBase> PosixState<M> {
         M: ManagerRead,
     {
         self.exited.read() > 0
-    }
-
-    /// Configures the mode from which the test harness will exit.
-    pub fn set_exit_mode(&mut self, mode: Mode)
-    where
-        M: ManagerWrite,
-    {
-        self.exit_mode.write(mode);
     }
 
     /// Handle a POSIX system call. Returns `Ok(true)` if it makes sense to continue execution.
@@ -101,7 +90,6 @@ impl<M: ManagerBase> NewState<M> for PosixState<M> {
         PosixState {
             code: Cell::new(manager),
             exited: Cell::new(manager),
-            exit_mode: Cell::new(manager),
         }
     }
 }

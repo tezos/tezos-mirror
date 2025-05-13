@@ -28,7 +28,6 @@ use crate::machine_state::memory::M1G;
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::memory::Permissions;
-use crate::machine_state::mode;
 use crate::program::Program;
 use crate::state::NewState;
 use crate::state_backend::owned_backend::Owned;
@@ -95,16 +94,15 @@ pub struct TestStepper<
 }
 
 impl<MC: MemoryConfig, B: Block<MC, Owned>> TestStepper<MC, TestCacheLayouts, B> {
-    /// Initialise an interpreter with a given `program`, starting execution in [mode].
+    /// Initialise an interpreter with a given `program`.
     /// An initial ramdisk can also optionally be passed.
     #[inline]
     pub fn new(
         program: &[u8],
         initrd: Option<&[u8]>,
-        mode: mode::Mode,
         block_builder: B::BlockBuilder,
     ) -> Result<Self, TestStepperError> {
-        Ok(Self::new_with_parsed_program(program, initrd, mode, block_builder)?.0)
+        Ok(Self::new_with_parsed_program(program, initrd, block_builder)?.0)
     }
 
     /// Consumes the stepper, returning the [`BlockBuilder`] used internally.
@@ -116,23 +114,19 @@ impl<MC: MemoryConfig, B: Block<MC, Owned>> TestStepper<MC, TestCacheLayouts, B>
         self.machine_state.block_cache.block_builder
     }
 
-    /// Initialise an interpreter with a given `program`, starting execution in [mode::Mode].
+    /// Initialise an interpreter with a given `program`.
     /// An initial ramdisk can also optionally be passed. Returns both the interpreter
     /// and the fully parsed program.
     #[inline]
     pub fn new_with_parsed_program(
         program: &[u8],
         initrd: Option<&[u8]>,
-        mode: mode::Mode,
         block_builder: B::BlockBuilder,
     ) -> Result<(Self, BTreeMap<u64, String>), TestStepperError> {
         let mut stepper = Self {
             posix_state: PosixState::new(&mut Owned),
             machine_state: MachineState::new(&mut Owned, block_builder),
         };
-
-        // By default the Posix EE expects to exit in a specific privilege mode.
-        stepper.posix_state.set_exit_mode(mode);
 
         // The interpreter needs a program to run.
         let elf_program = Program::<MC>::from_elf(program)?;
