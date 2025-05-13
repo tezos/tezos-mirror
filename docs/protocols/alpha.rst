@@ -34,6 +34,10 @@ Smart Rollups
 Data Availability Layer
 -----------------------
 
+- Receipt of the DAL rewards is conditioned by the receipt of the attestation
+  rewards. (MR :gl:`!17934`)
+
+
 Adaptive Issuance
 -----------------
 

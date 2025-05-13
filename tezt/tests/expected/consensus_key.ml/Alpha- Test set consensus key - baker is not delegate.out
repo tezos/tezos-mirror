@@ -125,20 +125,20 @@ This sequence of operations was run:
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
-  "pending_staking_parameters": [], "baking_power": "1466667344695",
-  "total_staked": "200000144014", "total_delegated": "3800002735836",
+  "pending_staking_parameters": [], "baking_power": "1466667339391",
+  "total_staked": "200000138710", "total_delegated": "3800002635060",
   "min_delegated_in_current_cycle":
     { "amount": "3800001602043",
       "level":
         { "level": 5, "level_position": 4, "cycle": 1, "cycle_position": 0,
           "expected_commitment": false } },
-  "own_full_balance": "4000002879850", "own_staked": "200000144014",
-  "own_delegated": "3800002735836", "external_staked": "0",
+  "own_full_balance": "4000002773770", "own_staked": "200000138710",
+  "own_delegated": "3800002635060", "external_staked": "0",
   "external_delegated": "0",
   "total_unstaked_per_cycle":
     [ { "cycle": 0, "deposit": "0" }, { "cycle": 1, "deposit": "0" } ],
   "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
-  "staking_denominator": "0", "current_voting_power": "4000002879850",
+  "staking_denominator": "0", "current_voting_power": "4000002773770",
   "voting_power": "4000000000000",
   "voting_info":
     { "voting_power": "4000000000000", "remaining_proposals": 20 },
@@ -149,5 +149,5 @@ This sequence of operations was run:
   "companion_key": { "active": null },
   "stakers":
     [ { "staker": "[PUBLIC_KEY_HASH]",
-        "frozen_deposits": "200000144014" } ],
+        "frozen_deposits": "200000138710" } ],
   "delegators": [ "[PUBLIC_KEY_HASH]" ] }

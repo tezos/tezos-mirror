@@ -75,7 +75,7 @@ Minimal participation
 
 Any baker that can take part in consensus is eligible for rewards.
 
-Bakers meeting the minimum participation ratio ``MINIMAL_PARTICIPATION_RATIO`` over a cycle, set to 64%, receive rewards for that cycle.
+Bakers meeting the minimum participation ratio ``MINIMAL_PARTICIPATION_RATIO`` over a cycle, set to 64%, receive rewards for that cycle, provided that they receive consensus attestation rewards for that cycle.
 
 The participation ratio of the baker is the proportion of slots the baker attested over the slots that were attestable by this baker during the cycle. Both slot numbers only count those slots that are deemed available by the protocol.
 

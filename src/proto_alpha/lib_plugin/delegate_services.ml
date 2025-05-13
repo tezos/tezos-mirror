@@ -975,11 +975,13 @@ module S = struct
          'sufficient_dal_participation' flag, which is true if currently the \
          delegate has sufficiently participated in attesting DAL slots \
          declared to be attested by the protocol. Note that this flag may \
-         evolve during the cycle. Also note, in particular, that if no DAL no \
-         DAL slots have been globally attested during the cycle (i.e., when \
-         'delegate_attestable_dal_slots' is zero), the flag is true. The \
-         'denounced' field specifies whether the delegate was denounced for \
-         not detecting traps during the current cycle."
+         evolve during the cycle. Also note, in particular, that if no DAL \
+         slots have been globally attested during the cycle (i.e., when \
+         'delegate_attestable_dal_slots' is zero), the flag is true; receipt \
+         of the DAL rewards is conditioned however on the receipt of the \
+         attestation rewards. The 'denounced' field specifies whether the \
+         delegate was denounced for not detecting traps during the current \
+         cycle."
       ~query:RPC_query.empty
       ~output:dal_participation_info_encoding
       RPC_path.(path / "dal_participation")

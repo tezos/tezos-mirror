@@ -89,6 +89,20 @@ GET http://[HOST]:[PORT]/chains/main/blocks/head~1/context/delegates/[PUBLIC_KEY
   "origin": "block"
 }
 {
+  "kind": "burned",
+  "category": "lost DAL attesting rewards",
+  "delegate": "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
+  "change": "212680",
+  "origin": "block"
+}
+{
+  "kind": "burned",
+  "category": "lost DAL attesting rewards",
+  "delegate": "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU",
+  "change": "212680",
+  "origin": "block"
+}
+{
   "kind": "freezer",
   "category": "deposits",
   "staker": {
@@ -100,36 +114,6 @@ GET http://[HOST]:[PORT]/chains/main/blocks/head~1/context/delegates/[PUBLIC_KEY
 {
   "kind": "contract",
   "contract": "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv",
-  "change": "202046",
-  "origin": "block"
-}
-{
-  "kind": "freezer",
-  "category": "deposits",
-  "staker": {
-    "baker_own_stake": "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"
-  },
-  "change": "10634",
-  "origin": "block"
-}
-{
-  "kind": "contract",
-  "contract": "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
-  "change": "202046",
-  "origin": "block"
-}
-{
-  "kind": "freezer",
-  "category": "deposits",
-  "staker": {
-    "baker_own_stake": "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
-  },
-  "change": "10634",
-  "origin": "block"
-}
-{
-  "kind": "contract",
-  "contract": "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU",
   "change": "202046",
   "origin": "block"
 }

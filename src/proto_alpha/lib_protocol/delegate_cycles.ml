@@ -52,7 +52,7 @@ let update_activity ctxt last_cycle =
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
 
-let distribute_dal_attesting_rewards ctxt delegate
+let distribute_dal_attesting_rewards ctxt delegate ~gets_consensus_rewards
     ~dal_attesting_reward_per_shard ~total_active_stake_weight
     ~active_stake_weight active_stake =
   let open Lwt_result_syntax in
@@ -80,7 +80,14 @@ let distribute_dal_attesting_rewards ctxt delegate
   let dal_rewards =
     Tez_repr.mul_exn dal_attesting_reward_per_shard expected_dal_shards
   in
-  if sufficient_dal_participation && not denounced_in_cycle then
+  if
+    gets_consensus_rewards && sufficient_dal_participation
+    && not denounced_in_cycle
+  then
+    (* Mostly for UX reasons, if the baker lost its attestation rewards, then it
+       does not receive DAL rewards. Indeed, the corner case that we want to
+       avoid is when a baker does not TB attest at all, but would get the DAL
+       rewards because no DAL slot was protocol-attested. *)
     Shared_stake.pay_rewards
       ctxt
       ~active_stake
@@ -100,7 +107,7 @@ let distribute_dal_attesting_rewards ctxt delegate
       (`Lost_dal_attesting_rewards delegate)
       dal_rewards
 
-let maybe_distribute_dal_attesting_rewards ctxt delegate
+let maybe_distribute_dal_attesting_rewards ctxt delegate ~gets_consensus_rewards
     ~dal_attesting_reward_per_shard ~total_active_stake_weight
     ~active_stake_weight active_stake =
   let open Lwt_result_syntax in
@@ -116,6 +123,7 @@ let maybe_distribute_dal_attesting_rewards ctxt delegate
       distribute_dal_attesting_rewards
         ctxt
         delegate
+        ~gets_consensus_rewards
         ~dal_attesting_reward_per_shard
         ~total_active_stake_weight
         ~active_stake_weight
@@ -171,9 +179,11 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
           ~active_stake_weight
       in
       let rewards = Tez_repr.mul_exn attesting_reward_per_slot expected_slots in
+      let gets_consensus_rewards =
+        sufficient_participation && has_revealed_nonces
+      in
       let* ctxt, payed_rewards_receipts =
-        if sufficient_participation && has_revealed_nonces then
-          (* Sufficient participation: we pay the rewards *)
+        if gets_consensus_rewards then
           Shared_stake.pay_rewards
             ctxt
             ~active_stake
@@ -181,7 +191,6 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
             ~delegate
             rewards
         else
-          (* Insufficient participation or unrevealed nonce: no rewards *)
           Token.transfer
             ctxt
             `Attesting_rewards
@@ -193,6 +202,7 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
         maybe_distribute_dal_attesting_rewards
           ctxt
           delegate
+          ~gets_consensus_rewards
           ~dal_attesting_reward_per_shard
           ~total_active_stake_weight
           ~active_stake_weight
