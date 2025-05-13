@@ -85,11 +85,8 @@ function print_and_exit() {
     echo "git reset --hard HEAD~${commits}"
   fi
 
-  log_green "To cleanup other created files"
-  echo "rm -rf src/proto_${protocol_target}"
-  echo "rm -rf docs/${label}"
-  echo "rm -rf src/proto_${version}_${short_hash}"
-  echo "rm -rf src/proto_${version}"
+  log_green "To cleanup other created files after reset --hard"
+  echo "rm -rf src/proto_${protocol_target} docs/${label} src/proto_${version}_${short_hash} src/proto_${version}"
   echo "exiting..."
   exit 1
 }
@@ -545,6 +542,19 @@ function sanity_check_before_script() {
   esac
 }
 
+# Recompute the different protocol and version names
+function recompute_names() {
+  if [[ ${is_snapshot} == true ]]; then
+    new_protocol_name="${version}_${short_hash}"
+    new_tezos_protocol="${version}-${short_hash}"
+    new_versioned_name="${version}_${label}"
+  else
+    new_protocol_name="${version}"
+    new_tezos_protocol="${version}"
+    new_versioned_name="${label}"
+  fi
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -558,15 +568,7 @@ function update_hashes() {
     log_magenta "Long hash computed: ${long_hash}"
     log_magenta "Short hash: ${short_hash}"
     log_cyan "Updating protocol name and version variables"
-    if [[ ${is_snapshot} == true ]]; then
-      new_protocol_name="${version}_${short_hash}"
-      new_tezos_protocol="${version}-${short_hash}"
-      new_versioned_name="${version}_${label}"
-    else
-      new_protocol_name="${version}"
-      new_tezos_protocol="${version}"
-      new_versioned_name="${label}"
-    fi
+    recompute_names
   else
     log_magenta "Can't find src/proto_${version}/lib_protocol"
     exit 1
@@ -676,6 +678,8 @@ function copy_source() {
       rm -f proto_to_hash.txt
       commit_no_hooks "src: add vanity nonce"
     fi
+    # recompute the protocol and version names, in case it has changed
+    recompute_names
   fi
   cd "src/proto_${version}/lib_protocol"
   # replace fake hash with real hash, this file doesn't influence the hash
@@ -780,7 +784,7 @@ function copy_source() {
   ## add protocol as active before alpha in parameters.ml
   if ! grep -q "${long_hash}" src/lib_agnostic_baker/parameters.ml; then
     ## look for "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" and add "${longhash};"
-    sed -i.old -e "/ \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\" /a \"${long_hash}\"; " src/lib_agnostic_baker/parameters.ml
+    sed -i.old "/ \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\"/i\"${long_hash}\"; " src/lib_agnostic_baker/parameters.ml
     ocamlformat -i src/lib_agnostic_baker/parameters.ml
     commit "src: add protocol to agnostic_baker"
   fi
@@ -1226,6 +1230,43 @@ function update_tezt_tests() {
   else
     commit "tezt: copy ${protocol_source} regression files"
   fi
+
+  # add new protocol baker
+  # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
+  if [[ ${is_snapshot} == false ]]; then
+    awk -v source="$protocol_source" -v target="$protocol_target" '
+$0 ~ "let octez_baker_" source " =" {
+  orig1 = $0
+  getline
+  orig2 = $0
+  print gensub(source, target, "g", orig1)
+  print gensub(source, target, "g", orig2)
+  print ""
+  print orig1
+  print orig2
+  next
+}
+1
+' tezt/lib_tezos/constant.ml > tezt/lib_tezos/constant.ml.tmp
+    mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+  else
+    lowercase_shorthash=$(echo "$short_hash" | tr '[:upper:]' '[:lower:]')
+    awk -v source="$protocol_source" -v short_hash="$short_hash" -v lowercase_shorthash="$lowercase_shorthash" '
+$0 ~ "let octez_baker_" source " =" {
+  print                  # line 1: unchanged
+  getline                # go to line 2
+  gsub("baker_" source, "baker_" lowercase_shorthash)
+  gsub("./octez-baker-" source , "./octez-baker-" short_hash)
+  print
+  next
+}
+1
+' tezt/lib_tezos/constant.ml > tezt/lib_tezos/constant.ml.tmp
+    mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+  fi
+
+  ocamlformat -i tezt/lib_tezos/constant.ml
+  commit_if_changes "tezt: add unused ${protocol_target} baker"
 
   # mkdir -p "tezt/tests/expected/check_proto_${label}_changes.ml"
   # rm -rf /tmp/tezos_proto_snapshot
