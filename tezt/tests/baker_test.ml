@@ -806,9 +806,6 @@ let prequorum_check_levels =
   in
   let* _ = Node.wait_for_level node 1 in
   let delegate = Constant.bootstrap1 in
-  let public_key_hashes =
-    List.map (fun (account : Account.key) -> account.public_key_hash)
-  in
   let* baker =
     Agnostic_baker.init
       ~event_level:`Debug
@@ -817,14 +814,13 @@ let prequorum_check_levels =
       client
   in
   Agnostic_baker.log_events ~max_length:1000 baker ;
-  let* () =
-    Client.bake_for_and_wait
+  let* current_level =
+    Client.bake_for_and_wait_level
       ~node
       ~keys:(public_key_hashes Constant.all_secret_keys)
       ~count:3
       client
   in
-  let* current_level = Node.get_level node in
   let previous_level = current_level - 1 in
   let next_level = current_level + 1 in
   let* block_payload_hash =
@@ -834,18 +830,14 @@ let prequorum_check_levels =
   let preattest_for level =
     let* slots = Operation.Consensus.get_slots ~level client in
     let slot = Operation.Consensus.first_slot ~slots delegate in
-    let preattestation =
-      Operation.Consensus.preattestation
+    let* _ =
+      Operation.Consensus.preattest_for
         ~slot
         ~level
         ~block_payload_hash
         ~round:0
-    in
-    let* _ =
-      Operation.Consensus.inject
         ~protocol
-        ~signer:delegate
-        preattestation
+        delegate
         client
     in
     unit

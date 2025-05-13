@@ -438,7 +438,7 @@ module Consensus = struct
     let json = `A [json consensus_operation] in
     let* branch =
       match branch with
-      | None -> get_branch ~offset:0 client
+      | None -> get_branch ~offset:2 client
       | Some branch -> return branch
     in
     let* chain_id =
