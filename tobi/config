@@ -41,6 +41,7 @@ efunc_core: efunc-core/src
 etherlink-benchmark-producer: etherlink/bin_benchmark_producer
 etherlink-governance-observer: etherlink/governance-metrics/src
 etherlink-outbox-monitor: etherlink/bin_outbox_monitor
+fa-bridge-watchtower: etherlink/fa-bridge-watchtower
 floodgate: etherlink/bin_floodgate
 gitlab_ci: ci/lib_gitlab_ci
 internal-devtools: devtools/tztop
