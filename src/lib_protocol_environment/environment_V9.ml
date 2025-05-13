@@ -1327,6 +1327,20 @@ struct
         | Validation_error of Error_monad.shell_tztrace
         | Add_conflict of operation_conflict
 
+      let unsupported_feature name =
+        let msg =
+          Printf.sprintf
+            "The current protocol does not support the '%s' feature."
+            name
+        in
+        [Exn (Failure msg)]
+
+      let partial_op_validation ?check_signature:_ _ _ =
+        Lwt.return_error (unsupported_feature "partial_op_validation")
+
+      let add_valid_operation ?conflict_handler:_ _ _ =
+        Error (Validation_error (unsupported_feature "add_valid_operation"))
+
       let add_operation ?check_signature ?conflict_handler info mempool op :
           (t * add_result, add_error) result Lwt.t =
         let open Lwt_syntax in

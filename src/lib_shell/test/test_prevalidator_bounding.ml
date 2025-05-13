@@ -82,6 +82,10 @@ module Mock_protocol :
       new_operation:Tezos_crypto.Hashed.Operation_hash.t * operation ->
       [`Keep | `Replace]
 
+    let partial_op_validation ?check_signature:_ _ _ = assert false
+
+    let add_valid_operation ?conflict_handler:_ _ _ = assert false
+
     let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
       assert false
 

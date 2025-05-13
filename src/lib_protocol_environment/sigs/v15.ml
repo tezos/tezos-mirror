@@ -11424,26 +11424,9 @@ end
 # 1 "v15/updater.mli"
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* Copyright (c) 2025 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -11889,20 +11872,44 @@ module type PROTOCOL = sig
     (** Mempool encoding *)
     val encoding : t Data_encoding.t
 
-    (** Adds an operation to a [mempool] if and only if it is valid and
-        does not conflict with previously added operation.
+    (** This function partially checks the validity of an operation (see
+        {!Validate.check_operation}) that is candidate to be added to the mempool.
 
-        This function checks the validity of an operation and tries to
-        add it to the mempool.
+        If a validation error is triggered, the result will be a [Validation_error].
 
-        If a validation error is triggered, the result will be a
-        [Validation_error].  If a conflict with a previous operation
-        exists, the result will be [Add_conflict] is then checked.
-        Important: no [Add_conflict] will be raised if a
-        [conflict_handler] is provided (see [add_result]).
+        It returns a list of comutative checks that MUST be ran in
+        order to fully validate the operation. It includes the signature
+        verification if relevant and if [check_signature] has NOT been set to
+        [false]. *)
+    val partial_op_validation :
+      ?check_signature:bool ->
+      validation_info ->
+      operation ->
+      (unit -> unit tzresult) list tzresult Lwt.t
+
+    (** Adds a valid operation to a [mempool] if it does not conflict with previously
+        added operation.
+
+        Operation should have been validated through [partial_op_validation] and
+        the list of commutative checks MUST have been ran.
+
+        If a conflict with a previous operation exists, the result will be
+        [Add_conflict] (see {!Validate.check_operation_conflict}). Important: no
+        [Add_conflict] will be raised if a [conflict_handler] is provided (see
+        [add_result]).
 
         If no error is raised the operation is potentially added to the
         [mempool] depending on the [add_result] value. *)
+    val add_valid_operation :
+      ?conflict_handler:conflict_handler ->
+      t ->
+      Operation_hash.t * operation ->
+      (t * add_result, add_error) result
+
+    (** Legacy function that combines checks of [partial_op_validation] and
+        action of [add_valid_operation].
+        This is not expected to be used by protocols using this
+        environment. *)
     val add_operation :
       ?check_signature:bool ->
       ?conflict_handler:conflict_handler ->

@@ -1251,12 +1251,23 @@ struct
 
       let encoding = Data_encoding.unit
 
-      let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
+      let unsupported_feature name =
         let msg =
-          "The mempool cannot accept any operations because it does not \
-           support the current protocol."
+          Printf.sprintf
+            "The current protocol does not support the '%s' feature."
+            name
         in
-        Lwt.return_error (Validation_error [Exn (Failure msg)])
+        [Exn (Failure msg)]
+
+      let partial_op_validation ?check_signature:_ _ _ =
+        Lwt.return_error (unsupported_feature "partial_op_validation")
+
+      let add_valid_operation ?conflict_handler:_ _ _ =
+        Error (Validation_error (unsupported_feature "add_valid_operation"))
+
+      let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
+        Lwt.return_error
+          (Validation_error (unsupported_feature "add_operation"))
 
       let remove_operation () _ = ()
 

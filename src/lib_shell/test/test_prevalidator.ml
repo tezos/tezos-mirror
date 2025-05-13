@@ -94,8 +94,21 @@ module Mock_protocol :
       new_operation:Tezos_crypto.Hashed.Operation_hash.t * operation ->
       [`Keep | `Replace]
 
-    let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
-      Lwt_result_syntax.return ((), Added)
+    let partial_op_validation ?check_signature:_ _ _ = Lwt.return_ok []
+
+    let add_valid_operation ?conflict_handler:_ _ _ = Ok ((), Added)
+
+    let add_operation ?check_signature ?conflict_handler v_info state (oph, op)
+        =
+      let open Lwt_result_syntax in
+      let*! partial_op_validation =
+        partial_op_validation ?check_signature v_info op
+      in
+      match partial_op_validation with
+      | Ok checks ->
+          let*? () = List.iter_e (fun check -> check ()) checks in
+          Lwt.return (add_valid_operation ?conflict_handler state (oph, op))
+      | Error e -> fail e
 
     let merge ?conflict_handler:_ () () = assert false
 
