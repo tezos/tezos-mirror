@@ -130,6 +130,20 @@ module Known_keys : sig
   end
 end
 
+module Bls_prove_possession : sig
+  module Request : sig
+    type t = Tezos_crypto.Signature.Public_key_hash.t
+
+    val encoding : t Data_encoding.t
+  end
+
+  module Response : sig
+    type t = Tezos_crypto.Signature.Bls.t
+
+    val encoding : t Data_encoding.t
+  end
+end
+
 module Request : sig
   type t =
     | Sign of Sign.Request.t
@@ -139,6 +153,7 @@ module Request : sig
     | Deterministic_nonce_hash of Deterministic_nonce_hash.Request.t
     | Supports_deterministic_nonces of Supports_deterministic_nonces.Request.t
     | Known_keys
+    | Bls_prove_possession of Bls_prove_possession.Request.t
 
   val encoding : t Data_encoding.t
 end

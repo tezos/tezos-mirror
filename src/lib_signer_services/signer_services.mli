@@ -85,3 +85,12 @@ val known_keys :
     unit,
     Tezos_crypto.Signature.Public_key_hash.t list )
   Tezos_rpc.Service.t
+
+val bls_prove_possession :
+  ( [`GET],
+    unit,
+    unit * Tezos_crypto.Signature.Public_key_hash.t,
+    unit,
+    unit,
+    Tezos_crypto.Signature.Bls.t )
+  Tezos_rpc.Service.t

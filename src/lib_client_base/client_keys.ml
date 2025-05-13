@@ -348,6 +348,9 @@ module type SIMPLE_SIGNER = sig
 
   val list_known_keys :
     Uri.t -> Tezos_crypto.Signature.Public_key_hash.t list tzresult Lwt.t
+
+  val bls_prove_possession :
+    sk_uri -> Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 end
 
 module type S = sig
@@ -414,6 +417,8 @@ module type S = sig
     signature ->
     Bytes.t ->
     bool tzresult Lwt.t
+
+  val bls_prove_possession : sk_uri -> Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 
   val deterministic_nonce : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
@@ -643,6 +648,8 @@ module Make (Signature : Signature_S) :
     let deterministic_nonce_hash = S.deterministic_nonce_hash
 
     let supports_deterministic_nonces = S.supports_deterministic_nonces
+
+    let bls_prove_possession = S.bls_prove_possession
   end
 
   let adapt_signer (module Signer : SIGNER) =
@@ -718,6 +725,10 @@ module Make (Signature : Signature_S) :
             (Signature_mismatch sk_uri)
         in
         return signature)
+
+  let bls_prove_possession sk_uri =
+    with_scheme_simple_signer sk_uri (fun (module Signer) ->
+        Signer.bls_prove_possession sk_uri)
 
   let append cctxt ?watermark loc buf =
     let open Lwt_result_syntax in

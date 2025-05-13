@@ -237,6 +237,19 @@ struct
       | Ok ans -> return ans
       | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_false
       | Error _ as res -> Lwt.return res
+
+    let bls_prove_possession uri =
+      let open Lwt_result_syntax in
+      let* base, pkh = parse (uri : sk_uri :> Uri.t) in
+      RPC_client.call_service
+        ~logger:P.logger
+        ?headers
+        Media_type.all_media_types
+        ~base
+        Signer_services.bls_prove_possession
+        ((), pkh)
+        ()
+        ()
   end
 
   let make_base host port = Uri.make ~scheme ~host ~port ()

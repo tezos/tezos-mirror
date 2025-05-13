@@ -352,3 +352,9 @@ let known_keys (cctxt : #Client_context.wallet) =
   let*! () = Events.(emit request_for_known_keys ()) in
   let+ all_keys = Client_keys.list_keys cctxt in
   List.map (fun (_, pkh, _, _) -> pkh) all_keys
+
+let bls_prove_possession (cctxt : #Client_context.wallet) pkh =
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit request_for_proof_of_possession pkh) in
+  let* _name, _pkh, sk_uri = Client_keys.get_key cctxt pkh in
+  Client_keys.bls_prove_possession sk_uri

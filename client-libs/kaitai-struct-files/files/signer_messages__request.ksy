@@ -74,6 +74,11 @@ types:
     - id: signature
       size-eos: true
       if: (signature_tag == bool::true)
+  signer_messages__bls_prove_possession__request:
+    seq:
+    - id: pkh
+      type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
   signer_messages__public_key__request:
     seq:
     - id: pkh
@@ -123,6 +128,7 @@ enums:
     4: deterministic_nonce_hash
     5: supports_deterministic_nonces
     6: known_keys
+    7: bls_prove_possession
 seq:
 - id: signer_messages__request_tag
   type: u1
@@ -142,3 +148,6 @@ seq:
 - id: supports_deterministic_nonces
   type: signer_messages__supports_deterministic_nonces__request
   if: (signer_messages__request_tag == signer_messages__request_tag::supports_deterministic_nonces)
+- id: bls_prove_possession
+  type: signer_messages__bls_prove_possession__request
+  if: (signer_messages__request_tag == signer_messages__request_tag::bls_prove_possession)

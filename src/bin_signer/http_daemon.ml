@@ -54,6 +54,12 @@ let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
       (fun pkh () () -> Handler.public_key cctxt pkh)
   in
   let dir =
+    Tezos_rpc.Directory.register1
+      dir
+      Signer_services.bls_prove_possession
+      (fun pkh () () -> Handler.bls_prove_possession cctxt pkh)
+  in
+  let dir =
     Tezos_rpc.Directory.register0
       dir
       Signer_services.authorized_keys
