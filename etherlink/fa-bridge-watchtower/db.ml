@@ -165,6 +165,22 @@ module Types = struct
     @@ proj level (fun (l : log_info) -> l.blockNumber)
     @@ proj bool (fun (l : log_info) -> l.removed)
     @@ proj_end
+
+  let execution_info =
+    product (fun transactionHash transactionIndex blockHash blockNumber ->
+        {transactionHash; transactionIndex; blockHash; blockNumber})
+    @@ proj hash (fun (l : execution_info) -> l.transactionHash)
+    @@ proj level (fun (l : execution_info) -> l.transactionIndex)
+    @@ proj block_hash (fun (l : execution_info) -> l.blockHash)
+    @@ proj level (fun (l : execution_info) -> l.blockNumber)
+    @@ proj_end
+
+  let deposit_log =
+    product (fun deposit log_info claimed -> {deposit; log_info; claimed})
+    @@ proj deposit (fun d -> d.deposit)
+    @@ proj log_info (fun d -> d.log_info)
+    @@ proj (option execution_info) (fun d -> d.claimed)
+    @@ proj_end
 end
 
 module Migrations = struct
@@ -275,10 +291,23 @@ let init ~data_dir perm : t tzresult Lwt.t =
   Sqlite.init ~path ~perm migration
 
 module Deposits = struct
-  let store ?conn db _log =
-    with_connection db conn @@ fun _conn ->
-    (* TODO *)
-    assert false
+  module Q = struct
+    open Types
+
+    let insert =
+      (t2 deposit log_info ->. unit)
+      @@ {sql|
+      REPLACE INTO deposits
+      (nonce, proxy, ticket_hash, receiver, amount,
+       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
+       log_blockNumber, log_removed)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      |sql}
+  end
+
+  let store ?conn db deposit log_info =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.insert (deposit, log_info)
 end
 
 module Pointers = struct

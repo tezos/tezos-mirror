@@ -300,9 +300,7 @@ let handle_one_log {ws_client; db; _} (log : Ethereum_types.transaction_log) =
       let* () =
         Event.emit_deposit_log ws_client deposit.deposit deposit.log_info
       in
-      (* TODO: store in DB *)
-      ignore (db, deposit) ;
-      return_unit
+      Db.Deposits.store db deposit.deposit deposit.log_info
 
 let lwt_stream_iter_es f stream =
   let open Lwt_result_syntax in
