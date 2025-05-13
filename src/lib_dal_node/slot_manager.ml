@@ -109,6 +109,28 @@ let () =
 
 type slot = bytes
 
+(* Used wrapper functions on top of Cryptobox. *)
+
+let polynomial_from_slot cryptobox slot =
+  let open Result_syntax in
+  match Cryptobox.polynomial_from_slot cryptobox slot with
+  | Ok r -> return r
+  | Error (`Slot_wrong_size _) ->
+      let open Cryptobox in
+      let provided = Bytes.length slot in
+      let {slot_size = expected; _} = parameters cryptobox in
+      Error (Errors.other [Invalid_slot_size {provided; expected}])
+
+let commit cryptobox polynomial =
+  let open Result_syntax in
+  match Cryptobox.commit cryptobox polynomial with
+  | Ok cm -> return cm
+  | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
+      Error
+        (Errors.other
+           [Invalid_degree (Cryptobox.string_of_commit_error commit_error)])
+  | Error `Prover_SRS_not_loaded -> Error (Errors.other [No_prover_SRS])
+
 let polynomial_from_shards cryptobox shards =
   match Cryptobox.polynomial_from_shards cryptobox shards with
   | Ok p -> Lwt.return_ok p
@@ -174,28 +196,6 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
         | Ok slot -> return slot
         | Error _ -> Lwt.return res_slot_store
       else Lwt.return res_slot_store
-
-(* Used wrapper functions on top of Cryptobox. *)
-
-let polynomial_from_slot cryptobox slot =
-  let open Result_syntax in
-  match Cryptobox.polynomial_from_slot cryptobox slot with
-  | Ok r -> return r
-  | Error (`Slot_wrong_size _) ->
-      let open Cryptobox in
-      let provided = Bytes.length slot in
-      let {slot_size = expected; _} = parameters cryptobox in
-      Error (Errors.other [Invalid_slot_size {provided; expected}])
-
-let commit cryptobox polynomial =
-  let open Result_syntax in
-  match Cryptobox.commit cryptobox polynomial with
-  | Ok cm -> return cm
-  | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
-      Error
-        (Errors.other
-           [Invalid_degree (Cryptobox.string_of_commit_error commit_error)])
-  | Error `Prover_SRS_not_loaded -> Error (Errors.other [No_prover_SRS])
 
 (* Main functions *)
 
