@@ -12,6 +12,13 @@ type rpc = {addr : string; port : int}
 (** Secret key for signing transactions *)
 type secret_key = Libsecp256k1.External.Key.secret Libsecp256k1.External.Key.t
 
+(** Whitelist item configuration for filtering deposits and withdrawals.
+    Can specify a proxy address, ticket hashes (disjunction), or both. *)
+type whitelist_item = {
+  proxy : Ethereum_types.address option;
+  ticket_hashes : Ethereum_types.hash list option;
+}
+
 (** Configuration for the FA bridge watchtower *)
 type t = {
   evm_node_endpoint : Uri.t;  (** Endpoint URL for the EVM node *)
@@ -19,7 +26,7 @@ type t = {
   max_fee_per_gas : int64;  (** Maximum fee per gas unit *)
   rpc : rpc option;  (** Optional RPC server configuration *)
   secret_key : secret_key option;  (** Optional secret key for signing *)
-  whitelist : Ethereum_types.address list option;
+  whitelist : whitelist_item list option;
       (** Optional list of whitelisted addresses *)
 }
 
@@ -76,6 +83,21 @@ let rpc_encoding =
     (obj2
        (req "addr" ~description:"Address for the RPC server" string)
        (req "port" ~description:"Port for the RPC server" int31))
+
+let whitelist_item_encoding =
+  let open Data_encoding in
+  conv
+    (fun {proxy; ticket_hashes} -> (proxy, ticket_hashes))
+    (fun (proxy, ticket_hashes) -> {proxy; ticket_hashes})
+    (obj2
+       (opt
+          "proxy"
+          ~description:"Optional proxy address"
+          Ethereum_types.address_encoding)
+       (opt
+          "ticket_hashes"
+          ~description:"Optional list of ticket hashes"
+          (list Ethereum_types.hash_encoding)))
 
 let encoding =
   let open Data_encoding in
@@ -134,8 +156,8 @@ let encoding =
           secret_key_encoding)
        (opt
           "whitelist"
-          ~description:"Optional list of whitelisted proxy addresses"
-          (list Ethereum_types.address_encoding)))
+          ~description:"Optional list of whitelisted items"
+          (list whitelist_item_encoding)))
 
 (** [load_file ~data_dir] attempts to load the configuration file from the
     specified data directory. Returns [None] if the file doesn't exist or [Some

@@ -14,7 +14,7 @@ type ctx = {
   sk : Libsecp256k1.External.Key.secret Libsecp256k1.External.Key.t;
   chain_id : L2_types.chain_id;
   gas_limit : Z.t;
-  whitelist : Ethereum_types.address list option;
+  whitelist : Config.whitelist_item list option;
 }
 
 module Craft = struct
@@ -101,21 +101,94 @@ let addr_to_topic address =
   let padded_hex = String.make (64 - String.length addr_hex) '0' ^ addr_hex in
   Ethereum_types.Hash (Hex padded_hex)
 
-let mk_filter address topic whitelist =
+(** [mk_filter address selector whitelist] creates an Ethereum log filter for
+    events.
+
+    This function builds a filter to match logs from a specific contract address
+    with a specific event selector, optionally filtered by whitelist items.
+
+    The filter's topics are constructed based on the whitelist configuration:
+    - With no whitelist: only filter by the event selector
+    - With a single whitelist item: filter by selector, ticket hashes,
+      and proxy address
+    - With multiple items that only have proxy addresses: filter by selector
+      and a list of proxies
+    - With multiple items that only have ticket hashes: filter by selector and
+      a list of ticket hashes
+    - With mixed items: filter by selector, all ticket hashes, and all proxy
+      addresses
+
+    @param address The contract address to filter logs from
+    @param selector The event selector (keccak hash of the event signature)
+    @param whitelist Optional list of whitelist items containing proxy
+      addresses and ticket hashes
+    @return A filter configuration for Ethereum log queries
+*)
+let mk_filter address selector whitelist =
+  (* First topic is always the event selector *)
+  let selector_topic = Some (Ethereum_types.Filter.One selector) in
+  (* Construct topics array based on whitelist configuration *)
   let topics =
-    [Some (Ethereum_types.Filter.One topic); None (* ignore token hash topic *)]
-    @
     match whitelist with
-    | None -> []
-    | Some addresses ->
-        let proxy_topics = List.map addr_to_topic addresses in
-        [Some (Or proxy_topics)]
+    | None ->
+        (* No whitelist: only filter by event selector *)
+        [selector_topic]
+    | Some [{Config.proxy; ticket_hashes}] ->
+        (* Single whitelist item: create specific filter for this item *)
+        let proxy_topic =
+          Option.map
+            (fun p -> Ethereum_types.Filter.One (addr_to_topic p))
+            proxy
+        in
+        let ticket_hashes_topic =
+          Option.map (fun th -> Ethereum_types.Filter.Or th) ticket_hashes
+        in
+        [selector_topic; ticket_hashes_topic; proxy_topic]
+    | Some whitelist
+      when List.for_all (fun w -> w.Config.ticket_hashes = None) whitelist ->
+        (* Multiple items with only proxy addresses: filter by list of
+           proxies *)
+        let proxy_topics =
+          List.filter_map
+            (fun {Config.proxy; _} -> Option.map addr_to_topic proxy)
+            whitelist
+        in
+        [selector_topic; None; Some (Or proxy_topics)]
+    | Some whitelist
+      when List.for_all (fun w -> w.Config.proxy = None) whitelist ->
+        (* Multiple items with only ticket hashes: filter by list of ticket
+           hashes *)
+        let ticket_hashes_topics =
+          List.concat_map
+            (fun {Config.ticket_hashes; _} ->
+              Option.value ticket_hashes ~default:[])
+            whitelist
+        in
+        [selector_topic; Some (Or ticket_hashes_topics)]
+    | Some whitelist ->
+        (* Mixed items: filter by all proxies and all ticket hashes. This is
+           inaccurate because we can only filter with a single Or for each
+           topic. *)
+        let proxy_topics =
+          List.filter_map
+            (fun {Config.proxy; _} -> Option.map addr_to_topic proxy)
+            whitelist
+        in
+        let ticket_hashes_topics =
+          List.concat_map
+            (fun {Config.ticket_hashes; _} ->
+              Option.value ticket_hashes ~default:[])
+            whitelist
+        in
+        [selector_topic; Some (Or ticket_hashes_topics); Some (Or proxy_topics)]
   in
+  (* Create bloom filter for efficient filtering *)
   let bloom =
     Filter_helpers.make_bloom_address_topics
       (Some (Single address))
       (Some topics)
   in
+  (* Return the complete filter configuration *)
   Filter_helpers.{bloom; address = [address]; topics}
 
 module Event = struct
@@ -366,11 +439,11 @@ module Deposit = struct
 
   let filter whitelist = mk_filter address topic whitelist
 
-  let decode_event_data Ethereum_types.{topics; data = Hex hex_data; _} =
+  let whitelist_filter whitelist topics =
     let open Result_syntax in
-    let* ticket_hash, proxy =
+    let* log_ticket_hash, log_proxy =
       match topics with
-      | [_selector; th; Hash (Hex proxy)] ->
+      | [_selector; th; Ethereum_types.Hash (Hex proxy)] ->
           let proxy =
             Hex.to_bytes_exn (`Hex proxy)
             |> extract_32 0 ~padding:(`Left_padded 20)
@@ -380,24 +453,57 @@ module Deposit = struct
       | _ ->
           error_with "Missing ticket hash and/or proxy from FA deposit topics"
     in
-    let data = Hex.to_bytes (`Hex hex_data) in
-    let* data =
-      match data with
-      | None -> error_with "Invalid hex data in deposit event"
-      | Some d -> return d
+    let matched_by_whitelist =
+      match whitelist with
+      | None | Some [_] -> true
+      | Some whitelist ->
+          List.for_all
+            (fun Config.{proxy; ticket_hashes} ->
+              proxy = None || ticket_hashes = None)
+            whitelist
+          || List.exists
+               (fun Config.{proxy; ticket_hashes} ->
+                 (match proxy with
+                 | None -> true
+                 | Some p -> Ethereum_types.Address.equal log_proxy p)
+                 &&
+                 match ticket_hashes with
+                 | None -> true
+                 | Some ticket_hashes ->
+                     List.mem
+                       ~equal:Ethereum_types.equal_hash
+                       log_ticket_hash
+                       ticket_hashes)
+               whitelist
     in
-    let* () =
-      if Bytes.length data < 3 * 32 then
-        error_with "Invalid length for data of deposit event"
-      else return_unit
-    in
-    let nonce = extract_32 0 data |> Ethereum_types.decode_number_be in
-    let receiver =
-      extract_32 1 data ~padding:(`Left_padded 20)
-      |> Ethereum_types.decode_address
-    in
-    let amount = extract_32 2 data |> Ethereum_types.decode_number_be in
-    return {nonce; proxy; ticket_hash; receiver; amount}
+    if matched_by_whitelist then return_some (log_ticket_hash, log_proxy)
+    else return_none
+
+  let decode_event_data whitelist
+      Ethereum_types.{topics; data = Hex hex_data; _} =
+    let open Result_syntax in
+    let* th_proxy = whitelist_filter whitelist topics in
+    match th_proxy with
+    | None -> return_none
+    | Some (ticket_hash, proxy) ->
+        let data = Hex.to_bytes (`Hex hex_data) in
+        let* data =
+          match data with
+          | None -> error_with "Invalid hex data in deposit event"
+          | Some d -> return d
+        in
+        let* () =
+          if Bytes.length data < 3 * 32 then
+            error_with "Invalid length for data of deposit event"
+          else return_unit
+        in
+        let nonce = extract_32 0 data |> Ethereum_types.decode_number_be in
+        let receiver =
+          extract_32 1 data ~padding:(`Left_padded 20)
+          |> Ethereum_types.decode_address
+        in
+        let amount = extract_32 2 data |> Ethereum_types.decode_number_be in
+        return_some {nonce; proxy; ticket_hash; receiver; amount}
 end
 
 let parsed_log_to_db (log : Ethereum_types.transaction_log) event =
@@ -428,10 +534,10 @@ let parsed_log_to_db (log : Ethereum_types.transaction_log) event =
           }
   | _ -> None
 
-let parse_log (log : Ethereum_types.transaction_log) =
+let parse_log whitelist (log : Ethereum_types.transaction_log) =
   let open Result_syntax in
-  let* deposit_data = Deposit.decode_event_data log in
-  return (parsed_log_to_db log deposit_data)
+  let* deposit_data = Deposit.decode_event_data whitelist log in
+  return (Option.map (parsed_log_to_db log) deposit_data)
 
 let precompiled_contract_address = Efunc_core.Private.a Deposit.address_hex
 
@@ -460,10 +566,11 @@ let claim ctx ~deposit_id =
   in
   return_unit
 
-let handle_one_log {ws_client; db; _} (log : Ethereum_types.transaction_log) =
+let handle_one_log {ws_client; db; whitelist; _}
+    (log : Ethereum_types.transaction_log) =
   let open Lwt_result_syntax in
   let*! () = Event.(emit transaction_log) log in
-  let deposit = parse_log log in
+  let deposit = parse_log whitelist log in
   match deposit with
   | Error e ->
       let*! () =
@@ -475,7 +582,10 @@ let handle_one_log {ws_client; db; _} (log : Ethereum_types.transaction_log) =
         Event.(emit parsing_error) "Log did not match deposit filter"
       in
       return_unit
-  | Ok (Some deposit) ->
+  | Ok (Some None) ->
+      (* Matched get_logs filter but not whitelist filter *)
+      return_unit
+  | Ok (Some (Some deposit)) ->
       let* () =
         Event.emit_deposit_log ws_client deposit.deposit deposit.log_info
       in

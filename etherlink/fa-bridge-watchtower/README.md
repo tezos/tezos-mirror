@@ -7,7 +7,7 @@ The FA bridge watchtower monitors
 `QueuedDeposit(uint256,address,uint256,uint256,uint256)` topic and
 claims deposits if found.
 
-A whitelist can be provided to filter on the proxy adresses.
+A whitelist can be provided to filter on the proxy adresses and specific ticket hashes.
 
 ### How
 
@@ -33,7 +33,7 @@ If not provided, the following configuration will be used by default.
 Example of configuration for the watchtower running on rainbownet is
 the following, where the watchtower only tracks tokens for the
 [LKC](http://vps-43b6dfcb.vps.ovh.net/token/0xE8b8716743dC84fE31bfaF7511dD9EC1Fa9A37A6)
-contract.
+contract and specific ticket hashes.
 
 ```
 {
@@ -45,7 +45,14 @@ contract.
     "port": 4002
   },
   "secret_key": "0x...",
-  "whitelist" : ["0xe8b8716743dc84fe31bfaf7511dd9ec1fa9a37a6"]
+  "whitelist": [
+    {
+      "proxy": "0xe8b8716743dc84fe31bfaf7511dd9ec1fa9a37a6",
+      "ticket_hashes": [
+        "0x588b32ab610954bd36c6561f326abae2c149ae9abe780f92422cb57178eedcb3"
+      ]
+    }
+  ]
 }
 ```
 
