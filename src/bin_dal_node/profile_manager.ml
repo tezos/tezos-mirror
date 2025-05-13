@@ -318,3 +318,31 @@ let save_profile_ctxt ctxt ~base_dir =
       let*! () = Lwt_utils_unix.create_file file_path value in
       return_unit)
     (fun exn -> fail [Failed_to_save_profile {reason = Printexc.to_string exn}])
+
+(* This function determines the storage period taking into account the node's
+   [first_seen_level]. Indeed, if the node started for the first time, we do not
+   expect it to store skip list cells (even if it supports refutations) for the
+   entire required period of 3 months, because it will anyway not have the slot
+   pages for this period. Note that this could be further refined by taking into
+   account when the corresponding rollup was originated. *)
+let get_storage_period profile_ctxt proto_parameters ~head_level
+    ~first_seen_level =
+  let supports_refutations = supports_refutations profile_ctxt in
+  let default_storage_period =
+    get_attested_data_default_store_period profile_ctxt proto_parameters
+  in
+  if supports_refutations then
+    (* This deliberately does not take into account the [last_processed_level]. *)
+    let online_period =
+      match first_seen_level with
+      | None -> 0
+      | Some first_seen_level ->
+          Int32.sub head_level first_seen_level |> Int32.to_int
+    in
+    (* Even if the node was not online previously, or it was online only for a
+       few levels, we still need to store data for the minimal period, defined
+       in [get_attested_data_default_store_period]. TODO: refactor to expose
+       this value. *)
+    let max_period = max (2 * proto_parameters.attestation_lag) online_period in
+    min max_period default_storage_period
+  else default_storage_period

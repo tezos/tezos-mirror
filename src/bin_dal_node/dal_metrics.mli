@@ -93,3 +93,25 @@ module Slot_id_bounded_map : Vache.MAP with type key = Types.Slot_id.t
 (** [collect_gossipsub_metrics gs_worker] allows to periodically collect metrics
     from the given GS Worker state. *)
 val collect_gossipsub_metrics : Gossipsub.Worker.t -> unit
+
+(** [update_timing_shard_received cryptobox shards_timing_table slot_id
+    ~number_of_already_stored_shards ~number_of_shards] updates the timing
+    metrics associated with [slot_id] in the [shards_timing_table].
+
+    This function should be called each time a shard is received. It records the
+    timestamp of the first shard received for a slot, and updates the durations
+    for:
+    - when enough shards are received (based on the [redundancy_factor])
+    - when all shards are received.
+
+    The update occurs only if the number of already stored shards has increased
+    and the corresponding duration has not yet been set. No I/O is performed;
+    the function only modifies the in-memory timing table.
+*)
+val update_timing_shard_received :
+  Cryptobox.t ->
+  slot_metrics Slot_id_bounded_map.t ->
+  Slot_id_bounded_map.key ->
+  number_of_already_stored_shards:int ->
+  number_of_shards:int ->
+  slot_metrics

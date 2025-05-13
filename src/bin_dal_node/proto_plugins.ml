@@ -229,3 +229,40 @@ let get_plugin_and_parameters_for_level plugins ~level =
       return (plugin, proto_parameters)
 
 include Plugins
+
+(* This function fetches the protocol plugins for levels in the past for which
+   the node may need a plugin, namely for adding skip list cells, or for
+   obtaining the protocol parameters.
+
+   Concerning the skip list, getting the plugin is (almost) necessary as skip
+   list cells are stored in the storage for a certain period and
+   [store_skip_list_cells] needs the L1 context for levels in this period. (It
+   would actually not be necessary to go as far in the past, because the
+   protocol parameters and the relevant encodings do not change for now, so the
+   head plugin could be used). *)
+let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
+    ~head_level proto_parameters =
+  let storage_period =
+    Profile_manager.get_storage_period
+      profile_ctxt
+      proto_parameters
+      ~head_level
+      ~first_seen_level
+  in
+  let first_level =
+    Int32.max
+      (match last_processed_level with None -> 1l | Some level -> level)
+      Int32.(sub head_level (of_int storage_period))
+  in
+  let first_level =
+    if Profile_manager.supports_refutations profile_ctxt then
+      Int32.sub
+        first_level
+        (Int32.of_int (History_check.skip_list_offset proto_parameters))
+    else
+      (* The DAL node may need the protocol parameters [attestation_lag] in the
+         past wrt to the head level. *)
+      Int32.sub first_level (Int32.of_int proto_parameters.attestation_lag)
+  in
+  let first_level = Int32.(max 1l first_level) in
+  initial_plugins cctxt ~first_level ~last_level:head_level
