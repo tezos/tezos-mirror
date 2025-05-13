@@ -41,3 +41,7 @@ val finalized_heads_stream :
 (** [shutdown t] shuts down the stream of finalized heads and cancels the monad
     instance of {!iter_heads} that populates the stream. *)
 val shutdown : t -> unit
+
+(** [last_seen_head t] returns the information of the last block that the L1
+    crawler saw. *)
+val last_seen_head : t -> (Block_hash.t * Block_header.shell_header) option
