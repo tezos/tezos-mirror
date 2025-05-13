@@ -45,6 +45,9 @@ let init_consensus_info ctxt (predecessor_level, predecessor_round) =
     consensus_slot_map = Consensus.allowed_consensus ctxt;
   }
 
+(** Helper used to run all the pending checks after an operation validation. *)
+let resolve_checks = List.iter_e (fun check -> check ())
+
 (** Map used to detect consensus operation conflicts. Each delegate may
     (pre)attest at most once for each level and round, so two attestations
     (resp. two DAL attestations or two preattestations) conflict when they have
@@ -708,16 +711,19 @@ module Consensus = struct
       | Mempool -> return_unit
     in
     let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
-    let*? () =
+    let check_signature =
       if check_signature then
-        Operation.check_signature
-          vi.ctxt
-          consensus_key.consensus_pk
-          vi.chain_id
-          operation
-      else ok_unit
+        [
+          (fun () ->
+            Operation.check_signature
+              vi.ctxt
+              consensus_key.consensus_pk
+              vi.chain_id
+              operation);
+        ]
+      else []
     in
-    return attesting_power
+    return (attesting_power, check_signature)
 
   let check_preattestation_conflict vs oph (op : Kind.preattestation operation)
       =
@@ -868,56 +874,64 @@ module Consensus = struct
         consensus_key
         dal_content
     in
-    let*? () =
-      let open Result_syntax in
+    let check_signature =
       if check_signature then
-        let* dal_dependent_pk =
-          match (consensus_key.Consensus_key.consensus_pk, dal_content) with
-          | Bls consensus_bls_pk, Some {attestation = dal_attestation}
-            when Constants.aggregate_attestation vi.ctxt -> (
-              match consensus_key.companion_pk with
-              | None ->
-                  tzfail
-                    (Missing_companion_key_for_bls_dal
-                       (Consensus_key.pkh consensus_key))
-              | Some companion_pk -> (
-                  let dal_dependent_bls_pk_opt =
-                    Dal.Attestation.Dal_dependent_signing.aggregate_pk
-                      ~subgroup_check:false
-                        (* We disable subgroup check (for better
-                           performances) because the context only
-                           contains valid consensus and companion
-                           keys. *)
-                      ~consensus_pk:consensus_bls_pk
-                      ~companion_pk
-                      dal_attestation
-                  in
-                  match dal_dependent_bls_pk_opt with
+        [
+          (fun () ->
+            let open Result_syntax in
+            let* dal_dependent_pk =
+              match (consensus_key.Consensus_key.consensus_pk, dal_content) with
+              | Bls consensus_bls_pk, Some {attestation = dal_attestation}
+                when Constants.aggregate_attestation vi.ctxt -> (
+                  match consensus_key.companion_pk with
                   | None ->
                       tzfail
-                        Validate_errors.Consensus.Public_key_aggregation_failure
-                  | Some dal_dependent_bls_pk ->
-                      return
-                        (Signature.Bls dal_dependent_bls_pk
-                          : Signature.Public_key.t)))
-          | _ ->
-              (* When the feature flag is not set or the consensus key
-                 is non-BLS, we use the old behavior: the signed
-                 content (which includes the dal_content if any) is
-                 signed by the consensus key alone.
+                        (Missing_companion_key_for_bls_dal
+                           (Consensus_key.pkh consensus_key))
+                  | Some companion_pk -> (
+                      let dal_dependent_bls_pk_opt =
+                        Dal.Attestation.Dal_dependent_signing.aggregate_pk
+                          ~subgroup_check:false
+                            (* We disable subgroup check (for better
+                               performances) because the context only
+                               contains valid consensus and companion
+                               keys. *)
+                          ~consensus_pk:consensus_bls_pk
+                          ~companion_pk
+                          dal_attestation
+                      in
+                      match dal_dependent_bls_pk_opt with
+                      | None ->
+                          tzfail
+                            Validate_errors.Consensus
+                            .Public_key_aggregation_failure
+                      | Some dal_dependent_bls_pk ->
+                          return
+                            (Signature.Bls dal_dependent_bls_pk
+                              : Signature.Public_key.t)))
+              | _ ->
+                  (* When the feature flag is not set or the consensus key
+                     is non-BLS, we use the old behavior: the signed
+                     content (which includes the dal_content if any) is
+                     signed by the consensus key alone.
 
-                 When the dal_content is None (even with enabled
-                 feature flag and BLS consensus key), it is
-                 represented by [dal_dependent_pk =
-                 consensus_pk]. Notably, this allows a BLS consensus
-                 key without any associated companion key to still
-                 issue an attestation without DAL. *)
-              return consensus_key.consensus_pk
-        in
-        Operation.check_signature vi.ctxt dal_dependent_pk vi.chain_id operation
-      else ok_unit
+                     When the dal_content is None (even with enabled
+                     feature flag and BLS consensus key), it is
+                     represented by [dal_dependent_pk =
+                     consensus_pk]. Notably, this allows a BLS consensus
+                     key without any associated companion key to still
+                     issue an attestation without DAL. *)
+                  return consensus_key.consensus_pk
+            in
+            Operation.check_signature
+              vi.ctxt
+              dal_dependent_pk
+              vi.chain_id
+              operation);
+        ]
+      else []
     in
-    return attesting_power
+    return (attesting_power, check_signature)
 
   let check_attestation_conflict vs oph (operation : Kind.attestation operation)
       =
@@ -1012,9 +1026,10 @@ module Consensus = struct
     let (Single (Preattestation consensus_content)) =
       operation.protocol_data.contents
     in
-    let* attesting_power =
+    let* attesting_power, pending_checks =
       check_preattestation info ~check_signature operation
     in
+    let*? () = resolve_checks pending_checks in
     let*? () =
       check_construction_preattestation_round_consistency
         info
@@ -1039,7 +1054,10 @@ module Consensus = struct
   let validate_attestation ~check_signature info operation_state block_state oph
       operation =
     let open Lwt_result_syntax in
-    let* power = check_attestation info ~check_signature operation in
+    let* power, pending_checks =
+      check_attestation info ~check_signature operation
+    in
+    let*? () = resolve_checks pending_checks in
     let*? () =
       check_attestation_conflict operation_state oph operation
       |> wrap_attestation_conflict
@@ -1630,15 +1648,28 @@ module Voting = struct
         let*? () = check_count ~count_in_ctxt ~proposals_length in
         check_already_proposed vi.ctxt source proposals
     in
-    if check_signature then
-      (* Retrieving the public key should not fail as it *should* be
-         called after checking that the delegate is in the vote
-         listings (or is a testnet dictator), which implies that it
-         is a manager with a revealed key. *)
-      let* public_key = Contract.get_manager_key vi.ctxt source in
-      Lwt.return
-        (Operation.check_signature vi.ctxt public_key vi.chain_id operation)
-    else return_unit
+    let*! pk =
+      if check_signature then
+        (* Retrieving the public key should not fail as it *should* be
+           called after checking that the delegate is in the vote
+           listings (or is a testnet dictator), which implies that it
+           is a manager with a revealed key. *)
+        Lwt.map Option.some (Contract.get_manager_key vi.ctxt source)
+      else Lwt.return_none
+    in
+    let check_signature =
+      match pk with
+      | Some pk ->
+          [
+            (fun () ->
+              Result.map_e
+                (fun pk ->
+                  Operation.check_signature vi.ctxt pk vi.chain_id operation)
+                pk);
+          ]
+      | None -> []
+    in
+    return check_signature
 
   (** Check that a Proposals operation is compatible with previously
       validated operations in the current block/mempool.
@@ -1744,13 +1775,28 @@ module Voting = struct
     let* () = check_current_proposal vi.ctxt proposal in
     let* () = check_source_has_not_already_voted vi.ctxt source in
     let* () = check_in_listings vi.ctxt source in
-    when_ check_signature (fun () ->
-        (* Retrieving the public key cannot fail. Indeed, we have
-           already checked that the delegate is in the vote listings,
-           which implies that it is a manager with a revealed key. *)
-        let* public_key = Contract.get_manager_key vi.ctxt source in
-        Lwt.return
-          (Operation.check_signature vi.ctxt public_key vi.chain_id operation))
+    let*! pk =
+      if check_signature then
+        (* Retrieving the public key should not fail as it *should* be
+           called after checking that the delegate is in the vote
+           listings (or is a testnet dictator), which implies that it
+           is a manager with a revealed key. *)
+        Lwt.map Option.some (Contract.get_manager_key vi.ctxt source)
+      else Lwt.return_none
+    in
+    let check_signature =
+      match pk with
+      | Some pk ->
+          [
+            (fun () ->
+              Result.map_e
+                (fun pk ->
+                  Operation.check_signature vi.ctxt pk vi.chain_id operation)
+                pk);
+          ]
+      | None -> []
+    in
+    return check_signature
 
   (** Check that a Ballot operation is compatible with previously
       validated operations in the current block/mempool.
@@ -2484,16 +2530,19 @@ module Anonymous = struct
         (Invalid_drain_delegate_insufficient_funds_for_burn_or_fees
            {delegate; destination; min_amount})
     in
-    let*? () =
+    let check_signature =
       if check_signature then
-        Operation.check_signature
-          info.ctxt
-          active_pk.consensus_pk
-          info.chain_id
-          operation
-      else ok_unit
+        [
+          (fun () ->
+            Operation.check_signature
+              info.ctxt
+              active_pk.consensus_pk
+              info.chain_id
+              operation);
+        ]
+      else []
     in
-    return_unit
+    return check_signature
 
   let check_drain_delegate_conflict state oph
       (operation : Kind.drain_delegate Operation.t) =
@@ -3108,12 +3157,15 @@ module Manager = struct
         ~consume_gas_for_sig_check:(Some signature_checking_gas_cost)
         remaining_block_gas
     in
-    let*? () =
+    let check_signature =
       if check_signature then
-        Operation.check_signature vi.ctxt source_pk vi.chain_id operation
-      else ok_unit
+        [
+          (fun () ->
+            Operation.check_signature vi.ctxt source_pk vi.chain_id operation);
+        ]
+      else []
     in
-    return gas_used
+    return (gas_used, check_signature)
 
   let check_manager_operation_conflict (type kind) vs oph
       (operation : kind Kind.manager operation) =
@@ -3196,13 +3248,14 @@ module Manager = struct
   let validate_manager_operation ~check_signature info operation_state
       block_state oph operation =
     let open Lwt_result_syntax in
-    let* gas_used =
+    let* gas_used, pending_checks =
       check_manager_operation
         info
         ~check_signature
         operation
         block_state.remaining_block_gas
     in
+    let*? () = resolve_checks pending_checks in
     let*? () =
       check_manager_operation_conflict operation_state oph operation
       |> wrap_check_manager_operation_conflict operation
@@ -3359,19 +3412,22 @@ let begin_no_predecessor_info ctxt chain_id =
   init_validation_state ctxt Mempool chain_id ~predecessor_level_and_round:None
 
 let check_operation ?(check_signature = true) info (type kind)
-    (operation : kind operation) : unit tzresult Lwt.t =
+    (operation : kind operation) : (unit -> unit tzresult) list tzresult Lwt.t =
   let open Lwt_result_syntax in
+  let no_pending_checks :
+      (unit, error trace) result Lwt.t ->
+      ((unit -> unit tzresult) list, error trace) result Lwt.t =
+    Lwt.map @@ Result.map @@ fun () -> []
+  in
   match operation.protocol_data.contents with
   | Single (Preattestation _) ->
-      let* (_attesting_power : int) =
-        Consensus.check_preattestation info ~check_signature operation
-      in
-      return_unit
+      Lwt.map
+        (Result.map snd)
+        (Consensus.check_preattestation info ~check_signature operation)
   | Single (Attestation _) ->
-      let* (_attesting_power : int) =
-        Consensus.check_attestation info ~check_signature operation
-      in
-      return_unit
+      Lwt.map
+        (Result.map snd)
+        (Consensus.check_attestation info ~check_signature operation)
   | Single (Preattestations_aggregate _) ->
       tzfail Validate_errors.Consensus.Aggregate_in_mempool
   | Single (Attestations_aggregate _) ->
@@ -3380,44 +3436,46 @@ let check_operation ?(check_signature = true) info (type kind)
       Voting.check_proposals info ~check_signature operation
   | Single (Ballot _) -> Voting.check_ballot info ~check_signature operation
   | Single (Activate_account _) ->
-      Anonymous.check_activate_account info operation
+      Anonymous.check_activate_account info operation |> no_pending_checks
   | Single (Double_preattestation_evidence _) ->
       Anonymous.check_double_preattestation_evidence info operation
+      |> no_pending_checks
   | Single (Double_attestation_evidence _) ->
       Anonymous.check_double_attestation_evidence info operation
+      |> no_pending_checks
   | Single (Double_baking_evidence _) ->
-      Anonymous.check_double_baking_evidence info operation
+      Anonymous.check_double_baking_evidence info operation |> no_pending_checks
   | Single (Dal_entrapment_evidence _) ->
       Anonymous.check_dal_entrapment_evidence info operation
+      |> no_pending_checks
   | Single (Drain_delegate _) ->
       Anonymous.check_drain_delegate info ~check_signature operation
   | Single (Seed_nonce_revelation _) ->
-      Anonymous.check_seed_nonce_revelation info operation
-  | Single (Vdf_revelation _) -> Anonymous.check_vdf_revelation info operation
+      Anonymous.check_seed_nonce_revelation info operation |> no_pending_checks
+  | Single (Vdf_revelation _) ->
+      Anonymous.check_vdf_revelation info operation |> no_pending_checks
   | Single (Manager_operation _) ->
       let remaining_gas =
         Gas.Arith.fp (Constants.hard_gas_limit_per_block info.ctxt)
       in
-      let* (_remaining_gas : Gas.Arith.fp) =
-        Manager.check_manager_operation
-          info
-          ~check_signature
-          operation
-          remaining_gas
-      in
-      return_unit
+      Lwt.map
+        (Result.map snd)
+        (Manager.check_manager_operation
+           info
+           ~check_signature
+           operation
+           remaining_gas)
   | Cons (Manager_operation _, _) ->
       let remaining_gas =
         Gas.Arith.fp (Constants.hard_gas_limit_per_block info.ctxt)
       in
-      let* (_remaining_gas : Gas.Arith.fp) =
-        Manager.check_manager_operation
-          info
-          ~check_signature
-          operation
-          remaining_gas
-      in
-      return_unit
+      Lwt.map
+        (Result.map snd)
+        (Manager.check_manager_operation
+           info
+           ~check_signature
+           operation
+           remaining_gas)
   | Single (Failing_noop _) -> tzfail Validate_errors.Failing_noop_error
 
 let check_operation_conflict (type kind) operation_conflict_state oph
@@ -3671,7 +3729,10 @@ let validate_operation ?(check_signature = true)
             operation
       | Single (Proposals _) ->
           let open Voting in
-          let* () = check_proposals info ~check_signature operation in
+          let* pending_checks =
+            check_proposals info ~check_signature operation
+          in
+          let*? () = resolve_checks pending_checks in
           let*? () =
             check_proposals_conflict operation_state oph operation
             |> wrap_proposals_conflict
@@ -3680,7 +3741,8 @@ let validate_operation ?(check_signature = true)
           return {info; operation_state; block_state}
       | Single (Ballot _) ->
           let open Voting in
-          let* () = check_ballot info ~check_signature operation in
+          let* pending_checks = check_ballot info ~check_signature operation in
+          let*? () = resolve_checks pending_checks in
           let*? () =
             check_ballot_conflict operation_state oph operation
             |> wrap_ballot_conflict
@@ -3750,7 +3812,10 @@ let validate_operation ?(check_signature = true)
           return {info; operation_state; block_state}
       | Single (Drain_delegate _) ->
           let open Anonymous in
-          let* () = check_drain_delegate info ~check_signature operation in
+          let* pending_checks =
+            check_drain_delegate info ~check_signature operation
+          in
+          let*? () = resolve_checks pending_checks in
           let*? () =
             check_drain_delegate_conflict operation_state oph operation
             |> wrap_drain_delegate_conflict operation
