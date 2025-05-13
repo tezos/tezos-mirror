@@ -34,6 +34,7 @@ let merge
         listen_addr;
         public_addr;
         endpoint;
+        http_backup_uris;
         metrics_addr;
         profile;
         peers;
@@ -65,6 +66,11 @@ let merge
     public_addr = Option.value ~default:configuration.public_addr public_addr;
     expected_pow = Option.value ~default:configuration.expected_pow expected_pow;
     endpoint = Option.value ~default:configuration.endpoint endpoint;
+    http_backup_uris =
+      (* backup URIs from the CLI, if any, are favored over the ones in the
+         config file. *)
+      (if List.is_empty http_backup_uris then configuration.http_backup_uris
+       else http_backup_uris);
     profile;
     (* metrics are disabled unless a metrics_addr option is specified *)
     metrics_addr;

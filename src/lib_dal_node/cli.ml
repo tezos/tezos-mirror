@@ -120,7 +120,7 @@ module Term = struct
       & opt (some (p2p_point_arg ~default_port)) None
       & info ~docs ~doc ~docv:"ADDR[:PORT]" ["public-addr"])
 
-  let endpoint_arg =
+  let uri_arg =
     let open Cmdliner in
     let decoder string =
       try Uri.of_string string |> Result.ok
@@ -137,8 +137,17 @@ module Term = struct
     in
     Arg.(
       value
-      & opt (some endpoint_arg) None
+      & opt (some uri_arg) None
       & info ~docs ~doc ~docv:"URI" ["endpoint"; "E"])
+
+  let http_backup_uris =
+    let open Cmdliner in
+    let doc =
+      "List of HTTP base URIs to fetch missing DAL slots if they are \
+       unavailable locally or cannot be reconstructed from shards. This option \
+       can be specified multiple times to provide fallback sources."
+    in
+    Arg.(value & opt_all uri_arg [] & info ~doc ~docv:"URI" ["http-backup"])
 
   let ignore_l1_config_peers =
     let open Cmdliner in
@@ -367,10 +376,11 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
-       $ public_addr $ endpoint $ metrics_addr $ attester_profile
-       $ operator_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
-       $ verbose $ ignore_l1_config_peers))
+       $ public_addr $ endpoint $ http_backup_uris $ metrics_addr
+       $ attester_profile $ operator_profile $ observer_profile
+       $ bootstrap_profile $ peers $ history_mode $ service_name
+       $ service_namespace $ fetch_trusted_setup $ verbose
+       $ ignore_l1_config_peers))
 end
 
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
@@ -520,6 +530,7 @@ type options = {
   listen_addr : P2p_point.Id.t option;
   public_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
+  http_backup_uris : Uri.t list;
   profile : Profile_manager.unresolved_profile option;
   metrics_addr : P2p_point.Id.t option;
   peers : string list;
@@ -534,9 +545,9 @@ type options = {
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
-      endpoint metrics_addr attesters operators observers bootstrap_flag peers
-      history_mode service_name service_namespace fetch_trusted_setup verbose
-      ignore_l1_config_peers =
+      endpoint http_backup_uris metrics_addr attesters operators observers
+      bootstrap_flag peers history_mode service_name service_namespace
+      fetch_trusted_setup verbose ignore_l1_config_peers =
     let run profile =
       run
         subcommand
@@ -547,6 +558,7 @@ let make ~run =
           listen_addr;
           public_addr;
           endpoint;
+          http_backup_uris;
           profile;
           metrics_addr;
           peers;

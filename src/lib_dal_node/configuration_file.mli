@@ -52,6 +52,8 @@ type t = {
   expected_pow : float;
       (** The expected PoW difficulty level for the peers' identity. *)
   endpoint : Uri.t;  (** The endpoint of a Tezos L1 node. *)
+  http_backup_uris : Uri.t list;
+      (** Backup URIs to fetch slot data if missing and unrecoverable from shards. *)
   metrics_addr : P2p_point.Id.t option;
       (** The TCP address of the node's server used to export metrics. *)
   profile : Profile_manager.unresolved_profile;
