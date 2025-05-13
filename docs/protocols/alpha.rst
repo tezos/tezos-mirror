@@ -89,6 +89,9 @@ Bug Fixes
 Minor Changes
 -------------
 
+- Allow ``finalise_unstake`` to be performed by any account (:gl:`!17950`). This allows finalisation
+  of unstake requests to be done automatically by a third party - for example a finalisation bot.
+
 Internal
 --------
 
