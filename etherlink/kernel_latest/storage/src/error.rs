@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use rlp::DecoderError;
+use tezos_data_encoding::enc::BinError;
+use tezos_data_encoding::nom::error::DecodeError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
@@ -19,6 +21,10 @@ pub enum Error {
     RlpDecoderError(DecoderError),
     #[error("Storage error: error while reading a value (incorrect size). Expected {expected} but got {actual}")]
     InvalidLoadValue { expected: usize, actual: usize },
+    #[error("Storage error: Failed to encode a value with BinWriter: {0}")]
+    BinWriteError(String),
+    #[error("Storage error: Failed to decode a value with NomReader: {0}")]
+    NomReadError(String),
 }
 
 impl From<PathError> for Error {
@@ -35,5 +41,19 @@ impl From<RuntimeError> for Error {
 impl From<DecoderError> for Error {
     fn from(e: DecoderError) -> Self {
         Self::RlpDecoderError(e)
+    }
+}
+
+impl From<DecodeError<&[u8]>> for Error {
+    fn from(value: DecodeError<&[u8]>) -> Self {
+        let msg = format!("{:?}", value);
+        Self::NomReadError(msg)
+    }
+}
+
+impl From<BinError> for Error {
+    fn from(value: BinError) -> Self {
+        let msg = format!("{}", value);
+        Self::BinWriteError(msg)
     }
 }

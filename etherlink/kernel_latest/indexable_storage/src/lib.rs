@@ -39,6 +39,10 @@ pub enum IndexableStorageError {
     InvalidLoadValue { expected: usize, actual: usize },
     #[error("Storage error: index out of bound")]
     IndexOutOfBounds,
+    #[error("Storage error: Failed to encode a value with BinWriter: {0}")]
+    BinWriteError(String),
+    #[error("Storage error: Failed to decode a value with NomReader: {0}")]
+    NomReadError(String),
 }
 
 impl From<GenStorageError> for IndexableStorageError {
@@ -52,6 +56,12 @@ impl From<GenStorageError> for IndexableStorageError {
             }
             GenStorageError::InvalidLoadValue { expected, actual } => {
                 IndexableStorageError::InvalidLoadValue { expected, actual }
+            }
+            GenStorageError::NomReadError(msg) => {
+                IndexableStorageError::NomReadError(msg)
+            }
+            GenStorageError::BinWriteError(msg) => {
+                IndexableStorageError::BinWriteError(msg)
             }
         }
     }

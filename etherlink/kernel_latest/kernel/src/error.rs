@@ -77,6 +77,11 @@ pub enum EncodingError {
     Entrypoint(EntrypointError),
     #[error("Invalid serialization")]
     Bin(BinError),
+    // BinWriter error comes from the storage crate wich need to
+    // implement PartialEq + Display which is why we're keeping a
+    // String instead of a BinError
+    #[error("Storage error: Failed to encode a value with BinWriter: {0}")]
+    BinWriterError(String),
 }
 
 #[derive(Error, Debug)]
@@ -90,6 +95,8 @@ pub enum Error {
     InvalidConversion,
     #[error("Failed to decode: {0}")]
     RlpDecoderError(DecoderError),
+    #[error("Storage error: Failed to decode a value with NomReader: {0}")]
+    NomReadError(String),
     #[error("Invalid parsing")]
     InvalidParsing,
     #[error(transparent)]
@@ -208,6 +215,10 @@ impl From<IndexableStorageError> for Error {
             IndexableStorageError::InvalidLoadValue { expected, actual } => {
                 Error::Storage(StorageError::InvalidLoadValue { expected, actual })
             }
+            IndexableStorageError::BinWriteError(msg) => {
+                Error::Encoding(EncodingError::BinWriterError(msg))
+            }
+            IndexableStorageError::NomReadError(msg) => Error::NomReadError(msg),
         }
     }
 }
@@ -222,6 +233,10 @@ impl From<GenStorageError> for Error {
             GenStorageError::InvalidLoadValue { expected, actual } => {
                 Error::Storage(StorageError::InvalidLoadValue { expected, actual })
             }
+            GenStorageError::BinWriteError(msg) => {
+                Error::Encoding(EncodingError::BinWriterError(msg))
+            }
+            GenStorageError::NomReadError(msg) => Error::NomReadError(msg),
         }
     }
 }
