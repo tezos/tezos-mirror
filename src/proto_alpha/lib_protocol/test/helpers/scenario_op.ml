@@ -658,3 +658,35 @@ let make_denunciations ?single ?rev ?filter () =
 (** Create an account and give an initial balance funded by [funder] *)
 let add_account_with_funds ?algo name ~funder amount =
   add_account ?algo name --> transfer funder name amount --> reveal name
+
+let batch ~source : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec_state (fun (_, state) ->
+      Log.info ~color:batch_color "[--- Batch for %s ---]" source ;
+      return
+        {state with State.source_batch = Some source; operation_mode = Batch})
+
+let add_batch_to_operations ?(mode_after = State.Bake) ((block, state) : t) :
+    State.t tzresult Lwt.t =
+  let open State in
+  let open Lwt_result_syntax in
+  let ops = state.pending_batch in
+  let source = find_account (Stdlib.Option.get state.source_batch) state in
+  let* batch =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:source.contract
+      (B block)
+      ops
+  in
+  let state = add_pending_operations [batch] state in
+  return {state with source_batch = None; operation_mode = mode_after}
+
+let end_batch ?(bake_after = false) ?(mode_after = State.Bake) () :
+    (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec_unit (fun _ ->
+      Log.info ~color:batch_color "[--- End Batch ---]" ;
+      return_unit)
+  --> exec_state (add_batch_to_operations ~mode_after)
+  --> if bake_after then next_block else noop

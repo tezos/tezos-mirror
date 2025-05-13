@@ -17,6 +17,8 @@ let warning_color = Log.Color.FG.red
 
 let low_debug_color = Log.Color.FG.gray
 
+let batch_color = Log.Color.(BG.green ++ FG.black)
+
 let assert_block_color = Log.Color.(BG.blue ++ FG.gray)
 
 let tez_color = Log.Color.FG.bright_white

@@ -16,6 +16,8 @@ type double_signing_state = {
   misbehaviour : Protocol.Misbehaviour_repr.t;
 }
 
+type operation_mode = Batch | Wait | Bake
+
 (** Type of the state *)
 type t = {
   account_map : account_map;
@@ -29,11 +31,14 @@ type t = {
   saved_rate : Q.t option;
   burn_rewards : bool;
   pending_operations : Protocol.Alpha_context.packed_operation list;
+  pending_batch : Protocol.Alpha_context.packed_operation list;
+  source_batch : string option;
   pending_slashes :
     (Signature.Public_key_hash.t * Protocol.Denunciations_repr.item) list;
   double_signings : double_signing_state list;
   force_attest_all : bool;
   check_finalized_block : Block.t * t -> unit tzresult Lwt.t;
+  operation_mode : operation_mode;
 }
 
 (** Expected number of cycles before staking parameters get applied *)
@@ -236,3 +241,6 @@ let add_pending_operations operations state =
 
 let pop_pending_operations state =
   ({state with pending_operations = []}, state.pending_operations)
+
+let add_pending_batch operations state =
+  {state with pending_batch = state.pending_batch @ operations}
