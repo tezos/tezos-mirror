@@ -313,6 +313,19 @@ module Deposits = struct
       where exec_transactionHash IS NULL
       ORDER BY nonce DESC
       |sql}
+
+    let set_claimed =
+      (t2 execution_info level ->. unit)
+      @@ {sql|
+      UPDATE deposits
+      SET
+        exec_transactionHash = ?,
+        exec_transactionIndex = ?,
+        exec_blockHash = ?,
+        exec_blockNumber = ?
+      WHERE
+        nonce = ?
+      |sql}
   end
 
   let store ?conn db deposit log_info =
@@ -322,6 +335,10 @@ module Deposits = struct
   let get_unclaimed ?conn db =
     with_connection db conn @@ fun conn ->
     Sqlite.Db.rev_collect_list conn Q.unclaimed ()
+
+  let set_claimed ?conn db nonce execution_info =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.set_claimed (execution_info, nonce)
 end
 
 module Pointers = struct

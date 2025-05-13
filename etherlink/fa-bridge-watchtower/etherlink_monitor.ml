@@ -432,8 +432,7 @@ let handle_confirmed_txs {db; ws_client; _}
                blockNumber = b.number;
              }
          in
-         (* TODO: set claimed in DB *)
-         ignore (db, nonce, exec) ;
+         let* () = Db.Deposits.set_claimed db nonce exec in
          let* () = Tx_queue.confirm tx_hash in
          return_unit
      | _ -> return_unit
