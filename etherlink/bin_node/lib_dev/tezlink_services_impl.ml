@@ -106,14 +106,14 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
 
     let current_block_number = Z.to_int32 current_block_number in
 
-    let constants = Tezlink_constants.mainnet in
+    let constants = Tezlink_constants.all_constants in
     let level = Int32.add current_block_number offset in
     return
       Tezos_types.
         {
           level;
-          cycle = Int32.div level constants.blocks_per_cycle;
-          cycle_position = Int32.rem level constants.blocks_per_cycle;
+          cycle = Int32.div level constants.parametric.blocks_per_cycle;
+          cycle_position = Int32.rem level constants.parametric.blocks_per_cycle;
         }
 
   let constants chain block =
@@ -137,35 +137,7 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
       | `Head _ -> return_unit
       | _ -> failwith "Unsupported block"
     in
-
-    let fixed_values =
-      Tezlink_constants.
-        ( ( proof_of_work_nonce_size,
-            nonce_length,
-            max_anon_ops_per_block,
-            max_operation_data_length,
-            max_proposals_per_delegate,
-            max_micheline_node_count,
-            max_micheline_bytes_limit,
-            max_allowed_global_constant_depth,
-            cache_layout_size,
-            michelson_maximum_type_size ),
-          ( max_slashing_period,
-            sc_max_wrapped_proof_binary_size,
-            sc_rollup_message_size_limit,
-            sc_rollup_max_number_of_messages_per_level ) )
-    in
-
-    let* fixed =
-      match Tezlink_constants.values_to_fixed fixed_values with
-      | Ok fixed -> return fixed
-      | Error err ->
-          failwith
-            "Failed to get fixed constants: %a"
-            Error_monad.pp_print_trace
-            err
-    in
-    return Tezlink_constants.{fixed; parametric = Tezlink_constants.mainnet}
+    return Tezlink_constants.all_constants
 
   let read p =
     let open Lwt_result_syntax in
