@@ -86,7 +86,7 @@ tezt:
     TESTS: /ci_disabled && /memory_3k && /memory_4k && /time_sensitive && /slow &&
       /cloud && /flaky
     TEZT_RETRY: "1"
-    TEZT_PARALLEL: "3"
+    TEZT_PARALLEL: "6"
     TEZT_NO_NPX: "true"
   artifacts:
     expire_in: 7 days
@@ -100,7 +100,7 @@ tezt:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 100
+  parallel: 50
 
 tezt-memory-3k:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
