@@ -136,7 +136,7 @@ let commands () =
       @@ Client_keys.Secret_key.source_param @@ stop)
       (fun () sk_uri (cctxt : #Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let* proof = Client_keys.bls_prove_possession sk_uri in
+        let* proof = Client_keys.bls_prove_possession cctxt sk_uri in
         let*! () = cctxt#message "%a" Signature.Bls.pp proof in
         return_unit);
     command

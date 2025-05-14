@@ -538,3 +538,6 @@ let aggregate_public_key_weighted_opt ?subgroup_check pks_with_weights =
   List.map (function w, Public_key.Bls12_381 s -> (w, s)) pks_with_weights
   |> Bls.aggregate_public_key_weighted_opt ?subgroup_check
   |> Option.map (fun s -> Public_key.Bls12_381 s)
+
+let pop_verify (Bls12_381 pubkey : public_key) proof =
+  Bls12_381_signature.MinPk.Pop.pop_verify pubkey proof

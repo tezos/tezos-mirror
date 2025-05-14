@@ -239,7 +239,10 @@ module type S = sig
     Bytes.t ->
     bool tzresult Lwt.t
 
-  val bls_prove_possession : sk_uri -> Tezos_crypto.Signature.Bls.t tzresult Lwt.t
+  val bls_prove_possession :
+    #Client_context.wallet ->
+    sk_uri ->
+    Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 
   val deterministic_nonce : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 

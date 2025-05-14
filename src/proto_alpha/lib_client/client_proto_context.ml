@@ -336,13 +336,13 @@ let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
     ~fee_parameter
     opt_delegate
 
-let build_update_consensus_key ?fee ?gas_limit ?storage_limit ?secret_key_uri
-    ~kind public_key =
+let build_update_consensus_key cctxt ?fee ?gas_limit ?storage_limit
+    ?secret_key_uri ~kind public_key =
   let open Lwt_result_syntax in
   let* proof =
     match ((public_key : Signature.public_key), secret_key_uri) with
     | Bls _, Some secret_key_uri ->
-        let* proof = Client_keys.bls_prove_possession secret_key_uri in
+        let* proof = Client_keys.bls_prove_possession cctxt secret_key_uri in
         return_some proof
     | _ -> return_none
   in
@@ -391,7 +391,7 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
           else Companion
         in
         let+ operation_content =
-          build_update_consensus_key ~kind ?fee ?secret_key_uri public_key
+          build_update_consensus_key cctxt ~kind ?fee ?secret_key_uri public_key
         in
         Annotated_manager_operation.Cons_manager
           ( delegate_op,
@@ -429,6 +429,7 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
       let* operation =
         let* operation_consensus =
           build_update_consensus_key
+            cctxt
             ~kind:Consensus
             ?fee
             ?secret_key_uri:secret_key_uri_consensus
@@ -436,6 +437,7 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
         in
         let* operation_companion =
           build_update_consensus_key
+            cctxt
             ~kind:Companion
             ?fee
             ?secret_key_uri:secret_key_uri_companion
@@ -491,7 +493,7 @@ let update_consensus_or_companion_key ~kind cctxt ~chain ~block ?confirmations
   let open Lwt_result_syntax in
   let source = Signature.Public_key.hash src_pk in
   let* operation =
-    build_update_consensus_key ?fee ?secret_key_uri ~kind public_key
+    build_update_consensus_key cctxt ?fee ?secret_key_uri ~kind public_key
   in
   let operation = Annotated_manager_operation.Single_manager operation in
   let* oph, _, op, result =

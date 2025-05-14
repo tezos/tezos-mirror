@@ -153,23 +153,40 @@ let make_sk_uri (x : Uri.t) : sk_uri tzresult =
       tzfail (Exn (Failure "Error while parsing URI: SK_URI needs a scheme"))
   | Some _ -> return x
 
-type error += Signature_mismatch of sk_uri
+type signer_output = Signature | Proof_of_possession
+
+let signer_output_pp fmt out =
+  Format.fprintf
+    fmt
+    "%s"
+    (match out with
+    | Signature -> "signature"
+    | Proof_of_possession -> "proof of possession")
+
+let signer_output_encoding =
+  Data_encoding.string_enum
+    [("Signature", Signature); ("Proof of possession", Proof_of_possession)]
+
+type error += Signer_output_mismatch of signer_output * sk_uri
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"cli.signature_mismatch"
-    ~title:"Signature mismatch"
-    ~description:"The signer produced an invalid signature"
-    ~pp:(fun ppf sk ->
+    ~id:"cli.signer_output_mismatch"
+    ~title:"Signer output mismatch"
+    ~description:"The signer produced an invalid output"
+    ~pp:(fun ppf (out, sk) ->
       Format.fprintf
         ppf
-        "The signer for %a produced an invalid signature"
+        "The signer for %a produced an invalid %a"
         Uri.pp_hum
-        sk)
-    Data_encoding.(obj1 (req "locator" uri_encoding))
-    (function Signature_mismatch sk -> Some sk | _ -> None)
-    (fun sk -> Signature_mismatch sk)
+        sk
+        signer_output_pp
+        out)
+    Data_encoding.(
+      obj2 (req "output" signer_output_encoding) (req "locator" uri_encoding))
+    (function Signer_output_mismatch (out, sk) -> Some (out, sk) | _ -> None)
+    (fun (out, sk) -> Signer_output_mismatch (out, sk))
 
 type sapling_uri = Uri.t
 
@@ -418,7 +435,10 @@ module type S = sig
     Bytes.t ->
     bool tzresult Lwt.t
 
-  val bls_prove_possession : sk_uri -> Tezos_crypto.Signature.Bls.t tzresult Lwt.t
+  val bls_prove_possession :
+    #Client_context.wallet ->
+    sk_uri ->
+    Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 
   val deterministic_nonce : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
@@ -722,13 +742,36 @@ module Make (Signature : Signature_S) :
         let* () =
           fail_unless
             (Signature.check ?watermark pubkey signature buf)
-            (Signature_mismatch sk_uri)
+            (Signer_output_mismatch (Signature, sk_uri))
         in
         return signature)
 
-  let bls_prove_possession sk_uri =
+  let bls_prove_possession cctxt sk_uri =
+    let open Lwt_result_syntax in
     with_scheme_simple_signer sk_uri (fun (module Signer) ->
-        Signer.bls_prove_possession sk_uri)
+        let* proof = Signer.bls_prove_possession sk_uri in
+        let* pk_uri = Signer.neuterize sk_uri in
+        let* pubkey =
+          let* o = Secret_key.rev_find cctxt sk_uri in
+          match o with
+          | None -> public_key pk_uri
+          | Some name -> (
+              let* r = Public_key.find cctxt name in
+              match r with
+              | _, None ->
+                  let* pk = public_key pk_uri in
+                  let* () = Public_key.update cctxt name (pk_uri, Some pk) in
+                  return pk
+              | _, Some pubkey -> return pubkey)
+        in
+        let* () =
+          fail_unless
+            (Signature.pop_verify
+               pubkey
+               (Tezos_crypto.Signature.Bls.to_bytes proof))
+            (Signer_output_mismatch (Proof_of_possession, sk_uri))
+        in
+        return proof)
 
   let append cctxt ?watermark loc buf =
     let open Lwt_result_syntax in
