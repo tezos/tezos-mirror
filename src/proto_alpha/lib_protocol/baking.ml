@@ -117,7 +117,7 @@ let attesting_rights_by_first_slot ctxt level :
     Slot.Range.create ~min:0 ~count:(Constants.consensus_committee_size ctxt)
   in
   let number_of_shards = Constants.dal_number_of_shards ctxt in
-  let* ctxt, (_, slots_map) =
+  let* ctxt, (delegates_map, slots_map) =
     Slot.Range.fold_es
       (fun (ctxt, (delegates_map, slots_map)) slot ->
         let+ ctxt, consensus_key =
@@ -153,7 +153,7 @@ let attesting_rights_by_first_slot ctxt level :
                       attestation_power =
                         {
                           Attestation_power_repr.slots = 1;
-                          (* TODO *) stake = 0L;
+                          (* built at a later step *) stake = 0L;
                         };
                       dal_power = in_dal_committee;
                     }
@@ -164,7 +164,6 @@ let attesting_rights_by_first_slot ctxt level :
                     {
                       consensus_key;
                       attestation_power =
-                        (* TODO *)
                         {
                           attestation_power with
                           slots = attestation_power.slots + 1;
@@ -176,5 +175,28 @@ let attesting_rights_by_first_slot ctxt level :
         (ctxt, (delegates_map, slots_map)))
       (ctxt, (Signature.Public_key_hash.Map.empty, Slot.Map.empty))
       slots
+  in
+  let* ctxt, _, stake_info_list = Stake_distribution.stake_info ctxt level in
+  let slots_map =
+    List.fold_left
+      (fun acc ((consensus_pk, weight) : Consensus_key.pk * Int64.t) ->
+        match
+          Signature.Public_key_hash.Map.find consensus_pk.delegate delegates_map
+        with
+        | None -> acc
+        | Some slot -> (
+            match Slot.Map.find slot slots_map with
+            | None -> acc (* Impossible by construction *)
+            | Some v ->
+                Slot.Map.add
+                  slot
+                  {
+                    v with
+                    attestation_power =
+                      {v.attestation_power with stake = weight};
+                  }
+                  acc))
+      Slot.Map.empty
+      stake_info_list
   in
   return (ctxt, slots_map)
