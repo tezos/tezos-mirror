@@ -248,6 +248,76 @@ let test_update_companion_key_without_consensus_key =
   in
   unit
 
+let test_update_companion_key_for_tz4_delegate =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"update companion key for tz4 delegate"
+    ~tags:[team; "companion_key"]
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* _node, client = init_node_and_client ~protocol in
+  (* gen keys delegate -s bls *)
+  (* transfer 1000000 from bootstrap2 to delegate *)
+  let* delegate =
+    Client.gen_and_show_keys ~alias:"delegate" ~sig_alg:"bls" client
+  in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 1_000_000)
+      ~giver:Constant.bootstrap2.alias
+      ~receiver:delegate.public_key_hash
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* set delegate for delegate to delegate *)
+  let*! () =
+    Client.set_delegate ~src:delegate.alias ~delegate:delegate.alias client
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* stake 800000 for delegate *)
+  let* () = Client.stake ~staker:delegate.alias (Tez.of_int 800_000) client in
+  let* () = Client.bake_for_and_wait client in
+  (* gen keys companion_key -s bls *)
+  (* set companion key for delegate to companion_key *)
+  let* companion_key_bls =
+    Client.gen_and_show_keys ~alias:"companion_key" ~sig_alg:"bls" client
+  in
+  Log.info "Updating companion key" ;
+  let* () =
+    Client.update_companion_key
+      ~src:delegate.alias
+      ~pk:companion_key_bls.alias
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  Log.info "Waiting for companion key activation" ;
+  let* () = bake_n_cycles (consensus_rights_delay + 1) client in
+
+  Log.info "Checking key is activated" ;
+  let* () =
+    check_companion_key
+      ~__LOC__
+      delegate
+      ~expected_active:companion_key_bls
+      client
+  in
+  let* () =
+    check_validators_companion_key ~__LOC__ delegate ~expected:None client
+  in
+  let* current_level = get_current_level client in
+  let* () =
+    check_validators_companion_key
+      ~__LOC__
+      ~level:(current_level.level + 1)
+      delegate
+      ~expected:(Some companion_key_bls.public_key_hash)
+      client
+  in
+  unit
+
 let register ~protocols =
   test_update_companion_key protocols ;
-  test_update_companion_key_without_consensus_key protocols
+  test_update_companion_key_without_consensus_key protocols ;
+  test_update_companion_key_for_tz4_delegate protocols
