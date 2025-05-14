@@ -263,6 +263,8 @@
   "int_00.tc.tzt": true,
   "int_nat_00.tzt": true,
   "int_nat_01.tzt": true,
+  "is_implicit_account_00.tzt": false,
+  "is_implicit_account_01.tzt": false,
   "isnat_00.tzt": true,
   "isnat_01.tzt": true,
   "iter_00.tc.tzt": true,

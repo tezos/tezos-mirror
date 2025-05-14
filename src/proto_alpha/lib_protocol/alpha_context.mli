@@ -603,6 +603,7 @@ module Script : sig
     | I_CREATE_ACCOUNT
     | I_CREATE_CONTRACT
     | I_IMPLICIT_ACCOUNT
+    | I_IS_IMPLICIT_ACCOUNT
     | I_DIP
     | I_DROP
     | I_DUP

@@ -1059,6 +1059,21 @@ let test_bitwise =
       ("bytes_of_int", "Unit", "Unit", "Unit");
     ]
 
+let test_is_implicit =
+  register_opcode_tests
+    ~supports:(Protocol.From_protocol 23)
+    [
+      (* Test IS_IMPLICIT_ACCOUNT instruction *)
+      ( "is_implicit_account",
+        "None",
+        {|"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"|},
+        {|(Some "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")|} );
+      ( "is_implicit_account",
+        "None",
+        {|"KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"|},
+        "None" );
+    ]
+
 let iter l f = Lwt_list.iter_s f l
 
 let run_script_and_check ?(trace_stack = true) ?balance ?now ?level ~storage
@@ -1496,6 +1511,7 @@ let test_map_map_side_effect protocol client =
 let register ~protocols =
   test_protocol_independent protocols ;
   test_bitwise protocols ;
+  test_is_implicit protocols ;
   List.iter
     (fun (test_opcode_name, test_function) ->
       Protocol.register_regression_test

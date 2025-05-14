@@ -1270,6 +1270,14 @@ module Raw = struct
               let key = accu in
               let res = Typed_implicit key in
               (step [@ocaml.tailcall]) g gas k ks res stack
+          | IIs_implicit_account (_, k) ->
+              let (address : address) = accu in
+              let res =
+                match address.destination with
+                | Contract (Implicit pkh) -> Some pkh
+                | _ -> None
+              in
+              (step [@ocaml.tailcall]) g gas k ks res stack
           | IView (_, view_signature, stack_ty, k) ->
               (iview [@ocaml.tailcall])
                 id

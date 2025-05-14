@@ -72,6 +72,7 @@ type prim =
   | I_CREATE_ACCOUNT
   | I_CREATE_CONTRACT
   | I_IMPLICIT_ACCOUNT
+  | I_IS_IMPLICIT_ACCOUNT
   | I_DIP
   | I_DROP
   | I_DUP
@@ -216,11 +217,11 @@ let namespace = function
   | I_CREATE_CONTRACT | I_DIG | I_DIP | I_DROP | I_DUG | I_DUP | I_VIEW | I_EDIV
   | I_EMPTY_BIG_MAP | I_EMPTY_MAP | I_EMPTY_SET | I_EQ | I_EXEC | I_FAILWITH
   | I_GE | I_GET | I_GET_AND_UPDATE | I_GT | I_HASH_KEY | I_IF | I_IF_CONS
-  | I_IF_LEFT | I_IF_NONE | I_IMPLICIT_ACCOUNT | I_INT | I_ISNAT | I_ITER
-  | I_JOIN_TICKETS | I_KECCAK | I_LAMBDA | I_LAMBDA_REC | I_LE | I_LEFT
-  | I_LEVEL | I_LOOP | I_LOOP_LEFT | I_LSL | I_LSR | I_LT | I_MAP | I_MEM
-  | I_MUL | I_NEG | I_NEQ | I_NEVER | I_NIL | I_NONE | I_NOT | I_NOW
-  | I_MIN_BLOCK_TIME | I_OR | I_PACK | I_PAIR | I_PAIRING_CHECK | I_PUSH
+  | I_IF_LEFT | I_IF_NONE | I_IMPLICIT_ACCOUNT | I_IS_IMPLICIT_ACCOUNT | I_INT
+  | I_ISNAT | I_ITER | I_JOIN_TICKETS | I_KECCAK | I_LAMBDA | I_LAMBDA_REC
+  | I_LE | I_LEFT | I_LEVEL | I_LOOP | I_LOOP_LEFT | I_LSL | I_LSR | I_LT
+  | I_MAP | I_MEM | I_MUL | I_NEG | I_NEQ | I_NEVER | I_NIL | I_NONE | I_NOT
+  | I_NOW | I_MIN_BLOCK_TIME | I_OR | I_PACK | I_PAIR | I_PAIRING_CHECK | I_PUSH
   | I_READ_TICKET | I_RENAME | I_RIGHT | I_SAPLING_EMPTY_STATE
   | I_SAPLING_VERIFY_UPDATE | I_SELF | I_SELF_ADDRESS | I_SENDER
   | I_SET_DELEGATE | I_SHA256 | I_SHA512 | I_SHA3 | I_SIZE | I_SLICE | I_SOME
@@ -286,6 +287,7 @@ let string_of_prim = function
   | I_CREATE_ACCOUNT -> "CREATE_ACCOUNT"
   | I_CREATE_CONTRACT -> "CREATE_CONTRACT"
   | I_IMPLICIT_ACCOUNT -> "IMPLICIT_ACCOUNT"
+  | I_IS_IMPLICIT_ACCOUNT -> "IS_IMPLICIT_ACCOUNT"
   | I_DIP -> "DIP"
   | I_DROP -> "DROP"
   | I_DUP -> "DUP"
@@ -448,6 +450,7 @@ let prim_of_string =
   | "CREATE_ACCOUNT" -> return I_CREATE_ACCOUNT
   | "CREATE_CONTRACT" -> return I_CREATE_CONTRACT
   | "IMPLICIT_ACCOUNT" -> return I_IMPLICIT_ACCOUNT
+  | "IS_IMPLICIT_ACCOUNT" -> return I_IS_IMPLICIT_ACCOUNT
   | "DIP" -> return I_DIP
   | "DROP" -> return I_DROP
   | "DUP" -> return I_DUP
@@ -799,6 +802,9 @@ let prim_encoding =
          ("NAT", I_NAT);
          (* Alpha_019 addition *)
          ("Ticket", D_Ticket);
+         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
+         (* Alpha_023 addition *)
+         ("IS_IMPLICIT_ACCOUNT", I_IS_IMPLICIT_ACCOUNT);
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
        ]

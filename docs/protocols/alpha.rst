@@ -41,6 +41,12 @@ Data Availability Layer
 Adaptive Issuance
 -----------------
 
+Michelson
+---------
+
+- A new instruction named ``IS_IMPLICIT_ACCOUNT`` has been added, it
+  provides a conversion from type ``address`` to type
+  ``key_hash``. (MR :gl:`!12436`)
 
 Gas improvements
 ----------------

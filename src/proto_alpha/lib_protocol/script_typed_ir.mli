@@ -886,6 +886,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IImplicit_account :
       Script.location * (unit typed_contract, 'S, 'r, 'F) kinstr
       -> (public_key_hash, 'S, 'r, 'F) kinstr
+  | IIs_implicit_account :
+      Script.location * (public_key_hash option, 'S, 'r, 'F) kinstr
+      -> (address, 'S, 'r, 'F) kinstr
   | ICreate_contract : {
       loc : Script.location;
       storage_type : ('a, _) ty;
@@ -1802,6 +1805,8 @@ val contract_t :
   Script.location -> ('arg, _) ty -> ('arg typed_contract, no) ty tzresult
 
 val contract_unit_t : (unit typed_contract, no) ty
+
+val key_hash_option_t : (public_key_hash option, yes) ty
 
 val sapling_transaction_t :
   memo_size:Sapling.Memo_size.t -> (Sapling.transaction, no) ty

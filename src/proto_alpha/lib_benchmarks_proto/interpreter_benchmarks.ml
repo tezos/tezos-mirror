@@ -3016,6 +3016,13 @@ module Registration_section = struct
 
     let () =
       simple_time_alloc_benchmark
+        ~name:Interpreter_workload.N_IIs_implicit_account
+        ~stack_type:(address @$ bot)
+        ~kinstr:(IIs_implicit_account (dummy_loc, halt))
+        ()
+
+    let () =
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_ICreate_contract
         ~stack_type:(option key_hash @$ mutez @$ unit @$ bot)
         ~kinstr:
