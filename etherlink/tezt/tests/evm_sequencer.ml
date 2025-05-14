@@ -13568,6 +13568,92 @@ let test_fa_deposit_can_be_claimed =
 
   unit
 
+let test_eip2930_storage_access =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "eip2930"]
+    ~title:"Check EIP-2930's semantic correctness"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let* eip2930_storage_access =
+    Solidity_contracts.eip2930_storage_access evm_version
+  in
+  let* eip2930_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:eip2930_storage_access.abi
+         ~bin:eip2930_storage_access.bin)
+      sequencer
+  in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let base_tx ~nonce ~access_list ~arg =
+    Cast.craft_tx
+      ~signature:"setValue(uint256)"
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas:100_000
+      ~gas_price
+      ~value:Wei.zero
+      ~access_list
+      ~address:eip2930_contract
+      ~arguments:[arg]
+      ~legacy:false
+      ()
+  in
+  let* raw_tx_with_storage_slot_access_list =
+    base_tx
+      ~nonce:1
+      ~access_list:
+        [
+          ( eip2930_contract,
+            (* slot 0 =  [uint256 public value] in [eip2930_storage_access.sol] *)
+            [
+              "0x0000000000000000000000000000000000000000000000000000000000000000";
+            ] );
+        ]
+      ~arg:"42"
+  in
+  let* raw_tx_without_storage_slot_access_list =
+    base_tx ~nonce:2 ~access_list:[(eip2930_contract, [])] ~arg:"43"
+  in
+  let*@ tx_with_storage_slot_access_list_hash =
+    Rpc.send_raw_transaction
+      ~raw_tx:raw_tx_with_storage_slot_access_list
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let*@ tx_without_storage_slot_access_list_hash =
+    Rpc.send_raw_transaction
+      ~raw_tx:raw_tx_without_storage_slot_access_list
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let*@! Transaction.{gasUsed = gas_with_storage_slot_access_list; _} =
+    Rpc.get_transaction_receipt
+      ~tx_hash:tx_with_storage_slot_access_list_hash
+      sequencer
+  in
+  let*@! Transaction.{gasUsed = gas_without_storage_slot_access_list; _} =
+    Rpc.get_transaction_receipt
+      ~tx_hash:tx_without_storage_slot_access_list_hash
+      sequencer
+  in
+  Check.(
+    Int64.(
+      sub gas_without_storage_slot_access_list gas_with_storage_slot_access_list
+      = of_int 200)
+      int64)
+    ~error_msg:
+      "The gas consumption with the preheated slot should have saved exactly \
+       %R but got %L" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -13754,4 +13840,5 @@ let () =
   test_tezlink_hash_rpc [Alpha] ;
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
-  test_fa_deposit_can_be_claimed [Alpha]
+  test_fa_deposit_can_be_claimed [Alpha] ;
+  test_eip2930_storage_access [Alpha]
