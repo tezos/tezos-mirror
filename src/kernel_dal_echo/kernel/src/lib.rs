@@ -27,7 +27,7 @@ fn process_slot(
         );
 
         match result {
-            Ok(num) if num == 0 => {
+            Ok(0) => {
                 // Currently, we send empty pages to kernels for non-attested slots.
                 debug_msg!(
                     host,

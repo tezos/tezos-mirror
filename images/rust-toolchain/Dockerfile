@@ -45,27 +45,6 @@ RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 1.80.1 1.84.1 1.86.0 nightly-2025-
     rustup component add --toolchain=nightly-2025-01-30 rustfmt miri rust-src && \
     rustup component add --toolchain=nightly-2023-12-15 rust-src llvm-tools
 
-# Install Rust 1.73.0 standard library for riscv64gc-unknown-hermit
-RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.73.0/rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz" -o rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz \
-    && (echo 65980ab1110081a6b7edd70b45bebe63a50e34a6e1555d6fc000c35360907547 rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz | sha256sum -c) \
-    && tar xf rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz \
-    && rust-std-1.73.0-riscv64gc-unknown-hermit/install.sh \
-    && rm -r rust-std-1.73.0-riscv64gc-unknown-hermit rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz
-
-# Install Rust 1.78.0 standard library for riscv64gc-unknown-hermit
-RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.78.0/rust-std-1.78.0-riscv64gc-unknown-hermit.tar.gz" -o rust-std-1.78.0-riscv64gc-unknown-hermit.tar.gz \
-    && (echo a4454f71a021b7af62f00b527cd6da28832e93728b606f6c4964c6c2c04789f0 rust-std-1.78.0-riscv64gc-unknown-hermit.tar.gz | sha256sum -c) \
-    && tar xf rust-std-1.78.0-riscv64gc-unknown-hermit.tar.gz \
-    && rust-std-1.78.0-riscv64gc-unknown-hermit/install.sh \
-    && rm -r rust-std-1.78.0-riscv64gc-unknown-hermit rust-std-1.78.0-riscv64gc-unknown-hermit.tar.gz
-
-# Install Rust 1.80.1 standard library for riscv64gc-unknown-hermit
-RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.80.1/rust-std-1.80.1-riscv64gc-unknown-hermit.tar.gz" -o rust-std-1.80.1-riscv64gc-unknown-hermit.tar.gz \
-    && (echo 9fc4e10aa629c87fd3aa09ffee57349d7d354364dbe8e0a128ebd94ccb30bac7 rust-std-1.80.1-riscv64gc-unknown-hermit.tar.gz | sha256sum -c) \
-    && tar xf rust-std-1.80.1-riscv64gc-unknown-hermit.tar.gz \
-    && rust-std-1.80.1-riscv64gc-unknown-hermit/install.sh \
-    && rm -r rust-std-1.80.1-riscv64gc-unknown-hermit rust-std-1.80.1-riscv64gc-unknown-hermit.tar.gz
-
 # Install Taplo
 RUN cargo +1.86.0 install taplo-cli --version 0.9.3 --locked && \
     taplo --version

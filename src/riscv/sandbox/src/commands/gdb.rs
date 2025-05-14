@@ -350,8 +350,8 @@ impl<'a, S: Stepper> run_blocking::BlockingEventLoop for RiscvEventLoop<'a, S> {
 }
 
 impl<S: Stepper> ExecFile for RiscvGdb<'_, S> {
-    // returns the input filename that we're currently executing
-    // this allows hermit to load the file from the local filesystem
+    // Return the executable file name to the GDB client. This allows it to fetch the file itself,
+    // if it wasn't specified in the client already.
     fn get_exec_file(
         &self,
         _pid: Option<gdbstub::common::Pid>,

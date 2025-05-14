@@ -4,14 +4,15 @@
 #
 # SPDX-License-Identifier: MIT
 
-.PHONY: build-deps
-build-deps:
-	rustup target add wasm32-unknown-unknown
-	rustup target add wasm32-unknown-unknown
-	../../src/riscv/scripts/install-rust-std-hermit.sh
+RISCV_RUSTC_VERSION = 1.86.0
 
 .PHONY: all
 all: check test
+
+.PHONY: build-deps
+build-deps:
+	@rustup target add wasm32-unknown-unknown
+	@rustup toolchain install ${RISCV_RUSTC_VERSION} --target riscv64gc-unknown-linux-musl
 
 .PHONY: check-fmt
 check-fmt:
@@ -27,15 +28,13 @@ check-wasm:
 	cargo check --target wasm32-unknown-unknown --no-default-features --features bls
 	cargo clippy --target wasm32-unknown-unknown --no-default-features --features bls
 
-.PHONY: check-riscv-hermit
-check-riscv-hermit:
-	cargo check --target riscv64gc-unknown-hermit --no-default-features
-	cargo clippy --target riscv64gc-unknown-hermit --no-default-features
+.PHONY: check-riscv
+check-riscv:
+	cargo +${RISCV_RUSTC_VERSION} check --target riscv64gc-unknown-linux-musl --no-default-features
+	cargo +${RISCV_RUSTC_VERSION} clippy --target riscv64gc-unknown-linux-musl --no-default-features
 
-# TODO: SDK-74 -- check against riscv64gc-unknown-linux-musl, which requires a more
-#       recent rust version
 .PHONY: check
-check: check-fmt check-native check-wasm check-riscv-hermit
+check: check-fmt check-native check-wasm check-riscv
 
 .PHONY: test
 test:
