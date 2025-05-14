@@ -933,18 +933,20 @@ let attestations_aggregation_on_reproposal =
   let* companion_key3 =
     Client.update_fresh_companion_key ~algo:"bls" bootstrap3 client
   in
-  Log.info "Launch a baker with bootstrap5" ;
+  Log.info "Bake until BLS consensus keys are activated" ;
+  let* _ = Client.bake_for_and_wait ~keys ~count:6 client in
   (* Bootstrap5 does not have enough voting power to progress independently. We
      manually inject consensus operations to control the progression of
      consensus. *)
+  Log.info "Launch a baker with bootstrap5" ;
   let* _baker =
     Agnostic_baker.init
       ~delegates:[Constant.bootstrap5.public_key_hash]
       node
       client
   in
-  Log.info "Bake until BLS consensus keys are activated" ;
-  let* base_level = Client.bake_for_and_wait_level ~keys ~count:7 client in
+  let* _ = Client.bake_for_and_wait ~keys client in
+  let base_level = 9 in
   (* BLS consensus keys are now activated. We feed the node with just enough
      consensus operations for the baker to bake a block at level 6. *)
   let* slots =
