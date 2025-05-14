@@ -2394,6 +2394,7 @@ name = "tezos-execution-latest"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "nom",
  "num-bigint",
  "primitive-types",
  "tezos-evm-runtime-latest",
