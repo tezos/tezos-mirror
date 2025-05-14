@@ -616,7 +616,7 @@ impl OpCode {
     ///
     /// [InstructionContextBuilder]: ICB
     #[inline(always)]
-    pub fn to_lowering<I: ICB>(self) -> Option<IcbLoweringFn<I>> {
+    pub(crate) fn to_lowering<I: ICB>(self) -> Option<IcbLoweringFn<I>> {
         match self {
             Self::Mv => Some(Args::run_mv),
             Self::Neg => Some(Args::run_neg),

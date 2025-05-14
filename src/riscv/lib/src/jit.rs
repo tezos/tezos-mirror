@@ -5,7 +5,7 @@
 //! A JIT library for compilation of sequences (or blocks) of RISC-V
 //! instructions to native code.
 
-mod builder;
+pub(crate) mod builder;
 pub(crate) mod state_access;
 
 use std::collections::HashMap;
