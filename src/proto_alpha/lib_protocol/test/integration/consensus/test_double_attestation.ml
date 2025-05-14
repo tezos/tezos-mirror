@@ -271,13 +271,38 @@ let test_different_slots () =
   in
   let* attestation1 = Op.raw_attestation ~delegate ~slot:slot1 blk in
   let* attestation2 = Op.raw_attestation ~delegate ~slot:slot2 blk in
-  let doubleA = double_attestation (B blk) attestation1 attestation2 in
-  let* (_ : Block.t) = Block.bake ~operation:doubleA blk in
+  let double_attestation =
+    double_attestation (B blk) attestation1 attestation2
+  in
   let* preattestation1 = Op.raw_preattestation ~delegate ~slot:slot1 blk in
   let* preattestation2 = Op.raw_preattestation ~delegate ~slot:slot2 blk in
-  let doubleB = double_preattestation (B blk) preattestation1 preattestation2 in
-  let* (_ : Block.t) = Block.bake ~operation:doubleB blk in
-  return_unit
+  let double_preattestation =
+    double_preattestation (B blk) preattestation1 preattestation2
+  in
+  let* {parametric = {aggregate_attestation; _}; _} =
+    Context.get_constants (B genesis)
+  in
+  (* Under [aggregate_attestation] feature flag, consensus operations with
+     non-minimal slots are not propagated by mempools and can't be denounced
+     anymore. *)
+  if aggregate_attestation then
+    let*! res = Block.bake ~operation:double_attestation blk in
+    let* () =
+      Assert.proto_error ~loc:__LOC__ res (function
+          | Validate_errors.Anonymous.Invalid_denunciation _ -> true
+          | _ -> false)
+    in
+    let*! res = Block.bake ~operation:double_preattestation blk in
+    let* () =
+      Assert.proto_error ~loc:__LOC__ res (function
+          | Validate_errors.Anonymous.Invalid_denunciation _ -> true
+          | _ -> false)
+    in
+    return_unit
+  else
+    let* (_ : Block.t) = Block.bake ~operation:double_attestation blk in
+    let* (_ : Block.t) = Block.bake ~operation:double_preattestation blk in
+    return_unit
 
 (** Say a delegate double-attests twice and say the 2 evidences are timely
    included. Then the delegate can no longer bake. *)
