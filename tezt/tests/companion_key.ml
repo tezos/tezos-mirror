@@ -124,6 +124,7 @@ let init_node_and_client ~protocol =
       (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
       (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
       (["allow_tz4_delegate_enable"], `Bool true);
+      (["aggregate_attestation"], `Bool true);
     ]
   in
   let* parameter_file =
@@ -200,15 +201,85 @@ let test_update_companion_key =
   in
   unit
 
-let test_update_companion_key_without_consensus_key =
+let test_update_companion_key_for_non_tz4_delegate =
   Protocol.register_regression_test
     ~__FILE__
-    ~title:"update companion key without updating consensus key"
+    ~title:"update companion key for non tz4 delegate"
     ~tags:[team; "companion_key"]
     ~supports:(Protocol.From_protocol 023)
   @@ fun protocol ->
   let* _node, client = init_node_and_client ~protocol in
   let delegate = Constant.bootstrap1 in
+  let* companion_key_bls =
+    Client.gen_and_show_keys ~alias:"companion_key" ~sig_alg:"bls" client
+  in
+  Log.info "Updating companion key" ;
+  let* () =
+    Client.update_companion_key
+      ~hooks
+      ~src:delegate.alias
+      ~pk:companion_key_bls.alias
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  Log.info "Waiting for companion key activation" ;
+  let* () = bake_n_cycles (consensus_rights_delay + 1) client in
+
+  Log.info "Checking key is activated" ;
+  let* () =
+    check_companion_key
+      ~__LOC__
+      delegate
+      ~expected_active:companion_key_bls
+      client
+  in
+  let* () =
+    check_validators_companion_key ~__LOC__ delegate ~expected:None client
+  in
+  let* current_level = get_current_level client in
+  let* () =
+    check_validators_companion_key
+      ~__LOC__
+      ~level:(current_level.level + 1)
+      delegate
+      ~expected:None
+      client
+  in
+  unit
+
+let test_update_companion_key_for_tz4_delegate =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"update companion key for tz4 delegate"
+    ~tags:[team; "companion_key"]
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* _node, client = init_node_and_client ~protocol in
+  (* gen keys delegate -s bls *)
+  (* transfer 1000000 from bootstrap2 to delegate *)
+  let* delegate =
+    Client.gen_and_show_keys ~alias:"delegate" ~sig_alg:"bls" client
+  in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 1_000_000)
+      ~giver:Constant.bootstrap2.alias
+      ~receiver:delegate.public_key_hash
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* set delegate for delegate to delegate *)
+  let*! () =
+    Client.set_delegate ~src:delegate.alias ~delegate:delegate.alias client
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* stake 800000 for delegate *)
+  let* () = Client.stake ~staker:delegate.alias (Tez.of_int 800_000) client in
+  let* () = Client.bake_for_and_wait client in
+  (* gen keys companion_key -s bls *)
+  (* set companion key for delegate to companion_key *)
   let* companion_key_bls =
     Client.gen_and_show_keys ~alias:"companion_key" ~sig_alg:"bls" client
   in
@@ -249,4 +320,5 @@ let test_update_companion_key_without_consensus_key =
 
 let register ~protocols =
   test_update_companion_key protocols ;
-  test_update_companion_key_without_consensus_key protocols
+  test_update_companion_key_for_non_tz4_delegate protocols ;
+  test_update_companion_key_for_tz4_delegate protocols
