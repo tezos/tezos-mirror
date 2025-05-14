@@ -33,8 +33,8 @@ EOF
 cat << EOF
 Will run a master_branch pipeline for:
 
-  CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
-                BRANCH = $BRANCH
+               CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
+                             BRANCH = $BRANCH
 EOF
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
