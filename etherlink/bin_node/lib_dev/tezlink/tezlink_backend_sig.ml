@@ -6,7 +6,7 @@
 (*****************************************************************************)
 
 module type S = sig
-  type block_param = [`Head | `Level of int32]
+  type block_param = [`Head of int32 | `Level of int32]
 
   val current_level :
     [`Main] -> block_param -> offset:int32 -> Tezos_types.level tzresult Lwt.t
@@ -32,4 +32,7 @@ module type S = sig
 
   val bootstrapped :
     unit -> (Ethereum_types.block_hash * Time.Protocol.t) tzresult Lwt.t
+
+  val block_hash :
+    [`Main] -> block_param -> Ethereum_types.block_hash option tzresult Lwt.t
 end

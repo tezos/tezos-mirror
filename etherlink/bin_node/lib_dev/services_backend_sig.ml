@@ -197,6 +197,8 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
 
     let block_param_to_block_number = Backend.block_param_to_block_number
 
+    let nth_block_hash = Block_storage.nth_block_hash
+
     let tez_nth_block = Block_storage.tez_nth_block
   end)
 

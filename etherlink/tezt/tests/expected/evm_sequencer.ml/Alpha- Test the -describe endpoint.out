@@ -39,6 +39,8 @@ Available services:
                 Access the counter of a contract, if any. 
             - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/manager_key
                 Access the manager of an implicit contract. 
+        - GET /tezlink/chains/<chain_id>/blocks/<block_id>/hash
+            The block's hash, its unique identifier. 
         - GET /tezlink/chains/<chain_id>/blocks/<block_id>/header
             The whole block header. 
         - GET /tezlink/chains/<chain_id>/blocks/<block_id>/helpers/current_level
@@ -110,6 +112,8 @@ Available services:
               Access the counter of a contract, if any. 
           - GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/manager_key
               Access the manager of an implicit contract. 
+      - GET /chains/<chain_id>/blocks/<block_id>/hash
+          The block's hash, its unique identifier. 
       - GET /chains/<chain_id>/blocks/<block_id>/header
           The whole block header. 
       - GET /chains/<chain_id>/blocks/<block_id>/helpers/current_level

@@ -530,6 +530,11 @@ let test_tezlink_current_level =
   in
   let* res = rpc_current_level "head" in
   let* () = check_current_level res 5 in
+  (* Check with block parameter *)
+  let* res = rpc_current_level "head~2" in
+  let* () = check_current_level res 3 in
+  let* res = rpc_current_level "head~2" ~offset:1 in
+  let* () = check_current_level res 4 in
   (* test negative offset *)
   let* res = rpc_current_level "head" ~offset:(-1) in
   Check.(
@@ -1259,6 +1264,26 @@ let test_tezlink_produceBlock =
   let* end_level = rpc_current_level_head sequencer in
   Check.((start_level + 3 = end_level) int)
     ~error_msg:"Expected new block number to be %L, but got: %R" ;
+  unit
+
+let test_tezlink_hash_rpc =
+  register_tezlink_test ~title:"Test Tezlink hash rpc" ~tags:["rpc"; "hash"]
+  @@ fun {sequencer; _} _protocol ->
+  let path_head = "/tezlink/chains/main/blocks/head/hash" in
+  let rpc_hash () =
+    let* res =
+      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path_head)
+      |> Runnable.run
+    in
+    return @@ JSON.parse ~origin:"curl_hash" res
+  in
+  let* hash_old_head = rpc_hash () in
+  let*@ _ = produce_block sequencer in
+  let* hash_current_head = rpc_hash () in
+  Check.(
+    JSON.(hash_current_head |> as_string <> (hash_old_head |> as_string))
+      string
+      ~error_msg:"Block hash should be different") ;
   unit
 
 module Protocol = struct
@@ -13631,6 +13656,7 @@ let () =
   test_tezlink_header [Alpha] ;
   test_tezlink_constants [Alpha] ;
   test_tezlink_produceBlock [Alpha] ;
+  test_tezlink_hash_rpc [Alpha] ;
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha]
