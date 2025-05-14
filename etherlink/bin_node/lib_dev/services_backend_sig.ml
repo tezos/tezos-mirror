@@ -121,16 +121,17 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
 
   module Tracer_etherlink =
     Tracer_sig.Make (Executor) (Block_storage) (Backend.Tracer)
+  module Tezlink_block_storage =
+    Tezlink_durable_storage.Make_block_storage (Backend.Reader)
 
-  module Tezlink = Tezlink_services_impl.Make (struct
-    include Backend.Reader
+  module Tezlink =
+    Tezlink_services_impl.Make
+      (struct
+        include Backend.Reader
 
-    let block_param_to_block_number = Backend.block_param_to_block_number
-
-    let nth_block_hash = Block_storage.nth_block_hash
-
-    let tez_nth_block = Block_storage.tez_nth_block
-  end)
+        let block_param_to_block_number = Backend.block_param_to_block_number
+      end)
+      (Tezlink_block_storage)
 
   let block_param_to_block_number = Backend.block_param_to_block_number
 

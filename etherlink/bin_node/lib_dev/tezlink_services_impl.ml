@@ -30,13 +30,10 @@ module type Backend = sig
   val block_param_to_block_number :
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
-
-  val tez_nth_block : Z.t -> L2_types.Tezos_block.t tzresult Lwt.t
-
-  val nth_block_hash : Z.t -> Ethereum_types.block_hash option tzresult Lwt.t
 end
 
-module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
+module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
+  Tezlink_backend_sig.S = struct
   type block_param = [`Head of int32 | `Level of int32]
 
   let shell_block_param_to_block_number =
@@ -119,7 +116,7 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
     let open Lwt_result_syntax in
     let `Main = chain in
     let* block_number = shell_block_param_to_block_number block in
-    Backend.tez_nth_block (Z.of_int32 block_number)
+    Block_storage.nth_block (Z.of_int32 block_number)
 
   let monitor_heads chain query =
     (* TODO: #7831
@@ -146,7 +143,7 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
           return_none
       | delay_ms :: rest -> (
           let* () = Lwt_unix.sleep (delay_ms /. 1000.) in
-          let* block_result = Backend.tez_nth_block level in
+          let* block_result = Block_storage.nth_block level in
           match block_result with
           | Ok block -> return_some block
           | Error _ -> fetch_block level rest)
@@ -170,13 +167,12 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
     let* (Qty current_block_number) =
       Backend.block_param_to_block_number (Block_parameter Latest)
     in
-    let* block = Backend.tez_nth_block current_block_number in
+    let* block = Block_storage.nth_block current_block_number in
     return (block.hash, block.timestamp)
 
   let block_hash chain block =
     let open Lwt_result_syntax in
     let `Main = chain in
     let* number = shell_block_param_to_block_number block in
-
-    Backend.nth_block_hash (Z.of_int32 number)
+    Block_storage.nth_block_hash (Z.of_int32 number)
 end
