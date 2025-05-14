@@ -344,11 +344,9 @@ let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
     @ make_bool_parameter_l
         ["dal_parametric"; "incentives_enable"]
         dal_incentives
-    @ (if Protocol.(number protocol > number Quebec) then
-         make_int_parameter
-           ["issuance_weights"; "dal_rewards_weight"]
-           dal_rewards_weight
-       else [])
+    @ make_int_parameter
+        ["issuance_weights"; "dal_rewards_weight"]
+        dal_rewards_weight
     @
     if riscv_pvm_enable then [(["smart_rollup_riscv_pvm_enable"], `Bool true)]
     else []

@@ -1,2 +1,0 @@
-{ parameter unit ; storage unit ; code { { UNIT ; FAILWITH } } }
-

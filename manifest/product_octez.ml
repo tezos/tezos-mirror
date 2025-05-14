@@ -7434,7 +7434,7 @@ let hash = Protocol.hash
         ~linkall:true
     in
     let dal =
-      only_if (active && N.(number >= 016)) @@ fun () ->
+      only_if N.(number >= 021) @@ fun () ->
       octez_protocol_lib
         "dal"
         ~internal_name:(sf "tezos_dal_%s" name_dash)
@@ -7886,7 +7886,7 @@ let hash = Protocol.hash
 
   let _020_PsParisC = frozen (Name.v "PsParisC" 020)
 
-  let _021_PsQuebec = active (Name.v "PsQuebec" 021)
+  let _021_PsQuebec = frozen (Name.v "PsQuebec" 021)
 
   let _022_PsRiotum = active (Name.v "PsRiotum" 022)
 

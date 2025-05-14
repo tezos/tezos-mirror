@@ -24,8 +24,6 @@ depends: [
   "uri" { >= "3.1.0" }
   "memtrace"
   "tezos-protocol-000-Ps9mPmXa" { = version }
-  "tezos-protocol-021-PsQuebec" { = version }
-  "octez-protocol-021-PsQuebec-libs" { = version }
   "tezos-protocol-022-PsRiotum" { = version }
   "octez-protocol-022-PsRiotum-libs" { = version }
 ]
@@ -69,6 +67,8 @@ depopts: [
   "octez-protocol-019-PtParisB-libs"
   "tezos-protocol-020-PsParisC"
   "octez-protocol-020-PsParisC-libs"
+  "tezos-protocol-021-PsQuebec"
+  "octez-protocol-021-PsQuebec-libs"
   "tezos-protocol-alpha"
   "octez-protocol-alpha-libs"
 ]
@@ -112,6 +112,8 @@ conflicts: [
   "octez-protocol-019-PtParisB-libs" { != version }
   "tezos-protocol-020-PsParisC" { != version }
   "octez-protocol-020-PsParisC-libs" { != version }
+  "tezos-protocol-021-PsQuebec" { != version }
+  "octez-protocol-021-PsQuebec-libs" { != version }
   "tezos-protocol-alpha" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]

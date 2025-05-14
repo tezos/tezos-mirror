@@ -217,51 +217,12 @@ let baker_stresstest_apply =
   let* () = Client.stresstest ~tps:25 ~transfers:100 client in
   unit
 
-let no_bls_baker_test =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"No BLS baker test"
-    ~tags:[team; "node"; "baker"; "bls"]
-    ~supports:Protocol.(Until_protocol (number Quebec))
-  @@ fun protocol ->
-  let* client0 = Client.init_mockup ~protocol () in
-  Log.info "Generate BLS keys for client" ;
-  let* keys =
-    Lwt_list.map_s
-      (fun i ->
-        Client.gen_and_show_keys
-          ~alias:(sf "bootstrap_bls_%d" i)
-          ~sig_alg:"bls"
-          client0)
-      (Base.range 1 5)
-  in
-  let* parameter_file =
-    Protocol.write_parameter_file
-      ~bootstrap_accounts:(List.map (fun k -> (k, None)) keys)
-      ~base:(Right (protocol, None))
-      []
-  in
-  let* _node, client =
-    Client.init_with_node ~keys:(Constant.activator :: keys) `Client ()
-  in
-  let activate_process =
-    Client.spawn_activate_protocol
-      ~protocol
-      ~timestamp:Now
-      ~parameter_file
-      client
-  in
-  let msg =
-    rex "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"
-  in
-  Process.check_error activate_process ~exit_code:1 ~msg
-
 let bls_baker_test =
   Protocol.register_test
     ~__FILE__
     ~title:"BLS baker test"
     ~tags:[team; "node"; "baker"; "bls"]
-    ~supports:Protocol.(From_protocol (number Quebec + 1))
+    ~supports:Protocol.(From_protocol 22)
   @@ fun protocol ->
   let* client0 = Client.init_mockup ~protocol () in
   Log.info "Generate BLS keys for client" ;
@@ -1163,7 +1124,6 @@ let register ~protocols =
   baker_stresstest protocols ;
   baker_stresstest_apply protocols ;
   bls_baker_test protocols ;
-  no_bls_baker_test protocols ;
   baker_remote_test protocols ;
   baker_check_consensus_branch protocols ;
   force_apply_from_round protocols ;

@@ -17,10 +17,8 @@
   octez-libs.data-encoding
   re
   tezos-protocol-genesis.embedded-protocol
-  tezos-protocol-021-PsQuebec.embedded-protocol
   tezos-protocol-022-PsRiotum.embedded-protocol
   tezos-protocol-alpha.embedded-protocol
-  octez-protocol-021-PsQuebec-libs.plugin-registerer
   octez-protocol-022-PsRiotum-libs.plugin-registerer
   octez-protocol-alpha-libs.plugin-registerer)
  (link_flags

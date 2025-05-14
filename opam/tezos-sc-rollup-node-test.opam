@@ -14,13 +14,10 @@ depends: [
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "bls12-381" {with-test}
   "octez-libs" {with-test}
-  "tezos-protocol-021-PsQuebec" {with-test}
-  "octez-protocol-021-PsQuebec-libs" {with-test}
-  "octez-smart-rollup-node-PsQuebec" {with-test}
-  "octez-alcotezt" {with-test}
   "tezos-protocol-022-PsRiotum" {with-test}
   "octez-protocol-022-PsRiotum-libs" {with-test}
   "octez-smart-rollup-node-PsRiotum" {with-test}
+  "octez-alcotezt" {with-test}
   "tezos-protocol-alpha" {with-test}
   "octez-protocol-alpha-libs" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}

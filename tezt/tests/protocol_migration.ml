@@ -102,21 +102,15 @@ let pp_option pp_item fmt = function
       Format.pp_print_string fmt "Some " ;
       pp_item fmt item
 
-let check_adaptive_issuance_launch_cycle ~loc ~migrate_from client =
+let check_adaptive_issuance_launch_cycle ~loc client =
   let* launch_cycle =
     Client.RPC.call client
     @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
   and* level = Client.level client in
   let expected =
-    if Protocol.(number migrate_from <= number Quebec) then
-      (* When activating P or Q from Genesis, the launch cycle is
-         initialized to [None] at level 1. Then, the level-2 block
-         sets it to 5 cycles after the activation of Q. *)
-      if level <= 1 then None else Some 5
-    else
-      (* From protocol R on, when the protocol is activated from
-         Genesis, AI is immediately active. *)
-      Some 0
+    (* From protocol R on, when the protocol is activated from
+       Genesis, AI is immediately active. *)
+    Some 0
   in
   Log.debug
     "Checking that adaptive_issuance_launch_cycle at level %d is %a."
@@ -205,9 +199,7 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
     Client.activate_protocol ~protocol:migrate_from client ?parameter_file
   in
   Log.info "Protocol %s activated" (Protocol.hash migrate_from) ;
-  let* () =
-    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
-  in
+  let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client in
   (* Bake until migration *)
   let* () =
     repeat (migration_level - 1) (fun () -> Client.bake_for_and_wait client)
@@ -222,9 +214,7 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
       ~migrate_to
       ~level:migration_level
   in
-  let* () =
-    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
-  in
+  let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client in
   (* Remove check_delegate_sampler_state after S. *)
   let* () = check_delegate_sampler_state client in
   let* () = Client.bake_for_and_wait client in
@@ -246,9 +236,7 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
     repeat baked_blocks_after_migration (fun () ->
         Client.bake_for_and_wait client)
   in
-  let* () =
-    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
-  in
+  let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client in
   (* Remove check_delegate_sampler_state after S. *)
   let* () = check_delegate_sampler_state client in
   return (client, node)
@@ -561,9 +549,7 @@ let test_migration_with_bakers ?(migration_level = 4)
       client
       ~protocol:migrate_from
   in
-  let* () =
-    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
-  in
+  let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client in
   let delegates =
     List.map
       (fun account -> account.Account.alias)
@@ -574,17 +560,13 @@ let test_migration_with_bakers ?(migration_level = 4)
     Agnostic_baker.init ~name:"agnostic_baker" node client ~delegates
   in
   let* _ret = Node.wait_for_level node migration_level in
-  let* () =
-    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
-  in
+  let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client in
 
   (* Bake enough blocks after migration *)
   let last_interesting_level = migration_level + num_blocks_post_migration in
   Log.info "Waiting to reach level %d" last_interesting_level ;
   let* _ret = Node.wait_for_level node last_interesting_level in
-  let* () =
-    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
-  in
+  let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client in
 
   Log.info
     "Checking migration block has not been attested -- this is a special case" ;
@@ -676,9 +658,7 @@ let test_forked_migration_manual ?(migration_level = 4)
       ~consensus_threshold:(fun ~consensus_committee_size ->
         consensus_committee_size)
   in
-  let* () =
-    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client_1
-  in
+  let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client_1 in
 
   let* () =
     let n = migration_level - 2 in
@@ -739,9 +719,7 @@ let test_forked_migration_manual ?(migration_level = 4)
   Log.info "Waiting for migration level %d" migration_level ;
   let* _ = Node.wait_for_level node_1 migration_level in
   let* _ = Node.wait_for_level node_2 migration_level in
-  let* () =
-    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client_1
-  in
+  let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client_1 in
 
   Log.info "Checking we have migration blocks at level %d" migration_level ;
   let* () =
@@ -785,9 +763,7 @@ let test_forked_migration_manual ?(migration_level = 4)
   let until_level = migration_level + num_blocks_post_migration in
   Log.info "Waiting to reach level %d" until_level ;
   let* _ = Node.wait_for_level node_1 until_level in
-  let* () =
-    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client_1
-  in
+  let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client_1 in
 
   let* () = Agnostic_baker.terminate baker_1 in
   let* () = Agnostic_baker.terminate baker_2 in
@@ -970,9 +946,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
     and* _agnostic_baker2 = agnostic_baker group2
     and* agnostic_baker3 = agnostic_baker group3 in
     let* () = start_protocol () in
-    let* () =
-      check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
-    in
+    let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client1 in
     let* () = wait_for_qc_at_level agnostic_baker1 pre_migration_level in
     let* () = disconnect_clusters () in
     let wait_for () =
@@ -986,9 +960,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
     check_post_migration_proposal ~wait_for
   in
 
-  let* () =
-    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
-  in
+  let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client1 in
 
   Log.info "Check that node1 and node3 have different migration blocks." ;
   let* migr_block1 = get_block_at_level migration_level client1
@@ -1005,9 +977,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   let* (_ : int) = Node.wait_for_level node1 end_level
   and* (_ : int) = Node.wait_for_level node2 end_level
   and* (_ : int) = Node.wait_for_level node3 end_level in
-  let* () =
-    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
-  in
+  let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client1 in
 
   let level_from = migration_level and level_to = end_level - 2 in
   Log.info
@@ -1334,162 +1304,9 @@ module Local_helpers = struct
     return (amount, level)
 end
 
-let test_tolerated_inactivity_period () =
-  (* In proto R, the [tolerated_inactivity_period] protocol constant
-     was lowered from 3 to 2 cycles. Given that [grace_period] for the
-     current scenarion is equal to 5 cycles, we check a protocol
-     migration near that cycle. *)
-  let migrate_from = Protocol.Quebec in
-  let migrate_to = Protocol.R022 in
-
-  for migration_cycle = 5 to 7 do
-    Test.register
-      ~__FILE__
-      ~title:
-        (Printf.sprintf
-           "protocol migration for tolerated_inactivity_period at the end of \
-            cycle %d"
-           (migration_cycle - 1))
-      ~tags:[team; "protocol"; "migration"; "tolerated_inactivity_period"]
-    @@ fun () ->
-    let* parameter_file =
-      Protocol.write_parameter_file
-        ~base:(Left (Protocol.parameter_file migrate_from))
-        [(["adaptive_issuance_force_activation"], `Bool true)]
-    in
-    let parameters = JSON.parse_file parameter_file in
-    let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
-    let migration_level = migration_cycle * blocks_per_cycle in
-    let () = Local_helpers.print_parameters ~parameter_file ~migration_level in
-
-    let* client, _node =
-      Local_helpers.activate_protocol
-        ~parameter_file
-        ~migrate_from
-        ~migrate_to
-        ~migration_level
-    in
-    let bake_until_cycle_with_and_check =
-      Local_helpers.bake_until_cycle_with_and_check
-        ~migration_level
-        ~migrate_from
-        ~migrate_to
-        ~blocks_per_cycle
-    in
-    (* [default_baker] never gets deactivated *)
-    let default_baker = Constant.bootstrap1.alias in
-    (* [funder] is used to fund all new accounts *)
-    let funder = Constant.bootstrap2.alias in
-
-    (* [delegate_i] stops participating in cycle (i + 1) *)
-    let* delegates =
-      Local_helpers.create_delegates_and_stake
-        ~baker:default_baker
-        ~giver:funder
-        ~delegates:
-          (List.init 8 (fun i ->
-               ("delegate_" ^ Int.to_string i, Tez.of_int 300_000)))
-        client
-    in
-    let delegates_array = Array.of_list delegates in
-    let all_activated = List.init 8 (fun _i -> false) in
-    let all_deactivated = List.init 8 (fun _i -> true) in
-
-    let check_deactivated_list expected_status_for_delegates =
-      Lwt_list.iteri_s
-        (fun i expected ->
-          let* () =
-            Local_helpers.check_deactivated delegates_array.(i) ~expected client
-          in
-          unit)
-        expected_status_for_delegates
-    in
-
-    let* () =
-      Local_helpers.check_current_level_and_cycle ~level:4 ~cycle:0 client
-    in
-    (* grace_period = tolerated_inactivity_period + consensus_rights_delay = 3 + 2 = 5 *)
-    (* all delegates are marked as active with [grace_period] = 5 *)
-    let* () = check_deactivated_list all_activated in
-
-    let* () =
-      Lwt_list.iter_s
-        (fun target_cycle ->
-          let delegates_i_and_higher i =
-            List.init (8 - i) (fun x -> delegates_array.(x + i).alias)
-          in
-          (* [delegate_i] can't bake during cycle_{0,1,2} as they have
-             no baking rights, so we wait for cycle 3 to start baking
-             with new delegates; delegate_{0,1,2} never bake in this
-             testing scenario *)
-          let bakers, delegate =
-            if 3 <= target_cycle && target_cycle <= 7 then
-              ( delegates_i_and_higher target_cycle,
-                delegates_array.(target_cycle).alias )
-            else ([], default_baker)
-          in
-          let expected_list =
-            match target_cycle with
-            | 3 | 4 | 5 -> all_activated
-            | 6 -> List.init 8 (fun i -> if i <= 2 then true else false)
-            | 7 -> List.init 8 (fun i -> if i <= 3 then true else false)
-            | 8 ->
-                (* [delegate_5] bakes for the last time in cycle 5. At
-                   this point, the cycle at the end of which it should
-                   get deactivated if no further participation is
-                   witnessed is set to [current_cycle +
-                   tolerated_inactivity_period], which is either cycle
-                   8 if Quebec is still active during cycle 5, or
-                   cycle 7 if proto R is already active during cycle
-                   5.
-
-                   So [delegate_5] gets deactivated at the end of
-                   cycle 7 IFF the migration_cycle is 5 or lower. *)
-                let is_deactivated i =
-                  if i <= 4 then true
-                  else if i = 5 then migration_cycle <= 5
-                  else false
-                in
-                List.init 8 is_deactivated
-            | 9 ->
-                (* As above, [delegate_6] status depends on whether
-                   proto R was already active during cycle 6. Note
-                   that [delegate_5] has now been deactivated in any
-                   case. *)
-                let is_deactivated i =
-                  if i <= 5 then true
-                  else if i = 6 then migration_cycle <= 6
-                  else false
-                in
-                List.init 8 is_deactivated
-            | 10 ->
-                (* When migrating at the end of cycle 6, [delegate_7] is
-                   deactivated by 1 cycle earlier *)
-                all_deactivated
-            | 11 -> all_deactivated
-            | _ -> failwith "unexpected input"
-          in
-          (* [default_baker] must be always active *)
-          let bakers = default_baker :: bakers in
-          let* () =
-            bake_until_cycle_with_and_check
-              ~bakers
-              ~target_cycle
-              ~delegate
-              ~check_last_block:(fun () -> check_deactivated_list expected_list)
-              ~check_next_block:(fun _ -> unit)
-              client
-          in
-          unit)
-        (* From cycle 3 to 11 *)
-        (List.init 9 (fun i -> i + 3))
-    in
-    unit
-  done
-
 let test_unstaked_requests_many_delegates () =
-  let migrate_from = Protocol.Quebec in
-  let migrate_to = Protocol.R022 in
+  let migrate_from = Protocol.R022 in
+  let migrate_to = Protocol.Alpha in
 
   Test.register
     ~__FILE__
@@ -1499,9 +1316,7 @@ let test_unstaked_requests_many_delegates () =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Left (Protocol.parameter_file migrate_from))
-      (if Protocol.(number migrate_from <= number Quebec) then
-         [(["adaptive_issuance_force_activation"], `Bool true)]
-       else [])
+      []
   in
   let parameters = JSON.parse_file parameter_file in
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
@@ -1609,8 +1424,8 @@ let test_unstaked_requests_many_delegates () =
   unit
 
 let test_unstaked_requests_and_min_delegated () =
-  let migrate_from = Protocol.Quebec in
-  let migrate_to = Protocol.R022 in
+  let migrate_from = Protocol.R022 in
+  let migrate_to = Protocol.Alpha in
 
   Test.register
     ~__FILE__
@@ -1620,9 +1435,7 @@ let test_unstaked_requests_and_min_delegated () =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Left (Protocol.parameter_file migrate_from))
-      (if Protocol.(number migrate_from <= number Quebec) then
-         [(["adaptive_issuance_force_activation"], `Bool true)]
-       else [])
+      []
   in
   let parameters = JSON.parse_file parameter_file in
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
@@ -1803,6 +1616,5 @@ let register ~migrate_from ~migrate_to =
   test_forked_migration_bakers ~migrate_from ~migrate_to ;
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
   test_migration_with_snapshots ~migrate_from ~migrate_to ;
-  test_tolerated_inactivity_period () ;
   test_unstaked_requests_many_delegates () ;
   test_unstaked_requests_and_min_delegated ()

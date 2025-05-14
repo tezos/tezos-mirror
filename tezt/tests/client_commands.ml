@@ -480,17 +480,12 @@ module Transfer = struct
       ~tags:[team; "client"; "set_delegate"; "bls"; "tz4"]
     @@ fun protocol ->
     let* parameter_file =
-      if Protocol.(number protocol > number Quebec) then
-        let* parameter_file =
-          Protocol.write_parameter_file
-            ~base:(Right (protocol, None))
-            [(["allow_tz4_delegate_enable"], `Bool false)]
-        in
-        return (Some parameter_file)
-      else return None
+      Protocol.write_parameter_file
+        ~base:(Right (protocol, None))
+        [(["allow_tz4_delegate_enable"], `Bool false)]
     in
     let* _node, client =
-      Client.init_with_protocol `Client ?parameter_file ~protocol ()
+      Client.init_with_protocol `Client ~parameter_file ~protocol ()
     in
     let* () =
       let Account.{alias; secret_key; _} = Constant.tz4_account in
@@ -513,7 +508,7 @@ module Transfer = struct
       ~__FILE__
       ~title:"Set delegate allowed on tz4"
       ~tags:[team; "client"; "set_delegate"; "bls"; "tz4"]
-      ~supports:Protocol.(From_protocol (number Quebec + 1))
+      ~supports:Protocol.(From_protocol 22)
     @@ fun protocol ->
     let* parameter_file =
       Protocol.write_parameter_file

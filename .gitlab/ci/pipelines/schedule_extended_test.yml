@@ -1241,13 +1241,12 @@ opam:all_6:
   parallel:
     matrix:
     - package:
-      - tezt-tezos
       - tezos-protocol-genesis
       - tezos-protocol-demo-noops
       - tezos-protocol-demo-counter
-      - tezos-openapi
-      - tezos-dal-node-services
-      - tezos-benchmark
+      - tezos-protocol-alpha
+      - tezos-protocol-022-PsRiotum
+      - tezos-protocol-021-PsQuebec
       - octez-shell-libs
       - octez-riscv-pvm
       - octez-proto-libs
@@ -1371,7 +1370,6 @@ opam:all_2:
       - octez-smart-rollup-node-lib
       - octez-smart-rollup-node-alpha
       - octez-smart-rollup-node-PtParisB
-      - octez-smart-rollup-node-PtNairob
       - octez-protocol-alpha-libs
       - octez-protocol-022-PsRiotum-libs
       - octez-protocol-021-PsQuebec-libs
@@ -1438,6 +1436,7 @@ opam:all_1:
   parallel:
     matrix:
     - package:
+      - octez-smart-rollup-node-PtNairob
       - octez-smart-rollup-node-PsRiotum
       - octez-smart-rollup-node-PsQuebec
       - octez-smart-rollup-node-PsParisC
@@ -1497,7 +1496,6 @@ opam:all_3:
   parallel:
     matrix:
     - package:
-      - octez-rpc-process
       - octez-protocol-015-PtLimaPt-libs
       - octez-protocol-014-PtKathma-libs
       - octez-protocol-013-PtJakart-libs
@@ -1624,8 +1622,6 @@ opam:all_4:
   parallel:
     matrix:
     - package:
-      - tezos-protocol-008-PtEdo2Zk
-      - tezos-protocol-007-PsDELPH1
       - tezos-protocol-006-PsCARTHA
       - tezos-protocol-005-PsBabyM1
       - tezos-protocol-005-PsBABY5H
@@ -1637,6 +1633,7 @@ opam:all_4:
       - tezos-dal-node-lib
       - tezos-client-genesis
       - tezos-client-demo-counter
+      - octez-rpc-process
       - octez-node-config
       - octez-crawler
 
@@ -1701,10 +1698,8 @@ opam:exec_1:
       - octez-codec
       - octez-client
       - octez-baker-PsRiotum
-      - octez-baker-PsQuebec
       - octez-baker
       - octez-accuser-PsRiotum
-      - octez-accuser-PsQuebec
       - octez-accuser
 
 opam:all_5:
@@ -1761,9 +1756,6 @@ opam:all_5:
   parallel:
     matrix:
     - package:
-      - tezos-protocol-alpha
-      - tezos-protocol-022-PsRiotum
-      - tezos-protocol-021-PsQuebec
       - tezos-protocol-020-PsParisC
       - tezos-protocol-019-PtParisB
       - tezos-protocol-018-Proxford
@@ -1777,6 +1769,8 @@ opam:all_5:
       - tezos-protocol-010-PtGRANAD
       - tezos-protocol-009-PsFLoren
       - tezos-protocol-008-PtEdoTez
+      - tezos-protocol-008-PtEdo2Zk
+      - tezos-protocol-007-PsDELPH1
 
 opam:all_7:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1832,6 +1826,10 @@ opam:all_7:
   parallel:
     matrix:
     - package:
+      - tezt-tezos
+      - tezos-openapi
+      - tezos-dal-node-services
+      - tezos-benchmark
       - octez-smart-rollup-wasm-debugger-plugin
       - octez-rustzcash-deps
       - octez-rust-deps

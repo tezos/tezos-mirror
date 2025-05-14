@@ -40,10 +40,6 @@
   octez-shell-libs.store
   octez-shell-libs.store.shared
   octez-shell-libs.context-ops
-  octez-protocol-021-PsQuebec-libs.baking
-  octez-protocol-021-PsQuebec-libs.client
-  octez-protocol-021-PsQuebec-libs.client.commands
-  tezos-protocol-021-PsQuebec.protocol
   octez-protocol-022-PsRiotum-libs.baking
   octez-protocol-022-PsRiotum-libs.client
   octez-protocol-022-PsRiotum-libs.client.commands
@@ -63,7 +59,7 @@
   -open Tezos_store
   -open Tezos_store_shared
   -open Tezos_context_ops)
- (modules sigs tool_021_PsQuebec tool_022_PsRiotum tool_alpha))
+ (modules sigs tool_022_PsRiotum tool_alpha))
 
 (executable
  (name simulation_scenario)
