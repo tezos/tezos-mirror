@@ -56,6 +56,10 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> Arithmetic<Builder<'_, MC, JSA>> for
             Shift::RightSigned => X64(icb.builder.ins().sshr(self.0, amount.0)),
         }
     }
+
+    fn modulus(self, other: Self, icb: &mut Builder<'_, MC, JSA>) -> Self {
+        X64(icb.builder.ins().srem(self.0, other.0))
+    }
 }
 
 impl<MC: MemoryConfig, JSA: JitStateAccess> Arithmetic<Builder<'_, MC, JSA>> for X32 {
@@ -99,5 +103,9 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> Arithmetic<Builder<'_, MC, JSA>> for
             Shift::RightUnsigned => X32(icb.builder.ins().ushr(self.0, amount.0)),
             Shift::RightSigned => X32(icb.builder.ins().sshr(self.0, amount.0)),
         }
+    }
+
+    fn modulus(self, other: Self, icb: &mut Builder<'_, MC, JSA>) -> Self {
+        X32(icb.builder.ins().srem(self.0, other.0))
     }
 }

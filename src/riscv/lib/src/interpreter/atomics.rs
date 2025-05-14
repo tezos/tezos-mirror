@@ -6,6 +6,9 @@
 
 use std::mem;
 
+use crate::instruction_context::ICB;
+use crate::instruction_context::LoadStoreWidth;
+use crate::instruction_context::arithmetic::Arithmetic;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory;
 use crate::machine_state::registers::XRegister;
@@ -155,4 +158,114 @@ where
     ) -> Result<(), Exception> {
         self.run_amo(rs1, rs2, rd, f, |x| x, |x| x)
     }
+}
+
+/// Generic implementation of any atomic memory operation which works on 64-bit values,
+/// implementing read-modify-write operations for multi-processor synchronisation
+/// (Section 8.4)
+fn run_x64_atomic<I: ICB>(
+    icb: &mut I,
+    rs1: XRegister,
+    rs2: XRegister,
+    rd: XRegister,
+    f: fn(I::XValue, I::XValue, &mut I) -> I::XValue,
+) -> I::IResult<()> {
+    let address_rs1 = icb.xregister_read(rs1);
+
+    // Handle the case where the address is not aligned.
+    let result = icb.atomic_access_fault_guard(address_rs1, LoadStoreWidth::Double);
+
+    // Continue with the operation if the address is aligned.
+    let val_rs1_result = I::and_then(result, |_| {
+        icb.main_memory_load(address_rs1, false, LoadStoreWidth::Double)
+    });
+
+    // Continue with the operation if the load was successful.
+    I::and_then(val_rs1_result, |val_rs1| {
+        // Apply the binary operation to the loaded value and the value in rs2
+        let val_rs2 = icb.xregister_read(rs2);
+        let res = f(val_rs1, val_rs2, icb);
+
+        // Write the value read fom the address in rs1 in rd
+        icb.xregister_write(rd, val_rs1);
+
+        // Store the resulting value to the address in rs1
+        icb.main_memory_store(address_rs1, res, LoadStoreWidth::Double)
+    })
+}
+
+/// Loads in rd the value from the address in rs1 and stores the result of
+/// adding it to val(rs2) back to the address in rs1.
+#[expect(
+    unused_variables,
+    reason = "The `aq` and `rl` bits specify additional memory constraints 
+    in multi-hart environments so they are currently ignored."
+)]
+pub fn run_x64_atomic_add<I: ICB>(
+    icb: &mut I,
+    rs1: XRegister,
+    rs2: XRegister,
+    rd: XRegister,
+    aq: bool,
+    rl: bool,
+) -> I::IResult<()> {
+    run_x64_atomic(icb, rs1, rs2, rd, |x, y, icb| x.add(y, icb))
+}
+
+#[cfg(test)]
+mod test {
+    use proptest::prelude::*;
+
+    use crate::backend_test;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::registers::a0;
+    use crate::machine_state::registers::a1;
+    use crate::machine_state::registers::a2;
+
+    macro_rules! test_atomic {
+        ($(#[$m:meta])* $name: ident, $instr: path, $f: expr, $align: expr, $t: ty) => {
+            backend_test!($name, F, {
+                use $crate::machine_state::memory::M4K;
+                use $crate::state::NewState;
+
+                let state = MachineCoreState::<M4K, _>::new(&mut F::manager());
+                let state_cell = std::cell::RefCell::new(state);
+
+                proptest!(|(
+                    r1_addr in (0..1023_u64/$align).prop_map(|x| x * $align),
+                    r1_val in any::<u64>(),
+                    r2_val in any::<u64>(),
+                )| {
+                    let mut state = state_cell.borrow_mut();
+                    state.reset();
+                    state.main_memory.set_all_readable_writeable();
+
+                    state.hart.xregisters.write(a0, r1_addr);
+                    state.write_to_bus(0, a0, r1_val)?;
+                    state.hart.xregisters.write(a1, r2_val);
+                    match $instr(&mut *state, a0, a1, a2, false, false) {
+                        Ok(_) => {}
+                        Err(e) => panic!("Error: {:?}", e),
+                    }
+                    let res: $t = state.read_from_address(r1_addr)?;
+
+                    prop_assert_eq!(
+                        state.hart.xregisters.read(a2) as $t, r1_val as $t);
+
+                    let f = $f;
+                    let expected = f(r1_val as $t, r2_val as $t);
+                    prop_assert_eq!(res, expected);
+                })
+            });
+
+        }
+    }
+
+    test_atomic!(
+        test_run_x64_atomic_add,
+        super::run_x64_atomic_add,
+        u64::wrapping_add,
+        8,
+        u64
+    );
 }

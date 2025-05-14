@@ -40,6 +40,10 @@ pub trait Arithmetic<I: ICB + ?Sized>: Copy {
 
     /// Perform a shift of the **XValue** as determined by the given [`Shift`].
     fn shift(self, shift: Shift, amount: Self, icb: &mut I) -> Self;
+
+    /// Find the signed remainder of the division of **self** by **other**.
+    /// Panics if **other** is zero.
+    fn modulus(self, other: Self, icb: &mut I) -> Self;
 }
 
 impl<I: ICB> Arithmetic<I> for XValue {
@@ -78,6 +82,10 @@ impl<I: ICB> Arithmetic<I> for XValue {
             Shift::RightSigned => (self as i64 >> amount) as XValue,
         }
     }
+
+    fn modulus(self, other: Self, _: &mut I) -> Self {
+        self % other
+    }
 }
 
 impl<I: ICB> Arithmetic<I> for XValue32 {
@@ -115,5 +123,9 @@ impl<I: ICB> Arithmetic<I> for XValue32 {
             Shift::RightUnsigned => self >> amount,
             Shift::RightSigned => (self as i32 >> amount) as XValue32,
         }
+    }
+
+    fn modulus(self, other: Self, _: &mut I) -> Self {
+        self % other
     }
 }

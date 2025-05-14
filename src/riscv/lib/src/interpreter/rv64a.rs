@@ -76,23 +76,6 @@ where
         self.run_amo_d(rs1, rs2, rd, |_, value_rs2| value_rs2)
     }
 
-    /// `AMOADD.D` R-type instruction
-    ///
-    /// Loads in rd the value from the address in rs1 and stores the result of
-    /// adding it to val(rs2) back to the address in rs1.
-    /// The `aq` and `rl` bits specify additional memory constraints in
-    /// multi-hart environments so they are currently ignored.
-    pub fn run_amoaddd(
-        &mut self,
-        rs1: XRegister,
-        rs2: XRegister,
-        rd: XRegister,
-        _rl: bool,
-        _aq: bool,
-    ) -> Result<(), Exception> {
-        self.run_amo_d(rs1, rs2, rd, u64::wrapping_add)
-    }
-
     /// `AMOXOR.D` R-type instruction
     ///
     /// Loads in rd the value from the address in rs1 and stores the result of
@@ -245,8 +228,6 @@ mod test {
     test_lrsc!(test_lrw_scd, run_lrw, run_scd, 8, u32);
 
     test_amo!(run_amoswapd, |_, r2_val| r2_val, 8, u64);
-
-    test_amo!(run_amoaddd, u64::wrapping_add, 8, u64);
 
     test_amo!(run_amoxord, u64::bitxor, 8, u64);
 
