@@ -447,8 +447,8 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
-let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts scenario
-    protocols =
+let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts
+    ?tez_bootstrap_contracts scenario protocols =
   register_all
     ~enable_tx_queue:Evm_node.(Enable false)
       (*Tx queue is not yet compatible with tezlink *)
@@ -461,6 +461,7 @@ let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts scenario
           (Evm_node.default_l2_setup ~l2_chain_id:12) with
           l2_chain_family = "Michelson";
           tez_bootstrap_accounts;
+          tez_bootstrap_contracts;
         };
       ]
     ~use_multichain:Register_with_feature

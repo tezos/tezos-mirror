@@ -30,12 +30,15 @@ type time_between_blocks = Nothing | Time_between_blocks of float
 
 type history_mode = Archive | Rolling of int | Full of int
 
+type tez_contract = {address : string; path : string; initial_storage : string}
+
 type l2_setup = {
   l2_chain_id : int;
   l2_chain_family : string;
   world_state_path : string option;
   eth_bootstrap_accounts : string list option;
   tez_bootstrap_accounts : Account.key list option;
+  tez_bootstrap_contracts : tez_contract list option;
   sequencer_pool_address : string option;
   minimum_base_fee_per_gas : Wei.t option;
   da_fee_per_byte : Wei.t option;
@@ -56,6 +59,7 @@ let default_l2_setup ~l2_chain_id =
     world_state_path = Some "/evm/world_state";
     eth_bootstrap_accounts = Some eth_default_bootstrap_accounts;
     tez_bootstrap_accounts = Some tez_default_bootstrap_accounts;
+    tez_bootstrap_contracts = None;
     sequencer_pool_address = None;
     minimum_base_fee_per_gas = None;
     da_fee_per_byte = None;
@@ -1874,7 +1878,7 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
 
 let make_l2_kernel_installer_config ?chain_id ?chain_family
     ?eth_bootstrap_balance ?tez_bootstrap_balance ?eth_bootstrap_accounts
-    ?tez_bootstrap_accounts ?minimum_base_fee_per_gas
+    ?tez_bootstrap_accounts ?tez_bootstrap_contracts ?minimum_base_fee_per_gas
     ?(da_fee_per_byte = Wei.zero) ?sequencer_pool_address
     ?maximum_gas_per_transaction ?(set_account_code = []) ?world_state_path
     ~output () =
@@ -1923,6 +1927,13 @@ let make_l2_kernel_installer_config ?chain_id ?chain_family
                    tez_bootstrap_account.Account.public_key;
                  ])
                tez_bootstrap_accounts)
+    @ (match tez_bootstrap_contracts with
+      | None -> []
+      | Some contracts ->
+          List.flatten
+          @@ List.map
+               (fun contract -> ["--tez-bootstrap-contract"; contract])
+               contracts)
     @
     match eth_bootstrap_accounts with
     | None -> []

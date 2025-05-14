@@ -144,6 +144,7 @@ val register_multichain_test :
   ?max_number_of_chunks:int ->
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
+  ?tez_bootstrap_contracts:Evm_node.tez_contract list ->
   ?sequencer:Account.key ->
   ?sequencer_pool_address:string ->
   kernel:Kernel.t ->

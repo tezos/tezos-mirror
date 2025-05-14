@@ -29,12 +29,15 @@
 (** EVM node server state. *)
 type t
 
+type tez_contract = {address : string; path : string; initial_storage : string}
+
 type l2_setup = {
   l2_chain_id : int;
   l2_chain_family : string;
   world_state_path : string option;
   eth_bootstrap_accounts : string list option;
   tez_bootstrap_accounts : Account.key list option;
+  tez_bootstrap_contracts : tez_contract list option;
   sequencer_pool_address : string option;
   minimum_base_fee_per_gas : Wei.t option;
   da_fee_per_byte : Wei.t option;
@@ -651,6 +654,7 @@ val make_l2_kernel_installer_config :
   ?tez_bootstrap_balance:Tez.t ->
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
+  ?tez_bootstrap_contracts:string list ->
   ?minimum_base_fee_per_gas:Wei.t ->
   ?da_fee_per_byte:Wei.t ->
   ?sequencer_pool_address:string ->
