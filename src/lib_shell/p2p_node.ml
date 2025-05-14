@@ -132,3 +132,18 @@ let create p2p_params =
   return {p2p; shutdown}
 
 let shutdown p2p_node = p2p_node.shutdown ()
+
+let build_rpc_directory p2p_node =
+  let register0 s f dir =
+    Tezos_rpc.Directory.register dir s (fun () p q -> f p q)
+  in
+  let dir =
+    Tezos_rpc.Directory.merge
+      (P2p_directory.build_rpc_directory p2p_node.p2p)
+      Tezos_rpc.Directory.empty
+  in
+  register0
+    Tezos_rpc.Service.error_service
+    (fun () () ->
+      Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding))
+    dir

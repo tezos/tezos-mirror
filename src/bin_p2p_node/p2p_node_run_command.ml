@@ -18,6 +18,15 @@ module Event = struct
       ~level:Notice
       ()
 
+  let starting_rpc_server =
+    declare_2
+      ~section
+      ~name:"starting_rpc_server"
+      ~msg:"starting RPC server on {host}:{port}"
+      ~level:Notice
+      ("host", Data_encoding.string)
+      ("port", Data_encoding.uint16)
+
   let starting_p2p_node =
     declare_2
       ~section
@@ -99,7 +108,27 @@ let init_p2p_node ~listen_addr ?peers ?discovery_addr () =
   in
   P2p_node.create p2p_params
 
-let run ~listen_addr ?peers ?discovery_addr () =
+let init_rpc rpc_addr (p2p_node : P2p_node.t) =
+  let open Lwt_result_syntax in
+  let dir = P2p_node.build_rpc_directory p2p_node in
+  let* addrs = Config_file.resolve_rpc_listening_addrs rpc_addr in
+  let* server =
+    match addrs with
+    | [] -> failwith "Cannot resolve listening address: %S" rpc_addr
+    | (addr, port) :: _ ->
+        let mode = `TCP (`Port port) in
+        let media_types = Tezos_rpc_http.Media_type.all_media_types in
+        let host = Ipaddr.V6.to_string addr in
+        let*! () = Event.(emit starting_rpc_server) (host, port) in
+        let server =
+          Tezos_rpc_http_server.RPC_server.init_server ~media_types dir
+        in
+        let*! () = Tezos_rpc_http_server.RPC_server.launch ~host server mode in
+        return server
+  in
+  return server
+
+let run ~listen_addr ?peers ?discovery_addr ~rpc_addr () =
   let open Lwt_result_syntax in
   (* Main loop *)
   let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -108,7 +137,8 @@ let run ~listen_addr ?peers ?discovery_addr () =
       ( Tezos_version_value.Current_git_info.octez_version,
         Tezos_version_value.Current_git_info.abbreviated_commit_hash )
   in
-  let* _p2p_node = init_p2p_node ~listen_addr ?peers ?discovery_addr () in
+  let* p2p_node = init_p2p_node ~listen_addr ?peers ?discovery_addr () in
+  let* _rpc_server = init_rpc rpc_addr p2p_node in
   let _ =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun exit_status ->
         let*! () = Event.(emit bye) exit_status in

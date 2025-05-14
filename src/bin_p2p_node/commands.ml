@@ -10,6 +10,8 @@ let group =
 
 let default_p2p_port = 19732
 
+let default_rpc_port = 18732
+
 let net_addr_arg =
   Tezos_clic.default_arg
     ~long:"net-addr"
@@ -37,7 +39,19 @@ let discovery_addr_arg =
     ~placeholder:"ADDR:PORT|:PORT"
     (Tezos_clic.parameter (fun () s -> Lwt_result.return s))
 
-let p2p_node_args = Tezos_clic.args3 net_addr_arg peers_arg discovery_addr_arg
+let rpc_addr_arg =
+  Tezos_clic.default_arg
+    ~long:"rpc-addr"
+    ~placeholder:"ADDR:PORT|:PORT"
+    ~default:("[::]:" ^ string_of_int default_rpc_port)
+    ~doc:
+      (Format.sprintf
+         "The RPC address and port. Defaults to %d"
+         default_rpc_port)
+    (Tezos_clic.parameter (fun () s -> Lwt_result.return s))
+
+let p2p_node_args =
+  Tezos_clic.args4 net_addr_arg peers_arg discovery_addr_arg rpc_addr_arg
 
 let run_command =
   let open Tezos_clic in
@@ -46,7 +60,7 @@ let run_command =
     ~desc:"Run the octez-p2p-node"
     p2p_node_args
     (prefix "run" @@ stop)
-    (fun (listen_addr, peers, discovery_addr) () ->
-      P2p_node_run_command.run ~listen_addr ?peers ?discovery_addr ())
+    (fun (listen_addr, peers, discovery_addr, rpc_addr) () ->
+      P2p_node_run_command.run ~listen_addr ?peers ?discovery_addr ~rpc_addr ())
 
 let p2p_node_commands = [run_command]
