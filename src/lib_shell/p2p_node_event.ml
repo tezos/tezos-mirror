@@ -54,6 +54,27 @@ let connection_established =
     ("peer", P2p_peer.Id.encoding)
     ("address", string)
 
+let text_message_received =
+  declare_2
+    ~section
+    ~alternative_color
+    ~name:"text_message_received"
+    ~msg:"Received text message from peer {peer}: {message}"
+    ~level:Notice
+    ("peer", P2p_peer.Id.encoding)
+    ("message", string)
+    ~pp2:Format.pp_print_string
+
+let bytes_message_received =
+  declare_2
+    ~section
+    ~alternative_color
+    ~name:"bytes_message_received"
+    ~msg:"Received bytes message from peer {peer}: {message} "
+    ~level:Notice
+    ("peer", P2p_peer.Id.encoding)
+    ("message", bytes)
+
 let disconnected =
   declare_1
     ~section

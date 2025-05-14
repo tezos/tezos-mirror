@@ -57,7 +57,7 @@ module Event = struct
       ("exit_code", Data_encoding.int31)
 end
 
-let init_p2p_node ~listen_addr ?peers ?discovery_addr () =
+let init_p2p_node ~listen_addr ?peers ?discovery_addr ~ping_interval () =
   let open Lwt_result_syntax in
   let* discovery_addr, discovery_port =
     match discovery_addr with
@@ -106,7 +106,7 @@ let init_p2p_node ~listen_addr ?peers ?discovery_addr () =
       },
       limits )
   in
-  P2p_node.create p2p_params
+  P2p_node.create ~ping_interval p2p_params
 
 let init_rpc rpc_addr (p2p_node : P2p_node.t) =
   let open Lwt_result_syntax in
@@ -128,7 +128,7 @@ let init_rpc rpc_addr (p2p_node : P2p_node.t) =
   in
   return server
 
-let run ~listen_addr ?peers ?discovery_addr ~rpc_addr () =
+let run ~listen_addr ?peers ?discovery_addr ~rpc_addr ~ping_interval () =
   let open Lwt_result_syntax in
   (* Main loop *)
   let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -137,7 +137,9 @@ let run ~listen_addr ?peers ?discovery_addr ~rpc_addr () =
       ( Tezos_version_value.Current_git_info.octez_version,
         Tezos_version_value.Current_git_info.abbreviated_commit_hash )
   in
-  let* p2p_node = init_p2p_node ~listen_addr ?peers ?discovery_addr () in
+  let* p2p_node =
+    init_p2p_node ~listen_addr ?peers ?discovery_addr ~ping_interval ()
+  in
   let* _rpc_server = init_rpc rpc_addr p2p_node in
   let _ =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun exit_status ->

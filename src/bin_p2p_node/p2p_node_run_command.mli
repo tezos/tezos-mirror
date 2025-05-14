@@ -10,5 +10,6 @@ val run :
   ?peers:string trace ->
   ?discovery_addr:string ->
   rpc_addr:string ->
+  ping_interval:float ->
   unit ->
   unit tzresult Lwt.t

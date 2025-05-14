@@ -101,7 +101,40 @@ let log_connections p2p =
     incoming
   |> ignore
 
-let init_p2p (p2p_config, limits) =
+let ping p2p ping_interval =
+  let open Lwt_syntax in
+  let peer_id = P2p.peer_id p2p in
+  let rec ping_loop () =
+    let* () = Lwt_unix.sleep ping_interval in
+    let msg = Format.asprintf "Hello from %a !" P2p_peer.Id.pp peer_id in
+    let all_conns =
+      P2p.fold_connections
+        p2p
+        ~init:(P2p_peer.Table.create 100)
+        ~f:(fun peer_id conn acc ->
+          P2p_peer.Table.add acc peer_id conn ;
+          acc)
+    in
+    P2p.broadcast p2p all_conns (Text msg) ;
+    ping_loop ()
+  in
+  ignore (ping_loop ())
+
+let log_messages p2p =
+  let open Lwt_syntax in
+  let rec recv_loop () =
+    let* conn, msg = P2p.recv_any p2p in
+    let info = P2p.connection_info p2p conn in
+    let* () =
+      match msg with
+      | Text s -> P2p_node_event.(emit text_message_received) (info.peer_id, s)
+      | Bytes b -> P2p_node_event.(emit bytes_message_received) (info.peer_id, b)
+    in
+    recv_loop ()
+  in
+  ignore (recv_loop ())
+
+let init_p2p ~ping_interval (p2p_config, limits) =
   let open Lwt_result_syntax in
   let c_meta = init_connection_metadata (Some p2p_config) true in
   let conn_metadata_cfg = connection_metadata_cfg c_meta in
@@ -118,12 +151,14 @@ let init_p2p (p2p_config, limits) =
 
   let () = P2p.activate p2p in
   let () = log_connections p2p in
+  ping p2p ping_interval ;
+  log_messages p2p ;
 
   return p2p |> trace Failed_to_init_P2P_node
 
-let create p2p_params =
+let create ~ping_interval p2p_params =
   let open Lwt_result_syntax in
-  let* p2p = init_p2p p2p_params in
+  let* p2p = init_p2p ~ping_interval p2p_params in
   let shutdown () =
     let*! () = P2p_node_event.(emit shutdown) () in
     let*! () = P2p.shutdown p2p in

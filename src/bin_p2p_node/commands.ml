@@ -50,8 +50,25 @@ let rpc_addr_arg =
          default_rpc_port)
     (Tezos_clic.parameter (fun () s -> Lwt_result.return s))
 
+let ping_interval_arg =
+  Tezos_clic.default_arg
+    ~long:"ping-interval"
+    ~doc:
+      "If this is set, the P2P node will ping its connected peers at this \
+       interval of time. Defaults to 10 seconds."
+    ~placeholder:"int"
+    ~default:"10"
+    (Tezos_clic.parameter (fun () p ->
+         try Lwt_result.return (float_of_string p)
+         with _ -> failwith "Cannot transform %s to int" p))
+
 let p2p_node_args =
-  Tezos_clic.args4 net_addr_arg peers_arg discovery_addr_arg rpc_addr_arg
+  Tezos_clic.args5
+    net_addr_arg
+    peers_arg
+    discovery_addr_arg
+    rpc_addr_arg
+    ping_interval_arg
 
 let run_command =
   let open Tezos_clic in
@@ -60,7 +77,13 @@ let run_command =
     ~desc:"Run the octez-p2p-node"
     p2p_node_args
     (prefix "run" @@ stop)
-    (fun (listen_addr, peers, discovery_addr, rpc_addr) () ->
-      P2p_node_run_command.run ~listen_addr ?peers ?discovery_addr ~rpc_addr ())
+    (fun (listen_addr, peers, discovery_addr, rpc_addr, ping_interval) () ->
+      P2p_node_run_command.run
+        ~listen_addr
+        ?peers
+        ?discovery_addr
+        ~rpc_addr
+        ~ping_interval
+        ())
 
 let p2p_node_commands = [run_command]

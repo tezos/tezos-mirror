@@ -7,7 +7,8 @@
 
 type t
 
-val create : P2p.config * P2p_limits.t -> (t, tztrace) result Lwt.t
+val create :
+  ping_interval:float -> P2p.config * P2p_limits.t -> (t, tztrace) result Lwt.t
 
 val shutdown : t -> unit Lwt.t
 
