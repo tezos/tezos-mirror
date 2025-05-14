@@ -201,8 +201,8 @@ let blueprint_applied block process_time =
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
       emit
         blueprint_application
-        ( Qty.to_z block.number,
-          block.timestamp |> Qty.to_z |> Z.to_int64 |> Time.Protocol.of_seconds,
+        ( Z.of_int32 block.level,
+          block.timestamp,
           0,
           Z.zero,
           block.hash,

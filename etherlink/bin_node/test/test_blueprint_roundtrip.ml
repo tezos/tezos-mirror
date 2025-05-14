@@ -76,9 +76,9 @@ let make_blueprint ~delayed_transactions ~transactions =
   in
   return blueprint
 
-let make_tez_block ~number ~timestamp ~parent_hash () =
+let make_tez_block ~level ~timestamp ~parent_hash () =
   let block_without_hash =
-    L2_types.Tezos_block.{number; hash = zero_hash; timestamp; parent_hash}
+    L2_types.Tezos_block.{level; hash = zero_hash; timestamp; parent_hash}
   in
   let block_bytes =
     Bytes.of_string
@@ -89,7 +89,7 @@ let make_tez_block ~number ~timestamp ~parent_hash () =
   let hash =
     Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
   in
-  return L2_types.Tezos_block.{number; hash; timestamp; parent_hash}
+  return L2_types.Tezos_block.{level; hash; timestamp; parent_hash}
 
 let test_blueprint_roundtrip ~title ~delayed_transactions ~transactions () =
   register ~title:(sf "Blueprint producer decoder roundtrip (%s)" title)
@@ -115,10 +115,10 @@ let test_blueprint_roundtrip ~title ~delayed_transactions ~transactions () =
       ~error_msg:"Wrong decoded of delayed transactions: got %L instead of %R") ;
   unit
 
-let test_tez_block_roundtrip ~title ~number ~timestamp ~parent_hash () =
+let test_tez_block_roundtrip ~title ~level ~timestamp ~parent_hash () =
   register ~title:(sf "Tez block producer decoder roundtrip (%s)" title)
   @@ fun () ->
-  let* block = make_tez_block ~number ~timestamp ~parent_hash () in
+  let* block = make_tez_block ~level ~timestamp ~parent_hash () in
   let encoding_result =
     expect_ok "could not encode the tez block"
     @@ L2_types.Tezos_block.encode_block block
@@ -128,14 +128,12 @@ let test_tez_block_roundtrip ~title ~number ~timestamp ~parent_hash () =
     @@ L2_types.Tezos_block.decode_block encoding_result
   in
   Check.(
-    (Z.to_int @@ Ethereum_types.Qty.to_z decoding_result.number
-    = Z.to_int @@ Ethereum_types.Qty.to_z block.number)
-      int
+    (decoding_result.level = block.level)
+      int32
       ~error_msg:"Wrong decoded of number for block: got %L instead of %R") ;
   Check.(
-    (Z.to_int @@ Ethereum_types.Qty.to_z decoding_result.timestamp
-    = Z.to_int @@ Ethereum_types.Qty.to_z block.timestamp)
-      int
+    (decoding_result.timestamp = block.timestamp)
+      (convert Time.Protocol.to_seconds int64)
       ~error_msg:"Wrong decoded of timestamp for block: got %L instead of %R") ;
   Check.(
     (Ethereum_types.block_hash_to_bytes decoding_result.parent_hash
@@ -186,15 +184,15 @@ let () =
 
   test_tez_block_roundtrip
     ~title:"all zeros tez block"
-    ~number:(Qty Z.zero)
-    ~timestamp:(Qty Z.zero)
+    ~level:0l
+    ~timestamp:Time.Protocol.epoch
     ~parent_hash:zero_hash
     () ;
 
   test_tez_block_roundtrip
     ~title:"genesis successor"
-    ~number:(Qty Z.one)
-    ~timestamp:(Qty Z.one)
+    ~level:0l
+    ~timestamp:Time.Protocol.epoch
     ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
     ()
 

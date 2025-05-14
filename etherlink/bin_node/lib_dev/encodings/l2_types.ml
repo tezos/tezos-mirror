@@ -48,10 +48,16 @@ module Chain_family = struct
 end
 
 module Tezos_block = struct
+  type block_without_hash = {
+    level : int32;
+    timestamp : Time.Protocol.t;
+    parent_hash : Ethereum_types.block_hash;
+  }
+
   type t = {
-    number : Ethereum_types.quantity;
+    level : int32;
     hash : Ethereum_types.block_hash;
-    timestamp : Ethereum_types.quantity;
+    timestamp : Time.Protocol.t;
     parent_hash : Ethereum_types.block_hash;
   }
 
@@ -63,52 +69,50 @@ module Tezos_block = struct
     Ethereum_types.Block_hash
       (Hex "8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8423e7c02934")
 
+  let block_without_hash_encoding : block_without_hash Data_encoding.t =
+    let open Data_encoding in
+    let timestamp_encoding = Time.Protocol.encoding in
+    let block_hash_encoding =
+      let open Ethereum_types in
+      conv
+        (fun (Block_hash (Hex s)) -> Hex.to_bytes_exn (`Hex s))
+        (fun b ->
+          let (`Hex s) = Hex.of_bytes b in
+          Block_hash (Hex s))
+        (Fixed.bytes 32)
+    in
+    def "tezlink_block"
+    @@ conv
+         (fun ({level; parent_hash; timestamp} : block_without_hash) ->
+           (level, parent_hash, timestamp))
+         (fun (level, parent_hash, timestamp) ->
+           {level; parent_hash; timestamp})
+         (obj3
+            (req "level" int32)
+            (req "parent_hash" block_hash_encoding)
+            (req "timestamp" timestamp_encoding))
+
+  let () = Data_encoding.Registration.register block_without_hash_encoding
+
   (* This function may be replaced in the future by an already existing function *)
   (* When Tezos block will be complete *)
-  let block_from_binary bytes =
-    if Bytes.length bytes = 44 then (
-      let number = Bytes.make 4 '\000' in
-      Bytes.blit bytes 0 number 0 4 ;
-      let number = Ethereum_types.Qty (Helpers.decode_z_be number) in
-      let previous_hash = Bytes.make 32 '\000' in
-      Bytes.blit bytes 4 previous_hash 0 32 ;
-      let parent = Ethereum_types.decode_block_hash previous_hash in
-      let timestamp = Bytes.make 8 '\000' in
-      Bytes.blit bytes 36 timestamp 0 8 ;
-      let timestamp = Ethereum_types.Qty (Helpers.decode_z_le timestamp) in
-      let block_hash = Block_hash.hash_bytes [bytes] in
-      let hash =
-        Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
-      in
-      {number; hash; timestamp; parent_hash = parent})
-    else raise (Invalid_argument "Expected a string of length 44")
-
-  let encode_block (block : t) : (string, string) result =
-    let (Ethereum_types.Qty number) = block.number in
-    let (Ethereum_types.Qty timestamp) = block.timestamp in
-
-    let z_to_32_be z =
-      let bytes = Bytes.make 32 '\000' in
-      Bytes.set_int32_be bytes 0 (Z.to_int32 z) ;
-      bytes
+  let block_from_binary bytes : t =
+    let ({level; parent_hash; timestamp} : block_without_hash) =
+      Data_encoding.Binary.of_bytes_exn block_without_hash_encoding bytes
     in
-
-    let z_to_64_le z =
-      let bytes = Bytes.make 64 '\000' in
-      Bytes.set_int64_le bytes 0 (Z.to_int64 z) ;
-      bytes
+    let block_hash = Block_hash.hash_bytes [bytes] in
+    let hash =
+      Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
     in
+    {level; parent_hash; timestamp; hash}
 
-    let number_bytes = z_to_32_be number in
-    let parent_bytes = Ethereum_types.encode_block_hash block.parent_hash in
-    let timestamp_bytes = z_to_64_le timestamp in
-
-    let encoded_block = Bytes.create 44 in
-    Bytes.blit number_bytes 0 encoded_block 0 4 ;
-    Bytes.blit parent_bytes 0 encoded_block 4 32 ;
-    Bytes.blit timestamp_bytes 0 encoded_block 36 8 ;
-
-    Ok (Bytes.to_string encoded_block)
+  let encode_block ({level; parent_hash; timestamp; hash = _} : t) :
+      (string, string) result =
+    Ok
+      (Bytes.to_string
+      @@ Data_encoding.Binary.to_bytes_exn
+           block_without_hash_encoding
+           {level; parent_hash; timestamp})
 
   let decode_block (b : string) : (t, string) result =
     let b = Bytes.of_string b in
@@ -121,7 +125,9 @@ let block_hash block =
   match block with Eth block -> block.hash | Tez block -> block.hash
 
 let block_number block =
-  match block with Eth block -> block.number | Tez block -> block.number
+  match block with
+  | Eth block -> block.number
+  | Tez block -> Ethereum_types.Qty (Z.of_int32 block.level)
 
 let block_number_of_transactions block =
   match block with
