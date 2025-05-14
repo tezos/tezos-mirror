@@ -22,16 +22,41 @@ module WorkerTbl = struct
   let find_opt tbl ~name = String.Hashtbl.find_opt tbl name
 end
 
-type t = {workers : WorkerTbl.t}
+type t = {
+  workers : WorkerTbl.t;
+  lwt_tasks_stream : (unit -> unit Lwt.t) Eio.Stream.t;
+}
 
-let hive = {workers = WorkerTbl.create ~initial_size:64}
+let hive =
+  {
+    workers = WorkerTbl.create ~initial_size:64;
+    lwt_tasks_stream = Eio.Stream.create max_int;
+  }
+
+(* Initialize the [lwt_scheduler_loop] by running it in its own domain in the
+   main Eio switch *)
+let () =
+  let lwt_scheduler_loop () =
+    let rec loop () : [`Stop_daemon] =
+      let lwt_closure = Eio.Stream.take hive.lwt_tasks_stream in
+      Lwt_eio.run_lwt_in_main lwt_closure ;
+      loop ()
+    in
+    loop ()
+  in
+  Tezos_base_unix.Event_loop.on_main_run (fun env switch ->
+      Eio.Fiber.fork_daemon ~sw:switch (fun () ->
+          Eio.Domain_manager.run env#domain_mgr lwt_scheduler_loop))
+
+let async_lwt = Eio.Stream.add hive.lwt_tasks_stream
 
 exception Unknown_worker of string
 
 let launch_worker (type worker) ?switch (worker : worker) ~bee_name ~domains
     worker_loop =
-  let {workers} = hive in
+  let {workers; _} = hive in
   let env = Tezos_base_unix.Event_loop.env_exn () in
+
   (* The fibers created by [fork_daemon] will be cancelled by the switch used
      once the switch has finished processing all non-daemon fibers.
 
@@ -62,7 +87,7 @@ let launch_worker (type worker) ?switch (worker : worker) ~bee_name ~domains
        {worker; launched = Time.System.now (); subdomains = domains; switch})
 
 let get_error bee_name =
-  let {workers} = hive in
+  let {workers; _} = hive in
   match WorkerTbl.find_opt workers ~name:bee_name with
   (* Note that this branch shouldn't be reachable, as this function is supposed
      to be called from within an existing worker loop. *)
