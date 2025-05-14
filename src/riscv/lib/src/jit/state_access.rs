@@ -27,12 +27,14 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 
 use abi::AbiCall;
+use cranelift::codegen::ir;
 use cranelift::codegen::ir::FuncRef;
 use cranelift::codegen::ir::InstBuilder;
 use cranelift::codegen::ir::Type;
 use cranelift::codegen::ir::Value;
 use cranelift::codegen::ir::types::I8;
 use cranelift::frontend::FunctionBuilder;
+use cranelift::prelude::MemFlags;
 use cranelift_jit::JITBuilder;
 use cranelift_jit::JITModule;
 use cranelift_module::FuncId;
@@ -49,6 +51,7 @@ use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::XRegisters;
 use crate::machine_state::registers::XValue;
 use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::owned_backend::Owned;
@@ -258,15 +261,88 @@ pub trait JitStateAccess: ManagerReadWrite {
             }
         }
     }
+
+    // -------------
+    // IR Generation
+    // -------------
+
+    /// Emit the required IR to read the value from the given xregister.
+    fn ir_xreg_read<MC: MemoryConfig>(
+        jsa_calls: &mut JsaCalls<'_, MC, Self>,
+        builder: &mut FunctionBuilder<'_>,
+        core_ptr: Value,
+        reg: NonZeroXRegister,
+    ) -> X64 {
+        let xreg_read = jsa_calls.xreg_read.get_or_insert_with(|| {
+            jsa_calls
+                .module
+                .declare_func_in_func(jsa_calls.imports.xreg_read, builder.func)
+        });
+        let reg = builder.ins().iconst(I8, reg as i64);
+        let call = builder.ins().call(*xreg_read, &[core_ptr, reg]);
+        X64(builder.inst_results(call)[0])
+    }
+
+    /// Emit the required IR to write the value to the given xregister.
+    fn ir_xreg_write<MC: MemoryConfig>(
+        jsa_calls: &mut JsaCalls<'_, MC, Self>,
+        builder: &mut FunctionBuilder<'_>,
+        core_ptr: Value,
+        reg: NonZeroXRegister,
+        value: X64,
+    ) {
+        let xreg_write = jsa_calls.xreg_write.get_or_insert_with(|| {
+            jsa_calls
+                .module
+                .declare_func_in_func(jsa_calls.imports.xreg_write, builder.func)
+        });
+        let reg = builder.ins().iconst(I8, reg as i64);
+        builder.ins().call(*xreg_write, &[core_ptr, reg, value.0]);
+    }
 }
 
-impl JitStateAccess for Owned {}
+impl JitStateAccess for Owned {
+    fn ir_xreg_read<MC: MemoryConfig>(
+        _jsa_calls: &mut JsaCalls<'_, MC, Self>,
+        builder: &mut FunctionBuilder<'_>,
+        core_ptr: Value,
+        reg: NonZeroXRegister,
+    ) -> X64 {
+        let offset = std::mem::offset_of!(MachineCoreState<MC, Self>, hart.xregisters)
+            + XRegisters::<Owned>::xregister_offset(reg);
+
+        // memory access corresponds directly to the xregister value
+        // - known to be aligned and non-trapping
+        let val = builder
+            .ins()
+            .load(ir::types::I64, MemFlags::trusted(), core_ptr, offset as i32);
+
+        X64(val)
+    }
+
+    fn ir_xreg_write<MC: MemoryConfig>(
+        _jsa_calls: &mut JsaCalls<'_, MC, Self>,
+        builder: &mut FunctionBuilder<'_>,
+        core_ptr: Value,
+        reg: NonZeroXRegister,
+        value: X64,
+    ) {
+        let offset = std::mem::offset_of!(MachineCoreState<MC, Self>, hart.xregisters)
+            + XRegisters::<Owned>::xregister_offset(reg);
+
+        // memory access corresponds directly to the xregister value
+        // - known to be aligned and non-trapping
+        builder
+            .ins()
+            .store(MemFlags::trusted(), value.0, core_ptr, offset as i32);
+    }
+}
 
 impl<M: ManagerReadWrite> JitStateAccess for ProofGen<M> {}
 
 /// References to locally imported [`JitStateAccess`] methods, used to directly call
 /// these accessor methods in the JIT-compilation context.
-pub(super) struct JsaCalls<'a, MC: MemoryConfig, JSA: JitStateAccess> {
+pub struct JsaCalls<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     module: &'a mut JITModule,
     imports: &'a JsaImports<MC, JSA>,
     ptr_type: Type,
@@ -316,38 +392,6 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
                 .declare_func_in_func(self.imports.pc_write, builder.func)
         });
         builder.ins().call(*pc_write, &[core_ptr, pc_val.0]);
-    }
-
-    /// Emit the required IR to read the value from the given xregister.
-    pub(super) fn xreg_read(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        core_ptr: Value,
-        reg: NonZeroXRegister,
-    ) -> X64 {
-        let xreg_read = self.xreg_read.get_or_insert_with(|| {
-            self.module
-                .declare_func_in_func(self.imports.xreg_read, builder.func)
-        });
-        let reg = builder.ins().iconst(I8, reg as i64);
-        let call = builder.ins().call(*xreg_read, &[core_ptr, reg]);
-        X64(builder.inst_results(call)[0])
-    }
-
-    /// Emit the required IR to write the value to the given xregister.
-    pub(super) fn xreg_write(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        core_ptr: Value,
-        reg: NonZeroXRegister,
-        value: X64,
-    ) {
-        let xreg_write = self.xreg_write.get_or_insert_with(|| {
-            self.module
-                .declare_func_in_func(self.imports.xreg_write, builder.func)
-        });
-        let reg = builder.ins().iconst(I8, reg as i64);
-        builder.ins().call(*xreg_write, &[core_ptr, reg, value.0]);
     }
 
     /// Emit the required IR to call `handle_exception`.

@@ -18,6 +18,7 @@ use super::ManagerReadWrite;
 use super::ManagerSerialise;
 use super::ManagerWrite;
 use super::Ref;
+use super::owned_backend::Owned;
 use super::proof_backend::ProofGen;
 use super::proof_backend::merkle::AccessInfoAggregatable;
 use crate::default::ConstDefault;
@@ -457,6 +458,14 @@ impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
         M: ManagerReadWrite,
     {
         M::region_replace(&mut self.region, index, value)
+    }
+}
+
+impl<E: 'static, const LEN: usize> Cells<E, LEN, Owned> {
+    /// Obtain the byte offset from a pointer to `Cells<E, LEN, M>` to the memory of the elem at
+    /// `index`.
+    pub(crate) const fn region_elem_offset(index: usize) -> usize {
+        std::mem::offset_of!(Self, region) + Owned::region_elem_offset::<E, LEN>(index)
     }
 }
 
