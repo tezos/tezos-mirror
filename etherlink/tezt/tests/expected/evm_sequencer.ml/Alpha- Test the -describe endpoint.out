@@ -52,6 +52,12 @@ Available services:
           The chain unique identifier. 
     - GET /tezlink/describe
         RPCs documentation and input/output schema 
+    - GET /tezlink/monitor/bootstrapped
+        Wait for the node to have synchronized its chain with a few peers
+        (configured by the node's administrator), streaming head updates that
+        happen during the bootstrapping process, and closing the stream at
+        the end. If the node was already bootstrapped, returns the current
+        head immediately. 
     - GET /tezlink/version
         Get information on the node version 
   - GET /version
@@ -114,6 +120,12 @@ Available services:
           Current and next protocol. 
     - GET /chains/<chain_id>/chain_id
         The chain unique identifier. 
+  - GET /monitor/bootstrapped
+      Wait for the node to have synchronized its chain with a few peers
+      (configured by the node's administrator), streaming head updates that
+      happen during the bootstrapping process, and closing the stream at the
+      end. If the node was already bootstrapped, returns the current head
+      immediately. 
   - GET /version
       Get information on the node version 
 

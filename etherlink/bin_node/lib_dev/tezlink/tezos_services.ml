@@ -343,6 +343,16 @@ module Imported_services = struct
         Block_services.block_header )
       Tezos_rpc.Service.t =
     import_service Block_services.S.header
+
+  let bootstrapped :
+      ( [`GET],
+        unit,
+        unit,
+        unit,
+        unit,
+        Block_hash.t * Time.Protocol.t )
+      Constants_services.RPC_service.t =
+    import_service Tezos_shell_services.Monitor_services.S.bootstrapped
 end
 
 let chain_directory_path = Tezos_shell_services.Chain_services.path
@@ -485,9 +495,16 @@ let register_chain_services ~l2_chain_id
 
 (** Builds the root directory. *)
 let build_dir ~l2_chain_id backend =
+  let (module Backend : Tezlink_backend_sig.S) = backend in
   Tezos_rpc.Directory.empty
   |> register_block_services ~l2_chain_id backend
   |> register_chain_services ~l2_chain_id backend
+  |> register_with_conversion
+       ~service:Imported_services.bootstrapped
+       ~impl:(fun () () () -> Backend.bootstrapped ())
+       ~convert_output:(fun (input_hash, input_time) ->
+         Result_syntax.return
+           (Protocol_types.ethereum_to_tezos_block_hash input_hash, input_time))
   |> register ~service:Imported_services.version ~impl:(fun () () () ->
          version ())
 
