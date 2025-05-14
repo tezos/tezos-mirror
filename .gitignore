@@ -135,6 +135,7 @@ _evm_unstripped_installer_preimages/
 etherlink-governance-observer
 floodgate
 etherlink-outbox-monitor
+/fa-bridge-watchtower
 /etherlink/docs/book/*
 
 # Terraform

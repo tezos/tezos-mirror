@@ -292,6 +292,7 @@ let evm_node_lib_dev =
         octez_rpc_http |> open_;
         octez_rpc_http_server;
         dream;
+        websocket_lwt_unix;
         websocket_cohttp_lwt;
         octez_workers |> open_;
         octez_rpc_http_client_unix;
@@ -320,20 +321,6 @@ let evm_node_lib_dev =
         supported_installers;
         wasm_runtime;
         performance_metrics;
-      ]
-
-let evm_node_lib_dev_client =
-  octez_evm_node_lib
-    "evm_node_lib_dev_client"
-    ~path:"etherlink/bin_node/lib_dev/client"
-    ~synopsis:"Client library for communicating with an EVM node"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        websocket_lwt_unix;
-        evm_node_lib_dev_encoding |> open_;
-        evm_node_lib_dev |> open_;
-        octez_rpc_http |> open_;
       ]
 
 let _octez_evm_node_tests =
@@ -555,9 +542,61 @@ let _outbox_monitor =
         re;
         octez_sqlite |> open_;
         evm_node_lib_dev_encoding |> open_;
-        evm_node_lib_dev_client |> open_;
         evm_node_lib_dev |> open_;
         octez_smart_rollup_lib;
+      ]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "migrations.ml"];
+            [S "deps"; [S "glob_files"; S "migrations/*.sql"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "sql";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S ".";
+              ];
+            ];
+          ];
+        ]
+
+let _fa_bridge_watchtower =
+  public_exe
+    "fa-bridge-watchtower"
+    ~internal_name:"main"
+    ~path:"etherlink/fa-bridge-watchtower"
+    ~opam:"fa-bridge-watchtower"
+    ~release_status:Unreleased
+    ~with_macos_security_framework:true
+    ~synopsis:"A binary to claim FA deposits sent by the bridge"
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_version_value;
+        octez_clic;
+        octez_rpc_http |> open_;
+        octez_rpc_http_client_unix;
+        octez_stdlib_unix |> open_;
+        caqti_lwt;
+        crunch;
+        re;
+        octez_sqlite |> open_;
+        evm_node_lib_dev_encoding |> open_;
+        evm_node_lib_dev |> open_;
+        efunc_core;
+        dream;
       ]
     ~dune:
       Dune.

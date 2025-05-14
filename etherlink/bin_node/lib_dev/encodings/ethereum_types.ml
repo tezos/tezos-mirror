@@ -232,6 +232,8 @@ let hash_to_bytes (Hash h) = hex_to_bytes h
 
 let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
+let equal_hash (Hash (Hex h1)) (Hash (Hex h2)) = String.equal h1 h2
+
 let pp_hash fmt (Hash (Hex h)) = Format.pp_print_string fmt h
 
 let pp_block_hash fmt (Block_hash (Hex h)) = Format.pp_print_string fmt h
@@ -1068,6 +1070,8 @@ module Address = struct
   type t = address
 
   let compare (Address (Hex h)) (Address (Hex h')) = String.compare h h'
+
+  let equal (Address (Hex h)) (Address (Hex h')) = String.equal h h'
 
   let to_string = address_to_string
 

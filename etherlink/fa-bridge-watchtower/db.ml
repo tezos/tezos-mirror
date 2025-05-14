@@ -1,0 +1,422 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2025 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2025 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
+open Caqti_request.Infix
+open Caqti_type.Std
+
+(** Current version for migrations. *)
+let version = 0
+
+module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
+
+let quantity_hum_encoding =
+  Data_encoding.conv
+    (fun (Ethereum_types.Qty z) -> z)
+    Ethereum_types.quantity_of_z
+    Data_encoding.z
+
+type deposit = {
+  nonce : Ethereum_types.quantity;
+  proxy : Ethereum_types.Address.t;
+  ticket_hash : Ethereum_types.hash;
+  receiver : Ethereum_types.Address.t;
+  amount : Ethereum_types.quantity;
+}
+
+type log_info = {
+  transactionHash : Ethereum_types.hash;
+  transactionIndex : Ethereum_types.quantity;
+  logIndex : Ethereum_types.quantity;
+  blockHash : Ethereum_types.block_hash;
+  blockNumber : Ethereum_types.quantity;
+  removed : bool;
+}
+
+type execution_info = {
+  transactionHash : Ethereum_types.hash;
+  transactionIndex : Ethereum_types.quantity;
+  blockHash : Ethereum_types.block_hash;
+  blockNumber : Ethereum_types.quantity;
+}
+
+type deposit_log = {
+  deposit : deposit;
+  log_info : log_info;
+  claimed : execution_info option;
+}
+
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["fa_bridge_watchtower"; "db"]
+
+  let create_db =
+    declare_0
+      ~section
+      ~name:"create_db"
+      ~msg:"Database is being created"
+      ~level:Info
+      ()
+
+  let applied_migration =
+    declare_1
+      ~section
+      ~name:"applied_migration"
+      ~msg:"Applied migration \"{name}\" to the database"
+      ~level:Notice
+      ("name", Data_encoding.string)
+
+  let migrations_from_the_future =
+    declare_2
+      ~section
+      ~name:"migrations_from_the_future"
+      ~msg:"Database has {applied} migrations applied but only aware of {known}"
+      ~level:Error
+      ("applied", Data_encoding.int31)
+      ("known", Data_encoding.int31)
+end
+
+let with_connection db conn =
+  match conn with
+  | Some conn -> Sqlite.with_connection conn
+  | None -> fun k -> Sqlite.use db @@ fun conn -> Sqlite.with_connection conn k
+
+let _with_transaction db k =
+  Sqlite.use db @@ fun conn -> Sqlite.with_transaction conn k
+
+module Types = struct
+  let level =
+    custom
+      ~encode:(fun (Ethereum_types.Qty x) -> Ok Z.(to_int x))
+      ~decode:(fun x -> Ok (Qty Z.(of_int x)))
+      int
+
+  let amount =
+    custom
+      ~encode:(fun (Ethereum_types.Qty x) -> Ok Z.(to_string x))
+      ~decode:(fun x -> Ok (Qty Z.(of_string x)))
+      string
+
+  let address =
+    custom
+      ~encode:(fun (Ethereum_types.Address (Hex address)) ->
+        Result.of_option ~error:"not a valid address"
+        @@ Hex.to_string (`Hex address))
+      ~decode:(fun address ->
+        let (`Hex address) = Hex.of_string address in
+        Ok (Address (Hex address)))
+      octets
+
+  let hash =
+    custom
+      ~encode:(fun (Ethereum_types.Hash (Hex hash)) ->
+        Result.of_option ~error:"not a valid hash" @@ Hex.to_string (`Hex hash))
+      ~decode:(fun hash ->
+        let (`Hex hash) = Hex.of_string hash in
+        Ok (Hash (Hex hash)))
+      octets
+
+  let block_hash =
+    custom
+      ~encode:(fun (Ethereum_types.Block_hash (Hex hash)) ->
+        Result.of_option ~error:"not a valid hash" @@ Hex.to_string (`Hex hash))
+      ~decode:(fun hash ->
+        let (`Hex hash) = Hex.of_string hash in
+        Ok (Block_hash (Hex hash)))
+      octets
+
+  let deposit =
+    product (fun nonce proxy ticket_hash receiver amount ->
+        {nonce; proxy; ticket_hash; receiver; amount})
+    @@ proj level (fun d -> d.nonce)
+    @@ proj address (fun d -> d.proxy)
+    @@ proj hash (fun d -> d.ticket_hash)
+    @@ proj address (fun d -> d.receiver)
+    @@ proj amount (fun d -> d.amount)
+    @@ proj_end
+
+  let log_info =
+    product
+      (fun
+        transactionHash
+        transactionIndex
+        logIndex
+        blockHash
+        blockNumber
+        removed
+      ->
+        {
+          transactionHash;
+          transactionIndex;
+          logIndex;
+          blockHash;
+          blockNumber;
+          removed;
+        })
+    @@ proj hash (fun (l : log_info) -> l.transactionHash)
+    @@ proj level (fun (l : log_info) -> l.transactionIndex)
+    @@ proj level (fun (l : log_info) -> l.logIndex)
+    @@ proj block_hash (fun (l : log_info) -> l.blockHash)
+    @@ proj level (fun (l : log_info) -> l.blockNumber)
+    @@ proj bool (fun (l : log_info) -> l.removed)
+    @@ proj_end
+
+  let execution_info =
+    product (fun transactionHash transactionIndex blockHash blockNumber ->
+        {transactionHash; transactionIndex; blockHash; blockNumber})
+    @@ proj hash (fun (l : execution_info) -> l.transactionHash)
+    @@ proj level (fun (l : execution_info) -> l.transactionIndex)
+    @@ proj block_hash (fun (l : execution_info) -> l.blockHash)
+    @@ proj level (fun (l : execution_info) -> l.blockNumber)
+    @@ proj_end
+
+  let deposit_log =
+    product (fun deposit log_info claimed -> {deposit; log_info; claimed})
+    @@ proj deposit (fun d -> d.deposit)
+    @@ proj log_info (fun d -> d.log_info)
+    @@ proj (option execution_info) (fun d -> d.claimed)
+    @@ proj_end
+end
+
+module Migrations = struct
+  module Q = struct
+    let table_exists =
+      (string ->! bool)
+      @@ {sql|
+    SELECT EXISTS (
+      SELECT name FROM sqlite_master
+      WHERE type='table'
+        AND name=?
+    )|sql}
+
+    let create_table =
+      (unit ->. unit)
+      @@ {sql|
+      CREATE TABLE migrations (
+        id SERIAL PRIMARY KEY,
+        name TEXT
+      )|sql}
+
+    let current_migration =
+      (unit ->? int) @@ {|SELECT id FROM migrations ORDER BY id DESC LIMIT 1|}
+
+    let register_migration =
+      (t2 int string ->. unit)
+      @@ {sql|
+      INSERT INTO migrations (id, name) VALUES (?, ?)
+      |sql}
+
+    let all : Sql_migrations.migration list = Sql_migrations.migrations version
+  end
+
+  let create_table store =
+    Sqlite.with_connection store @@ fun conn ->
+    Sqlite.Db.exec conn Q.create_table ()
+
+  let table_exists store =
+    Sqlite.with_connection store @@ fun conn ->
+    Sqlite.Db.find conn Q.table_exists "migrations"
+
+  let missing_migrations store =
+    let open Lwt_result_syntax in
+    let all_migrations = List.mapi (fun i m -> (i, m)) Q.all in
+    let* current =
+      Sqlite.with_connection store @@ fun conn ->
+      Sqlite.Db.find_opt conn Q.current_migration ()
+    in
+    match current with
+    | Some current ->
+        let applied = current + 1 in
+        let known = List.length all_migrations in
+        if applied <= known then return (List.drop_n applied all_migrations)
+        else
+          let*! () =
+            Events.(emit migrations_from_the_future) (applied, known)
+          in
+          failwith
+            "Cannot use a database at migration %d, the fa bridge watchtower \
+             only supports up to %d"
+            applied
+            known
+    | None -> return all_migrations
+
+  let apply_migration store id (module M : Sql_migrations.S) =
+    let open Lwt_result_syntax in
+    Sqlite.with_connection store @@ fun conn ->
+    let* () = List.iter_es (fun up -> Sqlite.Db.exec conn up ()) M.apply in
+    Sqlite.Db.exec conn Q.register_migration (id, M.name)
+end
+
+type t = Sqlite.t
+
+let sqlite_file_name = "fa-bridge-watchtower.sqlite"
+
+let init ~data_dir perm : t tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let*! () = Tezos_stdlib_unix.Lwt_utils_unix.create_dir data_dir in
+  let path = Filename.concat data_dir sqlite_file_name in
+  let*! exists = Lwt_unix.file_exists path in
+  let migration conn =
+    Sqlite.assert_in_transaction conn ;
+    let* () =
+      if not exists then
+        let* () = Migrations.create_table conn in
+        let*! () = Events.(emit create_db) () in
+        return_unit
+      else
+        let* table_exists = Migrations.table_exists conn in
+        let* () =
+          when_ (not table_exists) (fun () ->
+              failwith
+                "A database already exists, but its content is incorrect.")
+        in
+        return_unit
+    in
+    let* migrations = Migrations.missing_migrations conn in
+    let* () =
+      List.iter_es
+        (fun (i, ((module M : Sql_migrations.S) as mig)) ->
+          let* () = Migrations.apply_migration conn i mig in
+          let*! () = Events.(emit applied_migration) M.name in
+          return_unit)
+        migrations
+    in
+    return_unit
+  in
+  Sqlite.init ~path ~perm migration
+
+module Deposits = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (t2 deposit log_info ->. unit)
+      @@ {sql|
+      REPLACE INTO deposits
+      (nonce, proxy, ticket_hash, receiver, amount,
+       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
+       log_blockNumber, log_removed)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      |sql}
+
+    let unclaimed =
+      (unit ->* deposit)
+      @@ {sql|
+      SELECT
+       nonce, proxy, ticket_hash, receiver, amount
+      FROM deposits
+      where exec_transactionHash IS NULL
+      ORDER BY nonce DESC
+      |sql}
+
+    let unclaimed_full =
+      (unit ->* t2 deposit log_info)
+      @@ {sql|
+      SELECT
+       nonce, proxy, ticket_hash, receiver, amount,
+       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
+       log_blockNumber, log_removed
+      FROM deposits
+      where exec_transactionHash IS NULL
+      ORDER BY nonce DESC
+      |sql}
+
+    let list =
+      (t2 int int ->* deposit_log)
+      @@ {sql|
+      SELECT
+       nonce, proxy, ticket_hash, receiver, amount,
+       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
+       log_blockNumber, log_removed,
+       exec_transactionHash, exec_transactionIndex, exec_blockHash,
+       exec_blockNumber
+      FROM deposits
+      ORDER BY nonce DESC LIMIT ? OFFSET ?
+      |sql}
+
+    let list_by_receiver =
+      (t3 address int int ->* deposit_log)
+      @@ {sql|
+      SELECT
+       nonce, proxy, ticket_hash, receiver, amount,
+       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
+       log_blockNumber, log_removed,
+       exec_transactionHash, exec_transactionIndex, exec_blockHash,
+       exec_blockNumber
+      FROM deposits
+      WHERE receiver = ?
+      ORDER BY nonce DESC LIMIT ? OFFSET ?
+      |sql}
+
+    let set_claimed =
+      (t2 execution_info level ->. unit)
+      @@ {sql|
+      UPDATE deposits
+      SET
+        exec_transactionHash = ?,
+        exec_transactionIndex = ?,
+        exec_blockHash = ?,
+        exec_blockNumber = ?
+      WHERE
+        nonce = ?
+      |sql}
+  end
+
+  let store ?conn db deposit log_info =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.insert (deposit, log_info)
+
+  let get_unclaimed ?conn db =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.unclaimed ()
+
+  let get_unclaimed_full ?conn db =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.unclaimed_full ()
+
+  let set_claimed ?conn db nonce execution_info =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.set_claimed (execution_info, nonce)
+
+  let list ?conn db ~limit ~offset =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.list (limit, offset)
+
+  let list_by_receiver ?conn db addr ~limit ~offset =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.list_by_receiver (addr, limit, offset)
+end
+
+module Pointers = struct
+  module L2_head = struct
+    module Q = struct
+      open Types
+
+      let set =
+        (level ->. unit)
+        @@ {sql|REPLACE INTO pointers (name, value) VALUES ("l2_head", ?)|sql}
+
+      let find =
+        (unit ->? level)
+        @@ {sql|SELECT value from pointers WHERE name = "l2_head"|sql}
+
+      let get =
+        (unit ->! level)
+        @@ {sql|SELECT value from pointers WHERE name = "l2_head"|sql}
+    end
+
+    let set ?conn db value =
+      with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.set value
+
+    let find ?conn db =
+      with_connection db conn @@ fun conn -> Sqlite.Db.find_opt conn Q.find ()
+
+    let get ?conn db =
+      with_connection db conn @@ fun conn -> Sqlite.Db.find conn Q.get ()
+  end
+end

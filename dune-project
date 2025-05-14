@@ -10,6 +10,7 @@
 (package (name etherlink-benchmark-producer))
 (package (name etherlink-governance-observer))
 (package (name etherlink-outbox-monitor))
+(package (name fa-bridge-watchtower))
 (package (name floodgate))
 (package (name gitlab_ci))
 (package (name internal-devtools))

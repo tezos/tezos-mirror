@@ -445,6 +445,18 @@ let block_number = function
   | EIP_2930 obj -> obj.block_number
   | EIP_1559 obj -> obj.block_number
 
+let input = function
+  | Kernel obj -> obj.input
+  | Legacy obj -> obj.input
+  | EIP_2930 obj -> obj.input
+  | EIP_1559 obj -> obj.input
+
+let to_ = function
+  | Kernel obj -> obj.to_
+  | Legacy obj -> obj.to_
+  | EIP_2930 obj -> obj.to_
+  | EIP_1559 obj -> obj.to_
+
 let encoding =
   let open Data_encoding in
   union

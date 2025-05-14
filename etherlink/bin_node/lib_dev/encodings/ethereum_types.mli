@@ -129,6 +129,8 @@ val hash_to_string : hash -> string
 (** [hash_to_bytes hash] transforms the [hash] to binary format. *)
 val hash_to_bytes : hash -> string
 
+val equal_hash : hash -> hash -> bool
+
 (** Ethereum address (20 bytes) *)
 type address = Address of hex [@@unboxed]
 
@@ -290,7 +292,11 @@ module Address : sig
 
   val compare : t -> t -> int
 
+  val equal : t -> t -> bool
+
   val to_string : t -> string
+
+  val of_string : string -> t
 end
 
 (** [timestamp_to_bytes timestamp] transforms the timestamp to bytes

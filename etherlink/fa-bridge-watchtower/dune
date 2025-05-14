@@ -3,8 +3,8 @@
 
 (executable
  (name main)
- (public_name etherlink-outbox-monitor)
- (package etherlink-outbox-monitor)
+ (public_name fa-bridge-watchtower)
+ (package fa-bridge-watchtower)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-evm-node-libs.evm_node_rust_deps
@@ -15,12 +15,14 @@
   octez-libs.clic
   octez-libs.rpc-http
   octez-libs.rpc-http-client-unix
+  octez-libs.stdlib-unix
   caqti-lwt
   re
   octez-l2-libs.sqlite
   octez-evm-node-libs.evm_node_lib_dev_encoding
   octez-evm-node-libs.evm_node_lib_dev
-  octez-l2-libs.smart-rollup)
+  efunc_core
+  dream)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -29,6 +31,7 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_rpc_http
+  -open Tezos_stdlib_unix
   -open Octez_sqlite
   -open Evm_node_lib_dev_encoding
   -open Evm_node_lib_dev))

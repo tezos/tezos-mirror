@@ -45,6 +45,9 @@ type request = {
   callback : callback;
 }
 
+(** Inject transactions with either RPCs or on a websocket connection. *)
+type endpoint = Rpc of Uri.t | Websocket of Websocket_client.t
+
 (** [Nonce_bitset] registers known nonces from transactions that went
     through the tx_queue from a specific sender address. With this
     structure it's easy to do bookkeeping of address' nonce without
@@ -383,7 +386,7 @@ module Request = struct
         address : Ethereum_types.address;
       }
         -> (Ethereum_types.quantity, tztrace) t
-    | Tick : {evm_node_endpoint : Uri.t} -> (unit, tztrace) t
+    | Tick : {evm_node_endpoint : endpoint} -> (unit, tztrace) t
     | Clear : (unit, tztrace) t
     | Lock_transactions : (unit, tztrace) t
     | Unlock_transactions : (unit, tztrace) t
@@ -407,6 +410,13 @@ module Request = struct
   type view = View : _ t -> view
 
   let view req = View req
+
+  let endpoint_encoding =
+    let open Data_encoding in
+    conv
+      (function Rpc uri -> Uri.to_string uri | Websocket _ -> "[websocket]")
+      (fun _ -> assert false)
+      string
 
   let encoding =
     let open Data_encoding in
@@ -436,10 +446,9 @@ module Request = struct
           ~title:"Tick"
           (obj2
              (req "request" (constant "tick"))
-             (req "evm_node_endpoint" string))
+             (req "evm_node_endpoint" endpoint_encoding))
           (function
-            | View (Tick {evm_node_endpoint}) ->
-                Some ((), Uri.to_string evm_node_endpoint)
+            | View (Tick {evm_node_endpoint}) -> Some ((), evm_node_endpoint)
             | _ -> None)
           (fun _ -> assert false);
         case
@@ -572,17 +581,29 @@ let send_transactions_batch ~evm_node_endpoint ~keep_alive transactions =
     let*! () = Tx_queue_events.injecting_transactions (List.length batch) in
 
     let* responses =
-      Rollup_services.call_service
-        ~keep_alive
-        ~base:evm_node_endpoint
-        (Batch.dispatch_batch_service ~path:Resto.Path.root)
-        ()
-        ()
-        (Batch batch)
-    in
-
-    let responses =
-      match responses with Singleton r -> [r] | Batch rs -> rs
+      match evm_node_endpoint with
+      | Rpc base ->
+          let* batch_response =
+            Rollup_services.call_service
+              ~keep_alive
+              ~base
+              (Batch.dispatch_batch_service ~path:Resto.Path.root)
+              ()
+              ()
+              (Batch batch)
+          in
+          return
+            (match batch_response with Singleton r -> [r] | Batch rs -> rs)
+      | Websocket ws_client ->
+          List.map_es
+            (fun req ->
+              let+ resp_json =
+                Websocket_client.send_jsonrpc_request ws_client req
+              in
+              Data_encoding.Json.destruct
+                Rpc_encodings.JSONRPC.response_encoding
+                resp_json)
+            batch
     in
 
     let* missed_callbacks =
