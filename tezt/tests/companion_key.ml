@@ -201,10 +201,10 @@ let test_update_companion_key =
   in
   unit
 
-let test_update_companion_key_without_consensus_key =
+let test_update_companion_key_for_non_tz4_delegate =
   Protocol.register_regression_test
     ~__FILE__
-    ~title:"update companion key without updating consensus key"
+    ~title:"update companion key for non tz4 delegate"
     ~tags:[team; "companion_key"]
     ~supports:(Protocol.From_protocol 023)
   @@ fun protocol ->
@@ -249,7 +249,7 @@ let test_update_companion_key_without_consensus_key =
   unit
 
 let test_update_companion_key_for_tz4_delegate =
-  Protocol.register_test
+  Protocol.register_regression_test
     ~__FILE__
     ~title:"update companion key for tz4 delegate"
     ~tags:[team; "companion_key"]
@@ -286,6 +286,7 @@ let test_update_companion_key_for_tz4_delegate =
   Log.info "Updating companion key" ;
   let* () =
     Client.update_companion_key
+      ~hooks
       ~src:delegate.alias
       ~pk:companion_key_bls.alias
       client
@@ -319,5 +320,5 @@ let test_update_companion_key_for_tz4_delegate =
 
 let register ~protocols =
   test_update_companion_key protocols ;
-  test_update_companion_key_without_consensus_key protocols ;
+  test_update_companion_key_for_non_tz4_delegate protocols ;
   test_update_companion_key_for_tz4_delegate protocols
