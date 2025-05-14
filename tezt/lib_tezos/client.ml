@@ -508,6 +508,24 @@ module Admin = struct
   let connect_address ?endpoint ~peer client =
     spawn_connect_address ?endpoint ~peer client |> Process.check
 
+  let spawn_connect_p2p_node_address ?endpoint ~(peer : P2p_node.t) client =
+    spawn_command
+      ?endpoint
+      client
+      [
+        "connect";
+        "address";
+        Printf.sprintf
+          "%s:%d"
+          (address
+             ?from:endpoint
+             (Foreign_endpoint (P2p_node.as_rpc_endpoint peer)))
+          (P2p_node.net_port peer);
+      ]
+
+  let connect_p2p_node_address ?endpoint ~peer client =
+    spawn_connect_p2p_node_address ?endpoint ~peer client |> Process.check
+
   let spawn_kick_peer ?endpoint ~peer client =
     spawn_command ?endpoint client ["kick"; "peer"; peer]
 

@@ -1,5 +1,6 @@
 injector_server: _build/default/contrib/octez_injector_server/octez_injector_server.exe
 yes_wallet: _build/default/devtools/yes_wallet/yes_wallet.exe
+p2p_node: _build/default/src/bin_p2p_node/main_p2p_node.exe
 dal_echo_kernel: dal_echo_kernel.wasm
 etherlink_governance_observer: etherlink-governance-observer
 debug_kernel: etherlink/kernel_latest/kernel/tests/resources/debug_kernel.wasm

@@ -167,6 +167,12 @@ end
 let octez_agnostic_baker =
   Uses.make ~tag:"agnostic_baker" ~path:"./octez-baker" ()
 
+let octez_p2p_node =
+  Uses.make
+    ~tag:"p2p_node"
+    ~path:"./_build/default/src/bin_p2p_node/main_p2p_node.exe"
+    ()
+
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?
 *)
