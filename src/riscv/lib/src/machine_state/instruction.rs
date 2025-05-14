@@ -40,6 +40,7 @@ use crate::instruction_context::ICB;
 use crate::instruction_context::IcbFnResult;
 use crate::instruction_context::IcbLoweringFn;
 use crate::instruction_context::LoadStoreWidth;
+use crate::instruction_context::MulHighType;
 use crate::instruction_context::Predicate;
 use crate::instruction_context::Shift;
 use crate::interpreter::atomics;
@@ -296,9 +297,9 @@ pub enum OpCode {
     Divw,
     Divuw,
     Mul,
-    Mulh,
-    Mulhsu,
-    Mulhu,
+    X64MulHighSigned,
+    X64MulHighSignedUnsigned,
+    X64MulHighUnsigned,
     X32Mul,
 
     // RV64F instructions
@@ -513,9 +514,9 @@ impl OpCode {
             Self::Divw => Args::run_divw,
             Self::Divuw => Args::run_divuw,
             Self::Mul => Args::run_mul,
-            Self::Mulh => Args::run_mulh,
-            Self::Mulhsu => Args::run_mulhsu,
-            Self::Mulhu => Args::run_mulhu,
+            Self::X64MulHighSigned => Args::run_x64_mul_high_signed,
+            Self::X64MulHighSignedUnsigned => Args::run_x64_mul_high_signed_unsigned,
+            Self::X64MulHighUnsigned => Args::run_x64_mul_high_unsigned,
             Self::X32Mul => Args::run_x32_mul,
             Self::FclassS => Args::run_fclass_s,
             Self::Feqs => Args::run_feq_s,
@@ -633,6 +634,9 @@ impl OpCode {
             Self::X64XorImm => Some(Args::run_x64_xor_immediate),
             Self::Mul => Some(Args::run_mul),
             Self::X32Mul => Some(Args::run_x32_mul),
+            Self::X64MulHighSigned => Some(Args::run_x64_mul_high_signed),
+            Self::X64MulHighSignedUnsigned => Some(Args::run_x64_mul_high_signed_unsigned),
+            Self::X64MulHighUnsigned => Some(Args::run_x64_mul_high_unsigned),
             Self::X64DivSigned => Some(Args::run_x64_div_signed),
             Self::Li => Some(Args::run_li),
             Self::AddImmediateToPC => Some(Args::run_add_immediate_to_pc),
@@ -907,6 +911,23 @@ macro_rules! impl_x32_shift_type {
             let rs1 = unsafe { self.rs1.nzx };
             let rd = unsafe { self.rd.nzx };
             integer::run_x32_shift_immediate(icb, Shift::$shift, rs1, self.imm, rd);
+            icb.ok(Next(self.width))
+        }
+    };
+}
+
+macro_rules! impl_x64_mul_high_type {
+    ($fn: ident, $mul_high_type: ident) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            integer::run_x64_mul_high(
+                icb,
+                unsafe { self.rs1.nzx },
+                unsafe { self.rs2.nzx },
+                unsafe { self.rd.nzx },
+                MulHighType::$mul_high_type,
+            );
             icb.ok(Next(self.width))
         }
     };
@@ -1487,9 +1508,9 @@ impl Args {
     impl_r_type!(run_divw);
     impl_r_type!(run_divuw);
     impl_r_type!(integer::run_mul, run_mul, non_zero);
-    impl_r_type!(run_mulh);
-    impl_r_type!(run_mulhsu);
-    impl_r_type!(run_mulhu);
+    impl_x64_mul_high_type!(run_x64_mul_high_signed, Signed);
+    impl_x64_mul_high_type!(run_x64_mul_high_signed_unsigned, SignedUnsigned);
+    impl_x64_mul_high_type!(run_x64_mul_high_unsigned, Unsigned);
     impl_r_type!(integer::run_x32_mul, run_x32_mul, non_zero_rd);
 
     // RV64F instructions
@@ -1932,18 +1953,9 @@ impl From<&InstrCacheable> for Instruction {
                 args: args.into(),
             },
             InstrCacheable::Mul(args) => Instruction::from_ic_mul(args),
-            InstrCacheable::Mulh(args) => Instruction {
-                opcode: OpCode::Mulh,
-                args: args.into(),
-            },
-            InstrCacheable::Mulhsu(args) => Instruction {
-                opcode: OpCode::Mulhsu,
-                args: args.into(),
-            },
-            InstrCacheable::Mulhu(args) => Instruction {
-                opcode: OpCode::Mulhu,
-                args: args.into(),
-            },
+            InstrCacheable::Mulh(args) => Instruction::from_ic_mulh(args),
+            InstrCacheable::Mulhsu(args) => Instruction::from_ic_mulhsu(args),
+            InstrCacheable::Mulhu(args) => Instruction::from_ic_mulhu(args),
             InstrCacheable::Mulw(args) => {
                 Instruction::new_x32_mul(args.rd, args.rs1, args.rs2, InstrWidth::Uncompressed)
             }

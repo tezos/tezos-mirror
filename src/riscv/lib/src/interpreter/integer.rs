@@ -5,6 +5,7 @@
 //! Implementation of integer arithmetic operations for RISC-V over the ICB.
 
 use crate::instruction_context::ICB;
+use crate::instruction_context::MulHighType;
 use crate::instruction_context::Predicate;
 use crate::instruction_context::Shift;
 use crate::instruction_context::arithmetic::Arithmetic;
@@ -353,6 +354,23 @@ pub fn run_x32_mul(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZe
     let result = lhs.mul(rhs, icb);
 
     let result = icb.extend_signed(result);
+
+    icb.xregister_write_nz(rd, result)
+}
+
+// Extend `val(rs1)` and `val(rs2)` to 128 bits, multiply the 128 bits value and store the upper 64 bits in `rd`
+#[inline]
+pub fn run_x64_mul_high(
+    icb: &mut impl ICB,
+    rs1: NonZeroXRegister,
+    rs2: NonZeroXRegister,
+    rd: NonZeroXRegister,
+    mul_high_type: MulHighType,
+) {
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xregister_read_nz(rs2);
+
+    let result = icb.mul_high(lhs, rhs, mul_high_type);
 
     icb.xregister_write_nz(rd, result)
 }
@@ -1046,5 +1064,81 @@ mod tests {
                     .wrapping_mul(state.hart.xregisters.read(a2))
                     .wrapping_add(state.hart.xregisters.read(a3)));
         })
+    });
+
+    macro_rules! test_x64_mul_high {
+        ($state:ident, $r1_val:expr, $r2_val:expr, $mul_high_type:expr, $expected_val:expr) => {
+            $state.hart.xregisters.write_nz(nz::a0, $r1_val);
+            $state.hart.xregisters.write_nz(nz::a1, $r2_val);
+            run_x64_mul_high(&mut $state, nz::a0, nz::a1, nz::a2, $mul_high_type);
+            assert_eq!($state.hart.xregisters.read_nz(nz::a2), $expected_val);
+        };
+    }
+
+    backend_test!(test_x64_mul_high, F, {
+        let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
+
+        // MULH (Signed × Signed)
+        test_x64_mul_high!(
+            state,
+            i64::MAX as u64,
+            i64::MAX as u64,
+            MulHighType::Signed,
+            (((i64::MAX as i128) * (i64::MAX as i128)) >> 64) as u64
+        );
+        test_x64_mul_high!(
+            state,
+            i64::MIN as u64,
+            i64::MIN as u64,
+            MulHighType::Signed,
+            (((i64::MIN as i128) * (i64::MIN as i128)) >> 64) as u64
+        );
+        test_x64_mul_high!(
+            state,
+            i64::MIN as u64,
+            i64::MAX as u64,
+            MulHighType::Signed,
+            (((i64::MIN as i128) * (i64::MAX as i128)) >> 64) as u64
+        );
+
+        // MULHSU (Signed × Unsigned)
+        test_x64_mul_high!(
+            state,
+            i64::MAX as u64,
+            u64::MAX,
+            MulHighType::SignedUnsigned,
+            (((i64::MAX as i128) * (u64::MAX as u128) as i128) >> 64) as u64
+        );
+        test_x64_mul_high!(
+            state,
+            i64::MIN as u64,
+            u64::MAX,
+            MulHighType::SignedUnsigned,
+            (((i64::MIN as i128) * (u64::MAX as u128) as i128) >> 64) as u64
+        );
+        test_x64_mul_high!(
+            state,
+            -1i64 as u64,
+            u64::MAX,
+            MulHighType::SignedUnsigned,
+            (-((u64::MAX as u128) as i128) >> 64) as u64
+        );
+
+        // MULHU (Unsigned × Unsigned)
+        test_x64_mul_high!(
+            state,
+            u64::MAX,
+            u64::MAX,
+            MulHighType::Unsigned,
+            (((u64::MAX as u128) * (u64::MAX as u128)) >> 64) as u64
+        );
+        test_x64_mul_high!(
+            state,
+            i64::MIN as u64,
+            2u64,
+            MulHighType::Unsigned,
+            (((i64::MIN as u64 as u128) * (2u128)) >> 64) as u64
+        );
+        test_x64_mul_high!(state, 0u64, u64::MAX, MulHighType::Unsigned, 0u64);
     });
 }

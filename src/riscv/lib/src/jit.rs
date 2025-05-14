@@ -2373,4 +2373,110 @@ mod tests {
             scenario.run(&mut jit, &mut interpreted_bb);
         }
     });
+
+    backend_test!(test_mul_high, F, {
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        let test_mul_high = |constructor: fn(
+            NonZeroXRegister,
+            NonZeroXRegister,
+            NonZeroXRegister,
+            InstrWidth,
+        ) -> I,
+                             lhs_reg: NonZeroXRegister,
+                             lhs_val: u64,
+                             rhs_reg: NonZeroXRegister,
+                             rhs_val: u64,
+                             expected: u64|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_setup_hook(setup_hook!(core, F, {
+                    core.hart.xregisters.write_nz(lhs_reg, lhs_val);
+                    core.hart.xregisters.write_nz(rhs_reg, rhs_val);
+                }))
+                .set_instructions(&[constructor(x2, lhs_reg, rhs_reg, Compressed)])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(x2), expected);
+                }))
+                .build()
+        };
+
+        let scenarios: &[Scenario<F>] = &[
+            // MULH (Signed × Signed)
+            test_mul_high(
+                I::new_x64_mul_high_signed,
+                x1,
+                i64::MAX as u64,
+                x3,
+                i64::MAX as u64,
+                (((i64::MAX as i128) * (i64::MAX as i128)) >> 64) as u64,
+            ),
+            test_mul_high(
+                I::new_x64_mul_high_signed,
+                x1,
+                i64::MIN as u64,
+                x3,
+                i64::MIN as u64,
+                (((i64::MIN as i128) * (i64::MIN as i128)) >> 64) as u64,
+            ),
+            test_mul_high(
+                I::new_x64_mul_high_signed,
+                x1,
+                i64::MIN as u64,
+                x3,
+                i64::MAX as u64,
+                (((i64::MIN as i128) * (i64::MAX as i128)) >> 64) as u64,
+            ),
+            // MULHSU (Signed × Unsigned)
+            test_mul_high(
+                I::new_x64_mul_high_signed_unsigned,
+                x1,
+                i64::MAX as u64,
+                x3,
+                u64::MAX,
+                (((i64::MAX as i128) * (u64::MAX as u128) as i128) >> 64) as u64,
+            ),
+            test_mul_high(
+                I::new_x64_mul_high_signed_unsigned,
+                x1,
+                i64::MIN as u64,
+                x3,
+                u64::MAX,
+                (((i64::MIN as i128) * (u64::MAX as u128) as i128) >> 64) as u64,
+            ),
+            test_mul_high(
+                I::new_x64_mul_high_signed_unsigned,
+                x1,
+                -1i64 as u64,
+                x3,
+                u64::MAX,
+                (-((u64::MAX as u128) as i128) >> 64) as u64,
+            ),
+            // MULHU (Unsigned × Unsigned)
+            test_mul_high(
+                I::new_x64_mul_high_unsigned,
+                x1,
+                u64::MAX,
+                x3,
+                u64::MAX,
+                (((u64::MAX as u128) * (u64::MAX as u128)) >> 64) as u64,
+            ),
+            test_mul_high(
+                I::new_x64_mul_high_unsigned,
+                x1,
+                i64::MIN as u64,
+                x3,
+                2u64,
+                (((i64::MIN as u64 as u128) * (2u128)) >> 64) as u64,
+            ),
+            test_mul_high(I::new_x64_mul_high_unsigned, x1, 0u64, x3, u64::MAX, 0u64),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
 }
