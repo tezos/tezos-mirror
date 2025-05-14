@@ -130,6 +130,9 @@ pub(crate) trait ICB {
     /// Type for boolean operations.
     type Bool;
 
+    /// Perform a logical `and` operation of two [`ICB::Bool`] values.
+    fn bool_and(&mut self, lhs: Self::Bool, rhs: Self::Bool) -> Self::Bool;
+
     /// A 32-bit value to be used only in word-width operations.
     type XValue32: Arithmetic<Self> + Comparable<Self>;
 
@@ -289,6 +292,11 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     }
 
     type Bool = bool;
+
+    #[inline(always)]
+    fn bool_and(&mut self, lhs: Self::Bool, rhs: Self::Bool) -> Self::Bool {
+        lhs && rhs
+    }
 
     type XValue32 = XValue32;
 

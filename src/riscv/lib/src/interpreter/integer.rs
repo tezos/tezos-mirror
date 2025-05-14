@@ -11,6 +11,7 @@ use crate::instruction_context::arithmetic::Arithmetic;
 use crate::instruction_context::comparable::Comparable;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
+use crate::machine_state::registers::XValue;
 use crate::parser::SHIFT_BITMASK;
 
 /// Moves the two's complement of `val(rs1)` into `rd`.
@@ -354,6 +355,40 @@ pub fn run_x32_mul(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZe
     let result = icb.extend_signed(result);
 
     icb.xregister_write_nz(rd, result)
+}
+
+/// Signed integer division `⌊ val(rs1) / val(rs2) ⌋`, storing the result in `rd`.
+///
+/// If `val(rs2) == 0`, the result is `-1`.
+/// If `val(rs2) == -1` and `val(rs1) == i64::MIN`, the result is `i64::MIN`.
+///
+/// All values are _signed integers_.  
+pub fn run_div(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+    let rval1 = icb.xregister_read(rs1);
+    let rval2 = icb.xregister_read(rs2);
+    let zero = icb.xvalue_of_imm(0);
+    let cond = rval2.compare(zero, Predicate::Equal, icb);
+
+    let result = icb.branch_merge::<XValue, _, _>(
+        cond,
+        |icb| icb.xvalue_of_imm(-1),
+        |icb| {
+            let minimum = icb.xvalue_of_imm(i64::MIN);
+            let minus_one = icb.xvalue_of_imm(-1);
+
+            let cond1 = rval2.compare(minus_one, Predicate::Equal, icb);
+            let cond2 = rval1.compare(minimum, Predicate::Equal, icb);
+            let cond = icb.bool_and(cond1, cond2);
+
+            icb.branch_merge::<XValue, _, _>(
+                cond,
+                |icb| icb.xvalue_of_imm(i64::MIN),
+                |icb| rval1.div_signed(rval2, icb),
+            )
+        },
+    );
+
+    icb.xregister_write_nz(rd, result);
 }
 
 /// Shift bits in `rs1` by `shift_amount = val(rs2)\[5:0\]` in the method specified by `shift`
@@ -985,6 +1020,26 @@ mod tests {
             state.hart.xregisters.write(t3, val2);
             run_x64_xor(&mut state, nz::t3, nz::t2, nz::t1);
             prop_assert_eq!(state.hart.xregisters.read(t1), val1 ^ val2);
+        })
+    });
+
+    backend_test!(test_division, F, {
+        proptest!(|(
+            r1_val in any::<u64>(),
+            r2_val in any::<u64>(),
+        )| {
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
+
+            state.hart.xregisters.write(a0, r1_val);
+            state.hart.xregisters.write(a1, r2_val);
+            run_div(&mut state, a0, a1, nz::a2);
+            state.hart.xregisters.run_rem(a0, a1, a3);
+
+            prop_assert_eq!(
+                state.hart.xregisters.read(a0),
+                state.hart.xregisters.read(a1)
+                    .wrapping_mul(state.hart.xregisters.read(a2))
+                    .wrapping_add(state.hart.xregisters.read(a3)));
         })
     });
 }

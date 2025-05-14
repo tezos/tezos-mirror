@@ -49,27 +49,6 @@ where
         self.write(rd, result);
     }
 
-    /// `DIV` R-type instruction
-    ///
-    /// Divide val(rs1) by val(rs2). The result is stored in `rd`. In case val(rs2)
-    /// is zero, the result is `-1`. In case val(rs2) is `-1` and val(rs1) is the
-    /// minimum of signed 64 bit integer, the result is this minimum value as well.
-    /// All values are _signed integers_.
-    pub fn run_div(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
-        let rval1 = self.read(rs1) as i64;
-        let rval2 = self.read(rs2) as i64;
-
-        let result = if rval2 == 0 {
-            -1
-        } else if rval2 == -1 && rval1 == i64::MIN {
-            i64::MIN
-        } else {
-            rval1 / rval2
-        };
-
-        self.write(rd, result as u64);
-    }
-
     /// `DIVU` R-type instruction
     ///
     /// Divide val(rs1) by val(rs2). The result is stored in `rd`. In case val(rs2)
@@ -138,26 +117,6 @@ mod test {
     use crate::machine_state::registers::a2;
     use crate::machine_state::registers::a3;
     use crate::state::NewState;
-
-    backend_test!(test_div_rem_invariant, F, {
-        proptest!(|(
-            r1_val in any::<u64>(),
-            r2_val in any::<u64>(),
-        )| {
-            let mut state = XRegisters::new(&mut F::manager());
-
-            state.write(a0, r1_val);
-            state.write(a1, r2_val);
-            state.run_div(a0, a1, a2);
-            state.run_rem(a0, a1, a3);
-
-            prop_assert_eq!(
-                state.read(a0),
-                state.read(a1)
-                    .wrapping_mul(state.read(a2))
-                    .wrapping_add(state.read(a3)));
-        })
-    });
 
     backend_test!(test_divu_remu_invariant, F, {
         proptest!(|(

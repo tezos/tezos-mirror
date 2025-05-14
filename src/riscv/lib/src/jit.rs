@@ -992,6 +992,51 @@ mod tests {
         }
     });
 
+    backend_test!(test_div_jit, F, {
+        use crate::machine_state::registers::nz;
+        use crate::machine_state::registers::*;
+
+        let test_division = |numerator: i64, denominator: i64, expected: u64| {
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(nz::a0, numerator, Uncompressed),
+                    I::new_li(nz::a1, denominator, Compressed),
+                    I::new_div(nz::a2, a0, a1, Compressed),
+                    I::new_nop(Uncompressed),
+                ])
+                .set_expected_steps(4)
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(nz::a2), expected);
+                }))
+                .build()
+        };
+
+        let scenarios: &[Scenario<F>] = &[
+            // check standard division
+            test_division(10, 2, 5),
+            // check signed division.
+            test_division(10, -2, -5_i64 as u64),
+            test_division(-10, -2, 5),
+            // check division by zero
+            test_division(i64::MAX, 0, -1_i64 as u64),
+            // check when `val(rs2) == -1` but `val(rs1) != i64::MIN`.
+            test_division(38294, -1, -38294_i64 as u64),
+            // check when `val(rs1) == i64::MIN` but `val(rs2) != -1`.
+            test_division(i64::MIN, i64::MIN, 1),
+            // check when `val(rs1) == i64::MIN` and `val(rs2) == -1`.
+            test_division(i64::MIN, -1, i64::MIN as u64),
+            // check division of a smaller-magnitude number by a larger-magnitude number.
+            test_division(40, -80, 0),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
     backend_test!(test_j, F, {
         let scenarios: &[Scenario<F>] = &[
             ScenarioBuilder::default()

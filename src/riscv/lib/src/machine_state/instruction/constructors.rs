@@ -1213,6 +1213,25 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Div`].
+    pub(crate) fn new_div(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Div,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::ECall`].
     pub(crate) fn new_ecall() -> Self {
         Self {
@@ -1947,6 +1966,19 @@ impl Instruction {
             }
             (X::NonZero(rd), X::NonZero(rs1), X::NonZero(rs2)) => {
                 Instruction::new_mul(rd, rs1, rs2, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Div`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Div`]: crate::parser::instruction::InstrCacheable::Div
+    pub(super) fn from_ic_div(args: &RTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd), split_x0(args.rs1), split_x0(args.rs2)) {
+            (X::X0, _, _) => Instruction::new_nop(InstrWidth::Uncompressed),
+            (X::NonZero(rd), _, _) => {
+                Instruction::new_div(rd, args.rs1, args.rs2, InstrWidth::Uncompressed)
             }
         }
     }

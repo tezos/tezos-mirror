@@ -45,6 +45,11 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> Arithmetic<Builder<'_, MC, JSA>> for
         X64(res)
     }
 
+    fn div_signed(self, other: Self, icb: &mut Builder<'_, MC, JSA>) -> Self {
+        let res = icb.builder.ins().sdiv(self.0, other.0);
+        X64(res)
+    }
+
     fn negate(self, icb: &mut Builder<'_, MC, JSA>) -> Self {
         X64(icb.builder.ins().ineg(self.0))
     }
@@ -90,6 +95,11 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> Arithmetic<Builder<'_, MC, JSA>> for
 
     fn mul(self, other: Self, icb: &mut Builder<'_, MC, JSA>) -> Self {
         let res = icb.builder.ins().imul(self.0, other.0);
+        X32(res)
+    }
+
+    fn div_signed(self, other: Self, icb: &mut Builder<'_, MC, JSA>) -> Self {
+        let res = icb.builder.ins().sdiv(self.0, other.0);
         X32(res)
     }
 

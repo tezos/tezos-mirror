@@ -271,6 +271,10 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
     /// An `I8` width value.
     type Bool = Value;
 
+    fn bool_and(&mut self, lhs: Self::Bool, rhs: Self::Bool) -> Self::Bool {
+        self.builder.ins().band(lhs, rhs)
+    }
+
     type XValue32 = X32;
 
     fn narrow(&mut self, value: Self::XValue) -> Self::XValue32 {

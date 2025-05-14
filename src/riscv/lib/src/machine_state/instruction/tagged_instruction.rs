@@ -343,7 +343,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | X32LoadUnsigned | X64LoadSigned | X8Store | X16Store | X32Store | X64Store | Lrw
         | Scw | Amoswapw | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw | Amomaxw | Amominuw
         | Amomaxuw | Lrd | Scd | Amoswapd | X64AtomicAdd | Amoxord | Amoandd | Amoord | Amomind
-        | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw
+        | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw | Remuw | Divu | Divw | Divuw
         | Mulh | Mulhsu | Mulhu | X32Mul | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci => {
             ArgsShape::XSrcXDest
         }
@@ -417,7 +417,8 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | SetLessThanUnsigned
         | SetLessThanImmediateSigned
         | SetLessThanImmediateUnsigned
-        | AddImmediateToPC => ArgsShape::XSrcNZXDest,
+        | AddImmediateToPC
+        | Div => ArgsShape::XSrcNZXDest,
     }
 }
 
