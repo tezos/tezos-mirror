@@ -522,17 +522,35 @@ let test_tezlink_current_level =
   (* test with offset larger than a cycle *)
   let* res = rpc_current_level "head" ~offset:40000 in
   let* () = check_current_level res 40000 in
-  (* test negative offset *)
+  (* Bake 5 blocks and test that "head" is now at level 5. *)
   let* () =
     repeat 5 (fun () ->
         let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
+  let* res = rpc_current_level "head" in
+  let* () = check_current_level res 5 in
+  (* test negative offset *)
   let* res = rpc_current_level "head" ~offset:(-1) in
   Check.(
     JSON.(
       res |> as_list |> List.hd |-> "msg" |> as_string
       = "The specified level offset should be positive.")
+      string
+      ~error_msg:"Should have failed: expected %R but got %L") ;
+  (* test numeric block parameter *)
+  let* res = rpc_current_level "3" ~offset:1 in
+  let* () = check_current_level res 4 in
+  let* res = rpc_current_level "genesis" in
+  let err = JSON.(res |> as_list |> List.hd) in
+  Check.(
+    JSON.(
+      err |-> "id" |> as_string
+      = "evm_node.dev.tezlink.unsupported_block_parameter")
+      string
+      ~error_msg:"Should have failed: expected %R but got %L") ;
+  Check.(
+    JSON.(err |-> "block" |> as_string = "genesis")
       string
       ~error_msg:"Should have failed: expected %R but got %L") ;
 

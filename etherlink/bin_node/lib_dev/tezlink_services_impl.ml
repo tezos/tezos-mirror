@@ -24,11 +24,8 @@ module Path = struct
   let counter contract = account contract ^ "/counter"
 end
 
-let balance read chain block c =
-  (* TODO: #7831 !17664
-     Support non-default chain and block parameters. *)
-  ignore chain ;
-  ignore block ;
+let balance read chain c =
+  let `Main = chain in
 
   Durable_storage.inspect_durable_and_decode_default
     ~default:Tezos_types.Tez.zero
@@ -36,22 +33,20 @@ let balance read chain block c =
     (Path.balance c)
     (Data_encoding.Binary.of_bytes_exn Tez.encoding)
 
-let manager_key read chain block c =
+let manager_key read chain c =
   (* TODO: #7831 !17664
      Support non-default chain and block parameters. *)
-  ignore chain ;
-  ignore block ;
+  let `Main = chain in
 
   Durable_storage.inspect_durable_and_decode_opt
     read
     (Path.manager_key c)
     (Data_encoding.Binary.of_bytes_exn Signature.V1.Public_key.encoding)
 
-let counter read chain block c =
+let counter read chain c =
   (* TODO: #7831 !17664
      Support non-default chain and block parameters. *)
-  ignore chain ;
-  ignore block ;
+  let `Main = chain in
 
   Durable_storage.inspect_durable_and_decode_default
   (* FIXME: #7960
@@ -72,42 +67,32 @@ module type Backend = sig
 end
 
 module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
+  type block_param = [`Head | `Level of int32]
+
+  let shell_block_param_to_block_number =
+    let open Lwt_result_syntax in
+    function
+    | `Head ->
+        let* (Qty current_block_number) =
+          Backend.block_param_to_block_number (Block_parameter Latest)
+        in
+        return current_block_number
+    | `Level l -> return (Z.of_int32 l)
+
   let current_level chain block ~offset =
     let open Lwt_result_syntax in
+    let `Main = chain in
+
     let* offset =
       (* Tezos l1 requires non-negative offset #7845 *)
       if offset >= 0l then return offset
       else failwith "The specified level offset should be positive."
     in
 
-    (* TODO: #7831
-       take chain into account
-       For the moment this implementation only supports the main chain, once
-       the rpc support of tezlink is more stable, we can add support for other chains *)
-    let* () =
-      match chain with
-      | `Main -> return_unit
-      | _ -> failwith "Unsupported chain"
-    in
-
-    (* TODO: #7831
-       take block into account
-       For the moment this implementation only supports the head block, once
-       the rpc support of tezlink is more stable, we can add support for other blocks *)
-    let* () =
-      match block with
-      | `Head _ -> return_unit
-      | _ -> failwith "Unsupported block"
-    in
-
-    let* (Qty current_block_number) =
-      Backend.block_param_to_block_number (Block_parameter Latest)
-    in
-
-    let current_block_number = Z.to_int32 current_block_number in
+    let* block_number = shell_block_param_to_block_number block in
 
     let constants = Tezlink_constants.all_constants in
-    let level = Int32.add current_block_number offset in
+    let level = Z.to_int32 (Z.add block_number (Z.of_int32 offset)) in
     return
       Tezos_types.
         {
@@ -116,57 +101,32 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
           cycle_position = Int32.rem level constants.parametric.blocks_per_cycle;
         }
 
-  let constants chain block =
+  let constants chain (_block : block_param) =
     let open Lwt_result_syntax in
-    (* TODO: #7831
-       take chain into account
-       For the moment this implementation only supports the main chain, once
-       the rpc support of tezlink is more stable, we can add support for other chains *)
-    let* () =
-      match chain with
-      | `Main -> return_unit
-      | _ -> failwith "Unsupported chain"
-    in
-
-    (* TODO: #7831
-       take block into account
-       For the moment this implementation only supports the head block, once
-       the rpc support of tezlink is more stable, we can add support for other blocks *)
-    let* () =
-      match block with
-      | `Head _ -> return_unit
-      | _ -> failwith "Unsupported block"
-    in
+    let `Main = chain in
     return Tezlink_constants.all_constants
 
-  let read p =
+  let read ~block p =
     let open Lwt_result_syntax in
-    let* state = Backend.get_state () in
+    let block =
+      match block with
+      | `Head -> Ethereum_types.Block_parameter.(Block_parameter Latest)
+      | `Level l ->
+          Ethereum_types.Block_parameter.(
+            Block_parameter (Number (Qty (Z.of_int32 l))))
+    in
+    let* state = Backend.get_state ~block () in
     Backend.read state p
 
-  (* TODO: #7831 !17664
-     we type [chain], even though we don't use it, to satisfy the compiler. *)
-  let balance (chain : [> `Main]) = balance read chain
+  let balance chain block = balance (read ~block) chain
 
-  (* TODO: #7831 !17664
-     we type [chain], even though we don't use it, to satisfy the compiler. *)
-  let manager_key (chain : [> `Main]) = manager_key read chain
+  let manager_key chain block = manager_key (read ~block) chain
 
-  (* TODO: #7831 !17664
-     we type [chain], even though we don't use it, to satisfy the compiler. *)
-  let counter (chain : [> `Main]) = counter read chain
+  let counter chain block = counter (read ~block) chain
 
   let header chain block =
     let open Lwt_result_syntax in
-    (* TODO: #7831
-       take chain and block into account
-       For the moment this implementation only supports the main chain and head block, once
-       the rpc support of tezlink is more stable, we can add support for other chains and blocks. *)
-    ignore (chain, block) ;
-
-    let* (Qty block_number) =
-      Backend.block_param_to_block_number (Block_parameter Latest)
-    in
-
+    let `Main = chain in
+    let* block_number = shell_block_param_to_block_number block in
     Backend.tez_nth_block block_number
 end

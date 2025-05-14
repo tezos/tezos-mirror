@@ -361,38 +361,100 @@ let version () =
   (* TODO: #7857 need proper implementation *)
   Lwt_result_syntax.return Tezlink_version.mock
 
+type error +=
+  | Unsupported_chain_parameter of string
+  | Unsupported_block_parameter of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.unsupported_chain_parameter"
+    ~title:"Unsupported chain in RPC parameter"
+    ~description:"In a RPC call, the chain parameter was unsupported."
+    ~pp:(fun ppf chain ->
+      Format.fprintf ppf "Unsupported chain parameter %s" chain)
+    Data_encoding.(obj1 (req "chain" string))
+    (function Unsupported_chain_parameter chain -> Some chain | _ -> None)
+    (fun chain -> Unsupported_chain_parameter chain) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.unsupported_block_parameter"
+    ~title:"Unsupported block in RPC parameter"
+    ~description:"In a RPC call, the block parameter was unsupported."
+    ~pp:(fun ppf block ->
+      Format.fprintf ppf "Unsupported block parameter %s" block)
+    Data_encoding.(obj1 (req "block" string))
+    (function Unsupported_block_parameter block -> Some block | _ -> None)
+    (fun block -> Unsupported_block_parameter block)
+
+let check_chain =
+  let open Result_syntax in
+  function
+  | `Main -> return `Main
+  | chain ->
+      tzfail
+        (Unsupported_chain_parameter
+           (Tezos_shell_services.Chain_services.to_string chain))
+
+let check_block =
+  let open Result_syntax in
+  function
+  | `Level l -> return (`Level l)
+  | `Head 0 -> return `Head
+  | block ->
+      tzfail
+        (Unsupported_block_parameter
+           (Tezos_shell_services.Block_services.to_string block))
+
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
 let register_block_services ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) base_dir =
+  let open Lwt_result_syntax in
   let dir =
     Tezos_rpc.Directory.empty
     |> register_with_conversion
          ~service:Imported_services.current_level
          ~impl:(fun {block; chain} query () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
            Backend.current_level chain block ~offset:query.offset)
          ~convert_output:Protocol_types.Level.convert
-    |> register ~service:Imported_services.protocols ~impl:(fun _ _ () ->
+    |> register
+         ~service:Imported_services.protocols
+         ~impl:(fun {block; chain} _query () ->
+           let*? `Main = check_chain chain in
+           let*? _block = check_block block in
            protocols ())
     |> register
          ~service:Imported_services.balance
          ~impl:(fun ({chain; block}, contract) _ _ ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
            Backend.balance chain block contract)
     |> register
          ~service:Imported_services.manager_key
          ~impl:(fun ({chain; block}, contract) _ _ ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
            Backend.manager_key chain block contract)
     |> register_with_conversion
          ~service:Imported_services.counter
          ~impl:(fun ({block; chain}, contract) () () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
            Backend.counter chain block contract)
          ~convert_output:Protocol_types.Counter.of_z
     |> register
          ~service:Imported_services.constants
-         ~impl:(fun {block; chain} () () -> Backend.constants chain block)
+         ~impl:(fun {block; chain} () () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           Backend.constants chain block)
     |> register_with_conversion
          ~service:Imported_services.header
          ~impl:(fun {chain; block} () () ->
-           let open Lwt_result_syntax in
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
            let* header = Backend.header chain block in
            Lwt_result_syntax.return (header, chain))
          ~convert_output:
