@@ -26,8 +26,120 @@
 module Types = Tezos_dal_node_services.Types
 
 module Term = struct
-  let p2p_point_arg ~default_port =
+  type env = {docs : string; doc : string; name : string}
+
+  type 'a arg = {
+    default : 'a option;
+    short : char option;
+    long : string;
+    extra_long : string list;
+    parse : string -> ('a, string) result;
+    doc : string;
+    placeholder : string;
+    pp : Format.formatter -> 'a -> unit;
+    env : env option;
+  }
+
+  type 'a arg_list = {
+    default : 'a list;
+    short : char option;
+    long : string;
+    extra_long : string list;
+    parse : string -> ('a, string) result;
+    doc : string;
+    placeholder : string;
+    pp : Format.formatter -> 'a -> unit;
+    env : env option;
+  }
+
+  type switch = {long : string; extra_long : string list; doc : string}
+
+  let make_env ~docs ~doc name = {docs; doc; name}
+
+  let make_arg ?default ?short ~parse ~doc ?(placeholder = "VAL") ~pp ?env
+      ?(extra_long = []) long : 'a arg =
+    {default; short; long; extra_long; parse; doc; placeholder; pp; env}
+
+  let make_arg_list ?(default = []) ?short ~parse ~doc ?(placeholder = "VAL")
+      ~pp ?env ?(extra_long = []) long : 'a arg_list =
+    {default; short; long; extra_long; parse; doc; placeholder; pp; env}
+
+  let make_switch ~doc ?(extra_long = []) long = {long; extra_long; doc}
+
+  let docs = "OPTIONS"
+
+  let env_to_cmdliner {docs; doc; name} =
     let open Cmdliner in
+    Cmd.Env.info ~docs ~doc name
+
+  let arg_to_cmdliner
+      ({default; short; long; extra_long; parse; doc; placeholder; pp; env} :
+        'a arg) =
+    let open Cmdliner in
+    let parser =
+      let parser s = match parse s with Ok x -> `Ok x | Error s -> `Error s in
+      (parser, pp)
+    in
+    let names =
+      match short with
+      | None -> long :: extra_long
+      | Some short -> String.make 1 short :: long :: extra_long
+    in
+    Arg.(
+      value
+      & opt (some parser) default
+      & info
+          ~doc
+          ~docs
+          ?env:(Option.map env_to_cmdliner env)
+          ~docv:placeholder
+          names)
+
+  let arg_list_to_cmdliner
+      ({default; short; long; extra_long; parse; doc; placeholder; pp; env} :
+        'a arg_list) =
+    let open Cmdliner in
+    let parser =
+      let parser s = match parse s with Ok x -> `Ok x | Error s -> `Error s in
+      (parser, pp)
+    in
+    let names =
+      match short with
+      | None -> long :: extra_long
+      | Some short -> String.make 1 short :: long :: extra_long
+    in
+    Arg.(
+      value
+      & opt (list parser) default
+      & info
+          ~doc
+          ~docs
+          ?env:(Option.map env_to_cmdliner env)
+          ~docv:placeholder
+          names)
+
+  let switch_to_cmdliner {long; extra_long; doc} =
+    let open Cmdliner in
+    Arg.(value & flag & info ~docs ~doc (long :: extra_long))
+
+  let arg_list (parse, printer) =
+    let parse s =
+      let l = String.split_on_char ',' s in
+      let rec traverse acc = function
+        | [] -> Ok (List.rev acc)
+        | x :: xs -> (
+            match parse x with
+            | Ok x -> traverse (x :: acc) xs
+            | Error err -> Error err)
+      in
+      traverse [] l
+    in
+    ( parse,
+      Format.pp_print_list
+        ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",")
+        printer )
+
+  let p2p_point_format ~default_port =
     let decoder str =
       match P2p_point.Id.of_string ~default_port str with
       | Ok x -> Ok x
@@ -43,134 +155,144 @@ module Term = struct
                 Ok default
               with Failure _ ->
                 Error
-                  (`Msg
-                    (Format.asprintf "The port provided: '%s' is invalid" port))
-              )
-          | _ -> Error (`Msg msg))
+                  (Format.asprintf "The port provided: '%s' is invalid" port))
+          | _ -> Error msg)
     in
     let printer = P2p_point.Id.pp in
-    Arg.conv (decoder, printer)
+    (decoder, printer)
 
-  let docs = "OPTIONS"
-
-  let data_dir =
-    let open Cmdliner in
-    let doc =
-      Format.sprintf
+  let data_dir_arg =
+    make_arg
+      ~doc:
         "The directory where the Octez DAL node will store all its data. \
          Parent directories are created if necessary."
-    in
-    Arg.(
-      value
-      & opt (some string) None
-      & info ~docs ~docv:"DIR" ~doc ["data-dir"; "d"])
+      ~short:'d'
+      ~parse:Result.ok
+      ~placeholder:"DIR"
+      ~pp:Format.pp_print_string
+      "data-dir"
 
-  let rpc_addr =
-    let open Cmdliner in
+  let data_dir = arg_to_cmdliner data_dir_arg
+
+  let rpc_addr_arg =
     let default_port = Configuration_file.default.rpc_addr |> snd in
-    let doc =
-      Format.asprintf
+    let parse, pp = p2p_point_format ~default_port in
+    make_arg
+      ~doc:
         "The TCP address and optionally the port at which the RPC server of \
          this instance can be reached. The default address is 0.0.0.0. The \
          default port is 10732."
-    in
-    Arg.(
-      value
-      & opt (some (p2p_point_arg ~default_port)) None
-      & info ~docs ~doc ~docv:"ADDR[:PORT]" ["rpc-addr"])
+      ~parse
+      ~placeholder:"ADDR[:PORT]"
+      ~pp
+      "rpc-addr"
 
-  let expected_pow =
-    let open Cmdliner in
-    let doc =
-      "The expected proof-of-work difficulty level for the peers' identity."
-    in
-    Arg.(
-      value
-      & opt (some float) None
-      & info ~docs ~doc ~docv:"FLOAT" ["expected-pow"])
+  let rpc_addr = arg_to_cmdliner rpc_addr_arg
 
-  let net_addr =
-    let open Cmdliner in
+  let expected_pow_arg =
+    make_arg
+      ~doc:
+        "The expected proof-of-work difficulty level for the peers' identity."
+      ~parse:(fun s -> Result.ok (Float.of_string s))
+      ~placeholder:"FLOAT"
+      ~pp:Format.pp_print_float
+      "expected-pow"
+
+  let expected_pow = arg_to_cmdliner expected_pow_arg
+
+  let net_addr_arg =
     let default_port = Configuration_file.default.listen_addr |> snd in
-    let doc =
-      Format.asprintf
+    let parse, pp = p2p_point_format ~default_port in
+    make_arg
+      ~doc:
         "The TCP address and optionally the port bound by the DAL node. If \
          --public-addr is not provided, this is also the address and port at \
          which this instance can be reached by other P2P nodes. The default \
          address is 0.0.0.0. The default port is 11732."
-    in
-    Arg.(
-      value
-      & opt (some (p2p_point_arg ~default_port)) None
-      & info ~docs ~doc ~docv:"ADDR[:PORT]" ["net-addr"])
+      ~parse
+      ~placeholder:"ADDR[:PORT]"
+      ~pp
+      "net-addr"
 
-  let public_addr =
-    let open Cmdliner in
+  let net_addr = arg_to_cmdliner net_addr_arg
+
+  let public_addr_arg =
     let default_port = Configuration_file.default.public_addr |> snd in
-    let doc =
-      Format.asprintf
+    let parse, pp = p2p_point_format ~default_port in
+    make_arg
+      ~doc:
         "The TCP address and optionally the port at which this instance can be \
          reached by other P2P nodes. By default, the point is \
          '127.0.0.1:11732'. You can override the port using the syntax \
          ':2222'. If the IP address is detected as a special address (such as \
          a localhost one) it won't be advertised, only the port will."
-    in
-    Arg.(
-      value
-      & opt (some (p2p_point_arg ~default_port)) None
-      & info ~docs ~doc ~docv:"ADDR[:PORT]" ["public-addr"])
+      ~parse
+      ~placeholder:"ADDR[:PORT]"
+      ~pp
+      "public-addr"
 
-  let uri_arg =
-    let open Cmdliner in
+  let public_addr = arg_to_cmdliner public_addr_arg
+
+  let uri_format =
     let decoder string =
       try Uri.of_string string |> Result.ok
-      with _ -> Error (`Msg "The string '%s' is not a valid URI")
+      with _ -> Error "The string '%s' is not a valid URI"
     in
     let printer = Uri.pp_hum in
-    Arg.conv (decoder, printer)
+    (decoder, printer)
 
-  let endpoint =
-    let open Cmdliner in
-    let doc =
-      "The endpoint (an URI) of the Tezos node that the DAL node should \
-       connect to. The default endpoint is 'http://localhost:8732'."
-    in
-    Arg.(
-      value
-      & opt (some uri_arg) None
-      & info ~docs ~doc ~docv:"URI" ["endpoint"; "E"])
+  let endpoint_arg =
+    let decoder, printer = uri_format in
+    make_arg
+      ~doc:
+        "The endpoint (an URI) of the Tezos node that the DAL node should \
+         connect to. The default endpoint is 'http://localhost:8732'."
+      ~short:'E'
+      ~parse:decoder
+      ~placeholder:"URI"
+      ~pp:printer
+      "endpoint"
 
-  let http_backup_uris =
-    let open Cmdliner in
-    let doc =
-      "List of HTTP base URIs to fetch missing DAL slots if they are \
-       unavailable locally or cannot be reconstructed from shards. This option \
-       can be specified multiple times to provide fallback sources."
-    in
-    Arg.(value & opt_all uri_arg [] & info ~doc ~docv:"URI" ["http-backup"])
+  let endpoint = arg_to_cmdliner endpoint_arg
 
-  let trust_http_backup_uris =
-    let open Cmdliner in
-    let doc =
-      "If set, skip cryptographic verification of slots downloaded from HTTP \
-       backup URIs. Default is false. This can speed up slot retrieval when \
-       replaying history or for debugging purposes, but should be used with \
-       caution for normal operation or in the context of refutation games \
-       (unless the HTTP source is fully trusted)."
-    in
-    Arg.(value & flag & info ~doc ["trust-http-backup-uris"])
+  let http_backup_uris_arg =
+    let decoder, printer = uri_format in
+    make_arg_list
+      ~doc:
+        "List of HTTP base URIs to fetch missing DAL slots if they are \
+         unavailable locally or cannot be reconstructed from shards. This \
+         option can be specified multiple times to provide fallback sources."
+      ~placeholder:"URI"
+      ~parse:decoder
+      ~pp:printer
+      "http-printer"
 
-  let ignore_l1_config_peers =
-    let open Cmdliner in
-    let doc = "Ignore the boot(strap) peers provided by L1 config." in
-    Arg.(value & flag & info ~docs ~doc ["ignore-l1-config-peers"])
+  let http_backup_uris = arg_list_to_cmdliner http_backup_uris_arg
+
+  let trust_http_backup_uris_switch =
+    make_switch
+      ~doc:
+        "If set, skip cryptographic verification of slots downloaded from HTTP \
+         backup URIs. Default is false. This can speed up slot retrieval when \
+         replaying history or for debugging purposes, but should be used with \
+         caution for normal operation or in the context of refutation games \
+         (unless the HTTP source is fully trusted)."
+      "trust-http-backup-uris"
+
+  let trust_http_backup_uris = switch_to_cmdliner trust_http_backup_uris_switch
+
+  let ignore_l1_config_peers_switch =
+    make_switch
+      ~doc:"Ignore the boot(strap) peers provided by L1 config."
+      "ignore-l1-config-peers"
+
+  let ignore_l1_config_peers = switch_to_cmdliner ignore_l1_config_peers_switch
 
   let attester_profile_printer = Signature.Public_key_hash.pp
 
   let producer_profile_printer = Format.pp_print_int
 
-  let attester_profile_arg =
-    let open Cmdliner in
+  let attester_profile_format =
     let decoder arg =
       let arg =
         (* If the argument is wrapped with quotes, unwrap it. *)
@@ -181,17 +303,16 @@ module Term = struct
         else arg
       in
       match Signature.Public_key_hash.of_b58check_opt arg with
-      | None -> Error (`Msg "Unrecognized profile")
+      | None -> Error "Unrecognized profile"
       | Some pkh -> Ok pkh
     in
-    Arg.conv (decoder, attester_profile_printer)
+    (decoder, attester_profile_printer)
 
-  let producer_profile_arg =
-    let open Cmdliner in
+  let producer_profile_format =
     let decoder string =
       let error () =
         Format.kasprintf
-          (fun s -> Error (`Msg s))
+          (fun s -> Error s)
           "Unrecognized profile for producer (expected non-negative integer, \
            got %s)"
           string
@@ -201,14 +322,13 @@ module Term = struct
       | Some i when i < 0 -> error ()
       | Some slot_index -> Ok slot_index
     in
-    Arg.conv (decoder, producer_profile_printer)
+    (decoder, producer_profile_printer)
 
-  let observer_profile_arg =
-    let open Cmdliner in
+  let observer_profile_format =
     let decoder string =
       let error () =
         Format.kasprintf
-          (fun s -> Error (`Msg s))
+          (fun s -> Error s)
           "Unrecognized profile for observer (expected nonnegative integer, \
            got %s)"
           string
@@ -218,82 +338,88 @@ module Term = struct
       | Some i when i < 0 -> error ()
       | Some slot_index -> Ok slot_index
     in
-    Arg.conv (decoder, producer_profile_printer)
+    (decoder, producer_profile_printer)
 
-  let attester_profile =
-    let open Cmdliner in
-    let doc =
-      "The Octez DAL node attester profiles for given public key hashes."
-    in
-    Arg.(
-      value
-      & opt (list attester_profile_arg) []
-      & info ~docs ~doc ~docv:"PKH1,PKH2,..." ["attester-profiles"; "attester"])
+  let attester_profile_arg =
+    let parse, pp = attester_profile_format in
+    make_arg_list
+      ~doc:"The Octez DAL node attester profiles for given public key hashes."
+      ~placeholder:"PKH1,PKH2,..."
+      ~pp
+      ~parse
+      ~extra_long:["attester"]
+      "attester-profiles"
 
-  let operator_profile =
-    let open Cmdliner in
-    let doc =
-      "The Octez DAL node operator profiles for given slot indexes. These were \
-       previously known as producer profiles, however this name now refers to \
-       both operator and observer profiles."
-    in
-    Arg.(
-      value
-      & opt (list producer_profile_arg) []
-      & info
-          ~docs
-          ~doc
-          ~docv:"INDEX1,INDEX2,..."
-          ["producer-profiles"; "producer"; "operator-profiles"; "operator"])
+  let attester_profile = arg_list_to_cmdliner attester_profile_arg
 
-  let observer_profile =
-    let open Cmdliner in
-    let doc = "The Octez DAL node observer profiles for given slot indexes." in
-    Arg.(
-      value
-      & opt (some' (list observer_profile_arg)) None
-      & info
-          ~docs
-          ~doc
-          ~docv:"INDEX1,INDEX2,..."
-          ["observer-profiles"; "observer"])
+  let operator_profile_arg =
+    let parse, pp = producer_profile_format in
+    make_arg_list
+      ~doc:
+        "The Octez DAL node operator profiles for given slot indexes. These \
+         were previously known as producer profiles, however this name now \
+         refers to both operator and observer profiles."
+      ~placeholder:"INDEX1,INDEX2,..."
+      ~parse
+      ~pp
+      ~extra_long:["producer-profiles"; "producer"; "operator"]
+      "operator-profiles"
 
-  let bootstrap_profile =
-    let open Cmdliner in
-    let doc =
-      "The Octez DAL node bootstrap node profile. Note that a bootstrap node \
-       cannot also be an attester or a slot producer"
-    in
-    Arg.(value & flag & info ~docs ~doc ["bootstrap-profile"; "bootstrap"])
+  let operator_profile = arg_list_to_cmdliner operator_profile_arg
 
-  let peers =
-    let open Cmdliner in
+  let observer_profile_arg =
+    let parse, pp = arg_list observer_profile_format in
+    make_arg
+      ~doc:"The Octez DAL node observer profiles for given slot indexes."
+      ~placeholder:"INDEX1,INDEX2,..."
+      ~parse
+      ~pp
+      ~extra_long:["observer"]
+      "observer-profiles"
+
+  let observer_profile = arg_to_cmdliner observer_profile_arg
+
+  let bootstrap_profile_switch =
+    make_switch
+      ~doc:
+        "The Octez DAL node bootstrap node profile. Note that a bootstrap node \
+         cannot also be an attester or a slot producer"
+      ~extra_long:["bootstrap"]
+      "bootstrap-profile"
+
+  let bootstrap_profile = switch_to_cmdliner bootstrap_profile_switch
+
+  let peers_arg =
     let default_list = Configuration_file.default.peers in
-    let doc =
-      "An additional list of peers (bootstrap or not) to connect to, expanding \
-       the one from the DAL node's configuration parameter 'peers' and the one \
-       from the Octez node's configuration parameter \
-       'dal_config.bootstrap_peers'."
-    in
-    Arg.(
-      value
-      & opt (list string) default_list
-      & info ~docs ~doc ~docv:"ADDR:PORT,..." ["peers"])
+    make_arg_list
+      ~doc:
+        "An additional list of peers (bootstrap or not) to connect to, \
+         expanding the one from the DAL node's configuration parameter 'peers' \
+         and the one from the Octez node's configuration parameter \
+         'dal_config.bootstrap_peers'."
+      ~placeholder:"ADDR:PORT,..."
+      ~parse:Result.ok
+      ~pp:Format.pp_print_string
+      ~default:default_list
+      "peers"
 
-  let metrics_addr =
-    let open Cmdliner in
-    let doc =
-      "The TCP address and optionally the port of the node's metrics server. \
-       The default address is 0.0.0.0. The default port is 11733."
-    in
+  let peers = arg_list_to_cmdliner peers_arg
+
+  let metrics_addr_arg =
     let default_port = Configuration_file.default_metrics_port in
-    Arg.(
-      value
-      & opt (some (p2p_point_arg ~default_port)) None
-      & info ~docs ~doc ~docv:"ADDR[:PORT]" ["metrics-addr"])
+    let parse, pp = p2p_point_format ~default_port in
+    make_arg
+      ~doc:
+        "The TCP address and optionally the port of the node's metrics server. \
+         The default address is 0.0.0.0. The default port is 11733."
+      ~placeholder:"ADDR[:PORT]"
+      ~pp
+      ~parse
+      "metrics-addr"
 
-  let history_mode =
-    let open Cmdliner in
+  let metrics_addr = arg_to_cmdliner metrics_addr_arg
+
+  let history_mode_arg =
     let open Result_syntax in
     let doc =
       "The duration for the shards to be kept in the node storage. Either a \
@@ -311,75 +437,72 @@ module Term = struct
         | s -> (
             match int_of_string_opt s with
             | Some i -> return @@ Rolling {blocks = `Some i}
-            | None ->
-                Error (`Msg ("Invalid argument " ^ s ^ " for history-mode."))))
+            | None -> Error ("Invalid argument " ^ s ^ " for history-mode.")))
     in
     let printer fmt = function
       | Configuration_file.Full -> Format.fprintf fmt "full"
       | Rolling {blocks = `Auto} -> Format.fprintf fmt "auto"
       | Rolling {blocks = `Some i} -> Format.fprintf fmt "%d" i
     in
-    let history_mode_arg = Arg.conv (decoder, printer) in
-    Arg.(
-      value
-      & opt (some history_mode_arg) None
-      & info ~docs ~doc ["history-mode"])
+    make_arg ~doc ~parse:decoder ~pp:printer "history-mode"
+
+  let history_mode = arg_to_cmdliner history_mode_arg
 
   let service_name_env =
-    let open Cmdliner in
-    Cmd.Env.info
+    make_env
       ~docs:"Opentelemetry"
       ~doc:"Enable to provide an opentelemetry service name"
       "OTEL_SERVICE_NAME"
 
-  let service_name =
-    let open Cmdliner in
-    let doc =
-      "A name that can be used to identify this node. This name can appear in \
-       observability data such as traces."
-    in
-    let service_name_arg = Arg.string in
-    Arg.(
-      value
-      & opt (some service_name_arg) None
-      & info ~docs ~doc ~env:service_name_env ["service-name"])
+  let service_name_arg =
+    make_arg
+      ~doc:
+        "A name that can be used to identify this node. This name can appear \
+         in observability data such as traces."
+      ~env:service_name_env
+      ~parse:Result.ok
+      ~pp:Format.pp_print_string
+      "service-name"
+
+  let service_name = arg_to_cmdliner service_name_arg
 
   let service_namespace_env =
-    let open Cmdliner in
-    Cmd.Env.info
+    make_env
       ~docs:"Opentelemetry"
       ~doc:"Enable to provide an opentelemetry service namespace"
       "OTEL_SERVICE_NAMESPACE"
 
-  let service_namespace =
-    let open Cmdliner in
-    let doc =
-      "A namespace associated with the node. This namespace can appear in \
-       observability data such as traces."
-    in
-    let service_namespace_arg = Arg.string in
-    Arg.(
-      value
-      & opt (some service_namespace_arg) None
-      & info ~docs ~doc ~env:service_namespace_env ["service-namespace"])
+  let service_namespace_arg =
+    make_arg
+      ~doc:
+        "A namespace associated with the node. This namespace can appear in \
+         observability data such as traces."
+      ~env:service_namespace_env
+      ~parse:Result.ok
+      ~pp:Format.pp_print_string
+      "service-namespace"
 
-  let fetch_trusted_setup =
-    let open Cmdliner in
-    let doc =
-      "Should the DAL node fetch the trusted setup when it needs it. By \
-       default, it does so."
-    in
-    Arg.(
-      value
-      & opt (some bool) None
-      & info ~docs ~doc ~docv:"true | false" ["fetch-trusted-setup"])
+  let service_namespace = arg_to_cmdliner service_namespace_arg
 
-  let verbose =
-    let open Cmdliner in
-    let doc =
-      "Controls the verbosity of some emitted events. Default value is false."
-    in
-    Arg.(value & flag & info ~docs ~doc ["verbose"])
+  let fetch_trusted_setup_arg =
+    make_arg
+      ~doc:
+        "Should the DAL node fetch the trusted setup when it needs it. By \
+         default, it does so."
+      ~placeholder:"true | false"
+      ~parse:(fun s -> Result.ok (bool_of_string s))
+      ~pp:Format.pp_print_bool
+      "fetch-trusted-setup"
+
+  let fetch_trusted_setup = arg_to_cmdliner fetch_trusted_setup_arg
+
+  let verbose_switch =
+    make_switch
+      ~doc:
+        "Controls the verbosity of some emitted events. Default value is false."
+      "verbose"
+
+  let verbose = switch_to_cmdliner verbose_switch
 
   (* Experimental features. *)
 
