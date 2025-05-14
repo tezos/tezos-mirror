@@ -5228,6 +5228,8 @@ end
 (** This module re-exports definitions from {!Stake_storage},
     {!Delegate_storage} and {!Delegate}. *)
 module Stake_distribution : sig
+  val check_all_bakers_attest_at_level : context -> Level.t -> bool
+
   val baking_rights_owner :
     context ->
     Level.t ->

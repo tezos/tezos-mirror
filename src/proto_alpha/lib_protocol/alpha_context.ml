@@ -626,6 +626,9 @@ module Delegate = struct
 end
 
 module Stake_distribution = struct
+  let check_all_bakers_attest_at_level =
+    Delegate_sampler.check_all_bakers_attest_at_level
+
   let baking_rights_owner = Delegate_sampler.baking_rights_owner
 
   let slot_owner = Delegate_sampler.slot_owner
