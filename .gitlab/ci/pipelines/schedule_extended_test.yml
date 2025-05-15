@@ -769,7 +769,6 @@ oc.build_kernels:
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
-  - make -C src/riscv riscv-dummy.elf
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -788,7 +787,6 @@ oc.build_kernels:
     - tx_kernel.wasm
     - tx_kernel_dal.wasm
     - dal_echo_kernel.wasm
-    - src/riscv/riscv-dummy.elf
     when: on_success
 
 oc.build_dsn_node:

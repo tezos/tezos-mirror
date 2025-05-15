@@ -835,11 +835,7 @@ let job_build_kernels ?rules () : tezos_job =
     ~image:Images.rust_toolchain
     ~stage:Stages.build
     ?rules
-    [
-      "make -f kernels.mk build";
-      "make -f etherlink.mk evm_kernel.wasm";
-      "make -C src/riscv riscv-dummy.elf";
-    ]
+    ["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
     ~artifacts:
       (artifacts
          ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
@@ -852,7 +848,6 @@ let job_build_kernels ?rules () : tezos_job =
            "tx_kernel.wasm";
            "tx_kernel_dal.wasm";
            "dal_echo_kernel.wasm";
-           "src/riscv/riscv-dummy.elf";
          ])
   |> enable_kernels
   |> enable_sccache ~key:"kernels-sccache" ~path:"$CI_PROJECT_DIR/_sccache"
