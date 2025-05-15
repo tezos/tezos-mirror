@@ -630,7 +630,7 @@ module State = struct
           (fun hash ->
             let* receipt =
               let* receipt_opt =
-                Durable_storage.transaction_receipt
+                Etherlink_durable_storage.transaction_receipt
                   (read_from_state evm_state)
                   ~block_hash:block.hash
                   hash
@@ -642,7 +642,7 @@ module State = struct
             in
             let* object_ =
               let* object_opt =
-                Durable_storage.transaction_object
+                Etherlink_durable_storage.transaction_object
                   (read_from_state evm_state)
                   hash
               in
@@ -802,7 +802,7 @@ module State = struct
             let*! receipts =
               match block with
               | Eth block ->
-                  Durable_storage.block_receipts_of_block
+                  Etherlink_durable_storage.block_receipts_of_block
                     (read_from_state evm_state)
                     block
               | Tez _ ->

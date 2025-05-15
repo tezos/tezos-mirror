@@ -146,10 +146,11 @@ let validate_with_state_from_backend
   let* base_fee_per_gas = Backend_rpc.base_fee_per_gas () in
   let* state = Backend_rpc.Reader.get_state () in
   let* maximum_gas_limit =
-    Durable_storage.maximum_gas_per_transaction (Backend_rpc.Reader.read state)
+    Etherlink_durable_storage.maximum_gas_per_transaction
+      (Backend_rpc.Reader.read state)
   in
   let* da_fee_per_byte =
-    Durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
+    Etherlink_durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
   in
   let** _total_cost =
     validate_balance_and_gas

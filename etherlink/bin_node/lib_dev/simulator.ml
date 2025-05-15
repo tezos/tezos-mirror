@@ -132,7 +132,8 @@ module Make (SimulationBackend : SimulationBackend) = struct
       Option.map Ethereum_types.decode_number_le bytes
     in
     let* da_fee_per_byte =
-      Durable_storage.da_fee_per_byte (SimulationBackend.read simulation_state)
+      Etherlink_durable_storage.da_fee_per_byte
+        (SimulationBackend.read simulation_state)
     in
     let* (Qty gas_price) =
       (* In future iterations of the kernel, the default value will be
@@ -222,7 +223,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     in
     let timestamp = Misc.now () in
     let* (Qty maximum_gas_per_transaction) =
-      Durable_storage.maximum_gas_per_transaction
+      Etherlink_durable_storage.maximum_gas_per_transaction
         (SimulationBackend.read simulation_state)
     in
     let* simulation_version = simulation_version simulation_state in

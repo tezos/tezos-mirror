@@ -178,8 +178,9 @@ end
 
 module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   module Reader = Backend.Reader
-  include Durable_storage.Make (Backend.Reader)
-  module Block_storage = Durable_storage.Make_block_storage (Backend.Reader)
+  include Etherlink_durable_storage.Make (Backend.Reader)
+  module Block_storage =
+    Etherlink_durable_storage.Make_block_storage (Backend.Reader)
   include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
   include Simulator.Make (Backend.SimulatorBackend)
 
@@ -205,6 +206,8 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
     | Apply_success {block = Tez _; _} ->
         failwith "Could not replay a tezlink block"
     | Apply_failure -> failwith "Could not replay the block"
+
+  include Durable_storage.Make (Reader)
 
   let smart_rollup_address = Backend.smart_rollup_address
 
