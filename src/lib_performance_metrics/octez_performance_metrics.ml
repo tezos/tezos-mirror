@@ -33,18 +33,37 @@ let run_without_error cmd args =
   in
   match status with Unix.WEXITED 0 -> true | _ -> false
 
+let rec get_children pid =
+  let open Lwt_syntax in
+  let* children =
+    Lwt_process.with_process_full
+      ("pgrep", [|"pgrep"; "-P"; pid|])
+      (fun pc -> Lwt_io.read_lines pc#stdout |> Lwt_stream.to_list)
+  in
+  List.fold_left_s
+    (fun acc pid ->
+      let+ grandchildren = get_children pid in
+      acc @ grandchildren)
+    [pid]
+    children
+
+let get_pids pid = get_children (string_of_int pid)
+
+let get_pids_str ?(sep = ",") pid =
+  let open Lwt_syntax in
+  let+ pids = get_pids pid in
+  String.concat sep pids
+
 let supports_performance_metrics () =
   let open Lwt_syntax in
-  let pid = Unix.getpid () in
+  let* pids_str = get_pids_str (Unix.getpid ()) in
   let+ cmd_support =
     Lwt.all
       [
         run_without_error "which" ["lsof"];
         (* `ps` with BusyBox (used by Alpine) does not support the `-p` option,
            so `which` is not enough. *)
-        run_without_error
-          "ps"
-          ["-p"; string_of_int pid; "-o"; "%cpu,%mem,vsz,rss"];
+        run_without_error "ps" ["-p"; pids_str; "-o"; "%cpu=,%mem=,vsz=,rss="];
         run_without_error "which" ["du"];
       ]
   in
@@ -73,32 +92,33 @@ module Make (R : REGISTRY) = struct
       "performance_elapsed_time"
 
   let get_ps pid =
+    let open Lwt_syntax in
     Lwt.catch
       (fun () ->
-        let open Lwt_syntax in
-        let+ s =
-          Lwt_process.with_process_in
-            ~env:[|"LC_ALL=C"|]
-            ("ps", [|"ps"; "-p"; string_of_int pid; "-o"; "%cpu,%mem,vsz,rss"|])
-            (fun pc ->
-              let* s = Lwt_io.read_line_opt pc#stdout in
-              match s with
-              | None -> return_none
-              | Some _ ->
-                  (* skip header *)
-                  Lwt_io.read_line_opt pc#stdout)
-        in
-        match Option.map (String.split_no_empty ' ') s with
-        | Some [cpu; memp; virt; res] -> (
-            try
-              Some
-                ( float_of_string cpu,
-                  float_of_string memp,
-                  int_of_string virt,
-                  int_of_string res )
-            with _ -> None)
-        | _ -> None)
-      (function _exn -> Lwt.return None)
+        let* pids_str = get_pids_str pid in
+        Lwt_process.with_process_in
+          ~env:[|"LC_ALL=C"|]
+          ("ps", [|"ps"; "-p"; pids_str; "-o"; "%cpu=,%mem=,vsz=,rss="|])
+        @@ fun pc ->
+        let lines = Lwt_io.read_lines pc#stdout in
+        Lwt_stream.fold
+          (fun s acc ->
+            match String.split_no_empty ' ' s with
+            | [cpu; memp; virt; res] -> (
+                try
+                  let pcpu, pmemp, pvirt, pres =
+                    match acc with None -> (0., 0., 0, 0) | Some acc -> acc
+                  in
+                  Some
+                    ( pcpu +. float_of_string cpu,
+                      pmemp +. float_of_string memp,
+                      pvirt + int_of_string virt,
+                      pres + int_of_string res )
+                with _ -> acc)
+            | _ -> acc)
+          lines
+          None)
+      (function _exn -> return_none)
 
   let set_memory_cpu_stats () =
     let open Lwt_syntax in
@@ -201,10 +221,11 @@ module Make (R : REGISTRY) = struct
     Lwt.catch
       (fun () ->
         let open Lwt_syntax in
+        let* pids_str = get_pids_str pid in
         let+ fd, conn =
           Lwt_process.with_process_in
             ~env:[|"LC_ALL=C"|]
-            ("lsof", [|"lsof"; "-wap"; string_of_int pid|])
+            ("lsof", [|"lsof"; "-wap"; pids_str|])
             (fun pc ->
               let rec count fd conn =
                 Lwt.catch

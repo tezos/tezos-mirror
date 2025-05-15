@@ -12,6 +12,9 @@
 
 ### Metrics changes
 
+- Aggregate performance metrics for all child processes (including Irmin
+  GC). (!17973)
+
 ### Execution changes
 
 ### Command-line interface changes
