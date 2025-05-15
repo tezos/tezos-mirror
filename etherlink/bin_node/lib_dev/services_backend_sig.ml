@@ -7,7 +7,7 @@
 module type S = sig
   module Reader : Durable_storage.READER
 
-  module Block_storage : Block_storage_sig.S
+  module Etherlink_block_storage : Block_storage_sig.S
 
   module Tezlink : Tezlink_backend_sig.S
 
@@ -101,7 +101,7 @@ end
 
 module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   module Reader = Backend.Reader
-  module Block_storage =
+  module Etherlink_block_storage =
     Etherlink_durable_storage.Make_block_storage (Backend.Reader)
 
   module Etherlink = struct
@@ -120,7 +120,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   end
 
   module Tracer_etherlink =
-    Tracer_sig.Make (Executor) (Block_storage) (Backend.Tracer)
+    Tracer_sig.Make (Executor) (Etherlink_block_storage) (Backend.Tracer)
   module Tezlink_block_storage =
     Tezlink_durable_storage.Make_block_storage (Backend.Reader)
 

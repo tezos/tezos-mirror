@@ -180,7 +180,7 @@ let get_block_by_number ~full_transaction_object block_param
   let* (Ethereum_types.Qty n) =
     Rollup_node_rpc.block_param_to_block_number (Block_parameter block_param)
   in
-  Rollup_node_rpc.Block_storage.nth_block ~full_transaction_object n
+  Rollup_node_rpc.Etherlink_block_storage.nth_block ~full_transaction_object n
 
 let get_block_receipts block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
@@ -188,7 +188,7 @@ let get_block_receipts block_param
   let* (Ethereum_types.Qty n) =
     Rollup_node_rpc.block_param_to_block_number (Block_parameter block_param)
   in
-  Rollup_node_rpc.Block_storage.block_receipts n
+  Rollup_node_rpc.Etherlink_block_storage.block_receipts n
 
 let get_transaction_from_index block index
     (module Rollup_node_rpc : Services_backend_sig.S) =
@@ -197,7 +197,8 @@ let get_transaction_from_index block index
   | TxHash l -> (
       match List.nth_opt l index with
       | None -> return_none
-      | Some hash -> Rollup_node_rpc.Block_storage.transaction_object hash)
+      | Some hash ->
+          Rollup_node_rpc.Etherlink_block_storage.transaction_object hash)
   | TxFull l -> return @@ List.nth_opt l index
 
 let block_transaction_count block =
@@ -385,7 +386,9 @@ let get_fee_history block_count block_parameter config
     | Unlimited -> block_count
     | Limit block_count_limit -> Z.(min (of_int block_count_limit) block_count)
   in
-  let* nb_latest = Backend_rpc.Block_storage.current_block_number () in
+  let* nb_latest =
+    Backend_rpc.Etherlink_block_storage.current_block_number ()
+  in
   let is_reachable nb =
     match Configuration.(config.fee_history.max_past) with
     | None -> true
@@ -545,7 +548,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Block_number.Method ->
             let f (_ : unit option) =
               let* block_number =
-                Backend_rpc.Block_storage.current_block_number ()
+                Backend_rpc.Etherlink_block_storage.current_block_number ()
               in
               rpc_ok block_number
             in
@@ -564,7 +567,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Get_block_by_hash.Method ->
             let f (block_hash, full_transaction_object) =
               let* block =
-                Backend_rpc.Block_storage.block_by_hash
+                Backend_rpc.Etherlink_block_storage.block_by_hash
                   ~full_transaction_object
                   block_hash
               in
@@ -647,7 +650,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Get_block_transaction_count_by_hash.Method ->
             let f block_hash =
               let* block =
-                Backend_rpc.Block_storage.block_by_hash
+                Backend_rpc.Etherlink_block_storage.block_by_hash
                   ~full_transaction_object:false
                   block_hash
               in
@@ -674,7 +677,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Get_transaction_receipt.Method ->
             let f tx_hash =
               let* receipt =
-                Backend_rpc.Block_storage.transaction_receipt tx_hash
+                Backend_rpc.Etherlink_block_storage.transaction_receipt tx_hash
               in
               rpc_ok receipt
             in
@@ -685,7 +688,9 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
               let* transaction_object =
                 match transaction_object with
                 | Some transaction_object -> return_some transaction_object
-                | None -> Backend_rpc.Block_storage.transaction_object tx_hash
+                | None ->
+                    Backend_rpc.Etherlink_block_storage.transaction_object
+                      tx_hash
               in
               rpc_ok transaction_object
             in
@@ -693,7 +698,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Get_transaction_by_block_hash_and_index.Method ->
             let f (block_hash, Qty index) =
               let* block =
-                Backend_rpc.Block_storage.block_by_hash
+                Backend_rpc.Etherlink_block_storage.block_by_hash
                   ~full_transaction_object:false
                   block_hash
               in
