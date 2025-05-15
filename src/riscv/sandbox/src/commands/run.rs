@@ -25,21 +25,22 @@ use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use crate::cli::CommonOptions;
 use crate::cli::RunOptions;
 
-/// Inner execution strategy for blocks.
-#[cfg(not(any(feature = "inline-jit", feature = "outline-jit")))]
-type BlockImplInner = block::Interpreted<M1G, Owned>;
-
-/// Inner execution strategy for blocks.
-#[cfg(all(feature = "inline-jit", not(feature = "outline-jit")))]
-type BlockImplInner = block::Jitted<octez_riscv::jit::JIT<M1G, Owned>, M1G, Owned>;
-
-/// Inner execution strategy for blocks.
-#[cfg(feature = "outline-jit")]
-type BlockImplInner = block::Jitted<
-    octez_riscv::machine_state::block_cache::block::OutlineCompiler<M1G, Owned>,
-    M1G,
-    Owned,
->;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "disable-jit")] {
+        /// Inner execution strategy for blocks.
+        type BlockImplInner = block::Interpreted<M1G, Owned>;
+    } else if #[cfg(feature = "inline-jit")] {
+        /// Inner execution strategy for blocks.
+        type BlockImplInner = block::Jitted<octez_riscv::jit::JIT<M1G, Owned>, M1G, Owned>;
+    } else {
+        /// Inner execution strategy for blocks.
+        type BlockImplInner = block::Jitted<
+            octez_riscv::machine_state::block_cache::block::OutlineCompiler<M1G, Owned>,
+            M1G,
+            Owned,
+        >;
+    }
+}
 
 /// Executor of blocks
 #[cfg(not(feature = "metrics"))]
