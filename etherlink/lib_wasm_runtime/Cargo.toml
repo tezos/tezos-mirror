@@ -40,3 +40,6 @@ runtime-calypso = { package = "tezos-evm-runtime-calypso", path = "../kernel_cal
 # Calypso 2
 kernel-calypso2 = { package = "evm_kernel_calypso2", path = "../kernel_calypso2/kernel", default-features = false }
 runtime-calypso2 = { package = "tezos-evm-runtime-calypso2", path = "../kernel_calypso2/runtime", default-features = false }
+# Dionysus
+kernel-dionysus = { package = "evm_kernel_dionysus", path = "../kernel_dionysus/kernel", default-features = false }
+runtime-dionysus = { package = "tezos-evm-runtime-dionysus", path = "../kernel_dionysus/runtime", default-features = false }

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos_tezlink_latest"
+name = "tezos_tezlink_dionysus"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"

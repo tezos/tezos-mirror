@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos-storage-latest"
+name = "tezos-storage-dionysus"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
