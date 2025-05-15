@@ -40,6 +40,8 @@
           inherit pkgs opam-repository;
         };
       in {
+        ocamlDependencies = import ./nix/package-set.nix {inherit sources;};
+
         packages.default = import ./default.nix {inherit sources;};
 
         devShells.default = import ./shell.nix {inherit sources;};
