@@ -1427,11 +1427,13 @@ val spawn_stresstest :
     Optional parameters:
     - alias_prefix: allows to use a dedicated alias prefix for
       generated keys (default: bootstrap<key_index>),
+    - sig_algo: uses custom signature algorithm
 
     [endpoint]: cf {!create}*)
 val stresstest_gen_keys :
   ?endpoint:endpoint ->
   ?alias_prefix:string ->
+  ?sig_algo:string ->
   int ->
   t ->
   Account.key list Lwt.t
