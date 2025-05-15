@@ -599,17 +599,9 @@ module Consensus = struct
       [predecessor_level - 1 <= op_level <= predecessor_level + 1]
       (note that [predecessor_level + 1] is also known as [current_level]).
 
-      Note that we also don't check whether the slot is normalized
-      (that is, whether it is the delegate's smallest slot). Indeed,
-      we don't want to compute the right tables by first slot for all
-      three allowed levels. Checking the slot normalization is
-      therefore the responsability of the baker when it selects
-      the consensus operations to include in a new block. Moreover,
-      multiple attestations pointing to the same block with different
-      slots can be punished by a double-(pre)attestation operation.
+      The (pre)attested slot must be the lowest one assigned to its owner.
 
-      Return the slot owner's consensus key and a fake attesting power (the
-      latter won't be used anyway in Mempool mode). *)
+      Returns the corresponding delegate's consensus key and attesting power. *)
   let check_mempool_consensus vi consensus_info kind {level; slot; _} =
     let open Lwt_result_syntax in
     let*? () =
@@ -623,26 +615,15 @@ module Consensus = struct
           (Consensus_operation_for_future_level {kind; expected; provided})
       else ok_unit
     in
-    if Constants.aggregate_attestation vi.ctxt then
-      (* Under feature flag, minimal slots are pre-computed for all accepted
-         levels and stored in consensus_info.consensus_slot_map *)
-      let level = Level.from_raw vi.ctxt level in
-      match consensus_info.consensus_slot_map with
-      | None -> tzfail (Consensus.Slot_map_not_found {loc = __LOC__})
-      | Some level_map ->
-          let slot_map = Level.Map.find level level_map in
-          let*? consensus_key, attesting_power, _dal_power =
-            get_delegate_details slot_map kind slot
-          in
-          return (consensus_key, attesting_power)
-    else
-      let* (_ctxt : t), consensus_key =
-        Stake_distribution.slot_owner
-          vi.ctxt
-          (Level.from_raw vi.ctxt level)
-          slot
-      in
-      return (consensus_key, 0 (* Fake attesting power *))
+    let level = Level.from_raw vi.ctxt level in
+    match consensus_info.consensus_slot_map with
+    | None -> tzfail (Consensus.Slot_map_not_found {loc = __LOC__})
+    | Some level_map ->
+        let slot_map = Level.Map.find level level_map in
+        let*? consensus_key, attesting_power, _dal_power =
+          get_delegate_details slot_map kind slot
+        in
+        return (consensus_key, attesting_power)
   (* We do not check that the frozen deposits are positive because this
      only needs to be true in the context of a block that actually
      contains the operation, which may not be the same as the current
