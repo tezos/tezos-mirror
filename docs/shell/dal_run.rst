@@ -244,4 +244,4 @@ For both producers and bakers, it is essential to maintain good connectivity by 
 DAL and the Ledger
 ^^^^^^^^^^^^^^^^^^
 
-If you are using a Ledger device, make sure it runs a version of the Tezos baking app that supports the DAL, such as version 2.5.0 or later.
+If you are using a Ledger device, make sure it runs a version of the `Tezos baking app <https://github.com/trilitech/ledger-app-tezos-baking>`__ that supports the DAL, such as version 2.5.0 or later.
