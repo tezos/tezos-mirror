@@ -946,6 +946,29 @@ let test_pseudotokens_roundings =
       (* Difference = 1 *)
       --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 1L)
 
+let unstake_all =
+  let init_params =
+    {
+      limit_of_staking_over_baking = Q.one;
+      edge_of_baking_over_staking = Q.of_float 0.1;
+    }
+  in
+  init_constants ~reward_per_block:1_000_000L ()
+  --> begin_test ~force_attest_all:true ["delegate"]
+  --> set_delegate_params "delegate" init_params
+  --> add_account_with_funds
+        "staker"
+        ~funder:"delegate"
+        (Amount (Tez.of_mutez 2_000_000_000L))
+  --> set_delegate "staker" (Some "delegate")
+  --> wait_delegate_parameters_activation --> next_block
+  --> unstake "delegate" All
+  --> next_block_with_baker "delegate"
+  --> next_cycle
+  --> next_block_with_baker "delegate"
+  --> stake "staker" (Amount Tez.one_mutez)
+  --> unstake "staker" All
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -966,6 +989,7 @@ let tests =
          test_deactivation_after_unstake_all );
        ("Test change delegates", test_change_delegates);
        ("Test pseudotokens roundings", test_pseudotokens_roundings);
+       ("Test unstake all", unstake_all);
      ]
 
 let () = register_tests ~__FILE__ ~tags:["protocol"; "scenario"; "stake"] tests

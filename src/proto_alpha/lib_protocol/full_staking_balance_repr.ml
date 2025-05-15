@@ -423,9 +423,10 @@ let allowed_staked_frozen ~adaptive_issuance_global_limit_of_staking_over_baking
 
 let own_ratio ~adaptive_issuance_global_limit_of_staking_over_baking
     ~delegate_limit_of_staking_over_baking_millionth
-    ({own_frozen; staked_frozen = _; delegated = _; min_delegated_in_cycle = _}
-     as t) =
-  if Tez_repr.(own_frozen = zero) then (0L, 1L)
+    ({own_frozen; staked_frozen; delegated = _; min_delegated_in_cycle = _} as t)
+    =
+  if Tez_repr.(own_frozen = zero && staked_frozen = zero) then (1L, 1L)
+  else if Tez_repr.(own_frozen = zero) then (0L, 1L)
   else
     let allowed_staked_frozen =
       allowed_staked_frozen
