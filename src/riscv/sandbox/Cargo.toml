@@ -11,6 +11,7 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
+cfg-if.workspace = true
 clap.workspace = true
 comfy-table.workspace = true
 enum-tag.workspace = true
@@ -34,7 +35,7 @@ optional = true
 
 [features]
 default = []
+disable-jit = []
 inline-jit = []
-outline-jit = []
 metrics = ["octez-riscv/metrics"]
 log = ["octez-riscv/log", "dep:tracing-subscriber"]

@@ -8,7 +8,7 @@
 
 set -e
 
-USAGE="Usage: -t <num_transfers> [ -s: static inbox ] [ -p: profile with samply ] [ -n: run natively ] [ -i <num_iterations>: number of runs ] [ -j <inline|outline>: enable jit ] [ -m <all | jit-unsupported>: enable metrics ]"
+USAGE="Usage: -t <num_transfers> [ -s: static inbox ] [ -p: profile with samply ] [ -n: run natively ] [ -i <num_iterations>: number of runs ] [ -j <disable|inline>: disable jit / use inline jit ] [ -m <all | jit-unsupported>: enable metrics ]"
 DEFAULT_ROLLUP_ADDRESS="sr163Lv22CdE8QagCwf48PWDTquk6isQwv57"
 
 ITERATIONS="1"
@@ -50,11 +50,11 @@ while getopts "i:t:m:spnj:" OPTION; do
     i*)
       SANDBOX_ENABLE_FEATURES+=("inline-jit")
       ;;
-    o*)
-      SANDBOX_ENABLE_FEATURES+=("outline-jit")
+    d*)
+      SANDBOX_ENABLE_FEATURES+=("disable-jit")
       ;;
     *)
-      echo "-j <outline|inline>"
+      echo "-j <disable|inline>"
       exit 1
       ;;
     esac

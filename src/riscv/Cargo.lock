@@ -1798,6 +1798,7 @@ dependencies = [
 name = "riscv-sandbox"
 version = "0.0.0"
 dependencies = [
+ "cfg-if",
  "clap",
  "comfy-table",
  "enum-tag",
