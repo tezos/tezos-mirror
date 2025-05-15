@@ -161,6 +161,9 @@ module Get_storage_at :
       * Ethereum_types.Block_parameter.extended
      and type output = Ethereum_types.hex
 
+module Generic_block_number :
+  METHOD with type input = unit and type output = Ethereum_types.quantity
+
 module Block_number :
   METHOD with type input = unit and type output = Ethereum_types.quantity
 

@@ -549,6 +549,19 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
               rpc_ok value
             in
             build_with_input ~f module_ parameters
+        | Generic_block_number.Method ->
+            let f (_ : unit option) =
+              let chain_family =
+                Configuration.retrieve_chain_family
+                  ~l2_chains:config.experimental_features.l2_chains
+              in
+              let root =
+                Durable_storage_path.root_of_chain_family chain_family
+              in
+              let* block_number = Backend_rpc.current_block_number ~root in
+              rpc_ok block_number
+            in
+            build ~f module_ parameters
         | Block_number.Method ->
             let f (_ : unit option) =
               let* block_number =

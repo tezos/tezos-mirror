@@ -217,6 +217,22 @@ module Kernel_root_hash = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Generic_block_number = struct
+  open Ethereum_types
+
+  type input = unit
+
+  type output = quantity
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = quantity_encoding
+
+  let method_ = "tez_blockNumber"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Network_id = struct
   type input = unit
 
@@ -1025,11 +1041,17 @@ type map_result =
 
 let evm_supported_methods : (module METHOD) list =
   [
+    (* Generic rpcs *)
+    (module Generic_block_number);
     (module Kernel_version);
     (module Kernel_root_hash);
     (module Network_id);
     (module Chain_id);
     (module Chain_family);
+    (module Durable_state_value);
+    (module Durable_state_subkeys);
+    (module Get_finalized_blocks_of_l1_level);
+    (* Etherlink rpcs *)
     (module Accounts);
     (module Get_balance);
     (module Get_storage_at);
@@ -1060,8 +1082,6 @@ let evm_supported_methods : (module METHOD) list =
     (module Produce_block);
     (module Produce_proposal);
     (module Inject_transaction);
-    (module Durable_state_value);
-    (module Durable_state_subkeys);
     (module Eth_max_priority_fee_per_gas);
     (module Replay_block);
     (module Trace_transaction);
@@ -1071,7 +1091,6 @@ let evm_supported_methods : (module METHOD) list =
     (module Subscribe);
     (module Unsubscribe);
     (module Trace_block);
-    (module Get_finalized_blocks_of_l1_level);
   ]
 
 let evm_unsupported_methods : string list =
@@ -1126,7 +1145,7 @@ let michelson_supported_methods = evm_supported_methods
 
 let multichain_sequencer_supported_methods : (module METHOD) list =
   [
-    (module Block_number);
+    (module Generic_block_number);
     (module Send_raw_transaction);
     (* Private RPCs *)
     (module Produce_block);

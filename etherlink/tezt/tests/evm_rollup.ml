@@ -6426,11 +6426,11 @@ let test_rpcs_can_be_disabled =
   register_both
     ~tags:["evm"; "rpc"; "restricted"]
     ~title:"RPCs can be restricted"
-    ~restricted_rpcs:"tez_*"
+    ~restricted_rpcs:"tez_kernel*"
   @@ fun ~protocol:_ ~evm_setup ->
   let* kernel_version = Rpc.tez_kernelVersion evm_setup.evm_node in
   (match kernel_version with
-  | Ok _ -> Test.fail "tez_* methods should be unsupported"
+  | Ok _ -> Test.fail "tez_kernel* methods should be unsupported"
   | Error err ->
       Check.(
         (err.message = "Method disabled")
@@ -6438,7 +6438,7 @@ let test_rpcs_can_be_disabled =
           ~error_msg:"Disabled method should return %R, but returned %L")) ;
   let* kernel_root_hash = Rpc.tez_kernelRootHash evm_setup.evm_node in
   (match kernel_root_hash with
-  | Ok _ -> Test.fail "tez_* methods should be unsupported"
+  | Ok _ -> Test.fail "tez_kernel* methods should be unsupported"
   | Error err ->
       Check.(
         (err.message = "Method disabled")
