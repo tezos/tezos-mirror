@@ -38,11 +38,6 @@
 
         sources = {
           inherit pkgs opam-repository;
-
-          riscv64Pkgs = import nixpkgs {
-            crossSystem.config = "riscv64-unknown-linux-gnu";
-            inherit system;
-          };
         };
       in {
         packages.default = import ./default.nix {inherit sources;};
