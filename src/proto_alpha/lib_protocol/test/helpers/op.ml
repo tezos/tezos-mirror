@@ -874,7 +874,7 @@ let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
   }
 
 let double_attestation ctxt op1 op2 =
-  let contents = Single (Double_attestation_evidence {op1; op2}) in
+  let contents = Single (Double_consensus_operation_evidence {op1; op2}) in
   let branch = Context.branch ctxt in
   {
     shell = {branch};
@@ -882,7 +882,7 @@ let double_attestation ctxt op1 op2 =
   }
 
 let double_preattestation ctxt op1 op2 =
-  let contents = Single (Double_preattestation_evidence {op1; op2}) in
+  let contents = Single (Double_consensus_operation_evidence {op1; op2}) in
   let branch = Context.branch ctxt in
   {
     shell = {branch};

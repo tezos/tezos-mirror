@@ -230,7 +230,7 @@ end
 type anonymous_state = {
   activation_pkhs_seen : Operation_hash.t Ed25519.Public_key_hash.Map.t;
   double_baking_evidences_seen : Operation_hash.t Double_baking_evidence_map.t;
-  double_attesting_evidences_seen :
+  double_consensus_operation_evidences_seen :
     Operation_hash.t Double_operation_evidence_map.t;
   dal_entrapments_seen : Operation_hash.t Dal_entrapment_map.t;
   seed_nonce_levels_seen : Operation_hash.t Raw_level.Map.t;
@@ -252,27 +252,27 @@ let anonymous_state_encoding =
        (fun {
               activation_pkhs_seen;
               double_baking_evidences_seen;
-              double_attesting_evidences_seen;
+              double_consensus_operation_evidences_seen;
               dal_entrapments_seen;
               seed_nonce_levels_seen;
               vdf_solution_seen;
             } ->
          ( activation_pkhs_seen,
            double_baking_evidences_seen,
-           double_attesting_evidences_seen,
+           double_consensus_operation_evidences_seen,
            dal_entrapments_seen,
            seed_nonce_levels_seen,
            vdf_solution_seen ))
        (fun ( activation_pkhs_seen,
               double_baking_evidences_seen,
-              double_attesting_evidences_seen,
+              double_consensus_operation_evidences_seen,
               dal_entrapments_seen,
               seed_nonce_levels_seen,
               vdf_solution_seen ) ->
          {
            activation_pkhs_seen;
            double_baking_evidences_seen;
-           double_attesting_evidences_seen;
+           double_consensus_operation_evidences_seen;
            dal_entrapments_seen;
            seed_nonce_levels_seen;
            vdf_solution_seen;
@@ -285,7 +285,7 @@ let anonymous_state_encoding =
              "double_baking_evidences_seen"
              (Double_baking_evidence_map.encoding Operation_hash.encoding))
           (req
-             "double_attesting_evidences_seen"
+             "double_consensus_operation_evidences_seen"
              (Double_operation_evidence_map.encoding Operation_hash.encoding))
           (req
              "dal_entrapments_seen"
@@ -299,7 +299,8 @@ let empty_anonymous_state =
   {
     activation_pkhs_seen = Ed25519.Public_key_hash.Map.empty;
     double_baking_evidences_seen = Double_baking_evidence_map.empty;
-    double_attesting_evidences_seen = Double_operation_evidence_map.empty;
+    double_consensus_operation_evidences_seen =
+      Double_operation_evidence_map.empty;
     dal_entrapments_seen = Dal_entrapment_map.empty;
     seed_nonce_levels_seen = Raw_level.Map.empty;
     vdf_solution_seen = None;
@@ -2022,10 +2023,19 @@ module Anonymous = struct
         Consensus.check_attestations_aggregate_signature vi pks weighted_pks op
         |> Lwt.return
 
-  let check_double_attesting_evidence (type kind) vi
-      (op1 : kind Kind.consensus Operation.t)
-      (op2 : kind Kind.consensus Operation.t) =
+  let misbehaviour_kind (type a) (op : a Kind.consensus operation) =
+    match op.protocol_data.contents with
+    | Single (Preattestation _ | Preattestations_aggregate _) ->
+        Misbehaviour.Double_preattesting
+    | Single (Attestation _ | Attestations_aggregate _) ->
+        Misbehaviour.Double_attesting
+
+  let check_double_consensus_operation_evidence vi
+      (operation : Kind.double_consensus_operation_evidence operation) =
     let open Lwt_result_syntax in
+    let (Single (Double_consensus_operation_evidence {op1; op2})) =
+      operation.protocol_data.contents
+    in
     let* e1, e2, kind =
       match (op1.protocol_data.contents, op2.protocol_data.contents) with
       | Single (Preattestation e1), Single (Preattestation e2) ->
@@ -2033,9 +2043,12 @@ module Anonymous = struct
       | ( Single (Attestation {consensus_content = e1; dal_content = _}),
           Single (Attestation {consensus_content = e2; dal_content = _}) ) ->
           return (e1, e2, Misbehaviour.Double_attesting)
-      | ( Single (Preattestations_aggregate _),
-          Single (Preattestations_aggregate _) )
-      | Single (Attestations_aggregate _), Single (Attestations_aggregate _) ->
+      | Single (Preattestation _), Single (Attestation _)
+      | Single (Attestation _), Single (Preattestation _) ->
+          (* Incompatible kind *)
+          tzfail (Invalid_denunciation Double_preattesting)
+      | Single (Preattestations_aggregate _ | Attestations_aggregate _), _
+      | _, Single (Preattestations_aggregate _ | Attestations_aggregate _) ->
           (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
              handle denunciation for aggregates. *)
           tzfail Aggregate_denunciation_not_implemented
@@ -2100,106 +2113,71 @@ module Anonymous = struct
     let*? () = Operation.check_signature vi.ctxt delegate_pk vi.chain_id op2 in
     return_unit
 
-  let check_double_preattestation_evidence vi
-      (operation : Kind.double_preattestation_evidence operation) =
-    let (Single (Double_preattestation_evidence {op1; op2})) =
-      operation.protocol_data.contents
-    in
-    check_double_attesting_evidence vi op1 op2
-
-  let check_double_attestation_evidence vi
-      (operation : Kind.double_attestation_evidence operation) =
-    let (Single (Double_attestation_evidence {op1; op2})) =
-      operation.protocol_data.contents
-    in
-    check_double_attesting_evidence vi op1 op2
-
-  let check_double_attesting_evidence_conflict vs oph key =
+  let check_double_consensus_operation_evidence_conflict vs oph key =
     match
       Double_operation_evidence_map.find
         key
-        vs.anonymous_state.double_attesting_evidences_seen
+        vs.anonymous_state.double_consensus_operation_evidences_seen
     with
     | None -> ok_unit
     | Some existing ->
         Error (Operation_conflict {existing; new_operation = oph})
 
-  let conflict_key_of_double_preattestation
-      (operation : Kind.double_preattestation_evidence operation) =
-    let (Single (Double_preattestation_evidence {op1; _})) =
+  let conflict_key_of_double_consensus_operation
+      (operation : Kind.double_consensus_operation_evidence operation) =
+    let (Single (Double_consensus_operation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
     match op1.protocol_data.contents with
     | Single (Preattestation {slot; level; round; _}) ->
         (level, round, slot, Misbehaviour.Double_preattesting)
-
-  let conflict_key_of_double_attestation
-      (operation : Kind.double_attestation_evidence operation) =
-    let (Single (Double_attestation_evidence {op1; _})) =
-      operation.protocol_data.contents
-    in
-    match op1.protocol_data.contents with
     | Single (Attestation {consensus_content; _}) ->
         let {slot; level; round; _} = consensus_content in
         (level, round, slot, Misbehaviour.Double_attesting)
+    | Single (Preattestations_aggregate _ | Attestations_aggregate _) ->
+        (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
+           handle denunciation for aggregates. *)
+        assert false
 
-  let check_double_preattestation_evidence_conflict vs oph
-      (operation : Kind.double_preattestation_evidence operation) =
-    let key = conflict_key_of_double_preattestation operation in
-    check_double_attesting_evidence_conflict vs oph key
-
-  let check_double_attestation_evidence_conflict vs oph
-      (operation : Kind.double_attestation_evidence operation) =
-    let key = conflict_key_of_double_attestation operation in
-    check_double_attesting_evidence_conflict vs oph key
+  let check_double_consensus_operation_evidence_conflict vs oph
+      (operation : Kind.double_consensus_operation_evidence operation) =
+    let key = conflict_key_of_double_consensus_operation operation in
+    check_double_consensus_operation_evidence_conflict vs oph key
 
   let wrap_denunciation_conflict kind = function
     | Ok () -> ok_unit
     | Error conflict -> result_error (Conflicting_denunciation {kind; conflict})
 
-  let add_double_attesting_evidence vs oph key =
-    let double_attesting_evidences_seen =
+  let add_double_consensus_operation_evidence vs oph key =
+    let double_consensus_operation_evidences_seen =
       Double_operation_evidence_map.add
         key
         oph
-        vs.anonymous_state.double_attesting_evidences_seen
+        vs.anonymous_state.double_consensus_operation_evidences_seen
     in
     {
       vs with
       anonymous_state =
-        {vs.anonymous_state with double_attesting_evidences_seen};
+        {vs.anonymous_state with double_consensus_operation_evidences_seen};
     }
 
-  let add_double_attestation_evidence vs oph
-      (operation : Kind.double_attestation_evidence operation) =
-    let key = conflict_key_of_double_attestation operation in
-    add_double_attesting_evidence vs oph key
+  let add_double_consensus_operation_evidence vs oph
+      (operation : Kind.double_consensus_operation_evidence operation) =
+    let key = conflict_key_of_double_consensus_operation operation in
+    add_double_consensus_operation_evidence vs oph key
 
-  let add_double_preattestation_evidence vs oph
-      (operation : Kind.double_preattestation_evidence operation) =
-    let key = conflict_key_of_double_preattestation operation in
-    add_double_attesting_evidence vs oph key
-
-  let remove_double_attesting_evidence vs key =
-    let double_attesting_evidences_seen =
+  let remove_double_consensus_operation_evidence vs
+      (operation : Kind.double_consensus_operation_evidence operation) =
+    let key = conflict_key_of_double_consensus_operation operation in
+    let double_consensus_operation_evidences_seen =
       Double_operation_evidence_map.remove
         key
-        vs.anonymous_state.double_attesting_evidences_seen
+        vs.anonymous_state.double_consensus_operation_evidences_seen
     in
     let anonymous_state =
-      {vs.anonymous_state with double_attesting_evidences_seen}
+      {vs.anonymous_state with double_consensus_operation_evidences_seen}
     in
     {vs with anonymous_state}
-
-  let remove_double_preattestation_evidence vs
-      (operation : Kind.double_preattestation_evidence operation) =
-    let key = conflict_key_of_double_preattestation operation in
-    remove_double_attesting_evidence vs key
-
-  let remove_double_attestation_evidence vs
-      (operation : Kind.double_attestation_evidence operation) =
-    let key = conflict_key_of_double_attestation operation in
-    remove_double_attesting_evidence vs key
 
   let check_double_baking_evidence vi
       (operation : Kind.double_baking_evidence operation) =
@@ -3528,11 +3506,8 @@ let check_operation ?(check_signature = true) info (type kind)
   | Single (Ballot _) -> Voting.check_ballot info ~check_signature operation
   | Single (Activate_account _) ->
       Anonymous.check_activate_account info operation |> no_pending_checks
-  | Single (Double_preattestation_evidence _) ->
-      Anonymous.check_double_preattestation_evidence info operation
-      |> no_pending_checks
-  | Single (Double_attestation_evidence _) ->
-      Anonymous.check_double_attestation_evidence info operation
+  | Single (Double_consensus_operation_evidence _) ->
+      Anonymous.check_double_consensus_operation_evidence info operation
       |> no_pending_checks
   | Single (Double_baking_evidence _) ->
       Anonymous.check_double_baking_evidence info operation |> no_pending_checks
@@ -3595,13 +3570,8 @@ let check_operation_conflict (type kind) operation_conflict_state oph
         operation_conflict_state
         oph
         operation
-  | Single (Double_preattestation_evidence _) ->
-      Anonymous.check_double_preattestation_evidence_conflict
-        operation_conflict_state
-        oph
-        operation
-  | Single (Double_attestation_evidence _) ->
-      Anonymous.check_double_attestation_evidence_conflict
+  | Single (Double_consensus_operation_evidence _) ->
+      Anonymous.check_double_consensus_operation_evidence_conflict
         operation_conflict_state
         oph
         operation
@@ -3656,13 +3626,8 @@ let add_valid_operation operation_conflict_state oph (type kind)
       Voting.add_ballot operation_conflict_state oph operation
   | Single (Activate_account _) ->
       Anonymous.add_activate_account operation_conflict_state oph operation
-  | Single (Double_preattestation_evidence _) ->
-      Anonymous.add_double_preattestation_evidence
-        operation_conflict_state
-        oph
-        operation
-  | Single (Double_attestation_evidence _) ->
-      Anonymous.add_double_attestation_evidence
+  | Single (Double_consensus_operation_evidence _) ->
+      Anonymous.add_double_consensus_operation_evidence
         operation_conflict_state
         oph
         operation
@@ -3707,12 +3672,8 @@ let remove_operation operation_conflict_state (type kind)
   | Single (Ballot _) -> Voting.remove_ballot operation_conflict_state operation
   | Single (Activate_account _) ->
       Anonymous.remove_activate_account operation_conflict_state operation
-  | Single (Double_preattestation_evidence _) ->
-      Anonymous.remove_double_preattestation_evidence
-        operation_conflict_state
-        operation
-  | Single (Double_attestation_evidence _) ->
-      Anonymous.remove_double_attestation_evidence
+  | Single (Double_consensus_operation_evidence _) ->
+      Anonymous.remove_double_consensus_operation_evidence
         operation_conflict_state
         operation
   | Single (Double_baking_evidence _) ->
@@ -3851,32 +3812,21 @@ let validate_operation ?(check_signature = true)
             add_activate_account operation_state oph operation
           in
           return {info; operation_state; block_state}
-      | Single (Double_preattestation_evidence _) ->
+      | Single (Double_consensus_operation_evidence {op1; _}) ->
           let open Anonymous in
-          let* () = check_double_preattestation_evidence info operation in
+          let* () = check_double_consensus_operation_evidence info operation in
           let*? () =
-            check_double_preattestation_evidence_conflict
+            check_double_consensus_operation_evidence_conflict
               operation_state
               oph
               operation
-            |> wrap_denunciation_conflict Double_preattesting
+            |> wrap_denunciation_conflict (misbehaviour_kind op1)
           in
           let operation_state =
-            add_double_preattestation_evidence operation_state oph operation
-          in
-          return {info; operation_state; block_state}
-      | Single (Double_attestation_evidence _) ->
-          let open Anonymous in
-          let* () = check_double_attestation_evidence info operation in
-          let*? () =
-            check_double_attestation_evidence_conflict
+            add_double_consensus_operation_evidence
               operation_state
               oph
               operation
-            |> wrap_denunciation_conflict Double_attesting
-          in
-          let operation_state =
-            add_double_attestation_evidence operation_state oph operation
           in
           return {info; operation_state; block_state}
       | Single (Double_baking_evidence _) ->

@@ -166,8 +166,8 @@ let double_consensus_op_evidence (type kind) :
     op2:kind Alpha_context.operation ->
     unit ->
     bytes Environment.Error_monad.shell_tzresult Lwt.t = function
-  | Attestation -> Plugin.RPC.Forge.double_attestation_evidence
-  | Preattestation -> Plugin.RPC.Forge.double_preattestation_evidence
+  | Attestation -> Plugin.RPC.Forge.double_consensus_operation_evidence
+  | Preattestation -> Plugin.RPC.Forge.double_consensus_operation_evidence
 
 let lookup_recorded_consensus (type kind) consensus_key
     (op_kind : kind denunciable_consensus_operation) map :

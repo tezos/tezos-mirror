@@ -341,7 +341,8 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
             {
               contents =
                 Apply_results.Single_result
-                  (Apply_results.Double_attestation_evidence_result rslt);
+                  (Apply_results.Double_consensus_operation_evidence_result
+                    rslt);
             } ->
             rslt.forbidden_delegate = Some delegate
         | _ -> false)
