@@ -56,6 +56,9 @@ RUN cargo +1.86.0 install taplo-cli --version 0.9.3 --locked && \
 RUN cargo +1.86.0 install --locked cargo-audit --version 0.21.2 && \
     cargo audit --version
 
+# Install cargo-expand, used to test derive macros in sdk/rust/encoding-derive/
+RUN cargo +1.86.0 install cargo-expand
+
 # install wabt: https://packages.debian.org/source/sid/wabt
 # Install a version of binutils which supports RISC-V and put symlink in PATH
 # hadolint ignore=DL3008
