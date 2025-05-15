@@ -889,6 +889,12 @@ module Consensus = struct
                         (Missing_companion_key_for_bls_dal
                            (Consensus_key.pkh consensus_key))
                   | Some companion_pk -> (
+                      let serialized_op =
+                        Operation.(
+                          serialize_unsigned_operation
+                            bls_mode_unsigned_encoding
+                            operation)
+                      in
                       let dal_dependent_bls_pk_opt =
                         Dal.Attestation.Dal_dependent_signing.aggregate_pk
                           ~subgroup_check:false
@@ -898,6 +904,7 @@ module Consensus = struct
                                keys. *)
                           ~consensus_pk:consensus_bls_pk
                           ~companion_pk
+                          ~op:serialized_op
                           dal_attestation
                       in
                       match dal_dependent_bls_pk_opt with
@@ -1383,7 +1390,7 @@ module Consensus = struct
 
   let validate_attestations_aggregate ~check_signature info operation_state
       block_state oph
-      ({protocol_data = {contents = Single content; _}; _} as op :
+      ({protocol_data = {contents = Single content; _}; shell} as op :
         Kind.attestations_aggregate operation) =
     let open Lwt_result_syntax in
     match info.mode with
@@ -1415,6 +1422,22 @@ module Consensus = struct
             consensus_info
             {level; round; block_payload_hash; slot = Slot.zero}
         in
+        let attestation : Kind.attestation operation =
+          (* Reconstructing an attestation to match the content signed by
+             each delegate. Fields 'slot' and 'dal_content' are filled with
+             dummy values as they are not part of the signed payload *)
+          let consensus_content =
+            {slot = Slot.zero; level; round; block_payload_hash}
+          in
+          let contents =
+            Single (Attestation {consensus_content; dal_content = None})
+          in
+          {shell; protocol_data = {contents; signature = None}}
+        in
+        let serialized_op =
+          Operation.(
+            serialize_unsigned_operation bls_mode_unsigned_encoding attestation)
+        in
         (* Retrieve public keys that will later be aggregated (keys
            with weight 1 are put in [pks]; keys with a different
            weight are put in [weighted_pks]) and compute total attesting
@@ -1442,6 +1465,9 @@ module Consensus = struct
                   | Some {attestation = dal_attestation}, Some companion_pk ->
                       let weight =
                         Dal.Attestation.Dal_dependent_signing.weight
+                          ~consensus_pk
+                          ~companion_pk
+                          ~op:serialized_op
                           dal_attestation
                       in
                       if Z.(equal weight one) then

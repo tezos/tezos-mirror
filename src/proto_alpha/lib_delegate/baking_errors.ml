@@ -440,6 +440,7 @@ let () =
 type error +=
   | Signature_aggregation_failure
   | Unexpected_signature_type of Signature.t
+  | Unexpected_public_key_type of Signature.public_key
 
 let () =
   register_error_kind
@@ -464,4 +465,18 @@ let () =
         s)
     Data_encoding.(obj1 (req "signature" Signature.encoding))
     (function Unexpected_signature_type s -> Some s | _ -> None)
-    (fun s -> Unexpected_signature_type s)
+    (fun s -> Unexpected_signature_type s) ;
+  register_error_kind
+    `Permanent
+    ~id:"Baking_actions.unexpected_public_key_type"
+    ~title:"Unexpected public key type"
+    ~description:"Public key should be a BLS public key."
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "Public key should be a BLS public key %a."
+        Signature.Public_key.pp
+        s)
+    Data_encoding.(obj1 (req "pk" Signature.Public_key.encoding))
+    (function Unexpected_public_key_type s -> Some s | _ -> None)
+    (fun s -> Unexpected_public_key_type s)

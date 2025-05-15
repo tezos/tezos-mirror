@@ -144,7 +144,12 @@ module Dal_dependent_signing : sig
       for the companion key when signing an attestation with DAL.
 
       Post-condition: the output is strictly positive. *)
-  val weight : t -> Z.t
+  val weight :
+    consensus_pk:Bls.Public_key.t ->
+    companion_pk:Bls.Public_key.t ->
+    op:Bytes.t ->
+    t ->
+    Z.t
 
   (** Efficiently computes [consensus_pk + (weight t) * companion_pk].
 
@@ -161,6 +166,7 @@ module Dal_dependent_signing : sig
     subgroup_check:bool ->
     consensus_pk:Bls.Public_key.t ->
     companion_pk:Bls.Public_key.t ->
+    op:Bytes.t ->
     t ->
     Bls.Public_key.t option
 
@@ -168,8 +174,11 @@ module Dal_dependent_signing : sig
       {!aggregate_pk}, but with signatures instead of public keys. *)
   val aggregate_sig :
     subgroup_check:bool ->
+    consensus_pk:Bls.Public_key.t ->
+    companion_pk:Bls.Public_key.t ->
     consensus_sig:Bls.t ->
     companion_sig:Bls.t ->
+    op:Bytes.t ->
     t ->
     Bls.t option
 end
