@@ -418,7 +418,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | SetLessThanImmediateSigned
         | SetLessThanImmediateUnsigned
         | AddImmediateToPC
-        | Div => ArgsShape::XSrcNZXDest,
+        | X64DivSigned => ArgsShape::XSrcNZXDest,
     }
 }
 

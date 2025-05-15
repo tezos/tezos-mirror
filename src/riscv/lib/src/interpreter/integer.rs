@@ -363,7 +363,12 @@ pub fn run_x32_mul(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZe
 /// If `val(rs2) == -1` and `val(rs1) == i64::MIN`, the result is `i64::MIN`.
 ///
 /// All values are _signed integers_.  
-pub fn run_div(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+pub fn run_x64_div_signed(
+    icb: &mut impl ICB,
+    rs1: XRegister,
+    rs2: XRegister,
+    rd: NonZeroXRegister,
+) {
     let rval1 = icb.xregister_read(rs1);
     let rval2 = icb.xregister_read(rs2);
     let zero = icb.xvalue_of_imm(0);
@@ -1023,7 +1028,7 @@ mod tests {
         })
     });
 
-    backend_test!(test_division, F, {
+    backend_test!(test_x64_div_signed, F, {
         proptest!(|(
             r1_val in any::<u64>(),
             r2_val in any::<u64>(),
@@ -1032,7 +1037,7 @@ mod tests {
 
             state.hart.xregisters.write(a0, r1_val);
             state.hart.xregisters.write(a1, r2_val);
-            run_div(&mut state, a0, a1, nz::a2);
+            run_x64_div_signed(&mut state, a0, a1, nz::a2);
             state.hart.xregisters.run_rem(a0, a1, a3);
 
             prop_assert_eq!(

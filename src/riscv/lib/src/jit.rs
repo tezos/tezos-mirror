@@ -1001,7 +1001,7 @@ mod tests {
                 .set_instructions(&[
                     I::new_li(nz::a0, numerator, Uncompressed),
                     I::new_li(nz::a1, denominator, Compressed),
-                    I::new_div(nz::a2, a0, a1, Compressed),
+                    I::new_x64_div_signed(nz::a2, a0, a1, Compressed),
                     I::new_nop(Uncompressed),
                 ])
                 .set_expected_steps(4)
