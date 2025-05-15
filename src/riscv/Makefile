@@ -26,18 +26,8 @@ SANDBOX_ENABLE_FEATURES ?=
 NIGHTLY_VERSION = nightly-2025-01-30
 
 .PHONY: build
-build: riscv-sandbox
+build: 
 	@cargo build --release --workspace $(NATIVE_OPT) $(EXTRA_FLAGS)
-
-.PHONY: riscv-sandbox
-riscv-sandbox::
-	@cargo build --release --package riscv-sandbox $(NATIVE_OPT) $(SANDBOX_ENABLE_FEATURES:%=-F%)
-	@ln -f target/$(NATIVE_TARGET)/release/riscv-sandbox $@
-
-.PHONY: riscv-sandbox.prof
-riscv-sandbox.prof::
-	@cargo build --profile profiling --package riscv-sandbox $(SANDBOX_ENABLE_FEATURES:%=-F%)
-	@ln -f target/profiling/riscv-sandbox $@
 
 # Update checked-in binaries
 .PHONY: update-assets
@@ -79,18 +69,6 @@ endif
 test: build
 	@cargo test --workspace $(EXTRA_FLAGS)
 
-.PHONY: test-long
-test-long:
-	@cargo test --release $(EXTRA_FLAGS) -- test_jstz_determinism test_jstz_proofs_one_step --nocapture --ignored
-
-.PHONY: test-miri
-test-miri:
-	@cargo +$(NIGHTLY_VERSION) miri test $(EXTRA_FLAGS) -- miri
-
-.PHONY: coverage
-coverage:
-	@./scripts/isa-suite-coverage.sh
-
 .PHONY: check
 check:
 	@exec scripts/format.sh --check
@@ -114,4 +92,3 @@ audit:
 .PHONY: clean
 clean:
 	@cargo clean
-	@rm -f riscv-sandbox

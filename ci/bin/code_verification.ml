@@ -1763,30 +1763,6 @@ let jobs pipeline_type =
               riscv_ci_flags;
           ]
       in
-      let job_test_long_riscv_kernels : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"test_long_riscv_kernels"
-          ~changes:changeset_riscv_kernels
-          ~dependencies:(Dependent [Job job_check_riscv_kernels])
-          [
-            Format.asprintf
-              "make -C src/riscv EXTRA_FLAGS='%s' test-long"
-              riscv_ci_flags;
-          ]
-      in
-      let job_test_miri_riscv_kernels : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"test_miri_riscv_kernels"
-          ~changes:changeset_riscv_kernels
-          ~dependencies:(Dependent [Job job_check_riscv_kernels])
-          [
-            Format.asprintf
-              "make -C src/riscv EXTRA_FLAGS='%s' test-miri"
-              riscv_ci_flags;
-          ]
-      in
       let job_test_evm_compatibility : tezos_job =
         make_job_kernel
           ~__POS__
@@ -1810,8 +1786,6 @@ let jobs pipeline_type =
         job_audit_riscv_deps;
         job_check_riscv_kernels;
         job_test_riscv_kernels;
-        job_test_long_riscv_kernels;
-        job_test_miri_riscv_kernels;
         job_test_evm_compatibility;
       ]
     in
