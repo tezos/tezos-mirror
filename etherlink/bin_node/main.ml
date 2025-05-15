@@ -2834,7 +2834,8 @@ let preemptive_kernel_download_command =
          ~name:"kernel-id"
          ~desc:
            "Either a root hash of the kernel to download, or the name of a \
-            supported kernel (\"bifrost\", \"calypso\" or \"calypso2\")."
+            supported kernel (\"bifrost\", \"calypso\", \"calypso2\" or \
+            \"dionysus\")."
          (Tezos_clic.parameter (fun _ str ->
               let open Evm_node_lib_dev.Constants in
               let open Lwt_result_syntax in

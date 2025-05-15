@@ -16,15 +16,12 @@
 
 ### Command-line interface changes
 
-- Adds `--private-rpc-port` to `run observer` to enable the private RPC server
-  from command-line. (!17762)
-
-- Previously when submitting the same transaction multiple times, if
-  the first fails to be included by the sequencer then all following
-  will fails. Now when submitting multiple time the same transaction,
-  the first occurrence that could succeed does. (!17740)
-
-- Renames `--bootstrap-account` and `--bootstrap-balance` to `--eth-bootstrap-account` and `--eth-bootstrap-balance` for the `make kernel installer config` and `make l2 kernel installer config` commands. The old behavior is conserved (!17710)
+- Renames `--bootstrap-account` and `--bootstrap-balance` to
+  `--eth-bootstrap-account` and `--eth-bootstrap-balance` for the `make kernel
+  installer config` and `make l2 kernel installer config` commands. The old
+  behavior is conserved (!17710)
+- Adds support for downloading Dionysus kernel with`download kernel dionysus`.
+  (!17974)
 
 ### Storage changes
 
