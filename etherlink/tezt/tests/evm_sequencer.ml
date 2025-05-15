@@ -11398,29 +11398,36 @@ let test_websocket_newPendingTransactions_event =
   let scenario evm_node transaction_hash =
     let* websocket = Evm_node.open_websocket evm_node in
     let* id = Rpc.subscribe ~websocket ~kind:NewPendingTransactions evm_node in
-    Lwt.async (fun () ->
-        (* In observer mode, the transaction will never be mined which will cause
-           the following line to be blocking. *)
-        let* _ =
-          Eth_cli.transaction_send
-            ~source_private_key:sender.private_key
-            ~to_public_key:sender.address
-            ~value:(Wei.of_eth_int 10)
-            ~endpoint:(Evm_node.endpoint evm_node)
-            ()
-        in
-        unit) ;
+    (* In observer mode, the transaction will never be mined which will cause
+       the following lines of code to be blocking hence the [Background.register]. *)
+    Background.register
+      (Lwt.catch
+         (fun () ->
+           let* _ =
+             Eth_cli.transaction_send
+               ~source_private_key:sender.private_key
+               ~to_public_key:sender.address
+               ~value:(Wei.of_eth_int 10)
+               ~endpoint:(Evm_node.endpoint evm_node)
+               ()
+           in
+           unit)
+         (fun exn ->
+           Log.debug "TX send failed because %s" (Printexc.to_string exn) ;
+           unit)) ;
     let* tx = Websocket.recv websocket in
     let tx_hash = JSON.(tx |-> "params" |-> "result" |> as_string) in
     Check.((transaction_hash = tx_hash) string)
       ~error_msg:"Received tx_hash was %R, expected %L" ;
     check_unsubscription ~websocket ~id ~sequencer evm_node
   in
+  Log.info "Scenario with sequencer" ;
   let* () =
     scenario
       sequencer
       "0x1b5678a27af55582f2bd6fa07223ff59ee93e16c228e40a948d09ee593560d36"
   in
+  Log.info "Scenario with observer" ;
   scenario
     observer
     "0xf5e6dcb59cbf260cfe04d89d07a0f270c11e489a6de4df319916c7ddb19f3a34"
