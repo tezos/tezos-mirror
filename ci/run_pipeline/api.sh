@@ -82,9 +82,9 @@ EOF
 cat << EOF
 Will run an API triggered pipeline for:
 
-  CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
-                BRANCH = $BRANCH
-           TZ_API_KIND = $TZ_API_KIND
+               CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
+                             BRANCH = $BRANCH
+                        TZ_API_KIND = $TZ_API_KIND
 EOF
 
 # Run script from correct location

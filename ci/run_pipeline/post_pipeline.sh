@@ -9,7 +9,7 @@ PROJECT_ID="${PROJECT_ID:-3836952}"
 
 # The equal character (=) should be aligned with the one that other scripts output.
 cat << EOF
-            PROJECT_ID = "$PROJECT_ID" (tezos/tezos is 3836952, nomadic-labs/tezos is 9487506)
+                         PROJECT_ID = "$PROJECT_ID" (tezos/tezos is 3836952, nomadic-labs/tezos is 9487506)
 
 You can override those values by setting the corresponding environment variables.
 

@@ -35,9 +35,9 @@ EOF
 cat << EOF
 Will run a schedule_extended_test pipeline for:
 
-  CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
-                BRANCH = $BRANCH
-      TZ_SCHEDULE_KIND = $TZ_SCHEDULE_KIND
+               CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
+                             BRANCH = $BRANCH
+                   TZ_SCHEDULE_KIND = $TZ_SCHEDULE_KIND
 EOF
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
