@@ -36,7 +36,7 @@ octez-l2-libs: src/rust_deps/wasmer-3.3.0/lib/c-api/tests/wasm-c-api/include
 ### END OF tobi/config-manual
 RPC-toy: contrib/RPC_toy
 bls12-381: src/lib_bls12_381, src/lib_bls12_381/test, src/lib_bls12_381/utils
-dal_node_migrations: src/bin_dal_node/migrations
+dal_node_migrations: src/lib_dal_node/migrations
 efunc_core: efunc-core/src
 etherlink-benchmark-producer: etherlink/bin_benchmark_producer
 etherlink-governance-observer: etherlink/governance-metrics/src

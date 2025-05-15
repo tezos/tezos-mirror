@@ -7583,7 +7583,7 @@ module Refutations = struct
           (Format.sprintf "Hello slot %d" index)
         |> Helpers.publish_and_store_slot client honest_dal_node source ~index
       in
-      (* TODO: We should refactor this to use the function defined in bin_dal_node/store. *)
+      (* TODO: We should refactor this to use the function defined in lib_dal_node/store. *)
       return @@ Format.asprintf "%d_%d" published_level index
     in
     let* shards_file0 = publish_and_get_shards_filename Constant.bootstrap1 0 in

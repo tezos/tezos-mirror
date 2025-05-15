@@ -6,6 +6,7 @@
  (public_name tezos-dal-node-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
+  bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
   tezos-dal-node-services
@@ -16,13 +17,44 @@
   octez-libs.crypto-dal
   octez-shell-libs.p2p
   octez-libs.tezos-p2p-services
-  octez-l2-libs.sqlite)
+  octez-l2-libs.sqlite
+  octez-libs.version
+  cmdliner
+  octez-shell-libs.client-base
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
+  octez-libs.stdlib
+  octez-l2-libs.layer2_store
+  octez-shell-libs.store.unix
+  octez-shell-libs.store.shared
+  octez-libs.tezos-gossipsub
+  tezos-dal-node-lib.gossipsub
+  octez-libs.crypto
+  octez-libs.base.p2p-identity-file
+  octez-shell-libs.shell-services
+  opentelemetry
+  octez-libs.opentelemetry-client-cohttp-lwt
+  octez-libs.prometheus-app
+  octez-libs.prometheus
+  octez-crawler)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_dal_node_services
   -open Tezos_protocol_updater
   -open Tezos_stdlib_unix
   -open Tezos_crypto_dal
   -open Tezos_p2p
   -open Tezos_p2p_services
-  -open Octez_sqlite))
+  -open Octez_sqlite
+  -open Tezos_client_base
+  -open Tezos_rpc_http
+  -open Tezos_stdlib
+  -open Tezos_layer2_store
+  -open Tezos_store_shared
+  -open Tezos_gossipsub
+  -open Tezos_dal_node_lib_gossipsub
+  -open Tezos_crypto
+  -open Tezos_base_p2p_identity_file
+  -open Tezos_shell_services
+  -open Octez_crawler))

@@ -364,7 +364,7 @@ let handshake state kvs_store sql_store =
   in
   return_unit
 
-(* As found in bin_dal_node/store.ml *)
+(* As found in lib_dal_node/store.ml *)
 let init_skip_list_cells_store node_store_dir =
   let padded_encoded_cell_size = 64 * (32 + 1) in
   let encoded_hash_size = 32 + 4 in

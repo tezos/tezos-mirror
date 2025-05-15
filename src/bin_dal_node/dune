@@ -10,34 +10,8 @@
   octez-rust-deps
   bls12-381.archive
   octez-libs.base
-  octez-libs.base.unix
-  octez-libs.version
-  cmdliner
-  octez-shell-libs.client-base
-  octez-libs.rpc-http
-  octez-libs.rpc-http-server
-  octez-shell-libs.protocol-updater
-  octez-libs.rpc-http-client-unix
   octez-libs.stdlib-unix
-  octez-libs.stdlib
   tezos-dal-node-lib
-  tezos-dal-node-services
-  octez-l2-libs.layer2_store
-  octez-libs.crypto-dal
-  octez-shell-libs.store.unix
-  octez-shell-libs.store.shared
-  octez-libs.tezos-gossipsub
-  tezos-dal-node-lib.gossipsub
-  octez-shell-libs.p2p
-  octez-libs.tezos-p2p-services
-  octez-libs.crypto
-  octez-libs.base.p2p-identity-file
-  octez-shell-libs.shell-services
-  opentelemetry
-  octez-libs.opentelemetry-client-cohttp-lwt
-  octez-libs.prometheus-app
-  octez-libs.prometheus
-  octez-crawler
   memtrace
   (select void_for_linking-octez-protocol-021-PsQuebec-libs-dal from
    (octez-protocol-021-PsQuebec-libs.dal -> void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty)
@@ -53,23 +27,8 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_client_base
-  -open Tezos_rpc_http
   -open Tezos_stdlib_unix
-  -open Tezos_stdlib
-  -open Tezos_dal_node_lib
-  -open Tezos_dal_node_services
-  -open Tezos_layer2_store
-  -open Tezos_crypto_dal
-  -open Tezos_store_shared
-  -open Tezos_gossipsub
-  -open Tezos_dal_node_lib_gossipsub
-  -open Tezos_p2p
-  -open Tezos_p2p_services
-  -open Tezos_crypto
-  -open Tezos_base_p2p_identity_file
-  -open Tezos_shell_services
-  -open Octez_crawler))
+  -open Tezos_dal_node_lib))
 
 (rule
  (action

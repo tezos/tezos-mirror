@@ -5173,7 +5173,7 @@ let octez_dal_node_services =
 let octez_dal_node_migrations =
   public_lib
     "dal_node_migrations"
-    ~path:"src/bin_dal_node/migrations"
+    ~path:"src/lib_dal_node/migrations"
     ~synopsis:"Tezos: SQL migrations for the DAL node store"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; caqti_lwt; crunch; re]
     ~dune:
@@ -5201,6 +5201,37 @@ let octez_dal_node_migrations =
           ];
         ]
 
+let octez_dal_node_gossipsub_lib =
+  public_lib
+    "tezos-dal-node-lib.gossipsub"
+    ~path:"src/lib_dal_node/gossipsub"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_crypto_dal |> open_;
+        octez_gossipsub |> open_;
+        octez_p2p |> open_;
+        octez_p2p_services |> open_;
+        octez_dal_node_services |> open_;
+        octez_crypto |> open_;
+      ]
+
+let octez_crawler =
+  public_lib
+    "octez-crawler"
+    ~internal_name:"octez_crawler"
+    ~path:"src/lib_crawler"
+    ~synopsis:"Octez: library to crawl blocks of the L1 chain"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_rpc_http |> open_;
+        octez_base_unix;
+        octez_stdlib_unix |> open_;
+        octez_client_base |> open_;
+        octez_shell;
+      ]
+
 let octez_dal_node_lib =
   public_lib
     "tezos-dal-node-lib"
@@ -5209,9 +5240,10 @@ let octez_dal_node_lib =
     ~synopsis:"Tezos: `tezos-dal-node` library"
     ~deps:
       [
+        bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_dal_node_services;
+        octez_dal_node_services |> open_;
         octez_dal_node_migrations;
         octez_protocol_updater |> open_;
         octez_rpc_http_client_unix;
@@ -5220,6 +5252,25 @@ let octez_dal_node_lib =
         octez_p2p |> open_;
         octez_p2p_services |> open_;
         octez_sqlite |> open_;
+        octez_version;
+        cmdliner;
+        octez_client_base |> open_;
+        octez_rpc_http |> open_;
+        octez_rpc_http_server;
+        octez_stdlib |> open_;
+        octez_layer2_store |> open_;
+        octez_store_unix;
+        octez_store_shared |> open_;
+        octez_gossipsub |> open_;
+        octez_dal_node_gossipsub_lib |> open_;
+        octez_crypto |> open_;
+        octez_base_p2p_identity_file |> open_;
+        octez_shell_services |> open_;
+        opentelemetry;
+        opentelemetry_client_cohttp_lwt;
+        prometheus_app;
+        prometheus;
+        octez_crawler |> open_;
       ]
 
 let _octez_dal_node_lib_test =
@@ -5237,21 +5288,6 @@ let _octez_dal_node_lib_test =
         octez_dal_node_lib |> open_;
         octez_test_helpers |> open_;
         tezt_bam;
-      ]
-
-let octez_dal_node_gossipsub_lib =
-  public_lib
-    "tezos-dal-node-lib.gossipsub"
-    ~path:"src/lib_dal_node/gossipsub"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_crypto_dal |> open_;
-        octez_gossipsub |> open_;
-        octez_p2p |> open_;
-        octez_p2p_services |> open_;
-        octez_dal_node_services |> open_;
-        octez_crypto |> open_;
       ]
 
 let octez_node_config =
@@ -5295,22 +5331,6 @@ let octez_rpc_process =
         lwt_unix;
         lwt_exit;
         prometheus_app;
-      ]
-
-let octez_crawler =
-  public_lib
-    "octez-crawler"
-    ~internal_name:"octez_crawler"
-    ~path:"src/lib_crawler"
-    ~synopsis:"Octez: library to crawl blocks of the L1 chain"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives" |> open_;
-        octez_rpc_http |> open_;
-        octez_base_unix;
-        octez_stdlib_unix |> open_;
-        octez_client_base |> open_;
-        octez_shell;
       ]
 
 let octez_injector_lib =
@@ -8948,34 +8968,8 @@ let _octez_dal_node =
       ([
          bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives";
-         octez_base_unix;
-         octez_version;
-         cmdliner;
-         octez_client_base |> open_;
-         octez_rpc_http |> open_;
-         octez_rpc_http_server;
-         octez_protocol_updater;
-         octez_rpc_http_client_unix;
          octez_stdlib_unix |> open_;
-         octez_stdlib |> open_;
          octez_dal_node_lib |> open_;
-         octez_dal_node_services |> open_;
-         octez_layer2_store |> open_;
-         octez_crypto_dal |> open_;
-         octez_store_unix;
-         octez_store_shared |> open_;
-         octez_gossipsub |> open_;
-         octez_dal_node_gossipsub_lib |> open_;
-         octez_p2p |> open_;
-         octez_p2p_services |> open_;
-         octez_crypto |> open_;
-         octez_base_p2p_identity_file |> open_;
-         octez_shell_services |> open_;
-         opentelemetry;
-         opentelemetry_client_cohttp_lwt;
-         prometheus_app;
-         prometheus;
-         octez_crawler |> open_;
          memtrace;
        ]
       @ protocol_deps)
