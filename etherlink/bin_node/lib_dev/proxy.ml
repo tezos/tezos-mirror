@@ -85,7 +85,7 @@ let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
       ~validate_tx
   in
   let*! hashes =
-    Rollup_node_rpc.inject_transactions
+    Rollup_node_rpc.Etherlink.inject_transactions
     (* The timestamp is ignored in observer and proxy mode, it's just for
        compatibility with sequencer mode. *)
       ~timestamp:(Misc.now ())

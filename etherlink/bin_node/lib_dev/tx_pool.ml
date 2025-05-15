@@ -511,13 +511,13 @@ let pop_transactions state ~maximum_cumulative_size =
       Lwt_list.map_p
         (fun address ->
           let* nonce =
-            Backend.nonce
+            Backend.Etherlink.nonce
               address
               Ethereum_types.Block_parameter.(Block_parameter Latest)
           in
           let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
           let* (Qty balance) =
-            Backend.balance
+            Backend.Etherlink.balance
               address
               Ethereum_types.Block_parameter.(Block_parameter Latest)
           in
@@ -527,7 +527,7 @@ let pop_transactions state ~maximum_cumulative_size =
     let addr_with_nonces = List.filter_ok addr_with_nonces in
     (* Remove transactions with too low nonce, timed-out and the ones that
        can not be prepayed anymore. *)
-    let* (Qty base_fee_per_gas) = Backend.base_fee_per_gas () in
+    let* (Qty base_fee_per_gas) = Backend.Etherlink.base_fee_per_gas () in
     let current_timestamp = Misc.now () in
     let pool =
       List.fold_left
@@ -635,7 +635,7 @@ let pop_and_inject_transactions state =
   if not (List.is_empty txs) then
     let (module Backend : Services_backend_sig.S) = state.backend in
     let*! hashes =
-      Backend.inject_transactions
+      Backend.Etherlink.inject_transactions
       (* The timestamp is ignored in observer and proxy mode, it's just for
          compatibility with sequencer mode. *)
         ~timestamp:(Misc.now ())
@@ -820,7 +820,9 @@ let nonce pkey =
   let*? w = Lazy.force worker in
   let Types.{backend = (module Backend); pool; _} = Worker.state w in
   let+ current_nonce =
-    Backend.nonce pkey Ethereum_types.Block_parameter.(Block_parameter Latest)
+    Backend.Etherlink.nonce
+      pkey
+      Ethereum_types.Block_parameter.(Block_parameter Latest)
   in
   let current_nonce =
     Option.value ~default:Ethereum_types.Qty.zero current_nonce
@@ -880,13 +882,13 @@ let get_tx_pool_content () =
     Lwt_list.map_p
       (fun address ->
         let* nonce =
-          Backend.nonce
+          Backend.Etherlink.nonce
             address
             Ethereum_types.Block_parameter.(Block_parameter Latest)
         in
         let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
         let* (Qty balance) =
-          Backend.balance
+          Backend.Etherlink.balance
             address
             Ethereum_types.Block_parameter.(Block_parameter Latest)
         in

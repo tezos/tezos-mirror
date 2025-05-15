@@ -482,6 +482,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     (module struct
       include Backend
 
+      (* Overwrite Block_storage module *)
       module Block_storage = struct
         (* Current block number is kept in durable storage. *)
         let current_block_number = Block_storage.current_block_number
@@ -542,6 +543,10 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           Evm_store.Transactions.find_object conn hash
       end
 
+      (* Overwrite Etherlink Tracer using the new Etherlink_block_storage *)
+      module Tracer_etherlink =
+        Tracer_sig.Make (Executor) (Block_storage) (Tracer)
+
       let block_param_to_block_number
           (block_param : Ethereum_types.Block_parameter.extended) =
         let open Lwt_result_syntax in
@@ -565,13 +570,12 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
 
         let nth_block_hash = Block_storage.nth_block_hash
       end)
-
-      include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
     end)
   else
     (module struct
       include Backend
 
+      (* Overwrite Block_storage module *)
       module Block_storage = struct
         (* Current block number is kept in durable storage. *)
         let current_block_number = Block_storage.current_block_number
@@ -635,7 +639,9 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           | None -> return_none
       end
 
-      include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
+      (* Overwrite Etherlink Tracer using the new Etherlink_block_storage *)
+      module Tracer_etherlink =
+        Tracer_sig.Make (Executor) (Block_storage) (Tracer)
     end)
 
 let next_blueprint_number ctxt =
