@@ -311,6 +311,7 @@ and _ contents =
      reported and the byzantine will have its security deposit
      forfeited. *)
   | Double_consensus_operation_evidence : {
+      slot : Slot_repr.t;
       op1 : 'a Kind.consensus operation;
       op2 : 'b Kind.consensus operation;
     }

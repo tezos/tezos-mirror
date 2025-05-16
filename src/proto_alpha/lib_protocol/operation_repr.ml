@@ -303,6 +303,7 @@ and _ contents =
     }
       -> Kind.vdf_revelation contents
   | Double_consensus_operation_evidence : {
+      slot : Slot_repr.t;
       op1 : 'a Kind.consensus operation;
       op2 : 'b Kind.consensus operation;
     }
@@ -1306,7 +1307,8 @@ module Encoding = struct
         tag = 2;
         name = "double_consensus_operation_evidence";
         encoding =
-          obj2
+          obj3
+            (req "slot" Slot_repr.encoding)
             (req "op1" (dynamic_size inlined_consensus_operation_encoding))
             (req "op2" (dynamic_size inlined_consensus_operation_encoding));
         select =
@@ -1314,11 +1316,11 @@ module Encoding = struct
           | Contents (Double_consensus_operation_evidence _ as op) -> Some op
           | _ -> None);
         proj =
-          (fun (Double_consensus_operation_evidence {op1; op2}) ->
-            (Consensus_op op1, Consensus_op op2));
+          (fun (Double_consensus_operation_evidence {slot; op1; op2}) ->
+            (slot, Consensus_op op1, Consensus_op op2));
         inj =
-          (fun (Consensus_op op1, Consensus_op op2) ->
-            Double_consensus_operation_evidence {op1; op2});
+          (fun (slot, Consensus_op op1, Consensus_op op2) ->
+            Double_consensus_operation_evidence {slot; op1; op2});
       }
 
   (* Note: tag = 7 was used for Double_preattestation_evidence, before

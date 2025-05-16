@@ -3398,12 +3398,13 @@ module Forge = struct
   let double_baking_evidence ctxt block ~branch ~bh1 ~bh2 () =
     operation ctxt block ~branch (Double_baking_evidence {bh1; bh2})
 
-  let double_consensus_operation_evidence ctxt block ~branch ~op1 ~op2 () =
+  let double_consensus_operation_evidence ctxt block ~branch ~slot ~op1 ~op2 ()
+      =
     operation
       ctxt
       block
       ~branch
-      (Double_consensus_operation_evidence {op1; op2})
+      (Double_consensus_operation_evidence {slot; op1; op2})
 
   let dal_entrapment_evidence ctxt block ~branch ~attestation ~consensus_slot
       ~slot_index ~shard_with_proof =

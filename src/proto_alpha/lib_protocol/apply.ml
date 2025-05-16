@@ -2507,7 +2507,9 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
 let punish_double_consensus_operation (type kind) ctxt ~operation_hash
     ~payload_producer contents =
   let open Lwt_result_syntax in
-  let (Double_consensus_operation_evidence {op1; op2 = _}) = contents in
+  let (Double_consensus_operation_evidence {slot = _; op1; op2 = _}) =
+    contents
+  in
   let*? slot, misbehaviour =
     let open Result_syntax in
     match op1.protocol_data.contents with

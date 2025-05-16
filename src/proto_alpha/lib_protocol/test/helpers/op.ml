@@ -873,21 +873,30 @@ let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
     protocol_data = Operation_data {contents; signature = None};
   }
 
-let double_attestation ctxt op1 op2 =
-  let contents = Single (Double_consensus_operation_evidence {op1; op2}) in
+let double_consensus_operation (type a) ctxt (op1 : a Kind.consensus operation)
+    op2 =
+  let slot =
+    match op1.protocol_data.contents with
+    | Single
+        (Preattestation consensus_content | Attestation {consensus_content; _})
+      ->
+        consensus_content.slot
+    | Single (Preattestations_aggregate _ | Attestations_aggregate _) ->
+        invalid_arg
+          "Op.double_consensus_operation does not support aggregates yet"
+  in
+  let contents =
+    Single (Double_consensus_operation_evidence {slot; op1; op2})
+  in
   let branch = Context.branch ctxt in
   {
     shell = {branch};
     protocol_data = Operation_data {contents; signature = None};
   }
 
-let double_preattestation ctxt op1 op2 =
-  let contents = Single (Double_consensus_operation_evidence {op1; op2}) in
-  let branch = Context.branch ctxt in
-  {
-    shell = {branch};
-    protocol_data = Operation_data {contents; signature = None};
-  }
+let double_attestation = double_consensus_operation
+
+let double_preattestation = double_consensus_operation
 
 let double_baking ctxt bh1 bh2 =
   let contents = Single (Double_baking_evidence {bh1; bh2}) in

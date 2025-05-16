@@ -2033,7 +2033,7 @@ module Anonymous = struct
   let check_double_consensus_operation_evidence vi
       (operation : Kind.double_consensus_operation_evidence operation) =
     let open Lwt_result_syntax in
-    let (Single (Double_consensus_operation_evidence {op1; op2})) =
+    let (Single (Double_consensus_operation_evidence {slot = _; op1; op2})) =
       operation.protocol_data.contents
     in
     let* e1, e2, kind =

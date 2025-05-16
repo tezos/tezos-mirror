@@ -4765,6 +4765,7 @@ and _ contents =
     }
       -> Kind.vdf_revelation contents
   | Double_consensus_operation_evidence : {
+      slot : Slot.t;
       op1 : 'a Kind.consensus operation;
       op2 : 'b Kind.consensus operation;
     }

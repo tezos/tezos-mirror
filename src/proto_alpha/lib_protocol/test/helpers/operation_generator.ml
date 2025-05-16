@@ -403,9 +403,10 @@ let generate_double_consensus_operation =
      attestation with DAL, attestations aggregate, preattestations
      aggregate *)
   let generate_consensus_operation = generate_preattestation in
+  let* slot = gen_slot in
   let* op1 = generate_op generate_consensus_operation in
   let+ op2 = generate_op generate_consensus_operation in
-  Double_consensus_operation_evidence {op1; op2}
+  Double_consensus_operation_evidence {slot; op1; op2}
 
 let generate_double_baking =
   let open QCheck2.Gen in

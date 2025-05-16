@@ -162,6 +162,7 @@ let double_consensus_op_evidence (type kind) :
     #Protocol_client_context.full ->
     'a ->
     branch:Block_hash.t ->
+    slot:Alpha_context.Slot.t ->
     op1:kind Alpha_context.operation ->
     op2:kind Alpha_context.operation ->
     unit ->
@@ -308,6 +309,7 @@ let process_consensus_op (type kind) state cctxt
                   cctxt
                   (`Hash chain_id, block)
                   ~branch:block_hash
+                  ~slot
                   ~op1
                   ~op2
                   ()
