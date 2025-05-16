@@ -589,18 +589,6 @@ val manager_kind : 'kind manager_operation -> 'kind Kind.manager
 val committee_slots :
   (Slot_repr.t * dal_content option) list -> Slot_repr.t list
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/7935
-   The following two functions are used so that despite the type
-   having been updated with DAL contents, attestations aggregate still
-   has the old logic without DAL. They should be removed once the new
-   logic has been implemented everywhere. *)
-
-val tmp_to_old_committee :
-  (Slot_repr.t * dal_content option) list -> Slot_repr.t list
-
-val tmp_of_old_committee :
-  Slot_repr.t list -> (Slot_repr.t * dal_content option) list
-
 val encoding : packed_operation Data_encoding.t
 
 val contents_encoding : packed_contents Data_encoding.t

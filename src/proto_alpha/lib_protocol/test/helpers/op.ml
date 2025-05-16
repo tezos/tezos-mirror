@@ -146,15 +146,20 @@ let aggregate attestations =
     List.fold_left
       (fun acc ({shell; protocol_data = {contents; signature}} : _ Operation.t) ->
         match (contents, signature) with
-        | Single (Attestation {consensus_content; _}), Some (Bls bls_sig) -> (
+        | ( Single (Attestation {consensus_content; dal_content}),
+            Some (Bls bls_sig) ) -> (
             let {slot; _} = consensus_content in
             match acc with
             | Some (shell, proposal, slots, signatures) ->
-                Some (shell, proposal, slot :: slots, bls_sig :: signatures)
+                Some
+                  ( shell,
+                    proposal,
+                    (slot, dal_content) :: slots,
+                    bls_sig :: signatures )
             | None ->
                 let {level; round; block_payload_hash; _} = consensus_content in
                 let proposal = {level; round; block_payload_hash} in
-                Some (shell, proposal, [slot], [bls_sig]))
+                Some (shell, proposal, [(slot, dal_content)], [bls_sig]))
         | _, _ -> acc)
       None
       attestations
@@ -165,7 +170,6 @@ let aggregate attestations =
     Bls12_381_signature.MinPk.aggregate_signature_opt signatures
   in
   let contents =
-    let committee = Operation.tmp_of_old_committee committee in
     Single
       (Attestations_aggregate
          (* Reverse committee to preserve [attestations] order *)
