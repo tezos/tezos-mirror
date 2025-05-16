@@ -214,12 +214,12 @@ mod test {
     use crate::interpreter::atomics::SC_FAILURE;
     use crate::interpreter::atomics::SC_SUCCESS;
     use crate::interpreter::integer::run_addi;
+    use crate::interpreter::rv32a::test::test_amo;
+    use crate::interpreter::rv32a::test::test_lrsc;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::a2;
-    use crate::test_amo;
-    use crate::test_lrsc;
 
     test_lrsc!(test_lrd_scd, run_lrd, run_scd, 8, u64);
 

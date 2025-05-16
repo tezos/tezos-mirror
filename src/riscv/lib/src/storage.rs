@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-pub mod binary;
+pub(crate) mod binary;
 mod chunked_io;
 
 use std::io;

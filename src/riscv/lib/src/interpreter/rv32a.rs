@@ -220,7 +220,7 @@ where
 }
 
 #[cfg(test)]
-mod test {
+pub(super) mod test {
     use std::ops::BitAnd;
     use std::ops::BitOr;
     use std::ops::BitXor;
@@ -236,7 +236,6 @@ mod test {
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::a2;
 
-    #[macro_export]
     macro_rules! test_lrsc {
         ($name:ident, $lr: ident, $sc: ident, $align: expr, $t: ident) => {
             backend_test!($name, F, {
@@ -283,7 +282,8 @@ mod test {
         }
     }
 
-    #[macro_export]
+    pub(crate) use test_lrsc;
+
     macro_rules! test_amo {
         ($instr: ident, $f: expr, $align: expr, $t: ident) => {
             backend_test!($instr, F, {
@@ -318,6 +318,8 @@ mod test {
 
         }
     }
+
+    pub(crate) use test_amo;
 
     test_lrsc!(test_lrw_scw, run_lrw, run_scw, 4, u32);
 

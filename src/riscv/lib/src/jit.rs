@@ -6,7 +6,7 @@
 //! instructions to native code.
 
 mod builder;
-pub mod state_access;
+pub(crate) mod state_access;
 
 use std::collections::HashMap;
 use std::ffi::c_void;

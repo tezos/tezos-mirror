@@ -5,13 +5,13 @@
 
 pub mod block_cache;
 mod cache_layouts;
-pub mod csregisters;
-pub mod hart_state;
+pub(crate) mod csregisters;
+pub(crate) mod hart_state;
 pub mod instruction;
 pub mod memory;
-pub mod mode;
-pub mod registers;
-pub mod reservation_set;
+pub(crate) mod mode;
+pub(crate) mod registers;
+pub(crate) mod reservation_set;
 
 #[cfg(test)]
 extern crate proptest;

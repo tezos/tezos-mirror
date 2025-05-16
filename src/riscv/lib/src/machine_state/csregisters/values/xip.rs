@@ -31,12 +31,12 @@ impl XipCell {
     /// Does nothing but trigger the XIP effect.
     #[inline(always)]
     pub fn write(&mut self, _: u64) -> Option<CSREffect> {
-        Some(CSREffect::XIP)
+        Some(CSREffect::Xip)
     }
 
     /// Does nothing but trigger the XIP effect.
     #[inline(always)]
     pub fn replace(&mut self, _: u64) -> (u64, Option<CSREffect>) {
-        (0, Some(CSREffect::XIP))
+        (0, Some(CSREffect::Xip))
     }
 }

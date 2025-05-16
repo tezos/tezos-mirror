@@ -9,8 +9,8 @@ use crate::state_backend::ManagerBase;
 /// Effects to be handled by function [`handle_csr_effect`].
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum CSREffect {
-    XIE,
-    XIP,
+    Xie,
+    Xip,
 }
 
 macro_rules! create_effect_getter {
@@ -26,14 +26,14 @@ macro_rules! create_effect_getter {
 }
 
 create_effect_getter!(NoEffect, None);
-create_effect_getter!(XieEffect, Some(CSREffect::XIE));
-create_effect_getter!(XipEffect, Some(CSREffect::XIP));
+create_effect_getter!(XieEffect, Some(CSREffect::Xie));
+create_effect_getter!(XipEffect, Some(CSREffect::Xip));
 
 #[inline(always)]
 pub fn handle_csr_effect(_state: &mut CSRegisters<impl ManagerBase>, effect: Option<CSREffect>) {
     if let Some(effect) = effect {
         match effect {
-            CSREffect::XIE | CSREffect::XIP => {}
+            CSREffect::Xie | CSREffect::Xip => {}
         }
     }
 }
