@@ -48,7 +48,7 @@ module Parameters : sig
      data about attested slots assuming the node supports refutations and it has
      been start sufficiently far in the past. See the functions
      [Profile_manager.get_attested_data_default_store_period] and
-     [Daemon.get_storage_period] in src/bin_dal_node/. *)
+     [Daemon.get_storage_period] in src/lib_dal_node/. *)
   val full_storage_period_with_refutation_in_cycles :
     proto_parameters:JSON.t -> int
 
@@ -56,7 +56,7 @@ module Parameters : sig
      data about attested slots assuming the node supports refutations and it
      hash just been started. See the functions
      [Profile_manager.get_attested_data_default_store_period] and
-     [Daemon.get_storage_period] in src/bin_dal_node/. *)
+     [Daemon.get_storage_period] in src/lib_dal_node/. *)
   val initial_storage_period_with_refutation_in_cycles :
     proto_parameters:JSON.t -> int
 
@@ -64,7 +64,7 @@ module Parameters : sig
      data about attested slots assuming the node does not supports
      refutations. See the functions
      [Profile_manager.get_attested_data_default_store_period] and
-     [Daemon.get_proto_plugins] src/bin_dal_node/. *)
+     [Daemon.get_proto_plugins] src/lib_dal_node/. *)
   val storage_period_without_refutation_in_cycles :
     proto_parameters:JSON.t -> int
 end

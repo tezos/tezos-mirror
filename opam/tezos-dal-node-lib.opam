@@ -11,15 +11,18 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "tezos-dal-node-services" { = version }
-  "dal_node_migrations" { = version }
   "octez-shell-libs" { = version }
+  "tezos-dal-node-services" { = version }
+  "bls12-381" { = version }
+  "dal_node_migrations" { = version }
   "octez-l2-libs" { = version }
+  "cmdliner" { >= "1.1.0" }
+  "opentelemetry"
+  "octez-crawler" { = version }
   "octez-rust-deps" { with-test & = version }
   "ppx_hash" {with-test}
   "bam-ppx" { with-test & >= "0.3" }
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
-  "bls12-381" { with-test & = version }
   "tezt-bam" { with-test & >= "0.3" }
 ]
 build: [

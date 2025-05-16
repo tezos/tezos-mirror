@@ -13,13 +13,7 @@ depends: [
   "octez-rust-deps" { = version }
   "bls12-381" { = version }
   "octez-libs" { = version }
-  "cmdliner" { >= "1.1.0" }
-  "octez-shell-libs" { = version }
   "tezos-dal-node-lib" { = version }
-  "tezos-dal-node-services" { = version }
-  "octez-l2-libs" { = version }
-  "opentelemetry"
-  "octez-crawler" { = version }
   "memtrace"
   "octez-protocol-022-PsRiotum-libs" { = version }
 ]

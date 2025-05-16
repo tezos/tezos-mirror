@@ -56,7 +56,7 @@ module Q = struct
         - Create a .sql file led by the next migration number [N = version + 1]
           (with leading 0s) followed by the name of the migration (e.g.
           [005_create_blueprints_table.sql])
-        - Run [src/bin_dal_node/scripts/check_dal_store_migrations.sh promote]
+        - Run [src/lib_dal_node/scripts/check_dal_store_migrations.sh promote]
         - Regenerate the schemas, using [[
               dune exec tezt/tests/main.exe -- --file dal.ml store \
                 schemas regression --reset-regressions

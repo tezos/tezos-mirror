@@ -69,7 +69,7 @@ type error +=
 
 (** [Cryptobox.polynomial_from_slot] but using the [Errors] module.
 
-    The function returns an error {!ref:Invalid_slot_size} if the
+    The function returns an error {!Invalid_slot_size} if the
     [slot]'s size doesn't match the expected slots' size given in
     [cryptobox], or the [slot]'s polynomial otherwise. *)
 val polynomial_from_slot :
