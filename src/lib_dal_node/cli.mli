@@ -145,6 +145,29 @@ type options = {
     options. *)
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
 
+val cli_options_to_options :
+  string option ->
+  P2p_point.Id.t option ->
+  float option ->
+  P2p_point.Id.t option ->
+  P2p_point.Id.t option ->
+  Uri.t option ->
+  Uri.t list ->
+  bool ->
+  P2p_point.Id.t option ->
+  Signature.public_key_hash trace ->
+  int trace ->
+  int trace option ->
+  bool ->
+  string trace ->
+  Configuration_file.history_mode option ->
+  string option ->
+  string option ->
+  bool option ->
+  bool ->
+  bool ->
+  (options, bool * string) result
+
 (** [commands ~run] attaches a callback to each subcommands of the DAL
     node. *)
 val make : run:(t -> options -> unit Cmdliner.Term.ret) -> unit Cmdliner.Cmd.t

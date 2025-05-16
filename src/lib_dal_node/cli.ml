@@ -678,55 +678,83 @@ type options = {
   ignore_l1_config_peers : bool;
 }
 
+let cli_options_to_options data_dir rpc_addr expected_pow listen_addr
+    public_addr endpoint http_backup_uris trust_http_backup_uris metrics_addr
+    attesters operators observers bootstrap_flag peers history_mode service_name
+    service_namespace fetch_trusted_setup verbose ignore_l1_config_peers =
+  let open Result_syntax in
+  let profile = Controller_profiles.make ~attesters ~operators ?observers () in
+  let* profile =
+    match (bootstrap_flag, observers, profile) with
+    | false, None, profiles when Controller_profiles.is_empty profiles ->
+        return_none
+    | false, Some _, profiles when Controller_profiles.is_empty profiles ->
+        (* The user only mentioned '--observer' without any slot and
+           without any other profile. It will be assigned to random
+           slots. *)
+        return_some Profile_manager.random_observer
+    | false, _, _ -> return_some (Profile_manager.controller profile)
+    | true, None, profiles when Controller_profiles.is_empty profiles ->
+        return_some Profile_manager.bootstrap
+    | true, _, _ ->
+        fail
+          ( false,
+            "a bootstrap node (option '--bootstrap') cannot be an attester \
+             (option '--attester'), an operator (option '--operator') nor an \
+             observer (option '--observer')" )
+  in
+  return
+    {
+      data_dir;
+      rpc_addr;
+      expected_pow;
+      listen_addr;
+      public_addr;
+      endpoint;
+      http_backup_uris;
+      trust_http_backup_uris;
+      profile;
+      metrics_addr;
+      peers;
+      history_mode;
+      service_name;
+      service_namespace;
+      experimental_features = ();
+      fetch_trusted_setup;
+      verbose;
+      ignore_l1_config_peers;
+    }
+
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint http_backup_uris trust_http_backup_uris metrics_addr attesters
       operators observers bootstrap_flag peers history_mode service_name
       service_namespace fetch_trusted_setup verbose ignore_l1_config_peers =
-    let run profile =
-      run
-        subcommand
-        {
-          data_dir;
-          rpc_addr;
-          expected_pow;
-          listen_addr;
-          public_addr;
-          endpoint;
-          http_backup_uris;
-          trust_http_backup_uris;
-          profile;
-          metrics_addr;
-          peers;
-          history_mode;
-          service_name;
-          service_namespace;
-          experimental_features = ();
-          fetch_trusted_setup;
-          verbose;
-          ignore_l1_config_peers;
-        }
-    in
-    let profile =
-      Controller_profiles.make ~attesters ~operators ?observers ()
-    in
-    match (bootstrap_flag, observers, profile) with
-    | false, None, profiles when Controller_profiles.is_empty profiles ->
-        run None
-    | false, Some _, profiles when Controller_profiles.is_empty profiles ->
-        (* The user only mentioned '--observer' without any slot and
-           without any other profile. It will be assigned to random
-           slots. *)
-        run (Some Profile_manager.random_observer)
-    | false, _, _ -> run @@ Some (Profile_manager.controller profile)
-    | true, None, profiles when Controller_profiles.is_empty profiles ->
-        run @@ Some Profile_manager.bootstrap
-    | true, _, _ ->
-        `Error
-          ( false,
-            "a bootstrap node (option '--bootstrap') cannot be an attester \
-             (option '--attester'), an operator (option '--operator') nor an \
-             observer (option '--observer')" )
+    match
+      cli_options_to_options
+        data_dir
+        rpc_addr
+        expected_pow
+        listen_addr
+        public_addr
+        endpoint
+        http_backup_uris
+        trust_http_backup_uris
+        metrics_addr
+        attesters
+        operators
+        observers
+        bootstrap_flag
+        peers
+        history_mode
+        service_name
+        service_namespace
+        fetch_trusted_setup
+        verbose
+        ignore_l1_config_peers
+    with
+    | Ok options -> run subcommand options
+    | Error msg -> `Error msg
   in
   let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
   let info =
