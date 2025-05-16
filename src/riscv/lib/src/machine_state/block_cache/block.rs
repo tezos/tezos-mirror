@@ -299,6 +299,11 @@ impl<D: DispatchCompiler<MC, M>, MC: MemoryConfig, M: JitStateAccess> Jitted<D, 
         result: &mut Result<(), EnvironException>,
         block_builder: &mut <Self as Block<MC, M>>::BlockBuilder,
     ) {
+        if !block_builder.0.should_compile(&mut self.dispatch) {
+            unsafe { self.run_block_not_compiled(core, instr_pc, steps, result, block_builder) }
+            return;
+        }
+
         // trigger JIT compilation
         let instr = self
             .fallback
