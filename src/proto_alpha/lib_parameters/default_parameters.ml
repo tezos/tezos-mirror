@@ -407,10 +407,8 @@ let constants_mainnet : Constants.Parametric.t =
        - Introduce a new Ticket constructor in Michelson: #6643 *)
     direct_ticket_spending_enable = false;
     (* attestation aggregation feature flag *)
-    aggregate_attestation = false;
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7553
-       Enable once we built performance confidance *)
-    allow_tz4_delegate_enable = false;
+    aggregate_attestation = true;
+    allow_tz4_delegate_enable = true;
     all_bakers_attest_activation_level = None;
   }
 

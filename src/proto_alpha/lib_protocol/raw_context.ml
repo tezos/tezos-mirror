@@ -1253,8 +1253,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  zk_rollup = _;
                  adaptive_issuance = _;
                  direct_ticket_spending_enable;
-                 aggregate_attestation;
-                 allow_tz4_delegate_enable;
+                 aggregate_attestation = _;
+                 allow_tz4_delegate_enable = _;
                  all_bakers_attest_activation_level;
                }
                 : Previous.t) =
@@ -1305,8 +1305,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             zk_rollup;
             adaptive_issuance;
             direct_ticket_spending_enable;
-            aggregate_attestation;
-            allow_tz4_delegate_enable;
+            aggregate_attestation = true;
+            allow_tz4_delegate_enable = true;
             all_bakers_attest_activation_level;
           }
         in
@@ -1548,8 +1548,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  zk_rollup = _;
                  adaptive_issuance = _;
                  direct_ticket_spending_enable;
-                 aggregate_attestation;
-                 allow_tz4_delegate_enable;
+                 aggregate_attestation = _;
+                 allow_tz4_delegate_enable = _;
                  all_bakers_attest_activation_level;
                }
                 : Previous.t) =
@@ -1600,8 +1600,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             zk_rollup;
             adaptive_issuance;
             direct_ticket_spending_enable;
-            aggregate_attestation;
-            allow_tz4_delegate_enable;
+            aggregate_attestation = true;
+            allow_tz4_delegate_enable = true;
             all_bakers_attest_activation_level;
           }
         in
