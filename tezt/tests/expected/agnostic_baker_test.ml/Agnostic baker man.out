@@ -178,7 +178,7 @@ Commands for editing and viewing the client's config file:
 Commands related to the agnostic baker daemon.:
 
   run with local node <node_data_path> [<baker>...]
-    Launch the baker daemon.
+    Launch the baker daemon
   
   run remotely [<baker>...]
     Launch the baker daemon using RPCs only.
@@ -188,6 +188,26 @@ Commands related to the agnostic baker daemon.:
   
   run accuser 
     Launch the accuser daemon
+
+Commands related to the DAL daemon.:
+
+  run dal 
+    Run the Octez DAL
+  
+  config dal init 
+    This command creates a configuration file with the parameters provided on
+    the command-line, if no configuration file exists already in the
+    specified or default location. Otherwise, the command-line parameters
+    override the existing ones, and old parameters are lost. This
+    configuration is then used by the run command.
+  
+  config dal update 
+    This command updates the configuration file with the parameters provided
+    on the command-line. If no configuration file exists already, the command
+    will fail.
+  
+  debug dal print store schemas 
+    Print SQL statements describing the tables created in the store.
 
 Miscellaneous commands:
 
