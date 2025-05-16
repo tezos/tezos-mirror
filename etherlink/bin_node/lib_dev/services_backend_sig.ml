@@ -52,6 +52,28 @@ module type S = sig
   (** [chain_family chain_id] returns chain family defined for the chain with id chain_id. *)
   val chain_family : L2_types.chain_id -> L2_types.chain_family tzresult Lwt.t
 
+  (** [single_chain_id_and_family] should only be called if the
+    node is expected to follow a single chain. It compares the
+    configuration of the node and the one of the kernel regarding the
+    chain id and chain family.
+
+    If the multichain feature is disabled in both the kernel and the
+    node, the default value [(None, EVM)] is returned.
+
+    If the multichain feature is enabled in the kernel, check that it
+    is also enabled in the node, that the node is configured to follow
+    exactly one of the chains, that its chain id is among the
+    configured ones in the kernel, and that the chain families for
+    this chain agree in the node and the kernel.
+
+    If the multichain feature is disabled in the kernel but enabled in
+    the node, a warning is emmitted, the configured chain family is
+    ignored and the returned chain family is the default [EVM]. *)
+  val single_chain_id_and_family :
+    config:Configuration.t ->
+    enable_multichain:bool ->
+    (L2_types.chain_id option * L2_types.chain_family) tzresult Lwt.t
+
   (** [base_fee_per_gas ()] returns base fee defined by the rollup. *)
   val base_fee_per_gas : unit -> Ethereum_types.quantity tzresult Lwt.t
 
@@ -189,6 +211,30 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   let list_l1_l2_levels = Backend.list_l1_l2_levels
 
   let l2_levels_of_l1_level = Backend.l2_levels_of_l1_level
+
+  let single_chain_id_and_family ~(config : Configuration.t) ~enable_multichain
+      =
+    let open Lwt_result_syntax in
+    match (config.experimental_features.l2_chains, enable_multichain) with
+    | None, false -> return (None, L2_types.EVM)
+    | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
+    | Some [l2_chain], false ->
+        let*! () = Events.multichain_node_singlechain_kernel () in
+        return (Some l2_chain.chain_id, L2_types.EVM)
+    | Some [l2_chain], true ->
+        let chain_id = l2_chain.chain_id in
+        let* chain_family = chain_family chain_id in
+        if l2_chain.chain_family = chain_family then
+          return (Some chain_id, chain_family)
+        else
+          tzfail
+            (Node_error.Mismatched_chain_family
+               {
+                 chain_id;
+                 node_family = l2_chain.chain_family;
+                 kernel_family = chain_family;
+               })
+    | _ -> tzfail Node_error.Unexpected_multichain
 end
 
 (** Inject transactions with either RPCs or on a websocket connection. *)
