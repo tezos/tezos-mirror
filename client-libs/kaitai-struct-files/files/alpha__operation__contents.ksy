@@ -513,6 +513,8 @@ types:
       type: bh2_0
   double_consensus_operation_evidence:
     seq:
+    - id: slot
+      type: u2be
     - id: op1
       type: op1_0
     - id: op2
