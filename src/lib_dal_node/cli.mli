@@ -168,6 +168,5 @@ val cli_options_to_options :
   bool ->
   (options, bool * string) result
 
-(** [commands ~run] attaches a callback to each subcommands of the DAL
-    node. *)
-val make : run:(t -> options -> unit Cmdliner.Term.ret) -> unit Cmdliner.Cmd.t
+(** Subcommands of the DAL node *)
+val commands : unit Cmdliner.Cmd.t
