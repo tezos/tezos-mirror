@@ -6,7 +6,7 @@
 use crate::constraints::{add_where_clauses, TokenStreamWithConstraints};
 use crate::encoding::*;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned};
+use quote::quote_spanned;
 use syn::{parse_quote, punctuated::Punctuated, spanned::Spanned};
 
 pub fn generate_encoding_for_data(
@@ -31,7 +31,9 @@ pub fn generate_encoding_for_data(
 
 pub(crate) fn generate_encoding(encoding: &Encoding) -> TokenStreamWithConstraints {
     match encoding {
-        Encoding::Unit => quote!(tezos_data_encoding::encoding::Encoding::Unit).into(),
+        Encoding::Unit(span) => {
+            quote_spanned!(*span=> tezos_data_encoding::encoding::Encoding::Unit).into()
+        }
         Encoding::Primitive(primitive, span) => {
             generate_primitive_encoding(*primitive, *span).into()
         }

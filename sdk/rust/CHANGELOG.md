@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add `SecretKeySecp256k1` and `SecretKeyP256` hashes
 - Add `EncryptedSecretKeyEd25519`, `EncryptedSecretKeySecp256k1`, `EncryptedSecretKeyP256` and `EncryptedSecretKeyBls` hashes
 - Add `ScriptExprHash` hash
+- Allow the unit type `()` as field in derived implementations of `NomReader` and `BinWriter`.
 
 ### Changed
 
