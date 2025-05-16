@@ -115,8 +115,9 @@ bitstring is the hash of the concatenation of the previous bitstring with the
 iterated revealed nonce.
 
 A *nonce revelation* is an operation and multiple nonce revelations can thus be
-included in a block. A reward ``SEED_NONCE_REVELATION_TIP``, :ref:`potentially adjusted
-by the adaptive issuance coefficient <adaptive_issuance_rio>`, is given for
+included in a block. A reward ``seed_nonce_revelation_tip``, :ref:`potentially adjusted
+by the adaptive issuance coefficient <adaptive_issuance_rio>`
+and weighted by constant ``SEED_NONCE_REVELATION_TIP_WEIGHT``, is given for
 including a revelation. Revelations are free operations which do not compete
 with transactions for block space. Up to ``MAX_ANON_OPS_PER_BLOCK`` revelations,
 wallet activations and denunciations can be contained in any given block.
@@ -137,9 +138,10 @@ solution: its value is set to be the hash of the RANDAO output and the VDF
 solution.
 
 
-A *VDF revelation* is an operation. A reward ``SEED_NONCE_REVELATION_TIP``,
+A *VDF revelation* is an operation. A reward ``seed_nonce_revelation_tip``,
 :ref:`potentially adjusted by the adaptive issuance coefficient
-<adaptive_issuance_rio>`, is given for the first correct VDF revelation,
+<adaptive_issuance_rio>` and weighted by constant ``SEED_NONCE_REVELATION_TIP_WEIGHT``,
+is given for the first correct VDF revelation,
 subsequent VDF revelation operations being discarded.
 
 .. _rg_constants:
@@ -160,8 +162,8 @@ Randomness generation parameters
      - 960 blocks
    * -  ``MAX_ANON_OPS_PER_BLOCK``
      - 132 revelations
-   * - ``SEED_NONCE_REVELATION_TIP``
-     -  1/8 ꜩ
+   * - ``SEED_NONCE_REVELATION_TIP_WEIGHT``
+     -  1
    * - ``VDF_DIFFICULTY``
      - 8,000,000,000
 
