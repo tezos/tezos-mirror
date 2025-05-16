@@ -158,20 +158,11 @@ let test_negative_slot () =
 
 (** Attestation with a non-normalized slot (that is, a slot that
     belongs to the delegate but is not the delegate's smallest slot).
-    It should fail in application and construction modes, but be
-    accepted in mempool mode. *)
+    This should fail in all validation modes. *)
 let test_not_smallest_slot () =
   let open Lwt_result_syntax in
-  let* genesis, b = init_genesis () in
+  let* _genesis, b = init_genesis () in
   let* delegate, slot = delegate_and_second_slot b in
-  let* mempool_error =
-    (* Under [aggregate_attestation] feature flag, consensus operations with
-       non-minimal slots are no longer propagated by mempools anymore. *)
-    let* {parametric = {aggregate_attestation; _}; _} =
-      Context.get_constants (B genesis)
-    in
-    if aggregate_attestation then return_some error_wrong_slot else return_none
-  in
   Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~attested_block:b
@@ -179,7 +170,7 @@ let test_not_smallest_slot () =
     ~slot
     ~application_error:error_wrong_slot
     ~construction_error:error_wrong_slot
-    ?mempool_error
+    ~mempool_error:error_wrong_slot
     Attestation
 
 let delegate_and_someone_elses_slot block =
