@@ -553,11 +553,6 @@ let of_list l =
 
 let committee_slots committee = List.map fst committee
 
-let tmp_to_old_committee committee = List.map fst committee
-
-let tmp_of_old_committee committee =
-  List.map (fun slot -> (slot, None)) committee
-
 let tx_rollup_operation_tag_offset = 150
 
 let tx_rollup_operation_origination_tag = tx_rollup_operation_tag_offset + 0

@@ -5180,10 +5180,6 @@ module Operation : sig
 
   (** See {!Operation_repr.committee_slots}. *)
   val committee_slots : (Slot.t * dal_content option) list -> Slot.t list
-
-  val tmp_to_old_committee : (Slot.t * dal_content option) list -> Slot.t list
-
-  val tmp_of_old_committee : Slot.t list -> (Slot.t * dal_content option) list
 end
 
 (** This module re-exports definitions from {!Stake_storage},
