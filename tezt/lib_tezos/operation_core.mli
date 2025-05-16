@@ -396,7 +396,8 @@ module Anonymous : sig
     t
 
   (** [dal_entrapment_evidence] crafts a DAL entrapment evidence operation. *)
-  val dal_entrapment_evidence :
+  val dal_entrapment_evidence_standalone_attestation :
+    protocol:Protocol.t ->
     attestation:operation * Tezos_crypto.Signature.t ->
     slot_index:int ->
     Tezos_crypto_dal.Cryptobox.shard ->

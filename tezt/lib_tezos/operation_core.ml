@@ -593,9 +593,12 @@ module Anonymous = struct
       }
     | Dal_entrapment_evidence of {
         attestation : t * Tezos_crypto.Signature.t;
+        consensus_slot : int;
         slot_index : int;
         shard : Tezos_crypto_dal.Cryptobox.shard;
         proof : Tezos_crypto_dal.Cryptobox.shard_proof;
+        protocol : Protocol.t;
+            (* encoding of Dal_entrapment_evidence has changed in protocol S *)
       }
 
   let double_consensus_evidence ~kind (({kind = op1_kind; _}, _) as op1)
@@ -620,12 +623,20 @@ module Anonymous = struct
   let double_preattestation_evidence =
     double_consensus_evidence ~kind:Double_preattestation_evidence
 
-  let dal_entrapment_evidence ~attestation ~slot_index shard proof =
-    let {kind = op_kind; _}, _ = attestation in
+  let dal_entrapment_evidence_standalone_attestation ~protocol ~attestation
+      ~slot_index shard proof =
+    let {kind = op_kind; contents; _}, _ = attestation in
     match op_kind with
     | Consensus {kind = Attestation _; _} ->
-        Dal_entrapment_evidence {attestation; slot_index; shard; proof}
-    | _ -> Test.fail "Invalid arguments to create a dal_entrapment_evidence"
+        let consensus_slot =
+          JSON.(annotate ~origin:__LOC__ contents |=> 0 |-> "slot" |> as_int)
+        in
+        Dal_entrapment_evidence
+          {attestation; consensus_slot; slot_index; shard; proof; protocol}
+    | _ ->
+        Test.fail
+          "wrong kind of denounced operation for \
+           dal_entrapment_evidence_standalone_attestation"
 
   let kind_to_string kind =
     sf
@@ -662,20 +673,26 @@ module Anonymous = struct
             ("op1", op1);
             ("op2", op2);
           ]
-    | Dal_entrapment_evidence {attestation; slot_index; shard; proof} ->
+    | Dal_entrapment_evidence
+        {attestation; consensus_slot; slot_index; shard; proof; protocol} ->
         let attestation = denunced_op_json attestation in
         `O
-          [
-            ("kind", Ezjsonm.string "dal_entrapment_evidence");
-            ("attestation", attestation);
-            ("slot_index", json_of_int slot_index);
-            ( "shard_with_proof",
-              `O
-                [
-                  ("shard", json_of_shard shard);
-                  ("proof", json_of_shard_proof proof);
-                ] );
-          ]
+          ([
+             ("kind", Ezjsonm.string "dal_entrapment_evidence");
+             ("attestation", attestation);
+           ]
+          @ (if Protocol.(number protocol > number R022) then
+               [("consensus_slot", json_of_int consensus_slot)]
+             else [])
+          @ [
+              ("slot_index", json_of_int slot_index);
+              ( "shard_with_proof",
+                `O
+                  [
+                    ("shard", json_of_shard shard);
+                    ("proof", json_of_shard_proof proof);
+                  ] );
+            ])
 
   let operation ?branch anonymous_operation client =
     let json = `A [json anonymous_operation] in

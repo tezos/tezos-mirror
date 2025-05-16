@@ -8485,7 +8485,7 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
    attestation_lag). In protocol S we will not need this
    restriction. *)
 
-let test_inject_accusation _protocol dal_parameters cryptobox node client
+let test_inject_accusation protocol dal_parameters cryptobox node client
     _bootstrap_key =
   let slot_index = 0 in
   let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
@@ -8539,7 +8539,8 @@ let test_inject_accusation _protocol dal_parameters cryptobox node client
     |> Option.get
   in
   let accusation =
-    Operation.Anonymous.dal_entrapment_evidence
+    Operation.Anonymous.dal_entrapment_evidence_standalone_attestation
+      ~protocol
       ~attestation
       ~slot_index
       shard
@@ -8820,7 +8821,7 @@ let test_attester_did_not_attest (_protocol : Protocol.t)
      2. at the next cycle (expecting delegate already denounced)
      3. at the next-next cycle (expecting outdated evidence)
 *)
-let test_duplicate_denunciations _protocol dal_parameters cryptobox node client
+let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     _bootstrap_key =
   let slot_index = 0 in
   Log.info "Bake two blocks" ;
@@ -8877,7 +8878,8 @@ let test_duplicate_denunciations _protocol dal_parameters cryptobox node client
         shards_with_proofs
       |> Option.get
     in
-    Operation.Anonymous.dal_entrapment_evidence
+    Operation.Anonymous.dal_entrapment_evidence_standalone_attestation
+      ~protocol
       ~attestation
       ~slot_index
       shard1
@@ -8890,7 +8892,8 @@ let test_duplicate_denunciations _protocol dal_parameters cryptobox node client
         shards_with_proofs
       |> Option.get
     in
-    Operation.Anonymous.dal_entrapment_evidence
+    Operation.Anonymous.dal_entrapment_evidence_standalone_attestation
+      ~protocol
       ~attestation
       ~slot_index
       shard2
@@ -8947,7 +8950,7 @@ let test_duplicate_denunciations _protocol dal_parameters cryptobox node client
    inject an accusation for the first one at cycle `c` and another at
    for the second one at cycle `c + 1`, both injections are expected
    to succeed. *)
-let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
+let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
     _bootstrap_key =
   let* proto_params =
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
@@ -9028,7 +9031,8 @@ let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
       |> Option.get
     in
     let accusation =
-      Operation.Anonymous.dal_entrapment_evidence
+      Operation.Anonymous.dal_entrapment_evidence_standalone_attestation
+        ~protocol
         ~attestation
         ~slot_index
         shard
@@ -9077,7 +9081,8 @@ let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
       |> Option.get
     in
     let accusation =
-      Operation.Anonymous.dal_entrapment_evidence
+      Operation.Anonymous.dal_entrapment_evidence_standalone_attestation
+        ~protocol
         ~attestation
         ~slot_index
         shard
