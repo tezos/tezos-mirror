@@ -27,9 +27,9 @@ depends: [
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
   "memtrace"
+  "octez-baker-lib" { = version }
   "octez-protocol-compiler" { = version }
   "tezos-dal-node-lib" { = version }
-  "octez-baker-lib" { = version }
   "octez-injector" { = version }
   "octez-l2-libs" { = version }
   "octez-alcotezt" { with-test & = version }

@@ -26,6 +26,7 @@
 open Client_proto_args
 open Baking_errors
 module Events = Baking_events.Commands
+module Command_run = Octez_agnostic_baker.Command_run
 
 let pidfile_arg =
   let open Lwt_result_syntax in
@@ -35,16 +36,6 @@ let pidfile_arg =
     ~long:"pidfile"
     ~placeholder:"filename"
     (Tezos_clic.parameter (fun _ s -> return s))
-
-let may_lock_pidfile pidfile_opt f =
-  match pidfile_opt with
-  | None -> f ()
-  | Some pidfile ->
-      Lwt_lock_file.with_lock
-        ~when_locked:
-          (`Fail (Exn (Failure ("Failed to create the pidfile: " ^ pidfile))))
-        ~filename:pidfile
-        f
 
 let check_node_version cctxt bypass allowed =
   let open Lwt_result_syntax in
@@ -765,7 +756,7 @@ let run_baker ?(recommend_agnostic_baker = true)
       pre_emptive_forge_time,
       remote_calls_timeout ) baking_mode sources cctxt =
   let open Lwt_result_syntax in
-  may_lock_pidfile pidfile @@ fun () ->
+  Command_run.may_lock_pidfile pidfile @@ fun () ->
   let*! () =
     if recommend_agnostic_baker then Events.(emit recommend_octez_baker ())
     else Lwt.return_unit
@@ -852,7 +843,7 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
       (args2 pidfile_arg keep_alive_arg)
       (prefixes ["run"; "vdf"] @@ stop)
       (fun (pidfile, keep_alive) cctxt ->
-        may_lock_pidfile pidfile @@ fun () ->
+        Command_run.may_lock_pidfile pidfile @@ fun () ->
         Client_daemon.VDF.run cctxt ~chain:cctxt#chain ~keep_alive);
   ]
 
@@ -871,7 +862,7 @@ let accuser_commands () =
       (args3 pidfile_arg Client_proto_args.preserved_levels_arg keep_alive_arg)
       (prefixes ["run"] @@ stop)
       (fun (pidfile, preserved_levels, keep_alive) cctxt ->
-        may_lock_pidfile pidfile @@ fun () ->
+        Command_run.may_lock_pidfile pidfile @@ fun () ->
         Client_daemon.Accuser.run
           cctxt
           ~chain:cctxt#chain

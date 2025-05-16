@@ -7250,6 +7250,7 @@ let hash = Protocol.hash
             lwt_exit;
             uri;
             memtrace;
+            octez_agnostic_baker_lib |> open_;
           ]
         ~linkall:true
         ~all_modules_except:
