@@ -2337,9 +2337,12 @@ module Anonymous = struct
          {given = shard_index; min = 0; max = number_of_shards - 1})
 
   (* This function validates an entrapment evidence by doing the following checks:
+     - the included attestation is either a standalone attestation for
+       the included consensus_slot, or an attestations_aggregate whose
+       committee contains the included consensus_slot
+     - the included attestation contains a dal_content for
+       consensus_slot, in which the included slot index is attested
      - the included slot index and shard index are within bounds
-     - the included attestation contains a DAL attestation
-     - the slot was attested by the attester
      - the level of the faulty attestation is within the slashing period
      - the included shard is a trap
      - the delegate has not already been denounced for the same level and slot index
@@ -2351,24 +2354,34 @@ module Anonymous = struct
     let open Lwt_result_syntax in
     let (Single
           (Dal_entrapment_evidence
-            {attestation; consensus_slot = _; slot_index; shard_with_proof})) =
+            {attestation; consensus_slot; slot_index; shard_with_proof})) =
       operation.protocol_data.contents
     in
-    let consensus_content, dal_content =
+    let*? level, dal_content =
+      let open Result_syntax in
       match attestation.protocol_data.contents with
-      | Single (Attestation {consensus_content; dal_content}) ->
-          (consensus_content, dal_content)
-      | _ -> assert false (* Handled in an upcoming commit *)
+      | Single (Attestation {consensus_content = {slot; level; _}; dal_content})
+        ->
+          let* () =
+            error_unless
+              Slot.(slot = consensus_slot)
+              Invalid_accusation_inconsistent_consensus_slot
+          in
+          return (level, dal_content)
+      | Single
+          (Attestations_aggregate {consensus_content = {level; _}; committee})
+        -> (
+          match List.assoc ~equal:Slot.equal consensus_slot committee with
+          | None -> tzfail Invalid_accusation_inconsistent_consensus_slot
+          | Some dal_content -> return (level, dal_content))
+      | Single (Preattestation _ | Preattestations_aggregate _) ->
+          tzfail Invalid_accusation_of_preattestation
     in
     match dal_content with
     | None ->
         tzfail
           (Invalid_accusation_no_dal_content
-             {
-               tb_slot = consensus_content.slot;
-               level = consensus_content.level;
-               slot_index;
-             })
+             {tb_slot = consensus_slot; level; slot_index})
     | Some dal_content -> (
         let number_of_slots = Constants.dal_number_of_slots vi.ctxt in
         let*? () =
@@ -2379,17 +2392,16 @@ module Anonymous = struct
         let*? () =
           check_shard_index_is_in_range ~number_of_shards shard_index
         in
-        let level = consensus_content.level in
         let*? () =
           error_unless
             (Dal.Attestation.is_attested dal_content.attestation slot_index)
             (Invalid_accusation_slot_not_attested
-               {tb_slot = consensus_content.slot; level; slot_index})
+               {tb_slot = consensus_slot; level; slot_index})
         in
         let*? () = check_denunciation_age vi `Dal_denounciation level in
         let level = Level.from_raw vi.ctxt level in
         let* ctxt, consensus_key =
-          Stake_distribution.slot_owner vi.ctxt level consensus_content.slot
+          Stake_distribution.slot_owner vi.ctxt level consensus_slot
         in
         let delegate = consensus_key.delegate in
         let*! already_denounced =
