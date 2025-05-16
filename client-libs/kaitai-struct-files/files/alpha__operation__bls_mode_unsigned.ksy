@@ -68,29 +68,6 @@ types:
     - id: named
       type: named_0
       if: (alpha__entrypoint_tag == alpha__entrypoint_tag::named)
-  alpha__inlined__attestation:
-    seq:
-    - id: alpha__inlined__attestation
-      type: operation__shell_header
-    - id: operations
-      type: alpha__inlined__attestation_mempool__contents
-    - id: signature_tag
-      type: u1
-      enum: bool
-    - id: signature
-      size-eos: true
-      if: (signature_tag == bool::true)
-  alpha__inlined__attestation_mempool__contents:
-    seq:
-    - id: alpha__inlined__attestation_mempool__contents_tag
-      type: u1
-      enum: alpha__inlined__attestation_mempool__contents_tag
-    - id: attestation
-      type: attestation
-      if: (alpha__inlined__attestation_mempool__contents_tag == alpha__inlined__attestation_mempool__contents_tag::attestation)
-    - id: attestation_with_dal
-      type: attestation_with_dal
-      if: (alpha__inlined__attestation_mempool__contents_tag == alpha__inlined__attestation_mempool__contents_tag::attestation_with_dal)
   alpha__inlined__consensus_operation:
     seq:
     - id: alpha__inlined__consensus_operation
@@ -123,26 +100,6 @@ types:
     - id: attestations_aggregate
       type: attestations_aggregate
       if: (alpha__inlined__consensus_operation__contents_tag == alpha__inlined__consensus_operation__contents_tag::attestations_aggregate)
-  alpha__inlined__preattestation:
-    seq:
-    - id: alpha__inlined__preattestation
-      type: operation__shell_header
-    - id: operations
-      type: alpha__inlined__preattestation__contents
-    - id: signature_tag
-      type: u1
-      enum: bool
-    - id: signature
-      size-eos: true
-      if: (signature_tag == bool::true)
-  alpha__inlined__preattestation__contents:
-    seq:
-    - id: alpha__inlined__preattestation__contents_tag
-      type: u1
-      enum: alpha__inlined__preattestation__contents_tag
-    - id: preattestation
-      type: preattestation
-      if: (alpha__inlined__preattestation__contents_tag == alpha__inlined__preattestation__contents_tag::preattestation)
   alpha__michelson__v1__primitives:
     seq:
     - id: alpha__michelson__v1__primitives
@@ -169,12 +126,9 @@ types:
     - id: preattestations_aggregate
       type: preattestations_aggregate
       if: (alpha__operation__alpha__bls_mode_contents_tag == alpha__operation__alpha__bls_mode_contents_tag::preattestations_aggregate)
-    - id: double_preattestation_evidence
-      type: double_preattestation_evidence
-      if: (alpha__operation__alpha__bls_mode_contents_tag == alpha__operation__alpha__bls_mode_contents_tag::double_preattestation_evidence)
-    - id: double_attestation_evidence
-      type: double_attestation_evidence
-      if: (alpha__operation__alpha__bls_mode_contents_tag == alpha__operation__alpha__bls_mode_contents_tag::double_attestation_evidence)
+    - id: double_consensus_operation_evidence
+      type: double_consensus_operation_evidence
+      if: (alpha__operation__alpha__bls_mode_contents_tag == alpha__operation__alpha__bls_mode_contents_tag::double_consensus_operation_evidence)
     - id: seed_nonce_revelation
       type: seed_nonce_revelation
       if: (alpha__operation__alpha__bls_mode_contents_tag == alpha__operation__alpha__bls_mode_contents_tag::seed_nonce_revelation)
@@ -575,19 +529,13 @@ types:
       if: (state_tag == bool::true)
     - id: tick
       type: n
-  double_attestation_evidence:
-    seq:
-    - id: op1
-      type: op1_2
-    - id: op2
-      type: op2_2
   double_baking_evidence:
     seq:
     - id: bh1
       type: bh1_0
     - id: bh2
       type: bh2_0
-  double_preattestation_evidence:
+  double_consensus_operation_evidence:
     seq:
     - id: op1
       type: op1_0
@@ -780,8 +728,8 @@ types:
       repeat: eos
   op1:
     seq:
-    - id: alpha__inlined__preattestation
-      type: alpha__inlined__preattestation
+    - id: alpha__inlined__consensus_operation
+      type: alpha__inlined__consensus_operation
   op1_0:
     seq:
     - id: len_op1
@@ -791,23 +739,10 @@ types:
     - id: op1
       type: op1
       size: len_op1
-  op1_1:
-    seq:
-    - id: alpha__inlined__attestation
-      type: alpha__inlined__attestation
-  op1_2:
-    seq:
-    - id: len_op1
-      type: u4be
-      valid:
-        max: 1073741823
-    - id: op1
-      type: op1_1
-      size: len_op1
   op2:
     seq:
-    - id: alpha__inlined__preattestation
-      type: alpha__inlined__preattestation
+    - id: alpha__inlined__consensus_operation
+      type: alpha__inlined__consensus_operation
   op2_0:
     seq:
     - id: len_op2
@@ -816,19 +751,6 @@ types:
         max: 1073741823
     - id: op2
       type: op2
-      size: len_op2
-  op2_1:
-    seq:
-    - id: alpha__inlined__attestation
-      type: alpha__inlined__attestation
-  op2_2:
-    seq:
-    - id: len_op2
-      type: u4be
-      valid:
-        max: 1073741823
-    - id: op2
-      type: op2_1
       size: len_op2
   op_0:
     seq:
@@ -1681,17 +1603,12 @@ enums:
     8: finalize_unstake
     9: set_delegate_parameters
     255: named
-  alpha__inlined__attestation_mempool__contents_tag:
-    21: attestation
-    23: attestation_with_dal
   alpha__inlined__consensus_operation__contents_tag:
     20: preattestation
     21: attestation
     23: attestation_with_dal
     30: preattestations_aggregate
     31: attestations_aggregate
-  alpha__inlined__preattestation__contents_tag:
-    20: preattestation
   alpha__michelson__v1__primitives:
     0: parameter
     1: storage
@@ -2094,12 +2011,11 @@ enums:
       doc: IS_IMPLICIT_ACCOUNT
   alpha__operation__alpha__bls_mode_contents_tag:
     1: seed_nonce_revelation
-    2: double_attestation_evidence
+    2: double_consensus_operation_evidence
     3: double_baking_evidence
     4: activate_account
     5: proposals
     6: ballot
-    7: double_preattestation_evidence
     8: vdf_revelation
     9: drain_delegate
     17: failing_noop
