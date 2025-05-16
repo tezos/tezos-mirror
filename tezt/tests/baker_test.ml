@@ -933,20 +933,22 @@ let attestations_aggregation_on_reproposal =
   let* companion_key3 =
     Client.update_fresh_companion_key ~algo:"bls" bootstrap3 client
   in
-  Log.info "Launch a baker with bootstrap5" ;
+  Log.info "Bake until BLS consensus keys are activated" ;
+  let* _ = Client.bake_for_and_wait ~keys ~count:6 client in
   (* Bootstrap5 does not have enough voting power to progress independently. We
      manually inject consensus operations to control the progression of
      consensus. *)
+  Log.info "Launch a baker with bootstrap5" ;
   let* _baker =
     Agnostic_baker.init
       ~delegates:[Constant.bootstrap5.public_key_hash]
       node
       client
   in
-  Log.info "Bake until BLS consensus keys are activated" ;
-  let* base_level = Client.bake_for_and_wait_level ~keys ~count:7 client in
+  let* _ = Client.bake_for_and_wait ~keys client in
+  let base_level = 9 in
   (* BLS consensus keys are now activated. We feed the node with just enough
-     consensus operations for the baker to bake a block at level 6. *)
+     consensus operations for the baker to bake a block at [base_level + 1]. *)
   let* slots =
     Operation.Consensus.get_slots_by_consensus_key ~level:base_level client
   in
@@ -959,7 +961,10 @@ let attestations_aggregation_on_reproposal =
       ~block:(string_of_int base_level)
       client
   in
-  Log.info "Injecting consensus for bootstrap1 at level 5 round %d@." round ;
+  Log.info
+    "Injecting consensus for bootstrap1 at level %d round %d@."
+    base_level
+    round ;
   let dal_attestation = Array.init 16 (fun _ -> true) in
   let* () =
     Operation.Consensus.(
@@ -998,14 +1003,14 @@ let attestations_aggregation_on_reproposal =
       client
   in
   (* The baker running bootstrap5 doesn't have enough voting power to progress
-     alone. Since we won't attest any block at level 6, it will keep baking
-     level 6 as round increases. *)
-  Log.info "Attesting level 5 round %d with bootstrap2 & 4" round ;
-  (* Inject additional attestations for level 5. These attestations are expected
-     to be included in the coming level 6 proposal. In particular, bootstrap2
-     attestation is expected to be incorporated into the aggregation.
-     Since the baker didn't witnessed a prequorum, it is expected to bake a
-     fresh proposal. *)
+     alone. Since we won't attest any block at [base_level + 1], it will keep
+     baking blocks for [base_level + 1] as round increases. *)
+  Log.info "Attesting level %d round %d with bootstrap2 & 4" base_level round ;
+  (* Inject additional attestations for [base_level]. These attestations are
+     expected to be included in the coming [base_level + 1] proposal. In
+     particular, bootstrap2 attestation is expected to be incorporated into the
+     aggregation. Since the baker didn't witnessed a prequorum, it is expected
+     to bake a fresh proposal. *)
   let* () =
     Lwt_list.iter_s
       Operation.Consensus.(
@@ -1034,10 +1039,12 @@ let attestations_aggregation_on_reproposal =
       ~expected_attestations:[bootstrap4; bootstrap5]
       client
   in
-  Log.info "Preattesting the latest block at level 6 with bootstrap1 & 2" ;
-  (* We preattest the latest block at level 6 with enough voting power to
-     trigger a prequorum. Consequently, the baker is expected to lock on the
-     preattested payload and only bake reproposals. *)
+  Log.info
+    "Preattesting the latest block at level %d with bootstrap1 & 2"
+    (base_level + 1) ;
+  (* We preattest the latest block at level [base_level + 1] with enough voting
+     power to trigger a prequorum. Consequently, the baker is expected to lock
+     on the preattested payload and only bake reproposals. *)
   let* () =
     let* slots =
       Operation.Consensus.get_slots_by_consensus_key
@@ -1051,7 +1058,11 @@ let attestations_aggregation_on_reproposal =
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    Log.info "Preattesting level 6 round %d with branch %s" round branch ;
+    Log.info
+      "Preattesting level %d round %d with branch %s"
+      (base_level + 1)
+      round
+      branch ;
     Lwt_list.iter_s
       Operation.Consensus.(
         fun (delegate : Account.key) ->
@@ -1070,10 +1081,11 @@ let attestations_aggregation_on_reproposal =
           unit)
       [consensus_key1; consensus_key2; bootstrap4]
   in
-  (* Inject additional attestations for level 5. These attestations are expected
-     to be included in the coming level 6 reproposals. In particular, bootstrap3
-     attestation is expected to be incorporated into the aggregation. *)
-  Log.info "Attesting level 5 round %d with bootstrap3 & 6" round ;
+  (* Inject additional attestations for [base_level]. These attestations are
+     expected to be included in the coming [base_level + 1] reproposals. In
+     particular, bootstrap3 attestation is expected to be incorporated into the
+     aggregation. *)
+  Log.info "Attesting level %d round %d with bootstrap3 & 6" base_level round ;
   let* () =
     Lwt_list.iter_s
       Operation.Consensus.(
