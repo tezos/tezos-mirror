@@ -392,7 +392,17 @@ let () =
       ]
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in the Docker image for \
-       the latest release candidate of Octez"
+       the latest release candidate of Octez" ;
+  register
+    "schedule_documentation"
+    schedule_documentation
+    ~jobs:
+      (Common.job_datadog_pipeline_trace :: Master_branch.job_static_x86_64
+       :: Master_branch.jobs_documentation
+      |> List.map (with_interruptible false))
+    ~description:
+      "Scheduled pipeline that updates the octez.com/docs documentation \
+       without being interrupted."
 
 (** {Manual pipelines} *)
 
