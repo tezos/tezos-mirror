@@ -141,9 +141,7 @@ end
 (** {!type-t}-dependent combination of public keys or signatures. *)
 module Dal_dependent_signing : sig
   (** Encodes a {!type-t} into an integer that can be used as a weight
-      for the companion key when signing an attestation with DAL.
-
-      Post-condition: the output is strictly positive. *)
+      for the companion key when signing an attestation with DAL. *)
   val weight :
     consensus_pk:Bls.Public_key.t ->
     companion_pk:Bls.Public_key.t ->
@@ -158,10 +156,7 @@ module Dal_dependent_signing : sig
 
       Returns [None] if the deserialization of points fails or the
       subgroup check fails -- this cannot happen when the provided
-      keys are valid BLS keys.
-
-      Guarantees that the resulting key is different from both
-      [consensus_pk] and [companion_pk]. *)
+      keys are valid BLS keys. *)
   val aggregate_pk :
     subgroup_check:bool ->
     consensus_pk:Bls.Public_key.t ->
