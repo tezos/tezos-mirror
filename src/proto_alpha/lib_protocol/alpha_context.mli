@@ -4786,7 +4786,8 @@ and _ contents =
     }
       -> Kind.double_baking_evidence contents
   | Dal_entrapment_evidence : {
-      attestation : Kind.attestation operation;
+      attestation : 'a Kind.consensus operation;
+      consensus_slot : Slot.t;
       slot_index : Dal.Slot_index.t;
       shard_with_proof : Dal.Shard_with_proof.t;
     }

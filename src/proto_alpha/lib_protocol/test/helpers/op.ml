@@ -897,9 +897,16 @@ let double_baking ctxt bh1 bh2 =
     protocol_data = Operation_data {contents; signature = None};
   }
 
-let dal_entrapment ctxt attestation slot_index shard_with_proof =
+let dal_entrapment ctxt (attestation : Kind.attestation operation) slot_index
+    shard_with_proof =
+  let (Single (Attestation {consensus_content = {slot = consensus_slot; _}; _}))
+      =
+    attestation.protocol_data.contents
+  in
   let contents =
-    Single (Dal_entrapment_evidence {attestation; slot_index; shard_with_proof})
+    Single
+      (Dal_entrapment_evidence
+         {attestation; consensus_slot; slot_index; shard_with_proof})
   in
   let branch = Context.branch ctxt in
   {

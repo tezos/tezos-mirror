@@ -2257,14 +2257,15 @@ module Anonymous = struct
       (operation : Kind.dal_entrapment_evidence operation) =
     let open Lwt_result_syntax in
     let (Single
-          (Dal_entrapment_evidence {attestation; slot_index; shard_with_proof}))
-        =
+          (Dal_entrapment_evidence
+            {attestation; consensus_slot = _; slot_index; shard_with_proof})) =
       operation.protocol_data.contents
     in
     let consensus_content, dal_content =
       match attestation.protocol_data.contents with
       | Single (Attestation {consensus_content; dal_content}) ->
           (consensus_content, dal_content)
+      | _ -> assert false (* Handled in an upcoming commit *)
     in
     match dal_content with
     | None ->
@@ -2416,15 +2417,17 @@ module Anonymous = struct
 
   let dal_entrapment_evidence_info
       (operation : Kind.dal_entrapment_evidence operation) =
-    let (Single (Dal_entrapment_evidence {attestation; _})) =
+    let (Single (Dal_entrapment_evidence {attestation; consensus_slot; _})) =
       operation.protocol_data.contents
     in
-    let {level; slot; _} =
-      match attestation.protocol_data.contents with
-      | Single (Attestation {consensus_content; dal_content = _}) ->
-          consensus_content
+    let (Single
+          ( Preattestation {level; _}
+          | Attestation {consensus_content = {level; _}; _}
+          | Preattestations_aggregate {consensus_content = {level; _}; _}
+          | Attestations_aggregate {consensus_content = {level; _}; _} )) =
+      attestation.protocol_data.contents
     in
-    (level, slot)
+    (level, consensus_slot)
 
   let check_dal_entrapment_evidence_conflict vs oph
       (operation : Kind.dal_entrapment_evidence operation) =
