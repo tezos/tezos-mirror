@@ -19,50 +19,115 @@ end
 module type AGNOSTIC_DAEMON = sig
   type t
 
-  val create : node_endpoint:string -> keep_alive:bool -> t
+  type command
 
-  val run : t -> unit tzresult Lwt.t
+  val run :
+    keep_alive:bool ->
+    command:command ->
+    Tezos_client_base.Client_context.full ->
+    unit tzresult Lwt.t
 end
 
 module type AGENT = sig
   val name : string
 
-  val commands :
-    ?plugin:(module Protocol_plugin_sig.S) ->
-    unit ->
-    Tezos_client_base.Client_context.full Tezos_clic.command list
+  type command
+
+  val run_command :
+    (module Protocol_plugin_sig.S) ->
+    Tezos_client_base.Client_context.full ->
+    command ->
+    unit tzresult Lwt.t
 
   val init_sapling_params : bool
 end
 
-module Baker_agent : AGENT = struct
+type baker_command =
+  | Run_with_local_node of {
+      data_dir : string;
+      args : Configuration.t;
+      sources : Signature.public_key_hash trace;
+    }
+  | Run_remotely of {
+      args : Configuration.t;
+      sources : Signature.public_key_hash trace;
+    }
+  | Run_vdf of {pidfile : string option; keep_alive : bool}
+  | Run_accuser of {
+      pidfile : string option;
+      preserved_levels : int;
+      keep_alive : bool;
+    }
+
+module Baker_agent : AGENT with type command = baker_command = struct
   let name = "baker"
 
-  let commands = Commands.baker_commands
+  type command = baker_command
+
+  let run_command (module Plugin : Protocol_plugin_sig.S) cctxt command =
+    match command with
+    | Run_with_local_node {data_dir; args; sources} ->
+        let baking_mode = Some data_dir in
+        Plugin.Baker_commands_helpers.run_baker
+          ~configuration:args
+          ~baking_mode
+          ~sources
+          ~cctxt
+    | Run_remotely {args; sources} ->
+        let baking_mode = None in
+        Plugin.Baker_commands_helpers.run_baker
+          ~configuration:args
+          ~baking_mode
+          ~sources
+          ~cctxt
+    | Run_vdf {pidfile; keep_alive} ->
+        Configuration.may_lock_pidfile pidfile @@ fun () ->
+        Plugin.Baker_commands_helpers.run_vdf_daemon ~cctxt ~keep_alive
+    | Run_accuser {pidfile; preserved_levels; keep_alive} ->
+        Configuration.may_lock_pidfile pidfile @@ fun () ->
+        Plugin.Accuser_commands_helpers.run ~cctxt ~preserved_levels ~keep_alive
 
   let init_sapling_params = true
 end
 
-module Accuser_agent : AGENT = struct
+type accuser_command =
+  | Run_accuser of {
+      pidfile : string option;
+      preserved_levels : int;
+      keep_alive : bool;
+    }
+
+module Accuser_agent : AGENT with type command = accuser_command = struct
   let name = "accuser"
 
-  let commands = Commands.accuser_commands
+  type command = accuser_command
+
+  let run_command (module Plugin : Protocol_plugin_sig.S) cctxt command =
+    match command with
+    | Run_accuser {pidfile; preserved_levels; keep_alive} ->
+        Configuration.may_lock_pidfile pidfile @@ fun () ->
+        Plugin.Accuser_commands_helpers.run ~cctxt ~preserved_levels ~keep_alive
 
   let init_sapling_params = false
 end
 
-module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
-  type process = {thread : int Lwt.t; canceller : int Lwt.u}
+module Make_daemon (Agent : AGENT) :
+  AGNOSTIC_DAEMON with type command = Agent.command = struct
+  type process = {thread : unit tzresult Lwt.t; canceller : unit tzresult Lwt.u}
 
   type baker = {protocol_hash : Protocol_hash.t; process : process}
 
   type baker_to_kill = {baker : baker; level_to_kill : int}
+
+  type command = Agent.command
 
   type state = {
     node_endpoint : string;
     mutable current_baker : baker option;
     mutable old_baker : baker_to_kill option;
     keep_alive : bool;
+    command : command;
+    cctxt : Tezos_client_base.Client_context.full;
   }
 
   type t = state
@@ -89,10 +154,11 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
         retry_on_disconnection ~emit node_addr f
     | Error trace -> fail trace
 
-  (** [run_thread ~protocol_hash ~cancel_promise ~init_sapling_params] returns the main running thread
-      for the baker given its protocol [~protocol_hash] and cancellation [~cancel_promise]. It can
-      optionally initialise sapling parameters, as requested by [~init_sapling_params]. *)
-  let run_thread ~protocol_hash ~cancel_promise ~init_sapling_params =
+  (** [run_thread ~protocol_hash ~cancel_promise ~init_sapling_params state] returns the
+      main running thread for the baker given its protocol [~protocol_hash] and
+      cancellation [~cancel_promise]. It can optionally initialise sapling parameters,
+      as requested by [~init_sapling_params]. *)
+  let run_thread ~protocol_hash ~cancel_promise ~init_sapling_params state =
     let plugin =
       match
         Protocol_plugins.proto_plugin_for_protocol
@@ -111,11 +177,6 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
       | Ok plugin -> plugin
     in
 
-    let () =
-      Client_commands.register protocol_hash @@ fun _network ->
-      Agent.commands ~plugin ()
-    in
-
     if init_sapling_params then
       (* This call is not strictly necessary as the parameters are initialized
          lazily the first time a Sapling operation (validation or forging) is
@@ -127,20 +188,11 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
       Tezos_sapling.Core.Validator.init_params ()
     else () ;
 
-    Lwt.pick
-      [
-        Client_main_run.lwt_run
-          (module Agnostic_baker_config)
-          ~select_commands:(fun _ _ ->
-            Lwt_result_syntax.return @@ Agent.commands ~plugin ())
-            (* The underlying logging from the baker must not be initialised, otherwise we double log. *)
-          ~disable_logging:true
-          ();
-        cancel_promise;
-      ]
+    let agent_thread = Agent.run_command plugin state.cctxt state.command in
+    Lwt.pick [agent_thread; cancel_promise]
 
   (** [spawn_baker protocol_hash] spawns a new baker process for the given [protocol_hash]. *)
-  let spawn_baker protocol_hash =
+  let spawn_baker state protocol_hash =
     let open Lwt_result_syntax in
     let*! () = Events.(emit starting_agent) (Agent.name, protocol_hash) in
     let cancel_promise, canceller = Lwt.wait () in
@@ -149,6 +201,7 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
         ~protocol_hash
         ~cancel_promise
         ~init_sapling_params:Agent.init_sapling_params
+        state
     in
     let*! () = Events.(emit agent_running) (Agent.name, protocol_hash) in
     return {protocol_hash; process = {thread; canceller}}
@@ -175,7 +228,7 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
     state.old_baker <-
       Some {baker = current_baker; level_to_kill = level_to_kill_old_baker} ;
     state.current_baker <- None ;
-    let* new_baker = spawn_baker next_protocol_hash in
+    let* new_baker = spawn_baker state next_protocol_hash in
     state.current_baker <- Some new_baker ;
     return_unit
 
@@ -197,7 +250,7 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
           in
           Lwt.wakeup
             baker.process.canceller
-            0 [@profiler.record_f {verbosity = Notice} "kill old baker"] ;
+            (Ok ()) [@profiler.record_f {verbosity = Notice} "kill old baker"] ;
           state.old_baker <- None ;
           return_unit)
         else return_unit
@@ -302,12 +355,14 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
     it propagates any error that can appear. *)
   let baker_thread ~state =
     let open Lwt_result_syntax in
-    let*! retcode =
+    let*! res =
       match state.current_baker with
       | Some baker -> baker.process.thread
-      | None -> Lwt.return 0
+      | None -> return_unit
     in
-    if retcode = 0 then return_unit else tzfail (Agent_process_error Agent.name)
+    match res with
+    | Ok () -> return_unit
+    | Error err -> fail (Agent_process_error Agent.name :: err)
 
   (* ---- Agnostic Baker Bootstrap ---- *)
 
@@ -331,7 +386,7 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
       in
       match proto_status with
       | Active ->
-          let* current_baker = spawn_baker protocol_hash in
+          let* current_baker = spawn_baker state protocol_hash in
           state.current_baker <- Some current_baker ;
           return_unit
       | Frozen -> (
@@ -357,11 +412,35 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
     in
     may_start ~head_stream:None ()
 
-  let create ~node_endpoint ~keep_alive =
-    {node_endpoint; current_baker = None; old_baker = None; keep_alive}
+  (* Main entrypoint for the agnostic baker binary.
 
-  let run state =
+     We distinguish two cases:
+     1. If the binary is called against a `--help`, `--version` or `man` command, then
+     there is no reason to connect to a node, find the current protocol etc.
+     2. Otherwise, we run the agnostic baker daemon, which first obtains the
+     current protocol from the connected node, and then it monitors the chain
+     to determine when to switch to a new protocol baker process. *)
+
+  let[@warning "-32"] may_start_profiler baking_dir =
+    match Tezos_profiler_unix.Profiler_instance.selected_backend () with
+    | Some {instance_maker; _} ->
+        let profiler_maker = instance_maker ~directory:baking_dir in
+        Agnostic_baker_profiler.init profiler_maker
+    | None -> ()
+
+  let run ~keep_alive ~command cctxt =
     let open Lwt_result_syntax in
+    let state =
+      {
+        node_endpoint = Uri.to_string cctxt#base;
+        current_baker = None;
+        old_baker = None;
+        keep_alive;
+        command;
+        cctxt;
+      }
+    in
+    () [@profiler.overwrite may_start_profiler cctxt#get_base_dir] ;
     let node_addr = state.node_endpoint in
     let*! () = Events.(emit starting_daemon) Agent.name in
     let _ccid =
@@ -383,17 +462,24 @@ module Make_daemon (Agent : AGENT) : AGNOSTIC_DAEMON = struct
     in
     (* Monitoring voting periods through heads monitoring to avoid
        missing UAUs. *)
-    Lwt.pick
-      [
-        (* We do not care if --keep-alive is provided, if the baker thread doesn't
-           have the argument it'll abort the process anyway. *)
-        retry_on_disconnection
-          ~emit:(fun _ -> Lwt.return_unit)
-          node_addr
-          monitor_voting_periods;
-        baker_thread ~state;
-      ]
+    let* () =
+      Lwt.pick
+        [
+          (* We do not care if --keep-alive is provided, if the baker thread doesn't
+             have the argument it'll abort the process anyway. *)
+          retry_on_disconnection
+            ~emit:(fun _ -> Lwt.return_unit)
+            node_addr
+            monitor_voting_periods;
+          baker_thread ~state;
+        ]
+    in
+    let*! () = Lwt_utils.never_ending () in
+    return_unit
 end
 
-module Baker = Make_daemon (Baker_agent)
-module Accuser = Make_daemon (Accuser_agent)
+module Baker : AGNOSTIC_DAEMON with type command = Baker_agent.command =
+  Make_daemon (Baker_agent)
+
+module Accuser : AGNOSTIC_DAEMON with type command = Accuser_agent.command =
+  Make_daemon (Accuser_agent)

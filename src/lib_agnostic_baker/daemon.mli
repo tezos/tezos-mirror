@@ -27,13 +27,41 @@
 module type AGNOSTIC_DAEMON = sig
   type t
 
-  (** [create ~node_endpoint ~keep_alive] returns a non initialized daemon. *)
-  val create : node_endpoint:string -> keep_alive:bool -> t
+  type command
 
-  (** [run daemon] Runs the daemon responsible for the spawn/stop of the daemons. *)
-  val run : t -> unit tzresult Lwt.t
+  (** [run ~keep_alive ~command cctxt] Runs the daemon
+      responsible for the spawn/stop of the daemons. *)
+  val run :
+    keep_alive:bool ->
+    command:command ->
+    Tezos_client_base.Client_context.full ->
+    unit tzresult Lwt.t
 end
 
-module Baker : AGNOSTIC_DAEMON
+type baker_command =
+  | Run_with_local_node of {
+      data_dir : string;
+      args : Configuration.t;
+      sources : Signature.public_key_hash trace;
+    }
+  | Run_remotely of {
+      args : Configuration.t;
+      sources : Signature.public_key_hash trace;
+    }
+  | Run_vdf of {pidfile : string option; keep_alive : bool}
+  | Run_accuser of {
+      pidfile : string option;
+      preserved_levels : int;
+      keep_alive : bool;
+    }
 
-module Accuser : AGNOSTIC_DAEMON
+module Baker : AGNOSTIC_DAEMON with type command = baker_command
+
+type accuser_command =
+  | Run_accuser of {
+      pidfile : string option;
+      preserved_levels : int;
+      keep_alive : bool;
+    }
+
+module Accuser : AGNOSTIC_DAEMON with type command = accuser_command
