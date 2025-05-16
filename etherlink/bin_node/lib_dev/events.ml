@@ -247,6 +247,16 @@ let missing_chain_id =
     ~msg:"missing chain id: skipping consistency check with selected network"
     ()
 
+let missing_block =
+  Internal_event.Simple.declare_1
+    ~level:Warning
+    ~section
+    ~name:"missing_block"
+    ~msg:
+      "missing block: received event saying the block for {level} would be \
+       available, but reading it from storage failed"
+    ("level", Data_encoding.int32)
+
 let importing_snapshot =
   Internal_event.Simple.declare_1
     ~level:Notice
@@ -522,6 +532,8 @@ let replay_csv_available msg = emit replay_csv_available msg
 let wasm_pvm_fallback () = emit wasm_pvm_fallback ()
 
 let missing_chain_id () = emit missing_chain_id ()
+
+let missing_block level = emit missing_block level
 
 let multichain_node_singlechain_kernel () =
   emit multichain_node_singlechain_kernel ()

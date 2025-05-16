@@ -262,6 +262,7 @@ let evm_node_lib_dev_tezlink =
         octez_base |> open_ ~m:"TzPervasives";
         octez_shell_services;
         octez_version;
+        lwt_watcher;
       ]
 
 let evm_node_config =

@@ -825,6 +825,93 @@ let test_tezlink_bootstrapped =
       ~error_msg:"Check timestamp is latest, Expected %R but got %L") ;
   unit
 
+let test_tezlink_monitor_heads =
+  register_tezlink_test
+    ~title:"Test of the monitor/heads RPC"
+    ~tags:["evm"; "rpc"; "monitor_heads"]
+  @@ fun {sequencer; client; _} _protocol ->
+  let open Lwt.Syntax in
+  (* Prepare the RPC endpoint *)
+  let rpc_info = Evm_node.rpc_endpoint_record sequencer in
+  let endpoint = Client.Foreign_endpoint {rpc_info with path = "tezlink"} in
+
+  let total_headers = 4 in
+
+  (* Promise to resolve when we’ve received all expected headers *)
+  let wait_for_all, notify_all = Lwt.wait () in
+  let received_count = ref 0 in
+
+  (* Fetch the initial head for monotonicity checks *)
+  let* initial =
+    Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block_header ()
+  in
+  let previous_header = ref initial in
+
+  (* Notifier that is going to be used to indicate the block has been received by the monitor *)
+  let notify_block_received : (unit -> unit) ref =
+    ref (fun () -> ())
+    (* dummy, will be replaced below *)
+  in
+
+  (* Process each JSON header line from curl *)
+  let process_line line process =
+    !notify_block_received () ;
+    incr received_count ;
+    Log.info "Received block header #%d" !received_count ;
+    let current = JSON.parse ~origin:"curl_monitor_heads" line in
+    check_header
+      ~previous_header:!previous_header
+      ~current_header:current
+      ~current_timestamp:None
+      ~chain_id:None ;
+    previous_header := current ;
+    if !received_count = total_headers then (
+      Log.info "Received all %d headers" total_headers ;
+      Tezt.Process.terminate process ;
+      Lwt.wakeup_later notify_all ()) ;
+    unit
+  in
+
+  (* Start streaming headers via curl and process lines *)
+  let start_monitor () =
+    let url = Evm_node.endpoint sequencer ^ "/tezlink/monitor/heads/main" in
+    let process = Tezt.Process.spawn "curl" ["--no-buffer"; "--silent"; url] in
+    let ic = Tezt.Process.stdout process in
+    let rec loop () =
+      let* line_opt = Lwt_io.read_line_opt ic in
+      match line_opt with
+      | None -> Lwt.return_unit
+      | Some line ->
+          let* () = process_line line process in
+          loop ()
+    in
+    Lwt.async loop ;
+    unit
+  in
+
+  (* Produce blocks *)
+  let rec produce i =
+    if i = 0 then Lwt.return_unit
+    else
+      let wait_block_received, block_notifier = Lwt.wait () in
+      (notify_block_received := fun () -> Lwt.wakeup_later block_notifier ()) ;
+      let* _ = Rpc.produce_block sequencer in
+      let* () = wait_block_received in
+      produce (i - 1)
+  in
+
+  (* Timeout in case headers don’t arrive in time *)
+  let timeout =
+    let* () = Evm_node.wait_for_blueprint_applied sequencer total_headers in
+    let* () = Lwt_unix.sleep 10.0 in
+    Test.fail ~__LOC__ "Timed out waiting for streamed headers"
+  in
+
+  let* () = start_monitor () and* () = produce total_headers in
+  let* () = Lwt.pick [wait_for_all; timeout] in
+
+  unit
+
 let test_make_l2_kernel_installer_config chain_family =
   Protocol.register_test
     ~__FILE__
@@ -13659,6 +13746,7 @@ let () =
   test_tezlink_manager_key [Alpha] ;
   test_tezlink_counter [Alpha] ;
   test_tezlink_protocols [Alpha] ;
+  test_tezlink_monitor_heads [Alpha] ;
   test_tezlink_version [Alpha] ;
   test_tezlink_header [Alpha] ;
   test_tezlink_constants [Alpha] ;

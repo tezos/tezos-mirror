@@ -27,9 +27,9 @@ depends: [
   "octez-protocol-022-PsRiotum-libs"
   "tezos-protocol-022-PsRiotum"
   "octez-shell-libs"
+  "lwt-watcher" { = "0.2" }
   "dream" { >= "1.0.0~alpha7" }
   "octez-version"
-  "lwt-watcher" { = "0.2" }
   "lwt-exit"
   "octez-smart-rollup-wasm-debugger-lib"
   "tezos-dal-node-services"

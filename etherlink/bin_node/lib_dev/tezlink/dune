@@ -11,7 +11,8 @@
   tezos-protocol-022-PsRiotum.parameters
   octez-libs.base
   octez-shell-libs.shell-services
-  octez-libs.version)
+  octez-libs.version
+  lwt-watcher)
  (flags
   (:standard)
   -open Evm_node_lib_dev_encoding

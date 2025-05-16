@@ -35,4 +35,7 @@ module type S = sig
 
   val block_hash :
     [`Main] -> block_param -> Ethereum_types.block_hash option tzresult Lwt.t
+
+  val monitor_heads :
+    [> `Main] -> 'a -> L2_types.Tezos_block.t Lwt_stream.t * Lwt_watcher.stopper
 end

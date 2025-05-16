@@ -137,6 +137,47 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
     let* block_number = shell_block_param_to_block_number block in
     Backend.tez_nth_block (Z.of_int32 block_number)
 
+  let monitor_heads chain query =
+    (* TODO: #7831
+       take chain into account
+       For the moment this implementation only supports the main chain, once
+       the rpc support of tezlink is more stable, we can add support for other chains *)
+    ignore (chain, query) ;
+
+    let blueprint_stream, stopper = Broadcast.create_blueprint_stream () in
+
+    let retry_delays_ms = [0.; 50.; 100.; 500.] in
+
+    (* Convert blueprint notifications into full blocks, giving the store a
+       short grace period if the block is not yet written.
+       Note that this delay does not correspond to the time between blueprint production
+       and block application, but rather from the time the Database says the data has been
+       written in the storage and the moment it actually becomes available to be read. *)
+    let rec fetch_block level =
+      let open Lwt_syntax in
+      function
+      | [] ->
+          (* After all retries failed, emit warning event. *)
+          let* () = Events.missing_block @@ Z.to_int32 level in
+          return_none
+      | delay_ms :: rest -> (
+          let* () = Lwt_unix.sleep (delay_ms /. 1000.) in
+          let* block_result = Backend.tez_nth_block level in
+          match block_result with
+          | Ok block -> return_some block
+          | Error _ -> fetch_block level rest)
+    in
+
+    let block_stream =
+      Lwt_stream.filter_map_s
+        (fun (bp_with_events : Blueprint_types.with_events) ->
+          (* Extract the level from the blueprint. *)
+          let (Ethereum_types.Qty level) = bp_with_events.blueprint.number in
+          fetch_block level retry_delays_ms)
+        blueprint_stream
+    in
+    (block_stream, stopper)
+
   (* TODO: #7963 Support Observer Mode
      Here the catchup mechanism to fetch blueprints is not taken into account as
      the observer mode is not supported yet *)

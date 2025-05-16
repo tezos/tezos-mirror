@@ -372,6 +372,17 @@ module Imported_services = struct
         Block_hash.t * Time.Protocol.t )
       Constants_services.RPC_service.t =
     import_service Tezos_shell_services.Monitor_services.S.bootstrapped
+
+  let monitor_heads :
+      ( [`GET],
+        unit,
+        unit * chain,
+        < protocols : Protocol_hash.t list
+        ; next_protocols : Protocol_hash.t list >,
+        unit,
+        Block_hash.t * Block_header.t )
+      Tezos_rpc.Service.t =
+    Tezos_shell_services.Monitor_services.S.heads
 end
 
 let chain_directory_path = Tezos_shell_services.Chain_services.path
@@ -518,6 +529,41 @@ let register_chain_services ~l2_chain_id
     base_dir
     (Tezos_rpc.Directory.prefix chain_directory_path dir)
 
+(** Builds the directory registering the service at `/monitor/heads/<chain>`. *)
+let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
+  Tezos_rpc.Directory.gen_register
+    dir
+    Imported_services.monitor_heads
+    (fun ((), chain) query () ->
+      let stream, stopper = Backend.monitor_heads chain query in
+      let shutdown () = Lwt_watcher.shutdown stopper in
+      let next () =
+        let open Lwt_syntax in
+        let* block_opt = Lwt_stream.get stream in
+        match block_opt with
+        | None -> return_none
+        | Some block -> (
+            match
+              ( Protocol_types.Block_header.tezlink_block_to_shell_header block,
+                Protocol_types.ethereum_to_tezos_block_hash block.hash )
+            with
+            | Ok shell, Ok hash ->
+                return_some
+                  ( hash,
+                    ({
+                       shell;
+                       protocol_data =
+                         Data_encoding.Binary.to_bytes_exn
+                           Imported_protocol.Block_header_repr
+                           .protocol_data_encoding
+                           Mock.protocol_data;
+                     }
+                      : Block_header.t) )
+            | Error _, _ | _, Error _ -> return_none)
+      in
+
+      Tezos_rpc.Answer.return_stream {next; shutdown})
+
 (** Builds the root directory. *)
 let build_dir ~l2_chain_id backend =
   let (module Backend : Tezlink_backend_sig.S) = backend in
@@ -531,6 +577,7 @@ let build_dir ~l2_chain_id backend =
          let open Result_syntax in
          let* hash = Protocol_types.ethereum_to_tezos_block_hash input_hash in
          return (hash, input_time))
+  |> register_monitor_heads backend
   |> register ~service:Imported_services.version ~impl:(fun () () () ->
          version ())
 
