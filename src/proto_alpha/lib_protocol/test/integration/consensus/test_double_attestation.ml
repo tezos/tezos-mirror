@@ -250,7 +250,7 @@ let test_different_branch () =
   let* _blk = Block.bake ~operation blk in
   return_unit
 
-(** Check that a double (pre)attestation evidence succeeds when the
+(** Check that a double (pre)attestation evidence fails when the
     operations have distinct slots (that both belong to the delegate)
     and are otherwise identical. *)
 let test_different_slots () =
@@ -279,30 +279,19 @@ let test_different_slots () =
   let double_preattestation =
     double_preattestation (B blk) preattestation1 preattestation2
   in
-  let* {parametric = {aggregate_attestation; _}; _} =
-    Context.get_constants (B genesis)
+  let*! res = Block.bake ~operation:double_attestation blk in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ res (function
+        | Validate_errors.Anonymous.Invalid_denunciation _ -> true
+        | _ -> false)
   in
-  (* Under [aggregate_attestation] feature flag, consensus operations with
-     non-minimal slots are not propagated by mempools and can't be denounced
-     anymore. *)
-  if aggregate_attestation then
-    let*! res = Block.bake ~operation:double_attestation blk in
-    let* () =
-      Assert.proto_error ~loc:__LOC__ res (function
-          | Validate_errors.Anonymous.Invalid_denunciation _ -> true
-          | _ -> false)
-    in
-    let*! res = Block.bake ~operation:double_preattestation blk in
-    let* () =
-      Assert.proto_error ~loc:__LOC__ res (function
-          | Validate_errors.Anonymous.Invalid_denunciation _ -> true
-          | _ -> false)
-    in
-    return_unit
-  else
-    let* (_ : Block.t) = Block.bake ~operation:double_attestation blk in
-    let* (_ : Block.t) = Block.bake ~operation:double_preattestation blk in
-    return_unit
+  let*! res = Block.bake ~operation:double_preattestation blk in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ res (function
+        | Validate_errors.Anonymous.Invalid_denunciation _ -> true
+        | _ -> false)
+  in
+  return_unit
 
 (** Say a delegate double-attests twice and say the 2 evidences are timely
    included. Then the delegate can no longer bake. *)
