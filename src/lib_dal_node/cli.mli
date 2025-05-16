@@ -168,5 +168,7 @@ val cli_options_to_options :
   bool ->
   (options, bool * string) result
 
+val run : t -> options -> unit tzresult Lwt.t
+
 (** Subcommands of the DAL node *)
 val commands : unit Cmdliner.Cmd.t

@@ -810,6 +810,7 @@ let wrap_with_error main_promise =
       Lwt.return @@ `Error (false, Format.asprintf "%a" pp_print_trace err)
 
 let run subcommand cli_options =
+  let open Lwt_result_syntax in
   match subcommand with
   | Run ->
       let data_dir =
@@ -817,21 +818,10 @@ let run subcommand cli_options =
           ~default:Configuration_file.default.data_dir
           cli_options.data_dir
       in
-      Lwt.Exception_filter.(set handle_all_except_runtime) ;
-      Tezos_base_unix.Event_loop.main_run @@ fun () ->
-      wrap_with_error
-      @@ Daemon.run ~data_dir ~configuration_override:(merge cli_options)
+      Daemon.run ~data_dir ~configuration_override:(merge cli_options)
   | Config_init ->
-      Lwt.Exception_filter.(set handle_all_except_runtime) ;
-      Tezos_base_unix.Event_loop.main_run @@ fun () ->
-      wrap_with_error
-      @@ Configuration_file.save (merge cli_options Configuration_file.default)
+      Configuration_file.save (merge cli_options Configuration_file.default)
   | Config_update ->
-      Lwt.Exception_filter.(set handle_all_except_runtime) ;
-      Tezos_base_unix.Event_loop.main_run @@ fun () ->
-      wrap_with_error
-      @@
-      let open Lwt_result_syntax in
       let data_dir =
         Option.value
           ~default:Configuration_file.default.data_dir
@@ -840,15 +830,16 @@ let run subcommand cli_options =
       let* configuration = Configuration_file.load ~data_dir in
       Configuration_file.save (merge cli_options configuration)
   | Debug_print_store_schemas ->
-      let open Lwt_result_syntax in
-      Tezos_base_unix.Event_loop.main_run @@ fun () ->
-      wrap_with_error
-      @@ Lwt_utils_unix.with_tempdir "store"
-      @@ fun data_dir ->
+      Lwt_utils_unix.with_tempdir "store" @@ fun data_dir ->
       let* schemas = Store.Skip_list_cells.schemas data_dir in
       let output = String.concat ";\n\n" schemas in
       Format.printf "%s\n" output ;
       return_unit
+
+let main_run subcommand cli_options =
+  Lwt.Exception_filter.(set handle_all_except_runtime) ;
+  Tezos_base_unix.Event_loop.main_run @@ fun () ->
+  wrap_with_error @@ run subcommand cli_options
 
 let commands =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
@@ -878,7 +869,7 @@ let commands =
         verbose
         ignore_l1_config_peers
     with
-    | Ok options -> run subcommand options
+    | Ok options -> main_run subcommand options
     | Error msg -> `Error msg
   in
   let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
