@@ -59,6 +59,22 @@ module Contract = struct
     @@ Tezlink_imports.Alpha_context.Contract.of_b58check s
 end
 
+module Operation = struct
+  module ImportedOperation = Tezlink_imports.Alpha_context.Operation
+
+  type t = {
+    source : Signature.V1.public_key_hash;
+    counter : Z.t;
+    op : Tezlink_imports.Alpha_context.packed_operation;
+    raw : bytes;
+  }
+
+  let hash_operation {source = _; counter = _; op; raw = _} =
+    let hash = ImportedOperation.hash_packed op in
+    let (`Hex hex) = Operation_hash.to_hex hash in
+    Ethereum_types.Hash (Ethereum_types.Hex hex)
+end
+
 module Tez = struct
   include Tezlink_imports.Alpha_context.Tez
 

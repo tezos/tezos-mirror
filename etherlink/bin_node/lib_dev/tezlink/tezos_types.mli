@@ -44,6 +44,17 @@ module Contract : sig
   val of_implicit : Signature.V1.public_key_hash -> t
 end
 
+module Operation : sig
+  type t = {
+    source : Signature.V1.public_key_hash;
+    counter : Z.t;
+    op : Tezlink_imports.Alpha_context.packed_operation;
+    raw : bytes;
+  }
+
+  val hash_operation : t -> Ethereum_types.hash
+end
+
 module Tez : sig
   include module type of Tezlink_imports.Alpha_context.Tez
 
