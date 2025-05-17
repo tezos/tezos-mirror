@@ -147,7 +147,8 @@ let monitor_performances ~data_dir =
 let start_public_server (type f)
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
     ?delegate_health_check_to ?evm_services ?data_dir validation
-    (config : Configuration.t) tx_container ctxt =
+    (config : Configuration.t)
+    (tx_container : f Services_backend_sig.tx_container) ctxt =
   let open Lwt_result_syntax in
   let*! can_start_performance_metrics =
     Octez_performance_metrics.supports_performance_metrics ()
@@ -176,10 +177,30 @@ let start_public_server (type f)
           | Some l2_chain_id -> return l2_chain_id
           | None -> Backend.chain_id ()
         in
+        let (Services_backend_sig.Michelson_tx_container (module Tx_container))
+            =
+          tx_container
+        in
         return @@ Evm_directory.init_from_resto_directory
         @@ Tezlink_directory.register_tezlink_services
              ~l2_chain_id
              (module Backend.Tezlink)
+             ~add_operation:(fun op raw ->
+               (* TODO: https://gitlab.com/tezos/tezos/-/issues/8007
+                  Validate the operation and use the resulting "next_nonce" *)
+               let next_nonce = Ethereum_types.Qty op.counter in
+               let* hash_res =
+                 Tx_container.add
+                   ~next_nonce
+                   op
+                   ~raw_tx:(Ethereum_types.hex_of_bytes raw)
+               in
+               let* hash =
+                 match hash_res with
+                 | Ok hash -> return hash
+                 | Error s -> failwith "%s" s
+               in
+               return hash)
     | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server ->
         return @@ Evm_directory.empty config.experimental_features.rpc_server
   in

@@ -410,7 +410,7 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
       Tezos_rpc.Answer.return_stream {next; shutdown})
 
 (** Builds the root directory. *)
-let build_dir ~l2_chain_id backend =
+let build_dir ~l2_chain_id ~add_operation backend =
   let (module Backend : Tezlink_backend_sig.S) = backend in
   Tezos_rpc.Directory.empty
   |> register_dynamic_block_services ~l2_chain_id backend
@@ -424,12 +424,28 @@ let build_dir ~l2_chain_id backend =
          return (hash, input_time))
   |> register_monitor_heads backend
   |> register ~service:Tezos_services.version ~impl:(fun () () () -> version ())
+  |> register_with_conversion
+       ~service:Tezos_services.injection_operation
+       ~impl:(fun
+           ()
+             (* TODO: https://gitlab.com/tezos/tezos/-/issues/8007
+                When async is true, the RPC should return before
+                validation. *)
+           (_ : < async : bool ; chain : chain option >)
+           (raw_operation : bytes)
+         ->
+         let open Lwt_result_syntax in
+         let*? op = raw_operation |> Tezos_types.Operation.decode in
+         add_operation op raw_operation)
+       ~convert_output:(fun hash ->
+         hash |> Ethereum_types.hash_to_bytes |> Operation_hash.of_string_exn
+         |> Result_syntax.return)
 
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
 (* module entrypoint *)
-let register_tezlink_services ~l2_chain_id backend =
-  let directory = build_dir ~l2_chain_id backend in
+let register_tezlink_services ~l2_chain_id ~add_operation backend =
+  let directory = build_dir ~l2_chain_id ~add_operation backend in
   let directory =
     Tezos_rpc.Directory.register_describe_directory_service
       directory
