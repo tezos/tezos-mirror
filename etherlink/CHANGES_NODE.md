@@ -9,6 +9,8 @@
 ### RPCs changes
 - `eth_call` does not returns the `data` field when it's empty if it
   fails during the execution. (!17893)
+- RPCs that return transaction objects now include access lists when present,
+  per EIP-1559 and EIP-2930. (!18062)
 
 ### Metrics changes
 
