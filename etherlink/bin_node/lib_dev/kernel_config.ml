@@ -133,7 +133,7 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
             @ make_account_field
                 "counter"
                 Z.zero
-                (Data_encoding.Binary.to_string_exn Data_encoding.z))
+                (Data_encoding.Binary.to_string_exn Data_encoding.n))
           tez_bootstrap_accounts
         |> List.flatten
   in
