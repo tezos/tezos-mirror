@@ -220,6 +220,12 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint
   in
 
+  let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
+  let* l2_chain_id, chain_family =
+    let (module Backend) = observer_backend in
+    Backend.single_chain_id_and_family ~config ~enable_multichain
+  in
+
   let* () =
     match config.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
@@ -245,12 +251,6 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~mode:"observer"
     ~tx_pool_size_info:Tx_pool.size_info
     ~smart_rollup_address ;
-
-  let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-  let* l2_chain_id, chain_family =
-    let (module Backend) = observer_backend in
-    Backend.single_chain_id_and_family ~config ~enable_multichain
-  in
 
   let* finalizer_public_server =
     Rpc_server.start_public_server

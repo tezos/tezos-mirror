@@ -168,6 +168,12 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
 
   let rpc_backend = Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint in
 
+  let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ctxt in
+  let* l2_chain_id, chain_family =
+    let (module Backend) = rpc_backend in
+    Backend.single_chain_id_and_family ~config ~enable_multichain
+  in
+
   let* ping_tx_pool, tx_container =
     match
       (evm_node_private_endpoint, config.experimental_features.enable_tx_queue)
@@ -227,12 +233,6 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       experimental_features =
         {config.experimental_features with spawn_rpc = None};
     }
-  in
-
-  let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ctxt in
-  let* l2_chain_id, chain_family =
-    let (module Backend) = rpc_backend in
-    Backend.single_chain_id_and_family ~config ~enable_multichain
   in
 
   let* server_public_finalizer =

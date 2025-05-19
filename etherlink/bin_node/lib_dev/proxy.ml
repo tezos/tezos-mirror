@@ -142,6 +142,20 @@ let main
     | Some _base -> Validate.Stateless
     | None -> Validate.Full
   in
+  let* l2_chain_id, chain_family =
+    if finalized_view then
+      if
+        (* When finalized_view is set, it's too early to request the
+           feature flag from the rollup node. *)
+        Option.is_some config.experimental_features.l2_chains
+      then
+        (* The finalized view of the proxy mode and the multichain feature are not compatible. *)
+        tzfail (Node_error.Proxy_finalize_with_multichain `Node)
+      else return (None, L2_types.EVM)
+    else
+      let* enable_multichain = Rollup_node_rpc.is_multichain_enabled () in
+      Rollup_node_rpc.single_chain_id_and_family ~config ~enable_multichain
+  in
   let* on_new_head, tx_container =
     match
       ( config.experimental_features.enable_send_raw_transaction,
@@ -191,20 +205,6 @@ let main
       ?on_new_head
       ~rollup_node_endpoint
       ()
-  in
-  let* l2_chain_id, chain_family =
-    if finalized_view then
-      if
-        (* When finalized_view is set, it's too early to request the
-           feature flag from the rollup node. *)
-        Option.is_some config.experimental_features.l2_chains
-      then
-        (* The finalized view of the proxy mode and the multichain feature are not compatible. *)
-        tzfail (Node_error.Proxy_finalize_with_multichain `Node)
-      else return (None, L2_types.EVM)
-    else
-      let* enable_multichain = Rollup_node_rpc.is_multichain_enabled () in
-      Rollup_node_rpc.single_chain_id_and_family ~config ~enable_multichain
   in
 
   let* server_finalizer =

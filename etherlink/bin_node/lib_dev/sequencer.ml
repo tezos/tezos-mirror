@@ -286,6 +286,11 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
 
   let backend = Evm_ro_context.ro_backend ro_ctxt configuration in
+  let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
+  let* l2_chain_id, _chain_family =
+    let (module Backend) = backend in
+    Backend.single_chain_id_and_family ~config:configuration ~enable_multichain
+  in
   let* () =
     match configuration.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
@@ -336,11 +341,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           ()
       in
       return_unit
-  in
-  let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-  let* l2_chain_id, _chain_family =
-    let (module Backend) = backend in
-    Backend.single_chain_id_and_family ~config:configuration ~enable_multichain
   in
   let* finalizer_public_server =
     Rpc_server.start_public_server
