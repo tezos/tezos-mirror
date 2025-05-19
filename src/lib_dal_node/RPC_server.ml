@@ -395,6 +395,10 @@ module Profile_handlers = struct
     in
     Lwt.return_unit
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7969
+
+     We could reuse the internal L1 crawler's newly added status to implement this
+     function. *)
   let warn_if_lagging ~last_finalized_level ~attestation_level =
     (* The L1 node's level is at least [last_finalized_level + 2], because the
        DAL node processes blocks with a delay of two levels, to be sure that
