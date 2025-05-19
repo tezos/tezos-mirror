@@ -277,9 +277,14 @@ Miscellaneous
 -------------
 
 - Revert Renamed ``Bls`` file from the crypto library in ``Bls_aug.ml``. (MR :gl:`!17051`).
+
 - Grafazos: fix netdata metrics used for hardware monitoring, and add more flexibility
   over the mountpoint allowing to observe only / and /opt mountpoints if needed . Also,
   fix the network IOs panel presentation, avoiding a grafana panel transformation.
+
 - Grafazos: add a filter on the selected ``node_instance`` variable over all metrics (was
   previously showing data from all sources on some panels even when a specific source had
   been selected in the grafana dashboard's variable)
+
+- Logs: fix lines with milliseconds part as ``0000`` so that all timestamps have
+  the same width. (MR :gl:`!18040`)
