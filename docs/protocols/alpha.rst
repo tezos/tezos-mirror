@@ -102,6 +102,9 @@ Minor Changes
 - Allow ``finalise_unstake`` to be performed by any account (:gl:`!17950`). This allows finalisation
   of unstake requests to be done automatically by a third party - for example a finalisation bot.
 
+- Consensus operations with different slots are no longer considered a
+  punishable misbehaviour (MR :gl:`!18043`)
+
 Internal
 --------
 
