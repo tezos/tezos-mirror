@@ -23,13 +23,19 @@ let main_switch_exn () =
   | None -> raise Not_initialized
   | Some main_switch -> main_switch
 
+let on_main_run_callbacks = ref []
+
+let on_main_run callback =
+  on_main_run_callbacks := !on_main_run_callbacks @ [callback]
+
 let init_eio_loop ~env ~switch () =
   (* Having [!instance <> None] should only happen if [main_run] is
      called within [main_run]. It will be caught up by [Eio_posix.main_run]
      but we can [assert false] just in case the error is not caught
      for some reason. *)
   assert (!instance = None) ;
-  instance := Some {env; main_switch = switch}
+  instance := Some {env; main_switch = switch} ;
+  List.iter (fun callback -> callback env switch) !on_main_run_callbacks
 
 let main_run ?(eio = false) promise =
   if eio then (

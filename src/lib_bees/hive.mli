@@ -25,3 +25,8 @@ val launch_worker :
 (** [get_error bee_name] returns any eio-related error associated with the worker
     [bee_name]. *)
 val get_error : string -> exn option
+
+(** Delegate the execution of a Lwt promise to a specialized worker. Beware of
+    the fact that the Lwt.t promise won't be resolved as soon as [async_lwt]
+    returns, but (as suggested by the function name) asynchronously. *)
+val async_lwt : (unit -> unit Lwt.t) -> unit

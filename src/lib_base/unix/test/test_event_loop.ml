@@ -20,9 +20,19 @@ let eio () =
   Eio.Fiber.yield () ;
   Lwt.return_unit
 
+(* Wrap tests in a fork in order not to pollute other tests with eio. *)
 let register ~title promise =
   Test.register ~__FILE__ ~title ~tags @@ fun () ->
-  Lwt.return @@ Tezos_base_unix.Event_loop.main_run ~eio:true promise
+  match Lwt_unix.fork () with
+  | 0 -> (
+      match Tezos_base_unix.Event_loop.main_run ~eio:true promise with
+      | () -> exit 0
+      | exception _ -> exit 1)
+  | pid -> (
+      let* _, status = Lwt_unix.waitpid [] pid in
+      match status with
+      | Unix.WEXITED 0 -> Lwt.return_unit
+      | _ -> Lwt.fail_with "failed")
 
 let () = register ~title:"unix event loop: eio promise" eio
 

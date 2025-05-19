@@ -690,7 +690,7 @@ struct
                      once the promise is resolved. *)
                   Handlers.on_completion worker request v status ;
                   resolve resolver (Ok v) ;
-                  ( Lwt_eio.run_lwt_in_main @@ fun () ->
+                  ( Hive.async_lwt @@ fun () ->
                     Worker_events.(emit request_no_errors)
                       (Request.view request, status) ) ;
                   loop ()

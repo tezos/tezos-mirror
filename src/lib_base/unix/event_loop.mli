@@ -40,6 +40,10 @@ val main_switch : unit -> Eio.Switch.t option
     of [main_run] execution. *)
 val main_switch_exn : unit -> Eio.Switch.t
 
+(** [on_main_run callback] registers a callback to be called after
+    initializing each [main_run] call. *)
+val on_main_run : (Eio_unix.Stdenv.base -> Eio.Switch.t -> unit) -> unit
+
 (** [main_run] should be used as a replacement for [Lwt_main.run], as it also
     handles `Eio` env initialization internal calls to the `Eio` event loop
     if [~eio] is set to [true] ([false] by default).
