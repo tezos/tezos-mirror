@@ -83,10 +83,14 @@ let worker name domains =
 
 let launch_task_and_wait worker name on_request ?on_completion param =
   let r = Request.Task {name; on_request; param; on_completion} in
-  Worker.Queue.push_request_and_wait_eio worker r |> Lwt_eio.Promise.await_eio
+  Worker.Queue.push_request_and_wait_eio worker r
 
 let launch_tasks_and_wait worker name func ?on_completion args =
-  Lwt_list.map_p (launch_task_and_wait worker name ?on_completion func) args
+  Eio.Fiber.List.map
+    (fun arg ->
+      launch_task_and_wait worker name ?on_completion func arg
+      |> Eio.Promise.await)
+    args
 
 let launch_task worker name on_request ?on_completion param =
   let r = Request.Task {name; on_request; param; on_completion} in
