@@ -59,3 +59,7 @@ val launch_task :
   ?on_completion:('b -> unit) ->
   'a ->
   bool
+
+(** [shutdown worker] waits for all requests to be completed 
+    then closes the worker. *)
+val shutdown : task_worker -> unit

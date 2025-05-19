@@ -95,3 +95,5 @@ let launch_tasks_and_wait worker name func ?on_completion args =
 let launch_task worker name on_request ?on_completion param =
   let r = Request.Task {name; on_request; param; on_completion} in
   Worker.Queue.push_request_eio worker r
+
+let shutdown task_worker = Worker.shutdown_eio task_worker
