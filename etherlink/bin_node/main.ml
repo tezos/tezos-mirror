@@ -1999,6 +1999,23 @@ let tez_bootstrap_account_arg =
   in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"edp..." Params.tez_account
 
+let tez_bootstrap_contract_arg =
+  let long = "tez-bootstrap-contract" in
+  let doc =
+    "Add a tezlink bootstrap contract in the installer config passing the \
+     address to be used, the script and initial storage comma separated."
+  in
+  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"KT1...,0x...,0x...."
+  @@ Tezos_clic.parameter (fun _ address_script_storage ->
+         let open Lwt_result_syntax in
+         match String.split ',' address_script_storage with
+         | [address; script; storage] ->
+             let*? address =
+               Evm_node_lib_dev_tezlink.Tezos_types.Contract.of_b58check address
+             in
+             return (address, script, storage)
+         | _ -> failwith "Parsing error for %s" long)
+
 let eth_bootstrap_balance_arg =
   Tezos_clic.default_arg
     ~long:"eth-bootstrap-balance"
@@ -2051,7 +2068,7 @@ let make_l2_kernel_config_command =
     ~desc:
       "Produce a file containing the part of the kernel configuration \
        instructions related to a particular L2 chain."
-    (args12
+    (args13
        (config_key_arg ~name:"minimum_base_fee_per_gas" ~placeholder:"111...")
        (config_key_arg ~name:"da_fee_per_byte" ~placeholder:"111...")
        (config_key_arg ~name:"sequencer_pool_address" ~placeholder:"0x...")
@@ -2062,6 +2079,7 @@ let make_l2_kernel_config_command =
        eth_bootstrap_account_arg
        tez_bootstrap_balance_arg
        tez_bootstrap_account_arg
+       tez_bootstrap_contract_arg
        set_account_code
        (config_key_arg
           ~name:"world_state_path"
@@ -2092,6 +2110,7 @@ let make_l2_kernel_config_command =
            eth_bootstrap_accounts,
            tez_bootstrap_balance,
            tez_bootstrap_accounts,
+           tez_bootstrap_contracts,
            set_account_code,
            world_state_path,
            l2_chain_id,
@@ -2111,6 +2130,7 @@ let make_l2_kernel_config_command =
         ~tez_bootstrap_balance
         ?eth_bootstrap_accounts
         ?tez_bootstrap_accounts
+        ?tez_bootstrap_contracts
         ?minimum_base_fee_per_gas
         ?da_fee_per_byte
         ?sequencer_pool_address

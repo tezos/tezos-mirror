@@ -83,10 +83,10 @@ let clean_path path =
     (List.rev path)
 
 let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
-    ?eth_bootstrap_accounts ?tez_bootstrap_accounts ?minimum_base_fee_per_gas
-    ?da_fee_per_byte ?sequencer_pool_address ?maximum_gas_per_transaction
-    ?set_account_code ?world_state_path ~l2_chain_id ~l2_chain_family ~output ()
-    =
+    ?eth_bootstrap_accounts ?tez_bootstrap_accounts ?tez_bootstrap_contracts
+    ?minimum_base_fee_per_gas ?da_fee_per_byte ?sequencer_pool_address
+    ?maximum_gas_per_transaction ?set_account_code ?world_state_path
+    ~l2_chain_id ~l2_chain_family ~output () =
   let world_state_prefix =
     match world_state_path with
     | None -> ["evm"; "world_state"; l2_chain_id]
@@ -137,6 +137,25 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
           tez_bootstrap_accounts
         |> List.flatten
   in
+  let tez_bootstrap_contracts =
+    match tez_bootstrap_contracts with
+    | None -> []
+    | Some contracts ->
+        contracts
+        |> List.map (fun (address, script, storage) ->
+               let path_prefix =
+                 address |> Tezlink_durable_storage.Path.account
+                 |> String.split_on_char '/' |> clean_path
+               in
+               let make_account_field key value converter =
+                 make_instr ~path_prefix (Some (key, converter value))
+               in
+
+               make_account_field "data/code" script encode_hexa
+               @ make_account_field "data/storage" storage encode_hexa)
+        |> List.flatten
+  in
+
   let set_account_code =
     match set_account_code with
     | None -> []
@@ -179,7 +198,8 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
         | Error _ -> raise (Invalid_argument "sequencer_pool_address"))
       ~path_prefix:world_state_prefix
       sequencer_pool_address
-    @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ set_account_code
+    @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ tez_bootstrap_contracts
+    @ set_account_code
   in
   Installer_config.to_file (config_instrs @ world_state_instrs) ~output
 
