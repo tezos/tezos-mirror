@@ -11,7 +11,7 @@ type parameters = {
   sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
   uses_tx_queue : bool;
-  l2_chains : Configuration.l2_chain list option;
+  chain_family : L2_types.chain_family;
 }
 
 (** [start parameters] starts the events follower. *)

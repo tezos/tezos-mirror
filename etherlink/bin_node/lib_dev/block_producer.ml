@@ -11,7 +11,7 @@ type parameters = {
   sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
   uses_tx_queue : bool;
-  l2_chains : Configuration.l2_chain list option;
+  chain_family : L2_types.chain_family;
 }
 
 (* The size of a delayed transaction is overapproximated to the maximum size
@@ -216,7 +216,7 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
         in
         return `Drop
 
-let tx_queue_pop_valid_tx (head_info : Evm_context.head)
+let tx_queue_pop_valid_tx ~chain_family:_ (head_info : Evm_context.head)
     ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   let read = Evm_state.read head_info.evm_state in
@@ -245,7 +245,7 @@ let tx_queue_pop_valid_tx (head_info : Evm_context.head)
 
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
-let produce_block_if_needed ~cctxt ~l2_chains ~smart_rollup_address
+let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
     ~sequencer_key ~force ~timestamp ~delayed_hashes ~remaining_cumulative_size
     ~uses_tx_queue head_info =
   let open Lwt_result_syntax in
@@ -256,11 +256,10 @@ let produce_block_if_needed ~cctxt ~l2_chains ~smart_rollup_address
       return []
     else if uses_tx_queue then
       tx_queue_pop_valid_tx
+        ~chain_family
         head_info
         ~maximum_cumulative_size:remaining_cumulative_size
     else
-      (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-      let chain_family = Configuration.retrieve_chain_family ~l2_chains in
       Tx_pool.pop_transactions
         ~chain_family
         ~maximum_cumulative_size:remaining_cumulative_size
@@ -305,7 +304,7 @@ let head_info_and_delayed_transactions ~with_delayed_transactions
   let*! head_info = Evm_context.head_info () in
   return (head_info, delayed_hashes, remaining_cumulative_size)
 
-let produce_block ~l2_chains ~uses_tx_queue ~cctxt ~smart_rollup_address
+let produce_block ~chain_family ~uses_tx_queue ~cctxt ~smart_rollup_address
     ~sequencer_key ~force ~timestamp ~maximum_number_of_chunks
     ~with_delayed_transactions =
   let open Lwt_result_syntax in
@@ -343,7 +342,7 @@ let produce_block ~l2_chains ~uses_tx_queue ~cctxt ~smart_rollup_address
     else
       produce_block_if_needed
         ~cctxt
-        ~l2_chains
+        ~chain_family
         ~sequencer_key
         ~timestamp
         ~smart_rollup_address
@@ -371,13 +370,13 @@ module Handlers = struct
           sequencer_key;
           maximum_number_of_chunks;
           uses_tx_queue;
-          l2_chains;
+          chain_family;
         } =
           state
         in
         produce_block
-          ~l2_chains
           ~uses_tx_queue
+          ~chain_family
           ~cctxt
           ~smart_rollup_address
           ~sequencer_key

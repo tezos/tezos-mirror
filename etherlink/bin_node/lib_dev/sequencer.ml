@@ -287,7 +287,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
 
   let backend = Evm_ro_context.ro_backend ro_ctxt configuration in
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-  let* l2_chain_id, _chain_family =
+  let* l2_chain_id, chain_family =
     let (module Backend) = backend in
     Backend.single_chain_id_and_family ~config:configuration ~enable_multichain
   in
@@ -322,7 +322,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         sequencer_key = sequencer_config.sequencer;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
         uses_tx_queue = Configuration.is_tx_queue_enabled configuration;
-        l2_chains = configuration.experimental_features.l2_chains;
+        chain_family;
       }
   in
   let* () =
