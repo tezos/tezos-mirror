@@ -863,6 +863,17 @@ module Manager = struct
       ?(entrypoint = "default") ?(arg = `O [("prim", `String "Unit")]) () =
     Transfer {amount; dest; parameters = Some {entrypoint; arg}}
 
+  let create_proof_of_possession ~public_key ~signer =
+    let public_key =
+      Tezos_crypto.Signature.Public_key.of_b58check_exn public_key
+    in
+    let bytes =
+      Data_encoding.Binary.to_bytes_exn
+        Tezos_crypto.Signature.Public_key.encoding
+        public_key
+    in
+    Account.sign_bytes ~signer bytes |> Tezos_crypto.Signature.to_b58check
+
   let update_consensus_key ~public_key ?proof () =
     Update_consensus_key {public_key; proof}
 

@@ -531,6 +531,12 @@ module Manager : sig
     unit ->
     payload
 
+  (** [create_proof_of_possession] generates a proof of possession (aka PoP) for
+      the given [public_key] by signing it with the secret key of the [signer].
+      For now, this is only useful with BLS (tz4) keys. *)
+  val create_proof_of_possession :
+    public_key:string -> signer:Account.key -> string
+
   (** [update_consensus_key ~public_key ~proof ()] builds an
       update_consenus_key operation. [proof] is required only for tz4
       public keys. *)
