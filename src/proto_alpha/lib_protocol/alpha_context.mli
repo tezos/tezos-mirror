@@ -2267,6 +2267,8 @@ module Misbehaviour : sig
   val kind_encoding : kind Data_encoding.t
 
   val compare_kind : kind -> kind -> int
+
+  val equal_kind : kind -> kind -> bool
 end
 
 (** This module re-exports definitions from {!Delegate_storage},

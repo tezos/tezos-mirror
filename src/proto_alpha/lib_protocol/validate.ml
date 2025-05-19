@@ -2030,87 +2030,108 @@ module Anonymous = struct
     | Single (Attestation _ | Attestations_aggregate _) ->
         Misbehaviour.Double_attesting
 
+  let consensus_aggregate_content (type a) (op : a Kind.consensus operation) =
+    match op.protocol_data.contents with
+    | Single
+        ( Preattestation {level; round; block_payload_hash; _}
+        | Attestation
+            {consensus_content = {level; round; block_payload_hash; _}; _} ) ->
+        {level; round; block_payload_hash}
+    | Single
+        ( Preattestations_aggregate {consensus_content; _}
+        | Attestations_aggregate {consensus_content; _} ) ->
+        consensus_content
+
   let check_double_consensus_operation_evidence vi
       (operation : Kind.double_consensus_operation_evidence operation) =
     let open Lwt_result_syntax in
-    let (Single (Double_consensus_operation_evidence {slot = _; op1; op2})) =
+    let (Single (Double_consensus_operation_evidence {slot; op1; op2})) =
       operation.protocol_data.contents
     in
-    let* e1, e2, kind =
-      match (op1.protocol_data.contents, op2.protocol_data.contents) with
-      | Single (Preattestation e1), Single (Preattestation e2) ->
-          return (e1, e2, Misbehaviour.Double_preattesting)
-      | ( Single (Attestation {consensus_content = e1; dal_content = _}),
-          Single (Attestation {consensus_content = e2; dal_content = _}) ) ->
-          return (e1, e2, Misbehaviour.Double_attesting)
-      | Single (Preattestation _), Single (Attestation _)
-      | Single (Attestation _), Single (Preattestation _) ->
-          (* Incompatible kind *)
-          tzfail (Invalid_denunciation Double_preattesting)
-      | Single (Preattestations_aggregate _ | Attestations_aggregate _), _
-      | _, Single (Preattestations_aggregate _ | Attestations_aggregate _) ->
-          (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
-             handle denunciation for aggregates. *)
-          tzfail Aggregate_denunciation_not_implemented
+    let kind = misbehaviour_kind op1 in
+    let ({level; round; block_payload_hash} : consensus_aggregate_content) =
+      consensus_aggregate_content op1
     in
-    let op1_hash = Operation.hash op1 in
-    let op2_hash = Operation.hash op2 in
-    let same_levels = Raw_level.(e1.level = e2.level) in
-    let same_rounds = Round.(e1.round = e2.round) in
-    let same_payload =
-      Block_payload_hash.(e1.block_payload_hash = e2.block_payload_hash)
-    in
-    let same_branches = Block_hash.(op1.shell.branch = op2.shell.branch) in
-    let ordered_hashes = Operation_hash.(op1_hash < op2_hash) in
-    let is_denunciation_consistent =
-      same_levels && same_rounds
-      (* For the double (pre)attestations to be punishable, they must point to
-         the same block (same level and round), but also have at least a
-         difference that is the delegate's fault: different payloads or
-         different branches. Note that different payloads would endanger the
-         consensus process, while different branches could be used to spam
-         mempools with a lot of valid operations. On the other hand, if the
-         operations have identical levels, rounds, payloads, branches, and
-         slots, then only their signatures are different, which is not
-         considered the delegate's fault and therefore is not punished. *)
-      && ((not same_payload) || not same_branches)
-      && (* we require an order on hashes to avoid the existence of
-               equivalent evidences *)
-      ordered_hashes
+    let ({level = level2; round = round2; block_payload_hash = bph2}
+          : consensus_aggregate_content) =
+      consensus_aggregate_content op2
     in
     let*? () =
-      error_unless is_denunciation_consistent (Invalid_denunciation kind)
+      (* Both denounced operations must be of the same kind and point
+         to the same level and round. *)
+      error_unless
+        (Misbehaviour.equal_kind kind (misbehaviour_kind op2)
+        && Raw_level.(level = level2)
+        && Round.(round = round2))
+        (Invalid_denunciation kind)
     in
-    (* Disambiguate: levels are equal *)
-    let level = Level.from_raw vi.ctxt e1.level in
+    let*? () =
+      (* Both denounced operations must involve [slot]. That is,
+         they must be either a standalone (pre)attestation for [slot],
+         or an aggregate whose committee includes [slot]. *)
+      let open Result_syntax in
+      let check_slot (type a) (op : a Kind.consensus Operation.t) =
+        match op.protocol_data.contents with
+        | Single (Preattestation consensus_content)
+        | Single (Attestation {consensus_content; _}) ->
+            error_unless
+              Slot.(consensus_content.slot = slot)
+              (Invalid_denunciation kind)
+        | Single (Preattestations_aggregate {committee; _}) ->
+            error_unless
+              (List.mem ~equal:Slot.equal slot committee)
+              (Invalid_denunciation kind)
+        | Single (Attestations_aggregate {committee; _}) ->
+            error_unless
+              (List.mem_assoc ~equal:Slot.equal slot committee)
+              (Invalid_denunciation kind)
+      in
+      let* () = check_slot op1 in
+      check_slot op2
+    in
+    let*? () =
+      (* For the double operations to be punishable, they must have at
+         least one difference that is considered the delegate's fault:
+         different payloads or different branches. Note that different
+         payloads would endanger the consensus process, while
+         different branches could be used to spam mempools with a lot
+         of valid operations.
+
+         Indeed, we cannot punish a pair of operations just because
+         they have different hashes: the hash also depends on the
+         signature, and using signature malleability, anyone could
+         inject a consensus operation with all the same data as the
+         delegate's original operation but a different signature. *)
+      error_unless
+        (Block_payload_hash.(block_payload_hash <> bph2)
+        || Block_hash.(op1.shell.branch <> op2.shell.branch))
+        (Invalid_denunciation kind)
+    in
+    let*? () =
+      (* We require an order on hashes so that the denunciation
+         constructed from two given operations is unique. *)
+      error_unless
+        Operation_hash.(Operation.hash op1 < Operation.hash op2)
+        (Invalid_denunciation kind)
+    in
+    let level = Level.from_raw vi.ctxt level in
     let*? () =
       check_denunciation_age vi (`Consensus_denounciation kind) level.level
     in
-    let* ctxt, consensus_key1 =
-      Stake_distribution.slot_owner vi.ctxt level e1.slot
+    let* ctxt, consensus_key =
+      Stake_distribution.slot_owner vi.ctxt level slot
     in
-    let* ctxt, consensus_key2 =
-      Stake_distribution.slot_owner ctxt level e2.slot
-    in
-    let delegate1, delegate2 =
-      (consensus_key1.delegate, consensus_key2.delegate)
-    in
-    let*? () =
-      error_unless
-        (Signature.Public_key_hash.equal delegate1 delegate2)
-        (Inconsistent_denunciation {kind; delegate1; delegate2})
-    in
-    let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
+    let delegate = consensus_key.delegate in
     let* already_slashed =
-      Delegate.already_denounced ctxt delegate level e1.round kind
+      Delegate.already_denounced ctxt delegate level round kind
     in
     let*? () =
       error_unless
         (not already_slashed)
         (Already_denounced {kind; delegate; level})
     in
-    let*? () = Operation.check_signature vi.ctxt delegate_pk vi.chain_id op1 in
-    let*? () = Operation.check_signature vi.ctxt delegate_pk vi.chain_id op2 in
+    let* () = check_consensus_operation_signature vi consensus_key op1 in
+    let* () = check_consensus_operation_signature vi consensus_key op2 in
     return_unit
 
   let check_double_consensus_operation_evidence_conflict vs oph key =
@@ -2125,19 +2146,13 @@ module Anonymous = struct
 
   let conflict_key_of_double_consensus_operation
       (operation : Kind.double_consensus_operation_evidence operation) =
-    let (Single (Double_consensus_operation_evidence {op1; _})) =
+    let (Single (Double_consensus_operation_evidence {slot; op1; _})) =
       operation.protocol_data.contents
     in
-    match op1.protocol_data.contents with
-    | Single (Preattestation {slot; level; round; _}) ->
-        (level, round, slot, Misbehaviour.Double_preattesting)
-    | Single (Attestation {consensus_content; _}) ->
-        let {slot; level; round; _} = consensus_content in
-        (level, round, slot, Misbehaviour.Double_attesting)
-    | Single (Preattestations_aggregate _ | Attestations_aggregate _) ->
-        (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
-           handle denunciation for aggregates. *)
-        assert false
+    let ({level; round; _} : consensus_aggregate_content) =
+      consensus_aggregate_content op1
+    in
+    (level, round, slot, misbehaviour_kind op1)
 
   let check_double_consensus_operation_evidence_conflict vs oph
       (operation : Kind.double_consensus_operation_evidence operation) =
