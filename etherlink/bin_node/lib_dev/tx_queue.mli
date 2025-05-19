@@ -33,18 +33,6 @@ val start :
   unit ->
   unit tzresult Lwt.t
 
-(** [clear ()] removes the tx queue data but keeps the allocated space *)
-val clear : unit -> unit tzresult Lwt.t
-
-(** [lock_transactions] locks the transactions in the queue, new
-    transactions can be added but nothing can be retrieved with
-    {!pop_transactions}. *)
-val lock_transactions : unit -> unit tzresult Lwt.t
-
-(** [unlock_transactions] unlocks the transactions if it was locked by
-    {!lock_transactions}. *)
-val unlock_transactions : unit -> unit tzresult Lwt.t
-
 (** [is_locked] checks if the queue is locked. *)
 val is_locked : unit -> bool tzresult Lwt.t
 

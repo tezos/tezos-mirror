@@ -1499,6 +1499,7 @@ let init_from_rollup_node_command =
         ~omit_delayed_tx_events
         ~data_dir
         ~rollup_node_data_dir
+        ~tx_container:(module Evm_node_lib_dev.Tx_queue.Tx_container)
         ())
 
 let dump_to_rlp_command =
@@ -1709,7 +1710,12 @@ let patch_kernel_command =
       let configuration = {configuration with observer = None} in
       if force then
         let* _status =
-          Evm_context.start ~configuration ~data_dir ~store_perm:`Read_write ()
+          Evm_context.start
+            ~configuration
+            ~data_dir
+            ~store_perm:`Read_write
+            ~tx_container:(module Evm_node_lib_dev.Tx_queue.Tx_container)
+            ()
         in
         Evm_context.patch_kernel ?block_number (On_disk kernel_path)
       else
@@ -2809,7 +2815,12 @@ let patch_state_command =
            to interact with an upstream EVM node. *)
         let configuration = {configuration with observer = None} in
         let* _status =
-          Evm_context.start ~configuration ~data_dir ~store_perm:`Read_write ()
+          Evm_context.start
+            ~configuration
+            ~data_dir
+            ~store_perm:`Read_write
+            ~tx_container:(module Evm_node_lib_dev.Tx_queue.Tx_container)
+            ()
         in
         Evm_context.patch_state ?block_number ~key ~value ()
       else

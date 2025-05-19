@@ -227,6 +227,9 @@ module type Tx_container = sig
     to be processed. *)
   val shutdown : unit -> unit tzresult Lwt.t
 
+  (** [clear ()] removes the container data but keeps the allocated space *)
+  val clear : unit -> unit tzresult Lwt.t
+
   (** Trigger a tick in the [Tx_queue]. *)
   val tx_queue_tick : evm_node_endpoint:endpoint -> unit tzresult Lwt.t
 
@@ -235,4 +238,13 @@ module type Tx_container = sig
     [tick_interval] seconds. *)
   val tx_queue_beacon :
     evm_node_endpoint:endpoint -> tick_interval:float -> unit tzresult Lwt.t
+
+  (** [lock_transactions] locks the transactions in the queue, new
+    transactions can be added but nothing can be retrieved with
+    {!pop_transactions}. *)
+  val lock_transactions : unit -> unit tzresult Lwt.t
+
+  (** [unlock_transactions] unlocks the transactions if it was locked by
+    {!lock_transactions}. *)
+  val unlock_transactions : unit -> unit tzresult Lwt.t
 end

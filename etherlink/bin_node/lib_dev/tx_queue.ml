@@ -1033,17 +1033,6 @@ let start ~config ~keep_alive () =
   let*! () = Tx_queue_events.is_ready () in
   return_unit
 
-let clear () =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait w Clear |> handle_request_error
-
-let lock_transactions () =
-  bind_worker @@ fun w -> push_request w Lock_transactions
-
-let unlock_transactions () =
-  bind_worker @@ fun w -> push_request w Unlock_transactions
-
 let is_locked () =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
@@ -1120,6 +1109,11 @@ module Tx_container = struct
     let*! () = Worker.shutdown w in
     return_unit
 
+  let clear () =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    Worker.Queue.push_request_and_wait w Clear |> handle_request_error
+
   let tx_queue_tick ~evm_node_endpoint =
     bind_worker @@ fun w -> push_request w (Tick {evm_node_endpoint})
 
@@ -1131,4 +1125,10 @@ module Tx_container = struct
       loop ()
     in
     loop ()
+
+  let lock_transactions () =
+    bind_worker @@ fun w -> push_request w Lock_transactions
+
+  let unlock_transactions () =
+    bind_worker @@ fun w -> push_request w Unlock_transactions
 end

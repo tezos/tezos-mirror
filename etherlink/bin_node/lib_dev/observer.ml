@@ -131,10 +131,16 @@ let container_forward_tx ~keep_alive ~evm_node_endpoint :
 
     let shutdown () = Lwt_result_syntax.return_unit
 
+    let clear () = Lwt_result_syntax.return_unit
+
     let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
 
     let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
       Lwt_result_syntax.return_unit
+
+    let lock_transactions () = Lwt_result_syntax.return_unit
+
+    let unlock_transactions () = Lwt_result_syntax.return_unit
   end)
 
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
@@ -170,6 +176,25 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
             config.history_mode))
       init_from_snapshot
   in
+
+  let tx_container, ping_tx_pool =
+    match config.experimental_features.enable_tx_queue with
+    | Some _tx_queue_config ->
+        ( (module Tx_queue.Tx_container : Services_backend_sig.Tx_container),
+          false )
+    | None ->
+        if config.finalized_view then
+          let tx_container =
+            container_forward_tx
+              ~keep_alive:config.keep_alive
+              ~evm_node_endpoint
+          in
+          (tx_container, false)
+        else
+          ( (module Tx_pool.Tx_container : Services_backend_sig.Tx_container),
+            true )
+  in
+
   let* _loaded =
     Evm_context.start
       ~configuration:config
@@ -180,6 +205,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
            smart_rollup_address)
       ~store_perm:`Read_write
       ?snapshot_url
+      ~tx_container
       ()
   in
   let* ro_ctxt =
@@ -195,44 +221,25 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint
   in
 
-  let* tx_container, ping_tx_pool =
+  let* () =
     match config.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
-        let* () =
-          Tx_queue.start
-            ~config:tx_queue_config
-            ~keep_alive:config.keep_alive
-            ()
-        in
-        return
-          ( (module Tx_queue.Tx_container : Services_backend_sig.Tx_container),
-            false )
+        Tx_queue.start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
     | None ->
-        if config.finalized_view then
-          let tx_container =
-            container_forward_tx
-              ~keep_alive:config.keep_alive
-              ~evm_node_endpoint
-          in
-          return (tx_container, false)
+        if config.finalized_view then return_unit
         else
-          let* () =
-            Tx_pool.start
-              {
-                backend = observer_backend;
-                smart_rollup_address =
-                  Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
-                    smart_rollup_address;
-                mode = Relay;
-                tx_timeout_limit = config.tx_pool_timeout_limit;
-                tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-                tx_pool_tx_per_addr_limit =
-                  Int64.to_int config.tx_pool_tx_per_addr_limit;
-              }
-          in
-          return
-            ( (module Tx_pool.Tx_container : Services_backend_sig.Tx_container),
-              true )
+          Tx_pool.start
+            {
+              backend = observer_backend;
+              smart_rollup_address =
+                Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+                  smart_rollup_address;
+              mode = Relay;
+              tx_timeout_limit = config.tx_pool_timeout_limit;
+              tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+              tx_pool_tx_per_addr_limit =
+                Int64.to_int config.tx_pool_tx_per_addr_limit;
+            }
   in
 
   Metrics.init
