@@ -719,6 +719,9 @@ pub enum InstrCacheable {
         instr: u16,
     },
 
+    // Interrupt-Management
+    Wfi,
+
     Ecall,
 }
 
@@ -756,8 +759,6 @@ pub enum InstrUncacheable {
     Mret,
     Sret,
     Mnret,
-    // Interrupt-Management
-    Wfi,
     // Supervisor Memory-Management
     SFenceVma { asid: XRegister, vaddr: XRegister },
 }
@@ -946,6 +947,7 @@ impl InstrCacheable {
             | Csrrsi(_)
             | Csrrci(_)
             | Unknown { instr: _ }
+            | Wfi
             | Ecall
             | Hint { instr: _ } => InstrWidth::Uncompressed,
 
@@ -998,15 +1000,9 @@ impl InstrUncacheable {
     pub const fn width(&self) -> InstrWidth {
         use InstrUncacheable::*;
         match self {
-            FenceI
-            | Fence(_)
-            | FenceTso(_)
-            | Ebreak
-            | Mret
-            | Sret
-            | Mnret
-            | Wfi
-            | SFenceVma { .. } => InstrWidth::Uncompressed,
+            FenceI | Fence(_) | FenceTso(_) | Ebreak | Mret | Sret | Mnret | SFenceVma { .. } => {
+                InstrWidth::Uncompressed
+            }
 
             CEbreak => InstrWidth::Compressed,
         }
@@ -1447,6 +1443,8 @@ impl fmt::Display for InstrCacheable {
 
             Hint { instr } => write!(f, "hint {:x}", instr),
             HintCompressed { instr } => write!(f, "hint.c {:x}", instr),
+            // Interrupt-management
+            Wfi => write!(f, "wfi"),
             Ecall => write!(f, "ecall"),
         }
     }
@@ -1466,8 +1464,6 @@ impl fmt::Display for InstrUncacheable {
             Mret => write!(f, "mret"),
             Sret => write!(f, "sret"),
             Mnret => write!(f, "mnret"),
-            // Interrupt-management
-            Wfi => write!(f, "wfi"),
             // Supervisor Memory-Management
             SFenceVma { asid, vaddr } => write!(f, "sfence.vma {vaddr},{asid}"),
 

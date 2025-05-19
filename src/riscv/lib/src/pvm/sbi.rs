@@ -50,7 +50,6 @@ use crate::state_backend::CellReadWrite;
 use crate::state_backend::CellWrite;
 use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::ManagerWrite;
-use crate::traps::EnvironException;
 
 /// Write the SBI error code as the return value.
 #[inline]
@@ -371,18 +370,12 @@ pub fn handle_call<S, MC, M>(
     reveal_request: &mut RevealRequest<M>,
     machine: &mut MachineCoreState<MC, M>,
     hooks: &mut PvmHooks,
-    env_exception: EnvironException,
 ) -> bool
 where
     S: CellReadWrite<Value = PvmStatus>,
     MC: MemoryConfig,
     M: ManagerReadWrite,
 {
-    if let EnvironException::EnvCallFromMMode = env_exception {
-        sbi_return_error(&mut machine.hart.xregisters, SbiError::Failed);
-        return true;
-    }
-
     // No matter the outcome, we need to bump the
     // program counter because ECALL's don't update it
     // to the following instructions.

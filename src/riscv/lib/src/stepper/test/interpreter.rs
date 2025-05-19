@@ -15,10 +15,8 @@ use crate::machine_state::block_cache::block::Block;
 use crate::machine_state::block_cache::block::Interpreted;
 use crate::machine_state::block_cache::block::Jitted;
 use crate::machine_state::memory::M1M;
-use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::XRegister;
 use crate::machine_state::registers::XValue;
-use crate::machine_state::registers::gp;
 use crate::state_backend::ManagerRead;
 use crate::state_backend::owned_backend::Owned;
 use crate::stepper::Stepper;
@@ -48,7 +46,6 @@ where
 
 fn run_test_with_check<B: Block<M1M, Owned>>(
     path: &str,
-    exit_mode: Mode,
     check_xregs: &[(XRegister, u64)],
     block_builder: B::BlockBuilder,
 ) -> B::BlockBuilder {
@@ -60,7 +57,7 @@ fn run_test_with_check<B: Block<M1M, Owned>>(
     let contents = fs::read(format!("{TESTS_DIR}/{path}")).expect("Failed to read binary");
 
     let mut interpreter: TestStepper<M1M, _, B> =
-        TestStepper::new(&contents, None, exit_mode, block_builder).expect("Boot failed");
+        TestStepper::new(&contents, None, block_builder).expect("Boot failed");
 
     let res = interpreter.step_max(Bound::Included(MAX_STEPS));
     // Record the result to compare to the expected result
@@ -87,112 +84,45 @@ fn run_test_with_check<B: Block<M1M, Owned>>(
     interpreter.recover_builder()
 }
 
-fn interpret_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegister, u64)]) {
+fn interpret_test_with_check(path: &str, check_xregs: &[(XRegister, u64)]) {
     let block_builder = Default::default();
-    run_test_with_check::<Interpreted<M1M, Owned>>(path, exit_mode, check_xregs, block_builder);
+    run_test_with_check::<Interpreted<M1M, Owned>>(path, check_xregs, block_builder);
 }
 
 /// For the JIT, we run it twice - the first run to build up the blocks, and the
 /// second to run with these blocks already compiled (so that we actually use them).
-fn inline_jit_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegister, u64)]) {
+fn inline_jit_test_with_check(path: &str, check_xregs: &[(XRegister, u64)]) {
     type BlockImpl = Jitted<JIT<M1M, Owned>, M1M, Owned>;
 
     let block_builder = Default::default();
-    let block_builder =
-        run_test_with_check::<BlockImpl>(path, exit_mode, check_xregs, block_builder);
+    let block_builder = run_test_with_check::<BlockImpl>(path, check_xregs, block_builder);
 
-    run_test_with_check::<BlockImpl>(path, exit_mode, check_xregs, block_builder);
+    run_test_with_check::<BlockImpl>(path, check_xregs, block_builder);
 }
 
 macro_rules! test_case {
-    // Default start & exit mode (Machine & Machine)
+    // Run the test cases without specifying xregisters to check
     ($(#[$m:meta],)* $name: ident, $path: expr) => {
-        test_case!(
-            $(#[$m],)*
-            $name,
-            $path,
-            if $path.contains("rv64u") {
-                Mode::User
-            } else if $path.contains("rv64s") {
-                Mode::Supervisor
-            } else {
-                Mode::Machine
-            }
-        );
+        test_case!($(#[$m],)* $name, $path, &[]);
     };
 
-    // Choose exit mode, default start mode (Based on test name)
-    ($(#[$m:meta],)* $name: ident, $path: expr, $mode: expr) => {
-        test_case!($(#[$m],)* $name, $path, $mode, &[]);
-    };
-
-    // Choose exit mode, default start mode (based on test name), check xregisters
-    ($(#[$m:meta],)* $name: ident, $path: expr, $mode: expr, $xchecks: expr) => {
+    // Run the test cases, check xregisters
+    ($(#[$m:meta],)* $name: ident, $path: expr, $xchecks: expr) => {
         paste! {
             #[test]
             $(#[$m])*
             fn [< $name _interpreted >]() {
-                interpret_test_with_check($path, $mode, $xchecks)
+                interpret_test_with_check($path, $xchecks)
             }
 
             #[test]
             $(#[$m])*
             fn [< $name _inline_jit >]() {
-                inline_jit_test_with_check($path, $mode, $xchecks)
+                inline_jit_test_with_check($path, $xchecks)
             }
         }
     };
 }
-// RV64-MI
-test_case!(test_suite_rv64mi_p_access, "rv64mi-p-access");
-test_case!(#[ignore], test_suite_rv64mi_p_breakpoint, "rv64mi-p-breakpoint");
-test_case!(test_suite_rv64mi_p_csr, "rv64mi-p-csr", Mode::User);
-test_case!(test_suite_rv64mi_p_ld_misaligned, "rv64mi-p-ld-misaligned");
-test_case!(test_suite_rv64mi_p_lh_misaligned, "rv64mi-p-lh-misaligned");
-test_case!(test_suite_rv64mi_p_lw_misaligned, "rv64mi-p-lw-misaligned");
-test_case!(test_suite_rv64mi_p_ma_addr, "rv64mi-p-ma_addr");
-test_case!(test_suite_rv64mi_p_ma_fetch, "rv64mi-p-ma_fetch");
-test_case!(test_suite_rv64mi_p_mcsr, "rv64mi-p-mcsr");
-test_case!(test_suite_rv64mi_p_sbreak, "rv64mi-p-sbreak");
-test_case!(
-    test_suite_rv64mi_p_scall,
-    "rv64mi-p-scall",
-    Mode::User,
-    &[(gp, 1)] // This checks TESTNUM == 1, see scall.S in the riscv test suite
-);
-test_case!(test_suite_rv64mi_p_sd_misaligned, "rv64mi-p-sd-misaligned");
-test_case!(test_suite_rv64mi_p_sh_misaligned, "rv64mi-p-sh-misaligned");
-test_case!(test_suite_rv64mi_p_sw_misaligned, "rv64mi-p-sw-misaligned");
-test_case!(test_suite_rv64mi_p_zicntr, "rv64mi-p-zicntr");
-
-// RV64-SI
-test_case!(test_suite_rv64si_p_csr, "rv64si-p-csr");
-test_case!(
-    // This test requires dirtiness bits to be updated in the page tables (via satp). The
-    // supervising PVM does not do that, as those page translation tables are no longer the way to
-    // translate memory addresses.
-    #[ignore],
-    test_suite_rv64si_p_dirty,
-    "rv64si-p-dirty",
-    Mode::Machine
-);
-test_case!(
-    // This test requires address translation page tables (satp) to be respected. Since switching
-    // to the Supervising PVM, where that is not the case, this test is not relevant anymore.
-    #[ignore],
-    test_suite_rv64si_p_icache_alias,
-    "rv64si-p-icache-alias",
-    Mode::Machine
-);
-test_case!(test_suite_rv64si_p_ma_fetch, "rv64si-p-ma_fetch");
-test_case!(test_suite_rv64si_p_sbreak, "rv64si-p-sbreak");
-test_case!(
-    test_suite_rv64si_p_scall,
-    "rv64si-p-scall",
-    Mode::Supervisor,
-    &[(gp, 1)] // This checks TESTNUM == 1, see scall.S in the riscv test suite
-);
-test_case!(test_suite_rv64si_p_wfi, "rv64si-p-wfi");
 
 // RV64-UA
 test_case!(test_suite_rv64ua_p_amoadd_d, "rv64ua-p-amoadd_d");
@@ -215,30 +145,8 @@ test_case!(test_suite_rv64ua_p_amoxor_d, "rv64ua-p-amoxor_d");
 test_case!(test_suite_rv64ua_p_amoxor_w, "rv64ua-p-amoxor_w");
 test_case!(test_suite_rv64ua_p_lrsc, "rv64ua-p-lrsc");
 
-test_case!(test_suite_rv64ua_v_amoadd_d, "rv64ua-v-amoadd_d");
-test_case!(test_suite_rv64ua_v_amoadd_w, "rv64ua-v-amoadd_w");
-test_case!(test_suite_rv64ua_v_amoand_d, "rv64ua-v-amoand_d");
-test_case!(test_suite_rv64ua_v_amoand_w, "rv64ua-v-amoand_w");
-test_case!(test_suite_rv64ua_v_amomax_d, "rv64ua-v-amomax_d");
-test_case!(test_suite_rv64ua_v_amomax_w, "rv64ua-v-amomax_w");
-test_case!(test_suite_rv64ua_v_amomaxu_d, "rv64ua-v-amomaxu_d");
-test_case!(test_suite_rv64ua_v_amomaxu_w, "rv64ua-v-amomaxu_w");
-test_case!(test_suite_rv64ua_v_amomin_d, "rv64ua-v-amomin_d");
-test_case!(test_suite_rv64ua_v_amomin_w, "rv64ua-v-amomin_w");
-test_case!(test_suite_rv64ua_v_amominu_d, "rv64ua-v-amominu_d");
-test_case!(test_suite_rv64ua_v_amominu_w, "rv64ua-v-amominu_w");
-test_case!(test_suite_rv64ua_v_amoor_d, "rv64ua-v-amoor_d");
-test_case!(test_suite_rv64ua_v_amoor_w, "rv64ua-v-amoor_w");
-test_case!(test_suite_rv64ua_v_amoswap_d, "rv64ua-v-amoswap_d");
-test_case!(test_suite_rv64ua_v_amoswap_w, "rv64ua-v-amoswap_w");
-test_case!(test_suite_rv64ua_v_amoxor_d, "rv64ua-v-amoxor_d");
-test_case!(test_suite_rv64ua_v_amoxor_w, "rv64ua-v-amoxor_w");
-test_case!(test_suite_rv64ua_v_lrsc, "rv64ua-v-lrsc");
-
 // RV64-UC
 test_case!(test_suite_rv64uc_p_rvc, "rv64uc-p-rvc");
-
-test_case!(test_suite_rv64uc_v_rvc, "rv64uc-v-rvc");
 
 // RV64-UD
 test_case!(test_suite_rv64ud_p_fadd, "rv64ud-p-fadd");
@@ -254,19 +162,6 @@ test_case!(test_suite_rv64ud_p_move, "rv64ud-p-move");
 test_case!(test_suite_rv64ud_p_recoding, "rv64ud-p-recoding");
 test_case!(test_suite_rv64ud_p_structural, "rv64ud-p-structural");
 
-test_case!(test_suite_rv64ud_v_fadd, "rv64ud-v-fadd");
-test_case!(test_suite_rv64ud_v_fclass, "rv64ud-v-fclass");
-test_case!(test_suite_rv64ud_v_fcmp, "rv64ud-v-fcmp");
-test_case!(test_suite_rv64ud_v_fcvt, "rv64ud-v-fcvt");
-test_case!(test_suite_rv64ud_v_fcvt_w, "rv64ud-v-fcvt_w");
-test_case!(test_suite_rv64ud_v_fdiv, "rv64ud-v-fdiv");
-test_case!(test_suite_rv64ud_v_fmadd, "rv64ud-v-fmadd");
-test_case!(test_suite_rv64ud_v_fmin, "rv64ud-v-fmin");
-test_case!(test_suite_rv64ud_v_ldst, "rv64ud-v-ldst");
-test_case!(test_suite_rv64ud_v_move, "rv64ud-v-move");
-test_case!(test_suite_rv64ud_v_recoding, "rv64ud-v-recoding");
-test_case!(test_suite_rv64ud_v_structural, "rv64ud-v-structural");
-
 // RV64-UF
 test_case!(test_suite_rv64uf_p_fadd, "rv64uf-p-fadd");
 test_case!(test_suite_rv64uf_p_fclass, "rv64uf-p-fclass");
@@ -279,18 +174,6 @@ test_case!(test_suite_rv64uf_p_fmin, "rv64uf-p-fmin");
 test_case!(test_suite_rv64uf_p_ldst, "rv64uf-p-ldst");
 test_case!(test_suite_rv64uf_p_move, "rv64uf-p-move");
 test_case!(test_suite_rv64uf_p_recoding, "rv64uf-p-recoding");
-
-test_case!(test_suite_rv64uf_v_fadd, "rv64uf-v-fadd");
-test_case!(test_suite_rv64uf_v_fclass, "rv64uf-v-fclass");
-test_case!(test_suite_rv64uf_v_fcmp, "rv64uf-v-fcmp");
-test_case!(test_suite_rv64uf_v_fcvt, "rv64uf-v-fcvt");
-test_case!(test_suite_rv64uf_v_fcvt_w, "rv64uf-v-fcvt_w");
-test_case!(test_suite_rv64uf_v_fdiv, "rv64uf-v-fdiv");
-test_case!(test_suite_rv64uf_v_fmadd, "rv64uf-v-fmadd");
-test_case!(test_suite_rv64uf_v_fmin, "rv64uf-v-fmin");
-test_case!(test_suite_rv64uf_v_ldst, "rv64uf-v-ldst");
-test_case!(test_suite_rv64uf_v_move, "rv64uf-v-move");
-test_case!(test_suite_rv64uf_v_recoding, "rv64uf-v-recoding");
 
 // RV64-UI
 test_case!(test_suite_rv64ui_p_add, "rv64ui-p-add");
@@ -348,61 +231,6 @@ test_case!(test_suite_rv64ui_p_sw, "rv64ui-p-sw");
 test_case!(test_suite_rv64ui_p_xor, "rv64ui-p-xor");
 test_case!(test_suite_rv64ui_p_xori, "rv64ui-p-xori");
 
-test_case!(test_suite_rv64ui_v_add, "rv64ui-v-add");
-test_case!(test_suite_rv64ui_v_addi, "rv64ui-v-addi");
-test_case!(test_suite_rv64ui_v_addiw, "rv64ui-v-addiw");
-test_case!(test_suite_rv64ui_v_addw, "rv64ui-v-addw");
-test_case!(test_suite_rv64ui_v_and, "rv64ui-v-and");
-test_case!(test_suite_rv64ui_v_andi, "rv64ui-v-andi");
-test_case!(test_suite_rv64ui_v_auipc, "rv64ui-v-auipc");
-test_case!(test_suite_rv64ui_v_beq, "rv64ui-v-beq");
-test_case!(test_suite_rv64ui_v_bge, "rv64ui-v-bge");
-test_case!(test_suite_rv64ui_v_bgeu, "rv64ui-v-bgeu");
-test_case!(test_suite_rv64ui_v_blt, "rv64ui-v-blt");
-test_case!(test_suite_rv64ui_v_bltu, "rv64ui-v-bltu");
-test_case!(test_suite_rv64ui_v_bne, "rv64ui-v-bne");
-test_case!(test_suite_rv64ui_v_fence_i, "rv64ui-v-fence_i");
-test_case!(test_suite_rv64ui_v_jal, "rv64ui-v-jal");
-test_case!(test_suite_rv64ui_v_jalr, "rv64ui-v-jalr");
-test_case!(test_suite_rv64ui_v_lb, "rv64ui-v-lb");
-test_case!(test_suite_rv64ui_v_lbu, "rv64ui-v-lbu");
-test_case!(test_suite_rv64ui_v_ld, "rv64ui-v-ld");
-test_case!(test_suite_rv64ui_v_ld_st, "rv64ui-v-ld_st");
-test_case!(test_suite_rv64ui_v_lh, "rv64ui-v-lh");
-test_case!(test_suite_rv64ui_v_lhu, "rv64ui-v-lhu");
-test_case!(test_suite_rv64ui_v_lui, "rv64ui-v-lui");
-test_case!(test_suite_rv64ui_v_lw, "rv64ui-v-lw");
-test_case!(test_suite_rv64ui_v_lwu, "rv64ui-v-lwu");
-test_case!(test_suite_rv64ui_v_ma_data, "rv64ui-v-ma_data");
-test_case!(test_suite_rv64ui_v_or, "rv64ui-v-or");
-test_case!(test_suite_rv64ui_v_ori, "rv64ui-v-ori");
-test_case!(test_suite_rv64ui_v_sb, "rv64ui-v-sb");
-test_case!(test_suite_rv64ui_v_sd, "rv64ui-v-sd");
-test_case!(test_suite_rv64ui_v_sh, "rv64ui-v-sh");
-test_case!(test_suite_rv64ui_v_simple, "rv64ui-v-simple");
-test_case!(test_suite_rv64ui_v_sll, "rv64ui-v-sll");
-test_case!(test_suite_rv64ui_v_slli, "rv64ui-v-slli");
-test_case!(test_suite_rv64ui_v_slliw, "rv64ui-v-slliw");
-test_case!(test_suite_rv64ui_v_sllw, "rv64ui-v-sllw");
-test_case!(test_suite_rv64ui_v_slt, "rv64ui-v-slt");
-test_case!(test_suite_rv64ui_v_slti, "rv64ui-v-slti");
-test_case!(test_suite_rv64ui_v_sltiu, "rv64ui-v-sltiu");
-test_case!(test_suite_rv64ui_v_sltu, "rv64ui-v-sltu");
-test_case!(test_suite_rv64ui_v_sra, "rv64ui-v-sra");
-test_case!(test_suite_rv64ui_v_srai, "rv64ui-v-srai");
-test_case!(test_suite_rv64ui_v_sraiw, "rv64ui-v-sraiw");
-test_case!(test_suite_rv64ui_v_sraw, "rv64ui-v-sraw");
-test_case!(test_suite_rv64ui_v_srl, "rv64ui-v-srl");
-test_case!(test_suite_rv64ui_v_srli, "rv64ui-v-srli");
-test_case!(test_suite_rv64ui_v_srliw, "rv64ui-v-srliw");
-test_case!(test_suite_rv64ui_v_srlw, "rv64ui-v-srlw");
-test_case!(test_suite_rv64ui_v_st_ld, "rv64ui-v-st_ld");
-test_case!(test_suite_rv64ui_v_sub, "rv64ui-v-sub");
-test_case!(test_suite_rv64ui_v_subw, "rv64ui-v-subw");
-test_case!(test_suite_rv64ui_v_sw, "rv64ui-v-sw");
-test_case!(test_suite_rv64ui_v_xor, "rv64ui-v-xor");
-test_case!(test_suite_rv64ui_v_xori, "rv64ui-v-xori");
-
 // RV64-UM
 test_case!(test_suite_rv64um_p_div, "rv64um-p-div");
 test_case!(test_suite_rv64um_p_divu, "rv64um-p-divu");
@@ -417,17 +245,3 @@ test_case!(test_suite_rv64um_p_rem, "rv64um-p-rem");
 test_case!(test_suite_rv64um_p_remu, "rv64um-p-remu");
 test_case!(test_suite_rv64um_p_remuw, "rv64um-p-remuw");
 test_case!(test_suite_rv64um_p_remw, "rv64um-p-remw");
-
-test_case!(test_suite_rv64um_v_div, "rv64um-v-div");
-test_case!(test_suite_rv64um_v_divu, "rv64um-v-divu");
-test_case!(test_suite_rv64um_v_divuw, "rv64um-v-divuw");
-test_case!(test_suite_rv64um_v_divw, "rv64um-v-divw");
-test_case!(test_suite_rv64um_v_mul, "rv64um-v-mul");
-test_case!(test_suite_rv64um_v_mulh, "rv64um-v-mulh");
-test_case!(test_suite_rv64um_v_mulhsu, "rv64um-v-mulhsu");
-test_case!(test_suite_rv64um_v_mulhu, "rv64um-v-mulhu");
-test_case!(test_suite_rv64um_v_mulw, "rv64um-v-mulw");
-test_case!(test_suite_rv64um_v_rem, "rv64um-v-rem");
-test_case!(test_suite_rv64um_v_remu, "rv64um-v-remu");
-test_case!(test_suite_rv64um_v_remuw, "rv64um-v-remuw");
-test_case!(test_suite_rv64um_v_remw, "rv64um-v-remw");

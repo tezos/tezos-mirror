@@ -6,7 +6,6 @@ use crate::machine_state::CacheLayouts;
 use crate::machine_state::MachineState;
 use crate::machine_state::block_cache::block::Block;
 use crate::machine_state::memory::MemoryConfig;
-use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::a0;
 use crate::machine_state::registers::a7;
 use crate::state::NewState;
@@ -15,14 +14,11 @@ use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
-use crate::state_backend::ManagerWrite;
-use crate::traps::EnvironException;
 
 /// Posix execution environment state
 pub struct PosixState<M: ManagerBase> {
     code: Cell<u64, M>,
     exited: Cell<u8, M>,
-    exit_mode: Cell<Mode, M>,
 }
 
 impl<M: ManagerBase> PosixState<M> {
@@ -42,19 +38,10 @@ impl<M: ManagerBase> PosixState<M> {
         self.exited.read() > 0
     }
 
-    /// Configures the mode from which the test harness will exit.
-    pub fn set_exit_mode(&mut self, mode: Mode)
-    where
-        M: ManagerWrite,
-    {
-        self.exit_mode.write(mode);
-    }
-
     /// Handle a POSIX system call. Returns `Ok(true)` if it makes sense to continue execution.
     pub fn handle_call<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>>(
         &mut self,
         machine: &mut MachineState<MC, CL, B, M>,
-        env_exception: EnvironException,
     ) -> Result<bool, String>
     where
         M: ManagerReadWrite,
@@ -62,22 +49,6 @@ impl<M: ManagerBase> PosixState<M> {
         if self.exited() {
             // Can't exit twice
             return Err("Machine has already exited".to_owned());
-        }
-
-        let source_exception = env_exception.as_exception();
-        let source_mode = match env_exception {
-            EnvironException::EnvCallFromUMode => Mode::User,
-            EnvironException::EnvCallFromSMode => Mode::Supervisor,
-            EnvironException::EnvCallFromMMode => Mode::Machine,
-        };
-        let exit_mode = self.exit_mode.read();
-
-        if source_mode != exit_mode {
-            let return_pc = machine.core.hart.pc.read();
-            let new_pc = machine.core.hart.take_trap(source_exception, return_pc);
-            machine.core.hart.pc.write(new_pc);
-
-            return Ok(true);
         }
 
         let mut handle_exit = |code| {
@@ -119,7 +90,6 @@ impl<M: ManagerBase> NewState<M> for PosixState<M> {
         PosixState {
             code: Cell::new(manager),
             exited: Cell::new(manager),
-            exit_mode: Cell::new(manager),
         }
     }
 }

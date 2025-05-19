@@ -5,7 +5,6 @@
 
 use super::csregisters::xstatus::MStatus;
 use crate::bits::u64;
-use crate::default::ConstDefault;
 use crate::machine_state::csregisters;
 use crate::machine_state::csregisters::CSRegister;
 use crate::machine_state::csregisters::xstatus;
@@ -33,9 +32,6 @@ pub struct HartState<M: backend::ManagerBase> {
     /// Control and state registers
     pub csregisters: csregisters::CSRegisters<M>,
 
-    /// Current running mode of hart
-    pub mode: Cell<Mode, M>,
-
     /// Program counter
     pub pc: Cell<Address, M>,
 
@@ -48,7 +44,6 @@ pub type HartStateLayout = (
     registers::XRegistersLayout,
     registers::FRegistersLayout,
     csregisters::CSRegistersLayout,
-    Atom<Mode>,
     Atom<Address>,                         // Program counter layout
     reservation_set::ReservationSetLayout, // Reservation set layout
 );
@@ -60,9 +55,8 @@ impl<M: backend::ManagerBase> HartState<M> {
             xregisters: registers::XRegisters::bind(space.0),
             fregisters: registers::FRegisters::bind(space.1),
             csregisters: csregisters::CSRegisters::bind(space.2),
-            mode: space.3,
-            pc: space.4,
-            reservation_set: ReservationSet::bind(space.5),
+            pc: space.3,
+            reservation_set: ReservationSet::bind(space.4),
         }
     }
 
@@ -75,7 +69,6 @@ impl<M: backend::ManagerBase> HartState<M> {
             self.xregisters.struct_ref::<F>(),
             self.fregisters.struct_ref::<F>(),
             self.csregisters.struct_ref::<F>(),
-            self.mode.struct_ref::<F>(),
             self.pc.struct_ref::<F>(),
             self.reservation_set.struct_ref::<F>(),
         )
@@ -89,7 +82,6 @@ impl<M: backend::ManagerBase> HartState<M> {
         self.xregisters.reset();
         self.fregisters.reset();
         self.csregisters.reset();
-        self.mode.write(Mode::DEFAULT);
         self.pc.write(pc);
         self.reservation_set.reset();
     }
@@ -99,21 +91,7 @@ impl<M: backend::ManagerBase> HartState<M> {
     where
         M: backend::ManagerReadWrite,
     {
-        self.take_trap_from_mode(trap_source, self.mode.read(), return_pc)
-    }
-
-    /// Given a trap source, a return address and a mode to trap from, take a
-    /// trap on the machine.
-    fn take_trap_from_mode<TC: TrapContext>(
-        &mut self,
-        trap_source: TC,
-        current_mode: Mode,
-        return_pc: Address,
-    ) -> Address
-    where
-        M: backend::ManagerReadWrite,
-    {
-        let trap_mode = self.csregisters.get_trap_mode(&trap_source, current_mode);
+        let trap_mode = self.csregisters.get_trap_mode(&trap_source);
         let (xtvec_reg, xepc_reg, xcause_reg, xtval_reg) = match trap_mode {
             TrapMode::Supervisor => (
                 CSRegister::stvec,
@@ -148,13 +126,7 @@ impl<M: backend::ManagerBase> HartState<M> {
                 let mstatus = mstatus.with_sie(false);
 
                 // Remember the previous privilege mode
-                mstatus.with_spp(
-                    match current_mode {
-                        Mode::User => xstatus::SPPValue::User,
-                        Mode::Supervisor => xstatus::SPPValue::Supervisor,
-                        _ => unreachable!("Trapping to S-mode from Machine mode should already be an Environment Exception"),
-                    },
-                )
+                mstatus.with_spp(xstatus::SPPValue::User)
             }
 
             TrapMode::Machine => {
@@ -166,17 +138,10 @@ impl<M: backend::ManagerBase> HartState<M> {
                 let mstatus = mstatus.with_mie(false);
 
                 // Remember the previous privilege mode
-                mstatus.with_mpp(match current_mode {
-                    Mode::User => xstatus::MPPValue::User,
-                    Mode::Supervisor => xstatus::MPPValue::Supervisor,
-                    Mode::Machine => xstatus::MPPValue::Machine,
-                })
+                mstatus.with_mpp(xstatus::MPPValue::User)
             }
         };
         self.csregisters.write(CSRegister::mstatus, mstatus);
-
-        // Escalate the privilege to the corresponding mode
-        self.mode.write(trap_mode.as_mode());
 
         trap_source.trap_handler_address(self.csregisters.read(xtvec_reg))
     }
@@ -202,7 +167,6 @@ impl<M: backend::ManagerBase> NewState<M> for HartState<M> {
             xregisters: registers::XRegisters::new(manager),
             fregisters: registers::FRegisters::new(manager),
             csregisters: csregisters::CSRegisters::new(manager),
-            mode: Cell::new(manager),
             pc: Cell::new(manager),
             reservation_set: ReservationSet::new(manager),
         }
@@ -215,7 +179,6 @@ impl<M: backend::ManagerClone> Clone for HartState<M> {
             xregisters: self.xregisters.clone(),
             fregisters: self.fregisters.clone(),
             csregisters: self.csregisters.clone(),
-            mode: self.mode.clone(),
             pc: self.pc.clone(),
             reservation_set: self.reservation_set.clone(),
         }

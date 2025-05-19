@@ -20,7 +20,6 @@ use crate::machine_state::memory::Address;
 use crate::machine_state::memory::BadMemoryAccess;
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
-use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
 use crate::machine_state::registers::XValue;
@@ -292,11 +291,7 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     }
 
     fn ecall(&mut self) -> Self::IResult<ProgramCounterUpdate<Self::XValue>> {
-        Err(match self.hart.mode.read() {
-            Mode::User => Exception::EnvCallFromUMode,
-            Mode::Supervisor => Exception::EnvCallFromSMode,
-            Mode::Machine => Exception::EnvCallFromMMode,
-        })
+        Err(Exception::EnvCall)
     }
 
     #[inline(always)]

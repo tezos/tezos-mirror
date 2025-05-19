@@ -31,7 +31,6 @@ use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::memory::PAGE_SIZE;
 use crate::machine_state::memory::Permissions;
-use crate::machine_state::mode::Mode;
 use crate::machine_state::registers;
 use crate::program::Program;
 use crate::state::NewState;
@@ -359,9 +358,6 @@ where
             &[c"RUST_BACKTRACE=full"],
             &auxv,
         )?;
-
-        // The user program may not access the M or S privilege level
-        self.machine_state.core.hart.mode.write(Mode::User);
 
         // Setup heap addresses
         let program_end = self.system_state.program.end;

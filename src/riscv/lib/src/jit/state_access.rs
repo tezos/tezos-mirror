@@ -49,7 +49,6 @@ use crate::instruction_context::LoadStoreWidth;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
-use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegisters;
 use crate::machine_state::registers::XValue;
@@ -199,13 +198,7 @@ pub trait JitStateAccess: ManagerReadWrite {
         core: &mut MachineCoreState<MC, Self>,
         exception_out: &mut MaybeUninit<Exception>,
     ) {
-        let exception = match core.hart.mode.read() {
-            Mode::User => Exception::EnvCallFromUMode,
-            Mode::Supervisor => Exception::EnvCallFromSMode,
-            Mode::Machine => Exception::EnvCallFromMMode,
-        };
-
-        exception_out.write(exception);
+        exception_out.write(core.hart.run_ecall());
     }
 
     /// Store the lowest `width` bytes of the given value to memory, at the physical address.
