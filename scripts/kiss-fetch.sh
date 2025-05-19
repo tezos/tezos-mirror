@@ -24,12 +24,33 @@ arguments=${*:1:$#-1}
 encoded_url=$(echo "$original_url" | sed 's/ /%20/g; s/?/%3F/g; s/&/%26/g; s/=/%3D/g; s/#/%23/g; s/</%3C/g; s/>/%3E/g; s/"/%22/g; s/\//%2F/g; s/:/%3A/g')
 mangled_url="${KISSCACHE}/api/v1/fetch?url=${encoded_url}"
 
+# make sure this file exists and writable and readable by all users
+touch /tmp/kiss.log
+chmod a+rw /tmp/kiss.log
+
 # shellcheck disable=SC2086
 if curl --output /dev/null --silent --head --fail "$KISSCACHE"; then
   # Use curl to fetch the mangled URL
-  echo "curl -L $arguments $mangled_url" >> /tmp/kiss.log
   curl -L $arguments $mangled_url
+
+  # shellcheck disable=SC2181
+  if [ $? = 0 ]; then
+    echo "Kisscache hit: curl -L $arguments $mangled_url" >> /tmp/kiss.log
+  else
+    echo "Kisscache error: curl -L $arguments $mangled_url" >> /tmp/kiss.log
+    echo "Kisscache error: curl -L $arguments $mangled_url"
+    exit 1
+  fi
 else
-  echo "Kisscache server unreachable, falling back to fetch using mangled URL" >> /tmp/kiss.log
-  curl -L $arguments $mangled_url
+  # Use curl to fetch the original URL
+  curl -L $arguments $original_url
+
+  # shellcheck disable=SC2181
+  if [ $? = 0 ]; then
+    echo "Direct download succeded $original_url" >> /tmp/kiss.log
+  else
+    echo "Direct download failed $original_url" >> /tmp/kiss.log
+    echo "Direct download failed $original_url"
+    exit 1
+  fi
 fi
