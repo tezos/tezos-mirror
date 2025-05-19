@@ -404,7 +404,7 @@ let jobs pipeline_type =
            [
              "export DEBIAN_FRONTEND=noninteractive";
              "apt-get update";
-             "apt-get install lintian -y";
+             "apt-get install lintian parallel -y";
            ])
       script
   in
