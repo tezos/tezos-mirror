@@ -1,0 +1,54 @@
+# What is this?
+
+## This NGINX configuration template allows you to serve the content of the
+## `store/slot_store` directory of a DAL node as static files over HTTP.
+##
+## DAL nodes can be configured to fetch missing slots via fallback HTTP servers
+## using the following URI layout:
+##
+##   <URI>/v0/slots/by_published_level/<published_level>_<slot_index>_<slot_size>
+##
+## This layout is expected by the `--http-backup` option of the DAL node.
+
+# How to deploy?
+
+## When deploying this server, ensure that the parent directories of the DAL
+## node's data directory have appropriate permissions. In particular, NGINX
+## (often running under a separate user) must have execution rights (`+x`)
+## to traverse the directory tree, and read permissions (`+r`) on the target
+## directory and its contents:
+##
+##   chmod o+x /absolute/path
+##   chmod o+x /absolute/path/to
+##   chmod o+x /absolute/path/to/tezos-dal-node
+##   chmod o+x /absolute/path/to/tezos-dal-node/store
+##   chmod o+rx /absolute/path/to/tezos-dal-node/store/slot_store
+
+# How to test via command-line?
+
+## Fetch a single slot file:
+#   wget <URI>/v0/slots/by_published_level/<published_level>_<slot_index>_<slot_size>
+
+## Mirror the remote slot store locally:
+#   wget \
+#     --mirror \
+#     --no-parent \
+#     --no-host-directories \
+#     --cut-dirs=3 \
+#     --directory-prefix=store/slot_store \
+#     --accept-regex '[0-9]+_[0-9]+_[0-9]+' \
+#     --reject "index.html*" \
+#     <URI>/v0/slots/by_published_level/
+
+# NGINX configuration
+# Replace "/absolute/path/to/tezos-dal-node" with the actual path to your DAL node's data directory
+
+server {
+    listen 80;
+    server_name _;
+
+    location /v0/slots/by_published_level/ {
+        alias /absolute/path/to/tezos-dal-node/store/slot_store/;
+        autoindex on;
+    }
+}
