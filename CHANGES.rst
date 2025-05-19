@@ -136,6 +136,8 @@ the README from ``src/bin_agnostic_baker``.
 
 Accuser
 -------
+- Consensus operations with different slots are no longer denunced, as this no
+  longer considered a punishable misbehaviour (MR :gl:`!18049`).
 
 Agnostic Accuser
 ----------------
