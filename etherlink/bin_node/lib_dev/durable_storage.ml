@@ -176,4 +176,9 @@ module Make (Reader : READER) = struct
     let open Lwt_result_syntax in
     let* read = read_with_state () in
     kernel_root_hash read
+
+  let current_block_number ~root =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    block_number ~root read Durable_storage_path.Block.Current
 end

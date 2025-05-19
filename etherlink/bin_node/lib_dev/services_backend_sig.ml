@@ -20,6 +20,11 @@ module type S = sig
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
 
+  (** [current_block_number ~root] returns the current block number of the L2 chain
+      prefixed by [root] (depending on the chain_family in the configuration) *)
+  val current_block_number :
+    root:string -> Ethereum_types.quantity tzresult Lwt.t
+
   (** [chain_id ()] returns chain id defined by the rollup. *)
   val chain_id : unit -> L2_types.chain_id tzresult Lwt.t
 
