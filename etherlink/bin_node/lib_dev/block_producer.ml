@@ -217,32 +217,45 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
         in
         return `Drop
 
-let tx_queue_pop_valid_tx ~chain_family:_ (head_info : Evm_context.head)
+let tx_queue_pop_valid_tx ~chain_family (head_info : Evm_context.head)
     ~maximum_cumulative_size =
   let open Lwt_result_syntax in
-  let read = Evm_state.read head_info.evm_state in
-  let* base_fee_per_gas = Durable_storage.base_fee_per_gas read in
-  let* maximum_gas_limit = Durable_storage.maximum_gas_per_transaction read in
-  let* da_fee_per_byte = Durable_storage.da_fee_per_byte read in
-  let config =
-    Validate.
-      {
-        base_fee_per_gas;
-        maximum_gas_limit;
-        da_fee_per_byte;
-        next_nonce = (fun addr -> Durable_storage.nonce read addr);
-        balance = (fun addr -> Durable_storage.balance read addr);
-      }
-  in
-  let initial_validation_state =
-    ( 0,
-      Validate.
-        {config; addr_balance = String.Map.empty; addr_nonce = String.Map.empty}
-    )
-  in
-  Tx_queue.pop_transactions
-    ~validate_tx:(validate_tx ~maximum_cumulative_size)
-    ~initial_validation_state
+  (* Skip validation if chain_family is Michelson. *)
+  match chain_family with
+  | L2_types.Michelson ->
+      let initial_validation_state = () in
+      Tx_queue.pop_transactions
+        ~validate_tx:(fun () _ _ -> return (`Keep ()))
+        ~initial_validation_state
+  | EVM ->
+      let read = Evm_state.read head_info.evm_state in
+      let* base_fee_per_gas = Durable_storage.base_fee_per_gas read in
+      let* maximum_gas_limit =
+        Durable_storage.maximum_gas_per_transaction read
+      in
+      let* da_fee_per_byte = Durable_storage.da_fee_per_byte read in
+      let config =
+        Validate.
+          {
+            base_fee_per_gas;
+            maximum_gas_limit;
+            da_fee_per_byte;
+            next_nonce = (fun addr -> Durable_storage.nonce read addr);
+            balance = (fun addr -> Durable_storage.balance read addr);
+          }
+      in
+      let initial_validation_state =
+        ( 0,
+          Validate.
+            {
+              config;
+              addr_balance = String.Map.empty;
+              addr_nonce = String.Map.empty;
+            } )
+      in
+      Tx_queue.pop_transactions
+        ~validate_tx:(validate_tx ~maximum_cumulative_size)
+        ~initial_validation_state
 
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
