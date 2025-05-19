@@ -21,6 +21,10 @@ This protocol requires an updated protocol environment version (V15) from R vers
   signatures were expected to be produced with the ``Augmented`` cryptographic
   scheme. Starting from V15, they are expected to be produced with the ``Proof
   of possession`` cryptographic scheme. (MR :gl:`!17036`)
+- Environment V15 also exposes two new functions: ``partial_op_validation`` and
+  ``add_valid_operation`` which are the result of splitting ``add_operation`` in
+  two steps.
+
 
 Client
 ------

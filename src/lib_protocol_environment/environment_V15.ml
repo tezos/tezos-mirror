@@ -1172,7 +1172,7 @@ struct
     let activate = Context.set_protocol
 
     module type PROTOCOL =
-      Environment_protocol_T_V13.T
+      Environment_protocol_T_V15.T
         with type context := Context.t
          and type cache_value := Environment_context.Context.cache_value
          and type cache_key := Environment_context.Context.cache_key
@@ -1388,22 +1388,38 @@ struct
         | Validation_error of Error_monad.shell_tztrace
         | Add_conflict of operation_conflict
 
+      let convert_error = function
+        | Mempool.Validation_error e -> Validation_error (wrap_tztrace e)
+        | Mempool.Add_conflict c -> Add_conflict c
+
+      let partial_op_validation ?check_signature validation_info op =
+        let open Lwt_syntax in
+        let* operation_validation =
+          Mempool.partial_op_validation ?check_signature validation_info op
+        in
+        match operation_validation with
+        | Ok checks ->
+            List.map
+              (fun check () -> check () |> Result.map_error wrap_tztrace)
+              checks
+            |> Lwt.return_ok
+        | Error e -> Lwt.return_error (wrap_tztrace e)
+
+      let add_valid_operation ?conflict_handler mempool op =
+        Result.map_error
+          convert_error
+          (Mempool.add_valid_operation ?conflict_handler mempool op)
+
       let add_operation ?check_signature ?conflict_handler info mempool op :
           (t * add_result, add_error) result Lwt.t =
-        let open Lwt_syntax in
-        let+ r =
-          Mempool.add_operation
-            ?check_signature
-            ?conflict_handler
-            info
-            mempool
-            op
-        in
-        match r with
-        | Ok v -> Ok v
-        | Error (Mempool.Validation_error e) ->
-            Error (Validation_error (wrap_tztrace e))
-        | Error (Mempool.Add_conflict c) -> Error (Add_conflict c)
+        Lwt_result.map_error
+          convert_error
+          (Mempool.add_operation
+             ?check_signature
+             ?conflict_handler
+             info
+             mempool
+             op)
 
       let init ctxt chain_id ~head_hash ~head ~cache =
         let open Lwt_result_syntax in

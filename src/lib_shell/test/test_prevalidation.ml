@@ -377,8 +377,10 @@ module Toy_proto :
         (fun () -> (Operation_hash.Map.empty, Proto_success No_replacement))
         Data_encoding.unit
 
-    let add_operation ?check_signature:_ ?conflict_handler _info
-        (state, desired_outcome) (oph, op) =
+    let partial_op_validation ?check_signature:_ _ _ = Lwt.return_ok []
+
+    let add_valid_operation ?conflict_handler (state, desired_outcome) (oph, op)
+        =
       if Option.is_none conflict_handler then
         Test.fail
           "Prevalidation should always call [Proto.Mempool.add_operation] with \
@@ -392,18 +394,27 @@ module Toy_proto :
           let removed = random_oph_from_map state in
           let state = Operation_hash.Map.remove removed state in
           let state = Operation_hash.Map.add oph op state in
-          Lwt_result.return ((state, desired_outcome), Replaced {removed})
+          Ok ((state, desired_outcome), Replaced {removed})
       | Proto_success (No_replacement | Replacement) ->
           let state = Operation_hash.Map.add oph op state in
-          Lwt_result.return ((state, desired_outcome), Added)
-      | Proto_unchanged ->
-          Lwt_result.return ((state, desired_outcome), Unchanged)
-      | Proto_branch_delayed ->
-          Lwt_result.fail (Validation_error [Branch_delayed_error])
-      | Proto_branch_refused ->
-          Lwt_result.fail (Validation_error [Branch_refused_error])
-      | Proto_refused -> Lwt_result.fail (Validation_error [Refused_error])
+          Ok ((state, desired_outcome), Added)
+      | Proto_unchanged -> Ok ((state, desired_outcome), Unchanged)
+      | Proto_branch_delayed -> Error (Validation_error [Branch_delayed_error])
+      | Proto_branch_refused -> Error (Validation_error [Branch_refused_error])
+      | Proto_refused -> Error (Validation_error [Refused_error])
       | Proto_crash -> assert false
+
+    let add_operation ?check_signature ?conflict_handler info state (oph, op) :
+        (t * add_result, add_error) result Lwt.t =
+      let open Lwt_result_syntax in
+      let*! partial_op_validation =
+        partial_op_validation ?check_signature info op
+      in
+      match partial_op_validation with
+      | Ok checks ->
+          let*? () = List.iter_e (fun check -> check ()) checks in
+          Lwt.return (add_valid_operation ?conflict_handler state (oph, op))
+      | Error e -> fail e
 
     let remove_operation (state, desired_outcome) oph =
       (Operation_hash.Map.remove oph state, desired_outcome)

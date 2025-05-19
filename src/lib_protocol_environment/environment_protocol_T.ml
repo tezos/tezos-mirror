@@ -49,11 +49,11 @@ open Environment_context
    environment ([module type Vx_T]).
 
    If you want to mock this module type, see {!Environment_protocol_T_test}. *)
-module type T = Environment_protocol_T_V13.T
+module type T = Environment_protocol_T_V15.T
 (* Documentation for this interface may be found in
    module type [PROTOCOL] of [sigs/v6/updater.mli]. *)
 
-module V0toV13
+module V0toV15
     (E : Environment_protocol_T_V0.T
            with type context := Context.t
             and type quota := quota
@@ -61,7 +61,7 @@ module V0toV13
             and type rpc_context := rpc_context
             and type tztrace := Error_monad.tztrace
             and type 'a tzresult := 'a Error_monad.tzresult) :
-  Environment_protocol_T_V10.T
+  Environment_protocol_T_V15.T
     with type context := Context.t
      and type quota := quota
      and type validation_result := validation_result
@@ -79,18 +79,6 @@ module V0toV13
      and type cache_key = Context.Cache.key
      and type cache_value = Context.Cache.value = struct
   include E
-
-  let block_header_metadata_encoding_with_legacy_attestation_name =
-    block_header_metadata_encoding
-
-  let operation_data_encoding_with_legacy_attestation_name =
-    operation_data_encoding
-
-  let operation_receipt_encoding_with_legacy_attestation_name =
-    operation_receipt_encoding
-
-  let operation_data_and_receipt_encoding_with_legacy_attestation_name =
-    operation_data_and_receipt_encoding
 
   type application_state = validation_state
 
@@ -228,12 +216,22 @@ module V0toV13
 
     let encoding = Data_encoding.unit
 
-    let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
+    let unsupported_feature name =
       let msg =
-        "The mempool cannot accept any operations because it does not support \
-         the current protocol."
+        Printf.sprintf
+          "The current protocol does not support the '%s' feature."
+          name
       in
-      Lwt.return_error (Validation_error [Exn (Failure msg)])
+      [Exn (Failure msg)]
+
+    let partial_op_validation ?check_signature:_ _ _ =
+      Lwt.return_error (unsupported_feature "partial_op_validation")
+
+    let add_valid_operation ?conflict_handler:_ _ _ =
+      Error (Validation_error (unsupported_feature "add_valid_operation"))
+
+    let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
+      Lwt.return_error (Validation_error (unsupported_feature "add_operation"))
 
     let remove_operation () _ = ()
 
@@ -286,6 +284,26 @@ module type PROTOCOL = sig
 
   module Mempool : sig
     include module type of Mempool
+
+    val partial_op_validation :
+      ?check_signature:bool ->
+      validation_info ->
+      operation ->
+      (unit -> unit Error_monad.tzresult) list tzresult Lwt.t
+
+    val add_valid_operation :
+      ?conflict_handler:conflict_handler ->
+      t ->
+      Operation_hash.t * operation ->
+      (t * add_result, add_error) result
+
+    val add_operation :
+      ?check_signature:bool ->
+      ?conflict_handler:conflict_handler ->
+      validation_info ->
+      t ->
+      Operation_hash.t * operation ->
+      (t * add_result, add_error) result Lwt.t
 
     val init :
       Context.t ->

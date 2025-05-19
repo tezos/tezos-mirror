@@ -292,15 +292,22 @@ val finalize_block : validation_state -> unit tzresult Lwt.t
 
 (** Check the operation validity, similarly to {!validate_operation}.
 
-    However, this function does not check for conflicts with
-    previously validated operations, nor global block properties such
-    as the respect of the block gas limit. This allows the function to
-    only take an {!type-info} as input rather than a full
-    {!type-validation_state}.
+    It returns a (potentially empty) list of commutative checks that MUST be ran
+    in order to complete check the operation check. Note that, for now, the
+    returned list contains only the signature check or an empty list. It might
+    be augmented in the future.
+
+    However, this function does not check for conflicts with previously
+    validated operations, nor global block properties such as the respect of the
+    block gas limit. This allows the function to only take an {!type-info} as
+    input rather than a full {!type-validation_state}.
 
     This function is intended for {!Mempool_validation} exclusively. *)
 val check_operation :
-  ?check_signature:bool -> info -> 'kind operation -> unit tzresult Lwt.t
+  ?check_signature:bool ->
+  info ->
+  'kind operation ->
+  (unit -> unit tzresult) list tzresult Lwt.t
 
 (** Check that the operation does not conflict with other operations
     already validated and recorded in the {!operation_conflict_state}.
