@@ -266,11 +266,14 @@ let gather_definitions (schema : Json_schema.schema)
   in
   gather String_map.empty converted_schema
 
-let convert_schema (schema : Json.t) : env * Openapi.Schema.t =
-  let schema = Json_schema.of_json (Json.unannotate schema) in
+let convert_json_schema schema : env * Openapi.Schema.t =
   let converted_schema = convert_element (Json_schema.root schema) in
   let env = gather_definitions schema converted_schema in
   (env, converted_schema)
+
+let convert_schema (schema : Json.t) : env * Openapi.Schema.t =
+  let schema = Json_schema.of_json (Json.unannotate schema) in
+  convert_json_schema schema
 
 let convert_response ?code (schemas : Api.schemas option) :
     env * Openapi.Response.t list =

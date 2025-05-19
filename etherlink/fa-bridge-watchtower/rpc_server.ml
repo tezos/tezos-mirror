@@ -39,11 +39,117 @@ end
 
 let routes = ref []
 
-let register meth path ?input_encoding ?include_default_fields output_encoding
-    handler =
+module OpenAPI = struct
+  open Tezos_openapi
+
+  let version =
+    Format.sprintf
+      "fa-bridge-watchtower.%s (%s)@."
+      Tezos_version_value.Current_git_info.abbreviated_commit_hash
+      Tezos_version_value.Current_git_info.committer_date
+
+  let openapi = String.Hashtbl.create 3
+
+  let openapi_env = ref Convert.empty_env
+
+  let update_env env = openapi_env := Convert.merge_envs !openapi_env env
+
+  let service ~description ?query ?input_encoding output_encoding =
+    let request_body =
+      match input_encoding with
+      | None -> None
+      | Some e ->
+          let env, schema =
+            Convert.convert_schema
+              (Json.annotate
+                 ~origin:""
+                 (Json_schema.to_json (Data_encoding.Json.schema e)))
+          in
+          update_env env ;
+          Some schema
+    in
+    let env, ok_response =
+      Convert.convert_schema
+        (Json.annotate
+           ~origin:""
+           (Json_schema.to_json (Data_encoding.Json.schema output_encoding)))
+    in
+    update_env env ;
+    let responses =
+      [
+        Openapi.Response.make ~code:200 ~description:"success" ok_response;
+        Openapi.Response.make
+          ~code:400
+          ~description:"Bad request"
+          (Openapi.Schema.string
+             ~title:"Invalid body"
+             ~description:"Invalid data in body"
+             ());
+        Openapi.Response.make
+          ~code:400
+          ~description:"Bad JSON in request"
+          (Openapi.Schema.string
+             ~title:"Invalid JSON in body"
+             ~description:"Invalid JSON in body"
+             ());
+        Openapi.Response.make
+          ~code:500
+          ~description:"Internal server error"
+          (Openapi.Schema.any ~title:"error" ~description:"Server error" ());
+      ]
+    in
+    Openapi.Service.make ~description ?query ?request_body responses
+
+  let method_ = function
+    | `GET -> Method.GET
+    | `POST -> POST
+    | `PUT -> PUT
+    | `DELETE -> DELETE
+    | `PATCH -> PATCH
+
+  let register meth path ~description ?query ?input_encoding output_encoding =
+    let service = service ~description ?query ?input_encoding output_encoding in
+    let endpoint =
+      match String.Hashtbl.find openapi path with
+      | None ->
+          let path =
+            String.split_no_empty '/' path |> List.map Openapi.Path.static
+          in
+          Openapi.Endpoint.{path; methods = []}
+      | Some e -> e
+    in
+    let meth = method_ meth in
+    let endpoint =
+      Openapi.Endpoint.
+        {
+          endpoint with
+          methods =
+            (meth, service) :: Stdlib.List.remove_assoc meth endpoint.methods;
+        }
+    in
+    String.Hashtbl.replace openapi path endpoint
+
+  let get () =
+    let definitions = Convert.String_map.bindings !openapi_env in
+    Openapi.make
+      ~title:"FA bridge watchtower"
+      ~version
+      ~definitions
+      (String.Hashtbl.to_seq_values openapi |> List.of_seq)
+end
+
+let dream_meth = function
+  | `GET -> Dream.get
+  | `POST -> Dream.post
+  | `PUT -> Dream.put
+  | `DELETE -> Dream.delete
+  | `PATCH -> Dream.patch
+
+let register meth path ~description ?query ?input_encoding
+    ?include_default_fields output_encoding handler =
   let open Lwt_syntax in
   let route ctx =
-    meth path @@ fun message ->
+    dream_meth meth path @@ fun message ->
     let* response =
       let open Lwt_result_syntax in
       let* input =
@@ -87,7 +193,8 @@ let register meth path ?input_encoding ?include_default_fields output_encoding
           ~status:`Internal_Server_Error
           (Format.asprintf "%a\n" pp_print_trace e)
   in
-  routes := route :: !routes
+  routes := route :: !routes ;
+  OpenAPI.register meth path ~description ?query ?input_encoding output_encoding
 
 let make_routes db = List.rev_map (fun f -> f db) !routes
 
@@ -223,20 +330,30 @@ let deposit_with_token_info ctx Db.{nonce; proxy; ticket_hash; receiver; amount}
       Encodings.{nonce; proxy; ticket_hash; receiver; amount; token}
 
 let () =
-  register Dream.get "/health" Data_encoding.unit @@ fun _ _ _ ->
-  Lwt_result_syntax.return_unit
+  register
+    `GET
+    "/health"
+    Data_encoding.unit
+    ~description:"Health endpoint to check watchtower is running"
+  @@ fun _ _ _ -> Lwt_result_syntax.return_unit
 
 let () =
-  register Dream.get "/config" ~include_default_fields:`Always Config.encoding
+  register
+    `GET
+    "/config"
+    ~include_default_fields:`Always
+    Config.encoding
+    ~description:"Retrieve configuration of watchtower"
   @@ fun _ _ ctx ->
   Lwt_result_syntax.return
     {ctx.config with secret_key = None (* erase secret key from output *)}
 
 let () =
   register
-    Dream.get
+    `GET
     "/unclaimed"
     Data_encoding.(list (merge_objs Encodings.deposit Encodings.log_info))
+    ~description:"List unclaimed deposits"
   @@ fun _ _ ctx ->
   let open Lwt_result_syntax in
   let* deposits = Db.Deposits.get_unclaimed_full ctx.db in
@@ -247,7 +364,43 @@ let () =
     deposits
 
 let () =
-  register Dream.get "/deposits" (Data_encoding.list Encodings.deposit_log)
+  register
+    `GET
+    "/deposits"
+    (Data_encoding.list Encodings.deposit_log)
+    ~description:"List all deposits"
+    ~query:
+      (* TODO: query parameters are reported by hand for now *)
+      [
+        {
+          parameter =
+            {
+              name = "limit";
+              description = Some "Number of deposits to retrieve";
+              schema = Tezos_openapi.Openapi.Schema.integer ~minimum:0 ();
+            };
+          required = false;
+        };
+        {
+          parameter =
+            {
+              name = "offset";
+              description = Some "Offset number for deposits to retrieve";
+              schema = Tezos_openapi.Openapi.Schema.integer ~minimum:0 ();
+            };
+          required = false;
+        };
+        {
+          parameter =
+            {
+              name = "receiver";
+              description = Some "Filter deposits by receiver address";
+              schema =
+                Tezos_openapi.Openapi.Schema.string ~description:"address" ();
+            };
+          required = false;
+        };
+      ]
   @@ fun req _ ctx ->
   let open Lwt_result_syntax in
   let limit =
@@ -272,3 +425,14 @@ let () =
       let+ deposit = deposit_with_token_info ctx deposit in
       ((deposit, log_info), claimed))
     deposits
+
+let () =
+  register
+    `GET
+    "/openapi"
+    Data_encoding.json
+    ~description:"OpenAPI specification for watchtower API"
+  @@ fun _ _ _ ->
+  let open Lwt_result_syntax in
+  let openapi = OpenAPI.get () in
+  return (Tezos_openapi.Openapi.to_json openapi)
