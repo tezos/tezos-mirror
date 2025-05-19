@@ -174,7 +174,7 @@ let () =
 
   (* Eio Worker running with Eio handler *)
   let rec bench_all domains =
-    if domains > int_of_string Sys.argv.(1) then Lwt.return_unit
+    if domains > int_of_string Sys.argv.(1) then ()
     else (
       Eio.traceln
         "Eio Worker running with eio handlers and %d domains@."
@@ -198,9 +198,49 @@ let () =
       let worker = match worker with Ok w -> w | Error _ -> assert false in
       run eio_compute worker ;
       let _ = Worker.shutdown_eio worker in
-      Format.printf "stop@." ;
-      let () = (() [@profiler.stop]) in
 
-      bench_all (domains * 2))
+      (let () = (() [@profiler.stop]) in
+       Eio.traceln "Task_worker running %d domains@." domains)
+      [@profiler.record
+        {verbosity = Notice} (Format.sprintf "task_worker_%d_domains" domains)]) ;
+    let task_worker =
+      match Tezos_bees.Task_worker.worker "task_worker" domains with
+      | Ok w -> w
+      | Error _ -> assert false
+    in
+    let eio_task_worker worker label algo =
+      (let res :
+           ((bool, 'a) result, 'b Tezos_bees.Task_worker.message_error) result
+           list =
+         (fun worker keys_and_signatures ->
+           Tezos_bees.Task_worker.launch_tasks_and_wait
+             worker
+             "task_worker_checks"
+             (fun (pk, _sk, msg, signature) ->
+               Ok (Signature.check pk signature msg))
+             keys_and_signatures)
+         |> compute worker label algo
+       in
+
+       let res =
+         List.map
+           (function
+             | Ok (Ok b) -> b
+             | Ok (Error _) -> assert false
+             | Error _ -> assert false)
+           res
+       in
+       assert (List.for_all Fun.id res))
+      [@profiler.aggregate_f {verbosity = Notice} label]
+    in
+
+    run eio_task_worker task_worker ;
+    let _ = Tezos_bees.Task_worker.shutdown task_worker in
+    let () = (() [@profiler.stop]) in
+
+    Format.printf "stop@." ;
+
+    bench_all (domains * 2)
   in
+
   bench_all 1
