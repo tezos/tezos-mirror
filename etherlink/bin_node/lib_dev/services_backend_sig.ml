@@ -297,7 +297,12 @@ module type Tx_container = sig
   (** [is_locked] checks if the queue is locked. *)
   val is_locked : unit -> bool tzresult Lwt.t
 
-  (** [confirm_transactions ~clear_pending_queue_after ~confirmed_txs]
+  (** The Tx_queue has a table of pending transactions. There are two
+      ways for transactions to be removed from this table; either they
+      are confirmed because they have been seen in a block or they are
+      dropped.
+
+      [confirm_transactions ~clear_pending_queue_after ~confirmed_txs]
       confirms [confirmed_txs] hash. If [clear_pending_queue_after]
       then any other pending transactions in the tx_queue are
       dropped. *)
