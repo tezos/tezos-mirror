@@ -25,28 +25,9 @@ type parameters = {
 (** [start parameters] starts the tx-pool *)
 val start : parameters -> unit tzresult Lwt.t
 
-(** [shutdown ()] stops the tx-pool, waiting for the ongoing request
-    to be processed. *)
-val shutdown : unit -> unit tzresult Lwt.t
-
-(** [add transaction_object raw_tx] adds a eth transaction and its raw contents
-    to the tx-pool.
-
-    The consistency between [transaction_object] and [raw_tx] is assumed by
-    [add]. It is the responsibility of the caller to enforce it. *)
-val add :
-  Ethereum_types.legacy_transaction_object ->
-  string ->
-  (Ethereum_types.hash, string) result tzresult Lwt.t
-
-(** [nonce address] returns the nonce of the user
-    Returns the first gap in the tx-pool, or the nonce stored on the rollup
-    if no transactions are in the pool. *)
-val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
-
-(** [pop_transactions chain_family maximum_cumulative_size] pops as much 
-    valid transactions as possible from the pool, until their cumulative 
-    size exceeds `maximum_cumulative_size`. If the pool is locked or node 
+(** [pop_transactions chain_family maximum_cumulative_size] pops as much
+    valid transactions as possible from the pool, until their cumulative
+    size exceeds `maximum_cumulative_size`. If the pool is locked or node
     in tezlink mode, returns no transactions. *)
 val pop_transactions :
   chain_family:L2_types.chain_family ->
@@ -75,15 +56,6 @@ val unlock_transactions : unit -> unit tzresult Lwt.t
 val is_locked : unit -> bool tzresult Lwt.t
 
 val size_info : unit -> Metrics.Tx_pool.size_info tzresult Lwt.t
-
-val get_tx_pool_content : unit -> Ethereum_types.txpool tzresult Lwt.t
-
-(** [find tx_hash] look into the tx pool if a transaction with hash
-    [tx_hash] exists and returns it's corresponding
-    {!Ethereum_types.transaction_object}. *)
-val find :
-  Ethereum_types.hash ->
-  Ethereum_types.legacy_transaction_object option tzresult Lwt.t
 
 val clear_popped_transactions : unit -> unit tzresult Lwt.t
 

@@ -46,7 +46,9 @@ type request = {
 }
 
 (** Inject transactions with either RPCs or on a websocket connection. *)
-type endpoint = Rpc of Uri.t | Websocket of Websocket_client.t
+type endpoint = Services_backend_sig.endpoint =
+  | Rpc of Uri.t
+  | Websocket of Websocket_client.t
 
 (** [Nonce_bitset] registers known nonces from transactions that went
     through the tx_queue from a specific sender address. With this
@@ -376,7 +378,6 @@ end
 module Request = struct
   type ('a, 'b) t =
     | Inject : request -> ((unit, string) result, tztrace) t
-    | Confirm : {txn_hash : Ethereum_types.hash} -> (unit, tztrace) t
     | Find : {
         txn_hash : Ethereum_types.hash;
       }
@@ -431,15 +432,6 @@ module Request = struct
              (req "payload" Ethereum_types.hex_encoding))
           (function
             | View (Inject {payload; _}) -> Some ((), payload) | _ -> None)
-          (fun _ -> assert false);
-        case
-          Json_only
-          ~title:"Confirm"
-          (obj2
-             (req "request" (constant "confirm"))
-             (req "transaction_hash" Ethereum_types.hash_encoding))
-          (function
-            | View (Confirm {txn_hash}) -> Some ((), txn_hash) | _ -> None)
           (fun _ -> assert false);
         case
           Json_only
@@ -530,8 +522,6 @@ module Request = struct
     let open Format in
     match r with
     | Inject {payload = Hex txn; _} -> fprintf fmt "Inject %s" txn
-    | Confirm {txn_hash = Hash (Hex txn_hash)} ->
-        fprintf fmt "Confirm %s" txn_hash
     | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
     | Tick _ -> fprintf fmt "Tick"
     | Clear -> fprintf fmt "Clear"
@@ -819,13 +809,6 @@ module Handlers = struct
         else
           return
             (Error "Transaction limit was reached. Transaction is rejected.")
-    | Confirm {txn_hash} -> (
-        protect @@ fun () ->
-        match Pending_transactions.pop state.pending txn_hash with
-        | Some {pending_callback; _} ->
-            let*! () = pending_callback `Confirmed in
-            return_unit
-        | None -> return_unit)
     | Find {txn_hash} ->
         protect @@ fun () ->
         return @@ Transaction_objects.find state.tx_object txn_hash
@@ -1043,30 +1026,6 @@ let push_request worker request =
   let*! (pushed : bool) = Worker.Queue.push_request worker request in
   if not pushed then tzfail Tx_queue_is_closed else return_unit
 
-let tick ~evm_node_endpoint =
-  bind_worker @@ fun w -> push_request w (Tick {evm_node_endpoint})
-
-let beacon ~evm_node_endpoint ~tick_interval =
-  let open Lwt_result_syntax in
-  let rec loop () =
-    let* () = tick ~evm_node_endpoint in
-    let*! () = Lwt_unix.sleep tick_interval in
-    loop ()
-  in
-  loop ()
-
-let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
-    (tx_object : Ethereum_types.legacy_transaction_object) txn =
-  let open Lwt_syntax in
-  let* worker = worker_promise in
-  Worker.Queue.push_request_and_wait
-    worker
-    (Inject {next_nonce; payload = txn; tx_object; callback})
-  |> handle_request_error
-
-let confirm txn_hash =
-  bind_worker @@ fun w -> push_request w (Confirm {txn_hash})
-
 let start ~config ~keep_alive () =
   let open Lwt_result_syntax in
   let* worker = Worker.launch table () {config; keep_alive} (module Handlers) in
@@ -1074,33 +1033,10 @@ let start ~config ~keep_alive () =
   let*! () = Tx_queue_events.is_ready () in
   return_unit
 
-let find txn_hash =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait w (Find {txn_hash}) |> handle_request_error
-
 let clear () =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait w Clear |> handle_request_error
-
-let nonce ~next_nonce address =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait w (Nonce {next_nonce; address})
-  |> handle_request_error
-
-let content () =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait w Content |> handle_request_error
-
-let shutdown () =
-  let open Lwt_result_syntax in
-  bind_worker @@ fun w ->
-  let*! () = Tx_queue_events.shutdown () in
-  let*! () = Worker.shutdown w in
-  return_unit
 
 let lock_transactions () =
   bind_worker @@ fun w -> push_request w Lock_transactions
@@ -1135,7 +1071,20 @@ module Internal_for_tests = struct
 end
 
 module Tx_container = struct
-  let nonce = nonce
+  let nonce ~next_nonce address =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    Worker.Queue.push_request_and_wait w (Nonce {next_nonce; address})
+    |> handle_request_error
+
+  let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
+      (tx_object : Ethereum_types.legacy_transaction_object) txn =
+    let open Lwt_syntax in
+    let* worker = worker_promise in
+    Worker.Queue.push_request_and_wait
+      worker
+      (Inject {next_nonce; payload = txn; tx_object; callback})
+    |> handle_request_error
 
   let add ~next_nonce tx_object ~raw_tx =
     let open Lwt_result_syntax in
@@ -1144,9 +1093,13 @@ module Tx_container = struct
     | Ok () -> return (Ok tx_object.hash)
     | Error errs -> return (Error errs)
 
-  let find hash =
+  let find txn_hash =
     let open Lwt_result_syntax in
-    let* legacy_tx_object = find hash in
+    let* legacy_tx_object =
+      let*? w = Lazy.force worker in
+      Worker.Queue.push_request_and_wait w (Find {txn_hash})
+      |> handle_request_error
+    in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
        We should instrument the TX queue to return the real
        transaction objects. *)
@@ -1155,5 +1108,27 @@ module Tx_container = struct
          Transaction_object.from_store_transaction_object
          legacy_tx_object)
 
-  let content = content
+  let content () =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    Worker.Queue.push_request_and_wait w Content |> handle_request_error
+
+  let shutdown () =
+    let open Lwt_result_syntax in
+    bind_worker @@ fun w ->
+    let*! () = Tx_queue_events.shutdown () in
+    let*! () = Worker.shutdown w in
+    return_unit
+
+  let tx_queue_tick ~evm_node_endpoint =
+    bind_worker @@ fun w -> push_request w (Tick {evm_node_endpoint})
+
+  let tx_queue_beacon ~evm_node_endpoint ~tick_interval =
+    let open Lwt_result_syntax in
+    let rec loop () =
+      let* () = tx_queue_tick ~evm_node_endpoint in
+      let*! () = Lwt_unix.sleep tick_interval in
+      loop ()
+    in
+    loop ()
 end

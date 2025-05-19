@@ -34,12 +34,13 @@ let spawn_main ~exposed_port ~protected_endpoint ?private_endpoint ~data_dir ()
   let finalizer () = Lwt.return process#terminate in
   finalizer
 
-let install_finalizer_rpc server_public_finalizer =
+let install_finalizer_rpc server_public_finalizer
+    (module Tx_container : Services_backend_sig.Tx_container) =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
   let* () = server_public_finalizer () in
-  Misc.unwrap_error_monad @@ fun () -> Tx_pool.shutdown ()
+  Misc.unwrap_error_monad @@ fun () -> Tx_container.shutdown ()
 
 let set_metrics_level (ctxt : Evm_ro_context.t) =
   let open Lwt_result_syntax in
@@ -132,6 +133,13 @@ let container_forward_request ~public_endpoint ~private_endpoint ~keep_alive :
     let content () =
       Lwt_result.return
         Ethereum_types.{pending = AddressMap.empty; queued = AddressMap.empty}
+
+    let shutdown () = Lwt_result_syntax.return_unit
+
+    let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
+
+    let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
+      Lwt_result_syntax.return_unit
   end)
 
 let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
@@ -255,7 +263,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   in
 
   let (_ : Lwt_exit.clean_up_callback_id) =
-    install_finalizer_rpc server_public_finalizer
+    install_finalizer_rpc server_public_finalizer tx_container
   in
 
   let* () =
@@ -265,15 +273,10 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
 
   let* next_blueprint_number = Evm_ro_context.next_blueprint_number ctxt in
   let* () =
-    if
-      Configuration.is_tx_queue_enabled config
-      && Option.is_none evm_node_private_endpoint
-      (* Only start the beacon when the tx_queue is started. *)
-    then
-      Tx_queue.beacon
-        ~evm_node_endpoint:(Rpc evm_node_endpoint)
-        ~tick_interval:0.05
-    else return_unit
+    let (module Tx_container) = tx_container in
+    Tx_container.tx_queue_beacon
+      ~evm_node_endpoint:(Rpc evm_node_endpoint)
+      ~tick_interval:0.05
   and* () =
     Blueprints_follower.start
       ~ping_tx_pool

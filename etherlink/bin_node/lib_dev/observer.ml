@@ -99,7 +99,8 @@ let on_new_blueprint config evm_node_endpoint next_blueprint_number
     return (`Restart_from next_blueprint_number)
 
 let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
-    finalizer_private_server finalizer_rpc_process =
+    finalizer_private_server finalizer_rpc_process
+    (module Tx_container : Services_backend_sig.Tx_container) =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
@@ -108,8 +109,7 @@ let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
   let* () = Option.iter_s (fun f -> f ()) finalizer_rpc_process in
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
-  let* () = Tx_pool.shutdown () in
-  let* () = Tx_queue.shutdown () in
+  let* () = Tx_container.shutdown () in
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
@@ -128,6 +128,13 @@ let container_forward_tx ~keep_alive ~evm_node_endpoint :
 
     let content () =
       Lwt_result.return {pending = AddressMap.empty; queued = AddressMap.empty}
+
+    let shutdown () = Lwt_result_syntax.return_unit
+
+    let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
+
+    let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
+      Lwt_result_syntax.return_unit
   end)
 
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
@@ -330,6 +337,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       finalizer_public_server
       finalizer_private_server
       finalizer_rpc_process
+      tx_container
   in
 
   let*! next_blueprint_number = Evm_context.next_blueprint_number () in
@@ -349,10 +357,9 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     and* () =
       Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
     and* () =
-      if Configuration.is_tx_queue_enabled config then
-        Tx_queue.beacon
-          ~evm_node_endpoint:(Rpc evm_node_endpoint)
-          ~tick_interval:0.05
-      else return_unit
+      let (module Tx_container) = tx_container in
+      Tx_container.tx_queue_beacon
+        ~evm_node_endpoint:(Rpc evm_node_endpoint)
+        ~tick_interval:0.05
     in
     return_unit

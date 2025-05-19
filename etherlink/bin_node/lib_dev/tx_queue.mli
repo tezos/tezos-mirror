@@ -24,9 +24,6 @@
           [callback] is called with [`Dropped].}} *)
 type callback = [`Accepted | `Confirmed | `Dropped | `Refused] -> unit Lwt.t
 
-(** Inject transactions with either RPCs or on a websocket connection. *)
-type endpoint = Rpc of Uri.t | Websocket of Websocket_client.t
-
 (** [start ~config ~max_transaction_batch_length ()] starts the
     worker, meaning it is possible to call {!inject}, {!confirm} and
     {!beacon}. *)
@@ -36,66 +33,8 @@ val start :
   unit ->
   unit tzresult Lwt.t
 
-(** [shutdown ()] stops the tx queue, waiting for the ongoing request
-    to be processed. *)
-val shutdown : unit -> unit tzresult Lwt.t
-
 (** [clear ()] removes the tx queue data but keeps the allocated space *)
 val clear : unit -> unit tzresult Lwt.t
-
-(** [inject ?callback ~next_nonce tx_object raw_txn] pushes the
-    transaction [raw_txn] to the worker queue.
-
-    The [tx_object] is stored until the transaction is confirmed or
-    dropped, so the transaction can be retrieved with [find].
-
-    [next_nonce] is the next nonce expected by the kernel for the
-    address [tx_object.from]. [next_nonce] must always be increasing
-    for any given [tx_object.from], else if the tx_queue already
-    contains a transaction for [tx_object.from] it will raise an error
-    for that request. The increasing order of [next_nonce] is enforced
-    by the kernel execution where transaction must be executed in
-    order.
-
-    Any transaction added in the tx_queue via {!inject} must be a
-    valid transaction. In particular the nonce of the transaction must
-    be valid, i.e. it must be greater or equal to [next_nonce]. This
-    is validated by {!Validate.is_tx_valid}.
-
-    {b Note:} The promise will be sleeping until at least {!start} is called. *)
-val inject :
-  ?callback:callback ->
-  next_nonce:Ethereum_types.quantity ->
-  Ethereum_types.legacy_transaction_object ->
-  Ethereum_types.hex ->
-  (unit, string) result tzresult Lwt.t
-
-(** [confirm hash] is to be called by an external component to advertise a
-    transaction has been included in a blueprint. *)
-val confirm : Ethereum_types.hash -> unit tzresult Lwt.t
-
-(** Trigger a tick in the [Tx_queue]. *)
-val tick : evm_node_endpoint:endpoint -> unit tzresult Lwt.t
-
-(** [beacon ~evm_node_endpoint ~tick_interval] is a never fulfilled
-    promise which triggers a tick in the [Tx_queue] every
-    [tick_interval] seconds. *)
-val beacon :
-  evm_node_endpoint:endpoint -> tick_interval:float -> unit tzresult Lwt.t
-
-(** [find hash] returns the transaction associated with that hash if
-    it's found in the tx_queue. *)
-val find :
-  Ethereum_types.hash ->
-  Ethereum_types.legacy_transaction_object option tzresult Lwt.t
-
-(** [nonce ~next_nonce address] returns the first gap in the tx queue
-    for [address], or [next_nonce] if no transaction for [address] are
-    found. *)
-val nonce :
-  next_nonce:Ethereum_types.quantity ->
-  Ethereum_types.address ->
-  Ethereum_types.quantity tzresult Lwt.t
 
 (** [lock_transactions] locks the transactions in the queue, new
     transactions can be added but nothing can be retrieved with
@@ -108,12 +47,6 @@ val unlock_transactions : unit -> unit tzresult Lwt.t
 
 (** [is_locked] checks if the queue is locked. *)
 val is_locked : unit -> bool tzresult Lwt.t
-
-(** [content ()] returns the queued and pending transactions of the
-    tx_queue mapped into a tx_pool to mimic
-    {!Tx_pool.get_tx_pool_content}. Semantics of pending and queued
-    are not equal to {!Tx_pool.get_tx_pool_content} *)
-val content : unit -> Ethereum_types.txpool tzresult Lwt.t
 
 (** [pop_transactions ~validate_tx ~initial_validation_state] pops as
     many transactions as possible from the queue, validating them with

@@ -59,12 +59,19 @@ module Tx_queue = struct
 
   (* as found in etherlink/bin_floodgate/tx_queue.ml *)
   let transfer ctx ?to_ ?(value = Z.zero) ~nonce ~data () =
+    let open Lwt_result_syntax in
     let txn = Craft.transfer ctx ~nonce ?to_ ~value ~data () in
     let tx_raw = Ethereum_types.hex_to_bytes txn in
     let hash = Ethereum_types.hash_raw_tx tx_raw in
     let**? tx = Transaction.decode tx_raw in
     let**? tx_object = Transaction.to_transaction_object ~hash tx in
-    inject tx_object txn ~next_nonce:(Ethereum_types.Qty nonce)
+    let+ res =
+      Tx_container.add
+        tx_object
+        ~raw_tx:txn
+        ~next_nonce:(Ethereum_types.Qty nonce)
+    in
+    match res with Ok _hash -> Ok () | Error _ as res -> res
 end
 
 module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
@@ -716,7 +723,11 @@ let handle_confirmed_txs {db; ws_client; _}
                    exec.blockNumber )
              in
              let* () = Db.Deposits.set_claimed db nonce exec in
-             let* () = Tx_queue.confirm tx_hash in
+             let* () =
+               Tx_queue.confirm_transactions
+                 ~clear_pending_queue_after:false
+                 ~confirmed_txs:(Seq.cons tx_hash Seq.empty)
+             in
              return_unit
          | Some {status; _} ->
              let*! () =
@@ -851,7 +862,7 @@ end
 let start db ~config ~notify_ws_change ~first_block =
   let open Lwt_result_syntax in
   let evm_node_endpoint = config.Config.evm_node_endpoint in
-  let tx_queue_endpoint = ref (Tx_queue.Rpc evm_node_endpoint) in
+  let tx_queue_endpoint = ref (Services_backend_sig.Rpc evm_node_endpoint) in
   let run () =
     let*! ws_client =
       Websocket_client.connect
@@ -859,7 +870,7 @@ let start db ~config ~notify_ws_change ~first_block =
         Media_type.json
         (Uri.with_path evm_node_endpoint (Uri.path evm_node_endpoint ^ "/ws"))
     in
-    tx_queue_endpoint := Tx_queue.Websocket ws_client ;
+    tx_queue_endpoint := Services_backend_sig.Websocket ws_client ;
     notify_ws_change ws_client ;
     let* () = init_db_pointers db ws_client ~first_block in
     let* chain_id = get_chain_id ws_client in
@@ -893,7 +904,8 @@ let start db ~config ~notify_ws_change ~first_block =
   let rec tx_queue_beacon () =
     let open Lwt_syntax in
     let* res =
-      protect @@ fun () -> Tx_queue.tick ~evm_node_endpoint:!tx_queue_endpoint
+      protect @@ fun () ->
+      Tx_queue.Tx_container.tx_queue_tick ~evm_node_endpoint:!tx_queue_endpoint
     in
     let* () =
       match res with
