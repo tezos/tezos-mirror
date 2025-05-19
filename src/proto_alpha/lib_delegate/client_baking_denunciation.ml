@@ -218,9 +218,21 @@ let events_of_kind op_kind =
           double_preattestation_denounced,
           preattestation_conflict_ignored )
 
-let process_consensus_op state cctxt op_kind (type a)
-    (new_op : a Kind.consensus operation) chain_id level round slot =
+let process_consensus_op state cctxt chain_id slot (type a)
+    (new_op : a Kind.consensus operation) =
   let open Lwt_result_syntax in
+  let (Single
+        ( Preattestation {level; round; _}
+        | Attestation {consensus_content = {level; round; _}; _}
+        | Preattestations_aggregate {consensus_content = {level; round; _}; _}
+        | Attestations_aggregate {consensus_content = {level; round; _}; _} )) =
+    new_op.protocol_data.contents
+  in
+  let op_kind =
+    match new_op.protocol_data.contents with
+    | Single (Preattestation _ | Preattestations_aggregate _) -> Preattestation
+    | Single (Attestation _ | Attestations_aggregate _) -> Attestation
+  in
   let diff = Raw_level.diff state.highest_level_encountered level in
   if Int32.(diff > of_int state.preserved_levels) then
     (* We do not handle operations older than [preserved_levels] *)
@@ -335,45 +347,37 @@ let process_operations (cctxt : #Protocol_client_context.full) state
   let open Lwt_result_syntax in
   List.iter_es
     (fun op ->
-      let {shell; protocol_data; _} = packed_op op in
-      match protocol_data with
-      | Operation_data
-          ({contents = Single (Preattestation {round; slot; level; _}); _} as
-           protocol_data) ->
-          let new_preattestation : Kind.preattestation Alpha_context.operation =
-            {shell; protocol_data}
-          in
-          process_consensus_op
-            state
-            cctxt
-            Preattestation
-            new_preattestation
-            chain_id
-            level
-            round
-            slot
-      | Operation_data
-          ({
-             contents =
-               Single
-                 (Attestation {consensus_content = {round; slot; level; _}; _});
-             _;
-           } as protocol_data) ->
-          let new_attestation : Kind.attestation Alpha_context.operation =
-            {shell; protocol_data}
-          in
-          process_consensus_op
-            state
-            cctxt
-            Attestation
-            new_attestation
-            chain_id
-            level
-            round
-            slot
-      | _ ->
-          (* not a consensus operation *)
-          return_unit)
+      let {shell; protocol_data = Operation_data protocol_data; _} =
+        packed_op op
+      in
+      let op : _ operation = {shell; protocol_data} in
+      match protocol_data.contents with
+      | Single (Preattestation {slot; _}) ->
+          process_consensus_op state cctxt chain_id slot op
+      | Single (Attestation {consensus_content = {slot; _}; _}) ->
+          process_consensus_op state cctxt chain_id slot op
+      | Single (Preattestations_aggregate {committee; _}) ->
+          List.iter_es
+            (fun slot -> process_consensus_op state cctxt chain_id slot op)
+            committee
+      | Single (Attestations_aggregate {committee; _}) ->
+          List.iter_es
+            (fun (slot, (_ : dal_content option)) ->
+              process_consensus_op state cctxt chain_id slot op)
+            committee
+      | Single (Proposals _)
+      | Single (Ballot _)
+      | Single (Seed_nonce_revelation _)
+      | Single (Vdf_revelation _)
+      | Single (Double_consensus_operation_evidence _)
+      | Single (Double_baking_evidence _)
+      | Single (Dal_entrapment_evidence _)
+      | Single (Activate_account _)
+      | Single (Drain_delegate _)
+      | Single (Failing_noop _)
+      | Single (Manager_operation _)
+      | Cons (Manager_operation _, _) ->
+          (* not a consensus operation *) return_unit)
     attestations
 
 let context_block_header cctxt ~chain b_hash =
