@@ -10,13 +10,13 @@
    their corresponding attestation operation and DAL attestation. *)
 let get_attestation_map attestations =
   List.fold_left
-    (fun map (_tb_slot, delegate_opt, operation, dal_attestation) ->
+    (fun map (tb_slot, delegate_opt, operation, dal_attestation) ->
       match delegate_opt with
       | None -> map
       | Some delegate ->
           Signature.Public_key_hash.Map.add
             delegate
-            (operation, dal_attestation)
+            (operation, dal_attestation, tb_slot)
             map)
     Signature.Public_key_hash.Map.empty
     attestations
@@ -36,17 +36,18 @@ let filter_injectable_traps attestation_map traps =
           (* The delegate did not TB attest or we have not found the delegate in
              the attestation operation's receipt. *)
           None
-      | Some (_attestation, None) ->
+      | Some (_attestation, None, _tb_slot) ->
           (* The delegate did not DAL attest. *)
           None
-      | Some (attestation, Some dal_attestation) ->
+      | Some (attestation, Some dal_attestation, tb_slot) ->
           Some
             ( delegate,
               slot_index,
               attestation,
               dal_attestation,
               shard,
-              shard_proof ))
+              shard_proof,
+              tb_slot ))
     traps
 
 (* [inject_entrapment_evidences] processes and injects trap evidence
@@ -56,11 +57,13 @@ let filter_injectable_traps attestation_map traps =
 
    Guarded by [proto_parameters.incentives_enable].
 *)
-let inject_entrapment_evidences (type attestation_operation dal_attestation)
+let inject_entrapment_evidences
+    (type attestation_operation dal_attestation tb_slot)
     (module Plugin : Dal_plugin.T
       with type attestation_operation = attestation_operation
-       and type dal_attestation = dal_attestation) attestations node_ctxt
-    rpc_ctxt ~attested_level =
+       and type dal_attestation = dal_attestation
+       and type tb_slot = tb_slot) attestations node_ctxt rpc_ctxt
+    ~attested_level =
   let open Lwt_result_syntax in
   let*? proto_parameters =
     Node_context.get_proto_parameters node_ctxt ~level:(`Level attested_level)
@@ -86,7 +89,8 @@ let inject_entrapment_evidences (type attestation_operation dal_attestation)
                    attestation,
                    dal_attestation,
                    shard,
-                   shard_proof ) ->
+                   shard_proof,
+                   tb_slot ) ->
               if Plugin.is_attested dal_attestation slot_index then
                 let*! () =
                   Event.emit_trap_injection
@@ -104,6 +108,7 @@ let inject_entrapment_evidences (type attestation_operation dal_attestation)
                     ~slot_index
                     ~shard
                     ~proof:shard_proof
+                    ~tb_slot
                 in
                 match res with
                 | Ok () -> return_unit

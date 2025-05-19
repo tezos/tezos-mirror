@@ -16,8 +16,9 @@
 val inject_entrapment_evidences :
   (module Dal_plugin.T
      with type attestation_operation = 'attestation_operation
-      and type dal_attestation = 'dal_attestation) ->
-  (int
+      and type dal_attestation = 'dal_attestation
+      and type tb_slot = 'tb_slot) ->
+  ('tb_slot
   * Signature.public_key_hash option
   * 'attestation_operation
   * 'dal_attestation option)
