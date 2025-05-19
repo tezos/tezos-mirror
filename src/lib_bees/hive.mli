@@ -26,7 +26,14 @@ val launch_worker :
     [bee_name]. *)
 val get_error : string -> exn option
 
-(** Delegate the execution of a Lwt promise to a specialized worker. Beware of
+(** Delegate the execution of an Lwt promise to a specialized worker. Beware of
     the fact that the Lwt.t promise won't be resolved as soon as [async_lwt]
-    returns, but (as suggested by the function name) asynchronously. *)
+    returns, but (as suggested by the function name) asynchronously.
+
+    This means that [try async_lwt closure with _ -> ...] will not catch an
+    exception raised by the execution of the closure.
+    If the closure raises an exception, it will break the internal lwt loop
+    and prevent any subsequent asynchronous call to be executed. It's
+    consequently advised to handle exceptions directly in the closure and return
+    a [result]. *)
 val async_lwt : (unit -> unit Lwt.t) -> unit
