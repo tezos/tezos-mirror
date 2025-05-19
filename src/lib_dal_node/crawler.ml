@@ -15,9 +15,11 @@ type headers_cache = (Block_header.shell_header, tztrace) Blocks_cache.t
 
 type error += Cannot_find_block of Block_hash.t
 
+type block_info = Block_hash.t * Block_header.shell_header
+
 type finalized_heads = {
-  stream : (Block_hash.t * Block_header.shell_header) Lwt_stream.t;
-  stream_push : (Block_hash.t * Block_header.shell_header) option -> unit;
+  stream : block_info Lwt_stream.t;
+  stream_push : block_info option -> unit;
   iter_heads_promise : unit tzresult Lwt.t;
 }
 
@@ -26,6 +28,7 @@ type t = {
   headers_cache : headers_cache;  (** Global block headers cache. *)
   cctxt : Tezos_rpc.Context.generic;
   finalized_heads : finalized_heads;
+  last_seen_head : block_info option ref;
 }
 
 let () =
@@ -67,8 +70,8 @@ let get_predecessor crawler_lib hash level =
 
 (* This function initiates a call to function iter_heads and pushes finalized L1
    heads into the stream whose push function is given. *)
-let finalized_heads_monitor ~name ~last_notified_level crawler_lib cctxt
-    headers_cache stream_push =
+let finalized_heads_monitor ~name ~last_notified_level ~last_seen_head_ref
+    crawler_lib cctxt headers_cache stream_push =
   let open Lwt_result_syntax in
   let last_notified_level = ref last_notified_level in
   let rec catch_up_if_needed hash (shell_header : Block_header.shell_header) acc
@@ -114,6 +117,7 @@ let finalized_heads_monitor ~name ~last_notified_level crawler_lib cctxt
         ~level:shell_header_level
         ~fitness:shell_header.fitness
     in
+    last_seen_head_ref := Some (hash, shell_header) ;
     Dal_metrics.new_layer1_head ~head_level:shell_header_level ;
     cache_shell_header headers_cache hash shell_header ;
     if shell_header_level <= !last_notified_level then return_unit
@@ -165,17 +169,26 @@ let start ~name ~chain ~reconnection_delay ~l1_blocks_cache_size
   let last_notified_level = Int32.max 0l last_notified_level in
   let headers_cache = Blocks_cache.create l1_blocks_cache_size in
   let stream, stream_push = Lwt_stream.create () in
+  let last_seen_head_ref = ref None in
   let iter_heads_promise =
     finalized_heads_monitor
       ~name
       ~last_notified_level
+      ~last_seen_head_ref
       crawler_lib
       cctxt
       headers_cache
       stream_push
   in
   let finalized_heads = {stream; stream_push; iter_heads_promise} in
-  return {crawler_lib; cctxt; headers_cache; finalized_heads}
+  return
+    {
+      crawler_lib;
+      cctxt;
+      headers_cache;
+      finalized_heads;
+      last_seen_head = last_seen_head_ref;
+    }
 
 let finalized_heads_stream {finalized_heads; _} =
   Lwt_stream.clone finalized_heads.stream
@@ -183,3 +196,5 @@ let finalized_heads_stream {finalized_heads; _} =
 let shutdown {finalized_heads = {stream_push; iter_heads_promise; _}; _} =
   stream_push None ;
   Lwt.cancel iter_heads_promise
+
+let last_seen_head {last_seen_head; _} = !last_seen_head

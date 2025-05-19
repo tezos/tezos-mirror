@@ -69,6 +69,7 @@ let on_new_finalized_head ctxt cctxt crawler =
           Block_handler.new_finalized_head
             ctxt
             cctxt
+            crawler
             cryptobox
             finalized_block_hash
             finalized_shell_header
@@ -491,6 +492,7 @@ let run ~data_dir ~configuration_override =
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.emit_rpc_server_is_ready ~point:rpc_addr in
   (* Wait for the L1 node to be bootstrapped. *)
+  Node_context.(set_l1_crawler_status ctxt L1_bootstrapping) ;
   let* () = L1_helpers.wait_for_l1_bootstrapped cctxt in
   let* proto_plugins =
     Proto_plugins.get_proto_plugins
@@ -506,6 +508,10 @@ let run ~data_dir ~configuration_override =
     match last_processed_level with
     | None -> (* there's nothing to clean up *) return_unit
     | Some last_processed_level ->
+        L1_crawler_status.catching_up_or_synced_status
+          ~head_level
+          ~last_processed_level
+        |> Node_context.set_l1_crawler_status ctxt ;
         Store_cleanup.clean_up_store_and_catch_up
           ctxt
           cctxt

@@ -118,6 +118,12 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
       Shell_services.Blocks.Header.shell_header cctxt ~block:(`Head 0) ()
     in
     let new_head_level = header.Block_header.level in
+
+    L1_crawler_status.catching_up_or_synced_status
+      ~head_level:new_head_level
+      ~last_processed_level:last_level
+    |> Node_context.set_l1_crawler_status ctxt ;
+
     if new_head_level > head_level then do_clean_up last_level new_head_level
     else
       let*! () = Event.emit_end_catchup () in

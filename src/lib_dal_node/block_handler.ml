@@ -437,7 +437,7 @@ let process_block_data ctxt cctxt store proto_parameters block_level
     cctxt
     ~attested_level:block_level
 
-let process_block ctxt cctxt proto_parameters finalized_shell_header
+let process_block ctxt cctxt l1_crawler proto_parameters finalized_shell_header
     finalized_block_hash =
   let open Lwt_result_syntax in
   let store = Node_context.get_store ctxt in
@@ -469,28 +469,40 @@ let process_block ctxt cctxt proto_parameters finalized_shell_header
       ~level:block_level
       ~round:block_round
   in
+  let () =
+    match Crawler.last_seen_head l1_crawler with
+    | None -> assert false (* Not reachable *)
+    | Some (_hash, head) ->
+        L1_crawler_status.lagging_or_synced_status
+          ~head_level:head.Block_header.level
+          ~last_processed_level:block_level
+        |> Node_context.set_l1_crawler_status ctxt
+  in
   (* This should be done at the end of the function. *)
   let last_processed_level_store = Store.last_processed_level store in
   Store.Last_processed_level.save last_processed_level_store block_level
 
-let rec try_process_block ~retries ctxt cctxt proto_parameters
+let rec try_process_block ~retries ctxt cctxt l1_crawler proto_parameters
     finalized_shell_header finalized_block_hash =
   let open Lwt_syntax in
   let* res =
     process_block
       ctxt
       cctxt
+      l1_crawler
       proto_parameters
       finalized_shell_header
       finalized_block_hash
   in
   match res with
   | Error e when Layer_1.is_connection_error e && retries > 0 ->
+      Node_context.set_l1_crawler_status ctxt L1_crawler_status.L1_unreachable ;
       let* () = Lwt_unix.sleep Constants.crawler_re_processing_delay in
       try_process_block
         ~retries:(retries - 1)
         ctxt
         cctxt
+        l1_crawler
         proto_parameters
         finalized_shell_header
         finalized_block_hash
@@ -502,7 +514,7 @@ let rec try_process_block ~retries ctxt cctxt proto_parameters
    Tenderbake. Note that this means that shard propagation is delayed by two
    levels with respect to the publication level of the corresponding slot
    header. *)
-let new_finalized_head ctxt cctxt cryptobox finalized_block_hash
+let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
     finalized_shell_header ~launch_time =
   let open Lwt_result_syntax in
   let level = finalized_shell_header.Block_header.level in
@@ -552,6 +564,7 @@ let new_finalized_head ctxt cctxt cryptobox finalized_block_hash
         ~retries:Constants.crawler_retries_on_disconnection
         ctxt
         cctxt
+        l1_crawler
         proto_parameters
         finalized_shell_header
         finalized_block_hash
