@@ -2507,22 +2507,18 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
 let punish_double_consensus_operation (type kind) ctxt ~operation_hash
     ~payload_producer contents =
   let open Lwt_result_syntax in
-  let (Double_consensus_operation_evidence {slot = _; op1; op2 = _}) =
-    contents
-  in
-  let*? slot, misbehaviour =
-    let open Result_syntax in
+  let (Double_consensus_operation_evidence {slot; op1; op2 = _}) = contents in
+  let misbehaviour =
     match op1.protocol_data.contents with
-    | Single (Attestation {consensus_content; _}) ->
-        let {slot; level; round; block_payload_hash = _} = consensus_content in
-        return (slot, Misbehaviour.{level; round; kind = Double_attesting})
-    | Single (Preattestation consensus_content) ->
-        let {slot; level; round; _} = consensus_content in
-        return (slot, Misbehaviour.{level; round; kind = Double_preattesting})
-    | Single (Preattestations_aggregate _ | Attestations_aggregate _) ->
-        (* TODO : https://gitlab.com/tezos/tezos/-/issues/7598
-           handle denunciation for aggregates. *)
-        tzfail Validate_errors.Anonymous.Aggregate_denunciation_not_implemented
+    | Single
+        ( Preattestation {level; round; _}
+        | Preattestations_aggregate {consensus_content = {level; round; _}; _}
+          ) ->
+        Misbehaviour.{level; round; kind = Double_preattesting}
+    | Single
+        ( Attestation {consensus_content = {level; round; _}; _}
+        | Attestations_aggregate {consensus_content = {level; round; _}; _} ) ->
+        Misbehaviour.{level; round; kind = Double_attesting}
   in
   let mk_result forbidden_delegate balance_updates =
     Double_consensus_operation_evidence_result
