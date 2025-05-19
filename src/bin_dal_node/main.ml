@@ -35,6 +35,7 @@ let merge
         public_addr;
         endpoint;
         http_backup_uris;
+        trust_http_backup_uris;
         metrics_addr;
         profile;
         peers;
@@ -58,6 +59,14 @@ let merge
           ~lower_prio:configuration.profile
           ~higher_prio:from_cli
   in
+  let http_backup_uris, trust_http_backup_uris =
+    (* backup URIs from the CLI, if any, are favored over the ones in the
+       config file. *)
+    if List.is_empty http_backup_uris then
+      (configuration.http_backup_uris, configuration.trust_http_backup_uris)
+    else (http_backup_uris, trust_http_backup_uris)
+  in
+
   {
     configuration with
     data_dir = Option.value ~default:configuration.data_dir data_dir;
@@ -66,11 +75,8 @@ let merge
     public_addr = Option.value ~default:configuration.public_addr public_addr;
     expected_pow = Option.value ~default:configuration.expected_pow expected_pow;
     endpoint = Option.value ~default:configuration.endpoint endpoint;
-    http_backup_uris =
-      (* backup URIs from the CLI, if any, are favored over the ones in the
-         config file. *)
-      (if List.is_empty http_backup_uris then configuration.http_backup_uris
-       else http_backup_uris);
+    http_backup_uris;
+    trust_http_backup_uris;
     profile;
     (* metrics are disabled unless a metrics_addr option is specified *)
     metrics_addr;

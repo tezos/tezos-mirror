@@ -73,6 +73,7 @@ type t = {
   expected_pow : float;
   endpoint : Uri.t;
   http_backup_uris : Uri.t list;
+  trust_http_backup_uris : bool;
   metrics_addr : P2p_point.Id.t option;
   profile : Profile_manager.unresolved_profile;
   history_mode : history_mode;
@@ -134,6 +135,7 @@ let default =
     expected_pow = default_expected_pow;
     endpoint = default_endpoint;
     http_backup_uris = [];
+    trust_http_backup_uris = false;
     metrics_addr = None;
     history_mode = default_history_mode;
     profile = Profile_manager.Empty;
@@ -182,6 +184,7 @@ let encoding : t Data_encoding.t =
            expected_pow;
            endpoint;
            http_backup_uris;
+           trust_http_backup_uris;
            metrics_addr;
            history_mode;
            profile;
@@ -201,6 +204,7 @@ let encoding : t Data_encoding.t =
           expected_pow,
           endpoint,
           http_backup_uris,
+          trust_http_backup_uris,
           metrics_addr ),
         ( history_mode,
           profile,
@@ -219,6 +223,7 @@ let encoding : t Data_encoding.t =
              expected_pow,
              endpoint,
              http_backup_uris,
+             trust_http_backup_uris,
              metrics_addr ),
            ( history_mode,
              profile,
@@ -238,6 +243,7 @@ let encoding : t Data_encoding.t =
         expected_pow;
         endpoint;
         http_backup_uris;
+        trust_http_backup_uris;
         metrics_addr;
         history_mode;
         profile;
@@ -250,7 +256,7 @@ let encoding : t Data_encoding.t =
         ignore_l1_config_peers;
       })
     (merge_objs
-       (obj9
+       (obj10
           (dft
              "data-dir"
              ~description:"Location of the data dir"
@@ -291,6 +297,13 @@ let encoding : t Data_encoding.t =
              ~description:"Optional HTTP endpoints to fetch missing slots from."
              (list uri_encoding)
              [])
+          (dft
+             "trust_http_backup_uris"
+             ~description:
+               "Whether to trust the data downlaoded from the provided HTTP \
+                backup URIs."
+             bool
+             false)
           (dft
              "metrics-addr"
              ~description:"The point for the DAL node metrics server"
@@ -463,6 +476,7 @@ module V0 = struct
       verbose = false;
       ignore_l1_config_peers = false;
       http_backup_uris = [];
+      trust_http_backup_uris = false;
     }
 end
 
@@ -578,6 +592,7 @@ module V1 = struct
       verbose;
       ignore_l1_config_peers = false;
       http_backup_uris = [];
+      trust_http_backup_uris = false;
     }
 end
 
