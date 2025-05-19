@@ -114,6 +114,12 @@ val schedule_container_scanning_octez_rc : If.t
     [TZ_SCHEDULE_KIND] set to [CONTAINER_SCANNING_EVM_NODE_RELEASES]. *)
 val schedule_container_scanning_evm_node_releases : If.t
 
+(** A rule that is true for scheduled documentation pipelines.
+
+     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [DOCUMENTATION]. *)
+val schedule_documentation : If.t
+
 (** A rule that is true if [CI_COMMIT_BRANCH] is a given branch. *)
 val on_branch : string -> If.t
 

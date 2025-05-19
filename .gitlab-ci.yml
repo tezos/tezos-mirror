@@ -115,6 +115,10 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_container_scanning_octez_rc
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCUMENTATION"
+    variables:
+      PIPELINE_TYPE: schedule_documentation
+    when: always
   - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE" && $CI_PROJECT_NAMESPACE
       != "tezos"
     variables:
@@ -265,6 +269,10 @@ include:
 - local: .gitlab/ci/pipelines/schedule_container_scanning_octez_rc.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RC"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_documentation.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCUMENTATION"
     when: always
 - local: .gitlab/ci/pipelines/publish_test_release_page.yml
   rules:
