@@ -34,6 +34,7 @@ pub struct DispatchTarget<D: DispatchCompiler<MC, M>, MC: MemoryConfig, M: JitSt
     /// See <https://doc.rust-lang.org/std/primitive.fn.html#casting-to-and-from-integers> for
     /// considerations taken whilst converting pointer <--> usize.
     fun: Arc<AtomicUsize>,
+    called_times: usize,
     _pd: PhantomData<(D, MC, M)>,
 }
 
@@ -48,6 +49,8 @@ impl<D: DispatchCompiler<MC, M>, MC: MemoryConfig, M: JitStateAccess> DispatchTa
         self.fun = Arc::new(AtomicUsize::new(
             Jitted::<D, MC, M>::run_block_interpreted as usize,
         ));
+
+        self.called_times = 0;
     }
 
     /// Set the dispatch target to use the given `block_run` function.
@@ -81,6 +84,7 @@ impl<D: DispatchCompiler<MC, M>, MC: MemoryConfig, M: JitStateAccess> Default
             fun: Arc::new(AtomicUsize::new(
                 Jitted::<D, MC, M>::run_block_interpreted as usize,
             )),
+            called_times: 0,
             _pd: PhantomData,
         }
     }
@@ -89,6 +93,9 @@ impl<D: DispatchCompiler<MC, M>, MC: MemoryConfig, M: JitStateAccess> Default
 /// A compiler that can JIT-compile blocks of instructions, and hot-swap the execution of
 /// said block in the given dispatch target.
 pub trait DispatchCompiler<MC: MemoryConfig, M: JitStateAccess>: Default + Sized {
+    /// Whether compilation should be attempted for the block.
+    fn should_compile(&self, target: &mut DispatchTarget<Self, MC, M>) -> bool;
+
     /// Compile a block, hot-swapping the `run_block` function contained in `target` in
     /// the process. This could be to an interpreted execution method, and/or jit-compiled
     /// function.
@@ -104,6 +111,13 @@ pub trait DispatchCompiler<MC: MemoryConfig, M: JitStateAccess>: Default + Sized
 }
 
 impl<MC: MemoryConfig, M: JitStateAccess> DispatchCompiler<MC, M> for JIT<MC, M> {
+    #[inline]
+    fn should_compile(&self, _target: &mut DispatchTarget<Self, MC, M>) -> bool {
+        // every block must be compiled immediately for inline jit, as it's used for testing
+        // jit compatibility with interpreted mode.
+        true
+    }
+
     fn compile(
         &mut self,
         target: &mut DispatchTarget<Self, MC, M>,
@@ -194,6 +208,13 @@ impl<MC: MemoryConfig + Send, M: JitStateAccess + Send + 'static> Default
 impl<MC: MemoryConfig + Send, M: JitStateAccess + Send + 'static> DispatchCompiler<MC, M>
     for OutlineCompiler<MC, M>
 {
+    fn should_compile(&self, target: &mut DispatchTarget<Self, MC, M>) -> bool {
+        const COMPILATION_THRESHOLD: usize = 1000;
+
+        target.called_times += 1;
+        target.called_times > COMPILATION_THRESHOLD
+    }
+
     fn compile(
         &mut self,
         target: &mut DispatchTarget<Self, MC, M>,
