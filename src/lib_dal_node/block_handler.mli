@@ -23,6 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(*
+
+  /!\ WARNING:
+
+  If the daemon's logic regarding block processing changes, make sure that
+  the L1 crawler's [status] field in [node_context] is updated accordingly.
+
+*)
+
 (** [new_finalized_head ctxt cctxt l1_crawler cryptobox block_hash shell_header
     ~launch_time] processes a new finalized L1 block. It performs cleanup of old
     DAL data, updates the committee cache, re-registers the gossipsub message
