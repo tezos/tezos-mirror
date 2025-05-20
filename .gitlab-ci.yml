@@ -119,6 +119,11 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_documentation
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCKER_FRESH_IMAGE_BUILD"
+    variables:
+      PIPELINE_TYPE: schedule_docker_build_pipeline
+      DOCKER_FORCE_BUILD: "true"
+    when: always
   - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE" && $CI_PROJECT_NAMESPACE
       != "tezos"
     variables:
@@ -273,6 +278,10 @@ include:
 - local: .gitlab/ci/pipelines/schedule_documentation.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCUMENTATION"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_docker_build_pipeline.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCKER_FRESH_IMAGE_BUILD"
     when: always
 - local: .gitlab/ci/pipelines/publish_test_release_page.yml
   rules:
