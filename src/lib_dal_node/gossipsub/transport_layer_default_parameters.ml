@@ -32,12 +32,8 @@ module P2p_limits = struct
 
   let greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *)
 
-  (* Some of the default values below taken from L1 node instantiation of
-     Octez-p2p library. We amplify the value by this constant. *)
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6391
-
-     Decide which default value we should choose for P2P parameters and wheter we
-     specialize them per profile kind. *)
+  (* Some of the values taken from the L1 node's instantiation of the
+     octez-p2p library are amplified by the following constant. *)
   let dal_amplification_factor = 8
 
   (* [maintenance_idle_time] is set to [None] to disable the internal maintenance
