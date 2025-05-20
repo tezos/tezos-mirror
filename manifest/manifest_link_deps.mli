@@ -50,7 +50,7 @@ module LinkDeps : functor (TU : TargetUtilsSig) -> sig
   }
 
   (** Generate a manifest target with the given [kind], [deps], [link_deps] and inline tests options
-      compute the resulting [deps], [link_deps] and inline tests options taking into account 
+      compute the resulting [deps], [link_deps] and inline tests options taking into account
       unification of linking dependencies and type of target (e.g. library/executable) *)
   val compute_opts :
     kind:TU.target_kind ->
