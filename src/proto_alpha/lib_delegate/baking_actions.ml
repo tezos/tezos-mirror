@@ -744,24 +744,45 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
             sk_companion_uri
             unsigned_operation_bytes
         in
-        match (consensus_sig, companion_sig) with
+        match
+          ( consensus_sig,
+            companion_sig,
+            delegate.consensus_key.public_key,
+            companion_key.public_key )
+        with
         (* This if-else branch is for BLS mode so both signatures
-           should be BLS signatures *)
-        | Signature.Bls consensus_sig, Signature.Bls companion_sig -> (
+           should be BLS signatures, and both public keys should be
+           BLS public keys. *)
+        | ( Signature.Bls consensus_sig,
+            Signature.Bls companion_sig,
+            Signature.Bls consensus_pk,
+            Signature.Bls companion_pk ) -> (
             let dal_dependent_bls_sig_opt =
               Alpha_context.Dal.Attestation.Dal_dependent_signing.aggregate_sig
                 ~subgroup_check:false
+                ~consensus_pk
+                ~companion_pk
                 ~consensus_sig
                 ~companion_sig
+                ~op:unsigned_operation_bytes
                 dal_attestation
             in
             match dal_dependent_bls_sig_opt with
             | None -> tzfail Baking_errors.Signature_aggregation_failure
             | Some dal_dependent_bls_sig ->
                 return (Signature.Bls dal_dependent_bls_sig : Signature.t))
-        | Signature.Bls _, _ ->
+        | _, Signature.Bls _, Signature.Bls _, Signature.Bls _ ->
+            tzfail (Baking_errors.Unexpected_signature_type consensus_sig)
+        | _, _, Signature.Bls _, Signature.Bls _ ->
             tzfail (Baking_errors.Unexpected_signature_type companion_sig)
-        | _ -> tzfail (Baking_errors.Unexpected_signature_type consensus_sig))
+        | _, _, _, Signature.Bls _ ->
+            tzfail
+              (Baking_errors.Unexpected_public_key_type
+                 delegate.consensus_key.public_key)
+        | _, _, _, _ ->
+            tzfail
+              (Baking_errors.Unexpected_public_key_type companion_key.public_key)
+        )
   in
   let protocol_data = Operation_data {contents; signature = Some signature} in
   let signed_operation : Operation.packed = {shell; protocol_data} in

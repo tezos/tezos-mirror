@@ -2883,21 +2883,30 @@ module Dal : sig
 
     module Dal_dependent_signing : sig
       (** See {!Dal_attestation_repr.Dal_dependent_signing.weight}. *)
-      val weight : t -> Z.t
+      val weight :
+        consensus_pk:Bls.Public_key.t ->
+        companion_pk:Bls.Public_key.t ->
+        op:bytes ->
+        t ->
+        Z.t
 
       (** See {!Dal_attestation_repr.Dal_dependent_signing.aggregate_pk}. *)
       val aggregate_pk :
         subgroup_check:bool ->
         consensus_pk:Bls.Public_key.t ->
         companion_pk:Bls.Public_key.t ->
+        op:bytes ->
         t ->
         Bls.Public_key.t option
 
       (** See {!Dal_attestation_repr.Dal_dependent_signing.aggregate_sig}. *)
       val aggregate_sig :
         subgroup_check:bool ->
+        consensus_pk:Bls.Public_key.t ->
+        companion_pk:Bls.Public_key.t ->
         consensus_sig:Bls.t ->
         companion_sig:Bls.t ->
+        op:bytes ->
         t ->
         Bls.t option
     end
@@ -4967,6 +4976,11 @@ module Operation : sig
      enable BLS proof of possession aggregation. *)
   val bls_mode_unsigned_encoding :
     (Operation.shell_header * packed_contents_list) Data_encoding.t
+
+  val serialize_unsigned_operation :
+    (Operation.shell_header * packed_contents_list) Data_encoding.t ->
+    'a operation ->
+    bytes
 
   type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 

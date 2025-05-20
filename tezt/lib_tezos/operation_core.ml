@@ -114,6 +114,20 @@ let bls_mode_raw t client : Hex.t Lwt.t =
   t.raw <- Some (`Hex inject_bytes) ;
   return (`Hex sign_bytes)
 
+(* Same hash module as [src/proto_alpha/lib_protocol/dal_attestation_repr.ml] *)
+module HashModule =
+  Tezos_crypto.Blake2B.Make
+    (Tezos_crypto.Base58)
+    (struct
+      let name = "Dal attestation hash"
+
+      let title = "Dal attestation hash"
+
+      let b58check_prefix = "\056\012\165" (* dba(53) *)
+
+      let size = Some 32
+    end)
+
 let sign_tz4_attestation_with_dal ~watermark consensus_key companion_key
     contents bytes =
   let dal_attestation =
@@ -135,10 +149,41 @@ let sign_tz4_attestation_with_dal ~watermark consensus_key companion_key
   in
   match (consensus_signature, companion_signature) with
   | Bls consensus, Bls companion -> (
+      let consensus_pkh =
+        Tezos_crypto.Signature.Public_key_hash.(
+          of_b58check_exn consensus_key.public_key_hash)
+      in
+      let companion_pkh =
+        Tezos_crypto.Signature.Public_key_hash.(
+          of_b58check_exn companion_key.public_key_hash)
+      in
+      let consensus_pkh_bytes, companion_pkh_bytes =
+        match (consensus_pkh, companion_pkh) with
+        | Bls consensus_pkh, Bls companion_pkh ->
+            ( Tezos_crypto.Signature.Bls.Public_key_hash.to_bytes consensus_pkh,
+              Tezos_crypto.Signature.Bls.Public_key_hash.to_bytes companion_pkh
+            )
+        | _ -> assert false
+      in
+      let dal_attestation_bytes =
+        Z.to_bits dal_attestation |> Bytes.of_string
+      in
+      let weight =
+        HashModule.(
+          hash_bytes
+            [
+              consensus_pkh_bytes;
+              companion_pkh_bytes;
+              bytes;
+              dal_attestation_bytes;
+            ]
+          |> to_bytes)
+        |> Bytes.to_string |> Z.of_bits
+      in
       let aggregate =
         Tezos_crypto.Signature.Bls.aggregate_signature_weighted_opt
           ~subgroup_check:false
-          [(Z.one, consensus); (Z.succ dal_attestation, companion)]
+          [(Z.one, consensus); (weight, companion)]
       in
       match aggregate with
       | Some aggregate -> return (Tezos_crypto.Signature.of_bls aggregate)

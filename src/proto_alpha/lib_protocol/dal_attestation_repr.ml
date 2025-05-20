@@ -179,46 +179,72 @@ module Accountability = struct
 end
 
 module Dal_dependent_signing = struct
-  let weight t = Z.succ (to_z t)
+  module HashModule =
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "Dal attestation hash"
 
-  (* Computes [((to_z t) + 1) * companion + consensus].
+        let title = "Dal attestation hash"
 
-     The purpose of the [+ 1] is to guarantee that the result is
-     different from [consensus], even when [t] is {!empty} (because
-     dal is optional in attestations, and attestations without dal are
-     signed with just the consensus key).
+        let b58check_prefix = "\056\012\165" (* dba(53) *)
+
+        let size = Some 32
+      end)
+
+  (* Computes the hash of the public keys, the message [op] and the DAL attestation slot.
+     This hash is used as a weight for the companion key and companion signature
+     in the aggregated linear combinations, in [aggregate_pk] and [aggregate_sig]. *)
+  let weight ~consensus_pk ~companion_pk ~op t =
+    let consensus_bytes =
+      Bls.Public_key.hash consensus_pk |> Bls.Public_key_hash.to_bytes
+    in
+    let companion_bytes =
+      Bls.Public_key.hash companion_pk |> Bls.Public_key_hash.to_bytes
+    in
+    let bitset_bytes = Z.to_bits (to_z t) |> Bytes.of_string in
+    HashModule.(
+      hash_bytes [consensus_bytes; companion_bytes; op; bitset_bytes]
+      |> to_bytes)
+    |> Bytes.to_string |> Z.of_bits
+
+  (* Computes [(weight t) * companion_agg + consensus_agg].
 
      Produces the same result but is faster than calling
      [aggregate_weighted_opt
-       [((to_z t) + 1, companion); (Z.one, consensus)]]. *)
+       [(weight t, companion_agg); (Z.one, consensus_agg)]]. *)
   let aggregate ~subgroup_check ~aggregate_opt ~aggregate_weighted_opt
-      ~consensus ~companion t =
+      ~consensus_pk ~companion_pk ~consensus_agg ~companion_agg ~op t =
     let subgroup_check = Some subgroup_check in
-    let z = weight t in
+    let z = weight ~consensus_pk ~companion_pk ~op t in
     let weighted_companion_opt =
-      if Z.equal z Z.one then
-        (* Small optimization for the [t = empty] case. *)
-        Some companion
-      else aggregate_weighted_opt ?subgroup_check [(z, companion)]
+      aggregate_weighted_opt ?subgroup_check [(z, companion_agg)]
     in
     Option.bind weighted_companion_opt (fun weighted_companion ->
-        aggregate_opt ?subgroup_check [weighted_companion; consensus])
+        aggregate_opt ?subgroup_check [weighted_companion; consensus_agg])
 
-  let aggregate_pk ~subgroup_check ~consensus_pk ~companion_pk t =
+  let aggregate_pk ~subgroup_check ~consensus_pk ~companion_pk ~op t =
     aggregate
       ~subgroup_check
       ~aggregate_opt:Bls.aggregate_public_key_opt
       ~aggregate_weighted_opt:Bls.aggregate_public_key_weighted_opt
-      ~consensus:consensus_pk
-      ~companion:companion_pk
+      ~consensus_pk
+      ~companion_pk
+      ~consensus_agg:consensus_pk
+      ~companion_agg:companion_pk
+      ~op
       t
 
-  let aggregate_sig ~subgroup_check ~consensus_sig ~companion_sig t =
+  let aggregate_sig ~subgroup_check ~consensus_pk ~companion_pk ~consensus_sig
+      ~companion_sig ~op t =
     aggregate
       ~subgroup_check
       ~aggregate_opt:Bls.aggregate_signature_opt
       ~aggregate_weighted_opt:Bls.aggregate_signature_weighted_opt
-      ~consensus:consensus_sig
-      ~companion:companion_sig
+      ~consensus_pk
+      ~companion_pk
+      ~consensus_agg:consensus_sig
+      ~companion_agg:companion_sig
+      ~op
       t
 end
