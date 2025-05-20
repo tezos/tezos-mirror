@@ -72,6 +72,8 @@ type t = {
   peers : string list;
   expected_pow : float;
   endpoint : Uri.t;
+  http_backup_uris : Uri.t list;
+  trust_http_backup_uris : bool;
   metrics_addr : P2p_point.Id.t option;
   profile : Profile_manager.unresolved_profile;
   history_mode : history_mode;
@@ -132,6 +134,8 @@ let default =
     peers = default_peers;
     expected_pow = default_expected_pow;
     endpoint = default_endpoint;
+    http_backup_uris = [];
+    trust_http_backup_uris = false;
     metrics_addr = None;
     history_mode = default_history_mode;
     profile = Profile_manager.Empty;
@@ -151,7 +155,7 @@ let neighbor_encoding : neighbor Data_encoding.t =
     (fun (addr, port) -> {addr; port})
     (obj2 (req "rpc-addr" string) (req "rpc-port" uint16))
 
-let endpoint_encoding : Uri.t Data_encoding.t =
+let uri_encoding : Uri.t Data_encoding.t =
   let open Data_encoding in
   conv_with_guard
     (fun uri -> Uri.to_string uri)
@@ -159,7 +163,7 @@ let endpoint_encoding : Uri.t Data_encoding.t =
       try Uri.of_string str |> Result.ok
       with exn ->
         Format.asprintf
-          "endpoint decoding failed:@.%a@."
+          "uri decoding failed:@.%a@."
           Error_monad.pp_print_trace
           [Exn exn]
         |> Result.error)
@@ -179,6 +183,8 @@ let encoding : t Data_encoding.t =
            peers;
            expected_pow;
            endpoint;
+           http_backup_uris;
+           trust_http_backup_uris;
            metrics_addr;
            history_mode;
            profile;
@@ -197,6 +203,8 @@ let encoding : t Data_encoding.t =
           peers,
           expected_pow,
           endpoint,
+          http_backup_uris,
+          trust_http_backup_uris,
           metrics_addr ),
         ( history_mode,
           profile,
@@ -214,6 +222,8 @@ let encoding : t Data_encoding.t =
              peers,
              expected_pow,
              endpoint,
+             http_backup_uris,
+             trust_http_backup_uris,
              metrics_addr ),
            ( history_mode,
              profile,
@@ -232,6 +242,8 @@ let encoding : t Data_encoding.t =
         peers;
         expected_pow;
         endpoint;
+        http_backup_uris;
+        trust_http_backup_uris;
         metrics_addr;
         history_mode;
         profile;
@@ -244,7 +256,7 @@ let encoding : t Data_encoding.t =
         ignore_l1_config_peers;
       })
     (merge_objs
-       (obj8
+       (obj10
           (dft
              "data-dir"
              ~description:"Location of the data dir"
@@ -278,8 +290,20 @@ let encoding : t Data_encoding.t =
           (dft
              "endpoint"
              ~description:"The Tezos node endpoint"
-             endpoint_encoding
+             uri_encoding
              default_endpoint)
+          (dft
+             "http_backup_uris"
+             ~description:"Optional HTTP endpoints to fetch missing slots from."
+             (list uri_encoding)
+             [])
+          (dft
+             "trust_http_backup_uris"
+             ~description:
+               "Whether to trust the data downlaoded from the provided HTTP \
+                backup URIs."
+             bool
+             false)
           (dft
              "metrics-addr"
              ~description:"The point for the DAL node metrics server"
@@ -412,7 +436,7 @@ module V0 = struct
          (dft "peers" (list string) default_peers)
          (dft "expected-pow" float default_expected_pow)
          (dft "network-name" string legacy_network_name)
-         (dft "endpoint" endpoint_encoding default_endpoint)
+         (dft "endpoint" uri_encoding default_endpoint)
          (dft "metrics-addr" P2p_point.Id.encoding default_metrics_addr))
       (obj2
          (dft "history_mode" history_mode_encoding default_history_mode)
@@ -451,6 +475,8 @@ module V0 = struct
       fetch_trusted_setup = true;
       verbose = false;
       ignore_l1_config_peers = false;
+      http_backup_uris = [];
+      trust_http_backup_uris = false;
     }
 end
 
@@ -507,7 +533,7 @@ module V1 = struct
          (dft "peers" (list string) default_peers)
          (dft "expected-pow" float default_expected_pow)
          (dft "network-name" string legacy_network_name)
-         (dft "endpoint" endpoint_encoding default_endpoint)
+         (dft "endpoint" uri_encoding default_endpoint)
          (dft "metrics-addr" (Encoding.option P2p_point.Id.encoding) None))
       (obj8
          (dft "history_mode" history_mode_encoding default_history_mode)
@@ -565,6 +591,8 @@ module V1 = struct
       fetch_trusted_setup;
       verbose;
       ignore_l1_config_peers = false;
+      http_backup_uris = [];
+      trust_http_backup_uris = false;
     }
 end
 
