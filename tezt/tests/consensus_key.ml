@@ -38,6 +38,7 @@ let hooks =
   let replacements =
     ("edsig\\w{94}", "[SIGNATURE]")
     :: ("BLsig\\w{137}", "[BLS_SIGNATURE]")
+    :: ("BLpk\\w{72}", "[BLS_PUBLIC_KEY]")
     :: Tezos_regression.replacements
   in
   Tezos_regression.hooks_custom

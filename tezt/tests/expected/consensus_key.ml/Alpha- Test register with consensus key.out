@@ -117,7 +117,7 @@ This sequence of operations was run:
       "pendings":
         [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]",
             "pk":
-              "BLpk1x5uxfAqDWG8YstPwCAYZfEwGHr5YbKWdFUi1NZQiueTqy825JbJsmwCDDcTWQ6LKmLkRHfn" } ] },
+              "[BLS_PUBLIC_KEY]" } ] },
   "stakers": [], "delegators": [ "[PUBLIC_KEY_HASH]" ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
@@ -161,7 +161,7 @@ This sequence of operations was run:
     { "active":
         { "pkh": "[PUBLIC_KEY_HASH]",
           "pk":
-            "BLpk1x5uxfAqDWG8YstPwCAYZfEwGHr5YbKWdFUi1NZQiueTqy825JbJsmwCDDcTWQ6LKmLkRHfn" } },
+            "[BLS_PUBLIC_KEY]" } },
   "stakers":
     [ { "staker": "[PUBLIC_KEY_HASH]",
         "frozen_deposits": "500000000000" } ],
