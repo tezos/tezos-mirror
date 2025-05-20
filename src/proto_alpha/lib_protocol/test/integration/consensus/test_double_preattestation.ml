@@ -107,13 +107,6 @@ end = struct
             true
         | _ -> false)
 
-  let inconsistent_denunciation loc res =
-    Assert.proto_error ~loc res (function
-        | Validate_errors.Anonymous.Inconsistent_denunciation
-            {kind = Misbehaviour.Double_preattesting; _} ->
-            true
-        | _ -> false)
-
   let outdated_denunciation loc res =
     Assert.proto_error ~loc res (function
         | Validate_errors.Anonymous.Outdated_denunciation
@@ -308,7 +301,7 @@ end = struct
       ~nb_blocks_before_double:0
       ~nb_blocks_before_denunciation:2
       ~test_expected_ok:unexpected_success
-      ~test_expected_ko:inconsistent_denunciation
+      ~test_expected_ko:invalid_denunciation
       ~pick_attesters (* pick different attesters *)
       ~loc:__LOC__
       ()

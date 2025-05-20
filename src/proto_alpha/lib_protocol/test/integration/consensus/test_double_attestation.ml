@@ -654,8 +654,8 @@ let test_different_delegates () =
   double_attestation (B blk_b) e_a e_b |> fun operation ->
   let*! res = Block.bake ~operation blk_b in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Inconsistent_denunciation
-          {kind = Misbehaviour.Double_attesting; _} ->
+      | Validate_errors.Anonymous.Invalid_denunciation
+          Misbehaviour.Double_attesting ->
           true
       | _ -> false)
 
@@ -679,8 +679,8 @@ let test_wrong_delegate () =
   double_attestation (B blk_b) attestation_a attestation_b |> fun operation ->
   let*! res = Block.bake ~operation blk_b in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Inconsistent_denunciation
-          {kind = Misbehaviour.Double_attesting; _} ->
+      | Validate_errors.Anonymous.Invalid_denunciation
+          Misbehaviour.Double_attesting ->
           true
       | _ -> false)
 
