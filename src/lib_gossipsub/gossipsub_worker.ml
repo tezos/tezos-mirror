@@ -560,10 +560,6 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             | `Message message ->
                 Introspection.update_count_recv_iwants state.stats `Incr ;
                 let topic = Message_id.get_topic message_id in
-                (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5415
-
-                   Don't provide a topic when it can be inferred (e.g. from
-                   Message_id.t). This also applies for Message_with_header and IHave. *)
                 let message_with_header = {message; topic; message_id} in
                 let p2p_message = Message_with_header message_with_header in
                 emit_p2p_message state p2p_message (Seq.return peer)

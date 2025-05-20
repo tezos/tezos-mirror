@@ -1106,7 +1106,11 @@ module type WORKER = sig
   include WORKER_CONFIGURATION
 
   (** A message together with a header, that is, a topic and an id.
-     This corresponds to what the spec calls a "full message". *)
+      This corresponds to what the spec calls a "full message".
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/5415
+      The topic can be inferred from the message_id and can thus be omitted;
+      this also applies for the IHave message. *)
   type message_with_header = {
     message : GS.Message.t;
     topic : GS.Topic.t;
