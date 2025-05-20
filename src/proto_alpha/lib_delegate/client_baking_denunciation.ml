@@ -157,13 +157,6 @@ let get_payload_hash (type kind)
   | Attestation, Single (Attestation {consensus_content; _}) ->
       consensus_content.block_payload_hash
 
-let get_slot (type kind) (op_kind : kind denunciable_consensus_operation)
-    (op : kind Operation.t) =
-  match (op_kind, op.protocol_data.contents) with
-  | Preattestation, Single (Preattestation consensus_content)
-  | Attestation, Single (Attestation {consensus_content; _}) ->
-      consensus_content.slot
-
 let double_consensus_op_evidence (type kind) :
     kind denunciable_consensus_operation ->
     #Protocol_client_context.full ->
@@ -241,11 +234,6 @@ let events_of_kind (type kind) (op_kind : kind denunciable_consensus_operation)
           double_preattestation_denounced,
           preattestation_conflict_ignored )
 
-let should_different_slots_be_denunced (type kind) state =
-  (* consensus operations with different slots are not denunced under
-     aggregate_attestation feature flag *)
-  not state.constants.parametric.aggregate_attestation
-
 let process_consensus_op (type kind) state cctxt
     (op_kind : kind denunciable_consensus_operation) (new_op : kind Operation.t)
     chain_id level round slot =
@@ -298,15 +286,12 @@ let process_consensus_op (type kind) state cctxt
             in
             let existing_payload_hash = get_payload_hash op_kind existing_op in
             let new_payload_hash = get_payload_hash op_kind new_op in
-            let existing_slot = get_slot op_kind existing_op in
             if
               Block_payload_hash.(existing_payload_hash <> new_payload_hash)
-              || Slot.(existing_slot <> slot)
-                 && should_different_slots_be_denunced state
               || Block_hash.(existing_op.shell.branch <> new_op.shell.branch)
             then (
               (* Same level, round, and delegate, and:
-                 different payload hash OR different slot OR different branch *)
+                 different payload hash different branch *)
               let op1, op2 =
                 if Operation_hash.(new_op_hash < existing_op_hash) then
                   (new_op, existing_op)
