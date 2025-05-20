@@ -78,6 +78,9 @@ This kernel has been activated on Etherlink Testnet on block
 [17,443,389][6046-activation-testnet], and on Etherlink Mainnet on block
 [7,056,139][6046-activation-mainnet].
 
+[6046-activation-testnet]: https://testnet.explorer.etherlink.com/block/0xe1df4a09691c11dc795dc230e5a3929932527f6f66e937bd97a25d709f3c4a01?tab=index
+[6046-activation-mainnet]: https://explorer.etherlink.com/block/0xc7788ef7ccf24ad003757a73b6f8903c15d0d514bf9738011c6b3b583aad733f
+
 Its storage version is 26.
 
 ### Features
