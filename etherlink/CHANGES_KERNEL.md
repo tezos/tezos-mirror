@@ -4,6 +4,26 @@
 
 ### Features
 
+- The EVM now supports optional access lists.
+  See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930). (!17766)
+
+### Bug fixes
+
+### Internal
+
+## Dionysus (1f47de0)
+
+This kernel has been activated on Etherlink Testnet on block
+[19,307,965][1f47-activation-testnet], and on Etherlink Mainnet on block
+[15,262,162][1f47-activation-mainnet].
+
+[1f47-activation-testnet]: https://testnet.explorer.etherlink.com/block/0x905031212562def1cecd79e6472bf3b6588b9ea75563d0c8fc34c9c8b61871f0
+[1f47-activation-mainnet]: https://explorer.etherlink.com/block/0x0f3872315951a148220bd3fe63ec9012c59ddcca49dfcdc40ec3ffbfec93ea63
+
+Its storage version is 33.
+
+### Features
+
 - The EVM's configuration has been bumped to Cancun. (!16141)
   The following EIPs are now supported by Etherlink:
   * [EIP-1153](https://eips.ethereum.org/EIPS/eip-1153)
