@@ -228,12 +228,9 @@ module Raw_consensus = struct
         t
     | None -> {t with preattestations_quorum_round = Some round}
 
-  let initialize_with_attestations_and_preattestations ~allowed_attestations
-      ~allowed_preattestations t =
-    {t with allowed_attestations; allowed_preattestations}
-
-  let initialize_with_allowed_consensus ~allowed_consensus t =
-    {t with allowed_consensus}
+  let set_allowed_operations ~allowed_attestations ~allowed_preattestations
+      ~allowed_consensus t =
+    {t with allowed_attestations; allowed_preattestations; allowed_consensus}
 
   let locked_round_evidence t = t.locked_round_evidence
 
@@ -2047,10 +2044,8 @@ module type CONSENSUS = sig
     t ->
     allowed_attestations:(consensus_pk * int * int) slot_map option ->
     allowed_preattestations:(consensus_pk * int * int) slot_map option ->
+    allowed_consensus:(consensus_pk * int * int) slot_map level_map option ->
     t
-
-  val initialize_allowed_consensus :
-    t -> (consensus_pk * int * int) slot_map level_map option -> t
 
   val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
 
@@ -2115,17 +2110,13 @@ module Consensus :
     Raw_consensus.locked_round_evidence ctxt.back.consensus
 
   let[@inline] initialize_consensus_operation ctxt ~allowed_attestations
-      ~allowed_preattestations =
+      ~allowed_preattestations ~allowed_consensus =
     update_consensus_with
       ctxt
-      (Raw_consensus.initialize_with_attestations_and_preattestations
+      (Raw_consensus.set_allowed_operations
          ~allowed_attestations
-         ~allowed_preattestations)
-
-  let[@inline] initialize_allowed_consensus ctxt allowed_consensus =
-    update_consensus_with
-      ctxt
-      (Raw_consensus.initialize_with_allowed_consensus ~allowed_consensus)
+         ~allowed_preattestations
+         ~allowed_consensus)
 
   let[@inline] record_preattestation ctxt ~initial_slot ~power round =
     update_consensus_with_tzresult

@@ -146,6 +146,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
       ctxt
       ~allowed_attestations:(Some attestations_map)
       ~allowed_preattestations
+      ~allowed_consensus:None
   in
   return ctxt
 
@@ -179,13 +180,13 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
       allowed_levels
   in
   let ctxt =
+    (* Store the resulting map in the context as [allowed_consensus]. *)
     Consensus.initialize_consensus_operation
       ctxt
       ~allowed_attestations:None
       ~allowed_preattestations:None
+      ~allowed_consensus:(Some minimal_slots)
   in
-  (* Store the resulting map in the context as [allowed_consensus]. *)
-  let ctxt = Consensus.initialize_allowed_consensus ctxt (Some minimal_slots) in
   return ctxt
 
 let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
