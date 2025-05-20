@@ -513,7 +513,6 @@ type configuration = {
   bootstrap_node_identity_file : string option;
   bootstrap_dal_node_identity_file : string option;
   external_rpc : bool;
-  dal_incentives : bool;
   disable_shard_validation : bool;
 }
 
@@ -2477,19 +2476,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         (producer_accounts @ etherlink_rollup_operator_key
        @ etherlink_batching_operator_keys)
     in
-    let overrides =
-      if configuration.dal_incentives then
-        [
-          (["dal_parametric"; "incentives_enable"], `Bool true);
-          (["dal_parametric"; "rewards_ratio"; "numerator"], `String "1");
-          (["dal_parametric"; "rewards_ratio"; "denominator"], `String "10");
-          (* This one is derived from the two constants above. *)
-          (["issuance_weights"; "dal_rewards_weight"], `Int 5120);
-          (* This parameter should be lower than blocks_per_cycle *)
-          (["nonce_revelation_threshold"], `Int 4);
-        ]
-      else []
-    in
+    let overrides = [] in
     Protocol.write_parameter_file
       ~bootstrap_accounts
       ~additional_bootstrap_accounts
@@ -3762,7 +3749,6 @@ let register (module Cli : Scenarios_cli.Dal) =
     let with_dal = Cli.with_dal in
     let bakers = Cli.bakers in
     let external_rpc = Cli.node_external_rpc_server in
-    let dal_incentives = Cli.dal_incentives in
     let disable_shard_validation = Cli.disable_shard_validation in
     let t =
       {
@@ -3789,7 +3775,6 @@ let register (module Cli : Scenarios_cli.Dal) =
         bootstrap_node_identity_file;
         bootstrap_dal_node_identity_file;
         external_rpc;
-        dal_incentives;
         disable_shard_validation;
       }
     in

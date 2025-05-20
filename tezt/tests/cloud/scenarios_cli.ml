@@ -84,8 +84,6 @@ module type Dal = sig
 
   val with_dal : bool
 
-  val dal_incentives : bool
-
   val proxy_localhost : bool
 
   val disable_shard_validation : bool
@@ -401,15 +399,6 @@ module Dal () : Dal = struct
          (default is 'false'). DAL nodes can be activated via other options \
          such as [--producers]."
       true
-
-  let dal_incentives =
-    Clap.flag
-      ~section
-      ~set_long:"dal-incentives"
-      ~unset_long:"no-dal-incentives"
-      ~description:"Activate the DAL incentives"
-      (* Activate by default DAL incentives on Alpha. *)
-      (protocol = Protocol.Alpha)
 
   let proxy_localhost =
     Clap.flag
