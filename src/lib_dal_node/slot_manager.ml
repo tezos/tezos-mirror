@@ -171,10 +171,76 @@ let get_slot_content_from_shards cryptobox store slot_id =
   in
   return slot
 
-let try_fetch_slot_from_http_backup ~slot_size:_ ~published_level:_
-    ~slot_index:_ _cryptobox _expected_commitment_hash _http_backup_uri =
-  (* TODO in next commits *)
+let fetch_slot_from_http_uri ~slot_size:_ ~published_level:_ ~slot_index:_
+    _http_backup_uri =
+  (* TODO in the next commit(s) *)
   assert false
+
+let try_fetch_slot_from_http_backup ~slot_size ~published_level ~slot_index
+    cryptobox expected_commitment_hash http_backup_uri =
+  let open Lwt_result_syntax in
+  let fetch_and_sanitize_slot_content () =
+    let open Lwt_syntax in
+    (* /!\ Warning: We are fetching the slot content as stored by another DAL
+       node on disk into its store/slot_store/ directory. Currently the
+       home-made KVS we use appends extra bytes at the beginning of each
+       "file" to chech if values are present. We should takes them into
+       account to:
+       - compute the expected size of the data
+       - fetch the exact slot content, without encoding artifacts when written
+         to disk. *)
+    let* slot_opt =
+      fetch_slot_from_http_uri
+        ~slot_size
+        ~published_level
+        ~slot_index
+        http_backup_uri
+    in
+    match slot_opt with
+    | None -> return_none
+    | Some slot_bytes ->
+        let expected_size =
+          slot_size + Key_value_store.file_prefix_bitset_size
+        in
+        let obtained_size = Bytes.length slot_bytes in
+        if expected_size != obtained_size then
+          let* () =
+            Event.emit_slot_from_http_backup_has_unexpected_size
+              ~published_level
+              ~slot_index
+              ~http_backup_uri
+              ~expected_size
+              ~obtained_size
+          in
+          return_none
+        else
+          return_some
+          @@ Bytes.sub
+               slot_bytes
+               Key_value_store.file_prefix_bitset_size
+               slot_size
+  in
+  let*! slot_opt = fetch_and_sanitize_slot_content () in
+  match (slot_opt, expected_commitment_hash) with
+  | None, _ -> return_none
+  | Some slot, None ->
+      (* We trust the http server, no extra checks to do. *)
+      return_some slot
+  | Some slot, Some expected_commitment ->
+      let*? polynomial = polynomial_from_slot cryptobox slot in
+      let*? obtained_commitment = commit cryptobox polynomial in
+      if Cryptobox.Commitment.equal expected_commitment obtained_commitment then
+        return_some slot
+      else
+        let*! () =
+          Event.emit_slot_from_http_backup_has_unexpected_commitment
+            ~published_level
+            ~slot_index
+            ~http_backup_uri
+            ~expected_commitment
+            ~obtained_commitment
+        in
+        return_none
 
 let get_commitment_from_slot_id _ctxt _slot_id =
   (* TODO in follow-up MRs *)
