@@ -35,7 +35,7 @@ val launch_task_and_wait :
   ('a -> 'b) ->
   ?on_completion:('b -> unit) ->
   'a ->
-  ('b, 'c message_error) result Lwt.t
+  ('b, 'c message_error) result Eio.Promise.t
 
 (** [launch_tasks_and_wait worker name func ?on_completion args] runs
     {!val-launch_task_and_wait} for each each [arg] in [args], in parallel. *)
@@ -45,7 +45,7 @@ val launch_tasks_and_wait :
   ('a -> 'b) ->
   ?on_completion:('b -> unit) ->
   'a list ->
-  ('b, 'c message_error) result list Lwt.t
+  ('b, 'c message_error) result list
 
 (** [launch_task worker name func ?on_completion arg] create a request named
     [name] and executing [func args], and push it to [worker] queue, true if the
@@ -59,3 +59,7 @@ val launch_task :
   ?on_completion:('b -> unit) ->
   'a ->
   bool
+
+(** [shutdown worker] waits for all requests to be completed 
+    then closes the worker. *)
+val shutdown : task_worker -> unit

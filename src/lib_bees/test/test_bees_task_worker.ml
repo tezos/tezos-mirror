@@ -32,7 +32,7 @@ let tests_fibonacci =
           let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2) in
           let input = Stdlib.List.init 5 (fun i -> i + 10) in
           let expected = List.map fib input in
-          let* output =
+          let output =
             Tezos_bees.Task_worker.launch_tasks_and_wait worker "fib" fib input
           in
           let output = List.filter_map Result.to_option output in
@@ -70,8 +70,8 @@ let tests_reuse =
             succ
             str_input
         in
-        let* int_output in
-        let* str_output in
+        let int_output = Eio.Promise.await int_output in
+        let str_output = Eio.Promise.await str_output in
         Assert.equal (Ok int_expected) int_output ;
         Assert.equal (Ok str_expected) str_output ;
         Lwt.return_ok ()
@@ -86,13 +86,14 @@ let tests_on_completion_callback =
     | Ok worker ->
         let r = ref 0 in
         let noop () = () in
-        let* _ =
+        let _ =
           Tezos_bees.Task_worker.launch_task_and_wait worker "callback" noop ()
+          |> Eio.Promise.await
         in
         Assert.equal !r 0 ;
         let on_completion () = incr r in
         let tasks = 2 in
-        let* _ =
+        let _ =
           Tezos_bees.Task_worker.launch_tasks_and_wait
             ~on_completion
             worker
