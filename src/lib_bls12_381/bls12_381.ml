@@ -122,7 +122,7 @@ module type CURVE = sig
   (** Return the addition of two element *)
   val add : t -> t -> t
 
-  val add_inplace : t -> t -> unit
+  val add_inplace : t -> t -> t -> unit
 
   val add_bulk : t list -> t
 
@@ -142,7 +142,7 @@ module type CURVE = sig
   (** Multiply an element by a scalar *)
   val mul : t -> Scalar.t -> t
 
-  val mul_inplace : t -> Scalar.t -> unit
+  val mul_inplace : t -> t -> Scalar.t -> unit
 
   val hash_to_curve : Bytes.t -> Bytes.t -> t
 
