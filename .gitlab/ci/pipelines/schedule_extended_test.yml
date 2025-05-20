@@ -3167,10 +3167,11 @@ tezt:
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
     --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak
-    'dd_tags[memory.peak]' --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
+    ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
+    5_000_000_000
   - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
@@ -3229,10 +3230,11 @@ tezt-time-sensitive:
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
     --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak
-    'dd_tags[memory.peak]' --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
+    ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
+    5_000_000_000
   - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
@@ -3349,10 +3351,11 @@ tezt-extra:
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
     --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak
-    'dd_tags[memory.peak]' --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
+    ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
+    5_000_000_000
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -extra
@@ -3408,10 +3411,11 @@ tezt-flaky:
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
     --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak
-    'dd_tags[memory.peak]' --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
+    ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
+    5_000_000_000
   - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
@@ -3465,10 +3469,11 @@ tezt:static-binaries:
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
     --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak
-    'dd_tags[memory.peak]' --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
+    ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
+    5_000_000_000
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: ""
