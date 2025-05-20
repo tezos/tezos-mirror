@@ -66,6 +66,14 @@ module Events = struct
       ~pp2:pp_int
       ("preattestations", Data_encoding.int31)
 
+  let non_relevant_operation_received =
+    declare_0
+      ~section
+      ~name:"non_relevant_operation_received"
+      ~level:Debug
+      ~msg:"received a non relevant operation"
+      ()
+
   let preattestations_received =
     declare_4
       ~section
@@ -533,13 +541,16 @@ let update_monitoring ?(should_lock = true) state ops =
                 (current_ratio, pqc_watched.preattestations_count)))
           else return_unit
         in
-        Events.(
-          emit
-            preattestations_received
-            ( additional_preattestations_count,
-              additional_voting_power,
-              pqc_watched.current_voting_power,
-              pqc_watched.preattestations_count ))
+        if additional_preattestations_count = 0 then
+          Events.(emit non_relevant_operation_received ())
+        else
+          Events.(
+            emit
+              preattestations_received
+              ( additional_preattestations_count,
+                additional_voting_power,
+                pqc_watched.current_voting_power,
+                pqc_watched.preattestations_count ))
   | Some (Qc_watch qc_watched) ->
       let additional_voting_power, additional_attestations_count =
         update_qc_monitoring ~qc_watched ops
@@ -576,13 +587,16 @@ let update_monitoring ?(should_lock = true) state ops =
               emit qc_progression (current_ratio, qc_watched.attestations_count)))
           else return_unit
         in
-        Events.(
-          emit
-            attestations_received
-            ( additional_attestations_count,
-              additional_voting_power,
-              qc_watched.current_voting_power,
-              qc_watched.attestations_count ))
+        if additional_attestations_count = 0 then
+          Events.(emit non_relevant_operation_received ())
+        else
+          Events.(
+            emit
+              attestations_received
+              ( additional_attestations_count,
+                additional_voting_power,
+                qc_watched.current_voting_power,
+                qc_watched.attestations_count ))
 
 let monitor_quorum state new_proposal_watched =
   Lwt_mutex.with_lock state.lock @@ fun () ->
