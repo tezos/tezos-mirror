@@ -69,26 +69,6 @@ let jobs =
       ~dependencies
       ()
   in
-  let tezt_memory_3k : tezos_job =
-    Tezt.job
-      ~__POS__
-      ~name:"tezt-memory-3k"
-      ~tezt_tests:(Tezt.tests_tag_selector ~memory_3k:true [])
-      ~tezt_variant:"-memory_3k"
-      ~parallel:(Vector 12)
-      ~dependencies
-      ()
-  in
-  let tezt_memory_4k : tezos_job =
-    Tezt.job
-      ~__POS__
-      ~name:"tezt-memory-4k"
-      ~tezt_tests:(Tezt.tests_tag_selector ~memory_4k:true [])
-      ~tezt_variant:"-memory_4k"
-      ~parallel:(Vector 4)
-      ~dependencies
-      ()
-  in
   let tezt_time_sensitive : tezos_job =
     (* the following tests are executed with [~tezt_parallel:1] to ensure
        that other tests do not affect their executions. However, these
@@ -153,8 +133,6 @@ let jobs =
   in
   [
     tezt;
-    tezt_memory_3k;
-    tezt_memory_4k;
     tezt_time_sensitive;
     tezt_slow;
     tezt_flaky;

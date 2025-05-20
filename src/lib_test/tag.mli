@@ -34,9 +34,8 @@
 (** ["flaky"]: the test is flaky.
 
     The semantics depends on other tags:
-    - if the test also has tag {!memory_3k}, {!memory_4k} or {!time_sensitive},
-      the test still runs in job [tezt-memory-3k], [tezt-memory-4k]
-      or [tezt-time-sensitive] respectively;
+    - if the test also has tag {!time_sensitive},
+      the test still runs in job [tezt-time-sensitive];
     - if the test also has tag {!slow}, the test still runs in job [tezt-slow]
       but this job is manual, so it does not run by default, except in
       scheduled pipelines;
