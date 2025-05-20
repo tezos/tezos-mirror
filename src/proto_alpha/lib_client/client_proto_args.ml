@@ -1092,3 +1092,24 @@ let fee_parameter_args =
           force_low_fee_arg
           fee_cap_arg
           burn_cap_arg))
+
+let bls_key_pop_arg ~long =
+  let open Lwt_result_syntax in
+  Tezos_clic.arg
+    ~long
+    ~placeholder:"proof-of-possession"
+    ~doc:
+      "Proof of possession (PoP) for a BLS key (tz4 address), encoded in \
+       Base58. This is a BLS signature over the public key, proving control of \
+       the corresponding private key. If no proof is provided, the client can \
+       generate one, assuming the associated private key is available in your \
+       wallet."
+    (Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
+         match Signature.of_b58check_opt s with
+         | Some (Bls s) -> return s
+         | Some _ | None ->
+             cctxt#error "The provided proof is not a BLS signature"))
+
+let consensus_key_pop_arg = bls_key_pop_arg ~long:"consensus-key-pop"
+
+let companion_key_pop_arg = bls_key_pop_arg ~long:"companion-key-pop"

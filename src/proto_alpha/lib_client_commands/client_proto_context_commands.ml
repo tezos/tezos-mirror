@@ -2325,13 +2325,18 @@ let commands_rw () =
     command
       ~group
       ~desc:"Register the public key hash as a delegate with a consensus key."
-      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (args5
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         fee_parameter_args
+         consensus_key_pop_arg)
       (prefixes ["register"; "key"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["as"; "delegate"; "with"; "consensus"; "key"]
       @@ Public_key.source_param ~name:"key" ~desc:"the consensus key"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter)
+      (fun (fee, dry_run, verbose_signing, fee_parameter, _consensus_key_pop)
            src_pkh
            (name_pk, public_key)
            cctxt ->
@@ -2380,13 +2385,18 @@ let commands_rw () =
     command
       ~group
       ~desc:"Register the public key hash as a delegate with a companion key."
-      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (args5
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         fee_parameter_args
+         companion_key_pop_arg)
       (prefixes ["register"; "key"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["as"; "delegate"; "with"; "companion"; "key"]
       @@ Public_key.source_param ~name:"key" ~desc:"the companion key"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter)
+      (fun (fee, dry_run, verbose_signing, fee_parameter, _companion_key_pop)
            src_pkh
            (name_pk, public_key)
            cctxt ->
@@ -2437,7 +2447,13 @@ let commands_rw () =
       ~desc:
         "Register the public key hash as a delegate with a consensus and a \
          companion key."
-      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (args6
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         fee_parameter_args
+         consensus_key_pop_arg
+         companion_key_pop_arg)
       (prefixes ["register"; "key"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["as"; "delegate"; "with"; "consensus"; "key"]
@@ -2445,7 +2461,12 @@ let commands_rw () =
       @@ prefixes ["and"; "companion"; "key"]
       @@ Public_key.source_param ~name:"key" ~desc:"the companion key"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             fee_parameter,
+             _consensus_key_pop,
+             _companion_key_pop )
            src_pkh
            (name_pk_consensus, public_key_consensus)
            (name_pk_companion, public_key_companion)
@@ -2512,13 +2533,18 @@ let commands_rw () =
     command
       ~group
       ~desc:"Update the consensus key of a delegate."
-      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (args5
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         fee_parameter_args
+         consensus_key_pop_arg)
       (prefixes ["set"; "consensus"; "key"; "for"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["to"]
       @@ Public_key.source_param ~name:"key" ~desc:"the consensus key"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter)
+      (fun (fee, dry_run, verbose_signing, fee_parameter, _consensus_key_pop)
            delegate_pkh
            (name_pk, public_key)
            cctxt ->
@@ -2558,13 +2584,18 @@ let commands_rw () =
     command
       ~group
       ~desc:"Update the companion key of a delegate."
-      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (args5
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         fee_parameter_args
+         companion_key_pop_arg)
       (prefixes ["set"; "companion"; "key"; "for"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["to"]
       @@ Public_key.source_param ~name:"key" ~desc:"the companion key"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter)
+      (fun (fee, dry_run, verbose_signing, fee_parameter, _companion_key_pop)
            delegate_pkh
            (name_pk, public_key)
            cctxt ->

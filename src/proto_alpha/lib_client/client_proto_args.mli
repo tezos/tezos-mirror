@@ -301,3 +301,9 @@ module Dal : sig
 end
 
 val fee_parameter_args : (Injection.fee_parameter, full) Tezos_clic.arg
+
+val consensus_key_pop_arg :
+  (Bls12_381_signature.MinPk.signature option, full) Tezos_clic.arg
+
+val companion_key_pop_arg :
+  (Bls12_381_signature.MinPk.signature option, full) Tezos_clic.arg
