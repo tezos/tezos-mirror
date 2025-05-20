@@ -318,7 +318,55 @@ let test_update_companion_key_for_tz4_delegate =
   in
   unit
 
+let test_update_companion_key_with_external_pop =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"update companion key with external pop"
+    ~tags:[team; "companion_key"; "pop"]
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* node, client = init_node_and_client ~protocol in
+  let delegate = Constant.bootstrap1 in
+  (* gen keys companion_key -s bls *)
+  (* set companion key for delegate to companion_key *)
+  Log.info
+    "Init second client, generate a BLS companion key and its proof of \
+     possession" ;
+  let* client2 = Client.init ~endpoint:(Node node) () in
+  let* companion_key_bls =
+    Client.gen_and_show_keys ~alias:"companion_key" ~sig_alg:"bls" client2
+  in
+  let* companion_key_pop =
+    Client.create_bls_proof ~signer:companion_key_bls.alias client2
+  in
+
+  Log.info "Import the key on the first client" ;
+  let* () =
+    Client.import_public_key ~alias:"companion_key" client
+    @@ Unencrypted companion_key_bls.public_key
+  in
+  Log.info "Updating companion key without secret key nor proof possession" ;
+  let* () =
+    Client.update_companion_key
+      ~hooks
+      ~src:delegate.alias
+      ~pk:companion_key_bls.alias
+      ~expect_failure:true
+      client
+  in
+  Log.info "Updating companion key with BLS proof of possession" ;
+  let* () =
+    Client.update_companion_key
+      ~hooks
+      ~src:delegate.alias
+      ~pk:companion_key_bls.alias
+      ~companion_key_pop
+      client
+  in
+  unit
+
 let register ~protocols =
   test_update_companion_key protocols ;
   test_update_companion_key_for_non_tz4_delegate protocols ;
-  test_update_companion_key_for_tz4_delegate protocols
+  test_update_companion_key_for_tz4_delegate protocols ;
+  test_update_companion_key_with_external_pop protocols

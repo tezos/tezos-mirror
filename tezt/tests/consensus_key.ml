@@ -879,8 +879,58 @@ let test_drain_delegate_1 ?(baker = Constant.bootstrap1.alias)
   in
   unit
 
+let test_update_consensus_key_with_external_pop =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"update consensus key with external pop"
+    ~tags:[team; "consensus_key"; "pop"]
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol ~protocol `Client () in
+  let delegate = Constant.bootstrap1 in
+  (* gen keys consensus_key -s bls *)
+  (* set consensus key for delegate to consensus_key *)
+  Log.info
+    "Init second client, generate a BLS consensus key and its proof of \
+     possession" ;
+  let* client2 = Client.init ~endpoint:(Node node) () in
+  let* consensus_key_bls =
+    Client.gen_and_show_keys ~alias:"consensus_key" ~sig_alg:"bls" client2
+  in
+  let* consensus_key_pop =
+    Client.create_bls_proof ~signer:consensus_key_bls.alias client2
+  in
+
+  Log.info "Import the key on the first client" ;
+  let* () =
+    Client.import_public_key ~alias:"consensus_key" client
+    @@ Unencrypted consensus_key_bls.public_key
+  in
+  Log.info "Updating consensus key without secret key nor proof of possession" ;
+  let* () =
+    Client.update_consensus_key
+      ~hooks
+      ~src:delegate.alias
+      ~pk:consensus_key_bls.alias
+      ~expect_failure:true
+      client
+  in
+  Log.info "Updating consensus key with BLS proof of possession" ;
+  let* () =
+    Client.update_consensus_key
+      ~hooks
+      ~src:delegate.alias
+      ~pk:consensus_key_bls.alias
+      ~consensus_key_pop
+      client
+  in
+  unit
+
 let register ~protocols =
-  let () = test_update_consensus_key protocols in
+  let () =
+    test_update_consensus_key protocols ;
+    test_update_consensus_key_with_external_pop protocols
+  in
   let () =
     register
       "Test set consensus key - baker is not delegate"
