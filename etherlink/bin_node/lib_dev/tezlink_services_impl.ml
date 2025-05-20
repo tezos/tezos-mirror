@@ -101,35 +101,19 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
 
   let balance chain block c =
     let `Main = chain in
-
-    Durable_storage.inspect_durable_and_decode_default
-      ~default:Tezos_types.Tez.zero
-      (read ~block)
-      (Path.balance c)
-      (Data_encoding.Binary.of_bytes_exn Tez.encoding)
+    Tezlink_durable_storage.balance (read ~block) c
 
   let manager_key chain block c =
     (* TODO: #7831 !17664
        Support non-default chain and block parameters. *)
     let `Main = chain in
-
-    Durable_storage.inspect_durable_and_decode_opt
-      (read ~block)
-      (Path.manager_key c)
-      (Data_encoding.Binary.of_bytes_exn Signature.V1.Public_key.encoding)
+    Tezlink_durable_storage.manager_key (read ~block) c
 
   let counter chain block c =
     (* TODO: #7831 !17664
        Support non-default chain and block parameters. *)
     let `Main = chain in
-
-    Durable_storage.inspect_durable_and_decode_default
-    (* FIXME: #7960
-       This default should be the global counter *)
-      ~default:Z.one
-      (read ~block)
-      (Path.counter c)
-      (Data_encoding.Binary.of_bytes_exn Data_encoding.z)
+    Tezlink_durable_storage.counter (read ~block) c
 
   let header chain block =
     let open Lwt_result_syntax in
