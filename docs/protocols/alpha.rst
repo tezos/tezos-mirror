@@ -58,6 +58,10 @@ Gas improvements
 Breaking Changes
 ----------------
 
+- Unrevealed tz4 addresses. Starting in this protocol, tz4 addresses need a proof of possession
+  provided at revelation. This forces existing tz4 addresses to provide such a proof. This does
+  not change anything about the revelation of new addresses, or non-tz4 addresses. (MR :gl:`!18078`)
+
 RPC Changes
 -----------
 
