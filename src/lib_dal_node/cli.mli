@@ -97,6 +97,8 @@ module Term : sig
   val disable_amplification_switch : switch
 
   val verbose_switch : switch
+
+  val ignore_topics_arg : Signature.public_key_hash arg_list
 end
 
 (** {2 Command-line options} *)
@@ -147,6 +149,8 @@ type options = {
       (** Ignore the boot(strap) peers provided by L1. *)
   disable_amplification : bool;
       (** Disable amplification. Default value is false. *)
+  ignore_topics : Signature.public_key_hash list;
+      (** Do not distribute shards of these pkhs. *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type
@@ -164,7 +168,7 @@ val cli_options_to_options :
   Uri.t list ->
   bool ->
   P2p_point.Id.t option ->
-  Signature.public_key_hash trace ->
+  Signature.public_key_hash list ->
   int trace ->
   int trace option ->
   bool ->
@@ -177,6 +181,7 @@ val cli_options_to_options :
   bool ->
   bool ->
   bool ->
+  Signature.public_key_hash list ->
   (options, bool * string) result
 
 val run : ?disable_logging:bool -> t -> options -> unit tzresult Lwt.t

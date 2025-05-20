@@ -231,8 +231,8 @@ let update_and_register_profiles ctxt =
   let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
   return_unit
 
-let run ?(disable_logging = false) ?(disable_shard_validation = false) ~data_dir
-    ~configuration_override () =
+let run ?(disable_logging = false) ?(disable_shard_validation = false)
+    ~ignore_pkhs ~data_dir ~configuration_override () =
   let open Lwt_result_syntax in
   let*! () =
     if disable_logging then Lwt.return_unit
@@ -443,6 +443,12 @@ let run ?(disable_logging = false) ?(disable_shard_validation = false) ~data_dir
     if disable_shard_validation then Event.emit_shard_validation_is_disabled ()
     else Lwt.return_unit
   in
+  let*! () =
+    if not @@ List.is_empty ignore_pkhs then
+      Event.emit_ignoring_pkhs ~pkhs:ignore_pkhs
+    else Lwt.return_unit
+  in
+  let ignore_pkhs = Signature.Public_key_hash.Set.of_list ignore_pkhs in
   let ctxt =
     Node_context.init
       config
@@ -457,6 +463,7 @@ let run ?(disable_logging = false) ?(disable_shard_validation = false) ~data_dir
       ~last_finalized_level:head_level
       ~network_name
       ~disable_shard_validation
+      ~ignore_pkhs
       ()
   in
   let* () =
