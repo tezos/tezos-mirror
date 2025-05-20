@@ -837,10 +837,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
   in
   let tags =
     (if threshold_encryption then ["threshold_encryption"] else [])
-    (* DAL tests require additional memory because an extra daemon
-       (the DAL node) runs and it loads the full DAL SRS which takes
-       non-negligible memory. *)
-    @ (if enable_dal then ["dal"; Tag.memory_3k] else [])
+    @ (if enable_dal then ["dal"] else [])
     @ (if enable_multichain then ["multichain_enabled"] else [])
     @ tags
   in

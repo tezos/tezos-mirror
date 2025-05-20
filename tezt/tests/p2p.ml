@@ -209,15 +209,7 @@ module Maintenance = struct
     Test.register
       ~__FILE__
       ~title:"p2p-maintenance-disabled"
-      ~tags:
-        [
-          team;
-          "p2p";
-          "node";
-          "maintenance";
-          (* Uses about 1.7GB of memory. *)
-          Tag.memory_3k;
-        ]
+      ~tags:[team; "p2p"; "node"; "maintenance"]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
@@ -333,15 +325,7 @@ module Maintenance = struct
     Test.register
       ~__FILE__
       ~title:"p2p-maintenance-init-expected_connections"
-      ~tags:
-        [
-          team;
-          "p2p";
-          "node";
-          "maintenance";
-          (* Uses about 4.8GB of memory. *)
-          Tag.memory_4k;
-        ]
+      ~tags:[team; "p2p"; "node"; "maintenance"]
     @@ fun () ->
     (* Connections values evaluated from --connections option. *)
     let min_connections = expected_connections / 2 in
@@ -607,15 +591,7 @@ module Swap = struct
     Test.register
       ~__FILE__
       ~title:"p2p-swap-disable"
-      ~tags:
-        [
-          team;
-          "p2p";
-          "node";
-          "swap";
-          (* Uses about 3.4GB of memory. *)
-          Tag.memory_4k;
-        ]
+      ~tags:[team; "p2p"; "node"; "swap"]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
@@ -1297,7 +1273,7 @@ module P2p_stat = struct
     Test.register
       ~__FILE__
       ~title:"Test [octez-admin-client p2p stat]"
-      ~tags:[team; "p2p"; "connections"; "p2p_stat"; Tag.memory_3k]
+      ~tags:[team; "p2p"; "connections"; "p2p_stat"]
     @@ fun () ->
     let num_nodes = 5 in
     Log.info "Start a clique of %d nodes" num_nodes ;
@@ -1424,15 +1400,7 @@ module Peer_discovery = struct
     Test.register
       ~__FILE__
       ~title:"p2p-peer-discovery"
-      ~tags:
-        [
-          team;
-          "p2p";
-          "node";
-          "peer_discovery";
-          (* Uses about 1.7GB of memory. *)
-          Tag.memory_3k;
-        ]
+      ~tags:[team; "p2p"; "node"; "peer_discovery"]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
@@ -1449,15 +1417,7 @@ module Peer_discovery = struct
     Test.register
       ~__FILE__
       ~title:"p2p-peer-discovery-disable"
-      ~tags:
-        [
-          team;
-          "p2p";
-          "node";
-          "peer_discovery";
-          (* Uses about 1.7GB of memory. *)
-          Tag.memory_3k;
-        ]
+      ~tags:[team; "p2p"; "node"; "peer_discovery"]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->

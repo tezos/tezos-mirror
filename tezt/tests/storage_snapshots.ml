@@ -277,7 +277,7 @@ let test_export_import_snapshots =
   Protocol.register_test
     ~__FILE__
     ~title:"storage snapshot export and import"
-    ~tags:[team; "storage"; "snapshot"; "export"; "import"; Tag.memory_4k]
+    ~tags:[team; "storage"; "snapshot"; "export"; "import"]
   @@ fun protocol ->
   let archive_node =
     Node.create
