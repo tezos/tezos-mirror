@@ -319,6 +319,19 @@ module Plugin = struct
           cpctxt
           (`Main, `Level attested_level)
           ()
+
+    let slot_header_of_cell cell =
+      match Dal.Slots_history.(content cell) with
+      | Dal.Slots_history.Unpublished _ ->
+          None (* Cannot get a header if nothing is published. *)
+      | Published {header = {id; commitment}; _} ->
+          Some
+            Dal_plugin.
+              {
+                published_level = Raw_level.to_int32 id.published_level;
+                slot_index = Dal.Slot_index.to_int id.index;
+                commitment;
+              }
   end
 
   module RPC = struct

@@ -398,6 +398,8 @@ module Plugin = struct
           view cache |> Map.bindings
         in
         return last_cells
+
+    let slot_header_of_cell _cell = (* Not implemented for Quebec *) None
   end
 
   module RPC = struct

@@ -179,6 +179,10 @@ module type T = sig
       pred_publication_level_dal_constants:
         Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t Lazy.t ->
       (hash * cell) list tzresult Lwt.t
+
+    (** Extracts and returns the slot header of the given cell if it was
+        published to L1. *)
+    val slot_header_of_cell : cell -> slot_header option
   end
 
   module RPC : sig
