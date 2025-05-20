@@ -171,8 +171,50 @@ let get_slot_content_from_shards cryptobox store slot_id =
   in
   return slot
 
-let fetch_slot_from_http_backups _ctxt _cryptobox ~slot_size:_ _slot_id =
+let try_fetch_slot_from_http_backup ~slot_size:_ ~published_level:_
+    ~slot_index:_ _cryptobox _expected_commitment_hash _http_backup_uri =
+  (* TODO in next commits *)
   assert false
+
+let get_commitment_from_slot_id _ctxt _slot_id =
+  (* TODO in follow-up MRs *)
+  assert false
+
+let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
+  let open Lwt_result_syntax in
+  let config : Configuration_file.t = Node_context.get_config ctxt in
+  let Types.Slot_id.{slot_index; slot_level = published_level} = slot_id in
+  match config.http_backup_uris with
+  | [] ->
+      (* Fail if no http backup URI is configured. *)
+      fail Errors.not_found
+  | http_backup_uris -> (
+      (* We fetch the expected commitment hash from the published slot header on
+         L1 if [trust_http_backup_uris] is false. *)
+      let* expected_commitment_hash =
+        if config.trust_http_backup_uris then return_none
+        else get_commitment_from_slot_id ctxt slot_id
+      in
+      (* In the iter below, we "fail" to exit the loop as soon as a correct slot
+         content is fetched. *)
+      let*! res =
+        List.iter_es
+          (fun uri ->
+            let*! res =
+              try_fetch_slot_from_http_backup
+                cryptobox
+                ~slot_size
+                ~published_level
+                ~slot_index
+                expected_commitment_hash
+                uri
+            in
+            match res with Ok (Some slot) -> fail slot | _ -> return_unit)
+          http_backup_uris
+      in
+      match res with
+      | Ok () -> fail Errors.not_found
+      | Error slot -> return slot)
 
 let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   let open Lwt_result_syntax in
