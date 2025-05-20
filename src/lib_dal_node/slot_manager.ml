@@ -347,17 +347,12 @@ let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
   let cache = Store.cache node_store in
   match Store.Commitment_indexed_cache.find_opt cache commitment with
   | None ->
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5676
-
-          If this happens, we should probably tell the user that
-          something bad happened. Either:
-
-          1. The proofs where not stored properly (an invariant is broken)
-
-          2. The node was restarted (unlikely to happen given the time frame)
-
-          3. The cache was full (unlikely to happen if
-          [shards_proofs_cache_size] is set properly. *)
+      (* This is unexpected. Either:
+         1. The proofs where not stored properly (an invariant is broken)
+         2. The node was restarted (unlikely to happen given the time frame)
+         3. The cache was full (unlikely to happen if
+         [shards_proofs_cache_size] is set properly. *)
+      let*! () = Event.emit_commitment_not_found_in_cache ~commitment in
       return_unit
   | Some (slot, shares, shard_proofs) ->
       let shards =

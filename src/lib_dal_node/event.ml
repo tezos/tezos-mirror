@@ -1007,6 +1007,15 @@ open struct
       ~msg:"catching up done"
       ~level:Notice
       ()
+
+  let commitment_not_found_in_cache =
+    declare_1
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"commitment_not_found_in_cache"
+      ~msg:"commitment {commitment} was not found in the cache"
+      ~level:Warning
+      ("commitment", Cryptobox.Commitment.encoding)
 end
 
 (* DAL node event emission functions *)
@@ -1267,3 +1276,6 @@ let emit_start_catchup ~start_level ~end_level ~levels_to_clean_up =
 let emit_catching_up ~current_level = emit catching_up current_level
 
 let emit_end_catchup () = emit end_catchup ()
+
+let emit_commitment_not_found_in_cache ~commitment =
+  emit commitment_not_found_in_cache commitment
