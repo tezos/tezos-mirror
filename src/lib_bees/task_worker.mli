@@ -30,9 +30,12 @@ val launch_task_and_wait :
   'a ->
   ('b, 'c message_error) result Eio.Promise.t
 
-(** [launch_tasks_and_wait name func ?on_completion args] runs
-    {!val-launch_task_and_wait} for each each [arg] in [args], in parallel. *)
+(** [launch_tasks_and_wait ?max_fibers name func ?on_completion args] runs
+    {!val-launch_task_and_wait} for each each [arg] in [args], in parallel.
+    [max_fibers] sets the maximum number of fibers to run concurrently (default
+    = max_int). *)
 val launch_tasks_and_wait :
+  ?max_fibers:int ->
   string ->
   ('a -> 'b) ->
   ?on_completion:('b -> unit) ->

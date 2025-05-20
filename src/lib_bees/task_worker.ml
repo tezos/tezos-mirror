@@ -97,8 +97,10 @@ let launch_task_and_wait name on_request ?on_completion param =
   let r = Request.Task {name; on_request; param; on_completion} in
   Worker.Queue.push_request_and_wait_eio (Eio.Lazy.force worker) r
 
-let launch_tasks_and_wait name func ?on_completion args =
+let launch_tasks_and_wait ?(max_fibers = max_int) name func ?on_completion args
+    =
   Eio.Fiber.List.map
+    ~max_fibers
     (fun arg ->
       launch_task_and_wait name ?on_completion func arg |> Eio.Promise.await)
     args
