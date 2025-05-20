@@ -788,7 +788,7 @@ let prequorum_check_levels =
     let* json = Client.RPC.call client @@ RPC.get_chain_block_header () in
     return @@ JSON.(json |-> "payload_hash" |> as_string)
   in
-  let preattest_for level =
+  let preattest_for ~delegate level =
     let* slots = Operation.Consensus.get_slots ~level client in
     let slot = Operation.Consensus.first_slot ~slots delegate in
     let* _ =
@@ -815,12 +815,16 @@ let prequorum_check_levels =
           let preattestations = json |-> "preattestations" |> as_int in
           Some (count, delta, voting_power, preattestations))
   in
+  let wait_for_non_relevant_operation_received () =
+    Agnostic_baker.wait_for baker "non_relevant_operation_received.v0" (fun _ ->
+        Some ())
+  in
   Log.info "Injecting a preattestation for level %d round 0" current_level ;
   (* Listen for the next preattestations_received event and inject a
      preattestation for the current level. The preattestation is expected to be
      accounted in the prequorum monitoring. *)
   let waiter = wait_for_preattestations_received () in
-  let* () = preattest_for current_level in
+  let* () = preattest_for ~delegate current_level in
   let* count, delta, voting_power, preattestations = waiter in
   if count <> 1 || delta = 0 || voting_power = 0 || preattestations <> 1 then
     Test.fail "Prequorum is expected to progress" ;
@@ -828,26 +832,28 @@ let prequorum_check_levels =
   (* Same process but we inject a preattestation for the previous level. This
      time, the preattestation is not expected to be accounted in the prequorum
      monitoring. *)
-  let waiter = wait_for_preattestations_received () in
-  let* () = preattest_for previous_level in
-  let* count, delta', voting_power', preattestations' = waiter in
-  if
-    count <> 0 || delta' <> 0
-    || voting_power <> voting_power'
-    || preattestations <> preattestations'
-  then Test.fail "Prequorum is not expected to progress" ;
+  let waiter = wait_for_non_relevant_operation_received () in
+  let* () = preattest_for ~delegate previous_level in
+  let* () = waiter in
   Log.info "Injecting a preattestation for level %d round 0" next_level ;
   (* Same for next level. Again, the preattestation is not expected to be
      accounted in the prequorum monitoring. *)
+  let waiter = wait_for_non_relevant_operation_received () in
+  let* () = preattest_for ~delegate next_level in
+  let* () = waiter in
+  let delegate2 = Constant.bootstrap2 in
+  Log.info "Injecting a preattestation for level %d round 0" current_level ;
+  (* Listen for the next preattestations_received event and inject a
+     preattestation for delegate2 for the current level. The preattestation is
+     expected to be accounted in the prequorum monitoring. *)
   let waiter = wait_for_preattestations_received () in
-  let* () = preattest_for next_level in
-  let* count, delta', voting_power', preattestations' = waiter in
+  let* () = preattest_for ~delegate:delegate2 current_level in
+  let* count', delta', voting_power', preattestations' = waiter in
   if
-    count <> 0 || delta' <> 0
-    || voting_power <> voting_power'
-    || preattestations <> preattestations'
-  then Test.fail "Prequorum is not expected to progress" ;
-  let* _ = Mempool.get_mempool client in
+    count' <> 1 || delta' = 0
+    || voting_power' <= voting_power
+    || preattestations' <> 2
+  then Test.fail "Prequorum is expected to progress" ;
   unit
 
 let z_of_bool_vector dal_attestation =
