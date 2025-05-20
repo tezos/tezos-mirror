@@ -68,35 +68,6 @@ configure)
     esac
   else
     echo "Upgrading octez-node from version $2 ( postinst )"
-    # The configure script is called with the version of the old
-    # package in case of upgrade.
-    #
-    # In a testing environment next packages version have an
-    # epoch `1:<version>` to distinguish them from the current packages
-    #
-    # We check if the version string of the old package does NOT contain
-    # an epoch (no colon)
-    case "$2" in
-    1:*)
-      # If the version of the package contains the epoch `1:*` then
-      # we are upgrading a next package to a next package in a testing
-      # environment. We do nothing.
-      : nop
-      ;;
-    *)
-      # In that case, we are upgrading from a current package to a
-      # next package. It can be a released package as well as a dev package.
-      # This logic is going to be removed after making the next packages
-      # official.
-      echo "octez-node: upgrade warning from current"
-      db_set octez-node/configure "yes"
-      if [ -e "$TEZOS_HOME/.tezos-node/config.json" ]; then
-        db_input high octez-node/upgrade_note_current || true
-        #shellcheck disable=SC2119
-        db_go || true
-      fi
-      ;;
-    esac
   fi
 
   ;;

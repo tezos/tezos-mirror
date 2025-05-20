@@ -205,7 +205,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ]
   in
   let jobs_dnf_repository = Rpm_repository.jobs Release in
-  let jobs_debian_repository, _, _, _, _ = Debian_repository.jobs Release in
+  let jobs_debian_repository = Debian_repository.jobs Release in
   let job_gitlab_release_or_publish =
     let dependencies =
       Dependent
