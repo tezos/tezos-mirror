@@ -664,6 +664,7 @@ let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
   in
   let* committee = level_committee ~level:attestation_level in
   let attester_of_shard = shards_to_attesters committee in
+  let ignore_pkhs = Node_context.get_ignore_pkhs ctxt in
   shards
   |> Seq.iter_ep (fun Cryptobox.{index = shard_index; share} ->
          match
@@ -706,9 +707,10 @@ let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
                  message_id
                  message
              in
-             Gossipsub.Worker.(
-               Publish_message {message; topic; message_id}
-               |> app_input gs_worker) ;
+             (if not @@ Signature.Public_key_hash.Set.mem pkh ignore_pkhs then
+                Gossipsub.Worker.(
+                  Publish_message {message; topic; message_id}
+                  |> app_input gs_worker)) ;
              return_unit)
 
 (** This function publishes the shards of a commitment that is waiting
