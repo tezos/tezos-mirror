@@ -337,11 +337,12 @@ let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
     opt_delegate
 
 let build_update_consensus_key cctxt ?fee ?gas_limit ?storage_limit
-    ?secret_key_uri ~kind public_key =
+    ?pop_material ~kind public_key =
   let open Lwt_result_syntax in
   let* proof =
-    match ((public_key : Signature.public_key), secret_key_uri) with
-    | Bls _, Some secret_key_uri ->
+    match ((public_key : Signature.public_key), pop_material) with
+    | Bls _, Some (Either.Left pop) -> return_some pop
+    | Bls _, Some (Either.Right secret_key_uri) ->
         let* proof = Client_keys.bls_prove_possession cctxt secret_key_uri in
         return_some proof
     | _ -> return_none
@@ -383,15 +384,15 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
       match Apply_results.pack_contents_list op result with
       | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
           return ((oph, op, result), []))
-  | Some (public_key, secret_key_uri), None
-  | None, Some (public_key, secret_key_uri) -> (
+  | Some (public_key, pop_material), None | None, Some (public_key, pop_material)
+    -> (
       let* operation =
         let kind =
           if Option.is_some consensus_keys then Operation_repr.Consensus
           else Companion
         in
         let+ operation_content =
-          build_update_consensus_key cctxt ~kind ?fee ?secret_key_uri public_key
+          build_update_consensus_key cctxt ~kind ?fee ?pop_material public_key
         in
         Annotated_manager_operation.Cons_manager
           ( delegate_op,
@@ -424,15 +425,15 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
             res1,
             Single_and_result ((Manager_operation _ as op2), res2) ) ->
           return ((oph, op1, res1), [(op2, res2)]))
-  | ( Some (public_key_consensus, secret_key_uri_consensus),
-      Some (public_key_companion, secret_key_uri_companion) ) -> (
+  | ( Some (public_key_consensus, consensus_pop_material),
+      Some (public_key_companion, companion_pop_material) ) -> (
       let* operation =
         let* operation_consensus =
           build_update_consensus_key
             cctxt
             ~kind:Consensus
             ?fee
-            ?secret_key_uri:secret_key_uri_consensus
+            ?pop_material:consensus_pop_material
             public_key_consensus
         in
         let* operation_companion =
@@ -440,7 +441,7 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
             cctxt
             ~kind:Companion
             ?fee
-            ?secret_key_uri:secret_key_uri_companion
+            ?pop_material:companion_pop_material
             public_key_companion
         in
         return
@@ -488,12 +489,12 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
           return ((oph, op1, res1), [(op2, res2); (op3, res3)]))
 
 let update_consensus_or_companion_key ~kind cctxt ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing ?simulation ?fee ?secret_key_uri ~public_key
+    ?dry_run ?verbose_signing ?simulation ?fee ?pop_material ~public_key
     ~manager_sk ~fee_parameter src_pk =
   let open Lwt_result_syntax in
   let source = Signature.Public_key.hash src_pk in
   let* operation =
-    build_update_consensus_key cctxt ?fee ?secret_key_uri ~kind public_key
+    build_update_consensus_key cctxt ?fee ?pop_material ~kind public_key
   in
   let operation = Annotated_manager_operation.Single_manager operation in
   let* oph, _, op, result =
