@@ -922,7 +922,8 @@ module Tezt = struct
       ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
       ?(tezt_parallel = 1) ?(tezt_variant = "")
       ?(before_script = before_script ~source_version:true ~eval_opam:false [])
-      ?timeout ?job_select_tezts ~dependencies ?allow_failure () : tezos_job =
+      ?timeout ?(disable_test_timeout = false) ?job_select_tezts ~dependencies
+      ?allow_failure () : tezos_job =
     let variables =
       [
         ("JUNIT", "tezt-junit.xml");
@@ -1037,9 +1038,11 @@ module Tezt = struct
         "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
          --send-junit " ^ with_or_without_select_tezts
         ^ " \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
-           --global-timeout 1800 --on-unknown-regression-files fail --junit \
-           ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record \
-           tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
+           --global-timeout 1800"
+        ^ (if disable_test_timeout then "" else " --test-timeout 540")
+        ^ " --on-unknown-regression-files fail --junit ${JUNIT} \
+           --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records \
+           --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
            tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
            ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn \
            5_000_000_000";
