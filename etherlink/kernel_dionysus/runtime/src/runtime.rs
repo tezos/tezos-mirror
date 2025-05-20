@@ -15,8 +15,7 @@ use std::{
 
 use crate::{
     extensions::WithGas,
-    internal_runtime::{ExtendedRuntime, InternalHost, InternalRuntime},
-    mock_internal::MockInternal,
+    internal_runtime::{ExtendedRuntime, InternalRuntime},
 };
 use tezos_evm_logging::{Level, Verbosity};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
@@ -61,16 +60,15 @@ impl<T: SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity + WithGas> Ru
 //    However it is never used in the type itself, which will be rejected by the
 //    compiler. PhantomData associates `R` to the struct with no cost at
 //    runtime.
-pub struct KernelHost<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> {
+pub struct KernelHost<R, Host: BorrowMut<R> + Borrow<R>> {
     pub host: Host,
-    pub internal: Internal,
     pub logs_verbosity: Level,
     pub execution_gas_used: u64,
     pub _pd: PhantomData<R>,
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> SdkRuntime
-    for KernelHost<R, Host, Internal>
+impl<R: SdkRuntime + InternalRuntime, Host: BorrowMut<R> + Borrow<R>> SdkRuntime
+    for KernelHost<R, Host>
 {
     #[inline(always)]
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
@@ -250,20 +248,20 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
     }
 }
 
-impl<R: SdkRuntime, Host: Borrow<R> + BorrowMut<R>, Internal: InternalRuntime>
-    InternalRuntime for KernelHost<R, Host, Internal>
+impl<R: SdkRuntime + InternalRuntime, Host: Borrow<R> + BorrowMut<R>> InternalRuntime
+    for KernelHost<R, Host>
 {
     #[inline(always)]
     fn __internal_store_get_hash<T: Path>(
         &mut self,
         path: &T,
     ) -> Result<Vec<u8>, RuntimeError> {
-        self.internal.__internal_store_get_hash(path)
+        self.host.borrow_mut().__internal_store_get_hash(path)
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime>
-    ExtendedRuntime for KernelHost<R, Host, Internal>
+impl<R: SdkRuntime + InternalRuntime, Host: BorrowMut<R> + Borrow<R>> ExtendedRuntime
+    for KernelHost<R, Host>
 {
     #[inline(always)]
     fn store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
@@ -271,15 +269,13 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime>
     }
 }
 
-impl<R: SdkRuntime, Host: Borrow<R> + BorrowMut<R>, Internal>
-    KernelHost<R, Host, Internal>
+impl<R: SdkRuntime, Host: Borrow<R> + BorrowMut<R>> KernelHost<R, Host>
 where
     for<'a> &'a mut Host: BorrowMut<R>,
 {
-    pub fn to_ref_host(&mut self) -> KernelHost<R, &mut Host, &mut Internal> {
+    pub fn to_ref_host(&mut self) -> KernelHost<R, &mut Host> {
         KernelHost {
             host: &mut self.host,
-            internal: &mut self.internal,
             logs_verbosity: self.logs_verbosity,
             execution_gas_used: self.execution_gas_used,
             _pd: PhantomData,
@@ -287,8 +283,8 @@ where
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> Verbosity
-    for KernelHost<R, Host, Internal>
+impl<R: SdkRuntime + InternalRuntime, Host: BorrowMut<R> + Borrow<R>> Verbosity
+    for KernelHost<R, Host>
 {
     fn verbosity(&self) -> Level {
         self.logs_verbosity
@@ -306,8 +302,8 @@ pub fn read_logs_verbosity<Host: tezos_smart_rollup_host::runtime::Runtime>(
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> WithGas
-    for KernelHost<R, Host, Internal>
+impl<R: SdkRuntime + InternalRuntime, Host: BorrowMut<R> + Borrow<R>> WithGas
+    for KernelHost<R, Host>
 {
     fn add_execution_gas(&mut self, gas: u64) {
         self.execution_gas_used += gas;
@@ -318,26 +314,23 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> W
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host, InternalHost> {
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host> {
     pub fn init(host: Host) -> Self {
-        let internal_storage = InternalHost();
         let logs_verbosity = read_logs_verbosity(host.borrow());
         Self {
             host,
-            internal: internal_storage,
             logs_verbosity,
             execution_gas_used: 0,
             _pd: PhantomData,
         }
     }
 }
-pub type MockKernelHost = KernelHost<MockHost, MockHost, MockInternal>;
+pub type MockKernelHost = KernelHost<MockHost, MockHost>;
 
 impl Default for MockKernelHost {
     fn default() -> Self {
         Self {
             host: MockHost::default(),
-            internal: MockInternal(),
             logs_verbosity: Level::default(),
             execution_gas_used: 0,
             _pd: PhantomData,
@@ -348,10 +341,8 @@ impl Default for MockKernelHost {
 impl MockKernelHost {
     pub fn with_address(address: SmartRollupAddress) -> Self {
         let host = MockHost::with_address(&address);
-        let internal = MockInternal();
         KernelHost {
             host,
-            internal,
             logs_verbosity: Level::default(),
             execution_gas_used: 0,
             _pd: PhantomData,

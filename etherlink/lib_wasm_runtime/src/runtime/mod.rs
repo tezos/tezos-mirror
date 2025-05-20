@@ -109,6 +109,7 @@ enum NativeKernel {
     Bifrost,
     Calypso,
     Calypso2,
+    Dionysus,
 }
 
 impl NativeKernel {
@@ -117,6 +118,7 @@ impl NativeKernel {
             Self::Bifrost => RuntimeVersion::V0,
             Self::Calypso => RuntimeVersion::V1,
             Self::Calypso2 => RuntimeVersion::V1,
+            Self::Dionysus => RuntimeVersion::V1,
         }
     }
 }
@@ -127,6 +129,8 @@ const CALYPSO_ROOT_HASH_HEX: &'static str =
     "96114bf7a28e617a3788d8554aa24711b4b11f9c54cd0b12c00bc358beb814a7";
 const CALYPSO2_ROOT_HASH_HEX: &'static str =
     "7b42577597504d6a705cdd56e59c770125223a0ffda471d70b463a2dc2d5f84f";
+const DIONYSUS_ROOT_HASH_HEX: &'static str =
+    "2214b77edf321b0ed41cc3a1028934299c4b94e0687b06e5239cc0b4eb31417f";
 
 impl NativeKernel {
     fn of_root_hash(root_hash: &ContextHash) -> Option<NativeKernel> {
@@ -137,6 +141,7 @@ impl NativeKernel {
             BIFROST_ROOT_HASH_HEX => Some(NativeKernel::Bifrost),
             CALYPSO_ROOT_HASH_HEX => Some(NativeKernel::Calypso),
             CALYPSO2_ROOT_HASH_HEX => Some(NativeKernel::Calypso2),
+            DIONYSUS_ROOT_HASH_HEX => Some(NativeKernel::Dionysus),
             _ => None,
         }
     }
@@ -187,6 +192,16 @@ impl Runtime for NativeRuntime {
             ("populate_delayed_inbox", NativeKernel::Calypso2) => {
                 trace!("calypso2::populate_delayed_inbox");
                 kernel_calypso2::evm_node_entrypoint::populate_delayed_inbox(self.mut_host());
+                Ok(())
+            }
+            ("kernel_run", NativeKernel::Dionysus) => {
+                trace!("dionysus::kernel_loop");
+                kernel_dionysus::kernel_loop(self.mut_host());
+                Ok(())
+            }
+            ("populate_delayed_inbox", NativeKernel::Dionysus) => {
+                trace!("dionysus::populate_delayed_inbox");
+                kernel_dionysus::evm_node_entrypoint::populate_delayed_inbox(self.mut_host());
                 Ok(())
             }
             (missing_entrypoint, _) => todo!("entrypoint {missing_entrypoint} not covered yet"),

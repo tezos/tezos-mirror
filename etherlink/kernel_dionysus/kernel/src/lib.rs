@@ -28,9 +28,9 @@ use storage::{
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
+use tezos_evm_runtime::internal_runtime::InternalRuntime;
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
 use tezos_evm_runtime::safe_storage::WORLD_STATE_PATH;
-use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
     OutboxMessage, OutboxMessageWhitelistUpdate, OUTBOX_QUEUE,
@@ -52,7 +52,7 @@ mod dal_slot_import_signal;
 mod delayed_inbox;
 mod error;
 mod event;
-mod evm_node_entrypoint;
+pub mod evm_node_entrypoint;
 mod fallback_upgrade;
 mod fees;
 mod gas_price;
@@ -331,8 +331,9 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[entrypoint::main]
-pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut Host) {
+pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime + InternalRuntime>(
+    host: &mut Host,
+) {
     // In order to setup the temporary directory, we need to move something
     // from /evm to /tmp, so /evm must be non empty, this only happen
     // at the first run.
@@ -340,11 +341,7 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
     // The kernel host is initialized as soon as possible. `kernel_loop`
     // shouldn't be called in tests as it won't use `MockInternal` for the
     // internal runtime.
-    let mut host: KernelHost<
-        Host,
-        &mut Host,
-        tezos_evm_runtime::internal_runtime::InternalHost,
-    > = KernelHost::init(host);
+    let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
 
     let reboot_counter = host
         .host
