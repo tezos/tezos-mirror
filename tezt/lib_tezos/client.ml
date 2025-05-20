@@ -1472,14 +1472,15 @@ let paid_storage_space ?hooks ?endpoint ?(wait = "none") ~contract client =
   |> Process.check_and_read_stdout
 
 let update_consensus_key ?hooks ?endpoint ?(wait = "none") ?burn_cap
-    ?expect_failure ~src ~pk client =
+    ?consensus_key_pop ?expect_failure ~src ~pk client =
   spawn_command
     ?hooks
     ?endpoint
     client
     (["--wait"; wait]
     @ ["set"; "consensus"; "key"; "for"; src; "to"; pk]
-    @ optional_arg "burn-cap" Tez.to_string burn_cap)
+    @ optional_arg "burn-cap" Tez.to_string burn_cap
+    @ optional_arg "consensus-key-pop" Fun.id consensus_key_pop)
   |> Process.check ?expect_failure
 
 let update_fresh_consensus_key ?alias ?algo ?hooks ?endpoint ?wait ?burn_cap
@@ -1499,14 +1500,15 @@ let update_fresh_consensus_key ?alias ?algo ?hooks ?endpoint ?wait ?burn_cap
   return key
 
 let update_companion_key ?hooks ?endpoint ?(wait = "none") ?burn_cap
-    ?expect_failure ~src ~pk client =
+    ?companion_key_pop ?expect_failure ~src ~pk client =
   spawn_command
     ?hooks
     ?endpoint
     client
     (["--wait"; wait]
     @ ["set"; "companion"; "key"; "for"; src; "to"; pk]
-    @ optional_arg "burn-cap" Tez.to_string burn_cap)
+    @ optional_arg "burn-cap" Tez.to_string burn_cap
+    @ optional_arg "companion-key-pop" Fun.id companion_key_pop)
   |> Process.check ?expect_failure
 
 let update_fresh_companion_key ?alias ?algo ?hooks ?endpoint ?wait ?burn_cap
