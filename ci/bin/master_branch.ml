@@ -55,6 +55,33 @@ let jobs_documentation : tezos_job list =
   in
   [job_odoc; job_manuals; job_docgen; job_build_all; job_publish_documentation]
 
+(* Defines the jobs of the [schedule_docker_build_pipeline] pipeline.
+
+    This pipeline runs scheduled on the [master] branch. The goal
+   of this pipeline is to publish fresh Docker images for 'master' using the latest Alpine packages. *)
+
+let octez_distribution_docker_jobs =
+  let job_docker_amd64_experimental : tezos_job =
+    job_docker_build ~__POS__ ~rules:rules_always ~arch:Amd64 Experimental
+  in
+  let job_docker_arm64_experimental : tezos_job =
+    job_docker_build ~__POS__ ~rules:rules_always ~arch:Arm64 Experimental
+  in
+  let job_docker_merge_manifests =
+    job_docker_merge_manifests
+      ~__POS__
+      ~ci_docker_hub:true
+      ~job_docker_amd64:job_docker_amd64_experimental
+      ~job_docker_arm64:job_docker_arm64_experimental
+  in
+  [
+    (* Stage: build *)
+    job_docker_amd64_experimental;
+    job_docker_arm64_experimental;
+    (* Stage: prepare_release *)
+    job_docker_merge_manifests;
+  ]
+
 let jobs =
   (* Like in the {!Schedule_extended_test} variant of
      {!Code_verification} pipelines, we'd like to run as many jobs as
@@ -70,18 +97,18 @@ let jobs =
      [changes:] in different pipelines, see
      {{:https://docs.gitlab.com/ee/ci/jobs/job_troubleshooting.html#jobs-or-pipelines-run-unexpectedly-when-using-changes}
      GitLab Docs: Jobs or pipelines run unexpectedly when using changes}. *)
-  let job_docker_amd64_experimental : tezos_job =
-    job_docker_build ~__POS__ ~rules:rules_always ~arch:Amd64 Experimental
+  let job_static_arm64 =
+    job_build_static_binaries ~__POS__ ~arch:Arm64 ~rules:rules_always ()
   in
-  let job_docker_arm64_experimental : tezos_job =
-    job_docker_build ~__POS__ ~rules:rules_always ~arch:Arm64 Experimental
-  in
-  let job_docker_merge_manifests =
-    job_docker_merge_manifests
+  let job_static_x86_64 =
+    job_build_static_binaries
       ~__POS__
-      ~ci_docker_hub:true
-      ~job_docker_amd64:job_docker_amd64_experimental
-      ~job_docker_arm64:job_docker_arm64_experimental
+      ~arch:Amd64
+      ~cpu:Very_high
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
+      ~rules:rules_always
+      ()
   in
   let job_unified_coverage_default : tezos_job =
     job
@@ -146,18 +173,14 @@ let jobs =
     job_static_arm64;
     job_build_arm64_release;
     job_build_arm64_exp_dev_extra;
-    job_docker_amd64_experimental;
-    job_docker_arm64_experimental;
     (* Stage: sanity *)
     job_datadog_pipeline_trace;
     (* Stage: test_coverage *)
     job_unified_coverage_default;
   ]
+  (* Jobs to build and update on Docker Hub the Octez Docker image.  *)
+  @ octez_distribution_docker_jobs
   (* Stage: doc *)
   @ jobs_documentation
-  @ [
-      (* Stage: prepare_release *)
-      job_docker_merge_manifests;
-      (* Stage: manual *)
-      job_publish_kernel_sdk;
-    ]
+  (* Stage: manual *)
+  @ [job_publish_kernel_sdk]

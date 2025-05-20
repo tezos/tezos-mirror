@@ -120,6 +120,13 @@ val schedule_container_scanning_evm_node_releases : If.t
     [TZ_SCHEDULE_KIND] set to [DOCUMENTATION]. *)
 val schedule_documentation : If.t
 
+(** A rule that is true for scheduled pipelines that build
+    fresh Docker images (latest available Alpine packages).
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [DOCKER_FRESH_IMAGE_BUILD]. *)
+val schedule_docker_build : If.t
+
 (** A rule that is true if [CI_COMMIT_BRANCH] is a given branch. *)
 val on_branch : string -> If.t
 
