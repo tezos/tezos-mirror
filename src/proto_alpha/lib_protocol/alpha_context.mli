@@ -3126,9 +3126,8 @@ end
 
 (** This module re-exports definitions from {!Dal_errors_repr}. *)
 module Dal_errors : sig
-  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3168
-     do not expose these errors and return them in functions
-     from Dal_slot_repr or Dal_attestation_repr. *)
+  (* We could not expose these errors and instead return them in functions from
+     [Dal_slot_repr] or [Dal_attestation_repr]. *)
   type error +=
     | Dal_feature_disabled
     | Dal_incentives_disabled

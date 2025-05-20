@@ -34,11 +34,6 @@ type error +=
   | Not_enough_l1_history of {stored_cycles : int; minimal_cycles : int}
   | Amplificator_initialization_failed
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4622
-
-   Move errors from different DAL modules to this file.
-*)
-
 let () =
   register_error_kind
     `Permanent

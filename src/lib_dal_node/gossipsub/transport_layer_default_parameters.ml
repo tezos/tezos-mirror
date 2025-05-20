@@ -24,10 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/5565
-
-   Document these values (taken from octez-node), and chage them if needed.
-*)
+(* Most of the values below are taken from the octez-node. *)
 module P2p_limits = struct
   let connection_timeout = Time.System.Span.of_seconds_exn 10.
 

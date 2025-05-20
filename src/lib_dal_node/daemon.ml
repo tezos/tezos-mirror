@@ -81,8 +81,6 @@ let on_new_finalized_head ctxt cctxt crawler =
   loop ()
 
 let daemonize handlers =
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
-     Improve concurrent tasks by using workers *)
   let open Lwt_result_syntax in
   let* handlers = List.map_es (fun x -> x) handlers in
   let (_ : Lwt_exit.clean_up_callback_id) =
@@ -224,9 +222,6 @@ let update_and_register_profiles ctxt =
   let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
   return_unit
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
-   Improve general architecture, handle L1 disconnection etc
-*)
 let run ~data_dir ~configuration_override =
   let open Lwt_result_syntax in
   let log_cfg = Tezos_base_unix.Logs_simple_config.default_cfg in

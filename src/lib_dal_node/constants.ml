@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4458
-
-   Better handling of this limitation. *)
-
 (* Each entry in the cache maintains two open file descriptors (one via
    regular file opening and one via mmap on the bitset region).
    So the selected value should be bigger than twice the number of slots per level,

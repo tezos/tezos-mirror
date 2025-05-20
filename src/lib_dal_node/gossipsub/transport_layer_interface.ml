@@ -26,9 +26,6 @@
 
 module Types = Tezos_dal_node_services.Types
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/5583
-
-   Version this type to ease future migrations. *)
 module P2p_message_V1 = struct
   type px_peer = Types.Peer.t
 
@@ -204,9 +201,6 @@ module P2p_message_V1 = struct
 
   let distributed_db_version = Distributed_db_version.zero
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5638
-
-     Decide how to safely choose the node db version. *)
   let distributed_db_versions = [distributed_db_version]
 
   let message_config ~network_name : p2p_message P2p_params.message_config =

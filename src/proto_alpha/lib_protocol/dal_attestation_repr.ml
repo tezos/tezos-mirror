@@ -23,23 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3103
-
-   This may be a bit heavy in practice. We could also assume that in
-   practice, many bits in this bitfield will be set to one. Hence, we
-   could consider a better encoding which is smaller in the optimistic
-   case. For example:
-
-   1. When all the slots are attested, the encoding can be represented
-   in one bit.
-
-   2. Otherwise, we can pack slots by [8]. Have a header of [slots/8]
-   which is [1] if all the slots in this set are [1], [0]
-   otherwise. For all pack with a bit set to [0], we give the explicit
-   representation. Hence, if there are [256] slots, and [2] are not
-   attested, this representation will be of size [32] bits + [16] bits
-   = [48] bits which is better than [256] bits. *)
-
 (* A set of (attested) slot indexes. *)
 type t = Bitset.t
 
