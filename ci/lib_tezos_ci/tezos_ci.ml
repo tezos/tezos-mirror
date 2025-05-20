@@ -732,10 +732,6 @@ type tag =
   | Gcp_dev_arm64
   | Gcp_tezt
   | Gcp_tezt_dev
-  | Gcp_tezt_memory_3k
-  | Gcp_tezt_memory_3k_dev
-  | Gcp_tezt_memory_4k
-  | Gcp_tezt_memory_4k_dev
   | Gcp_high_cpu
   | Gcp_high_cpu_dev
   | Gcp_very_high_cpu
@@ -750,10 +746,6 @@ let string_of_tag = function
   | Gcp_dev_arm64 -> "gcp_dev_arm64"
   | Gcp_tezt -> "gcp_tezt"
   | Gcp_tezt_dev -> "gcp_tezt_dev"
-  | Gcp_tezt_memory_3k -> "gcp_tezt_memory_3k"
-  | Gcp_tezt_memory_3k_dev -> "gcp_tezt_memory_3k_dev"
-  | Gcp_tezt_memory_4k -> "gcp_tezt_memory_4k"
-  | Gcp_tezt_memory_4k_dev -> "gcp_tezt_memory_4k_dev"
   | Gcp_high_cpu -> "gcp_high_cpu"
   | Gcp_high_cpu_dev -> "gcp_high_cpu_dev"
   | Gcp_very_high_cpu -> "gcp_very_high_cpu"
@@ -764,10 +756,8 @@ let string_of_tag = function
 (** The architecture of the runner associated to a tag . *)
 let arch_of_tag = function
   | Gcp_arm64 | Gcp_dev_arm64 -> Some Arm64
-  | Gcp | Gcp_dev | Gcp_tezt | Gcp_tezt_dev | Gcp_tezt_memory_3k
-  | Gcp_tezt_memory_3k_dev | Gcp_tezt_memory_4k | Gcp_tezt_memory_4k_dev
-  | Gcp_high_cpu | Gcp_high_cpu_dev | Gcp_very_high_cpu | Gcp_very_high_cpu_dev
-  | Aws_specific ->
+  | Gcp | Gcp_dev | Gcp_tezt | Gcp_tezt_dev | Gcp_high_cpu | Gcp_high_cpu_dev
+  | Gcp_very_high_cpu | Gcp_very_high_cpu_dev | Aws_specific ->
       Some Amd64
   | Dynamic -> None
 
