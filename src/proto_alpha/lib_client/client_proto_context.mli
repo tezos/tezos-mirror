@@ -301,11 +301,12 @@ val register_as_delegate :
   manager_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   ?consensus_keys:public_key * Client_keys.sk_uri option ->
+  ?companion_keys:public_key * Client_keys.sk_uri option ->
   public_key ->
   (Kind.delegation Kind.manager Injection.result
   * (Kind.update_consensus_key Kind.manager contents
     * Kind.update_consensus_key Kind.manager Apply_results.contents_result)
-    option)
+    list)
   tzresult
   Lwt.t
 

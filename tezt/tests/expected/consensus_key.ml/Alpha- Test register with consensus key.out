@@ -2,13 +2,15 @@
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "0", "counter": "1" }
 
-./octez-client --wait none register key dummy_account_0 as delegate with consensus key dummy_account_1
+./octez-client --wait none register key dummy_account_0 as delegate with consensus key dummy_account_1 and companion key dummy_account_2
 Node is bootstrapped.
-Estimated gas: 172.789 units (will add 0 for safety)
+Estimated gas: 178.751 units (will add 0 for safety)
 Estimated storage: no bytes added
 Estimated gas: 100 units (will add 0 for safety)
 Estimated storage: no bytes added
 Estimated gas: 100 units (will add 100 for safety)
+Estimated storage: no bytes added
+Estimated gas: 1671.680 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -21,7 +23,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000275
     Expected counter: 2
-    Gas limit: 173
+    Gas limit: 179
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000275
@@ -30,7 +32,7 @@ This sequence of operations was run:
       Contract: [PUBLIC_KEY_HASH]
       Key: [PUBLIC_KEY]
       This revelation was successfully applied
-      Consumed gas: 172.557
+      Consumed gas: 178.453
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000159
@@ -58,6 +60,20 @@ This sequence of operations was run:
       Public key hash: [PUBLIC_KEY_HASH]
       This consensus key update was successfully applied
       Consumed gas: 100
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000456
+    Expected counter: 5
+    Gas limit: 1772
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000456
+      payload fees(the block proposer) ....... +ꜩ0.000456
+    Update_companion_key:
+      Public key hash: [PUBLIC_KEY_HASH]
+      Proof of possession: [BLS_SIGNATURE]
+      This companion key update was successfully applied
+      Consumed gas: 1671.680
 
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
@@ -76,18 +92,18 @@ This sequence of operations was run:
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
   "pending_staking_parameters": [], "baking_power": "0", "total_staked": "0",
-  "total_delegated": "999999999384",
+  "total_delegated": "999999998928",
   "min_delegated_in_current_cycle":
-    { "amount": "999999999384",
+    { "amount": "999999998928",
       "level":
         { "level": 3, "level_position": 2, "cycle": 0, "cycle_position": 2,
           "expected_commitment": false } },
-  "own_full_balance": "999999999384", "own_staked": "0",
-  "own_delegated": "999999999384", "external_staked": "0",
+  "own_full_balance": "999999998928", "own_staked": "0",
+  "own_delegated": "999999998928", "external_staked": "0",
   "external_delegated": "0",
   "total_unstaked_per_cycle": [ { "cycle": 0, "deposit": "0" } ],
   "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
-  "staking_denominator": "0", "current_voting_power": "999999999384",
+  "staking_denominator": "0", "current_voting_power": "999999998928",
   "voting_power": "0", "voting_info": {},
   "consensus_key":
     { "active":
@@ -96,11 +112,16 @@ This sequence of operations was run:
       "pendings":
         [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]",
             "pk": "[PUBLIC_KEY]" } ] },
-  "companion_key": { "active": null }, "stakers": [],
-  "delegators": [ "[PUBLIC_KEY_HASH]" ] }
+  "companion_key":
+    { "active": null,
+      "pendings":
+        [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]",
+            "pk":
+              "[BLS_PUBLIC_KEY]" } ] },
+  "stakers": [], "delegators": [ "[PUBLIC_KEY_HASH]" ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-{ "balance": "0", "counter": "4" }
+{ "balance": "0", "counter": "5" }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "deactivated": false, "is_forbidden": false,
@@ -117,26 +138,30 @@ This sequence of operations was run:
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
-  "pending_staking_parameters": [], "baking_power": "666666666253",
-  "total_staked": "500000000000", "total_delegated": "499999998761",
+  "pending_staking_parameters": [], "baking_power": "666666666101",
+  "total_staked": "500000000000", "total_delegated": "499999998305",
   "min_delegated_in_current_cycle":
-    { "amount": "499999998761",
+    { "amount": "499999998305",
       "level":
         { "level": 5, "level_position": 4, "cycle": 1, "cycle_position": 0,
           "expected_commitment": false } },
-  "own_full_balance": "999999998761", "own_staked": "500000000000",
-  "own_delegated": "499999998761", "external_staked": "0",
+  "own_full_balance": "999999998305", "own_staked": "500000000000",
+  "own_delegated": "499999998305", "external_staked": "0",
   "external_delegated": "0",
   "total_unstaked_per_cycle":
     [ { "cycle": 0, "deposit": "0" }, { "cycle": 1, "deposit": "0" } ],
   "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
-  "staking_denominator": "0", "current_voting_power": "999999998761",
+  "staking_denominator": "0", "current_voting_power": "999999998305",
   "voting_power": "0", "voting_info": {},
   "consensus_key":
     { "active":
         { "pkh": "[PUBLIC_KEY_HASH]",
           "pk": "[PUBLIC_KEY]" } },
-  "companion_key": { "active": null },
+  "companion_key":
+    { "active":
+        { "pkh": "[PUBLIC_KEY_HASH]",
+          "pk":
+            "[BLS_PUBLIC_KEY]" } },
   "stakers":
     [ { "staker": "[PUBLIC_KEY_HASH]",
         "frozen_deposits": "500000000000" } ],

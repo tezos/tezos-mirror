@@ -76,6 +76,11 @@ Client
 - Add a new command ``threshold bls signatures`` to recover a BLS
   threshold signature. (MR :gl:`!17467`)
 
+- Added ``octez-client register key <key> as delegate with companion key <bls_key>``,
+  and ``octez-client register key <key> as delegate with consensus key <key> and companion key <bls_key>``,
+  setting a companion key at the same time as registering a given key as a delegate.
+  (MR :gl:`!17960`)
+
 Signer
 ------
 

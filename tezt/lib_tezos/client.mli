@@ -2687,13 +2687,19 @@ val spawn_command_with_stdin :
 
 (** Register public key for given account with given client. *)
 val spawn_register_key :
-  ?hooks:Process.hooks -> ?consensus:string -> string -> t -> Process.t
+  ?hooks:Process.hooks ->
+  ?consensus:string ->
+  ?companion:string ->
+  string ->
+  t ->
+  Process.t
 
 (** Register public key for given account with given client. *)
 val register_key :
   ?hooks:Process.hooks ->
   ?expect_failure:bool ->
   ?consensus:string ->
+  ?companion:string ->
   string ->
   t ->
   unit Lwt.t
