@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 MAKE_RUST = $(MAKE) -C rust/
-MAKE_PYTHON = $(MAKE) -C python/
+MAKE_PYTHON = $(MAKE) -C rust/ -f python.mk
 MAKE_KOTLIN = $(MAKE) -C kotlin/demo/
 MAKE_SWIFT = $(MAKE) -C swift/
 
