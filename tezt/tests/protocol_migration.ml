@@ -1610,6 +1610,166 @@ let test_unstaked_requests_and_min_delegated () =
   in
   unit
 
+let test_reveal_migration () =
+  let migrate_from = Protocol.R022 in
+  let migrate_to = Protocol.Alpha in
+
+  Test.register
+    ~__FILE__
+    ~title:"protocol migration for reveal"
+    ~tags:[team; "protocol"; "migration"; "reveal"]
+  @@ fun () ->
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file migrate_from))
+      []
+  in
+  let parameters = JSON.parse_file parameter_file in
+  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  (* Migration at the end of cycle 1 *)
+  let migration_level = 2 * blocks_per_cycle in
+  let () = Local_helpers.print_parameters ~parameter_file ~migration_level in
+  let* client, _node =
+    Local_helpers.activate_protocol
+      ~parameter_file
+      ~migrate_from
+      ~migrate_to
+      ~migration_level
+  in
+  let check_not_revealed id =
+    let* metadata =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_manager_key ~id ()
+    in
+    assert (JSON.is_null metadata) ;
+    return ()
+  in
+  let check_revealed id =
+    let* metadata =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_manager_key ~id ()
+    in
+    assert (not (JSON.is_null metadata)) ;
+    return ()
+  in
+  (* Three new key pairs.
+     The first one will be revealed before the migration. It should still be revealed after.
+     The second will be revealed after, revelation is still possible.
+     The third one (tz4) will be revealed before, unrevealed by the migration, and rerevealed after. *)
+  let* fresh_account = Client.gen_and_show_keys ~sig_alg:"ed25519" client in
+  let* another_fresh_account =
+    Client.gen_and_show_keys ~sig_alg:"ed25519" client
+  in
+  let* fresh_account_tz4 = Client.gen_and_show_keys ~sig_alg:"bls" client in
+
+  Log.info "Transfer tez to new keys" ;
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:Tez.one
+      ~giver:"bootstrap1"
+      ~receiver:fresh_account.alias
+      client
+  in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:Tez.one
+      ~giver:"bootstrap2"
+      ~receiver:another_fresh_account.alias
+      client
+  in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:Tez.one
+      ~giver:"bootstrap3"
+      ~receiver:fresh_account_tz4.alias
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  (* No key has been revealed yet *)
+  let* () = check_not_revealed fresh_account.public_key_hash in
+  let* () = check_not_revealed fresh_account_tz4.public_key_hash in
+  let* () = check_not_revealed another_fresh_account.public_key_hash in
+
+  (* Reveal key 1 *)
+  Log.info "Reveal %s" fresh_account.alias ;
+  let* () = Client.reveal ~src:fresh_account.alias client |> Runnable.run in
+  let* () = Client.bake_for_and_wait client in
+  let* () = check_revealed fresh_account.public_key_hash in
+  let* () = check_not_revealed fresh_account_tz4.public_key_hash in
+
+  (* Reveal key 3 (tz4) *)
+  Log.info "Reveal %s" fresh_account_tz4.alias ;
+  let* () = Client.reveal ~src:fresh_account_tz4.alias client |> Runnable.run in
+  let* () = Client.bake_for_and_wait client in
+  let* () = check_revealed fresh_account.public_key_hash in
+  let* () = check_revealed fresh_account_tz4.public_key_hash in
+
+  let* tz4_balance_before =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:fresh_account_tz4.public_key_hash
+         ()
+  in
+
+  (* Wait for migration *)
+  Log.info "Bake until migration" ;
+  let* () = Client.bake_until_cycle ~target_cycle:2 client in
+
+  (* Check balance after migration *)
+  let* tz4_balance_after_migration =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:fresh_account_tz4.public_key_hash
+         ()
+  in
+  assert (
+    Int64.equal
+      (Tez.mutez_int64 tz4_balance_before)
+      (Tez.mutez_int64 tz4_balance_after_migration)) ;
+
+  (* Check revelation status. key 3 has been unrevealed. *)
+  let* () = check_revealed fresh_account.public_key_hash in
+  let* () = check_not_revealed another_fresh_account.public_key_hash in
+  let* () = check_not_revealed fresh_account_tz4.public_key_hash in
+
+  (* Reveal key 3 again *)
+  Log.info "Reveal %s" fresh_account_tz4.alias ;
+  let* () =
+    Client.reveal
+      ~fee:Tez.(of_mutez_int64 11_111L)
+      ~src:fresh_account_tz4.alias
+      client
+    |> Runnable.run
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () = check_revealed fresh_account_tz4.public_key_hash in
+
+  (* Reveal key 2 *)
+  Log.info "Reveal %s" another_fresh_account.alias ;
+  let* () =
+    Client.reveal ~src:another_fresh_account.alias client |> Runnable.run
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () = check_revealed another_fresh_account.public_key_hash in
+
+  (* Check balance after reveal *)
+  let* tz4_balance_after_reveal =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:fresh_account_tz4.public_key_hash
+         ()
+  in
+  assert (
+    Int64.equal
+      (Tez.mutez_int64 tz4_balance_before)
+      (Int64.add 11_111L (Tez.mutez_int64 tz4_balance_after_reveal))) ;
+
+  return ()
+
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
@@ -1617,4 +1777,5 @@ let register ~migrate_from ~migrate_to =
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
   test_migration_with_snapshots ~migrate_from ~migrate_to ;
   test_unstaked_requests_many_delegates () ;
-  test_unstaked_requests_and_min_delegated ()
+  test_unstaked_requests_and_min_delegated () ;
+  test_reveal_migration ()
