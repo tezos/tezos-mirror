@@ -1,12 +1,20 @@
 # Changelog
 
-## Unreleased
+## Version 0.26 (2025-05-20)
 
-### Breaking changes
+This release of the EVM node adds support for executing natively the Dionysus
+kernel. This improves performance for computationally intensive RPCs like
+`eth_call` when the update is activated on the network. This releases also
+improves compatibility of the EVM node with Ethereum tooling like
+anvil/cast. The docker images produced as part of this release _do not_ suffer
+from [CVE-2025-4207](https://nvd.nist.gov/vuln/detail/CVE-2025-4207) and
+[CVE-2025-29087](https://nvd.nist.gov/vuln/detail/CVE-2025-29087) anymore.
 
-### Configuration changes
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
 
 ### RPCs changes
+
 - `eth_call` does not returns the `data` field when it's empty if it
   fails during the execution. (!17893)
 - RPCs that return transaction objects now include access lists when present,
@@ -29,17 +37,6 @@
   behavior is conserved (!17710)
 - Adds support for downloading Dionysus kernel with`download kernel dionysus`.
   (!17974)
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.25 (2025-05-05)
 
