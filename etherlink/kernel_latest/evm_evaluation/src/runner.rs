@@ -12,6 +12,7 @@ use evm_execution::handler::ExecutionOutcome;
 use evm_execution::precompiles::{precompile_set, PrecompileBTreeMap};
 use evm_execution::{run_transaction, Config, EthereumError};
 
+use tezos_ethereum::access_list::AccessList;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 
 use hex_literal::hex;
@@ -197,6 +198,7 @@ fn execute_transaction(
     env: &mut Env,
     test: &Test,
     data: Bytes,
+    access_list: AccessList,
 ) -> Result<Option<ExecutionOutcome>, EthereumError> {
     let gas_limit = *unit.transaction.gas_limit.get(test.indexes.gas).unwrap();
     let gas_limit = u64::try_from(gas_limit).unwrap_or(u64::MAX);
@@ -228,10 +230,12 @@ fn execute_transaction(
         "Executing transaction with:\n\
                     \t- data: {}\n\
                     \t- gas: {} gas\n\
-                    \t- value: {} wei",
+                    \t- value: {} wei\n\
+                    \t- access list: {:?}",
         string_of_hexa(&env.tx.data),
         gas_limit,
-        env.tx.value
+        env.tx.value,
+        access_list
     );
     run_transaction(
         host,
@@ -247,6 +251,7 @@ fn execute_transaction(
         transaction_value,
         pay_for_gas,
         None,
+        access_list,
     )
 }
 
@@ -373,12 +378,17 @@ pub fn run_test(
                     }
                 }
 
-                let data = unit
-                    .transaction
-                    .data
-                    .get(test_execution.indexes.data)
-                    .unwrap()
-                    .clone();
+                let data_index = test_execution.indexes.data;
+
+                let data = unit.transaction.data.get(data_index).unwrap().clone();
+
+                let access_list = match unit.transaction.access_lists {
+                    Some(ref access_list) => match access_list.get(data_index).unwrap() {
+                        Some(access_list) => access_list.to_vec(),
+                        None => vec![],
+                    },
+                    None => vec![],
+                };
 
                 if data_to_skip(&name, &data, skip_data) {
                     continue;
@@ -393,6 +403,7 @@ pub fn run_test(
                     &mut env,
                     test_execution,
                     data,
+                    access_list,
                 );
 
                 let labels = LabelIndexes {

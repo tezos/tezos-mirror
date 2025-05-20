@@ -17,7 +17,7 @@ use evm::executor::stack::PrecompileFailure;
 use handler::{EvmHandler, ExecutionOutcome, ExecutionResult};
 use host::{path::RefPath, runtime::RuntimeError};
 use primitive_types::{H160, H256, U256};
-use tezos_ethereum::block::BlockConstants;
+use tezos_ethereum::{access_list::AccessList, block::BlockConstants};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_storage::StorageError;
@@ -278,6 +278,7 @@ pub fn run_transaction<'a, Host>(
     value: U256,
     pay_for_gas: bool,
     tracer: Option<TracerInput>,
+    access_list: AccessList,
 ) -> Result<Option<handler::ExecutionOutcome>, EthereumError>
 where
     Host: Runtime,
@@ -300,6 +301,7 @@ where
         precompiles,
         effective_gas_price,
         tracer,
+        access_list,
     );
 
     let call_data_for_tracing = if tracer.is_some() {
@@ -478,6 +480,7 @@ mod test {
     use primitive_types::{H160, H256};
     use std::str::FromStr;
     use std::vec;
+    use tezos_ethereum::access_list::empty_access_list;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -653,6 +656,7 @@ mod test {
             transaction_value,
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -715,6 +719,7 @@ mod test {
             transaction_value,
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -771,6 +776,7 @@ mod test {
             transaction_value,
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -824,6 +830,7 @@ mod test {
             transaction_value,
             true,
             None,
+            empty_access_list(),
         );
 
         let new_address =
@@ -859,6 +866,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
         assert!(result2.is_ok(), "execution should have succeeded");
         let result = result2.unwrap();
@@ -890,6 +898,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
         assert!(result3.is_ok(), "execution should have succeeded");
         let result = result3.unwrap();
@@ -920,6 +929,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
         assert!(result2.is_ok(), "execution should have succeeded");
         let result = result2.unwrap();
@@ -977,6 +987,7 @@ mod test {
             transaction_value,
             true,
             None,
+            empty_access_list(),
         );
 
         assert!(result.is_ok());
@@ -1027,6 +1038,7 @@ mod test {
             transaction_value,
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -1077,6 +1089,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_gas = 21000; // base cost
@@ -1220,6 +1233,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_gas = 21000 // base cost
@@ -1280,6 +1294,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_gas = 21000 // base cost
@@ -1339,6 +1354,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         // Assert
@@ -1393,6 +1409,7 @@ mod test {
             U256::from(100),
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -1450,6 +1467,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_gas = 21000 // base cost
@@ -1507,6 +1525,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         // Assert
@@ -1619,6 +1638,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         // Assert
@@ -1697,6 +1717,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_gas = 21000 // base cost
@@ -1787,6 +1808,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_gas = 21000 // base cost
@@ -1899,6 +1921,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let log_record1 = Log {
@@ -2008,6 +2031,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let log_record1 = Log {
@@ -2107,6 +2131,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
         let expected_gas = 21000 // base cost
         + 7624; // execution gas cost (taken at face value from tests)
@@ -2221,6 +2246,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -2316,6 +2342,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_gas = 21000 // base cost
@@ -2398,6 +2425,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_gas = 21000 // base cost
@@ -2476,6 +2504,7 @@ mod test {
             U256::from(100),
             true,
             None,
+            empty_access_list(),
         );
 
         let expected_result = Err(EthereumError::EthereumAccountError(
@@ -2525,6 +2554,7 @@ mod test {
             transaction_value,
             true,
             None,
+            empty_access_list(),
         );
 
         let result = unwrap_outcome!(result);
@@ -2583,6 +2613,7 @@ mod test {
             transaction_value,
             true,
             None,
+            empty_access_list(),
         );
 
         let result = unwrap_outcome!(&result, false);
@@ -2655,6 +2686,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         // Assert
@@ -2724,6 +2756,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         // Assert
@@ -2786,6 +2819,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         )
     }
 
@@ -2888,6 +2922,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let result = unwrap_outcome!(&result, false);
@@ -2968,6 +3003,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let result_init = unwrap_outcome!(&result_init, true);
@@ -3075,6 +3111,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let result_init = unwrap_outcome!(&result_init, true);
@@ -3153,6 +3190,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let result = unwrap_outcome!(&result, false);
@@ -3198,6 +3236,7 @@ mod test {
             transaction_value,
             true,
             None,
+            empty_access_list(),
         );
 
         let result = unwrap_outcome!(result);
@@ -3251,6 +3290,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         let path = account_path(&caller).unwrap();
@@ -3338,6 +3378,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         );
 
         // Get info on contract that should not be created
@@ -3460,6 +3501,7 @@ mod test {
             U256::zero(),
             false,
             None,
+            empty_access_list(),
         );
 
         unwrap_outcome!(result, true);
@@ -3543,6 +3585,7 @@ mod test {
             U256::zero(),
             false,
             None,
+            empty_access_list(),
         );
 
         unwrap_outcome!(result, false);
@@ -3580,6 +3623,7 @@ mod test {
             U256::zero(),
             false,
             None,
+            empty_access_list(),
         );
 
         let internal_address_nonce =
@@ -3658,6 +3702,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         )
         .unwrap()
         .unwrap();
@@ -3746,6 +3791,7 @@ mod test {
             U256::zero(),
             true,
             None,
+            empty_access_list(),
         )
         .unwrap()
         .unwrap();
@@ -3804,6 +3850,7 @@ mod test {
             U256::zero(),
             false,
             None,
+            empty_access_list(),
         );
 
         // The origin address is empty but when you start a transaction the nonce is bump

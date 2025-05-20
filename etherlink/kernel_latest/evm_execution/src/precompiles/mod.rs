@@ -299,6 +299,7 @@ mod test_helpers {
     use evm::Transfer;
     use host::runtime::Runtime;
     use primitive_types::{H160, U256};
+    use tezos_ethereum::access_list::empty_access_list;
     use tezos_ethereum::block::BlockConstants;
     use tezos_ethereum::block::BlockFees;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -377,6 +378,7 @@ mod test_helpers {
             &precompiles,
             gas_price,
             None,
+            empty_access_list(),
         );
 
         let value = transfer.map(|t| t.value);

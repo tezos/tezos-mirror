@@ -432,6 +432,12 @@ let incrementor_proxy =
     ~label:"proxy"
     ~contract:"Proxy"
 
+let eip2930_storage_access =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/eip2930_storage_access.sol")
+    ~label:"storageaccess"
+    ~contract:"StorageAccess"
+
 module Precompile = struct
   let withdrawal = "0xff00000000000000000000000000000000000001"
 

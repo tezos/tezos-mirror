@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2021-2023 draganrakita
 //
 // SPDX-License-Identifier: MIT
@@ -13,6 +13,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt,
 };
+use tezos_ethereum::access_list::AccessList;
 
 use crate::models::deserializer::*;
 
@@ -173,6 +174,7 @@ pub struct UnitEnv {
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionParts {
+    pub access_lists: Option<Vec<Option<AccessList>>>,
     #[serde(deserialize_with = "deserialize_vec_as_vec_bytes")]
     pub data: Vec<Bytes>,
     pub gas_limit: Vec<U256>,

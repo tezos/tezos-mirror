@@ -53,6 +53,7 @@ use primitive_types::H256;
 use primitive_types::{H160, U256};
 use rlp::Decodable;
 use rlp::Rlp;
+use tezos_ethereum::access_list::empty_access_list;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::Log;
 use tezos_evm_logging::{
@@ -221,6 +222,7 @@ pub fn queue_fa_deposit<'a, Host: Runtime>(
         precompiles,
         block.base_fee_per_gas(),
         tracer_input,
+        empty_access_list(),
     );
 
     handler.begin_initial_transaction(

@@ -10,6 +10,7 @@ use num_bigint::BigInt;
 use primitive_types::{H160, H256, U256};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::{
+    access_list::empty_access_list,
     block::{BlockConstants, BlockFees},
     Log,
 };
@@ -99,6 +100,7 @@ pub fn deploy_mock_wrapper(
         U256::zero(),
         false,
         None,
+        empty_access_list(),
     )
     .expect("Failed to deploy")
     .unwrap()
@@ -143,6 +145,7 @@ pub fn deploy_reentrancy_tester(
         U256::zero(),
         false,
         None,
+        empty_access_list(),
     )
     .expect("Failed to deploy")
     .unwrap()
@@ -189,6 +192,7 @@ pub fn run_fa_deposit(
             &precompiles,
             U256::from(21000),
             None,
+            empty_access_list(),
         );
 
         handler
@@ -439,6 +443,7 @@ pub fn fa_bridge_precompile_call_withdraw(
         &precompiles,
         U256::from(21000),
         None,
+        empty_access_list(),
     );
 
     handler

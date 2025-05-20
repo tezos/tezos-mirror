@@ -396,15 +396,12 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         | "Create2OnDepth1024.json"
         | "CallRecursiveBombLog2.json"
 
-        // Reason: EIP-2930 (https://eips.ethereum.org/EIPS/eip-2930) concerns optional
-        // access lists and we don't intend to implement them for now
-        | "addressOpcodes.json"
+        // Reason: Coinbase related tests that expects an absurd amount of WEI
+        // after the execution.
+        // NB: The expected storage slots for 0x000000000000000000000000000000000000C0DE
+        // which contains the gas cost with hot/cold access are accurate.
         | "coinbaseT01.json"
         | "coinbaseT2.json"
-        | "manualCreate.json"
-        | "storageCosts.json"
-        | "transactionCosts.json"
-        | "variedContext.json"
 
         // Reason: relying on precompile contract kzg_point_evaluation from
         // EIP-4844 which we don't support.

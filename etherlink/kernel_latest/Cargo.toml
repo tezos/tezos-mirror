@@ -44,6 +44,7 @@ tezos_data_encoding = { version = "0.6", path = "../../sdk/rust/encoding" }
 const-decoder = { version = "0.3.0" }
 rlp = "0.5.2"
 nom = { version = "7.1", default-features = false }
+serde = { version = "1.0", features = ["derive", "rc"] }
 
 # ethereum VM
 evm = { path = "../sputnikvm", default-features = false }
