@@ -10879,7 +10879,13 @@ let test_tx_pool_pending_nonce () =
 let test_da_fees_after_execution =
   register_all
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "da_fees"]
+    ~tags:
+      [
+        "evm";
+        "da_fees";
+        (* Those tests take about 13 minutes in the CI. *)
+        Tag.slow;
+      ]
     ~da_fee:(Wei.of_string "4_000_000_000_000")
     ~title:"da fees test"
   @@ fun {sequencer; _} _protocol ->
