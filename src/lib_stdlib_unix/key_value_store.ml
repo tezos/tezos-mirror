@@ -720,7 +720,7 @@ end = struct
   let load_file files last_actions lru filename =
     let open Lwt_syntax in
     let* lru_node = add_lru files last_actions lru filename in
-    let* fd = Lwt_unix.openfile filename [O_RDWR; O_CLOEXEC] 0o660 in
+    let* fd = Lwt_unix.openfile filename [O_RDWR; O_CLOEXEC] 0o644 in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6033
        Should we check that the file is at least as big as the bitset? *)
     let bitset =
@@ -748,7 +748,7 @@ end = struct
       Lwt_unix.openfile
         layout.filepath
         [O_RDWR; O_CREAT; O_EXCL; O_CLOEXEC]
-        0o660
+        0o644
     in
     let total_size =
       bitset_size + (layout.number_of_keys_per_file * layout.value_size)
