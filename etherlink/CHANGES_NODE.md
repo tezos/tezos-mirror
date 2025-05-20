@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+### Configuration changes
+
+### RPCs changes
+
+### Metrics changes
+
+### Execution changes
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
 ## Version 0.26 (2025-05-20)
 
 This release of the EVM node adds support for executing natively the Dionysus
