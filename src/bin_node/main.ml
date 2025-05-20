@@ -246,6 +246,7 @@ let commands =
       Node_reconstruct_command.cmd;
       Node_storage_command.cmd;
       Node_metrics_command.cmd;
+      Node_upnp_commands.cmd;
     ]
 
 let () =
