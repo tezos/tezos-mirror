@@ -171,6 +171,9 @@ let get_slot_content_from_shards cryptobox store slot_id =
   in
   return slot
 
+let fetch_slot_from_http_backups _ctxt _cryptobox ~slot_size:_ _slot_id =
+  assert false
+
 let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
@@ -182,20 +185,24 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   in
   match res_slot_store with
   | Ok slot -> return slot
-  | Error _ ->
-      if reconstruct_if_missing then
-        (* The slot could not be obtained from the slot store, attempt a
-           reconstruction. *)
-        let*! res_shard_store =
-          Node_context.may_reconstruct
-            ~reconstruct:(get_slot_content_from_shards cryptobox store)
-            slot_id
-            ctxt
-        in
-        match res_shard_store with
-        | Ok slot -> return slot
-        | Error _ -> Lwt.return res_slot_store
-      else Lwt.return res_slot_store
+  | Error _ -> (
+      let*! res_shard_store =
+        if reconstruct_if_missing then
+          (* The slot could not be obtained from the slot store, attempt a
+             reconstruction. *)
+          let*! res_shard_store =
+            Node_context.may_reconstruct
+              ~reconstruct:(get_slot_content_from_shards cryptobox store)
+              slot_id
+              ctxt
+          in
+          Lwt.return_some res_shard_store
+        else Lwt.return_none
+      in
+      match res_shard_store with
+      | Some (Ok slot) -> return slot
+      | Some (Error _) | None ->
+          fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id)
 
 (* Main functions *)
 
