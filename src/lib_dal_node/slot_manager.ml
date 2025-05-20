@@ -171,10 +171,39 @@ let get_slot_content_from_shards cryptobox store slot_id =
   in
   return slot
 
-let fetch_slot_from_http_uri ~slot_size:_ ~published_level:_ ~slot_index:_
-    _http_backup_uri =
-  (* TODO in the next commit(s) *)
-  assert false
+let fetch_slot_from_http_uri ~slot_size ~published_level ~slot_index
+    http_backup_uri =
+  let open Lwt_syntax in
+  let url =
+    Uri.with_path
+      http_backup_uri
+      String.(
+        concat
+          "/"
+          [
+            "v0";
+            "slots";
+            "by_published_level";
+            Format.sprintf "%ld_%d_%d" published_level slot_index slot_size;
+          ])
+  in
+  let* resp, body = Cohttp_lwt_unix.Client.get url in
+  match resp.status with
+  | `OK ->
+      let* body_str = Cohttp_lwt.Body.to_string body in
+      return_some (Bytes.of_string body_str)
+  | #Cohttp.Code.status_code as status ->
+      (* Consume the body of the request in case of failure to avoid leaking stream!
+         See https://github.com/mirage/ocaml-cohttp/issues/730 *)
+      let* _ = Cohttp_lwt.Body.drain_body body in
+      let* () =
+        Event.emit_fetching_slot_from_http_backup_failed
+          ~published_level
+          ~slot_index
+          ~http_backup_uri
+          ~status
+      in
+      return_none
 
 let try_fetch_slot_from_http_backup ~slot_size ~published_level ~slot_index
     cryptobox expected_commitment_hash http_backup_uri =
