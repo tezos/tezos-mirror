@@ -95,7 +95,7 @@ let operations_to_reclassify =
   declare_1
     ~section
     ~name:"operations_to_reclassify"
-    ~msg:"{count} operations set to be reeclassified after the flush"
+    ~msg:"{count} operations set to be reclassified after the flush"
     ~level:Debug
     ~pp1:Format.pp_print_int
     ("count", Data_encoding.int31)

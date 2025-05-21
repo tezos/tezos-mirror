@@ -262,7 +262,7 @@ module MakeAbstract
         return_some (removed, classification_of_trace trace)
     | Unchanged ->
         (* There was an operation conflict and [op] lost to the
-           pre-existing operation. The error should indicate the fee
+           preexisting operation. The error should indicate the fee
            that [op] would need in order to win the conflict and replace
            the old operation, if such a fee exists; otherwise the error
            should contain [None]. *)

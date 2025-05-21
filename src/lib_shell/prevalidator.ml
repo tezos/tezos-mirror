@@ -63,7 +63,7 @@ module Events = Prevalidator_events
 module Classification = Prevalidator_classification
 
 (** This module encapsulates pending operations to maintain them in two
-    different data structure and avoid coslty repetitive convertions when
+    different data structure and avoid costly repetitive conversions when
     handling batches in [classify_pending_operations]. *)
 module Pending_ops = Prevalidator_pending_operations
 
@@ -72,7 +72,7 @@ module Pending_ops = Prevalidator_pending_operations
     [include] this module in {!Internal_for_tests} below and avoid
     code duplication.
 
-    The raison d'etre of these records of functions is to be able to use
+    The raison d'être of these records of functions is to be able to use
     alternative implementations of all functions in tests.
 
     The purpose of the {!Tools.tools} record is to abstract away from {!Store.chain_store}.
@@ -1149,7 +1149,7 @@ module Make_s
              | Drop -> Lwt.return (pending, nb_pending)
              | Priority ((High | Medium | Low _) as priority) ->
                  (* Here, an operation injected in this node with High priority will
-                    now get its approriate priority. *)
+                    now get its appropriate priority. *)
                  let status =
                    (* If the operation has not yet been classified we set its
                       status to Fresh *)
