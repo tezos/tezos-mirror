@@ -5,12 +5,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type options = {
+type discovery_options = {
   bind_addr : string option;
   broadcast_addr : string option;
   timeout : float option;
   single_search_timeout : float option;
 }
+
+type mapping_options = {
+  local_addr : string option;
+  lease_duration : int option;
+  description : string option;
+}
+
+(* The duration depends on UPNP/IGV version:
+   - If the gateway implements v1, the lease is unlimited
+   - If the gateway implements v2, the lease is the maximum allocated time,
+   which is 604800 seconds, i.e. one week.
+
+   See specification at
+   https://upnp.org/specs/gw/UPnP-gw-WANIPConnection-v2-Service.pdf, paragraph
+   2.3.16.
+*)
+let default_lease_duration = 0l
+
+let default_description = "octez-node P2P"
 
 let search_gateway {bind_addr; broadcast_addr; timeout; single_search_timeout}
     () =
@@ -65,8 +84,63 @@ let handle_local_address gateway local_addr =
             "Cannot determine machine network address, please give it using \
              the option `--local-addr`.")
 
-let search_gateway options () =
-  Tezos_base_unix.Event_loop.main_run (search_gateway options)
+let search_gateway_cmd options () =
+  Tezos_base_unix.Event_loop.main_run (search_gateway_cmd options)
+
+let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
+    {local_addr; lease_duration; description} () =
+  let open Lwt_result_syntax in
+  let gateway =
+    Octez_igd_next.Igd_next_gen.search_gateway
+      ~bind_addr
+      ~broadcast_address:broadcast_addr
+      ~timeout
+      ~single_search_timeout
+  in
+  let*? gateway =
+    match gateway with
+    | Ok g -> Ok g
+    | Error e -> error_with "Cannot find gateway: %s" e
+  in
+  let* local_addr = handle_local_address gateway local_addr in
+  let*? lease_duration =
+    match lease_duration with
+    | Some l ->
+        if l >= 1 lsl 31 then
+          error_with
+            "Please use a duration less than or equal to %ld seconds."
+            Int32.max_int
+        else Ok (Int32.of_int l)
+    | None -> Ok default_lease_duration
+  in
+  (* These two values are temporary and will be extracted from the config files
+     in the next commit. *)
+  let local_port = 9732 in
+  let external_port = Option.value ~default:local_port None in
+  let port =
+    Octez_igd_next.Igd_next_gen.gateway_map_port
+      gateway
+      Udp
+      ~local_addr
+      ~local_port
+      ~external_port
+      ~lease_duration
+      ~description:(Option.value ~default:default_description description)
+  in
+  match port with
+  | Ok () ->
+      (* Note that the external IP can be retrieved from the gateway, but it
+         avoids leaking it in the logs. *)
+      Format.printf
+        "Redirecting <external_ip>:%d to %s:%d\n%!"
+        external_port
+        local_addr
+        local_port ;
+      return_unit
+  | Error e -> failwith "%s" e
+
+let map_port_cmd search_options mapping_options () =
+  Tezos_base_unix.Event_loop.main_run (map_port search_options mapping_options)
 
 module Term = struct
   open Cmdliner
@@ -105,7 +179,35 @@ module Term = struct
       & opt (some float) None
       & info ~docs ~doc ~docv:"SEC" ["single-search-timeout"])
 
-  let options =
+  let local_addr =
+    let doc = "Local network IP address on which the redirection is done." in
+    Arg.(
+      value
+      & opt (some string) None
+      & info ~docs ~doc ~docv:"ADDR" ["local-addr"])
+
+  let lease_duration =
+    let doc =
+      "Lease duration of the mapping, in seconds. Defaults to `0` which either \
+       corresponds to an unlimited lease if the gateway implements UPNP/IGD \
+       v1, or 604800 seconds for UPNP/IGD v2."
+    in
+    Arg.(
+      value
+      & opt (some int) None
+      & info ~docs ~doc ~docv:"SEC" ["lease-duration"])
+
+  let description =
+    let doc =
+      "Name of the mapping, used by UPNP clients/routers to document the \
+       redirection."
+    in
+    Arg.(
+      value
+      & opt (some string) None
+      & info ~docs ~doc ~docv:"DESC" ["mapping-description"])
+
+  let search_options =
     let open Term.Syntax in
     let+ bind_addr
     and+ broadcast_addr
@@ -118,9 +220,17 @@ module Term = struct
       single_search_timeout;
     }
 
-  let process options = `Ok (search_gateway options ())
+  let mapping_options =
+    let open Term.Syntax in
+    let+ local_addr and+ lease_duration and+ description in
+    {local_addr; lease_duration; description}
 
-  let term = Term.(ret (const process $ options))
+  let process search_options mapping_options =
+    match map_port_cmd search_options mapping_options () with
+    | Ok () -> `Ok ()
+    | Error e -> `Error (true, Format.asprintf "%a" Error_monad.pp_print_trace e)
+
+  let term = Term.(ret (const process $ search_options $ mapping_options))
 end
 
 module Manpage = struct
@@ -137,7 +247,7 @@ module Manpage = struct
   (* Note that this command is temporary as a proof of concept, and will evolve
      into a full-fledge port mapping command. As such, the documentation is
      minimal for now as it doesn't make sense. *)
-  let info = Cmdliner.Cmd.info ~doc:"Experimental" ~man "search-gateway"
+  let info = Cmdliner.Cmd.info ~doc:"Experimental" ~man "map-port"
 end
 
 let cmd = Cmdliner.Cmd.v Manpage.info Term.term
