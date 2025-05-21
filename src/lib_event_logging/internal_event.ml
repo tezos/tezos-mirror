@@ -112,7 +112,7 @@ module Section : sig
 
   val make_sanitized : string list -> t
 
-  val append : string -> t -> t
+  val append : t -> string -> t
 
   val name : t -> string
 
@@ -152,7 +152,7 @@ end = struct
   let make_sanitized sl =
     List.map (String.map (fun c -> if valid_char c then c else '_')) sl |> make
 
-  let append name t =
+  let append t name =
     check_name_exn name make_name_exception ;
     {path = t.path @ [name]}
 

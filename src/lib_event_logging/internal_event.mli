@@ -79,7 +79,7 @@ module Section : sig
   (** Build a {!Section.t} by replacing special characters with ['_']. *)
   val make_sanitized : string list -> t
 
-  val append : string -> t -> t
+  val append : t -> string -> t
 
   (** [is_prefix ~prefix p] checks that [p] starts with [~prefix].  *)
   val is_prefix : prefix:t -> t -> bool

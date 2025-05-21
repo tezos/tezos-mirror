@@ -27,6 +27,21 @@
 (** Ensure that the prometheus profiler is linked. *)
 let () = (() [@profiler.overwrite ignore Prometheus_profiler.prometheus])
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "main"]
+
+  let gc_allocation_policy_changed =
+    declare_2
+      ~section
+      ~level:Info
+      ~name:"gc_allocation_policy_changed"
+      ~msg:"default allocation policy changed: {current} (default {default})"
+      ("current", Data_encoding.int31)
+      ("default", Data_encoding.int31)
+end
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025
    Remove backwards compatible Tezos symlinks. *)
 let warn_if_argv0_name_not_octez () =
@@ -80,10 +95,10 @@ let () =
   | None -> Gc.set {current with allocation_policy = default_allocation_policy}
   | Some _ -> ()) ;
   if (Gc.get ()).allocation_policy <> default_allocation_policy then
-    Format.eprintf
-      "WARNING: Default allocation policy changed: %d (default %d)@."
-      current.allocation_policy
-      default_allocation_policy
+    Events.(
+      emit_at_top_level
+        gc_allocation_policy_changed
+        (current.allocation_policy, default_allocation_policy))
 
 (* This can be removed once the protocol is fixed
    (currently there is [to_int Int32.max_int] which is obviously invalid). *)

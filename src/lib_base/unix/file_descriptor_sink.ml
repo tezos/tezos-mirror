@@ -715,7 +715,7 @@ end) : Internal_event.SINK with type t = t = struct
             (fun (prefix, _) ->
               Internal_event.Section.is_prefix
                 ~prefix
-                (Internal_event.Section.append M.simple_name section))
+                (Internal_event.Section.append section M.simple_name))
             kvl
         with
         | None ->
