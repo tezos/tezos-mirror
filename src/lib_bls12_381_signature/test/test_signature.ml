@@ -175,6 +175,14 @@ struct
       SignatureM.signature_size_in_bytes
       = Bytes.length (SignatureM.signature_to_bytes signature))
 
+  let test_zero_pk () =
+    assert (Option.is_none @@ SignatureM.pk_of_bytes_opt PkGroup.(to_bytes zero))
+
+  let test_zero_signature () =
+    assert (
+      Option.is_none
+      @@ SignatureM.signature_of_bytes_opt SigGroup.(to_bytes zero))
+
   let test_unsafe_pk_of_bytes_does_no_check_on_the_input () =
     let bytes = generate_random_bytes (Random.int 1000) in
     ignore @@ SignatureM.unsafe_pk_of_bytes bytes
@@ -506,6 +514,18 @@ struct
     val name : string
   end) =
   struct
+    let test_verify_with_zero_pk_and_sig () =
+      (* sk = 0 => pk = [sk]G = zero and sign(sk, msg) = [sk]H(msg) = zero *)
+      let pk = SignatureM.unsafe_pk_of_bytes PkGroup.(to_bytes zero) in
+      let signature =
+        SignatureM.unsafe_signature_of_bytes SigGroup.(to_bytes zero)
+      in
+      let msg_length = 1 + Random.int 512 in
+      let msg = generate_random_bytes msg_length in
+      (* pk = zero is an invalid public key *)
+      (* sig = zero is an invalid signature *)
+      assert (not (Scheme.verify pk msg signature))
+
     let test_sign_and_verify_same_message_with_correct_keys () =
       let ikm = generate_random_bytes 32 in
       let sk = Bls12_381_signature.generate_sk ikm in
@@ -633,6 +653,10 @@ struct
       ( Printf.sprintf "Properties and test vectors for %s" Scheme.name,
         [
           test_case
+            "Verify with zero public key and signature"
+            `Quick
+            (Utils.repeat 100 test_verify_with_zero_pk_and_sig);
+          test_case
             "Sign and verify same message with correct keys"
             `Quick
             (Utils.repeat
@@ -738,6 +762,8 @@ struct
         ] );
       ( "Auxiliary functions",
         [
+          test_case "zero pk" `Quick test_zero_pk;
+          test_case "zero signature" `Quick test_zero_signature;
           test_case
             "unsafe_pk_of_bytes does no check on the input"
             `Quick
