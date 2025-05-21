@@ -70,30 +70,43 @@ module Handlers : Worker.EIO_HANDLERS with type self = task_worker = struct
   let on_close _ = ()
 end
 
-type launch_error = Handlers.launch_error
-
 type 'a message_error = 'a Worker.message_error =
   | Closed of error list option
   | Request_error of 'a
   | Any of exn
 
-let worker name domains =
+(* This is a conservative limit that aims to fit all machines, without
+   overloading it.*)
+let default_max_domains = max (min (Domain.recommended_domain_count () / 2) 8) 1
+
+let number_of_domains = default_max_domains
+
+let worker =
   let table = Worker.create_table Queue in
-  Worker.launch_eio ~domains table ~name () (module Handlers)
+  Eio.Lazy.from_fun ~cancel:`Protect @@ fun () ->
+  match
+    Worker.launch_eio
+      ~domains:default_max_domains
+      table
+      ~name:"shared task worker"
+      ()
+      (module Handlers)
+  with
+  | Ok w -> w
+  | Error _ -> assert false
 
-let launch_task_and_wait worker name on_request ?on_completion param =
+let launch_task_and_wait name on_request ?on_completion param =
   let r = Request.Task {name; on_request; param; on_completion} in
-  Worker.Queue.push_request_and_wait_eio worker r
+  Worker.Queue.push_request_and_wait_eio (Eio.Lazy.force worker) r
 
-let launch_tasks_and_wait worker name func ?on_completion args =
+let launch_tasks_and_wait ?(max_fibers = max_int) name func ?on_completion args
+    =
   Eio.Fiber.List.map
+    ~max_fibers
     (fun arg ->
-      launch_task_and_wait worker name ?on_completion func arg
-      |> Eio.Promise.await)
+      launch_task_and_wait name ?on_completion func arg |> Eio.Promise.await)
     args
 
-let launch_task worker name on_request ?on_completion param =
+let launch_task name on_request ?on_completion param =
   let r = Request.Task {name; on_request; param; on_completion} in
-  Worker.Queue.push_request_eio worker r
-
-let shutdown task_worker = Worker.shutdown_eio task_worker
+  Worker.Queue.push_request_eio (Eio.Lazy.force worker) r
