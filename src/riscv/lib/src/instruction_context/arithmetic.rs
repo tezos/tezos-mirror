@@ -35,6 +35,11 @@ pub trait Arithmetic<I: ICB + ?Sized>: Copy {
     /// This behaves identically for both signed & unsigned values.
     fn mul(self, other: Self, icb: &mut I) -> Self;
 
+    /// Perform the signed integer division of **self** by **other**, returning the new value.
+    ///
+    /// This panics if **other** is zero.
+    fn div_signed(self, other: Self, icb: &mut I) -> Self;
+
     /// Negate the value of the **XValue**.
     fn negate(self, icb: &mut I) -> Self;
 
@@ -71,6 +76,10 @@ impl<I: ICB> Arithmetic<I> for XValue {
         self.wrapping_mul(other)
     }
 
+    fn div_signed(self, other: Self, _: &mut I) -> Self {
+        ((self as i64) / (other as i64)) as Self
+    }
+
     fn negate(self, _: &mut I) -> Self {
         0_u64.wrapping_sub(self)
     }
@@ -79,7 +88,7 @@ impl<I: ICB> Arithmetic<I> for XValue {
         match shift {
             Shift::Left => self << amount,
             Shift::RightUnsigned => self >> amount,
-            Shift::RightSigned => (self as i64 >> amount) as XValue,
+            Shift::RightSigned => (self as i64 >> amount) as Self,
         }
     }
 
@@ -113,6 +122,10 @@ impl<I: ICB> Arithmetic<I> for XValue32 {
         self.wrapping_mul(other)
     }
 
+    fn div_signed(self, other: Self, _: &mut I) -> Self {
+        ((self as i32) / (other as i32)) as Self
+    }
+
     fn negate(self, _: &mut I) -> Self {
         0_u32.wrapping_sub(self)
     }
@@ -121,7 +134,7 @@ impl<I: ICB> Arithmetic<I> for XValue32 {
         match shift {
             Shift::Left => self << amount,
             Shift::RightUnsigned => self >> amount,
-            Shift::RightSigned => (self as i32 >> amount) as XValue32,
+            Shift::RightSigned => (self as i32 >> amount) as Self,
         }
     }
 

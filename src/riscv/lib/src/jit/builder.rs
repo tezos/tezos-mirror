@@ -28,6 +28,7 @@ use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::instruction_context::LoadStoreWidth;
+use crate::instruction_context::PhiValue;
 use crate::instruction_context::Predicate;
 use crate::instruction_context::arithmetic::Arithmetic;
 use crate::instruction_context::comparable::Comparable;
@@ -46,7 +47,7 @@ pub struct X64(pub Value);
 pub struct X32(pub Value);
 
 /// Builder context used when lowering individual instructions within a block.
-pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
+pub(crate) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     /// Cranelift function builder
     builder: FunctionBuilder<'a>,
 
@@ -270,6 +271,10 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
     /// An `I8` width value.
     type Bool = Value;
 
+    fn bool_and(&mut self, lhs: Self::Bool, rhs: Self::Bool) -> Self::Bool {
+        self.builder.ins().band(lhs, rhs)
+    }
+
     type XValue32 = X32;
 
     fn narrow(&mut self, value: Self::XValue) -> Self::XValue32 {
@@ -330,6 +335,59 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
         });
 
         ProgramCounterUpdate::Next(instr_width)
+    }
+
+    fn branch_merge<Phi: PhiValue, OnTrue, OnFalse>(
+        &mut self,
+        cond: Self::Bool,
+        true_branch: OnTrue,
+        false_branch: OnFalse,
+    ) -> Phi::IcbValue<Self>
+    where
+        OnTrue: FnOnce(&mut Self) -> Phi::IcbValue<Self>,
+        OnFalse: FnOnce(&mut Self) -> Phi::IcbValue<Self>,
+    {
+        // Set up parallel blocks.
+        let true_block = self.builder.create_block();
+        let false_block = self.builder.create_block();
+
+        // set up common post-block.
+        let post_block = self.builder.create_block();
+
+        // Add a parameter to the post-block for each parameter returned by the closures.
+        Phi::IR_TYPES.iter().for_each(|v| {
+            self.builder.append_block_param(post_block, *v);
+        });
+
+        self.builder
+            .ins()
+            .brif(cond, true_block, &[], false_block, &[]);
+
+        // both IR blocks need access to the dynamic values at this point in time.
+        // These can be modified by the `true_branch` and `false_branch` functions.
+        let snapshot = self.dynamic;
+        self.builder.switch_to_block(true_block);
+
+        let res_val = Phi::to_ir_vals(true_branch(self));
+        self.builder
+            .ins()
+            .jump(post_block, &res_val.into_iter().collect::<Vec<_>>());
+        self.builder.seal_block(true_block);
+
+        self.dynamic = snapshot;
+        self.builder.switch_to_block(false_block);
+
+        let res_val = Phi::to_ir_vals(false_branch(self));
+        self.builder
+            .ins()
+            .jump(post_block, &res_val.into_iter().collect::<Vec<_>>());
+        self.builder.seal_block(false_block);
+
+        // The post-block is the common exit point for both branches.
+        self.builder.switch_to_block(post_block);
+        let params = self.builder.block_params(post_block);
+
+        Phi::from_ir_vals(params)
     }
 
     fn atomic_access_fault_guard(

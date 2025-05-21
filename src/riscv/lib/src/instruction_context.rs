@@ -12,7 +12,11 @@ pub(super) mod comparable;
 
 use arithmetic::Arithmetic;
 use comparable::Comparable;
+use cranelift::codegen::ir;
+use cranelift::codegen::ir::types::I64;
 
+use crate::jit::state_access::JitStateAccess;
+use crate::jit::{self};
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Args;
@@ -38,10 +42,70 @@ pub type IcbLoweringFn<I> = unsafe fn(&Args, &mut I) -> IcbFnResult<I>;
 /// Result of lowering an instruction.
 pub type IcbFnResult<I> = <I as ICB>::IResult<ProgramCounterUpdate<<I as ICB>::XValue>>;
 
+/// PhiValue allows the conversion of values to and from cranelift primitive
+/// [`ir::Value`] when in the context of [`JIT`] compilation. It represents a chosen
+/// correct value from multiple control flows possible in `ICB::branch_merge`.
+///
+/// These methods have no relevance in the context of interpreted mode.
+///
+/// [`JIT`]: crate::jit::JIT
+pub(super) trait PhiValue {
+    /// Represents the generic representation of the value in the ICB.
+    type IcbValue<I: ICB + ?Sized>: Sized;
+
+    /// In JIT, convert the value to an iterator of [`ir::Value`]s.
+    fn to_ir_vals<MC: MemoryConfig, JSA: JitStateAccess>(
+        icb_repr: Self::IcbValue<jit::builder::Builder<'_, MC, JSA>>,
+    ) -> impl IntoIterator<Item = ir::Value>;
+
+    /// Convert [`ir::Value`]s back to itself.
+    fn from_ir_vals<'a, MC: MemoryConfig, JSA: JitStateAccess>(
+        params: &[ir::Value],
+    ) -> Self::IcbValue<jit::builder::Builder<'a, MC, JSA>>;
+
+    /// The cranelift primitive types of the IR values representing this value in JIT.
+    const IR_TYPES: &'static [ir::Type];
+}
+
+impl PhiValue for () {
+    type IcbValue<I: ICB + ?Sized> = ();
+
+    fn to_ir_vals<MC: MemoryConfig, JSA: JitStateAccess>(
+        _: Self::IcbValue<jit::builder::Builder<'_, MC, JSA>>,
+    ) -> impl IntoIterator<Item = ir::Value> {
+        []
+    }
+
+    fn from_ir_vals<'a, MC: MemoryConfig, JSA: JitStateAccess>(
+        _: &[ir::Value],
+    ) -> Self::IcbValue<jit::builder::Builder<'a, MC, JSA>> {
+    }
+
+    const IR_TYPES: &'static [ir::Type] = &[];
+}
+
+impl PhiValue for XValue {
+    type IcbValue<I: ICB + ?Sized> = I::XValue;
+
+    fn to_ir_vals<MC: MemoryConfig, JSA: JitStateAccess>(
+        icb_repr: Self::IcbValue<jit::builder::Builder<'_, MC, JSA>>,
+    ) -> impl IntoIterator<Item = ir::Value> {
+        [icb_repr.0]
+    }
+
+    fn from_ir_vals<'a, MC: MemoryConfig, JSA: JitStateAccess>(
+        params: &[ir::Value],
+    ) -> Self::IcbValue<jit::builder::Builder<'a, MC, JSA>> {
+        jit::builder::X64(params[0])
+    }
+
+    const IR_TYPES: &'static [ir::Type] = &[I64];
+}
+
 /// Instruction Context Builder contains operations required to
 /// execute RISC-V instructions.
 #[expect(clippy::upper_case_acronyms, reason = "ICB looks cooler than Icb")]
-pub trait ICB {
+pub(crate) trait ICB {
     /// A 64-bit value stored in [`XRegisters`].
     ///
     /// [`XRegisters`]: crate::machine_state::registers::XRegisters
@@ -66,6 +130,9 @@ pub trait ICB {
     /// Type for boolean operations.
     type Bool;
 
+    /// Perform a logical `and` operation of two [`ICB::Bool`] values.
+    fn bool_and(&mut self, lhs: Self::Bool, rhs: Self::Bool) -> Self::Bool;
+
     /// A 32-bit value to be used only in word-width operations.
     type XValue32: Arithmetic<Self> + Comparable<Self>;
 
@@ -76,6 +143,7 @@ pub trait ICB {
     fn extend_signed(&mut self, value: Self::XValue32) -> Self::XValue;
 
     /// Zero-extend an [`XValue32`] to an [`XValue`].
+    #[expect(dead_code)]
     fn extend_unsigned(&mut self, value: Self::XValue32) -> Self::XValue;
 
     /// Convert a boolean value to an xvalue.
@@ -97,6 +165,24 @@ pub trait ICB {
         offset: i64,
         instr_width: InstrWidth,
     ) -> ProgramCounterUpdate<Self::XValue>;
+
+    /// Take a branch based on the given condition and return to a common line of execution.
+    ///
+    /// This is used for situations where we have a common execution path following branching.
+    /// The `cond` is the condition to branch on, and the `true_branch` and `false_branch` are the
+    /// functions to execute for the left and right branches, respectively.
+    ///
+    /// Semantically, this function returns the caller into the context of the common
+    /// execution path with the resulting value of the branch that was taken.
+    fn branch_merge<Phi: PhiValue, OnTrue, OnFalse>(
+        &mut self,
+        cond: Self::Bool,
+        true_branch: OnTrue,
+        false_branch: OnFalse,
+    ) -> Phi::IcbValue<Self>
+    where
+        OnTrue: FnOnce(&mut Self) -> Phi::IcbValue<Self>,
+        OnFalse: FnOnce(&mut Self) -> Phi::IcbValue<Self>;
 
     /// Representation for the manipulation of fallible operations.
     type IResult<Value>;
@@ -207,6 +293,11 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
 
     type Bool = bool;
 
+    #[inline(always)]
+    fn bool_and(&mut self, lhs: Self::Bool, rhs: Self::Bool) -> Self::Bool {
+        lhs && rhs
+    }
+
     type XValue32 = XValue32;
 
     #[inline(always)]
@@ -242,6 +333,24 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
             ProgramCounterUpdate::Set(address)
         } else {
             ProgramCounterUpdate::Next(instr_width)
+        }
+    }
+
+    #[inline(always)]
+    fn branch_merge<Phi: PhiValue, OnTrue, OnFalse>(
+        &mut self,
+        cond: Self::Bool,
+        true_branch: OnTrue,
+        false_branch: OnFalse,
+    ) -> Phi::IcbValue<Self>
+    where
+        OnTrue: FnOnce(&mut Self) -> Phi::IcbValue<Self>,
+        OnFalse: FnOnce(&mut Self) -> Phi::IcbValue<Self>,
+    {
+        if cond {
+            true_branch(self)
+        } else {
+            false_branch(self)
         }
     }
 

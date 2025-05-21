@@ -291,7 +291,7 @@ pub enum OpCode {
     Remu,
     Remw,
     Remuw,
-    Div,
+    X64DivSigned,
     Divu,
     Divw,
     Divuw,
@@ -508,7 +508,7 @@ impl OpCode {
             Self::Remu => Args::run_remu,
             Self::Remw => Args::run_remw,
             Self::Remuw => Args::run_remuw,
-            Self::Div => Args::run_div,
+            Self::X64DivSigned => Args::run_x64_div_signed,
             Self::Divu => Args::run_divu,
             Self::Divw => Args::run_divw,
             Self::Divuw => Args::run_divuw,
@@ -616,7 +616,7 @@ impl OpCode {
     ///
     /// [InstructionContextBuilder]: ICB
     #[inline(always)]
-    pub fn to_lowering<I: ICB>(self) -> Option<IcbLoweringFn<I>> {
+    pub(crate) fn to_lowering<I: ICB>(self) -> Option<IcbLoweringFn<I>> {
         match self {
             Self::Mv => Some(Args::run_mv),
             Self::Neg => Some(Args::run_neg),
@@ -633,6 +633,7 @@ impl OpCode {
             Self::X64XorImm => Some(Args::run_x64_xor_immediate),
             Self::Mul => Some(Args::run_mul),
             Self::X32Mul => Some(Args::run_x32_mul),
+            Self::X64DivSigned => Some(Args::run_x64_div_signed),
             Self::Li => Some(Args::run_li),
             Self::AddImmediateToPC => Some(Args::run_add_immediate_to_pc),
             Self::J => Some(Args::run_j),
@@ -1481,7 +1482,7 @@ impl Args {
     impl_r_type!(run_remu);
     impl_r_type!(run_remw);
     impl_r_type!(run_remuw);
-    impl_r_type!(run_div);
+    impl_r_type!(integer::run_x64_div_signed, run_x64_div_signed, non_zero_rd);
     impl_r_type!(run_divu);
     impl_r_type!(run_divw);
     impl_r_type!(run_divuw);
@@ -1917,10 +1918,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Remuw,
                 args: args.into(),
             },
-            InstrCacheable::Div(args) => Instruction {
-                opcode: OpCode::Div,
-                args: args.into(),
-            },
+            InstrCacheable::Div(args) => Instruction::from_ic_div(args),
             InstrCacheable::Divu(args) => Instruction {
                 opcode: OpCode::Divu,
                 args: args.into(),

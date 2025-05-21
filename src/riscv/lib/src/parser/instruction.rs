@@ -481,16 +481,22 @@ pub enum InstrCacheable {
     Remu(RTypeArgs),
     Remw(RTypeArgs),
     Remuw(RTypeArgs),
+    /// `DIV` - signed integer division `⌊ val(rs1) / val(rs2) ⌋`, storing the result in `rd`.
+    ///
+    /// If `val(rs2) == 0`, the result is `-1`.
+    /// If `val(rs2) == -1` and `val(rs1) == i64::MIN`, the result is `i64::MIN`.
+    ///
+    /// All values are _signed integers_.    
     Div(RTypeArgs),
     Divu(RTypeArgs),
     Divw(RTypeArgs),
     Divuw(RTypeArgs),
-    /// `MUL` - Perform bitwise-multiplication of val(rs1) with val(rs2).
+    /// `MUL` - Perform bitwise-multiplication of `val(rs1)` with `val(rs2)`.
     Mul(RTypeArgs),
     Mulh(RTypeArgs),
     Mulhsu(RTypeArgs),
     Mulhu(RTypeArgs),
-    /// `MULW` - Multiply the lower 32 bits of val(rs1) with the lower 32 bits of val(rs2)
+    /// `MULW` - Multiply the lower 32 bits of `val(rs1)` with the lower 32 bits of `val(rs2)`
     /// and store the sign-extended result in `rd`.
     Mulw(RTypeArgs),
 
