@@ -32,6 +32,17 @@
 
 let team = Tag.layer1
 
+let bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5 =
+  Constant.(bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5)
+
+let public_key_hashes =
+  List.map (fun (account : Account.key) -> account.public_key_hash)
+
+let delegate_forbidden_error =
+  rex
+    "has committed too many misbehaviours; it is temporarily not allowed to \
+     bake/preattest/attest."
+
 let double_attestation_waiter accuser =
   Accuser.wait_for accuser (sf "double_attestation_denounced.v0") (fun _ ->
       Some ())
@@ -416,6 +427,107 @@ let operation_too_far_in_future =
   in
   let* () = waiter in
   unit
+
+let fetch_anonymous_operations ?block client =
+  let* json =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_operations_validation_pass
+         ?block
+         ~validation_pass:2
+         ()
+  in
+  return JSON.(as_list json)
+
+type kind =
+  | Preattestation
+  | Attestation
+  | Attestations_aggregate
+  | Preattestations_aggregate
+
+let string_of_kind = function
+  | Preattestation -> "preattestation"
+  | Attestation -> "attestation"
+  | Attestations_aggregate -> "attestations_aggregate"
+  | Preattestations_aggregate -> "preattestations_aggregate"
+
+(* [filter_consensus_denunciations ~level ~round ~delegate ~evidence ops]
+   filters [ops], keeping only "double_consensus_operation_evidence" operations
+   that match the given [level], [round], [delegate], and [evidence]. *)
+let filter_consensus_denunciations ~level ~round ~delegate ~evidence
+    anonymous_operations =
+  List.filter
+    JSON.(
+      fun operation_json ->
+        let contents = operation_json |-> "contents" |> as_list |> List.hd in
+        let forbidden_delegate =
+          contents |-> "metadata" |-> "punished_delegate" |> as_string
+        in
+        let kind = contents |-> "kind" |> as_string in
+        match kind with
+        | "double_consensus_operation_evidence"
+          when delegate = forbidden_delegate ->
+            let kind1, kind2 = evidence in
+            let op1 = contents |-> "op1" |-> "operations" in
+            let op2 = contents |-> "op2" |-> "operations" in
+            let kind1' = op1 |-> "kind" |> as_string in
+            let kind2' = op2 |-> "kind" |> as_string in
+            let level', round' =
+              let consensus_content_opt =
+                op1 |-> "consensus_content" |> as_opt
+              in
+              match consensus_content_opt with
+              | Some consensus_content ->
+                  (* aggregate operations *)
+                  let level = consensus_content |-> "level" |> as_int in
+                  let round = consensus_content |-> "round" |> as_int in
+                  (level, round)
+              | None ->
+                  (* non-aggregate operations *)
+                  let level = op1 |-> "level" |> as_int in
+                  let round = op1 |-> "round" |> as_int in
+                  (level, round)
+            in
+            let kind1 = string_of_kind kind1 in
+            let kind2 = string_of_kind kind2 in
+            level = level' && round = round'
+            && ((kind1 = kind1' && kind2 = kind2')
+               || (kind1 = kind2' && kind2 = kind1'))
+        | _ -> false)
+    anonymous_operations
+
+(* [check_contains_consensus_denunciations ~loc ~level ~round
+   ~anonymous_operations denunciations]
+   asserts that, for each (delegate, evidence) pair in [denunciations], there
+   is exactly one matching "double_consensus_operation_evidence" operation
+   in [anonymous_operations] for the given [level] and [round].
+   Fails the test otherwise. *)
+let check_contains_consensus_denunciations ~loc ~level ~round
+    ~anonymous_operations denunciations =
+  List.iter
+    (fun (delegate, evidence) ->
+      let delegate = delegate.Account.public_key_hash in
+      let corresponding_denunciations =
+        filter_consensus_denunciations
+          ~level
+          ~round
+          ~delegate
+          ~evidence
+          anonymous_operations
+      in
+      match corresponding_denunciations with
+      | [] ->
+          Test.fail
+            "%s@.No such denunciation found for %s at level %d round %d"
+            loc
+            delegate
+            level
+            round
+      | _ :: [] -> ()
+      | _ :: _ :: _ ->
+          Test.fail
+            "%s@.Unexpected multiple corresponding denunciations found"
+            loc)
+    denunciations
 
 let register ~protocols =
   double_attestation_wrong_block_payload_hash protocols ;
