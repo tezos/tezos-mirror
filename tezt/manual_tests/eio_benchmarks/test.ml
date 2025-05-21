@@ -14,6 +14,13 @@ open TzPervasives
 open Helpers
 
 let () =
+  if Array.length Sys.argv = 1 then (
+    Format.eprintf
+      "Missing number of domains to benchmark. Run the test with <NB_DOMAINS> \
+       as argument@." ;
+    exit 1)
+
+let () =
   match Tezos_profiler_unix.Profiler_instance.selected_backend () with
   | Some {instance_maker; _} -> (
       let profiler_maker = instance_maker ~directory:"/tmp" ~name:"main" in
