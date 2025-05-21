@@ -3294,7 +3294,7 @@ module Forge = struct
             match (sourcePubKey, revealed) with
             | None, _ | _, Some _ -> ops
             | Some pk, None ->
-                let operation = Reveal pk in
+                let operation = Reveal {public_key = pk; proof = None} in
                 Contents
                   (Manager_operation
                      {source; counter; operation; fee; gas_limit; storage_limit})

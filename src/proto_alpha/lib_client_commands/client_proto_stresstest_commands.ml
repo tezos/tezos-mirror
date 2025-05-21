@@ -580,7 +580,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
             counter = reveal_counter;
             gas_limit = cost_of_manager_operation;
             storage_limit = Z.zero;
-            operation = Reveal transfer.src.pk;
+            operation = Reveal {public_key = transfer.src.pk; proof = None};
           }
       in
       let manager_op =

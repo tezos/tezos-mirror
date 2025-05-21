@@ -1516,7 +1516,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
           ~fee:Limit.unknown
           ~gas_limit:Limit.unknown
           ~storage_limit:Limit.unknown
-          (Reveal src_pk)
+          (Reveal {public_key = src_pk; proof = None})
       in
       let*? reveal = Annotated_manager_operation.set_source source reveal in
       let*? reveal = Annotated_manager_operation.set_counter counter reveal in

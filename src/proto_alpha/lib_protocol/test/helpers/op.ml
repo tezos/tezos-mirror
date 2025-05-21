@@ -489,7 +489,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
               source = Signature.Public_key.hash public_key;
               fee = Tez.zero;
               counter;
-              operation = Reveal public_key;
+              operation = Reveal {public_key; proof = None};
               gas_limit = default_high_gas_limit;
               storage_limit = Z.zero;
             }
@@ -576,7 +576,7 @@ let manager_operation_with_fixed_gas_limit ?(force_reveal = false) ?counter
           source = Signature.Public_key.hash public_key;
           fee = Tez.zero;
           counter;
-          operation = Reveal public_key;
+          operation = Reveal {public_key; proof = None};
           gas_limit = reveal_gas_limit;
           storage_limit = Z.zero;
         }
@@ -658,7 +658,7 @@ let revelation_with_fixed_gas_limit ?(fee = Tez.zero) ~gas_limit
       source = pkh;
       fee;
       counter;
-      operation = Reveal public_key;
+      operation = Reveal {public_key; proof = None};
       gas_limit;
       storage_limit;
     }

@@ -2918,9 +2918,12 @@ module Manager = struct
     let* () = Contract.check_counter_increment vi.ctxt source first_counter in
     let revealed_key =
       match contents_list with
-      | Single (Manager_operation {operation = Reveal pk; _})
-      | Cons (Manager_operation {operation = Reveal pk; _}, _) ->
-          Some pk
+      | Single
+          (Manager_operation {operation = Reveal {public_key; proof = _}; _})
+      | Cons
+          (Manager_operation {operation = Reveal {public_key; proof = _}; _}, _)
+        ->
+          Some public_key
       | _ -> None
     in
     let* pk =
@@ -3081,7 +3084,8 @@ module Manager = struct
       contents
     in
     match operation with
-    | Reveal pk -> Contract.check_public_key pk source
+    | Reveal {public_key; proof = _} ->
+        Contract.check_public_key public_key source
     | Transaction {parameters; _} ->
         let* (_ : Gas.Arith.fp) =
           consume_decoding_gas remaining_gas parameters

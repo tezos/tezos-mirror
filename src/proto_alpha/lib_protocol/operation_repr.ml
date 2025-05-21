@@ -380,7 +380,11 @@ and _ contents =
       -> 'kind Kind.manager contents
 
 and _ manager_operation =
-  | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
+  | Reveal : {
+      public_key : Signature.Public_key.t;
+      proof : Bls.t option;
+    }
+      -> Kind.reveal manager_operation
   | Transaction : {
       amount : Tez_repr.t;
       parameters : Script_repr.lazy_expr;
@@ -676,10 +680,13 @@ module Encoding = struct
         {
           tag = 0;
           name = "reveal";
-          encoding = obj1 (req "public_key" Signature.Public_key.encoding);
+          encoding =
+            obj2
+              (req "public_key" Signature.Public_key.encoding)
+              (opt "proof" (dynamic_size Bls.encoding));
           select = (function Manager (Reveal _ as op) -> Some op | _ -> None);
-          proj = (function Reveal pkh -> pkh);
-          inj = (fun pkh -> Reveal pkh);
+          proj = (function Reveal {public_key; proof} -> (public_key, proof));
+          inj = (fun (public_key, proof) -> Reveal {public_key; proof});
         }
 
     let transaction_case =

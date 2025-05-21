@@ -464,7 +464,7 @@ let generate_manager_operation ?source gen_manop =
 let generate_reveal =
   let open QCheck2.Gen in
   let+ pk = random_pk in
-  Reveal pk
+  Reveal {public_key = pk; proof = None}
 
 let generate_transaction =
   let open QCheck2.Gen in

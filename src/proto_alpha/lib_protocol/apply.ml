@@ -1014,7 +1014,7 @@ let apply_manager_operation :
       Script.Always
     in
     match operation with
-    | Reveal pk ->
+    | Reveal {public_key; proof = _} ->
         (* TODO #2603
 
            Even if [precheck_manager_contents] has already asserted that
@@ -1033,7 +1033,11 @@ let apply_manager_operation :
            using [Contract.check_public_key] and this usage of
            [Contract.reveal_manager_key] should become the standard. *)
         let* ctxt =
-          Contract.reveal_manager_key ~check_consistency:false ctxt source pk
+          Contract.reveal_manager_key
+            ~check_consistency:false
+            ctxt
+            source
+            public_key
         in
         return
           ( ctxt,

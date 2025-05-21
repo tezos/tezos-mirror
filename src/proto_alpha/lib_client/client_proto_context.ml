@@ -209,7 +209,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ()
 
 let build_reveal_operation ?fee ?gas_limit ?storage_limit pk =
-  let operation = Reveal pk in
+  let operation = Reveal {public_key = pk; proof = None} in
   Injection.prepare_manager_operation
     ~fee:(Limit.of_option fee)
     ~gas_limit:(Limit.of_option gas_limit)
