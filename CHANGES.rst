@@ -81,6 +81,11 @@ Client
   setting a companion key at the same time as registering a given key as a delegate.
   (MR :gl:`!17960`)
 
+- Added ``--consensus-key-pop`` and ``--companion-key-pop`` argument when updating
+  bls consensus or companion key. These argument allow to provide a pre-computed
+  proof of possession for the bls key instead of asking the client to compute
+  it. (MR :gl:`!18084`)
+
 Signer
 ------
 
