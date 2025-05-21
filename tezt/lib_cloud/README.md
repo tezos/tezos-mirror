@@ -441,3 +441,18 @@ You should see the name servers you just added.
     ControlPath ~/.ssh/master-%r@%h:%p
     ControlPersist 120
    ```
+
+# Deploying on non-gcp machines via ssh.
+
+You need ssh access to the machine, and the ssh-key to be loaded in your
+ssh-agent. If the login used to connect to the machine is not 'root',
+`tezt-cloud` will automatically enable 'root' connections by key pair.
+
+At this point, the machine is expected to be a debian. It does not need to be
+provisionned, it will be provisionned automatically, by installing docker and
+setting up docker repository access.
+
+The following command should deploy and start an experiment:
+```
+dune exec tezt/tests/cloud/main.exe -- DAL -v --bootstrap --vms-limit 0 --ssh-host my.ssh.machine
+```
