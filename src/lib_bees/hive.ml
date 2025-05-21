@@ -39,14 +39,15 @@ let () =
   let lwt_scheduler_loop () =
     let rec loop () : [`Stop_daemon] =
       let lwt_closure = Eio.Stream.take hive.lwt_tasks_stream in
-      Lwt_eio.run_lwt_in_main lwt_closure ;
+      (* The loop will run in the [Event_loop] main domain, so [Eio.run_lwt] is
+         fine. *)
+      Lwt_eio.run_lwt lwt_closure ;
       loop ()
     in
     loop ()
   in
-  Tezos_base_unix.Event_loop.on_main_run (fun env switch ->
-      Eio.Fiber.fork_daemon ~sw:switch (fun () ->
-          Eio.Domain_manager.run env#domain_mgr lwt_scheduler_loop))
+  Tezos_base_unix.Event_loop.on_main_run (fun _env switch ->
+      Eio.Fiber.fork_daemon ~sw:switch lwt_scheduler_loop)
 
 let async_lwt = Eio.Stream.add hive.lwt_tasks_stream
 
