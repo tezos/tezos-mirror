@@ -83,6 +83,17 @@ RPC Changes
 Operations
 ----------
 
+- In order to enable denunciations of aggregated consensus operations,
+  the ``Double_preattestation_evidence`` and
+  ``Double_attestation_evidence`` operations have been replaced with a
+  new ``Double_consensus_operation_evidence`` operation. This new
+  operation contains a denounced slot and two denounced consensus
+  operations. For the evidence to be valid, the denounced operations
+  must both be preattestations (each one may be aggregated or not) or
+  both be attestations. Moreover, both must involve the denounced
+  slot, that is, be either a standalone operation for this slot or an
+  aggregate whose committee includes this slot. (MR :gl:`!18032`)
+
 - The ``Dal_entrapment_evidence`` operation has a new
   ``consensus_slot`` field, and its ``attestation`` field may now
   contain any kind of consensus operation. For the evidence to be
