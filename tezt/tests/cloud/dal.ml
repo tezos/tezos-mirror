@@ -514,6 +514,7 @@ type configuration = {
   bootstrap_dal_node_identity_file : string option;
   external_rpc : bool;
   disable_shard_validation : bool;
+  ignore_pkhs : string list;
 }
 
 type bootstrap = {
@@ -2726,11 +2727,16 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
   let () = toplog "Init producer %s: wait for DAL node to be ready" name in
   let otel = Cloud.open_telemetry_endpoint cloud in
   let is_ready =
+    let ignore_pkhs =
+      if configuration.ignore_pkhs = [] then None
+      else Some configuration.ignore_pkhs
+    in
     Dal_node.Agent.run
       ?otel
       ~memtrace:configuration.memtrace
       ~event_level:`Notice
       ~disable_shard_validation:configuration.disable_shard_validation
+      ?ignore_pkhs
       dal_node
   in
   let () = toplog "Init producer %s: DAL node is ready" name in
@@ -3723,6 +3729,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let data_dir = Cli.data_dir in
     let producer_key = Cli.producer_key in
     let producers_delay = Cli.producers_delay in
+    let ignore_pkhs = Cli.ignore_pkhs in
     let fundraiser =
       Option.fold
         ~none:(Sys.getenv_opt "TEZT_CLOUD_FUNDRAISER")
@@ -3776,6 +3783,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         bootstrap_dal_node_identity_file;
         external_rpc;
         disable_shard_validation;
+        ignore_pkhs;
       }
     in
     (t, etherlink)
