@@ -116,7 +116,8 @@ module Plugin = struct
     let shard_with_proof = Dal.Shard_with_proof.{shard; proof} in
     let protocol_data = operation.protocol_data in
     match operation.protocol_data.contents with
-    | Single (Attestation _) ->
+    | Single (Attestation {consensus_content = {slot = consensus_slot; _}; _})
+      ->
         let attestation : Kind.attestation Alpha_context.operation =
           {shell = operation.shell; protocol_data}
         in
@@ -125,6 +126,7 @@ module Plugin = struct
             cpctxt
             (chain, block)
             ~branch:block_hash
+            ~consensus_slot
             ~attestation
             ~slot_index
             ~shard_with_proof

@@ -807,6 +807,62 @@ module Consensus = struct
           consensus_key
           attestation
 
+  let check_attestation_signature vi consensus_key
+      (operation : Kind.attestation operation) =
+    let open Result_syntax in
+    let (Single (Attestation {dal_content; _})) =
+      operation.protocol_data.contents
+    in
+    let* dal_dependent_pk =
+      match (consensus_key.Consensus_key.consensus_pk, dal_content) with
+      | Bls consensus_bls_pk, Some {attestation = dal_attestation}
+        when Constants.aggregate_attestation vi.ctxt -> (
+          match consensus_key.companion_pk with
+          | None ->
+              tzfail
+                (Missing_companion_key_for_bls_dal
+                   (Consensus_key.pkh consensus_key))
+          | Some companion_pk -> (
+              let serialized_op =
+                Operation.(
+                  serialize_unsigned_operation
+                    bls_mode_unsigned_encoding
+                    operation)
+              in
+              let dal_dependent_bls_pk_opt =
+                Dal.Attestation.Dal_dependent_signing.aggregate_pk
+                  ~subgroup_check:false
+                    (* We disable subgroup check (for better
+                       performances) because the context only contains
+                       valid consensus and companion keys. *)
+                  ~consensus_pk:consensus_bls_pk
+                  ~companion_pk
+                  ~op:serialized_op
+                  dal_attestation
+              in
+              match dal_dependent_bls_pk_opt with
+              | None ->
+                  tzfail
+                    Validate_errors.Consensus.Public_key_aggregation_failure
+              | Some dal_dependent_bls_pk ->
+                  return
+                    (Signature.Bls dal_dependent_bls_pk
+                      : Signature.Public_key.t)))
+      | _ ->
+          (* When the feature flag is not set or the consensus key is
+             non-BLS, we use the old behavior: the signed content
+             (which includes the dal_content if any) is signed by the
+             consensus key alone.
+
+             When the dal_content is None (even with enabled feature
+             flag and BLS consensus key), it is represented by
+             [dal_dependent_pk = consensus_pk]. Notably, this allows a
+             BLS consensus key without any associated companion key to
+             still issue an attestation without DAL. *)
+          return consensus_key.consensus_pk
+    in
+    Operation.check_signature vi.ctxt dal_dependent_pk vi.chain_id operation
+
   let check_attestation vi ~check_signature
       (operation : Kind.attestation operation) =
     let open Lwt_result_syntax in
@@ -857,66 +913,7 @@ module Consensus = struct
     in
     let check_signature =
       if check_signature then
-        [
-          (fun () ->
-            let open Result_syntax in
-            let* dal_dependent_pk =
-              match (consensus_key.Consensus_key.consensus_pk, dal_content) with
-              | Bls consensus_bls_pk, Some {attestation = dal_attestation}
-                when Constants.aggregate_attestation vi.ctxt -> (
-                  match consensus_key.companion_pk with
-                  | None ->
-                      tzfail
-                        (Missing_companion_key_for_bls_dal
-                           (Consensus_key.pkh consensus_key))
-                  | Some companion_pk -> (
-                      let serialized_op =
-                        Operation.(
-                          serialize_unsigned_operation
-                            bls_mode_unsigned_encoding
-                            operation)
-                      in
-                      let dal_dependent_bls_pk_opt =
-                        Dal.Attestation.Dal_dependent_signing.aggregate_pk
-                          ~subgroup_check:false
-                            (* We disable subgroup check (for better
-                               performances) because the context only
-                               contains valid consensus and companion
-                               keys. *)
-                          ~consensus_pk:consensus_bls_pk
-                          ~companion_pk
-                          ~op:serialized_op
-                          dal_attestation
-                      in
-                      match dal_dependent_bls_pk_opt with
-                      | None ->
-                          tzfail
-                            Validate_errors.Consensus
-                            .Public_key_aggregation_failure
-                      | Some dal_dependent_bls_pk ->
-                          return
-                            (Signature.Bls dal_dependent_bls_pk
-                              : Signature.Public_key.t)))
-              | _ ->
-                  (* When the feature flag is not set or the consensus key
-                     is non-BLS, we use the old behavior: the signed
-                     content (which includes the dal_content if any) is
-                     signed by the consensus key alone.
-
-                     When the dal_content is None (even with enabled
-                     feature flag and BLS consensus key), it is
-                     represented by [dal_dependent_pk =
-                     consensus_pk]. Notably, this allows a BLS consensus
-                     key without any associated companion key to still
-                     issue an attestation without DAL. *)
-                  return consensus_key.consensus_pk
-            in
-            Operation.check_signature
-              vi.ctxt
-              dal_dependent_pk
-              vi.chain_id
-              operation);
-        ]
+        [(fun () -> check_attestation_signature vi consensus_key operation)]
       else []
     in
     return (attesting_power, check_signature)
@@ -1929,6 +1926,102 @@ module Anonymous = struct
           Outdated_dal_denunciation
             {level = given_level; last_cycle = last_denunciable_cycle})
 
+  (** Checks the signature of the given consensus operation [op]. To
+      be called on denounced operations.
+
+      [consensus_key] is the consensus key of the denounced delegate:
+      when [op] is a standalone (pre)attestation, it assumed to be the
+      key associated with the operation's [slot]. When [op] is an
+      aggregate, [consensus_key] is not used since the signature
+      depends on the whole committee. *)
+  let check_consensus_operation_signature (type a) vi consensus_key
+      (op : a Kind.consensus Operation.t) =
+    let open Lwt_result_syntax in
+    match op.protocol_data.contents with
+    | Single (Preattestation _) ->
+        Operation.check_signature
+          vi.ctxt
+          consensus_key.Consensus_key.consensus_pk
+          vi.chain_id
+          op
+        |> Lwt.return
+    | Single (Attestation _) ->
+        Consensus.check_attestation_signature vi consensus_key op |> Lwt.return
+    | Single
+        (Preattestations_aggregate {consensus_content = {level; _}; committee})
+      ->
+        let level = Level.from_raw vi.ctxt level in
+        let* _ctxt, public_keys =
+          (* [ctxt] is part of the accumulator so that attesting
+             rights data for [level] are loaded at most once. *)
+          List.fold_left_es
+            (fun (ctxt, public_keys) slot ->
+              let* ctxt, consensus_key =
+                Stake_distribution.slot_owner ctxt level slot
+              in
+              match consensus_key.consensus_pk with
+              | Bls pk -> return (ctxt, pk :: public_keys)
+              | _ -> tzfail Validate_errors.Consensus.Non_bls_key_in_aggregate)
+            (vi.ctxt, [])
+            committee
+        in
+        Consensus.check_preattestations_aggregate_signature vi public_keys op
+    | Single
+        (Attestations_aggregate
+          {consensus_content = {level; round; block_payload_hash}; committee})
+      ->
+        let serialized_op =
+          let attestation : Kind.attestation operation =
+            (* Reconstructing an attestation to match the content signed by
+               each delegate. Fields 'slot' and 'dal_content' are filled with
+               dummy values as they are not part of the signed payload *)
+            let consensus_content =
+              {slot = Slot.zero; level; round; block_payload_hash}
+            in
+            let contents =
+              Single (Attestation {consensus_content; dal_content = None})
+            in
+            {shell = op.shell; protocol_data = {contents; signature = None}}
+          in
+          Operation.(
+            serialize_unsigned_operation bls_mode_unsigned_encoding attestation)
+        in
+        let level = Level.from_raw vi.ctxt level in
+        let* _ctxt, pks, weighted_pks =
+          List.fold_left_es
+            (fun (ctxt, pks, weighted_pks) (slot, dal) ->
+              let* ctxt, consensus_key =
+                Stake_distribution.slot_owner ctxt level slot
+              in
+              match consensus_key.consensus_pk with
+              | Bls consensus_pk -> (
+                  let pks = consensus_pk :: pks in
+                  match (dal, consensus_key.companion_pk) with
+                  | None, _ -> return (ctxt, pks, weighted_pks)
+                  | Some {attestation = dal_attestation}, Some companion_pk ->
+                      let weight =
+                        Dal.Attestation.Dal_dependent_signing.weight
+                          ~consensus_pk
+                          ~companion_pk
+                          ~op:serialized_op
+                          dal_attestation
+                      in
+                      let weighted_pks =
+                        (weight, companion_pk) :: weighted_pks
+                      in
+                      return (ctxt, pks, weighted_pks)
+                  | Some _, None ->
+                      tzfail
+                        (Validate_errors.Consensus
+                         .Missing_companion_key_for_bls_dal
+                           (Consensus_key.pkh consensus_key)))
+              | _ -> tzfail Validate_errors.Consensus.Non_bls_key_in_aggregate)
+            (vi.ctxt, [], [])
+            committee
+        in
+        Consensus.check_attestations_aggregate_signature vi pks weighted_pks op
+        |> Lwt.return
+
   let check_double_attesting_evidence (type kind) vi
       (op1 : kind Kind.consensus Operation.t)
       (op2 : kind Kind.consensus Operation.t) =
@@ -2244,9 +2337,12 @@ module Anonymous = struct
          {given = shard_index; min = 0; max = number_of_shards - 1})
 
   (* This function validates an entrapment evidence by doing the following checks:
+     - the included attestation is either a standalone attestation for
+       the included consensus_slot, or an attestations_aggregate whose
+       committee contains the included consensus_slot
+     - the included attestation contains a dal_content for
+       consensus_slot, in which the included slot index is attested
      - the included slot index and shard index are within bounds
-     - the included attestation contains a DAL attestation
-     - the slot was attested by the attester
      - the level of the faulty attestation is within the slashing period
      - the included shard is a trap
      - the delegate has not already been denounced for the same level and slot index
@@ -2257,24 +2353,35 @@ module Anonymous = struct
       (operation : Kind.dal_entrapment_evidence operation) =
     let open Lwt_result_syntax in
     let (Single
-          (Dal_entrapment_evidence {attestation; slot_index; shard_with_proof}))
-        =
+          (Dal_entrapment_evidence
+            {attestation; consensus_slot; slot_index; shard_with_proof})) =
       operation.protocol_data.contents
     in
-    let consensus_content, dal_content =
+    let*? level, dal_content =
+      let open Result_syntax in
       match attestation.protocol_data.contents with
-      | Single (Attestation {consensus_content; dal_content}) ->
-          (consensus_content, dal_content)
+      | Single (Attestation {consensus_content = {slot; level; _}; dal_content})
+        ->
+          let* () =
+            error_unless
+              Slot.(slot = consensus_slot)
+              Invalid_accusation_inconsistent_consensus_slot
+          in
+          return (level, dal_content)
+      | Single
+          (Attestations_aggregate {consensus_content = {level; _}; committee})
+        -> (
+          match List.assoc ~equal:Slot.equal consensus_slot committee with
+          | None -> tzfail Invalid_accusation_inconsistent_consensus_slot
+          | Some dal_content -> return (level, dal_content))
+      | Single (Preattestation _ | Preattestations_aggregate _) ->
+          tzfail Invalid_accusation_of_preattestation
     in
     match dal_content with
     | None ->
         tzfail
           (Invalid_accusation_no_dal_content
-             {
-               tb_slot = consensus_content.slot;
-               level = consensus_content.level;
-               slot_index;
-             })
+             {tb_slot = consensus_slot; level; slot_index})
     | Some dal_content -> (
         let number_of_slots = Constants.dal_number_of_slots vi.ctxt in
         let*? () =
@@ -2285,17 +2392,16 @@ module Anonymous = struct
         let*? () =
           check_shard_index_is_in_range ~number_of_shards shard_index
         in
-        let level = consensus_content.level in
         let*? () =
           error_unless
             (Dal.Attestation.is_attested dal_content.attestation slot_index)
             (Invalid_accusation_slot_not_attested
-               {tb_slot = consensus_content.slot; level; slot_index})
+               {tb_slot = consensus_slot; level; slot_index})
         in
         let*? () = check_denunciation_age vi `Dal_denounciation level in
         let level = Level.from_raw vi.ctxt level in
         let* ctxt, consensus_key =
-          Stake_distribution.slot_owner vi.ctxt level consensus_content.slot
+          Stake_distribution.slot_owner vi.ctxt level consensus_slot
         in
         let delegate = consensus_key.delegate in
         let*! already_denounced =
@@ -2381,14 +2487,7 @@ module Anonymous = struct
                     header.commitment
                     shard_with_proof
                 in
-                let*? () =
-                  Operation.check_signature
-                    vi.ctxt
-                    consensus_key.consensus_pk
-                    vi.chain_id
-                    attestation
-                in
-                return_unit
+                check_consensus_operation_signature vi consensus_key attestation
             | Some (header, _publisher) ->
                 (* TODO: https://gitlab.com/tezos/tezos/-/issues/7126
                    Can also fail if `attestation_lag` changes. *)
@@ -2416,15 +2515,17 @@ module Anonymous = struct
 
   let dal_entrapment_evidence_info
       (operation : Kind.dal_entrapment_evidence operation) =
-    let (Single (Dal_entrapment_evidence {attestation; _})) =
+    let (Single (Dal_entrapment_evidence {attestation; consensus_slot; _})) =
       operation.protocol_data.contents
     in
-    let {level; slot; _} =
-      match attestation.protocol_data.contents with
-      | Single (Attestation {consensus_content; dal_content = _}) ->
-          consensus_content
+    let (Single
+          ( Preattestation {level; _}
+          | Attestation {consensus_content = {level; _}; _}
+          | Preattestations_aggregate {consensus_content = {level; _}; _}
+          | Attestations_aggregate {consensus_content = {level; _}; _} )) =
+      attestation.protocol_data.contents
     in
-    (level, slot)
+    (level, consensus_slot)
 
   let check_dal_entrapment_evidence_conflict vs oph
       (operation : Kind.dal_entrapment_evidence operation) =

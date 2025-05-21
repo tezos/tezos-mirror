@@ -170,6 +170,8 @@ module Anonymous : sig
         level : Raw_level.t;
         last_cycle : Cycle.t;
       }
+    | Invalid_accusation_inconsistent_consensus_slot
+    | Invalid_accusation_of_preattestation
     | Too_early_dal_denunciation of {level : Raw_level.t; current : Raw_level.t}
     | Outdated_dal_denunciation of {level : Raw_level.t; last_cycle : Cycle.t}
     | Invalid_shard_index of {given : int; min : int; max : int}

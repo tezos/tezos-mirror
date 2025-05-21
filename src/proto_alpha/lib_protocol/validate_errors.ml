@@ -1025,6 +1025,8 @@ module Anonymous = struct
       (fun () -> Aggregate_denunciation_not_implemented)
 
   type error +=
+    | Invalid_accusation_inconsistent_consensus_slot
+    | Invalid_accusation_of_preattestation
     | Too_early_dal_denunciation of {level : Raw_level.t; current : Raw_level.t}
     | Outdated_dal_denunciation of {level : Raw_level.t; last_cycle : Cycle.t}
     | Invalid_shard_index of {given : int; min : int; max : int}
@@ -1076,6 +1078,28 @@ module Anonymous = struct
 
   let () =
     let open Data_encoding in
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_inconsistent_consensus_slot"
+      ~title:"Invalid DAL denunciation: inconsistent consensus slot"
+      ~description:
+        "The denounced attestation must be either a standalone attestation for \
+         the denounced consensus slot, or an attestations aggregate whose \
+         committee includes the denounced consensus slot."
+      empty
+      (function
+        | Invalid_accusation_inconsistent_consensus_slot -> Some () | _ -> None)
+      (fun () -> Invalid_accusation_inconsistent_consensus_slot) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_of_preattestation"
+      ~title:"Invalid DAL denunciation of preattestation"
+      ~description:
+        "DAL denunciations cannot target preattestations, since they have no \
+         DAL content."
+      empty
+      (function Invalid_accusation_of_preattestation -> Some () | _ -> None)
+      (fun () -> Invalid_accusation_of_preattestation) ;
     register_error_kind
       `Temporary
       ~id:"validate.operation.block.too_early_dal_denunciation"
@@ -1161,12 +1185,14 @@ module Anonymous = struct
       ~id:"validate.operation.invalid_accusation_no_dal_content"
       ~title:"Invalid accusation: no DAL content"
       ~description:
-        "Invalid accusation: the attestation operation has no DAL content."
+        "Invalid accusation: the attestation operation has no DAL content for \
+         the denounced consensus slot."
       ~pp:(fun ppf (tb_slot, level, slot_index) ->
         Format.fprintf
           ppf
-          "Invalid accusation for validator slot %a, level %a, and DAL slot \
-           index %a: the attestation operation has no DAL content."
+          "Invalid accusation for consensus slot %a, level %a, and DAL slot \
+           index %a: the attestation operation has no DAL content for this \
+           consensus slot."
           Slot.pp
           tb_slot
           Raw_level.pp

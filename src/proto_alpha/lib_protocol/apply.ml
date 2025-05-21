@@ -2634,13 +2634,23 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       punish_double_attestation ctxt ~operation_hash ~op1 ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2 = _}) ->
       punish_double_baking ctxt ~operation_hash bh1 ~payload_producer
-  | Single (Dal_entrapment_evidence {attestation; slot_index; _}) ->
-      let {slot; level = raw_level; _} =
-        match attestation.protocol_data.contents with
-        | Single (Attestation {consensus_content; _}) -> consensus_content
+  | Single
+      (Dal_entrapment_evidence {attestation; consensus_slot; slot_index; _}) ->
+      let (Single
+            (* Note that since the evidence has been successfully
+               validated, [attestation] cannot be a preattestation or
+               preattestations aggregate (also [consensus_slot] is
+               consistent, and [slot_index] is an attested trap, etc.) *)
+            ( Preattestation {level; _}
+            | Attestation {consensus_content = {level; _}; _}
+            | Preattestations_aggregate {consensus_content = {level; _}; _}
+            | Attestations_aggregate {consensus_content = {level; _}; _} )) =
+        attestation.protocol_data.contents
       in
-      let level = Level.from_raw ctxt raw_level in
-      let* ctxt, consensus_pk = Stake_distribution.slot_owner ctxt level slot in
+      let level = Level.from_raw ctxt level in
+      let* ctxt, consensus_pk =
+        Stake_distribution.slot_owner ctxt level consensus_slot
+      in
       let delegate = consensus_pk.delegate in
       let*! ctxt, _already_denounced =
         Dal.Delegate.add_denunciation ctxt delegate level slot_index

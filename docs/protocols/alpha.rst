@@ -80,6 +80,16 @@ RPC Changes
   with the new field ``companion_key`` which returns the active companion key for
   the given ``delegate`` and ``level``. (MR :gl:`!17703`)
 
+Operations
+----------
+
+- The ``Dal_entrapment_evidence`` operation has a new
+  ``consensus_slot`` field, and its ``attestation`` field may now
+  contain any kind of consensus operation. For the evidence to be
+  valid, ``attestation`` must be either a standalone attestation for
+  ``consensus_slot``, or an attestations aggregate whose committee
+  includes ``consensus_slot``. (MR :gl:`!18073`)
+
 Operation receipts
 ------------------
 

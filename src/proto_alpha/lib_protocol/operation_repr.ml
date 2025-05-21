@@ -324,7 +324,8 @@ and _ contents =
     }
       -> Kind.double_baking_evidence contents
   | Dal_entrapment_evidence : {
-      attestation : Kind.attestation operation;
+      attestation : 'a Kind.consensus operation;
+      consensus_slot : Slot_repr.t;
       slot_index : Dal_slot_index_repr.t;
       shard_with_proof : Dal_slot_repr.Shard_with_proof.t;
     }
@@ -1297,6 +1298,54 @@ module Encoding = struct
             Preattestations_aggregate {consensus_content; committee});
       }
 
+  type packed_consensus_operation_contents =
+    | Consensus_op_contents :
+        'a Kind.consensus contents
+        -> packed_consensus_operation_contents
+
+  type packed_consensus_operation =
+    | Consensus_op : 'a Kind.consensus operation -> packed_consensus_operation
+
+  (* For denunciations *)
+  let inlined_consensus_operation_encoding =
+    let make (Case {tag; name; encoding; select; proj; inj}) =
+      assert (not @@ reserved_tag tag) ;
+      case
+        (Tag tag)
+        name
+        encoding
+        (function
+          | Consensus_op_contents o -> (
+              match select (Contents o) with
+              | None -> None
+              | Some o -> Some (proj o)))
+        (fun x -> Consensus_op_contents (inj x))
+    in
+    let consensus_operation_contents_encoding =
+      def "inlined.consensus_operation.contents"
+      @@ union
+           [
+             make preattestation_case;
+             make attestation_case;
+             make attestation_with_dal_case;
+             make preattestations_aggregate_case;
+             make attestations_aggregate_case;
+           ]
+    in
+    def "inlined.consensus_operation"
+    @@ conv
+         (fun (Consensus_op
+                {shell; protocol_data = {contents = Single contents; signature}}) ->
+           (shell, (Consensus_op_contents contents, signature)))
+         (fun (shell, (Consensus_op_contents contents, signature)) ->
+           Consensus_op
+             {shell; protocol_data = {contents = Single contents; signature}})
+         (merge_objs
+            Operation.shell_header_encoding
+            (obj2
+               (req "operations" consensus_operation_contents_encoding)
+               (varopt "signature" Signature.encoding)))
+
   let seed_nonce_revelation_case =
     Case
       {
@@ -1479,8 +1528,11 @@ module Encoding = struct
         tag = 24;
         name = "dal_entrapment_evidence";
         encoding =
-          obj3
-            (req "attestation" (dynamic_size attestation_encoding))
+          obj4
+            (req
+               "attestation"
+               (dynamic_size inlined_consensus_operation_encoding))
+            (req "consensus_slot" Slot_repr.encoding)
             (req "slot_index" Dal_slot_index_repr.encoding)
             (req "shard_with_proof" Dal_slot_repr.Shard_with_proof.encoding);
         select =
@@ -1488,11 +1540,18 @@ module Encoding = struct
           | Contents (Dal_entrapment_evidence _ as op) -> Some op | _ -> None);
         proj =
           (fun (Dal_entrapment_evidence
-                 {attestation; slot_index; shard_with_proof}) ->
-            (attestation, slot_index, shard_with_proof));
+                 {attestation; consensus_slot; slot_index; shard_with_proof}) ->
+            ( Consensus_op attestation,
+              consensus_slot,
+              slot_index,
+              shard_with_proof ));
         inj =
-          (fun (attestation, slot_index, shard_with_proof) ->
-            Dal_entrapment_evidence {attestation; slot_index; shard_with_proof});
+          (fun ( Consensus_op attestation,
+                 consensus_slot,
+                 slot_index,
+                 shard_with_proof ) ->
+            Dal_entrapment_evidence
+              {attestation; consensus_slot; slot_index; shard_with_proof});
       }
 
   let manager_encoding =
@@ -2378,6 +2437,36 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
 
 type dal_entrapment_info = {level : int32; number_of_attested_slots : int}
 
+let dal_entrapment_info
+    (Dal_entrapment_evidence {attestation; consensus_slot; _}) =
+  let level, dal_content =
+    match attestation.protocol_data.contents with
+    | Single (Attestation {consensus_content; dal_content}) ->
+        (consensus_content.level, dal_content)
+    | Single (Attestations_aggregate {consensus_content; committee}) ->
+        let dal_content =
+          List.assoc_opt ~equal:Slot_repr.equal consensus_slot committee
+          |> Option.join
+        in
+        (consensus_content.level, dal_content)
+    (* Preattestation and Preattestations_aggregate cases should not
+       be possible for a valid Dal_entrapment_evidence, but these
+       cases are easy to cover anyway. *)
+    | Single (Preattestation consensus_content) ->
+        (consensus_content.level, None)
+    | Single (Preattestations_aggregate {consensus_content; _}) ->
+        (consensus_content.level, None)
+  in
+  {
+    level = Raw_level_repr.to_int32 level;
+    number_of_attested_slots =
+      Option.fold
+        ~none:0
+        ~some:(fun d ->
+          Dal_attestation_repr.number_of_attested_slots d.attestation)
+        dal_content;
+  }
+
 (** The weight of an operation.
 
    Given an operation, its [weight] carries on static information that
@@ -2562,21 +2651,9 @@ let weight_of : packed_operation -> operation_weight =
         consensus_infos_and_hash_from_block_header bh1
       in
       W (Anonymous, Weight_double_baking double_baking_infos)
-  | Single (Dal_entrapment_evidence {attestation; _}) -> (
-      match attestation.protocol_data.contents with
-      | Single (Attestation {consensus_content; dal_content}) ->
-          let info =
-            {
-              level = Raw_level_repr.to_int32 consensus_content.level;
-              number_of_attested_slots =
-                Option.fold
-                  ~none:0
-                  ~some:(fun d ->
-                    Dal_attestation_repr.number_of_attested_slots d.attestation)
-                  dal_content;
-            }
-          in
-          W (Anonymous, Weight_dal_entrapment_evidence info))
+  | Single (Dal_entrapment_evidence _ as contents) ->
+      let info = dal_entrapment_info contents in
+      W (Anonymous, Weight_dal_entrapment_evidence info)
   | Single (Activate_account {id; _}) ->
       W (Anonymous, Weight_activate_account id)
   | Single (Drain_delegate {delegate; _}) ->

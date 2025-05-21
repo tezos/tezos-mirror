@@ -339,7 +339,8 @@ and _ contents =
   (* The attester failed to correctly identify a trap when attesting DAL
      slots. *)
   | Dal_entrapment_evidence : {
-      attestation : Kind.attestation operation;
+      attestation : 'a Kind.consensus operation;
+      consensus_slot : Slot_repr.t;
       slot_index : Dal_slot_index_repr.t;
       shard_with_proof : Dal_slot_repr.Shard_with_proof.t;
     }

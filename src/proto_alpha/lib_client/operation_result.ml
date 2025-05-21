@@ -1114,7 +1114,12 @@ let pp_contents_and_result :
           pp_balance_updates
           balance_updates
     | ( Dal_entrapment_evidence
-          {attestation; slot_index = _; shard_with_proof = _},
+          {
+            attestation;
+            consensus_slot = _;
+            slot_index = _;
+            shard_with_proof = _;
+          },
         Dal_entrapment_evidence_result {balance_updates} ) ->
         Format.fprintf
           ppf

@@ -91,6 +91,38 @@ types:
     - id: attestation_with_dal
       type: attestation_with_dal
       if: (alpha__inlined__attestation_mempool__contents_tag == alpha__inlined__attestation_mempool__contents_tag::attestation_with_dal)
+  alpha__inlined__consensus_operation:
+    seq:
+    - id: alpha__inlined__consensus_operation
+      type: operation__shell_header
+    - id: operations
+      type: alpha__inlined__consensus_operation__contents
+    - id: signature_tag
+      type: u1
+      enum: bool
+    - id: signature
+      size-eos: true
+      if: (signature_tag == bool::true)
+  alpha__inlined__consensus_operation__contents:
+    seq:
+    - id: alpha__inlined__consensus_operation__contents_tag
+      type: u1
+      enum: alpha__inlined__consensus_operation__contents_tag
+    - id: preattestation
+      type: preattestation
+      if: (alpha__inlined__consensus_operation__contents_tag == alpha__inlined__consensus_operation__contents_tag::preattestation)
+    - id: attestation
+      type: attestation
+      if: (alpha__inlined__consensus_operation__contents_tag == alpha__inlined__consensus_operation__contents_tag::attestation)
+    - id: attestation_with_dal
+      type: attestation_with_dal
+      if: (alpha__inlined__consensus_operation__contents_tag == alpha__inlined__consensus_operation__contents_tag::attestation_with_dal)
+    - id: preattestations_aggregate
+      type: preattestations_aggregate
+      if: (alpha__inlined__consensus_operation__contents_tag == alpha__inlined__consensus_operation__contents_tag::preattestations_aggregate)
+    - id: attestations_aggregate
+      type: attestations_aggregate
+      if: (alpha__inlined__consensus_operation__contents_tag == alpha__inlined__consensus_operation__contents_tag::attestations_aggregate)
   alpha__inlined__preattestation:
     seq:
     - id: alpha__inlined__preattestation
@@ -291,8 +323,8 @@ types:
       size: 32
   attestation_0:
     seq:
-    - id: alpha__inlined__attestation
-      type: alpha__inlined__attestation
+    - id: alpha__inlined__consensus_operation
+      type: alpha__inlined__consensus_operation
   attestation_1:
     seq:
     - id: len_attestation
@@ -469,6 +501,8 @@ types:
     seq:
     - id: attestation
       type: attestation_1
+    - id: consensus_slot
+      type: u2be
     - id: slot_index
       type: u1
     - id: shard_with_proof
@@ -1649,6 +1683,12 @@ enums:
   alpha__inlined__attestation_mempool__contents_tag:
     21: attestation
     23: attestation_with_dal
+  alpha__inlined__consensus_operation__contents_tag:
+    20: preattestation
+    21: attestation
+    23: attestation_with_dal
+    30: preattestations_aggregate
+    31: attestations_aggregate
   alpha__inlined__preattestation__contents_tag:
     20: preattestation
   alpha__michelson__v1__primitives:
