@@ -107,7 +107,8 @@ let tezt_source =
       [
         {
           address = "localhost";
-          port = (if Env.mode = `Orchestrator then 80 else 8080);
+          port =
+            (if Env.mode = `Remote_orchestrator_local_agents then 80 else 8080);
           app_name = "tezt";
         };
       ];

@@ -24,9 +24,11 @@ let pp_docker_image fmt = function
 
 let domain agents =
   match Env.mode with
-  | `Orchestrator | `Ssh_host _ ->
+  | `Remote_orchestrator_local_agents | `Ssh_host _ ->
       Proxy.get_agent agents |> Agent.point |> Option.get |> fst
-  | `Host | `Localhost | `Cloud -> "localhost"
+  | `Remote_orchestrator_remote_agents | `Local_orchestrator_local_agents
+  | `Local_orchestrator_remote_agents ->
+      "localhost"
 
 let string_docker_command agent =
   match Agent.runner agent with
@@ -101,7 +103,7 @@ let agent_jingo_template agent =
 let monitoring_jingo_template agents agent =
   let open Jingoo.Jg_types in
   let host =
-    if Env.mode = `Localhost then "localhost"
+    if Env.mode = `Local_orchestrator_local_agents then "localhost"
     else
       match Agent.point agent with
       | Some (host, _port) -> host

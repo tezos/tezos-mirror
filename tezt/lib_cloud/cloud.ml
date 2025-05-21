@@ -482,10 +482,11 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
       let args = Sys.argv |> Array.to_list |> List.tl in
       let args = filter_ssh [] args in
       args @ ["--localhost"; "--tezt-cloud"; Env.tezt_cloud]
-      (* [--localhost] will be combined with --proxy, this enables to detect we want to run in [`Orchestrator].
+      (* [--localhost] will be combined with [--proxy], this enables to detect we
+         want to run in [`Remote_orchestrator_local_agents] mode.
 
-         [--tezt-cloud] is used so that the [`Orchestrator] mode knows this value.
-      *)
+         [--tezt-cloud] is used so that the [`Remote_orchestrator_local_agents]
+         mode knows this value. *)
     in
     (* We execute a command in a screen session that will start the orchestrator. *)
     Agent.docker_run_command
@@ -561,15 +562,19 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
           "The legacy behaviour with '--vms-limit 0' may be removed in the \
            future." ;
         match Env.mode with
-        | `Localhost | `Cloud -> None
-        | `Host | `Orchestrator | `Ssh_host (_, _) ->
-            (* In Host mode, we want to run a deployment deploying the
-               Proxy VM. In orchestrator mode, there is few
-               initialisation steps needed. By using [Some []], we
-               ensure they will be done. When the scenario asks for an
-               agent and do not find it there is fallback to a default
-               agent. This works but this is hackish and should be
-               removed in the near future (famous last words). *)
+        | `Local_orchestrator_local_agents | `Local_orchestrator_remote_agents
+          ->
+            None
+        | `Remote_orchestrator_remote_agents | `Remote_orchestrator_local_agents
+        | `Ssh_host (_, _) ->
+            (* In [Remote_orchestrator_remote_agents] mode, we want to run a
+               deployment deploying the Proxy VM. In
+               [Remote_orchestrator_local_agents] or in [Ssh_host] mode, there is
+               few initialisation steps needed. By using [Some []], we ensure
+               they will be done. When the scenario asks for an agent and do not
+               find it there is fallback to a default agent. This works but this
+               is hackish and should be removed in the near future (famous last
+               words). *)
             Some [])
     | Some vms, Some vms_limit ->
         let number_of_vms = List.length vms in
@@ -643,7 +648,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
             |> List.map wait_and_faketime |> Lwt.join
         in
         match Env.mode with
-        | `Orchestrator ->
+        | `Remote_orchestrator_local_agents ->
             (* The scenario is executed locally on the proxy VM. *)
             let contents =
               Base.read_file (Path.proxy_deployement ~tezt_cloud)
@@ -659,13 +664,13 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
             in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
-        | `Localhost ->
+        | `Local_orchestrator_local_agents ->
             (* The scenario is executed locally and the VM are on the host machine. *)
             let* () = Jobs.docker_build ~push:false ~ssh_public_key () in
             let* deployement = Deployement.deploy ~configurations in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
-        | `Cloud ->
+        | `Local_orchestrator_remote_agents ->
             (* The scenario is executed locally and the VMs are on the cloud. *)
             let* () = Jobs.deploy_docker_registry () in
             let* () =
@@ -674,7 +679,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
             let* deployement = Deployement.deploy ~configurations in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
-        | `Host | `Ssh_host _ ->
+        | `Remote_orchestrator_remote_agents | `Ssh_host _ ->
             (* The scenario is executed remotely. *)
             let* proxy_running = try_reattach () in
             if not proxy_running then
@@ -689,7 +694,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
 
 let agents t =
   match Env.mode with
-  | `Orchestrator -> (
+  | `Remote_orchestrator_local_agents -> (
       let proxy_agent = Proxy.get_agent t.agents in
       let proxy_name = Agent.name proxy_agent in
       match
@@ -719,7 +724,9 @@ let agents t =
           in
           [default_agent]
       | agents -> agents)
-  | `Host | `Cloud | `Localhost | `Ssh_host _ -> t.agents
+  | `Remote_orchestrator_remote_agents | `Local_orchestrator_remote_agents
+  | `Local_orchestrator_local_agents | `Ssh_host _ ->
+      t.agents
 
 let write_website t =
   match t.website with
@@ -754,13 +761,13 @@ let open_telemetry_endpoint t =
   | None -> None
   | Some _otel -> (
       match Env.mode with
-      | `Orchestrator ->
+      | `Remote_orchestrator_local_agents ->
           let agent = Proxy.get_agent t.agents in
           let address = Agent.point agent |> Option.get |> fst in
           let port = 55681 in
           Some (Format.asprintf "http://%s:%d" address port)
       | _ ->
-          (* It likely won't work in [Cloud] mode. *)
+          (* It likely won't work in [Local_orchestrator_remote_agents] mode. *)
           let address = "localhost" in
           let port = 55681 in
           Some (Format.asprintf "http://%s:%d" address port))

@@ -783,16 +783,16 @@ type t =
 
 let deploy ~configurations =
   match Env.mode with
-  | `Localhost ->
+  | `Local_orchestrator_local_agents ->
       let* localhost = Localhost.deploy ~configurations () in
       Lwt.return (Localhost localhost)
-  | `Cloud ->
+  | `Local_orchestrator_remote_agents ->
       let* remote = Remote.deploy ~proxy:false ~configurations in
       Lwt.return (Remote remote)
-  | `Host ->
+  | `Remote_orchestrator_remote_agents ->
       let* remote = Remote.deploy ~proxy:true ~configurations in
       Lwt.return (Remote remote)
-  | `Orchestrator -> assert false
+  | `Remote_orchestrator_local_agents -> assert false
   | `Ssh_host (host, port) ->
       let* host =
         Ssh_host.deploy ~user:(Sys.getenv "USER") ~host ~port ~configurations ()

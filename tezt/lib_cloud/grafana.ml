@@ -78,7 +78,7 @@ let shutdown _t = Process.run "docker" ["kill"; "grafana"]
 
 let dashboards_filepaths () =
   let path =
-    if Env.mode = `Orchestrator then
+    if Env.mode = `Remote_orchestrator_local_agents then
       Filename.get_temp_dir_name () // "grafana" // "dashboards"
     else Path.grafana_dashboards
   in
