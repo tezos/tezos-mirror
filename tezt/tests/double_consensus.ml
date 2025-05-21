@@ -529,10 +529,120 @@ let check_contains_consensus_denunciations ~loc ~level ~round
             loc)
     denunciations
 
+let attestation_and_aggregation_wrong_payload_hash =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"attestation and aggregation wrong payload hash"
+    ~tags:[Tag.layer1; "attestation"; "aggregation"]
+    ~supports:Protocol.(From_protocol 023)
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
+  @@ fun protocol ->
+  let consensus_rights_delay = 1 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      [
+        (["allow_tz4_delegate_enable"], `Bool true);
+        (["aggregate_attestation"], `Bool true);
+        (* Diminish some constants to activate consensus keys faster *)
+        (["blocks_per_cycle"], `Int 2);
+        (["nonce_revelation_threshold"], `Int 1);
+        (["consensus_rights_delay"], `Int consensus_rights_delay);
+        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+      ]
+  in
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol ~parameter_file ()
+  in
+  let* _ = Node.wait_for_level node 1 in
+  (* Run accusers (simulates a network were multiple denunciations are received
+     simultaneously) *)
+  let* _accuser1 = Accuser.init ~protocol node in
+  let* _accuser2 = Accuser.init ~protocol node in
+  (* Set a BLS consensus key for some bootstrap accounts *)
+  let* ck1 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap1 client in
+  let* ck2 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap2 client in
+  let* ck3 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap3 client in
+  let keys =
+    public_key_hashes
+      [
+        ck1; ck2; ck3; bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5;
+      ]
+  in
+  (* Bake until consensus keys become active *)
+  let* level = Client.bake_for_and_wait_level ~keys ~count:6 client in
+  (* Bake a block: it is expected to contain an attestations_aggregate with all
+     bootstrap accounts *)
+  let* () = Client.bake_for_and_wait ~keys client in
+  (* Attest for bootstrap1 with a dummy block_payload_hash *)
+  let* _ =
+    let open Operation.Consensus in
+    let* slots = get_slots_by_consensus_key ~level client in
+    let slot = first_slot ~slots ck1 in
+    let* branch = get_branch ~attested_level:level client in
+    let* bph_level_4 = get_block_payload_hash ~block:"4" client in
+    attest_for
+      ~protocol
+      ~branch
+      ~slot
+      ~level
+      ~round:0
+      ~block_payload_hash:bph_level_4
+      ck1
+      client
+  in
+  (* Bake a block: it is expected to contain a denunciation. *)
+  let* level = Client.bake_for_and_wait_level ~keys client in
+  (* Fetch anonymous operations from the current head
+     and check for the expected denunciation *)
+  let* anonymous_operations = fetch_anonymous_operations client in
+  let () =
+    check_contains_consensus_denunciations
+      ~loc:__LOC__
+      ~level:(level - 2)
+      ~round:0
+      ~anonymous_operations
+      [(bootstrap1, (Attestation, Attestations_aggregate))]
+  in
+  let open Operation.Consensus in
+  let* slots = get_slots_by_consensus_key ~level client in
+  let* branch = get_branch ~attested_level:level client in
+  let* block_payload_hash = get_block_payload_hash client in
+  (* Attest for bootstrap1 and check that he is forbidden *)
+  let* (`OpHash _) =
+    let slot = first_slot ~slots ck1 in
+    attest_for
+      ~error:delegate_forbidden_error
+      ~protocol
+      ~branch
+      ~slot
+      ~level
+      ~round:0
+      ~block_payload_hash
+      ck1
+      client
+  in
+  (* Attest for bootstrap2 and expect a success *)
+  let* (`OpHash _) =
+    let slot = first_slot ~slots ck2 in
+    attest_for
+      ~protocol
+      ~branch
+      ~slot
+      ~level
+      ~round:0
+      ~block_payload_hash
+      ck2
+      client
+  in
+  unit
+
 let register ~protocols =
   double_attestation_wrong_block_payload_hash protocols ;
   double_preattestation_wrong_block_payload_hash protocols ;
   double_attestation_wrong_branch protocols ;
   double_preattestation_wrong_branch protocols ;
   operation_too_old protocols ;
-  operation_too_far_in_future protocols
+  operation_too_far_in_future protocols ;
+  attestation_and_aggregation_wrong_payload_hash protocols
