@@ -2264,7 +2264,13 @@ module Misbehaviour : sig
 
   type t = {level : Raw_level.t; round : Round.t; kind : kind}
 
+  val pp_kind : Format.formatter -> kind -> unit
+
+  val pp : Format.formatter -> t -> unit
+
   val kind_encoding : kind Data_encoding.t
+
+  val encoding : t Data_encoding.t
 
   val compare_kind : kind -> kind -> int
 

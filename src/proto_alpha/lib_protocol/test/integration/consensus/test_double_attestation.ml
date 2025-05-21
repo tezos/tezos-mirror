@@ -342,9 +342,9 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
               contents =
                 Apply_results.Single_result
                   (Apply_results.Double_consensus_operation_evidence_result
-                    rslt);
+                    {punished_delegate; _});
             } ->
-            rslt.forbidden_delegate = Some delegate
+            Signature.Public_key_hash.(punished_delegate = delegate)
         | _ -> false)
       operations_recpts
   in

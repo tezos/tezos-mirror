@@ -1165,15 +1165,18 @@ let balance_updates_of_single_content :
     type a.
     a Protocol.Apply_results.contents_result ->
     Protocol.Alpha_context.Receipt.balance_updates = function
-  | Proposals_result | Ballot_result -> []
+  | Proposals_result | Ballot_result
+  | Double_consensus_operation_evidence_result
+      {punished_delegate = _; rewarded_delegate = _; misbehaviour = _}
+  | Double_baking_evidence_result
+      {punished_delegate = _; rewarded_delegate = _; misbehaviour = _} ->
+      []
   | Preattestation_result {balance_updates; _}
   | Attestation_result {balance_updates; _}
   | Preattestations_aggregate_result {balance_updates; _}
   | Attestations_aggregate_result {balance_updates; _}
   | Seed_nonce_revelation_result balance_updates
   | Vdf_revelation_result balance_updates
-  | Double_consensus_operation_evidence_result {balance_updates; _}
-  | Double_baking_evidence_result {balance_updates; _}
   | Dal_entrapment_evidence_result {balance_updates; _}
   | Activate_account_result balance_updates
   | Drain_delegate_result {balance_updates; _} ->

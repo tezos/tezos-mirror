@@ -2488,10 +2488,10 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
   in
   return (ctxt, contents_result_list)
 
-let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
+let punish_double_signing ctxt ~operation_hash delegate level misbehaviour
     ~payload_producer =
   let open Lwt_result_syntax in
-  let rewarded = payload_producer.Consensus_key.delegate in
+  let rewarded_delegate = payload_producer.Consensus_key.delegate in
   let* ctxt =
     Delegate.punish_double_signing
       ctxt
@@ -2499,10 +2499,12 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
       misbehaviour
       delegate
       level
-      ~rewarded
+      ~rewarded:rewarded_delegate
   in
-  let content_result = mk_result (Some delegate) [] in
-  return (ctxt, Single_result content_result)
+  let contents_result =
+    {punished_delegate = delegate; rewarded_delegate; misbehaviour}
+  in
+  return (ctxt, contents_result)
 
 let punish_double_consensus_operation (type kind) ctxt ~operation_hash
     ~payload_producer contents =
@@ -2520,40 +2522,42 @@ let punish_double_consensus_operation (type kind) ctxt ~operation_hash
         | Attestations_aggregate {consensus_content = {level; round; _}; _} ) ->
         Misbehaviour.{level; round; kind = Double_attesting}
   in
-  let mk_result forbidden_delegate balance_updates =
-    Double_consensus_operation_evidence_result
-      {forbidden_delegate; balance_updates}
-  in
   let level = Level.from_raw ctxt misbehaviour.level in
   let* ctxt, {delegate; _} = Stake_distribution.slot_owner ctxt level slot in
-  punish_delegate
-    ctxt
-    ~operation_hash
-    delegate
-    level
-    misbehaviour
-    mk_result
-    ~payload_producer
+  let* ctxt, contents_result =
+    punish_double_signing
+      ctxt
+      ~operation_hash
+      delegate
+      level
+      misbehaviour
+      ~payload_producer
+  in
+  return
+    ( ctxt,
+      Single_result (Double_consensus_operation_evidence_result contents_result)
+    )
 
 let punish_double_baking ctxt ~operation_hash (bh1 : Block_header.t)
     ~payload_producer =
   let open Lwt_result_syntax in
   let*? bh1_fitness = Fitness.from_raw bh1.shell.fitness in
-  let round1 = Fitness.round bh1_fitness in
+  let round = Fitness.round bh1_fitness in
   let*? raw_level = Raw_level.of_int32 bh1.shell.level in
   let level = Level.from_raw ctxt raw_level in
-  let* ctxt, _, consensus_pk1 =
-    Stake_distribution.baking_rights_owner ctxt level ~round:round1
+  let* ctxt, _, {delegate; _} =
+    Stake_distribution.baking_rights_owner ctxt level ~round
   in
-  punish_delegate
-    ctxt
-    ~operation_hash
-    consensus_pk1.delegate
-    level
-    {level = raw_level; round = round1; kind = Double_baking}
-    ~payload_producer
-    (fun forbidden_delegate balance_updates ->
-      Double_baking_evidence_result {forbidden_delegate; balance_updates})
+  let* ctxt, contents_result =
+    punish_double_signing
+      ctxt
+      ~operation_hash
+      delegate
+      level
+      {level = raw_level; round; kind = Double_baking}
+      ~payload_producer
+  in
+  return (ctxt, Single_result (Double_baking_evidence_result contents_result))
 
 let apply_contents_list (type kind) ctxt chain_id (mode : mode)
     ~payload_producer ~operation ~operation_hash

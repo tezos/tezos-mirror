@@ -37,6 +37,12 @@ open Alpha_context
 open Apply_operation_result
 open Apply_internal_results
 
+type double_signing_result = {
+  punished_delegate : public_key_hash;
+  rewarded_delegate : public_key_hash;
+  misbehaviour : Misbehaviour.t;
+}
+
 (** Result of applying a {!Operation.t}. Follows the same structure. *)
 type 'kind operation_metadata = {contents : 'kind contents_result_list}
 
@@ -91,15 +97,11 @@ and 'kind contents_result =
   | Vdf_revelation_result :
       Receipt.balance_updates
       -> Kind.vdf_revelation contents_result
-  | Double_consensus_operation_evidence_result : {
-      forbidden_delegate : Signature.public_key_hash option;
-      balance_updates : Receipt.balance_updates;
-    }
+  | Double_consensus_operation_evidence_result :
+      double_signing_result
       -> Kind.double_consensus_operation_evidence contents_result
-  | Double_baking_evidence_result : {
-      forbidden_delegate : Signature.public_key_hash option;
-      balance_updates : Receipt.balance_updates;
-    }
+  | Double_baking_evidence_result :
+      double_signing_result
       -> Kind.double_baking_evidence contents_result
   | Dal_entrapment_evidence_result : {
       balance_updates : Receipt.balance_updates;
