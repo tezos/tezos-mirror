@@ -403,13 +403,8 @@ module type CONSENSUS = sig
     t ->
     allowed_attestations:(consensus_pk * int * int) slot_map option ->
     allowed_preattestations:(consensus_pk * int * int) slot_map option ->
+    allowed_consensus:(consensus_pk * int * int) slot_map level_map option ->
     t
-
-  (** Initializes the map of allowed consensus operations, this
-      function must be called only once and before applying any consensus
-      operation. *)
-  val initialize_allowed_consensus :
-    t -> (consensus_pk * int * int) slot_map level_map option -> t
 
   (** [record_attestation ctx ~initial_slot ~power] records an
      attestation for the current block.
