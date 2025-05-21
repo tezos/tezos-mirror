@@ -25,11 +25,21 @@
 
 (* Tezos Protocol Implementation - Low level Repr. of Managers' keys *)
 
-type manager_key =
-  | Hash of Signature.Public_key_hash.t
-  | Public_key of Signature.Public_key.t
+(* In S, the type of the [Manager] storage has been changed to [manager_key_storage_type].
+   This change is purely internal. Previously revealed keys are determined to be valid
+   or not at encoding time. This is necessary because the tz4 addresses that have been
+   revealed before S should be revealed again. After S, the revealed keys are
+   registered separately (tag 2).
 
-type t = manager_key
+   To keep consistency, this type is projected on [manager_key], which has the same
+   types as before, and verifies the same invariants. This means that any member of
+   [Hash] needs to be revealed (regardless of if it was already revealed before S or not),
+   and member of [Public_key] are considered revealed.
+*)
+type manager_key_storage_type =
+  | Hash of Signature.Public_key_hash.t
+  | Public_key_before_S of Signature.Public_key.t
+  | Public_key_after_S of Signature.Public_key.t
 
 open Data_encoding
 
@@ -46,7 +56,36 @@ let pubkey_case tag =
     tag
     ~title:"Public_key"
     Signature.Public_key.encoding
-    (function Public_key hash -> Some hash | _ -> None)
-    (fun hash -> Public_key hash)
+    (function Public_key_before_S pk -> Some pk | _ -> None)
+    (fun pk -> Public_key_before_S pk)
 
-let encoding = union [hash_case (Tag 0); pubkey_case (Tag 1)]
+let pubkey_ok_case tag =
+  case
+    tag
+    ~title:"Public_key_after_S"
+    Signature.Public_key.encoding
+    (function Public_key_after_S pk -> Some pk | _ -> None)
+    (fun pk -> Public_key_after_S pk)
+
+let encoding_legacy =
+  union [hash_case (Tag 0); pubkey_case (Tag 1); pubkey_ok_case (Tag 2)]
+
+type manager_key =
+  | Hash of Signature.Public_key_hash.t
+  | Public_key of Signature.Public_key.t
+
+type t = manager_key
+
+let encoding =
+  conv
+    (function
+      | Hash hash -> (Hash hash : manager_key_storage_type)
+      (* This encoding change only takes effect after S, so newly registered public keys
+         are stored as [Public_key_after_S] *)
+      | Public_key pk -> Public_key_after_S pk)
+    (function
+      | Hash hash -> Hash hash
+      | Public_key_before_S (Bls _ as pk) -> Hash (Signature.Public_key.hash pk)
+      | Public_key_before_S pk -> Public_key pk
+      | Public_key_after_S pk -> Public_key pk)
+    encoding_legacy
