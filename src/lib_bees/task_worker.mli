@@ -18,6 +18,10 @@ type 'a message_error =
   | Request_error of 'a
   | Any of exn
 
+(* Exposes the number of domains that is currently used to execute parallel
+   computations. *)
+val number_of_domains : int
+
 (** [launch_task_and_wait name func ?on_completion arg] create a request named
     [name] and executing [func args], and push it to a [worker] queue. [worker]
     is created at toplevel and shared amongst all the components. Returns a

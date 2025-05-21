@@ -79,6 +79,8 @@ type 'a message_error = 'a Worker.message_error =
    overloading it.*)
 let default_max_domains = max (min (Domain.recommended_domain_count () / 2) 8) 1
 
+let number_of_domains = default_max_domains
+
 let worker =
   let table = Worker.create_table Queue in
   Eio.Lazy.from_fun ~cancel:`Protect @@ fun () ->
