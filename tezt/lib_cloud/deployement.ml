@@ -302,6 +302,185 @@ end
 module Ssh_host = struct
   type t = {point : string * string * int; agents : Agent.t list}
 
+  (* This function allows to setup the prerequisites to run the deployment
+     of containers on a vm which can be connected to via ssh.
+     Multiple hosts are currently supported:
+       - a gcp debian vm
+       - a qemu vm
+       - a physical machine.
+     All that is required is that the host can be contacted either via root
+     account or a sudo enabled account. *)
+  let initial_host_provisionning user host port =
+    let runner =
+      Runner.create
+        ~ssh_user:user
+        ~ssh_port:port
+        ~address:host
+        ~ssh_id:(Env.ssh_private_key_filename ())
+        ()
+    in
+    let* () =
+      (* Allows direct connections as root on debian, using key authentication.
+         This is not unsecure (as key logging is secure) as long as users
+         logging in as root are careful. This allows to not be embarrassed with sudo *)
+      if user = "root" then Lwt.return_unit
+      else
+        let* _ =
+          Process.spawn
+            ~runner
+            "sudo"
+            [
+              "sed";
+              "-i";
+              "s/PermitRootLogin no/PermitRootLogin prohibit-password/";
+              "/etc/ssh/sshd_config";
+            ]
+          |> Process.wait
+        in
+        with_open_in (Env.ssh_public_key_filename ()) @@ fun fd ->
+        let ssh_public_key_content = input_line fd in
+        let* () =
+          Process.spawn ~runner "sudo" ["mkdir"; "-p"; "/root/.ssh"]
+          |> Process.check
+        in
+        let* () =
+          Process.spawn
+            ~runner
+            "sh"
+            [
+              "-c";
+              Format.asprintf
+                "echo %s | sudo tee -a /root/.ssh/authorized_keys"
+                ssh_public_key_content;
+            ]
+          |> Process.check
+        in
+        Process.spawn ~runner "sudo" ["systemctl"; "restart"; "ssh.service"]
+        |> Process.check
+    in
+    (* Setup a new runner for root connections *)
+    let runner =
+      Runner.create
+        ~ssh_user:"root"
+        ~ssh_port:port
+        ~address:host
+        ~ssh_id:(Env.ssh_private_key_filename ())
+        ()
+    in
+    let user = "root" in
+    (* Installs docker *)
+    Log.report "Installing docker" ;
+    let* () = Process.spawn ~runner "apt-get" ["update"] |> Process.check in
+    let* () =
+      Process.spawn ~runner "apt-get" ["install"; "-y"; "docker.io"; "libev4"]
+      |> Process.check
+    in
+    let* project = Env.project_id () in
+    (* Generate locally an access token to access to gcp docker registry *)
+    let* iam_key_filename =
+      let service_account_name = Format.asprintf "%s-id" Env.tezt_cloud in
+      let* service_account =
+        (* FIXME: service_account_fullname is strictly bound to dal team and should
+           be configured and stored in a tezt-cloud ~/.config directory.
+           Here, preserving backward compatibility with terraform naming *)
+        let service_account_fullname =
+          Format.asprintf "%s-id@nl-dal.iam.gserviceaccount.com" Env.tezt_cloud
+        in
+        (* Delete service account if exists. Do not fail if it does not *)
+        let* _ =
+          Process.spawn
+            "gcloud"
+            ["iam"; "service-accounts"; "delete"; service_account_fullname]
+          |> Process.wait
+        in
+        let* () =
+          Process.spawn
+            "gcloud"
+            [
+              "iam";
+              "service-accounts";
+              "create";
+              "--project";
+              project;
+              service_account_name;
+              "--display-name";
+              service_account_name;
+            ]
+          |> Process.check
+        in
+        Lwt.return service_account_fullname
+      in
+      Log.report "waiting for the iam account to become valid" ;
+      let* () = Lwt_unix.sleep 3.0 in
+      let iam_key_filename = "/tmp/iam-keys" in
+      let* () =
+        Process.spawn
+          "gcloud"
+          [
+            "iam";
+            "service-accounts";
+            "keys";
+            "create";
+            iam_key_filename;
+            "--iam-account";
+            service_account;
+            "--project";
+            project;
+          ]
+        |> Process.check
+      in
+      Log.report "waiting for the iam key to become valid" ;
+      let* () = Lwt_unix.sleep 3.0 in
+      let* () =
+        Process.spawn
+          "gcloud"
+          [
+            "artifacts";
+            "repositories";
+            "add-iam-policy-binding";
+            Format.asprintf "%s-docker-registry" Env.tezt_cloud;
+            "--location";
+            "europe-west1";
+            "--member";
+            Format.asprintf "serviceAccount:%s" service_account;
+            "--role";
+            "roles/artifactregistry.reader";
+          ]
+        |> Process.check
+      in
+      Log.report "waiting for the iam key binding to become valid" ;
+      let* () = Lwt_unix.sleep 3.0 in
+      Lwt.return iam_key_filename
+    in
+    (* Upload the key to the host via ssh *)
+    let* () =
+      Process.run
+        "scp"
+        (["-i"; Env.ssh_private_key_filename (); iam_key_filename]
+        @ (if port <> 22 then ["-p"; string_of_int port] else [])
+        @ [Format.asprintf "%s@%s:%s" user host iam_key_filename])
+    in
+    let* () =
+      let rec retry () =
+        let* status =
+          Process.spawn
+            ~runner
+            "sh"
+            [
+              "-c";
+              Format.asprintf
+                "cat %s | docker login -u _json_key --password-stdin  \
+                 https://europe-west1-docker.pkg.dev"
+                iam_key_filename;
+            ]
+          |> Process.wait
+        in
+        match status with WEXITED 0 -> Lwt.return_unit | _ -> retry ()
+      in
+      retry ()
+    in
+    Lwt.return_unit
+
   let deploy_proxy runner =
     let configuration = Proxy.make_config () in
     let next_available_port =
@@ -357,6 +536,7 @@ module Ssh_host = struct
 
   let deploy ~user ~host ~port ~(configurations : Agent.Configuration.t list) ()
       =
+    let* () = initial_host_provisionning user host port in
     let proxy_runner =
       Runner.create ~ssh_user:"root" ~ssh_port:port ~address:host ()
     in
