@@ -17,11 +17,12 @@ module Configuration = struct
 
   let uri_of_docker_image docker_image =
     match (docker_image, Env.mode) with
-    | Types.Agent_configuration.Gcp {alias}, (`Cloud | `Host | `Orchestrator) ->
+    | ( Types.Agent_configuration.Gcp {alias},
+        (`Cloud | `Host | `Orchestrator | `Ssh_host _) ) ->
         let* registry_uri = Env.registry_uri () in
         Lwt.return (Format.asprintf "%s/%s" registry_uri alias)
     | Gcp {alias}, `Localhost -> Lwt.return alias
-    | Octez_release _, (`Cloud | `Host | `Orchestrator) ->
+    | Octez_release _, (`Cloud | `Host | `Orchestrator | `Ssh_host _) ->
         let* registry_uri = Env.registry_uri () in
         Lwt.return (Format.asprintf "%s/octez" registry_uri)
     | Octez_release _, `Localhost -> Lwt.return "octez"

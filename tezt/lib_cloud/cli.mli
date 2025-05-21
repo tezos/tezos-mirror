@@ -143,3 +143,6 @@ val binaries_path : string
     Defaults to 300
     Use 0 to disable log-rotation *)
 val log_rotation : int
+
+(** The hostname of the host accessed by ssh on which to deploy *)
+val ssh_host : string option

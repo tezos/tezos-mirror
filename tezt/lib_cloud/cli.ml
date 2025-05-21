@@ -22,6 +22,13 @@ let localhost =
     ~description:"If set, the test is run locally"
     false
 
+let ssh_host =
+  Clap.optional_string
+    ~section
+    ~long:"ssh-host"
+    ~description:"Whether to provision a non-gcp vm host via ssh"
+    ()
+
 let monitoring =
   Clap.flag
     ~section

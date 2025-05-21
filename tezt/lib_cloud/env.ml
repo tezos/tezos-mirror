@@ -12,19 +12,31 @@ let tezt_cloud =
       (* This is a lazy value to be sure that this is evaluated only inside a Tezt test. *)
       match Sys.getenv_opt "TEZT_CLOUD" with None -> "" | Some value -> value)
 
+let mode =
+  match (Cli.localhost, Cli.proxy, Cli.ssh_host) with
+  | true, true, None -> `Orchestrator
+  | true, false, None -> `Localhost
+  | false, true, None -> `Host
+  | false, false, None -> `Cloud
+  | true, _, Some _ | _, true, Some _ ->
+      Test.fail
+        "Unexpected combination of options: ssh_host and (proxy or localhost)"
+  | _, _, Some endpoint ->
+      let uri = Uri.of_string (Format.asprintf "tcp://%s" endpoint) in
+      let host =
+        match Uri.host uri with
+        | None -> Test.fail "No valid hostname specified: %s" endpoint
+        | Some host -> host
+      in
+      let port = Option.value ~default:22 (Uri.port uri) in
+      `Ssh_host (host, port)
+
 let ssh_private_key_filename ?(home = Sys.getenv "HOME") () =
   home // ".ssh" // Format.asprintf "%s-tf" tezt_cloud
 
 let ssh_public_key_filename ?home () =
   let ssh_key = ssh_private_key_filename ?home () in
   Format.asprintf "%s.pub" ssh_key
-
-let mode =
-  match (Cli.localhost, Cli.proxy) with
-  | true, true -> `Orchestrator
-  | true, false -> `Localhost
-  | false, true -> `Host
-  | false, false -> `Cloud
 
 let prometheus = Cli.prometheus
 
@@ -133,6 +145,7 @@ let init () =
       ( with_open_out pidfile @@ fun fd ->
         output_string fd (Format.asprintf "%d\n" pid) ) ;
       Lwt.return_unit
+  | `Ssh_host _ -> Lwt.return_unit
   | `Host | `Cloud ->
       let* project_id = project_id () in
       Log.info "Initializing docker registry..." ;
@@ -222,7 +235,8 @@ let dns_domains () =
           match domain with
           | None -> Lwt.return Cli.dns_domains
           | Some domain -> Lwt.return (domain :: Cli.dns_domains))
-      | `Orchestrator | `Localhost | `Cloud -> Lwt.return Cli.dns_domains
+      | `Orchestrator | `Localhost | `Cloud | `Ssh_host _ ->
+          Lwt.return Cli.dns_domains
   in
   (* A fully-qualified domain name requires to end with a dot.
      However, the usage tends to omit this final dot. Because having a
