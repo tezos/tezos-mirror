@@ -987,8 +987,6 @@ module History = struct
 
     type proof = bytes
 
-    (** DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/4084
-        DAL proof's encoding should be bounded *)
     let proof_encoding = Data_encoding.(bytes Hex)
 
     type error += Dal_invalid_proof_serialization

@@ -24,17 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/7068
-
-   Think about a better implementation of the skip list cells store that:
-
-   - Doesn't add padding (KVS with values of variable size)
-
-   - Doesn't encode to intermediate structures (like
-     [Dal_proto_types.Skip_list_cell]). Maybe have a per-protocol store in this
-     case, and move most of the store creating and updating to the proto plugin
-     to avoid existential type variables issues.
-*)
 (**
    This module instantiates the key value store to provide facilities for
    storing and retrieving the cells of the DAL skip list. The store maintains:

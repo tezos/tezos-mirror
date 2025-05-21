@@ -139,9 +139,8 @@ let new_connections_handler gs_worker p2p_layer peer_id conn =
         fold_pool_opt P2p_pool.Points.get_trusted (addr, port))
   in
   let trusted = trusted_peer || trusted_point in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5584
-
-     Add the ability to have direct peers. *)
+  (* Currently direct peers are not supported. The "private mode" mechanism
+     present in octez-p2p could maybe be used for that. *)
   let direct = false in
   let peer = peer_of_connection p2p_layer conn in
   Worker.(
@@ -190,10 +189,6 @@ let try_connect ?expected_peer_id gs_worker p2p_layer ~trusted point =
          wipe / regenerate their peer identities while keeping the same IP
          addresses. The [expected_peer_id] check, if enabled, will make
          Octez-p2p reject any other connection with a different identity. *)
-      (* DAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7646
-
-          Implement a better PX exchange.
-      *)
       ignore expected_peer_id ;
       let* (result : _ P2p.connection tzresult) =
         P2p.connect ~trusted p2p_layer point
@@ -230,11 +225,6 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
           | None ->
               (* This could happen when the peer is disconnected or the
                  connection is accepted but not running (authenticated) yet. *)
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/5649
-
-                 Are there weird cases in which there is no connection
-                 associated to the peer, but the peer is still registered as
-                 connected on the GS side? *)
               Events.(emit no_connection_for_peer to_peer.peer_id)
           | Some conn -> (
               let* (res : unit tzresult) =

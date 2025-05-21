@@ -204,10 +204,6 @@ module Shards = struct
         shards
       |> Errors.other_lwt_result
     in
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4974
-
-       DAL/Node: rehaul the store  abstraction & notification system.
-    *)
     return_unit
 
   let read_all shards_store slot_id ~number_of_shards =

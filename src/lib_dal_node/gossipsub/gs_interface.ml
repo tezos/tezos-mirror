@@ -108,11 +108,9 @@ module Worker_config :
   let maybe_reachable_point Types.Peer.{maybe_reachable_point; _} =
     maybe_reachable_point
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5596
-
-     Use Seq_s instead of Lwt_stream to implement module Stream. *)
   module Stream = struct
     type 'a t = {
+      (* In principle [Seq_s] could also be used instead. *)
       stream : 'a Lwt_stream.t;
       pusher : 'a option -> unit;
       mutable length : int;

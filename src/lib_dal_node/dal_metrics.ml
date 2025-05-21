@@ -265,9 +265,6 @@ module GS = struct
         Format.asprintf "%a" Signature.Public_key_hash.pp pkh;
       ]
 
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6593
-
-       Be able to clean peers from metrics once they are disconnected. *)
     let collect_peers_per_topic_metrics gs_state =
       let module W = Gossipsub.Worker in
       W.GS.Topic.Map.fold
@@ -282,9 +279,6 @@ module GS = struct
         gs_state.W.GS.Introspection.mesh
         Prometheus.LabelSetMap.empty
 
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6593
-
-       Be able to clean peers from metrics onces they are disconnected. *)
     let collect_scores_of_peers_metrics gs_state =
       let module W = Gossipsub.Worker in
       W.GS.Peer.Map.fold

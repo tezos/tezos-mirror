@@ -750,8 +750,7 @@ module Make (C : AUTOMATON_CONFIG) :
       | `unknown_peer -> return Subscribe_to_unknown_peer
       | `subscribed connections ->
           let* () = set_connections connections in
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5143
-             rust-libp2p adds the peer to the mesh if needed here. *)
+          (* Note: rust-libp2p adds the peer to the mesh if needed here. *)
           return Subscribed
   end
 
