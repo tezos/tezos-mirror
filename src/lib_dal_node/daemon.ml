@@ -490,13 +490,7 @@ let run ~data_dir ~configuration_override =
   Node_context.(set_l1_crawler_status ctxt L1_bootstrapping) ;
   let* () = L1_helpers.wait_for_l1_bootstrapped cctxt in
   let* proto_plugins =
-    Proto_plugins.get_proto_plugins
-      cctxt
-      profile_ctxt
-      ~last_processed_level
-      ~first_seen_level
-      ~head_level
-      proto_parameters
+    Proto_plugins.get_supported_proto_plugins cctxt ~head_level
   in
   Node_context.set_proto_plugins ctxt proto_plugins ;
   let* () =
