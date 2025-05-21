@@ -390,7 +390,6 @@ let () =
     "schedule_docker_build_pipeline"
     schedule_docker_build
     ~jobs:Master_branch.octez_distribution_docker_jobs
-    ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       "Scheduled pipeline for forcing building fresh Docker image (skipping \
        any cache mechanism) for the current master branch of Octez. The newly \

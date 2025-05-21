@@ -207,9 +207,17 @@ module Pipeline = struct
         (name pipeline)
     else pipelines := pipeline :: !pipelines
 
-  let register ?variables ?auto_cancel ~description ~jobs name if_ =
+  let register ?(variables = []) ?auto_cancel ~description ~jobs name if_ =
     register_raw
-      (Pipeline {variables; if_; name; jobs; auto_cancel; description})
+      (Pipeline
+         {
+           variables = Some (("DOCKER_FORCE_BUILD", "true") :: variables);
+           if_;
+           name;
+           jobs;
+           auto_cancel;
+           description;
+         })
 
   let register_child ?auto_cancel ?inherit_ ~description ~jobs name =
     let child_pipeline = {name; inherit_; jobs; auto_cancel; description} in

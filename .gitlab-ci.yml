@@ -13,11 +13,13 @@ workflow:
       && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
     variables:
       PIPELINE_TYPE: before_merging
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
       && $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
     variables:
       PIPELINE_TYPE: merge_train
+      DOCKER_FORCE_BUILD: "true"
     when: always
     auto_cancel:
       on_job_failure: all
@@ -25,45 +27,54 @@ workflow:
       == "master"
     variables:
       PIPELINE_TYPE: master_branch
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "latest-release"
     variables:
       PIPELINE_TYPE: octez_latest_release
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "latest-release-test"
     variables:
       PIPELINE_TYPE: octez_latest_release_test
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^octez-v\d+\.\d+(?:\-rc\d+)?$/
     variables:
       PIPELINE_TYPE: octez_release_tag
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^octez-v\d+\.\d+\-beta\d*$/
     variables:
       PIPELINE_TYPE: octez_beta_release_tag
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && ($CI_COMMIT_TAG
       =~ /^octez-v\d+\.\d+(?:\-rc\d+)?$/ || $CI_COMMIT_TAG =~ /^octez-v\d+\.\d+\-beta\d*$/)
     variables:
       PIPELINE_TYPE: octez_release_tag_test
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^grafazos-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: grafazos_release_tag_test
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^teztale-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: teztale_release_tag_test
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
     variables:
       PIPELINE_TYPE: octez_evm_node_release_tag
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
@@ -71,6 +82,7 @@ workflow:
       && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: non_release_tag
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
@@ -78,50 +90,62 @@ workflow:
       && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: non_release_tag_test
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     variables:
       PIPELINE_TYPE: schedule_extended_test
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_RPC_TESTS"
     variables:
       PIPELINE_TYPE: schedule_extended_rpc_test
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_VALIDATION_TESTS"
     variables:
       PIPELINE_TYPE: schedule_extended_validation_test
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_BAKER_REMOTE_MODE_TESTS"
     variables:
       PIPELINE_TYPE: schedule_extended_baker_remote_mode_test
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "TEST_RELEASE"
     variables:
       PIPELINE_TYPE: schedule_master_test_release
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_MASTER"
     variables:
       PIPELINE_TYPE: schedule_container_scanning_master
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RELEASES"
     variables:
       PIPELINE_TYPE: schedule_container_scanning_octez_releases
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_EVM_NODE_RELEASES"
     variables:
       PIPELINE_TYPE: schedule_container_scanning_evm_node_releases
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RC"
     variables:
       PIPELINE_TYPE: schedule_container_scanning_octez_rc
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "SECURITY_SCANS"
     variables:
       PIPELINE_TYPE: schedule_security_scans
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCUMENTATION"
     variables:
       PIPELINE_TYPE: schedule_documentation
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCKER_FRESH_IMAGE_BUILD"
     variables:
@@ -132,11 +156,13 @@ workflow:
       != "tezos"
     variables:
       PIPELINE_TYPE: publish_test_release_page
+      DOCKER_FORCE_BUILD: "true"
     when: always
   - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE" && $CI_PROJECT_NAMESPACE
       == "tezos"
     variables:
       PIPELINE_TYPE: publish_release_page
+      DOCKER_FORCE_BUILD: "true"
     when: always
 
 default:
