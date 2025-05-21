@@ -358,9 +358,10 @@ struct
     Evm_store.use Ctxt.ctxt.store @@ fun conn ->
     Evm_store.L1_l2_finalized_levels.find conn ~l1_level
 
-  let block_param_to_block_number
+  let block_param_to_block_number ~chain_family
       (block_param : Ethereum_types.Block_parameter.extended) =
     let open Lwt_result_syntax in
+    let root = Durable_storage_path.root_of_chain_family chain_family in
     match block_param with
     | Block_parameter (Number n) -> return n
     | Block_parameter (Latest | Pending) when Ctxt.ctxt.finalized_view -> (
@@ -395,14 +396,12 @@ struct
         let*! bytes =
           Evm_state.inspect
             evm_state
-            Durable_storage_path.(
-              (* We're expecting an etherlink block here so we can inline etherlink root *)
-              Block.by_hash ~root:Durable_storage_path.etherlink_root hash)
+            Durable_storage_path.(Block.by_hash ~root hash)
         in
         match bytes with
         | Some bytes ->
-            let block = Ethereum_types.block_from_rlp bytes in
-            return block.number
+            let block = L2_types.block_from_bytes ~chain_family bytes in
+            return (L2_types.block_number block)
         | None -> failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
 end
 
@@ -544,7 +543,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
       module Tracer_etherlink =
         Tracer_sig.Make (Executor) (Etherlink_block_storage) (Tracer)
 
-      let block_param_to_block_number
+      let block_param_to_block_number ~chain_family
           (block_param : Ethereum_types.Block_parameter.extended) =
         let open Lwt_result_syntax in
         match block_param with
@@ -555,7 +554,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
             | Some number -> return number
             | None ->
                 failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
-        | param -> block_param_to_block_number param
+        | param -> block_param_to_block_number ~chain_family param
 
       module Tezlink_block_storage : Tezlink_block_storage_sig.S = struct
         let nth_block level =
@@ -577,7 +576,8 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           (struct
             include Backend.Reader
 
-            let block_param_to_block_number = block_param_to_block_number
+            let block_param_to_block_number =
+              block_param_to_block_number ~chain_family:L2_types.Michelson
           end)
           (Tezlink_block_storage)
     end)

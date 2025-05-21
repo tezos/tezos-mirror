@@ -178,7 +178,9 @@ let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
   let open Lwt_result_syntax in
   let* (Ethereum_types.Qty n) =
-    Rollup_node_rpc.block_param_to_block_number (Block_parameter block_param)
+    Rollup_node_rpc.block_param_to_block_number
+      ~chain_family:L2_types.EVM
+      (Block_parameter block_param)
   in
   Rollup_node_rpc.Etherlink_block_storage.nth_block ~full_transaction_object n
 
@@ -186,7 +188,9 @@ let get_block_receipts block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
   let open Lwt_result_syntax in
   let* (Ethereum_types.Qty n) =
-    Rollup_node_rpc.block_param_to_block_number (Block_parameter block_param)
+    Rollup_node_rpc.block_param_to_block_number
+      ~chain_family:L2_types.EVM
+      (Block_parameter block_param)
   in
   Rollup_node_rpc.Etherlink_block_storage.block_receipts n
 
@@ -915,6 +919,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             let f ((block_param, config) : Tracer_types.block_input) =
               let* (Ethereum_types.Qty block_number) =
                 Backend_rpc.block_param_to_block_number
+                  ~chain_family:L2_types.EVM
                   (Block_parameter block_param)
               in
               let*! traces =

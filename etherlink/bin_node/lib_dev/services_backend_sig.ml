@@ -16,6 +16,7 @@ module type S = sig
   module Tracer_etherlink : Tracer_sig.S
 
   val block_param_to_block_number :
+    chain_family:L2_types.chain_family ->
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
 
@@ -84,6 +85,7 @@ module type Backend = sig
   (** [block_param_to_block_number block_param] returns the block number of the
       block identified by [block_param]. *)
   val block_param_to_block_number :
+    chain_family:L2_types.chain_family ->
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
 
@@ -129,7 +131,8 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
       (struct
         include Backend.Reader
 
-        let block_param_to_block_number = Backend.block_param_to_block_number
+        let block_param_to_block_number =
+          Backend.block_param_to_block_number ~chain_family:L2_types.Michelson
       end)
       (Tezlink_block_storage)
 
