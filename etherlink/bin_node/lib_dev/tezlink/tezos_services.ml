@@ -50,6 +50,33 @@ module Mock = struct
 
   let protocol_data : Imported_protocol.Block_header_repr.protocol_data =
     {contents; signature}
+
+  let receipts =
+    Imported_protocol.Apply_results.Operation_metadata
+      {
+        contents =
+          Single_result
+            (Manager_operation_result
+               {
+                 balance_updates = [];
+                 operation_result =
+                   Applied
+                     (Transaction_result
+                        (Transaction_to_contract_result
+                           {
+                             storage = None;
+                             lazy_storage_diff = None;
+                             balance_updates = [];
+                             ticket_receipt = [];
+                             originated_contracts = [];
+                             consumed_gas = Alpha_context.Gas.Arith.zero;
+                             storage_size = Z.zero;
+                             paid_storage_size_diff = Z.zero;
+                             allocated_destination_contract = true;
+                           }));
+                 internal_operation_results = [];
+               });
+      }
 end
 
 (* Module importing, amending, and converting, protocol types. Those types
@@ -373,6 +400,20 @@ module Imported_services = struct
       Constants_services.RPC_service.t =
     import_service Tezos_shell_services.Monitor_services.S.bootstrapped
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
+  (* We need a proper implementation *)
+  let simulate_operation :
+      ( [`POST],
+        tezlink_rpc_context,
+        tezlink_rpc_context,
+        < successor_level : bool
+        ; version : Imported_protocol_plugin.RPC.version option >,
+        int32 option * Alpha_context.packed_operation * Chain_id.t * int,
+        Alpha_context.packed_protocol_data * Imported_protocol.operation_receipt
+      )
+      Constants_services.RPC_service.t =
+    import_service Imported_protocol_plugin.RPC.Scripts.S.simulate_operation
+
   let monitor_heads :
       ( [`GET],
         unit,
@@ -505,6 +546,18 @@ let register_block_services ~l2_chain_id
            let*? block = check_block block in
            Backend.block_hash chain block)
          ~convert_output:Protocol_types.ethereum_to_tezos_block_hash
+    |> register
+       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
+       (* We need a proper implementation *)
+         ~service:Imported_services.simulate_operation
+         ~impl:(fun
+             {block = _; chain = _}
+             _param
+             ( _blocks_before_activation,
+               operation,
+               _chain_id,
+               _operation_inclusion_latency )
+           -> return (operation.protocol_data, Mock.receipts))
   in
   Tezos_rpc.Directory.prefix
     block_directory_path
