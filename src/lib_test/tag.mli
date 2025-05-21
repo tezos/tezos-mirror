@@ -34,9 +34,8 @@
 (** ["flaky"]: the test is flaky.
 
     The semantics depends on other tags:
-    - if the test also has tag {!memory_3k}, {!memory_4k} or {!time_sensitive},
-      the test still runs in job [tezt-memory-3k], [tezt-memory-4k]
-      or [tezt-time-sensitive] respectively;
+    - if the test also has tag {!time_sensitive},
+      the test still runs in job [tezt-time-sensitive];
     - if the test also has tag {!slow}, the test still runs in job [tezt-slow]
       but this job is manual, so it does not run by default, except in
       scheduled pipelines;
@@ -64,12 +63,6 @@ val flaky : string
     You must provide a comment to explain why the test is disabled.
     For flaky tests, {!flaky} should be preferred to [ci_disabled]. *)
 val ci_disabled : string
-
-(** ["memory_3k"]: tag memory hungry tests ( >3 GB of memory ). *)
-val memory_3k : string
-
-(** ["memory_4k"]: tag memory hungry tests ( >4 GB of memory ). *)
-val memory_4k : string
 
 (** ["time_sensitive"]: tag for time-sensitive tests.
 

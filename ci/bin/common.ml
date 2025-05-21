@@ -1057,22 +1057,19 @@ module Tezt = struct
     It returns a TSL expression that:
     - always deselects tags with [ci_disabled];
     - selects, respectively deselects, the tests with the tags
-      [memory_3k], [memory_4k], [time_sensitive], [slow] or [cloud],
-      depending on the value of the corresponding function
-      argument. These arguments all default to false.
+      [time_sensitive], [slow] or [cloud],
+      depending on the value of the corresponding function argument.
+      These arguments all default to false.
 
     See [src/lib_test/tag.mli] for a description of the above tags.
 
     The list of TSL expressions [and_] are appended to the final
     selector, allowing to modify the selection further. *)
-  let tests_tag_selector ?(memory_3k = false) ?(memory_4k = false)
-      ?(time_sensitive = false) ?(slow = false) ?(cloud = false)
-      (and_ : Tezt_core.TSL_AST.t list) : Tezt_core.TSL_AST.t =
+  let tests_tag_selector ?(time_sensitive = false) ?(slow = false)
+      ?(cloud = false) (and_ : Tezt_core.TSL_AST.t list) : Tezt_core.TSL_AST.t =
     let tags =
       [
         (false, "ci_disabled");
-        (memory_3k, "memory_3k");
-        (memory_4k, "memory_4k");
         (time_sensitive, "time_sensitive");
         (slow, "slow");
         (cloud, "cloud");

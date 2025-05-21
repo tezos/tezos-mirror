@@ -72,13 +72,7 @@ let disputed_commit = "Attempted to cement a disputed commitment"
 let register_test ?kind ?supports ?(regression = false) ~__FILE__ ~tags ?uses
     ~title f =
   let kind_tags =
-    match kind with
-    | Some "riscv" ->
-        (* TODO: At the moment, the memory consumption of the RISC-V PVM when
-           executed by the rollup node is prohibitive for regular CI jobs. *)
-        ["riscv"; Tag.memory_4k]
-    | Some k -> [k]
-    | _ -> []
+    match kind with Some "riscv" -> ["riscv"] | Some k -> [k] | _ -> []
   in
   let tags = Tag.etherlink :: "sc_rollup" :: (kind_tags @ tags) in
   if regression then

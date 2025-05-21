@@ -70,13 +70,7 @@ let check_node_synchronization_state =
     ~title:"check synchronization state"
     ~tags:
       [
-        team;
-        Tag.flaky;
-        "synchronisation_threshold";
-        "bootstrap";
-        "node";
-        "sync";
-        Tag.memory_3k;
+        team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "node"; "sync";
       ]
   @@ fun protocol ->
   let* main_node = Node.init ~name:"main_node" [] in
@@ -509,14 +503,7 @@ let test_many_nodes_bootstrap =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: many nodes bootstrap"
-    ~tags:
-      [
-        team;
-        "synchronisation_threshold";
-        "bootstrap";
-        "threshold";
-        Tag.memory_4k;
-      ]
+    ~tags:[team; "synchronisation_threshold"; "bootstrap"; "threshold"]
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let num_nodes = 8 in

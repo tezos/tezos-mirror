@@ -39,8 +39,6 @@
 
    Invocation:   dune exec tezt/tests/main.exe -- --file dal.ml
    Subject: Integration tests related to the data-availability layer
-   Remarks: For tagging tests with memory tags (like memory_3k), the script
-            tezt_cgmemtime_all.sh from !9593 was used.
 *)
 
 let team = Tag.tezos2
@@ -631,10 +629,6 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
     scenario =
   let description = "Testing DAL L1 integration" in
   let tags = if List.mem team tags then tags else team :: tags in
-  let tags =
-    if List.mem Tag.memory_3k tags || List.mem Tag.memory_4k tags then tags
-    else Tag.memory_3k :: tags
-  in
   test
     ?regression
     ~__FILE__
@@ -677,10 +671,6 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?l1_history_mode variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
-  let tags =
-    if List.mem Tag.memory_3k tags || List.mem Tag.memory_4k tags then tags
-    else Tag.memory_3k :: tags
-  in
   test
     ?regression
     ~__FILE__
@@ -731,10 +721,6 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     scenario =
   let description = "Testing DAL rollup and node with L1" in
   let tags = if List.mem team tags then tags else team :: tags in
-  let tags =
-    if List.mem Tag.memory_3k tags || List.mem Tag.memory_4k tags then tags
-    else Tag.memory_3k :: tags
-  in
   test
     ~regression
     ~__FILE__
@@ -3537,7 +3523,7 @@ let register_end_to_end_tests ~protocols =
       let slot_index = 5 in
       let operator_profiles = [slot_index] in
       let tags =
-        ["e2e"; network; Tag.memory_4k]
+        ["e2e"; network]
         @ (match constants with Constants_mainnet -> [Tag.slow] | _ -> [])
         @ tags
       in
@@ -5197,7 +5183,7 @@ module History_rpcs = struct
     in
 
     let description = "test commitments history with migration" in
-    let tags = ["rpc"; "skip_list"; Tag.memory_3k; Tag.ci_disabled] in
+    let tags = ["rpc"; "skip_list"; Tag.ci_disabled] in
     test_l1_migration_scenario
       ~migrate_from
       ~migrate_to
@@ -6516,7 +6502,7 @@ module Garbage_collection = struct
 
   let test_gc_skip_list_cells ~protocols =
     let title = "garbage collection of skip list cells" in
-    let tags = Tag.[tezos2; memory_3k; "dal"; "gc"; "skip_list"] in
+    let tags = Tag.[tezos2; "dal"; "gc"; "skip_list"] in
     Protocol.register_test
       ~__FILE__
       ~tags
@@ -7325,7 +7311,7 @@ let scenario_tutorial_dal_baker =
   test
     ~regression:true
     ~__FILE__
-    ~tags:[team; Tag.memory_3k; "tutorial"; "dal"; "baker"]
+    ~tags:[team; "tutorial"; "dal"; "baker"]
     ~uses:(fun _protocol ->
       [Constant.octez_agnostic_baker; Constant.octez_dal_node])
     (Printf.sprintf "%s" description)
@@ -10118,7 +10104,6 @@ let register ~protocols =
      mainnet value. It could be extended to higher values if
      desired. *)
   scenario_with_layer1_node
-    ~tags:[Tag.memory_4k]
     ~regression:true
     ~number_of_slots:32
     ~additional_bootstrap_accounts:(32 - Array.length Account.Bootstrap.keys)
@@ -10280,7 +10265,7 @@ let register ~protocols =
     test_baker_registers_profiles
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["bootstrap"; Tag.memory_3k]
+    ~tags:["bootstrap"]
     ~bootstrap_profile:true
     ~prover:false
     ~l1_history_mode:Default_with_refutation
@@ -10296,7 +10281,7 @@ let register ~protocols =
     protocols ;
 
   scenario_with_layer1_and_dal_nodes
-    ~tags:["bootstrap"; "trusted"; "connection"; Tag.memory_3k]
+    ~tags:["bootstrap"; "trusted"; "connection"]
     ~bootstrap_profile:true
     "trusted peers reconnection"
     ~prover:false
@@ -10310,7 +10295,7 @@ let register ~protocols =
     test_operator_profile
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["attestation"; "p2p"; Tag.memory_3k]
+    ~tags:["attestation"; "p2p"]
     ~attestation_threshold:100
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
@@ -10319,7 +10304,7 @@ let register ~protocols =
     protocols ;
   History_rpcs.test_commitments_history_rpcs protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["amplification"; Tag.memory_4k]
+    ~tags:["amplification"]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~redundancy_factor:2
@@ -10334,21 +10319,21 @@ let register ~protocols =
     Amplification.test_amplification
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["amplification"; "simple"; Tag.memory_4k]
+    ~tags:["amplification"; "simple"]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     "observer triggers amplification (without lost shards)"
     Amplification.test_amplification_without_lost_shards
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "simple"; Tag.memory_3k]
+    ~tags:["gc"; "simple"]
     ~operator_profiles:[0]
     ~number_of_slots:1
     "garbage collection of shards for producer"
     Garbage_collection.test_gc_simple_producer
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "attester"; Tag.memory_4k]
+    ~tags:["gc"; "attester"]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
@@ -10356,7 +10341,7 @@ let register ~protocols =
     Garbage_collection.test_gc_producer_and_attester
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "multi"; Tag.memory_4k]
+    ~tags:["gc"; "multi"]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1

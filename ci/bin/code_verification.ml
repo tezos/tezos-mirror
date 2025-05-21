@@ -1473,20 +1473,18 @@ let jobs pipeline_type =
 
        The Tezt jobs are split into a set of special-purpose jobs running the
        tests of the corresponding tag:
-       - [tezt-memory-3k]: runs the jobs with tag [memory_3k],
-       - [tezt-memory-4k]: runs the jobs with tag [memory_4k],
-       - [tezt-time_sensitive]: runs the jobs with tag [time-sensitive],
-       - [tezt-slow]: runs the jobs with tag [slow].
+       - [tezt-time_sensitive]: runs the jobs with tag [time_sensitive];
+       - [tezt-slow]: runs the jobs with tag [slow];
        - [tezt-flaky]: runs the jobs with tag [flaky] and
-          none of the tags above.
+          none of the tags above;
 
        and a job [tezt] that runs all remaining tests (excepting those
        that are tagged [ci_disabled], that are disabled in the CI.)
 
-       There is an implicit rule that the Tezt tags [memory_3k],
-       [memory_4k], [time_sensitive], [slow] and [cloud] are mutually
-       exclusive. The [flaky] tag is not exclusive to these tags. If
-       e.g. a test has both tags [slow] and [flaky], it will run in
+       There is an implicit rule that the Tezt tags [time_sensitive],
+       [slow] and [cloud] are mutually exclusive.
+       The [flaky] tag is not exclusive to these tags.
+       If e.g. a test has both tags [slow] and [flaky], it will run in
        [tezt-slow], to prevent flaky tests to run in the [tezt-flaky]
        job if they also have another special tag. Tests tagged [cloud] are
        meant to be used with Tezt cloud (see [tezt/lib_cloud/README.md]) and
@@ -1536,34 +1534,6 @@ let jobs pipeline_type =
           ~rules
           ~dependencies
           ?job_select_tezts
-          ()
-        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
-      in
-      let tezt_memory_3k : tezos_job =
-        Tezt.job
-          ~__POS__
-          ~name:"tezt-memory-3k"
-          ~tag:Gcp_tezt_memory_3k
-          ~tezt_tests:(Tezt.tests_tag_selector ~memory_3k:true [])
-          ~tezt_variant:"-memory_3k"
-          ~parallel:(Vector 12)
-          ~dependencies
-          ?job_select_tezts
-          ~rules
-          ()
-        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
-      in
-      let tezt_memory_4k : tezos_job =
-        Tezt.job
-          ~__POS__
-          ~name:"tezt-memory-4k"
-          ~tag:Gcp_tezt_memory_4k
-          ~tezt_tests:(Tezt.tests_tag_selector ~memory_4k:true [])
-          ~tezt_variant:"-memory_4k"
-          ~parallel:(Vector 4)
-          ~dependencies
-          ?job_select_tezts
-          ~rules
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
       in
@@ -1658,15 +1628,7 @@ let jobs pipeline_type =
           ~before_script:(before_script ["mv octez-binaries/x86_64/octez-* ."])
           ()
       in
-      [
-        tezt;
-        tezt_memory_3k;
-        tezt_memory_4k;
-        tezt_time_sensitive;
-        tezt_slow;
-        tezt_flaky;
-        tezt_static_binaries;
-      ]
+      [tezt; tezt_time_sensitive; tezt_slow; tezt_flaky; tezt_static_binaries]
     in
     let jobs_sdk_rust : tezos_job list =
       let job_test_sdk_rust =
