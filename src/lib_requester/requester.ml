@@ -199,10 +199,11 @@ end = struct
     include Request
 
     let send p peer keys =
-      List.iter
-        (fun _k ->
-          (() [@profiler.aggregate_f {verbosity = Info} "p2p requests sent"]))
-        keys ;
+      ()
+      [@profiler.overwrite
+        List.iter
+          (fun _ -> Profiler.mark Profiler.Info (["p2p requests sent"], []))
+          keys] ;
       send p peer keys
   end
 
