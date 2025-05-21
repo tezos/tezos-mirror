@@ -4391,6 +4391,7 @@ let octez_shell =
         octez_version |> open_;
         octez_dal_config |> open_;
         lwt_exit;
+        octez_bees;
       ]
 
 let octez_rpc_http =

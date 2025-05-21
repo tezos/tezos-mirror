@@ -956,7 +956,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
       (function exn -> fail_with_exn exn)
   in
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Tezos_base_unix.Event_loop.main_run (fun () ->
+  Tezos_base_unix.Event_loop.main_run ~eio:true (fun () ->
       let*! r = Lwt_exit.wrap_and_exit main_promise in
       match r with
       | Ok () ->
