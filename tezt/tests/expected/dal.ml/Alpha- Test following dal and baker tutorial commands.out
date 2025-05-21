@@ -37,7 +37,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none register key my_baker as delegate
 Node is bootstrapped.
-Estimated gas: 170.669 units (will add 0 for safety)
+Estimated gas: 170.702 units (will add 0 for safety)
 Estimated storage: no bytes added
 Estimated gas: 100 units (will add 0 for safety)
 Estimated storage: no bytes added
@@ -50,18 +50,18 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000275
+    Fee to the baker: ꜩ0.000276
     Expected counter: 2
     Gas limit: 171
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000275
-      payload fees(the block proposer) ....... +ꜩ0.000275
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000276
+      payload fees(the block proposer) ....... +ꜩ0.000276
     Revelation of manager public key:
       Contract: [PUBLIC_KEY_HASH]
       Key: [PUBLIC_KEY]
       This revelation was successfully applied
-      Consumed gas: 170.503
+      Consumed gas: 170.536
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000159
@@ -125,19 +125,19 @@ This sequence of operations was run:
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
-  "pending_staking_parameters": [], "baking_power": "499933332981",
-  "total_staked": "499900000000", "total_delegated": "99998943",
+  "pending_staking_parameters": [], "baking_power": "499933332980",
+  "total_staked": "499900000000", "total_delegated": "99998942",
   "min_delegated_in_current_cycle":
-    { "amount": "99998943",
+    { "amount": "99998942",
       "level":
         { "level": 4, "level_position": 3, "cycle": 0, "cycle_position": 3,
           "expected_commitment": true } },
-  "own_full_balance": "499999998943", "own_staked": "499900000000",
-  "own_delegated": "99998943", "external_staked": "0",
+  "own_full_balance": "499999998942", "own_staked": "499900000000",
+  "own_delegated": "99998942", "external_staked": "0",
   "external_delegated": "0",
   "total_unstaked_per_cycle": [ { "cycle": 0, "deposit": "0" } ],
   "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
-  "staking_denominator": "0", "current_voting_power": "499999998943",
+  "staking_denominator": "0", "current_voting_power": "499999998942",
   "voting_power": "0", "voting_info": {},
   "consensus_key":
     { "active":
