@@ -5051,35 +5051,17 @@ module History_rpcs = struct
                int
                ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
         let cell_kind = JSON.(content |-> "kind" |> as_string) in
-        (* This case is only usefull when testing migration fro Q to R. Once the
-           testing of Q->R migration is not done anymore, we can set
-           content_is_legacy to false. *)
-        let content_is_legacy =
-          cell_kind = "attested" || cell_kind = "unattested"
-        in
-        let published_or_attested cell_level =
-          (*
-             - Cond 1 : we publish at [slot_index]
-
+        let published cell_level =
+          (* - Cond 1: we publish at [slot_index]
              - Cond 2: the (published) [cell_level] is greater than
-             [starting_level]
-
-             - Cond 3: either the cell is published in the new protocol
-             ([>=first_level_new_proto]) or in the previous protocol, but
-             [attestation_lag] before the activation of the new one. In fact,
-             for the migration, we invalidate all publications in the previous
-             protocol that would be attested in the new one. *)
-          cell_slot_index = slot_index
-          && cell_level > starting_level
-          && (cell_level >= first_level_new_proto
-             || cell_level < first_level_new_proto - lag)
+             [starting_level] *)
+          cell_slot_index = slot_index && cell_level > starting_level
         in
         let expected_kind =
-          if not (published_or_attested cell_level) then
-            if content_is_legacy then "unattested" else "unpublished"
+          if not (published cell_level) then "unpublished"
           else (
             at_least_one_attested_status := true ;
-            if content_is_legacy then "attested" else "published")
+            "published")
         in
         Check.(
           (cell_kind = expected_kind)
@@ -5148,7 +5130,7 @@ module History_rpcs = struct
         client
         dal_node
     in
-    let tags = ["rpc"; "skip_list"; Tag.ci_disabled] in
+    let tags = ["rpc"; "skip_list"] in
     let description = "commitments history RPCs" in
     scenario_with_layer1_and_dal_nodes
       ~tags
@@ -5183,7 +5165,7 @@ module History_rpcs = struct
     in
 
     let description = "test commitments history with migration" in
-    let tags = ["rpc"; "skip_list"; Tag.ci_disabled] in
+    let tags = ["rpc"; "skip_list"] in
     test_l1_migration_scenario
       ~migrate_from
       ~migrate_to
