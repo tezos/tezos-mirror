@@ -128,12 +128,21 @@ kernel.
 This release will not apply any migration to the node’s store (version 20),
 meaning it is possible to downgrade to the previous version.
 
+This is the minimal required version to run when the Dionysus kernel is active.
+
 ### Breaking changes
 
 - Replaces the command `download kernel with root hash` by `download kernel`.
   In addition to supporting root hash prefixed by `0x` (something the previous
   command was rejecting), `download kernel` also accept known kernel names
   (currently, `bifrost`, `calypso` and `calypso2`). (!17696)
+
+### RPCs changes
+
+- Blocks now include placeholders for (!17673):
+  - `withdrawals` and `withdrawalsRoot` (EIP-4895)
+  - `blobGasUsed` and `excessBlobGas` (EIP-4844)
+  - `parentBeaconBlockRoot` (EIP-4788)
 
 ### Command-line interface changes
 
@@ -217,10 +226,6 @@ directory.
   at least) level `l`. If the node does not have the blueprint for level `l` in
   its store, the RPC returns a 404 error instead of an empty list. `c` default
   to `1` if not specified and reduced to `500` if superior. (!17592)
-- Blocks now include placeholders for (!17673):
-  - `withdrawals` and `withdrawalsRoot` (EIP-4895)
-  - `blobGasUsed` and `excessBlobGas` (EIP-4844)
-  - `parentBeaconBlockRoot` (EIP-4788)
 
 ### Execution changes
 
