@@ -1025,14 +1025,24 @@ module Tezt = struct
            because if the CI timeout is reached, there are no artefacts,
            and thus no logs to investigate.
            See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818 *)
+        (* To observe memory usage of tests, we use the following options:
+           - --record-mem-peak causes Tezt to measure memory usage
+             (it is implied by --mem-warn so we could omit it);
+           - --junit-mem-peak tells Tezt to store peak memory usage
+             in a <property> named dd_tags[memory.peak] in JUnit reports,
+             which makes DataDog aware of it
+             (see https://docs.datadoghq.com/tests/setup/junit_xml/?tab=linux#providing-metadata-through-property-elements);
+           - --mem-warn causes Tezt to warn if a test uses more than the specified
+             amount of memory (in bytes). We set the threshold to 5 GB. *)
         "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
          --send-junit " ^ with_or_without_select_tezts
         ^ " \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
            --global-timeout 1800 --on-unknown-regression-files fail --junit \
-           ${JUNIT} --from-record tezt/records --job \
-           ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
+           ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record \
+           tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
            tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
-           ${TEZT_PARALLEL} --retry ${TEZT_RETRY}";
+           ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn \
+           5_000_000_000";
       ]
 
   (** Tezt tag selector string.
