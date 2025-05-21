@@ -436,12 +436,6 @@ struct
     | Bounded_buffer q -> Eio.Stream.add q m
     | Dropbox_buffer q -> Eio.Stream.add q m
 
-  let is_empty (type a) (t : a t) =
-    match t.buffer with
-    | Queue_buffer q -> Eio.Stream.is_empty q
-    | Bounded_buffer q -> Eio.Stream.is_empty q
-    | Dropbox_buffer q -> Eio.Stream.is_empty q
-
   type exn += Request_exn
 
   let state w =

@@ -301,24 +301,6 @@ module type T = sig
     ('kind t, 'launch_error) result
 end
 
-module Make_internal
-    (Name : Worker_intf.NAME)
-    (Request : Worker_intf.REQUEST)
-    (Types : Worker_intf.TYPES)
-    (Worker_events : Worker_events.S
-                       with type view = Request.view
-                        and type critical_error = tztrace) : sig
-  include
-    T
-      with module Name = Name
-       and module Request = Request
-       and module Types = Types
-
-  val is_empty : 'a t -> bool
-
-  type exn += Request_exn
-end
-
 module MakeGroup (Name : Worker_intf.NAME) (Request : Worker_intf.REQUEST) : sig
   module MakeWorker (Types : Worker_intf.TYPES) :
     T
