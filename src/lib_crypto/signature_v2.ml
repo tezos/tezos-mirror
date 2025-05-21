@@ -990,6 +990,11 @@ let deterministic_nonce_hash sk msg =
   | Secret_key.P256 sk -> P256.deterministic_nonce_hash sk msg
   | Secret_key.Bls sk -> Bls.deterministic_nonce_hash sk msg
 
+let pop_verify pubkey proof =
+  match pubkey with
+  | Public_key.Bls pk -> Bls12_381_signature.MinPk.Pop.pop_verify pk proof
+  | _ -> false
+
 module Of_V0 = struct
   let public_key_hash : Signature_v0.Public_key_hash.t -> Public_key_hash.t =
     function

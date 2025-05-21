@@ -1206,13 +1206,10 @@ let update_consensus_or_companion ~kind ?force_reveal ?counter ?fee ?gas_limit
     | None -> return_none
     | Some account -> (
         let* account = Context.Contract.manager ctxt account in
-        let bytes =
-          Data_encoding.Binary.to_bytes_exn
-            Signature.Public_key.encoding
-            public_key
-        in
-        match Signature.sign account.sk bytes with
-        | Bls proof -> return_some proof
+        match account.sk with
+        | Bls sk ->
+            return_some
+            @@ Signature.Bls.of_bytes_exn (Signature.Bls.pop_prove sk)
         | _ ->
             failwith
               "Can't forge an Update_consensus_key with a non-BLS proof of \

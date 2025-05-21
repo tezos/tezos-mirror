@@ -164,6 +164,21 @@ struct
         let* pkhs = Tezos_base_unix.Socket.recv conn encoding in
         match pkhs with Error _ as e -> Lwt.return e | Ok pkhs -> return pkhs)
 
+  let bls_prove_possession path pkh =
+    let open Lwt_result_syntax in
+    Tezos_base_unix.Socket.with_connection path (fun conn ->
+        let* () =
+          Tezos_base_unix.Socket.send
+            conn
+            Request.encoding
+            (Request.Bls_prove_possession pkh)
+        in
+        let encoding = result_encoding Bls_prove_possession.Response.encoding in
+        let* proof_of_possession = Tezos_base_unix.Socket.recv conn encoding in
+        match proof_of_possession with
+        | Error _ as e -> Lwt.return e
+        | Ok proof_of_possession -> return proof_of_possession)
+
   let public_key path pkh =
     let open Lwt_result_syntax in
     Tezos_base_unix.Socket.with_connection path (fun conn ->
@@ -248,6 +263,11 @@ struct
       let open Lwt_result_syntax in
       let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       supports_deterministic_nonces path pkh
+
+    let bls_prove_possession uri =
+      let open Lwt_result_syntax in
+      let* path, pkh = parse (uri : sk_uri :> Uri.t) in
+      bls_prove_possession path pkh
   end
 
   module Tcp = struct
@@ -328,6 +348,11 @@ struct
       let open Lwt_result_syntax in
       let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       supports_deterministic_nonces path pkh
+
+    let bls_prove_possession uri =
+      let open Lwt_result_syntax in
+      let* path, pkh = parse (uri : sk_uri :> Uri.t) in
+      bls_prove_possession path pkh
   end
 end
 

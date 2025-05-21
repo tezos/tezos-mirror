@@ -547,4 +547,14 @@ struct
     return (Signature.deterministic_nonce_hash sk buf)
 
   let supports_deterministic_nonces _ = Lwt_result_syntax.return_true
+
+  let bls_prove_possession sk_uri =
+    let open Lwt_result_syntax in
+    let* sk = decrypt C.cctxt sk_uri in
+    match sk with
+    | Bls sk ->
+        return @@ Signature.Bls.of_bytes_exn (Signature.Bls.pop_prove sk)
+    | _ ->
+        Error_monad.failwith
+          "Proof of possession can only be requested for BLS keys."
 end

@@ -283,6 +283,26 @@ module Known_keys = struct
   end
 end
 
+module Bls_prove_possession = struct
+  module Request = struct
+    type t = Tezos_crypto.Signature.Public_key_hash.t
+
+    let encoding =
+      let open Data_encoding in
+      def "signer_messages.bls_prove_possession.request"
+      @@ obj1 (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
+  end
+
+  module Response = struct
+    type t = Tezos_crypto.Signature.Bls.t
+
+    let encoding =
+      let open Data_encoding in
+      def "signer_messages.bls_prove_possession.response"
+      @@ obj1 (req "bls_prove_possession" Tezos_crypto.Signature.Bls.encoding)
+  end
+end
+
 module Request = struct
   type t =
     | Sign of Sign.Request.t
@@ -292,6 +312,7 @@ module Request = struct
     | Deterministic_nonce_hash of Deterministic_nonce_hash.Request.t
     | Supports_deterministic_nonces of Supports_deterministic_nonces.Request.t
     | Known_keys
+    | Bls_prove_possession of Bls_prove_possession.Request.t
 
   let encoding =
     let open Data_encoding in
@@ -352,6 +373,14 @@ module Request = struct
              (obj1 (req "kind" (constant "known_keys")))
              (function Known_keys -> Some () | _ -> None)
              (fun () -> Known_keys);
+           case
+             (Tag 7)
+             ~title:"Bls_prove_possession"
+             (merge_objs
+                (obj1 (req "kind" (constant "Bls_prove_possession")))
+                Bls_prove_possession.Request.encoding)
+             (function Bls_prove_possession req -> Some ((), req) | _ -> None)
+             (fun ((), req) -> Bls_prove_possession req);
          ]
 end
 
@@ -363,4 +392,5 @@ let () =
   register Deterministic_nonce_hash.Response.encoding ;
   register Supports_deterministic_nonces.Response.encoding ;
   register Public_key.Response.encoding ;
-  register Known_keys.Response.encoding
+  register Known_keys.Response.encoding ;
+  register Bls_prove_possession.Response.encoding

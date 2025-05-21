@@ -159,6 +159,9 @@ module type SIGNER = sig
       the signer. *)
   val list_known_keys :
     Uri.t -> Tezos_crypto.Signature.Public_key_hash.t list tzresult Lwt.t
+
+  val bls_prove_possession :
+    sk_uri -> Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 end
 
 type signer = (module SIGNER)
@@ -235,6 +238,11 @@ module type S = sig
     signature ->
     Bytes.t ->
     bool tzresult Lwt.t
+
+  val bls_prove_possession :
+    #Client_context.wallet ->
+    sk_uri ->
+    Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 
   val deterministic_nonce : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 

@@ -96,6 +96,17 @@ let supports_deterministic_nonces =
     Tezos_rpc.Path.(
       root / "keys" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg)
 
+let bls_prove_possession =
+  Tezos_rpc.Service.get_service
+    ~description:"Obtain a proof of possession for a given remote key"
+    ~query:Tezos_rpc.Query.empty
+    ~output:
+      Data_encoding.(
+        obj1 (req "bls_prove_possession" Tezos_crypto.Signature.Bls.encoding))
+    Tezos_rpc.Path.(
+      root / "bls_prove_possession"
+      /: Tezos_crypto.Signature.Public_key_hash.rpc_arg)
+
 let public_key =
   Tezos_rpc.Service.get_service
     ~description:"Retrieve the public key of a given remote key"

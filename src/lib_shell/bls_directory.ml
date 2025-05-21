@@ -9,12 +9,7 @@
 module Bls = Tezos_crypto.Signature.Bls
 
 let check_public_key_with_proof pk proof =
-  let msg =
-    Data_encoding.Binary.to_bytes_exn
-      Signature.Public_key.encoding
-      (Signature.Bls pk)
-  in
-  Bls.check pk proof msg
+  Signature.Bls.pop_verify pk (Signature.Bls.to_bytes proof)
 
 let build_rpc_directory () =
   let open Lwt_result_syntax in

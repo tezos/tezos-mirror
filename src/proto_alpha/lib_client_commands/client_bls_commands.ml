@@ -102,12 +102,7 @@ let threshold_signature_encoding =
     (obj2 (req "id" int8) (req "signature" Signature.Bls.encoding))
 
 let check_public_key_with_proof pk proof =
-  let msg =
-    Data_encoding.Binary.to_bytes_exn
-      Signature.Public_key.encoding
-      (Signature.Bls pk)
-  in
-  Signature.Bls.check pk proof msg
+  Signature.Bls.pop_verify pk (Signature.Bls.to_bytes proof)
 
 let commands () =
   let open Lwt_result_syntax in
@@ -141,17 +136,9 @@ let commands () =
       @@ Client_keys.Secret_key.source_param @@ stop)
       (fun () sk_uri (cctxt : #Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let* pk_uri = Client_keys.neuterize sk_uri in
-        let* pk = Client_keys.public_key pk_uri in
-        match pk with
-        | Bls _ ->
-            let msg =
-              Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding pk
-            in
-            let* proof = Client_keys.sign cctxt sk_uri msg in
-            let*! () = cctxt#message "%a" Signature.pp proof in
-            return_unit
-        | _ -> cctxt#error "Failed to produce a proof: input is not a BLS key");
+        let* proof = Client_keys.bls_prove_possession cctxt sk_uri in
+        let*! () = cctxt#message "%a" Signature.Bls.pp proof in
+        return_unit);
     command
       ~group
       ~desc:"Check a BLS proof"

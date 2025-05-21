@@ -247,15 +247,18 @@ module Local_helpers = struct
     return op
 
   let create_proof ~(signer : Account.key) =
-    let public_key =
-      Tezos_crypto.Signature.Public_key.of_b58check_exn signer.public_key
+    let b58_secret_key =
+      Account.require_unencrypted_secret_key ~__LOC__ signer.secret_key
     in
-    let msg =
-      Data_encoding.Binary.to_bytes_exn
-        Tezos_crypto.Signature.Public_key.encoding
-        public_key
+    let secret_key =
+      Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
     in
-    Account.sign_bytes ~signer msg |> Tezos_crypto.Signature.to_b58check
+    match secret_key with
+    | Bls sk ->
+        let proof = Tezos_crypto.Signature.Bls.pop_prove sk in
+        Tezos_crypto.Signature.of_bytes_exn proof
+        |> Tezos_crypto.Signature.to_b58check
+    | _ -> Test.fail "Proof-of-Possession is only required for BLS keys"
 
   let inject_bls_sign_op ~baker ~(signer : Account.key) (op : Operation.t)
       client =

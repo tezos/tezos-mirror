@@ -74,3 +74,8 @@ val supports_deterministic_nonces :
 val known_keys :
   #Client_context.wallet ->
   Tezos_crypto.Signature.public_key_hash list tzresult Lwt.t
+
+val bls_prove_possession :
+  #Client_context.wallet ->
+  Signature.public_key_hash ->
+  Tezos_crypto.Signature.Bls.t tzresult Lwt.t

@@ -845,3 +845,5 @@ let deterministic_nonce_hash sk msg =
   | Secret_key.Ed25519 sk -> Ed25519.deterministic_nonce_hash sk msg
   | Secret_key.Secp256k1 sk -> Secp256k1.deterministic_nonce_hash sk msg
   | Secret_key.P256 sk -> P256.deterministic_nonce_hash sk msg
+
+let pop_verify _ _ = false
