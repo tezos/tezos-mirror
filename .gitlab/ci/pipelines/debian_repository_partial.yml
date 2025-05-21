@@ -29,7 +29,7 @@ datadog_pipeline_trace:
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
 oc.docker-systemd_tests_debian:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -61,7 +61,7 @@ oc.docker-systemd_tests_debian:
       - gcp_very_high_cpu
 
 oc.docker-build-debian-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -250,7 +250,7 @@ oc.upgrade_bin_debian_bookworm:
   - ./docs/introduction/upgrade-bin-deb.sh debian bookworm
 
 oc.install_bin_debian_bookworm_systemd_test:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -283,7 +283,7 @@ oc.install_bin_debian_bookworm_systemd_test:
     - runner_system_failure
 
 oc.install_bin_debian_bookworm_systemd_custom_datadir:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -317,7 +317,7 @@ oc.install_bin_debian_bookworm_systemd_custom_datadir:
     - runner_system_failure
 
 oc.install_bin_debian_bookworm_systemd_agnostic_baker:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -351,7 +351,7 @@ oc.install_bin_debian_bookworm_systemd_agnostic_baker:
     - runner_system_failure
 
 oc.upgrade_bin_debian_bookworm-systemd:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp

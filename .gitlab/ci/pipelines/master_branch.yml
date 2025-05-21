@@ -11,7 +11,7 @@ stages:
 - manual
 
 oc.docker:ci:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -32,7 +32,7 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 oc.docker:rust-toolchain:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -52,7 +52,7 @@ oc.docker:rust-toolchain:amd64:
       dotenv: rust_toolchain_image_tag.env
 
 oc.docker:ci:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp_arm64
@@ -339,7 +339,7 @@ oc.unified_coverage:
   coverage: '/Coverage: ([^%]+%)/'
 
 oc.docker:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp
@@ -364,7 +364,7 @@ oc.docker:amd64:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
 
 oc.docker:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp_arm64
@@ -388,7 +388,7 @@ oc.docker:arm64:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
 
 docker:merge_manifests:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: prepare_release
   tags:
   - gcp
