@@ -1095,6 +1095,12 @@ types:
     - id: public_key
       type: public_key
       doc: A Ed25519, Secp256k1, or P256 public key
+    - id: proof_tag
+      type: u1
+      enum: bool
+    - id: proof
+      type: proof_0
+      if: (proof_tag == bool::true)
   reveal_proof:
     seq:
     - id: reveal_proof_tag
