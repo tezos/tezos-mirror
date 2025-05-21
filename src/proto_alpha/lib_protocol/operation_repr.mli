@@ -235,6 +235,14 @@ val consensus_key_kind_encoding : consensus_key_kind Data_encoding.t
 
 val pp_consensus_key_kind : Format.formatter -> consensus_key_kind -> unit
 
+type public_key_kind = Manager_pk | Consensus_pk | Companion_pk
+
+val public_key_kind_encoding : public_key_kind Data_encoding.t
+
+val pp_public_key_kind : Format.formatter -> public_key_kind -> unit
+
+val consensus_to_public_key_kind : consensus_key_kind -> public_key_kind
+
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 val raw_encoding : raw Data_encoding.t

@@ -1448,9 +1448,12 @@ let apply_manager_operation :
               let* () =
                 fail_unless
                   (Signature.pop_verify bls_public_key (Bls.to_bytes proof))
-                  (Validate_errors.Manager
-                   .Update_consensus_key_with_incorrect_proof
-                     {kind; public_key; proof})
+                  (Validate_errors.Manager.Incorrect_bls_proof
+                     {
+                       kind = Operation_repr.consensus_to_public_key_kind kind;
+                       public_key;
+                       proof;
+                     })
               in
               return ctxt
           | _, _ -> return ctxt

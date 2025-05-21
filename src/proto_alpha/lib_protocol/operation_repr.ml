@@ -256,6 +256,30 @@ let consensus_key_kind_to_string = function
 let pp_consensus_key_kind ppf kind =
   Format.fprintf ppf "%s" (consensus_key_kind_to_string kind)
 
+type public_key_kind = Manager_pk | Consensus_pk | Companion_pk
+
+let public_key_kind_encoding =
+  let open Data_encoding in
+  string_enum
+    [
+      ("manager_pk", Manager_pk);
+      ("consensus_pk", Consensus_pk);
+      ("companion_pk", Companion_pk);
+    ]
+
+let pp_public_key_kind fmt kind =
+  Format.pp_print_string
+    fmt
+    (match kind with
+    | Manager_pk -> "manager"
+    | Consensus_pk -> "consensus"
+    | Companion_pk -> "companion")
+
+let consensus_to_public_key_kind kind : public_key_kind =
+  match (kind : consensus_key_kind) with
+  | Consensus -> Consensus_pk
+  | Companion -> Companion_pk
+
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 let raw_encoding = Operation.encoding

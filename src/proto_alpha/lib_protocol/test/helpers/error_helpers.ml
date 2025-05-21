@@ -160,3 +160,27 @@ let expect_empty_implicit_delegated_contract ~loc ~contract errs =
       | [Contract_storage.Empty_implicit_delegated_contract c] ->
           Signature.Public_key_hash.(c = Account.pkh_of_contract_exn contract)
       | _ -> false)
+
+let expect_incorrect_bls_proof ~loc ~kind_pk ~pk errs =
+  Assert.expect_error ~loc errs (function
+      | [Incorrect_bls_proof {kind = err_kind; public_key = err_pk; proof = _}]
+        ->
+          err_kind = kind_pk && Signature.Public_key.(err_pk = pk)
+      | _ -> false)
+
+let expect_unused_bls_proof ~loc ~kind_pk errs =
+  Assert.expect_error ~loc errs (function
+      | [Unused_bls_proof {kind = err_kind; source = _; public_key = _}] ->
+          err_kind = kind_pk
+      | _ -> false)
+
+let expect_missing_bls_proof ~loc ~kind_pk ~pk ~source_pkh errs =
+  Assert.expect_error ~loc errs (function
+      | [
+          Missing_bls_proof
+            {kind = err_kind; source = err_source; public_key = err_pk};
+        ] ->
+          err_kind = kind_pk
+          && Signature.Public_key.(err_pk = pk)
+          && Signature.Public_key_hash.(err_source = source_pkh)
+      | _ -> false)

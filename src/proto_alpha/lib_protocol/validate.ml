@@ -3011,14 +3011,19 @@ module Manager = struct
         record_trace Gas.Gas_limit_too_high
 
   let check_update_consensus_key vi remaining_gas source
-      (public_key : Signature.Public_key.t) proof kind =
+      (public_key : Signature.Public_key.t) proof
+      (kind : Operation_repr.consensus_key_kind) =
     let open Result_syntax in
     if Constants.allow_tz4_delegate_enable vi.ctxt then
       match (public_key, proof, kind) with
       | Bls _bls_public_key, None, kind ->
           result_error
-            (Validate_errors.Manager.Update_consensus_key_with_tz4_without_proof
-               {kind; source; public_key})
+            (Validate_errors.Manager.Missing_bls_proof
+               {
+                 kind = Operation_repr.consensus_to_public_key_kind kind;
+                 source;
+                 public_key;
+               })
       | Bls bls_public_key, Some _, _kind ->
           (* Compute the gas cost to encode the consensus public key and
              check the proof. *)
@@ -3044,8 +3049,8 @@ module Manager = struct
                {source; public_key})
       | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof, Consensus ->
           result_error
-            (Validate_errors.Manager.Update_consensus_key_with_unused_proof
-               {kind = Consensus; source; public_key})
+            (Validate_errors.Manager.Unused_bls_proof
+               {kind = Consensus_pk; source; public_key})
       | (Ed25519 _ | Secp256k1 _ | P256 _), None, Consensus -> return_unit
     else
       let* () = Delegate.Consensus_key.check_not_tz4 kind public_key in
@@ -3057,8 +3062,8 @@ module Manager = struct
       | Consensus ->
           if Option.is_some proof then
             result_error
-              (Validate_errors.Manager.Update_consensus_key_with_unused_proof
-                 {kind; source; public_key})
+              (Validate_errors.Manager.Unused_bls_proof
+                 {kind = Consensus_pk; source; public_key})
           else return_unit
 
   let check_kind_specific_content (type kind)
