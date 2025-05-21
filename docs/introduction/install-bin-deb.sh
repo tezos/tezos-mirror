@@ -21,7 +21,9 @@ fi
 # include apt-get function with retry
 . scripts/packaging/tests/tests-common.inc.sh
 
-. scripts/ci/octez-packages-version.sh
+if [ -n "$CI" ]; then
+  . scripts/ci/octez-packages-version.sh
+fi
 
 case "$RELEASETYPE" in
 ReleaseCandidate | TestReleaseCandidate)
