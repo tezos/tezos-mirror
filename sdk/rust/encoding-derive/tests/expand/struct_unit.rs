@@ -4,7 +4,5 @@
 
 use tezos_data_encoding_derive::{BinWriter, NomReader, HasEncoding};
 
-// All three derivations fail when a field has type ()
-
 #[derive(HasEncoding, NomReader, BinWriter)]
 struct StructUnit { a : () }
