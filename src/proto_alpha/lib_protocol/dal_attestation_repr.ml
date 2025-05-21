@@ -231,3 +231,7 @@ module Dal_dependent_signing = struct
       ~op
       t
 end
+
+module Internal_for_tests = struct
+  let of_z = Bitset.from_z
+end

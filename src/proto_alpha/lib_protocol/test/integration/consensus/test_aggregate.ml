@@ -450,7 +450,7 @@ let test_preattestations_aggregate_non_bls_delegate () =
       ~loc:__LOC__
       (find_attester_with_non_bls_key attesters)
   in
-  (* Craft a preattestation for this attester to retreive a signature and a
+  (* Craft a preattestation for this attester to retrieve a signature and a
      triplet {level, round, block_payload_hash} *)
   let* {shell; protocol_data = {contents; signature}} =
     Op.raw_preattestation
@@ -499,34 +499,47 @@ let test_attestations_aggregate_non_bls_delegate () =
       ~loc:__LOC__
       (find_attester_with_non_bls_key attesters)
   in
-  (* Craft an attestation for this attester to retreive a signature and a
+  (* Craft an attestation for this attester to retrieve a signature and a
      triplet {level, round, block_payload_hash} *)
   let* {shell; protocol_data = {contents; signature}} =
     Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot block
   in
-  match contents with
-  | Single (Attestation {consensus_content; _}) ->
-      let {level; round; block_payload_hash; _} :
-          Alpha_context.consensus_content =
-        consensus_content
-      in
-      (* Craft an aggregate including the attester slot and signature *)
-      let consensus_content : Alpha_context.consensus_aggregate_content =
-        {level; round; block_payload_hash}
-      in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7935
-         Add tests with dal_content = Some _. *)
-      let contents : _ Alpha_context.contents_list =
-        Single
-          (Attestations_aggregate
-             {consensus_content; committee = [(slot, None)]})
-      in
-      let aggregate : operation =
-        {shell; protocol_data = Operation_data {contents; signature}}
-      in
-      (* Bake a block containing this aggregate and expect an error *)
-      let*! res = Block.bake ~operation:aggregate block in
-      Assert.proto_error ~loc:__LOC__ res non_bls_in_aggregate
+  let (Single
+        (Attestation
+          {consensus_content = {level; round; block_payload_hash; _}; _})) =
+    contents
+  in
+  (* Craft an aggregate including the attester slot and signature and
+     various dal_contents *)
+  let consensus_content : Alpha_context.consensus_aggregate_content =
+    {level; round; block_payload_hash}
+  in
+  let check_non_bls_aggregate_refused dal_content =
+    let contents : _ Alpha_context.contents_list =
+      Single
+        (Attestations_aggregate
+           {consensus_content; committee = [(slot, dal_content)]})
+    in
+    let operation : operation =
+      {shell; protocol_data = Operation_data {contents; signature}}
+    in
+    Op.check_validation_and_application_all_modes_different_outcomes
+      ~loc:__LOC__
+      ~application_error:non_bls_in_aggregate
+      ~construction_error:non_bls_in_aggregate
+      ~mempool_error:aggregate_in_mempool_error
+      ~predecessor:block
+      operation
+  in
+  let dal_contents_to_test =
+    [
+      None;
+      Some Alpha_context.{attestation = Dal.Attestation.empty};
+      Some (Dal_helpers.dal_content_of_int ~loc:__LOC__ 1);
+      Some (Dal_helpers.dal_content_of_int ~loc:__LOC__ 255);
+    ]
+  in
+  List.iter_es check_non_bls_aggregate_refused dal_contents_to_test
 
 let test_multiple_aggregates_per_block_forbidden () =
   let open Lwt_result_syntax in

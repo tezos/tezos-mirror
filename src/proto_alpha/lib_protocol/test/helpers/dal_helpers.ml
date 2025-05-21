@@ -294,3 +294,11 @@ struct
            "Skip_list.search returned Nearest', while all given levels to \
             produce proofs are supposed to be in the skip list.")
 end
+
+let dal_content_of_int ~loc n =
+  let attestation =
+    WithExceptions.Result.get_ok
+      ~loc
+      (Alpha_context.Dal.Attestation.Internal_for_tests.of_z (Z.of_int n))
+  in
+  Alpha_context.{attestation}
