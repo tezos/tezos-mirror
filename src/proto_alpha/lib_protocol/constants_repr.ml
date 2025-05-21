@@ -248,24 +248,47 @@ let check_constants constants =
           blocks_per_cycle and strictly positive.")
   in
   let* () =
+    let benchmark_ips = Int64.of_int 200_000 in
+    let difficulty period_in_blocks ~ips ~factor =
+      let block_time = Period_repr.to_seconds constants.minimal_block_delay in
+      let period = Int64.mul period_in_blocks block_time in
+      Int64.(mul (mul ips (of_int factor)) period)
+    in
+    let* () =
+      error_unless
+        Compare.Int64.(
+          let ips =
+            (* We reduce the ips for short blocks_per_commitment so that we have
+               low difficulty during tests *)
+            if Compare.Int32.(constants.blocks_per_commitment > 32l) then
+              benchmark_ips
+            else Int64.one
+          in
+          let difficulty =
+            difficulty
+              (Int64.of_int32 constants.nonce_revelation_threshold)
+              ~ips
+              ~factor:5
+          in
+          constants.vdf_difficulty >= difficulty)
+        (Invalid_protocol_constants
+           "The VDF difficulty must be greater than the number of modulo \
+            squarings in class groups that can be done on the faster CPU \
+            during the nonce revelation period.")
+    in
     error_unless
       Compare.Int64.(
-        let threshold = Int64.of_int32 constants.nonce_revelation_threshold in
-        let block = Period_repr.to_seconds constants.minimal_block_delay in
-        let ips =
-          (* We reduce the ips for short blocks_per_commitment so that we have
-             low difficulty during tests *)
-          if Compare.Int32.(constants.blocks_per_commitment > 32l) then
-            Int64.of_int 200_000
-          else Int64.one
+        let difficulty =
+          difficulty
+            (Int64.of_int32 constants.blocks_per_cycle)
+            ~ips:benchmark_ips
+            ~factor:1
         in
-        let factor = Int64.of_int 5 in
-        let difficulty = Int64.(mul (mul ips factor) (mul threshold block)) in
-        constants.vdf_difficulty > difficulty)
+        constants.vdf_difficulty < difficulty)
       (Invalid_protocol_constants
-         "The VDF difficulty must be strictly greater than the product of the \
-          nonce_revelation_threshold, the minimial_block_delay, a benchmark of \
-          modulo squaring in class groups and a security threshold.")
+         "The VDF difficulty must be strictly smaller than the number of \
+          modulo squarings in class groups that can be done on the benchmark \
+          CPU during one cycle.")
   in
   let* () =
     error_unless

@@ -91,7 +91,9 @@ Errors
 Protocol parameters
 -------------------
 
-
+- Reduced the nonce revelation period from 960 levels to 300 levels, roughly
+  matching the reduction of the cycle length in Rio. Reduced accordingly the VDF
+  difficulty as well. (:gl:`!18003`)
 
 Bug Fixes
 ---------

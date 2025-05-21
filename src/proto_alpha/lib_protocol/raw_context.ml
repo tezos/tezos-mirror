@@ -1510,14 +1510,14 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  tolerated_inactivity_period;
                  blocks_per_cycle;
                  blocks_per_commitment;
-                 nonce_revelation_threshold;
+                 nonce_revelation_threshold = _;
                  cycles_per_voting_period;
                  hard_gas_limit_per_operation;
                  hard_gas_limit_per_block;
                  proof_of_work_threshold;
                  minimal_stake;
                  minimal_frozen_stake;
-                 vdf_difficulty;
+                 vdf_difficulty = _;
                  origination_size;
                  max_operations_time_to_live;
                  issuance_weights = _;
@@ -1554,6 +1554,14 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                }
                 : Previous.t) =
             c
+          in
+          let nonce_revelation_threshold, vdf_difficulty =
+            if Compare.Int32.(c.nonce_revelation_threshold = 960l) then
+              let vdf_difficulty =
+                Int64.div (Int64.mul c.vdf_difficulty 3L) 10L
+              in
+              (300l, vdf_difficulty)
+            else (c.nonce_revelation_threshold, c.vdf_difficulty)
           in
           {
             Constants_parametric_repr.consensus_rights_delay;
