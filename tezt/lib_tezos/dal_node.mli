@@ -36,8 +36,9 @@ type history_mode = Full | Auto | Custom of int
 
 val disable_shard_validation_environment_variable : string
 
-(** Creates a DAL node *)
+val ignore_topics_environment_variable : string
 
+(** Creates a DAL node *)
 val create :
   ?runner:Runner.t ->
   ?path:string ->
@@ -52,6 +53,7 @@ val create :
   ?metrics_addr:string ->
   ?disable_shard_validation:bool ->
   ?disable_amplification:bool ->
+  ?ignore_pkhs:string list ->
   node:Node.t ->
   unit ->
   t
@@ -70,6 +72,7 @@ val create_from_endpoint :
   ?metrics_addr:string ->
   ?disable_shard_validation:bool ->
   ?disable_amplification:bool ->
+  ?ignore_pkhs:string list ->
   l1_node_endpoint:Endpoint.t ->
   unit ->
   t
@@ -100,6 +103,9 @@ val metrics_port : t -> int
 (** Get the data-dir of an dal node. *)
 val data_dir : t -> string
 
+(** Get the identity file of a dal node. *)
+val identity_file : t -> string
+
 (** [run ?wait_ready ?env ?event_level node] launches the given dal
     node where env is a map of environment variable.
 
@@ -107,12 +113,7 @@ val data_dir : t -> string
     [true] by default.
 
     [event_level] allows to determine the printed levels. By default,
-    it is set to [`Debug] by default.
-*)
-
-(** Get the identity file of a dal node. *)
-val identity_file : t -> string
-
+    it is set to [`Debug]. *)
 val run :
   ?wait_ready:bool ->
   ?env:string String_map.t ->
