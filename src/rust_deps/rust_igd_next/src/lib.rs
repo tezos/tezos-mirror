@@ -160,3 +160,9 @@ pub fn gateway_map_any_port(
         .add_any_port(protocol.into(), local_addr, lease_duration, description)
         .map_err(|e| e.to_string())
 }
+
+#[ocaml::func]
+#[ocaml::sig("gateway -> string")]
+pub fn gateway_ip(gateway: &Gateway) -> String {
+    gateway.0.addr.ip().to_string()
+}
