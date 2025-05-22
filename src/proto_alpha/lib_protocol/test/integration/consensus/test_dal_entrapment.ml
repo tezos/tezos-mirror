@@ -103,7 +103,7 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
       consensus_threshold_size = 0;
     }
   in
-  let slot_index =
+  let dal_slot_index =
     Dal.Slot_index.of_int_opt ~number_of_slots 3 |> Stdlib.Option.get
   in
   let other_slot_index =
@@ -148,7 +148,8 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
   in
 
   let slot_header =
-    Dal.Operations.Publish_commitment.{slot_index; commitment; commitment_proof}
+    Dal.Operations.Publish_commitment.
+      {slot_index = dal_slot_index; commitment; commitment_proof}
   in
   let* op = Op.dal_publish_commitment (B genesis) contract slot_header in
   let* blk =
@@ -176,7 +177,7 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
   let dal_content =
     if with_dal_content then
       let attestation =
-        if attest_slot then Dal.Attestation.(commit empty slot_index)
+        if attest_slot then Dal.Attestation.(commit empty dal_slot_index)
         else Dal.Attestation.(commit empty other_slot_index)
       in
       Some {attestation}
@@ -197,6 +198,16 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
   in
   let* attestation = Op.raw_attestation blk ~delegate ?dal_content in
   let attestation_level = blk.header.shell.level in
+  let* consensus_slot =
+    let+ all_slots = Context.get_attester_slot (B blk) delegate in
+    let fst_slot = Option.bind all_slots List.hd in
+    match fst_slot with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "Unexpected case: delegate is not in attestation committee"
+    | Some slot -> slot
+  in
 
   let* blk =
     let blocks_to_bake =
@@ -239,7 +250,12 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
         if not_trap then Stdlib.List.hd not_traps else Stdlib.List.hd traps
   in
   let accusation =
-    Op.dal_entrapment (B blk) attestation slot_index shard_with_proof
+    Op.dal_entrapment
+      (B blk)
+      attestation
+      ~consensus_slot
+      dal_slot_index
+      shard_with_proof
   in
 
   Log.info "6. Bake a block with the accusation" ;

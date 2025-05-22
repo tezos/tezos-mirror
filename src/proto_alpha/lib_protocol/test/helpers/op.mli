@@ -387,7 +387,8 @@ val double_baking :
 
 val dal_entrapment :
   Context.t ->
-  Kind.attestation operation ->
+  'a Kind.consensus operation ->
+  consensus_slot:Slot.t ->
   Dal.Slot_index.t ->
   Dal.Shard_with_proof.t ->
   Operation.packed
