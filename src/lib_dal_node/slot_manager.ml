@@ -109,6 +109,28 @@ let () =
 
 type slot = bytes
 
+(* Used wrapper functions on top of Cryptobox. *)
+
+let polynomial_from_slot cryptobox slot =
+  let open Result_syntax in
+  match Cryptobox.polynomial_from_slot cryptobox slot with
+  | Ok r -> return r
+  | Error (`Slot_wrong_size _) ->
+      let open Cryptobox in
+      let provided = Bytes.length slot in
+      let {slot_size = expected; _} = parameters cryptobox in
+      Error (Errors.other [Invalid_slot_size {provided; expected}])
+
+let commit cryptobox polynomial =
+  let open Result_syntax in
+  match Cryptobox.commit cryptobox polynomial with
+  | Ok cm -> return cm
+  | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
+      Error
+        (Errors.other
+           [Invalid_degree (Cryptobox.string_of_commit_error commit_error)])
+  | Error `Prover_SRS_not_loaded -> Error (Errors.other [No_prover_SRS])
+
 let polynomial_from_shards cryptobox shards =
   match Cryptobox.polynomial_from_shards cryptobox shards with
   | Ok p -> Lwt.return_ok p
@@ -149,6 +171,146 @@ let get_slot_content_from_shards cryptobox store slot_id =
   in
   return slot
 
+let fetch_slot_from_http_uri ~slot_size ~published_level ~slot_index
+    http_backup_uri =
+  let open Lwt_syntax in
+  let url =
+    Uri.with_path
+      http_backup_uri
+      String.(
+        concat
+          "/"
+          [
+            "v0";
+            "slots";
+            "by_published_level";
+            Format.sprintf "%ld_%d_%d" published_level slot_index slot_size;
+          ])
+  in
+  let* resp, body = Cohttp_lwt_unix.Client.get url in
+  match resp.status with
+  | `OK ->
+      let* body_str = Cohttp_lwt.Body.to_string body in
+      return_some (Bytes.of_string body_str)
+  | #Cohttp.Code.status_code as status ->
+      (* Consume the body of the request in case of failure to avoid leaking stream!
+         See https://github.com/mirage/ocaml-cohttp/issues/730 *)
+      let* _ = Cohttp_lwt.Body.drain_body body in
+      let* () =
+        Event.emit_fetching_slot_from_http_backup_failed
+          ~published_level
+          ~slot_index
+          ~http_backup_uri
+          ~status
+      in
+      return_none
+
+let try_fetch_slot_from_http_backup ~slot_size ~published_level ~slot_index
+    cryptobox expected_commitment_hash http_backup_uri =
+  let open Lwt_result_syntax in
+  let fetch_and_sanitize_slot_content () =
+    let open Lwt_syntax in
+    (* /!\ Warning: We are fetching the slot content as stored by another DAL
+       node on disk into its store/slot_store/ directory. Currently the
+       home-made KVS we use appends extra bytes at the beginning of each
+       "file" to chech if values are present. We should takes them into
+       account to:
+       - compute the expected size of the data
+       - fetch the exact slot content, without encoding artifacts when written
+         to disk. *)
+    let* slot_opt =
+      fetch_slot_from_http_uri
+        ~slot_size
+        ~published_level
+        ~slot_index
+        http_backup_uri
+    in
+    match slot_opt with
+    | None -> return_none
+    | Some slot_bytes ->
+        let expected_size =
+          slot_size + Key_value_store.file_prefix_bitset_size
+        in
+        let obtained_size = Bytes.length slot_bytes in
+        if expected_size != obtained_size then
+          let* () =
+            Event.emit_slot_from_http_backup_has_unexpected_size
+              ~published_level
+              ~slot_index
+              ~http_backup_uri
+              ~expected_size
+              ~obtained_size
+          in
+          return_none
+        else
+          return_some
+          @@ Bytes.sub
+               slot_bytes
+               Key_value_store.file_prefix_bitset_size
+               slot_size
+  in
+  let*! slot_opt = fetch_and_sanitize_slot_content () in
+  match (slot_opt, expected_commitment_hash) with
+  | None, _ -> return_none
+  | Some slot, None ->
+      (* We trust the http server, no extra checks to do. *)
+      return_some slot
+  | Some slot, Some expected_commitment ->
+      let*? polynomial = polynomial_from_slot cryptobox slot in
+      let*? obtained_commitment = commit cryptobox polynomial in
+      if Cryptobox.Commitment.equal expected_commitment obtained_commitment then
+        return_some slot
+      else
+        let*! () =
+          Event.emit_slot_from_http_backup_has_unexpected_commitment
+            ~published_level
+            ~slot_index
+            ~http_backup_uri
+            ~expected_commitment
+            ~obtained_commitment
+        in
+        return_none
+
+let get_commitment_from_slot_id _ctxt _slot_id =
+  (* TODO in follow-up MRs *)
+  assert false
+
+let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
+  let open Lwt_result_syntax in
+  let config : Configuration_file.t = Node_context.get_config ctxt in
+  let Types.Slot_id.{slot_index; slot_level = published_level} = slot_id in
+  match config.http_backup_uris with
+  | [] ->
+      (* Fail if no http backup URI is configured. *)
+      fail Errors.not_found
+  | http_backup_uris -> (
+      (* We fetch the expected commitment hash from the published slot header on
+         L1 if [trust_http_backup_uris] is false. *)
+      let* expected_commitment_hash =
+        if config.trust_http_backup_uris then return_none
+        else get_commitment_from_slot_id ctxt slot_id
+      in
+      (* In the iter below, we "fail" to exit the loop as soon as a correct slot
+         content is fetched. *)
+      let*! res =
+        List.iter_es
+          (fun uri ->
+            let*! res =
+              try_fetch_slot_from_http_backup
+                cryptobox
+                ~slot_size
+                ~published_level
+                ~slot_index
+                expected_commitment_hash
+                uri
+            in
+            match res with Ok (Some slot) -> fail slot | _ -> return_unit)
+          http_backup_uris
+      in
+      match res with
+      | Ok () -> fail Errors.not_found
+      | Error slot -> return slot)
+
 let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
@@ -160,42 +322,24 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   in
   match res_slot_store with
   | Ok slot -> return slot
-  | Error _ ->
-      if reconstruct_if_missing then
-        (* The slot could not be obtained from the slot store, attempt a
-           reconstruction. *)
-        let*! res_shard_store =
-          Node_context.may_reconstruct
-            ~reconstruct:(get_slot_content_from_shards cryptobox store)
-            slot_id
-            ctxt
-        in
-        match res_shard_store with
-        | Ok slot -> return slot
-        | Error _ -> Lwt.return res_slot_store
-      else Lwt.return res_slot_store
-
-(* Used wrapper functions on top of Cryptobox. *)
-
-let polynomial_from_slot cryptobox slot =
-  let open Result_syntax in
-  match Cryptobox.polynomial_from_slot cryptobox slot with
-  | Ok r -> return r
-  | Error (`Slot_wrong_size _) ->
-      let open Cryptobox in
-      let provided = Bytes.length slot in
-      let {slot_size = expected; _} = parameters cryptobox in
-      Error (Errors.other [Invalid_slot_size {provided; expected}])
-
-let commit cryptobox polynomial =
-  let open Result_syntax in
-  match Cryptobox.commit cryptobox polynomial with
-  | Ok cm -> return cm
-  | Error (`Invalid_degree_strictly_less_than_expected _ as commit_error) ->
-      Error
-        (Errors.other
-           [Invalid_degree (Cryptobox.string_of_commit_error commit_error)])
-  | Error `Prover_SRS_not_loaded -> Error (Errors.other [No_prover_SRS])
+  | Error _ -> (
+      let*! res_shard_store =
+        if reconstruct_if_missing then
+          (* The slot could not be obtained from the slot store, attempt a
+             reconstruction. *)
+          let*! res_shard_store =
+            Node_context.may_reconstruct
+              ~reconstruct:(get_slot_content_from_shards cryptobox store)
+              slot_id
+              ctxt
+          in
+          Lwt.return_some res_shard_store
+        else Lwt.return_none
+      in
+      match res_shard_store with
+      | Some (Ok slot) -> return slot
+      | Some (Error _) | None ->
+          fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id)
 
 (* Main functions *)
 

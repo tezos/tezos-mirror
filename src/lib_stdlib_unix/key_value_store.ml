@@ -187,7 +187,7 @@ let max_number_of_keys_per_file = 4096
    With a true bitset, we'd have [max_number_of_keys_per_file/8].
    Should be ok in practice since an atomic read/write on Linux is 4KiB.
 *)
-let bitset_size = max_number_of_keys_per_file
+let file_prefix_bitset_size = max_number_of_keys_per_file
 
 (** The module [Files] handles writing and reading into memory-mapped files. A
     virtual file is backed by a physical file and a key is just an index (from 0
@@ -410,7 +410,7 @@ end = struct
   (* This computation relies on the fact that the size of all the
      values are fixed, and the values are stored after the bitset. *)
   let position_of layout index =
-    bitset_size + (index * layout.value_size) |> Int64.of_int
+    file_prefix_bitset_size + (index * layout.value_size) |> Int64.of_int
 
   let read_with_opened_file layout opened_file key =
     let open Lwt_syntax in
@@ -727,14 +727,14 @@ end = struct
       Lwt_bytes.map_file
         ~fd:(Lwt_unix.unix_file_descr fd)
         ~shared:true
-        ~size:bitset_size
+        ~size:file_prefix_bitset_size
         ()
     in
     return
       {
         fd;
         bitset;
-        count = number_of_set_bits bitset bitset_size;
+        count = number_of_set_bits bitset file_prefix_bitset_size;
         cache = Cache.create 101;
         lru_node;
       }
@@ -751,12 +751,17 @@ end = struct
         0o644
     in
     let total_size =
-      bitset_size + (layout.number_of_keys_per_file * layout.value_size)
+      file_prefix_bitset_size
+      + (layout.number_of_keys_per_file * layout.value_size)
     in
     let* () = Lwt_unix.ftruncate fd total_size in
     let unix_fd = Lwt_unix.unix_file_descr fd in
     let bitset =
-      Lwt_bytes.map_file ~fd:unix_fd ~shared:true ~size:bitset_size ()
+      Lwt_bytes.map_file
+        ~fd:unix_fd
+        ~shared:true
+        ~size:file_prefix_bitset_size
+        ()
     in
     return {fd; bitset; count = 0; cache = Cache.create 101; lru_node}
 
