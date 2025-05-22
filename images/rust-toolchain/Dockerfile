@@ -15,6 +15,7 @@ ENV LANG='C.UTF-8' LC_ALL='C.UTF-8' TZ='Etc/UTC'
 
 WORKDIR /root
 
+COPY ./scripts/install_datadog_static.sh /tmp
 # common packages
 # hadolint ignore=DL3008
 RUN apt-get update && \
@@ -25,7 +26,9 @@ RUN apt-get update && \
     autoconf automake autotools-dev libtool xutils-dev clang cmake \
     sccache \
     musl-tools && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    /tmp/install_datadog_static.sh && \
+    rm /tmp/install_datadog_static.sh
 
 # install toolchain
 RUN curl https://sh.rustup.rs --silent --show-error --fail | \
@@ -60,6 +63,6 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y wabt binutils-riscv64-unknown-elf gcc-riscv64-linux-gnu \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
-    && ln -s /usr/bin/riscv64-linux-gnu-gcc /usr/bin/riscv64-unknown-linux-musl-gcc 
+    && ln -s /usr/bin/riscv64-linux-gnu-gcc /usr/bin/riscv64-unknown-linux-musl-gcc
 
 RUN ln -s /usr/bin/riscv64-unknown-elf-objdump /usr/local/bin/objdump
