@@ -1566,17 +1566,12 @@ module Monitoring_app = struct
           "*DAL report* for the *%s* network over the last 6 hours."
           (String.capitalize_ascii (Network.to_string network))
       in
-      let network_info =
-        Format.sprintf
-          "• Network: %s"
-          (String.capitalize_ascii (Network.to_string network))
-      in
       let* ratio_dal_commitments_total_info =
         fetch_dal_commitments_total_info ()
       in
       let* slots_info = fetch_slots_info () in
       let network_overview_info =
-        network_info :: ratio_dal_commitments_total_info :: slots_info
+        ratio_dal_commitments_total_info :: slots_info
       in
       let data =
         let open Format_app in
