@@ -93,9 +93,9 @@ impl Event<'_> {
                 number,
                 hash: evm_block_header.hash,
             },
-            ChainHeader::Tez(_tez_block_header) => Self::BlueprintApplied {
+            ChainHeader::Tez(tez_block_header) => Self::BlueprintApplied {
                 number,
-                hash: H256::zero(),
+                hash: tez_block_header.hash,
             },
         }
     }
