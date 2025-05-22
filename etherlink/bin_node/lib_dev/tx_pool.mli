@@ -20,6 +20,7 @@ type parameters = {
   tx_pool_addr_limit : int;  (** Maximum allowed addresses inside the pool. *)
   tx_pool_tx_per_addr_limit : int;
       (** Maximum allowed transactions per address inside the pool. *)
+  chain_family : L2_types.chain_family;
 }
 
 (** [start parameters] starts the tx-pool *)
@@ -30,7 +31,6 @@ val start : parameters -> unit tzresult Lwt.t
     size exceeds `maximum_cumulative_size`. If the pool is locked or node
     in tezlink mode, returns no transactions. *)
 val pop_transactions :
-  chain_family:L2_types.chain_family ->
   maximum_cumulative_size:int ->
   (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 
@@ -43,9 +43,6 @@ val pop_and_inject_transactions : unit -> unit tzresult Lwt.t
     [pop_and_inject_transactions] but don't wait for the request to
     complete *)
 val pop_and_inject_transactions_lazy : unit -> unit tzresult Lwt.t
-
-(** [is_locked] checks if the pools is locked. *)
-val is_locked : unit -> bool tzresult Lwt.t
 
 val size_info : unit -> Metrics.Tx_pool.size_info tzresult Lwt.t
 

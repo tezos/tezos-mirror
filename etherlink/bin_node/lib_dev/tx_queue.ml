@@ -1033,27 +1033,6 @@ let start ~config ~keep_alive () =
   let*! () = Tx_queue_events.is_ready () in
   return_unit
 
-let is_locked () =
-  let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Is_locked |> handle_request_error
-
-let pop_transactions ~validate_tx ~initial_validation_state =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait
-    w
-    (Pop_transactions {validate_tx; validation_state = initial_validation_state})
-  |> handle_request_error
-
-let confirm_transactions ~clear_pending_queue_after ~confirmed_txs =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait
-    w
-    (Confirm_transactions {confirmed_txs; clear_pending_queue_after})
-  |> handle_request_error
-
 module Internal_for_tests = struct
   module Nonce_bitset = Nonce_bitset
   module Address_nonce = Address_nonce
@@ -1126,9 +1105,32 @@ module Tx_container = struct
     in
     loop ()
 
+  let confirm_transactions ~clear_pending_queue_after ~confirmed_txs =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    Worker.Queue.push_request_and_wait
+      w
+      (Confirm_transactions {confirmed_txs; clear_pending_queue_after})
+    |> handle_request_error
+
   let lock_transactions () =
     bind_worker @@ fun w -> push_request w Lock_transactions
 
   let unlock_transactions () =
     bind_worker @@ fun w -> push_request w Unlock_transactions
+
+  let is_locked () =
+    let open Lwt_result_syntax in
+    let*? worker = Lazy.force worker in
+    Worker.Queue.push_request_and_wait worker Is_locked |> handle_request_error
+
+  let pop_transactions ~maximum_cumulative_size:_ ~validate_tx
+      ~initial_validation_state =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    Worker.Queue.push_request_and_wait
+      w
+      (Pop_transactions
+         {validate_tx; validation_state = initial_validation_state})
+    |> handle_request_error
 end

@@ -10,8 +10,8 @@ type parameters = {
   smart_rollup_address : string;
   sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
-  uses_tx_queue : bool;
-  l2_chains : Configuration.l2_chain list option;
+  chain_family : L2_types.chain_family;
+  tx_container : (module Services_backend_sig.Tx_container);
 }
 
 (* The size of a delayed transaction is overapproximated to the maximum size
@@ -216,53 +216,67 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
         in
         return `Drop
 
-let tx_queue_pop_valid_tx (head_info : Evm_context.head)
-    ~maximum_cumulative_size =
+let pop_valid_tx ~chain_family
+    ~(tx_container : (module Services_backend_sig.Tx_container))
+    (head_info : Evm_context.head) ~maximum_cumulative_size =
   let open Lwt_result_syntax in
-  let read = Evm_state.read head_info.evm_state in
-  let* base_fee_per_gas = Durable_storage.base_fee_per_gas read in
-  let* maximum_gas_limit = Durable_storage.maximum_gas_per_transaction read in
-  let* da_fee_per_byte = Durable_storage.da_fee_per_byte read in
-  let config =
-    Validate.
-      {
-        base_fee_per_gas;
-        maximum_gas_limit;
-        da_fee_per_byte;
-        next_nonce = (fun addr -> Durable_storage.nonce read addr);
-        balance = (fun addr -> Durable_storage.balance read addr);
-      }
-  in
-  let initial_validation_state =
-    ( 0,
-      Validate.
-        {config; addr_balance = String.Map.empty; addr_nonce = String.Map.empty}
-    )
-  in
-  Tx_queue.pop_transactions
-    ~validate_tx:(validate_tx ~maximum_cumulative_size)
-    ~initial_validation_state
+  let (module Tx_container) = tx_container in
+  (* Skip validation if chain_family is Michelson. *)
+  match chain_family with
+  | L2_types.Michelson ->
+      let initial_validation_state = () in
+      Tx_container.pop_transactions
+        ~maximum_cumulative_size
+        ~validate_tx:(fun () _ _ -> return (`Keep ()))
+        ~initial_validation_state
+  | EVM ->
+      let read = Evm_state.read head_info.evm_state in
+      let* base_fee_per_gas = Durable_storage.base_fee_per_gas read in
+      let* maximum_gas_limit =
+        Durable_storage.maximum_gas_per_transaction read
+      in
+      let* da_fee_per_byte = Durable_storage.da_fee_per_byte read in
+      let config =
+        Validate.
+          {
+            base_fee_per_gas;
+            maximum_gas_limit;
+            da_fee_per_byte;
+            next_nonce = (fun addr -> Durable_storage.nonce read addr);
+            balance = (fun addr -> Durable_storage.balance read addr);
+          }
+      in
+      let initial_validation_state =
+        ( 0,
+          Validate.
+            {
+              config;
+              addr_balance = String.Map.empty;
+              addr_nonce = String.Map.empty;
+            } )
+      in
+      Tx_container.pop_transactions
+        ~maximum_cumulative_size
+        ~validate_tx:(validate_tx ~maximum_cumulative_size)
+        ~initial_validation_state
 
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
-let produce_block_if_needed ~cctxt ~l2_chains ~smart_rollup_address
+let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
     ~sequencer_key ~force ~timestamp ~delayed_hashes ~remaining_cumulative_size
-    ~uses_tx_queue head_info =
+    ~(tx_container : (module Services_backend_sig.Tx_container)) head_info =
   let open Lwt_result_syntax in
+  let (module Tx_container) = tx_container in
   let* transactions_and_objects =
     (* Low key optimization to avoid even checking the txpool if there is not
        enough space for the smallest transaction. *)
     if remaining_cumulative_size <= minimum_ethereum_transaction_size then
       return []
-    else if uses_tx_queue then
-      tx_queue_pop_valid_tx
-        head_info
-        ~maximum_cumulative_size:remaining_cumulative_size
     else
-      (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-      let chain_family = Configuration.retrieve_chain_family ~l2_chains in
-      Tx_pool.pop_transactions
+      pop_valid_tx
         ~chain_family
+        ~tx_container
+        head_info
         ~maximum_cumulative_size:remaining_cumulative_size
   in
   let n = List.length transactions_and_objects + List.length delayed_hashes in
@@ -278,11 +292,9 @@ let produce_block_if_needed ~cctxt ~l2_chains ~smart_rollup_address
         head_info
     in
     let* () =
-      if uses_tx_queue then
-        Tx_queue.confirm_transactions
-          ~clear_pending_queue_after:true
-          ~confirmed_txs
-      else Tx_pool.clear_popped_transactions ()
+      Tx_container.confirm_transactions
+        ~clear_pending_queue_after:true
+        ~confirmed_txs
     in
     return (`Block_produced n)
   else return `No_block
@@ -305,13 +317,12 @@ let head_info_and_delayed_transactions ~with_delayed_transactions
   let*! head_info = Evm_context.head_info () in
   return (head_info, delayed_hashes, remaining_cumulative_size)
 
-let produce_block ~l2_chains ~uses_tx_queue ~cctxt ~smart_rollup_address
-    ~sequencer_key ~force ~timestamp ~maximum_number_of_chunks
-    ~with_delayed_transactions =
+let produce_block ~chain_family ~cctxt ~smart_rollup_address ~sequencer_key
+    ~force ~timestamp ~maximum_number_of_chunks ~with_delayed_transactions
+    ~(tx_container : (module Services_backend_sig.Tx_container)) =
   let open Lwt_result_syntax in
-  let* is_locked =
-    if uses_tx_queue then Tx_queue.is_locked () else Tx_pool.is_locked ()
-  in
+  let (module Tx_container) = tx_container in
+  let* is_locked = Tx_container.is_locked () in
   if is_locked then
     let*! () = Block_producer_events.production_locked () in
     return `No_block
@@ -343,14 +354,14 @@ let produce_block ~l2_chains ~uses_tx_queue ~cctxt ~smart_rollup_address
     else
       produce_block_if_needed
         ~cctxt
-        ~l2_chains
+        ~chain_family
         ~sequencer_key
         ~timestamp
         ~smart_rollup_address
         ~force
         ~delayed_hashes
         ~remaining_cumulative_size
-        ~uses_tx_queue
+        ~tx_container
         head_info
 
 module Handlers = struct
@@ -370,14 +381,13 @@ module Handlers = struct
           smart_rollup_address;
           sequencer_key;
           maximum_number_of_chunks;
-          uses_tx_queue;
-          l2_chains;
+          chain_family;
+          tx_container;
         } =
           state
         in
         produce_block
-          ~l2_chains
-          ~uses_tx_queue
+          ~chain_family
           ~cctxt
           ~smart_rollup_address
           ~sequencer_key
@@ -385,6 +395,7 @@ module Handlers = struct
           ~timestamp
           ~maximum_number_of_chunks
           ~with_delayed_transactions
+          ~tx_container
 
   type launch_error = error trace
 

@@ -724,7 +724,7 @@ let handle_confirmed_txs {db; ws_client; _}
              in
              let* () = Db.Deposits.set_claimed db nonce exec in
              let* () =
-               Tx_queue.confirm_transactions
+               Tx_queue.Tx_container.confirm_transactions
                  ~clear_pending_queue_after:false
                  ~confirmed_txs:(Seq.cons tx_hash Seq.empty)
              in

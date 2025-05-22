@@ -53,9 +53,19 @@ let container_forward_tx ~evm_node_endpoint ~keep_alive :
     let lock_transactions () = Lwt_result_syntax.return_unit
 
     let unlock_transactions () = Lwt_result_syntax.return_unit
+
+    let is_locked () = Lwt_result_syntax.return_false
+
+    let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
+        ~initial_validation_state:_ =
+      Lwt_result_syntax.return_nil
+
+    let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
+      Lwt_result_syntax.return_unit
   end)
 
 let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
+    (module Tx_container : Services_backend_sig.Tx_container)
     ~smart_rollup_address =
   let open Lwt_result_syntax in
   let maximum_cumulative_size =
@@ -69,7 +79,10 @@ let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
     else return (`Keep new_size)
   in
   let* popped_txs =
-    Tx_queue.pop_transactions ~initial_validation_state ~validate_tx
+    Tx_container.pop_transactions
+      ~maximum_cumulative_size
+      ~initial_validation_state
+      ~validate_tx
   in
   let*! hashes =
     Rollup_node_rpc.inject_transactions
@@ -85,7 +98,7 @@ let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
       return_unit
   | Ok hashes ->
       let* () =
-        Tx_queue.confirm_transactions
+        Tx_container.confirm_transactions
           ~clear_pending_queue_after:true
           ~confirmed_txs:(List.to_seq hashes)
       in
@@ -142,6 +155,20 @@ let main
     | Some _base -> Validate.Stateless
     | None -> Validate.Full
   in
+  let* l2_chain_id, chain_family =
+    if finalized_view then
+      if
+        (* When finalized_view is set, it's too early to request the
+           feature flag from the rollup node. *)
+        Option.is_some config.experimental_features.l2_chains
+      then
+        (* The finalized view of the proxy mode and the multichain feature are not compatible. *)
+        tzfail (Node_error.Proxy_finalize_with_multichain `Node)
+      else return (None, L2_types.EVM)
+    else
+      let* enable_multichain = Rollup_node_rpc.is_multichain_enabled () in
+      Rollup_node_rpc.single_chain_id_and_family ~config ~enable_multichain
+  in
   let* on_new_head, tx_container =
     match
       ( config.experimental_features.enable_send_raw_transaction,
@@ -155,14 +182,17 @@ let main
             ~keep_alive:config.keep_alive
             ()
         in
+        let tx_container =
+          (module Tx_queue.Tx_container : Services_backend_sig.Tx_container)
+        in
         return
         @@ ( Some
                (fun () ->
                  tx_queue_pop_and_inject
                    (module Rollup_node_rpc)
+                   tx_container
                    ~smart_rollup_address),
-             (module Tx_queue.Tx_container : Services_backend_sig.Tx_container)
-           )
+             tx_container )
     | true, None, None ->
         let* () =
           Tx_pool.start
@@ -174,6 +204,7 @@ let main
               tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
               tx_pool_tx_per_addr_limit =
                 Int64.to_int config.tx_pool_tx_per_addr_limit;
+              chain_family;
             }
         in
         return
@@ -191,39 +222,6 @@ let main
       ?on_new_head
       ~rollup_node_endpoint
       ()
-  in
-  let* l2_chain_id, chain_family =
-    if finalized_view then
-      if
-        (* When finalized_view is set, it's too early to request the
-           feature flag from the rollup node. *)
-        Option.is_some config.experimental_features.l2_chains
-      then
-        (* The finalized view of the proxy mode and the multichain feature are not compatible. *)
-        tzfail (Node_error.Proxy_finalize_with_multichain `Node)
-      else return (None, L2_types.EVM)
-    else
-      let* enable_multichain = Rollup_node_rpc.is_multichain_enabled () in
-      match (config.experimental_features.l2_chains, enable_multichain) with
-      | None, false -> return (None, L2_types.EVM)
-      | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
-      | Some [l2_chain], false ->
-          let*! () = Events.multichain_node_singlechain_kernel () in
-          return (Some l2_chain.chain_id, L2_types.EVM)
-      | Some [l2_chain], true ->
-          let chain_id = l2_chain.chain_id in
-          let* chain_family = Rollup_node_rpc.chain_family chain_id in
-          if l2_chain.chain_family = chain_family then
-            return (Some chain_id, chain_family)
-          else
-            tzfail
-              (Node_error.Mismatched_chain_family
-                 {
-                   chain_id;
-                   node_family = l2_chain.chain_family;
-                   kernel_family = chain_family;
-                 })
-      | _ -> tzfail Node_error.Unexpected_multichain
   in
 
   let* server_finalizer =

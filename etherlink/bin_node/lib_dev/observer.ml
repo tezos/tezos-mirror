@@ -7,15 +7,6 @@
 (*****************************************************************************)
 
 open Ethereum_types
-open L2_types
-
-let confirm_txs config confirmed_txs =
-  let open Lwt_result_syntax in
-  if Configuration.is_tx_queue_enabled config then
-    Tx_queue.confirm_transactions
-      ~clear_pending_queue_after:false
-      ~confirmed_txs
-  else return_unit
 
 (** [on_new_blueprint evm_node_endpoint next_blueprint_number
     blueprint] applies evm events found in the blueprint, then applies
@@ -30,10 +21,12 @@ let confirm_txs config confirmed_txs =
     into a forced blueprint. The sequencer has performed a reorganization and
     starts submitting blocks from the new branch.
 *)
-let on_new_blueprint config evm_node_endpoint next_blueprint_number
+let on_new_blueprint (tx_container : (module Services_backend_sig.Tx_container))
+    evm_node_endpoint next_blueprint_number
     (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
      blueprint_with_events) =
   let open Lwt_result_syntax in
+  let (module Tx_container) = tx_container in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
   if Z.(equal level number) then
@@ -68,8 +61,12 @@ let on_new_blueprint config evm_node_endpoint next_blueprint_number
             failwith
               "Could not recover from failing to apply latest received \
                blueprint.")
-    | Ok tx_hashes ->
-        let* () = confirm_txs config tx_hashes in
+    | Ok confirmed_txs ->
+        let* () =
+          Tx_container.confirm_transactions
+            ~clear_pending_queue_after:false
+            ~confirmed_txs
+        in
         return `Continue
     | Error (Node_error.Diverged {must_exit = false; _} :: _) ->
         (* If we have diverged, but should keep the node alive. This happens
@@ -141,6 +138,15 @@ let container_forward_tx ~keep_alive ~evm_node_endpoint :
     let lock_transactions () = Lwt_result_syntax.return_unit
 
     let unlock_transactions () = Lwt_result_syntax.return_unit
+
+    let is_locked () = Lwt_result_syntax.return_false
+
+    let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
+      Lwt_result_syntax.return_unit
+
+    let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
+        ~initial_validation_state:_ =
+      Lwt_result_syntax.return_nil
   end)
 
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
@@ -221,6 +227,12 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint
   in
 
+  let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
+  let* l2_chain_id, chain_family =
+    let (module Backend) = observer_backend in
+    Backend.single_chain_id_and_family ~config ~enable_multichain
+  in
+
   let* () =
     match config.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
@@ -239,6 +251,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
               tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
               tx_pool_tx_per_addr_limit =
                 Int64.to_int config.tx_pool_tx_per_addr_limit;
+              chain_family;
             }
   in
 
@@ -246,31 +259,6 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~mode:"observer"
     ~tx_pool_size_info:Tx_pool.size_info
     ~smart_rollup_address ;
-
-  let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-
-  let* l2_chain_id, chain_family =
-    match (config.experimental_features.l2_chains, enable_multichain) with
-    | None, false -> return (None, EVM)
-    | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
-    | Some [l2_chain], false ->
-        let*! () = Events.multichain_node_singlechain_kernel () in
-        return (Some l2_chain.chain_id, EVM)
-    | Some [l2_chain], true ->
-        let chain_id = l2_chain.chain_id in
-        let* chain_family = Evm_ro_context.read_chain_family ro_ctxt chain_id in
-        if l2_chain.chain_family = chain_family then
-          return (Some chain_id, chain_family)
-        else
-          tzfail
-            (Node_error.Mismatched_chain_family
-               {
-                 chain_id;
-                 node_family = l2_chain.chain_family;
-                 kernel_family = chain_family;
-               })
-    | _ -> tzfail Node_error.Unexpected_multichain
-  in
 
   let* finalizer_public_server =
     Rpc_server.start_public_server
@@ -360,7 +348,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
         ~time_between_blocks
         ~evm_node_endpoint
         ~next_blueprint_number
-        (on_new_blueprint config evm_node_endpoint)
+        (on_new_blueprint tx_container evm_node_endpoint)
     and* () =
       Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
     and* () =

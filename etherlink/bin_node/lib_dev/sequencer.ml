@@ -286,6 +286,11 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
 
   let backend = Evm_ro_context.ro_backend ro_ctxt configuration in
+  let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
+  let* l2_chain_id, chain_family =
+    let (module Backend) = backend in
+    Backend.single_chain_id_and_family ~config:configuration ~enable_multichain
+  in
   let* () =
     match configuration.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
@@ -303,6 +308,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
             tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
             tx_pool_tx_per_addr_limit =
               Int64.to_int configuration.tx_pool_tx_per_addr_limit;
+            chain_family;
           }
   in
   Metrics.init
@@ -316,8 +322,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         smart_rollup_address = smart_rollup_address_b58;
         sequencer_key = sequencer_config.sequencer;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
-        uses_tx_queue = Configuration.is_tx_queue_enabled configuration;
-        l2_chains = configuration.experimental_features.l2_chains;
+        chain_family;
+        tx_container;
       }
   in
   let* () =
@@ -337,37 +343,9 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       in
       return_unit
   in
-  let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-  let* () =
-    match
-      (configuration.experimental_features.l2_chains, enable_multichain)
-    with
-    | None, false -> return_unit
-    | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
-    | Some _, false ->
-        let*! () = Events.multichain_node_singlechain_kernel () in
-        return_unit
-    | Some l2_chains, true ->
-        List.iter_es
-          (fun l2_chain ->
-            let chain_id = l2_chain.chain_id in
-            let* chain_family =
-              Evm_ro_context.read_chain_family ro_ctxt chain_id
-            in
-            if chain_family = l2_chain.chain_family then return_unit
-            else
-              tzfail
-                (Node_error.Mismatched_chain_family
-                   {
-                     chain_id;
-                     node_family = l2_chain.chain_family;
-                     kernel_family = chain_family;
-                   }))
-          l2_chains
-  in
   let* finalizer_public_server =
     Rpc_server.start_public_server
-      ~l2_chain_id:None
+      ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(
           evm_services_methods ro_ctxt sequencer_config.time_between_blocks)
