@@ -1520,6 +1520,43 @@ let test_tezlink_transfer =
     ~error_msg:"Wrong balance for bootstrap2: exptected %R, actual %L" ;
   unit
 
+let test_tezlink_reveal =
+  register_tezlink_test
+    ~title:"Test Tezlink reveal"
+    ~tags:["kernel"; "reveal"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let amount = Tez.one in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* manager_key = account_rpc sequencer Constant.bootstrap2 "manager_key" in
+  Check.(
+    JSON.(manager_key |> as_string_opt = None)
+      (option string)
+      ~error_msg:"Expected %R but got %L") ;
+  let*! () = Client.reveal ~endpoint ~src:Constant.bootstrap2.alias client in
+  let*@ _ = produce_block sequencer in
+  let* manager_key = account_rpc sequencer Constant.bootstrap2 "manager_key" in
+  Check.(
+    JSON.(manager_key |> as_string_opt = Some Constant.bootstrap2.public_key)
+      (option string)
+      ~error_msg:"Expected %R but got %L") ;
+  unit
+
 module Protocol = struct
   include Protocol
 
@@ -14148,6 +14185,7 @@ let () =
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
   test_tezlink_transfer [Alpha] ;
+  test_tezlink_reveal [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;
   test_tezlink_block_info [Alpha] ;
   test_tezlink_storage [Alpha] ;
