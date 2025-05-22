@@ -290,26 +290,21 @@ let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
         if config.trust_http_backup_uris then return_none
         else get_commitment_from_slot_id ctxt slot_id
       in
-      (* In the iter below, we "fail" to exit the loop as soon as a correct slot
-         content is fetched. *)
-      let*! res =
-        List.iter_es
+      let* slot_opt =
+        List.find_map_es
           (fun uri ->
-            let*! res =
-              try_fetch_slot_from_http_backup
-                cryptobox
-                ~slot_size
-                ~published_level
-                ~slot_index
-                expected_commitment_hash
-                uri
-            in
-            match res with Ok (Some slot) -> fail slot | _ -> return_unit)
+            try_fetch_slot_from_http_backup
+              cryptobox
+              ~slot_size
+              ~published_level
+              ~slot_index
+              expected_commitment_hash
+              uri)
           http_backup_uris
       in
-      match res with
-      | Ok () -> fail Errors.not_found
-      | Error slot -> return slot)
+      match slot_opt with
+      | None -> fail Errors.not_found
+      | Some slot -> return slot)
 
 let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   let open Lwt_result_syntax in
