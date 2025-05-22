@@ -903,8 +903,10 @@ let test_update_consensus_key_with_external_pop =
 
   Log.info "Import the key on the first client" ;
   let* () =
-    Client.import_public_key ~alias:"consensus_key" client
-    @@ Unencrypted consensus_key_bls.public_key
+    Client.import_public_key
+      ~alias:"consensus_key"
+      ~public_key:consensus_key_bls.public_key
+      client
   in
   Log.info "Updating consensus key without secret key nor proof of possession" ;
   let* () =

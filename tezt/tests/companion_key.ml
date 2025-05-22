@@ -342,8 +342,10 @@ let test_update_companion_key_with_external_pop =
 
   Log.info "Import the key on the first client" ;
   let* () =
-    Client.import_public_key ~alias:"companion_key" client
-    @@ Unencrypted companion_key_bls.public_key
+    Client.import_public_key
+      ~alias:"companion_key"
+      ~public_key:companion_key_bls.public_key
+      client
   in
   Log.info "Updating companion key without secret key nor proof possession" ;
   let* () =

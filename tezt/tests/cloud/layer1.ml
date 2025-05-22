@@ -268,9 +268,8 @@ module Node = struct
     let* yes_wallet = yes_wallet agent in
     let* () =
       Lwt_list.iter_s
-        (fun {pkh; pk} ->
-          let alias = pkh in
-          Client.import_public_key ~alias client @@ Unencrypted pk)
+        (fun {pkh = alias; pk = public_key} ->
+          Client.import_public_key ~alias ~public_key client)
         accounts
     in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
@@ -291,7 +290,7 @@ module Node = struct
     let* client = client ~node agent in
     let* yes_wallet = yes_wallet agent in
     let* () = Client.forget_all_keys client in
-    let* () = Client.import_public_key ~alias:pkh client @@ Unencrypted pk in
+    let* () = Client.import_public_key ~alias:pkh ~public_key:pk client in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
     let* accounts =
       Client.stresstest_gen_keys

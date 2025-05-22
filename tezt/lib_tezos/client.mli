@@ -451,7 +451,7 @@ val import_public_key :
   ?force:bool ->
   ?endpoint:endpoint ->
   t ->
-  Account.secret_key ->
+  public_key:string ->
   alias:string ->
   unit Lwt.t
 
