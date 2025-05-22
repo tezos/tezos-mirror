@@ -234,13 +234,13 @@ val add_slot_headers :
 module Skip_list_cells : sig
   open Dal_proto_types
 
-  (** [find ?conn store hash] returns the cell associated to [hash] in the [store], if
-      any. *)
-  val find :
+  (** [find_opt ?conn store hash] returns the cell associated to [hash] in the
+      [store], if any. *)
+  val find_opt :
     ?conn:Dal_store_sqlite3.conn ->
     t ->
     Skip_list_hash.t ->
-    Skip_list_cell.t tzresult Lwt.t
+    Skip_list_cell.t option tzresult Lwt.t
 
   (** [insert ?conn store ~attested_level values] inserts the given list of [values]
       associated to the given [attested_level] in the [store]. Any existing value

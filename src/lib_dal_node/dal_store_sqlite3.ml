@@ -163,8 +163,9 @@ module Skip_list_cells = struct
     open Dal_proto_types
     open Tezos_dal_node_services.Types
 
-    let find : (Skip_list_hash.t, Skip_list_cell.t, [`One]) Caqti_request.t =
-      (skip_list_hash ->! skip_list_cell)
+    let find_opt :
+        (Skip_list_hash.t, Skip_list_cell.t, [`Zero | `One]) Caqti_request.t =
+      (skip_list_hash ->? skip_list_cell)
       @@ {sql|
       SELECT cell
       FROM skip_list_cells
@@ -209,9 +210,9 @@ module Skip_list_cells = struct
       |sql}
   end
 
-  let find ?conn store skip_list_hash =
+  let find_opt ?conn store skip_list_hash =
     with_connection store conn @@ fun conn ->
-    Sqlite.Db.find conn Q.find skip_list_hash
+    Sqlite.Db.find_opt conn Q.find_opt skip_list_hash
 
   let remove ?conn store ~attested_level =
     let open Lwt_result_syntax in

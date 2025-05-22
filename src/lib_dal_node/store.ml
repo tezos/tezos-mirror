@@ -663,8 +663,8 @@ let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
     ()
 
 module Skip_list_cells = struct
-  let find ?conn t skip_list_hash =
-    Dal_store_sqlite3.Skip_list_cells.find
+  let find_opt ?conn t skip_list_hash =
+    Dal_store_sqlite3.Skip_list_cells.find_opt
       ?conn
       t.skip_list_cells_store
       skip_list_hash
