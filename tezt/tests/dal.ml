@@ -9356,7 +9356,7 @@ let create_account_and_reveal ?source ~amount ~alias client =
   let* fresh_account = create_account ?source ~amount ~alias client in
   Log.info "Reveal pkh of [%s] account." alias ;
   let op_reveal =
-    Operation.Manager.(make ~source:fresh_account (reveal fresh_account))
+    Operation.Manager.(make ~source:fresh_account (reveal fresh_account ()))
   in
   let* _oph = Operation.Manager.inject [op_reveal] client in
   let* () = bake_for client in

@@ -145,7 +145,7 @@ let create_account_and_reveal ?source ~node ~amount ~alias client =
   let* fresh_account = create_account ?source ~node ~amount ~alias client in
   Log.info ~color:Log.Color.FG.green "Reveal pkh of [%s] account." alias ;
   let op_reveal =
-    Operation.Manager.(make ~source:fresh_account (reveal fresh_account))
+    Operation.Manager.(make ~source:fresh_account (reveal fresh_account ()))
   in
   let* _oph = Operation.Manager.inject [op_reveal] client in
   let* () = Client.bake_for_and_wait ~node client in
@@ -182,7 +182,7 @@ let test_reveal =
     create_account ~node ~amount:10_000_000 ~alias:"fresh_account" client
   in
   Log.info ~color:Log.Color.FG.green "Reveal pkh of [fresh_account]." ;
-  let op_reveal = Operation.Manager.reveal fresh_account in
+  let op_reveal = Operation.Manager.reveal fresh_account () in
   operation_size_and_gas ~source:fresh_account ~node op_reveal client
 
 let test_simple_transfer =

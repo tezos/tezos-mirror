@@ -152,7 +152,7 @@ module Local_helpers = struct
     let* () = Client.bake_for_and_wait ~keys:[baker] client in
     unit
 
-  let mk_op_reveal (new_account : Account.key) client =
+  let mk_op_reveal (new_account : Account.key) ?proof client =
     Log.info
       ~color:Log.Color.FG.green
       "Reveal a public key of %s with pkh = %s."
@@ -160,7 +160,8 @@ module Local_helpers = struct
       new_account.public_key_hash ;
     let module M = Operation.Manager in
     let op_manager =
-      M.make ~gas_limit:1800 ~source:new_account @@ M.reveal new_account
+      M.make ~gas_limit:3500 ~source:new_account
+      @@ M.reveal new_account ?proof ()
     in
     let* op = M.operation [op_manager] client in
     return op
@@ -218,7 +219,7 @@ module Local_helpers = struct
       ~amount ?(delegate_consensus_key : Account.key option) ?proof client =
     let module M = Operation.Manager in
     let* counter = M.get_next_counter client ~source:delegate in
-    let reveal = M.reveal delegate in
+    let reveal = M.reveal delegate () in
     let delegation = M.delegation ~delegate () in
     let stake =
       M.call
@@ -245,20 +246,6 @@ module Local_helpers = struct
     in
     let* op = M.operation ops client in
     return op
-
-  let create_proof ~(signer : Account.key) =
-    let b58_secret_key =
-      Account.require_unencrypted_secret_key ~__LOC__ signer.secret_key
-    in
-    let secret_key =
-      Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
-    in
-    match secret_key with
-    | Bls sk ->
-        let proof = Tezos_crypto.Signature.Bls.pop_prove sk in
-        Tezos_crypto.Signature.of_bytes_exn proof
-        |> Tezos_crypto.Signature.to_b58check
-    | _ -> Test.fail "Proof-of-Possession is only required for BLS keys"
 
   let inject_bls_sign_op ~baker ~(signer : Account.key) (op : Operation.t)
       client =
@@ -714,8 +701,10 @@ let test_single_staker_sign_staking_operation_consensus_key_op_core =
       ~receiver:delegate.alias
       client
   in
+  (* create a proof for a manager key *)
+  let proof = Operation.Manager.create_proof_of_possession ~signer:delegate in
   (* reveal key for delegate *)
-  let* op_reveal = Local_helpers.mk_op_reveal delegate client in
+  let* op_reveal = Local_helpers.mk_op_reveal delegate ?proof client in
   let* _op_hash =
     Local_helpers.inject_bls_sign_op
       ~baker:default_baker
@@ -756,13 +745,15 @@ let test_single_staker_sign_staking_operation_consensus_key_op_core =
       client
   in
   (* create a proof for a consensus key *)
-  let proof = Local_helpers.create_proof ~signer:delegate_consensus_key in
+  let proof =
+    Operation.Manager.create_proof_of_possession ~signer:delegate_consensus_key
+  in
   (* set consensus key for delegate to delegate_consensus_key *)
   let* op_update_consensus_key =
     Local_helpers.mk_op_update_consensus_key
       ~delegate
       ~delegate_consensus_key
-      ~proof
+      ?proof
       client
   in
   let* _op_hash =

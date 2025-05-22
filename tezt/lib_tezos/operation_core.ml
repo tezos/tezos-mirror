@@ -895,7 +895,7 @@ module Manager = struct
   type transfer_parameters = {entrypoint : string; arg : JSON.u}
 
   type payload =
-    | Reveal of Account.key
+    | Reveal of {public_key : string; proof : string option}
     | Transfer of {
         amount : int;
         dest : string;
@@ -916,7 +916,8 @@ module Manager = struct
         refutation : sc_rollup_refutation;
       }
 
-  let reveal account = Reveal account
+  let reveal (account : Account.key) ?proof () =
+    Reveal {public_key = account.public_key; proof}
 
   let transfer ?(dest = Constant.bootstrap2) ?(amount = 1_000_000) () =
     Transfer {amount; dest = dest.public_key_hash; parameters = None}
@@ -925,16 +926,19 @@ module Manager = struct
       ?(entrypoint = "default") ?(arg = `O [("prim", `String "Unit")]) () =
     Transfer {amount; dest; parameters = Some {entrypoint; arg}}
 
-  let create_proof_of_possession ~public_key ~signer =
-    let public_key =
-      Tezos_crypto.Signature.Public_key.of_b58check_exn public_key
+  let create_proof_of_possession ~(signer : Account.key) =
+    let b58_secret_key =
+      Account.require_unencrypted_secret_key ~__LOC__ signer.secret_key
     in
-    let bytes =
-      Data_encoding.Binary.to_bytes_exn
-        Tezos_crypto.Signature.Public_key.encoding
-        public_key
+    let secret_key =
+      Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
     in
-    Account.sign_bytes ~signer bytes |> Tezos_crypto.Signature.to_b58check
+    match secret_key with
+    | Bls sk ->
+        let proof = Tezos_crypto.Signature.Bls.pop_prove sk in
+        Tezos_crypto.Signature.of_bytes_exn proof
+        |> Tezos_crypto.Signature.to_b58check |> Option.some
+    | _ -> None
 
   let update_consensus_key ~public_key ?proof () =
     Update_consensus_key {public_key; proof}
@@ -960,8 +964,13 @@ module Manager = struct
   }
 
   let json_payload_binding = function
-    | Reveal account ->
-        [("kind", `String "reveal"); ("public_key", `String account.public_key)]
+    | Reveal {public_key; proof} ->
+        let proof =
+          match proof with
+          | None -> []
+          | Some proof -> [("proof", `String proof)]
+        in
+        [("kind", `String "reveal"); ("public_key", `String public_key)] @ proof
     | Transfer {amount; dest; parameters} ->
         let parameters =
           match parameters with
