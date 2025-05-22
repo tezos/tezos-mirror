@@ -159,9 +159,9 @@ let may_update_topics ctxt proto_parameters ~block_level =
     (Node_context.get_gs_worker ctxt)
     committee
 
-let store_skip_list_cells (type block_info) ctxt cctxt dal_constants
-    (block_info : block_info) block_level
-    (module Plugin : Dal_plugin.T with type block_info = block_info) =
+(* TODO: rename block_level to attested level and add a label *)
+let store_skip_list_cells ctxt cctxt dal_constants block_level
+    (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
   let* cells_of_level =
     let pred_published_level =
@@ -170,7 +170,7 @@ let store_skip_list_cells (type block_info) ctxt cctxt dal_constants
         (Int32.of_int (1 + dal_constants.Types.attestation_lag))
     in
     Plugin.Skip_list.cells_of_level
-      block_info
+      ~attested_level:block_level
       cctxt
       ~dal_constants
       ~pred_publication_level_dal_constants:
@@ -372,9 +372,8 @@ let process_block_data ctxt cctxt store proto_parameters block_level
         ctxt
         cctxt
         proto_parameters
-        block_info
         block_level
-        (module Plugin : Dal_plugin.T with type block_info = Plugin.block_info)
+        (module Plugin : Dal_plugin.T)
     else return_unit
   in
   let* slot_headers = Plugin.get_published_slot_headers ~block_level cctxt in

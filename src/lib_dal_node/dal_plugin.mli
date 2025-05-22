@@ -172,7 +172,7 @@ module type T = sig
       The ordering of the elements in the returned list is not relevant.
     *)
     val cells_of_level :
-      block_info ->
+      attested_level:int32 ->
       Tezos_rpc.Context.generic ->
       dal_constants:Tezos_dal_node_services.Types.proto_parameters ->
       pred_publication_level_dal_constants:

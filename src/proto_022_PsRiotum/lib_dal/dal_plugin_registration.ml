@@ -301,11 +301,10 @@ module Plugin = struct
        cells of the skip list by calling the appropriate DAL function in the
        protocol. *)
 
-    let cells_of_level (block_info : block_info) ctxt ~dal_constants
+    let cells_of_level ~attested_level ctxt ~dal_constants
         ~pred_publication_level_dal_constants:_ =
       let open Lwt_result_syntax in
       let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
-      let attested_level = block_info.header.shell.level in
       let published_level =
         Int32.sub
           attested_level
