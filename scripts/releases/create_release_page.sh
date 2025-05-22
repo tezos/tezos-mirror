@@ -19,8 +19,6 @@ fi
 
 sudo apk add pandoc jq
 
-echo "# Octez Releases" >> index.md
-
 # [versions] is a 2D array representation of the [$versions_list_filename] JSON:
 # - one line per release or release candidate
 # - each line has four elements: "[major].[minor] [rc] [latest] [announcement]"
@@ -36,23 +34,23 @@ mapfile -t versions < <(jq -r '[.[] | "\(.major).\(.minor) \(.rc // "null") \(.l
 # - latest release
 while read -r version rc latest announcement; do
   if [[ ${rc} != null ]]; then
-    echo "## Octez Release Candidate ${version}~rc${rc}" >> index.md
+    echo "# Octez Release Candidate ${version}~rc${rc}" >> index.md
     version="${version}-rc${rc}"
   else
     if [[ ${latest} != null ]]; then
-      echo "## Octez $version (latest)" >> index.md
+      echo "# Octez $version (latest)" >> index.md
     else
-      echo "## Octez $version" >> index.md
+      echo "# Octez $version" >> index.md
     fi
   fi
 
   {
     echo -e "Details and changelogs available in [the documentation](${announcement})\n"
-    echo "### Static Binaries"
+    echo "## Static Binaries"
   } >> index.md
 
   for arch in x86_64 arm64; do
-    echo "#### $arch" >> index.md
+    echo "### $arch" >> index.md
 
     aws s3 cp "s3://${S3_BUCKET}/octez-v${version}/binaries/${arch}/sha256sums.txt" "./sha256sums.txt"
 
@@ -70,12 +68,12 @@ while read -r version rc latest announcement; do
   done
 
   {
-    echo -e "### Debian Packages\n"
+    echo -e "## Debian Packages\n"
     echo -e "For installation instructions, refer to the [Octez Debian Packages Guide](https://octez.tezos.com/docs/introduction/howtoget.html#ubuntu-and-debian-octez-packages)\n"
   } >> index.md
 
   {
-    echo -e "### RPM Packages\n"
+    echo -e "## RPM Packages\n"
     echo -e "For installation instructions, refer to the [Octez RPM Packages Guide](https://tezos.gitlab.io/introduction/howtoget.html#fedora-octez-packages)\n"
   } >> index.md
 done <<< "$(printf "%s\n" "${versions[@]}")"
