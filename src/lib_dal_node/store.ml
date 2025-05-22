@@ -669,6 +669,13 @@ module Skip_list_cells = struct
       t.skip_list_cells_store
       skip_list_hash
 
+  let find_by_slot_id_opt ?conn t ~attested_level ~slot_index =
+    Dal_store_sqlite3.Skip_list_cells.find_by_slot_id_opt
+      ?conn
+      t.skip_list_cells_store
+      ~attested_level
+      ~slot_index
+
   let insert ?conn t ~attested_level items =
     Dal_store_sqlite3.Skip_list_cells.insert
       ?conn
