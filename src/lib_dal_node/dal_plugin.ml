@@ -42,6 +42,8 @@ module type T = sig
 
   type attestation_operation
 
+  type tb_slot
+
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
@@ -63,7 +65,7 @@ module type T = sig
   val get_attestations :
     block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
-    (int
+    (tb_slot
     * Signature.public_key_hash option
     * attestation_operation
     * dal_attestation option)
@@ -93,6 +95,7 @@ module type T = sig
     slot_index:slot_index ->
     shard:Cryptobox.shard ->
     proof:Cryptobox.shard_proof ->
+    tb_slot:tb_slot ->
     unit tzresult Lwt.t
 
   val is_delegate :

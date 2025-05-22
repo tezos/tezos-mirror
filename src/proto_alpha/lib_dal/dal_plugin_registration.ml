@@ -35,7 +35,29 @@ module Plugin = struct
 
   type dal_attestation = Environment.Bitset.t
 
-  type attestation_operation = Kind.attestation Alpha_context.operation
+  type attestation_operation =
+    | Op : 'a Kind.consensus Alpha_context.operation -> attestation_operation
+
+  type tb_slot = Slot.t
+
+  type error += Aggregation_result_size_error
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"Aggregation_result_size_error"
+      ~title:"Bad aggregagtion result size"
+      ~description:
+        "Aggregation result should have as many elements as the original \
+         aggregated attestation"
+      ~pp:(fun ppf () ->
+        Format.fprintf
+          ppf
+          "Aggregation result should have as many elements as the original \
+           aggregated attestation")
+      Data_encoding.unit
+      (function Aggregation_result_size_error -> Some () | _ -> None)
+      (fun () -> Aggregation_result_size_error)
 
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -89,7 +111,8 @@ module Plugin = struct
     else return (`Head 0)
 
   let inject_entrapment_evidence cctxt ~attested_level
-      (operation : attestation_operation) ~slot_index ~shard ~proof =
+      (Op attestation : attestation_operation) ~slot_index ~shard ~proof
+      ~tb_slot =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context cctxt in
     let chain = `Main in
@@ -114,26 +137,19 @@ module Plugin = struct
       Protocol_client_context.Alpha_block_services.hash cctxt ~chain ~block ()
     in
     let shard_with_proof = Dal.Shard_with_proof.{shard; proof} in
-    let protocol_data = operation.protocol_data in
-    match operation.protocol_data.contents with
-    | Single (Attestation {consensus_content = {slot = consensus_slot; _}; _})
-      ->
-        let attestation : Kind.attestation Alpha_context.operation =
-          {shell = operation.shell; protocol_data}
-        in
-        let* bytes =
-          Plugin.RPC.Forge.dal_entrapment_evidence
-            cpctxt
-            (chain, block)
-            ~branch:block_hash
-            ~consensus_slot
-            ~attestation
-            ~slot_index
-            ~shard_with_proof
-        in
-        let bytes = Signature.concat bytes Signature.zero in
-        let* _op_hash = Shell_services.Injection.operation cctxt ~chain bytes in
-        return_unit
+    let* bytes =
+      Plugin.RPC.Forge.dal_entrapment_evidence
+        cpctxt
+        (chain, block)
+        ~branch:block_hash
+        ~consensus_slot:tb_slot
+        ~attestation
+        ~slot_index
+        ~shard_with_proof
+    in
+    let bytes = Signature.concat bytes Signature.zero in
+    let* _op_hash = Shell_services.Injection.operation cctxt ~chain bytes in
+    return_unit
 
   let block_info ?chain ?block ~metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -189,22 +205,24 @@ module Plugin = struct
         ~metadata:`Always
         0
     in
-    return
-    @@ List.filter_map
+    Lwt.return @@ Result.map List.flatten
+    @@ List.map_e
          (fun operation ->
            let (Operation_data operation_data) = operation.protocol_data in
            match operation_data.contents with
            | Single (Attestation attestation) -> (
-               let packed_operation : Kind.attestation Alpha_context.operation =
-                 {
-                   Alpha_context.shell = operation.shell;
-                   protocol_data = operation_data;
-                 }
+               let packed_operation =
+                 Op
+                   {
+                     Alpha_context.shell = operation.shell;
+                     protocol_data = operation_data;
+                   }
                in
-               let tb_slot = Slot.to_int attestation.consensus_content.slot in
-               let dal_attestation : dal_attestation option =
+               let tb_slot = attestation.consensus_content.slot in
+               let dal_attestation =
                  Option.map
-                   (fun x -> (x.attestation :> dal_attestation))
+                   (fun dal_content ->
+                     (dal_content.attestation :> dal_attestation))
                    attestation.dal_content
                in
                match operation.receipt with
@@ -215,16 +233,62 @@ module Plugin = struct
                          Tezos_crypto.Signature.Of_V2.public_key_hash
                            result.delegate
                        in
-                       Some
-                         ( tb_slot,
-                           Some delegate,
-                           packed_operation,
-                           dal_attestation )
-                   | _ -> Some (tb_slot, None, packed_operation, dal_attestation)
-                   )
+                       Ok
+                         [
+                           ( tb_slot,
+                             Some delegate,
+                             packed_operation,
+                             dal_attestation );
+                         ]
+                   | _ ->
+                       Ok [(tb_slot, None, packed_operation, dal_attestation)])
                | Empty | Too_large | Receipt No_operation_metadata ->
-                   Some (tb_slot, None, packed_operation, dal_attestation))
-           | _ -> None)
+                   Ok [(tb_slot, None, packed_operation, dal_attestation)])
+           | Single (Attestations_aggregate {committee; _}) -> (
+               let packed_operation =
+                 Op
+                   {
+                     Alpha_context.shell = operation.shell;
+                     protocol_data = operation_data;
+                   }
+               in
+               let slots_and_dal_attestations =
+                 List.map
+                   (fun (slot, dal_content_opt) ->
+                     ( slot,
+                       Option.map
+                         (fun dal_content ->
+                           (dal_content.attestation :> dal_attestation))
+                         dal_content_opt ))
+                   committee
+               in
+               match operation.receipt with
+               | Receipt (Operation_metadata operation_metadata) -> (
+                   match operation_metadata.contents with
+                   | Single_result
+                       (Attestations_aggregate_result {committee; _}) ->
+                       List.map2
+                         ~when_different_lengths:[Aggregation_result_size_error]
+                         (fun (tb_slot, dal_attestation) consensus_key ->
+                           ( tb_slot,
+                             Some consensus_key.Consensus_key.delegate,
+                             packed_operation,
+                             dal_attestation ))
+                         slots_and_dal_attestations
+                         committee
+                   | _ ->
+                       Ok
+                         (List.map
+                            (fun (tb_slot, dal_attestation) ->
+                              (tb_slot, None, packed_operation, dal_attestation))
+                            slots_and_dal_attestations))
+               | Empty | Too_large | Receipt No_operation_metadata ->
+                   Ok
+                     (List.map
+                        (fun (tb_slot, dal_attestation) ->
+                          (tb_slot, None, packed_operation, dal_attestation))
+                        slots_and_dal_attestations))
+           | _ -> Ok [])
          consensus_ops
 
   let get_committee ctxt ~level =

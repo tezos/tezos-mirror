@@ -37,6 +37,8 @@ module Plugin = struct
 
   type attestation_operation = Kind.attestation Alpha_context.operation
 
+  type tb_slot = int
+
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol.Constants_services.parametric cpctxt (chain, block)
@@ -89,7 +91,7 @@ module Plugin = struct
     else return (`Head 0)
 
   let inject_entrapment_evidence cctxt ~attested_level
-      (operation : attestation_operation) ~slot_index ~shard ~proof =
+      (operation : attestation_operation) ~slot_index ~shard ~proof ~tb_slot:_ =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context cctxt in
     let chain = `Main in

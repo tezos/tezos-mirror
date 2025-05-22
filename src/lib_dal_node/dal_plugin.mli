@@ -51,6 +51,8 @@ module type T = sig
 
   type attestation_operation
 
+  type tb_slot
+
   (** [block_info ?chain ?block ~metadata ctxt] returns the information of the
       [block] in [ctxt] for the given [chain]. Block's metadata are included or
       skipped depending on the value of [metadata]. This is a wrapper on top of
@@ -81,7 +83,7 @@ module type T = sig
   val get_attestations :
     block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
-    (int
+    (tb_slot
     * Signature.public_key_hash option
     * attestation_operation
     * dal_attestation option)
@@ -128,6 +130,7 @@ module type T = sig
     slot_index:slot_index ->
     shard:Cryptobox.shard ->
     proof:Cryptobox.shard_proof ->
+    tb_slot:tb_slot ->
     unit tzresult Lwt.t
 
   val is_delegate :
