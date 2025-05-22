@@ -1160,6 +1160,7 @@ val update_consensus_key :
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
+  ?consensus_key_pop:string ->
   ?expect_failure:bool ->
   src:string ->
   pk:string ->
@@ -1189,6 +1190,7 @@ val update_companion_key :
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
+  ?companion_key_pop:string ->
   ?expect_failure:bool ->
   src:string ->
   pk:string ->

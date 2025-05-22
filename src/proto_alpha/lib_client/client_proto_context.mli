@@ -209,7 +209,8 @@ val update_consensus_key :
   ?verbose_signing:bool ->
   ?simulation:bool ->
   ?fee:Tez.t ->
-  ?secret_key_uri:Client_keys.sk_uri ->
+  ?pop_material:
+    (Bls12_381_signature.MinPk.signature, Client_keys.sk_uri) Either.t ->
   public_key:Signature.public_key ->
   manager_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
@@ -225,7 +226,8 @@ val update_companion_key :
   ?verbose_signing:bool ->
   ?simulation:bool ->
   ?fee:Tez.t ->
-  ?secret_key_uri:Client_keys.sk_uri ->
+  ?pop_material:
+    (Bls12_381_signature.MinPk.signature, Client_keys.sk_uri) Either.t ->
   public_key:Signature.public_key ->
   manager_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
@@ -300,8 +302,12 @@ val register_as_delegate :
   ?fee:Tez.t ->
   manager_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
-  ?consensus_keys:public_key * Client_keys.sk_uri option ->
-  ?companion_keys:public_key * Client_keys.sk_uri option ->
+  ?consensus_keys:
+    public_key
+    * (Bls12_381_signature.MinPk.signature, Client_keys.sk_uri) Either.t option ->
+  ?companion_keys:
+    public_key
+    * (Bls12_381_signature.MinPk.signature, Client_keys.sk_uri) Either.t option ->
   public_key ->
   (Kind.delegation Kind.manager Injection.result
   * (Kind.update_consensus_key Kind.manager contents

@@ -1136,6 +1136,35 @@ let commands_network network () =
             return_unit);
       ]
 
+let get_pop_material (cctxt : Protocol_client_context.full) pop
+    (public_key : public_key) =
+  let open Lwt_result_syntax in
+  match pop with
+  | Some pop -> return_some @@ Either.left pop
+  | None -> (
+      match public_key with
+      | Bls _ -> (
+          let pkh = Signature.Public_key.hash public_key in
+          let*! res = Client_keys.get_key cctxt pkh in
+          match res with
+          | Ok (_, _, secret_key_uri) ->
+              return_some @@ Either.right secret_key_uri
+          | Error [Exn (Failure s)]
+            when String.equal
+                   s
+                   (Format.asprintf
+                      "Unknown secret key for %a"
+                      Signature.Public_key_hash.pp
+                      pkh) ->
+              cctxt#error
+                "Unable to include a proof of possession for %a: the \
+                 associated private key must be available in your wallet, or a \
+                 proof of possession must be explicitly provided."
+                Signature.Public_key_hash.pp
+                pkh
+          | Error err -> fail err)
+      | _ -> return_none)
+
 let commands_rw () =
   let open Client_proto_programs in
   let open Tezos_micheline in
@@ -2325,13 +2354,18 @@ let commands_rw () =
     command
       ~group
       ~desc:"Register the public key hash as a delegate with a consensus key."
-      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (args5
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         fee_parameter_args
+         consensus_key_pop_arg)
       (prefixes ["register"; "key"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["as"; "delegate"; "with"; "consensus"; "key"]
       @@ Public_key.source_param ~name:"key" ~desc:"the consensus key"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter)
+      (fun (fee, dry_run, verbose_signing, fee_parameter, consensus_key_pop)
            src_pkh
            (name_pk, public_key)
            cctxt ->
@@ -2343,15 +2377,18 @@ let commands_rw () =
             | Some pk -> return pk
             | None -> Client_keys.public_key name_pk
           in
-          let* secret_key_uri =
-            match public_key with
-            | Bls _ ->
-                let pkh = Signature.Public_key.hash public_key in
-                let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
-                return_some secret_key_uri
-            | _ -> return_none
+          let* pop_material =
+            match consensus_key_pop with
+            | Some pop -> return_some @@ Either.left pop
+            | None -> (
+                match public_key with
+                | Bls _ ->
+                    let pkh = Signature.Public_key.hash public_key in
+                    let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
+                    return_some @@ Either.right secret_key_uri
+                | _ -> return_none)
           in
-          return (public_key, secret_key_uri)
+          return (public_key, pop_material)
         in
         let*! r =
           register_as_delegate
@@ -2380,13 +2417,18 @@ let commands_rw () =
     command
       ~group
       ~desc:"Register the public key hash as a delegate with a companion key."
-      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (args5
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         fee_parameter_args
+         companion_key_pop_arg)
       (prefixes ["register"; "key"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["as"; "delegate"; "with"; "companion"; "key"]
       @@ Public_key.source_param ~name:"key" ~desc:"the companion key"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter)
+      (fun (fee, dry_run, verbose_signing, fee_parameter, companion_key_pop)
            src_pkh
            (name_pk, public_key)
            cctxt ->
@@ -2398,15 +2440,18 @@ let commands_rw () =
             | Some pk -> return pk
             | None -> Client_keys.public_key name_pk
           in
-          let* secret_key_uri =
-            match public_key with
-            | Bls _ ->
-                let pkh = Signature.Public_key.hash public_key in
-                let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
-                return_some secret_key_uri
-            | _ -> return_none
+          let* pop_material =
+            match companion_key_pop with
+            | Some pop -> return_some @@ Either.left pop
+            | None -> (
+                match public_key with
+                | Bls _ ->
+                    let pkh = Signature.Public_key.hash public_key in
+                    let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
+                    return_some @@ Either.right secret_key_uri
+                | _ -> return_none)
           in
-          return (public_key, secret_key_uri)
+          return (public_key, pop_material)
         in
         let*! r =
           register_as_delegate
@@ -2437,7 +2482,13 @@ let commands_rw () =
       ~desc:
         "Register the public key hash as a delegate with a consensus and a \
          companion key."
-      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (args6
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         fee_parameter_args
+         consensus_key_pop_arg
+         companion_key_pop_arg)
       (prefixes ["register"; "key"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["as"; "delegate"; "with"; "consensus"; "key"]
@@ -2445,7 +2496,12 @@ let commands_rw () =
       @@ prefixes ["and"; "companion"; "key"]
       @@ Public_key.source_param ~name:"key" ~desc:"the companion key"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             fee_parameter,
+             consensus_key_pop,
+             companion_key_pop )
            src_pkh
            (name_pk_consensus, public_key_consensus)
            (name_pk_companion, public_key_companion)
@@ -2458,15 +2514,18 @@ let commands_rw () =
             | Some pk -> return pk
             | None -> Client_keys.public_key name_pk_consensus
           in
-          let* secret_key_uri =
-            match public_key with
-            | Bls _ ->
-                let pkh = Signature.Public_key.hash public_key in
-                let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
-                return_some secret_key_uri
-            | _ -> return_none
+          let* pop_material =
+            match consensus_key_pop with
+            | Some pop -> return_some @@ Either.left pop
+            | None -> (
+                match public_key with
+                | Bls _ ->
+                    let pkh = Signature.Public_key.hash public_key in
+                    let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
+                    return_some @@ Either.right secret_key_uri
+                | _ -> return_none)
           in
-          return (public_key, secret_key_uri)
+          return (public_key, pop_material)
         in
         let* companion_keys =
           let* public_key =
@@ -2474,15 +2533,18 @@ let commands_rw () =
             | Some pk -> return pk
             | None -> Client_keys.public_key name_pk_companion
           in
-          let* secret_key_uri =
-            match public_key with
-            | Bls _ ->
-                let pkh = Signature.Public_key.hash public_key in
-                let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
-                return_some secret_key_uri
-            | _ -> return_none
+          let* pop_material =
+            match companion_key_pop with
+            | Some pop -> return_some @@ Either.left pop
+            | None -> (
+                match public_key with
+                | Bls _ ->
+                    let pkh = Signature.Public_key.hash public_key in
+                    let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
+                    return_some @@ Either.right secret_key_uri
+                | _ -> return_none)
           in
-          return (public_key, secret_key_uri)
+          return (public_key, pop_material)
         in
         let*! r =
           register_as_delegate
@@ -2512,13 +2574,18 @@ let commands_rw () =
     command
       ~group
       ~desc:"Update the consensus key of a delegate."
-      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (args5
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         fee_parameter_args
+         consensus_key_pop_arg)
       (prefixes ["set"; "consensus"; "key"; "for"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["to"]
       @@ Public_key.source_param ~name:"key" ~desc:"the consensus key"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter)
+      (fun (fee, dry_run, verbose_signing, fee_parameter, consensus_key_pop)
            delegate_pkh
            (name_pk, public_key)
            cctxt ->
@@ -2531,13 +2598,16 @@ let commands_rw () =
           | Some pk -> return pk
           | None -> Client_keys.public_key name_pk
         in
-        let* secret_key_uri =
-          match public_key with
-          | Bls _ ->
-              let pkh = Signature.Public_key.hash public_key in
-              let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
-              return_some secret_key_uri
-          | _ -> return_none
+        let* pop_material =
+          match consensus_key_pop with
+          | Some pop -> return_some @@ Either.left pop
+          | None -> (
+              match public_key with
+              | Bls _ ->
+                  let pkh = Signature.Public_key.hash public_key in
+                  let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
+                  return_some @@ Either.right secret_key_uri
+              | _ -> return_none)
         in
         let*! r =
           update_consensus_key
@@ -2549,7 +2619,7 @@ let commands_rw () =
             ~fee_parameter
             ~verbose_signing
             ?fee
-            ?secret_key_uri
+            ?pop_material
             ~public_key
             ~manager_sk:delegate_sk
             delegate_pk
@@ -2558,13 +2628,18 @@ let commands_rw () =
     command
       ~group
       ~desc:"Update the companion key of a delegate."
-      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (args5
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         fee_parameter_args
+         companion_key_pop_arg)
       (prefixes ["set"; "companion"; "key"; "for"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["to"]
       @@ Public_key.source_param ~name:"key" ~desc:"the companion key"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter)
+      (fun (fee, dry_run, verbose_signing, fee_parameter, companion_key_pop)
            delegate_pkh
            (name_pk, public_key)
            cctxt ->
@@ -2577,13 +2652,16 @@ let commands_rw () =
           | Some pk -> return pk
           | None -> Client_keys.public_key name_pk
         in
-        let* secret_key_uri =
-          match public_key with
-          | Bls _ ->
-              let pkh = Signature.Public_key.hash public_key in
-              let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
-              return_some secret_key_uri
-          | _ -> return_none
+        let* pop_material =
+          match companion_key_pop with
+          | Some pop -> return_some @@ Either.left pop
+          | None -> (
+              match public_key with
+              | Bls _ ->
+                  let pkh = Signature.Public_key.hash public_key in
+                  let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
+                  return_some @@ Either.right secret_key_uri
+              | _ -> return_none)
         in
         let*! r =
           update_companion_key
@@ -2595,7 +2673,7 @@ let commands_rw () =
             ~fee_parameter
             ~verbose_signing
             ?fee
-            ?secret_key_uri
+            ?pop_material
             ~public_key
             ~manager_sk:delegate_sk
             delegate_pk
