@@ -1366,12 +1366,26 @@ module Monitoring_app = struct
         view_ratio_attested_over_published
           (`attested attested, `published published)
       in
-      let view =
+      let ratio_view =
         (Format.sprintf
            "• Percentage of attested over published DAL commitments: %s")
           (Option.value ~default:"unk" ratio)
       in
-      Lwt.return view
+      let slot_size = 126_944 (* TODO: do not hard-code this *) in
+      let bandwidth =
+        Option.map
+          (fun x ->
+            Format.sprintf
+              "%.2f"
+              (x *. float_of_int slot_size /. float_of_int (1024 * 6 * 3600)))
+          attested
+      in
+      let bandwidth_view =
+        Format.sprintf
+          "• Bandwidth: %s KiB/s"
+          (Option.value ~default:"unk" bandwidth)
+      in
+      Lwt.return (ratio_view, bandwidth_view)
 
     let pp_stake fmt stake_ratio =
       Format.fprintf fmt "`%.2f%%` stake" (stake_ratio *. 100.)
@@ -1566,12 +1580,12 @@ module Monitoring_app = struct
           "*DAL report* for the *%s* network over the last 6 hours."
           (String.capitalize_ascii (Network.to_string network))
       in
-      let* ratio_dal_commitments_total_info =
+      let* ratio_dal_commitments_total_info, bandwidth_info =
         fetch_dal_commitments_total_info ()
       in
       let* slots_info = fetch_slots_info () in
       let network_overview_info =
-        ratio_dal_commitments_total_info :: slots_info
+        bandwidth_info :: ratio_dal_commitments_total_info :: slots_info
       in
       let data =
         let open Format_app in
