@@ -33,6 +33,8 @@ RUN opam install --yes \
         # manager.
         --assume-depexts \ 
         $(opam list --all --short | grep -v ocaml-option-) \
+    # Pin Tezt to a commit that has the memory measurement features we need.
+    && opam pin --yes tezt https://gitlab.com/nomadic-labs/tezt.git#70eeb3644a06626fa9d72e3877d5f51180360e92 \
     && opam clean
 
 # ENTRYPOINT and CMD already set in prebuild
