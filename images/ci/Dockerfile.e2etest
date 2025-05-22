@@ -37,8 +37,8 @@ RUN cargo install \
 # - ocamlformat and bisect-ppx-report, copied from the
 #   build image.
 # - eth-cli, installed from npm
-# - some utilities used in the Tezt integration test suite: curl, git, file
-# - some utilities used in the [unified_coverage] job: make, jq
+# - some utilities used in the Tezt integration test suite: git, file
+# - some utilities used in the [unified_coverage] job: make
 #
 # This image is intended for
 # - Running end-to-end tests (mostly Tezt) in the tezos/tezos CI.
@@ -90,7 +90,7 @@ SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 
 # hadolint ignore=DL3018,DL3019
 RUN apk update \
- && apk add --no-cache curl git file make jq websocat gcc clang lld \
+ && apk add --no-cache git file make websocat gcc clang lld \
  && apk add --no-cache ca-certificates build-base musl-dev libusb-dev linux-headers procps-ng npm
 
 # Install dal SRS setup (need curl)
