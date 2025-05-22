@@ -3013,6 +3013,39 @@ module Manager = struct
            trace to this effect. *)
         record_trace Gas.Gas_limit_too_high
 
+  let check_bls_proof_for_manager_pk remaining_gas source
+      (public_key : Signature.Public_key.t) proof =
+    let open Result_syntax in
+    match (public_key, proof) with
+    | Bls _bls_public_key, None ->
+        result_error
+          (Validate_errors.Manager.Missing_bls_proof
+             {kind = Manager_pk; source; public_key})
+    | Bls bls_public_key, Some _ ->
+        (* Compute the gas cost to encode the manager public key and
+           check the proof. *)
+        let gas_cost_for_sig_check =
+          let open Saturation_repr.Syntax in
+          let size = Bls.Public_key.size bls_public_key in
+          Operation_costs.serialization_cost size
+          + Michelson_v1_gas.Cost_of.Interpreter.check_signature_on_algo
+              Bls
+              size
+        in
+        let* (_ : Gas.Arith.fp) =
+          record_trace
+            Insufficient_gas_for_manager
+            (Gas.consume_from
+               (Gas.Arith.fp remaining_gas)
+               gas_cost_for_sig_check)
+        in
+        return_unit
+    | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof ->
+        result_error
+          (Validate_errors.Manager.Unused_bls_proof
+             {kind = Manager_pk; source; public_key})
+    | (Ed25519 _ | Secp256k1 _ | P256 _), None -> return_unit
+
   let check_update_consensus_key vi remaining_gas source
       (public_key : Signature.Public_key.t) proof
       (kind : Operation_repr.consensus_key_kind) =
@@ -3084,8 +3117,9 @@ module Manager = struct
       contents
     in
     match operation with
-    | Reveal {public_key; proof = _} ->
-        Contract.check_public_key public_key source
+    | Reveal {public_key; proof} ->
+        let* () = Contract.check_public_key public_key source in
+        check_bls_proof_for_manager_pk remaining_gas source public_key proof
     | Transaction {parameters; _} ->
         let* (_ : Gas.Arith.fp) =
           consume_decoding_gas remaining_gas parameters

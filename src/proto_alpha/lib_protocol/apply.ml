@@ -1014,7 +1014,7 @@ let apply_manager_operation :
       Script.Always
     in
     match operation with
-    | Reveal {public_key; proof = _} ->
+    | Reveal {public_key; proof} ->
         (* TODO #2603
 
            Even if [precheck_manager_contents] has already asserted that
@@ -1023,6 +1023,30 @@ let apply_manager_operation :
            should be solved by forking out [validate_operation] from
            [apply_operation]. *)
         let* () = Contract.must_be_allocated ctxt source_contract in
+        (* Check proof *)
+        let* ctxt =
+          match (public_key, proof) with
+          | Bls bls_public_key, Some proof ->
+              let*? ctxt =
+                let gas_cost_for_sig_check =
+                  let open Saturation_repr.Syntax in
+                  let size = Bls.Public_key.size bls_public_key in
+                  Operation_costs.serialization_cost size
+                  + Michelson_v1_gas.Cost_of.Interpreter.check_signature_on_algo
+                      Bls
+                      size
+                in
+                Gas.consume ctxt gas_cost_for_sig_check
+              in
+              let* () =
+                fail_unless
+                  (Signature.pop_verify bls_public_key (Bls.to_bytes proof))
+                  (Validate_errors.Manager.Incorrect_bls_proof
+                     {kind = Manager_pk; public_key; proof})
+              in
+              return ctxt
+          | _, _ -> return ctxt
+        in
         (* TODO tezos/tezos#3070
 
            We have already asserted the consistency of the supplied public
