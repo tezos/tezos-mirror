@@ -1511,12 +1511,19 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
           reveal_error cctxt
         else return_unit
       in
+      let* proof =
+        match (src_pk : Signature.public_key) with
+        | Bls _ ->
+            let* proof = Client_keys.bls_prove_possession cctxt src_sk in
+            return_some proof
+        | _ -> return_none
+      in
       let reveal =
         prepare_manager_operation
           ~fee:Limit.unknown
           ~gas_limit:Limit.unknown
           ~storage_limit:Limit.unknown
-          (Reveal {public_key = src_pk; proof = None})
+          (Reveal {public_key = src_pk; proof})
       in
       let*? reveal = Annotated_manager_operation.set_source source reveal in
       let*? reveal = Annotated_manager_operation.set_counter counter reveal in

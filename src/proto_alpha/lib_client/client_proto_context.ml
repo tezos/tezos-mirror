@@ -208,8 +208,17 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?replace_by_fees
     ()
 
-let build_reveal_operation ?fee ?gas_limit ?storage_limit pk =
-  let operation = Reveal {public_key = pk; proof = None} in
+let build_reveal_operation cctxt ?fee ?gas_limit ?storage_limit ~src_sk
+    public_key =
+  let open Lwt_result_syntax in
+  let+ proof =
+    match (public_key : Signature.public_key) with
+    | Bls _ ->
+        let* proof = Client_keys.bls_prove_possession cctxt src_sk in
+        return_some proof
+    | _ -> return_none
+  in
+  let operation = Reveal {public_key; proof} in
   Injection.prepare_manager_operation
     ~fee:(Limit.of_option fee)
     ~gas_limit:(Limit.of_option gas_limit)
@@ -219,9 +228,11 @@ let build_reveal_operation ?fee ?gas_limit ?storage_limit pk =
 let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
     ~source ~src_pk ~src_sk ?fee ~fee_parameter () =
   let open Lwt_result_syntax in
-  let contents =
-    Annotated_manager_operation.Single_manager
-      (build_reveal_operation ?fee ~storage_limit:Z.zero src_pk)
+  let* contents =
+    let+ operation_content =
+      build_reveal_operation cctxt ?fee ~storage_limit:Z.zero ~src_sk src_pk
+    in
+    Annotated_manager_operation.Single_manager operation_content
   in
   let* oph, _, op, result =
     Injection.inject_manager_operation

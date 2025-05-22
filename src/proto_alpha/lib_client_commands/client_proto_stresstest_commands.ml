@@ -572,6 +572,11 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
     if not already_revealed then
       let reveal_counter = Manager_counter.succ current_counter in
       let transf_counter = Manager_counter.succ reveal_counter in
+      let proof =
+        match transfer.src.sk with
+        | Bls sk -> Signature.Bls.of_bytes_opt (Signature.Bls.pop_prove sk)
+        | _ -> None
+      in
       let reveal =
         Manager_operation
           {
@@ -580,7 +585,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
             counter = reveal_counter;
             gas_limit = cost_of_manager_operation;
             storage_limit = Z.zero;
-            operation = Reveal {public_key = transfer.src.pk; proof = None};
+            operation = Reveal {public_key = transfer.src.pk; proof};
           }
       in
       let manager_op =
@@ -1333,14 +1338,17 @@ let generate_transfers ~sources ~amount ~parameters ~entrypoint ~fee ~gas_limit
     sources
 
 (* Returns a list of reveals from each element of [sources]. *)
-let generate_reveals ~sources ~fee ~gas_limit ~storage_limit =
-  List.map
+let generate_reveals cctxt ~sources ~fee ~gas_limit ~storage_limit =
+  let open Lwt_result_syntax in
+  List.map_es
     (fun dst ->
-      let reveal =
+      let+ reveal =
         Client_proto_context.build_reveal_operation
+          cctxt
           ~fee
           ~gas_limit
           ~storage_limit
+          ~src_sk:dst.sk_uri
           dst.pk
       in
       (dst, Annotated_manager_operation.Annotated_manager_operation reveal))
@@ -1354,7 +1362,8 @@ let generate_reveals ~sources ~fee ~gas_limit ~storage_limit =
     [sources] is the list of "starter" accounts, used to fund all
     accounts in a exponential way.
 *)
-let generate_starter_ops ~sources ~amount ~batch_size =
+let generate_starter_ops cctxt ~sources ~amount ~batch_size =
+  let open Lwt_result_syntax in
   let fee = Tez.of_mutez_exn 1_000L in
   let gas_limit = Gas.Arith.integral_of_int_exn 1_040 in
   let storage_limit = Z.of_int 257 in
@@ -1375,7 +1384,9 @@ let generate_starter_ops ~sources ~amount ~batch_size =
       ~gas_limit
       ~storage_limit
   in
-  let reveal_ops = generate_reveals ~sources ~fee ~gas_limit ~storage_limit in
+  let+ reveal_ops =
+    generate_reveals cctxt ~sources ~fee ~gas_limit ~storage_limit
+  in
   let rec split n acc = function
     | [] -> acc
     | l ->
@@ -1856,8 +1867,9 @@ let fund_accounts_from_source : Protocol_client_context.full Tezos_clic.command
         log Notice (fun () ->
             cctxt#message "Generating starter transactions and reveals@.")
       in
-      let starter_batch, starter_reveals =
+      let* starter_batch, starter_reveals =
         generate_starter_ops
+          cctxt
           ~sources:starter_sources
           ~amount:starter_initial_amount
           ~batch_size
