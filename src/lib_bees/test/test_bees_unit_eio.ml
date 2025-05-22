@@ -15,7 +15,23 @@
 
 module Assert = Assert
 open Mocked_worker
-module Event = Internal_event.Simple
+
+module Events = struct
+  let section = ["test_bees_unit_eio"]
+
+  include Internal_event.Simple
+
+  let request_received =
+    declare_1
+      ~section
+      ~name:"request_received"
+      ~msg:"request {req} received"
+      ~level:Notice
+      ~pp1:Request.pp
+      ("req", Request.encoding)
+
+  let emit event param = Tezos_bees.Hive.async_lwt (fun () -> emit event param)
+end
 
 type error += TzCrashError
 
@@ -34,6 +50,7 @@ let create_handlers (type a) ?on_completion ?(slow = false) () =
         self -> (r, request_error) Request.t -> (r, request_error) result =
      fun _w request ->
       let () = if slow then sleep 0.2 else () in
+      let () = Events.(emit request_received) (Request.view request) in
       match request with
       | Request.RqA _i -> (Ok () : (r, request_error) result)
       | Request.RqB -> Ok ()

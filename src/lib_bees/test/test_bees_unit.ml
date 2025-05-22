@@ -33,7 +33,21 @@
 
 module Assert = Assert
 open Mocked_worker
-module Event = Internal_event.Simple
+
+module Events = struct
+  let section = ["test_bees_unit"]
+
+  include Internal_event.Simple
+
+  let request_received =
+    declare_1
+      ~section
+      ~name:"request_received"
+      ~msg:"request {req} received"
+      ~level:Notice
+      ~pp1:Request.pp
+      ("req", Request.encoding)
+end
 
 type error += TzCrashError
 
@@ -50,6 +64,7 @@ let create_handlers (type a) ?on_completion ?(slow = false) () =
      fun _w request ->
       let open Lwt_result_syntax in
       let*! () = if slow then Lwt_unix.sleep 0.2 else Lwt.return_unit in
+      let*! () = Events.(emit request_received) (Request.view request) in
       match request with
       | Request.RqA _i -> (return_unit : (r, request_error) result Lwt.t)
       | Request.RqB -> return_unit
