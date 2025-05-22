@@ -344,52 +344,28 @@ let () =
   register
     "schedule_container_scanning_master"
     schedule_container_scanning_master
-    ~jobs:
-      [
-        Common.job_datadog_pipeline_trace;
-        Common.job_container_scanning
-          ~docker_image:"tezos/tezos:master"
-          ~dockerfile_path:"build.Dockerfile";
-      ]
+    ~jobs:(Container_scanning.jobs "tezos/tezos:master")
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:master \
        Docker image" ;
   register
     "schedule_container_scanning_octez_releases"
     schedule_container_scanning_octez_releases
-    ~jobs:
-      [
-        Common.job_datadog_pipeline_trace;
-        Common.job_container_scanning
-          ~docker_image:"tezos/tezos:latest"
-          ~dockerfile_path:"build.Dockerfile";
-      ]
+    ~jobs:(Container_scanning.jobs "tezos/tezos:latest")
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:latest \
        Docker image" ;
   register
     "schedule_container_scanning_evm_node_releases"
     schedule_container_scanning_evm_node_releases
-    ~jobs:
-      [
-        Common.job_datadog_pipeline_trace;
-        Common.job_container_scanning
-          ~docker_image:"tezos/tezos:octez-evm-node-v0.26"
-          ~dockerfile_path:"build.Dockerfile";
-      ]
+    ~jobs:(Container_scanning.jobs "tezos/tezos:octez-evm-node-v0.26")
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in latest \
        tezos/tezos:octez-evm-node-vX.Y Docker image" ;
   register
     "schedule_container_scanning_octez_rc"
     schedule_container_scanning_octez_rc
-    ~jobs:
-      [
-        Common.job_datadog_pipeline_trace;
-        Common.job_container_scanning
-          ~docker_image:"tezos/tezos:octez-v22.0-rc3"
-          ~dockerfile_path:"build.Dockerfile";
-      ]
+    ~jobs:(Container_scanning.jobs "tezos/tezos:octez-v22.0-rc3")
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in the Docker image for \
        the latest release candidate of Octez" ;
