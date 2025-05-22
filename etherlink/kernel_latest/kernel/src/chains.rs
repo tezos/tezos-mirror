@@ -29,8 +29,10 @@ use std::fmt::{Debug, Display};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
-use tezos_smart_rollup_host::path::Path;
+use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::block::TezBlock;
+
+pub const TEZLINK_SAFE_STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/tezlink");
 
 #[derive(Clone, Copy, Debug)]
 pub enum ChainFamily {
