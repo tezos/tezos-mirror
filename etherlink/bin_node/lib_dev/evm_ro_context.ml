@@ -555,6 +555,17 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
                 failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
         | param -> block_param_to_block_number param
 
+      (* Overwrites Tezlink_backend using the store instead of the durable_storage *)
+      module Tezlink_backend = Tezlink_services_impl.Make (struct
+        include Backend.Reader
+
+        let block_param_to_block_number = block_param_to_block_number
+
+        let tez_nth_block = Block_storage.tez_nth_block
+
+        let nth_block_hash = Block_storage.nth_block_hash
+      end)
+
       include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
     end)
   else
