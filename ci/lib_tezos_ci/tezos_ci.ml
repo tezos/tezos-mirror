@@ -1627,6 +1627,9 @@ module Images = struct
     let runtime =
       mk_ci_image ~image_path:"${ci_image_name}/runtime:${ci_image_tag}"
 
+    let monitoring =
+      mk_ci_image ~image_path:"${ci_image_name}/monitoring:${ci_image_tag}"
+
     let prebuild =
       mk_ci_image ~image_path:"${ci_image_name}/prebuild:${ci_image_tag}"
 
