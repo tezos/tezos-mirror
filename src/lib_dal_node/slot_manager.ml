@@ -491,12 +491,23 @@ let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
   let cache = Store.cache node_store in
   match Store.Commitment_indexed_cache.find_opt cache commitment with
   | None ->
-      (* This is unexpected. Either:
-         1. The proofs where not stored properly (an invariant is broken)
-         2. The node was restarted (unlikely to happen given the time frame)
-         3. The cache was full (unlikely to happen if
-         [shards_proofs_cache_size] is set properly. *)
-      let*! () = Event.emit_commitment_not_found_in_cache ~commitment in
+      let*! () =
+        if
+          Profile_manager.can_publish_on_slot_index
+            slot_id.Types.Slot_id.slot_index
+            (Node_context.get_profile_ctxt ctxt)
+        then
+          (* This is unexpected. Either:
+             1. The proofs where not stored properly (an invariant is broken)
+             2. The node was restarted (unlikely to happen given the time frame)
+             3. The cache was full (unlikely to happen if
+             [shards_proofs_cache_size] is set properly. *)
+          Event.emit_commitment_not_found_in_cache ~commitment
+        else
+          (* The node is likely not concerned with the publication of the shards
+             of this commit. *)
+          Lwt.return_unit
+      in
       return_unit
   | Some (slot, shares, shard_proofs) ->
       let shards =
