@@ -389,6 +389,9 @@ let process_block_data ctxt cctxt store proto_parameters block_level
     (* If a slot header was posted to the L1 and we have the corresponding
        data, post it to gossipsub.  Note that this is done independently
        of the profile. *)
+    let level_committee = Node_context.fetch_committee ctxt in
+    let slot_size = proto_parameters.cryptobox_parameters.slot_size in
+    let gs_worker = Node_context.get_gs_worker ctxt in
     List.iter_es
       (fun Dal_plugin.{slot_index; commitment; published_level} ->
         let slot_id : Types.slot_id =
@@ -396,9 +399,9 @@ let process_block_data ctxt cctxt store proto_parameters block_level
         in
         Slot_manager.publish_slot_data
           ctxt
-          ~level_committee:(Node_context.fetch_committee ctxt)
-          ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-          (Node_context.get_gs_worker ctxt)
+          ~level_committee
+          ~slot_size
+          gs_worker
           proto_parameters
           commitment
           slot_id)
