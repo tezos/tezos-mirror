@@ -4,6 +4,7 @@
 (* Copyright (c) 2021-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -80,6 +81,16 @@ let ci_rollup_node =
     ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
     ~release_status:Unreleased
 
+let ci_sdk_bindings =
+  private_lib
+    "sdk_bindings_ci"
+    ~opam:""
+    ~path:"contrib/sdk-bindings/ci"
+    ~bisect_ppx:No
+    ~modules:["sdk_bindings_ci"]
+    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
+    ~release_status:Unreleased
+
 let _ci_bin_main =
   private_exe
     "main"
@@ -93,6 +104,7 @@ let _ci_bin_main =
         ci_grafazos;
         ci_teztale;
         ci_rollup_node;
+        ci_sdk_bindings;
         yaml;
         unix;
         tezt_core_lib;

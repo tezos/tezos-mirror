@@ -9,6 +9,7 @@
   grafazos
   teztale
   rollup_node
+  sdk_bindings_ci
   yaml
   unix
   tezt.core)

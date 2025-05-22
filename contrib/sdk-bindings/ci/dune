@@ -1,0 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name sdk_bindings_ci)
+ (libraries
+  gitlab_ci
+  tezos_ci)
+ (flags
+  (:standard)
+  -open Gitlab_ci.Base)
+ (modules sdk_bindings_ci))
