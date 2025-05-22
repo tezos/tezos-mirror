@@ -9,7 +9,7 @@ module type S = sig
 
   module Block_storage : Block_storage_sig.S
 
-  module Tezlink_backend : Tezlink_backend_sig.S
+  module Tezlink : Tezlink_backend_sig.S
 
   (** [balance address block_param] returns the [address]'s balance at block
       [block_param]. *)
@@ -184,7 +184,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
   include Simulator.Make (Backend.SimulatorBackend)
 
-  module Tezlink_backend = Tezlink_services_impl.Make (struct
+  module Tezlink = Tezlink_services_impl.Make (struct
     include Backend.Reader
 
     let block_param_to_block_number = Backend.block_param_to_block_number
