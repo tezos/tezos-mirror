@@ -11,6 +11,7 @@ init_sandboxed_client() {
   shift 1
 
   rpc=$((18730 + id))
+  dal_node_rpc_port=$((28730 + id))
   client_dir="$(mktemp -d -t tezos-tmp-client.XXXXXXXX)"
   client_dirs+=("$client_dir")
 
@@ -194,6 +195,7 @@ PATH="$client_dir/bin:\$PATH" ; export PATH ;
 alias octez-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
 alias octez-client-reset="rm -rf \"$client_dir\"; unalias \$(alias | sed 's/alias //g' | grep -o '^octez-[^=]*' | tr '\n' ' '); unalias octez-client-reset" ;
 trap octez-client-reset EXIT ;
+DAL_NODE_RPC_PORT="$dal_node_rpc_port" ; export DAL_NODE_RPC_PORT ;
 
 EOF
 
@@ -216,6 +218,8 @@ or if you run this command a second time.
 Activate tab completion by running:
 
   octez-autocomplete
+
+You may reach the DAL node at the port given by the DAL_NODE_RPC_PORT variable.
 
 EOF
 
