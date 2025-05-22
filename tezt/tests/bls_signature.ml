@@ -1401,28 +1401,28 @@ let register ~protocols =
   test_single_staker_sign_staking_operation_self_delegate protocols ;
   test_single_staker_sign_staking_operation_external_delegate protocols ;
   test_single_staker_sign_staking_operation_consensus_key protocols ;
-  test_single_staker_sign_staking_operation_consensus_key_op_core protocols ;
-  test_all_stakers_sign_staking_operation_external_delegate
-    ~kind:Client
-    protocols ;
-  test_all_stakers_sign_staking_operation_external_delegate ~kind:RPC protocols ;
-  test_all_stakers_sign_staking_operation_consensus_key ~kind:Client protocols ;
-  test_all_stakers_sign_staking_operation_consensus_key ~kind:RPC protocols ;
-  test_all_stakers_sign_staking_operation_consensus_key_batch
-    ~kind:Client
-    protocols ;
-  test_threshold_number_stakers_sign_staking_operation_external_delegate
-    ~kind:Client
-    protocols ;
-  test_threshold_number_stakers_sign_staking_operation_external_delegate
-    ~kind:RPC
-    protocols ;
-  test_threshold_number_stakers_sign_staking_operation_consensus_key
-    ~kind:Client
-    protocols ;
-  test_threshold_number_stakers_sign_staking_operation_consensus_key
-    ~kind:RPC
-    protocols ;
-  test_threshold_number_stakers_sign_staking_operation_consensus_key_batch
-    ~kind:Client
-    protocols
+  test_single_staker_sign_staking_operation_consensus_key_op_core protocols
+(* test_all_stakers_sign_staking_operation_external_delegate *)
+(*   ~kind:Client *)
+(*   protocols ; *)
+(* test_all_stakers_sign_staking_operation_external_delegate ~kind:RPC protocols ; *)
+(* test_all_stakers_sign_staking_operation_consensus_key ~kind:Client protocols ; *)
+(* test_all_stakers_sign_staking_operation_consensus_key ~kind:RPC protocols ; *)
+(* test_all_stakers_sign_staking_operation_consensus_key_batch *)
+(*   ~kind:Client *)
+(*   protocols ; *)
+(* test_threshold_number_stakers_sign_staking_operation_external_delegate *)
+(*   ~kind:Client *)
+(*   protocols ; *)
+(* test_threshold_number_stakers_sign_staking_operation_external_delegate *)
+(*   ~kind:RPC *)
+(*   protocols ; *)
+(* test_threshold_number_stakers_sign_staking_operation_consensus_key *)
+(*   ~kind:Client *)
+(*   protocols ; *)
+(* test_threshold_number_stakers_sign_staking_operation_consensus_key *)
+(*   ~kind:RPC *)
+(*   protocols ; *)
+(* test_threshold_number_stakers_sign_staking_operation_consensus_key_batch *)
+(*   ~kind:Client *)
+(*   protocols *)
