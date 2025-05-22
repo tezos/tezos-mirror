@@ -463,8 +463,13 @@ let generate_manager_operation ?source gen_manop =
 
 let generate_reveal =
   let open QCheck2.Gen in
-  let+ pk = random_pk in
-  Reveal {public_key = pk; proof = None}
+  let+ _, pk, sk = random_keys in
+  let proof =
+    match sk with
+    | Bls sk -> Signature.Bls.of_bytes_opt (Signature.Bls.pop_prove sk)
+    | _ -> None
+  in
+  Reveal {public_key = pk; proof}
 
 let generate_transaction =
   let open QCheck2.Gen in

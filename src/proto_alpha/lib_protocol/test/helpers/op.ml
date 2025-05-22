@@ -60,6 +60,11 @@ let sign ctxt ?(watermark = Signature.Generic_operation) sk branch contents =
     ({shell = {branch}; protocol_data = {contents; signature = Some signature}}
       : _ Operation.t)
 
+let create_proof sk =
+  match (sk : Signature.secret_key) with
+  | Bls sk -> Signature.Bls.of_bytes_opt (Signature.Bls.pop_prove sk)
+  | _ -> None
+
 (** Generates the block payload hash based on the hash [pred_hash] of
     the predecessor block and the hash of non-consensus operations of
     the current block [b]. *)
@@ -489,7 +494,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
               source = Signature.Public_key.hash public_key;
               fee = Tez.zero;
               counter;
-              operation = Reveal {public_key; proof = None};
+              operation = Reveal {public_key; proof = create_proof account.sk};
               gas_limit = default_high_gas_limit;
               storage_limit = Z.zero;
             }
@@ -576,7 +581,7 @@ let manager_operation_with_fixed_gas_limit ?(force_reveal = false) ?counter
           source = Signature.Public_key.hash public_key;
           fee = Tez.zero;
           counter;
-          operation = Reveal {public_key; proof = None};
+          operation = Reveal {public_key; proof = create_proof account.sk};
           gas_limit = reveal_gas_limit;
           storage_limit = Z.zero;
         }
@@ -647,18 +652,19 @@ let revelation_with_fixed_gas_limit ?(fee = Tez.zero) ~gas_limit
     | None -> Signature.Public_key.hash public_key
   in
   let source = Contract.Implicit pkh in
-  let+ counter =
+  let* counter =
     match counter with
     | None -> Context.Contract.counter ctxt source
     | Some ctr -> return ctr
   in
   let counter = Manager_counter.succ counter in
+  let+ account = Context.Contract.manager ctxt source in
   Manager_operation
     {
       source = pkh;
       fee;
       counter;
-      operation = Reveal {public_key; proof = None};
+      operation = Reveal {public_key; proof = create_proof account.sk};
       gas_limit;
       storage_limit;
     }
