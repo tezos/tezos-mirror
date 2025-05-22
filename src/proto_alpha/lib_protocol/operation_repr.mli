@@ -95,14 +95,8 @@ module Kind : sig
 
   type vdf_revelation = Vdf_revelation_kind
 
-  type 'a double_consensus_operation_evidence =
+  type double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
-
-  type double_attestation_evidence =
-    attestation_consensus_kind double_consensus_operation_evidence
-
-  type double_preattestation_evidence =
-    preattestation_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
 
@@ -310,27 +304,21 @@ and _ contents =
       solution : Seed_repr.vdf_solution;
     }
       -> Kind.vdf_revelation contents
-  (* Double_preattestation_evidence: Double-preattestation is a
-     kind of malicious attack where a byzantine attempts to fork
-     the chain by preattesting blocks with different
-     contents (at the same level and same round)
-     twice. This behavior may be reported and the byzantine will have
-     its security deposit forfeited. *)
-  | Double_preattestation_evidence : {
-      op1 : Kind.preattestation operation;
-      op2 : Kind.preattestation operation;
+  (* Double_consensus_operation_evidence: Double-consensus-operation
+     is a kind of malicious attack where a byzantine attempts to fork
+     the chain by preattesting or attesting two blocks at the same
+     level and round with different payloads. This behavior may be
+     reported and the byzantine will have its security deposit
+     forfeited. *)
+  | Double_consensus_operation_evidence : {
+      slot : Slot_repr.t;
+      op1 : 'a Kind.consensus operation;
+      op2 : 'b Kind.consensus operation;
     }
-      -> Kind.double_preattestation_evidence contents
-  (* Double_attestation_evidence: Similar to double-preattestation but
-     for attestations. *)
-  | Double_attestation_evidence : {
-      op1 : Kind.attestation operation;
-      op2 : Kind.attestation operation;
-    }
-      -> Kind.double_attestation_evidence contents
-  (* Double_baking_evidence: Similarly to double-attestation but the
-     byzantine attempts to fork by signing two different blocks at the
-     same level. *)
+      -> Kind.double_consensus_operation_evidence contents
+  (* Double_baking_evidence: Similarly to
+     Double_consensus_operation_evidence but the byzantine attempts to
+     fork by signing two different blocks at the same level. *)
   | Double_baking_evidence : {
       bh1 : Block_header_repr.t;
       bh2 : Block_header_repr.t;
@@ -768,10 +756,8 @@ module Encoding : sig
 
   val vdf_revelation_case : Kind.vdf_revelation case
 
-  val double_preattestation_evidence_case :
-    Kind.double_preattestation_evidence case
-
-  val double_attestation_evidence_case : Kind.double_attestation_evidence case
+  val double_consensus_operation_evidence_case :
+    Kind.double_consensus_operation_evidence case
 
   val double_baking_evidence_case : Kind.double_baking_evidence case
 

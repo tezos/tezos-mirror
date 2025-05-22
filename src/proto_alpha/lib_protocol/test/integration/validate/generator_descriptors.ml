@@ -884,8 +884,7 @@ let op_kind_of_packed_operation op =
   | Single (Preattestations_aggregate _) -> KPreattestations_aggregate
   | Single (Seed_nonce_revelation _) -> KNonce
   | Single (Vdf_revelation _) -> KVdf
-  | Single (Double_attestation_evidence _) -> KDbl_consensus
-  | Single (Double_preattestation_evidence _) -> KDbl_consensus
+  | Single (Double_consensus_operation_evidence _) -> KDbl_consensus
   | Single (Double_baking_evidence _) -> KDbl_baking
   | Single (Dal_entrapment_evidence _) -> KEntrapment
   | Single (Activate_account _) -> KActivate

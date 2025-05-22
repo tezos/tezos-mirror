@@ -119,12 +119,9 @@ let covalidation_sanity () =
           | Single (Seed_nonce_revelation _), _ -> assert false
           | Single (Vdf_revelation _), KVdf -> return_unit
           | Single (Vdf_revelation _), _ -> assert false
-          | Single (Double_attestation_evidence _), KDbl_consensus ->
+          | Single (Double_consensus_operation_evidence _), KDbl_consensus ->
               return_unit
-          | Single (Double_attestation_evidence _), _ -> assert false
-          | Single (Double_preattestation_evidence _), KDbl_consensus ->
-              return_unit
-          | Single (Double_preattestation_evidence _), _ -> assert false
+          | Single (Double_consensus_operation_evidence _), _ -> assert false
           | Single (Double_baking_evidence _), KDbl_baking -> return_unit
           | Single (Double_baking_evidence _), _ -> assert false
           | Single (Dal_entrapment_evidence _), KEntrapment -> return_unit

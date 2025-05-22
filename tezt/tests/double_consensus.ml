@@ -44,7 +44,12 @@ let double_consensus_already_denounced_waiter accuser oph =
   Accuser.wait_for accuser "double_consensus_already_denounced.v0" (fun json ->
       if String.equal (JSON.as_string json) oph then Some () else None)
 
-let get_double_consensus_denounciation_hash consensus_name client =
+let get_double_consensus_denounciation_hash protocol consensus_name client =
+  let double_consensus_kind =
+    if Protocol.(number protocol > number R022) then
+      "double_consensus_operation_evidence"
+    else sf "double_%s_evidence" consensus_name
+  in
   let* mempool =
     Client.RPC.call client
     @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
@@ -56,7 +61,7 @@ let get_double_consensus_denounciation_hash consensus_name client =
         let kind =
           JSON.(op |-> "contents" |> as_list |> List.hd |-> "kind" |> as_string)
         in
-        if String.equal kind (sf "double_%s_evidence" consensus_name) then
+        if String.equal kind double_consensus_kind then
           Some JSON.(op |-> "hash" |> as_string)
         else None)
       ops
@@ -158,7 +163,9 @@ let double_consensus_wrong_block_payload_hash
   let op =
     mk_consensus ~slot:(List.nth slots 0) ~level ~round ~block_payload_hash
   in
-  let* oph = get_double_consensus_denounciation_hash consensus_name client in
+  let* oph =
+    get_double_consensus_denounciation_hash protocol consensus_name client
+  in
   let waiter_already_denounced =
     double_consensus_already_denounced_waiter accuser oph
   in
@@ -236,7 +243,9 @@ let double_consensus_wrong_branch
   let op =
     mk_consensus ~slot:(List.nth slots 0) ~level ~round ~block_payload_hash
   in
-  let* oph = get_double_consensus_denounciation_hash consensus_name client in
+  let* oph =
+    get_double_consensus_denounciation_hash protocol consensus_name client
+  in
   let waiter_already_denounced =
     double_consensus_already_denounced_waiter accuser oph
   in

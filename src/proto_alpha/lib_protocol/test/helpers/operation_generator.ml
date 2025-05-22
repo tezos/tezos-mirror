@@ -55,8 +55,7 @@ let anonymous_kinds =
   [
     `KSeed_nonce_revelation;
     `KVdf_revelation;
-    `KDouble_attestation;
-    `KDouble_preattestation;
+    `KDouble_consensus_operation;
     `KDouble_baking;
     `KActivate_account;
   ]
@@ -101,7 +100,7 @@ let pp_kind fmt k =
     | `KDal_attestation -> "KDal_attestation"
     | `KSeed_nonce_revelation -> "KSeed_nonce_revelation"
     | `KVdf_revelation -> "KVdf_revelation"
-    | `KDouble_attestation -> "KDouble_attestation"
+    | `KDouble_consensus_operation -> "KDouble_consensus_operation"
     | `KDouble_preattestation -> "KDouble_preattestation"
     | `KDouble_baking -> "KDouble_baking"
     | `KActivate_account -> "KActivate_account"
@@ -397,17 +396,17 @@ let generate_seed_nonce_revelation =
   let+ nonce = random_nonce in
   Seed_nonce_revelation {level; nonce}
 
-let generate_double_preattestation =
+let generate_double_consensus_operation =
   let open QCheck2.Gen in
-  let* op1 = generate_op generate_preattestation in
-  let+ op2 = generate_op generate_preattestation in
-  Double_preattestation_evidence {op1; op2}
-
-let generate_double_attestation =
-  let open QCheck2.Gen in
-  let* op1 = generate_op generate_attestation in
-  let+ op2 = generate_op generate_attestation in
-  Double_attestation_evidence {op1; op2}
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7971
+     Generate any combination of preattestation, attestation,
+     attestation with DAL, attestations aggregate, preattestations
+     aggregate *)
+  let generate_consensus_operation = generate_preattestation in
+  let* slot = gen_slot in
+  let* op1 = generate_op generate_consensus_operation in
+  let+ op2 = generate_op generate_consensus_operation in
+  Double_consensus_operation_evidence {slot; op1; op2}
 
 let generate_double_baking =
   let open QCheck2.Gen in
@@ -636,8 +635,8 @@ let generate_non_manager_operation =
   | `KAttestation -> generate_operation generate_attestation
   | `KSeed_nonce_revelation -> generate_operation generate_seed_nonce_revelation
   | `KVdf_revelation -> generate_operation generate_vdf_revelation
-  | `KDouble_attestation -> generate_operation generate_double_attestation
-  | `KDouble_preattestation -> generate_operation generate_double_preattestation
+  | `KDouble_consensus_operation ->
+      generate_operation generate_double_consensus_operation
   | `KDouble_baking -> generate_operation generate_double_baking
   | `KActivate_account -> generate_operation generate_activate_account
   | `KProposals -> generate_operation generate_proposals
@@ -710,9 +709,8 @@ let generate_operation =
     | `KSeed_nonce_revelation ->
         generate_operation generate_seed_nonce_revelation
     | `KVdf_revelation -> generate_operation generate_vdf_revelation
-    | `KDouble_attestation -> generate_operation generate_double_attestation
-    | `KDouble_preattestation ->
-        generate_operation generate_double_preattestation
+    | `KDouble_consensus_operation ->
+        generate_operation generate_double_consensus_operation
     | `KDouble_baking -> generate_operation generate_double_baking
     | `KActivate_account -> generate_operation generate_activate_account
     | `KProposals -> generate_operation generate_proposals

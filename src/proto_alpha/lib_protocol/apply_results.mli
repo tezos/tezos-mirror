@@ -91,16 +91,11 @@ and 'kind contents_result =
   | Vdf_revelation_result :
       Receipt.balance_updates
       -> Kind.vdf_revelation contents_result
-  | Double_attestation_evidence_result : {
+  | Double_consensus_operation_evidence_result : {
       forbidden_delegate : Signature.public_key_hash option;
       balance_updates : Receipt.balance_updates;
     }
-      -> Kind.double_attestation_evidence contents_result
-  | Double_preattestation_evidence_result : {
-      forbidden_delegate : Signature.public_key_hash option;
-      balance_updates : Receipt.balance_updates;
-    }
-      -> Kind.double_preattestation_evidence contents_result
+      -> Kind.double_consensus_operation_evidence contents_result
   | Double_baking_evidence_result : {
       forbidden_delegate : Signature.public_key_hash option;
       balance_updates : Receipt.balance_updates;

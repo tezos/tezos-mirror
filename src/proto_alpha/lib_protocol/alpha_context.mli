@@ -2267,6 +2267,8 @@ module Misbehaviour : sig
   val kind_encoding : kind Data_encoding.t
 
   val compare_kind : kind -> kind -> int
+
+  val equal_kind : kind -> kind -> bool
 end
 
 (** This module re-exports definitions from {!Delegate_storage},
@@ -4602,14 +4604,8 @@ module Kind : sig
 
   type vdf_revelation = Vdf_revelation_kind
 
-  type 'a double_consensus_operation_evidence =
+  type double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
-
-  type double_attestation_evidence =
-    attestation_consensus_kind double_consensus_operation_evidence
-
-  type double_preattestation_evidence =
-    preattestation_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
 
@@ -4770,16 +4766,12 @@ and _ contents =
       solution : Seed.vdf_solution;
     }
       -> Kind.vdf_revelation contents
-  | Double_preattestation_evidence : {
-      op1 : Kind.preattestation operation;
-      op2 : Kind.preattestation operation;
+  | Double_consensus_operation_evidence : {
+      slot : Slot.t;
+      op1 : 'a Kind.consensus operation;
+      op2 : 'b Kind.consensus operation;
     }
-      -> Kind.double_preattestation_evidence contents
-  | Double_attestation_evidence : {
-      op1 : Kind.attestation operation;
-      op2 : Kind.attestation operation;
-    }
-      -> Kind.double_attestation_evidence contents
+      -> Kind.double_consensus_operation_evidence contents
   | Double_baking_evidence : {
       bh1 : Block_header.t;
       bh2 : Block_header.t;
@@ -5062,10 +5054,8 @@ module Operation : sig
 
     val vdf_revelation_case : Kind.vdf_revelation case
 
-    val double_preattestation_evidence_case :
-      Kind.double_preattestation_evidence case
-
-    val double_attestation_evidence_case : Kind.double_attestation_evidence case
+    val double_consensus_operation_evidence_case :
+      Kind.double_consensus_operation_evidence case
 
     val double_baking_evidence_case : Kind.double_baking_evidence case
 

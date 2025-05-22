@@ -555,8 +555,7 @@ let pre_filter info config
          mempools. *)
       `Refused [Environment.wrap_tzerror Wrong_operation]
   | Single (Seed_nonce_revelation _)
-  | Single (Double_preattestation_evidence _)
-  | Single (Double_attestation_evidence _)
+  | Single (Double_consensus_operation_evidence _)
   | Single (Double_baking_evidence _)
   | Single (Dal_entrapment_evidence _)
   | Single (Activate_account _)
@@ -695,9 +694,8 @@ let find_manager {shell = _; protocol_data = Operation_data {contents; _}} =
       ( Preattestation _ | Attestation _ | Preattestations_aggregate _
       | Attestations_aggregate _ | Proposals _ | Ballot _
       | Seed_nonce_revelation _ | Vdf_revelation _ | Double_baking_evidence _
-      | Double_preattestation_evidence _ | Double_attestation_evidence _
-      | Dal_entrapment_evidence _ | Activate_account _ | Drain_delegate _
-      | Failing_noop _ ) ->
+      | Double_consensus_operation_evidence _ | Dal_entrapment_evidence _
+      | Activate_account _ | Drain_delegate _ | Failing_noop _ ) ->
       None
 
 (* The purpose of this module is to offer a version of
@@ -844,8 +842,7 @@ let sources_from_operation ctxt
         consensus_content
         (Operation.committee_slots committee)
   | Single (Seed_nonce_revelation _)
-  | Single (Double_preattestation_evidence _)
-  | Single (Double_attestation_evidence _)
+  | Single (Double_consensus_operation_evidence _)
   | Single (Double_baking_evidence _)
   | Single (Dal_entrapment_evidence _)
   | Single (Activate_account _)

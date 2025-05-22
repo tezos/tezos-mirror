@@ -2247,10 +2247,9 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   | Single (Attestations_aggregate _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
-      | Vdf_revelation _ | Double_attestation_evidence _
-      | Double_preattestation_evidence _ | Double_baking_evidence _
-      | Dal_entrapment_evidence _ | Activate_account _ | Drain_delegate _
-      | Manager_operation _ )
+      | Vdf_revelation _ | Double_consensus_operation_evidence _
+      | Double_baking_evidence _ | Dal_entrapment_evidence _
+      | Activate_account _ | Drain_delegate _ | Manager_operation _ )
   | Cons (Manager_operation _, _) ->
       record_non_consensus_operation_hash ctxt hash
 
@@ -2505,54 +2504,36 @@ let punish_delegate ctxt ~operation_hash delegate level misbehaviour mk_result
   let content_result = mk_result (Some delegate) [] in
   return (ctxt, Single_result content_result)
 
-let punish_double_preattestation ctxt ~operation_hash
-    ~(op1 : Kind.preattestation Operation.t) ~payload_producer =
+let punish_double_consensus_operation (type kind) ctxt ~operation_hash
+    ~payload_producer contents =
   let open Lwt_result_syntax in
-  match op1.protocol_data.contents with
-  | Single (Preattestation consensus_content) ->
-      let {slot; level; round; _} = consensus_content in
-      let misbehaviour =
+  let (Double_consensus_operation_evidence {slot; op1; op2 = _}) = contents in
+  let misbehaviour =
+    match op1.protocol_data.contents with
+    | Single
+        ( Preattestation {level; round; _}
+        | Preattestations_aggregate {consensus_content = {level; round; _}; _}
+          ) ->
         Misbehaviour.{level; round; kind = Double_preattesting}
-      in
-      let mk_result forbidden_delegate balance_updates =
-        Double_preattestation_evidence_result
-          {forbidden_delegate; balance_updates}
-      in
-      let level = Level.from_raw ctxt level in
-      let* ctxt, {delegate; _} =
-        Stake_distribution.slot_owner ctxt level slot
-      in
-      punish_delegate
-        ctxt
-        ~operation_hash
-        delegate
-        level
-        misbehaviour
-        mk_result
-        ~payload_producer
-
-let punish_double_attestation ctxt ~operation_hash
-    ~(op1 : Kind.attestation Operation.t) ~payload_producer =
-  let open Lwt_result_syntax in
-  match op1.protocol_data.contents with
-  | Single (Attestation {consensus_content; _}) ->
-      let {slot; level; round; block_payload_hash = _} = consensus_content in
-      let misbehaviour = Misbehaviour.{level; round; kind = Double_attesting} in
-      let mk_result forbidden_delegate balance_updates =
-        Double_attestation_evidence_result {forbidden_delegate; balance_updates}
-      in
-      let level = Level.from_raw ctxt level in
-      let* ctxt, {delegate; _} =
-        Stake_distribution.slot_owner ctxt level slot
-      in
-      punish_delegate
-        ctxt
-        ~operation_hash
-        delegate
-        level
-        misbehaviour
-        mk_result
-        ~payload_producer
+    | Single
+        ( Attestation {consensus_content = {level; round; _}; _}
+        | Attestations_aggregate {consensus_content = {level; round; _}; _} ) ->
+        Misbehaviour.{level; round; kind = Double_attesting}
+  in
+  let mk_result forbidden_delegate balance_updates =
+    Double_consensus_operation_evidence_result
+      {forbidden_delegate; balance_updates}
+  in
+  let level = Level.from_raw ctxt misbehaviour.level in
+  let* ctxt, {delegate; _} = Stake_distribution.slot_owner ctxt level slot in
+  punish_delegate
+    ctxt
+    ~operation_hash
+    delegate
+    level
+    misbehaviour
+    mk_result
+    ~payload_producer
 
 let punish_double_baking ctxt ~operation_hash (bh1 : Block_header.t)
     ~payload_producer =
@@ -2628,10 +2609,12 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
           tip
       in
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
-  | Single (Double_preattestation_evidence {op1; op2 = _}) ->
-      punish_double_preattestation ctxt ~operation_hash ~op1 ~payload_producer
-  | Single (Double_attestation_evidence {op1; op2 = _}) ->
-      punish_double_attestation ctxt ~operation_hash ~op1 ~payload_producer
+  | Single (Double_consensus_operation_evidence _ as contents) ->
+      punish_double_consensus_operation
+        ctxt
+        ~operation_hash
+        ~payload_producer
+        contents
   | Single (Double_baking_evidence {bh1; bh2 = _}) ->
       punish_double_baking ctxt ~operation_hash bh1 ~payload_producer
   | Single

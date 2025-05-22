@@ -910,16 +910,11 @@ type 'kind contents_result =
   | Vdf_revelation_result :
       Receipt.balance_updates
       -> Kind.vdf_revelation contents_result
-  | Double_attestation_evidence_result : {
+  | Double_consensus_operation_evidence_result : {
       forbidden_delegate : Signature.public_key_hash option;
       balance_updates : Receipt.balance_updates;
     }
-      -> Kind.double_attestation_evidence contents_result
-  | Double_preattestation_evidence_result : {
-      forbidden_delegate : Signature.public_key_hash option;
-      balance_updates : Receipt.balance_updates;
-    }
-      -> Kind.double_preattestation_evidence contents_result
+      -> Kind.double_consensus_operation_evidence contents_result
   | Double_baking_evidence_result : {
       forbidden_delegate : Signature.public_key_hash option;
       balance_updates : Receipt.balance_updates;
@@ -1232,60 +1227,33 @@ module Encoding = struct
         inj = (fun bus -> Vdf_revelation_result bus);
       }
 
-  let double_attestation_evidence_case =
+  let double_consensus_operation_evidence_case =
     Case
       {
-        op_case = Operation.Encoding.double_attestation_evidence_case;
+        op_case = Operation.Encoding.double_consensus_operation_evidence_case;
         encoding =
           obj2
             (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
             (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
-          | Contents_result (Double_attestation_evidence_result _ as op) ->
-              Some op
-          | _ -> None);
-        mselect =
-          (function
-          | Contents_and_result ((Double_attestation_evidence _ as op), res) ->
-              Some (op, res)
-          | _ -> None);
-        proj =
-          (fun (Double_attestation_evidence_result
-                 {forbidden_delegate; balance_updates}) ->
-            (forbidden_delegate, balance_updates));
-        inj =
-          (fun (forbidden_delegate, balance_updates) ->
-            Double_attestation_evidence_result
-              {forbidden_delegate; balance_updates});
-      }
-
-  let double_preattestation_evidence_case =
-    Case
-      {
-        op_case = Operation.Encoding.double_preattestation_evidence_case;
-        encoding =
-          obj2
-            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
-            (dft "balance_updates" Receipt.balance_updates_encoding []);
-        select =
-          (function
-          | Contents_result (Double_preattestation_evidence_result _ as op) ->
-              Some op
-          | _ -> None);
-        mselect =
-          (function
-          | Contents_and_result ((Double_preattestation_evidence _ as op), res)
+          | Contents_result (Double_consensus_operation_evidence_result _ as op)
             ->
+              Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result
+              ((Double_consensus_operation_evidence _ as op), res) ->
               Some (op, res)
           | _ -> None);
         proj =
-          (fun (Double_preattestation_evidence_result
+          (fun (Double_consensus_operation_evidence_result
                  {forbidden_delegate; balance_updates}) ->
             (forbidden_delegate, balance_updates));
         inj =
           (fun (forbidden_delegate, balance_updates) ->
-            Double_preattestation_evidence_result
+            Double_consensus_operation_evidence_result
               {forbidden_delegate; balance_updates});
       }
 
@@ -1477,8 +1445,8 @@ module Encoding = struct
           | Contents_result Ballot_result -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
           | Contents_result (Vdf_revelation_result _) -> None
-          | Contents_result (Double_attestation_evidence_result _) -> None
-          | Contents_result (Double_preattestation_evidence_result _) -> None
+          | Contents_result (Double_consensus_operation_evidence_result _) ->
+              None
           | Contents_result (Double_baking_evidence_result _) -> None
           | Contents_result (Dal_entrapment_evidence_result _) -> None
           | Contents_result (Activate_account_result _) -> None
@@ -1786,8 +1754,8 @@ let contents_cases =
   let open Encoding in
   attestation_case :: attestation_with_dal_case :: preattestation_case
   :: attestations_aggregate_case :: preattestations_aggregate_case
-  :: double_attestation_evidence_case :: double_preattestation_evidence_case
-  :: dal_entrapment_evidence_case :: common_cases
+  :: double_consensus_operation_evidence_case :: dal_entrapment_evidence_case
+  :: common_cases
 
 let make_contents_result
     (Encoding.Case
@@ -1955,12 +1923,10 @@ let kind_equal :
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation_result _ -> Some Eq
   | Vdf_revelation _, _ -> None
-  | Double_preattestation_evidence _, Double_preattestation_evidence_result _ ->
+  | ( Double_consensus_operation_evidence _,
+      Double_consensus_operation_evidence_result _ ) ->
       Some Eq
-  | Double_preattestation_evidence _, _ -> None
-  | Double_attestation_evidence _, Double_attestation_evidence_result _ ->
-      Some Eq
-  | Double_attestation_evidence _, _ -> None
+  | Double_consensus_operation_evidence _, _ -> None
   | Double_baking_evidence _, Double_baking_evidence_result _ -> Some Eq
   | Double_baking_evidence _, _ -> None
   | Dal_entrapment_evidence _, Dal_entrapment_evidence_result _ -> Some Eq

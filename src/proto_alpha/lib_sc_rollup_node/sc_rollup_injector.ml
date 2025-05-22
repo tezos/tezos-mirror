@@ -211,8 +211,7 @@ module Proto_client = struct
     | Attestations_aggregate_result _ -> Successful
     | Seed_nonce_revelation_result _ -> Successful
     | Vdf_revelation_result _ -> Successful
-    | Double_attestation_evidence_result _ -> Successful
-    | Double_preattestation_evidence_result _ -> Successful
+    | Double_consensus_operation_evidence_result _ -> Successful
     | Double_baking_evidence_result _ -> Successful
     | Dal_entrapment_evidence_result _ -> Successful
     | Activate_account_result _ -> Successful
