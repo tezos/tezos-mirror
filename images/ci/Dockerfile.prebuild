@@ -32,7 +32,7 @@ COPY --chown=tezos:tezos .gitconfig /home/tezos/
 COPY --chown=tezos:tezos install-rust.sh /tmp/
 
 # setup kisscache
-COPY --chown=tezos:tezos scripts/kiss-fetch.sh /tmp/
+COPY --chown=tezos:tezos scripts/kiss-fetch.sh scripts/kiss-logs.sh /tmp/
 ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
 ENV OPAMFETCH="/tmp/kiss-fetch.sh"
 
@@ -85,7 +85,8 @@ RUN apk update \
     opam --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community
 
 # Install Cargo and Rust (more information in the shell script)
-RUN ./install-rust.sh && rm -rf /tmp/install-rust.sh /tmp/kiss.log
+RUN ./install-rust.sh \
+    && rm -rf /tmp/install-rust.sh
 
 USER tezos
 WORKDIR /home/tezos
@@ -118,6 +119,12 @@ RUN opam init --disable-sandboxing --no-setup --yes \
 RUN opam admin cache \
  && opam update \
  && opam clean
+
+USER root
+RUN /tmp/kiss-logs.sh /tmp/kiss.log \
+ && rm -f /tmp/kiss.log
+
+USER tezos
 
 ENTRYPOINT [ "opam", "exec", "--" ]
 CMD [ "/bin/sh" ]
