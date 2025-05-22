@@ -59,7 +59,7 @@ type error +=
     implementation). Different keys should be associated to different
     indexes.
 
-    A maximum of 4096 values can be stored in a file.
+    A maximum of [file_prefix_bitset_size] (currently 4096) values can be stored in a file.
 
     To avoid I/Os, the store keeps recently used values in memory, as
     follows. It maintains an LRU (least-recently used) of a given maximum (see
@@ -75,6 +75,10 @@ type ('key, 'value) layout
 (** The type of functions to compute the layout of a given file. *)
 type ('file, 'key, 'value) file_layout =
   root_dir:string -> 'file -> ('key, 'value) layout
+
+(** Number of bytes reserved at the beginning of each file to store the bitset.
+    This bitset indicates which key-value slots are occupied. *)
+val file_prefix_bitset_size : int
 
 (** [layout ?encoded_value_size value_encoding path eq index_of
     ~number_of_keys_per_file] describes a virtual file layout.
@@ -214,7 +218,7 @@ val count_values :
 module View : sig
   (** Returns the number of files currently opened by the key value
       store. Do note this number is an upper bound on the number of
-      file descriptors opened. This number should always be lower than [lru_size].     
+      file descriptors opened. This number should always be lower than [lru_size].
   *)
   val opened_files : ('file, 'key, 'value) t -> int
 
