@@ -108,6 +108,24 @@ Operation receipts
   key update, with the ``kind`` field used to differientiate between both.
   (MR :gl:`!17320`)
 
+- Reworked the receipts for the
+  ``Double_consensus_operation_evidence`` and
+  ``Double_baking_evidence`` operations (MR :gl:`!18103`):
+
+  - The ``balance_updates`` field has been removed, because these
+    operations no longer produce them since the Oxford protocol.
+
+  - The ``forbidden_delegate`` field has been renamed to
+    ``punished_delegate`` and is no longer optional, because
+    forbidding the punished delegate has been systematic since the
+    Paris protocol.
+
+  - A new ``rewarded_delegate`` field has been added, because it's no
+    longer easily retrievable from the balance updates since Oxford.
+
+  - A new ``misbehaviour`` field has been added, containing the
+    misbehaviour's level, round, and kind
+    (double-baking/double-attesting/double-preattesting).
 
 Errors
 ------
