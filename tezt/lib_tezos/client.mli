@@ -507,7 +507,7 @@ val forget_all_keys : ?endpoint:endpoint -> t -> unit Lwt.t
 
 (** Run [octez-client activate protocol].
 
-    If [timestamp] is not specified explicitely, it is set to [Ago
+    If [timestamp] is not specified explicitly, it is set to [Ago
     timestamp_delay], where [timestamp_delay] is 365 days, which
     allows to bake plenty of blocks before their timestamp reach the
     present (at which point one would have to wait between each block
@@ -1292,7 +1292,7 @@ val spawn_originate_contract :
     Returns a pair [(alias, res)] where [alias] is a value which can be used to
     identify the originated contract, and [res] is the originated contract hash.
     By default, [alias] is the last component of the scripts name [n], but this
-    can be overriden through the [alias] parameter.
+    can be overridden through the [alias] parameter.
 *)
 val originate_contract_at :
   ?hooks:Process.hooks ->
@@ -2470,7 +2470,7 @@ val spawn_sapling_shield :
 (** Run [octez-client sapling unshield <qty> from <src-sap> to <dst-tz> using <sapling_contract>].
 
     Returns [(balance_diff, fees)] where [balance_diff] is [sapling_contract]'s diff in balance and
-    [fees] is the amount of fees payed.
+    [fees] is the amount of fees paid.
  *)
 val sapling_unshield :
   ?wait:string ->

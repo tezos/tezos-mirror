@@ -7039,7 +7039,7 @@ let test_sequencer_dont_read_level_twice =
       client
   in
 
-  (* We bake two blocks, so thet the EVM node can process the deposit and
+  (* We bake two blocks, so that the EVM node can process the deposit and
      create a blueprint with it. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
@@ -12671,7 +12671,7 @@ let test_spawn_rpc =
   in
   let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
   let*@ size = Rpc.produce_block sequencer in
-  Check.((size = 1) int) ~error_msg:"block size sould be 1" ;
+  Check.((size = 1) int) ~error_msg:"block size should be 1" ;
   let* () = Evm_node.wait_for_blueprint_applied sequencer 1 in
   let* () = Evm_node.wait_for_blueprint_applied observer 1 in
   let*@ _seq_block = Rpc.get_block_by_number ~block:"1" sequencer in

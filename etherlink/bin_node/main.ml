@@ -862,7 +862,7 @@ let compress_on_the_fly_arg : (bool, unit) Tezos_clic.arg =
     ~doc:
       "Produce a compressed snapshot on the fly. The rollup node will use less \
        disk space to produce the snapshot but will lock the rollup node (if \
-       running) for a longer time. Without this option, producing a snaphsot \
+       running) for a longer time. Without this option, producing a snapshot \
        requires the available disk space to be around the size of the data \
        dir."
     ()

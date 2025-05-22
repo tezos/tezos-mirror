@@ -158,7 +158,7 @@ val data_dir : t -> string
 val config_file : t -> string option
 
 (** Returns the path to the directory storing the preimages used by the
-    kernel runned by the node. *)
+    kernel run by the node. *)
 val preimages_dir : t -> string
 
 val supports_threshold_encryption : t -> bool
@@ -480,7 +480,7 @@ val wait_for_block_producer_rejected_transaction :
     `None`. *)
 val wait_for_shutdown_event : ?can_terminate:bool -> t -> int option Lwt.t
 
-(** [wait_for_split ?level evm_node] waits untils the node terminates
+(** [wait_for_split ?level evm_node] waits until the node terminates
     splitting its irmin context at level [level] if provided. *)
 val wait_for_split : ?level:int -> t -> int Lwt.t
 
