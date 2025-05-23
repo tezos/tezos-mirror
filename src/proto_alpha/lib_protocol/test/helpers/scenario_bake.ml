@@ -371,17 +371,43 @@ let bake ?baker : t -> t tzresult Lwt.t =
           op
         in
         match protocol_data.contents with
-        | Single (Attestation {consensus_content; _}) ->
+        | Single (Attestation {consensus_content; _})
+        | Single (Preattestation consensus_content) ->
             let*@ _, owner =
               Stake_distribution.slot_owner
                 ctxt
                 (Level.from_raw ctxt consensus_content.level)
                 consensus_content.slot
             in
-            return_some owner.delegate
+            return_some [owner.delegate]
+        | Single (Attestations_aggregate {committee; consensus_content}) ->
+            let*@ owners =
+              List.map_es
+                (fun (slot, _) ->
+                  Stake_distribution.slot_owner
+                    ctxt
+                    (Level.from_raw ctxt consensus_content.level)
+                    slot)
+                committee
+            in
+            return_some
+              (List.map (fun (_, (o : Consensus_key.pk)) -> o.delegate) owners)
+        | Single (Preattestations_aggregate {committee; consensus_content}) ->
+            let*@ owners =
+              List.map_es
+                (fun slot ->
+                  Stake_distribution.slot_owner
+                    ctxt
+                    (Level.from_raw ctxt consensus_content.level)
+                    slot)
+                committee
+            in
+            return_some
+              (List.map (fun (_, (o : Consensus_key.pk)) -> o.delegate) owners)
         | _ -> return_none)
       operations
   in
+  let attesters = List.flatten attesters in
   let state =
     State.update_map
       ~f:(fun acc_map ->
