@@ -450,6 +450,7 @@ val job :
   __POS__:string * int * int * int ->
   ?image:Image.t ->
   ?template:Gitlab_ci.Types.template ->
+  ?datadog:bool ->
   stage:Stage.t ->
   name:string ->
   string list ->
