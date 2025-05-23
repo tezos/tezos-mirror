@@ -507,24 +507,17 @@ diff --git a/src/proto_alpha/lib_protocol/raw_context.ml b/src/proto_alpha/lib_p
 index 910c9d5dad7..ea684a8f115 100644
 --- a/src/proto_alpha/lib_protocol/raw_context.ml
 +++ b/src/proto_alpha/lib_protocol/raw_context.ml
-@@ -1753,12 +1753,13 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
+@@ -1764,5 +1764,11 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
-   let+ ctxt =
--    prepare
--      ctxt
--      ~level
--      ~predecessor_timestamp:timestamp
--      ~timestamp
--      ~adaptive_issuance_enable:false
+-  let+ ctxt = prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp in
++  let+ ctxt =
 +    (prepare
 +       ctxt
 +       ~level
 +       ~predecessor_timestamp:timestamp
-+       ~timestamp
-+       ~adaptive_issuance_enable:false
-+     [@profiler.record_s {verbosity = Notice} "Prepare"])
-   in
++       ~timestamp [@profiler.record_s {verbosity = Notice} "Prepare"])
++  in
    (previous_proto, previous_proto_constants, ctxt)
 
 diff --git a/src/proto_alpha/lib_protocol/script_cache.ml b/src/proto_alpha/lib_protocol/script_cache.ml
