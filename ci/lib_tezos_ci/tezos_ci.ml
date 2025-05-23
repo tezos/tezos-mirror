@@ -1301,8 +1301,6 @@ module Stages = struct
 
   let publish_release = Stage.register "publish_release"
 
-  let publish_package_gitlab = Stage.register "publish_package_gitlab"
-
   let manual = Stage.register "manual"
 end
 

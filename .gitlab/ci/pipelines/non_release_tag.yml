@@ -7,7 +7,6 @@ stages:
 - build
 - publish
 - prepare_release
-- publish_package_gitlab
 
 oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -261,7 +260,7 @@ docker:merge_manifests:
 
 gitlab:publish:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish_package_gitlab
+  stage: publish
   tags:
   - gcp
   needs:
