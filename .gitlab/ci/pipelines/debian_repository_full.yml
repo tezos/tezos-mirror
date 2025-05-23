@@ -10,8 +10,8 @@ stages:
 - start
 - images
 - build
+- test
 - publish
-- publishing_tests
 
 datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
@@ -349,7 +349,7 @@ apt_repo_ubuntu:
 
 oc.lintian_debian:
   image: debian:bookworm
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -369,7 +369,7 @@ oc.lintian_debian:
 
 oc.install_bin_debian_bookworm:
   image: debian:bookworm
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -390,7 +390,7 @@ oc.install_bin_debian_bookworm:
 
 oc.upgrade_bin_debian_bookworm:
   image: debian:bookworm
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -404,7 +404,7 @@ oc.upgrade_bin_debian_bookworm:
 
 oc.install_bin_debian_bookworm_systemd_test:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -437,7 +437,7 @@ oc.install_bin_debian_bookworm_systemd_test:
 
 oc.install_bin_debian_bookworm_systemd_custom_datadir:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -471,7 +471,7 @@ oc.install_bin_debian_bookworm_systemd_custom_datadir:
 
 oc.install_bin_debian_bookworm_systemd_agnostic_baker:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -505,7 +505,7 @@ oc.install_bin_debian_bookworm_systemd_agnostic_baker:
 
 oc.upgrade_bin_debian_bookworm-systemd:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -538,7 +538,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
 
 oc.lintian_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -558,7 +558,7 @@ oc.lintian_ubuntu:
 
 oc.install_bin_ubunty_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -579,7 +579,7 @@ oc.install_bin_ubunty_jammy:
 
 oc.install_bin_ubunty_noble:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -600,7 +600,7 @@ oc.install_bin_ubunty_noble:
 
 oc.upgrade_bin_ubuntu_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -614,7 +614,7 @@ oc.upgrade_bin_ubuntu_jammy:
 
 oc.install_bin_ubuntu_noble_systemd:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -647,7 +647,7 @@ oc.install_bin_ubuntu_noble_systemd:
 
 oc.upgrade_bin_ubuntu_noble_systemd_test:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:

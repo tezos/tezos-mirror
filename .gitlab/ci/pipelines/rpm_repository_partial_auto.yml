@@ -10,8 +10,8 @@ stages:
 - start
 - images
 - build
+- test
 - publish
-- publishing_tests
 
 datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
@@ -208,7 +208,7 @@ rpm_repo_rockylinux:
 
 oc.install_bin_rockylinux_9.3.doc:
   image: rockylinux:9.3
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:
@@ -228,7 +228,7 @@ oc.install_bin_rockylinux_9.3.doc:
 
 oc.install_bin_rockylinux_93_systemd:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: publishing_tests
+  stage: test
   tags:
   - gcp
   needs:

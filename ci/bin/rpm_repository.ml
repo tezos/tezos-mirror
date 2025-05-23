@@ -239,7 +239,7 @@ let jobs pipeline_type =
       ~variables
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
-      ~stage:Stages.publishing_tests
+      ~stage:Stages.test
       script
   in
   (* These test the upgrade *)
@@ -253,7 +253,7 @@ let jobs pipeline_type =
       ~dependencies
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
-      ~stage:Stages.publishing_tests
+      ~stage:Stages.test
       script
   in
   let job_install_systemd_bin ~__POS__ ~name ~dependencies ?(variables = [])
@@ -266,7 +266,7 @@ let jobs pipeline_type =
       ~variables
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
-      ~stage:Stages.publishing_tests
+      ~stage:Stages.test
       script
   in
   let test_fedora_packages_jobs =

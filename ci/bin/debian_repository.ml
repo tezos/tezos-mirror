@@ -291,7 +291,7 @@ let jobs pipeline_type =
       ~variables
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
-      ~stage:Stages.publishing_tests
+      ~stage:Stages.test
       ?before_script
       script
   in
@@ -305,7 +305,7 @@ let jobs pipeline_type =
       ~variables
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
-      ~stage:Stages.publishing_tests
+      ~stage:Stages.test
       script
   in
 
@@ -317,7 +317,7 @@ let jobs pipeline_type =
       ~name
       ~image
       ~dependencies
-      ~stage:Stages.publishing_tests
+      ~stage:Stages.test
       ~variables
       ~before_script:
         (before_script
@@ -338,7 +338,7 @@ let jobs pipeline_type =
       ~name
       ~image
       ~dependencies
-      ~stage:Stages.publishing_tests
+      ~stage:Stages.test
       script
   in
   let test_ubuntu_packages_jobs =
