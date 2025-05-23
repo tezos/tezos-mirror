@@ -271,6 +271,19 @@ let try_fetch_slot_from_http_backup ~slot_size ~published_level ~slot_index
         in
         return_none
 
+(* Attempt to retrieve the commitment associated with [slot_id] from the
+   in-memory finalized commitments store.
+
+   This function queries the local in-memory cache that holds the finalized
+   commitments for previously published slots. It is typically faster than
+   accessing the on-disk skip list or querying the L1 context.
+
+   Returns [Some commitment] if a commitment for the given [slot_id] is found in
+   memory, [None] otherwise. *)
+let _try_get_commitment_of_slot_id_from_memory ctxt slot_id =
+  let store = Node_context.get_store ctxt in
+  Store.Slot_id_cache.find_opt (Store.finalized_commitments store) slot_id
+
 let get_commitment_from_slot_id _ctxt _slot_id =
   (* TODO in follow-up MRs *)
   assert false
