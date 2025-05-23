@@ -577,8 +577,7 @@ let jobs pipeline_type =
      we make these dependencies optional. *)
   let dependencies_needs_start =
     make_dependencies
-      ~before_merging:(fun job_start ->
-        Dependent ([Job job_start] @ List.map (fun job -> Optional job) sanity))
+      ~before_merging:(fun job_start -> Dependent [Job job_start])
       ~schedule_extended_test:(fun () -> Staged [])
   in
   (* Job [documentation:manuals] requires the build jobs, because it needs

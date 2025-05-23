@@ -566,28 +566,8 @@ oc.build:static-x86_64-linux-binaries:
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -665,28 +645,8 @@ oc.build:static-arm64-linux-binaries:
     when: manual
     allow_failure: true
   needs:
-  - job: oc.docker:ci:arm64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:arm64
+  - trigger
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -763,28 +723,8 @@ oc.build_x86_64-released:
     - vendors/**/*
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -877,28 +817,8 @@ oc.build_x86_64-exp-dev-extra:
     - vendors/**/*
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -976,28 +896,8 @@ wasm-runtime-check:
     - src/lib_wasm_runtime/**/*.rs
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1652,27 +1552,7 @@ trigger:debian_repository_partial_auto:
     - scripts/version.sh
     when: on_success
   needs:
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - trigger
   trigger:
     include: .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     strategy: depend
@@ -1695,27 +1575,7 @@ trigger:rpm_repository_partial_auto:
     - scripts/version.sh
     when: on_success
   needs:
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - trigger
   trigger:
     include: .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
     strategy: depend
@@ -1735,27 +1595,7 @@ trigger:homebrew_auto:
     - scripts/version.sh
     when: on_success
   needs:
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - trigger
   trigger:
     include: .gitlab/ci/pipelines/homebrew_auto.yml
     strategy: depend
@@ -1775,28 +1615,8 @@ kaitai_checks:
     - src/**/*
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1872,28 +1692,8 @@ oc.check_lift_limits_patch:
     - src/proto_alpha/lib_protocol/main.ml
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1937,28 +1737,8 @@ oc.python_check:
     - pyproject.toml
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2065,28 +1845,8 @@ oc.script:test-gen-genesis:
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2219,28 +1979,8 @@ oc.script:b58_prefix:
     - scripts/b58_prefix/test_b58_prefix.py
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2288,28 +2028,8 @@ oc:scripts:release_script_values:
   tags:
   - gcp
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2331,28 +2051,8 @@ mir_unit:
     - images/**/*
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2382,28 +2082,8 @@ mir_tzt:
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2432,28 +2112,8 @@ test_sdk_rust:
     - sdk/rust/**/*
     when: on_success
   needs:
-  - job: oc.docker:rust-toolchain:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:rust-toolchain:amd64
+  - trigger
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
@@ -2493,28 +2153,8 @@ test_sdk_bindings:
     - sdk/rust/**/*
     when: on_success
   needs:
-  - job: oc.docker:rust-sdk-bindings:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:rust-sdk-bindings:amd64
+  - trigger
   dependencies:
   - oc.docker:rust-sdk-bindings:amd64
   timeout: 60 minutes
@@ -2820,28 +2460,8 @@ ocaml-check:
     - tezt/**/*
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3502,27 +3122,7 @@ oc.install_opam_noble:
   - when: manual
     allow_failure: true
   needs:
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - trigger
   dependencies: []
   allow_failure: true
   timeout: 2 hours
@@ -3545,27 +3145,7 @@ oc.compile_sources_doc_bookworm:
   - when: manual
     allow_failure: true
   needs:
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - trigger
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -4204,27 +3784,7 @@ documentation:install_python_bookworm:
   - when: manual
     allow_failure: true
   needs:
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - trigger
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -4260,28 +3820,8 @@ documentation:odoc:
     - vendors/**/*
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -4398,28 +3938,8 @@ documentation:docgen:
     - vendors/**/*
     when: on_success
   needs:
-  - job: oc.docker:ci:amd64
-  - job: trigger
-  - job: sanity_ci
-    optional: true
-  - job: docker:hadolint
-    optional: true
-  - job: oc.ocaml_fmt
-    optional: true
-  - job: oc.semgrep
-    optional: true
-  - job: oc.misc_checks
-    optional: true
-  - job: check_jsonnet
-    optional: true
-  - job: check_rust_fmt
-    optional: true
-  - job: documentation:rst-check
-    optional: true
-  - job: nix
-    optional: true
-  - job: commit_titles
-    optional: true
+  - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
