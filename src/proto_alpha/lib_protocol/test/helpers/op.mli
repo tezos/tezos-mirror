@@ -56,6 +56,8 @@ val sign :
   packed_contents_list ->
   (packed_operation, tztrace) result Environment.Lwt.t
 
+val create_proof : Signature.secret_key -> Signature.Bls.t option
+
 (** Create an unpacked attestation that is expected for given [Block.t].
 
     Optional parameters allow to specify the attested values: [level],
@@ -280,9 +282,9 @@ val increase_paid_storage :
   Z.t ->
   Operation.packed tzresult Lwt.t
 
-(** [revelation ?fee ?gas_limit ?forge_pkh ctxt pkh] Creates a new
-    [Reveal] {!manager_operation} to reveal a public key [pkh]
-    applying to current context [ctxt].
+(** [revelation ?fee ?gas_limit ?forge_pkh ?forge_proof ctxt pkh]
+    Creates a new [Reveal] {!manager_operation} to reveal a public key
+    [pkh] applying to current context [ctxt].
 
     Optional arguments allow to override defaults:
 
@@ -295,6 +297,10 @@ val increase_paid_storage :
     {li [?forge_pkh]: use a provided [pkh] as source, instead of
     hashing [pkh]. Useful for forging non-honest reveal operations}
 
+    {li [?forge_proof]: use a provided [proof] instead of creating a
+    correct proof for [pkh]. Useful for forging non-honest reveal
+    operations}
+    
     {li [?storage_limit:Z.t]: forces a storage limit, otherwise
     set to [Z.zero]}}
 *)
@@ -304,6 +310,7 @@ val revelation :
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
   ?forge_pkh:public_key_hash option ->
+  ?forge_proof:Signature.Bls.t option ->
   Context.t ->
   public_key ->
   (packed_operation, tztrace) result Lwt.t

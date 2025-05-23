@@ -640,7 +640,8 @@ let manager_operation ?force_reveal ?counter ?fee ?(gas_limit = High)
     operation
 
 let revelation_with_fixed_gas_limit ?(fee = Tez.zero) ~gas_limit
-    ?(storage_limit = Z.zero) ?counter ?(forge_pkh = None) ctxt public_key =
+    ?(storage_limit = Z.zero) ?counter ?(forge_pkh = None) ?forge_proof ctxt
+    public_key =
   let open Lwt_result_syntax in
   (* If Some pkh is provided to ?forge_pkh we take that hash at face
      value, otherwise we honestly compute the hash from
@@ -659,18 +660,23 @@ let revelation_with_fixed_gas_limit ?(fee = Tez.zero) ~gas_limit
   in
   let counter = Manager_counter.succ counter in
   let+ account = Context.Contract.manager ctxt source in
+  let proof =
+    match forge_proof with
+    | Some proof -> proof
+    | None -> create_proof account.sk
+  in
   Manager_operation
     {
       source = pkh;
       fee;
       counter;
-      operation = Reveal {public_key; proof = create_proof account.sk};
+      operation = Reveal {public_key; proof};
       gas_limit;
       storage_limit;
     }
 
-let revelation ?fee ?(gas_limit = High) ?storage_limit ?counter ?forge_pkh ctxt
-    public_key =
+let revelation ?fee ?(gas_limit = High) ?storage_limit ?counter ?forge_pkh
+    ?forge_proof ctxt public_key =
   let open Lwt_result_syntax in
   let* (Manager_operation {source; _} as dummy_operation) =
     revelation_with_fixed_gas_limit
@@ -679,6 +685,7 @@ let revelation ?fee ?(gas_limit = High) ?storage_limit ?counter ?forge_pkh ctxt
       ?storage_limit
       ?counter
       ?forge_pkh
+      ?forge_proof
       ctxt
       public_key
   in
@@ -700,6 +707,7 @@ let revelation ?fee ?(gas_limit = High) ?storage_limit ?counter ?forge_pkh ctxt
       ?storage_limit
       ?counter
       ?forge_pkh
+      ?forge_proof
       ctxt
       public_key
   in
