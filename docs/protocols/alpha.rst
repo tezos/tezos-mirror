@@ -77,8 +77,10 @@ RPC Changes
 
 - Updated ``GET
   /chains/<chain_id>/blocks/<block_id>/helpers/validators?delegate=<delegate_pkh>&level=<level_id>``
-  with the new field ``companion_key`` which returns the active companion key for
-  the given ``delegate`` and ``level``. (MR :gl:`!17703`)
+  with the new optional field ``companion_key``, only present if the
+  delegate has an active companion key and this companion key is
+  needed for crafting and validating attestations at the queried
+  level. (MRs :gl:`!17703`, :gl:`!17957`)
 
 Operations
 ----------
