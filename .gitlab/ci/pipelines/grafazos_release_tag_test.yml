@@ -4,7 +4,7 @@
 stages:
 - images
 - build
-- publish_release_gitlab
+- publish
 - publish_release
 
 oc.docker:jsonnet:amd64:
@@ -51,7 +51,7 @@ build_grafazos_dashboards:
 
 gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish_release_gitlab
+  stage: publish
   tags:
   - gcp
   needs:
