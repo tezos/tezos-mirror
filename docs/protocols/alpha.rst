@@ -89,6 +89,19 @@ RPC Changes
 Operations
 ----------
 
+- Added new operations ``Preattestations_aggregate`` and
+  ``Attestations_aggregate``. (MR :gl:`!15244`, :gl:`!17485`)
+
+- The optional ``proof`` field of the ``Update_consensus_key``
+  operation is now required if (and only if) the new consensus key is
+  a tz4 (BLS key). Its encoding now exclusively accepts BLS
+  signatures. (MR :gl:`!17360`)
+
+- Extended the ``Update_consensus_key`` manager operation with a ``kind``
+  field to support updating a delegate's companion key in addition to the
+  consensus key. The ``kind`` field distinguishes between the two types
+  of key updates. (MR :gl:`!17320`)
+
 - In order to enable denunciations of aggregated consensus operations,
   the ``Double_preattestation_evidence`` and
   ``Double_attestation_evidence`` operations have been replaced with a
