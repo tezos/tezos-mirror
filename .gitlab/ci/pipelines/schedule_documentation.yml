@@ -5,7 +5,7 @@ stages:
 - start
 - images
 - build
-- publishing
+- publish
 
 oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -314,7 +314,7 @@ documentation:build_all:
 
 documentation:publish:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   rules:

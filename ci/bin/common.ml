@@ -1326,7 +1326,7 @@ module Documentation = struct
       ~__POS__
       ~name:"documentation:publish"
       ~image:Images.CI.test
-      ~stage:Stages.publishing
+      ~stage:Stages.publish
       ~dependencies
       ~before_script:
         (before_script

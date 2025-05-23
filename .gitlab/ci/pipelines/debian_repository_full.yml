@@ -10,7 +10,7 @@ stages:
 - start
 - images
 - build
-- publishing
+- publish
 - publishing_tests
 
 datadog_pipeline_trace:
@@ -204,7 +204,7 @@ oc.build-data_packages:
 
 apt_repo_debian:
   image: debian:bookworm
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:
@@ -317,7 +317,7 @@ oc.build-ubuntu:
 
 apt_repo_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:

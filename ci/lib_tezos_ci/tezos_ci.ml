@@ -1291,7 +1291,7 @@ module Stages = struct
 
   let packaging = Stage.register "packaging"
 
-  let publishing = Stage.register "publishing"
+  let publish = Stage.register "publish"
 
   let publishing_tests = Stage.register "publishing_tests"
 

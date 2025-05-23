@@ -564,7 +564,7 @@ module Stages : sig
 
   val packaging : Stage.t
 
-  val publishing : Stage.t
+  val publish : Stage.t
 
   val publishing_tests : Stage.t
 

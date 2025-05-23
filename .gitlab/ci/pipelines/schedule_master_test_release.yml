@@ -5,7 +5,7 @@ stages:
 - start
 - images
 - build
-- publishing
+- publish
 - prepare_release
 - publish_package_gitlab
 
@@ -404,7 +404,7 @@ oc.build-data_packages:
 
 apt_repo_debian:
   image: debian:bookworm
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:
@@ -517,7 +517,7 @@ oc.build-ubuntu:
 
 apt_repo_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:
@@ -700,7 +700,7 @@ oc.build-rockylinux-data:
 
 rpm_repo_rockylinux:
   image: rockylinux:9.3
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:
@@ -886,7 +886,7 @@ oc.build-fedora-data:
 
 rpm_repo_fedora:
   image: fedora:39
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:
