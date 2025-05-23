@@ -336,6 +336,7 @@ module Consensus : sig
 
   (** Forge and inject a preattestation for the given account. *)
   val preattest_for :
+    ?error:rex ->
     protocol:Protocol.t ->
     slot:int ->
     level:int ->
@@ -348,6 +349,7 @@ module Consensus : sig
 
   (** Forge and inject an attestation for the given account. *)
   val attest_for :
+    ?error:rex ->
     protocol:Protocol.t ->
     slot:int ->
     level:int ->

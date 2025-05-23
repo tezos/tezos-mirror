@@ -549,8 +549,8 @@ module Consensus = struct
     let block = string_of_int (attested_level - 2) in
     Client.RPC.call_via_endpoint client @@ RPC.get_chain_block_hash ~block ()
 
-  let preattest_for ~protocol ~slot ~level ~round ~block_payload_hash ?branch
-      delegate client =
+  let preattest_for ?error ~protocol ~slot ~level ~round ~block_payload_hash
+      ?branch delegate client =
     let preattestation =
       preattestation ~slot ~level ~round ~block_payload_hash
     in
@@ -559,10 +559,10 @@ module Consensus = struct
       | Some branch -> return branch
       | None -> get_branch ~attested_level:level client
     in
-    inject ~protocol ~branch ~signer:delegate preattestation client
+    inject ?error ~protocol ~branch ~signer:delegate preattestation client
 
-  let attest_for ~protocol ~slot ~level ~round ~block_payload_hash ?branch
-      ?dal_attestation ?companion_key delegate client =
+  let attest_for ?error ~protocol ~slot ~level ~round ~block_payload_hash
+      ?branch ?dal_attestation ?companion_key delegate client =
     let attestation =
       attestation ?dal_attestation ~slot ~level ~round ~block_payload_hash ()
     in
@@ -572,6 +572,7 @@ module Consensus = struct
       | None -> get_branch ~attested_level:level client
     in
     inject
+      ?error
       ~protocol
       ~branch
       ?signer_companion:companion_key
