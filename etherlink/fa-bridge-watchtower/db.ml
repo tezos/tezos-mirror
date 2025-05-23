@@ -442,3 +442,44 @@ module Pointers = struct
       with_connection db conn @@ fun conn -> Sqlite.Db.find conn Q.get ()
   end
 end
+
+module Whitelist = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (t2 (option address) (option hash) ->. unit)
+      @@ {sql|
+      INSERT INTO whitelist
+      (proxy, ticket_hash)
+      VALUES (?, ?)
+      |sql}
+
+    let clear = (unit ->. unit) @@ {sql| DELETE FROM whitelist |sql}
+  end
+
+  let insert ?conn db pth =
+    with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.insert pth
+
+  let clear ?conn db =
+    with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.clear ()
+
+  let register db (whitelist : Config.whitelist_item list option) =
+    let open Lwt_result_syntax in
+    with_transaction db @@ fun conn ->
+    let* () = clear ~conn db in
+    match whitelist with
+    | None ->
+        (* Matches every deposit log *)
+        insert ~conn db (None, None)
+    | Some whitelist ->
+        List.iter_es
+          (fun {Config.proxy; ticket_hashes} ->
+            match ticket_hashes with
+            | None -> insert ~conn db (proxy, None)
+            | Some ticket_hashes ->
+                List.iter_es
+                  (fun ticket_hash -> insert ~conn db (proxy, Some ticket_hash))
+                  ticket_hashes)
+          whitelist
+end

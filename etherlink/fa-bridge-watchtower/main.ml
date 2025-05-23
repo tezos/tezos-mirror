@@ -162,6 +162,7 @@ let run_command =
         | None ->
             failwith "secret key not provided neither in config, cli nor env"
       in
+      let* () = Db.Whitelist.register db config.whitelist in
       let*! notify_ws_change =
         match config.rpc with
         | None -> Lwt.return ignore
