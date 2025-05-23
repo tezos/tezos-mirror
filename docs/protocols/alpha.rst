@@ -82,6 +82,10 @@ RPC Changes
   needed for crafting and validating attestations at the queried
   level. (MRs :gl:`!17703`, :gl:`!17957`)
 
+- Added a new RPC ``GET
+  /chains/<chain>/blocks/<block>/helpers/total_baking_power`` to retrieve the
+  total baking power for the current cycle. (MR :gl:`!17553`)
+
 Operations
 ----------
 

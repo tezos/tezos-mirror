@@ -282,13 +282,6 @@ DAL node
   ``delegate`` which restrict the output mesh to topics related to specified slot index
   or delegate pkh (MR :gl:`!17770`).
 
-Protocol
-~~~~~~~~
-
-- Add a new RPC ``GET
-  /chains/<chain>/blocks/<block>/helpers/total_baking_power`` to retrieve the
-  total baking power for the current cycle. (MR :gl:`!17553`)
-
 Miscellaneous
 -------------
 
