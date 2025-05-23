@@ -280,7 +280,7 @@ let try_fetch_slot_from_http_backup ~slot_size ~published_level ~slot_index
 
    Returns [Some commitment] if a commitment for the given [slot_id] is found in
    memory, [None] otherwise. *)
-let _try_get_commitment_of_slot_id_from_memory ctxt slot_id =
+let try_get_commitment_of_slot_id_from_memory ctxt slot_id =
   let store = Node_context.get_store ctxt in
   Store.Slot_id_cache.find_opt (Store.finalized_commitments store) slot_id
 
@@ -357,7 +357,7 @@ let try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
     Returns [Some commitment] if found and matches the [slot_id], [None]
     otherwise. Performs assertions to ensure the returned slot header matches
     the requested [slot_id]. *)
-let _try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt dal_constants
+let try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt dal_constants
     slot_id ~attested_level =
   let open Lwt_result_syntax in
   let*! published_slot_header_opt =
@@ -389,9 +389,38 @@ let _try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt dal_constants
       return_none
   | Error error -> tzfail error
 
-let get_commitment_from_slot_id _ctxt _slot_id =
-  (* TODO in follow-up MRs *)
-  assert false
+(* This function attempts to retrieve the commitment associated to a (published)
+   slot whose id is given in [slot_id]. For that, we check in various places:
+   in-memory store, sqlite3 skip lists store, and L1 context. *)
+let get_commitment_from_slot_id ctxt slot_id =
+  let open Lwt_result_syntax in
+  match try_get_commitment_of_slot_id_from_memory ctxt slot_id with
+  | Some res -> return res
+  | None -> (
+      let published_level = slot_id.Types.Slot_id.slot_level in
+      let*? dal_plugin, dal_constants =
+        Node_context.get_plugin_and_parameters_for_level
+          ctxt
+          ~level:published_level
+      in
+      let attested_level =
+        Int32.add
+          published_level
+          (Int32.of_int dal_constants.Types.attestation_lag)
+      in
+      let*! res =
+        try_get_commitment_of_slot_id_from_skip_list
+          dal_plugin
+          ctxt
+          dal_constants
+          slot_id
+          ~attested_level
+      in
+      match res with
+      | Ok (Some res) -> return res
+      | _ ->
+          (* Errors handling done in the next commit *)
+          assert false)
 
 let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
   let open Lwt_result_syntax in
@@ -405,8 +434,11 @@ let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
       (* We fetch the expected commitment hash from the published slot header on
          L1 if [trust_http_backup_uris] is false. *)
       let* expected_commitment_hash =
-        if config.trust_http_backup_uris then return_none
-        else get_commitment_from_slot_id ctxt slot_id
+        (if config.trust_http_backup_uris then return_none
+         else
+           let+ res = get_commitment_from_slot_id ctxt slot_id in
+           Option.some res)
+        |> Errors.other_lwt_result
       in
       let* slot_opt =
         List.find_map_es
