@@ -171,7 +171,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job
       ~__POS__
       ~image:Images.ci_release
-      ~stage:Stages.publish_release_gitlab
+      ~stage:Stages.publish
       ~interruptible:false
       ~dependencies
       ~name:"gitlab:release"
@@ -345,7 +345,7 @@ let octez_evm_node_jobs ?(test = false) () =
     job
       ~__POS__
       ~image:Images.ci_release
-      ~stage:Stages.publish_release_gitlab
+      ~stage:Stages.publish
       ~interruptible:false
       ~dependencies
       ~name:"gitlab:octez-evm-node-release"

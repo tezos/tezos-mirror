@@ -25,7 +25,7 @@ let job_gitlab_release =
   job
     ~__POS__
     ~image:Images.ci_release
-    ~stage:Stages.publish_release_gitlab
+    ~stage:Stages.publish
     ~interruptible:false
     ~dependencies:(Dependent [Artifacts (Common.job_build_grafazos ())])
     ~name:"gitlab:release"

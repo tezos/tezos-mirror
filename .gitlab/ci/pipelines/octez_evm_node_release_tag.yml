@@ -5,8 +5,8 @@ stages:
 - start
 - images
 - build
+- publish
 - prepare_release
-- publish_release_gitlab
 - publish_release
 
 oc.docker:ci:amd64:
@@ -232,7 +232,7 @@ docker:merge_manifests:
 
 gitlab:octez-evm-node-release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish_release_gitlab
+  stage: publish
   tags:
   - gcp
   needs:

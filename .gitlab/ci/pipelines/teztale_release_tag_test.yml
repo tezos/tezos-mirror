@@ -4,7 +4,7 @@
 stages:
 - images
 - build
-- publish_release_gitlab
+- publish
 - publish_release
 
 oc.docker:ci:amd64:
@@ -137,7 +137,7 @@ teztale.build:static-arm64:
 
 gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish_release_gitlab
+  stage: publish
   tags:
   - gcp
   needs:
