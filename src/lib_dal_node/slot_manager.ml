@@ -30,6 +30,8 @@ type error +=
   | Invalid_slot_size of {provided : int; expected : int}
   | Invalid_degree of string
   | No_prover_SRS
+  | Unable_to_fetch_the_commitment_of_slot_id of Types.Slot_id.t
+  | No_commitment_published_on_l1_for_slot_id of Types.Slot_id.t
 
 let () =
   register_error_kind
@@ -105,7 +107,46 @@ let () =
          or observer) to be able to compute proofs.")
     Data_encoding.empty
     (function No_prover_SRS -> Some () | _ -> None)
-    (fun () -> No_prover_SRS)
+    (fun () -> No_prover_SRS) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.unable_to_fetch_the_commitment_of_slot_id"
+    ~title:"Unable to fetch the commitment of slot id"
+    ~description:
+      "The node is unable to fetch the commitment of the given slot id."
+    ~pp:(fun ppf (published_level, slot_index) ->
+      Format.fprintf
+        ppf
+        "The node is unable to retrieve the commitment of the slot published \
+         at level %ld and index %d from memory, SQLite store or the L1 \
+         context."
+        published_level
+        slot_index)
+    Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
+    (function
+      | Unable_to_fetch_the_commitment_of_slot_id id ->
+          Some (id.slot_level, id.slot_index)
+      | _ -> None)
+    (fun (slot_level, slot_index) ->
+      Unable_to_fetch_the_commitment_of_slot_id {slot_level; slot_index}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.No_commitment_published_on_l1_for_slot_id"
+    ~title:"No commitment published on L1 for slot id"
+    ~description:"No commitment was published on L1 for the given slot id."
+    ~pp:(fun ppf (published_level, slot_index) ->
+      Format.fprintf
+        ppf
+        "There is no commitment published on L1 at level %ld and index %d."
+        published_level
+        slot_index)
+    Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
+    (function
+      | No_commitment_published_on_l1_for_slot_id id ->
+          Some (id.slot_level, id.slot_index)
+      | _ -> None)
+    (fun (slot_level, slot_index) ->
+      No_commitment_published_on_l1_for_slot_id {slot_level; slot_index})
 
 type slot = bytes
 
@@ -418,9 +459,21 @@ let get_commitment_from_slot_id ctxt slot_id =
       in
       match res with
       | Ok (Some res) -> return res
-      | _ ->
-          (* Errors handling done in the next commit *)
-          assert false)
+      | Ok None ->
+          (* Here, we managed to fetch the skip list cell, but nothing was
+             published at the given slot id. *)
+          tzfail @@ No_commitment_published_on_l1_for_slot_id slot_id
+      | Error error ->
+          (* Here, we encountered an error which could be due to various
+             reasons, like not having sufficient L1 history to fetch the skip
+             list cell. *)
+          let*! () =
+            Event.emit_failed_to_retrieve_commitment_of_slot_id
+              ~published_level:slot_id.slot_level
+              ~slot_index:slot_id.slot_index
+              ~error
+          in
+          Unable_to_fetch_the_commitment_of_slot_id slot_id |> tzfail)
 
 let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
   let open Lwt_result_syntax in
