@@ -64,10 +64,15 @@ module type T = sig
 
   type valid_operation
 
-  val validate_operation :
-    t ->
-    protocol_operation operation ->
-    (valid_operation, Prevalidator_classification.classification) Lwt_result.t
+  type partially_validated_operation =
+    (protocol_operation operation * (unit -> unit tzresult) list) tzresult
+
+  val partial_op_validation :
+    t -> protocol_operation operation -> partially_validated_operation Lwt.t
+
+  val handle_partially_validated :
+    partially_validated_operation ->
+    (valid_operation, Prevalidator_classification.error_classification) Result.t
 
   val add_valid_operation : t -> config -> valid_operation -> add_result
 
@@ -202,6 +207,9 @@ module MakeAbstract
   type add_result = t * operation * classification * replacements
 
   type valid_operation = operation
+
+  type partially_validated_operation =
+    (operation * (unit -> unit tzresult) list) tzresult
 
   let classification_of_trace trace =
     match classify_trace trace with
@@ -359,41 +367,37 @@ module MakeAbstract
           all_replacements
       in
       let state = {state with mempool; bounding_state; conflict_map} in
-      Ok (state, op, `Validated, all_replacements)
+      return (state, op, `Validated, all_replacements)
     in
     match res with
-    | Ok add_result -> Ok add_result
+    | Ok add_result -> add_result
     | Error trace ->
         (* When [res] is an error, we convert it to an [add_result]
            here (instead of letting [add_operation] do it below) so
            that we can return the updated [valid_op]. *)
-        Ok (state, op, classification_of_trace trace, [])
+        (state, op, classification_of_trace trace, [])
 
   let add_valid_operation_result state (filter_config, bounding_config)
       (op : valid_operation) =
-    let open Result_syntax in
     let conflict_handler = Proto.Plugin.conflict_handler filter_config in
-    let* mempool, proto_add_result =
-      proto_add_valid_operation ~conflict_handler state op
-    in
-    let* state, op, classification, todo =
-      add_operation_result_aux
-        state
-        (filter_config, bounding_config)
-        op
-        mempool
-        proto_add_result
-    in
-    Ok (state, record_successful_signature_check op, classification, todo)
+    Result.map
+      (fun (mempool, proto_add_result) ->
+        add_operation_result_aux
+          state
+          (filter_config, bounding_config)
+          op
+          mempool
+          proto_add_result)
+      (proto_add_valid_operation ~conflict_handler state op)
 
   let add_operation_result state (filter_config, bounding_config)
-      (op : valid_operation) =
+      (op : operation) =
     let open Lwt_result_syntax in
     let conflict_handler = Proto.Plugin.conflict_handler filter_config in
     let* mempool, proto_add_result =
       proto_add_operation ~conflict_handler state op
     in
-    let*? state, op, classification, todo =
+    let state, op, classification, todo =
       add_operation_result_aux
         state
         (filter_config, bounding_config)
@@ -403,18 +407,18 @@ module MakeAbstract
     in
     return (state, record_successful_signature_check op, classification, todo)
 
-  let validate_operation state op =
-    let open Lwt_syntax in
-    let* res =
-      Proto.Mempool.partial_op_validation
-        ~check_signature:(not op.signature_checked)
-        state.validation_info
-        op.protocol
-    in
-    match res with
-    | Ok checks -> (
+  let partial_op_validation state op : partially_validated_operation Lwt.t =
+    Lwt_result.map
+      (fun checks -> (op, checks))
+      (Proto.Mempool.partial_op_validation
+         ~check_signature:(not op.signature_checked)
+         state.validation_info
+         op.protocol)
+
+  let handle_partially_validated = function
+    | Ok (op, checks) -> (
         match List.iter_e (fun check -> check ()) checks with
-        | Error trace -> Lwt.return_error (classification_of_trace trace)
+        | Error trace -> Error (classification_of_trace trace)
         | Ok () ->
             (* The operation might still be rejected because of a conflict
                with a previously validated operation, or if the mempool is
@@ -423,9 +427,8 @@ module MakeAbstract
                that the operation is individually valid, in particular its
                signature is correct. We record this so that any future
                signature check can be skipped. *)
-            let op = record_successful_signature_check op in
-            Lwt.return_ok op)
-    | Error trace -> Lwt.return_error (classification_of_trace trace)
+            Ok (record_successful_signature_check op))
+    | Error trace -> Error (classification_of_trace trace)
 
   let legacy_add_operation state config op : add_result Lwt.t =
     let open Lwt_syntax in

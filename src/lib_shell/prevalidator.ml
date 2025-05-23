@@ -494,12 +494,14 @@ module Make_s
       if Protocol.compare_version Proto.environment_version V15 < 0 then
         Prevalidation_t.legacy_add_operation validation_state config op
       else
-        let* res = Prevalidation_t.validate_operation validation_state op in
-        match res with
+        let* res = Prevalidation_t.partial_op_validation validation_state op in
+        match Prevalidation_t.handle_partially_validated res with
         | Ok op ->
             Lwt.return
               (Prevalidation_t.add_valid_operation validation_state config op)
-        | Error res -> Lwt.return (validation_state, op, res, [])
+        | Error res ->
+            Lwt.return
+              (validation_state, op, (res :> Classification.classification), [])
     in
     let validated_operation, to_handle =
       handle_classify_operation_result
