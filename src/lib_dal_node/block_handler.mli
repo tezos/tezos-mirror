@@ -48,15 +48,15 @@ val new_finalized_head :
   launch_time:float ->
   (unit, tztrace) result Lwt.t
 
-(** [store_skip_list_cells ctxt cctxt proto_parameters block_level
-    plugin] extracts and stores the skip list cells from [block_info] at
-    [block_level], using the encoding from the corresponding [plugin]. It is
-    used to support DAL refutation. *)
+(** [store_skip_list_cells ctxt cctxt proto_parameters ~attested_level plugin]
+    extracts and stores the skip list cells from [block_info] at [block_level],
+    using the encoding from the corresponding [plugin]. It is used to support
+    DAL refutation. *)
 val store_skip_list_cells :
   Node_context.t ->
   Rpc_context.t ->
   Tezos_dal_node_services.Types.proto_parameters ->
-  int32 ->
+  attested_level:int32 ->
   (module Dal_plugin.T) ->
   (unit, tztrace) result Lwt.t
 

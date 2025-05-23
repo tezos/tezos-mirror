@@ -159,18 +159,17 @@ let may_update_topics ctxt proto_parameters ~block_level =
     (Node_context.get_gs_worker ctxt)
     committee
 
-(* TODO: rename block_level to attested level and add a label *)
-let store_skip_list_cells ctxt cctxt dal_constants block_level
+let store_skip_list_cells ctxt cctxt dal_constants ~attested_level
     (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
   let* cells_of_level =
     let pred_published_level =
       Int32.sub
-        block_level
+        attested_level
         (Int32.of_int (1 + dal_constants.Types.attestation_lag))
     in
     Plugin.Skip_list.cells_of_level
-      ~attested_level:block_level
+      ~attested_level
       cctxt
       ~dal_constants
       ~pred_publication_level_dal_constants:
@@ -192,7 +191,7 @@ let store_skip_list_cells ctxt cctxt dal_constants block_level
       cells_of_level
   in
   let store = Node_context.get_store ctxt in
-  Store.Skip_list_cells.insert store ~attested_level:block_level cells_of_level
+  Store.Skip_list_cells.insert store ~attested_level cells_of_level
 
 (* This functions counts, for each slot, the number of shards attested by the bakers. *)
 let attested_shards_per_slot attestations committee ~number_of_slots is_attested
@@ -372,7 +371,7 @@ let process_block_data ctxt cctxt store proto_parameters block_level
         ctxt
         cctxt
         proto_parameters
-        block_level
+        ~attested_level:block_level
         (module Plugin : Dal_plugin.T)
     else return_unit
   in

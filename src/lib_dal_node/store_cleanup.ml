@@ -53,7 +53,7 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
       ctxt
       cctxt
       dal_constants
-      level
+      ~attested_level:level
       (module Plugin : Dal_plugin.T)
   in
   let store = Node_context.get_store ctxt in
