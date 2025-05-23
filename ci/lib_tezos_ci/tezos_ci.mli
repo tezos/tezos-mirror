@@ -568,8 +568,6 @@ module Stages : sig
 
   val publishing_tests : Stage.t
 
-  val doc : Stage.t
-
   (* Scanning vulnerabilities of Docker images. *)
   val scan : Stage.t
 

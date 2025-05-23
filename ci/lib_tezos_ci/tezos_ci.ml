@@ -1295,8 +1295,6 @@ module Stages = struct
 
   let publishing_tests = Stage.register "publishing_tests"
 
-  let doc = Stage.register "doc"
-
   let scan = Stage.register "scan"
 
   let prepare_release = Stage.register "prepare_release"
