@@ -53,14 +53,15 @@ module type T = sig
 
   type tb_slot
 
-  (** [block_info ?chain ?block ~metadata ctxt] returns the information of the
-      [block] in [ctxt] for the given [chain]. Block's metadata are included or
-      skipped depending on the value of [metadata]. This is a wrapper on top of
+  (** [block_info ?chain ?block ~operations_metadata ctxt] returns the
+      information of the [block] in [ctxt] for the given [chain]. Operations'
+      metadata are included or skipped depending on the value of
+      [operations_metadata]. This is a wrapper on top of
       {!Protocol_client_context.Alpha_block_services.info}.  *)
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
-    metadata:[`Always | `Never] ->
+    operations_metadata:[`Always | `Never] ->
     Tezos_rpc.Context.generic ->
     block_info tzresult Lwt.t
 

@@ -151,13 +151,13 @@ module Plugin = struct
     let* _op_hash = Shell_services.Injection.operation cctxt ~chain bytes in
     return_unit
 
-  let block_info ?chain ?block ~metadata ctxt =
+  let block_info ?chain ?block ~operations_metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol_client_context.Alpha_block_services.info
       cpctxt
       ?chain
       ?block
-      ~metadata
+      ~metadata:operations_metadata
       ()
 
   let block_shell_header (block_info : block_info) = block_info.header.shell

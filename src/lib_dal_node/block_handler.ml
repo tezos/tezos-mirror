@@ -363,7 +363,10 @@ let process_block_data ctxt cctxt store proto_parameters block_level
     (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
   let* block_info =
-    Plugin.block_info cctxt ~block:(`Level block_level) ~metadata:`Never
+    Plugin.block_info
+      cctxt
+      ~block:(`Level block_level)
+      ~operations_metadata:`Never
   in
   let* () =
     if Node_context.supports_refutations ctxt then

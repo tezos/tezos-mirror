@@ -96,13 +96,13 @@ module Plugin = struct
     (* This is supposed to be dead code, but we implement a fallback to be defensive. *)
     fail [DAL_accusation_not_available]
 
-  let block_info ?chain ?block ~metadata ctxt =
+  let block_info ?chain ?block ~operations_metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol_client_context.Alpha_block_services.info
       cpctxt
       ?chain
       ?block
-      ~metadata
+      ~metadata:operations_metadata
       ()
 
   let block_shell_header (block_info : block_info) = block_info.header.shell
@@ -282,7 +282,10 @@ module Plugin = struct
          of the skip list. Now that Rio is activated, we don't expect
          [cells_of_level] to be actively called. *)
       let* block_info =
-        block_info ctxt ~block:(`Level attested_level) ~metadata:`Never
+        block_info
+          ctxt
+          ~block:(`Level attested_level)
+          ~operations_metadata:`Never
       in
       let published_level =
         Int32.sub

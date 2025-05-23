@@ -47,7 +47,7 @@ module type T = sig
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
-    metadata:[`Always | `Never] ->
+    operations_metadata:[`Always | `Never] ->
     Tezos_rpc.Context.generic ->
     block_info tzresult Lwt.t
 
