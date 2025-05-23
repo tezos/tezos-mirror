@@ -19,7 +19,7 @@ let job_container_scanning ?(dockerfile_path = "build.Dockerfile") docker_image
   job
     ~__POS__
     ~name:"container_scanning"
-    ~stage:Stages.scan
+    ~stage:Stages.test
     ~template:Jobs_container_scanning
     ~variables:
       [
@@ -47,7 +47,7 @@ let job_container_scanning_slack_notification ?dockerfile_path docker_image :
     ~dependencies:
       (Dependent
          [Artifacts (job_container_scanning ?dockerfile_path docker_image)])
-    ~stage:Stages.scan
+    ~stage:Stages.test
     ~image:Images.CI.monitoring
     [". ./scripts/ci/container_scanning_slack_notification.sh " ^ docker_image]
 

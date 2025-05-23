@@ -7,7 +7,7 @@ include:
 stages:
 - start
 - images
-- scan
+- test
 
 oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -46,7 +46,7 @@ datadog_pipeline_trace:
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
 container_scanning:
-  stage: scan
+  stage: test
   tags:
   - gcp
   dependencies: []
@@ -68,7 +68,7 @@ container_scanning:
 
 container_scanning_slack_notification:
   image: ${ci_image_name}/monitoring:${ci_image_tag}
-  stage: scan
+  stage: test
   tags:
   - gcp
   needs:
