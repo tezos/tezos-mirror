@@ -96,13 +96,13 @@ module Plugin = struct
     (* This is supposed to be dead code, but we implement a fallback to be defensive. *)
     fail [DAL_accusation_not_available]
 
-  let block_info ?chain ?block ~metadata ctxt =
+  let block_info ?chain ?block ~operations_metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol_client_context.Alpha_block_services.info
       cpctxt
       ?chain
       ?block
-      ~metadata
+      ~metadata:operations_metadata
       ()
 
   let block_shell_header (block_info : block_info) = block_info.header.shell
@@ -275,11 +275,18 @@ module Plugin = struct
 
       The ordering of the elements in the returned list is not relevant.
     *)
-    let cells_of_level (block_info : block_info) ctxt ~dal_constants
+    let cells_of_level ~attested_level ctxt ~dal_constants
         ~pred_publication_level_dal_constants =
       let open Lwt_result_syntax in
-      (* 0. Let's call [attested_level] the block's level. *)
-      let attested_level = block_info.header.shell.level in
+      (* 0. For Quebec, block_info is still needed to reconstruct the cells
+         of the skip list. Now that Rio is activated, we don't expect
+         [cells_of_level] to be actively called. *)
+      let* block_info =
+        block_info
+          ctxt
+          ~block:(`Level attested_level)
+          ~operations_metadata:`Never
+      in
       let published_level =
         Int32.sub
           attested_level

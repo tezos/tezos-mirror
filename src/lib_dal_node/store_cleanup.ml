@@ -46,9 +46,6 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     let*? (module Plugin) =
       Node_context.get_plugin_for_level ctxt ~level:(Int32.pred level)
     in
-    let* block_info =
-      Plugin.block_info cctxt ~block:(`Level level) ~metadata:`Always
-    in
     let*? dal_constants =
       Node_context.get_proto_parameters ctxt ~level:(`Level level)
     in
@@ -56,9 +53,8 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
       ctxt
       cctxt
       dal_constants
-      block_info
-      level
-      (module Plugin : Dal_plugin.T with type block_info = Plugin.block_info)
+      ~attested_level:level
+      (module Plugin : Dal_plugin.T)
   in
   let store = Node_context.get_store ctxt in
   let last_processed_level_store = Store.last_processed_level store in

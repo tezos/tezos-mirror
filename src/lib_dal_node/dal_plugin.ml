@@ -47,7 +47,7 @@ module type T = sig
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
-    metadata:[`Always | `Never] ->
+    operations_metadata:[`Always | `Never] ->
     Tezos_rpc.Context.generic ->
     block_info tzresult Lwt.t
 
@@ -121,7 +121,7 @@ module type T = sig
     val cell_hash : cell -> hash
 
     val cells_of_level :
-      block_info ->
+      attested_level:int32 ->
       Tezos_rpc.Context.generic ->
       dal_constants:Tezos_dal_node_services.Types.proto_parameters ->
       pred_publication_level_dal_constants:
