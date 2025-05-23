@@ -42,7 +42,7 @@ let supports_dal = function
 let select_evm_version ?evm_version kernel =
   match (evm_version, kernel) with
   | Some Evm_version.Shanghai, _ -> Evm_version.Shanghai
-  | None, (Ghostnet | Mainnet) -> Evm_version.Shanghai
+  | None, (Ghostnet | Mainnet) -> Evm_version.Cancun
   | None, Latest -> Cancun
   | Some v, Latest -> v
   | _ -> Test.fail "Invalid combination of kernel and evm_version"

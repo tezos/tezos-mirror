@@ -5256,11 +5256,11 @@ let test_ghostnet_kernel =
     ~error_msg:"The ghostnet kernel has version %L but constant says %R" ;
   unit
 
-let test_estimate_gas_out_of_ticks =
+let test_estimate_gas_out_of_gas =
   register_both
     ~kernels:[Kernel.Ghostnet; Kernel.Mainnet]
-    ~tags:["evm"; "estimate_gas"; "out_of_ticks"; "simulate"; "loop"]
-    ~title:"estimateGas works with out of ticks"
+    ~tags:["evm"; "estimate_gas"; "simulate"; "loop"]
+    ~title:"estimateGas fails with out of gas for overly costly transaction"
   @@ fun ~protocol:_ ~evm_setup:({evm_node; evm_version; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* loop_resolved = loop evm_version in
@@ -5281,8 +5281,8 @@ let test_estimate_gas_out_of_ticks =
   let*@? {message; code = _; data = _} =
     Rpc.estimate_gas estimateGas evm_node
   in
-  Check.(message =~ rex "The transaction would exhaust all the ticks")
-    ~error_msg:"The estimate gas should fail with out of ticks message." ;
+  Check.(message =~ rex "Error\\(OutOfGas\\)")
+    ~error_msg:"The estimate gas should fail with out of gas message." ;
   unit
 
 let test_l2_call_selfdetruct_contract_in_same_transaction =
@@ -6664,7 +6664,7 @@ let register_evm_node ~protocols =
   test_migrate_proxy_to_sequencer_past protocols ;
   test_migrate_proxy_to_sequencer_future protocols ;
   test_ghostnet_kernel protocols ;
-  test_estimate_gas_out_of_ticks protocols ;
+  test_estimate_gas_out_of_gas protocols ;
   test_l2_call_selfdetruct_contract_in_same_transaction protocols ;
   test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transaction
     protocols ;
