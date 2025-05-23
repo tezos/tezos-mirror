@@ -730,7 +730,7 @@ let job_docker_promote_to_latest ?dependencies ~ci_docker_hub () : tezos_job =
   job_docker_authenticated
     ~__POS__
     ?dependencies
-    ~stage:Stages.publish_release
+    ~stage:Stages.publish
     ~name:"docker:promote_to_latest"
     ~ci_docker_hub
     ["./scripts/ci/docker_promote_to_latest.sh"]

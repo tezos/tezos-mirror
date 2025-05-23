@@ -573,8 +573,6 @@ module Stages : sig
 
   val prepare_release : Stage.t
 
-  val publish_release : Stage.t
-
   val manual : Stage.t
 end
 

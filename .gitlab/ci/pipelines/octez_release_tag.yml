@@ -7,7 +7,6 @@ stages:
 - build
 - publish
 - prepare_release
-- publish_release
 
 oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -915,7 +914,7 @@ rpm_repo_fedora:
 
 opam:release:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
-  stage: publish_release
+  stage: publish
   tags:
   - gcp
   dependencies:
@@ -929,7 +928,7 @@ opam:release:
 
 publish:release-page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish_release
+  stage: publish
   tags:
   - gcp
   rules:
