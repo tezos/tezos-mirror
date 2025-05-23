@@ -132,7 +132,9 @@ end
 
 module Bls_prove_possession : sig
   module Request : sig
-    type t = Tezos_crypto.Signature.Public_key_hash.t
+    type t =
+      Tezos_crypto.Signature.Public_key_hash.t
+      * Tezos_crypto.Signature.Bls.Public_key.t option
 
     val encoding : t Data_encoding.t
   end

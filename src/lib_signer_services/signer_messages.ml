@@ -285,12 +285,16 @@ end
 
 module Bls_prove_possession = struct
   module Request = struct
-    type t = Tezos_crypto.Signature.Public_key_hash.t
+    type t =
+      Tezos_crypto.Signature.Public_key_hash.t
+      * Tezos_crypto.Signature.Bls.Public_key.t option
 
     let encoding =
       let open Data_encoding in
       def "signer_messages.bls_prove_possession.request"
-      @@ obj1 (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
+      @@ obj2
+           (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
+           (opt "override_pk" Tezos_crypto.Signature.Bls.Public_key.encoding)
   end
 
   module Response = struct

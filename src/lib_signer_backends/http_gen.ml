@@ -238,7 +238,7 @@ struct
       | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_false
       | Error _ as res -> Lwt.return res
 
-    let bls_prove_possession uri =
+    let bls_prove_possession ?override_pk uri =
       let open Lwt_result_syntax in
       let* base, pkh = parse (uri : sk_uri :> Uri.t) in
       RPC_client.call_service
@@ -248,7 +248,7 @@ struct
         ~base
         Signer_services.bls_prove_possession
         ((), pkh)
-        ()
+        override_pk
         ()
   end
 

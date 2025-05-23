@@ -883,7 +883,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
 
   let supports_deterministic_nonces _ = Lwt_result_syntax.return_true
 
-  let bls_prove_possession _sk_uri =
+  let bls_prove_possession ?override_pk:_ _sk_uri =
     Lwt_result_syntax.tzfail Ledger_BLS_and_proof_of_possession_not_supported
 end
 

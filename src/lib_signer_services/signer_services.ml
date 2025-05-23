@@ -54,6 +54,16 @@ let sign_query =
        snd
   |> seal
 
+let bls_pk_query =
+  let open Tezos_rpc.Query in
+  query (fun pk -> pk)
+  |+ opt_field
+       ~descr:"Override the public key to sign when making a BLS proof"
+       "bls_pk"
+       Tezos_crypto.Signature.Bls.Public_key.rpc_arg
+       (fun pk -> pk)
+  |> seal
+
 let sign =
   Tezos_rpc.Service.post_service
     ~description:"Sign a piece of data with a given remote key"
@@ -99,7 +109,7 @@ let supports_deterministic_nonces =
 let bls_prove_possession =
   Tezos_rpc.Service.get_service
     ~description:"Obtain a proof of possession for a given remote key"
-    ~query:Tezos_rpc.Query.empty
+    ~query:bls_pk_query
     ~output:
       Data_encoding.(
         obj1 (req "bls_prove_possession" Tezos_crypto.Signature.Bls.encoding))

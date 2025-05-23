@@ -121,11 +121,14 @@ let deterministic_nonce_hash sk_uri buf =
 
 let supports_deterministic_nonces _ = Lwt_result_syntax.return_true
 
-let bls_prove_possession sk_uri =
+let bls_prove_possession ?override_pk sk_uri =
   let open Lwt_result_syntax in
   let* sk = secret_key sk_uri in
   match sk with
-  | Bls sk -> return @@ Signature.Bls.of_bytes_exn (Signature.Bls.pop_prove sk)
+  | Bls sk ->
+      return
+      @@ Signature.Bls.of_bytes_exn
+           (Signature.Bls.pop_prove ?msg:override_pk sk)
   | _ ->
       Error_monad.failwith
         "Proof of possession can only be requested for BLS keys."

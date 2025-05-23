@@ -367,7 +367,9 @@ module type SIMPLE_SIGNER = sig
     Uri.t -> Tezos_crypto.Signature.Public_key_hash.t list tzresult Lwt.t
 
   val bls_prove_possession :
-    sk_uri -> Tezos_crypto.Signature.Bls.t tzresult Lwt.t
+    ?override_pk:Tezos_crypto.Signature.Bls.Public_key.t ->
+    sk_uri ->
+    Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 end
 
 module type S = sig
@@ -437,6 +439,7 @@ module type S = sig
 
   val bls_prove_possession :
     #Client_context.wallet ->
+    ?override_pk:Tezos_crypto.Signature.Bls.Public_key.t ->
     sk_uri ->
     Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 
@@ -746,10 +749,10 @@ module Make (Signature : Signature_S) :
         in
         return signature)
 
-  let bls_prove_possession cctxt sk_uri =
+  let bls_prove_possession cctxt ?override_pk sk_uri =
     let open Lwt_result_syntax in
     with_scheme_simple_signer sk_uri (fun (module Signer) ->
-        let* proof = Signer.bls_prove_possession sk_uri in
+        let* proof = Signer.bls_prove_possession ?override_pk sk_uri in
         let* pk_uri = Signer.neuterize sk_uri in
         let* pubkey =
           let* o = Secret_key.rev_find cctxt sk_uri in
@@ -768,6 +771,7 @@ module Make (Signature : Signature_S) :
           fail_unless
             (Signature.pop_verify
                pubkey
+               ?msg:override_pk
                (Tezos_crypto.Signature.Bls.to_bytes proof))
             (Signer_output_mismatch (Proof_of_possession, sk_uri))
         in

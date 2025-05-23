@@ -127,10 +127,10 @@ struct
     let*? v = Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)) in
     Remote.supports_deterministic_nonces v
 
-  let bls_prove_possession sk_uri =
+  let bls_prove_possession ?override_pk sk_uri =
     let open Lwt_result_syntax in
     let*? sk_uri = Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)) in
-    Remote.bls_prove_possession sk_uri
+    Remote.bls_prove_possession ?override_pk sk_uri
 end
 
 let make_sk sk =

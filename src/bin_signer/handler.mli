@@ -77,5 +77,6 @@ val known_keys :
 
 val bls_prove_possession :
   #Client_context.wallet ->
+  ?override_pk:Tezos_crypto.Signature.Bls.Public_key.t ->
   Signature.public_key_hash ->
   Tezos_crypto.Signature.Bls.t tzresult Lwt.t
