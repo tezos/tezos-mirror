@@ -86,7 +86,7 @@ let with_connection db conn =
   | Some conn -> Sqlite.with_connection conn
   | None -> fun k -> Sqlite.use db @@ fun conn -> Sqlite.with_connection conn k
 
-let _with_transaction db k =
+let with_transaction db k =
   Sqlite.use db @@ fun conn -> Sqlite.with_transaction conn k
 
 module Types = struct
@@ -365,6 +365,20 @@ module Deposits = struct
       WHERE
         nonce = ?
       |sql}
+
+    let delete_before =
+      (level ->. unit)
+      @@ {sql|
+      DELETE FROM deposits
+      WHERE log_blockNumber < ?
+      |sql}
+
+    let delete_after =
+      (level ->. unit)
+      @@ {sql|
+      DELETE FROM deposits
+      WHERE log_blockNumber > ?
+      |sql}
   end
 
   let store ?conn db deposit log_info =
@@ -390,6 +404,14 @@ module Deposits = struct
   let list_by_receiver ?conn db addr ~limit ~offset =
     with_connection db conn @@ fun conn ->
     Sqlite.Db.collect_list conn Q.list_by_receiver (addr, limit, offset)
+
+  let delete_before ?conn db level =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn db level =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Pointers = struct
