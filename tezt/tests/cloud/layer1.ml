@@ -33,7 +33,7 @@ module Network = struct
   let block_time = function `Ghostnet -> 5 | `Mainnet -> 8
 
   (** Next protocol for both Mainnet and Ghostnet - needs to be updated manually. *)
-  let migrate_to _network = Protocol.R022
+  let migrate_to _network = Protocol.Alpha
 end
 
 let yes_crypto_env =
