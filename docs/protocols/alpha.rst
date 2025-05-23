@@ -120,6 +120,10 @@ Operations
   ``consensus_slot``, or an attestations aggregate whose committee
   includes ``consensus_slot``. (MR :gl:`!18073`)
 
+- The ``Reveal`` operation has a new optional ``proof`` field required
+  for tz4 public keys. This results in an increase of gas cost per
+  revealing tz4 public keys. (MR :gl:`!18095`)
+
 Operation receipts
 ------------------
 
