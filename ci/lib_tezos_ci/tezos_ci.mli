@@ -571,8 +571,6 @@ module Stages : sig
   (* Scanning vulnerabilities of Docker images. *)
   val scan : Stage.t
 
-  val prepare_release : Stage.t
-
   val manual : Stage.t
 end
 

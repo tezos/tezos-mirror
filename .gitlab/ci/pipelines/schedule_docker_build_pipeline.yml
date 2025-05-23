@@ -4,7 +4,7 @@
 stages:
 - images
 - build
-- prepare_release
+- publish
 
 oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -123,7 +123,7 @@ oc.docker:arm64:
 
 docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: prepare_release
+  stage: publish
   tags:
   - gcp
   needs:
