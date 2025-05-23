@@ -284,6 +284,33 @@ let _try_get_commitment_of_slot_id_from_memory ctxt slot_id =
   let store = Node_context.get_store ctxt in
   Store.Slot_id_cache.find_opt (Store.finalized_commitments store) slot_id
 
+(* Try to retrieve the slot header associated with [slot_id], based on the local
+   skip list cell stored in the SQLite store.
+
+   Steps:
+   - Fetch the skip list cell for the given [attested_level] and slot index from
+     the SQLite store.
+   - Decode the cell using the DAL plugin.
+   - Return the extracted slot header, if available.
+
+    Returns [None] if the cell is not found in the store. *)
+let _try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
+    ctxt ~attested_level slot_id =
+  let open Lwt_result_syntax in
+  let* cell_bytes_opt =
+    Store.Skip_list_cells.find_by_slot_id_opt
+      (Node_context.get_store ctxt)
+      ~attested_level
+      ~slot_index:slot_id.Types.Slot_id.slot_index
+  in
+  match cell_bytes_opt with
+  | None -> return_none
+  | Some cell_bytes ->
+      Dal_proto_types.Skip_list_cell.to_proto
+        Plugin.Skip_list.cell_encoding
+        cell_bytes
+      |> Plugin.Skip_list.slot_header_of_cell |> return
+
 let get_commitment_from_slot_id _ctxt _slot_id =
   (* TODO in follow-up MRs *)
   assert false
