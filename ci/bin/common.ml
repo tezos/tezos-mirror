@@ -1324,7 +1324,7 @@ module Documentation = struct
     let dependencies = mk_artifact_dependencies ?dependencies [job_build_all] in
     job
       ~__POS__
-      ~name:"publish:documentation"
+      ~name:"documentation:publish"
       ~image:Images.CI.test
       ~stage:Stages.publishing
       ~dependencies

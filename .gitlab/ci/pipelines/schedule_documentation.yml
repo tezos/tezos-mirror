@@ -312,7 +312,7 @@ documentation:build_all:
     - docs/_build/
     expose_as: Documentation - excluding old protocols
 
-publish:documentation:
+documentation:publish:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: publishing
   tags:
