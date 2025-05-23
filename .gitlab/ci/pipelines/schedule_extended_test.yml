@@ -3439,7 +3439,7 @@ tezt:static-binaries:
       junit: $JUNIT
     when: always
 
-oc.install_python_noble:
+documentation:install_python_noble:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
   stage: test
   tags:
@@ -3454,7 +3454,7 @@ oc.install_python_noble:
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
-oc.install_python_jammy:
+documentation:install_python_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
   stage: test
   tags:
@@ -3469,7 +3469,7 @@ oc.install_python_jammy:
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
-oc.install_python_bookworm:
+documentation:install_python_bookworm:
   image: debian:bookworm
   stage: test
   tags:

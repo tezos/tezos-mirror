@@ -4252,7 +4252,7 @@ oc.unified_coverage:
     expose_as: Coverage report
   coverage: '/Coverage: ([^%]+%)/'
 
-oc.install_python_bookworm:
+documentation:install_python_bookworm:
   image: debian:bookworm
   stage: test
   tags:

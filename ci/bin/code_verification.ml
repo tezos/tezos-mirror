@@ -1937,19 +1937,19 @@ let jobs pipeline_type =
           [
             job_install_python
               ~__POS__
-              ~name:"oc.install_python_noble"
+              ~name:"documentation:install_python_noble"
               ~image:Images.ubuntu_noble
               ~project:"tezos/tezos"
               ~branch:"master";
             job_install_python
               ~__POS__
-              ~name:"oc.install_python_jammy"
+              ~name:"documentation:install_python_jammy"
               ~image:Images.ubuntu_jammy
               ~project:"tezos/tezos"
               ~branch:"master";
             job_install_python
               ~__POS__
-              ~name:"oc.install_python_bookworm"
+              ~name:"documentation:install_python_bookworm"
               ~image:Images.debian_bookworm
               ~project:"tezos/tezos"
               ~branch:"master";
@@ -1958,7 +1958,7 @@ let jobs pipeline_type =
           [
             job_install_python
               ~__POS__
-              ~name:"oc.install_python_bookworm"
+              ~name:"documentation:install_python_bookworm"
               ~image:Images.debian_bookworm
               ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
               ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
