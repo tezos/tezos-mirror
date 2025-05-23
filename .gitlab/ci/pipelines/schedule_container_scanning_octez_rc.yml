@@ -58,7 +58,7 @@ container_scanning:
   variables:
     GIT_STRATEGY: fetch
     CS_IMAGE: tezos/tezos:octez-v22.0-rc3
-    SECURE_LOG_LEVEL: debug
+    SECURE_LOG_LEVEL: info
     CS_DOCKERFILE_PATH: build.Dockerfile
   artifacts:
     paths:

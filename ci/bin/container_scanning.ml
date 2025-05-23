@@ -24,7 +24,7 @@ let job_container_scanning ?(dockerfile_path = "build.Dockerfile") docker_image
     ~variables:
       [
         ("CS_IMAGE", docker_image);
-        ("SECURE_LOG_LEVEL", "debug");
+        ("SECURE_LOG_LEVEL", "info");
         ("CS_DOCKERFILE_PATH", dockerfile_path);
       ]
     ~description:(Format.sprintf "Scanning image %s" docker_image)
