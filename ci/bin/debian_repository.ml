@@ -343,7 +343,7 @@ let jobs pipeline_type =
   in
   let test_ubuntu_packages_jobs =
     (* in merge pipelines we tests only debian. ubuntu packages
-       are built and tested in the sheduled pipelines*)
+       are built and tested in the scheduled pipelines*)
     [
       job_lintian
         ~__POS__
