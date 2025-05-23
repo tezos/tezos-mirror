@@ -2,11 +2,11 @@
 # Edit file ci/bin/main.ml instead.
 
 stages:
-- publish_release
+- publish
 
 publish:release-page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish_release
+  stage: publish
   tags:
   - gcp
   rules:

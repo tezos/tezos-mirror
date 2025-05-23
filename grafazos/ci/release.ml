@@ -35,7 +35,7 @@ let job_release_page ~test () =
   job
     ~__POS__
     ~image:Images.ci_release
-    ~stage:Stages.publish_release
+    ~stage:Stages.publish
     ~description:
       "A job  to update the Grafazos release page. If running in a test \
        pipeline, the assets are pushed in the \
