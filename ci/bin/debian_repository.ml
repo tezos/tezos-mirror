@@ -66,7 +66,7 @@ let archs_variables pipeline =
   | Full | Release -> [("ARCHITECTURES", String.concat " " all)]
 
 (* Push .deb artifacts to storagecloud apt repository. *)
-let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
+let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ?dependencies ~prefix ~variables ~image script : tezos_job =
   let variables =
     variables @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")] @ [("PREFIX", prefix)]

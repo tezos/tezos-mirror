@@ -47,7 +47,7 @@ let fedora_package_release_matrix = function
       ]
 
 (* Push .rpm artifacts to storagecloud rpm repository. *)
-let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
+let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ?(prefix = false) ?dependencies ~variables ?id_tokens ~image ~before_script
     script : tezos_job =
   let variables =

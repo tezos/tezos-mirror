@@ -6,7 +6,7 @@ stages:
 - images
 - build
 - test_coverage
-- publishing
+- publish
 - prepare_release
 - manual
 
@@ -623,7 +623,7 @@ documentation:build_all:
 
 documentation:publish:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   rules:
