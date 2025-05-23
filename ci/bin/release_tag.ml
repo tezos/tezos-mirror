@@ -190,7 +190,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job
       ~__POS__
       ~image:Images.ci_release
-      ~stage:Stages.publish_package_gitlab
+      ~stage:Stages.publish
       ~interruptible:false
       ~dependencies
       ?before_script

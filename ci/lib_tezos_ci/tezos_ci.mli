@@ -575,8 +575,6 @@ module Stages : sig
 
   val publish_release : Stage.t
 
-  val publish_package_gitlab : Stage.t
-
   val manual : Stage.t
 end
 
