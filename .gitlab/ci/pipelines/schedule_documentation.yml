@@ -5,7 +5,7 @@ stages:
 - start
 - images
 - build
-- doc
+- publishing
 
 oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -97,7 +97,7 @@ oc.build:static-x86_64-linux-binaries:
 
 documentation:odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -159,7 +159,7 @@ documentation:odoc:
 
 documentation:manuals:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -205,7 +205,7 @@ documentation:manuals:
 
 documentation:docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -265,7 +265,7 @@ documentation:docgen:
 
 documentation:build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -314,7 +314,7 @@ documentation:build_all:
 
 publish:documentation:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: publishing
   tags:
   - gcp
   rules:

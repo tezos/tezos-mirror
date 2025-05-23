@@ -6,7 +6,7 @@ stages:
 - images
 - build
 - test_coverage
-- doc
+- publishing
 - prepare_release
 - manual
 
@@ -410,7 +410,7 @@ docker:merge_manifests:
 
 documentation:odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -471,7 +471,7 @@ documentation:odoc:
 
 documentation:manuals:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -516,7 +516,7 @@ documentation:manuals:
 
 documentation:docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -575,7 +575,7 @@ documentation:docgen:
 
 documentation:build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -623,7 +623,7 @@ documentation:build_all:
 
 publish:documentation:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: publishing
   tags:
   - gcp
   rules:

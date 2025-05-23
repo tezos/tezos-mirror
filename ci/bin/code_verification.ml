@@ -1899,7 +1899,7 @@ let jobs pipeline_type =
     | Schedule_extended_test -> []
   in
 
-  (*Doc jobs*)
+  (* Doc jobs *)
   let doc =
     let jobs_install_python =
       (* Creates a job that tests installation of the python environment in [image] *)
@@ -1908,7 +1908,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name
           ~image
-          ~stage:Stages.doc
+          ~stage:Stages.test
           ~dependencies:dependencies_needs_start
           ~rules:
             (make_rules
