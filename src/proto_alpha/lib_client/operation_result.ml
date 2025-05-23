@@ -959,15 +959,17 @@ let pp_manager_operation_result ppf
 let pp_contents_and_result :
     type kind. Format.formatter -> kind contents * kind contents_result -> unit
     =
-  let pp_forbidden ppf forbidden =
-    match forbidden with
-    | None -> ()
-    | Some forbidden_delegate ->
-        Format.fprintf
-          ppf
-          "         Forbidden delegate: %a@,"
-          Signature.Public_key_hash.pp
-          forbidden_delegate
+  let pp_double_signing_result ppf
+      {punished_delegate; rewarded_delegate; misbehaviour} =
+    Format.fprintf
+      ppf
+      "Misbehaviour: %a@,Punished delegate: %a@,Rewarded delegate: %a"
+      Misbehaviour.pp
+      misbehaviour
+      Signature.Public_key_hash.pp
+      punished_delegate
+      Signature.Public_key_hash.pp
+      rewarded_delegate
   in
   fun ppf -> function
     | Seed_nonce_revelation {level; nonce}, Seed_nonce_revelation_result bus ->
@@ -993,22 +995,16 @@ let pp_contents_and_result :
           pp_balance_updates
           bus
     | ( Double_baking_evidence {bh1; bh2},
-        Double_baking_evidence_result {forbidden_delegate; balance_updates} ) ->
+        Double_baking_evidence_result double_signing_result ) ->
         Format.fprintf
           ppf
-          "@[<v 2>Double baking evidence:@,\
-           Exhibit A: %a@,\
-           Exhibit B: %a@,\
-           %aBalance updates:@,\
-           %a@]"
+          "@[<v 2>Double baking evidence:@,Exhibit A: %a@,Exhibit B: %a@,%a@]"
           Block_hash.pp
           (Block_header.hash bh1)
           Block_hash.pp
           (Block_header.hash bh2)
-          pp_forbidden
-          forbidden_delegate
-          pp_balance_updates
-          balance_updates
+          pp_double_signing_result
+          double_signing_result
     | ( Preattestation {level; _},
         Preattestation_result
           {balance_updates; delegate; consensus_key; consensus_power} ) ->
@@ -1078,26 +1074,22 @@ let pp_contents_and_result :
           committee
           consensus_power
     | ( Double_consensus_operation_evidence {slot; op1; op2},
-        Double_consensus_operation_evidence_result
-          {forbidden_delegate; balance_updates} ) ->
+        Double_consensus_operation_evidence_result double_signing_result ) ->
         Format.fprintf
           ppf
           "@[<v 2>Double consensus operation evidence:@,\
            Slot: %a@,\
            Exhibit A: %a@,\
            Exhibit B: %a@,\
-           %aBalance updates:@,\
-          \  %a@]"
+           %a@]"
           Slot.pp
           slot
           Operation_hash.pp
           (Operation.hash op1)
           Operation_hash.pp
           (Operation.hash op2)
-          pp_forbidden
-          forbidden_delegate
-          pp_balance_updates
-          balance_updates
+          pp_double_signing_result
+          double_signing_result
     | ( Dal_entrapment_evidence
           {
             attestation;

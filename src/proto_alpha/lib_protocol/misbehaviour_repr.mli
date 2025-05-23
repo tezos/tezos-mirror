@@ -22,6 +22,10 @@ type kind = Double_baking | Double_attesting | Double_preattesting
     context. *)
 type t = {level : Raw_level_repr.t; round : Round_repr.t; kind : kind}
 
+val pp_kind : Format.formatter -> kind -> unit
+
+val pp : Format.formatter -> t -> unit
+
 val kind_encoding : kind Data_encoding.t
 
 val encoding : t Data_encoding.t

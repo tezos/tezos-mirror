@@ -18,6 +18,25 @@ let kind_encoding =
 
 type t = {level : Raw_level_repr.t; round : Round_repr.t; kind : kind}
 
+let pp_kind fmt kind =
+  Format.pp_print_string
+    fmt
+    (match kind with
+    | Double_baking -> "double-baking"
+    | Double_attesting -> "double-attesting"
+    | Double_preattesting -> "double-preattesting")
+
+let pp fmt {level; round; kind} =
+  Format.fprintf
+    fmt
+    "%a at level %a, round %a"
+    pp_kind
+    kind
+    Raw_level_repr.pp
+    level
+    Round_repr.pp
+    round
+
 let compare_kind a b =
   let to_int = function
     | Double_baking -> 0

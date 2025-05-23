@@ -877,6 +877,12 @@ let successful_manager_operation_result_encoding :
          make Manager_result.sc_rollup_originate_case;
        ]
 
+type double_signing_result = {
+  punished_delegate : public_key_hash;
+  rewarded_delegate : public_key_hash;
+  misbehaviour : Misbehaviour.t;
+}
+
 type 'kind contents_result =
   | Preattestation_result : {
       balance_updates : Receipt.balance_updates;
@@ -910,15 +916,11 @@ type 'kind contents_result =
   | Vdf_revelation_result :
       Receipt.balance_updates
       -> Kind.vdf_revelation contents_result
-  | Double_consensus_operation_evidence_result : {
-      forbidden_delegate : Signature.public_key_hash option;
-      balance_updates : Receipt.balance_updates;
-    }
+  | Double_consensus_operation_evidence_result :
+      double_signing_result
       -> Kind.double_consensus_operation_evidence contents_result
-  | Double_baking_evidence_result : {
-      forbidden_delegate : Signature.public_key_hash option;
-      balance_updates : Receipt.balance_updates;
-    }
+  | Double_baking_evidence_result :
+      double_signing_result
       -> Kind.double_baking_evidence contents_result
   | Dal_entrapment_evidence_result : {
       balance_updates : Receipt.balance_updates;
@@ -1227,14 +1229,22 @@ module Encoding = struct
         inj = (fun bus -> Vdf_revelation_result bus);
       }
 
+  let double_signing_result_encoding =
+    conv
+      (fun {punished_delegate; rewarded_delegate; misbehaviour} ->
+        (punished_delegate, rewarded_delegate, misbehaviour))
+      (fun (punished_delegate, rewarded_delegate, misbehaviour) ->
+        {punished_delegate; rewarded_delegate; misbehaviour})
+      (obj3
+         (req "punished_delegate" Signature.Public_key_hash.encoding)
+         (req "rewarded_delegate" Signature.Public_key_hash.encoding)
+         (req "misbehaviour" Misbehaviour.encoding))
+
   let double_consensus_operation_evidence_case =
     Case
       {
         op_case = Operation.Encoding.double_consensus_operation_evidence_case;
-        encoding =
-          obj2
-            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
-            (dft "balance_updates" Receipt.balance_updates_encoding []);
+        encoding = double_signing_result_encoding;
         select =
           (function
           | Contents_result (Double_consensus_operation_evidence_result _ as op)
@@ -1249,22 +1259,18 @@ module Encoding = struct
           | _ -> None);
         proj =
           (fun (Double_consensus_operation_evidence_result
-                 {forbidden_delegate; balance_updates}) ->
-            (forbidden_delegate, balance_updates));
+                 double_signing_result) ->
+            double_signing_result);
         inj =
-          (fun (forbidden_delegate, balance_updates) ->
-            Double_consensus_operation_evidence_result
-              {forbidden_delegate; balance_updates});
+          (fun double_signing_result ->
+            Double_consensus_operation_evidence_result double_signing_result);
       }
 
   let double_baking_evidence_case =
     Case
       {
         op_case = Operation.Encoding.double_baking_evidence_case;
-        encoding =
-          obj2
-            (opt "forbidden_delegate" Signature.Public_key_hash.encoding)
-            (dft "balance_updates" Receipt.balance_updates_encoding []);
+        encoding = double_signing_result_encoding;
         select =
           (function
           | Contents_result (Double_baking_evidence_result _ as op) -> Some op
@@ -1275,12 +1281,11 @@ module Encoding = struct
               Some (op, res)
           | _ -> None);
         proj =
-          (fun (Double_baking_evidence_result
-                 {forbidden_delegate; balance_updates}) ->
-            (forbidden_delegate, balance_updates));
+          (fun (Double_baking_evidence_result double_signing_result) ->
+            double_signing_result);
         inj =
-          (fun (forbidden_delegate, balance_updates) ->
-            Double_baking_evidence_result {forbidden_delegate; balance_updates});
+          (fun double_signing_result ->
+            Double_baking_evidence_result double_signing_result);
       }
 
   let dal_entrapment_evidence_case =
