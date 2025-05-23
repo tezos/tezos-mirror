@@ -227,15 +227,19 @@ module MinPk : sig
         in section 4.2.3}. *)
     val verify : pk -> Bytes.t -> signature -> bool
 
-    (** [pop_proof sk] implements
+    (** [pop_prove ?msg sk] implements
         {{:https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.3.2}
-        section 3.3.2}. *)
-    val pop_prove : sk -> proof
+        section 3.3.2}.
+        If [msg] is provided, will provide a proof for [msg] instead of the public key of [sk].
+    *)
+    val pop_prove : ?msg:pk -> sk -> proof
 
-    (** [pop_verify pk signature] implements
+    (** [pop_verify pk ?msg signature] implements
         {{:https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.3.3}
-        section 3.3.3}. *)
-    val pop_verify : pk -> proof -> bool
+        section 3.3.3}.
+        If [msg] is provided, will verify the proof against [msg] instead of [pk].
+    *)
+    val pop_verify : pk -> ?msg:pk -> proof -> bool
 
     (** [aggregate_verify pks msg aggregated_signature] performs a aggregate
         signature verification. It supposes the same message [msg] has been
@@ -436,15 +440,19 @@ module MinSig : sig
         section 4.2.3 } *)
     val verify : pk -> Bytes.t -> signature -> bool
 
-    (** [pop_proof sk] implements the algorithm described in {{:
+    (** [pop_prove ?msg sk] implements the algorithm described in {{:
         https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.3.2
-        } section 3.3.2 } *)
-    val pop_prove : sk -> proof
+        } section 3.3.2 }.
+        If [msg] is provided, will provide a proof for [msg] instead of the public key of [sk].
+    *)
+    val pop_prove : ?msg:pk -> sk -> proof
 
-    (** [pop_verify pk proof] implements the algorithm described in {{:
+    (** [pop_verify pk ?msg proof] implements the algorithm described in {{:
         https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.3.3
-        } section 3.3.3 } *)
-    val pop_verify : pk -> proof -> bool
+        } section 3.3.3 }.
+        If [msg] is provided, will verify the proof against [msg] instead of [pk].
+    *)
+    val pop_verify : pk -> ?msg:pk -> proof -> bool
 
     (** [aggregate_verify pks msg aggregated_signature] performs a aggregate
         signature verification. It supposes the same message [msg] has been

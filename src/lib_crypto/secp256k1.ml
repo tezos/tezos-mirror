@@ -351,7 +351,7 @@ let deterministic_nonce_hash sk msg =
   let nonce = deterministic_nonce sk msg in
   Blake2B.to_bytes (Blake2B.hash_bytes [nonce])
 
-let pop_verify _ _ = false
+let pop_verify _ ?msg:_ _ = false
 
 let recover signature msg =
   let open Error_monad.Result_syntax in

@@ -368,6 +368,6 @@ let deterministic_nonce sk msg =
 let deterministic_nonce_hash sk msg =
   Blake2B.to_bytes (Blake2B.hash_bytes [deterministic_nonce sk msg])
 
-let pop_verify _ _ = false
+let pop_verify _ ?msg:_ _ = false
 
 include (Compare.Bytes : Compare.S with type t := t)
