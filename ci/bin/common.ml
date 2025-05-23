@@ -717,7 +717,7 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
     ~job_docker_arm64 : tezos_job =
   job_docker_authenticated
     ~__POS__
-    ~stage:Stages.prepare_release
+    ~stage:Stages.publish
     ~name:"docker:merge_manifests"
       (* This job merges the images produced in the jobs
          [docker:{amd64,arm64}] into a single multi-architecture image, and
