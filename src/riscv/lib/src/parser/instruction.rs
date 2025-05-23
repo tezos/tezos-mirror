@@ -493,8 +493,16 @@ pub enum InstrCacheable {
     Divuw(RTypeArgs),
     /// `MUL` - Perform bitwise-multiplication of `val(rs1)` with `val(rs2)`.
     Mul(RTypeArgs),
+    /// Multiply val(rs1) with val(rs2) and store the upper 64 bits of the result
+    /// in register `rd`.
     Mulh(RTypeArgs),
+    /// Multiply val(rs1) with val(rs2) and store the upper 64 bits of the result
+    /// in register `rd`. val(rs1) is treated as a _signed integer_, while val(rs2)
+    /// is treated as an _unsigned integer_.
     Mulhsu(RTypeArgs),
+    /// Multiply val(rs1) with val(rs2) and store the upper 64 bits of the result
+    /// in register `rd`. Both val(rs1) and val(rs2) are treated as
+    /// _unsigned integers_.
     Mulhu(RTypeArgs),
     /// `MULW` - Multiply the lower 32 bits of `val(rs1)` with the lower 32 bits of `val(rs2)`
     /// and store the sign-extended result in `rd`.

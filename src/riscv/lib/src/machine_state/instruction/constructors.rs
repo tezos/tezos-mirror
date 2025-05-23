@@ -1213,6 +1213,63 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64MulHighSigned`].
+    pub(crate) fn new_x64_mul_high_signed(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X64MulHighSigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64MulHighSignedUnsigned`].
+    pub(crate) fn new_x64_mul_high_signed_unsigned(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X64MulHighSignedUnsigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64MulHighUnsigned`].
+    pub(crate) fn new_x64_mul_high_unsigned(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::X64MulHighUnsigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::X64DivSigned`].
     pub(crate) fn new_x64_div_signed(
         rd: NonZeroXRegister,
@@ -1966,6 +2023,59 @@ impl Instruction {
             }
             (X::NonZero(rd), X::NonZero(rs1), X::NonZero(rs2)) => {
                 Instruction::new_mul(rd, rs1, rs2, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Converts [`InstrCacheable::Mulh`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Mulh`]: crate::parser::instruction::InstrCacheable::Mulh
+    pub(crate) fn from_ic_mulh(args: &RTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd), split_x0(args.rs1), split_x0(args.rs2)) {
+            (X::X0, _, _) => Instruction::new_nop(InstrWidth::Uncompressed),
+            (X::NonZero(rd), X::X0, _) | (X::NonZero(rd), _, X::X0) => {
+                Instruction::new_li(rd, 0, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rd), X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_x64_mul_high_signed(rd, rs1, rs2, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Converts [`InstrCacheable::Mulhsu`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Mulhsu`]: crate::parser::instruction::InstrCacheable::Mulhsu
+    pub(crate) fn from_ic_mulhsu(args: &RTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd), split_x0(args.rs1), split_x0(args.rs2)) {
+            (X::X0, _, _) => Instruction::new_nop(InstrWidth::Uncompressed),
+            (X::NonZero(rd), X::X0, _) | (X::NonZero(rd), _, X::X0) => {
+                Instruction::new_li(rd, 0, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rd), X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_x64_mul_high_signed_unsigned(
+                    rd,
+                    rs1,
+                    rs2,
+                    InstrWidth::Uncompressed,
+                )
+            }
+        }
+    }
+
+    /// Converts [`InstrCacheable::Mulhu`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Mulhu`]: crate::parser::instruction::InstrCacheable::Mulhu
+    pub(crate) fn from_ic_mulhu(args: &RTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd), split_x0(args.rs1), split_x0(args.rs2)) {
+            (X::X0, _, _) => Instruction::new_nop(InstrWidth::Uncompressed),
+            (X::NonZero(rd), X::X0, _) | (X::NonZero(rd), _, X::X0) => {
+                Instruction::new_li(rd, 0, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rd), X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_x64_mul_high_unsigned(rd, rs1, rs2, InstrWidth::Uncompressed)
             }
         }
     }

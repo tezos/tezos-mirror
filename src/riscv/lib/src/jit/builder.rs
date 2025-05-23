@@ -20,6 +20,7 @@ use cranelift::codegen::ir::condcodes::IntCC;
 use cranelift::codegen::ir::types::I32;
 use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
+use cranelift::prelude::types::I128;
 use errno::AtomicAccessGuard;
 
 use self::block_state::DynamicValues;
@@ -28,6 +29,7 @@ use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::instruction_context::LoadStoreWidth;
+use crate::instruction_context::MulHighType;
 use crate::instruction_context::PhiValue;
 use crate::instruction_context::Predicate;
 use crate::instruction_context::arithmetic::Arithmetic;
@@ -287,6 +289,32 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'_, MC, JSA> {
 
     fn extend_unsigned(&mut self, value: Self::XValue32) -> Self::XValue {
         X64(self.builder.ins().uextend(I64, value.0))
+    }
+
+    fn mul_high(
+        &mut self,
+        lhs: Self::XValue,
+        rhs: Self::XValue,
+        mul_high_type: MulHighType,
+    ) -> Self::XValue {
+        let (lhs, rhs) = match mul_high_type {
+            MulHighType::Signed => (
+                self.builder.ins().sextend(I128, lhs.0),
+                self.builder.ins().sextend(I128, rhs.0),
+            ),
+            MulHighType::Unsigned => (
+                self.builder.ins().uextend(I128, lhs.0),
+                self.builder.ins().uextend(I128, rhs.0),
+            ),
+            MulHighType::SignedUnsigned => (
+                self.builder.ins().sextend(I128, lhs.0),
+                self.builder.ins().uextend(I128, rhs.0),
+            ),
+        };
+        let result = self.builder.ins().imul(lhs, rhs);
+        let (_low, high) = self.builder.ins().isplit(result);
+
+        X64(high)
     }
 
     fn xregister_read_nz(&mut self, reg: NonZeroXRegister) -> Self::XValue {

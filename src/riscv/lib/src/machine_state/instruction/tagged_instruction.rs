@@ -344,9 +344,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Scw | Amoswapw | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw | Amomaxw | Amominuw
         | Amomaxuw | Lrd | Scd | Amoswapd | X64AtomicAdd | Amoxord | Amoandd | Amoord | Amomind
         | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw | Remuw | Divu | Divw | Divuw
-        | Mulh | Mulhsu | Mulhu | X32Mul | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci => {
-            ArgsShape::XSrcXDest
-        }
+        | X32Mul | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci => ArgsShape::XSrcXDest,
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -371,6 +369,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Add
         | Sub
         | Mul
+        | X64MulHighSigned
+        | X64MulHighSignedUnsigned
+        | X64MulHighUnsigned
         | Mv
         | Neg
         | And

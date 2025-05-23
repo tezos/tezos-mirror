@@ -146,6 +146,15 @@ pub(crate) trait ICB {
     #[expect(dead_code)]
     fn extend_unsigned(&mut self, value: Self::XValue32) -> Self::XValue;
 
+    /// Multiply two [`XValue`] values and return the high 64 bits of the result, with
+    /// the appropriate sign-extension passed in as 2 boolean arguments.
+    fn mul_high(
+        &mut self,
+        lhs: Self::XValue,
+        rhs: Self::XValue,
+        mul_high_type: MulHighType,
+    ) -> Self::XValue;
+
     /// Convert a boolean value to an xvalue.
     ///
     /// Coerces to the following:
@@ -316,6 +325,23 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     }
 
     #[inline(always)]
+    fn mul_high(
+        &mut self,
+        lhs: Self::XValue,
+        rhs: Self::XValue,
+        mul_high_type: MulHighType,
+    ) -> Self::XValue {
+        let (lhs, rhs) = match mul_high_type {
+            MulHighType::Signed => (lhs as i64 as i128 as u128, rhs as i64 as i128 as u128),
+            MulHighType::Unsigned => (lhs as u128, rhs as u128),
+            MulHighType::SignedUnsigned => (lhs as i64 as i128 as u128, rhs as u128),
+        };
+        let result = lhs.wrapping_mul(rhs);
+
+        (result >> 64) as u64
+    }
+
+    #[inline(always)]
     fn xvalue_from_bool(&mut self, value: Self::Bool) -> Self::XValue {
         value as XValue
     }
@@ -473,6 +499,13 @@ pub enum Shift {
     RightUnsigned,
     /// Arithmetic right shift. Sign-bits (ones) are shifted into the most significant bits.
     RightSigned,
+}
+
+/// The type of X64 mul_high operation to perform.
+pub enum MulHighType {
+    Signed,
+    Unsigned,
+    SignedUnsigned,
 }
 
 /// Supported value widths for loading from/storing to main memory for XRegisters.
