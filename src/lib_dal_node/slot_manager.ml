@@ -311,6 +311,42 @@ let _try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
         cell_bytes
       |> Plugin.Skip_list.slot_header_of_cell |> return
 
+(* Retrieve the slot header for [slot_id] by accessing the skip list cells
+   produced during [attested_level] and stored in in the L1 context).
+
+   Steps:
+   - Retrieve the skip list cells for [attested_level] using the plugin from L1.
+   - Locate the one matching the [slot_index] of [slot_id].
+   - Extract and return the slot header via the plugin. *)
+let _try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
+    ~dal_constants ~attested_level slot_id =
+  let open Lwt_result_syntax in
+  let* cells_of_level =
+    let pred_published_level = Int32.pred slot_id.Types.Slot_id.slot_level in
+    Plugin.Skip_list.cells_of_level
+      ~attested_level
+      (Node_context.get_tezos_node_cctxt ctxt)
+      ~dal_constants
+      ~pred_publication_level_dal_constants:
+        (lazy
+          (Lwt.return
+          @@ Node_context.get_proto_parameters
+               ctxt
+               ~level:(`Level pred_published_level)))
+  in
+  match
+    List.find_all
+      (fun (_h, _c, c_slot_index) -> c_slot_index = slot_id.slot_index)
+      cells_of_level
+  with
+  | [(_cell_hash, cell, _slot_index)] ->
+      Plugin.Skip_list.slot_header_of_cell cell |> return
+  | _ ->
+      (* This should not happen (unless the slot index is not valid). In fact,
+         the skip list delta for a level contains exactly [number_of_slots]
+         items: one per slot index. *)
+      assert false
+
 let get_commitment_from_slot_id _ctxt _slot_id =
   (* TODO in follow-up MRs *)
   assert false
