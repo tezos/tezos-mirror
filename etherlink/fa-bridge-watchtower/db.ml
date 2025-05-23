@@ -10,7 +10,7 @@ open Caqti_request.Infix
 open Caqti_type.Std
 
 (** Current version for migrations. *)
-let version = 0
+let version = 1
 
 module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
 
