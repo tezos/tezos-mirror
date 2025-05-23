@@ -294,7 +294,7 @@ let _try_get_commitment_of_slot_id_from_memory ctxt slot_id =
    - Return the extracted slot header, if available.
 
     Returns [None] if the cell is not found in the store. *)
-let _try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
+let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
     ctxt ~attested_level slot_id =
   let open Lwt_result_syntax in
   let* cell_bytes_opt =
@@ -318,7 +318,7 @@ let _try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
    - Retrieve the skip list cells for [attested_level] using the plugin from L1.
    - Locate the one matching the [slot_index] of [slot_id].
    - Extract and return the slot header via the plugin. *)
-let _try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
+let try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
     ~dal_constants ~attested_level slot_id =
   let open Lwt_result_syntax in
   let* cells_of_level =
@@ -346,6 +346,48 @@ let _try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
          the skip list delta for a level contains exactly [number_of_slots]
          items: one per slot index. *)
       assert false
+
+(* Attempt to retrieve the commitment hash associated with the published slot
+   header identified by [slot_id].
+
+   Retrieval order:
+    1. Attempt to get the header from the local SQLite skip list.
+    2. If not found, fall back to fetching it from the L1 skip list context.
+
+    Returns [Some commitment] if found and matches the [slot_id], [None]
+    otherwise. Performs assertions to ensure the returned slot header matches
+    the requested [slot_id]. *)
+let _try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt dal_constants
+    slot_id ~attested_level =
+  let open Lwt_result_syntax in
+  let*! published_slot_header_opt =
+    let*! from_sqlite =
+      try_get_slot_header_from_indexed_skip_list
+        dal_plugin
+        ctxt
+        ~attested_level
+        slot_id
+    in
+    match from_sqlite with
+    | Ok (Some _header as res) -> return res
+    | _ ->
+        try_get_slot_header_from_L1_skip_list
+          dal_plugin
+          ctxt
+          ~dal_constants
+          ~attested_level
+          slot_id
+  in
+  match published_slot_header_opt with
+  | Ok (Some Dal_plugin.{published_level; slot_index; commitment}) ->
+      (* These invariants are expected to hold by design. *)
+      assert (Int32.equal published_level slot_id.slot_level) ;
+      assert (Int.equal slot_index slot_id.slot_index) ;
+      return_some commitment
+  | Ok None ->
+      (* The function(s) above succeeded, but nothing was found as "published". *)
+      return_none
+  | Error error -> tzfail error
 
 let get_commitment_from_slot_id _ctxt _slot_id =
   (* TODO in follow-up MRs *)
