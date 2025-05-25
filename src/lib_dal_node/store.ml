@@ -519,28 +519,21 @@ end)
 
 module Storage_backend = struct
   (** The type [kind] represents the available storage backend types.
-      [Legacy] refers to the current implementation using KVS.
-      [SQLite3] corresponds to the new implementation integrating a
+      [SQLite3] corresponds to the current implementation integrating a
       [Sqlite.t] database into the DAL node for storing skip list
       cells and whose purpose is to replace the
       [Kvs_skip_list_cells_store] module. *)
-  type kind = Legacy | SQLite3
+  type kind = SQLite3
 
   let encoding =
     let open Data_encoding in
     union
       [
         case
-          ~title:"legacy"
-          (Tag 0)
-          (constant "legacy")
-          (function Legacy -> Some () | _ -> None)
-          (fun () -> Legacy);
-        case
           ~title:"sqlite3"
           (Tag 1)
           (constant "sqlite3")
-          (function SQLite3 -> Some () | _ -> None)
+          (function SQLite3 -> Some ())
           (fun () -> SQLite3);
       ]
 
@@ -581,34 +574,6 @@ module Storage_backend = struct
         | _ -> None)
       (fun (current, specified) ->
         Storage_backend_mismatch {current; specified})
-
-  (** [set ?force store ~sqlite3_backend] configures the storage
-      backend based on the value of [sqlite3_backend]. If
-      [sqlite3_backend] is [true], it sets the [SQLite3] storage
-      backend; otherwise, it sets the [Legacy] backend. This function
-      fails with [Storage_backend_mismatch] if the previously used
-      storage backend does not match the one specified by
-      [sqlite3_backend] and [force] is false. If [force] is true, then
-      overwrite the storage backend without taking into account the
-      previous one. *)
-  let set ?(force = false) store ~sqlite3_backend =
-    let open Lwt_result_syntax in
-    let* current_opt = load store in
-    let specified = if sqlite3_backend then SQLite3 else Legacy in
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7528
-       Update the following code according to the migration from KVS
-       to SQLite3 once it is done.*)
-    if force then
-      let+ () = save store specified in
-      specified
-    else
-      match current_opt with
-      | Some current ->
-          if current = specified then return current
-          else tzfail (Storage_backend_mismatch {current; specified})
-      | None ->
-          let+ () = save store specified in
-          specified
 end
 
 (** Store context *)
@@ -695,217 +660,11 @@ module Skip_list_cells = struct
     Dal_store_sqlite3.Skip_list_cells.schemas store
 end
 
-let init_skip_list_cells_store base_dir =
-  (* We support at most 64 back-pointers, each of which takes 32 bytes.
-     The cells content itself takes less than 64 bytes. *)
-  let padded_encoded_cell_size = 64 * (32 + 1) in
-  (* A pointer hash is 32 bytes length, but because of the double
-     encoding in Dal_proto_types and then in skip_list_cells_store, we
-     have an extra 4 bytes for encoding the size. *)
-  let encoded_hash_size = 32 + 4 in
-  Kvs_skip_list_cells_store.init
-    ~node_store_dir:base_dir
-    ~skip_list_store_dir:Stores_dirs.skip_list_cells
-    ~padded_encoded_cell_size
-    ~encoded_hash_size
-
 let cache_entry node_store commitment slot shares shard_proofs =
   Commitment_indexed_cache.replace
     node_store.cache
     commitment
     (slot, shares, shard_proofs)
-
-let upgrade_from_v0_to_v1 ~base_dir =
-  let open Lwt_syntax in
-  let ( // ) = Filename.Infix.( // ) in
-  let* () =
-    Event.emit_store_upgrade_start
-      ~old_version:(Version.make 0)
-      ~new_version:(Version.make 1)
-  in
-  let rec move_directory_contents src dst =
-    let stream = Lwt_unix.files_of_directory src in
-    Lwt_stream.iter_s
-      (fun name ->
-        Lwt.catch
-          (fun () ->
-            match name with
-            | "." | ".." -> Lwt.return_unit
-            | file_name -> (
-                let src_path = src // file_name in
-                let dst_path = dst // file_name in
-                let* stats = Lwt_unix.lstat src_path in
-                match stats.st_kind with
-                | Unix.S_REG | S_LNK -> Lwt_unix.rename src_path dst_path
-                | S_DIR ->
-                    let* () = Lwt_unix.mkdir dst_path stats.st_perm in
-                    let* () = move_directory_contents src_path dst_path in
-                    Lwt_utils_unix.remove_dir src_path
-                | _ -> Lwt.return_unit))
-          (fun exn ->
-            let src_path = src // name in
-            let dst_path = dst // name in
-            let* () =
-              Event.emit_store_upgrade_error_moving_directory
-                ~src:src_path
-                ~dst:dst_path
-                ~exn:(Printexc.to_string exn)
-            in
-            Lwt.return_unit))
-      stream
-  in
-  let move_and_rename old_path new_path =
-    let* () =
-      Lwt.catch
-        (fun () -> Lwt_unix.mkdir new_path 0o700)
-        (fun exn ->
-          let* () =
-            Event.emit_store_upgrade_error_creating_directory
-              ~path:new_path
-              ~exn:(Printexc.to_string exn)
-          in
-          Lwt.return ())
-    in
-    let* () = move_directory_contents old_path new_path in
-    Lwt_utils_unix.remove_dir old_path
-  in
-  (* Remove the Irmin store, that is, delete the "index" directory and all files
-     that start with "store". *)
-  let stream = Lwt_unix.files_of_directory base_dir in
-  let irmin_prefix = "store" in
-  let* () =
-    Lwt_stream.iter_p
-      (fun name ->
-        let path = Filename.Infix.(base_dir // name) in
-        if String.equal name "index" then
-          (* that's Irmin related *)
-          Lwt_utils_unix.remove_dir path
-        else if String.starts_with ~prefix:irmin_prefix name then
-          Lwt_unix.unlink path
-        else if String.equal name "shard_store" then
-          (* The V0 shard store uses a different layout. We just delete it, for
-             simplicity. *)
-          Lwt_utils_unix.remove_dir path
-        else if String.equal name "skip_list" then
-          (* The skip list store is not handled by this module, but we treat this
-             case here, for simplicity *)
-          let new_path = Filename.Infix.(base_dir // "skip_list_store") in
-          move_and_rename path new_path
-        else Lwt.return ())
-      stream
-  in
-  Event.emit_store_upgraded
-    ~old_version:(Version.make 0)
-    ~new_version:(Version.make 1)
-
-let upgrade_from_v1_to_v2 ~base_dir =
-  let open Lwt_result_syntax in
-  let*! () =
-    Event.emit_store_upgrade_start
-      ~old_version:(Version.make 1)
-      ~new_version:(Version.make 2)
-  in
-  (* Initialize both stores and migrate. *)
-  let* storage_backend_store = Storage_backend.init ~root_dir:base_dir in
-  let* storage_backend = Storage_backend.load storage_backend_store in
-  let*! res =
-    match storage_backend with
-    | None | Some Storage_backend.Legacy ->
-        let* kvs_store = init_skip_list_cells_store base_dir in
-        let* sql_store = init_sqlite_skip_list_cells_store base_dir in
-        let* () =
-          Store_migrations.migrate_skip_list_store kvs_store sql_store
-        in
-        let* () = Kvs_skip_list_cells_store.close kvs_store in
-        let*! () = Dal_store_sqlite3.Skip_list_cells.close sql_store in
-        return_unit
-    | Some SQLite3 ->
-        (* If a previous sqlite database has been created using the
-           `--sqlite3-backend` experimental flag. We simply move it to the
-           new destination path. *)
-        let open Filename.Infix in
-        let mv name =
-          let previous_path = base_dir // name in
-          let new_path = base_dir // Stores_dirs.skip_list_cells // name in
-          if Sys.(file_exists previous_path) then
-            let*! () =
-              if not (Sys.file_exists new_path) then
-                Lwt_utils_unix.copy_file ~src:previous_path ~dst:new_path ()
-              else Lwt.return_unit
-            in
-            let*! () = Lwt_unix.unlink previous_path in
-            return_unit
-          else return_unit
-        in
-        let*! () =
-          Lwt_utils_unix.create_dir (base_dir // Stores_dirs.skip_list_cells)
-        in
-        let* () = mv Dal_store_sqlite3.sqlite_file_name in
-        let* () = mv (Dal_store_sqlite3.sqlite_file_name ^ "-shm") in
-        let* () = mv (Dal_store_sqlite3.sqlite_file_name ^ "-wal") in
-        return_unit
-  in
-  match res with
-  | Ok () ->
-      (* Set the new storage backend to sqlite3. *)
-      let* (_ : Storage_backend.kind) =
-        Storage_backend.set
-          storage_backend_store
-          ~sqlite3_backend:true
-          ~force:true
-      in
-      (* Remove the Stores_dirs.skip_list_cells directory. *)
-      let open Filename.Infix in
-      let store_dir = base_dir // Stores_dirs.skip_list_cells in
-      let*! () = Lwt_utils_unix.remove_dir (store_dir // "hashes") in
-      let*! () = Lwt_utils_unix.remove_dir (store_dir // "cells") in
-      (* The storage upgrade has been done. *)
-      let*! () =
-        Event.emit_store_upgraded
-          ~old_version:(Version.make 1)
-          ~new_version:(Version.make 2)
-      in
-      return_unit
-  | Error err ->
-      (* Clean the sqlite store unless the storage backend was already set to sqlite. *)
-      let* storage_backend = Storage_backend.load storage_backend_store in
-      let*! () =
-        match storage_backend with
-        | None | Some Legacy ->
-            let rm name =
-              let open Filename.Infix in
-              let path = base_dir // Stores_dirs.skip_list_cells // name in
-              Lwt_unix.unlink path
-            in
-            let*! () = rm Dal_store_sqlite3.sqlite_file_name in
-            let*! () = rm (Dal_store_sqlite3.sqlite_file_name ^ "-shm") in
-            rm (Dal_store_sqlite3.sqlite_file_name ^ "-wal")
-        | Some SQLite3 -> Lwt.return_unit
-      in
-      (* The store upgrade failed. *)
-      let*! () = Event.emit_store_upgrade_error () in
-      Format.eprintf "%a" Error_monad.pp_print_trace err ;
-      fail err
-
-(* Returns [upgradable old_version new_version] returns an upgrade function if
-   the store is upgradable from [old_version] to [new_version]. Otherwise it
-   returns [None]. *)
-let upgradable old_version new_version :
-    (base_dir:string -> unit tzresult Lwt.t) option =
-  let open Lwt_result_syntax in
-  match (old_version, new_version) with
-  | 0, 1 ->
-      Some
-        (fun ~base_dir ->
-          let*! () = upgrade_from_v0_to_v1 ~base_dir in
-          return_unit)
-  | 0, 2 ->
-      Some
-        (fun ~base_dir ->
-          let*! () = upgrade_from_v0_to_v1 ~base_dir in
-          upgrade_from_v1_to_v2 ~base_dir)
-  | 1, 2 -> Some (fun ~base_dir -> upgrade_from_v1_to_v2 ~base_dir)
-  | _ -> None
 
 (* Checks the version of the store with the respect to the current
    version. Returns [None] if the store does not need an upgrade and [Some
@@ -927,14 +686,9 @@ let check_version_and_may_upgrade base_dir =
   in
   if Version.(equal version current_version) then return_unit
   else
-    match upgradable version Version.current_version with
-    | Some upgrade ->
-        let* () = upgrade ~base_dir in
-        Version.write_version_file ~base_dir
-    | None ->
-        tzfail
-          (Version.Invalid_data_dir_version
-             {actual = version; expected = Version.current_version})
+    tzfail
+      (Version.Invalid_data_dir_version
+         {actual = version; expected = Version.current_version})
 
 (** [init config] inits the store on the filesystem using the
     given [config]. *)
@@ -945,6 +699,7 @@ let init config =
   let* slot_header_statuses = Statuses.init base_dir Stores_dirs.status in
   let* shards = Shards.init base_dir Stores_dirs.shard in
   let* slots = Slots.init base_dir Stores_dirs.slot in
+  let* () = Version.write_version_file ~base_dir in
   let traps = Traps.create ~capacity:Constants.traps_cache_size in
   let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
   let* first_seen_level = First_seen_level.init ~root_dir:base_dir in
