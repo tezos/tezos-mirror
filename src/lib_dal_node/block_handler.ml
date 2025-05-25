@@ -181,13 +181,14 @@ let store_skip_list_cells ctxt cctxt dal_constants ~attested_level
   in
   let cells_of_level =
     List.map
-      (fun (hash, cell) ->
+      (fun (hash, cell, slot_index) ->
         ( Dal_proto_types.Skip_list_hash.of_proto
             Plugin.Skip_list.hash_encoding
             hash,
           Dal_proto_types.Skip_list_cell.of_proto
             Plugin.Skip_list.cell_encoding
-            cell ))
+            cell,
+          slot_index ))
       cells_of_level
   in
   let store = Node_context.get_store ctxt in

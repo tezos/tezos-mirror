@@ -315,10 +315,23 @@ module Plugin = struct
       (* 1. There are no cells for [published_level = 0]. *)
       if published_level <= 0l then return []
       else
-        Plugin.RPC.Dal.skip_list_cells_of_level
-          cpctxt
-          (`Main, `Level attested_level)
-          ()
+        let+ cells =
+          Plugin.RPC.Dal.skip_list_cells_of_level
+            cpctxt
+            (`Main, `Level attested_level)
+            ()
+        in
+        (* 2. For other levels, fetch the cells and retrieve the slot indices
+           from the cells' content. *)
+        List.map
+          (fun (hash, cell) ->
+            let slot_index =
+              Dal.(
+                Slots_history.(content cell |> content_id).index
+                |> Slot_index.to_int)
+            in
+            (hash, cell, slot_index))
+          cells
 
     let slot_header_of_cell cell =
       match Dal.Slots_history.(content cell) with

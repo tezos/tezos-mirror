@@ -153,7 +153,7 @@ module Helpers = struct
     type t =
       | Insert of {
           attested_level : Level.t;
-          payload : (Skip_list_hash.t * Skip_list_cell.t) list;
+          payload : (Skip_list_hash.t * Skip_list_cell.t * int) list;
         }
       | Find of {skip_list_hash : Skip_list_hash.t}
       | Remove of {attested_level : Level.t}
@@ -167,9 +167,10 @@ module Helpers = struct
           ~size:(return number_of_slots)
           (pair Skip_list_hash.gen Skip_list_cell.gen)
       in
+      let payload = List.mapi (fun i (h, c) -> (h, c, i)) payload in
       let hashes =
         List.fold_left
-          (fun acc (hash, _) -> HashSet.add hash acc)
+          (fun acc (hash, _, _) -> HashSet.add hash acc)
           HashSet.empty
           payload
       in
@@ -213,14 +214,15 @@ module Helpers = struct
           in
           return (Some (new_state, Remove {attested_level}))
 
-    let pp_action_insert_payload_item fmt (hash, cell) =
+    let pp_action_insert_payload_item fmt (hash, cell, slot_index) =
       Format.fprintf
         fmt
-        "(%a, %a)"
+        "(%a, %a, %d)"
         Skip_list_hash.pp
         hash
         Skip_list_cell.pp
         cell
+        slot_index
 
     let pp_action_insert_payload fmt payload =
       Format.pp_print_list pp_action_insert_payload_item fmt payload
@@ -478,6 +480,7 @@ let populate n kvs_store =
     let* payload =
       list ~size:(return number_of_slots) (pair Skip_list_hash.gen cells)
     in
+    let payload = List.mapi (fun i (h, c) -> (h, c, i)) payload in
     return payload
   in
   let rec loop state n =

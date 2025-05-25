@@ -59,7 +59,7 @@ module Skip_list_cells : sig
     ?conn:conn ->
     t ->
     attested_level:int32 ->
-    slot_index:int ->
+    slot_index:Types.slot_index ->
     Skip_list_cell.t option tzresult Lwt.t
 
   (** [insert ?conn store ~attested_level values] inserts the given
@@ -70,7 +70,7 @@ module Skip_list_cells : sig
     ?conn:conn ->
     t ->
     attested_level:int32 ->
-    (Skip_list_hash.t * Skip_list_cell.t) list ->
+    (Skip_list_hash.t * Skip_list_cell.t * Types.slot_index) list ->
     unit tzresult Lwt.t
 
   (** [remove ?conn store ~attested_level] removes any data related to

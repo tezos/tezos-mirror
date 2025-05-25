@@ -391,13 +391,48 @@ module Plugin = struct
             attested_slot_headers
           |> Environment.wrap_tzresult
         in
-        (* 7. We finally export and return the cells alongside their hashes as a
-           list. *)
+        (* 7. Export and return the skip list cells along with their hashes and
+           slot indices. *)
+        let module HC = Dal.Slots_history.History_cache in
+        let module PHM = Dal.Slots_history.Pointer_hash.Map in
+        (* 7-A. The [cache] contains exactly [number_of_slots] cells for the
+           current level. *)
         let last_cells =
-          let open Dal.Slots_history.History_cache in
-          view cache |> Map.bindings
+          (* 7-B. Retrieve the list of (hash, cell) pairs from the cache.  The
+             list is ordered by hash and contains [number_of_slots] elements. *)
+          HC.view cache |> HC.Map.bindings
         in
-        return last_cells
+        let ordered_hashes_by_insertion =
+          (* 7-C. To retrieve the cells in insertion (i.e., slot index) order,
+             we rely on [HC.Internal_for_tests.keys], which preserves the
+             original insertion order.
+
+             This is acceptable since:
+             - The cache size is small (equal to [number_of_slots]).
+             - This function is not expected to run in practice, as Rio is
+             enabled on all networks.
+             - We don't have another way of doing so in Quebec without relying
+             on this function. *)
+          HC.Internal_for_tests.keys cache
+        in
+        let last_cells_map =
+          (* Convert the list of (hash, cell) into a map for fast lookup. *)
+          List.to_seq last_cells |> PHM.of_seq
+        in
+        let last_cells_ordered_by_insertion =
+          (* 7-D. Reconstruct the final list in slot index order.
+             Each element includes the cell, its hash, and the associated slot index. *)
+          List.mapi
+            (fun slot_index hash ->
+              match PHM.find hash last_cells_map with
+              | None ->
+                  (* This should never happen: all hashes from [ordered_hashes_by_insertion]
+                     must exist in [last_cells_map]. *)
+                  assert false
+              | Some cell -> (hash, cell, slot_index))
+            ordered_hashes_by_insertion
+        in
+        return last_cells_ordered_by_insertion
 
     let slot_header_of_cell _cell = (* Not implemented for Quebec *) None
   end
