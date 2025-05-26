@@ -126,9 +126,9 @@ module Node = struct
       ~name network cloud agent =
     toplog "Inititializing an L1 node for %s" name ;
     match network with
-    | (`Mainnet | `Ghostnet | `Nextnet _ | `Weeklynet _ | `Rionet) as network
-      -> (
-        (* For public networks deployments, we listen on all interfaces on both
+    | #Network.public -> (
+        let network = Network.to_public network in
+        (* for public networks deployments, we listen on all interfaces on both
            ipv4 and ipv6 *)
         let net_addr = "[::]" in
         match data_dir with
@@ -239,7 +239,7 @@ module Node = struct
             let* () = Node.wait_for_synchronisation ~statuses:["synced"] node in
             toplog "Node is bootstrapped" ;
             Lwt.return node)
-    | `Sandbox -> (
+    | _ (* private network *) -> (
         (* For sandbox deployments, we only listen on local interface, hence
            no connection could be made to us from outside networks *)
         let net_addr = "127.0.0.1" in
@@ -3200,7 +3200,7 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
     (bakers : baker list) (producers : producer list)
     (observers : observer list) etherlink =
   match (agent, network) with
-  | None, (`Mainnet | `Ghostnet | `Nextnet _ | `Weeklynet _) -> (
+  | None, #Network.public -> (
       match (bakers, producers, observers, etherlink) with
       | baker :: _, _, _, _ -> Node.as_rpc_endpoint baker.node
       | [], producer :: _, _, _ -> Node.as_rpc_endpoint producer.node
@@ -3276,7 +3276,8 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           configuration
           ?etherlink_configuration
           bootstrap_agent
-    | (`Ghostnet | `Nextnet _ | `Mainnet | `Weeklynet _ | `Rionet) as network ->
+    | #Network.public ->
+        let network = Network.to_public configuration.network in
         init_public_network
           cloud
           configuration
