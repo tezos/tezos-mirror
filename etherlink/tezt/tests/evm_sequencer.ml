@@ -213,7 +213,8 @@ let default_multichain_registration =
   Register_both {extra_tags_with = [Tag.slow]; extra_tags_without = []}
 
 let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
-    ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config body =
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
+    body =
   Test.register
     ~__FILE__
     ~title
@@ -235,6 +236,7 @@ let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
       ?patch_config
+      ?websockets
       ()
   in
   body sequencer
@@ -11139,18 +11141,19 @@ let test_websocket_cleanup =
   unit
 
 let test_websocket_max_message_length () =
-  let max_websocket_message_length = 512 in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~rpc_server:Resto (* The limit is not implemented for Dream *)
-      ~enable_websocket:true
-      ~max_websocket_message_length
-      ()
+  let max_message_length = 512 in
+  let patch_config json =
+    json
+    |> Evm_node.patch_config_with_experimental_feature
+         ~rpc_server:Resto (* The limit is not implemented for Dream *)
+         ()
+    |> Evm_node.patch_config_websockets_if_enabled ~max_message_length
   in
   register_sandbox
     ~tags:["evm"; "rpc"; "websocket"; "max"]
     ~title:"Websocket server does not accept messages larger than maximum"
     ~patch_config
+    ~websockets:true
   @@ fun sequencer ->
   let* websocket = Evm_node.open_websocket sequencer in
   let shutdown =
@@ -11163,9 +11166,7 @@ let test_websocket_max_message_length () =
       ]
   in
   let* () =
-    Websocket.send_raw
-      websocket
-      (String.make (max_websocket_message_length + 1) '\000')
+    Websocket.send_raw websocket (String.make (max_message_length + 1) '\000')
   in
   let* reason = shutdown in
   Log.info "Websocket shutdown reason: %S." reason ;
@@ -11190,24 +11191,26 @@ let test_websocket_rate_limit strategy =
     | `Error -> "error"
     | `Close -> "close"
   in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~rpc_server:Resto (* The limit is not implemented for Dream *)
-      ~enable_websocket:true
-      ~monitor_websocket_heartbeat:false (* To not count ping/pong frames *)
-      ~websocket_rate_limit:
-        (`O
-          [
-            ("max_messages", `Float (float_of_int max_messages));
-            ("interval", `Float (float_of_int interval));
-            ("strategy", `String strategy_str);
-          ])
-      ()
+  let patch_config json =
+    json
+    |> Evm_node.patch_config_with_experimental_feature
+         ~rpc_server:Resto (* The limit is not implemented for Dream *)
+         ()
+    |> Evm_node.patch_config_websockets_if_enabled
+         ~monitor_heartbeat:false (* To not count ping/pong frames *)
+         ~rate_limit:
+           (`O
+             [
+               ("max_messages", `Float (float_of_int max_messages));
+               ("interval", `Float (float_of_int interval));
+               ("strategy", `String strategy_str);
+             ])
   in
   register_sandbox
     ~tags:["evm"; "rpc"; "websocket"; "rate_limit"; strategy_str]
     ~title:(sf "Websocket server limits rate of messages (%s)" strategy_str)
     ~patch_config
+    ~websockets:true
   @@ fun sequencer ->
   let* websocket = Evm_node.open_websocket sequencer in
   let*@ _ = produce_block sequencer in
@@ -11288,23 +11291,26 @@ let test_websocket_rate_limit strategy =
 let test_websocket_frames_rate_limit () =
   let max_frames = 100 in
   let interval = 3 in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~rpc_server:Resto (* The limit is not implemented for Dream *)
-      ~enable_websocket:true
-      ~monitor_websocket_heartbeat:false (* To not count ping/pong frames *)
-      ~websocket_rate_limit:
-        (`O
-          [
-            ("max_frames", `Float (float_of_int max_frames));
-            ("interval", `Float (float_of_int interval));
-          ])
-      ()
+  let patch_config json =
+    json
+    |> Evm_node.patch_config_with_experimental_feature
+         ~rpc_server:Resto (* The limit is not implemented for Dream *)
+         ()
+    |> Evm_node.patch_config_websockets_if_enabled
+         ~monitor_heartbeat:false (* To not count ping/pong frames *)
+         ~rate_limit:
+           (`O
+             [
+               ("max_frames", `Float (float_of_int max_frames));
+               ("interval", `Float (float_of_int interval));
+             ])
   in
+
   register_sandbox
     ~tags:["evm"; "rpc"; "websocket"; "rate_limit"; "frames"]
     ~title:"Websocket server limits rate of frames"
     ~patch_config
+    ~websockets:true
   @@ fun sequencer ->
   let* websocket = Evm_node.open_websocket sequencer in
   let*@ _ = produce_block sequencer in
@@ -11347,16 +11353,18 @@ let test_websocket_frames_rate_limit () =
   unit
 
 let test_websocket_heartbeat_monitoring () =
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~rpc_server:Resto (* Monitoring is not implemented for Dream *)
-      ~enable_websocket:true
-      ()
+  let patch_config json =
+    json
+    |> Evm_node.patch_config_with_experimental_feature
+         ~rpc_server:Resto (* Monitoring is not implemented for Dream *)
+         ()
+    |> Evm_node.patch_config_websockets_if_enabled ~monitor_heartbeat:true
   in
   register_sandbox
     ~tags:["evm"; "rpc"; "websocket"; "monitoring"]
     ~title:"Websocket server closes connection when client unresponsive"
     ~patch_config
+    ~websockets:true
   @@ fun sequencer ->
   let ws_connection_established =
     Evm_node.wait_for sequencer "websocket_starting.v0" @@ fun _json -> Some ()

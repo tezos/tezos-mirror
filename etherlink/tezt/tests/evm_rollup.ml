@@ -433,10 +433,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     else unit
   in
   let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ?enable_websocket:websockets
-      ?enable_tx_queue
-      ()
+    Evm_node.patch_config_with_experimental_feature ?enable_tx_queue ()
   in
   let* produce_block, evm_node =
     match setup_mode with
@@ -447,6 +444,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
             ~patch_config
             ~mode
             ?restricted_rpcs
+            ?websockets
             (Sc_rollup_node.endpoint sc_rollup_node)
         in
         return
@@ -489,6 +487,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
             ~patch_config
             ~mode:sequencer_mode
             ?restricted_rpcs
+            ?websockets
             (Sc_rollup_node.endpoint sc_rollup_node)
         in
         let produce_block () = Rpc.produce_block sequencer in

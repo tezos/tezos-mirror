@@ -163,12 +163,14 @@ val preimages_dir : t -> string
 
 val supports_threshold_encryption : t -> bool
 
-(** [create ?name ?runner ?mode ?history ?data_dir ?rpc_addr ?rpc_port ?spawn_rpc
-    rollup_node_endpoint] creates an EVM node server.
+(** [create ?name ?runner ?mode ?history ?data_dir ?rpc_addr ?rpc_port
+    ?spawn_rpc ?websockets rollup_node_endpoint] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to [Constant.default_host] and a fresh port
     is chosen if [rpc_port] is not set.
+
+    If [websockets] is true, activates the websocket server.
 
     The server communicates with a rollup-node and sets its endpoint via
     [rollup_node_endpoint].
@@ -187,6 +189,7 @@ val create :
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
   ?spawn_rpc:int ->
+  ?websockets:bool ->
   string ->
   t
 
@@ -334,7 +337,7 @@ type tx_queue_config =
 
 (** [patch_config_with_experimental_feature
     ?drop_duplicate_when_injection ?next_wasm_runtime ?rpc_server
-    ?enable_websocket ?max_websocket_message_length json_config]
+    json_config]
     patches a config to add experimental feature. Each optional
     argument adds the corresponding experimental feature. *)
 val patch_config_with_experimental_feature :
@@ -342,10 +345,6 @@ val patch_config_with_experimental_feature :
   ?blueprints_publisher_order_enabled:bool ->
   ?next_wasm_runtime:bool ->
   ?rpc_server:rpc_server ->
-  ?enable_websocket:bool ->
-  ?max_websocket_message_length:int ->
-  ?monitor_websocket_heartbeat:bool ->
-  ?websocket_rate_limit:Ezjsonm.value ->
   ?enable_tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
@@ -354,13 +353,21 @@ val patch_config_with_experimental_feature :
   JSON.t ->
   JSON.t
 
+(** Edit websockets server configuration if websockets server is enabled. *)
+val patch_config_websockets_if_enabled :
+  ?max_message_length:int ->
+  ?monitor_heartbeat:bool ->
+  ?rate_limit:Ezjsonm.value ->
+  JSON.t ->
+  JSON.t
+
 (** Edit garbage collector parameters in the configuration file. *)
 val patch_config_gc : ?history_mode:history_mode -> JSON.t -> JSON.t
 
-(** [init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr
-    ?rpc_port rollup_node_endpoint] creates an EVM node server with
-    {!create}, init the config with {!spawn_init_config}, patch it
-    with [patch_config], then runs it with {!run}. *)
+(** [init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
+    ?websockets rollup_node_endpoint] creates an EVM node server with {!create},
+    init the config with {!spawn_init_config}, patch it with [patch_config],
+    then runs it with {!run}. *)
 val init :
   ?patch_config:(JSON.t -> JSON.t) ->
   ?name:string ->
@@ -373,6 +380,7 @@ val init :
   ?restricted_rpcs:string ->
   ?history_mode:history_mode ->
   ?spawn_rpc:int ->
+  ?websockets:bool ->
   string ->
   t Lwt.t
 

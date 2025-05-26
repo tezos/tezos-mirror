@@ -259,6 +259,7 @@ val init_sequencer_sandbox :
   ?minimum_base_fee_per_gas:Wei.t ->
   ?history_mode:Evm_node.history_mode ->
   ?patch_config:(JSON.t -> JSON.t) ->
+  ?websockets:bool ->
   ?kernel:Uses.t ->
   ?evm_version:Evm_version.t ->
   ?eth_bootstrap_accounts:string list ->

@@ -192,9 +192,9 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
     else patch_config
   in
   let patch_config =
-    match (rpc_server, websockets, enable_tx_queue) with
-    | None, None, None -> patch_config
-    | _, _, _ ->
+    match (rpc_server, enable_tx_queue) with
+    | None, None -> patch_config
+    | _, _ ->
         fun c ->
           Evm_node.patch_config_with_experimental_feature
             ?l2_chains:
@@ -202,7 +202,6 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
               | None -> None
               | Some l2_chain -> Some [l2_chain])
             ?rpc_server
-            ?enable_websocket:websockets
             ?enable_tx_queue
             ()
           @@ patch_config c
@@ -237,6 +236,7 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
       ~mode:observer_mode
       ~config_file
       ?history_mode
+      ?websockets
       (Evm_node.endpoint evm_node)
   in
   let* () = Evm_node.wait_for_blueprint_applied observer 0 in
@@ -535,7 +535,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
       ?rpc_server
-      ?enable_websocket:websockets
       ?spawn_rpc
       ?enable_tx_queue
       (* When adding new experimental feature please make sure it's a
@@ -549,7 +548,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
       ?rpc_server
-      ?enable_websocket:websockets
       ?enable_tx_queue
       ?periodic_snapshot_path
       ()
@@ -561,7 +559,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
       ?rpc_server
-      ?enable_websocket:websockets
       ?enable_tx_queue
       ?periodic_snapshot_path
       ()
@@ -620,6 +617,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~mode:sequencer_mode
       ?history_mode
       ?spawn_rpc
+      ?websockets
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* observers =
