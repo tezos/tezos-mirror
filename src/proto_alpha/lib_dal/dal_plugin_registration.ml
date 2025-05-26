@@ -96,6 +96,7 @@ module Plugin = struct
           parametric.sc_rollup.reveal_activation_level
             .dal_attested_slots_validity_lag;
         blocks_per_cycle = parametric.blocks_per_cycle;
+        minimal_block_delay = Period.to_seconds parametric.minimal_block_delay;
       }
 
   (* We choose a previous offset (5 blocks from head) to ensure that the

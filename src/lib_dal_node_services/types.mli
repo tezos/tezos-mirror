@@ -274,6 +274,7 @@ type proto_parameters = {
   commitment_period_in_blocks : int;
   dal_attested_slots_validity_lag : int;
   blocks_per_cycle : int32;
+  minimal_block_delay : int64;
 }
 
 (** The type contains all elements required to construct a trap accusation.

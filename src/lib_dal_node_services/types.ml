@@ -361,6 +361,7 @@ type proto_parameters = {
   commitment_period_in_blocks : int;
   dal_attested_slots_validity_lag : int;
   blocks_per_cycle : int32;
+  minimal_block_delay : int64;
 }
 
 type trap = {
@@ -504,6 +505,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
            commitment_period_in_blocks;
            dal_attested_slots_validity_lag;
            blocks_per_cycle;
+           minimal_block_delay;
          } ->
       ( ( feature_enable,
           incentives_enable,
@@ -515,7 +517,8 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
           sc_rollup_challenge_window_in_blocks,
           commitment_period_in_blocks,
           dal_attested_slots_validity_lag,
-          blocks_per_cycle ) ))
+          blocks_per_cycle,
+          minimal_block_delay ) ))
     (fun ( ( feature_enable,
              incentives_enable,
              number_of_slots,
@@ -526,7 +529,8 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
              sc_rollup_challenge_window_in_blocks,
              commitment_period_in_blocks,
              dal_attested_slots_validity_lag,
-             blocks_per_cycle ) ) ->
+             blocks_per_cycle,
+             minimal_block_delay ) ) ->
       {
         feature_enable;
         incentives_enable;
@@ -539,6 +543,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
         commitment_period_in_blocks;
         dal_attested_slots_validity_lag;
         blocks_per_cycle;
+        minimal_block_delay;
       })
     (merge_objs
        (obj6
@@ -548,12 +553,13 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
           (req "attestation_lag" int31)
           (req "attestation_threshold" int31)
           (req "traps_fraction" q_encoding))
-       (obj5
+       (obj6
           (req "cryptobox_parameters" Cryptobox.Verifier.parameters_encoding)
           (req "sc_rollup_challenge_window_in_blocks" int31)
           (req "commitment_period_in_blocks" int31)
           (req "dal_attested_slots_validity_lag" int31)
-          (req "blocks_per_cycle" int32)))
+          (req "blocks_per_cycle" int32)
+          (req "minimal_block_delay" int64)))
 
 let trap_encoding =
   Data_encoding.(
