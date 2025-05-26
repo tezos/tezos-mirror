@@ -86,7 +86,7 @@ let worker =
   Eio.Lazy.from_fun ~cancel:`Protect @@ fun () ->
   match
     Worker.launch_eio
-      ~domains:default_max_domains
+      ~domains:number_of_domains
       table
       ~name:"shared task worker"
       ()
