@@ -12054,12 +12054,12 @@ let test_transaction_object expected_type_ name make_transaction =
     (type_ = expected_type_)
       string
       ~error_msg:
-        ("Type was expected to be %L (" ^ name ^ "), but the RPC returned %R")) ;
+        ("Type was expected to be %R (" ^ name ^ "), but the RPC returned %L")) ;
   unit
 
 let test_eip2930_transaction_object =
   test_transaction_object
-    "0x01"
+    "0x1"
     "eip2930"
     (Cast.craft_tx
        ~legacy:true
@@ -12078,7 +12078,7 @@ let test_eip2930_transaction_object =
 
 let test_eip1559_transaction_object =
   test_transaction_object
-    "0x02"
+    "0x2"
     "eip1559"
     (Cast.craft_tx
        ~legacy:false
