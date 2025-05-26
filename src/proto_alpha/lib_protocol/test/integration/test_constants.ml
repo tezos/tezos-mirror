@@ -122,24 +122,27 @@ let () =
     Alpha_context.Period.one_hour
     result
 
+let cycles_to_period
+    ~(constants : Protocol.Alpha_context.Constants.Parametric.t) c =
+  let open Lwt_result_wrap_syntax in
+  let open Protocol in
+  let*?@ one_cycle_period =
+    Alpha_context.Period.mult
+      constants.blocks_per_cycle
+      constants.minimal_block_delay
+  in
+  let*?@ res = Alpha_context.Period.mult c one_cycle_period in
+  return res
+
 let check_protocol_time_correlation
     ~(constants : Protocol.Alpha_context.Constants.Parametric.t) ~cycles ~days =
   let open Lwt_result_wrap_syntax in
   let open Protocol in
-  let cycles_to_period x =
-    let*?@ one_cycle_period =
-      Alpha_context.Period.mult
-        constants.blocks_per_cycle
-        constants.minimal_block_delay
-    in
-    let*?@ res = Alpha_context.Period.mult x one_cycle_period in
-    return res
-  in
   let days_to_period x =
     let*?@ res = Protocol.Alpha_context.Period.(mult x one_day) in
     return res
   in
-  let* constant = cycles_to_period cycles in
+  let* constant = cycles_to_period ~constants cycles in
   let* days = days_to_period days in
   Assert.equal
     ~loc:__LOC__
@@ -188,6 +191,87 @@ let () =
     ~constants
     ~cycles:(Int32.of_int constants.tolerated_inactivity_period)
     ~days:2l
+
+(* For the rational of VDF related constants, see the description of
+   [vdf_difficulty] in
+   {!val:Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet}. *)
+
+(* Security factor ensures that even with the most powerful CPU in the market,
+   you cannot compute the VDF result within the time granted for nonce
+   revelation. *)
+let vdf_security_factor = 5l
+
+(* This factor is to ensure that after nonce revelation and VDF computation, we
+   have a comfortable margin to inject the VDF computation result.
+
+   [margin_in_cycle_factor=2] means that the cycle should last two times more
+   than nonce revelation + VDF computation. ie half of the cycle remains for
+   including the VDF result in a block . *)
+let margin_in_cycle_factor = 2l
+
+(* Number of modular squaring per second on benchmark machine *)
+let vdf_modular_squaring_per_second = 200_000L
+
+let () =
+  register_test
+    ~title:"Nonce revelation period is short enough for VDF to fit in a cycle "
+  @@ fun () ->
+  let constants = Default_parameters.constants_mainnet in
+  Assert.lt
+    ~loc:__LOC__
+    Int32.compare
+    "nonce_revelation_threshold is too short wrt blocks_per_cycle"
+    (fun ppf -> Format.fprintf ppf "%ld")
+    Int32.(
+      (* time of reveal + vdf comp + VDF injection *)
+      mul
+        margin_in_cycle_factor
+        ((* time for revelation AND vdf computation *)
+         mul
+           (add 1l vdf_security_factor)
+           constants.nonce_revelation_threshold))
+    constants.blocks_per_cycle
+
+let () =
+  register_test ~title:"VDF difficulty fits into a cycle" @@ fun () ->
+  let constants = Default_parameters.constants_mainnet in
+  let open Lwt_result_syntax in
+  let* cycle_period = cycles_to_period ~constants 1l in
+  Assert.lt
+    ~loc:__LOC__
+    Int64.compare
+    "nonce_revelation_threshold is too short wrt blocks_per_cycle"
+    (fun ppf -> Format.fprintf ppf "%Ld")
+    Int64.(mul (of_int32 margin_in_cycle_factor) constants.vdf_difficulty)
+    Int64.(
+      (* time of a cycle translated to VDF difficulty *)
+      mul
+        vdf_modular_squaring_per_second
+        (Protocol.Alpha_context.Period.to_seconds cycle_period))
+
+let () =
+  register_test ~title:"VDF difficulty is secure wrt revelation period"
+  @@ fun () ->
+  let constants = Default_parameters.constants_mainnet in
+  let open Lwt_result_wrap_syntax in
+  let*?@ revelation_period =
+    Protocol.Alpha_context.Period.mult
+      constants.nonce_revelation_threshold
+      constants.minimal_block_delay
+  in
+  Assert.leq
+    ~loc:__LOC__
+    Int64.compare
+    "vdf_difficulty is too easy wrt nonce_revelation_threshold"
+    (fun ppf -> Format.fprintf ppf "%Ld")
+    Int64.(
+      (* [vdf_security_factor] times revelation period translated to VDF difficulty *)
+      mul
+        (of_int32 vdf_security_factor)
+        (mul
+           vdf_modular_squaring_per_second
+           (Protocol.Alpha_context.Period.to_seconds revelation_period)))
+    constants.vdf_difficulty
 
 (* Check that
     [sc_rollup_challenge_window_in_blocks < sc_rollup_max_lookahead_in_blocks]
