@@ -204,9 +204,8 @@ can be exported from a given history mode node.
 Snapshot providers
 ~~~~~~~~~~~~~~~~~~
 
-There are several services providing node snapshots. They create snapshots
+There may be several services providing node snapshots. They create snapshots
 of their nodes on a regular basis (usually daily) and make them available for
 download. These include:
 
 * `Tzinit snapshots <https://snapshots.tzinit.org/>`_
-* `Teztnets (Tezos Testnets) <https://teztnets.com/>`_
