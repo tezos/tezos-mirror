@@ -847,6 +847,151 @@ let test_reveal_with_unused_proof () =
   in
   return_unit
 
+let test_reveal_tz4_in_batch () =
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
+  let new_bls_c = Account.new_account ~algo:Bls () in
+  let new_bls_contract = Contract.Implicit new_bls_c.pkh in
+  let* op_transaction =
+    Op.transaction (B blk) c new_bls_contract (Tez.of_mutez_exn 10_000_000L)
+  in
+  let* blk = Block.bake blk ~operation:op_transaction in
+  let* () =
+    let* revealead =
+      Context.Contract.is_manager_key_revealed (B blk) new_bls_contract
+    in
+    when_ revealead (fun () ->
+        failwith "Unexpected revelation: expected fresh pkh")
+  in
+  let* inc = Incremental.begin_construction blk in
+
+  (* reveal with incorrect proof *)
+  let new_bls_c_for_proof = Account.new_account ~algo:Bls () in
+  let proof = Op.create_proof new_bls_c_for_proof.sk in
+  let* reveal_with_incorrect_proof =
+    Op.revelation ~forge_proof:proof ~fee:Tez.zero (I inc) new_bls_c.pk
+  in
+  let* op_transfer =
+    Op.transaction
+      ~force_reveal:false
+      ~fee:Tez.zero
+      (I inc)
+      new_bls_contract
+      c
+      (Tez.of_mutez_exn 1_000_001L)
+  in
+  let* batched_operation =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:new_bls_contract
+      (I inc)
+      [reveal_with_incorrect_proof; op_transfer]
+  in
+  let expect_apply_failure =
+    Error_helpers.expect_incorrect_bls_proof
+      ~loc:__LOC__
+      ~kind_pk:Manager_pk
+      ~pk:new_bls_c.pk
+  in
+  let* (i_incorrect_proof : Incremental.t) =
+    Incremental.add_operation ~expect_apply_failure inc batched_operation
+  in
+  let* () =
+    let* revealead =
+      Context.Contract.is_manager_key_revealed
+        (I i_incorrect_proof)
+        new_bls_contract
+    in
+    when_ revealead (fun () ->
+        failwith "Unexpected contract revelation: reveal was expected to fail")
+  in
+
+  (* missing bls proof *)
+  let* reveal_with_missing_bls_proof =
+    Op.revelation ~forge_proof:None ~fee:Tez.zero (I inc) new_bls_c.pk
+  in
+  let* batched_operation =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:new_bls_contract
+      (I inc)
+      [reveal_with_missing_bls_proof; op_transfer]
+  in
+  let expect_failure =
+    Error_helpers.expect_missing_bls_proof
+      ~loc:__LOC__
+      ~kind_pk:Manager_pk
+      ~pk:new_bls_c.pk
+      ~source_pkh:new_bls_c.pkh
+  in
+  let* (_i : Incremental.t) =
+    Incremental.validate_operation ~expect_failure inc batched_operation
+  in
+
+  (* correct reveal *)
+  let* op_reveal = Op.revelation ~fee:Tez.zero (I inc) new_bls_c.pk in
+  let* batched_operation =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:new_bls_contract
+      (I inc)
+      [op_reveal; op_transfer]
+  in
+  let* blk = Block.bake blk ~operation:batched_operation in
+  let* () =
+    let* revealead =
+      Context.Contract.is_manager_key_revealed (B blk) new_bls_contract
+    in
+    when_ (not revealead) (fun () -> failwith "New contract revelation failed.")
+  in
+  return_unit
+
+let test_reveal_with_unused_proof_in_batch () =
+  let open Lwt_result_syntax in
+  let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
+  let new_c = Account.new_account ~algo:Ed25519 () in
+  let new_contract = Contract.Implicit new_c.pkh in
+  let* op_transaction =
+    Op.transaction (B blk) c new_contract (Tez.of_mutez_exn 10_000_000L)
+  in
+  let* blk = Block.bake blk ~operation:op_transaction in
+  let* () =
+    let* revealead =
+      Context.Contract.is_manager_key_revealed (B blk) new_contract
+    in
+    when_ revealead (fun () ->
+        failwith "Unexpected revelation: expected fresh pkh")
+  in
+  let* inc = Incremental.begin_construction blk in
+  let new_bls_c_for_proof = Account.new_account ~algo:Bls () in
+  let proof = Op.create_proof new_bls_c_for_proof.sk in
+  let* reveal_with_unused_proof =
+    Op.revelation ~forge_proof:proof ~fee:Tez.zero (I inc) new_c.pk
+  in
+  let* op_transfer =
+    Op.transaction
+      ~force_reveal:false
+      ~fee:Tez.zero
+      (I inc)
+      new_contract
+      c
+      (Tez.of_mutez_exn 1_000_001L)
+  in
+  let* batched_operation =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:new_contract
+      (I inc)
+      [reveal_with_unused_proof; op_transfer]
+  in
+  let expect_failure =
+    Error_helpers.expect_unused_bls_proof ~loc:__LOC__ ~kind_pk:Manager_pk
+  in
+  let* (_i : Incremental.t) =
+    Incremental.validate_operation ~expect_failure inc batched_operation
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest "simple reveal" `Quick test_simple_reveal;
@@ -904,6 +1049,14 @@ let tests =
       "reveal with unused proof"
       `Quick
       test_reveal_with_unused_proof;
+    Tztest.tztest
+      "reveal of tz4 public key in batch"
+      `Quick
+      test_reveal_tz4_in_batch;
+    Tztest.tztest
+      "reveal with unused proof in batch"
+      `Quick
+      test_reveal_with_unused_proof_in_batch;
   ]
 
 let () =
