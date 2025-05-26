@@ -153,6 +153,20 @@ type websockets_config = {
   rate_limit : websocket_rate_limit option;
 }
 
+(* This should be enough for messages we expect to receive in the ethereum
+   JSONRPC protocol. *)
+let default_max_socket_message_length = 4096 * 1024
+
+let default_monitor_websocket_heartbeat =
+  Some {ping_interval = 5.; ping_timeout = 30.}
+
+let default_websockets_config =
+  {
+    max_message_length = default_max_socket_message_length;
+    monitor_heartbeat = default_monitor_websocket_heartbeat;
+    rate_limit = None;
+  }
+
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   blueprints_publisher_order_enabled : bool;
@@ -293,13 +307,6 @@ let pp_history_mode_debug fmt h =
 
 let pp_history_mode_info fmt h =
   Format.pp_print_string fmt @@ string_of_history_mode_info h
-
-(* This should be enough for messages we expect to receive in the ethereum
-   JSONRPC protocol. *)
-let default_max_socket_message_length = 4096 * 1024
-
-let default_monitor_websocket_heartbeat =
-  Some {ping_interval = 5.; ping_timeout = 30.}
 
 let default_l2_chains = None
 
@@ -1753,11 +1760,11 @@ module Cli = struct
     }
 
   let patch_configuration_from_args ?rpc_addr ?rpc_port ?rpc_batch_limit
-      ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
-      ?dont_track_rollup_node ?verbose ?preimages ?preimages_endpoint
-      ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
+      ?cors_origins ?cors_headers ?enable_websocket ?tx_pool_timeout_limit
+      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?keep_alive
+      ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?preimages
+      ?preimages_endpoint ?native_execution_policy ?time_between_blocks
+      ?max_number_of_chunks ?private_rpc_port ?sequencer_key ?evm_node_endpoint
       ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
@@ -1993,11 +2000,16 @@ module Cli = struct
         ~default:configuration.rollup_node_endpoint
         rollup_node_endpoint
     in
-
+    let websockets =
+      match enable_websocket with
+      | None -> configuration.websockets
+      | Some false -> None
+      | Some true -> Some default_websockets_config
+    in
     {
       public_rpc;
       private_rpc;
-      websockets = configuration.websockets;
+      websockets;
       log_filter;
       kernel_execution;
       sequencer;
@@ -2026,7 +2038,7 @@ module Cli = struct
     }
 
   let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
-      ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
+      ?cors_headers ?enable_websocket ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
       ?dont_track_rollup_node ?verbose ?preimages ?preimages_endpoint
       ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
@@ -2043,6 +2055,7 @@ module Cli = struct
          ?rpc_batch_limit
          ?cors_origins
          ?cors_headers
+         ?enable_websocket
          ?tx_pool_timeout_limit
          ?tx_pool_addr_limit
          ?tx_pool_tx_per_addr_limit
@@ -2074,11 +2087,11 @@ module Cli = struct
          ?history_mode
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
-      ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
-      ?dont_track_rollup_node ?verbose ?preimages ?preimages_endpoint
-      ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
+      ?cors_origins ?cors_headers ?enable_websocket ?tx_pool_timeout_limit
+      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?keep_alive
+      ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?preimages
+      ?preimages_endpoint ?native_execution_policy ?time_between_blocks
+      ?max_number_of_chunks ?private_rpc_port ?sequencer_key ?evm_node_endpoint
       ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
@@ -2110,6 +2123,7 @@ module Cli = struct
           ?rpc_batch_limit
           ?cors_origins
           ?cors_headers
+          ?enable_websocket
           ?keep_alive
           ?sequencer_key
           ?evm_node_endpoint
@@ -2151,6 +2165,7 @@ module Cli = struct
           ?rpc_batch_limit
           ?cors_origins
           ?cors_headers
+          ?enable_websocket
           ?keep_alive
           ?sequencer_key
           ?evm_node_endpoint

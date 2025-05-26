@@ -325,6 +325,7 @@ module Cli : sig
     ?rpc_batch_limit:limit ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
+    ?enable_websocket:bool ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
@@ -364,6 +365,7 @@ module Cli : sig
     ?rpc_batch_limit:limit ->
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
+    ?enable_websocket:bool ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
@@ -403,6 +405,7 @@ module Cli : sig
     ?rpc_batch_limit:limit ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
+    ?enable_websocket:bool ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
