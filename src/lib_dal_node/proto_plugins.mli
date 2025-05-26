@@ -72,3 +72,7 @@ val resolve_plugin_for_level :
 *)
 val get_supported_proto_plugins :
   Rpc_context.t -> head_level:int32 -> t tzresult Lwt.t
+
+(** returns true if an only if the given proto_plugins structure has some
+    plugins registered in it. *)
+val has_plugins : t -> bool

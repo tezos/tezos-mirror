@@ -170,3 +170,5 @@ let get_supported_proto_plugins cctxt ~head_level =
   match res with
   | Ok (plugins, _) | Error (`End_loop_ok plugins) -> return plugins
   | Error (`End_loop_nok err) -> fail err
+
+let has_plugins plugins = not (LevelMap.is_empty plugins)
