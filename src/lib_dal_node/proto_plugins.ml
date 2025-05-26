@@ -55,7 +55,8 @@ let () =
 
 let last_failed_protocol = ref None
 
-let resolve_plugin_by_hash ?(emit_failure_event = true) proto_hash =
+let resolve_plugin_by_hash ?(emit_failure_event = true) ~start_level proto_hash
+    =
   let open Lwt_result_syntax in
   let plugin_opt = Dal_plugin.get proto_hash in
   match plugin_opt with
@@ -70,22 +71,19 @@ let resolve_plugin_by_hash ?(emit_failure_event = true) proto_hash =
       in
       tzfail (No_plugin_for_proto {proto_hash})
   | Some plugin ->
-      let*! () = Event.emit_protocol_plugin_resolved ~proto_hash in
+      let*! () = Event.emit_protocol_plugin_resolved ~proto_hash ~start_level in
       return plugin
-
-let resolve_plugin_for_level cctxt ~level =
-  let open Lwt_result_syntax in
-  let* protocols =
-    Chain_services.Blocks.protocols cctxt ~block:(`Level level) ()
-  in
-  let proto_hash = protocols.next_protocol in
-  resolve_plugin_by_hash proto_hash
 
 let may_add cctxt plugins ~first_level ~proto_level =
   let open Lwt_result_syntax in
   let add first_level =
-    let* plugin = resolve_plugin_for_level cctxt ~level:first_level in
-    let (module Plugin) = plugin in
+    let* protocols =
+      Chain_services.Blocks.protocols cctxt ~block:(`Level first_level) ()
+    in
+    let proto_hash = protocols.next_protocol in
+    let* ((module Plugin) as plugin) =
+      resolve_plugin_by_hash proto_hash ~start_level:first_level
+    in
     let+ proto_parameters =
       Plugin.get_constants `Main (`Level first_level) cctxt
     in
@@ -134,14 +132,25 @@ include Plugins
    because the first level of the protocol (the activation level) might be too
    old, in that the L1 node might not have the context for that protocol. *)
 let add_plugin_for_proto cctxt plugins
-    Chain_services.{protocol; proto_level; activation_block} highest_level =
+    Chain_services.
+      {protocol; proto_level; activation_block = _, activation_level}
+    highest_level =
   let open Lwt_result_syntax in
-  let* plugin = resolve_plugin_by_hash ~emit_failure_event:false protocol in
+  let* plugin =
+    resolve_plugin_by_hash
+      ~emit_failure_event:false
+      protocol
+      ~start_level:activation_level
+  in
   let block = `Level highest_level in
   let (module Plugin) = plugin in
   let+ proto_parameters = Plugin.get_constants `Main block cctxt in
-  let _hash, level = activation_block in
-  Plugins.add plugins ~first_level:level ~proto_level plugin proto_parameters
+  Plugins.add
+    plugins
+    ~first_level:activation_level
+    ~proto_level
+    plugin
+    proto_parameters
 
 let get_supported_proto_plugins cctxt ~head_level =
   let open Lwt_result_syntax in

@@ -55,15 +55,6 @@ val get_plugin_and_parameters_for_level :
 val may_add :
   Rpc_context.t -> t -> first_level:int32 -> proto_level:int -> t tzresult Lwt.t
 
-(** [resolve_plugin_for_level rpc_ctxt ~level] returns the plugin for the given
-    [level].
-
-    It returns an error if the [Chain_services.Blocks.protocols] RPC fails, or
-    if the plugin is not registered, in which case it returns
-    [No_plugin_for_proto]. *)
-val resolve_plugin_for_level :
-  Rpc_context.t -> level:int32 -> (module Dal_plugin.T) tzresult Lwt.t
-
 (** [get_supported_proto_plugins cctxt ~head_level] fetches all the protocol plugins that
     it can and for which it can also fetch the protocol parameters.
 
