@@ -15,6 +15,7 @@ type ctx = {
   chain_id : L2_types.chain_id;
   gas_limit : Z.t;
   whitelist : Config.whitelist_item list option;
+  mutable nonce : Ethereum_types.quantity;
 }
 
 module Craft = struct
@@ -58,20 +59,20 @@ module Tx_queue = struct
     match v with Ok v -> f v | Error err -> return (Error err)
 
   (* as found in etherlink/bin_floodgate/tx_queue.ml *)
-  let transfer ctx ?to_ ?(value = Z.zero) ~nonce ~data () =
+  let transfer ctx ?to_ ?(value = Z.zero) ~data () =
     let open Lwt_result_syntax in
+    let (Ethereum_types.Qty nonce as qnonce) = ctx.nonce in
     let txn = Craft.transfer ctx ~nonce ?to_ ~value ~data () in
     let tx_raw = Ethereum_types.hex_to_bytes txn in
     let hash = Ethereum_types.hash_raw_tx tx_raw in
     let**? tx = Transaction.decode tx_raw in
     let**? tx_object = Transaction.to_transaction_object ~hash tx in
-    let+ res =
-      Tx_container.add
-        tx_object
-        ~raw_tx:txn
-        ~next_nonce:(Ethereum_types.Qty nonce)
-    in
-    match res with Ok _hash -> Ok () | Error _ as res -> res
+    let+ res = Tx_container.add tx_object ~raw_tx:txn ~next_nonce:qnonce in
+    match res with
+    | Ok _hash ->
+        ctx.nonce <- Ethereum_types.Qty.next ctx.nonce ;
+        Ok ()
+    | Error _ as res -> res
 end
 
 module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
@@ -550,20 +551,13 @@ let precompiled_contract_address = Efunc_core.Private.a Deposit.address_hex
 
 let claim ctx ~deposit_id =
   let open Lwt_result_syntax in
-  let* (Ethereum_types.Qty nonce) =
-    Websocket_client.send_jsonrpc
-      ctx.ws_client
-      (Call
-         ( (module Rpc_encodings.Get_transaction_count),
-           (ctx.public_key, Block_parameter Latest) ))
-  in
   let data =
     Efunc_core.Evm.encode ~name:"claim" [`uint 256] [`int deposit_id]
   in
   let _ : unit Lwt.t =
     let open Lwt_syntax in
     let* res =
-      Tx_queue.transfer ctx ~nonce ~to_:precompiled_contract_address ~data ()
+      Tx_queue.transfer ctx ~to_:precompiled_contract_address ~data ()
     in
     match res with
     | Ok (Ok ()) -> return_unit
@@ -748,6 +742,14 @@ let claim_deposits ctx =
   | [] -> return_unit
   | _ ->
       let*! () = Event.(emit unclaimed_deposits) (List.length deposits) in
+      let* nonce =
+        Websocket_client.send_jsonrpc
+          ctx.ws_client
+          (Call
+             ( (module Rpc_encodings.Get_transaction_count),
+               (ctx.public_key, Block_parameter Latest) ))
+      in
+      ctx.nonce <- nonce ;
       (* Clear queue because we reinject all missing claims. *)
       let* () = Tx_queue.Tx_container.clear () in
       List.iter_es
@@ -885,6 +887,7 @@ let start db ~config ~notify_ws_change ~first_block =
         chain_id;
         gas_limit = Z.of_int64 config.gas_limit;
         whitelist = config.whitelist;
+        nonce = Ethereum_types.Qty.zero;
       }
     in
     monitor_heads ctx
