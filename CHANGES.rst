@@ -101,8 +101,13 @@ Signer
 ------
 
 - Add a ``--allow-list-known-keys`` argument at signer launch to allow client to
-  ask for the signer list of known public key hashes. The signer return ``List
+  ask for the signer list of known public key hashes. The signer returns ``List
   known keys request not allowed.`` otherwise. (MR :gl:`!17403`)
+
+- Add a ``--allow-to-prove-possession`` argument at signer launch to allow
+  client to request proof of possession of known public key hashes. The signer
+  returns ``Request to prove possession is not allowed`` otherwise.
+  (MR :gl:`!18137`)
 
 Baker
 -----
