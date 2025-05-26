@@ -358,7 +358,7 @@ let () =
   register
     "schedule_container_scanning_evm_node_releases"
     schedule_container_scanning_evm_node_releases
-    ~jobs:(Container_scanning.jobs "tezos/tezos:octez-evm-node-v0.26")
+    ~jobs:(Container_scanning.jobs "tezos/tezos:octez-evm-node-v0.27")
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in latest \
        tezos/tezos:octez-evm-node-vX.Y Docker image" ;
