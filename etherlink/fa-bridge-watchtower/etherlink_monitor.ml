@@ -744,20 +744,18 @@ let handle_confirmed_txs {db; ws_client; _}
 let claim_deposits ctx =
   let open Lwt_result_syntax in
   let* deposits = Db.Deposits.get_unclaimed ctx.db in
-  let*! () =
-    let number = List.length deposits in
-    if number > 0 then Event.(emit unclaimed_deposits) number
-    else Lwt.return_unit
-  in
-  let* () =
-    List.iter_es
-      (fun deposit ->
-        let (Qty deposit_id) = deposit.Db.nonce in
-        let*! () = Event.(emit claiming_deposit) deposit.Db.nonce in
-        claim ctx ~deposit_id)
-      deposits
-  in
-  return_unit
+  match deposits with
+  | [] -> return_unit
+  | _ ->
+      let*! () = Event.(emit unclaimed_deposits) (List.length deposits) in
+      (* Clear queue because we reinject all missing claims. *)
+      let* () = Tx_queue.Tx_container.clear () in
+      List.iter_es
+        (fun deposit ->
+          let (Qty deposit_id) = deposit.Db.nonce in
+          let*! () = Event.(emit claiming_deposit) deposit.Db.nonce in
+          claim ctx ~deposit_id)
+        deposits
 
 let on_new_block ctx ~catch_up (b : _ Ethereum_types.block) =
   let open Lwt_result_syntax in
