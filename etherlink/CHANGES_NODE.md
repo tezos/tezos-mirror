@@ -1,30 +1,17 @@
 # Changelog
 
-## Unreleased
+## Version 0.27 (2025-05-26)
 
-### Breaking changes
+This is a hot fix release to address an issue in the encoding of transaction
+type in JSON RPC responses.
 
-### Configuration changes
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
 
 ### RPCs changes
 
 - Fix transaction type encoding to use a compact hex encoding following the
   [standard](https://ethereum.org/en/developers/docs/transactions/#typed-transaction-envelope). (!18132)
-
-### Metrics changes
-
-### Execution changes
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.26 (2025-05-20)
 
