@@ -369,6 +369,14 @@ let build_block_static_directory ~l2_chain_id
          Lwt_result.return
            Storage_repr.Cycle.
              {delegate_sampler_state; selected_stake_distribution})
+  |> register_with_conversion
+       ~service:Tezos_services.shell_header
+       ~impl:(fun {chain; block} () () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let* tezlink_block = Backend.block chain block in
+         Lwt_result_syntax.return tezlink_block)
+       ~convert_output:Current_block_header.tezlink_block_to_shell_header
 
 let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
     (module Block_header : HEADER) base_dir =
