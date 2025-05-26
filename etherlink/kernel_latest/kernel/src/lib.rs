@@ -368,6 +368,21 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
             .unwrap();
     }
 
+    let tezlink_subkeys = host
+        .host
+        .store_count_subkeys(&chains::TEZLINK_SAFE_STORAGE_ROOT_PATH)
+        .expect("The kernel failed to read the number of /tezlink subkeys");
+
+    if tezlink_subkeys == 0 {
+        host.host
+            .store_write(
+                &chains::TEZLINK_SAFE_STORAGE_ROOT_PATH,
+                b"Un carnaval de foncteur",
+                0,
+            )
+            .unwrap();
+    }
+
     if is_revealed_storage(&host) {
         reveal_storage(
             &mut host,
