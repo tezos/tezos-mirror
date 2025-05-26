@@ -43,11 +43,24 @@ module Skip_list_cells : sig
   (** [use t k] executes [k] with a fresh connection to [t]. *)
   val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
-  (** [find ?conn store hash] returns the cell associated to [hash] in
+  (** [find_opt ?conn store hash] returns the cell associated to [hash] in
       the [store], if any. Uses the [conn] if provided (defaults to
       [None]). *)
-  val find :
-    ?conn:conn -> t -> Skip_list_hash.t -> Skip_list_cell.t tzresult Lwt.t
+  val find_opt :
+    ?conn:conn ->
+    t ->
+    Skip_list_hash.t ->
+    Skip_list_cell.t option tzresult Lwt.t
+
+  (** [find_by_slot_id_opt ?conn store ~attested_level ~slot_index] returns the cell
+      associated to ([attested_level], [slot_index]) in the [store], if
+      any. Uses the [conn] if provided (defaults to [None]). *)
+  val find_by_slot_id_opt :
+    ?conn:conn ->
+    t ->
+    attested_level:int32 ->
+    slot_index:int ->
+    Skip_list_cell.t option tzresult Lwt.t
 
   (** [insert ?conn store ~attested_level values] inserts the given
       list of [values] associated to the given [attested_level] in the

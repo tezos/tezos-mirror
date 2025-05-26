@@ -312,7 +312,7 @@ let perform_sqlite store action =
   | Action.Insert {attested_level; payload} ->
       insert store ~attested_level payload
   | Find {skip_list_hash} ->
-      let* _cell = find store skip_list_hash in
+      let* _cell = find_opt store skip_list_hash in
       return_unit
   | Remove {attested_level} -> remove store ~attested_level
 
@@ -337,8 +337,10 @@ let handshake state kvs_store sql_store =
       (fun hash ->
         (* The hash must exist in the stores and the associated cell must be the same. *)
         let* kvs_cell = Kvs_skip_list_cells_store.find kvs_store hash in
-        let* sql_cell = Dal_store_sqlite3.Skip_list_cells.find sql_store hash in
-        assert (Skip_list_cell.equal kvs_cell sql_cell) ;
+        let* sql_cell =
+          Dal_store_sqlite3.Skip_list_cells.find_opt sql_store hash
+        in
+        assert (Option.equal Skip_list_cell.equal (Some kvs_cell) sql_cell) ;
         return_unit)
       must_exist_hashes
   in
