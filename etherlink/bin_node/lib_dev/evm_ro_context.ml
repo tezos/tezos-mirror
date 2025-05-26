@@ -482,9 +482,16 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     (module struct
       include Backend
 
-      module Block_storage = struct
+      (* This function is generic that's why we don't define it in Tezlink block storage
+         (even if for now this is the only place where it's used) *)
+      let nth_block_hash level =
+        Evm_store.use ctxt.store @@ fun conn ->
+        Evm_store.Blocks.find_hash_of_number conn (Qty level)
+
+      (* Overwrite Etherlink_block_storage module *)
+      module Etherlink_block_storage = struct
         (* Current block number is kept in durable storage. *)
-        let current_block_number = Block_storage.current_block_number
+        let current_block_number = Etherlink_block_storage.current_block_number
 
         let nth_block ~full_transaction_object level =
           let open Lwt_result_syntax in
@@ -498,20 +505,6 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           match block_opt with
           | None -> failwith "Block %a not found" Z.pp_print level
           | Some block -> return block
-
-        let tez_nth_block level =
-          let open Lwt_result_syntax in
-          Evm_store.use ctxt.store @@ fun conn ->
-          let* block_opt =
-            Evm_store.Blocks.tez_find_with_level conn (Qty level)
-          in
-          match block_opt with
-          | None -> failwith "Block %a not found" Z.pp_print level
-          | Some block -> return block
-
-        let nth_block_hash level =
-          Evm_store.use ctxt.store @@ fun conn ->
-          Evm_store.Blocks.find_hash_of_number conn (Qty level)
 
         let block_by_hash ~full_transaction_object hash =
           let open Lwt_result_syntax in
@@ -542,6 +535,10 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           Evm_store.Transactions.find_object conn hash
       end
 
+      (* Overwrite Etherlink Tracer using the new Etherlink_block_storage *)
+      module Tracer_etherlink =
+        Tracer_sig.Make (Executor) (Etherlink_block_storage) (Tracer)
+
       let block_param_to_block_number
           (block_param : Ethereum_types.Block_parameter.extended) =
         let open Lwt_result_syntax in
@@ -555,26 +552,38 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
                 failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
         | param -> block_param_to_block_number param
 
-      (* Overwrites Tezlink_backend using the store instead of the durable_storage *)
-      module Tezlink_backend = Tezlink_services_impl.Make (struct
-        include Backend.Reader
+      module Tezlink_block_storage : Tezlink_block_storage_sig.S = struct
+        let nth_block level =
+          let open Lwt_result_syntax in
+          Evm_store.use ctxt.store @@ fun conn ->
+          let* block_opt =
+            Evm_store.Blocks.tez_find_with_level conn (Qty level)
+          in
+          match block_opt with
+          | None -> failwith "Block %a not found" Z.pp_print level
+          | Some block -> return block
 
-        let block_param_to_block_number = block_param_to_block_number
+        let nth_block_hash = nth_block_hash
+      end
 
-        let tez_nth_block = Block_storage.tez_nth_block
+      (* Overwrites Tezlink using the store instead of the durable_storage *)
+      module Tezlink =
+        Tezlink_services_impl.Make
+          (struct
+            include Backend.Reader
 
-        let nth_block_hash = Block_storage.nth_block_hash
-      end)
-
-      include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
+            let block_param_to_block_number = block_param_to_block_number
+          end)
+          (Tezlink_block_storage)
     end)
   else
     (module struct
       include Backend
 
-      module Block_storage = struct
+      (* Overwrite Etherlink_block_storage module *)
+      module Etherlink_block_storage = struct
         (* Current block number is kept in durable storage. *)
-        let current_block_number = Block_storage.current_block_number
+        let current_block_number = Etherlink_block_storage.current_block_number
 
         let with_blueprint ~default level k =
           let open Lwt_result_syntax in
@@ -587,24 +596,8 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
 
         let nth_block ~full_transaction_object level =
           let open Lwt_result_syntax in
-          let* block = Block_storage.nth_block ~full_transaction_object level in
-          if full_transaction_object then
-            with_blueprint ~default:block block.number @@ fun blueprint ->
-            Lwt.return
-              (Transaction_object.rereconstruct_block blueprint.payload block)
-          else
-            (* [full_transaction_object] being false, we just return hashes, no
-               need to try to reconstruct the transaction objects. *)
-            return block
-
-        let tez_nth_block = Block_storage.tez_nth_block
-
-        let nth_block_hash = Block_storage.nth_block_hash
-
-        let block_by_hash ~full_transaction_object hash =
-          let open Lwt_result_syntax in
           let* block =
-            Block_storage.block_by_hash ~full_transaction_object hash
+            Etherlink_block_storage.nth_block ~full_transaction_object level
           in
           if full_transaction_object then
             with_blueprint ~default:block block.number @@ fun blueprint ->
@@ -615,13 +608,27 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
                need to try to reconstruct the transaction objects. *)
             return block
 
-        let block_receipts = Block_storage.block_receipts
+        let block_by_hash ~full_transaction_object hash =
+          let open Lwt_result_syntax in
+          let* block =
+            Etherlink_block_storage.block_by_hash ~full_transaction_object hash
+          in
+          if full_transaction_object then
+            with_blueprint ~default:block block.number @@ fun blueprint ->
+            Lwt.return
+              (Transaction_object.rereconstruct_block blueprint.payload block)
+          else
+            (* [full_transaction_object] being false, we just return hashes, no
+               need to try to reconstruct the transaction objects. *)
+            return block
 
-        let transaction_receipt = Block_storage.transaction_receipt
+        let block_receipts = Etherlink_block_storage.block_receipts
+
+        let transaction_receipt = Etherlink_block_storage.transaction_receipt
 
         let transaction_object hash =
           let open Lwt_result_syntax in
-          let* obj = Block_storage.transaction_object hash in
+          let* obj = Etherlink_block_storage.transaction_object hash in
           match obj with
           | Some obj -> (
               match Transaction_object.block_number obj with
@@ -635,7 +642,9 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           | None -> return_none
       end
 
-      include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
+      (* Overwrite Etherlink Tracer using the new Etherlink_block_storage *)
+      module Tracer_etherlink =
+        Tracer_sig.Make (Executor) (Etherlink_block_storage) (Tracer)
     end)
 
 let next_blueprint_number ctxt =

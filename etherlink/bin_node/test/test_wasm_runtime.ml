@@ -47,7 +47,7 @@ let test_wasm_runtime_id () =
   in
   Log.info "Check state consistency" ;
   let* quantity =
-    Durable_storage.current_block_number (fun key ->
+    Etherlink_durable_storage.current_block_number (fun key ->
         let* candidate = Evm_state.inspect tree key in
         return (Ok candidate))
   in

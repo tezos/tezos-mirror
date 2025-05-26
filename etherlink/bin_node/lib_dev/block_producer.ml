@@ -231,19 +231,19 @@ let pop_valid_tx ~chain_family
         ~initial_validation_state
   | EVM ->
       let read = Evm_state.read head_info.evm_state in
-      let* base_fee_per_gas = Durable_storage.base_fee_per_gas read in
+      let* base_fee_per_gas = Etherlink_durable_storage.base_fee_per_gas read in
       let* maximum_gas_limit =
-        Durable_storage.maximum_gas_per_transaction read
+        Etherlink_durable_storage.maximum_gas_per_transaction read
       in
-      let* da_fee_per_byte = Durable_storage.da_fee_per_byte read in
+      let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
       let config =
         Validate.
           {
             base_fee_per_gas;
             maximum_gas_limit;
             da_fee_per_byte;
-            next_nonce = (fun addr -> Durable_storage.nonce read addr);
-            balance = (fun addr -> Durable_storage.balance read addr);
+            next_nonce = (fun addr -> Etherlink_durable_storage.nonce read addr);
+            balance = (fun addr -> Etherlink_durable_storage.balance read addr);
           }
       in
       let initial_validation_state =

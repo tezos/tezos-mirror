@@ -176,7 +176,7 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
         return @@ Evm_directory.init_from_resto_directory
         @@ Tezos_services.register_tezlink_services
              ~l2_chain_id
-             (module Backend.Tezlink_backend)
+             (module Backend.Tezlink)
     | Single_chain_node_rpc_server L2_types.EVM
     | Multichain_sequencer_rpc_server ->
         return @@ Evm_directory.empty config.experimental_features.rpc_server

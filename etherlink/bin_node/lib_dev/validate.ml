@@ -67,7 +67,7 @@ let validate_sender_not_a_contract (module Backend_rpc : Services_backend_sig.S)
     caller : (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* (Hex code) =
-    Backend_rpc.code caller Block_parameter.(Block_parameter Latest)
+    Backend_rpc.Etherlink.code caller Block_parameter.(Block_parameter Latest)
   in
   if code = "" then return (Ok ())
   else return (Error "Sender is a contract which is not possible")
@@ -141,15 +141,18 @@ let validate_with_state_from_backend
     (module Backend_rpc : Services_backend_sig.S) transaction ~caller =
   let open Lwt_result_syntax in
   let* from_balance =
-    Backend_rpc.balance caller Block_parameter.(Block_parameter Latest)
+    Backend_rpc.Etherlink.balance
+      caller
+      Block_parameter.(Block_parameter Latest)
   in
-  let* base_fee_per_gas = Backend_rpc.base_fee_per_gas () in
+  let* base_fee_per_gas = Backend_rpc.Etherlink.base_fee_per_gas () in
   let* state = Backend_rpc.Reader.get_state () in
   let* maximum_gas_limit =
-    Durable_storage.maximum_gas_per_transaction (Backend_rpc.Reader.read state)
+    Etherlink_durable_storage.maximum_gas_per_transaction
+      (Backend_rpc.Reader.read state)
   in
   let* da_fee_per_byte =
-    Durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
+    Etherlink_durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
   in
   let** _total_cost =
     validate_balance_and_gas
@@ -169,7 +172,7 @@ let valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx =
   let caller = tx_object.from in
   let* next_nonce =
     let (module Backend_rpc : Services_backend_sig.S) = backend_rpc in
-    Backend_rpc.nonce caller Block_parameter.(Block_parameter Latest)
+    Backend_rpc.Etherlink.nonce caller Block_parameter.(Block_parameter Latest)
   in
   let next_nonce =
     match next_nonce with None -> Qty Z.zero | Some next_nonce -> next_nonce

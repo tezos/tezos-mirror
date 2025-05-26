@@ -180,7 +180,7 @@ let get_block_by_number ~full_transaction_object block_param
   let* (Ethereum_types.Qty n) =
     Rollup_node_rpc.block_param_to_block_number (Block_parameter block_param)
   in
-  Rollup_node_rpc.Block_storage.nth_block ~full_transaction_object n
+  Rollup_node_rpc.Etherlink_block_storage.nth_block ~full_transaction_object n
 
 let get_block_receipts block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
@@ -188,7 +188,7 @@ let get_block_receipts block_param
   let* (Ethereum_types.Qty n) =
     Rollup_node_rpc.block_param_to_block_number (Block_parameter block_param)
   in
-  Rollup_node_rpc.Block_storage.block_receipts n
+  Rollup_node_rpc.Etherlink_block_storage.block_receipts n
 
 let get_transaction_from_index block index
     (module Rollup_node_rpc : Services_backend_sig.S) =
@@ -197,7 +197,8 @@ let get_transaction_from_index block index
   | TxHash l -> (
       match List.nth_opt l index with
       | None -> return_none
-      | Some hash -> Rollup_node_rpc.Block_storage.transaction_object hash)
+      | Some hash ->
+          Rollup_node_rpc.Etherlink_block_storage.transaction_object hash)
   | TxFull l -> return @@ List.nth_opt l index
 
 let block_transaction_count block =
@@ -385,7 +386,9 @@ let get_fee_history block_count block_parameter config
     | Unlimited -> block_count
     | Limit block_count_limit -> Z.(min (of_int block_count_limit) block_count)
   in
-  let* nb_latest = Backend_rpc.Block_storage.current_block_number () in
+  let* nb_latest =
+    Backend_rpc.Etherlink_block_storage.current_block_number ()
+  in
   let is_reachable nb =
     match Configuration.(config.fee_history.max_past) with
     | None -> true
@@ -400,7 +403,8 @@ let get_fee_history block_count block_parameter config
       (module Backend_rpc)
   in
   let* base_fee_per_gas_next_block =
-    if newest_block.number = nb_latest then Backend_rpc.base_fee_per_gas ()
+    if newest_block.number = nb_latest then
+      Backend_rpc.Etherlink.base_fee_per_gas ()
     else
       let next_block_number = Qty.next newest_block.number in
       let* next_block =
@@ -527,14 +531,16 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             build_with_input ~f module_ parameters
         | Get_balance.Method ->
             let f (address, block_param) =
-              let* balance = Backend_rpc.balance address block_param in
+              let* balance =
+                Backend_rpc.Etherlink.balance address block_param
+              in
               rpc_ok balance
             in
             build_with_input ~f module_ parameters
         | Get_storage_at.Method ->
             let f (address, position, block_param) =
               let* value =
-                Backend_rpc.storage_at address position block_param
+                Backend_rpc.Etherlink.storage_at address position block_param
               in
               rpc_ok value
             in
@@ -542,7 +548,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Block_number.Method ->
             let f (_ : unit option) =
               let* block_number =
-                Backend_rpc.Block_storage.current_block_number ()
+                Backend_rpc.Etherlink_block_storage.current_block_number ()
               in
               rpc_ok block_number
             in
@@ -561,7 +567,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Get_block_by_hash.Method ->
             let f (block_hash, full_transaction_object) =
               let* block =
-                Backend_rpc.Block_storage.block_by_hash
+                Backend_rpc.Etherlink_block_storage.block_by_hash
                   ~full_transaction_object
                   block_hash
               in
@@ -578,7 +584,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             build_with_input ~f module_ parameters
         | Get_code.Method ->
             let f (address, block_param) =
-              let* code = Backend_rpc.code address block_param in
+              let* code = Backend_rpc.Etherlink.code address block_param in
               rpc_ok code
             in
             build_with_input ~f module_ parameters
@@ -603,9 +609,13 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
                  increase to 33% of what it was before. For a current gas price
                  of 1.5Gwei, the result of `eth_gasPrice` cannot be larger than
                  2 Gwei (¾ * 1.5). *)
-              let* minimum = Backend_rpc.minimum_base_fee_per_gas () in
-              let* (Qty latest_price) = Backend_rpc.base_fee_per_gas () in
-              let* backlog = Backend_rpc.backlog () in
+              let* minimum =
+                Backend_rpc.Etherlink.minimum_base_fee_per_gas ()
+              in
+              let* (Qty latest_price) =
+                Backend_rpc.Etherlink.base_fee_per_gas ()
+              in
+              let* backlog = Backend_rpc.Etherlink.backlog () in
               let* storage_version = Backend_rpc.storage_version () in
               let base_fee =
                 let open Z in
@@ -623,12 +633,16 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             let f (address, block_param) =
               match block_param with
               | Ethereum_types.Block_parameter.(Block_parameter Pending) ->
-                  let* next_nonce = Backend_rpc.nonce address block_param in
+                  let* next_nonce =
+                    Backend_rpc.Etherlink.nonce address block_param
+                  in
                   let next_nonce = Option.value ~default:Qty.zero next_nonce in
                   let* nonce = Tx_container.nonce ~next_nonce address in
                   rpc_ok nonce
               | _ ->
-                  let* nonce = Backend_rpc.nonce address block_param in
+                  let* nonce =
+                    Backend_rpc.Etherlink.nonce address block_param
+                  in
                   let nonce = Option.value ~default:Qty.zero nonce in
                   rpc_ok nonce
             in
@@ -636,7 +650,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Get_block_transaction_count_by_hash.Method ->
             let f block_hash =
               let* block =
-                Backend_rpc.Block_storage.block_by_hash
+                Backend_rpc.Etherlink_block_storage.block_by_hash
                   ~full_transaction_object:false
                   block_hash
               in
@@ -663,7 +677,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Get_transaction_receipt.Method ->
             let f tx_hash =
               let* receipt =
-                Backend_rpc.Block_storage.transaction_receipt tx_hash
+                Backend_rpc.Etherlink_block_storage.transaction_receipt tx_hash
               in
               rpc_ok receipt
             in
@@ -674,7 +688,9 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
               let* transaction_object =
                 match transaction_object with
                 | Some transaction_object -> return_some transaction_object
-                | None -> Backend_rpc.Block_storage.transaction_object tx_hash
+                | None ->
+                    Backend_rpc.Etherlink_block_storage.transaction_object
+                      tx_hash
               in
               rpc_ok transaction_object
             in
@@ -682,7 +698,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Get_transaction_by_block_hash_and_index.Method ->
             let f (block_hash, Qty index) =
               let* block =
-                Backend_rpc.Block_storage.block_by_hash
+                Backend_rpc.Etherlink_block_storage.block_by_hash
                   ~full_transaction_object:false
                   block_hash
               in
@@ -765,7 +781,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Eth_call.Method ->
             let f (call, block_param, state_override) =
               let* call_result =
-                Backend_rpc.simulate_call
+                Backend_rpc.Etherlink.simulate_call
                   ~overwrite_tick_limit:
                     config.experimental_features.overwrite_simulation_tick_limit
                   call
@@ -791,7 +807,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             build_with_input ~f module_ parameters
         | Get_estimate_gas.Method ->
             let f (call, block) =
-              let* result = Backend_rpc.estimate_gas call block in
+              let* result = Backend_rpc.Etherlink.estimate_gas call block in
               match result with
               | Ok (Ok {value = _; gas_used = Some gas}) -> rpc_ok gas
               | Ok (Ok {value = _; gas_used = None}) ->
@@ -857,7 +873,9 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             build ~f module_ parameters
         | Trace_transaction.Method ->
             let f ((hash, config) : Tracer_types.input) =
-              let*! trace = Backend_rpc.trace_transaction hash config in
+              let*! trace =
+                Backend_rpc.Tracer_etherlink.trace_transaction hash config
+              in
               process_trace_result trace
             in
             build_with_input ~f module_ parameters
@@ -881,13 +899,15 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
         | Coinbase.Method ->
             let f (_ : unit option) =
               let open Lwt_result_syntax in
-              let* coinbase = Backend_rpc.coinbase () in
+              let* coinbase = Backend_rpc.Etherlink.coinbase () in
               rpc_ok coinbase
             in
             build ~f module_ parameters
         | Trace_call.Method ->
             let f (((call, block), config) : Tracer_types.call_input) =
-              let*! trace = Backend_rpc.trace_call call block config in
+              let*! trace =
+                Backend_rpc.Tracer_etherlink.trace_call call block config
+              in
               process_trace_result trace
             in
             build_with_input ~f module_ parameters
@@ -898,7 +918,9 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
                   (Block_parameter block_param)
               in
               let*! traces =
-                Backend_rpc.trace_block (Qty block_number) config
+                Backend_rpc.Tracer_etherlink.trace_block
+                  (Qty block_number)
+                  config
               in
               process_trace_result traces
             in
@@ -990,7 +1012,7 @@ let dispatch_private_request (rpc_server_family : Rpc_types.rpc_server_family)
           let* is_valid =
             let get_nonce () =
               let* next_nonce =
-                Backend_rpc.nonce
+                Backend_rpc.Etherlink.nonce
                   transaction_object.from
                   (Block_parameter Latest)
               in
@@ -1056,7 +1078,7 @@ let dispatch_private_request (rpc_server_family : Rpc_types.rpc_server_family)
               ~none:[error_of_fmt "missing block number"]
               block_number
           in
-          let* block = Backend_rpc.replay block_number in
+          let* block = Backend_rpc.Etherlink.replay block_number in
           rpc_ok block
         in
         build ~f module_ parameters
