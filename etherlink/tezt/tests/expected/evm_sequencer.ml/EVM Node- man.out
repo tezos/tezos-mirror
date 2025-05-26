@@ -33,7 +33,7 @@ Run commands:
   run sandbox [--data-dir <data-dir>] [--config-file <path>]
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
-      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
       [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
@@ -62,6 +62,10 @@ Run commands:
       single batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --ws [BOOL?]: Enable websockets server when present or set to
+      true.
+      Defaults to ``true` when the switch is present, and is `false`
+      otherwise`.
     --max-number-blocks <100>: Maximum number of blocks kept in the log.
     --max-number-logs <1000>: Maximum number of logs kept.
     --chunk-size <10>: Blocks to be filtered are split in chunks, which will
@@ -136,7 +140,7 @@ Run commands:
   run proxy [--data-dir <data-dir>] [--config-file <path>]
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
-      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
       [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
@@ -156,6 +160,10 @@ Run commands:
       single batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --ws [BOOL?]: Enable websockets server when present or set to
+      true.
+      Defaults to ``true` when the switch is present, and is `false`
+      otherwise`.
     --max-number-blocks <100>: Maximum number of blocks kept in the log.
     --max-number-logs <1000>: Maximum number of logs kept.
     --chunk-size <10>: Blocks to be filtered are split in chunks, which will
@@ -191,7 +199,7 @@ Run commands:
   run sequencer [--data-dir <data-dir>] [--config-file <path>]
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
-      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
       [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
@@ -220,6 +228,10 @@ Run commands:
       single batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --ws [BOOL?]: Enable websockets server when present or set to
+      true.
+      Defaults to ``true` when the switch is present, and is `false`
+      otherwise`.
     --max-number-blocks <100>: Maximum number of blocks kept in the log.
     --max-number-logs <1000>: Maximum number of logs kept.
     --chunk-size <10>: Blocks to be filtered are split in chunks, which will
@@ -281,7 +293,7 @@ Run commands:
   run observer [--data-dir <data-dir>] [--config-file <path>]
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
-      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
       [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
@@ -307,6 +319,10 @@ Run commands:
       single batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --ws [BOOL?]: Enable websockets server when present or set to
+      true.
+      Defaults to ``true` when the switch is present, and is `false`
+      otherwise`.
     --max-number-blocks <100>: Maximum number of blocks kept in the log.
     --max-number-logs <1000>: Maximum number of logs kept.
     --chunk-size <10>: Blocks to be filtered are split in chunks, which will
@@ -372,7 +388,7 @@ Run commands:
   experimental run rpc [--data-dir <data-dir>] [--config-file <path>]
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
-      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
       [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
@@ -394,6 +410,10 @@ Run commands:
       single batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --ws [BOOL?]: Enable websockets server when present or set to
+      true.
+      Defaults to ``true` when the switch is present, and is `false`
+      otherwise`.
     --max-number-blocks <100>: Maximum number of blocks kept in the log.
     --max-number-logs <1000>: Maximum number of logs kept.
     --chunk-size <10>: Blocks to be filtered are split in chunks, which will
@@ -452,7 +472,7 @@ Configuration commands:
   init config [--data-dir <data-dir>] [--config-file <path>]
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
-      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
       [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
@@ -487,6 +507,10 @@ Configuration commands:
       single batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --ws [BOOL?]: Enable websockets server when present or set to
+      true.
+      Defaults to ``true` when the switch is present, and is `false`
+      otherwise`.
     --max-number-blocks <100>: Maximum number of blocks kept in the log.
     --max-number-logs <1000>: Maximum number of logs kept.
     --chunk-size <10>: Blocks to be filtered are split in chunks, which will
