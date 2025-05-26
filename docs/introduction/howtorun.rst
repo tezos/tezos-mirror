@@ -230,7 +230,8 @@ the node data directory for performance reasons (to reduce the number of RPC cal
 Note also that since version 13.0, option ``--liquidity-baking-toggle-vote`` is mandatory, see :ref:`the changelog <changes_13_0_rc1_baker>`.
 Note that ``--liquidity-baking-toggle-vote`` must be placed
 **after** ``run`` on the command-line.
-Note that option ``--without-dal`` exists since version 21.3 and will be mandatory starting from 22.0.
+Note that option ``--without-dal`` is mandatory starting from version 22.0 to run the Octez node without a DAL node.
+Instead, it is now recommended to :doc:`start a DAL node <../shell/dal_run>` alongside the Octez node before starting the baker.
 
 .. warning::
 
