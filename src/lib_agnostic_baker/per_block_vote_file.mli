@@ -70,7 +70,6 @@ val read_per_block_votes_no_fail :
     (the file is freshly read each time). *)
 val load_per_block_votes_config :
   default_liquidity_baking_vote:Per_block_votes.per_block_vote option ->
-  default_adaptive_issuance_vote:Per_block_votes.per_block_vote option ->
   per_block_vote_file:string option ->
   Configuration.per_block_votes_config tzresult Lwt.t
 

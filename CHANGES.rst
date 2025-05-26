@@ -111,8 +111,18 @@ Baker
   the logging level. It can be disabled by setting ``"log" : { advertises_level
   : false }`` in the client configuration. (MR :gl:`!17737`)
 
+- Deprecates the adaptive issuance vote from the CLI (and vote file
+  configuration), the feature has been enabled and no longer requires a vote.
+  Please remove it from your CLI and configuration, as the support will be
+  removed in the next release. (MR :gl:`!18138`)
+
 Agnostic Baker
 --------------
+
+- Deprecates the adaptive issuance vote from the CLI (and vote file
+  configuration), the feature has been enabled and no longer requires a vote.
+  Please remove it from your CLI and configuration, as the support will be
+  removed in the next release. (MR :gl:`!18138`)
 
 - Add support for ``run dal` and all other commands of the ``octez-dal-node`` to
   the baker. (MR :gl:`!18050`)

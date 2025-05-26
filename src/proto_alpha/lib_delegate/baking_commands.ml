@@ -660,6 +660,11 @@ let run_baker ?(recommend_agnostic_baker = true)
         (cctxt :> Client_context.full)
     else Lwt.return per_block_vote_file
   in
+  let*! () =
+    if Option.is_some adaptive_issuance_vote then
+      Events.(emit unused_cli_adaptive_issuance_vote ())
+    else Lwt.return_unit
+  in
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for
      the per-block votes. *)
@@ -685,8 +690,6 @@ let run_baker ?(recommend_agnostic_baker = true)
       Octez_agnostic_baker.Per_block_vote_file.load_per_block_votes_config
         ~default_liquidity_baking_vote:
           (Option.map of_protocol liquidity_baking_vote)
-        ~default_adaptive_issuance_vote:
-          (Option.map of_protocol adaptive_issuance_vote)
         ~per_block_vote_file
     in
     return

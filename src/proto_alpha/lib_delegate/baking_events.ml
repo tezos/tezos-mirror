@@ -95,6 +95,16 @@ module Commands = struct
          instead of `octez-baker-<protocol>`, as it automatically handles \
          protocol switches."
       ()
+
+  let unused_cli_adaptive_issuance_vote =
+    declare_0
+      ~section
+      ~name:"unused_cli_adaptive_issuance_vote"
+      ~level:Warning
+      ~msg:
+        "Adaptive issuance is now enabled, voting is no longer necessary. \
+         Please remove the argument from the CLI."
+      ()
 end
 
 module State_transitions = struct

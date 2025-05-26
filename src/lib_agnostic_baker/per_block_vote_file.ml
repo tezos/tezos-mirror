@@ -96,18 +96,10 @@ let read_per_block_votes_no_fail ~default ~per_block_vote_file =
       return {default with liquidity_baking_vote = liquidity_baking_toggle_vote}
 
 let load_per_block_votes_config ~default_liquidity_baking_vote
-    ~default_adaptive_issuance_vote ~per_block_vote_file :
-    Configuration.per_block_votes_config tzresult Lwt.t =
+    ~per_block_vote_file : Configuration.per_block_votes_config tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* If a vote file is given, it takes priority. Otherwise, we expect
      per-block vote arguments to be passed. *)
-  let default_adaptive_issuance_vote =
-    (* Unlike the vote for liquidity baking, the vote for adaptive
-       issuance is not mandatory. *)
-    match default_adaptive_issuance_vote with
-    | None -> Per_block_votes.Per_block_vote_pass
-    | Some default_adaptive_issuance_vote -> default_adaptive_issuance_vote
-  in
   let* config =
     match (per_block_vote_file, default_liquidity_baking_vote) with
     | None, None -> tzfail Missing_vote_on_startup
@@ -116,7 +108,7 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
           {
             Configuration.vote_file = None;
             liquidity_baking_vote;
-            adaptive_issuance_vote = default_adaptive_issuance_vote;
+            adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass;
           }
     | Some per_block_vote_file, _ -> (
         let*! (res : _ tzresult) = read_per_block_votes ~per_block_vote_file in
@@ -126,16 +118,16 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
               liquidity_baking_toggle_vote = liquidity_baking_vote;
               adaptive_issuance_vote_opt;
             } ->
-            let adaptive_issuance_vote =
-              Option.value
-                ~default:default_adaptive_issuance_vote
-                adaptive_issuance_vote_opt
+            let*! () =
+              if Option.is_some adaptive_issuance_vote_opt then
+                Events.(emit unused_config_adaptive_issuance_vote ())
+              else Lwt.return_unit
             in
             return
               {
                 Configuration.vote_file = Some per_block_vote_file;
                 liquidity_baking_vote;
-                adaptive_issuance_vote;
+                adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass;
               }
         | Error errs ->
             let*! () = Events.(emit per_block_vote_file_fail) errs in
@@ -143,9 +135,6 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
   in
   let*! () =
     Events.(emit liquidity_baking_toggle_vote) config.liquidity_baking_vote
-  in
-  let*! () =
-    Events.(emit adaptive_issuance_vote) config.adaptive_issuance_vote
   in
   return config
 
