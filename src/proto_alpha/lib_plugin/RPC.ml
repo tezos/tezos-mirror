@@ -3275,7 +3275,7 @@ module Forge = struct
              }))
 
   module Manager = struct
-    let operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
+    let operations ctxt block ~branch ~source ?sourcePubKey ?proof ~counter ~fee
         ~gas_limit ~storage_limit operations =
       let open Lwt_result_syntax in
       let*! result = Contract_services.manager_key ctxt block source in
@@ -3294,7 +3294,7 @@ module Forge = struct
             match (sourcePubKey, revealed) with
             | None, _ | _, Some _ -> ops
             | Some pk, None ->
-                let operation = Reveal {public_key = pk; proof = None} in
+                let operation = Reveal {public_key = pk; proof} in
                 Contents
                   (Manager_operation
                      {source; counter; operation; fee; gas_limit; storage_limit})
@@ -3303,22 +3303,24 @@ module Forge = struct
           let*? ops = Environment.wrap_tzresult @@ Operation.of_list ops in
           RPC_context.make_call0 S.operations ctxt block () ({branch}, ops)
 
-    let reveal ctxt block ~branch ~source ~sourcePubKey ~counter ~fee () =
+    let reveal ctxt block ~branch ~source ~sourcePubKey ?proof ~counter ~fee ()
+        =
       operations
         ctxt
         block
         ~branch
         ~source
         ~sourcePubKey
+        ?proof
         ~counter
         ~fee
         ~gas_limit:Gas.Arith.zero
         ~storage_limit:Z.zero
         []
 
-    let transaction ctxt block ~branch ~source ?sourcePubKey ~counter ~amount
-        ~destination ?(entrypoint = Entrypoint.default) ?parameters ~gas_limit
-        ~storage_limit ~fee () =
+    let transaction ctxt block ~branch ~source ?sourcePubKey ?proof ~counter
+        ~amount ~destination ?(entrypoint = Entrypoint.default) ?parameters
+        ~gas_limit ~storage_limit ~fee () =
       let parameters =
         Option.fold
           ~some:Script.lazy_expr
@@ -3331,20 +3333,22 @@ module Forge = struct
         ~branch
         ~source
         ?sourcePubKey
+        ?proof
         ~counter
         ~fee
         ~gas_limit
         ~storage_limit
         [Manager (Transaction {amount; parameters; destination; entrypoint})]
 
-    let origination ctxt block ~branch ~source ?sourcePubKey ~counter ~balance
-        ?delegatePubKey ~script ~gas_limit ~storage_limit ~fee () =
+    let origination ctxt block ~branch ~source ?sourcePubKey ?proof ~counter
+        ~balance ?delegatePubKey ~script ~gas_limit ~storage_limit ~fee () =
       operations
         ctxt
         block
         ~branch
         ~source
         ?sourcePubKey
+        ?proof
         ~counter
         ~fee
         ~gas_limit
@@ -3354,7 +3358,7 @@ module Forge = struct
             (Origination {delegate = delegatePubKey; script; credit = balance});
         ]
 
-    let delegation ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
+    let delegation ctxt block ~branch ~source ?sourcePubKey ?proof ~counter ~fee
         delegate =
       operations
         ctxt
@@ -3362,6 +3366,7 @@ module Forge = struct
         ~branch
         ~source
         ?sourcePubKey
+        ?proof
         ~counter
         ~fee
         ~gas_limit:Gas.Arith.zero
