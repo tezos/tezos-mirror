@@ -241,21 +241,21 @@ Besides listening to requests from the client,
 the node listens to connections from peers, by default on port ``9732`` (this can be changed using option ``--net-addr``), so it's advisable to
 open incoming connections to that port.
 
-Summing up
-~~~~~~~~~~
+Quickstart Octez node
+~~~~~~~~~~~~~~~~~~~~~
 
-Putting together all the above instructions, you may want to run a node as follows:
+Putting together all the above instructions, you may want to quickly start a node on a testnet as follows:
 
 .. code-block:: shell
 
-    # Download a snapshot for your target network, e.g. <test-net>:
-    wget <snapshot-url> -O <snapshot-file>
-    # Configure the node for running on <test-net>:
-    octez-node config init --data-dir ~/.tezos-node-<test-net> --network <test-net>
-    # Import the snapshot into the node data directory:
-    octez-node snapshot import --data-dir ~/.tezos-node-<test-net> --block <block-hash> <snapshot-file>
+    # Download a snapshot for your target network, e.g. ghostnet:
+    wget https://snapshots.tzinit.org/ghostnet/rolling -O rolling
+    # Configure the node for running on your testnet, e.g. ghostnet:
+    octez-node config init --network ghostnet --rpc-addr 127.0.0.1
+    # Import the snapshot file into the node:
+    octez-node snapshot import rolling
     # Run the node:
-    octez-node run --data-dir ~/.tezos-node-<test-net> --rpc-addr 127.0.0.1
+    octez-node run
 
 .. _howtouse_tezos_client:
 
