@@ -10,6 +10,10 @@ type public =
 
 type t = [public | `Sandbox]
 
+let to_public = function
+  | `Sandbox -> failwith "Sandbox is not public"
+  | #public as p -> p
+
 let to_string = function
   | `Mainnet -> "mainnet"
   | `Ghostnet -> "ghostnet"
