@@ -883,8 +883,8 @@ module Groups = struct
 end
 
 let websocket_checks config =
-  match config.experimental_features with
-  | {enable_websocket = true; rpc_server = Dream; _} ->
+  match (config.websockets, config.experimental_features) with
+  | Some _, {rpc_server = Dream; _} ->
       Internal_event.Simple.emit Event.buggy_dream_websocket () |> Lwt_result.ok
   | _ -> Lwt_result_syntax.return_unit
 

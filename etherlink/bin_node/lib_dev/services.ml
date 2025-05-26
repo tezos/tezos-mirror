@@ -1233,15 +1233,15 @@ let dispatch_private (rpc_server_family : Rpc_types.rpc_server_family)
 
 let generic_websocket_dispatch (config : Configuration.t) tx_container ctx dir
     path dispatch_websocket =
-  if config.experimental_features.enable_websocket then
-    Evm_directory.jsonrpc_websocket_register
-      ?monitor:config.experimental_features.monitor_websocket_heartbeat
-      ~max_message_length:
-        config.experimental_features.max_websocket_message_length
-      dir
-      path
-      (dispatch_websocket config tx_container ctx)
-  else dir
+  match config.websockets with
+  | None -> dir
+  | Some {max_message_length; monitor_heartbeat; _} ->
+      Evm_directory.jsonrpc_websocket_register
+        ?monitor:monitor_heartbeat
+        ~max_message_length
+        dir
+        path
+        (dispatch_websocket config tx_container ctx)
 
 let dispatch_websocket_public (rpc_server_family : Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) validation config tx_container ctx dir =

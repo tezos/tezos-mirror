@@ -110,6 +110,12 @@ type websocket_rate_limit = {
   strategy : [`Wait | `Error | `Close];
 }
 
+type websockets_config = {
+  max_message_length : int;
+  monitor_heartbeat : monitor_websocket_heartbeat option;
+  rate_limit : websocket_rate_limit option;
+}
+
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
 type experimental_features = {
@@ -118,10 +124,6 @@ type experimental_features = {
   enable_send_raw_transaction : bool;
   overwrite_simulation_tick_limit : bool;
   rpc_server : rpc_server;
-  enable_websocket : bool;
-  max_websocket_message_length : int;
-  monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
-  websocket_rate_limit : websocket_rate_limit option;
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
   enable_tx_queue : tx_queue option;
@@ -192,6 +194,7 @@ type rpc = {
 type t = {
   public_rpc : rpc;
   private_rpc : rpc option;
+  websockets : websockets_config option;
   log_filter : log_filter_config;
   kernel_execution : kernel_execution_config;
   sequencer : sequencer option;

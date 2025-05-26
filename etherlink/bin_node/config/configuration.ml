@@ -147,16 +147,18 @@ type websocket_rate_limit = {
 
 let default_websocket_rate_limit_strategy = `Close
 
+type websockets_config = {
+  max_message_length : int;
+  monitor_heartbeat : monitor_websocket_heartbeat option;
+  rate_limit : websocket_rate_limit option;
+}
+
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   blueprints_publisher_order_enabled : bool;
   enable_send_raw_transaction : bool;
   overwrite_simulation_tick_limit : bool;
   rpc_server : rpc_server;
-  enable_websocket : bool;
-  max_websocket_message_length : int;
-  monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
-  websocket_rate_limit : websocket_rate_limit option;
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
   enable_tx_queue : tx_queue option;
@@ -220,6 +222,7 @@ type rpc = {
 type t = {
   public_rpc : rpc;
   private_rpc : rpc option;
+  websockets : websockets_config option;
   log_filter : log_filter_config;
   kernel_execution : kernel_execution_config;
   sequencer : sequencer option;
@@ -307,10 +310,6 @@ let default_experimental_features =
     blueprints_publisher_order_enabled = false;
     overwrite_simulation_tick_limit = false;
     rpc_server = Resto;
-    enable_websocket = false;
-    max_websocket_message_length = default_max_socket_message_length;
-    monitor_websocket_heartbeat = default_monitor_websocket_heartbeat;
-    websocket_rate_limit = None;
     spawn_rpc = None;
     l2_chains = default_l2_chains;
     enable_tx_queue = Some default_tx_queue;
@@ -997,10 +996,6 @@ let experimental_features_encoding =
            enable_send_raw_transaction;
            overwrite_simulation_tick_limit;
            rpc_server;
-           enable_websocket;
-           max_websocket_message_length;
-           monitor_websocket_heartbeat;
-           websocket_rate_limit;
            spawn_rpc;
            l2_chains : l2_chain list option;
            enable_tx_queue;
@@ -1013,10 +1008,6 @@ let experimental_features_encoding =
           overwrite_simulation_tick_limit,
           None ),
         ( rpc_server,
-          enable_websocket,
-          max_websocket_message_length,
-          monitor_websocket_heartbeat,
-          websocket_rate_limit,
           spawn_rpc,
           l2_chains,
           enable_tx_queue,
@@ -1028,10 +1019,6 @@ let experimental_features_encoding =
              overwrite_simulation_tick_limit,
              _next_wasm_runtime ),
            ( rpc_server,
-             enable_websocket,
-             max_websocket_message_length,
-             monitor_websocket_heartbeat,
-             websocket_rate_limit,
              spawn_rpc,
              l2_chains,
              enable_tx_queue,
@@ -1042,10 +1029,6 @@ let experimental_features_encoding =
         enable_send_raw_transaction;
         overwrite_simulation_tick_limit;
         rpc_server;
-        enable_websocket;
-        max_websocket_message_length;
-        monitor_websocket_heartbeat;
-        websocket_rate_limit;
         spawn_rpc;
         l2_chains;
         enable_tx_queue;
@@ -1100,7 +1083,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj9
+       (obj5
           (dft
              "rpc_server"
              ~description:
@@ -1108,27 +1091,6 @@ let experimental_features_encoding =
                 the latter being the default one."
              rpc_server_encoding
              default_experimental_features.rpc_server)
-          (dft
-             "enable_websocket"
-             ~description:"Enable or disable the experimental websocket server"
-             bool
-             default_experimental_features.enable_websocket)
-          (dft
-             "max_websocket_message_length"
-             ~description:
-               "Maximum message size accepted by the websocket server (only \
-                for Resto backend)"
-             int31
-             default_max_socket_message_length)
-          (dft
-             "monitor_websocket_heartbeat"
-             ~description:"Parameters to monitor websocket connections"
-             opt_monitor_websocket_heartbeat_encoding
-             default_monitor_websocket_heartbeat)
-          (opt
-             "websocket_rate_limit"
-             ~description:"Rate limit for websocket server"
-             websocket_rate_limit_encoding)
           (dft
              "spawn_rpc"
              ~description:"Spawn a RPC node listening on the given port"
@@ -1347,6 +1309,36 @@ let rpc_encoding =
             Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.encoding
             default_max_active_connections)))
 
+let websockets_config_encoding =
+  let open Data_encoding in
+  conv
+    (fun {max_message_length; monitor_heartbeat; rate_limit} ->
+      (max_message_length, monitor_heartbeat, rate_limit))
+    (fun (max_message_length, monitor_heartbeat, rate_limit) ->
+      {max_message_length; monitor_heartbeat; rate_limit})
+    (obj3
+       (dft
+          "max_message_length"
+          ~description:
+            "Maximum allowed length in bytes for a websocket message."
+          int31
+          default_max_socket_message_length)
+       (dft
+          "monitor_heartbeat"
+          ~description:
+            "Configuration for the websocket heartbeat mechanism. When \
+             enabled, the server will periodically send ping frames to the \
+             client and expect a pong response."
+          opt_monitor_websocket_heartbeat_encoding
+          default_monitor_websocket_heartbeat)
+       (opt
+          "rate_limit"
+          ~description:
+            "Rate limiting configuration for websocket connections. When \
+             enabled, the server will limit the number of messages and/or \
+             frames a client can send in a given time interval."
+          websocket_rate_limit_encoding))
+
 let encoding ?network data_dir : t Data_encoding.t =
   let open Data_encoding in
   let observer_field name encoding =
@@ -1366,6 +1358,7 @@ let encoding ?network data_dir : t Data_encoding.t =
     (fun {
            public_rpc;
            private_rpc;
+           websockets;
            log_filter;
            sequencer;
            threshold_encryption_sequencer;
@@ -1396,6 +1389,7 @@ let encoding ?network data_dir : t Data_encoding.t =
           ( kernel_execution,
             public_rpc,
             private_rpc,
+            websockets,
             finalized_view,
             history_mode ) ) ))
     (fun ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
@@ -1411,11 +1405,13 @@ let encoding ?network data_dir : t Data_encoding.t =
              ( kernel_execution,
                public_rpc,
                private_rpc,
+               websockets,
                finalized_view,
                history_mode ) ) ) ->
       {
         public_rpc;
         private_rpc;
+        websockets;
         log_filter;
         sequencer;
         threshold_encryption_sequencer;
@@ -1489,7 +1485,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                 default_experimental_features)
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "fee_history" fee_history_encoding default_fee_history))
-          (obj5
+          (obj6
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding ?network data_dir)
@@ -1500,6 +1496,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                    ()))
              (dft "public_rpc" rpc_encoding (default_rpc ()))
              (opt "private_rpc" rpc_encoding)
+             (opt "websockets" websockets_config_encoding)
              (dft
                 ~description:
                   "When enabled, the node only expose blocks that are \
@@ -1644,6 +1641,20 @@ let migrate_stabilized_experimental_features json =
               must be 86400, use new format." ;
          let nb = json |->! ["number_of_chunks"] in
          `O [("mode", `String "rolling"); ("retention", nb)])
+  |> migrate_experimental_feature
+       ["enable_websocket"]
+       ~new_path:["websockets"]
+       ~transform:(fun json ->
+         match Ezjsonm.get_bool json with true -> `O [] | false -> `Null)
+  |> migrate_experimental_feature
+       ["max_websocket_message_length"]
+       ~new_path:["websockets"; "max_message_length"]
+  |> migrate_experimental_feature
+       ["monitor_websocket_heartbeat"]
+       ~new_path:["websockets"; "monitor_heartbeat"]
+  |> migrate_experimental_feature
+       ["websocket_rate_limit"]
+       ~new_path:["websockets"; "rate_limit"]
 
 let load_file ?network ~data_dir path =
   let open Lwt_result_syntax in
@@ -1693,6 +1704,7 @@ module Cli = struct
     {
       public_rpc = default_rpc ();
       private_rpc = None;
+      websockets = None;
       log_filter = default_filter_config ();
       kernel_execution;
       sequencer = None;
@@ -1985,6 +1997,7 @@ module Cli = struct
     {
       public_rpc;
       private_rpc;
+      websockets = configuration.websockets;
       log_filter;
       kernel_execution;
       sequencer;
