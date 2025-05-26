@@ -21,7 +21,9 @@ type public =
 
 type t = [public | `Sandbox]
 
-(** ["mainnet" | "ghostnet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
+val to_public : t -> public
+
+(** ["mainnet" | "ghostnet" | "rionet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
 val to_string : t -> string
 
 (** Known protocol used by the network *)
