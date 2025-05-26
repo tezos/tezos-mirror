@@ -748,7 +748,9 @@ let test_tezlink_chain_id =
   unit
 
 let test_tezlink_header =
-  register_tezlink_test ~title:"Test of the header rpc" ~tags:["rpc"; "header"]
+  register_tezlink_test
+    ~title:"Test of the header rpc"
+    ~tags:["rpc"; "header"; "offset"]
   @@ fun {sequencer; client; l2_chains; _} _protocol ->
   let chain_id =
     match l2_chains with
@@ -764,16 +766,16 @@ let test_tezlink_header =
 
   let*@ n = Rpc.produce_block sequencer in
   let* () = Evm_node.wait_for_blueprint_applied sequencer n in
-  let* block_1 =
-    Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block_header ()
-  in
-
   let current_timestamp =
     Tezos_base.Time.(
       System.now () |> System.to_protocol |> Protocol.to_notation)
   in
   let*@ n = Rpc.produce_block ~timestamp:current_timestamp sequencer in
   let* () = Evm_node.wait_for_blueprint_applied sequencer n in
+  let* block_1 =
+    Client.RPC.call ~hooks ~endpoint client
+    @@ RPC.get_chain_block_header ~block:"head~1" ()
+  in
   let* block_2 =
     Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block_header ()
   in

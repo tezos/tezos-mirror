@@ -509,6 +509,10 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           | None -> failwith "Block %a not found" Z.pp_print level
           | Some block -> return block
 
+        let nth_block_hash level =
+          Evm_store.use ctxt.store @@ fun conn ->
+          Evm_store.Blocks.find_hash_of_number conn (Qty level)
+
         let block_by_hash ~full_transaction_object hash =
           let open Lwt_result_syntax in
           Evm_store.use ctxt.store @@ fun conn ->
@@ -551,6 +555,17 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
                 failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
         | param -> block_param_to_block_number param
 
+      (* Overwrites Tezlink_backend using the store instead of the durable_storage *)
+      module Tezlink_backend = Tezlink_services_impl.Make (struct
+        include Backend.Reader
+
+        let block_param_to_block_number = block_param_to_block_number
+
+        let tez_nth_block = Block_storage.tez_nth_block
+
+        let nth_block_hash = Block_storage.nth_block_hash
+      end)
+
       include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
     end)
   else
@@ -582,10 +597,9 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
                need to try to reconstruct the transaction objects. *)
             return block
 
-        let tez_nth_block level =
-          let open Lwt_result_syntax in
-          let* block = Block_storage.tez_nth_block level in
-          return block
+        let tez_nth_block = Block_storage.tez_nth_block
+
+        let nth_block_hash = Block_storage.nth_block_hash
 
         let block_by_hash ~full_transaction_object hash =
           let open Lwt_result_syntax in
