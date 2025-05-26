@@ -192,6 +192,18 @@ let () =
     ~cycles:(Int32.of_int constants.tolerated_inactivity_period)
     ~days:2l
 
+let () =
+  register_test ~title:"Nonce commitment per cycle is above 128" @@ fun () ->
+  let constants = Default_parameters.constants_mainnet in
+  Assert.leq
+    ~loc:__LOC__
+    Int32.compare
+    "blocks_per_commitment is too large wrt blocks_per_cycle. Not enough \
+     nonces will be produced per cycle."
+    (fun ppf -> Format.fprintf ppf "%ld")
+    128l
+    Int32.(div constants.blocks_per_cycle constants.blocks_per_commitment)
+
 (* For the rational of VDF related constants, see the description of
    [vdf_difficulty] in
    {!val:Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet}. *)
