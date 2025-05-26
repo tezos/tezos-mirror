@@ -8,6 +8,9 @@
 
 ### RPCs changes
 
+- Fix transaction type encoding to use a compact hex encoding following the
+  [standard](https://ethereum.org/en/developers/docs/transactions/#typed-transaction-envelope). (!18132)
+
 ### Metrics changes
 
 ### Execution changes

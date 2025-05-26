@@ -469,14 +469,14 @@ let encoding =
         (fun o -> Legacy o);
       case
         ~title:"eip-2930"
-        (Tag 1)
-        (merge_objs (obj1 (req "type" (constant "0x01"))) EIP_2930.encoding)
+        (Tag 3)
+        (merge_objs (obj1 (req "type" (constant "0x1"))) EIP_2930.encoding)
         (function EIP_2930 o -> Some ((), o) | _ -> None)
         (fun ((), o) -> EIP_2930 o);
       case
         ~title:"eip-1559"
-        (Tag 2)
-        (merge_objs (obj1 (req "type" (constant "0x02"))) EIP_1559.encoding)
+        (Tag 4)
+        (merge_objs (obj1 (req "type" (constant "0x2"))) EIP_1559.encoding)
         (function EIP_1559 o -> Some ((), o) | _ -> None)
         (fun ((), o) -> EIP_1559 o);
       case
@@ -485,4 +485,20 @@ let encoding =
         Ethereum_types.legacy_transaction_object_encoding
         (function Kernel o -> Some o | _ -> None)
         (fun o -> Kernel o);
+      (* The following are incorrect but kept for backward compatibility. See
+         https://ethereum.org/en/developers/docs/apis/json-rpc/#quantities-encoding
+         and
+         https://ethereum.org/en/developers/docs/transactions/#typed-transaction-envelope. *)
+      case
+        ~title:"eip-2930-backward-compat"
+        (Tag 1)
+        (merge_objs (obj1 (req "type" (constant "0x01"))) EIP_2930.encoding)
+        (fun _ -> None)
+        (fun ((), o) -> EIP_2930 o);
+      case
+        ~title:"eip-1559-backward-compat"
+        (Tag 2)
+        (merge_objs (obj1 (req "type" (constant "0x02"))) EIP_1559.encoding)
+        (fun _ -> None)
+        (fun ((), o) -> EIP_1559 o);
     ]
