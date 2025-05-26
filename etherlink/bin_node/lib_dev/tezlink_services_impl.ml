@@ -14,7 +14,10 @@ end
 
 module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
   Tezlink_backend_sig.S = struct
-  type block_param = [`Head of int32 | `Level of int32]
+  type block_param =
+    [ `Head of int32
+    | `Level of int32
+    | `Hash of Ethereum_types.block_hash * int32 ]
 
   let shell_block_param_to_block_number =
     let open Lwt_result_syntax in
@@ -28,6 +31,12 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
           Backend.block_param_to_block_number (Block_parameter Latest)
         in
         compute_offset current_block_number offset
+    | `Hash (hash, offset) ->
+        let* current_block_number =
+          Backend.block_param_to_block_number
+            (Block_hash {hash; require_canonical = false})
+        in
+        compute_offset current_block_number offset
     | `Level l -> return l
 
   let shell_block_param_to_eth_block_param =
@@ -37,6 +46,10 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
         return
         @@ Ethereum_types.Block_parameter.Block_parameter
              Ethereum_types.Block_parameter.Latest
+    | `Hash (hash, 0l) ->
+        return
+        @@ Ethereum_types.Block_parameter.Block_hash
+             {hash; require_canonical = false}
     | block ->
         let* num = shell_block_param_to_block_number block in
         return
