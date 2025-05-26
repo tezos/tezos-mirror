@@ -398,8 +398,9 @@ let share_secret_key secret_key ~m ~n =
 let generate_threshold_key sk ~m ~n =
   let pk = Bls12_381_signature.MinPk.derive_pk sk in
   let pkh = Public_key.hash pk in
+  let proof = Bls12_381_signature.MinPk.Pop.pop_prove sk in
   let secret_shares = share_secret_key sk ~n ~m in
-  (pk, pkh, secret_shares)
+  (pk, pkh, proof, secret_shares)
 
 let threshold_signature_opt = Bls12_381_signature.MinPk.threshold_signature_opt
 

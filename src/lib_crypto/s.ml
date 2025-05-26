@@ -492,13 +492,13 @@ module type THRESHOLD_SIGNATURE = sig
     Secret_key.t -> m:int -> n:int -> (int * Secret_key.t) list
 
   (** [generate_threshold_key sk m n] is the same as [share_secret_key
-      sk m n] but also returns a public key and a public key hash
-      corresponding to a secret key [sk]. *)
+      sk m n] but also returns a public key, a public key hash and a
+      proof of possession corresponding to a secret key [sk]. *)
   val generate_threshold_key :
     Secret_key.t ->
     m:int ->
     n:int ->
-    Public_key.t * Public_key_hash.t * (int * Secret_key.t) list
+    Public_key.t * Public_key_hash.t * Bytes.t * (int * Secret_key.t) list
 
   (** [threshold_signature_opt [(id_x, s_x);(id_y, s_y);...] ]
       reconstructs a signature if at least [m] valid signatures [s_i]
