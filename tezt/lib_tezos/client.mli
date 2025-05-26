@@ -819,6 +819,10 @@ val list_known_remote_keys : t -> Uri.t -> string list Lwt.t
     exit. *)
 val spawn_list_known_remote_keys : t -> Uri.t -> Process.t
 
+(** Run [octez-client --wait wait set consensus key for account to key] *)
+val spawn_set_consensus_key :
+  ?wait:string -> t -> account:string -> key:string -> Process.t
+
 (** Run [octez-client gen keys] and return the key alias.
 
     The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)

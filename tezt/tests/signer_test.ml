@@ -123,7 +123,9 @@ let signer_bls_test =
     ~uses:(fun _ -> [Constant.octez_signer])
   @@ fun protocol ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
-  let* signer = Signer.init ~keys:[Constant.tz4_account] () in
+  let* signer =
+    Signer.init ~keys:[Constant.tz4_account] ~allow_to_prove_possession:true ()
+  in
   let* () =
     let Account.{alias; public_key_hash; _} = Constant.tz4_account in
     Client.import_signer_key
@@ -190,8 +192,57 @@ let signer_known_remote_keys_test =
     let pp = Format.(pp_print_list pp_print_string) in
     Test.fail "@[<v 2>expected:@,%a@]@,@[<v 2>found:@,%a@]" pp expected pp found
 
+let signer_prove_possession_test =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Prove possession of tz4 test"
+    ~tags:[team; "signer"; "prove"; "possession"; "keys"]
+    ~uses:(fun _ -> [Constant.octez_signer])
+  @@ fun protocol ->
+  let* _node, client = Client.init_with_protocol `Client ~protocol () in
+  let keys = [Constant.tz4_account] in
+  let alias = "alias_ko" in
+  let* signer = Signer.init ~keys () in
+  let* () =
+    Client.import_signer_key
+      ~alias
+      client
+      ~signer:(Signer.uri signer)
+      ~public_key_hash:Constant.tz4_account.public_key_hash
+  in
+  let process =
+    Client.spawn_set_consensus_key
+      client
+      ~account:Constant.bootstrap1.alias
+      ~key:alias
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex "Request to prove possession is not allowed")
+      process
+  in
+  let alias = "alias_ok" in
+  let* signer = Signer.init ~keys ~allow_to_prove_possession:true () in
+  let* () =
+    Client.import_signer_key
+      ~force:true
+      ~alias
+      client
+      ~signer:(Signer.uri signer)
+      ~public_key_hash:Constant.tz4_account.public_key_hash
+  in
+  let process =
+    Client.spawn_set_consensus_key
+      client
+      ~account:Constant.bootstrap2.alias
+      ~key:alias
+  in
+  Process.check process
+
 let register ~protocols =
   signer_simple_test protocols ;
   signer_magic_bytes_test protocols ;
   signer_bls_test protocols ;
-  signer_known_remote_keys_test protocols
+  signer_known_remote_keys_test protocols ;
+  signer_prove_possession_test
+    (List.filter (fun p -> Protocol.number p > 022) protocols)
