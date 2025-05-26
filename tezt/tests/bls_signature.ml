@@ -216,10 +216,11 @@ module Local_helpers = struct
     return op
 
   let mk_reveal_delegation_stake_update_ck_in_batch ~(delegate : Account.key)
-      ~amount ?(delegate_consensus_key : Account.key option) ?proof client =
+      ~amount ?(delegate_consensus_key : Account.key option) ?proof_mk ?proof_ck
+      client =
     let module M = Operation.Manager in
     let* counter = M.get_next_counter client ~source:delegate in
-    let reveal = M.reveal delegate () in
+    let reveal = M.reveal ?proof:proof_mk delegate () in
     let delegation = M.delegation ~delegate () in
     let stake =
       M.call
@@ -232,7 +233,10 @@ module Local_helpers = struct
       match delegate_consensus_key with
       | Some delegate_ck ->
           let update_ck =
-            M.update_consensus_key ~public_key:delegate_ck.public_key ?proof ()
+            M.update_consensus_key
+              ~public_key:delegate_ck.public_key
+              ?proof:proof_ck
+              ()
           in
           [update_ck]
       | None -> []
@@ -404,7 +408,7 @@ module Local_helpers = struct
   let create_accounts_from_master_sk ~sk ~m ~n client =
     if not (1 < m && m <= n) then
       Test.fail "Invalid parameters for N = %d and M = %d" n m ;
-    let* group_pk, group_pkh, secret_shares =
+    let* group_pk, group_pkh, proof, secret_shares =
       Client.share_bls_secret_key ~sk ~n:5 ~m:3 client
     in
     let stakers =
@@ -415,7 +419,7 @@ module Local_helpers = struct
           ))
         secret_shares
     in
-    return (group_pk, group_pkh, stakers)
+    return (group_pk, group_pkh, proof, stakers)
 
   let print_parameters parameters =
     let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
@@ -702,9 +706,11 @@ let test_single_staker_sign_staking_operation_consensus_key_op_core =
       client
   in
   (* create a proof for a manager key *)
-  let proof = Operation.Manager.create_proof_of_possession ~signer:delegate in
+  let proof_mk =
+    Operation.Manager.create_proof_of_possession ~signer:delegate
+  in
   (* reveal key for delegate *)
-  let* op_reveal = Local_helpers.mk_op_reveal delegate ?proof client in
+  let* op_reveal = Local_helpers.mk_op_reveal delegate ?proof:proof_mk client in
   let* _op_hash =
     Local_helpers.inject_bls_sign_op
       ~baker:default_baker
@@ -745,7 +751,7 @@ let test_single_staker_sign_staking_operation_consensus_key_op_core =
       client
   in
   (* create a proof for a consensus key *)
-  let proof =
+  let proof_ck =
     Operation.Manager.create_proof_of_possession ~signer:delegate_consensus_key
   in
   (* set consensus key for delegate to delegate_consensus_key *)
@@ -753,7 +759,7 @@ let test_single_staker_sign_staking_operation_consensus_key_op_core =
     Local_helpers.mk_op_update_consensus_key
       ~delegate
       ~delegate_consensus_key
-      ?proof
+      ?proof:proof_ck
       client
   in
   let* _op_hash =
@@ -963,7 +969,7 @@ let test_all_stakers_sign_staking_operation_consensus_key ~kind =
       client
   in
   (* create a proof for a consensus key *)
-  let* proof =
+  let* proof_ck =
     Client.create_bls_proof ~signer:delegate_consensus_key.alias client
   in
   (* set consensus key for group_staker to delegate_consensus_key *)
@@ -971,7 +977,7 @@ let test_all_stakers_sign_staking_operation_consensus_key ~kind =
     Local_helpers.mk_op_update_consensus_key
       ~delegate:group_staker
       ~delegate_consensus_key
-      ~proof
+      ~proof:proof_ck
       client
   in
   let* _op_hash =
@@ -1052,7 +1058,7 @@ let test_all_stakers_sign_staking_operation_consensus_key_batch ~kind =
       client
   in
   (* create a proof for a consensus key *)
-  let* proof =
+  let* proof_ck =
     Client.create_bls_proof ~signer:delegate_consensus_key.alias client
   in
 
@@ -1064,7 +1070,7 @@ let test_all_stakers_sign_staking_operation_consensus_key_batch ~kind =
     Local_helpers.mk_reveal_delegation_stake_update_ck_in_batch
       ~delegate:group_staker
       ~delegate_consensus_key
-      ~proof
+      ~proof_ck
       ~amount:(Tez.of_int 140_000)
       client
   in
@@ -1112,7 +1118,7 @@ let test_threshold_number_stakers_sign_staking_operation_external_delegate ~kind
     |> Local_helpers.bls_sk_to_b58_string
   in
   (* Shamir's Secret Sharing *)
-  let* group_pk_bls, group_pkh_bls, stakers =
+  let* group_pk_bls, group_pkh_bls, proof_mk, stakers =
     Local_helpers.create_accounts_from_master_sk ~sk:master_sk ~m:3 ~n:5 client
   in
   let group_staker =
@@ -1133,7 +1139,9 @@ let test_threshold_number_stakers_sign_staking_operation_external_delegate ~kind
 
   let signers = List.filteri (fun i _s -> i < 3) stakers in
   (* reveal key for group_staker *)
-  let* op_reveal = Local_helpers.mk_op_reveal group_staker client in
+  let* op_reveal =
+    Local_helpers.mk_op_reveal ~proof:proof_mk group_staker client
+  in
   let* _op_hash =
     Local_helpers.inject_threshold_bls_sign_op
       ~kind
@@ -1197,7 +1205,7 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key ~kind =
     |> Local_helpers.bls_sk_to_b58_string
   in
   (* Shamir's Secret Sharing *)
-  let* group_pk_bls, group_pkh_bls, stakers =
+  let* group_pk_bls, group_pkh_bls, proof_mk, stakers =
     Local_helpers.create_accounts_from_master_sk ~sk:master_sk ~m:3 ~n:5 client
   in
   let group_staker =
@@ -1218,7 +1226,9 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key ~kind =
 
   let signers = List.filteri (fun i _s -> i < 3) stakers in
   (* reveal key for group_staker *)
-  let* op_reveal = Local_helpers.mk_op_reveal group_staker client in
+  let* op_reveal =
+    Local_helpers.mk_op_reveal ~proof:proof_mk group_staker client
+  in
   let* _op_hash =
     Local_helpers.inject_threshold_bls_sign_op
       ~kind
@@ -1265,7 +1275,7 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key ~kind =
       client
   in
   (* create a proof for a consensus key *)
-  let* proof =
+  let* proof_ck =
     Client.create_bls_proof ~signer:delegate_consensus_key.alias client
   in
   (* set consensus key for group_staker to delegate_consensus_key *)
@@ -1273,7 +1283,7 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key ~kind =
     Local_helpers.mk_op_update_consensus_key
       ~delegate:group_staker
       ~delegate_consensus_key
-      ~proof
+      ~proof:proof_ck
       client
   in
   let* _op_hash =
@@ -1320,7 +1330,7 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key_batch
     |> Local_helpers.bls_sk_to_b58_string
   in
   (* Shamir's Secret Sharing *)
-  let* group_pk_bls, group_pkh_bls, stakers =
+  let* group_pk_bls, group_pkh_bls, proof_mk, stakers =
     Local_helpers.create_accounts_from_master_sk ~sk:master_sk ~m:3 ~n:5 client
   in
   let group_staker =
@@ -1349,7 +1359,7 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key_batch
       client
   in
   (* create a proof for a consensus key *)
-  let* proof =
+  let* proof_ck =
     Client.create_bls_proof ~signer:delegate_consensus_key.alias client
   in
 
@@ -1361,7 +1371,8 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key_batch
     Local_helpers.mk_reveal_delegation_stake_update_ck_in_batch
       ~delegate:group_staker
       ~delegate_consensus_key
-      ~proof
+      ~proof_mk
+      ~proof_ck
       ~amount:(Tez.of_int 140_000)
       client
   in
@@ -1392,28 +1403,28 @@ let register ~protocols =
   test_single_staker_sign_staking_operation_self_delegate protocols ;
   test_single_staker_sign_staking_operation_external_delegate protocols ;
   test_single_staker_sign_staking_operation_consensus_key protocols ;
-  test_single_staker_sign_staking_operation_consensus_key_op_core protocols
-(* test_all_stakers_sign_staking_operation_external_delegate *)
-(*   ~kind:Client *)
-(*   protocols ; *)
-(* test_all_stakers_sign_staking_operation_external_delegate ~kind:RPC protocols ; *)
-(* test_all_stakers_sign_staking_operation_consensus_key ~kind:Client protocols ; *)
-(* test_all_stakers_sign_staking_operation_consensus_key ~kind:RPC protocols ; *)
-(* test_all_stakers_sign_staking_operation_consensus_key_batch *)
-(*   ~kind:Client *)
-(*   protocols ; *)
-(* test_threshold_number_stakers_sign_staking_operation_external_delegate *)
-(*   ~kind:Client *)
-(*   protocols ; *)
-(* test_threshold_number_stakers_sign_staking_operation_external_delegate *)
-(*   ~kind:RPC *)
-(*   protocols ; *)
-(* test_threshold_number_stakers_sign_staking_operation_consensus_key *)
-(*   ~kind:Client *)
-(*   protocols ; *)
-(* test_threshold_number_stakers_sign_staking_operation_consensus_key *)
-(*   ~kind:RPC *)
-(*   protocols ; *)
-(* test_threshold_number_stakers_sign_staking_operation_consensus_key_batch *)
-(*   ~kind:Client *)
-(*   protocols *)
+  test_single_staker_sign_staking_operation_consensus_key_op_core protocols ;
+  (* test_all_stakers_sign_staking_operation_external_delegate *)
+  (*   ~kind:Client *)
+  (*   protocols ; *)
+  (* test_all_stakers_sign_staking_operation_external_delegate ~kind:RPC protocols ; *)
+  (* test_all_stakers_sign_staking_operation_consensus_key ~kind:Client protocols ; *)
+  (* test_all_stakers_sign_staking_operation_consensus_key ~kind:RPC protocols ; *)
+  (* test_all_stakers_sign_staking_operation_consensus_key_batch *)
+  (*   ~kind:Client *)
+  (*   protocols ; *)
+  test_threshold_number_stakers_sign_staking_operation_external_delegate
+    ~kind:Client
+    protocols ;
+  test_threshold_number_stakers_sign_staking_operation_external_delegate
+    ~kind:RPC
+    protocols ;
+  test_threshold_number_stakers_sign_staking_operation_consensus_key
+    ~kind:Client
+    protocols ;
+  test_threshold_number_stakers_sign_staking_operation_consensus_key
+    ~kind:RPC
+    protocols ;
+  test_threshold_number_stakers_sign_staking_operation_consensus_key_batch
+    ~kind:Client
+    protocols

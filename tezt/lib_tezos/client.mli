@@ -3357,7 +3357,7 @@ val share_bls_secret_key :
   n:int ->
   m:int ->
   t ->
-  (string * string * (int * string) list) Lwt.t
+  (string * string * string * (int * string) list) Lwt.t
 
 (** Run [octez-client threshold bls signatures <id_signatures>]. *)
 val threshold_bls_signatures : t -> (int * string) list -> string Lwt.t
