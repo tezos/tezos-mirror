@@ -68,3 +68,5 @@ module Tez = struct
         raise (Invalid_argument (Printf.sprintf "Invalid tez value: %s" str))
     | Some s -> s
 end
+
+module Manager = Tezlink_imports.Imported_protocol.Manager_repr

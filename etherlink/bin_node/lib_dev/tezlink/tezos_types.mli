@@ -49,3 +49,5 @@ module Tez : sig
 
   val of_string_exn : string -> t
 end
+
+module Manager = Tezlink_imports.Imported_protocol.Manager_repr

@@ -19,7 +19,7 @@ module Path = struct
 
   let balance contract = account contract ^ "/balance"
 
-  let manager_key contract = account contract ^ "/manager_key"
+  let manager contract = account contract ^ "/manager"
 
   let counter contract = account contract ^ "/counter"
 end
@@ -101,10 +101,14 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     Tezlink_durable_storage.balance (read ~block) c
 
   let manager_key chain block c =
+    let open Lwt_result_syntax in
     (* TODO: #7831 !17664
        Support non-default chain and block parameters. *)
     let `Main = chain in
-    Tezlink_durable_storage.manager_key (read ~block) c
+    let* manager_opt = Tezlink_durable_storage.manager (read ~block) c in
+    match manager_opt with
+    | Some (Public_key k) -> return_some k
+    | _ -> return_none
 
   let counter chain block c =
     (* TODO: #7831 !17664
