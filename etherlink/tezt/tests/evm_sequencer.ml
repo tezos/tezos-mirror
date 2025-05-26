@@ -651,6 +651,25 @@ let test_tezlink_balance =
   Check.((Tez.to_mutez invalid_res = 0) int ~error_msg:"Expected %R but got %L") ;
   unit
 
+let test_tezlink_storage =
+  let contract = (Michelson_contracts.bootstraps ()).(0) in
+  register_tezlink_test
+    ~title:"Test of the storage rpc"
+    ~tags:["rpc"; "storage"]
+    ~tez_bootstrap_contracts:[contract]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* storage = Client.contract_storage ~endpoint contract.address client in
+  Check.(
+    (String.trim storage = String.trim contract.initial_storage)
+      string
+      ~error_msg:"Expected \"%R\" but got \"%L\"") ;
+  unit
+
 let account_rpc sequencer account key =
   let path =
     sf
@@ -13866,5 +13885,6 @@ let () =
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;
-  test_eip2930_storage_access [Alpha] ;
-  test_tezlink_block_info [Alpha]
+  test_tezlink_block_info [Alpha] ;
+  test_tezlink_storage [Alpha] ;
+  test_eip2930_storage_access [Alpha]

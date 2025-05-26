@@ -3207,9 +3207,10 @@ let register_key ?hooks ?expect_failure ?consensus ?companion owner client =
   spawn_register_key ?hooks ?consensus ?companion owner client
   |> Process.check ?expect_failure
 
-let contract_storage ?hooks ?unparsing_mode address client =
+let contract_storage ?hooks ?unparsing_mode ?endpoint address client =
   spawn_command
     client
+    ?endpoint
     ?hooks
     (["get"; "contract"; "storage"; "for"; address]
     @ optional_arg "unparsing-mode" normalize_mode_to_string unparsing_mode)

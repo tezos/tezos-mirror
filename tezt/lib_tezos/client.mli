@@ -2723,6 +2723,7 @@ val register_key :
 val contract_storage :
   ?hooks:Process.hooks ->
   ?unparsing_mode:normalize_mode ->
+  ?endpoint:endpoint ->
   string ->
   t ->
   string Lwt.t
