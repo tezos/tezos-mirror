@@ -25,6 +25,8 @@ module Path = struct
   let manager contract = account contract ^ "/manager"
 
   let counter contract = account contract ^ "/counter"
+
+  let storage contract = account contract ^ "/data/storage"
 end
 
 let balance read c =
