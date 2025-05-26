@@ -77,11 +77,30 @@ RPC Changes
 
 - Updated ``GET
   /chains/<chain_id>/blocks/<block_id>/helpers/validators?delegate=<delegate_pkh>&level=<level_id>``
-  with the new field ``companion_key`` which returns the active companion key for
-  the given ``delegate`` and ``level``. (MR :gl:`!17703`)
+  with the new optional field ``companion_key``, only present if the
+  delegate has an active companion key and this companion key is
+  needed for crafting and validating attestations at the queried
+  level. (MRs :gl:`!17703`, :gl:`!17957`)
+
+- Added a new RPC ``GET
+  /chains/<chain>/blocks/<block>/helpers/total_baking_power`` to retrieve the
+  total baking power for the current cycle. (MR :gl:`!17553`)
 
 Operations
 ----------
+
+- Added new operations ``Preattestations_aggregate`` and
+  ``Attestations_aggregate``. (MR :gl:`!15244`, :gl:`!17485`)
+
+- The optional ``proof`` field of the ``Update_consensus_key``
+  operation is now required if (and only if) the new consensus key is
+  a tz4 (BLS key). Its encoding now exclusively accepts BLS
+  signatures. (MR :gl:`!17360`)
+
+- Extended the ``Update_consensus_key`` manager operation with a ``kind``
+  field to support updating a delegate's companion key in addition to the
+  consensus key. The ``kind`` field distinguishes between the two types
+  of key updates. (MR :gl:`!17320`)
 
 - In order to enable denunciations of aggregated consensus operations,
   the ``Double_preattestation_evidence`` and
