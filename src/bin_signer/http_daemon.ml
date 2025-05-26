@@ -26,7 +26,8 @@
 module Events = Signer_events.Http_daemon
 
 let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
-    ?(allow_list_known_keys = false) ~check_high_watermark ~require_auth mode =
+    ?(allow_list_known_keys = false) ?(allow_to_prove_possession = false)
+    ~check_high_watermark ~require_auth mode =
   let open Lwt_result_syntax in
   let dir = Tezos_rpc.Directory.empty in
   let dir =
@@ -54,11 +55,18 @@ let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
       (fun pkh () () -> Handler.public_key cctxt pkh)
   in
   let dir =
-    Tezos_rpc.Directory.register1
-      dir
-      Signer_services.bls_prove_possession
-      (fun pkh override_pk () ->
-        Handler.bls_prove_possession cctxt ?override_pk pkh)
+    if allow_to_prove_possession then
+      Tezos_rpc.Directory.register1
+        dir
+        Signer_services.bls_prove_possession
+        (fun pkh override_pk () ->
+          Handler.bls_prove_possession cctxt ?override_pk pkh)
+    else
+      Tezos_rpc.Directory.register1
+        dir
+        Signer_services.bls_prove_possession
+        (fun _pkh _override_pk () ->
+          failwith "Request to prove possession is not allowed.")
   in
   let dir =
     Tezos_rpc.Directory.register0
@@ -107,8 +115,8 @@ let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
       | exn -> fail_with_exn exn)
 
 let run_https ~host ~port ~cert ~key ?signing_version ?magic_bytes
-    ?allow_list_known_keys ~check_high_watermark ~require_auth
-    (cctxt : #Client_context.wallet) =
+    ?allow_list_known_keys ?allow_to_prove_possession ~check_high_watermark
+    ~require_auth (cctxt : #Client_context.wallet) =
   let open Lwt_syntax in
   let* points =
     Lwt_utils_unix.getaddrinfo
@@ -130,12 +138,14 @@ let run_https ~host ~port ~cert ~key ?signing_version ?magic_bytes
         ?signing_version
         ?magic_bytes
         ?allow_list_known_keys
+        ?allow_to_prove_possession
         ~check_high_watermark
         ~require_auth
         mode
 
 let run_http ~host ~port ?signing_version ?magic_bytes ?allow_list_known_keys
-    ~check_high_watermark ~require_auth (cctxt : #Client_context.wallet) =
+    ?allow_to_prove_possession ~check_high_watermark ~require_auth
+    (cctxt : #Client_context.wallet) =
   let open Lwt_syntax in
   let* points =
     Lwt_utils_unix.getaddrinfo
@@ -155,6 +165,7 @@ let run_http ~host ~port ?signing_version ?magic_bytes ?allow_list_known_keys
         ?signing_version
         ?magic_bytes
         ?allow_list_known_keys
+        ?allow_to_prove_possession
         ~check_high_watermark
         ~require_auth
         mode

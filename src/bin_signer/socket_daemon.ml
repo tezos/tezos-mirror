@@ -27,8 +27,8 @@ open Signer_messages
 module Events = Signer_events.Socket_daemon
 
 let handle_client_step ?signing_version ?magic_bytes ?timeout
-    ?(allow_list_known_keys = false) ~check_high_watermark ~require_auth cctxt
-    fd =
+    ?(allow_list_known_keys = false) ?(allow_to_prove_possession = false)
+    ~check_high_watermark ~require_auth cctxt fd =
   let open Lwt_result_syntax in
   let* recved = Tezos_base_unix.Socket.recv ?timeout fd Request.encoding in
   match recved with
@@ -87,11 +87,16 @@ let handle_client_step ?signing_version ?magic_bytes ?timeout
       Tezos_base_unix.Socket.send fd encoding res
   | Bls_prove_possession (pkh, override_pk) ->
       let encoding = result_encoding Bls_prove_possession.Response.encoding in
-      let*! res = Handler.bls_prove_possession cctxt ?override_pk pkh in
+      let*! res =
+        if allow_to_prove_possession then
+          Handler.bls_prove_possession cctxt ?override_pk pkh
+        else failwith "Request to prove possession is not allowed"
+      in
       Tezos_base_unix.Socket.send fd encoding res
 
 let handle_client_loop ?signing_version ?magic_bytes ?timeout
-    ?allow_list_known_keys ~check_high_watermark ~require_auth cctxt fd =
+    ?allow_list_known_keys ?allow_to_prove_possession ~check_high_watermark
+    ~require_auth cctxt fd =
   let rec loop () =
     let open Lwt_result_syntax in
     let* () =
@@ -100,6 +105,7 @@ let handle_client_loop ?signing_version ?magic_bytes ?timeout
         ?magic_bytes
         ?timeout
         ?allow_list_known_keys
+        ?allow_to_prove_possession
         ~check_high_watermark
         ~require_auth
         cctxt
@@ -110,7 +116,8 @@ let handle_client_loop ?signing_version ?magic_bytes ?timeout
   loop ()
 
 let run ?signing_version ?magic_bytes ?timeout ?allow_list_known_keys
-    ~check_high_watermark ~require_auth (cctxt : #Client_context.wallet) path =
+    ?allow_to_prove_possession ~check_high_watermark ~require_auth
+    (cctxt : #Client_context.wallet) path =
   let open Lwt_result_syntax in
   let open Tezos_base_unix.Socket in
   let*! () =
@@ -144,6 +151,7 @@ let run ?signing_version ?magic_bytes ?timeout ?allow_list_known_keys
                     ?magic_bytes
                     ?timeout
                     ?allow_list_known_keys
+                    ?allow_to_prove_possession
                     ~check_high_watermark
                     ~require_auth
                     cctxt
