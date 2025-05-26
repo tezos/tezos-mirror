@@ -56,16 +56,17 @@ module Validators_cache =
 type ops_stream =
   ((Operation_hash.t * packed_operation) * error trace option) list Lwt_stream.t
 
-type 'kind recorded_consensus =
-  | No_operation_seen
-  | Operation_seen of {
-      operation : 'kind operation;
+type recorded_consensus =
+  | No_operation_seen : recorded_consensus
+  | Operation_seen : {
+      operation : 'a Kind.consensus operation;
       previously_denounced_oph : Operation_hash.t option;
     }
+      -> recorded_consensus
 
 type recorded_consensus_operations = {
-  attestation : Kind.attestation recorded_consensus;
-  preattestation : Kind.preattestation recorded_consensus;
+  attestation : recorded_consensus;
+  preattestation : recorded_consensus;
 }
 
 type 'a state = {
@@ -98,9 +99,7 @@ type 'a state = {
   mutable ops_stream_stopper : unit -> unit;
 }
 
-type 'a denunciable_consensus_operation =
-  | Attestation : Kind.attestation denunciable_consensus_operation
-  | Preattestation : Kind.preattestation denunciable_consensus_operation
+type double_operation_misbehaviour_kind = Attestation | Preattestation
 
 let create_state (cctxt : #Protocol_client_context.full) ~preserved_levels
     blocks_stream ops_stream ops_stream_stopper =
@@ -150,29 +149,16 @@ let get_block_offset level =
       in
       return (`Head 0)
 
-let get_payload_hash (type kind)
-    (op_kind : kind denunciable_consensus_operation) (op : kind Operation.t) =
-  match (op_kind, op.protocol_data.contents) with
-  | Preattestation, Single (Preattestation consensus_content)
-  | Attestation, Single (Attestation {consensus_content; _}) ->
+let get_payload_hash (type a) (op : a Kind.consensus Operation.t) =
+  match op.protocol_data.contents with
+  | Single (Preattestation consensus_content)
+  | Single (Attestation {consensus_content; _}) ->
+      consensus_content.block_payload_hash
+  | Single (Preattestations_aggregate {consensus_content; _})
+  | Single (Attestations_aggregate {consensus_content; _}) ->
       consensus_content.block_payload_hash
 
-let double_consensus_op_evidence (type kind) :
-    kind denunciable_consensus_operation ->
-    #Protocol_client_context.full ->
-    'a ->
-    branch:Block_hash.t ->
-    slot:Alpha_context.Slot.t ->
-    op1:kind Alpha_context.operation ->
-    op2:kind Alpha_context.operation ->
-    unit ->
-    bytes Environment.Error_monad.shell_tzresult Lwt.t = function
-  | Attestation -> Plugin.RPC.Forge.double_consensus_operation_evidence
-  | Preattestation -> Plugin.RPC.Forge.double_consensus_operation_evidence
-
-let lookup_recorded_consensus (type kind) consensus_key
-    (op_kind : kind denunciable_consensus_operation) map :
-    kind recorded_consensus =
+let lookup_recorded_consensus consensus_key op_kind map =
   match Delegate_map.find consensus_key map with
   | None -> No_operation_seen
   | Some {attestation; preattestation} -> (
@@ -180,9 +166,7 @@ let lookup_recorded_consensus (type kind) consensus_key
       | Attestation -> attestation
       | Preattestation -> preattestation)
 
-let add_consensus_operation (type kind) consensus_key
-    (op_kind : kind denunciable_consensus_operation)
-    (recorded_operation : kind recorded_consensus) map =
+let add_consensus_operation consensus_key op_kind recorded_operation map =
   Delegate_map.update
     consensus_key
     (fun x ->
@@ -221,8 +205,7 @@ let get_validator_rights state cctxt level =
       return validators
   | Some t -> return t
 
-let events_of_kind (type kind) (op_kind : kind denunciable_consensus_operation)
-    =
+let events_of_kind op_kind =
   match op_kind with
   | Attestation ->
       Events.
@@ -235,10 +218,21 @@ let events_of_kind (type kind) (op_kind : kind denunciable_consensus_operation)
           double_preattestation_denounced,
           preattestation_conflict_ignored )
 
-let process_consensus_op (type kind) state cctxt
-    (op_kind : kind denunciable_consensus_operation) (new_op : kind Operation.t)
-    chain_id level round slot =
+let process_consensus_op state cctxt chain_id slot (type a)
+    (new_op : a Kind.consensus operation) =
   let open Lwt_result_syntax in
+  let (Single
+        ( Preattestation {level; round; _}
+        | Attestation {consensus_content = {level; round; _}; _}
+        | Preattestations_aggregate {consensus_content = {level; round; _}; _}
+        | Attestations_aggregate {consensus_content = {level; round; _}; _} )) =
+    new_op.protocol_data.contents
+  in
+  let op_kind =
+    match new_op.protocol_data.contents with
+    | Single (Preattestation _ | Preattestations_aggregate _) -> Preattestation
+    | Single (Attestation _ | Attestations_aggregate _) -> Attestation
+  in
   let diff = Raw_level.diff state.highest_level_encountered level in
   if Int32.(diff > of_int state.preserved_levels) then
     (* We do not handle operations older than [preserved_levels] *)
@@ -285,27 +279,23 @@ let process_consensus_op (type kind) state cctxt
             let new_op_hash, existing_op_hash =
               (Operation.hash new_op, Operation.hash existing_op)
             in
-            let existing_payload_hash = get_payload_hash op_kind existing_op in
-            let new_payload_hash = get_payload_hash op_kind new_op in
+            let existing_payload_hash = get_payload_hash existing_op in
+            let new_payload_hash = get_payload_hash new_op in
             if
               Block_payload_hash.(existing_payload_hash <> new_payload_hash)
               || Block_hash.(existing_op.shell.branch <> new_op.shell.branch)
             then (
-              (* Same level, round, and delegate, and:
-                 different payload hash different branch *)
-              let op1, op2 =
-                if Operation_hash.(new_op_hash < existing_op_hash) then
-                  (new_op, existing_op)
-                else (existing_op, new_op)
-              in
+              (* Same level, round, and slot, and:
+                   (different payload hash OR different branch)
+                 Cf [Anonymous.check_double_consensus_operation_evidence]
+                 in {!Protocol.Validate}. *)
               let*! block = get_block_offset level in
               let chain = `Hash chain_id in
               let* block_hash =
                 Alpha_block_services.hash cctxt ~chain ~block ()
               in
-              let* bytes =
-                double_consensus_op_evidence
-                  op_kind
+              let forge op1 op2 =
+                Plugin.RPC.Forge.double_consensus_operation_evidence
                   cctxt
                   (`Hash chain_id, block)
                   ~branch:block_hash
@@ -313,6 +303,11 @@ let process_consensus_op (type kind) state cctxt
                   ~op1
                   ~op2
                   ()
+              in
+              let* bytes =
+                if Operation_hash.(new_op_hash < existing_op_hash) then
+                  forge new_op existing_op
+                else forge existing_op new_op
               in
               let bytes = Signature.concat bytes Signature.zero in
               let*! () =
@@ -352,45 +347,37 @@ let process_operations (cctxt : #Protocol_client_context.full) state
   let open Lwt_result_syntax in
   List.iter_es
     (fun op ->
-      let {shell; protocol_data; _} = packed_op op in
-      match protocol_data with
-      | Operation_data
-          ({contents = Single (Preattestation {round; slot; level; _}); _} as
-           protocol_data) ->
-          let new_preattestation : Kind.preattestation Alpha_context.operation =
-            {shell; protocol_data}
-          in
-          process_consensus_op
-            state
-            cctxt
-            Preattestation
-            new_preattestation
-            chain_id
-            level
-            round
-            slot
-      | Operation_data
-          ({
-             contents =
-               Single
-                 (Attestation {consensus_content = {round; slot; level; _}; _});
-             _;
-           } as protocol_data) ->
-          let new_attestation : Kind.attestation Alpha_context.operation =
-            {shell; protocol_data}
-          in
-          process_consensus_op
-            state
-            cctxt
-            Attestation
-            new_attestation
-            chain_id
-            level
-            round
-            slot
-      | _ ->
-          (* not a consensus operation *)
-          return_unit)
+      let {shell; protocol_data = Operation_data protocol_data; _} =
+        packed_op op
+      in
+      let op : _ operation = {shell; protocol_data} in
+      match protocol_data.contents with
+      | Single (Preattestation {slot; _}) ->
+          process_consensus_op state cctxt chain_id slot op
+      | Single (Attestation {consensus_content = {slot; _}; _}) ->
+          process_consensus_op state cctxt chain_id slot op
+      | Single (Preattestations_aggregate {committee; _}) ->
+          List.iter_es
+            (fun slot -> process_consensus_op state cctxt chain_id slot op)
+            committee
+      | Single (Attestations_aggregate {committee; _}) ->
+          List.iter_es
+            (fun (slot, (_ : dal_content option)) ->
+              process_consensus_op state cctxt chain_id slot op)
+            committee
+      | Single (Proposals _)
+      | Single (Ballot _)
+      | Single (Seed_nonce_revelation _)
+      | Single (Vdf_revelation _)
+      | Single (Double_consensus_operation_evidence _)
+      | Single (Double_baking_evidence _)
+      | Single (Dal_entrapment_evidence _)
+      | Single (Activate_account _)
+      | Single (Drain_delegate _)
+      | Single (Failing_noop _)
+      | Single (Manager_operation _)
+      | Cons (Manager_operation _, _) ->
+          (* not a consensus operation *) return_unit)
     attestations
 
 let context_block_header cctxt ~chain b_hash =
