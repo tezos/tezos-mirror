@@ -250,3 +250,5 @@ let dns_domains () =
   |> List.map (fun domain ->
          if String.ends_with ~suffix:"." domain then domain else domain ^ ".")
   |> Lwt.return
+
+let notifier = assert false

@@ -114,3 +114,11 @@ module Agent_configuration = struct
       vm = {os; machine_type; docker_image; max_run_duration; binaries_path};
     }
 end
+
+type notifier =
+  | Notifier_null
+  | Notifier_slack of {
+      name : string;
+      slack_bot_token : string;
+      slack_channel_id : string;
+    }
