@@ -127,8 +127,6 @@ module G1 = struct
 
   type affine_array = Stubs.affine_array * int
 
-  let global_buffer = Stubs.allocate_g1 ()
-
   let size_in_bytes = 96
 
   let compressed_size_in_bytes = 48
@@ -249,9 +247,7 @@ module G1 = struct
     ignore @@ Stubs.dadd buffer x y ;
     buffer
 
-  let add_inplace x y =
-    ignore @@ Stubs.dadd global_buffer x y ;
-    memcpy x global_buffer
+  let add_inplace res x y = ignore @@ Stubs.dadd res x y
 
   let add_bulk xs =
     let buffer = Stubs.allocate_g1 () in
@@ -274,14 +270,8 @@ module G1 = struct
     ignore @@ Stubs.mult buffer g bytes (Unsigned.Size_t.of_int (32 * 8)) ;
     buffer
 
-  let mul_inplace g n =
-    ignore
-    @@ Stubs.mult
-         global_buffer
-         g
-         (Fr.to_bytes n)
-         (Unsigned.Size_t.of_int (32 * 8)) ;
-    memcpy g global_buffer
+  let mul_inplace res g n =
+    ignore @@ Stubs.mult res g (Fr.to_bytes n) (Unsigned.Size_t.of_int (32 * 8))
 
   let b = Fq.(one + one + one + one)
 
@@ -369,8 +359,9 @@ module G1 = struct
     if start < 0 || len < 1 || start + len > n then
       raise @@ Invalid_argument (Format.sprintf "start %i len %i" start len) ;
     (if len = 1 then (
-       ignore @@ Stubs.continuous_array_get buffer ps start ;
-       mul_inplace buffer ss.(start))
+       let tmp = Stubs.allocate_g1 () in
+       ignore @@ Stubs.continuous_array_get tmp ps start ;
+       mul_inplace buffer tmp ss.(start))
      else
        let res =
          Stubs.pippenger_with_affine_array

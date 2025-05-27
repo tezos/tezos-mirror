@@ -173,8 +173,6 @@ module G2 = struct
     memcpy dst src ;
     dst
 
-  let global_buffer = Stubs.allocate_g2 ()
-
   module Scalar = Fr
 
   let check_bytes bs =
@@ -247,9 +245,7 @@ module G2 = struct
     ignore @@ Stubs.dadd buffer x y ;
     buffer
 
-  let add_inplace x y =
-    ignore @@ Stubs.dadd global_buffer x y ;
-    memcpy x global_buffer
+  let add_inplace res x y = ignore @@ Stubs.dadd res x y
 
   let add_bulk xs =
     let buffer = Stubs.allocate_g2 () in
@@ -280,15 +276,10 @@ module G2 = struct
     let bytes = Fr.to_bytes n in
     mul_bits g bytes
 
-  let mul_inplace g n =
+  let mul_inplace res g n =
     let bytes = Fr.to_bytes n in
     ignore
-    @@ Stubs.mult
-         global_buffer
-         g
-         bytes
-         (Unsigned.Size_t.of_int (Bytes.length bytes * 8)) ;
-    memcpy g global_buffer
+    @@ Stubs.mult res g bytes (Unsigned.Size_t.of_int (Bytes.length bytes * 8))
 
   let b =
     let buffer = Fq2.Stubs.allocate_fp2 () in
@@ -401,8 +392,9 @@ module G2 = struct
     if start < 0 || len < 1 || start + len > n then
       raise @@ Invalid_argument (Format.sprintf "start %i len %i" start len) ;
     (if len = 1 then (
-       ignore @@ Stubs.continuous_array_get buffer ps start ;
-       mul_inplace buffer ss.(start))
+       let tmp = Stubs.allocate_g2 () in
+       ignore @@ Stubs.continuous_array_get tmp ps start ;
+       mul_inplace buffer tmp ss.(start))
      else
        let res =
          Stubs.pippenger_with_affine_array

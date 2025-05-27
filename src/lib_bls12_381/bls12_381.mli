@@ -212,9 +212,9 @@ module type CURVE = sig
   (** Return the addition of two element *)
   val add : t -> t -> t
 
-  (** [add_inplace a b] is the same than {!add} but writes the output in [a]. No
-      allocation happens. *)
-  val add_inplace : t -> t -> unit
+  (** [add_inplace res a b] is the same than {!add} but writes the
+      result in [res]. No allocation happens. *)
+  val add_inplace : t -> t -> t -> unit
 
   (** [add_bulk xs] returns the sum of the elements of [xs] by performing only
       one allocation for the output. This method is recommended to save the
@@ -237,9 +237,9 @@ module type CURVE = sig
   (** Multiply an element by a scalar *)
   val mul : t -> Scalar.t -> t
 
-  (** [mul_inplace g x] is the same than {!mul} but writes the output in [g]. No
-      allocation happens. *)
-  val mul_inplace : t -> Scalar.t -> unit
+  (** [mul_inplace g x] is the same than {!mul} but writes the output
+      in [res]. No allocation happens. *)
+  val mul_inplace : t -> t -> Scalar.t -> unit
 
   (** [hash_to_curve msg dst] follows the standard {{:
       https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-14.txt } Hashing

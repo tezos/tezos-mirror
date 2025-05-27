@@ -292,15 +292,17 @@ module MakeInplaceOperations (G : Bls12_381.CURVE) = struct
     let n = G.Scalar.random () in
     let g = G.random () in
     let res = G.mul g n in
-    G.mul_inplace g n ;
-    assert (G.eq g res)
+    let res1 = G.(copy one) in
+    G.mul_inplace res1 g n ;
+    assert (G.eq res1 res)
 
   let test_add_inplace () =
     let x = G.random () in
     let y = G.random () in
     let res = G.add x y in
-    G.add_inplace x y ;
-    assert (G.eq x res)
+    let res1 = G.(copy one) in
+    G.add_inplace res1 x y ;
+    assert (G.eq res1 res)
 
   let get_tests () =
     let txt = "Inplace operations" in
