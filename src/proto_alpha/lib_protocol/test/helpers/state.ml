@@ -41,6 +41,7 @@ type t = {
     (Block.full_metadata -> Block.t * t -> unit tzresult Lwt.t) list;
   check_finalized_block_temp :
     (Block.full_metadata -> Block.t * t -> unit tzresult Lwt.t) list;
+  previous_metadata : Block.full_metadata option;
   operation_mode : operation_mode;
 }
 

@@ -468,7 +468,13 @@ let bake ?baker : t -> t tzresult Lwt.t =
       (fun f -> f metadata (block, state))
       state.check_finalized_block_temp
   in
-  let state = {state with check_finalized_block_temp = []} in
+  let state =
+    {
+      state with
+      check_finalized_block_temp = [];
+      previous_metadata = Some metadata;
+    }
+  in
   return (block, state)
 
 let rec repeat n f acc =
