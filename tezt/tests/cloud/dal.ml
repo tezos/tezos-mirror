@@ -1658,9 +1658,9 @@ module Monitoring_app = struct
       Lwt.return_unit
 
     let check_for_lost_dal_rewards t ~metadata =
-      match t.configuration.monitor_app_configuration with
-      | None -> unit
-      | Some {slack_channel_id; slack_bot_token; _} ->
+      match Cloud.notifier t.cloud with
+      | Notifier_null -> unit
+      | Notifier_slack {slack_channel_id; slack_bot_token; _} ->
           let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
           let level = JSON.(metadata |-> "level_info" |-> "level" |> as_int) in
           let balance_updates =
@@ -1741,9 +1741,9 @@ module Monitoring_app = struct
       Lwt.return_unit
 
     let check_for_dal_accusations t ~cycle ~level ~operations ~endpoint =
-      match t.configuration.monitor_app_configuration with
-      | None -> unit
-      | Some {slack_channel_id; slack_bot_token; _} ->
+      match Cloud.notifier t.cloud with
+      | Notifier_null -> unit
+      | Notifier_slack {slack_channel_id; slack_bot_token; _} ->
           let open JSON in
           let accusations =
             operations |> as_list |> Fun.flip List.nth 2 |> as_list
@@ -1835,9 +1835,8 @@ module Monitoring_app = struct
 
     type attestation_transition = Stopped_attesting | Restarted_attesting
 
-    let report_attestation_transition ~monitor_app_configuration ~network ~level
-        ~pkh ~transition ~attestation_percentage =
-      let {slack_channel_id; slack_bot_token} = monitor_app_configuration in
+    let report_attestation_transition ~slack_channel_id ~slack_bot_token
+        ~network ~level ~pkh ~transition ~attestation_percentage =
       let data =
         let header =
           Format.asprintf
@@ -1877,9 +1876,9 @@ module Monitoring_app = struct
       let prev_was_enough = Hashtbl.create 50 in
       let to_treat_delegates = ref [] in
       fun t ~level ~metadata ->
-        match t.configuration.monitor_app_configuration with
-        | None -> unit
-        | Some monitor_app_configuration -> (
+        match Cloud.notifier t.cloud with
+        | Notifier_null -> unit
+        | Notifier_slack {slack_bot_token; slack_channel_id; _} -> (
             let cycle_position =
               JSON.(metadata |-> "level_info" |-> "cycle_position" |> as_int)
             in
@@ -1934,7 +1933,8 @@ module Monitoring_app = struct
                           else Stopped_attesting
                         in
                         report_attestation_transition
-                          ~monitor_app_configuration
+                          ~slack_channel_id
+                          ~slack_bot_token
                           ~network
                           ~level
                           ~pkh
