@@ -845,3 +845,8 @@ let notify_service_stop ~name =
       | None -> ()
       | Some service_manager ->
           Service_manager.notify_stop_service ~name service_manager)
+
+let register_chronos_task t task =
+  match t.chronos with
+  | None -> ()
+  | Some chronos -> Chronos.add_task chronos task

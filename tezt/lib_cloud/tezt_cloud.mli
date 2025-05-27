@@ -206,6 +206,9 @@ module Cloud : sig
 
   (** [notify_service_stop: name] notify the normal termination of a service *)
   val notify_service_stop : name:string -> unit
+
+  (** Register a chronos task *)
+  val register_chronos_task : t -> Chronos.task -> unit
 end
 
 module Prometheus : sig
