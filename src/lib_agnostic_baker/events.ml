@@ -152,3 +152,40 @@ let node_version_check =
     ( "baker_commit",
       Data_encoding.option Tezos_version.Octez_node_version.commit_info_encoding
     )
+
+module Per_block_votes = struct
+  include Internal_event.Simple
+
+  let reading_per_block_votes =
+    declare_1
+      ~section
+      ~name:"reading_per_block_votes"
+      ~level:Notice
+      ~msg:"reading votes file: {path}"
+      ("path", Data_encoding.string)
+
+  let liquidity_baking_toggle_vote =
+    declare_1
+      ~section
+      ~name:"read_liquidity_baking_toggle_vote"
+      ~level:Notice
+      ~msg:"read liquidity baking toggle vote = {value}"
+      ("value", Per_block_votes.liquidity_baking_vote_encoding)
+
+  let per_block_vote_file_fail =
+    declare_1
+      ~section
+      ~name:"per_block_vote_file_error"
+      ~level:Error
+      ~msg:"Error reading the block vote file: {errors}"
+      ~pp1:pp_print_top_error_of_trace
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+
+  let adaptive_issuance_vote =
+    declare_1
+      ~section
+      ~name:"read_adaptive_issuance_vote"
+      ~level:Notice
+      ~msg:"read adaptive issuance vote = {value}"
+      ("value", Per_block_votes.adaptive_issuance_vote_encoding)
+end

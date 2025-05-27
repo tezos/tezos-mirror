@@ -597,7 +597,9 @@ let remote_calls_timeout_arg =
 
 let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
   let open Lwt_syntax in
-  let default_filename = Per_block_vote_file.default_vote_json_filename in
+  let default_filename =
+    Octez_agnostic_baker.Per_block_vote_file.default_vote_json_filename
+  in
   let file_exists path =
     Lwt.catch (fun () -> Lwt_unix.file_exists path) (fun _ -> return_false)
   in
@@ -700,10 +702,38 @@ let run_baker ?(recommend_agnostic_baker = true)
      option (CLI, file path, or file in default location) for
      the per-block votes. *)
   let* votes =
-    Per_block_vote_file.load_per_block_votes_config
-      ~default_liquidity_baking_vote:liquidity_baking_vote
-      ~default_adaptive_issuance_vote:adaptive_issuance_vote
-      ~per_block_vote_file
+    let of_protocol = function
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_on ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_on
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_off ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_off
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_pass
+    in
+    let to_protocol = function
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_on ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_off ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_off
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_pass ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
+    in
+    let* Octez_agnostic_baker.Configuration.
+           {vote_file; liquidity_baking_vote; adaptive_issuance_vote} =
+      Octez_agnostic_baker.Per_block_vote_file.load_per_block_votes_config
+        ~default_liquidity_baking_vote:
+          (Option.map of_protocol liquidity_baking_vote)
+        ~default_adaptive_issuance_vote:
+          (Option.map of_protocol adaptive_issuance_vote)
+        ~per_block_vote_file
+    in
+    return
+      Baking_configuration.
+        {
+          vote_file;
+          liquidity_baking_vote = to_protocol liquidity_baking_vote;
+          adaptive_issuance_vote = to_protocol adaptive_issuance_vote;
+        }
   in
   let dal_node_rpc_ctxt =
     Option.map create_dal_node_rpc_ctxt dal_node_endpoint

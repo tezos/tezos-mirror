@@ -23,21 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Baking_events.Per_block_votes
-open Baking_errors
+module Events = Events.Per_block_votes
+open Errors
 
 let default_vote_json_filename = "per_block_votes.json"
 
 type per_block_votes = {
-  liquidity_baking_toggle_vote :
-    Protocol.Alpha_context.Per_block_votes.per_block_vote;
-  adaptive_issuance_vote_opt :
-    Protocol.Alpha_context.Per_block_votes.per_block_vote option;
+  liquidity_baking_toggle_vote : Per_block_votes.per_block_vote;
+  adaptive_issuance_vote_opt : Per_block_votes.per_block_vote option;
 }
 
 let vote_file_content_encoding =
   let open Data_encoding in
-  def (String.concat "." [Protocol.name; "vote_file_content"])
+  def "vote_file_content"
   @@ conv
        (fun {liquidity_baking_toggle_vote; adaptive_issuance_vote_opt} ->
          (liquidity_baking_toggle_vote, adaptive_issuance_vote_opt))
@@ -46,12 +44,10 @@ let vote_file_content_encoding =
        (obj2
           (req
              "liquidity_baking_toggle_vote"
-             Protocol.Alpha_context.Per_block_votes
-             .liquidity_baking_vote_encoding)
+             Per_block_votes.liquidity_baking_vote_encoding)
           (opt
              "adaptive_issuance_vote"
-             Protocol.Alpha_context.Per_block_votes
-             .adaptive_issuance_vote_encoding))
+             Per_block_votes.adaptive_issuance_vote_encoding))
 
 let check_file_exists file =
   let open Lwt_result_syntax in
@@ -91,7 +87,7 @@ let read_per_block_votes_no_fail ~default ~per_block_vote_file =
         adaptive_issuance_vote_opt = Some adaptive_issuance_vote;
       } ->
       return
-        Protocol.Alpha_context.Per_block_votes.
+        Per_block_votes.
           {
             liquidity_baking_vote = liquidity_baking_toggle_vote;
             adaptive_issuance_vote;
@@ -101,7 +97,7 @@ let read_per_block_votes_no_fail ~default ~per_block_vote_file =
 
 let load_per_block_votes_config ~default_liquidity_baking_vote
     ~default_adaptive_issuance_vote ~per_block_vote_file :
-    Baking_configuration.per_block_votes_config tzresult Lwt.t =
+    Configuration.per_block_votes_config tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* If a vote file is given, it takes priority. Otherwise, we expect
      per-block vote arguments to be passed. *)
@@ -109,7 +105,7 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
     (* Unlike the vote for liquidity baking, the vote for adaptive
        issuance is not mandatory. *)
     match default_adaptive_issuance_vote with
-    | None -> Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
+    | None -> Per_block_votes.Per_block_vote_pass
     | Some default_adaptive_issuance_vote -> default_adaptive_issuance_vote
   in
   let* config =
@@ -118,7 +114,7 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
     | None, Some liquidity_baking_vote ->
         return
           {
-            Baking_configuration.vote_file = None;
+            Configuration.vote_file = None;
             liquidity_baking_vote;
             adaptive_issuance_vote = default_adaptive_issuance_vote;
           }
@@ -137,7 +133,7 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
             in
             return
               {
-                Baking_configuration.vote_file = Some per_block_vote_file;
+                Configuration.vote_file = Some per_block_vote_file;
                 liquidity_baking_vote;
                 adaptive_issuance_vote;
               }
@@ -152,3 +148,20 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
     Events.(emit adaptive_issuance_vote) config.adaptive_issuance_vote
   in
   return config
+
+let lookup_default_vote_file_path
+    (cctxt : Tezos_client_base.Client_context.full) =
+  let open Lwt_syntax in
+  let default_filename = default_vote_json_filename in
+  let file_exists path =
+    Lwt.catch (fun () -> Lwt_unix.file_exists path) (fun _ -> return_false)
+  in
+  let when_s pred x g =
+    let* b = pred x in
+    if b then return_some x else g ()
+  in
+  (* Check in current working directory *)
+  when_s file_exists default_filename @@ fun () ->
+  (* Check in the baker directory *)
+  let base_dir_file = Filename.Infix.(cctxt#get_base_dir // default_filename) in
+  when_s file_exists base_dir_file @@ fun () -> return_none

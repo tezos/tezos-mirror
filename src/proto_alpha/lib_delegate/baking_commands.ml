@@ -595,22 +595,6 @@ let remote_calls_timeout_arg =
          try return (Q.of_string s)
          with _ -> failwith "remote-calls-timeout expected int or float."))
 
-let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
-  let open Lwt_syntax in
-  let default_filename = Per_block_vote_file.default_vote_json_filename in
-  let file_exists path =
-    Lwt.catch (fun () -> Lwt_unix.file_exists path) (fun _ -> return_false)
-  in
-  let when_s pred x g =
-    let* b = pred x in
-    if b then return_some x else g ()
-  in
-  (* Check in current working directory *)
-  when_s file_exists default_filename @@ fun () ->
-  (* Check in the baker directory *)
-  let base_dir_file = Filename.Infix.(cctxt#get_base_dir // default_filename) in
-  when_s file_exists base_dir_file @@ fun () -> return_none
-
 (* This function checks that a DAL node endpoint was given,
    and that the specified DAL node is "healthy",
    (the DAL's nodes 'health' RPC is used for that). *)
@@ -703,17 +687,46 @@ let run_baker ?(recommend_agnostic_baker = true)
     if per_block_vote_file = None then
       (* If the votes file was not explicitly given, we
          look into default locations. *)
-      lookup_default_vote_file_path cctxt
+      Octez_agnostic_baker.Per_block_vote_file.lookup_default_vote_file_path
+        (cctxt :> Client_context.full)
     else Lwt.return per_block_vote_file
   in
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for
      the per-block votes. *)
   let* votes =
-    Per_block_vote_file.load_per_block_votes_config
-      ~default_liquidity_baking_vote:liquidity_baking_vote
-      ~default_adaptive_issuance_vote:adaptive_issuance_vote
-      ~per_block_vote_file
+    let of_protocol = function
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_on ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_on
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_off ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_off
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_pass
+    in
+    let to_protocol = function
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_on ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_off ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_off
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_pass ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
+    in
+    let* Octez_agnostic_baker.Configuration.
+           {vote_file; liquidity_baking_vote; adaptive_issuance_vote} =
+      Octez_agnostic_baker.Per_block_vote_file.load_per_block_votes_config
+        ~default_liquidity_baking_vote:
+          (Option.map of_protocol liquidity_baking_vote)
+        ~default_adaptive_issuance_vote:
+          (Option.map of_protocol adaptive_issuance_vote)
+        ~per_block_vote_file
+    in
+    return
+      Baking_configuration.
+        {
+          vote_file;
+          liquidity_baking_vote = to_protocol liquidity_baking_vote;
+          adaptive_issuance_vote = to_protocol adaptive_issuance_vote;
+        }
   in
   let dal_node_rpc_ctxt =
     Option.map create_dal_node_rpc_ctxt dal_node_endpoint

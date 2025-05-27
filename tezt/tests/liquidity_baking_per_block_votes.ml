@@ -115,7 +115,6 @@ let test_all_per_block_votes =
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let ( >|= ) = Lwt.( >|= ) in
-  let error_prefix = "baker." ^ Protocol.encoding_prefix protocol ^ "." in
 
   if Sys.file_exists default_votefile then
     Test.fail
@@ -247,8 +246,7 @@ let test_all_per_block_votes =
     (* Explicitly remove the votefile to check that the baker has retained its value *)
     let p_error =
       baker_wait_for_per_block_vote_file_error
-        ~expected_id:
-          (error_prefix ^ "Per_block_vote_file.block_vote_file_not_found")
+        ~expected_id:"Per_block_vote_file.block_vote_file_not_found"
         ~expected_file_path:default_votefile
         baker
     in

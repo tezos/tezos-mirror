@@ -11,16 +11,6 @@ open Protocol.Alpha_context
 (** [parse_minimal_fees] parses integer valued fees to [Tez] values. *)
 let parse_minimal_fees = Tez.of_mutez_exn
 
-(** [parse_per_block_vote] parses string valued voting options to protocol
-    specific [Per_block_votes] values. *)
-let parse_per_block_vote =
-  Option.map (function
-      | "on" -> Per_block_votes.Per_block_vote_on
-      | "off" -> Per_block_vote_off
-      | "pass" -> Per_block_vote_pass
-      (* This is unreachable because any other value would fail in CLI configuration parsing *)
-      | _ -> assert false)
-
 (** [parse_operations] parses uri's to either [Remote] or [Local] operations sources. *)
 let parse_operations =
   let open Baking_configuration.Operations_source in
@@ -56,6 +46,14 @@ let parse_configuration
       pre_emptive_forge_time;
       remote_calls_timeout;
     } =
+  let to_protocol = function
+    | Octez_agnostic_baker.Per_block_votes.Per_block_vote_on ->
+        Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
+    | Octez_agnostic_baker.Per_block_votes.Per_block_vote_off ->
+        Protocol.Alpha_context.Per_block_votes.Per_block_vote_off
+    | Octez_agnostic_baker.Per_block_votes.Per_block_vote_pass ->
+        Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
+  in
   ( pidfile,
     node_version_check_bypass,
     node_version_allowed,
@@ -64,8 +62,8 @@ let parse_configuration
     minimal_nanotez_per_byte,
     force_apply_from_round,
     keep_alive,
-    parse_per_block_vote liquidity_baking_vote,
-    parse_per_block_vote adaptive_issuance_vote,
+    Option.map to_protocol liquidity_baking_vote,
+    Option.map to_protocol adaptive_issuance_vote,
     per_block_vote_file,
     parse_operations extra_operations,
     dal_node_endpoint,
