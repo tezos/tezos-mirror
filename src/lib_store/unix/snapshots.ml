@@ -3988,8 +3988,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           @@ fun () ->
           let*! () =
             Context_ops.integrity_check
-              ?ppf:None
-              ~root:(Tezos_context_ops.Context_ops.context_dir dst_data_dir)
+              ~ppf:Format.std_formatter
+              ~root:dst_data_dir
               ~auto_repair:false
               ~always:false
               ~heads:(Some [Context_hash.to_b58check imported_context_hash])
