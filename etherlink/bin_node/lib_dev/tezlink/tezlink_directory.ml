@@ -42,19 +42,26 @@ let check_chain =
         (Unsupported_chain_parameter
            (Tezos_shell_services.Chain_services.to_string chain))
 
+let ethereum_to_tezos_block_hash hash =
+  hash |> Ethereum_types.block_hash_to_bytes |> Block_hash.of_string
+
+let tezos_to_ethereum_block_hash hash =
+  hash |> Block_hash.to_bytes |> Ethereum_types.block_hash_of_bytes
+
 let check_block =
   let open Result_syntax in
   function
   | `Genesis -> return (`Level 0l)
   | `Level l -> return (`Level l)
   | `Head offset -> return (`Head (Int32.of_int offset))
+  | `Hash (hash, offset) ->
+      let hash = tezos_to_ethereum_block_hash hash in
+      let offset = Int32.of_int offset in
+      return (`Hash (hash, offset))
   | block ->
       tzfail
         (Unsupported_block_parameter
            (Tezos_shell_services.Block_services.to_string block))
-
-let ethereum_to_tezos_block_hash hash =
-  hash |> Ethereum_types.block_hash_to_bytes |> Block_hash.of_string
 
 let protocols () = Lwt_result_syntax.return Tezlink_protocols.current
 

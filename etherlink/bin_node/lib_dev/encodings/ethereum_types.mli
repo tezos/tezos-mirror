@@ -71,6 +71,8 @@ val genesis_parent_hash : block_hash
 
 val block_hash_to_bytes : block_hash -> string
 
+val block_hash_of_bytes : bytes -> block_hash
+
 val block_hash_of_string : string -> block_hash
 
 (** Ethereum generic quantity, always encoded in hexadecimal. *)

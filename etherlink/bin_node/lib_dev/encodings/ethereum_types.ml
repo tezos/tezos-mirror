@@ -125,6 +125,8 @@ let block_hash_encoding =
 
 let block_hash_to_bytes (Block_hash h) = hex_to_bytes h
 
+let block_hash_of_bytes s = Block_hash (hex_of_bytes s)
+
 let genesis_parent_hash = Block_hash (Hex (String.make 64 'f'))
 
 module Block_parameter = struct
