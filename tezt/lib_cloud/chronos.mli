@@ -52,6 +52,9 @@ val task :
   unit ->
   task
 
+(** Add a task to be run by chronos *)
+val add_task : t -> task -> unit
+
 (** [init ~tasks] creates an chronos scheduler performing the given
     [tasks]. *)
 val init : tasks:task list -> t
