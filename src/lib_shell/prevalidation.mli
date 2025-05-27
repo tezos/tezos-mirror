@@ -94,12 +94,32 @@ module type T = sig
     * Prevalidator_classification.classification
     * replacements
 
-  type valid_operation
+  (** Represents either:
+      - an operation that was partially validated associated with pending
+        checks that must be ran before considering the operation as valid,
+      - an operation validation error *)
+  type partially_validated_operation =
+    (protocol_operation Shell_operation.operation
+    * (unit -> unit tzresult) list)
+    tzresult
 
-  val validate_operation :
+  (** Runs the protocol [partial_op_validation] but does not check the remaining
+      pending checks. This aims to be used in pair with
+      [handle_partially_validated]. *)
+  val partial_op_validation :
     t ->
     protocol_operation Shell_operation.operation ->
-    (valid_operation, Prevalidator_classification.classification) Lwt_result.t
+    partially_validated_operation Lwt.t
+
+  (** An operation that passed [partial_op_validation] and the pending checks
+      resulting from this call. *)
+  type valid_operation
+
+  (** Run the pending checks associated with a partially validated operation
+      Without this call, the [partial_op_validation] is not complete. *)
+  val handle_partially_validated :
+    partially_validated_operation ->
+    (valid_operation, Prevalidator_classification.error_classification) Result.t
 
   val add_valid_operation : t -> config -> valid_operation -> add_result
 
