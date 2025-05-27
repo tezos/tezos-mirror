@@ -579,7 +579,7 @@ module Layer1 () = struct
   let vms_config =
     Clap.optional_string
       ~section
-      ~long:"vms-conf"
+      ~long:"vms"
       ~description:
         "JSON file optionally describing options for each VM involved in the \
          test"

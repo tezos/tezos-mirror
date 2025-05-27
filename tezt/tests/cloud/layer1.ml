@@ -33,7 +33,7 @@ module Network = struct
   let block_time = function `Ghostnet -> 5 | `Mainnet -> 8
 
   (** Next protocol for both Mainnet and Ghostnet - needs to be updated manually. *)
-  let migrate_to _network = Protocol.R022
+  let migrate_to _network = Protocol.Alpha
 end
 
 let yes_crypto_env =
@@ -935,7 +935,7 @@ let vms_conf_encoding =
     (obj3
        (opt "bootstrap" vm_conf_encoding)
        (opt "bakers" @@ list vm_conf_encoding)
-       (opt "stressteser" vm_conf_encoding))
+       (opt "stresstester" vm_conf_encoding))
 
 (** Copy/paste from teztale_server_main.ml *)
 let parse_conf encoding file =
@@ -968,7 +968,7 @@ let parse_conf encoding file =
             (Data_encoding.Json.print_error ?print_unknown:None)
             e
             Json_schema.pp
-            (Data_encoding.Json.schema vm_conf_encoding)
+            (Data_encoding.Json.schema encoding)
         in
         exit 1)
 
@@ -1067,7 +1067,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
                @@ Option.bind vms_conf (fun {bootstrap; _} -> bootstrap)
            | `Stresstest j ->
                make_vm_conf ~name:(Format.sprintf "stresstest-%d" j)
-               @@ Option.bind vms_conf (fun {bootstrap; _} -> bootstrap)
+               @@ Option.bind vms_conf (fun {stresstester; _} -> stresstester)
            | `Baker i ->
                make_vm_conf ~name:(Format.sprintf "baker-%d" i)
                @@ Option.bind vms_conf (function
