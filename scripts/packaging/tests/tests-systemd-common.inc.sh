@@ -65,3 +65,7 @@ else
     tail "$logfile"
   done
 fi
+
+systemctl stop octez-node.service
+systemctl stop octez-baker.service
+systemctl stop octez-agnostic-baker.service

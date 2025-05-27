@@ -143,10 +143,9 @@ as explained in :doc:`./services`.
 
 To remove the Octez packages you can simply run the following command.
 
-.. literalinclude:: install-bin-deb.sh
-   :language: shell
-   :start-after: [test autopurge]
-   :end-before: [check autopurge]
+::
+
+  sudo apt-get autopurge -y octez-baker
 
 If migrating from Serokell packages you can check out migration documentation
 :doc:`./serokell`.
