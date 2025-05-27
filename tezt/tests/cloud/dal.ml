@@ -1140,21 +1140,6 @@ module Monitoring_app = struct
         "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/ghostnet.png"
     | `Sandbox | `Weeklynet _ | `Nextnet _ -> "no_image_yet"
 
-  let endpoint_of_webhook webhook =
-    let host =
-      (* Default to slack hooks host. *)
-      Option.value ~default:"hooks.slack.com" (Uri.host webhook)
-    in
-    let scheme =
-      (* Default to https scheme. *)
-      Option.value ~default:"https" (Uri.scheme webhook)
-    in
-    let port =
-      (* Default to https default https port. *)
-      match scheme with "https" -> 443 | "http" -> 80 | _ -> 443
-    in
-    Endpoint.make ~host ~scheme ~port ()
-
   module Format_app = struct
     (* Helper for Slack App message format block-kit
        See: https://api.slack.com/reference/block-kit/
