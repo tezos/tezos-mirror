@@ -39,6 +39,8 @@ It is possible and advised to use a hardware wallet to securely store and manage
 keys. The Octez client supports Ledger Nano devices provided that they have
 two Tezos apps installed, `Tezos Wallet app <https://github.com/trilitech/ledger-app-tezos-wallet>`_ and `Tezos Baking app <https://github.com/trilitech/ledger-app-tezos-baking>`_ which are provided by `Trilitech Ltd <https://www.trili.tech/>`_. They can be installed from the Ledger Live store.
 
+For performance reasons (see `details <https://github.com/trilitech/ledger-app-tezos-baking?tab=readme-ov-file#benchmarking>`__), a Ledger Nano S Plus model is a preferable choice with respect to a Ledger Nano.
+
 Ledger Manager
 ~~~~~~~~~~~~~~
 
@@ -93,6 +95,8 @@ Setup the Ledger baking app on any Tezos network using the following command::
 
 More details on setting up baking with the Ledger can be found on the `Tezos Baking app readme
 <https://github.com/trilitech/ledger-app-tezos-baking>`_.
+
+For details about baking using a Ledger device, see a `dedicated tutorial <https://docs.tezos.com/tutorials/bake-with-ledger>`__.
 
 .. _signer:
 

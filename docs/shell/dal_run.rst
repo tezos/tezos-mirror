@@ -240,3 +240,8 @@ For both producers and bakers, it is essential to maintain good connectivity by 
 - If you're behind a firewall, you must configure it to allow both incoming and outgoing connections on the P2P port.
 
 - If you're not using the ``--public-addr`` argument, ensure that the NAT forwarding rule uses the same external and internal ports.
+
+DAL and the Ledger
+^^^^^^^^^^^^^^^^^^
+
+If you are using a Ledger device, make sure it runs a version of the `Tezos baking app <https://github.com/trilitech/ledger-app-tezos-baking>`__ that supports the DAL, such as version 2.5.0 or later.

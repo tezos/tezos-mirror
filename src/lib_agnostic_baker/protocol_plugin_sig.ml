@@ -11,7 +11,7 @@ module type BAKER_COMMANDS_HELPERS = sig
       requires the [~configuration] which contains all the possible CLI arguments
       for the agnostic baker, together with a [~baking_mode] argument and delegates
       list given by [~sources] in the client context [~cctxt].
-      
+
       Depending on the protocol, the arguments can be transformed in the corresponding
       plugin, but the structure of the list of arguments will not grow or shrink, to
       prevent incompatibilities at migrations. *)

@@ -20,7 +20,7 @@ with a probability that increases rapidly with fork length.
 
 `Tenderbake <https://arxiv.org/abs/2001.11965>`_ instead, like any classic
 BFT-style consensus algorithm (such as
-`PBFT <https://pmg.csail.mit.edu/papers/osdi99.pdf>`_ or
+`PBFT <https://www.scs.stanford.edu/nyu/03sp/sched/bfs.pdf>`_ or
 `Tendermint <https://arxiv.org/abs/1807.04938>`_), offers *deterministic*
 finality: a block that has just been appended to the chain of some node is known
 to be final once it has two additional blocks on top of it, regardless of
