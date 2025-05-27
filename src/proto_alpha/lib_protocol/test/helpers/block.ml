@@ -41,6 +41,8 @@ type t = {
 
 type block = t
 
+type full_metadata = block_header_metadata * operation_receipt list
+
 let get_alpha_ctxt b =
   let open Lwt_result_wrap_syntax in
   let*@ ctxt, _migration_balance_updates, _migration_operation_results =

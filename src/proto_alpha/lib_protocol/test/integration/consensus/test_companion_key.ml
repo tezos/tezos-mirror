@@ -214,19 +214,19 @@ let test_simple_register_consensus_and_companion_keys =
   let consensus_rights_delay =
     Default_parameters.constants_mainnet.consensus_rights_delay
   in
-  let check_finalized_block = check_cks delegate in
+  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> (Tag "is bootstrap"
        --> begin_test
              ~force_attest_all:true
-             ~check_finalized_block
+             ~check_finalized_block_perm
              (delegate :: bootstrap_accounts)
       |+ Tag "is created"
          --> begin_test
                ~force_attest_all:true
-               ~check_finalized_block
+               ~check_finalized_block_perm
                ~algo:Bls
                bootstrap_accounts
          --> add_account_with_funds
@@ -329,7 +329,7 @@ let test_register_other_accounts_as_ck =
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
         ~algo:Bls
-        ~check_finalized_block:check_all_cks
+        ~check_finalized_block_perm:[(fun _ -> check_all_cks)]
         ~force_attest_all:true
         ["delegate"; "victim_1"; "victim_2"]
   (* Both victims start with themselves as their own consensus_keys *)
@@ -386,14 +386,14 @@ let test_self_register_as_companion =
     Default_parameters.constants_mainnet.consensus_rights_delay
   in
   let delegate = "delegate" in
-  let check_finalized_block = check_cks delegate in
+  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
         ~algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block
+        ~check_finalized_block_perm
         [delegate]
   (* As expected, a delegate cannot register itself as a companion,
      if it is already itself its own consensus key *)
@@ -530,7 +530,7 @@ let test_register_same_key_multiple_times =
   in
   let delegate = "delegate" in
   let ck = "ck" in
-  let check_finalized_block = check_cks delegate in
+  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
   let update_either_ck ~ck_name delegate =
     Tag "consensus" --> update_consensus_key ~ck_name delegate
     |+ Tag "companion" --> update_companion_key ~ck_name delegate
@@ -596,7 +596,7 @@ let test_register_same_key_multiple_times =
   --> begin_test
         ~algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block
+        ~check_finalized_block_perm
         [delegate]
   --> add_account ~algo:Bls ck
   --> update_either_ck ~ck_name:ck delegate
@@ -617,7 +617,7 @@ let test_register_new_key_every_cycle =
     Default_parameters.constants_mainnet.consensus_rights_delay
   in
   let delegate = "delegate" in
-  let check_finalized_block = check_cks delegate in
+  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
   let update_both_cks delegate =
     add_account "consensus_key"
     --> update_consensus_key ~ck_name:"consensus_key" delegate
@@ -630,7 +630,7 @@ let test_register_new_key_every_cycle =
   --> begin_test
         ~algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block
+        ~check_finalized_block_perm
         [delegate]
   --> loop (consensus_rights_delay + 2) (update_both_cks delegate --> next_cycle)
 
@@ -639,14 +639,14 @@ let test_register_key_end_of_cycle =
     Default_parameters.constants_mainnet.consensus_rights_delay
   in
   let delegate = "delegate" in
-  let check_finalized_block = check_cks delegate in
+  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
         ~algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block
+        ~check_finalized_block_perm
         [delegate]
   --> add_account ~algo:Bls "ck"
   --> exec bake_until_next_cycle_end_but_one
@@ -665,13 +665,13 @@ let test_register_key_end_of_cycle =
 
 let test_registration_override =
   let delegate = "delegate" in
-  let check_finalized_block = check_cks delegate in
+  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
   --> begin_test
         ~algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block
+        ~check_finalized_block_perm
         [delegate]
   --> add_account ~algo:Bls "ck1"
   --> add_account ~algo:Bls "ck2"
@@ -725,7 +725,7 @@ let test_in_registration_table_twice =
      This ensures that a key can be pending for two different cycles at the same time. *)
   let consensus_rights_delay = 4 in
   let delegate = "delegate" in
-  let check_finalized_block = check_cks delegate in
+  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
   let check_is_pending_twice ~loc ~ck ~registered_for kind =
     let open Lwt_result_syntax in
     exec_unit (fun (block, state) ->
@@ -771,7 +771,7 @@ let test_in_registration_table_twice =
   --> begin_test
         ~algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block
+        ~check_finalized_block_perm
         [delegate]
   --> add_account ~algo:Bls "ck1"
   --> add_account ~algo:Bls "ck2"
@@ -875,7 +875,7 @@ let test_fail_noop =
     Default_parameters.constants_mainnet.consensus_rights_delay
   in
   let delegate = "delegate" in
-  let check_finalized_block = check_cks delegate in
+  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
   let assert_fail_with_invalid_consensus_key_update_noop kind =
     assert_failure ~loc:__LOC__ ~expected_error:(fun (_block, state) err ->
         let delegate = State.find_account delegate state in
@@ -898,7 +898,7 @@ let test_fail_noop =
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
-  --> begin_test ~force_attest_all:true ~check_finalized_block [delegate]
+  --> begin_test ~force_attest_all:true ~check_finalized_block_perm [delegate]
   --> add_account ~algo:Bls "ck"
   --> fold_tag
         (fun kind ->

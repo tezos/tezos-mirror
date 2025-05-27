@@ -328,8 +328,8 @@ let bake ?baker : t -> t tzresult Lwt.t =
   in
   let* () = check_issuance_rpc block in
   let state, operations = State.pop_pending_operations state in
-  let* block, state =
-    let* block', _metadata =
+  let* metadata, block, state =
+    let* block', metadata =
       Block.bake_with_metadata ?policy ~adaptive_issuance_vote ~operations block
     in
     if state.burn_rewards then
@@ -347,11 +347,18 @@ let bake ?baker : t -> t tzresult Lwt.t =
           block_rewards
       in
       let i = Incremental.set_alpha_ctxt i context in
-      let* i = List.fold_left_es Incremental.add_operation i operations in
-      let* block = Incremental.finalize_block i in
+      let* i, op_metadata =
+        List.fold_left_es
+          (fun (i, metadata) op ->
+            let* i, m = Incremental.add_operation_with_metadata i op in
+            return (i, m :: metadata))
+          (i, [])
+          operations
+      in
+      let* block, block_metadata = Incremental.finalize_block_with_metadata i in
       let state = State.apply_burn block_rewards baker_name state in
-      return (block, state)
-    else return (block', state)
+      return ((block_metadata, List.rev op_metadata), block, state)
+    else return (metadata, block', state)
   in
   let baker_acc = State.find_account baker_name state in
   (* update baker and attesters activity *)
@@ -451,7 +458,17 @@ let bake ?baker : t -> t tzresult Lwt.t =
     if state.force_attest_all then attest_all_ previous_block (block, state)
     else return (block, state)
   in
-  let* () = state.check_finalized_block (block, state) in
+  let* () =
+    List.iter_es
+      (fun f -> f metadata (block, state))
+      state.check_finalized_block_perm
+  in
+  let* () =
+    List.iter_es
+      (fun f -> f metadata (block, state))
+      state.check_finalized_block_temp
+  in
+  let state = {state with check_finalized_block_temp = []} in
   return (block, state)
 
 let rec repeat n f acc =
