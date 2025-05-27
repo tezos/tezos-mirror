@@ -213,19 +213,18 @@ module Event = struct
       ("log", Ethereum_types.transaction_log_encoding)
 
   let deposit_log =
-    declare_7
+    declare_6
       ~section
       ~name:"deposit_log"
       ~msg:
         "Deposit {nonce}: {amount} {token} to {receiver} in transaction \
-         {transactionHash}({transactionIndex}) of block {blockNumber}"
+         {transactionHash} of block {blockNumber}"
       ~level:Notice
       ("nonce", Db.quantity_hum_encoding)
       ("amount", Data_encoding.float)
       ("token", Data_encoding.string)
       ("receiver", Ethereum_types.address_encoding)
       ("transactionHash", Ethereum_types.hash_encoding)
-      ("transactionIndex", Db.quantity_hum_encoding)
       ("blockNumber", Db.quantity_hum_encoding)
       ~pp1:Ethereum_types.pp_quantity
       ~pp3:Format.pp_print_string
@@ -233,7 +232,6 @@ module Event = struct
         Format.pp_print_string fmt (Ethereum_types.Address.to_string a))
       ~pp5:Ethereum_types.pp_hash
       ~pp6:Ethereum_types.pp_quantity
-      ~pp7:Ethereum_types.pp_quantity
 
   let emit_deposit_log ws_client (d : Db.deposit) (l : Db.log_info) =
     let open Lwt_result_syntax in
@@ -243,13 +241,7 @@ module Event = struct
     Lwt_result.ok
     @@ emit
          deposit_log
-         ( d.nonce,
-           amount,
-           symbol,
-           d.receiver,
-           l.transactionHash,
-           l.transactionIndex,
-           l.blockNumber )
+         (d.nonce, amount, symbol, d.receiver, l.transactionHash, l.blockNumber)
 
   let unclaimed_deposits =
     declare_1
@@ -269,21 +261,19 @@ module Event = struct
       ~pp1:Ethereum_types.pp_quantity
 
   let claimed_deposit =
-    declare_4
+    declare_3
       ~section
       ~name:"claimed_deposit"
       ~msg:
-        "Claimed deposit {nonce} in transaction \
-         {transactionHash}({transactionIndex}) of block {blockNumber}"
+        "Claimed deposit {nonce} in transaction {transactionHash} of block \
+         {blockNumber}"
       ~level:Notice
       ("nonce", Db.quantity_hum_encoding)
       ("transactionHash", Ethereum_types.hash_encoding)
-      ("transactionIndex", Db.quantity_hum_encoding)
       ("blockNumber", Db.quantity_hum_encoding)
       ~pp1:Ethereum_types.pp_quantity
       ~pp2:Ethereum_types.pp_hash
       ~pp3:Ethereum_types.pp_quantity
-      ~pp4:Ethereum_types.pp_quantity
 
   let claiming_deposit_status_fail =
     declare_3
@@ -711,10 +701,7 @@ let handle_confirmed_txs {db; ws_client; _}
              in
              let*! () =
                Event.(emit claimed_deposit)
-                 ( nonce,
-                   exec.transactionHash,
-                   exec.transactionIndex,
-                   exec.blockNumber )
+                 (nonce, exec.transactionHash, exec.blockNumber)
              in
              let* () = Db.Deposits.set_claimed db nonce exec in
              let* () =
