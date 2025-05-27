@@ -4,7 +4,6 @@ distroname=$1
 release=$2
 
 bucket="$GCP_LINUX_PACKAGES_BUCKET"
-protocol=$(head -1 script-inputs/active_protocol_versions_without_number)
 
 . scripts/ci/octez-packages-version.sh
 
@@ -70,23 +69,3 @@ else
   rpm --import "https://storage.googleapis.com/$bucket/$distribution/octez.asc"
 
 fi
-
-dnf -y install sudo
-
-# [install octez]
-dnf -y install octez-node
-dnf -y install octez-client
-dnf -y install octez-node
-dnf -y install octez-baker
-dnf -y install octez-dal-node
-dnf -y install octez-smart-rollup-node
-# [end install octez]
-
-# [test executables]
-octez-client --version
-octez-node --version
-"octez-baker-$protocol" --version
-"octez-accuser-$protocol" --version
-
-# [test autopurge]
-dnf -y remove octez-node octez-client octez-baker octez-dal-node octez-smart-rollup-node
