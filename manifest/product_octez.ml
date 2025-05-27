@@ -5314,6 +5314,26 @@ let octez_node_config =
         octez_validation |> open_;
       ]
 
+let _octez_p2p_node =
+  private_exe
+    "main_p2p_node"
+    ~path:"src/bin_p2p_node"
+    ~opam:""
+    ~synopsis:"Tezos: node with only the P2P layer used for testing"
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_clic |> open_;
+        octez_version_value |> open_;
+        octez_node_config |> open_;
+        octez_p2p_services |> open_;
+        octez_p2p |> open_;
+        octez_shell |> open_;
+      ]
+    ~linkall:true
+    ~with_macos_security_framework:true
+
 let octez_rpc_process =
   public_lib
     "octez-rpc-process"
