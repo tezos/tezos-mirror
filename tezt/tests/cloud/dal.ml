@@ -1603,16 +1603,26 @@ module Monitoring_app = struct
        time (summer months), Paris switches to Central European Summer
        Time (CEST), which is UTC+2.
     *)
-    let tasks ~configuration endpoint =
+    let register_chronos_task cloud ~configuration endpoint =
       match configuration.monitor_app_configuration with
-      | None -> []
+      | None -> ()
       | Some {slack_bot_token; slack_channel_id; _} ->
-          let action () =
-            action ~slack_bot_token ~slack_channel_id ~configuration endpoint ()
+          let task =
+            let action () =
+              action
+                ~slack_bot_token
+                ~slack_channel_id
+                ~configuration
+                endpoint
+                ()
+            in
+            Chronos.task
+              ~name:"network-overview"
+              ~tm:"0 0-23/6 * * *"
+              ~action
+              ()
           in
-          [
-            Chronos.task ~name:"network-overview" ~tm:"0 0-23/6 * * *" ~action ();
-          ]
+          Cloud.register_chronos_task cloud task
   end
 
   module Alert = struct
@@ -3820,7 +3830,6 @@ let register (module Cli : Scenarios_cli.Dal) =
       | Some fundraiser_key -> ["--fundraiser"; fundraiser_key])
     ~__FILE__
     ~title:"DAL node benchmark"
-    ~tasks:(Monitoring_app.Tasks.tasks ~configuration endpoint)
     ~tags:[]
     (fun cloud ->
       toplog "Creating the agents" ;
@@ -3844,6 +3853,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         in
         Lwt.return agent
       in
+      Monitoring_app.Tasks.register_chronos_task cloud ~configuration endpoint ;
       let* t = init ~configuration etherlink_configuration cloud next_agent in
       Lwt.wakeup resolver_endpoint t.some_node_rpc_endpoint ;
       toplog "Starting main loop" ;
