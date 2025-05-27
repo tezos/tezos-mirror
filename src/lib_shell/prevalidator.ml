@@ -405,50 +405,18 @@ module Make_s
         shell.parameters.tools.chain_tools.clear_or_cancel old_hash ;
         None
 
-  (* Determine the classification of a given operation in the current
-     validation state, i.e. whether it could be included in a
-     block on top of the current head, and if not, why. If yes, the
-     operation is accumulated in the given [mempool].
-
-     The function returns a tuple
-     [(validation_state, validated_operation, to_handle)],
-     where:
-     - [validation_state] is the (possibly) updated validation_state,
-     - [validated_operation] is an (operation * bool) option set to [None] if
-     the operation has not been validated. If the operation has been validated
-     the function return [Some (operation,is_advertisable)]. [is_advertisable]
-     is true if the operation must be advertise.
-     - [to_handle] contains the given operation and its classification, and all
-       operations whose classes are changed/impacted by this classification
-       (eg. in case of operation replacement).
-  *)
-  let classify_operation shell ~config ~validation_state
-      (status_and_priority : Pending_ops.status_and_priority) op :
-      (prevalidation_t
-      * (Operation_hash.t * bool) option
-      * (protocol_operation operation * Classification.classification) trace)
-      Lwt.t =
-    let open Lwt_syntax in
+  let handle_classify_operation_result shell
+      (status_and_priority : Pending_ops.status_and_priority) op classification
+      replacements :
+      (Operation_hash.t * bool) option
+      * (protocol_operation operation * Classification.classification) trace =
     let[@warning "-26"] section =
       match status_and_priority.priority with
       | High -> "classify_operation : consensus"
       | Medium -> "classify_operation : voting/anonymous"
       | Low _ -> "classify_operation : manager"
     in
-    (let* v_state, op, classification, replacements =
-       (* Protocols before V15 env do not implement
-          [partial_op_validation]/[add_valid_operation] *)
-       if Protocol.compare_version Proto.environment_version V15 < 0 then
-         Prevalidation_t.legacy_add_operation validation_state config op
-       else
-         let* res = Prevalidation_t.validate_operation validation_state op in
-         match res with
-         | Ok op ->
-             Lwt.return
-               (Prevalidation_t.add_valid_operation validation_state config op)
-         | Error res -> Lwt.return (validation_state, op, res, [])
-     in
-     let to_replace =
+    (let to_replace =
        List.filter_map
          (fun (replaced_oph, new_classification) ->
            reclassify_replaced_manager_op replaced_oph shell new_classification)
@@ -494,8 +462,54 @@ module Make_s
        | `Outdated _ ->
            None [@profiler.mark {verbosity = Debug} ["outdated operation"]]
      in
-     return (v_state, validated_operation, to_handle))
-    [@profiler.aggregate_s {verbosity = Info} section]
+     (validated_operation, to_handle))
+    [@profiler.aggregate_f {verbosity = Info} section]
+
+  (** Determine the classification of a given operation in the current
+      validation state, i.e. whether it could be included in a block on top of
+      the current head, and if not, why. If yes, the operation is accumulated in
+      the given [mempool].
+
+      The function returns a tuple [(validation_state, validated_operation,
+      to_handle)], where:
+      - [validation_state] is the (possibly) updated validation_state,
+      - [validated_operation] is an (operation * bool) option set to [None] if
+        the operation has not been validated. If the operation has been
+        validated the function return [Some (operation,is_advertisable)].
+        [is_advertisable] is true if the operation must be advertise.
+      - [to_handle] contains the given operation and its classification, and all
+        operations whose classes are changed/impacted by this classification
+        (eg. in case of operation replacement).
+  *)
+  let legacy_classify_operation shell ~config ~validation_state
+      (status_and_priority : Pending_ops.status_and_priority) op :
+      (prevalidation_t
+      * (Operation_hash.t * bool) option
+      * (protocol_operation operation * Classification.classification) list)
+      Lwt.t =
+    let open Lwt_syntax in
+    let* validation_state, op, classification, replacements =
+      (* Protocols before V15 env do not implement
+         [partial_op_validation]/[add_valid_operation] *)
+      if Protocol.compare_version Proto.environment_version V15 < 0 then
+        Prevalidation_t.legacy_add_operation validation_state config op
+      else
+        let* res = Prevalidation_t.validate_operation validation_state op in
+        match res with
+        | Ok op ->
+            Lwt.return
+              (Prevalidation_t.add_valid_operation validation_state config op)
+        | Error res -> Lwt.return (validation_state, op, res, [])
+    in
+    let validated_operation, to_handle =
+      handle_classify_operation_result
+        shell
+        status_and_priority
+        op
+        classification
+        replacements
+    in
+    Lwt.return (validation_state, validated_operation, to_handle)
 
   (* Classify pending operations into either:
      [Refused | Outdated | Branch_delayed | Branch_refused | Validated].
@@ -514,7 +528,7 @@ module Make_s
      operations are advertised to the remote peers. However, if a peer
      requests our mempool, we advertise all our classified operations and
      all our pending operations. *)
-  let classify_pending_operations ~notifier shell config state =
+  let legacy_classify_pending_operations ~notifier shell config state =
     let open Lwt_syntax in
     let* r =
       Pending_ops.fold_es
@@ -533,7 +547,7 @@ module Make_s
             (* Defined as a function to avoid an useless allocation *)
             shell.pending <- Pending_ops.remove oph shell.pending ;
             let* new_validation_state, validated_operation, to_handle =
-              classify_operation
+              legacy_classify_operation
                 shell
                 ~config
                 ~validation_state:acc_validation_state
@@ -572,6 +586,8 @@ module Make_s
         Lwt.return (state, advertisable_mempool, validated_mempool)
     | Ok (state, advertisable_mempool, validated_mempool, _) ->
         Lwt.return (state, advertisable_mempool, validated_mempool)
+
+  let classify_pending_operations = legacy_classify_pending_operations
 
   let update_advertised_mempool_fields pv_shell advertisable_mempool
       validated_mempool =
@@ -808,7 +824,7 @@ module Make_s
             else
               let notifier = mk_notifier pv.operation_stream in
               let*! validation_state, validated_operation, to_handle =
-                classify_operation
+                legacy_classify_operation
                   pv.shell
                   ~config:pv.config
                   ~validation_state:pv.validation_state
