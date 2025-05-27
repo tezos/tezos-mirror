@@ -914,7 +914,7 @@ let start db ~config ~notify_ws_change ~first_block =
       | Error e ->
           Format.kasprintf Event.(emit tx_queue_error) "%a" pp_print_trace e
     in
-    let*! () = Lwt_unix.sleep 0.05 in
+    let*! () = Lwt_unix.sleep 0.5 in
     tx_queue_beacon ()
   in
   let* () =
