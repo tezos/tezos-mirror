@@ -64,6 +64,10 @@ Client
 - Add a new command ``check bls proof`` to check a BLS proof. (MR
   :gl:`!17461`)
 
+- It is possible to specify a different public key for ``create bls proof``
+  and ``check bls proof``, using the command line option ``--override-public-key``.
+  (MR :gl:`!18110`)
+
 - Add a new command ``share bls secret key <sk> between <n> shares
   with threshold <m>`` to share a BLS secret key between ``n``
   participants so that any ``m`` participants can collaboratively sign
