@@ -213,8 +213,8 @@ let validate_operation ?expect_failure ?check_size st op =
   | None, Ok validation_state ->
       return {st with state = (validation_state, application_state)}
 
-let add_operation ?expect_failure ?expect_apply_failure ?allow_manager_failure
-    ?check_size st op =
+let add_operation_with_metadata ?expect_failure ?expect_apply_failure
+    ?allow_manager_failure ?check_size st op =
   let open Lwt_result_wrap_syntax in
   let open Apply_results in
   let* st = validate_operation ?expect_failure ?check_size st op in
@@ -222,8 +222,8 @@ let add_operation ?expect_failure ?expect_apply_failure ?allow_manager_failure
   | Some _ ->
       (* The expected failure has already been observed in
          [validate_operation]. *)
-      return st
-  | None -> (
+      return (st, No_operation_metadata)
+  | None ->
       let validation_state, application_state = st.state in
       let oph = Operation.hash_packed op in
       let*@ application_state, metadata =
@@ -237,22 +237,39 @@ let add_operation ?expect_failure ?expect_apply_failure ?allow_manager_failure
           rev_tickets = metadata :: st.rev_tickets;
         }
       in
-      match allow_manager_failure with
-      | Some true -> return st
-      | None | Some false -> (
-          match (expect_apply_failure, metadata) with
-          | None, No_operation_metadata -> return st
-          | None, Operation_metadata result ->
-              let*? () = detect_script_failure result in
-              return st
-          | Some _, No_operation_metadata ->
-              failwith "Error expected while adding operation"
-          | Some f, Operation_metadata result -> (
-              match detect_script_failure result with
-              | Ok _ -> failwith "Error expected while adding operation"
-              | Error err ->
-                  let* () = f err in
-                  return st)))
+      let* st =
+        match allow_manager_failure with
+        | Some true -> return st
+        | None | Some false -> (
+            match (expect_apply_failure, metadata) with
+            | None, No_operation_metadata -> return st
+            | None, Operation_metadata result ->
+                let*? () = detect_script_failure result in
+                return st
+            | Some _, No_operation_metadata ->
+                failwith "Error expected while adding operation"
+            | Some f, Operation_metadata result -> (
+                match detect_script_failure result with
+                | Ok _ -> failwith "Error expected while adding operation"
+                | Error err ->
+                    let* () = f err in
+                    return st))
+      in
+      return (st, metadata)
+
+let add_operation ?expect_failure ?expect_apply_failure ?allow_manager_failure
+    ?check_size st op =
+  let open Lwt_result_wrap_syntax in
+  let* st, _ =
+    add_operation_with_metadata
+      ?expect_failure
+      ?expect_apply_failure
+      ?allow_manager_failure
+      ?check_size
+      st
+      op
+  in
+  return st
 
 let finalize_validation_and_application (validation_state, application_state)
     shell_header =
@@ -260,7 +277,7 @@ let finalize_validation_and_application (validation_state, application_state)
   let* () = finalize_validation validation_state in
   finalize_application application_state shell_header
 
-let finalize_block st =
+let finalize_block_with_metadata st =
   let open Lwt_result_wrap_syntax in
   let operations = List.rev st.rev_operations in
   let operations_hash =
@@ -274,7 +291,7 @@ let finalize_block st =
       operations_hash;
     }
   in
-  let*@ validation_result, _ =
+  let*@ validation_result, metadata =
     finalize_validation_and_application st.state (Some shell_header)
   in
   let operations = List.rev st.rev_operations in
@@ -296,13 +313,19 @@ let finalize_block st =
   in
   let hash = Block_header.hash header in
   return
-    {
-      Block.hash;
-      header;
-      operations;
-      context = validation_result.context;
-      constants = st.constants;
-    }
+    ( {
+        Block.hash;
+        header;
+        operations;
+        context = validation_result.context;
+        constants = st.constants;
+      },
+      metadata )
+
+let finalize_block st =
+  let open Lwt_result_wrap_syntax in
+  let* st, _ = finalize_block_with_metadata st in
+  return st
 
 let assert_validate_operation_fails expect_failure op block =
   let open Lwt_result_syntax in
