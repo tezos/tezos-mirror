@@ -155,7 +155,7 @@ module Node = struct
             toplog
               "No data dir given, we will attempt to bootstrap the node from a \
                rolling snapshot." ;
-            toplog "Creating the agent." ;
+            toplog "Creating the agent %s." name ;
             let* node =
               Node.Agent.create
                 ~rpc_external
@@ -172,9 +172,9 @@ module Node = struct
                 agent
             in
             let* () = may_copy_node_identity_file agent node identity_file in
-            toplog "Initializing node configuration" ;
+            toplog "Initializing node configuration for %s" name ;
             let* () = Node.config_init node [] in
-            toplog "Trying to download a rolling snapshot" ;
+            toplog "Trying to download a rolling snapshot for %s" name ;
             let* exit_status =
               Process.spawn
                 ?runner:(runner_of_agent agent)
@@ -189,13 +189,15 @@ module Node = struct
             let* () =
               match exit_status with
               | WEXITED 0 ->
-                  toplog "Importing the snapshot" ;
+                  toplog "Importing the snapshot for %s" name ;
                   let* () =
                     try
                       let* () =
                         Node.snapshot_import ~no_check:true node "snapshot_file"
                       in
-                      let () = toplog "Snapshot import succeeded." in
+                      let () =
+                        toplog "Snapshot import succeeded for %s." name
+                      in
                       let* _ =
                         Process.wait (Process.spawn "rm" ["snapshot_file"])
                       in
@@ -207,17 +209,19 @@ module Node = struct
                                  genesis block is OK. *)
                       let () =
                         toplog
-                          "Snapshot import failed, the node will be \
+                          "Snapshot import failed for %s, the node will be \
                            bootstrapped from genesis."
+                          name
                       in
                       Lwt.return_unit
                   in
                   Lwt.return_unit
               | WEXITED code ->
                   toplog
-                    "Could not download the snapshot: wget exit code: %d\n\
-                     Starting without snapshot. This could last long before \
-                     the node is bootstrapped"
+                    "Could not download the snapshot for %s: wget exit code: %d\n\
+                     Starting without snapshot. It could last long before the \
+                     node is bootstrapped"
+                    name
                     code ;
                   Lwt.return_unit
               | status -> (
@@ -226,18 +230,18 @@ module Node = struct
                   | Error (`Invalid_status reason) ->
                       failwith @@ Format.sprintf "wget: %s" reason)
             in
-            toplog "Launching the node." ;
+            toplog "Launching the node %s." name ;
             let* () =
               Node.Agent.run
                 node
                 (Force_history_mode_switch :: Synchronisation_threshold 1
                :: arguments)
             in
-            toplog "Waiting for the node to be ready." ;
+            toplog "Waiting for the node %s to be ready." name ;
             let* () = wait_for_ready node in
-            toplog "Node is ready." ;
+            toplog "Node %s is ready." name ;
             let* () = Node.wait_for_synchronisation ~statuses:["synced"] node in
-            toplog "Node is bootstrapped" ;
+            toplog "Node %s is bootstrapped" name ;
             Lwt.return node)
     | _ (* private network *) -> (
         (* For sandbox deployments, we only listen on local interface, hence
@@ -2087,7 +2091,7 @@ let init_teztale (configuration : configuration) cloud agent =
 let may_copy_dal_node_identity_file agent node = function
   | None -> Lwt.return_unit
   | Some source ->
-      toplog "Copying the DAL node identity file" ;
+      toplog "Copying the DAL node identity file for %s" (Agent.name agent) ;
       let* _ =
         Agent.copy agent ~source ~destination:(Dal_node.identity_file node)
       in
@@ -2123,7 +2127,7 @@ let init_public_network cloud (configuration : configuration)
         in
         Lwt.return bootstrap
     | Some agent ->
-        let () = toplog "Some agent given" in
+        let () = toplog "Some agent given (%s)" (Agent.name agent) in
         let () = toplog "Initializing the bootstrap node agent" in
         let* node =
           Node.init
@@ -2599,12 +2603,12 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
 
 let init_producer cloud configuration ~bootstrap teztale account i slot_index
     agent =
-  let () = toplog "Initializing a DAL producer" in
   let name = Format.asprintf "producer-node-%i" i in
+  let () = toplog "Initializing the DAL producer %s" name in
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
-  let () = toplog "Init producer: init node" in
+  let () = toplog "Init producer %s: init L1 node" name in
   let* node =
     Node.init
       ?data_dir
@@ -2616,9 +2620,9 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       agent
   in
   let endpoint = Client.Node node in
-  let () = toplog "Init producer: create client" in
+  let () = toplog "Init %s producer: create client" name in
   let* client = Client.Agent.create ~endpoint agent in
-  let () = toplog "Init producer: import key" in
+  let () = toplog "Init %s producer: import key" name in
   let* () =
     Client.import_secret_key
       client
@@ -2626,10 +2630,10 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       account.Account.secret_key
       ~alias:account.Account.alias
   in
-  let () = toplog "Init producer: reveal account" in
+  let () = toplog "Init producer %s: reveal account" name in
   let*? process = Client.reveal client ~endpoint ~src:account.Account.alias in
   let* _ = Process.wait process in
-  let () = toplog "Init producer: create agent" in
+  let () = toplog "Init producer %s: create agent" name in
   let* dal_node =
     Dal_node.Agent.create
       ~name:(Format.asprintf "producer-dal-node-%i" i)
@@ -2637,7 +2641,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       cloud
       agent
   in
-  let () = toplog "Init producer: init DAL node config" in
+  let () = toplog "Init producer %s: init DAL node config" name in
   let* () =
     Dal_node.init_config
       ~expected_pow:(Network.expected_pow configuration.network)
@@ -2648,7 +2652,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
          mode, it can make sense on ghostnet for example. *)
       dal_node
   in
-  let () = toplog "Init producer: add DAL node metrics" in
+  let () = toplog "Init producer %s: add DAL node metrics" name in
   let* () =
     add_prometheus_source
       ~node
@@ -2668,7 +2672,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
   in
   (* We do not wait on the promise because loading the SRS takes some time.
      Instead we will publish commitments only once this promise is fulfilled. *)
-  let () = toplog "Init producer: wait for DAL node to be ready" in
+  let () = toplog "Init producer %s: wait for DAL node to be ready" name in
   let otel = Cloud.open_telemetry_endpoint cloud in
   let is_ready =
     Dal_node.Agent.run
@@ -2677,7 +2681,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       ~event_level:`Notice
       dal_node
   in
-  let () = toplog "Init producer: DAL node is ready" in
+  let () = toplog "Init producer %s: DAL node is ready" name in
   let* () =
     match teztale with
     | None -> Lwt.return_unit
@@ -3460,13 +3464,13 @@ let update_bakers_infos t =
   Lwt.return_unit
 
 let on_new_level t level ~metadata =
-  toplog "Start process level %d" level ;
+  toplog "Start processing level %d" level ;
   clean_up t (level - t.configuration.blocks_history) ;
   let* () =
     if level mod 1_000 = 0 then update_bakers_infos t else Lwt.return_unit
   in
   let* infos_per_level = get_infos_per_level t ~level ~metadata in
-  toplog "Level info processed" ;
+  toplog "Level %d's info processed" level ;
   Hashtbl.replace t.infos level infos_per_level ;
   let metrics =
     get_metrics t infos_per_level (Hashtbl.find t.metrics (level - 1))
@@ -3498,7 +3502,7 @@ let on_new_level t level ~metadata =
         Lwt.return {t with disconnection_state = Some disconnection_state}
     | _ -> Lwt.return t
   in
-  toplog "Level processed" ;
+  toplog "Level %d processed" level ;
   Lwt.return t
 
 let on_new_cycle t ~level =
@@ -3551,11 +3555,10 @@ let ensure_enough_funds t i =
       in
       (* This is to prevent having to refund two producers at the same time and ensure it can produce at least one slot. *)
       let random = Random.int 5_000_000 + 10_000 in
-      if balance < Tez.of_mutez_int random then (
+      if balance < Tez.of_mutez_int random then
         let* fundraiser =
           Client.show_address ~alias:"fundraiser" t.bootstrap.client
         in
-        toplog "### transfer" ;
         let* _op_hash =
           Operation.Manager.transfer
             ~amount:10_000_000
@@ -3567,14 +3570,14 @@ let ensure_enough_funds t i =
                (Operation.Manager.inject ~dont_wait:true)
                t.bootstrap.client
         in
-        Lwt.return_unit)
+        Lwt.return_unit
       else Lwt.return_unit
 
 let produce_slot t level i =
   if level mod t.configuration.producers_delay = 0 then (
-    toplog "producing slots for level %d" level ;
+    toplog "Producing a slot for level %d" level ;
     let* () = ensure_enough_funds t i in
-    toplog "ensured enough funds are available" ;
+    toplog "Ensured enough funds are available" ;
     let producer = List.nth t.producers i in
     let index = producer.slot_index in
     let content =
@@ -3584,7 +3587,7 @@ let produce_slot t level i =
            ~slot_size:t.parameters.cryptobox.slot_size
     in
     let* _ = Node.wait_for_level producer.node level in
-    let* _ =
+    let* _commitment =
       (* A dry-run of the "publish dal commitment" command outputs fees of 516µtz and
          1333 gas consumed. We added a (quite small) margin to it. *)
       Helpers.publish_and_store_slot
@@ -3598,7 +3601,7 @@ let produce_slot t level i =
         ~index
         content
     in
-    Log.info "publish slot" ;
+    Log.info "publish_commitment operation injected" ;
     Lwt.return_unit)
   else Lwt.return_unit
 
@@ -3617,7 +3620,7 @@ let rec loop t level =
   let p = on_new_block t ~level in
   let _p2 =
     if producers_not_ready t then (
-      toplog "producers not ready for level %d" level ;
+      toplog "Producers not ready for level %d" level ;
       Lwt.return_unit)
     else
       Seq.ints 0
