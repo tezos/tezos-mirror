@@ -194,7 +194,11 @@ let () =
   let has_non_release_tag =
     let release_tags =
       octez_release_tags
-      @ [octez_evm_node_release_tag_re; octez_smart_rollup_node_release_tag_re]
+      @ [
+          octez_evm_node_release_tag_re;
+          octez_smart_rollup_node_release_tag_re;
+          Sdk_bindings_ci.Release.tag_re;
+        ]
       @ !Hooks.release_tags
     in
     If.(Predefined_vars.ci_commit_tag != null && not (has_any_tag release_tags))

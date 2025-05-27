@@ -23,3 +23,67 @@ let job_test ?dependencies ?rules () =
     ?rules
     ["make -C contrib/sdk-bindings check"; "make -C contrib/sdk-bindings test"]
   |> enable_cargo_cache |> enable_sccache
+
+module Release = struct
+  (** Jobs and pipelines to release SDK bindings for each supported language *)
+
+  let jobs_build_sdk =
+    let build_python_sdk =
+      let linux : tezos_job =
+        job
+          ~__POS__
+          ~name:"build_python_sdk_linux"
+          ~description:"Build Python SDK for Linux"
+          ~stage:Stages.build
+          ~image:Images.rust_sdk_bindings
+          ~artifacts:
+            (Gitlab_ci.Util.artifacts
+               ["contrib/sdk-bindings/rust/target/wheels/*"])
+          ~before_script:
+            ["export CARGO_NET_OFFLINE=false"; ". $HOME/.venv/bin/activate"]
+          ["make -C contrib/sdk-bindings/rust -f python.mk build"]
+        |> enable_cargo_cache |> enable_sccache
+      in
+      [linux]
+    in
+    build_python_sdk
+
+  let job_publish_sdk =
+    let maturin_variables : Gitlab_ci.Types.variables =
+      [
+        ("MATURIN_REPOSITORY", "testpypi");
+        ("MATURIN_PYPI_TOKEN", "$CI_TESTPYPI_TOKEN");
+      ]
+    in
+    let dependencies =
+      Dependent (List.map (fun job -> Artifacts job) jobs_build_sdk)
+    in
+    job
+      ~__POS__
+      ~name:"publish_sdk"
+      ~description:"Publish all previously built SDK"
+      ~stage:Stages.publish
+      ~image:Images.rust_sdk_bindings
+      ~variables:maturin_variables
+      ~dependencies
+      ~before_script:[". $HOME/.venv/bin/activate"]
+      ["make -C contrib/sdk-bindings publish"]
+
+  let jobs = jobs_build_sdk @ [job_publish_sdk]
+
+  (* Matches Tezos SDK release tags, e.g. [tezos-sdk-v1.2.0]. *)
+  let tag_re = "/^tezos-sdk-v\\d+\\.\\d+\\.\\d+$/"
+
+  let () =
+    let open Gitlab_ci in
+    let open Rules in
+    Pipeline.register
+      "publish_sdk_bindings_releases"
+      If.(on_tezos_namespace && push && has_tag_match tag_re)
+      ~jobs
+      ~description:
+        "Release tag pipeline for SDK-bindings.\n\n\
+         Created when the release manager pushes a tag in the format \
+         tezos-sdk-vX.Y.Z. Creates and publishes releases on each supported \
+         package manager. Supported package manager are: 'TestPyPI'"
+end

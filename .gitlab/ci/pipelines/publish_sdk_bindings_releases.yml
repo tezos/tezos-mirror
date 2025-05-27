@@ -1,0 +1,91 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+stages:
+- images
+- build
+- publish
+
+oc.docker:rust-sdk-bindings:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_rust_sdk_bindings_build.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: rust_sdk_bindings_image_tag.env
+
+build_python_sdk_linux:
+  image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
+  stage: build
+  tags:
+  - gcp
+  dependencies:
+  - oc.docker:rust-sdk-bindings:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - export CARGO_NET_OFFLINE=false
+  - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C contrib/sdk-bindings/rust -f python.mk build
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    paths:
+    - contrib/sdk-bindings/rust/target/wheels/*
+
+publish_sdk:
+  image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
+  stage: publish
+  tags:
+  - gcp
+  needs:
+  - oc.docker:rust-sdk-bindings:amd64
+  - build_python_sdk_linux
+  dependencies:
+  - oc.docker:rust-sdk-bindings:amd64
+  - build_python_sdk_linux
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - make -C contrib/sdk-bindings publish
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    MATURIN_REPOSITORY: testpypi
+    MATURIN_PYPI_TOKEN: $CI_TESTPYPI_TOKEN
