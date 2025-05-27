@@ -234,9 +234,10 @@ let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
 let equal_hash (Hash (Hex h1)) (Hash (Hex h2)) = String.equal h1 h2
 
-let pp_hash fmt (Hash (Hex h)) = Format.pp_print_string fmt h
+let pp_hash fmt h = Format.pp_print_string fmt (hash_to_string h)
 
-let pp_block_hash fmt (Block_hash (Hex h)) = Format.pp_print_string fmt h
+let pp_block_hash fmt (Block_hash h) =
+  Format.pp_print_string fmt (hex_to_string h)
 
 let decode_hex bytes = Hex Hex.(of_bytes bytes |> show)
 
