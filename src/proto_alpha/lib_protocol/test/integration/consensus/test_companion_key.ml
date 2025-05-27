@@ -962,20 +962,13 @@ let test_fail_no_signer =
               let delegate = State.find_account delegate state in
               let ck = State.find_account "ck" state in
               let* ck_account = Account.find ck.pkh in
-              Assert.expect_error ~loc:__LOC__ err (function
-                  | [
-                      Protocol.Validate_errors.Manager
-                      .Update_consensus_key_with_tz4_without_proof
-                        {
-                          kind = err_kind;
-                          source = err_source;
-                          public_key = err_pk;
-                        };
-                    ] ->
-                      Signature.Public_key_hash.equal err_source delegate.pkh
-                      && Signature.Public_key.equal err_pk ck_account.pk
-                      && err_kind = kind
-                  | _ -> false))
+              Error_helpers.expect_missing_bls_proof
+                ~loc:__LOC__
+                ~kind_pk:
+                  (Protocol.Operation_repr.consensus_to_public_key_kind kind)
+                ~pk:ck_account.pk
+                ~source_pkh:delegate.pkh
+                err)
             (update_key ~force_no_signer:true ~kind ~ck_name:"ck" delegate))
         [("update consensus", Consensus); ("update companion", Companion)]
 
@@ -993,15 +986,12 @@ let test_fail_wrong_signer =
             ~expected_error:(fun (_block, state) err ->
               let ck = State.find_account "ck" state in
               let* ck_account = Account.find ck.pkh in
-              Assert.expect_error ~loc:__LOC__ err (function
-                  | [
-                      Protocol.Validate_errors.Manager
-                      .Update_consensus_key_with_incorrect_proof
-                        {kind = err_kind; public_key = err_pk; proof = _};
-                    ] ->
-                      Signature.Public_key.equal err_pk ck_account.pk
-                      && err_kind = kind
-                  | _ -> false))
+              Error_helpers.expect_incorrect_bls_proof
+                ~loc:__LOC__
+                ~kind_pk:
+                  (Protocol.Operation_repr.consensus_to_public_key_kind kind)
+                ~pk:ck_account.pk
+                err)
             (update_key ~proof_signer:"signer" ~kind ~ck_name:"ck" delegate))
         [("update consensus", Consensus); ("update companion", Companion)]
 

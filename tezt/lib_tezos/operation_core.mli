@@ -508,8 +508,9 @@ module Manager : sig
   (** Build a public key revelation.
 
      The [Account.key] argument has no default value because it will
-     typically be a fresh account. *)
-  val reveal : Account.key -> payload
+     typically be a fresh account. [proof] is required only for tz4
+     public keys. *)
+  val reveal : Account.key -> ?proof:string -> unit -> payload
 
   (** [transfer ?(dest=Constant.bootstrap2) ~amount:1_000_000 ()]
      builds a transfer operation. Note that the amount is expressed in
@@ -532,11 +533,10 @@ module Manager : sig
     unit ->
     payload
 
-  (** [create_proof_of_possession] generates a proof of possession (aka PoP) for
-      the given [public_key] by signing it with the secret key of the [signer].
-      For now, this is only useful with BLS (tz4) keys. *)
-  val create_proof_of_possession :
-    public_key:string -> signer:Account.key -> string
+  (** [create_proof_of_possession] generates a proof of possession
+      (aka PoP) for the secret key of the [signer]. For now, this is
+      required only for BLS (tz4) keys. *)
+  val create_proof_of_possession : signer:Account.key -> string option
 
   (** [update_consensus_key ~public_key ~proof ()] builds an
       update_consenus_key operation. [proof] is required only for tz4

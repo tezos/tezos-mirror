@@ -4826,7 +4826,11 @@ and _ contents =
       -> 'kind Kind.manager contents
 
 and _ manager_operation =
-  | Reveal : public_key -> Kind.reveal manager_operation
+  | Reveal : {
+      public_key : Signature.Public_key.t;
+      proof : Bls.t option;
+    }
+      -> Kind.reveal manager_operation
   | Transaction : {
       amount : Tez.t;
       parameters : Script.lazy_expr;

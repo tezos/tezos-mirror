@@ -436,11 +436,13 @@ val transfer :
 
 (** Calls {!Injection.prepare_manager_operation} with [Reveal pk] as [operation] *)
 val build_reveal_operation :
+  #Protocol_client_context.full ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
+  src_sk:Client_keys.sk_uri ->
   public_key ->
-  Kind.reveal Annotated_manager_operation.t
+  Kind.reveal Annotated_manager_operation.t tzresult Lwt.t
 
 (** Calls {!Injection.inject_manager_operation}
     with {!Annotated_manager_operation.Single_manager}

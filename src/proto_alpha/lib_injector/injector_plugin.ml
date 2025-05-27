@@ -116,8 +116,12 @@ module Proto_client = struct
   let operation_size_overhead =
     let dummy_operation =
       Reveal
-        (Signature.Public_key.of_b58check_exn
-           "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav")
+        {
+          public_key =
+            Signature.Public_key.of_b58check_exn
+              "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
+          proof = None;
+        }
     in
     let dummy_contents =
       Manager_operation

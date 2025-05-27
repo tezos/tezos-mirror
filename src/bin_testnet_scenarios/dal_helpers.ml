@@ -115,7 +115,7 @@ let reveal_accounts client accounts =
       (fun account ->
         Log.info "Revealing address %s" account.Account.alias ;
         let op =
-          Operation.Manager.reveal account
+          Operation.Manager.reveal account ()
           |> Operation.Manager.make ~source:account
         in
         let* _op_hash = Operation.Manager.inject ~signer:account [op] client in

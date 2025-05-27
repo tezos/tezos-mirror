@@ -60,6 +60,11 @@ let sign ctxt ?(watermark = Signature.Generic_operation) sk branch contents =
     ({shell = {branch}; protocol_data = {contents; signature = Some signature}}
       : _ Operation.t)
 
+let create_proof sk =
+  match (sk : Signature.secret_key) with
+  | Bls sk -> Signature.Bls.of_bytes_opt (Signature.Bls.pop_prove sk)
+  | _ -> None
+
 (** Generates the block payload hash based on the hash [pred_hash] of
     the predecessor block and the hash of non-consensus operations of
     the current block [b]. *)
@@ -489,7 +494,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
               source = Signature.Public_key.hash public_key;
               fee = Tez.zero;
               counter;
-              operation = Reveal public_key;
+              operation = Reveal {public_key; proof = create_proof account.sk};
               gas_limit = default_high_gas_limit;
               storage_limit = Z.zero;
             }
@@ -576,7 +581,7 @@ let manager_operation_with_fixed_gas_limit ?(force_reveal = false) ?counter
           source = Signature.Public_key.hash public_key;
           fee = Tez.zero;
           counter;
-          operation = Reveal public_key;
+          operation = Reveal {public_key; proof = create_proof account.sk};
           gas_limit = reveal_gas_limit;
           storage_limit = Z.zero;
         }
@@ -635,7 +640,8 @@ let manager_operation ?force_reveal ?counter ?fee ?(gas_limit = High)
     operation
 
 let revelation_with_fixed_gas_limit ?(fee = Tez.zero) ~gas_limit
-    ?(storage_limit = Z.zero) ?counter ?(forge_pkh = None) ctxt public_key =
+    ?(storage_limit = Z.zero) ?counter ?(forge_pkh = None) ?forge_proof ctxt
+    public_key =
   let open Lwt_result_syntax in
   (* If Some pkh is provided to ?forge_pkh we take that hash at face
      value, otherwise we honestly compute the hash from
@@ -647,24 +653,30 @@ let revelation_with_fixed_gas_limit ?(fee = Tez.zero) ~gas_limit
     | None -> Signature.Public_key.hash public_key
   in
   let source = Contract.Implicit pkh in
-  let+ counter =
+  let* counter =
     match counter with
     | None -> Context.Contract.counter ctxt source
     | Some ctr -> return ctr
   in
   let counter = Manager_counter.succ counter in
+  let+ account = Context.Contract.manager ctxt source in
+  let proof =
+    match forge_proof with
+    | Some proof -> proof
+    | None -> create_proof account.sk
+  in
   Manager_operation
     {
       source = pkh;
       fee;
       counter;
-      operation = Reveal public_key;
+      operation = Reveal {public_key; proof};
       gas_limit;
       storage_limit;
     }
 
-let revelation ?fee ?(gas_limit = High) ?storage_limit ?counter ?forge_pkh ctxt
-    public_key =
+let revelation ?fee ?(gas_limit = High) ?storage_limit ?counter ?forge_pkh
+    ?forge_proof ctxt public_key =
   let open Lwt_result_syntax in
   let* (Manager_operation {source; _} as dummy_operation) =
     revelation_with_fixed_gas_limit
@@ -673,6 +685,7 @@ let revelation ?fee ?(gas_limit = High) ?storage_limit ?counter ?forge_pkh ctxt
       ?storage_limit
       ?counter
       ?forge_pkh
+      ?forge_proof
       ctxt
       public_key
   in
@@ -694,6 +707,7 @@ let revelation ?fee ?(gas_limit = High) ?storage_limit ?counter ?forge_pkh ctxt
       ?storage_limit
       ?counter
       ?forge_pkh
+      ?forge_proof
       ctxt
       public_key
   in

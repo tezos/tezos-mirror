@@ -2918,9 +2918,12 @@ module Manager = struct
     let* () = Contract.check_counter_increment vi.ctxt source first_counter in
     let revealed_key =
       match contents_list with
-      | Single (Manager_operation {operation = Reveal pk; _})
-      | Cons (Manager_operation {operation = Reveal pk; _}, _) ->
-          Some pk
+      | Single
+          (Manager_operation {operation = Reveal {public_key; proof = _}; _})
+      | Cons
+          (Manager_operation {operation = Reveal {public_key; proof = _}; _}, _)
+        ->
+          Some public_key
       | _ -> None
     in
     let* pk =
@@ -3010,15 +3013,53 @@ module Manager = struct
            trace to this effect. *)
         record_trace Gas.Gas_limit_too_high
 
+  let check_bls_proof_for_manager_pk remaining_gas source
+      (public_key : Signature.Public_key.t) proof =
+    let open Result_syntax in
+    match (public_key, proof) with
+    | Bls _bls_public_key, None ->
+        result_error
+          (Validate_errors.Manager.Missing_bls_proof
+             {kind = Manager_pk; source; public_key})
+    | Bls bls_public_key, Some _ ->
+        (* Compute the gas cost to encode the manager public key and
+           check the proof. *)
+        let gas_cost_for_sig_check =
+          let open Saturation_repr.Syntax in
+          let size = Bls.Public_key.size bls_public_key in
+          Operation_costs.serialization_cost size
+          + Michelson_v1_gas.Cost_of.Interpreter.check_signature_on_algo
+              Bls
+              size
+        in
+        let* (_ : Gas.Arith.fp) =
+          record_trace
+            Insufficient_gas_for_manager
+            (Gas.consume_from
+               (Gas.Arith.fp remaining_gas)
+               gas_cost_for_sig_check)
+        in
+        return_unit
+    | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof ->
+        result_error
+          (Validate_errors.Manager.Unused_bls_proof
+             {kind = Manager_pk; source; public_key})
+    | (Ed25519 _ | Secp256k1 _ | P256 _), None -> return_unit
+
   let check_update_consensus_key vi remaining_gas source
-      (public_key : Signature.Public_key.t) proof kind =
+      (public_key : Signature.Public_key.t) proof
+      (kind : Operation_repr.consensus_key_kind) =
     let open Result_syntax in
     if Constants.allow_tz4_delegate_enable vi.ctxt then
       match (public_key, proof, kind) with
       | Bls _bls_public_key, None, kind ->
           result_error
-            (Validate_errors.Manager.Update_consensus_key_with_tz4_without_proof
-               {kind; source; public_key})
+            (Validate_errors.Manager.Missing_bls_proof
+               {
+                 kind = Operation_repr.consensus_to_public_key_kind kind;
+                 source;
+                 public_key;
+               })
       | Bls bls_public_key, Some _, _kind ->
           (* Compute the gas cost to encode the consensus public key and
              check the proof. *)
@@ -3044,8 +3085,8 @@ module Manager = struct
                {source; public_key})
       | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof, Consensus ->
           result_error
-            (Validate_errors.Manager.Update_consensus_key_with_unused_proof
-               {kind = Consensus; source; public_key})
+            (Validate_errors.Manager.Unused_bls_proof
+               {kind = Consensus_pk; source; public_key})
       | (Ed25519 _ | Secp256k1 _ | P256 _), None, Consensus -> return_unit
     else
       let* () = Delegate.Consensus_key.check_not_tz4 kind public_key in
@@ -3057,8 +3098,8 @@ module Manager = struct
       | Consensus ->
           if Option.is_some proof then
             result_error
-              (Validate_errors.Manager.Update_consensus_key_with_unused_proof
-                 {kind; source; public_key})
+              (Validate_errors.Manager.Unused_bls_proof
+                 {kind = Consensus_pk; source; public_key})
           else return_unit
 
   let check_kind_specific_content (type kind)
@@ -3076,7 +3117,9 @@ module Manager = struct
       contents
     in
     match operation with
-    | Reveal pk -> Contract.check_public_key pk source
+    | Reveal {public_key; proof} ->
+        let* () = Contract.check_public_key public_key source in
+        check_bls_proof_for_manager_pk remaining_gas source public_key proof
     | Transaction {parameters; _} ->
         let* (_ : Gas.Arith.fp) =
           consume_decoding_gas remaining_gas parameters

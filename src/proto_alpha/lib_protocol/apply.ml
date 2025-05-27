@@ -1014,7 +1014,7 @@ let apply_manager_operation :
       Script.Always
     in
     match operation with
-    | Reveal pk ->
+    | Reveal {public_key; proof} ->
         (* TODO #2603
 
            Even if [precheck_manager_contents] has already asserted that
@@ -1023,6 +1023,30 @@ let apply_manager_operation :
            should be solved by forking out [validate_operation] from
            [apply_operation]. *)
         let* () = Contract.must_be_allocated ctxt source_contract in
+        (* Check proof *)
+        let* ctxt =
+          match (public_key, proof) with
+          | Bls bls_public_key, Some proof ->
+              let*? ctxt =
+                let gas_cost_for_sig_check =
+                  let open Saturation_repr.Syntax in
+                  let size = Bls.Public_key.size bls_public_key in
+                  Operation_costs.serialization_cost size
+                  + Michelson_v1_gas.Cost_of.Interpreter.check_signature_on_algo
+                      Bls
+                      size
+                in
+                Gas.consume ctxt gas_cost_for_sig_check
+              in
+              let* () =
+                fail_unless
+                  (Signature.pop_verify bls_public_key (Bls.to_bytes proof))
+                  (Validate_errors.Manager.Incorrect_bls_proof
+                     {kind = Manager_pk; public_key; proof})
+              in
+              return ctxt
+          | _, _ -> return ctxt
+        in
         (* TODO tezos/tezos#3070
 
            We have already asserted the consistency of the supplied public
@@ -1033,7 +1057,11 @@ let apply_manager_operation :
            using [Contract.check_public_key] and this usage of
            [Contract.reveal_manager_key] should become the standard. *)
         let* ctxt =
-          Contract.reveal_manager_key ~check_consistency:false ctxt source pk
+          Contract.reveal_manager_key
+            ~check_consistency:false
+            ctxt
+            source
+            public_key
         in
         return
           ( ctxt,
@@ -1448,9 +1476,12 @@ let apply_manager_operation :
               let* () =
                 fail_unless
                   (Signature.pop_verify bls_public_key (Bls.to_bytes proof))
-                  (Validate_errors.Manager
-                   .Update_consensus_key_with_incorrect_proof
-                     {kind; public_key; proof})
+                  (Validate_errors.Manager.Incorrect_bls_proof
+                     {
+                       kind = Operation_repr.consensus_to_public_key_kind kind;
+                       public_key;
+                       proof;
+                     })
               in
               return ctxt
           | _, _ -> return ctxt

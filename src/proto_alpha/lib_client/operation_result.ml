@@ -196,14 +196,24 @@ let pp_manager_operation_content (type kind) source ppf
             "@,Delegate: %a"
             Signature.Public_key_hash.pp
             delegate)
-  | Reveal key ->
+  | Reveal {public_key = key; proof} ->
       Format.fprintf
         ppf
-        "Revelation of manager public key:@,Contract: %a@,Key: %a"
+        "Revelation of manager public key:@,Contract: %a@,Key: %a%a"
         Contract.pp
         source
         Signature.Public_key.pp
         key
+        (fun ppf proof ->
+          match proof with
+          | None -> ()
+          | Some proof ->
+              Format.fprintf
+                ppf
+                "@,Proof of possession: %a"
+                Signature.Bls.pp
+                proof)
+        proof
   | Delegation delegate_opt -> (
       Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
       match delegate_opt with

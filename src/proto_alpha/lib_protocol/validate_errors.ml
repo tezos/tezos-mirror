@@ -1652,18 +1652,18 @@ module Manager = struct
         counter : Manager_counter.t;
       }
     | Incorrect_reveal_position
-    | Update_consensus_key_with_tz4_without_proof of {
-        kind : Operation_repr.consensus_key_kind;
+    | Missing_bls_proof of {
+        kind : Operation_repr.public_key_kind;
         source : public_key_hash;
         public_key : public_key;
       }
-    | Update_consensus_key_with_incorrect_proof of {
-        kind : Operation_repr.consensus_key_kind;
+    | Incorrect_bls_proof of {
+        kind : Operation_repr.public_key_kind;
         public_key : public_key;
         proof : Bls.t;
       }
-    | Update_consensus_key_with_unused_proof of {
-        kind : Operation_repr.consensus_key_kind;
+    | Unused_bls_proof of {
+        kind : Operation_repr.public_key_kind;
         source : public_key_hash;
         public_key : public_key;
       }
@@ -1761,44 +1761,48 @@ module Manager = struct
       (fun () -> Incorrect_reveal_position) ;
     register_error_kind
       `Permanent
-      ~id:"validate.operation.update_consensus_key_with_tz4_without_proof"
-      ~title:"update consensus key with tz4 without proof"
-      ~description:"Update to a tz4 consensus key without proof of possession"
-      ~pp:(fun ppf (kind, pk, source) ->
+      ~id:"validate.operation.missing_bls_proof"
+      ~title:"Proof of possession is required for tz4 key"
+      ~description:
+        "Revealing tz4 public keys and updating consensus and companion keys \
+         with tz4 require a proof of possession."
+      ~pp:(fun ppf (kind, source, pk) ->
         Format.fprintf
           ppf
-          "Update to a BLS %a key %a from %a should contain a proof of \
-           possession."
-          Operation_repr.pp_consensus_key_kind
+          "%s a BLS %a key %a from %a should contain a proof of possession."
+          (match (kind : Operation_repr.public_key_kind) with
+          | Manager_pk -> "Reveal of"
+          | _ -> "Update to")
+          Operation_repr.pp_public_key_kind
           kind
-          Signature.Public_key_hash.pp
-          pk
           Signature.Public_key.pp
+          pk
+          Signature.Public_key_hash.pp
           source)
       Data_encoding.(
         obj3
-          (req "kind" Operation_repr.consensus_key_kind_encoding)
+          (req "kind" Operation_repr.public_key_kind_encoding)
           (req "source" Signature.Public_key_hash.encoding)
           (req "public_key" Signature.Public_key.encoding))
       (function
-        | Update_consensus_key_with_tz4_without_proof {kind; source; public_key}
-          ->
+        | Missing_bls_proof {kind; source; public_key} ->
             Some (kind, source, public_key)
         | _ -> None)
       (fun (kind, source, public_key) ->
-        Update_consensus_key_with_tz4_without_proof {kind; source; public_key}) ;
+        Missing_bls_proof {kind; source; public_key}) ;
     register_error_kind
       `Permanent
-      ~id:"validate.operation.update_consensus_key_with_incorrect_proof"
-      ~title:"update consensus key with tz4 with incorrect proof"
-      ~description:
-        "Update to a tz4 consensus key with an incorrect proof of possession"
+      ~id:"validate.operation.incorrect_bls_proof"
+      ~title:"Incorrect proof of possession for tz4 key"
+      ~description:"Incorrect proof of possession for tz4 key."
       ~pp:(fun ppf (kind, pk, proof) ->
         Format.fprintf
           ppf
-          "Update to a BLS %a key %a contains an incorrect proof of possession \
-           %a."
-          Operation_repr.pp_consensus_key_kind
+          "%s a BLS %a key %a contains an incorrect proof of possession %a."
+          (match (kind : Operation_repr.public_key_kind) with
+          | Manager_pk -> "Reveal of"
+          | _ -> "Update to")
+          Operation_repr.pp_public_key_kind
           kind
           Signature.Public_key.pp
           pk
@@ -1806,41 +1810,44 @@ module Manager = struct
           proof)
       Data_encoding.(
         obj3
-          (req "kind" Operation_repr.consensus_key_kind_encoding)
+          (req "kind" Operation_repr.public_key_kind_encoding)
           (req "public_key" Signature.Public_key.encoding)
           (req "proof" Bls.encoding))
       (function
-        | Update_consensus_key_with_incorrect_proof {kind; public_key; proof} ->
+        | Incorrect_bls_proof {kind; public_key; proof} ->
             Some (kind, public_key, proof)
         | _ -> None)
       (fun (kind, public_key, proof) ->
-        Update_consensus_key_with_incorrect_proof {kind; public_key; proof}) ;
+        Incorrect_bls_proof {kind; public_key; proof}) ;
     register_error_kind
       `Permanent
-      ~id:"validate.operation.update_consensus_key_with_unused_proof"
-      ~title:"update consensus key with unused proof"
-      ~description:"Update consensus key with unused proof of possession"
-      ~pp:(fun ppf (kind, pk, source) ->
+      ~id:"validate.operation.unused_bls_proof"
+      ~title:"Proof of possession is only required for tz4 keys"
+      ~description:"Proof of possession is only required for tz4 keys"
+      ~pp:(fun ppf (kind, source, pk) ->
         Format.fprintf
           ppf
-          "Update %a key of %a from %a contains an unused proof of possession."
-          Operation_repr.pp_consensus_key_kind
+          "%s %a key of %a from %a contains an unused proof of possession."
+          (match (kind : Operation_repr.public_key_kind) with
+          | Manager_pk -> "Reveal of"
+          | _ -> "Update to")
+          Operation_repr.pp_public_key_kind
           kind
-          Signature.Public_key_hash.pp
-          pk
           Signature.Public_key.pp
+          pk
+          Signature.Public_key_hash.pp
           source)
       Data_encoding.(
         obj3
-          (req "kind" Operation_repr.consensus_key_kind_encoding)
+          (req "kind" Operation_repr.public_key_kind_encoding)
           (req "source" Signature.Public_key_hash.encoding)
           (req "public_key" Signature.Public_key.encoding))
       (function
-        | Update_consensus_key_with_unused_proof {kind; source; public_key} ->
+        | Unused_bls_proof {kind; source; public_key} ->
             Some (kind, source, public_key)
         | _ -> None)
       (fun (kind, source, public_key) ->
-        Update_consensus_key_with_unused_proof {kind; source; public_key}) ;
+        Unused_bls_proof {kind; source; public_key}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.update_companion_key_not_tz4"

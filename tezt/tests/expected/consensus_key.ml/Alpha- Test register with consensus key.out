@@ -4,7 +4,7 @@
 
 ./octez-client --wait none register key dummy_account_0 as delegate with consensus key dummy_account_1 and companion key dummy_account_2
 Node is bootstrapped.
-Estimated gas: 178.751 units (will add 0 for safety)
+Estimated gas: 178.785 units (will add 0 for safety)
 Estimated storage: no bytes added
 Estimated gas: 100 units (will add 0 for safety)
 Estimated storage: no bytes added
@@ -21,18 +21,18 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000275
+    Fee to the baker: ꜩ0.000276
     Expected counter: 2
     Gas limit: 179
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000275
-      payload fees(the block proposer) ....... +ꜩ0.000275
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000276
+      payload fees(the block proposer) ....... +ꜩ0.000276
     Revelation of manager public key:
       Contract: [PUBLIC_KEY_HASH]
       Key: [PUBLIC_KEY]
       This revelation was successfully applied
-      Consumed gas: 178.453
+      Consumed gas: 178.486
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000159
@@ -92,18 +92,18 @@ This sequence of operations was run:
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
   "pending_staking_parameters": [], "baking_power": "0", "total_staked": "0",
-  "total_delegated": "999999998928",
+  "total_delegated": "999999998927",
   "min_delegated_in_current_cycle":
-    { "amount": "999999998928",
+    { "amount": "999999998927",
       "level":
         { "level": 3, "level_position": 2, "cycle": 0, "cycle_position": 2,
           "expected_commitment": false } },
-  "own_full_balance": "999999998928", "own_staked": "0",
-  "own_delegated": "999999998928", "external_staked": "0",
+  "own_full_balance": "999999998927", "own_staked": "0",
+  "own_delegated": "999999998927", "external_staked": "0",
   "external_delegated": "0",
   "total_unstaked_per_cycle": [ { "cycle": 0, "deposit": "0" } ],
   "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
-  "staking_denominator": "0", "current_voting_power": "999999998928",
+  "staking_denominator": "0", "current_voting_power": "999999998927",
   "voting_power": "0", "voting_info": {},
   "consensus_key":
     { "active":
@@ -139,19 +139,19 @@ This sequence of operations was run:
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
   "pending_staking_parameters": [], "baking_power": "666666666101",
-  "total_staked": "500000000000", "total_delegated": "499999998305",
+  "total_staked": "500000000000", "total_delegated": "499999998304",
   "min_delegated_in_current_cycle":
-    { "amount": "499999998305",
+    { "amount": "499999998304",
       "level":
         { "level": 5, "level_position": 4, "cycle": 1, "cycle_position": 0,
           "expected_commitment": false } },
-  "own_full_balance": "999999998305", "own_staked": "500000000000",
-  "own_delegated": "499999998305", "external_staked": "0",
+  "own_full_balance": "999999998304", "own_staked": "500000000000",
+  "own_delegated": "499999998304", "external_staked": "0",
   "external_delegated": "0",
   "total_unstaked_per_cycle":
     [ { "cycle": 0, "deposit": "0" }, { "cycle": 1, "deposit": "0" } ],
   "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
-  "staking_denominator": "0", "current_voting_power": "999999998305",
+  "staking_denominator": "0", "current_voting_power": "999999998304",
   "voting_power": "0", "voting_info": {},
   "consensus_key":
     { "active":

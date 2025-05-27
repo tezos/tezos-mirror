@@ -235,6 +235,14 @@ val consensus_key_kind_encoding : consensus_key_kind Data_encoding.t
 
 val pp_consensus_key_kind : Format.formatter -> consensus_key_kind -> unit
 
+type public_key_kind = Manager_pk | Consensus_pk | Companion_pk
+
+val public_key_kind_encoding : public_key_kind Data_encoding.t
+
+val pp_public_key_kind : Format.formatter -> public_key_kind -> unit
+
+val consensus_to_public_key_kind : consensus_key_kind -> public_key_kind
+
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 val raw_encoding : raw Data_encoding.t
@@ -385,10 +393,19 @@ and _ contents =
 (** A [manager_operation] describes management and interactions
     between contracts (whether implicit or smart). *)
 and _ manager_operation =
-  (* [Reveal] for the revelation of a public key, a one-time
-     prerequisite to any signed operation, in order to be able to
-     check the sender’s signature. *)
-  | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
+  (* [Reveal {public_key; proof}] for the revelation of a public key
+     [public_key], a one-time prerequisite to any signed operation, in
+     order to be able to check the sender’s signature. To prevent
+     rogue key attacks, a proof of possession [proof] must be provided
+     if and only if the new key is a BLS key. The [proof] is a
+     signature over the public key itself (cf. the IETF BLS Signature
+     V4 standard
+     https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.3 *)
+  | Reveal : {
+      public_key : Signature.Public_key.t;
+      proof : Bls.t option;
+    }
+      -> Kind.reveal manager_operation
   (* [Transaction] of some amount to some destination contract. It can
      also be used to execute/call smart-contracts. *)
   | Transaction : {

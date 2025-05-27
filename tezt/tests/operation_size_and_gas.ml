@@ -124,13 +124,14 @@ let operation_size_and_gas ?name ?gas_limit ?storage_limit ~node ~source
   print_op_size_and_gas_in_file ~name ~op_size ~op_gas () ;
   unit
 
-let create_account ?(source = Constant.bootstrap2) ~node ~amount ~alias client =
+let create_account ?(source = Constant.bootstrap2) ~node ~amount ?sig_alg ~alias
+    client =
   Log.info
     ~color:Log.Color.FG.green
     "Create a [%s] account: generate a key, inject a transaction that funds \
      it, and bake a block to apply the transaction."
     alias ;
-  let* fresh_account = Client.gen_and_show_keys ~alias client in
+  let* fresh_account = Client.gen_and_show_keys ?sig_alg ~alias client in
   let* _oph =
     Operation.Manager.inject_single_transfer
       client
@@ -145,7 +146,7 @@ let create_account_and_reveal ?source ~node ~amount ~alias client =
   let* fresh_account = create_account ?source ~node ~amount ~alias client in
   Log.info ~color:Log.Color.FG.green "Reveal pkh of [%s] account." alias ;
   let op_reveal =
-    Operation.Manager.(make ~source:fresh_account (reveal fresh_account))
+    Operation.Manager.(make ~source:fresh_account (reveal fresh_account ()))
   in
   let* _oph = Operation.Manager.inject [op_reveal] client in
   let* () = Client.bake_for_and_wait ~node client in
@@ -182,8 +183,38 @@ let test_reveal =
     create_account ~node ~amount:10_000_000 ~alias:"fresh_account" client
   in
   Log.info ~color:Log.Color.FG.green "Reveal pkh of [fresh_account]." ;
-  let op_reveal = Operation.Manager.reveal fresh_account in
+  let op_reveal = Operation.Manager.reveal fresh_account () in
   operation_size_and_gas ~source:fresh_account ~node op_reveal client
+
+let test_reveal_tz4 =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"operation size and gas for tz4 reveal operation"
+    ~tags:(operation_size_and_gas_tags @ ["reveal"; "tz4"])
+  @@ fun protocol ->
+  Log.info ~color:Log.Color.FG.green "Initialize a node and a client." ;
+  let* node, client = Client.init_with_protocol ~protocol `Client () in
+  let* fresh_account =
+    create_account
+      ~node
+      ~amount:10_000_000
+      ~sig_alg:"bls"
+      ~alias:"fresh_account"
+      client
+  in
+  let proof =
+    if Protocol.(number protocol > 022) then
+      Operation.Manager.create_proof_of_possession ~signer:fresh_account
+    else None
+  in
+  Log.info ~color:Log.Color.FG.green "Reveal pkh of [fresh_account]." ;
+  let op_reveal = Operation.Manager.reveal ?proof fresh_account () in
+  operation_size_and_gas
+    ~gas_limit:3500
+    ~source:fresh_account
+    ~node
+    op_reveal
+    client
 
 let test_simple_transfer =
   Protocol.register_regression_test
@@ -494,6 +525,7 @@ let test_staking_operations =
 
 let register ~protocols =
   test_reveal protocols ;
+  test_reveal_tz4 protocols ;
   test_simple_transfer protocols ;
   test_delegation protocols ;
   test_contract_call protocols ;
