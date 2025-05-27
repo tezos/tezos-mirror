@@ -82,6 +82,9 @@ let schedule_container_scanning_evm_node_releases =
 let schedule_documentation =
   scheduled && var "TZ_SCHEDULE_KIND" == str "DOCUMENTATION"
 
+let schedule_docker_build =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "DOCKER_FRESH_IMAGE_BUILD"
+
 let on_master = Predefined_vars.ci_commit_branch == str "master"
 
 let on_branch branch = Predefined_vars.ci_commit_branch == str branch

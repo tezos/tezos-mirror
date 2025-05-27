@@ -285,55 +285,6 @@ oc.build_arm64-exp-dev-extra:
     - etherlink-governance-observer
     when: on_success
 
-oc.docker:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - when: always
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  script:
-  - ./scripts/ci/docker_release.sh
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
-    DOCKER_BUILD_TARGET: with-evm-artifacts
-    IMAGE_ARCH_PREFIX: amd64_
-    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
-
-oc.docker:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: build
-  tags:
-  - gcp_arm64
-  rules:
-  - when: always
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  script:
-  - ./scripts/ci/docker_release.sh
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: arm64_
-    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
-
 datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
@@ -386,6 +337,76 @@ oc.unified_coverage:
     when: always
     expose_as: Coverage report
   coverage: '/Coverage: ([^%]+%)/'
+
+oc.docker:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_release.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "true"
+    DOCKER_BUILD_TARGET: with-evm-artifacts
+    IMAGE_ARCH_PREFIX: amd64_
+    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+
+oc.docker:arm64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: build
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_release.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "true"
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    IMAGE_ARCH_PREFIX: arm64_
+    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+
+docker:merge_manifests:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: prepare_release
+  tags:
+  - gcp
+  needs:
+  - oc.docker:amd64
+  - oc.docker:arm64
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_merge_manifests.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "true"
 
 documentation:odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -657,27 +678,6 @@ publish:documentation:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
-
-docker:merge_manifests:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: prepare_release
-  tags:
-  - gcp
-  needs:
-  - oc.docker:amd64
-  - oc.docker:arm64
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  script:
-  - ./scripts/ci/docker_merge_manifests.sh
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
 
 publish_kernel_sdk:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
