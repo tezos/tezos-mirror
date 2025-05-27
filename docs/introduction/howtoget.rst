@@ -103,7 +103,7 @@ Using the official Deb or RPM packages offers several advantages:
 Ubuntu and Debian Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Ubuntu or Debian, you can install the Deb packages
+If you're using Ubuntu or Debian, you can install the Debian packages
 using ``apt`` directly from our APT repository.
 
 We support the following distribution/releases:
