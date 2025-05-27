@@ -10,9 +10,10 @@ use nom::error::{ErrorKind, ParseError};
 use nom::{bytes::complete::take, Finish};
 use primitive_types::H256;
 use tezos_crypto_rs::hash::{HashType, UnknownSignature};
+use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
-    enc::{self as tezos_enc, BinError, BinResult, BinWriter},
-    nom::{self as tezos_nom, error::DecodeError, NomError, NomReader, NomResult},
+    enc::{BinError, BinResult, BinWriter},
+    nom::{error::DecodeError, NomError, NomReader, NomResult},
 };
 use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup::types::PublicKeyHash;
@@ -37,7 +38,7 @@ impl OperationContent {
                 let (array, pk) = PublicKey::nom_read(bytes)?;
                 NomResult::Ok((array, Self::Reveal { pk }))
             }
-            _ => Err(nom::Err::Error(tezos_nom::NomError::invalid_tag(
+            _ => Err(nom::Err::Error(NomError::invalid_tag(
                 bytes,
                 tag.to_string(),
             ))),
@@ -62,10 +63,10 @@ impl BinWriter for OperationContent {
 #[derive(PartialEq, Debug)]
 pub struct ManagerOperation {
     pub source: PublicKeyHash,
-    pub fee: num_bigint::BigUint,
-    pub counter: num_bigint::BigUint,
-    pub gas_limit: num_bigint::BigUint,
-    pub storage_limit: num_bigint::BigUint,
+    pub fee: Narith,
+    pub counter: Narith,
+    pub gas_limit: Narith,
+    pub storage_limit: Narith,
     pub operation: OperationContent,
 }
 
@@ -87,13 +88,13 @@ impl BinWriter for ManagerOperation {
         // Push data related to the operation
         source.bin_write(data)?;
 
-        tezos_enc::n_bignum(fee, data)?;
+        fee.bin_write(data)?;
 
-        tezos_enc::n_bignum(counter, data)?;
+        counter.bin_write(data)?;
 
-        tezos_enc::n_bignum(gas_limit, data)?;
+        gas_limit.bin_write(data)?;
 
-        tezos_enc::n_bignum(storage_limit, data)?;
+        storage_limit.bin_write(data)?;
 
         // Append the operation
         operation.bin_write(data)?;
@@ -110,13 +111,13 @@ impl NomReader<'_> for ManagerOperation {
 
         let (bytes, source) = PublicKeyHash::nom_read(bytes)?;
 
-        let (bytes, fee) = tezos_nom::n_bignum(bytes)?;
+        let (bytes, fee) = Narith::nom_read(bytes)?;
 
-        let (bytes, counter) = tezos_nom::n_bignum(bytes)?;
+        let (bytes, counter) = Narith::nom_read(bytes)?;
 
-        let (bytes, gas_limit) = tezos_nom::n_bignum(bytes)?;
+        let (bytes, gas_limit) = Narith::nom_read(bytes)?;
 
-        let (bytes, storage_limit) = tezos_nom::n_bignum(bytes)?;
+        let (bytes, storage_limit) = Narith::nom_read(bytes)?;
 
         let (bytes, operation) = OperationContent::from_bytes(tag, bytes)?;
 
@@ -198,10 +199,7 @@ impl Operation {
     pub fn try_from_bytes(data: &[u8]) -> Result<Self, DecodeError<&[u8]>> {
         let (remaining, operation) = Self::nom_read(data).finish()?;
         if !remaining.is_empty() {
-            return Err(tezos_nom::NomError::from_error_kind(
-                remaining,
-                ErrorKind::NonEmpty,
-            ));
+            return Err(NomError::from_error_kind(remaining, ErrorKind::NonEmpty));
         }
         Ok(operation)
     }
