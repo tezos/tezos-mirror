@@ -16,9 +16,6 @@
     "enable_send_raw_transaction": true,
     "overwrite_simulation_tick_limit": false,
     "rpc_server": "resto",
-    "enable_websocket": false,
-    "max_websocket_message_length": 4194304,
-    "monitor_websocket_heartbeat": "disabled",
     "spawn_rpc": null,
     "l2_chains": null,
     "enable_tx_queue": {
@@ -79,9 +76,6 @@
     "enable_send_raw_transaction": true,
     "overwrite_simulation_tick_limit": false,
     "rpc_server": "resto",
-    "enable_websocket": false,
-    "max_websocket_message_length": 4194304,
-    "monitor_websocket_heartbeat": "disabled",
     "spawn_rpc": null,
     "l2_chains": null,
     "enable_tx_queue": {
@@ -135,9 +129,6 @@
     "enable_send_raw_transaction": true,
     "overwrite_simulation_tick_limit": false,
     "rpc_server": "resto",
-    "enable_websocket": false,
-    "max_websocket_message_length": 4194304,
-    "monitor_websocket_heartbeat": "disabled",
     "spawn_rpc": null,
     "l2_chains": null,
     "enable_tx_queue": {

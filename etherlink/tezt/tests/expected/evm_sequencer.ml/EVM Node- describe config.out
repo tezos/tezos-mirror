@@ -143,38 +143,6 @@
            to replace the Smart Rollup’s Fast Exec runtime. DEPRECATED: You
            should remove this option from your configuration file. */,
       "rpc_server"?: "dream" | "resto",
-      "enable_websocket"?:
-        boolean
-        /* Enable or disable the experimental websocket server */,
-      "max_websocket_message_length"?:
-        integer ∈ [-2^30, 2^30]
-        /* Maximum message size accepted by the websocket server (only for
-           Resto backend) */,
-      "monitor_websocket_heartbeat"?:
-        /* Parameters to monitor websocket connections */
-        "disabled"
-        || { /* enabled */
-             "ping_interval":
-               number
-               /* Interval, in seconds, at which a ping will be sent to the
-                  client to monitor the websocket connection. */,
-             "ping_timeout":
-               number
-               /* Timeout in seconds after which the connection will be
-                  considered dead and closed. */ },
-      "websocket_rate_limit"?:
-        { /* Rate limit for websocket server */
-          "max_frames"?:
-            integer ∈ [-2^30, 2^30]
-            /* Max allowed websocket frames in the below interval (10x
-               max_messages when unspecified). */,
-          "max_messages"?:
-            integer ∈ [-2^30, 2^30]
-            /* Max allowed websocket messages in the below interval. */,
-          "interval":
-            integer ∈ [-2^30, 2^30]
-            /* Interval in seconds for the rate limit. */,
-          "strategy"?: "wait" | "error" | "close" },
       "spawn_rpc"?:
         /* Spawn a RPC node listening on the given port */
         { /* Some */
@@ -313,6 +281,39 @@
                 The list of JSON RPC API methods disallowed for this server. */
              "blacklist": [ $unistring ... ] },
       "max_active_connections"?: $max_active_rpc_connections },
+  "websockets"?:
+    { "max_message_length"?:
+        integer ∈ [-2^30, 2^30]
+        /* Maximum allowed length in bytes for a websocket message. */,
+      "monitor_heartbeat"?:
+        /* Configuration for the websocket heartbeat mechanism. When enabled,
+           the server will periodically send ping frames to the client and
+           expect a pong response. */
+        "disabled"
+        || { /* enabled */
+             "ping_interval":
+               number
+               /* Interval, in seconds, at which a ping will be sent to the
+                  client to monitor the websocket connection. */,
+             "ping_timeout":
+               number
+               /* Timeout in seconds after which the connection will be
+                  considered dead and closed. */ },
+      "rate_limit"?:
+        { /* Rate limiting configuration for websocket connections. When
+             enabled, the server will limit the number of messages and/or
+             frames a client can send in a given time interval. */
+          "max_frames"?:
+            integer ∈ [-2^30, 2^30]
+            /* Max allowed websocket frames in the below interval (10x
+               max_messages when unspecified). */,
+          "max_messages"?:
+            integer ∈ [-2^30, 2^30]
+            /* Max allowed websocket messages in the below interval. */,
+          "interval":
+            integer ∈ [-2^30, 2^30]
+            /* Interval in seconds for the rate limit. */,
+          "strategy"?: "wait" | "error" | "close" } },
   "finalized_view"?:
     boolean
     /* When enabled, the node only expose blocks that are finalized, i.e.,

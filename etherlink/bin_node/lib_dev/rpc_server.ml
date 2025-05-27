@@ -68,13 +68,10 @@ module Resto = struct
         directory.Evm_directory.dir
     in
     let*? () =
-      match config.Configuration.experimental_features with
-      | {
-       enable_websocket = true;
-       websocket_rate_limit =
-         Some {max_frames; max_messages; interval; strategy};
-       _;
-      } ->
+      match config.Configuration.websockets with
+      | Some
+          {rate_limit = Some {max_frames; max_messages; interval; strategy}; _}
+        ->
           let interval = Ptime.Span.of_int_s interval in
           let messages_limit =
             Option.map
@@ -208,7 +205,7 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
       ~rpc_addr:rpc.addr
       ~rpc_port:rpc.port
       ~backend:config.experimental_features.rpc_server
-      ~websockets:config.experimental_features.enable_websocket
+      ~websockets:(Option.is_some config.websockets)
   in
   return finalizer
 
@@ -234,7 +231,7 @@ let start_private_server ~(rpc_server_family : Rpc_types.rpc_server_family)
           ~rpc_addr:private_rpc.addr
           ~rpc_port:private_rpc.port
           ~backend:config.experimental_features.rpc_server
-          ~websockets:config.experimental_features.enable_websocket
+          ~websockets:(Option.is_some config.websockets)
       in
       return finalizer
   | None -> return (fun () -> Lwt_syntax.return_unit)

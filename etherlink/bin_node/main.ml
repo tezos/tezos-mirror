@@ -267,6 +267,24 @@ let private_rpc_port_arg =
     ~doc:"The EVM node private server rpc port."
     Params.int
 
+let ws_arg =
+  Tezos_clic.arg_or_switch
+    ~long:"ws"
+    ~placeholder:"BOOL?"
+    ~doc:"Enable websockets server when present or set to true."
+    ~default:"true"
+    ~pp_default:(fun fmt ->
+      Format.fprintf
+        fmt
+        "`true` when the switch is present, and is `false` otherwise")
+  @@ Tezos_clic.parameter (fun _ctxt ->
+         let open Lwt_result_syntax in
+         function
+         | "true" -> return_true
+         | "false" -> return_false
+         | s ->
+             failwith "Invalid argument for --ws: %s. Should be true or false" s)
+
 let block_number_arg ~doc =
   let open Evm_node_lib_dev_encoding in
   Tezos_clic.map_arg ~f:(fun _ctxt i ->
@@ -815,7 +833,7 @@ let history_arg =
     Params.history_param
 
 let common_config_args =
-  Tezos_clic.args20
+  Tezos_clic.args21
     data_dir_arg
     config_path_arg
     rpc_addr_arg
@@ -823,6 +841,7 @@ let common_config_args =
     rpc_batch_limit_arg
     cors_allowed_origins_arg
     cors_allowed_headers_arg
+    ws_arg
     log_filter_max_nb_blocks_arg
     log_filter_max_nb_logs_arg
     log_filter_chunk_size_arg
@@ -883,8 +902,8 @@ module Groups = struct
 end
 
 let websocket_checks config =
-  match config.experimental_features with
-  | {enable_websocket = true; rpc_server = Dream; _} ->
+  match (config.websockets, config.experimental_features) with
+  | Some _, {rpc_server = Dream; _} ->
       Internal_event.Simple.emit Event.buggy_dream_websocket () |> Lwt_result.ok
   | _ -> Lwt_result_syntax.return_unit
 
@@ -943,11 +962,11 @@ let init_logs ~daily_logs ?rpc_mode_port ~data_dir configuration =
   init ~config ()
 
 let start_proxy ~data_dir ~config_file ~keep_alive ?rpc_addr ?rpc_port
-    ?rpc_batch_limit ?cors_origins ?cors_headers ?log_filter_max_nb_blocks
-    ?log_filter_max_nb_logs ?log_filter_chunk_size ?rollup_node_endpoint
-    ?evm_node_endpoint ?tx_pool_timeout_limit ?tx_pool_addr_limit
-    ?tx_pool_tx_per_addr_limit ?restricted_rpcs ~verbose ~read_only
-    ~finalized_view ~ignore_block_param () =
+    ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
+    ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+    ?rollup_node_endpoint ?evm_node_endpoint ?tx_pool_timeout_limit
+    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?restricted_rpcs ~verbose
+    ~read_only ~finalized_view ~ignore_block_param () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -958,6 +977,7 @@ let start_proxy ~data_dir ~config_file ~keep_alive ?rpc_addr ?rpc_port
       ?rpc_batch_limit
       ?cors_origins
       ?cors_headers
+      ?enable_websocket
       ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs
       ?log_filter_chunk_size
@@ -1028,9 +1048,9 @@ let kernel_from_args network kernel =
         | Testnet -> None))
 
 let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
-    ?rpc_batch_limit ?cors_origins ?cors_headers ?tx_pool_timeout_limit
-    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
-    ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
+    ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
+    ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
+    ~keep_alive ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
     ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
     ?private_rpc_port ?sequencer_str ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?log_filter_max_nb_blocks
@@ -1057,6 +1077,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ?rpc_batch_limit
       ?cors_origins
       ?cors_headers
+      ?enable_websocket
       ?tx_pool_timeout_limit
       ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit
@@ -1125,6 +1146,7 @@ let rpc_command =
              rpc_batch_limit,
              cors_origins,
              cors_headers,
+             enable_websocket,
              log_filter_max_nb_blocks,
              log_filter_max_nb_logs,
              log_filter_chunk_size,
@@ -1200,6 +1222,7 @@ let rpc_command =
           ?cors_origins
           ?cors_headers
           ?rpc_batch_limit
+          ?enable_websocket
           ~verbose
           ?preimages
           ?preimages_endpoint
@@ -1229,9 +1252,9 @@ let rpc_command =
         ())
 
 let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
-    ?private_rpc_port ?cors_origins ?cors_headers ~verbose ?preimages
-    ?preimages_endpoint ?native_execution_policy ?rollup_node_endpoint
-    ~dont_track_rollup_node ?evm_node_endpoint
+    ?private_rpc_port ?cors_origins ?cors_headers ?enable_websocket ~verbose
+    ?preimages ?preimages_endpoint ?native_execution_policy
+    ?rollup_node_endpoint ~dont_track_rollup_node ?evm_node_endpoint
     ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
     ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel
@@ -1248,6 +1271,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?rpc_batch_limit
       ?cors_origins
       ?cors_headers
+      ?enable_websocket
       ?rollup_node_endpoint
       ?dont_track_rollup_node:
         (* If `dont_track_rollup_node` is false, it means the argument was
@@ -1790,6 +1814,7 @@ let init_config_command =
              rpc_batch_limit,
              cors_origins,
              cors_headers,
+             enable_websocket,
              log_filter_max_nb_blocks,
              log_filter_max_nb_logs,
              log_filter_chunk_size,
@@ -1844,6 +1869,7 @@ let init_config_command =
           ?rpc_batch_limit
           ?cors_origins
           ?cors_headers
+          ?enable_websocket
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
@@ -2214,6 +2240,7 @@ let proxy_command =
              rpc_batch_limit,
              cors_origins,
              cors_headers,
+             enable_websocket,
              log_filter_max_nb_blocks,
              log_filter_max_nb_logs,
              log_filter_chunk_size,
@@ -2242,6 +2269,7 @@ let proxy_command =
         ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
+        ?enable_websocket
         ?log_filter_max_nb_blocks
         ?log_filter_max_nb_logs
         ?log_filter_chunk_size
@@ -2316,6 +2344,7 @@ let sequencer_command =
              rpc_batch_limit,
              cors_origins,
              cors_headers,
+             enable_websocket,
              log_filter_max_nb_blocks,
              log_filter_max_nb_logs,
              log_filter_chunk_size,
@@ -2359,6 +2388,7 @@ let sequencer_command =
         ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
+        ?enable_websocket
         ?tx_pool_timeout_limit
         ?tx_pool_addr_limit
         ?tx_pool_tx_per_addr_limit
@@ -2402,6 +2432,7 @@ let sandbox_command =
              rpc_batch_limit,
              cors_origins,
              cors_headers,
+             enable_websocket,
              log_filter_max_nb_blocks,
              log_filter_max_nb_logs,
              log_filter_chunk_size,
@@ -2478,6 +2509,7 @@ let sandbox_command =
         ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
+        ?enable_websocket
         ?tx_pool_timeout_limit
         ?tx_pool_addr_limit
         ?tx_pool_tx_per_addr_limit
@@ -2536,6 +2568,7 @@ let observer_command =
              rpc_batch_limit,
              cors_origins,
              cors_headers,
+             enable_websocket,
              log_filter_max_nb_blocks,
              log_filter_max_nb_logs,
              log_filter_chunk_size,
@@ -2576,6 +2609,7 @@ let observer_command =
         ?rpc_batch_limit
         ?cors_origins
         ?cors_headers
+        ?enable_websocket
         ?private_rpc_port
         ~verbose
         ?preimages

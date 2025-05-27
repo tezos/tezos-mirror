@@ -3026,7 +3026,6 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
                    @@ `A [`String "*"]))
           json
         |> Evm_node.patch_config_with_experimental_feature
-             ~enable_websocket:true
              ~drop_duplicate_when_injection:true
              ~blueprints_publisher_order_enabled:true
              ())

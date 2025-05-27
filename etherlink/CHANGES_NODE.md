@@ -6,6 +6,12 @@
 
 ### Configuration changes
 
+- Stabilize websocket server. The fields in `experimental_features` related to
+  websockets are now deprecated in favor of a top level `websockets` field
+  (which can contain additional configuration parameters for the websockets
+  server). A new CLI parameter `--ws` allows to activate the websockets server
+  without editing the configuration. (!18145)
+
 ### RPCs changes
 
 ### Metrics changes

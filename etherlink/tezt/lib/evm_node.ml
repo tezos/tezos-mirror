@@ -146,6 +146,7 @@ module Parameters = struct
     config_file : string option;
     rpc_addr : string;
     rpc_port : int;
+    websockets : bool;
     endpoint : string;
     runner : Runner.t option;
     restricted_rpcs : string option;
@@ -832,7 +833,7 @@ let mode_with_new_private_rpc (mode : mode) =
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
     ?(mode = Proxy) ?history ?data_dir ?config_file ?rpc_addr ?rpc_port
-    ?restricted_rpcs ?spawn_rpc endpoint =
+    ?restricted_rpcs ?spawn_rpc ?(websockets = false) endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
@@ -870,6 +871,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         config_file;
         rpc_addr;
         rpc_port;
+        websockets;
         endpoint;
         restricted_rpcs;
         runner;
@@ -1080,6 +1082,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           | Rolling n -> sf "rolling:%d" n
           | Full n -> sf "full:%d" n)
         evm_node.persistent_state.history
+    @ Cli_arg.optional_switch "ws" evm_node.persistent_state.websockets
   in
 
   let time_between_blocks_fmt = function
@@ -1382,8 +1385,7 @@ type tx_queue_config =
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
-    ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length
-    ?(monitor_websocket_heartbeat = enable_websocket) ?websocket_rate_limit
+    ?rpc_server
     ?(enable_tx_queue =
       Config
         {max_size = 1000; max_lifespan = 100_000; tx_per_addr_limit = 100_000})
@@ -1405,7 +1407,6 @@ let patch_config_with_experimental_feature
   |> optional_json_put ~name:"rpc_server" rpc_server (function
          | Resto -> `String "resto"
          | Dream -> `String "dream")
-  |> conditional_json_put enable_websocket ~name:"enable_websocket" (`Bool true)
   |> fun json ->
   let value_json =
     JSON.annotate ~origin:"evm_node.config_patch"
@@ -1421,18 +1422,6 @@ let patch_config_with_experimental_feature
     | Enable b -> `Bool b
   in
   JSON.put ("enable_tx_queue", value_json) json
-  |> optional_json_put
-       max_websocket_message_length
-       ~name:"max_websocket_message_length"
-       (fun max -> `Float (float_of_int max))
-  (* Monitor websocket connections with frequent heartbeats and small timeout
-     for the tests. *)
-  |> conditional_json_put_default
-       monitor_websocket_heartbeat
-       ~name:"monitor_websocket_heartbeat"
-       (`O [("ping_interval", `Float 0.5); ("ping_timeout", `Float 2.)])
-       ~default:(`String "disabled")
-  |> optional_json_put websocket_rate_limit ~name:"websocket_rate_limit" Fun.id
   |> optional_json_put spawn_rpc ~name:"spawn_rpc" (fun port ->
          `O [("protected_port", `Float (float_of_int port))])
   |> optional_json_put
@@ -1450,6 +1439,25 @@ let patch_config_with_experimental_feature
                   ])
               l2_chains))
 
+let patch_config_websockets_if_enabled ?max_message_length
+    ?(monitor_heartbeat = true) ?rate_limit =
+  JSON.update "websockets" @@ fun json ->
+  if JSON.is_null json then json
+  else
+    optional_json_put
+      max_message_length
+      ~name:"max_message_length"
+      (fun max -> `Float (float_of_int max))
+      json
+    (* Monitor websocket connections with frequent heartbeats and small timeout
+       for the tests. *)
+    |> conditional_json_put_default
+         monitor_heartbeat
+         ~name:"monitor_heartbeat"
+         (`O [("ping_interval", `Float 0.5); ("ping_timeout", `Float 2.)])
+         ~default:(`String "disabled")
+    |> optional_json_put rate_limit ~name:"rate_limit" Fun.id
+
 let patch_config_gc ?history_mode json =
   json
   |> optional_json_put ~name:"history" history_mode (function
@@ -1458,7 +1466,8 @@ let patch_config_gc ?history_mode json =
          | Full retention -> `String (Format.sprintf "full:%d" retention))
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
-    ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc rollup_node =
+    ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc ?websockets rollup_node
+    =
   let evm_node =
     create
       ?name
@@ -1471,6 +1480,7 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
       ?rpc_port
       ?restricted_rpcs
       ?spawn_rpc
+      ?websockets
       rollup_node
   in
   let* () = Process.check @@ spawn_init_config evm_node in
