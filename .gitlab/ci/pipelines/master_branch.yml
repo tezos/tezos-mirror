@@ -430,6 +430,10 @@ documentation:odoc:
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
+  - export OPAMFETCH='wget'
+  - opam remote add default https://opam.ocaml.org/
+  - opam update
+  - opam install --yes odoc.2.4.4
   - make -C docs odoc
   after_script:
   - ./scripts/ci/sccache-stop.sh
