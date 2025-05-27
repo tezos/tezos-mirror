@@ -9,8 +9,6 @@ let global_options = Tezos_clic.no_options
 
 let executable_name = Filename.basename Sys.executable_name
 
-let p2p_node_commands = [] (* TODO: Implement commands *)
-
 let handle_error = function
   | Ok () -> Lwt.return 0
   | Error [Tezos_clic.Version] ->
@@ -66,7 +64,7 @@ let main () =
               (if Unix.isatty Unix.stdout then Tezos_clic.Ansi
                else Tezos_clic.Plain)
               Format.std_formatter
-              p2p_node_commands
+              Commands.p2p_node_commands
           in
           Tezos_clic.dispatch commands ctxt args
         in
