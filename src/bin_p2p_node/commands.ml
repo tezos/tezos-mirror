@@ -30,7 +30,14 @@ let peers_arg =
          let peers = if s = "" then [] else String.split_on_char ',' s in
          Lwt_result_syntax.return peers))
 
-let p2p_node_args = Tezos_clic.args2 net_addr_arg peers_arg
+let discovery_addr_arg =
+  Tezos_clic.arg
+    ~long:"discovery-addr"
+    ~doc:"The UDP address and port used for local peer discovery."
+    ~placeholder:"ADDR:PORT|:PORT"
+    (Tezos_clic.parameter (fun () s -> Lwt_result.return s))
+
+let p2p_node_args = Tezos_clic.args3 net_addr_arg peers_arg discovery_addr_arg
 
 let run_command =
   let open Tezos_clic in
@@ -39,10 +46,7 @@ let run_command =
     ~desc:"Run the octez-p2p-node"
     p2p_node_args
     (prefix "run" @@ stop)
-    (fun (p2p_addr, _peers) () ->
-      Format.eprintf
-        "TODO: Implement run command for P2P node on address %s@."
-        p2p_addr ;
-      Lwt_result_syntax.return_unit)
+    (fun (listen_addr, peers, discovery_addr) () ->
+      P2p_node_run_command.run ~listen_addr ?peers ?discovery_addr ())
 
 let p2p_node_commands = [run_command]
