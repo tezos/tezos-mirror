@@ -204,7 +204,6 @@ Then, to install the binaries, run the following commands:
 
   dnf -y install octez-node
   dnf -y install octez-client
-  dnf -y install octez-node
   dnf -y install octez-baker
   dnf -y install octez-dal-node
   dnf -y install octez-smart-rollup-node
