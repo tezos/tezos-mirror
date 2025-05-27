@@ -588,6 +588,16 @@ let shell_header :
     Tezos_rpc.Service.t =
   import_service Block_services.S.Header.shell_header
 
+let operation_hashes :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      unit,
+      unit,
+      Operation_hash.t list list )
+    Tezos_rpc.Service.t =
+  import_service Block_services.S.Operation_hashes.operation_hashes
+
 let bootstrapped :
     ( [`GET],
       unit,

@@ -377,6 +377,22 @@ let build_block_static_directory ~l2_chain_id
          let* tezlink_block = Backend.block chain block in
          Lwt_result_syntax.return tezlink_block)
        ~convert_output:Current_block_header.tezlink_block_to_shell_header
+  |> register
+       ~service:Tezos_services.operation_hashes
+       ~impl:(fun {chain; block} () () ->
+         let*? chain = check_chain chain in
+         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+         let*? block = check_block block in
+         let* operations = Backend.operations chain ~chain_id block in
+         return
+           [
+             [];
+             [];
+             [];
+             List.map
+               (fun (op : Tezos_services.Block_services.operation) -> op.hash)
+               operations;
+           ])
 
 let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
     (module Block_header : HEADER) base_dir =
