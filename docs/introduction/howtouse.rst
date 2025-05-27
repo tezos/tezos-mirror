@@ -241,6 +241,8 @@ Besides listening to requests from the client,
 the node listens to connections from peers, by default on port ``9732`` (this can be changed using option ``--net-addr``), so it's advisable to
 open incoming connections to that port.
 
+.. _quickstart_node:
+
 Quickstart Octez node
 ~~~~~~~~~~~~~~~~~~~~~
 
