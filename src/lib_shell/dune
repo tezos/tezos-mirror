@@ -29,7 +29,8 @@
   octez-shell-libs.validation
   octez-libs.version
   octez-libs.crypto-dal.dal-config
-  lwt-exit)
+  lwt-exit
+  octez-libs.tezos-bees)
  (inline_tests
   (flags -verbose)
   (modes native)
