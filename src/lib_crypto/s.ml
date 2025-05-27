@@ -437,10 +437,11 @@ module type SIGNATURE = sig
   val deterministic_nonce_hash : Secret_key.t -> Bytes.t -> Bytes.t
 
   (** [pop_verify pk proof] checks if [proof] is a valid proof of possesssion
-     for [pk].
+     for [pk] (or [msg] is provided).
      If [pk] is not a BLS key, [pop_verify pk _ = false].
    *)
-  val pop_verify : Public_key.t -> Bytes.t -> bool
+  val pop_verify :
+    Public_key.t -> ?msg:Bls12_381_signature.MinPk.pk -> Bytes.t -> bool
 end
 
 module type AGGREGATE_SIGNATURE = sig

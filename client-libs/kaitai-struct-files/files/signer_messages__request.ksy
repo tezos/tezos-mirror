@@ -79,6 +79,12 @@ types:
     - id: pkh
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+    - id: override_pk_tag
+      type: u1
+      enum: bool
+    - id: override_pk
+      size: 48
+      if: (override_pk_tag == bool::true)
   signer_messages__public_key__request:
     seq:
     - id: pkh

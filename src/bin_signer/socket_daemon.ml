@@ -85,9 +85,9 @@ let handle_client_step ?signing_version ?magic_bytes ?timeout
         else failwith "List known keys request not allowed."
       in
       Tezos_base_unix.Socket.send fd encoding res
-  | Bls_prove_possession pkh ->
+  | Bls_prove_possession (pkh, override_pk) ->
       let encoding = result_encoding Bls_prove_possession.Response.encoding in
-      let*! res = Handler.bls_prove_possession cctxt pkh in
+      let*! res = Handler.bls_prove_possession cctxt ?override_pk pkh in
       Tezos_base_unix.Socket.send fd encoding res
 
 let handle_client_loop ?signing_version ?magic_bytes ?timeout

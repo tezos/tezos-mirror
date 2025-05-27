@@ -438,18 +438,20 @@ module MinPk = struct
       in
       core_verify pk msg signature ciphersuite
 
-    let pop_prove sk =
+    let pop_prove ?msg sk =
       let ciphersuite =
         Bytes.of_string "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
       in
       let pk = derive_pk sk in
-      core_sign sk pk ciphersuite
+      let msg = Option.value ~default:pk msg in
+      core_sign sk msg ciphersuite
 
-    let pop_verify pk signature =
+    let pop_verify pk ?msg signature =
       let ciphersuite =
         Bytes.of_string "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
       in
-      core_verify pk pk signature ciphersuite
+      let msg = Option.value ~default:pk msg in
+      core_verify pk msg signature ciphersuite
 
     let aggregate_verify pks_with_pops msg aggregated_signature =
       let pks_bytes = List.map fst pks_with_pops in
@@ -768,18 +770,20 @@ module MinSig = struct
       in
       core_verify pk msg signature ciphersuite
 
-    let pop_prove sk =
+    let pop_prove ?msg sk =
       let ciphersuite =
         Bytes.of_string "BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
       in
       let pk = derive_pk sk in
-      core_sign sk pk ciphersuite
+      let msg = Option.value ~default:pk msg in
+      core_sign sk msg ciphersuite
 
-    let pop_verify pk signature =
+    let pop_verify pk ?msg signature =
       let ciphersuite =
         Bytes.of_string "BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
       in
-      core_verify pk pk signature ciphersuite
+      let msg = Option.value ~default:pk msg in
+      core_verify pk msg signature ciphersuite
 
     let aggregate_verify pks_with_pops msg aggregated_signature =
       let pks_bytes = List.map fst pks_with_pops in

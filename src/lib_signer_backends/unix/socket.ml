@@ -164,14 +164,14 @@ struct
         let* pkhs = Tezos_base_unix.Socket.recv conn encoding in
         match pkhs with Error _ as e -> Lwt.return e | Ok pkhs -> return pkhs)
 
-  let bls_prove_possession path pkh =
+  let bls_prove_possession path ?override_pk pkh =
     let open Lwt_result_syntax in
     Tezos_base_unix.Socket.with_connection path (fun conn ->
         let* () =
           Tezos_base_unix.Socket.send
             conn
             Request.encoding
-            (Request.Bls_prove_possession pkh)
+            (Request.Bls_prove_possession (pkh, override_pk))
         in
         let encoding = result_encoding Bls_prove_possession.Response.encoding in
         let* proof_of_possession = Tezos_base_unix.Socket.recv conn encoding in
@@ -264,10 +264,10 @@ struct
       let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       supports_deterministic_nonces path pkh
 
-    let bls_prove_possession uri =
+    let bls_prove_possession ?override_pk uri =
       let open Lwt_result_syntax in
       let* path, pkh = parse (uri : sk_uri :> Uri.t) in
-      bls_prove_possession path pkh
+      bls_prove_possession path ?override_pk pkh
   end
 
   module Tcp = struct
@@ -349,10 +349,10 @@ struct
       let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       supports_deterministic_nonces path pkh
 
-    let bls_prove_possession uri =
+    let bls_prove_possession ?override_pk uri =
       let open Lwt_result_syntax in
       let* path, pkh = parse (uri : sk_uri :> Uri.t) in
-      bls_prove_possession path pkh
+      bls_prove_possession path ?override_pk pkh
   end
 end
 

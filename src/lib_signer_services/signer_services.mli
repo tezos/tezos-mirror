@@ -90,7 +90,7 @@ val bls_prove_possession :
   ( [`GET],
     unit,
     unit * Tezos_crypto.Signature.Public_key_hash.t,
-    unit,
+    Tezos_crypto.Signature.Bls.Public_key.t option,
     unit,
     Tezos_crypto.Signature.Bls.t )
   Tezos_rpc.Service.t

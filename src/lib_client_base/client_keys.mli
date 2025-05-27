@@ -161,7 +161,9 @@ module type SIGNER = sig
     Uri.t -> Tezos_crypto.Signature.Public_key_hash.t list tzresult Lwt.t
 
   val bls_prove_possession :
-    sk_uri -> Tezos_crypto.Signature.Bls.t tzresult Lwt.t
+    ?override_pk:Tezos_crypto.Signature.Bls.Public_key.t ->
+    sk_uri ->
+    Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 end
 
 type signer = (module SIGNER)
@@ -241,6 +243,7 @@ module type S = sig
 
   val bls_prove_possession :
     #Client_context.wallet ->
+    ?override_pk:Tezos_crypto.Signature.Bls.Public_key.t ->
     sk_uri ->
     Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 

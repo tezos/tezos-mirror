@@ -19,15 +19,17 @@ let signature_parameter ~name ~desc =
          | Some s -> return s
          | None -> cctxt#error "Failed to read a BLS signature"))
 
-let public_key_parameter ~name ~desc =
-  param
-    ~name
-    ~desc
-    (parameter (fun (cctxt : #Protocol_client_context.full) s ->
-         let open Lwt_result_syntax in
-         match Signature.Bls.Public_key.of_b58check_opt s with
-         | Some pk -> return pk
-         | None -> cctxt#error "Failed to read a BLS public key"))
+let public_key_param =
+  parameter (fun (cctxt : #Protocol_client_context.full) s ->
+      let open Lwt_result_syntax in
+      match Signature.Bls.Public_key.of_b58check_opt s with
+      | Some pk -> return pk
+      | None -> cctxt#error "Failed to read a BLS public key")
+
+let public_key_parameter ~name ~desc = param ~name ~desc public_key_param
+
+let public_key_arg ~doc ?short ~long ~placeholder ?env () =
+  arg ~doc ?short ~long ~placeholder ?env public_key_param
 
 let secret_key_parameter ~name ~desc =
   param
@@ -101,8 +103,8 @@ let threshold_signature_encoding =
     (fun (id, signature) -> {id; signature})
     (obj2 (req "id" int8) (req "signature" Signature.Bls.encoding))
 
-let check_public_key_with_proof pk proof =
-  Signature.Bls.pop_verify pk (Signature.Bls.to_bytes proof)
+let check_public_key_with_proof pk ?override_pk proof =
+  Signature.Bls.pop_verify pk ?msg:override_pk (Signature.Bls.to_bytes proof)
 
 let commands () =
   let open Lwt_result_syntax in
@@ -131,18 +133,30 @@ let commands () =
     command
       ~group
       ~desc:"Create a BLS proof by signing a public key"
-      no_options
+      (args1
+         (public_key_arg
+            ~doc:"Change the public key to sign for the proof"
+            ~long:"override-public-key"
+            ~placeholder:"OVERRIDE_PUBLIC_KEY"
+            ()))
       (prefixes ["create"; "bls"; "proof"; "for"]
       @@ Client_keys.Secret_key.source_param @@ stop)
-      (fun () sk_uri (cctxt : #Protocol_client_context.full) ->
+      (fun override_pk sk_uri (cctxt : #Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let* proof = Client_keys.bls_prove_possession cctxt sk_uri in
+        let* proof =
+          Client_keys.bls_prove_possession cctxt ?override_pk sk_uri
+        in
         let*! () = cctxt#message "%a" Signature.Bls.pp proof in
         return_unit);
     command
       ~group
       ~desc:"Check a BLS proof"
-      no_options
+      (args1
+         (public_key_arg
+            ~doc:"Change the public key of the proof"
+            ~long:"override-public-key"
+            ~placeholder:"PUBLIC_KEY"
+            ()))
       (prefixes ["check"; "bls"; "proof"]
       @@ signature_parameter
            ~name:"BLS proof"
@@ -152,9 +166,9 @@ let commands () =
            ~name:"BLS public key"
            ~desc:"B58 encoded BLS public key"
       @@ stop)
-      (fun () proof pk (cctxt : #Protocol_client_context.full) ->
+      (fun override_pk proof pk (cctxt : #Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let is_valid = check_public_key_with_proof pk proof in
+        let is_valid = check_public_key_with_proof pk ?override_pk proof in
         if is_valid then
           let*! () = cctxt#message "Proof check is successful." in
           return_unit
