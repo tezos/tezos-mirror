@@ -81,17 +81,19 @@ let threshold_secret_key_encoding =
 type threshold_keys = {
   pk : Signature.Bls.Public_key.t;
   pkh : Signature.Bls.Public_key_hash.t;
+  proof : Signature.Bls.t;
   secret_shares : threshold_secret_key list;
 }
 
 let threshold_keys_encoding =
   let open Data_encoding in
   conv
-    (fun {pk; pkh; secret_shares} -> (pk, pkh, secret_shares))
-    (fun (pk, pkh, secret_shares) -> {pk; pkh; secret_shares})
-    (obj3
+    (fun {pk; pkh; proof; secret_shares} -> (pk, pkh, proof, secret_shares))
+    (fun (pk, pkh, proof, secret_shares) -> {pk; pkh; proof; secret_shares})
+    (obj4
        (req "public_key" Signature.Bls.Public_key.encoding)
        (req "public_key_hash" Signature.Bls.Public_key_hash.encoding)
+       (req "proof" Signature.Bls.encoding)
        (req "secret_shares" (list threshold_secret_key_encoding)))
 
 type threshold_signature = {id : int; signature : Signature.Bls.t}
@@ -231,14 +233,15 @@ let commands () =
       @@ stop)
       (fun () sk n m (cctxt : #Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let pk, pkh, secret_shares =
+        let pk, pkh, proof, secret_shares =
           Signature.Bls.generate_threshold_key sk ~n ~m
         in
+        let proof = Signature.Bls.of_bytes_exn proof in
         let secret_shares = List.map (fun (id, sk) -> {id; sk}) secret_shares in
         let json =
           Data_encoding.Json.construct
             threshold_keys_encoding
-            {pk; pkh; secret_shares}
+            {pk; pkh; proof; secret_shares}
         in
         let*! () = cctxt#message "%a@." Data_encoding.Json.pp json in
         return_unit);

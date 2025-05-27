@@ -4630,6 +4630,7 @@ let share_bls_secret_key ~sk ~n ~m client =
   let output = JSON.parse ~origin:"share_bls_secret_key" client_output in
   let group_pk = JSON.(output |-> "public_key" |> as_string) in
   let group_pkh = JSON.(output |-> "public_key_hash" |> as_string) in
+  let proof = JSON.(output |-> "proof" |> as_string) in
   let secret_shares_list = JSON.(output |-> "secret_shares" |> as_list) in
   let secret_shares =
     List.map
@@ -4639,7 +4640,7 @@ let share_bls_secret_key ~sk ~n ~m client =
         (id, sk))
       secret_shares_list
   in
-  return (group_pk, group_pkh, secret_shares)
+  return (group_pk, group_pkh, proof, secret_shares)
 
 let spawn_threshold_bls_signatures client id_signatures =
   let id_signatures =
