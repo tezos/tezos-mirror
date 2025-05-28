@@ -352,6 +352,18 @@ let octez_evm_node_jobs ?(test = false) () =
       ~description:"Create a GitLab release for Etherlink"
       ["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
   in
+  let job_docker_promote_to_latest ~ci_docker_hub () : tezos_job =
+    job_docker_authenticated
+      ~__POS__
+      ~dependencies:(Dependent [Job job_docker_merge])
+      ~stage:Stages.publish_release
+      ~name:"docker:promote_to_latest"
+      ~ci_docker_hub
+      [
+        "./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest \
+         ./scripts/ci/octez-evm-node-release.sh";
+      ]
+  in
   [
     (* Stage: start *)
     job_datadog_pipeline_trace;
@@ -362,4 +374,5 @@ let octez_evm_node_jobs ?(test = false) () =
     job_docker_arm64;
     job_docker_merge;
     job_gitlab_release;
+    job_docker_promote_to_latest ~ci_docker_hub:(not test) ();
   ]
