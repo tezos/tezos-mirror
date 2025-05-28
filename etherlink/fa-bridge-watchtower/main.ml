@@ -81,6 +81,11 @@ module Arg = struct
       ~placeholder:"number"
     @@ Tezos_clic.parameter (fun _ x ->
            Lwt_result.return (Ethereum_types.Qty (Z.of_string x)))
+
+  let level_param ~desc =
+    Tezos_clic.param ~name:"level" ~desc
+    @@ Tezos_clic.parameter (fun _ x ->
+           Lwt_result.return (Ethereum_types.Qty (Z.of_string x)))
 end
 
 let log_config ~verbosity ~data_dir =
@@ -124,17 +129,23 @@ let global_options_args =
 
 let global_options = Tezos_clic.args1 global_options_args
 
-let om_command ~desc args cmd_prefixes f =
+let om_command ~desc ?group args cmd_prefixes f =
   let open Tezos_clic in
   command
     ~desc
+    ?group
     (args2 global_options_args (aggregate args))
     cmd_prefixes
     (fun (global, args) -> f global args)
 
+let run_group = Tezos_clic.{name = "run"; title = "Running the watchtower"}
+
+let admin_group = Tezos_clic.{name = "admin"; title = "Admin"}
+
 let run_command =
   let open Tezos_clic in
   om_command
+    ~group:run_group
     ~desc:"Start FA bridge watchtower"
     (args3 Arg.evm_node_endpoint Arg.secret_key Arg.first_block)
     (prefixes ["run"] @@ stop)
@@ -158,7 +169,33 @@ let run_command =
       in
       Etherlink_monitor.start db ~config ~first_block ~notify_ws_change)
 
-let commands = [run_command]
+let reset_command =
+  let open Tezos_clic in
+  om_command
+    ~group:admin_group
+    ~desc:"Reset the watchtower to a specific level in the past"
+    no_options
+    (prefixes ["reset"; "to"]
+    @@ Arg.level_param ~desc:"Level at which to reset"
+    @@ stop)
+  @@ fun {data_dir; verbosity} () level _ ->
+  let open Lwt_result_syntax in
+  let*! () = log_config ~verbosity ~data_dir in
+  let* db = Db.init ~data_dir `Read_write in
+  let* last_level = Db.Pointers.L2_head.get db in
+  if Ethereum_types.Qty.(last_level < level) then
+    failwith
+      "FA bridge watchtower is at head %a and hasn't seen level %a yet."
+      Ethereum_types.pp_quantity
+      last_level
+      Ethereum_types.pp_quantity
+      level
+  else
+    Db.with_transaction db @@ fun conn ->
+    let* () = Db.Pointers.L2_head.set ~conn db level in
+    Db.Deposits.delete_after ~conn db level
+
+let commands = [run_command; reset_command]
 
 let executable_name = Filename.basename Sys.executable_name
 
