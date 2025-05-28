@@ -87,8 +87,46 @@ let handle_local_address gateway local_addr =
 let search_gateway_cmd options () =
   Tezos_base_unix.Event_loop.main_run (search_gateway_cmd options)
 
+let resolve_config_file ?data_dir ?config_file () =
+  let open Lwt_result_syntax in
+  let* _, config_file =
+    Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+  in
+  return config_file
+
+(* Returns the port where the P2P server is listening, and the port advertised
+   to peer, taking in priority the ports given with the CLI. *)
+let resolve_ports config_file ?listen_addr ?advertised_net_port () =
+  let open Lwt_result_syntax in
+  let* port =
+    let* listening_addrs =
+      Option.either
+        listen_addr
+        config_file.Octez_node_config.Config_file.p2p.listen_addr
+      |> Option.map_es Octez_node_config.Config_file.resolve_listening_addrs
+    in
+    match listening_addrs with
+    | None | Some [] ->
+        failwith "P2P server is disabled, port mapping is irrelevant"
+    | Some ((_addr, port) :: _) -> return port
+  in
+  let advertised_net_port =
+    Option.either
+      advertised_net_port
+      config_file.Octez_node_config.Config_file.p2p.advertised_net_port
+  in
+  return (port, advertised_net_port)
+
+let patch_config ?data_dir config_file ?listen_addr ?advertised_net_port () =
+  Octez_node_config.Config_file.update
+    ?data_dir
+    ?listen_addr
+    ?advertised_net_port
+    config_file
+
 let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
-    {local_addr; lease_duration; description} () =
+    {local_addr; lease_duration; description} ?data_dir ?config_file
+    ?listen_addr ?advertised_net_port () =
   let open Lwt_result_syntax in
   let gateway =
     Octez_igd_next.Igd_next_gen.search_gateway
@@ -113,10 +151,11 @@ let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
         else Ok (Int32.of_int l)
     | None -> Ok default_lease_duration
   in
-  (* These two values are temporary and will be extracted from the config files
-     in the next commit. *)
-  let local_port = 9732 in
-  let external_port = Option.value ~default:local_port None in
+  let* config_file = resolve_config_file ?data_dir ?config_file () in
+  let* local_port, advertised_net_port =
+    resolve_ports config_file ?listen_addr ?advertised_net_port ()
+  in
+  let external_port = Option.value ~default:local_port advertised_net_port in
   let port =
     Octez_igd_next.Igd_next_gen.gateway_map_port
       gateway
@@ -136,11 +175,20 @@ let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
         external_port
         local_addr
         local_port ;
+      let* _ = patch_config config_file ?listen_addr ?advertised_net_port () in
       return_unit
   | Error e -> failwith "%s" e
 
-let map_port_cmd search_options mapping_options () =
-  Tezos_base_unix.Event_loop.main_run (map_port search_options mapping_options)
+let map_port_cmd search_options mapping_options ?data_dir ?config_file
+    ?listen_addr ?advertised_net_port () =
+  Tezos_base_unix.Event_loop.main_run
+    (map_port
+       search_options
+       mapping_options
+       ?data_dir
+       ?config_file
+       ?listen_addr
+       ?advertised_net_port)
 
 module Term = struct
   open Cmdliner
@@ -225,12 +273,27 @@ module Term = struct
     let+ local_addr and+ lease_duration and+ description in
     {local_addr; lease_duration; description}
 
-  let process search_options mapping_options =
-    match map_port_cmd search_options mapping_options () with
+  let process config_file data_dir listen_addr advertised_net_port
+      search_options mapping_options =
+    match
+      map_port_cmd
+        search_options
+        mapping_options
+        ?data_dir
+        ?config_file
+        ?listen_addr
+        ?advertised_net_port
+        ()
+    with
     | Ok () -> `Ok ()
     | Error e -> `Error (true, Format.asprintf "%a" Error_monad.pp_print_trace e)
 
-  let term = Term.(ret (const process $ search_options $ mapping_options))
+  let term =
+    Term.(
+      ret
+        (const process $ Shared_arg.Term.config_file $ Shared_arg.Term.data_dir
+       $ Shared_arg.Term.listen_addr $ Shared_arg.Term.advertised_net_port
+       $ search_options $ mapping_options))
 end
 
 module Manpage = struct
