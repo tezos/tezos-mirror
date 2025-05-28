@@ -214,6 +214,10 @@ Smart Rollup node
 - Aggregate performance metrics for all child processes (including Irmin
   GC). (MR :gl:`!17973`)
 
+- Add new commands ``replay block`` and ``replay blocks`` to replay one or
+  multiple L1 blocks. The results are compared with what the rollup node has
+  stored on disk. (MR :gl:`!18160`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
