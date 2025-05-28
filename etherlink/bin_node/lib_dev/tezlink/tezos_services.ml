@@ -145,6 +145,29 @@ module Protocol_types = struct
         {chain_id; hash; shell; protocol_data}
       in
       return block_header
+
+    let tezlink_block_to_raw_block_header block =
+      let open Result_syntax in
+      let* protocol_data = Protocol_data.get_mock_protocol_data in
+      let* shell = tezlink_block_to_shell_header block in
+      let raw_block_header : Block_services.raw_block_header =
+        {shell; protocol_data}
+      in
+      return raw_block_header
+  end
+
+  module Block = struct
+    let _tezlink_block_to_block_info ~l2_chain_id (version, block, chain) =
+      let open Result_syntax in
+      let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+      let* hash =
+        ethereum_to_tezos_block_hash block.L2_types.Tezos_block.hash
+      in
+      let* header = Block_header.tezlink_block_to_raw_block_header block in
+      let block_info : Block_services.block_info =
+        {chain_id; hash; header; metadata = None; operations = []}
+      in
+      return (version, block_info)
   end
 
   module Level = struct
