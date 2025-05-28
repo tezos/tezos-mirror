@@ -46,6 +46,14 @@ val content_slot_id :
 val dal_attestation :
   Alpha_context.Dal.Slot_index.t list -> Alpha_context.Dal.Attestation.t
 
+(** Returns [true] iff the given delegate has at least one assigned shard at the
+    given level. *)
+val has_assigned_shards :
+  Context.t ->
+  ?level:Protocol.Alpha_context.Raw_level.t ->
+  Alpha_context.public_key_hash ->
+  bool tzresult Lwt.t
+
 module Make (P : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 
