@@ -43,7 +43,7 @@ module Plugin = struct
   type error += Aggregation_result_size_error
 
   let () =
-    register_error_kind
+    Protocol_client_context.register_error_kind
       `Permanent
       ~id:"Aggregation_result_size_error"
       ~title:"Bad aggregagtion result size"
