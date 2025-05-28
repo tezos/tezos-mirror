@@ -102,8 +102,6 @@ let default_public_addr =
   let open Gossipsub.Transport_layer.Default_parameters.P2p_config in
   P2p_point.Id.of_string_exn ~default_port:listening_port "127.0.0.1"
 
-let default_neighbors = []
-
 let default_peers = []
 
 let default_expected_pow =
@@ -115,9 +113,6 @@ let default_endpoint = Uri.of_string "http://localhost:8732"
 
 let default_metrics_port =
   Gossipsub.Transport_layer.Default_parameters.P2p_config.listening_port + 1
-
-let default_metrics_addr =
-  P2p_point.Id.of_string_exn ~default_port:default_metrics_port "0.0.0.0"
 
 let default_history_mode = Rolling {blocks = `Auto}
 
@@ -147,13 +142,6 @@ let default =
     verbose = false;
     ignore_l1_config_peers = false;
   }
-
-let neighbor_encoding : neighbor Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {addr; port} -> (addr, port))
-    (fun (addr, port) -> {addr; port})
-    (obj2 (req "rpc-addr" string) (req "rpc-port" uint16))
 
 let uri_encoding : Uri.t Data_encoding.t =
   let open Data_encoding in
@@ -353,249 +341,6 @@ let encoding : t Data_encoding.t =
              bool
              default.ignore_l1_config_peers)))
 
-module V0 = struct
-  type v0_profile =
-    | Bootstrap
-    | Controller of Controller_profiles.t
-    | Random_observer
-
-  let v0_profile_encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          ~title:"Bootstrap node"
-          (Tag 1)
-          (obj1 (req "kind" (constant "bootstrap")))
-          (function Bootstrap -> Some () | _ -> None)
-          (function () -> Bootstrap);
-        case
-          ~title:"Controller"
-          (Tag 2)
-          (obj2
-             (req "kind" (constant "controller"))
-             (req "controller_profiles" Controller_profiles.encoding))
-          (function
-            | Controller controller_profiles -> Some ((), controller_profiles)
-            | _ -> None)
-          (function (), controller_profiles -> Controller controller_profiles);
-        case
-          ~title:"Random_observer"
-          (Tag 3)
-          (obj1 (req "kind" (constant "random_observer")))
-          (function Random_observer -> Some () | _ -> None)
-          (function () -> Random_observer);
-      ]
-
-  let to_latest_profile = function
-    | Random_observer -> Profile_manager.Random_observer
-    | Bootstrap -> Profile_manager.bootstrap
-    | Controller profile -> Profile_manager.controller profile
-
-  (* Legacy V0 configuration type used solely for migration purposes.
-
-     This type represents the legacy (V0) version of the configuration,
-     originally defined as a record. It is intentionally rewritten as a tuple
-     for the following reasons:
-
-     - Simplified Encoding/Decoding: Using a tuple allows removing
-     [Data_encoding.conv] and its field-by-field mapping, significantly reducing
-     boilerplate in the migration code.
-
-     - Read-Only & Migration-Only: The V0 type is no longer edited or used
-     beyond JSON decoding and transformation into the current configuration
-     version. Record semantics (field names, accessors) are unnecessary.
-
-     This design reflects the temporary, transitional nature of the V0
-     configuration and isolates legacy logic from the active codebase. *)
-  type t = tup1 * tup2
-
-  and tup1 =
-    string (* data_dir *)
-    * P2p_point.Id.t (* rpc_addr *)
-    * P2p_point.Id.t (* listen_addr *)
-    * P2p_point.Id.t (* public_addr *)
-    * neighbor list (* neighbors *)
-    * string list (* peers *)
-    * float (* expected_pow *)
-    * string (* network_name *)
-    * Uri.t (* endpoint *)
-    * P2p_point.Id.t (* metrics_addr *)
-
-  and tup2 = history_mode (* history_mode *) * v0_profile (* profile *)
-
-  let encoding : t Data_encoding.t =
-    let open Data_encoding in
-    merge_objs
-      (obj10
-         (dft "data-dir" string default_data_dir)
-         (dft "rpc-addr" P2p_point.Id.encoding default_rpc_addr)
-         (dft "net-addr" P2p_point.Id.encoding default_listen_addr)
-         (dft "public-addr" P2p_point.Id.encoding default_listen_addr)
-         (dft "neighbors" (list neighbor_encoding) default_neighbors)
-         (dft "peers" (list string) default_peers)
-         (dft "expected-pow" float default_expected_pow)
-         (dft "network-name" string legacy_network_name)
-         (dft "endpoint" uri_encoding default_endpoint)
-         (dft "metrics-addr" P2p_point.Id.encoding default_metrics_addr))
-      (obj2
-         (dft "history_mode" history_mode_encoding default_history_mode)
-         (dft
-            "profiles"
-            v0_profile_encoding
-            (Controller Controller_profiles.empty)))
-
-  let to_latest_version
-      ( ( data_dir,
-          rpc_addr,
-          listen_addr,
-          public_addr,
-          _neighbors,
-          peers,
-          expected_pow,
-          _network_name,
-          endpoint,
-          metrics_addr ),
-        (history_mode, profile) ) =
-    {
-      data_dir;
-      rpc_addr;
-      listen_addr;
-      public_addr;
-      peers;
-      expected_pow;
-      endpoint;
-      metrics_addr = Some metrics_addr;
-      history_mode;
-      profile = to_latest_profile profile;
-      version = current_version;
-      service_name = None;
-      service_namespace = None;
-      experimental_features = default_experimental_features;
-      fetch_trusted_setup = true;
-      verbose = false;
-      ignore_l1_config_peers = false;
-      http_backup_uris = [];
-      trust_http_backup_uris = false;
-    }
-end
-
-module V1 = struct
-  (* Legacy V1 configuration type used solely for migration purposes.
-
-     This type represents the legacy (V1) version of the configuration,
-     originally defined as a record. It is intentionally rewritten as a tuple
-     for the following reasons:
-
-     - Simplified Encoding/Decoding: Using a tuple allows removing
-     [Data_encoding.conv] and its field-by-field mapping, significantly reducing
-     boilerplate in the migration code.
-
-     - Read-Only & Migration-Only: The V1 type is no longer edited or used
-     beyond JSON decoding and transformation into the current configuration
-     version. Record semantics (field names, accessors) are unnecessary.
-
-     This design reflects the temporary, transitional nature of the V1
-     configuration and isolates legacy logic from the active codebase. *)
-  type t = tup1 * tup2
-
-  and tup1 =
-    string (* data_dir *)
-    * P2p_point.Id.t (* rpc_addr *)
-    * P2p_point.Id.t (*listen_addr  *)
-    * P2p_point.Id.t (* public_addr *)
-    * neighbor list (* neighbors *)
-    * string list (* peers *)
-    * float (* expected_pow *)
-    * string (*network_name  *)
-    * Uri.t (*endpoint  *)
-    * P2p_point.Id.t option (*metrics_addr  *)
-
-  and tup2 =
-    history_mode (* history_mode *)
-    * V0.v0_profile (* profile *)
-    * int (*version  *)
-    * string option (* service_name *)
-    * string option (*service_namespace  *)
-    * experimental_features (* experimental_features *)
-    * bool (* fetch_trusted_setup *)
-    * bool (* verbose *)
-
-  let encoding : t Data_encoding.t =
-    let open Data_encoding in
-    merge_objs
-      (obj10
-         (dft "data-dir" string default_data_dir)
-         (dft "rpc-addr" P2p_point.Id.encoding default_rpc_addr)
-         (dft "net-addr" P2p_point.Id.encoding default_listen_addr)
-         (dft "public-addr" P2p_point.Id.encoding default_listen_addr)
-         (dft "neighbors" (list neighbor_encoding) default_neighbors)
-         (dft "peers" (list string) default_peers)
-         (dft "expected-pow" float default_expected_pow)
-         (dft "network-name" string legacy_network_name)
-         (dft "endpoint" uri_encoding default_endpoint)
-         (dft "metrics-addr" (Encoding.option P2p_point.Id.encoding) None))
-      (obj8
-         (dft "history_mode" history_mode_encoding default_history_mode)
-         (dft
-            "profiles"
-            V0.v0_profile_encoding
-            (V0.Controller Controller_profiles.empty))
-         (req "version" int31)
-         (dft "service_name" (Data_encoding.option Data_encoding.string) None)
-         (dft
-            "service_namespace"
-            (Data_encoding.option Data_encoding.string)
-            None)
-         (dft
-            "experimental_features"
-            experimental_features_encoding
-            default_experimental_features)
-         (dft "fetch_trusted_setup" bool true)
-         (dft "verbose" bool default.verbose))
-
-  let to_latest_version
-      ( ( data_dir,
-          rpc_addr,
-          listen_addr,
-          public_addr,
-          _neighbors,
-          peers,
-          expected_pow,
-          _network_name,
-          endpoint,
-          metrics_addr ),
-        ( history_mode,
-          profile,
-          version,
-          service_name,
-          service_namespace,
-          experimental_features,
-          fetch_trusted_setup,
-          verbose ) ) =
-    {
-      data_dir;
-      rpc_addr;
-      listen_addr;
-      public_addr;
-      peers;
-      expected_pow;
-      endpoint;
-      metrics_addr;
-      history_mode;
-      profile = V0.to_latest_profile profile;
-      version;
-      service_name;
-      service_namespace;
-      experimental_features;
-      fetch_trusted_setup;
-      verbose;
-      ignore_l1_config_peers = false;
-      http_backup_uris = [];
-      trust_http_backup_uris = false;
-    }
-end
-
 type error += DAL_node_unable_to_write_configuration_file of string
 
 let () =
@@ -636,8 +381,12 @@ let load =
   let config_versions =
     [
       (2, destruct encoding);
-      (1, fun json -> destruct V1.encoding json |> V1.to_latest_version);
-      (0, fun json -> destruct V0.encoding json |> V0.to_latest_version);
+      (* We can add cases here of the form:
+
+         <version x>, fun json -> destruct Vx.encoding json |> Vx.to_latest_version)
+
+         If we need to migrate the configuration format. See how it was done for previous
+         migrations for more insight. *)
     ]
   in
   let rec try_decode json = function
