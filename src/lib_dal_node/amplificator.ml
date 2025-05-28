@@ -28,6 +28,14 @@ type t = {
   query_pipe : query_msg Lwt_pipe.Unbounded.t;
   mutable query_id : int;
   query_store : (int, query) Query_store.t;
+  amplification_random_delay_min : float;
+  amplification_random_delay_max : float;
+      (* When receiving shards from the network, the DAL node does not
+         perform the amplification as soon as it has enough shards to do
+         the reconstruction but waits a bit in case the missing shards are
+         received from the network. The duration of the delay is picked at
+         random between [amplification_random_delay_min] and
+         [amplification_random_delay_max]. *)
 }
 
 type error +=
@@ -331,8 +339,33 @@ let reply_receiver_job {process; query_store; _} node_context =
           let err = [error_of_exn exn] in
           Lwt.return (Error err))
 
+let determine_amplification_delays node_ctxt =
+  let open Result_syntax in
+  let+ parameters =
+    Node_context.get_proto_parameters ~level:`Last_proto node_ctxt
+  in
+  (* The propagation window is the attestation lag minus 4 levels, because:
+     - the daemon waits 2 levels for the head to be finalized
+     - attestation operations are included in the block at the next level
+     - the baker asks attestation information one level in advance *)
+  let propagation_period =
+    (parameters.attestation_lag - 4)
+    * Int64.to_int parameters.minimal_block_delay
+  in
+  (* We split this window in 3: one third for the normal propagation round, one
+     third for amplification; one third for the second propagation round. Note,
+     currently for Mainnet: 4 * 8s = 32s, so roughly 10s; for Ghostnet: 16s, so
+     roughly 5s. We round to the lowest integer. *)
+  let amplification_period = float_of_int (propagation_period / 3) in
+  let amplification_random_delay_min = amplification_period in
+  let amplification_random_delay_max = 2. *. amplification_period in
+  (amplification_random_delay_min, amplification_random_delay_max)
+
 let start_amplificator node_ctxt =
   let open Lwt_result_syntax in
+  let*? amplification_random_delay_min, amplification_random_delay_max =
+    determine_amplification_delays node_ctxt
+  in
   let cryptobox = Node_context.get_cryptobox node_ctxt in
   let shards_proofs_precomputation =
     Node_context.get_shards_proofs_precomputation node_ctxt
@@ -353,7 +386,15 @@ let start_amplificator node_ctxt =
   let queue_length = Query_store.length query_store in
   let () = Dal_metrics.update_amplification_queue_length queue_length in
   let amplificator =
-    {node_ctxt; process; query_pipe; query_store; query_id = 0}
+    {
+      node_ctxt;
+      process;
+      query_pipe;
+      query_store;
+      query_id = 0;
+      amplification_random_delay_min;
+      amplification_random_delay_max;
+    }
   in
   let (_ : Lwt_exit.clean_up_callback_id) =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_code ->
@@ -510,10 +551,10 @@ let try_amplification commitment slot_metrics slot_id amplificator =
        all the shards so that the reconstruction is not needed, and
        also avoids having multiple nodes reconstruct at once. *)
     let random_delay =
-      Constants.(
-        amplification_random_delay_min
-        +. Random.float
-             (amplification_random_delay_max -. amplification_random_delay_min))
+      amplificator.amplification_random_delay_min
+      +. Random.float
+           (amplificator.amplification_random_delay_max
+          -. amplificator.amplification_random_delay_min)
     in
     let*! () =
       Event.emit_reconstruct_starting_in
