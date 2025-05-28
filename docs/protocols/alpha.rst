@@ -161,6 +161,9 @@ Protocol parameters
   matching the reduction of the cycle length in Rio. Reduced accordingly the VDF
   difficulty as well. (:gl:`!18003`)
 
+- reduced blocks per commitment to 84, bringing back the number of nonces per
+  cycle to 128. (:gl:`!18147`)
+
 Bug Fixes
 ---------
 
