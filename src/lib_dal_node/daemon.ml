@@ -298,20 +298,14 @@ let run ~data_dir ~configuration_override =
   let* p2p_config = Transport_layer_parameters.p2p_config config in
   let p2p_limits = Transport_layer_parameters.p2p_limits in
   (* Get the current L1 head and its DAL plugin and parameters. *)
-  let* header, (module Plugin : Dal_plugin.T) =
-    L1_helpers.wait_for_block_with_plugin cctxt
-  in
+  let* header, proto_plugins = L1_helpers.wait_for_block_with_plugin cctxt in
   let head_level = header.Block_header.shell.level in
-  let* proto_parameters =
-    Plugin.get_constants `Main (`Level head_level) cctxt
+  let*? _plugin, proto_parameters =
+    Proto_plugins.get_plugin_and_parameters_for_level
+      proto_plugins
+      ~level:head_level
   in
-  let proto_plugins =
-    Proto_plugins.singleton
-      ~first_level:head_level
-      ~proto_level:header.shell.proto_level
-      (module Plugin)
-      proto_parameters
-  in
+
   (* Set proto number of slots hook. *)
   Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
   let* profile_ctxt =
@@ -489,16 +483,6 @@ let run ~data_dir ~configuration_override =
   (* Wait for the L1 node to be bootstrapped. *)
   Node_context.(set_l1_crawler_status ctxt L1_bootstrapping) ;
   let* () = L1_helpers.wait_for_l1_bootstrapped cctxt in
-  let* proto_plugins =
-    Proto_plugins.get_proto_plugins
-      cctxt
-      profile_ctxt
-      ~last_processed_level
-      ~first_seen_level
-      ~head_level
-      proto_parameters
-  in
-  Node_context.set_proto_plugins ctxt proto_plugins ;
   let* () =
     match last_processed_level with
     | None -> (* there's nothing to clean up *) return_unit

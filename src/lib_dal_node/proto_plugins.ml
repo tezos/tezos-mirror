@@ -55,7 +55,8 @@ let () =
 
 let last_failed_protocol = ref None
 
-let resolve_plugin_by_hash proto_hash =
+let resolve_plugin_by_hash ?(emit_failure_event = true) ~start_level proto_hash
+    =
   let open Lwt_result_syntax in
   let plugin_opt = Dal_plugin.get proto_hash in
   match plugin_opt with
@@ -65,128 +66,24 @@ let resolve_plugin_by_hash proto_hash =
         | Some hash when Protocol_hash.equal hash proto_hash -> Lwt.return_unit
         | _ ->
             last_failed_protocol := Some proto_hash ;
-            Event.emit_no_protocol_plugin ~proto_hash
+            if emit_failure_event then Event.emit_no_protocol_plugin ~proto_hash
+            else Lwt.return_unit
       in
       tzfail (No_plugin_for_proto {proto_hash})
   | Some plugin ->
-      let*! () = Event.emit_protocol_plugin_resolved ~proto_hash in
+      let*! () = Event.emit_protocol_plugin_resolved ~proto_hash ~start_level in
       return plugin
-
-let resolve_plugin_for_level cctxt ~level =
-  let open Lwt_result_syntax in
-  let* protocols =
-    Chain_services.Blocks.protocols cctxt ~block:(`Level level) ()
-  in
-  let proto_hash = protocols.next_protocol in
-  resolve_plugin_by_hash proto_hash
-
-let add_plugin_for_level cctxt plugins
-    (protocols : Chain_services.Blocks.protocols) ~level =
-  let open Lwt_result_syntax in
-  let* plugin = resolve_plugin_by_hash protocols.next_protocol in
-  let block = `Level level in
-  let* header = Shell_services.Blocks.Header.shell_header cctxt ~block () in
-  let proto_level = header.proto_level in
-  let (module Plugin) = plugin in
-  let+ proto_parameters = Plugin.get_constants `Main block cctxt in
-  Plugins.add plugins ~first_level:level ~proto_level plugin proto_parameters
-
-(* This function performs a (kind of) binary search to search for all values
-   that satisfy the given condition [cond] on values. There is bijection between
-   values and levels (which are here just positive int32 integers). The
-   functions [to_level] and [from_level] retrieve the associates levels/values
-   from given values/levels (respectively). The function [no_satisfying_value l1
-   l2] returns true iff no value satisfying [cond] is present in the interval
-   [l1, l2] (both inclusive). The search is performed between (the levels
-   associated to) the values [first] and [last] (both inclusive). *)
-let binary_search (cond : 'a -> bool) (no_satisfying_value : 'a -> 'a -> bool)
-    (to_level : 'a -> int32) (from_level : int32 -> 'a tzresult Lwt.t)
-    ~(first : 'a) ~(last : 'a) =
-  let open Lwt_result_syntax in
-  let rec search ~first ~last acc =
-    if no_satisfying_value first last then return acc
-    else
-      let first_level = to_level first in
-      let last_level = to_level last in
-      if first_level >= last_level then
-        (* search ended *)
-        if cond last then return (last :: acc) else return acc
-      else if Int32.succ first_level = last_level then
-        (* search ended as well *)
-        let acc = if cond last then last :: acc else acc in
-        return @@ if cond first then first :: acc else acc
-      else
-        let mid_level =
-          Int32.(add first_level (div (sub last_level first_level) 2l))
-        in
-        let* mid = from_level mid_level in
-        let* acc = search ~first ~last:mid acc in
-        search ~first:mid ~last acc
-  in
-  search ~first ~last []
-
-let migration protocols =
-  not
-  @@ Protocol_hash.equal
-       protocols.Chain_services.Blocks.current_protocol
-       protocols.Chain_services.Blocks.next_protocol
-
-type level_with_protos = {
-  level : int32;
-  protocols : Chain_services.Blocks.protocols;
-}
-
-(* Return the smallest levels between [first_level] and [last_level] for which a
-   different plugin should be added. *)
-let find_first_levels cctxt ~first_level ~last_level =
-  let open Lwt_result_syntax in
-  let to_level {level; _} = level in
-  let from_level level =
-    let* protocols =
-      Chain_services.Blocks.protocols cctxt ~block:(`Level level) ()
-    in
-    return {level; protocols}
-  in
-  let cond {protocols; _} = migration protocols in
-  let no_satisfying_value first last =
-    let first_proto = first.protocols.Chain_services.Blocks.next_protocol in
-    let last_proto = last.protocols.Chain_services.Blocks.next_protocol in
-    Protocol_hash.equal first_proto last_proto
-  in
-  let* first = from_level first_level in
-  let* last = from_level last_level in
-  (* Performs a binary search between [first_working_level] and [last_level]
-     to search for migration levels. *)
-  let* migration_levels =
-    binary_search cond no_satisfying_value to_level from_level ~first ~last
-  in
-  let sorted_levels =
-    List.sort
-      (fun {level = level1; _} {level = level2; _} ->
-        Int32.compare level1 level2)
-      migration_levels
-  in
-  (* We need to add the plugin for [first_level] even if it's not a migration
-     level. *)
-  match sorted_levels with
-  | [] -> return [first]
-  | {level; _} :: _ when first.level <> level -> return (first :: sorted_levels)
-  | _ -> return sorted_levels
-
-let initial_plugins cctxt ~first_level ~last_level =
-  let open Lwt_result_syntax in
-  let* first_levels = find_first_levels cctxt ~first_level ~last_level in
-  List.fold_left_es
-    (fun plugins {level; protocols} ->
-      add_plugin_for_level cctxt plugins protocols ~level)
-    Plugins.empty
-    first_levels
 
 let may_add cctxt plugins ~first_level ~proto_level =
   let open Lwt_result_syntax in
   let add first_level =
-    let* plugin = resolve_plugin_for_level cctxt ~level:first_level in
-    let (module Plugin) = plugin in
+    let* protocols =
+      Chain_services.Blocks.protocols cctxt ~block:(`Level first_level) ()
+    in
+    let proto_hash = protocols.next_protocol in
+    let* ((module Plugin) as plugin) =
+      resolve_plugin_by_hash proto_hash ~start_level:first_level
+    in
     let+ proto_parameters =
       Plugin.get_constants `Main (`Level first_level) cctxt
     in
@@ -230,39 +127,57 @@ let get_plugin_and_parameters_for_level plugins ~level =
 
 include Plugins
 
-(* This function fetches the protocol plugins for levels in the past for which
-   the node may need a plugin, namely for adding skip list cells, or for
-   obtaining the protocol parameters.
+(* [highest_level] is the highest known level of the protocol for which we
+   register the plugin. We use this level when getting the protocol parameters,
+   because the first level of the protocol (the activation level) might be too
+   old, in that the L1 node might not have the context for that protocol. *)
+let add_plugin_for_proto cctxt plugins
+    Chain_services.
+      {protocol; proto_level; activation_block = _, activation_level}
+    highest_level =
+  let open Lwt_result_syntax in
+  let* plugin =
+    resolve_plugin_by_hash
+      ~emit_failure_event:false
+      protocol
+      ~start_level:activation_level
+  in
+  let block = `Level highest_level in
+  let (module Plugin) = plugin in
+  let+ proto_parameters = Plugin.get_constants `Main block cctxt in
+  Plugins.add
+    plugins
+    ~first_level:activation_level
+    ~proto_level
+    plugin
+    proto_parameters
 
-   Concerning the skip list, getting the plugin is (almost) necessary as skip
-   list cells are stored in the storage for a certain period and
-   [store_skip_list_cells] needs the L1 context for levels in this period. (It
-   would actually not be necessary to go as far in the past, because the
-   protocol parameters and the relevant encodings do not change for now, so the
-   head plugin could be used). *)
-let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
-    ~head_level proto_parameters =
-  let storage_period =
-    Profile_manager.get_storage_period
-      profile_ctxt
-      proto_parameters
-      ~head_level
-      ~first_seen_level
+let get_supported_proto_plugins cctxt ~head_level =
+  let open Lwt_result_syntax in
+  let* protocols = Chain_services.Protocols.list cctxt () in
+  (* [protocols] are ordered increasingly wrt their protocol level; we treat
+     them from the last one backwards, because we stop at the most recent one
+     which cannot be registered *)
+  let protocols = List.rev protocols in
+  let*! res =
+    List.fold_left_es
+      (fun (plugins, highest_level) protocol_info ->
+        let*! res =
+          add_plugin_for_proto cctxt plugins protocol_info highest_level
+        in
+        let _hash, level = protocol_info.activation_block in
+        let highest_level = Int32.pred level in
+        match res with
+        | Ok plugins -> return (plugins, highest_level)
+        | Error [No_plugin_for_proto {proto_hash}]
+          when Protocol_hash.equal proto_hash protocol_info.protocol ->
+            fail (`End_loop_ok plugins)
+        | Error err -> fail (`End_loop_nok err))
+      (Plugins.empty, head_level)
+      protocols
   in
-  let first_level =
-    Int32.max
-      (match last_processed_level with None -> 1l | Some level -> level)
-      Int32.(sub head_level (of_int storage_period))
-  in
-  let first_level =
-    if Profile_manager.supports_refutations profile_ctxt then
-      Int32.sub
-        first_level
-        (Int32.of_int (History_check.skip_list_offset proto_parameters))
-    else
-      (* The DAL node may need the protocol parameters [attestation_lag] in the
-         past wrt to the head level. *)
-      Int32.sub first_level (Int32.of_int proto_parameters.attestation_lag)
-  in
-  let first_level = Int32.(max 1l first_level) in
-  initial_plugins cctxt ~first_level ~last_level:head_level
+  match res with
+  | Ok (plugins, _) | Error (`End_loop_ok plugins) -> return plugins
+  | Error (`End_loop_nok err) -> fail err
+
+let has_plugins plugins = not (LevelMap.is_empty plugins)

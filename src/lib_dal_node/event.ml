@@ -235,14 +235,17 @@ open struct
       ()
 
   let protocol_plugin_resolved =
-    declare_1
+    declare_2
       ~section
       ~prefix_name_with_section:true
       ~name:"plugin_resolved"
-      ~msg:"resolved plugin on protocol {proto_hash}"
+      ~msg:
+        "resolved plugin on protocol {proto_hash} that starts at level \
+         {start_level}"
       ~level:Notice
       ~pp1:Protocol_hash.pp_short
       ("proto_hash", Protocol_hash.encoding)
+      ("start_level", Data_encoding.int32)
 
   let no_protocol_plugin =
     declare_1
@@ -1139,8 +1142,8 @@ let emit_layer1_node_final_block ~hash ~level ~round =
 
 let emit_layer1_node_tracking_started () = emit layer1_node_tracking_started ()
 
-let emit_protocol_plugin_resolved ~proto_hash =
-  emit protocol_plugin_resolved proto_hash
+let emit_protocol_plugin_resolved ~proto_hash ~start_level =
+  emit protocol_plugin_resolved (proto_hash, start_level)
 
 let emit_no_protocol_plugin ~proto_hash = emit no_protocol_plugin proto_hash
 

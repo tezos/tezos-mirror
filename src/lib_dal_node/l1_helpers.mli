@@ -41,4 +41,4 @@ val infer_dal_network_name :
 (** [wait_for_block_with_plugin cctxt] waits until a block is available with a
     known DAL plugin, and returns its header along with the plugin module. *)
 val wait_for_block_with_plugin :
-  Rpc_context.t -> (Block_header.t * (module Dal_plugin.T)) tzresult Lwt.t
+  Rpc_context.t -> (Block_header.t * Proto_plugins.t) tzresult Lwt.t

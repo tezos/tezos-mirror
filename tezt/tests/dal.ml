@@ -4402,7 +4402,7 @@ let test_migration_plugin ~migrate_from ~migrate_to =
 
     let wait_for_plugin =
       Dal_node.wait_for dal_node "dal_plugin_resolved.v0" (fun json ->
-          let proto_hash = JSON.(json |> as_string) in
+          let proto_hash = JSON.(json |-> "proto_hash" |> as_string) in
           if String.equal proto_hash (Protocol.hash migrate_to) then Some ()
           else None)
     in

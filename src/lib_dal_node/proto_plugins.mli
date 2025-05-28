@@ -55,44 +55,15 @@ val get_plugin_and_parameters_for_level :
 val may_add :
   Rpc_context.t -> t -> first_level:int32 -> proto_level:int -> t tzresult Lwt.t
 
-(** [initial_plugins rpc_ctxt ~first_level ~last_level] returns the plugins for
-    levels between [first_level] and [last_last]. Note that if migrations have
-    happened in this interval, there will be several plugins.
-
-    It returns an error if the [Chain_services.Blocks.protocols] RPC fails, or
-    if some plugin is not registered, in which case it returns
-    [No_plugin_for_proto]. *)
-val initial_plugins :
-  Rpc_context.t -> first_level:int32 -> last_level:int32 -> t tzresult Lwt.t
-
-(** [resolve_plugin_for_level rpc_ctxt ~level] returns the plugin for the given
-    [level].
-
-    It returns an error if the [Chain_services.Blocks.protocols] RPC fails, or
-    if the plugin is not registered, in which case it returns
-    [No_plugin_for_proto]. *)
-val resolve_plugin_for_level :
-  Rpc_context.t -> level:int32 -> (module Dal_plugin.T) tzresult Lwt.t
-
-(** [get_proto_plugins cctxt profile_ctxt ~last_processed_level
-    ~first_seen_level ~head_level proto_parameters] returns the set of protocol
-    plugins required by the DAL node to operate correctly over its current
-    storage window.
-
-    It computes the first level for which a plugin may be needed based on the
-    DAL node's storage period and whether refutation support is enabled
-    (which requires access to older levels for skip list storage or protocol
-    parameters). The returned plugin map covers the range from this computed
-    first level up to [head_level].
+(** [get_supported_proto_plugins cctxt ~head_level] fetches all the protocol plugins that
+    it can and for which it can also fetch the protocol parameters.
 
     This function is typically called once at startup after fetching the current
     [head_level] from L1.
 *)
-val get_proto_plugins :
-  Rpc_context.t ->
-  Profile_manager.t ->
-  last_processed_level:int32 option ->
-  first_seen_level:int32 option ->
-  head_level:int32 ->
-  Types.proto_parameters ->
-  t tzresult Lwt.t
+val get_supported_proto_plugins :
+  Rpc_context.t -> head_level:int32 -> t tzresult Lwt.t
+
+(** returns true if an only if the given proto_plugins structure has some
+    plugins registered in it. *)
+val has_plugins : t -> bool

@@ -110,18 +110,15 @@ let wait_for_block_with_plugin (cctxt : Rpc_context.t) =
     let*! head_opt = Lwt_stream.get stream in
     match head_opt with
     | None -> failwith "Lost the connection with the L1 node"
-    | Some (_hash, header) -> (
-        let*! res =
-          Proto_plugins.resolve_plugin_for_level
+    | Some (_hash, header) ->
+        let* proto_plugins =
+          Proto_plugins.get_supported_proto_plugins
             cctxt
-            ~level:header.Block_header.shell.level
+            ~head_level:header.Block_header.shell.level
         in
-        match res with
-        | Error [Proto_plugins.No_plugin_for_proto _] -> wait_for_level ()
-        | Error err ->
-            failwith "Unexpected error: %a" Error_monad.pp_print_trace err
-        | Ok (module Plugin : Dal_plugin.T) ->
-            let () = stop () in
-            return (header, (module Plugin : Dal_plugin.T)))
+        if Proto_plugins.has_plugins proto_plugins then
+          let () = stop () in
+          return (header, proto_plugins)
+        else wait_for_level ()
   in
   wait_for_level ()
