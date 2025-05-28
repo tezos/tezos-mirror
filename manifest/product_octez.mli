@@ -49,6 +49,8 @@ val octez_layer2_irmin_context : Manifest.target
 
 val octez_layer2_riscv_context : Manifest.target
 
+val octez_openapi : Manifest.target
+
 val octez_sqlite : Manifest.target
 
 val octez_rpc_http_client_unix : Manifest.target
