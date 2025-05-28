@@ -44,8 +44,7 @@ val connect : ?monitoring:monitoring -> Media_type.t -> Uri.t -> t Lwt.t
 val disconnect : t -> unit Lwt.t
 
 (** Send a raw JSON RPC request on the websocket. *)
-val send_jsonrpc_request :
-  t -> JSONRPC.request -> Data_encoding.json tzresult Lwt.t
+val send_jsonrpc_request : t -> JSONRPC.request -> JSONRPC.value Lwt.t
 
 (** [send_jsonrpc client (Call ((module Method), input))] makes a JSONRPC
     request with the provided [Method] and [input] to the websocket [client]. It

@@ -416,7 +416,7 @@ let connect ?monitoring media uri =
 let disconnect {conn; _} = disconnect conn
 
 let send_jsonrpc_request client (request : JSONRPC.request) =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let message = client.media.construct JSONRPC.request_encoding request in
   let opcode = if client.binary then Websocket.Frame.Opcode.Binary else Text in
   let response, resolver = Lwt.task () in
@@ -424,16 +424,14 @@ let send_jsonrpc_request client (request : JSONRPC.request) =
     client.pending_requests
     request.id
     (Lwt.wakeup_later_result resolver) ;
-  let*! () =
+  let* () =
     Websocket_lwt_unix.write
       client.conn
       (Websocket.Frame.create ~opcode ~content:message ())
   in
-  let*! response in
+  let* response in
   Request_table.remove client.pending_requests request.id ;
-  match response with
-  | Error e -> tzfail (Request_failed (request, e))
-  | Ok resp -> return resp
+  return response
 
 type (_, _) call =
   | Call :
@@ -454,8 +452,11 @@ let send_jsonrpc :
         id = Some id;
       }
   in
-  let+ response = send_jsonrpc_request client request in
-  Data_encoding.Json.destruct M.output_encoding response
+  let*! response = send_jsonrpc_request client request in
+  match response with
+  | Error e -> tzfail (Request_failed (request, e))
+  | Ok response ->
+      return @@ Data_encoding.Json.destruct M.output_encoding response
 
 let subscribe client (kind : Ethereum_types.Subscription.kind) =
   let open Lwt_result_syntax in

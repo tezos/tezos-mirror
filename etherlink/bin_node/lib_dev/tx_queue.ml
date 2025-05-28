@@ -593,14 +593,12 @@ module Handlers = struct
             return
               (match batch_response with Singleton r -> [r] | Batch rs -> rs)
         | Websocket ws_client ->
-            List.map_es
+            List.map_ep
               (fun req ->
-                let+ resp_json =
+                let*! response =
                   Websocket_client.send_jsonrpc_request ws_client req
                 in
-                Data_encoding.Json.destruct
-                  Rpc_encodings.JSONRPC.response_encoding
-                  resp_json)
+                return Rpc_encodings.JSONRPC.{value = response; id = req.id})
               batch
       in
 
