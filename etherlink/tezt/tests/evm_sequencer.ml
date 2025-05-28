@@ -582,12 +582,11 @@ let test_tezlink_protocols =
     in
     return @@ JSON.parse ~origin:"curl_protocols" res
   in
+  let protocol_hash = Protocol.hash Michelson_contracts.tezlink_protocol in
 
   let* res = rpc_protocols () in
   Check.(
-    JSON.(
-      res |-> "protocol" |> as_string
-      = "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7")
+    JSON.(res |-> "protocol" |> as_string = protocol_hash)
       string
       ~error_msg:"Expected %R but got %L") ;
   unit
