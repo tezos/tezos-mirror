@@ -72,6 +72,13 @@ let derive_dal_parameters (reference : Cryptobox.parameters) ~redundancy_factor
 let content_slot_id = function
   | Hist.Unpublished id | Published {header = {id; _}; _} -> id
 
+let dal_attestation slot_indexes =
+  let open Alpha_context.Dal in
+  List.fold_left
+    (fun acc slot_index -> Attestation.commit acc slot_index)
+    Attestation.empty
+    slot_indexes
+
 module Make (Parameters : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 
