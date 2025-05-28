@@ -1,8 +1,13 @@
 # Changelog
 
-## Unreleased
+## Version 0.28 (2025-05-28)
 
-### Breaking changes
+This is a re-release of version 0.27 with the additional stabilized websockets
+server (which can now be enabled simply with `--ws`). Binaries and images for
+version 0.27 were not built due to an issue in the CI.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
 
 ### Configuration changes
 
@@ -11,23 +16,6 @@
   (which can contain additional configuration parameters for the websockets
   server). A new CLI parameter `--ws` allows to activate the websockets server
   without editing the configuration. (!18145)
-
-### RPCs changes
-
-### Metrics changes
-
-### Execution changes
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.27 (2025-05-26)
 
