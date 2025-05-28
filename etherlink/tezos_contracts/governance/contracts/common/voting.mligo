@@ -298,17 +298,17 @@ let add_new_proposal_and_upvote
         upvotes_voting_power = voting_power;
     } in
     let updated_proposal_period =
-	let (upvoters_upvotes_count,upvoters_proposals) =
-	    Set.fold
-	       (fun ((upvoters_upvotes_count,upvoters_proposals), proposer) ->
+        let (upvoters_upvotes_count,upvoters_proposals) =
+            Set.fold
+               (fun ((upvoters_upvotes_count,upvoters_proposals), proposer) ->
                  (increment_upvotes_count proposer upvoters_upvotes_count,
                  add_proposal_to_upvoter proposer payload upvoters_proposals))
-	       proposers
+               proposers
                (upvoters_upvotes_count, proposal_period.upvoters_proposals)
-	       in
+               in
         { proposal_period with
-	upvoters_upvotes_count = upvoters_upvotes_count;
-	upvoters_proposals = upvoters_proposals;
+        upvoters_upvotes_count = upvoters_upvotes_count;
+        upvoters_proposals = upvoters_proposals;
         proposals = Big_map.add payload value proposal_period.proposals
     } in
     let proposal_period = update_winner_candidate voting_power payload updated_proposal_period in
@@ -321,7 +321,7 @@ let proposal_already_upvoted
         (payload : pt)
         (upvoters_proposals : pt Storage.upvoters_proposals_t)
         : bool =
-	Big_map.mem (upvoter, payload) upvoters_proposals
+        Big_map.mem (upvoter, payload) upvoters_proposals
 
 [@inline]
 let assert_proposal_not_already_upvoted

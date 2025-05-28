@@ -22,8 +22,14 @@ sequencer_governance_metadata = base_template | {
     'description': 'The contract allows bakers to make proposals and vote on the sequencer operator',
 }
 
+delegated_governance_metadata = base_template | {
+    'name': 'Etherlink Delegated Governance',
+    'description': 'The contract allows bakers to delegate their voting rights to another key.',
+}
+
 metadata_by_contract_type = {
     ContractType.kernel_regular_governance: kernel_regular_governance_metadata,
     ContractType.kernel_security_governance: kernel_security_governance_metadata,
     ContractType.sequencer_governance: sequencer_governance_metadata,
+    ContractType.delegated_governance: delegated_governance_metadata,
 }

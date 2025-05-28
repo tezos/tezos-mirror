@@ -48,7 +48,7 @@ let is_delegate
         ( match contract, Map.find_opt voter delegate_map with
           | _ , None  -> False
           | None, Some _ -> True
-	  | Some _, Some (_,None) -> True
+          | Some _, Some (_,None) -> True
           | Some c, Some (True,Some whitelist) -> Set.mem c whitelist
           | Some c, Some (False,Some blacklist) -> not Set.mem c blacklist)
 
@@ -65,7 +65,7 @@ let list_delegates
       Map.fold (fun ((l,(d,(b,wbl))): address list * (address * delegate_info)) :address list ->
          match b,wbl with
          | _, None -> d::l
-	 | True, Some wl -> if Set.mem c wl then d::l else l
-	 | False, Some bl -> if Set.mem c bl then l else d::l
+         | True, Some wl -> if Set.mem c wl then d::l else l
+         | False, Some bl -> if Set.mem c bl then l else d::l
       ) delegate_map []      
 end

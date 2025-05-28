@@ -82,8 +82,8 @@ let vote
             (fun (period,(voter,voting_power)) ->
                 let promotion_period = Voting.get_promotion_period period in
                 let updated_period =
-		  Voting.vote_promotion vote voter voting_power promotion_period
-		in
+                  Voting.vote_promotion vote voter voting_power promotion_period
+                in
            { voting_context with period = updated_period })
            voters
            voting_context)
