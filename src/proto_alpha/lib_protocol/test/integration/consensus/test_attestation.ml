@@ -628,9 +628,7 @@ let test_two_attestations_with_same_attester () =
   let* _genesis, attested_block = init_genesis ~dal_enable:true () in
   let* op1 = Op.raw_attestation attested_block in
   let dal_content =
-    let attestation =
-      Dal.Attestation.commit Dal.Attestation.empty Dal.Slot_index.zero
-    in
+    let attestation = Dal_helpers.dal_attestation [Dal.Slot_index.zero] in
     {attestation}
   in
   let* op2 = Op.raw_attestation ~dal_content attested_block in
@@ -769,7 +767,7 @@ let test_dal_attestation_threshold () =
   let* b = Block.bake genesis ~operation:op in
   let* b = Block.bake_n (attestation_lag - 1) b in
   let* dal_committee = Context.Dal.shards (B b) () in
-  let attestation = Dal.Attestation.commit Dal.Attestation.empty slot_index in
+  let attestation = Dal_helpers.dal_attestation [slot_index] in
   let dal_content = {attestation} in
   let min_power = attestation_threshold * number_of_shards / 100 in
   Log.info "Number of minimum required attested shards: %d" min_power ;
