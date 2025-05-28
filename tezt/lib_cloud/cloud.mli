@@ -58,3 +58,5 @@ val service_register : name:string -> executable:string -> Agent.t -> unit
 val notify_service_start : name:string -> pid:int -> unit
 
 val notify_service_stop : name:string -> unit
+
+val register_chronos_task : t -> Chronos.task -> unit

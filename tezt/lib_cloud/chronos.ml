@@ -109,10 +109,12 @@ type task = {
 }
 
 type t = {
-  tasks : task list;
+  mutable tasks : task list;
   shutdown : unit Lwt.t;
   trigger_shutdown : unit Lwt.u;
 }
+
+let add_task t task = t.tasks <- task :: t.tasks
 
 let validate_time s =
   let in_range ~kind ~v (min, max) =
