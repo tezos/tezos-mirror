@@ -690,20 +690,14 @@ let test_attester_not_in_dal_committee () =
   let pkh = Stdlib.List.hd contracts |> Context.Contract.pkh in
   let rec iter b i =
     let* committee = Context.get_attesters (B b) in
-    let* dal_committee = Context.Dal.shards (B b) () in
     let in_committee =
       List.exists
         (fun del ->
           Signature.Public_key_hash.equal pkh del.RPC.Validators.delegate)
         committee
     in
-    let in_dal_committee =
-      List.exists
-        (fun ({delegate; _} : Plugin.RPC.Dal.S.shards_assignment) ->
-          Signature.Public_key_hash.equal pkh delegate)
-        dal_committee
-    in
-    if in_committee && not in_dal_committee then
+    let* has_assigned_shards = Dal_helpers.has_assigned_shards (B b) pkh in
+    if in_committee && not has_assigned_shards then
       let dal_content = {attestation = Dal.Attestation.empty} in
       let* op = Op.attestation ~delegate:pkh ~dal_content b in
       let* ctxt = Incremental.begin_construction b in
