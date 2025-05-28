@@ -362,8 +362,9 @@ let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
 let try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
     ~dal_constants ~attested_level slot_id =
   let open Lwt_result_syntax in
+  let Types.Slot_id.{slot_level; slot_index} = slot_id in
   let* cells_of_level =
-    let pred_published_level = Int32.pred slot_id.Types.Slot_id.slot_level in
+    let pred_published_level = Int32.pred slot_level in
     Plugin.Skip_list.cells_of_level
       ~attested_level
       (Node_context.get_tezos_node_cctxt ctxt)
@@ -377,7 +378,7 @@ let try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
   in
   match
     List.find_all
-      (fun (_h, _c, c_slot_index) -> c_slot_index = slot_id.slot_index)
+      (fun (_hash, _cell, cell_slot_index) -> cell_slot_index = slot_index)
       cells_of_level
   with
   | [(_cell_hash, cell, _slot_index)] ->
@@ -386,7 +387,11 @@ let try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
       (* This should not happen (unless the slot index is not valid). In fact,
          the skip list delta for a level contains exactly [number_of_slots]
          items: one per slot index. *)
-      assert false
+      let number_of_slots = dal_constants.number_of_slots in
+      if slot_index < 0 || slot_index >= number_of_slots then
+        tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
+      else (* Should not be reachable *)
+        assert false
 
 (* Attempt to retrieve the commitment hash associated with the published slot
    header identified by [slot_id].
