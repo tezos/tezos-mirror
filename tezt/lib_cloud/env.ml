@@ -251,4 +251,19 @@ let dns_domains () =
          if String.ends_with ~suffix:"." domain then domain else domain ^ ".")
   |> Lwt.return
 
-let notifier = assert false
+let notifier =
+  let open Types in
+  match (Cli.slack_bot_token, Cli.slack_channel_id) with
+  | None, None -> Notifier_null
+  | Some _, None ->
+      Log.warn
+        "A Slack bot token has been provided but no Slack channel id. No \
+         reports or alerts will be sent." ;
+      Notifier_null
+  | None, Some _ ->
+      Log.warn
+        "A Slack channel ID has been provided but no Slack bot token. No \
+         reports or alerts will be sent." ;
+      Notifier_null
+  | Some slack_bot_token, Some slack_channel_id ->
+      Notifier_slack {name = "default-slack"; slack_channel_id; slack_bot_token}

@@ -452,11 +452,6 @@ type etherlink_configuration = {
   chain_id : int option;
 }
 
-type monitor_app_configuration = {
-  slack_bot_token : string;
-  slack_channel_id : string;
-}
-
 type configuration = {
   with_dal : bool;
   stake : int list;
@@ -483,7 +478,6 @@ type configuration = {
   bootstrap_dal_node_identity_file : string option;
   external_rpc : bool;
   dal_incentives : bool;
-  monitor_app_configuration : monitor_app_configuration option;
 }
 
 type bootstrap = {
@@ -1604,9 +1598,9 @@ module Monitoring_app = struct
        Time (CEST), which is UTC+2.
     *)
     let register_chronos_task cloud ~configuration endpoint =
-      match configuration.monitor_app_configuration with
-      | None -> ()
-      | Some {slack_bot_token; slack_channel_id; _} ->
+      match Cloud.notifier cloud with
+      | Notifier_null -> ()
+      | Notifier_slack {slack_bot_token; slack_channel_id; _} ->
           let task =
             let action () =
               action
@@ -3684,22 +3678,6 @@ let register (module Cli : Scenarios_cli.Dal) =
     let bakers = Cli.bakers in
     let external_rpc = Cli.node_external_rpc_server in
     let dal_incentives = Cli.dal_incentives in
-    let monitor_app_configuration =
-      match Cli.Monitoring_app.(slack_bot_token, slack_channel_id) with
-      | None, None -> None
-      | Some _, None ->
-          Log.warn
-            "A Slack bot token has been provided but no Slack channel id. No \
-             reports or alerts will be sent." ;
-          None
-      | None, Some _ ->
-          Log.warn
-            "A Slack channel ID has been provided but no Slack bot token. No \
-             reports or alerts will be sent." ;
-          None
-      | Some slack_bot_token, Some slack_channel_id ->
-          Some {slack_channel_id; slack_bot_token}
-    in
     let t =
       {
         with_dal;
@@ -3725,7 +3703,6 @@ let register (module Cli : Scenarios_cli.Dal) =
         bootstrap_dal_node_identity_file;
         external_rpc;
         dal_incentives;
-        monitor_app_configuration;
       }
     in
     (t, etherlink)
