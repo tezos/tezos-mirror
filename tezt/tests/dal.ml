@@ -7161,6 +7161,10 @@ let dal_crypto_benchmark () =
           Profiler.record_f Profiler.main Debug ("polynomial from slot", [])
           @@ fun () -> polynomial_from_slot dal slot
         in
+        let _slot =
+          Profiler.record_f Profiler.main Debug ("polynomial to slot", [])
+          @@ fun () -> polynomial_to_slot dal polynomial
+        in
         let*? commitment =
           Profiler.record_f Profiler.main Debug ("commit", []) @@ fun () ->
           commit dal polynomial
