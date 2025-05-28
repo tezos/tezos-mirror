@@ -1019,6 +1019,9 @@ module Replay = struct
       {hash = protocol.protocol; proto_level = protocol.proto_level; constants}
       configuration
 
+  let process_time_treshold =
+    Ptime.Span.of_float_s 0.5 |> WithExceptions.Option.get ~loc:__LOC__
+
   let replay_block_aux ?(verbose = false) node_ctxt block =
     let open Lwt_result_syntax in
     let* hash, level =
@@ -1034,12 +1037,12 @@ module Replay = struct
     let* block = Node_context.get_full_l2_block node_ctxt hash in
     if verbose then
       Format.eprintf
-        "@[<v 2>\x1B[1mReplaying block:\x1B[0m@,%a@,@]@."
+        "@[<v 2>\x1B[1mReplaying block: \x1B[0m@,%a@,@]@."
         Data_encoding.Json.pp
         (Data_encoding.Json.construct Sc_rollup_block.full_encoding block)
     else
       Format.eprintf
-        "Replaying block: \x1B[36m%ld\x1B[0m (\x1B[1m%a\x1B[0m)  %!"
+        "\x1B[1mReplaying block \x1B[1;36m%ld\x1B[0m (%a)  %!"
         level
         Block_hash.pp
         hash ;
@@ -1141,19 +1144,47 @@ module Replay = struct
       failed := true) ;
 
     if !failed then failwith "Replayed block differed from the one on disk"
-    else (
+    else
+      let block_time =
+        (Reference.get node_ctxt.current_protocol).constants.minimal_block_delay
+        |> Int64.to_float
+      in
+      let color_time =
+        let time_f = Ptime.Span.to_float_s time in
+        if time_f > 2. *. block_time then "\x1B[1;7;31m"
+        else if time_f > block_time then "\x1B[1;31m"
+        else if time_f > block_time /. 2. then "\x1B[31m"
+        else if time_f > block_time /. 5. then "\x1B[33m"
+        else "\x1B[0m"
+      in
       if not verbose then
-        Format.eprintf "[\x1B[1;32mOK\x1B[0m] %a@." Ptime.Span.pp time
+        Format.eprintf
+          "[\x1B[1;32mOK\x1B[0m] %s %a \x1B[0m@."
+          color_time
+          Ptime.Span.pp
+          time
       else
         Format.eprintf
-          "\x1B[32mReplayed block %ld \x1B[1msuccessfully\x1B[0m in %a!@."
+          "\x1B[32mReplayed block %ld \x1B[1msuccessfully\x1B[0m in \
+           %s%a\x1B[0m!@."
           level
+          color_time
           Ptime.Span.pp
           time ;
-      return_unit)
+      return_unit
 
   let replay_block ~data_dir cctxt block =
     let open Lwt_result_syntax in
     let* node_ctxt = mk_node_ctxt ~data_dir cctxt block in
     replay_block_aux ~verbose:true node_ctxt block
+
+  let replay_blocks ~data_dir cctxt start_level end_level =
+    let open Lwt_result_syntax in
+    let* node_ctxt = mk_node_ctxt ~data_dir cctxt (`Level start_level) in
+    let levels =
+      Stdlib.List.init
+        (Int32.sub end_level start_level |> Int32.to_int |> succ)
+        (fun x -> Int32.add (Int32.of_int x) start_level)
+    in
+    List.iter_es (fun l -> replay_block_aux node_ctxt (`Level l)) levels
 end

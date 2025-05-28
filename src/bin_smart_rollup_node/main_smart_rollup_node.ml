@@ -662,6 +662,21 @@ let replay_block_command =
     (fun data_dir block cctxt ->
       Rollup_node_daemon.Replay.replay_block ~data_dir cctxt block)
 
+let replay_blocks_command =
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:"Replay a sequence of L1 blocks."
+    (args1 data_dir_arg)
+    (prefixes ["replay"; "blocks"; "from"]
+    @@ Cli.level_param @@ prefix "to" @@ Cli.level_param @@ stop)
+    (fun data_dir start_level end_level cctxt ->
+      Rollup_node_daemon.Replay.replay_blocks
+        ~data_dir
+        cctxt
+        start_level
+        end_level)
+
 let sc_rollup_commands () =
   [
     config_init_command;
@@ -678,6 +693,7 @@ let sc_rollup_commands () =
     openapi_command;
     list_metrics_command;
     replay_block_command;
+    replay_blocks_command;
   ]
   @ Repair.commands
 
