@@ -97,6 +97,8 @@ module Block_seen_event = struct
 
     let name = "block-seen-" ^ Protocol.name
 
+    let simple_name = name
+
     type nonrec t = t
 
     let encoding =

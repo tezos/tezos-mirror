@@ -32,6 +32,8 @@ module Attempt_logging = Internal_event.Make (struct
 
   let name = "rpc_http_attempt"
 
+  let simple_name = name
+
   let doc = "Error emitted when an HTTP request returned a 502 error."
 
   let encoding =

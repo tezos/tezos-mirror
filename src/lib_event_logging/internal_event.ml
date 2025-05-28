@@ -112,6 +112,8 @@ module Section : sig
 
   val make_sanitized : string list -> t
 
+  val append : string -> t -> t
+
   val name : t -> string
 
   val is_prefix : prefix:t -> t -> bool
@@ -136,20 +138,23 @@ end = struct
 
   let name s = String.concat "." s.path
 
+  let make_name_exception name char =
+    Printf.ksprintf
+      (fun s -> Invalid_argument s)
+      "Internal_event.Section: invalid name %S (contains %c)"
+      name
+      char
+
   let make sl =
-    List.iter
-      (fun s ->
-        check_name_exn s (fun name char ->
-            Printf.ksprintf
-              (fun s -> Invalid_argument s)
-              "Internal_event.Section: invalid name %S (contains %c)"
-              name
-              char))
-      sl ;
+    List.iter (fun s -> check_name_exn s make_name_exception) sl ;
     {path = sl}
 
   let make_sanitized sl =
     List.map (String.map (fun c -> if valid_char c then c else '_')) sl |> make
+
+  let append name t =
+    check_name_exn name make_name_exception ;
+    {path = t.path @ [name]}
 
   let to_string_list s = s.path
 
@@ -197,6 +202,8 @@ module type EVENT_DEFINITION = sig
   val section : Section.t option
 
   val name : string
+
+  val simple_name : string
 
   val doc : string
 
@@ -811,6 +818,7 @@ module Simple = struct
   let declare_0 ?alternative_color ?section ?(prefix_name_with_section = false)
       ~name ~msg ?(level = Info) () =
     let section = make_section section in
+    let simple_name = name in
     let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg = parse_msg [] msg in
     let module Definition : EVENT_DEFINITION with type t = unit = struct
@@ -821,6 +829,8 @@ module Simple = struct
       let section = section
 
       let name = name
+
+      let simple_name = simple_name
 
       let pp ~all_fields ~block fmt () =
         pp_log_message ~all_fields ~block parsed_msg fmt []
@@ -842,6 +852,7 @@ module Simple = struct
       ?(prefix_name_with_section = false) ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) =
     let section = make_section section in
+    let simple_name = name in
     let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg = parse_msg [f1_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a = struct
@@ -850,6 +861,8 @@ module Simple = struct
       let doc = msg
 
       let section = section
+
+      let simple_name = simple_name
 
       let name = name
 
@@ -879,6 +892,7 @@ module Simple = struct
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) =
     let section = make_section section in
+    let simple_name = name in
     let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg = parse_msg [f1_name; f2_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a * b = struct
@@ -887,6 +901,8 @@ module Simple = struct
       let doc = msg
 
       let section = section
+
+      let simple_name = simple_name
 
       let name = name
 
@@ -924,6 +940,7 @@ module Simple = struct
       (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) =
     let section = make_section section in
+    let simple_name = name in
     let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg = parse_msg [f1_name; f2_name; f3_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a * b * c = struct
@@ -932,6 +949,8 @@ module Simple = struct
       let doc = msg
 
       let section = section
+
+      let simple_name = simple_name
 
       let name = name
 
@@ -972,6 +991,7 @@ module Simple = struct
       (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) =
     let section = make_section section in
+    let simple_name = name in
     let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg = parse_msg [f1_name; f2_name; f3_name; f4_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a * b * c * d =
@@ -981,6 +1001,8 @@ module Simple = struct
       let doc = msg
 
       let section = section
+
+      let simple_name = simple_name
 
       let name = name
 
@@ -1024,6 +1046,7 @@ module Simple = struct
       (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
       (f5_name, (f5_enc : e Data_encoding.t)) =
     let section = make_section section in
+    let simple_name = name in
     let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg =
       parse_msg [f1_name; f2_name; f3_name; f4_name; f5_name] msg
@@ -1035,6 +1058,8 @@ module Simple = struct
       let doc = msg
 
       let section = section
+
+      let simple_name = simple_name
 
       let name = name
 
@@ -1081,6 +1106,7 @@ module Simple = struct
       (f5_name, (f5_enc : e Data_encoding.t)) ?pp6
       (f6_name, (f6_enc : f Data_encoding.t)) =
     let section = make_section section in
+    let simple_name = name in
     let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg =
       parse_msg [f1_name; f2_name; f3_name; f4_name; f5_name; f6_name] msg
@@ -1092,6 +1118,8 @@ module Simple = struct
       let doc = msg
 
       let section = section
+
+      let simple_name = simple_name
 
       let name = name
 
@@ -1141,6 +1169,7 @@ module Simple = struct
       (f6_name, (f6_enc : f Data_encoding.t)) ?pp7
       (f7_name, (f7_enc : g Data_encoding.t)) =
     let section = make_section section in
+    let simple_name = name in
     let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg =
       parse_msg
@@ -1154,6 +1183,8 @@ module Simple = struct
       let doc = msg
 
       let section = section
+
+      let simple_name = simple_name
 
       let name = name
 
@@ -1206,6 +1237,7 @@ module Simple = struct
       (f7_name, (f7_enc : g Data_encoding.t)) ?pp8
       (f8_name, (f8_enc : h Data_encoding.t)) =
     let section = make_section section in
+    let simple_name = name in
     let name = may_prefix_name ~prefix_name_with_section ~name ~section in
     let parsed_msg =
       parse_msg
@@ -1219,6 +1251,8 @@ module Simple = struct
       let doc = msg
 
       let section = section
+
+      let simple_name = simple_name
 
       let name = name
 
@@ -1271,6 +1305,8 @@ module Lwt_worker_logger = struct
 
     let name = "lwt-worker_started"
 
+    let simple_name = name
+
     let encoding = Data_encoding.constant "started"
 
     let pp ~all_fields:_ ~block:_ ppf () = Format.fprintf ppf "started"
@@ -1289,6 +1325,8 @@ module Lwt_worker_logger = struct
 
     let name = "lwt-worker_ended"
 
+    let simple_name = name
+
     let encoding = Data_encoding.constant "ended"
 
     let pp ~all_fields:_ ~block:_ ppf () = Format.fprintf ppf "ended"
@@ -1306,6 +1344,8 @@ module Lwt_worker_logger = struct
     let section = None
 
     let name = "lwt-worker_failed"
+
+    let simple_name = name
 
     let encoding = Data_encoding.(obj1 (req "error" string))
 
