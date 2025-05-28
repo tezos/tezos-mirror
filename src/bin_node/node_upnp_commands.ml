@@ -31,22 +31,6 @@ let default_lease_duration = 0l
 
 let default_description = "octez-node P2P"
 
-let search_gateway {bind_addr; broadcast_addr; timeout; single_search_timeout}
-    () =
-  match
-    Octez_igd_next.Igd_next_gen.search_gateway
-      ~bind_addr
-      ~broadcast_address:broadcast_addr
-      ~timeout
-      ~single_search_timeout
-  with
-  | Ok _ ->
-      Format.printf "Gateway found\n%!" ;
-      Lwt.return_unit
-  | Error e ->
-      Format.eprintf "Cannot find gateway: %s\n%!" e ;
-      Lwt.return_unit
-
 (* This is a ugly hack to get the IP assigned to the machine as seen by the
    gateway. It avoids having to give it manually.
 
@@ -83,9 +67,6 @@ let handle_local_address gateway local_addr =
           failwith
             "Cannot determine machine network address, please give it using \
              the option `--local-addr`.")
-
-let search_gateway_cmd options () =
-  Tezos_base_unix.Event_loop.main_run (search_gateway_cmd options)
 
 let resolve_config_file ?data_dir ?config_file () =
   let open Lwt_result_syntax in
