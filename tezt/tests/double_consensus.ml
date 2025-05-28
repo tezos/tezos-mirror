@@ -32,6 +32,17 @@
 
 let team = Tag.layer1
 
+let bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5 =
+  Constant.(bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5)
+
+let public_key_hashes =
+  List.map (fun (account : Account.key) -> account.public_key_hash)
+
+let delegate_forbidden_error =
+  rex
+    "has committed too many misbehaviours; it is temporarily not allowed to \
+     bake/preattest/attest."
+
 let double_attestation_waiter accuser =
   Accuser.wait_for accuser (sf "double_attestation_denounced.v0") (fun _ ->
       Some ())
@@ -417,10 +428,371 @@ let operation_too_far_in_future =
   let* () = waiter in
   unit
 
+let fetch_anonymous_operations ?block client =
+  let* json =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_operations_validation_pass
+         ?block
+         ~validation_pass:2
+         ()
+  in
+  return JSON.(as_list json)
+
+type kind =
+  | Preattestation
+  | Attestation
+  | Attestations_aggregate
+  | Preattestations_aggregate
+
+let string_of_kind = function
+  | Preattestation -> "preattestation"
+  | Attestation -> "attestation"
+  | Attestations_aggregate -> "attestations_aggregate"
+  | Preattestations_aggregate -> "preattestations_aggregate"
+
+(* [filter_consensus_denunciations ~level ~round ~delegate ~evidence ops]
+   filters [ops], keeping only "double_consensus_operation_evidence" operations
+   that match the given [level], [round], [delegate], and [evidence]. *)
+let filter_consensus_denunciations ~level ~round ~delegate ~evidence
+    anonymous_operations =
+  List.filter
+    JSON.(
+      fun operation_json ->
+        let contents = operation_json |-> "contents" |> as_list |> List.hd in
+        let forbidden_delegate =
+          contents |-> "metadata" |-> "punished_delegate" |> as_string
+        in
+        let kind = contents |-> "kind" |> as_string in
+        match kind with
+        | "double_consensus_operation_evidence"
+          when delegate = forbidden_delegate ->
+            let kind1, kind2 = evidence in
+            let op1 = contents |-> "op1" |-> "operations" in
+            let op2 = contents |-> "op2" |-> "operations" in
+            let kind1' = op1 |-> "kind" |> as_string in
+            let kind2' = op2 |-> "kind" |> as_string in
+            let level', round' =
+              let consensus_content_opt =
+                op1 |-> "consensus_content" |> as_opt
+              in
+              match consensus_content_opt with
+              | Some consensus_content ->
+                  (* aggregate operations *)
+                  let level = consensus_content |-> "level" |> as_int in
+                  let round = consensus_content |-> "round" |> as_int in
+                  (level, round)
+              | None ->
+                  (* non-aggregate operations *)
+                  let level = op1 |-> "level" |> as_int in
+                  let round = op1 |-> "round" |> as_int in
+                  (level, round)
+            in
+            let kind1 = string_of_kind kind1 in
+            let kind2 = string_of_kind kind2 in
+            level = level' && round = round'
+            && ((kind1 = kind1' && kind2 = kind2')
+               || (kind1 = kind2' && kind2 = kind1'))
+        | _ -> false)
+    anonymous_operations
+
+(* [check_contains_consensus_denunciations ~loc ~level ~round
+   ~anonymous_operations denunciations]
+   asserts that, for each (delegate, evidence) pair in [denunciations], there
+   is exactly one matching "double_consensus_operation_evidence" operation
+   in [anonymous_operations] for the given [level] and [round].
+   Fails the test otherwise. *)
+let check_contains_consensus_denunciations ~loc ~level ~round
+    ~anonymous_operations denunciations =
+  List.iter
+    (fun (delegate, evidence) ->
+      let delegate = delegate.Account.public_key_hash in
+      let corresponding_denunciations =
+        filter_consensus_denunciations
+          ~level
+          ~round
+          ~delegate
+          ~evidence
+          anonymous_operations
+      in
+      match corresponding_denunciations with
+      | [] ->
+          Test.fail
+            "%s@.No such denunciation found for %s at level %d round %d"
+            loc
+            delegate
+            level
+            round
+      | _ :: [] -> ()
+      | _ :: _ :: _ ->
+          Test.fail
+            "%s@.Unexpected multiple corresponding denunciations found"
+            loc)
+    denunciations
+
+let attestation_and_aggregation_wrong_payload_hash =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"attestation and aggregation wrong payload hash"
+    ~tags:[Tag.layer1; "attestation"; "aggregation"]
+    ~supports:Protocol.(From_protocol 023)
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
+  @@ fun protocol ->
+  let consensus_rights_delay = 1 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      [
+        (["allow_tz4_delegate_enable"], `Bool true);
+        (["aggregate_attestation"], `Bool true);
+        (* Diminish some constants to activate consensus keys faster *)
+        (["blocks_per_cycle"], `Int 2);
+        (["nonce_revelation_threshold"], `Int 1);
+        (["consensus_rights_delay"], `Int consensus_rights_delay);
+        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+      ]
+  in
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol ~parameter_file ()
+  in
+  let* _ = Node.wait_for_level node 1 in
+  (* Run accusers (simulates a network were multiple denunciations are received
+     simultaneously) *)
+  let* _accuser1 = Accuser.init ~protocol node in
+  let* _accuser2 = Accuser.init ~protocol node in
+  (* Set a BLS consensus key for some bootstrap accounts *)
+  let* ck1 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap1 client in
+  let* ck2 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap2 client in
+  let* ck3 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap3 client in
+  let keys =
+    public_key_hashes
+      [
+        ck1; ck2; ck3; bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5;
+      ]
+  in
+  (* Bake until consensus keys become active *)
+  let* level = Client.bake_for_and_wait_level ~keys ~count:6 client in
+  (* Bake a block: it is expected to contain an attestations_aggregate with all
+     bootstrap accounts *)
+  let* () = Client.bake_for_and_wait ~keys client in
+  (* Attest for bootstrap1 with a dummy block_payload_hash *)
+  let* _ =
+    let open Operation.Consensus in
+    let* slots = get_slots_by_consensus_key ~level client in
+    let slot = first_slot ~slots ck1 in
+    let* branch = get_branch ~attested_level:level client in
+    let* bph_level_4 = get_block_payload_hash ~block:"4" client in
+    attest_for
+      ~protocol
+      ~branch
+      ~slot
+      ~level
+      ~round:0
+      ~block_payload_hash:bph_level_4
+      ck1
+      client
+  in
+  (* Bake a block: it is expected to contain a denunciation. *)
+  let* level = Client.bake_for_and_wait_level ~keys client in
+  (* Fetch anonymous operations from the current head
+     and check for the expected denunciation *)
+  let* anonymous_operations = fetch_anonymous_operations client in
+  let () =
+    check_contains_consensus_denunciations
+      ~loc:__LOC__
+      ~level:(level - 2)
+      ~round:0
+      ~anonymous_operations
+      [(bootstrap1, (Attestation, Attestations_aggregate))]
+  in
+  let open Operation.Consensus in
+  let* slots = get_slots_by_consensus_key ~level client in
+  let* branch = get_branch ~attested_level:level client in
+  let* block_payload_hash = get_block_payload_hash client in
+  (* Attest for bootstrap1 and check that he is forbidden *)
+  let* (`OpHash _) =
+    let slot = first_slot ~slots ck1 in
+    attest_for
+      ~error:delegate_forbidden_error
+      ~protocol
+      ~branch
+      ~slot
+      ~level
+      ~round:0
+      ~block_payload_hash
+      ck1
+      client
+  in
+  (* Attest for bootstrap2 and expect a success *)
+  let* (`OpHash _) =
+    let slot = first_slot ~slots ck2 in
+    attest_for
+      ~protocol
+      ~branch
+      ~slot
+      ~level
+      ~round:0
+      ~block_payload_hash
+      ck2
+      client
+  in
+  unit
+
+let double_aggregation_wrong_payload_hash =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"double aggregation wrong payload hash"
+    ~tags:[Tag.layer1; "double"; "aggregation"]
+    ~supports:Protocol.(From_protocol 023)
+    ~uses:(fun protocol -> [Protocol.accuser protocol])
+  @@ fun protocol ->
+  let consensus_rights_delay = 1 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      [
+        (["allow_tz4_delegate_enable"], `Bool true);
+        (["aggregate_attestation"], `Bool true);
+        (* Diminish some constants to activate consensus keys faster. *)
+        (["blocks_per_cycle"], `Int 3);
+        (["nonce_revelation_threshold"], `Int 1);
+        (["consensus_rights_delay"], `Int consensus_rights_delay);
+        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+      ]
+  in
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~parameter_file
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_node
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      `Client
+      ()
+  in
+  let* node1_id = Node.wait_for_identity node1 in
+  let* node2_id = Node.wait_for_identity node2 in
+  (* Connect nodes together *)
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  let* _ = Node.wait_for_level node2 1 in
+  (* Run accusers *)
+  let* _accuser1 = Accuser.init ~protocol node1 in
+  let* _accuser2 = Accuser.init ~protocol node2 in
+  (* Set BLS consensus key for some bootstrap accounts *)
+  let* ck1 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap1 client1 in
+  let* ck2 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap2 client1 in
+  let* ck3 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap3 client1 in
+  (* Import the consensus keys in client2 aswell *)
+  let* () = Client.import_secret_key ~alias:"ck1" client2 ck1.secret_key in
+  let* () = Client.import_secret_key ~alias:"ck2" client2 ck2.secret_key in
+  let* () = Client.import_secret_key ~alias:"ck3" client2 ck3.secret_key in
+  let keys =
+    [
+      ck1.public_key_hash;
+      ck2.public_key_hash;
+      ck3.public_key_hash;
+      bootstrap1.public_key_hash;
+      bootstrap2.public_key_hash;
+      bootstrap3.public_key_hash;
+      bootstrap4.public_key_hash;
+      bootstrap5.public_key_hash;
+    ]
+  in
+  let double_attesting_keys =
+    [ck1.public_key_hash; ck2.public_key_hash; bootstrap4.public_key_hash]
+  in
+  (* Bake until consensus keys become active *)
+  let* level = Client.bake_for_and_wait_level ~keys ~count:5 client1 in
+  let* _ = Node.wait_for_level node2 level in
+  (* Disconnect nodes *)
+  let* () = Client.Admin.kick_peer ~peer:node2_id client1 in
+  let* () = Client.Admin.kick_peer ~peer:node1_id client2 in
+  (* On node1's branch, bake 2 blocks *)
+  let* () = Client.bake_for_and_wait ~count:2 ~keys client1 in
+  (* On node2's branch, inject a transfer and bake 3 blocks *)
+  let* _ = Operation.Manager.inject_single_transfer client2 in
+  let* level =
+    Client.bake_for_and_wait_level ~count:3 ~keys:double_attesting_keys client2
+  in
+  (* Reconnect nodes together *)
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  (* node1 is expected to switch to node2's branch *)
+  let* _ = Node.wait_for_level node1 level in
+  (* Bake a block: it is expected to contain denunciations *)
+  let* level = Client.bake_for_and_wait_level ~keys client1 in
+  (* Fetch anonymous operations from the current head
+     and check for the expected denunciations *)
+  let* anonymous_operations = fetch_anonymous_operations client1 in
+  let () =
+    check_contains_consensus_denunciations
+      ~loc:__LOC__
+      ~level:(level - 3)
+      ~round:0
+      ~anonymous_operations
+      [
+        (bootstrap1, (Attestations_aggregate, Attestations_aggregate));
+        (bootstrap2, (Attestations_aggregate, Attestations_aggregate));
+        (bootstrap4, (Attestation, Attestation));
+      ]
+  in
+  let open Operation.Consensus in
+  let* branch = get_branch ~attested_level:level client1 in
+  let* block_payload_hash = get_block_payload_hash client1 in
+  let* slots = get_slots_by_consensus_key ~level client1 in
+  (* Attest with the double attesting keys and check that they are forbidden *)
+  let* () =
+    Lwt_list.iter_s
+      (fun ck ->
+        let slot = first_slot ~slots ck in
+        let* (`OpHash _) =
+          attest_for
+            ~error:delegate_forbidden_error
+            ~protocol
+            ~branch
+            ~slot
+            ~level
+            ~round:0
+            ~block_payload_hash
+            ck
+            client1
+        in
+        unit)
+      [ck1; ck2; bootstrap4]
+  in
+  (* Attest for the other keys and expect a success *)
+  let* () =
+    Lwt_list.iter_s
+      (fun ck ->
+        let slot = first_slot ~slots ck in
+        let* (`OpHash _) =
+          attest_for
+            ~protocol
+            ~branch
+            ~slot
+            ~level
+            ~round:0
+            ~block_payload_hash
+            ck
+            client1
+        in
+        unit)
+      [ck3; bootstrap5]
+  in
+  unit
+
 let register ~protocols =
   double_attestation_wrong_block_payload_hash protocols ;
   double_preattestation_wrong_block_payload_hash protocols ;
   double_attestation_wrong_branch protocols ;
   double_preattestation_wrong_branch protocols ;
   operation_too_old protocols ;
-  operation_too_far_in_future protocols
+  operation_too_far_in_future protocols ;
+  attestation_and_aggregation_wrong_payload_hash protocols ;
+  double_aggregation_wrong_payload_hash protocols
