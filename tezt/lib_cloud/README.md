@@ -289,7 +289,7 @@ instead of your local machine. This may have several benefits, but in
 particular, it can be used to set up long experiments (that can last
 for weeks).
 
-When running a test in `--proxy` mode, you can detach it after the
+When running a test in proxy mode, you can detach it after the
 deployement has been made and the scenario start to kick in. In that
 case, you can detach from your experiment by pressing `ctrl+d`. By
 doing so, you can do whatever you want, but the experiment is still
@@ -317,7 +317,7 @@ UX-wise, the proxy mode has still some awkwards behaviour regarding
 how log events are printed on `Ctrl+D` or `Ctrl+C`. Moreover, the
 handling of `sigint` (Ctrl+C) may be a bit fragile.
 
-We recommend to use first the `Cloud` mode before using the `Proxy`
+We recommend to use first the default mode before using the proxy
 mode to ensure the scenario behaves as expected.
 
 With the proxy mode, we recommend to use the website if you want to
@@ -325,7 +325,7 @@ follow your experiment. The website should be provided in the logs
 once you detach from the experiment.
 
 Otherwise, you can connect to it by looking at the external IP address
-of the `proxy` machine on GCP and use the port `8080`.
+of the proxy machine on GCP and use the port `8080`.
 
 ### DNS
 

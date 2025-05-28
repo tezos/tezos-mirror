@@ -13,11 +13,11 @@ let tezt_cloud =
       match Sys.getenv_opt "TEZT_CLOUD" with None -> "" | Some value -> value)
 
 let mode =
-  match (Cli.localhost, Cli.proxy, Cli.ssh_host) with
-  | true, true, None -> `Orchestrator
-  | true, false, None -> `Localhost
-  | false, true, None -> `Host
-  | false, false, None -> `Cloud
+  match (Cli.proxy, Cli.localhost, Cli.ssh_host) with
+  | true, true, None -> `Remote_orchestrator_local_agents
+  | true, false, None -> `Remote_orchestrator_remote_agents
+  | false, true, None -> `Local_orchestrator_local_agents
+  | false, false, None -> `Local_orchestrator_remote_agents
   | true, _, Some _ | _, true, Some _ ->
       Test.fail
         "Unexpected combination of options: ssh_host and (proxy or localhost)"
@@ -129,8 +129,8 @@ let init () =
          in
          Sys.set_signal Sys.sighup (Sys.Signal_handle signal_hup_handler)) ;
   match mode with
-  | `Localhost -> Lwt.return_unit
-  | `Orchestrator ->
+  | `Local_orchestrator_local_agents | `Ssh_host _ -> Lwt.return_unit
+  | `Remote_orchestrator_local_agents ->
       (* In orchestrator mode, expose the PID of tezt-cloud in a file as the
          process can be considered as a daemon
          It will be useful for logrotate *)
@@ -145,8 +145,7 @@ let init () =
       ( with_open_out pidfile @@ fun fd ->
         output_string fd (Format.asprintf "%d\n" pid) ) ;
       Lwt.return_unit
-  | `Ssh_host _ -> Lwt.return_unit
-  | `Host | `Cloud ->
+  | `Remote_orchestrator_remote_agents | `Local_orchestrator_remote_agents ->
       let* project_id = project_id () in
       Log.info "Initializing docker registry..." ;
       let* () = Terraform.Docker_registry.init () in
@@ -228,14 +227,15 @@ let dns_domains () =
     if Cli.no_dns then Lwt.return_nil
     else
       match mode with
-      | `Host -> (
+      | `Remote_orchestrator_remote_agents -> (
           let* domain =
             Gcloud.DNS.get_fqdn ~name:tezt_cloud ~zone:"tezt-cloud"
           in
           match domain with
           | None -> Lwt.return Cli.dns_domains
           | Some domain -> Lwt.return (domain :: Cli.dns_domains))
-      | `Orchestrator | `Localhost | `Cloud | `Ssh_host _ ->
+      | `Remote_orchestrator_local_agents | `Local_orchestrator_local_agents
+      | `Local_orchestrator_remote_agents | `Ssh_host _ ->
           Lwt.return Cli.dns_domains
   in
   (* A fully-qualified domain name requires to end with a dot.
