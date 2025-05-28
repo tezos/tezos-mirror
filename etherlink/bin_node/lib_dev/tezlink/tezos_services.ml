@@ -516,6 +516,18 @@ module Imported_services = struct
         Block_hash.t * Block_header.t )
       Tezos_rpc.Service.t =
     Tezos_shell_services.Monitor_services.S.heads
+
+  let _block_info :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context,
+        < force_metadata : bool
+        ; metadata : [`Always | `Never] option
+        ; version : Tezlink_protocols.Shell_impl.version >,
+        unit,
+        Tezlink_protocols.Shell_impl.version * Block_services.block_info )
+      Tezos_rpc.Service.t =
+    import_service Block_services.S.info
 end
 
 let chain_directory_path = Tezos_shell_services.Chain_services.path
