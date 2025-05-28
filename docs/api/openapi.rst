@@ -29,14 +29,6 @@ For convenience, the files generated from the most recent release(s) are provide
     There exists an alternative reference for the node RPCs, presented in more static pages (e.g. :doc:`../active/rpc` for the active protocol).
     However, the static referece omits some RPCs, such as the ones related to the mempool.
 
-.. warning::
-    The links below to the different OpenAPI specifications are opened using the Swagger UI integrated in GitLab.
-    This UI can be used for browsing the OpenAPIs (no need to install Swagger UI for that).
-    However, the interactive use suggested in this UI does not currently work because:
-
-    - the UI does not allow one to specify a server (which should correspond to a runnning Tezos node), and
-    - browsers may block some of the generated requests or responses for security issues.
-
 Shell RPCs
 ----------
 
@@ -52,8 +44,8 @@ Shell RPCs
 The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- :src:`docs/api/rpc-openapi.json` (version 22.0)
-- :src:`docs/api/rpc-openapi-dev.json` (version master)
+- `rpc-openapi <../_static/rpc-openapi.html>`__ (version 22.0)
+- `rpc-openapi-dev <../_static/rpc-openapi-dev.html>`__ (version master)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
@@ -63,12 +55,12 @@ Rio RPCs
 The OpenAPI specifications for RPCs which are specific to the Rio (``PsRiotum``)
 protocol can be found at:
 
-- :src:`docs/api/rio-openapi.json` (version 22.0)
+- `rio-openapi <../_static/rio-openapi.html>`__ (version 22.0)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Rio protocol proposal can be found at:
 
-- :src:`docs/api/rio-mempool-openapi.json` (version 22.0)
+- `rio-mempool-openapi <../_static/rio-mempool-openapi.html>`__ (version 22.0)
 
 Alpha RPCs
 ----------
@@ -76,12 +68,12 @@ Alpha RPCs
 The OpenAPI specifications for RPCs which are specific to the Alpha
 protocol can be found at:
 
-- :src:`docs/api/alpha-openapi.json` (version master)
+- `alpha-openapi <../_static/alpha-openapi.html>`__ (version master)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Alpha protocol can be found at:
 
-- :src:`docs/api/alpha-mempool-openapi.json` (version master)
+- `alpha-mempool-openapi <../_static/alpha-mempool-openapi.html>`__ (version master)
 
 Smart Rollup Node
 ~~~~~~~~~~~~~~~~~
@@ -99,7 +91,7 @@ Rio RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Rio
 (``PsRiotum``) protocol can be found at:
 
-- :src:`docs/api/rio-smart-rollup-node-openapi.json` (version 22.0)
+- `rio-smart-rollup-node-openapi <../_static/rio-smart-rollup-node-openapi.html>`__ (version 22.0)
 
 Alpha RPCs
 ----------
@@ -107,7 +99,7 @@ Alpha RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Alpha
 protocol can be found at:
 
-- :src:`docs/api/alpha-smart-rollup-node-openapi.json` (version master)
+- `alpha-smart-rollup-node-openapi <../_static/alpha-smart-rollup-node-openapi.html>`__ (version master)
 
 DAL Node
 ~~~~~~~~
@@ -115,20 +107,31 @@ DAL Node
 The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
-- :src:`docs/api/dal-node-openapi.json` (version 22.0)
-- :src:`docs/api/dal-node-openapi-dev.json` (version master)
+- `dal-node-openapi <../_static/dal-node-openapi.html>`__ (version 22.0)
+- `dal-node-openapi <../_static/dal-node-openapi-dev.html>`__ (version master)
 
 .. _openapi_generate:
 
 How to Generate
 ~~~~~~~~~~~~~~~
 
-To generate the ``*-dev.json`` and ``alpha-*.json`` files above from the current sources in your Octez repository, run the ``src/bin_openapi/generate.sh`` script
-from the root of the Octez repository.
-Note that the generation script requires the Octez executables to be built, so you have to first run ``make`` from the repository root.
+To regenerate the ``*-dev.json`` and ``alpha-*.json`` files above from the current sources in your Octez repository, run ``make -C docs openapi`` from the root of the Octez repository, which will run the generation script and check if the JSON files above are up-to-date with respect to their versions under Git (modulo the ``version`` fields inside).
+If there are any significant differences, it will also render the corresponding JSON files as HTML.
 
-You may instead run this script via ``make -C docs openapi``, which will run the generation script and check if the files above are up-to-date with respect to their versions under Git (modulo the ``version`` fields inside).
-If there are any other differences, you may want to create an MR to update these JSON files under ``docs/api/``.
+Note that:
+
+- The generation script ``src/bin_openapi/generate.sh`` requires the Octez executables to be built, so you have to first run ``make`` from the repository root.
+- The HTML rendering script :src:`docs/scripts/openapi2html.sh` requires `yq <https://github.com/mikefarah/yq>`__ and `redocly <https://redocly.com>`__ to be installed.
+
+For platform contributors: if you want to update the OpenAPI and HTML files in the official repository and documentation, you may create a merge request to update the changed files under ``docs/api/``.
+
+Instead of executing all at once with the makefile, you may execute manually the generation or rendering, as follows.
+
+OpenAPI generation
+------------------
+
+The OpenAPI generation script ``src/bin_openapi/generate.sh`` must be run
+from the root of the Octez repository.
 
 The generation script will start a sandbox node, activate the protocol,
 get the RPC specifications from this node and convert them to OpenAPI specifications.
@@ -144,6 +147,12 @@ protocol_name=alpha
 
 For ``protocol_hash``, use the value defined in ``TEZOS_PROTOCOL``.
 
+HTML rendering
+--------------
+
+For generated OpenAPI files that changed, you may derive the corresponding statically-rendered HTML pages, typically using::
+
+    docs/scripts/openapi2html.sh docs/api/*.json
 
 How to Test
 ~~~~~~~~~~~

@@ -195,8 +195,8 @@ rpc-protocols: $(NAMED_PROTOS:%=%/rpc.rst)
 openapi:
 	cd ..; ./src/bin_openapi/generate.sh
 	@if ! git diff --quiet --ignore-matching-lines='^ *"version":' api/*.json ;\
-		then echo "Error: docs/api/*.json have changed, commit them if you want to update the repo"; exit 1;\
-		else echo "OK: Your docs/api/*.json are up to date";\
+		then ./scripts/openapi2html.sh api/*.json; echo "docs/api/*.json have changed, commit them if you want to update the repo";\
+		else git checkout api/*.json; echo "OK: Your docs/api/*.json are up to date";\
 	fi
 
 shell/p2p_api.rst: $(P2PDOCEXE) shell/p2p_usage.rst.inc

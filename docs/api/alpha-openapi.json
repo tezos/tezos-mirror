@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol alpha RPC",
     "description": "The RPC API for protocol alpha served by the Octez node.",
-    "version": "Octez 22.0 (TBD)"
+    "version": "Octez 21.0~rc3+dev (d0769d42)"
   },
   "paths": {
     "/": {
@@ -3656,71 +3656,6 @@
                                 "content": {
                                   "oneOf": [
                                     {
-                                      "title": "unattested",
-                                      "type": "object",
-                                      "properties": {
-                                        "kind": {
-                                          "type": "string",
-                                          "enum": [
-                                            "unattested"
-                                          ]
-                                        },
-                                        "level": {
-                                          "type": "integer",
-                                          "minimum": 0,
-                                          "maximum": 2147483647
-                                        },
-                                        "index": {
-                                          "type": "integer",
-                                          "minimum": 0,
-                                          "maximum": 255
-                                        }
-                                      },
-                                      "required": [
-                                        "kind",
-                                        "level",
-                                        "index"
-                                      ]
-                                    },
-                                    {
-                                      "title": "attested",
-                                      "type": "object",
-                                      "properties": {
-                                        "kind": {
-                                          "type": "string",
-                                          "enum": [
-                                            "attested"
-                                          ]
-                                        },
-                                        "version": {
-                                          "type": "string",
-                                          "enum": [
-                                            "0"
-                                          ]
-                                        },
-                                        "level": {
-                                          "type": "integer",
-                                          "minimum": 0,
-                                          "maximum": 2147483647
-                                        },
-                                        "index": {
-                                          "type": "integer",
-                                          "minimum": 0,
-                                          "maximum": 255
-                                        },
-                                        "commitment": {
-                                          "$ref": "#/components/schemas/DAL_commitment"
-                                        }
-                                      },
-                                      "required": [
-                                        "kind",
-                                        "version",
-                                        "level",
-                                        "index",
-                                        "commitment"
-                                      ]
-                                    },
-                                    {
                                       "title": "unpublished",
                                       "type": "object",
                                       "properties": {
@@ -4038,71 +3973,6 @@
                                     },
                                     "content": {
                                       "oneOf": [
-                                        {
-                                          "title": "unattested",
-                                          "type": "object",
-                                          "properties": {
-                                            "kind": {
-                                              "type": "string",
-                                              "enum": [
-                                                "unattested"
-                                              ]
-                                            },
-                                            "level": {
-                                              "type": "integer",
-                                              "minimum": 0,
-                                              "maximum": 2147483647
-                                            },
-                                            "index": {
-                                              "type": "integer",
-                                              "minimum": 0,
-                                              "maximum": 255
-                                            }
-                                          },
-                                          "required": [
-                                            "kind",
-                                            "level",
-                                            "index"
-                                          ]
-                                        },
-                                        {
-                                          "title": "attested",
-                                          "type": "object",
-                                          "properties": {
-                                            "kind": {
-                                              "type": "string",
-                                              "enum": [
-                                                "attested"
-                                              ]
-                                            },
-                                            "version": {
-                                              "type": "string",
-                                              "enum": [
-                                                "0"
-                                              ]
-                                            },
-                                            "level": {
-                                              "type": "integer",
-                                              "minimum": 0,
-                                              "maximum": 2147483647
-                                            },
-                                            "index": {
-                                              "type": "integer",
-                                              "minimum": 0,
-                                              "maximum": 255
-                                            },
-                                            "commitment": {
-                                              "$ref": "#/components/schemas/DAL_commitment"
-                                            }
-                                          },
-                                          "required": [
-                                            "kind",
-                                            "version",
-                                            "level",
-                                            "index",
-                                            "commitment"
-                                          ]
-                                        },
                                         {
                                           "title": "unpublished",
                                           "type": "object",
@@ -4689,6 +4559,59 @@
                         "active"
                       ]
                     },
+                    "companion_key": {
+                      "type": "object",
+                      "properties": {
+                        "active": {
+                          "nullable": true,
+                          "oneOf": [
+                            {
+                              "title": "Some",
+                              "type": "object",
+                              "properties": {
+                                "pkh": {
+                                  "$ref": "#/components/schemas/Bls12_381.Public_key_hash"
+                                },
+                                "pk": {
+                                  "$ref": "#/components/schemas/Bls12_381.Public_key"
+                                }
+                              },
+                              "required": [
+                                "pkh",
+                                "pk"
+                              ]
+                            }
+                          ]
+                        },
+                        "pendings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "cycle": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "pkh": {
+                                "$ref": "#/components/schemas/Bls12_381.Public_key_hash"
+                              },
+                              "pk": {
+                                "$ref": "#/components/schemas/Bls12_381.Public_key"
+                              }
+                            },
+                            "required": [
+                              "cycle",
+                              "pkh",
+                              "pk"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "active"
+                      ]
+                    },
                     "stakers": {
                       "type": "array",
                       "items": {
@@ -4738,6 +4661,7 @@
                     "voting_power",
                     "voting_info",
                     "consensus_key",
+                    "companion_key",
                     "stakers",
                     "delegators"
                   ]
@@ -4835,6 +4759,94 @@
                   "title": "64 bit integers",
                   "description": "Decimal representation of 64 bit integers",
                   "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/delegates/{pkh}/companion_key": {
+      "get": {
+        "description": "The active companion key (if set) for a given delegate and the pending companion keys.",
+        "parameters": [
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "active": {
+                      "nullable": true,
+                      "oneOf": [
+                        {
+                          "title": "Some",
+                          "type": "object",
+                          "properties": {
+                            "pkh": {
+                              "$ref": "#/components/schemas/Bls12_381.Public_key_hash"
+                            },
+                            "pk": {
+                              "$ref": "#/components/schemas/Bls12_381.Public_key"
+                            }
+                          },
+                          "required": [
+                            "pkh",
+                            "pk"
+                          ]
+                        }
+                      ]
+                    },
+                    "pendings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "cycle": {
+                            "type": "integer",
+                            "minimum": -2147483648,
+                            "maximum": 2147483647
+                          },
+                          "pkh": {
+                            "$ref": "#/components/schemas/Bls12_381.Public_key_hash"
+                          },
+                          "pk": {
+                            "$ref": "#/components/schemas/Bls12_381.Public_key"
+                          }
+                        },
+                        "required": [
+                          "cycle",
+                          "pkh",
+                          "pk"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "active"
+                  ]
                 }
               }
             }
@@ -5054,7 +5066,7 @@
     },
     "/context/delegates/{pkh}/dal_participation": {
       "get": {
-        "description": "Returns information about the delegate's participation in the attestation of slots published into the Data Availability Layer (DAL) during the current cycle. The field 'expected_assigned_shards_per_slot' indicates the expected number of shards assigned to the delegate in the cycle per DAL slot. The field 'delegate_attested_dal_slots' represents the number of attested DAL slots which are also attested by the delegate, while 'delegate_attestable_dal_slots' provides the total number of DAL slots attested during the cycle for which the delegate had shards assigned. The 'expected_dal_rewards' field specifies the expected amount of rewards for the delegate based on DAL participation, provided the delegate meets the required participation. Whether this threshold is currently met is determined by the 'sufficient_dal_participation' flag, which is true if currently the delegate has sufficiently participated in attesting DAL slots declared to be attested by the protocol. Note that this flag may evolve during the cycle. Also note, in particular, that if no DAL no DAL slots have been globally attested during the cycle (i.e., when 'delegate_attestable_dal_slots' is zero), the flag is true. The 'denounced' field specifies whether the delegate was denounced for not detecting traps during the current cycle.",
+        "description": "Returns information about the delegate's participation in the attestation of slots published into the Data Availability Layer (DAL) during the current cycle. The field 'expected_assigned_shards_per_slot' indicates the expected number of shards assigned to the delegate in the cycle per DAL slot. The field 'delegate_attested_dal_slots' represents the number of attested DAL slots which are also attested by the delegate, while 'delegate_attestable_dal_slots' provides the total number of DAL slots attested during the cycle for which the delegate had shards assigned. The 'expected_dal_rewards' field specifies the expected amount of rewards for the delegate based on DAL participation, provided the delegate meets the required participation. Whether this threshold is currently met is determined by the 'sufficient_dal_participation' flag, which is true if currently the delegate has sufficiently participated in attesting DAL slots declared to be attested by the protocol. Note that this flag may evolve during the cycle. Also note, in particular, that if no DAL slots have been globally attested during the cycle (i.e., when 'delegate_attestable_dal_slots' is zero), the flag is true; receipt of the DAL rewards is conditioned however on the receipt of the attestation rewards. The 'denounced' field specifies whether the delegate was denounced for not detecting traps during the current cycle.",
         "parameters": [
           {
             "name": "pkh",
@@ -8151,71 +8163,6 @@
                                       "content": {
                                         "oneOf": [
                                           {
-                                            "title": "unattested",
-                                            "type": "object",
-                                            "properties": {
-                                              "kind": {
-                                                "type": "string",
-                                                "enum": [
-                                                  "unattested"
-                                                ]
-                                              },
-                                              "level": {
-                                                "type": "integer",
-                                                "minimum": 0,
-                                                "maximum": 2147483647
-                                              },
-                                              "index": {
-                                                "type": "integer",
-                                                "minimum": 0,
-                                                "maximum": 255
-                                              }
-                                            },
-                                            "required": [
-                                              "kind",
-                                              "level",
-                                              "index"
-                                            ]
-                                          },
-                                          {
-                                            "title": "attested",
-                                            "type": "object",
-                                            "properties": {
-                                              "kind": {
-                                                "type": "string",
-                                                "enum": [
-                                                  "attested"
-                                                ]
-                                              },
-                                              "version": {
-                                                "type": "string",
-                                                "enum": [
-                                                  "0"
-                                                ]
-                                              },
-                                              "level": {
-                                                "type": "integer",
-                                                "minimum": 0,
-                                                "maximum": 2147483647
-                                              },
-                                              "index": {
-                                                "type": "integer",
-                                                "minimum": 0,
-                                                "maximum": 255
-                                              },
-                                              "commitment": {
-                                                "$ref": "#/components/schemas/DAL_commitment"
-                                              }
-                                            },
-                                            "required": [
-                                              "kind",
-                                              "version",
-                                              "level",
-                                              "index",
-                                              "commitment"
-                                            ]
-                                          },
-                                          {
                                             "title": "unpublished",
                                             "type": "object",
                                             "properties": {
@@ -10014,6 +9961,62 @@
         }
       }
     },
+    "/helpers/forge/signed_operations": {
+      "post": {
+        "description": "Forge a signed operation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "An operation's shell header.",
+                "type": "object",
+                "properties": {
+                  "branch": {
+                    "$ref": "#/components/schemas/block_hash"
+                  },
+                  "contents": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/alpha.operation.alpha.contents"
+                    }
+                  },
+                  "signature": {
+                    "$ref": "#/components/schemas/Signature.V2"
+                  }
+                },
+                "required": [
+                  "branch",
+                  "contents"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/helpers/forge_block_header": {
       "post": {
         "description": "Forge a block header",
@@ -10252,7 +10255,7 @@
                       "$ref": "#/components/schemas/alpha.adaptive_issuance_vote"
                     },
                     "signature": {
-                      "$ref": "#/components/schemas/Signature.V1"
+                      "$ref": "#/components/schemas/Signature.V2"
                     }
                   },
                   "required": [
@@ -10338,7 +10341,7 @@
                         }
                       },
                       "signature": {
-                        "$ref": "#/components/schemas/Signature.V1"
+                        "$ref": "#/components/schemas/Signature.V2"
                       }
                     },
                     "required": [
@@ -10422,7 +10425,7 @@
                         "$ref": "#/components/schemas/alpha.adaptive_issuance_vote"
                       },
                       "signature": {
-                        "$ref": "#/components/schemas/Signature.V1"
+                        "$ref": "#/components/schemas/Signature.V2"
                       }
                     },
                     "required": [
@@ -11756,7 +11759,7 @@
                         }
                       },
                       "signature": {
-                        "$ref": "#/components/schemas/Signature.V1"
+                        "$ref": "#/components/schemas/Signature.V2"
                       }
                     },
                     "required": [
@@ -11794,7 +11797,7 @@
                           }
                         },
                         "signature": {
-                          "$ref": "#/components/schemas/Signature.V1"
+                          "$ref": "#/components/schemas/Signature.V2"
                         }
                       },
                       "required": [
@@ -11812,7 +11815,7 @@
                           }
                         },
                         "signature": {
-                          "$ref": "#/components/schemas/Signature.V1"
+                          "$ref": "#/components/schemas/Signature.V2"
                         }
                       },
                       "required": [
@@ -12250,7 +12253,7 @@
                         }
                       },
                       "signature": {
-                        "$ref": "#/components/schemas/Signature.V1"
+                        "$ref": "#/components/schemas/Signature.V2"
                       }
                     },
                     "required": [
@@ -12293,7 +12296,7 @@
                           }
                         },
                         "signature": {
-                          "$ref": "#/components/schemas/Signature.V1"
+                          "$ref": "#/components/schemas/Signature.V2"
                         }
                       },
                       "required": [
@@ -12311,7 +12314,7 @@
                           }
                         },
                         "signature": {
-                          "$ref": "#/components/schemas/Signature.V1"
+                          "$ref": "#/components/schemas/Signature.V2"
                         }
                       },
                       "required": [
@@ -12695,9 +12698,38 @@
         }
       }
     },
+    "/helpers/total_baking_power": {
+      "get": {
+        "description": "Returns the total baking power for the current cycle",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "64 bit integers",
+                  "description": "Decimal representation of 64 bit integers",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/helpers/validators": {
       "get": {
-        "description": "Retrieves the level, the attestation slots and the public key hash of each delegate allowed to attest a block.\nBy default, it provides this information for the next level.\nParameter `level` can be used to specify the (valid) level(s) in the past or future at which the attestation rights have to be returned. Parameter `delegate` can be used to restrict the results results to the given delegates. Parameter `consensus_key` can be used to restrict the results to the given consensus_keys.\n",
+        "description": "Retrieves the level, the attestation slots and the public key hash of each delegate allowed to attest a block. Also returns each delegate's current consensus key, and current companion key when needed for crafting and validating attestations at this level.\nBy default, it provides this information for the next level.\nParameter `level` can be used to specify the (valid) level(s) in the past or future at which the attestation rights have to be returned. Parameter `delegate` can be used to restrict the results results to the given delegates. Parameter `consensus_key` can be used to restrict the results to the given consensus_keys.\n",
         "parameters": [
           {
             "name": "level",
@@ -12755,6 +12787,9 @@
                       },
                       "consensus_key": {
                         "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      },
+                      "companion_key": {
+                        "$ref": "#/components/schemas/Bls12_381.Public_key_hash"
                       }
                     },
                     "required": [
@@ -13976,6 +14011,30 @@
           }
         ]
       },
+      "Bls12_381.Public_key": {
+        "title": "A Bls12_381 public key (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Bls12_381.Public_key_hash": {
+        "title": "A Bls12_381 public key hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Bls12_381_signature": {
+        "title": "A Bls12_381 signature (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
       "Chain_id": {
         "title": "Network identifier (Base58Check-encoded)",
         "oneOf": [
@@ -14072,7 +14131,7 @@
           }
         ]
       },
-      "Signature.V1": {
+      "Signature.V2": {
         "title": "A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded)",
         "oneOf": [
           {
@@ -14344,7 +14403,7 @@
             "$ref": "#/components/schemas/alpha.adaptive_issuance_vote"
           },
           "signature": {
-            "$ref": "#/components/schemas/Signature.V1"
+            "$ref": "#/components/schemas/Signature.V2"
           }
         },
         "required": [
@@ -14547,7 +14606,7 @@
           }
         ]
       },
-      "alpha.inlined.attestation": {
+      "alpha.inlined.consensus_operation": {
         "description": "An operation's shell header.",
         "type": "object",
         "properties": {
@@ -14555,10 +14614,10 @@
             "$ref": "#/components/schemas/block_hash"
           },
           "operations": {
-            "$ref": "#/components/schemas/alpha.inlined.attestation_mempool.contents"
+            "$ref": "#/components/schemas/alpha.inlined.consensus_operation.contents"
           },
           "signature": {
-            "$ref": "#/components/schemas/Signature.V1"
+            "$ref": "#/components/schemas/Signature.V2"
           }
         },
         "required": [
@@ -14566,8 +14625,45 @@
           "operations"
         ]
       },
-      "alpha.inlined.attestation_mempool.contents": {
+      "alpha.inlined.consensus_operation.contents": {
         "oneOf": [
+          {
+            "title": "Preattestation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "preattestation"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "round": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "block_payload_hash": {
+                "$ref": "#/components/schemas/value_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "slot",
+              "level",
+              "round",
+              "block_payload_hash"
+            ]
+          },
           {
             "title": "Attestation",
             "type": "object",
@@ -14645,62 +14741,114 @@
               "block_payload_hash",
               "dal_attestation"
             ]
-          }
-        ]
-      },
-      "alpha.inlined.preattestation": {
-        "description": "An operation's shell header.",
-        "type": "object",
-        "properties": {
-          "branch": {
-            "$ref": "#/components/schemas/block_hash"
           },
-          "operations": {
-            "$ref": "#/components/schemas/alpha.inlined.preattestation.contents"
-          },
-          "signature": {
-            "$ref": "#/components/schemas/Signature.V1"
-          }
-        },
-        "required": [
-          "branch",
-          "operations"
-        ]
-      },
-      "alpha.inlined.preattestation.contents": {
-        "type": "object",
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "preattestation"
+          {
+            "title": "Preattestations_aggregate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "preattestations_aggregate"
+                ]
+              },
+              "consensus_content": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "round": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "block_payload_hash": {
+                    "$ref": "#/components/schemas/value_hash"
+                  }
+                },
+                "required": [
+                  "level",
+                  "round",
+                  "block_payload_hash"
+                ]
+              },
+              "committee": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "consensus_content",
+              "committee"
             ]
           },
-          "slot": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 65535
-          },
-          "level": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 2147483647
-          },
-          "round": {
-            "type": "integer",
-            "minimum": -2147483648,
-            "maximum": 2147483647
-          },
-          "block_payload_hash": {
-            "$ref": "#/components/schemas/value_hash"
+          {
+            "title": "Attestations_aggregate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "attestations_aggregate"
+                ]
+              },
+              "consensus_content": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "round": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "block_payload_hash": {
+                    "$ref": "#/components/schemas/value_hash"
+                  }
+                },
+                "required": [
+                  "level",
+                  "round",
+                  "block_payload_hash"
+                ]
+              },
+              "committee": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    },
+                    "dal_attestation": {
+                      "$ref": "#/components/schemas/bignum"
+                    }
+                  },
+                  "required": [
+                    "slot"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "consensus_content",
+              "committee"
+            ]
           }
-        },
-        "required": [
-          "kind",
-          "slot",
-          "level",
-          "round",
-          "block_payload_hash"
         ]
       },
       "alpha.lazy_storage_diff": {
@@ -15091,162 +15239,163 @@
         "type": "string",
         "enum": [
           "SHA256",
-          "GT",
-          "RIGHT",
-          "SAPLING_EMPTY_STATE",
-          "False",
+          "PUSH",
+          "GET_AND_UPDATE",
           "RENAME",
+          "False",
           "CAST",
-          "tx_rollup_l2_address",
+          "ISNAT",
+          "address",
           "PACK",
-          "BYTES",
-          "timestamp",
-          "bls12_381_g2",
-          "Pair",
-          "IF_LEFT",
-          "contract",
+          "EMIT",
           "mutez",
+          "bls12_381_g1",
+          "Pair",
+          "IF_CONS",
+          "bool",
+          "bytes",
           "storage",
-          "PAIR",
+          "OR",
           "view",
           "UNPACK",
           "ADD",
-          "DROP",
-          "big_map",
-          "MUL",
-          "NAT",
-          "SELF",
-          "CONTRACT",
+          "DIP",
+          "map",
+          "MEM",
+          "BYTES",
+          "SENDER",
+          "ADDRESS",
           "CDR",
-          "SAPLING_VERIFY_UPDATE",
-          "pair",
-          "LSL",
-          "int",
-          "operation",
+          "SAPLING_EMPTY_STATE",
+          "or",
+          "LOOP",
+          "contract",
+          "unit",
           "SHA512",
           "CREATE_ACCOUNT",
           "BLAKE2B",
-          "SPLIT_TICKET",
-          "LEFT",
-          "never",
-          "unit",
-          "address",
-          "signature",
+          "READ_TICKET",
+          "LE",
+          "chain_id",
+          "timestamp",
+          "operation",
+          "set",
           "CHAIN_ID",
-          "constant",
-          "SLICE",
-          "SENDER",
+          "chest",
+          "SELF_ADDRESS",
+          "SOURCE",
           "IMPLICIT_ACCOUNT",
-          "key_hash",
+          "key",
           "AMOUNT",
           "CHECK_SIGNATURE",
-          "sapling_state",
-          "LT",
-          "EXEC",
-          "Elt",
-          "EMIT",
-          "NONE",
-          "CREATE_CONTRACT",
+          "sapling_transaction_deprecated",
           "LSR",
-          "SET_DELEGATE",
+          "EQ",
+          "Elt",
           "OPEN_CHEST",
+          "NIL",
+          "CREATE_CONTRACT",
+          "LSL",
           "TRANSFER_TOKENS",
+          "JOIN_TICKETS",
+          "SWAP",
           "Some",
           "parameter",
-          "set",
-          "bls12_381_fr",
-          "EDIV",
+          "pair",
+          "bls12_381_g2",
+          "VIEW",
           "None",
-          "STEPS_TO_QUOTA",
-          "key",
+          "SLICE",
+          "int",
           "ABS",
+          "lambda",
+          "DUG",
           "list",
-          "NEVER",
-          "map",
           "CAR",
-          "IF",
-          "GET_AND_UPDATE",
+          "GET",
+          "HASH_KEY",
           "CONCAT",
-          "LOOP",
-          "DIG",
-          "KECCAK",
+          "LEVEL",
+          "SAPLING_VERIFY_UPDATE",
+          "TOTAL_VOTING_POWER",
           "Lambda_rec",
-          "SOME",
-          "option",
-          "SUB",
-          "INT",
-          "PUSH",
+          "SIZE",
+          "nat",
+          "STEPS_TO_QUOTA",
+          "IF_NONE",
+          "UNPAIR",
           "CONS",
           "Unit",
-          "ISNAT",
-          "NEG",
-          "XOR",
-          "APPLY",
-          "UNPAIR",
-          "JOIN_TICKETS",
-          "SIZE",
-          "lambda",
+          "CONTRACT",
+          "MUL",
+          "UPDATE",
+          "EXEC",
+          "PAIR",
+          "SPLIT_TICKET",
+          "RIGHT",
+          "key_hash",
           "AND",
-          "NEQ",
-          "or",
+          "NEG",
+          "option",
           "BALANCE",
-          "UNIT",
-          "VOTING_POWER",
-          "OR",
-          "LAMBDA",
-          "chest",
-          "LOOP_LEFT",
+          "SET_DELEGATE",
+          "NEVER",
+          "MIN_BLOCK_TIME",
+          "INT",
+          "chest_key",
+          "ITER",
           "True",
           "Right",
           "Ticket",
-          "HASH_KEY",
-          "DUG",
-          "sapling_transaction",
-          "SUB_MUTEZ",
-          "EMPTY_BIG_MAP",
-          "MEM",
-          "IF_NONE",
-          "nat",
-          "TOTAL_VOTING_POWER",
-          "LE",
-          "Left",
-          "chest_key",
-          "READ_TICKET",
-          "ticket",
-          "bls12_381_g1",
-          "LEVEL",
-          "VIEW",
-          "string",
-          "PAIRING_CHECK",
-          "LAMBDA_REC",
-          "NOW",
-          "SHA3",
-          "bool",
-          "MIN_BLOCK_TIME",
-          "GET",
-          "bytes",
-          "sapling_transaction_deprecated",
-          "NIL",
-          "IF_CONS",
-          "GE",
-          "NOT",
-          "SWAP",
-          "ITER",
-          "ADDRESS",
-          "TICKET",
-          "DUP",
-          "EMPTY_MAP",
-          "UPDATE",
-          "chain_id",
-          "TICKET_DEPRECATED",
-          "EMPTY_SET",
-          "FAILWITH",
+          "GT",
+          "DIG",
+          "tx_rollup_l2_address",
+          "SUB",
+          "EDIV",
           "MAP",
-          "SOURCE",
-          "DIP",
+          "IF_LEFT",
+          "big_map",
+          "VOTING_POWER",
+          "LAMBDA_REC",
+          "Left",
+          "ticket",
+          "TICKET_DEPRECATED",
+          "bls12_381_fr",
+          "never",
+          "DUP",
+          "LEFT",
+          "constant",
+          "signature",
+          "SHA3",
+          "LAMBDA",
+          "NOT",
+          "KECCAK",
+          "NOW",
+          "NAT",
+          "GE",
+          "string",
+          "sapling_transaction",
+          "NEQ",
+          "IF",
+          "FAILWITH",
+          "NONE",
+          "SUB_MUTEZ",
+          "XOR",
+          "LOOP_LEFT",
+          "PAIRING_CHECK",
+          "DROP",
+          "EMPTY_BIG_MAP",
+          "UNIT",
+          "sapling_state",
+          "TICKET",
+          "EMPTY_MAP",
+          "APPLY",
+          "LT",
+          "SOME",
+          "IS_IMPLICIT_ACCOUNT",
           "COMPARE",
-          "EQ",
-          "SELF_ADDRESS",
+          "EMPTY_SET",
+          "SELF",
           "code"
         ]
       },
@@ -15406,6 +15555,65 @@
               "committee": {
                 "type": "array",
                 "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    },
+                    "dal_attestation": {
+                      "$ref": "#/components/schemas/bignum"
+                    }
+                  },
+                  "required": [
+                    "slot"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "consensus_content",
+              "committee"
+            ]
+          },
+          {
+            "title": "Preattestations_aggregate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "preattestations_aggregate"
+                ]
+              },
+              "consensus_content": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "round": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "block_payload_hash": {
+                    "$ref": "#/components/schemas/value_hash"
+                  }
+                },
+                "required": [
+                  "level",
+                  "round",
+                  "block_payload_hash"
+                ]
+              },
+              "committee": {
+                "type": "array",
+                "items": {
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 65535
@@ -15419,47 +15627,30 @@
             ]
           },
           {
-            "title": "Double_preattestation_evidence",
+            "title": "Double_consensus_operation_evidence",
             "type": "object",
             "properties": {
               "kind": {
                 "type": "string",
                 "enum": [
-                  "double_preattestation_evidence"
+                  "double_consensus_operation_evidence"
                 ]
               },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
               "op1": {
-                "$ref": "#/components/schemas/alpha.inlined.preattestation"
+                "$ref": "#/components/schemas/alpha.inlined.consensus_operation"
               },
               "op2": {
-                "$ref": "#/components/schemas/alpha.inlined.preattestation"
+                "$ref": "#/components/schemas/alpha.inlined.consensus_operation"
               }
             },
             "required": [
               "kind",
-              "op1",
-              "op2"
-            ]
-          },
-          {
-            "title": "Double_attestation_evidence",
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "double_attestation_evidence"
-                ]
-              },
-              "op1": {
-                "$ref": "#/components/schemas/alpha.inlined.attestation"
-              },
-              "op2": {
-                "$ref": "#/components/schemas/alpha.inlined.attestation"
-              }
-            },
-            "required": [
-              "kind",
+              "slot",
               "op1",
               "op2"
             ]
@@ -15555,7 +15746,12 @@
                 ]
               },
               "attestation": {
-                "$ref": "#/components/schemas/alpha.inlined.attestation"
+                "$ref": "#/components/schemas/alpha.inlined.consensus_operation"
+              },
+              "consensus_slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
               },
               "slot_index": {
                 "type": "integer",
@@ -15597,6 +15793,7 @@
             "required": [
               "kind",
               "attestation",
+              "consensus_slot",
               "slot_index",
               "shard_with_proof"
             ]
@@ -15722,6 +15919,9 @@
               },
               "public_key": {
                 "$ref": "#/components/schemas/Signature.Public_key"
+              },
+              "proof": {
+                "$ref": "#/components/schemas/Bls12_381_signature"
               }
             },
             "required": [
@@ -15984,7 +16184,49 @@
                 "$ref": "#/components/schemas/Signature.Public_key"
               },
               "proof": {
-                "$ref": "#/components/schemas/Signature.V1"
+                "$ref": "#/components/schemas/Bls12_381_signature"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "pk"
+            ]
+          },
+          {
+            "title": "Update_companion_key",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "update_companion_key"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/alpha.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "pk": {
+                "$ref": "#/components/schemas/Signature.Public_key"
+              },
+              "proof": {
+                "$ref": "#/components/schemas/Bls12_381_signature"
               }
             },
             "required": [
@@ -18099,6 +18341,101 @@
               "committee": {
                 "type": "array",
                 "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    },
+                    "dal_attestation": {
+                      "$ref": "#/components/schemas/bignum"
+                    }
+                  },
+                  "required": [
+                    "slot"
+                  ]
+                }
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "balance_updates": {
+                    "$ref": "#/components/schemas/alpha.operation_metadata.alpha.balance_updates"
+                  },
+                  "committee": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "delegate": {
+                          "$ref": "#/components/schemas/Signature.Public_key_hash"
+                        },
+                        "consensus_pkh": {
+                          "$ref": "#/components/schemas/Signature.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "delegate",
+                        "consensus_pkh"
+                      ]
+                    }
+                  },
+                  "consensus_power": {
+                    "type": "integer",
+                    "minimum": -1073741824,
+                    "maximum": 1073741823
+                  }
+                },
+                "required": [
+                  "committee",
+                  "consensus_power"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "consensus_content",
+              "committee",
+              "metadata"
+            ]
+          },
+          {
+            "title": "Preattestations_aggregate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "preattestations_aggregate"
+                ]
+              },
+              "consensus_content": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "round": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "block_payload_hash": {
+                    "$ref": "#/components/schemas/value_hash"
+                  }
+                },
+                "required": [
+                  "level",
+                  "round",
+                  "block_payload_hash"
+                ]
+              },
+              "committee": {
+                "type": "array",
+                "items": {
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 65535
@@ -18148,70 +18485,74 @@
             ]
           },
           {
-            "title": "Double_attestation_evidence",
+            "title": "Double_consensus_operation_evidence",
             "type": "object",
             "properties": {
               "kind": {
                 "type": "string",
                 "enum": [
-                  "double_attestation_evidence"
+                  "double_consensus_operation_evidence"
                 ]
               },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
               "op1": {
-                "$ref": "#/components/schemas/alpha.inlined.attestation"
+                "$ref": "#/components/schemas/alpha.inlined.consensus_operation"
               },
               "op2": {
-                "$ref": "#/components/schemas/alpha.inlined.attestation"
+                "$ref": "#/components/schemas/alpha.inlined.consensus_operation"
               },
               "metadata": {
                 "type": "object",
                 "properties": {
-                  "forbidden_delegate": {
+                  "punished_delegate": {
                     "$ref": "#/components/schemas/Signature.Public_key_hash"
                   },
-                  "balance_updates": {
-                    "$ref": "#/components/schemas/alpha.operation_metadata.alpha.balance_updates"
+                  "rewarded_delegate": {
+                    "$ref": "#/components/schemas/Signature.Public_key_hash"
+                  },
+                  "misbehaviour": {
+                    "type": "object",
+                    "properties": {
+                      "level": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "round": {
+                        "type": "integer",
+                        "minimum": -2147483648,
+                        "maximum": 2147483647
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "attestation",
+                          "block",
+                          "preattestation"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "level",
+                      "round",
+                      "kind"
+                    ]
                   }
-                }
-              }
-            },
-            "required": [
-              "kind",
-              "op1",
-              "op2",
-              "metadata"
-            ]
-          },
-          {
-            "title": "Double_preattestation_evidence",
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "double_preattestation_evidence"
+                },
+                "required": [
+                  "punished_delegate",
+                  "rewarded_delegate",
+                  "misbehaviour"
                 ]
-              },
-              "op1": {
-                "$ref": "#/components/schemas/alpha.inlined.preattestation"
-              },
-              "op2": {
-                "$ref": "#/components/schemas/alpha.inlined.preattestation"
-              },
-              "metadata": {
-                "type": "object",
-                "properties": {
-                  "forbidden_delegate": {
-                    "$ref": "#/components/schemas/Signature.Public_key_hash"
-                  },
-                  "balance_updates": {
-                    "$ref": "#/components/schemas/alpha.operation_metadata.alpha.balance_updates"
-                  }
-                }
               }
             },
             "required": [
               "kind",
+              "slot",
               "op1",
               "op2",
               "metadata"
@@ -18228,7 +18569,12 @@
                 ]
               },
               "attestation": {
-                "$ref": "#/components/schemas/alpha.inlined.attestation"
+                "$ref": "#/components/schemas/alpha.inlined.consensus_operation"
+              },
+              "consensus_slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
               },
               "slot_index": {
                 "type": "integer",
@@ -18278,6 +18624,7 @@
             "required": [
               "kind",
               "attestation",
+              "consensus_slot",
               "slot_index",
               "shard_with_proof",
               "metadata"
@@ -18377,13 +18724,46 @@
               "metadata": {
                 "type": "object",
                 "properties": {
-                  "forbidden_delegate": {
+                  "punished_delegate": {
                     "$ref": "#/components/schemas/Signature.Public_key_hash"
                   },
-                  "balance_updates": {
-                    "$ref": "#/components/schemas/alpha.operation_metadata.alpha.balance_updates"
+                  "rewarded_delegate": {
+                    "$ref": "#/components/schemas/Signature.Public_key_hash"
+                  },
+                  "misbehaviour": {
+                    "type": "object",
+                    "properties": {
+                      "level": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "round": {
+                        "type": "integer",
+                        "minimum": -2147483648,
+                        "maximum": 2147483647
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "attestation",
+                          "block",
+                          "preattestation"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "level",
+                      "round",
+                      "kind"
+                    ]
                   }
-                }
+                },
+                "required": [
+                  "punished_delegate",
+                  "rewarded_delegate",
+                  "misbehaviour"
+                ]
               }
             },
             "required": [
@@ -18572,6 +18952,9 @@
               },
               "public_key": {
                 "$ref": "#/components/schemas/Signature.Public_key"
+              },
+              "proof": {
+                "$ref": "#/components/schemas/Bls12_381_signature"
               },
               "metadata": {
                 "type": "object",
@@ -19018,7 +19401,70 @@
                 "$ref": "#/components/schemas/Signature.Public_key"
               },
               "proof": {
-                "$ref": "#/components/schemas/Signature.V1"
+                "$ref": "#/components/schemas/Bls12_381_signature"
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "balance_updates": {
+                    "$ref": "#/components/schemas/alpha.operation_metadata.alpha.balance_updates"
+                  },
+                  "operation_result": {
+                    "$ref": "#/components/schemas/alpha.operation.alpha.operation_result.update_consensus_key"
+                  },
+                  "internal_operation_results": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/alpha.apply_internal_results.alpha.operation_result"
+                    }
+                  }
+                },
+                "required": [
+                  "operation_result"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "pk",
+              "metadata"
+            ]
+          },
+          {
+            "title": "Update_companion_key",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "update_companion_key"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/alpha.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "pk": {
+                "$ref": "#/components/schemas/Signature.Public_key"
+              },
+              "proof": {
+                "$ref": "#/components/schemas/Bls12_381_signature"
               },
               "metadata": {
                 "type": "object",
@@ -23020,12 +23466,16 @@
                   "applied"
                 ]
               },
+              "kind": {
+                "type": "boolean"
+              },
               "consumed_milligas": {
                 "$ref": "#/components/schemas/positive_bignum"
               }
             },
             "required": [
-              "status"
+              "status",
+              "kind"
             ]
           },
           {
@@ -23081,12 +23531,16 @@
                   "$ref": "#/components/schemas/alpha.error"
                 }
               },
+              "kind": {
+                "type": "boolean"
+              },
               "consumed_milligas": {
                 "$ref": "#/components/schemas/positive_bignum"
               }
             },
             "required": [
-              "status"
+              "status",
+              "kind"
             ]
           }
         ]
@@ -23407,7 +23861,7 @@
                 }
               },
               "signature": {
-                "$ref": "#/components/schemas/Signature.V1"
+                "$ref": "#/components/schemas/Signature.V2"
               }
             },
             "required": [
@@ -23425,7 +23879,7 @@
                 }
               },
               "signature": {
-                "$ref": "#/components/schemas/Signature.V1"
+                "$ref": "#/components/schemas/Signature.V2"
               }
             },
             "required": [
@@ -24940,7 +25394,7 @@
             }
           },
           "signature": {
-            "$ref": "#/components/schemas/Signature.V1"
+            "$ref": "#/components/schemas/Signature.V2"
           }
         },
         "required": [

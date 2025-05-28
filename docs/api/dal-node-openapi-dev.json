@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 21.0~rc3+dev (2cd0ffe3)"
+    "version": "Octez 21.0~rc3+dev (d0769d42)"
   },
   "paths": {
     "/health": {
@@ -23,6 +23,7 @@
                         "degraded",
                         "up",
                         "ko",
+                        "no",
                         "ok",
                         "down"
                       ]
@@ -41,6 +42,7 @@
                               "degraded",
                               "up",
                               "ko",
+                              "no",
                               "ok",
                               "down"
                             ]
@@ -57,6 +59,35 @@
                     "status",
                     "checks"
                   ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/last_processed_level": {
+      "get": {
+        "description": "Returns the last (finalized) L1 level which was processed by the DAL node.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
                 }
               }
             }
@@ -483,7 +514,19 @@
                           "type": "object",
                           "properties": {
                             "peer": {
-                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                              "type": "object",
+                              "properties": {
+                                "peer_id": {
+                                  "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                },
+                                "maybe_reachable_point": {
+                                  "$ref": "#/components/schemas/p2p_point.id"
+                                }
+                              },
+                              "required": [
+                                "peer_id",
+                                "maybe_reachable_point"
+                              ]
                             },
                             "backoff": {
                               "$ref": "#/components/schemas/timestamp.system"
@@ -532,7 +575,19 @@
                     "type": "object",
                     "properties": {
                       "peer": {
-                        "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        "type": "object",
+                        "properties": {
+                          "peer_id": {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          "maybe_reachable_point": {
+                            "$ref": "#/components/schemas/p2p_point.id"
+                          }
+                        },
+                        "required": [
+                          "peer_id",
+                          "maybe_reachable_point"
+                        ]
                       },
                       "connection": {
                         "type": "object",
@@ -578,6 +633,171 @@
                     "required": [
                       "peer",
                       "connection"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/fanout": {
+      "get": {
+        "description": "Returns the fanout peers per topic alongside the last publication time on the topic.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "topic": {
+                        "type": "object",
+                        "properties": {
+                          "slot_index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "pkh": {
+                            "$ref": "#/components/schemas/Signature.Public_key_hash"
+                          }
+                        },
+                        "required": [
+                          "slot_index",
+                          "pkh"
+                        ]
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
+                        }
+                      },
+                      "last_publication_time": {
+                        "$ref": "#/components/schemas/timestamp.system"
+                      }
+                    },
+                    "required": [
+                      "topic",
+                      "peers",
+                      "last_publication_time"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/mesh": {
+      "get": {
+        "description": "Get the mesh of the peer. Concretely, the RPC returns a list of topics, where each topic is associated to the remote peers with which the current node shares a full connection (on that topic). Optional arguments allow to restrict the output to a given delegate or slot index.",
+        "parameters": [
+          {
+            "name": "delegate",
+            "in": "query",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot_index",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "topic": {
+                        "type": "object",
+                        "properties": {
+                          "slot_index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "pkh": {
+                            "$ref": "#/components/schemas/Signature.Public_key_hash"
+                          }
+                        },
+                        "required": [
+                          "slot_index",
+                          "pkh"
+                        ]
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "topic",
+                      "peers"
                     ]
                   }
                 }
@@ -672,10 +892,10 @@
     },
     "/p2p/gossipsub/pkhs/peers": {
       "get": {
-        "description": "Get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'subscribed' flag is given, then restrict the output to the topics this peer is subscribed to.",
+        "description": "When the 'all' flag is given, get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'all' flag is not given, then restrict the output to the topics this peer is subscribed to.",
         "parameters": [
           {
-            "name": "subscribed",
+            "name": "all",
             "in": "query",
             "required": false,
             "schema": {
@@ -699,13 +919,67 @@
                       "peers": {
                         "type": "array",
                         "items": {
-                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
                         }
                       }
                     },
                     "required": [
                       "pkh",
                       "peers"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/reconnection_delays": {
+      "get": {
+        "description": "For each unreachable point, retrieve the time remaining until the next reconnection attempt.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "point": {
+                        "$ref": "#/components/schemas/p2p_point.id"
+                      },
+                      "delay": {
+                        "$ref": "#/components/schemas/unistring"
+                      }
+                    },
+                    "required": [
+                      "point",
+                      "delay"
                     ]
                   }
                 }
@@ -739,7 +1013,19 @@
                     "type": "object",
                     "properties": {
                       "peer": {
-                        "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        "type": "object",
+                        "properties": {
+                          "peer_id": {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          "maybe_reachable_point": {
+                            "$ref": "#/components/schemas/p2p_point.id"
+                          }
+                        },
+                        "required": [
+                          "peer_id",
+                          "maybe_reachable_point"
+                        ]
                       },
                       "score": {
                         "type": "number"
@@ -769,10 +1055,10 @@
     },
     "/p2p/gossipsub/slot_indexes/peers": {
       "get": {
-        "description": "Get an association list between each public key hash part of a topic subscribed to by the connected peers and the remote peers subscribed to such topics. If the 'subscribed' flag is given, then restrict the output to the topics this peer is subscribed to.",
+        "description": "When the 'all' flag is given, get an association list between each public key hash part of a topic subscribed to by the connected peers and the remote peers subscribed to such topics. If the 'all' flag is not given, then restrict the output to the topics this peer is subscribed to.",
         "parameters": [
           {
-            "name": "subscribed",
+            "name": "all",
             "in": "query",
             "required": false,
             "schema": {
@@ -798,7 +1084,19 @@
                       "peers": {
                         "type": "array",
                         "items": {
-                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
                         }
                       }
                     },
@@ -870,10 +1168,10 @@
     },
     "/p2p/gossipsub/topics/peers": {
       "get": {
-        "description": "Get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'subscribed' flag is given, then restrict the output to the topics this peer is subscribed to.",
+        "description": "When the 'all' flag is given, get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'all' flag is not given, then restrict the output to the topics this peer is subscribed to.",
         "parameters": [
           {
-            "name": "subscribed",
+            "name": "all",
             "in": "query",
             "required": false,
             "schema": {
@@ -911,7 +1209,19 @@
                       "peers": {
                         "type": "array",
                         "items": {
-                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
                         }
                       }
                     },
@@ -1757,7 +2067,7 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "title": "Boostrap node",
+                      "title": "Bootstrap node",
                       "type": "object",
                       "properties": {
                         "kind": {
@@ -1782,130 +2092,36 @@
                           ]
                         },
                         "controller_profiles": {
-                          "oneOf": [
-                            {
-                              "title": "profile_encoding",
-                              "type": "object",
-                              "properties": {
-                                "operators": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "integer",
-                                    "minimum": -1073741824,
-                                    "maximum": 1073741823
-                                  }
-                                },
-                                "observers": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "integer",
-                                    "minimum": -1073741824,
-                                    "maximum": 1073741823
-                                  }
-                                },
-                                "attesters": {
-                                  "type": "array",
-                                  "items": {
-                                    "$ref": "#/components/schemas/Signature.Public_key_hash"
-                                  }
-                                }
-                              },
-                              "required": [
-                                "operators",
-                                "observers",
-                                "attesters"
-                              ]
-                            },
-                            {
-                              "title": "legacy_profile_encoding",
+                          "type": "object",
+                          "properties": {
+                            "operators": {
                               "type": "array",
                               "items": {
-                                "oneOf": [
-                                  {
-                                    "title": "Attester with pkh",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": [
-                                          "attester"
-                                        ]
-                                      },
-                                      "public_key_hash": {
-                                        "$ref": "#/components/schemas/Signature.Public_key_hash"
-                                      }
-                                    },
-                                    "required": [
-                                      "kind",
-                                      "public_key_hash"
-                                    ]
-                                  },
-                                  {
-                                    "title": "Slot producer",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": [
-                                          "producer"
-                                        ]
-                                      },
-                                      "slot_index": {
-                                        "type": "integer",
-                                        "minimum": -1073741824,
-                                        "maximum": 1073741823
-                                      }
-                                    },
-                                    "required": [
-                                      "kind",
-                                      "slot_index"
-                                    ]
-                                  },
-                                  {
-                                    "title": "observer",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": [
-                                          "observer"
-                                        ]
-                                      },
-                                      "slot_index": {
-                                        "type": "integer",
-                                        "minimum": -1073741824,
-                                        "maximum": 1073741823
-                                      }
-                                    },
-                                    "required": [
-                                      "kind",
-                                      "slot_index"
-                                    ]
-                                  }
-                                ]
+                                "type": "integer",
+                                "minimum": -1073741824,
+                                "maximum": 1073741823
+                              }
+                            },
+                            "observers": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer",
+                                "minimum": -1073741824,
+                                "maximum": 1073741823
+                              }
+                            },
+                            "attesters": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Signature.Public_key_hash"
                               }
                             }
-                          ]
+                          }
                         }
                       },
                       "required": [
                         "kind",
                         "controller_profiles"
-                      ]
-                    },
-                    {
-                      "title": "Random_observer",
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "enum": [
-                            "random_observer"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "kind"
                       ]
                     }
                   ]
@@ -1931,110 +2147,31 @@
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
-                  {
-                    "title": "profile_encoding",
-                    "type": "object",
-                    "properties": {
-                      "operators": {
-                        "type": "array",
-                        "items": {
-                          "type": "integer",
-                          "minimum": -1073741824,
-                          "maximum": 1073741823
-                        }
-                      },
-                      "observers": {
-                        "type": "array",
-                        "items": {
-                          "type": "integer",
-                          "minimum": -1073741824,
-                          "maximum": 1073741823
-                        }
-                      },
-                      "attesters": {
-                        "type": "array",
-                        "items": {
-                          "$ref": "#/components/schemas/Signature.Public_key_hash"
-                        }
-                      }
-                    },
-                    "required": [
-                      "operators",
-                      "observers",
-                      "attesters"
-                    ]
-                  },
-                  {
-                    "title": "legacy_profile_encoding",
+                "type": "object",
+                "properties": {
+                  "operators": {
                     "type": "array",
                     "items": {
-                      "oneOf": [
-                        {
-                          "title": "Attester with pkh",
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "attester"
-                              ]
-                            },
-                            "public_key_hash": {
-                              "$ref": "#/components/schemas/Signature.Public_key_hash"
-                            }
-                          },
-                          "required": [
-                            "kind",
-                            "public_key_hash"
-                          ]
-                        },
-                        {
-                          "title": "Slot producer",
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "producer"
-                              ]
-                            },
-                            "slot_index": {
-                              "type": "integer",
-                              "minimum": -1073741824,
-                              "maximum": 1073741823
-                            }
-                          },
-                          "required": [
-                            "kind",
-                            "slot_index"
-                          ]
-                        },
-                        {
-                          "title": "observer",
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "observer"
-                              ]
-                            },
-                            "slot_index": {
-                              "type": "integer",
-                              "minimum": -1073741824,
-                              "maximum": 1073741823
-                            }
-                          },
-                          "required": [
-                            "kind",
-                            "slot_index"
-                          ]
-                        }
-                      ]
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    }
+                  },
+                  "observers": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    }
+                  },
+                  "attesters": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Signature.Public_key_hash"
                     }
                   }
-                ]
+                }
               }
             }
           }
@@ -2185,6 +2322,240 @@
                       ]
                     }
                   ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/protocol_parameters": {
+      "get": {
+        "description": "Returns the protocol parameters as known by the DAL node. An optional 'level' argument can specify for which level to retrieve them.",
+        "parameters": [
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "feature_enable": {
+                      "type": "boolean"
+                    },
+                    "incentives_enable": {
+                      "type": "boolean"
+                    },
+                    "number_of_slots": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "attestation_lag": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "attestation_threshold": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "traps_fraction": {
+                      "type": "object",
+                      "properties": {
+                        "numerator": {
+                          "$ref": "#/components/schemas/bignum"
+                        },
+                        "denominator": {
+                          "$ref": "#/components/schemas/bignum"
+                        }
+                      },
+                      "required": [
+                        "numerator",
+                        "denominator"
+                      ]
+                    },
+                    "cryptobox_parameters": {
+                      "type": "object",
+                      "properties": {
+                        "redundancy_factor": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        },
+                        "page_size": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 65535
+                        },
+                        "slot_size": {
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
+                        },
+                        "number_of_shards": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 65535
+                        }
+                      },
+                      "required": [
+                        "redundancy_factor",
+                        "page_size",
+                        "slot_size",
+                        "number_of_shards"
+                      ]
+                    },
+                    "sc_rollup_challenge_window_in_blocks": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "commitment_period_in_blocks": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "dal_attested_slots_validity_lag": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "blocks_per_cycle": {
+                      "type": "integer",
+                      "minimum": -2147483648,
+                      "maximum": 2147483647
+                    }
+                  },
+                  "required": [
+                    "feature_enable",
+                    "incentives_enable",
+                    "number_of_slots",
+                    "attestation_lag",
+                    "attestation_threshold",
+                    "traps_fraction",
+                    "cryptobox_parameters",
+                    "sc_rollup_challenge_window_in_blocks",
+                    "commitment_period_in_blocks",
+                    "dal_attested_slots_validity_lag",
+                    "blocks_per_cycle"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/published_levels/{int32}/known_traps": {
+      "get": {
+        "description": "For a given published level, return all the traps known by the node. Optional arguments allow to restrict the output to a given delegate or slot index.",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "delegate",
+            "in": "query",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot_index",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "delegate": {
+                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      },
+                      "slot_index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "shard": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "proof": {
+                        "$ref": "#/components/schemas/DAL_commitment"
+                      }
+                    },
+                    "required": [
+                      "delegate",
+                      "slot_index",
+                      "shard",
+                      "proof"
+                    ]
+                  }
                 }
               }
             }
@@ -2368,6 +2739,11 @@
             "$ref": "#/components/schemas/unistring"
           }
         ]
+      },
+      "bignum": {
+        "title": "Big number",
+        "description": "Decimal representation of a big number",
+        "type": "string"
       },
       "distributed_db_version": {
         "description": "A version number for the distributed DB protocol",
