@@ -167,6 +167,7 @@ val init_config :
   ?observer_profiles:int list ->
   ?bootstrap_profile:bool ->
   ?history_mode:history_mode ->
+  ?slots_backup_uris:string list ->
   t ->
   unit Lwt.t
 
@@ -177,6 +178,7 @@ val update_config :
   ?observer_profiles:int list ->
   ?bootstrap_profile:bool ->
   ?history_mode:history_mode ->
+  ?slots_backup_uris:string list ->
   t ->
   unit Lwt.t
 
