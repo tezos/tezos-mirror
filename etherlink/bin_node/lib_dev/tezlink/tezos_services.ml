@@ -157,7 +157,7 @@ module Protocol_types = struct
   end
 
   module Block = struct
-    let _tezlink_block_to_block_info ~l2_chain_id (version, block, chain) =
+    let tezlink_block_to_block_info ~l2_chain_id (version, block, chain) =
       let open Result_syntax in
       let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
       let* hash =
@@ -540,7 +540,7 @@ module Imported_services = struct
       Tezos_rpc.Service.t =
     Tezos_shell_services.Monitor_services.S.heads
 
-  let _block_info :
+  let block_info :
       ( [`GET],
         tezlink_rpc_context,
         tezlink_rpc_context,
@@ -690,6 +690,17 @@ let register_block_services ~l2_chain_id
                _chain_id,
                _operation_inclusion_latency )
            -> return (operation.protocol_data, Mock.receipts))
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7993 *)
+    (* RPCs at directory level doesn't appear properly in the describe RPC *)
+    |> register_with_conversion
+         ~service:Imported_services.block_info
+         ~impl:(fun {block; chain} q () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let* tezlink_block = Backend.block chain block in
+           Lwt_result_syntax.return (q#version, tezlink_block, chain))
+         ~convert_output:
+           (Protocol_types.Block.tezlink_block_to_block_info ~l2_chain_id)
   in
   Tezos_rpc.Directory.prefix
     block_directory_path
