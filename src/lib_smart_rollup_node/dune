@@ -55,7 +55,6 @@
   -open Tezos_crypto
   -open Tezos_client_base
   -open Tezos_client_base_unix
-  -open Tezos_dal_node_lib
   -open Octez_injector
   -open Tezos_version_value
   -open Tezos_layer2_store
