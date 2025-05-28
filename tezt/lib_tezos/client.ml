@@ -4572,20 +4572,35 @@ let aggregate_bls_signatures client signatures =
   in
   return (String.trim s)
 
-let spawn_create_bls_proof ~signer client =
-  spawn_command client @@ ["create"; "bls"; "proof"; "for"; signer]
+let spawn_create_bls_proof ?override_pk ~signer client =
+  let override_pk =
+    match override_pk with
+    | Some override_pk -> ["--override-public-key"; override_pk]
+    | None -> []
+  in
+  spawn_command client
+  @@ ["create"; "bls"; "proof"; "for"; signer]
+  @ override_pk
 
-let create_bls_proof ~signer client =
+let create_bls_proof ?override_pk ~signer client =
   let* s =
-    spawn_create_bls_proof ~signer client |> Process.check_and_read_stdout
+    spawn_create_bls_proof ?override_pk ~signer client
+    |> Process.check_and_read_stdout
   in
   return (String.trim s)
 
-let spawn_check_bls_proof ~pk ~proof client =
-  spawn_command client @@ ["check"; "bls"; "proof"; proof; "for"; pk]
+let spawn_check_bls_proof ?override_pk ~pk ~proof client =
+  let override_pk =
+    match override_pk with
+    | Some override_pk -> ["--override-public-key"; override_pk]
+    | None -> []
+  in
+  spawn_command client
+  @@ ["check"; "bls"; "proof"; proof; "for"; pk]
+  @ override_pk
 
-let check_bls_proof ~pk ~proof client =
-  spawn_check_bls_proof ~pk ~proof client |> Process.check
+let check_bls_proof ?override_pk ~pk ~proof client =
+  spawn_check_bls_proof ?override_pk ~pk ~proof client |> Process.check
 
 let spawn_aggregate_bls_public_keys client pks_with_proofs =
   let pks_with_proofs =
