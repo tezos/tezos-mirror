@@ -1023,6 +1023,20 @@ open struct
       ~level:Notice
       ()
 
+  let failed_to_retrieve_commitment_of_slot_id =
+    declare_3
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"failed_to_retrieve_commitment_of_slot_id"
+      ~msg:
+        "The node is unable to retrieve the commitment of the slot published \
+         at level {published_level} and index {slot_index} from neither \
+         memory, on-disk store, nor the L1 context. Error {error}"
+      ~level:Warning
+      ("published_level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("error", Data_encoding.list Error_monad.trace_encoding)
+
   let slot_from_http_backup_has_unexpected_size =
     declare_5
       ~section
@@ -1073,6 +1087,12 @@ open struct
 end
 
 (* DAL node event emission functions *)
+
+let emit_failed_to_retrieve_commitment_of_slot_id ~published_level ~slot_index
+    ~error =
+  emit
+    failed_to_retrieve_commitment_of_slot_id
+    (published_level, slot_index, error)
 
 let emit_slot_from_http_backup_has_unexpected_size ~published_level ~slot_index
     ~http_backup_uri ~expected_size ~obtained_size =
