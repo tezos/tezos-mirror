@@ -199,7 +199,7 @@ module Dal = struct
               ignore_l1_config_peers
           in
           match options with
-          | Ok options -> Cli.run cmd options
+          | Ok options -> Cli.run ~disable_logging:true cmd options
           | Error (_, msg) -> failwith "%s" msg)
     in
 

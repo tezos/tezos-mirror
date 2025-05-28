@@ -809,7 +809,7 @@ let wrap_with_error main_promise =
       let* _ = Lwt_exit.exit_and_wait 1 in
       Lwt.return @@ `Error (false, Format.asprintf "%a" pp_print_trace err)
 
-let run subcommand cli_options =
+let run ?disable_logging subcommand cli_options =
   let open Lwt_result_syntax in
   match subcommand with
   | Run ->
@@ -818,7 +818,11 @@ let run subcommand cli_options =
           ~default:Configuration_file.default.data_dir
           cli_options.data_dir
       in
-      Daemon.run ~data_dir ~configuration_override:(merge cli_options)
+      Daemon.run
+        ?disable_logging
+        ~data_dir
+        ~configuration_override:(merge cli_options)
+        ()
   | Config_init ->
       Configuration_file.save (merge cli_options Configuration_file.default)
   | Config_update ->
