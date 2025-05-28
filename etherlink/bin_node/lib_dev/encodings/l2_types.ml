@@ -53,6 +53,7 @@ module Tezos_block = struct
     level : int32;
     timestamp : Time.Protocol.t;
     parent_hash : Ethereum_types.block_hash;
+    operations : bytes; (* TODO: #7928 decode operations with receipts *)
   }
 
   let decode_block_hash = Ethereum_types.decode_block_hash
@@ -77,15 +78,16 @@ module Tezos_block = struct
     in
     def "tezlink_block"
     @@ conv
-         (fun {hash; level; parent_hash; timestamp} ->
-           (hash, level, parent_hash, timestamp))
-         (fun (hash, level, parent_hash, timestamp) ->
-           {hash; level; parent_hash; timestamp})
-         (obj4
+         (fun {hash; level; parent_hash; timestamp; operations} ->
+           (hash, level, parent_hash, timestamp, operations))
+         (fun (hash, level, parent_hash, timestamp, operations) ->
+           {hash; level; parent_hash; timestamp; operations})
+         (obj5
             (req "hash" block_hash_encoding)
             (req "level" int32)
             (req "parent_hash" block_hash_encoding)
-            (req "timestamp" timestamp_encoding))
+            (req "timestamp" timestamp_encoding)
+            (req "operations" bytes))
 
   let () = Data_encoding.Registration.register block_encoding
 

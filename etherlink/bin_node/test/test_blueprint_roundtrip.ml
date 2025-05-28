@@ -78,7 +78,14 @@ let make_blueprint ~delayed_transactions ~transactions =
 
 let make_tez_block ~level ~timestamp ~parent_hash () =
   let block_without_hash =
-    L2_types.Tezos_block.{level; hash = zero_hash; timestamp; parent_hash}
+    L2_types.Tezos_block.
+      {
+        level;
+        hash = zero_hash;
+        timestamp;
+        parent_hash;
+        operations = Bytes.empty;
+      }
   in
   let block_bytes =
     Bytes.of_string
@@ -89,7 +96,9 @@ let make_tez_block ~level ~timestamp ~parent_hash () =
   let hash =
     Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
   in
-  return L2_types.Tezos_block.{level; hash; timestamp; parent_hash}
+  return
+    L2_types.Tezos_block.
+      {level; hash; timestamp; parent_hash; operations = Bytes.empty}
 
 let test_blueprint_roundtrip ~title ~delayed_transactions ~transactions () =
   register ~title:(sf "Blueprint producer decoder roundtrip (%s)" title)
