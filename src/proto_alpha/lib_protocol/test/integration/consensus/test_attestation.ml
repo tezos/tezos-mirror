@@ -651,13 +651,13 @@ let test_two_attestations_with_same_attester () =
   in
   Assert.proto_error ~loc:__LOC__ res error
 
-(* Check that if an attester includes some DAL content but is not in the DAL
-   committee, then an error is returned at block validation.
+(* Check that if an attester includes some DAL content but they have no assigned
+   shards, then an error is returned at block validation.
 
    Note that we change the value of [consensus_committee_size] because with the
    default test parameters, [consensus_committee_size = 25 < 64 =
    number_of_shards], so that test would not work! *)
-let test_attester_not_in_dal_committee () =
+let test_attester_with_no_assigned_shards () =
   let open Lwt_result_syntax in
   let bal_high = 80_000_000_000L in
   let bal_low = 08_000_000_000L in
@@ -986,9 +986,9 @@ let tests =
       `Quick
       test_two_attestations_with_same_attester;
     Tztest.tztest
-      "attester not in DAL committee"
+      "attester without assigned shards"
       `Quick
-      test_attester_not_in_dal_committee;
+      test_attester_with_no_assigned_shards;
     Tztest.tztest
       "DAL attestation_threshold"
       `Quick
