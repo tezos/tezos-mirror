@@ -15,17 +15,6 @@ use tezos_smart_rollup::{
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 
-#[derive(Debug, PartialEq)]
-pub struct TezlinkImplicitAccount {
-    path: OwnedPath,
-}
-
-impl From<OwnedPath> for TezlinkImplicitAccount {
-    fn from(path: OwnedPath) -> Self {
-        Self { path }
-    }
-}
-
 // This enum is inspired of `src/proto_alpha/lib_protocol/manager_repr.ml`
 // A manager can be:
 //  - a public key, it means that the account is revealed
@@ -58,6 +47,47 @@ fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::
     Ok(OwnedPath::try_from(path_string)?)
 }
 
+pub trait TezlinkAccount {
+    fn path(&self) -> &OwnedPath;
+
+    /// Get the **balance** of an account in Mutez held by the account.
+    fn balance(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<Narith, tezos_storage::error::Error> {
+        let path = concat(self.path(), &BALANCE_PATH)?;
+        Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
+    }
+
+    /// Set the **balance** of an account in Mutez held by the account.
+    fn set_balance(
+        &mut self,
+        host: &mut impl Runtime,
+        balance: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = concat(self.path(), &BALANCE_PATH)?;
+        store_bin(balance, host, &path)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct TezlinkImplicitAccount {
+    path: OwnedPath,
+}
+
+impl From<OwnedPath> for TezlinkImplicitAccount {
+    fn from(path: OwnedPath) -> Self {
+        Self { path }
+    }
+}
+
+impl TezlinkAccount for TezlinkImplicitAccount {
+    #[inline]
+    fn path(&self) -> &OwnedPath {
+        &self.path
+    }
+}
+
 impl TezlinkImplicitAccount {
     // We must provide the context object to get the full path in the durable storage
     pub fn from_contract(
@@ -85,7 +115,7 @@ impl TezlinkImplicitAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = concat(&self.path, &COUNTER_PATH)?;
+        let path = concat(self.path(), &COUNTER_PATH)?;
         Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
     }
 
@@ -95,34 +125,15 @@ impl TezlinkImplicitAccount {
         host: &mut impl Runtime,
         counter: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(&self.path, &COUNTER_PATH)?;
+        let path = concat(self.path(), &COUNTER_PATH)?;
         store_bin(counter, host, &path)
-    }
-
-    /// Get the **balance** of an account in Mutez held by the account.
-    pub fn balance(
-        &self,
-        host: &impl Runtime,
-    ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = concat(&self.path, &BALANCE_PATH)?;
-        Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
-    }
-
-    /// Set the **balance** of an account in Mutez held by the account.
-    pub fn set_balance(
-        &mut self,
-        host: &mut impl Runtime,
-        balance: &Narith,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(&self.path, &BALANCE_PATH)?;
-        store_bin(balance, host, &path)
     }
 
     pub fn manager(
         &self,
         host: &impl Runtime,
     ) -> Result<Manager, tezos_storage::error::Error> {
-        let path = concat(&self.path, &MANAGER_PATH)?;
+        let path = concat(self.path(), &MANAGER_PATH)?;
         let manager: Manager = read_nom_value(host, &path)?;
         Ok(manager)
     }
@@ -135,7 +146,7 @@ impl TezlinkImplicitAccount {
         host: &mut impl Runtime,
         public_key_hash: &PublicKeyHash,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(&self.path, &MANAGER_PATH)?;
+        let path = concat(self.path(), &MANAGER_PATH)?;
         // The tag for public key hash is 0 (see the Manager enum above)
         let mut buffer = vec![0_u8];
         public_key_hash
@@ -153,7 +164,7 @@ impl TezlinkImplicitAccount {
         host: &mut impl Runtime,
         public_key: &PublicKey,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(&self.path, &MANAGER_PATH)?;
+        let path = concat(self.path(), &MANAGER_PATH)?;
         // The tag for public key hash is 1 (see the Manager enum above)
         let mut buffer = vec![1_u8];
         public_key
