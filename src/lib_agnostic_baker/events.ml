@@ -189,3 +189,55 @@ module Per_block_votes = struct
       ~msg:"read adaptive issuance vote = {value}"
       ("value", Per_block_votes.adaptive_issuance_vote_encoding)
 end
+
+module Commands = struct
+  include Internal_event.Simple
+
+  let section = section @ ["commands"]
+
+  let no_dal_node_provided =
+    declare_0
+      ~section
+      ~name:"no_dal_node_provided"
+      ~level:Warning
+      ~msg:
+        "No DAL node endpoint has been provided.\n\
+         Not running a DAL node might result in losing a share of the \
+         participation rewards.\n\
+         For instructions on how to run a DAL node, please visit \
+         https://docs.tezos.com/tutorials/join-dal-baker."
+      ()
+
+  let healthy_dal_node =
+    declare_0
+      ~section
+      ~name:"healthy_dal_node"
+      ~level:Notice
+      ~msg:"The DAL node is healthy."
+      ()
+
+  let unhealthy_dal_node =
+    declare_2
+      ~section
+      ~name:"unhealthy_dal_node"
+      ~level:Error
+      ~msg:
+        "The DAL node running on {endpoint} is not healthy. DAL attestations \
+         cannot be sent. Its health is {health}. Please check that your DAL \
+         node is configured correctly."
+      ~pp1:Uri.pp
+      ("endpoint", Tezos_rpc.Encoding.uri_encoding)
+      ~pp2:Tezos_dal_node_services.Types.Health.pp
+      ("health", Tezos_dal_node_services.Types.Health.encoding)
+
+  let unreachable_dal_node =
+    declare_1
+      ~section
+      ~name:"unreachable_dal_node"
+      ~level:Error
+      ~msg:
+        "The DAL node cannot be reached on endpoint: {endpoint}.\n\
+         Please check your DAL node and possibly restart it."
+      ~pp1:Uri.pp
+      ("endpoint", Tezos_rpc.Encoding.uri_encoding)
+end

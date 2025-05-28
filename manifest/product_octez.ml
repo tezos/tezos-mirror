@@ -5691,6 +5691,7 @@ let octez_agnostic_baker_lib =
         octez_profiler |> open_;
         octez_stdlib_unix |> open_;
         octez_shell_services |> open_;
+        octez_dal_node_services;
       ]
 
 (* PROTOCOL PACKAGES *)

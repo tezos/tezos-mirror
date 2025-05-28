@@ -24,6 +24,8 @@ type error +=
   | Block_vote_file_wrong_content of string
   | Block_vote_file_missing_liquidity_baking_toggle_vote of string
   | Missing_vote_on_startup
+  | No_dal_node_endpoint
+  | Incompatible_dal_options
 
 let () =
   Error_monad.register_error_kind
@@ -252,4 +254,31 @@ let () =
          current working directory or in the baker directory.")
     Data_encoding.empty
     (function Missing_vote_on_startup -> Some () | _ -> None)
-    (fun () -> Missing_vote_on_startup)
+    (fun () -> Missing_vote_on_startup) ;
+  register_error_kind
+    `Permanent
+    ~id:"Client_commands.no_dal_node_endpoint"
+    ~title:"Missing_dal_node_argument"
+    ~description:"Explicit DAL node configuration is required."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Please connect a running DAL node using '--dal-node <endpoint>'. If \
+         you do not want to run a DAL node, you have to opt-out using \
+         '--without-dal'.")
+    Data_encoding.unit
+    (function No_dal_node_endpoint -> Some () | _ -> None)
+    (fun () -> No_dal_node_endpoint) ;
+  register_error_kind
+    `Permanent
+    ~id:"Client_commands.incompatible_dal_options"
+    ~title:"Incompatible_dal_options"
+    ~description:"'--dal-node' and '--without-dal' are incompatible."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "'--dal-node <endpoint>' and '--without-dal' are incompatible. Please \
+         do not pass '--without-dal' option.")
+    Data_encoding.unit
+    (function Incompatible_dal_options -> Some () | _ -> None)
+    (fun () -> Incompatible_dal_options)
