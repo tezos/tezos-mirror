@@ -241,8 +241,8 @@ module Skip_list_cells = struct
   let insert ?conn store ~attested_level items =
     let open Lwt_result_syntax in
     with_connection store conn @@ fun conn ->
-    List.iteri_es
-      (fun slot_index (cell_hash, cell) ->
+    List.iter_es
+      (fun (cell_hash, cell, slot_index) ->
         let* () =
           Sqlite.Db.exec
             conn

@@ -63,7 +63,10 @@ val init :
 val insert :
   t ->
   attested_level:int32 ->
-  (Dal_proto_types.Skip_list_hash.t * Dal_proto_types.Skip_list_cell.t) list ->
+  (Dal_proto_types.Skip_list_hash.t
+  * Dal_proto_types.Skip_list_cell.t
+  * Types.slot_index)
+  list ->
   unit tzresult Lwt.t
 
 (** [find store hash] returns the cell associated to [hash] in the [store], if
@@ -101,6 +104,6 @@ module Internal_for_migrations : sig
   val find_hash :
     t ->
     attested_level:int32 ->
-    slot_index:int ->
+    slot_index:Types.slot_index ->
     Dal_proto_types.Skip_list_hash.t tzresult Lwt.t
 end
