@@ -5,24 +5,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Duo_context_sig
 open Context_wrapper
 
-module Make
-    (Irmin_Context : IRMIN_CONTEXT)
-    (Brassaia_Context : BRASSAIA_CONTEXT) =
-struct
-  module Context = MakeContext (Irmin_Context) (Brassaia_Context)
-  include Tezos_protocol_environment.Register (Context)
+module Make (P : CONTEXT_PARAM) : sig
+  include EXPORTED
 
-  let impl_name = Context.name
+  val make_index : P.index_1 -> P.index_2 -> index
+end = struct
+  module C = MakeContext (P)
+  include C
+  include Tezos_protocol_environment.Register (C)
+
+  let impl_name = C.name
 
   let checkout :
-      Context.index ->
+      C.index ->
       Context_hash.t ->
       Tezos_protocol_environment.Context.t option Lwt.t =
    fun index context_hash ->
     let open Lwt_syntax in
-    let* ctxt = Context.checkout index context_hash in
+    let* ctxt = C.checkout index context_hash in
     match ctxt with
     | Some ctxt ->
         Lwt.return_some
@@ -35,12 +38,10 @@ struct
     | _ -> Lwt.return_none
 
   let checkout_exn :
-      Context.index ->
-      Context_hash.t ->
-      Tezos_protocol_environment.Context.t Lwt.t =
+      C.index -> Context_hash.t -> Tezos_protocol_environment.Context.t Lwt.t =
    fun index context_hash ->
     let open Lwt_syntax in
-    let* ctxt = Context.checkout_exn index context_hash in
+    let* ctxt = C.checkout_exn index context_hash in
     Lwt.return
       (Tezos_protocol_environment.Context.make
          ~ops
@@ -57,8 +58,7 @@ struct
       ~equality_witness
       ~impl_name
 
-  let unwrap_context : Tezos_protocol_environment.Context.t -> Context.t =
-    function
+  let unwrap_context : Tezos_protocol_environment.Context.t -> C.t = function
     | Tezos_protocol_environment.Context.Context {ctxt; kind = Context; _} ->
         ctxt
     | Tezos_protocol_environment.Context.Context t ->
@@ -67,28 +67,37 @@ struct
           ~got:t.impl_name
 end
 
-module Duo_context =
-  Make
-    (struct
-      let name = "Irmin_disk"
+module Duo_context = struct
+  include Make (struct
+    let backend_1 = Internal.Irmin_disk
 
-      include Tezos_context.Context
-    end)
-    (struct
-      let name = "Brassaia_disk"
+    let backend_2 = Internal.Brassaia_disk
 
-      include Tezos_context_brassaia.Tezos_context.Context
-    end)
+    type index_1 = Tezos_context_disk.Context.index
 
-module Duo_memory_context =
-  Make
-    (struct
-      let name = "Irmin_mem"
+    type index_2 = Tezos_context_brassaia.Tezos_context.Context.index
 
-      include Tezos_context_memory.Context
-    end)
-    (struct
-      let name = "Brassaia_mem"
+    let make_index irmin_index brassaia_index : Internal.index =
+      {
+        index_1 = Irmin_disk_index irmin_index;
+        index_2 = Brassaia_disk_index brassaia_index;
+      }
+  end)
+end
 
-      include Tezos_context_brassaia_memory.Tezos_context_memory.Context
-    end)
+module Duo_memory_context = Make (struct
+  let backend_1 = Internal.Irmin_mem
+
+  let backend_2 = Internal.Brassaia_mem
+
+  type index_1 = Tezos_context_memory.Context.index
+
+  type index_2 =
+    Tezos_context_brassaia_memory.Tezos_context_memory.Context.index
+
+  let make_index irmin_index brassaia_index : Internal.index =
+    {
+      index_1 = Irmin_mem_index irmin_index;
+      index_2 = Brassaia_mem_index brassaia_index;
+    }
+end)
