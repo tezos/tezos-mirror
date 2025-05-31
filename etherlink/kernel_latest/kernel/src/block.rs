@@ -183,6 +183,7 @@ fn compute<Host: Runtime>(
             sequencer_pool_address,
             tracer_input,
             evm_configuration,
+            limits,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
