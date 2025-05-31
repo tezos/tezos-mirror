@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::apply::{
-    apply_transaction, ExecutionInfo, ExecutionResult, Validity, WITHDRAWAL_OUTBOX_QUEUE,
+    apply_transaction, ExecutionInfo, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE,
 };
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
@@ -168,20 +168,6 @@ fn compute<Host: Runtime>(
 
             return Ok(BlockInProgressComputationResult::RebootNeeded);
         }
-
-        let execution_gas_limit =
-            transaction.execution_gas_limit(&block_constants.block_fees)?;
-        if execution_gas_limit > limits.maximum_gas_limit {
-            log!(
-                host,
-                Debug,
-                "Reason of invalidity: {:?}",
-                Validity::InvalidGasLimitTooHigh
-            );
-            log!(host, Benchmarking, "Transaction type: INVALID");
-            on_invalid_transaction(host, &transaction, block_in_progress, data_size);
-            continue;
-        };
 
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.

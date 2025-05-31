@@ -196,7 +196,6 @@ pub enum Validity {
     InvalidCode,
     InvalidMaxBaseFee,
     InvalidNotEnoughGasForFees,
-    InvalidGasLimitTooHigh,
 }
 
 // TODO: https://gitlab.com/tezos/tezos/-/issues/6812
