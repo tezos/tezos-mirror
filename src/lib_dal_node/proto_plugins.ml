@@ -72,7 +72,7 @@ let () =
 
 let last_failed_protocol = ref None
 
-let _get_constants_for_plugin ?(emit_failure_event = true) cctxt plugin level
+let get_constants_for_plugin ?(emit_failure_event = true) cctxt plugin level
     proto_hash =
   let open Lwt_result_syntax in
   let block = `Level level in
@@ -114,11 +114,9 @@ let may_add cctxt plugins ~first_level ~proto_level =
       Chain_services.Blocks.protocols cctxt ~block:(`Level first_level) ()
     in
     let proto_hash = protocols.next_protocol in
-    let* ((module Plugin) as plugin) =
-      resolve_plugin_by_hash proto_hash ~start_level:first_level
-    in
+    let* plugin = resolve_plugin_by_hash proto_hash ~start_level:first_level in
     let+ proto_parameters =
-      Plugin.get_constants `Main (`Level first_level) cctxt
+      get_constants_for_plugin cctxt plugin first_level proto_hash
     in
     Plugins.add plugins ~proto_level ~first_level plugin proto_parameters
   in
@@ -178,9 +176,14 @@ let add_plugin_for_proto cctxt plugins
       protocol
       ~start_level:activation_level
   in
-  let block = `Level highest_level in
-  let (module Plugin) = plugin in
-  let+ proto_parameters = Plugin.get_constants `Main block cctxt in
+  let+ proto_parameters =
+    get_constants_for_plugin
+      ~emit_failure_event:false
+      cctxt
+      plugin
+      highest_level
+      protocol
+  in
   Plugins.add
     plugins
     ~first_level:activation_level
