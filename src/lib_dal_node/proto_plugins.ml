@@ -35,7 +35,9 @@ end
 
 let singleton = Plugins.add Plugins.empty
 
-type error += No_plugin_for_proto of {proto_hash : Protocol_hash.t}
+type error +=
+  | No_plugin_for_proto of {proto_hash : Protocol_hash.t}
+  | No_constants_for_proto of {proto_hash : Protocol_hash.t}
 
 let () =
   register_error_kind
@@ -51,9 +53,40 @@ let () =
         proto_hash)
     Data_encoding.(obj1 (req "proto_hash" Protocol_hash.encoding))
     (function No_plugin_for_proto {proto_hash} -> Some proto_hash | _ -> None)
-    (fun proto_hash -> No_plugin_for_proto {proto_hash})
+    (fun proto_hash -> No_plugin_for_proto {proto_hash}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.no_constants_for_proto"
+    ~title:"DAL node: no constants for protocol"
+    ~description:"DAL node: no constants for the protocol %a"
+    ~pp:(fun ppf proto_hash ->
+      Format.fprintf
+        ppf
+        "No constants for the protocol %a."
+        Protocol_hash.pp
+        proto_hash)
+    Data_encoding.(obj1 (req "proto_hash" Protocol_hash.encoding))
+    (function
+      | No_constants_for_proto {proto_hash} -> Some proto_hash | _ -> None)
+    (fun proto_hash -> No_constants_for_proto {proto_hash})
 
 let last_failed_protocol = ref None
+
+let _get_constants_for_plugin ?(emit_failure_event = true) cctxt plugin level
+    proto_hash =
+  let open Lwt_result_syntax in
+  let block = `Level level in
+  let (module Plugin : Dal_plugin.T) = plugin in
+  let*! proto_parameters_res = Plugin.get_constants `Main block cctxt in
+  match proto_parameters_res with
+  | Ok proto_parameters -> return proto_parameters
+  | Error _ ->
+      let*! () =
+        if emit_failure_event then
+          Event.emit_no_protocol_constnts ~proto_hash ~level
+        else Lwt.return_unit
+      in
+      tzfail @@ No_constants_for_proto {proto_hash}
 
 let resolve_plugin_by_hash ?(emit_failure_event = true) ~start_level proto_hash
     =
