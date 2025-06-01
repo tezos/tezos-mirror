@@ -210,7 +210,11 @@ let get_supported_proto_plugins cctxt ~head_level =
         let highest_level = Int32.pred level in
         match res with
         | Ok plugins -> return (plugins, highest_level)
-        | Error [No_plugin_for_proto {proto_hash}]
+        | Error
+            [
+              ( No_plugin_for_proto {proto_hash}
+              | No_constants_for_proto {proto_hash} );
+            ]
           when Protocol_hash.equal proto_hash protocol_info.protocol ->
             fail (`End_loop_ok plugins)
         | Error err -> fail (`End_loop_nok err))
