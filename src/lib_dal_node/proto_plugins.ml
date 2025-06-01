@@ -76,7 +76,7 @@ let resolve_plugin_by_hash ?(emit_failure_event = true) ~start_level proto_hash
 
 let may_add cctxt plugins ~first_level ~proto_level =
   let open Lwt_result_syntax in
-  let add first_level =
+  let try_add_new_plugin first_level =
     let* protocols =
       Chain_services.Blocks.protocols cctxt ~block:(`Level first_level) ()
     in
@@ -91,11 +91,14 @@ let may_add cctxt plugins ~first_level ~proto_level =
   in
   let plugin_opt = Plugins.LevelMap.min_binding_opt plugins in
   match plugin_opt with
-  | None -> add first_level
-  | Some (_, Plugins.{proto_level = prev_proto_level; _})
-    when prev_proto_level < proto_level ->
-      add first_level
-  | _ -> return plugins
+  | None -> try_add_new_plugin first_level
+  | Some (_, Plugins.{proto_level = prev_proto_level; _}) ->
+      if prev_proto_level < proto_level then
+        (* A new protocol has been activated on L1. Add its DAL plugin. *)
+        try_add_new_plugin first_level
+      else
+        (* We already have a plugin for the current protocol. *)
+        return plugins
 
 type error += No_plugin_for_level of {level : int32}
 
