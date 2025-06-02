@@ -9123,7 +9123,7 @@ let octez_scoru_wasm_debugger_plugin =
   public_lib
     "octez-smart-rollup-wasm-debugger-plugin"
     ~path:"src/bin_wasm_debugger/plugin"
-    ~release_status:Released
+    ~release_status:Unreleased
     ~deps:[]
     ~synopsis:"Plugin interface for the Octez Smart Rollup WASM Debugger"
 
@@ -9132,7 +9132,7 @@ let octez_scoru_wasm_debugger_lib =
     "octez-smart-rollup-wasm-debugger-lib"
     ~path:"src/lib_wasm_debugger"
     ~synopsis:"Tezos: Library used for the Smart Rollups' WASM debugger"
-    ~release_status:Released
+    ~release_status:Unreleased
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -9161,7 +9161,7 @@ let _octez_scoru_wasm_debugger =
     ~path:"src/bin_wasm_debugger"
     ~opam:"octez-smart-rollup-wasm-debugger"
     ~synopsis:"Tezos: Debugger for the smart rollups’ WASM kernels"
-    ~release_status:Released
+    ~release_status:Unreleased
     ~with_macos_security_framework:true
     ~deps:
       [
