@@ -58,6 +58,8 @@ Moreover, to participate in consensus and governance, the delegate
 needs to be :ref:`active<active_delegate_alpha>` and to meet
 :ref:`minimal balance requirements<minimal_baking_power_alpha>`.
 
+.. _security_deposit_alpha:
+
 Delegates and delegators may :doc:`stake<staking>` their tez. Staked
 tez are security deposits that may be forfeited in case the baker does
 not follow (some particular rules of) the protocol. Besides, as

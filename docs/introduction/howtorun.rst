@@ -122,39 +122,8 @@ Rights for baking and attesting are randomly assigned
 to delegates proportionally to their :doc:`baking power <../alpha/baking_power>`,
 which usually is their own staked funds plus the funds staked by external stakers, plus the third of their total delegation.
 
-A :ref:`minimal active stake<def_minimal_stake>`
-is required for participating in consensus and in governance as a delegate.
-
-Delegates are required to freeze some of their funds into
-a security deposit (called their own stake), at least ``MINIMAL_FROZEN_STAKE`` (see :ref:`ps_constants`).
+Delegates are required to freeze some of their funds into a :ref:`security deposit <security_deposit>`.
 This can be done via the same commands used by external stakers in the previous section.
-Since the activation of the new :doc:`staking mechanism <../active/staking>`,
-a delegate may choose to accept (or not) staked funds from external stakers.
-Both the delegate's own stake and the stake from external stakers can be
-:ref:`slashed<slashing>` (that is, partially lost), when the delegate misbehaves by double-signing.
-
-Delegates can set two parameters by configuring their :ref:`staking policy <staking_policy_configuration>`:
-
-- the maximum ratio of external stake over their own stake: a factor between 0 and 9, by default 0, which means that:
-
-  + for any factor *f*, the delegate accepts *f* times its own stake from external stakers
-  + by default, delegates don't allow external staking
-- the proportion of rewards kept by the delegator (the rest being paid to external stakers): a factor between 0 and 1, by default 1.
-
-These paramaters are configured as follows::
-
-  octez-client set delegate parameters for  <delegate> --limit-of-staking-over-baking <value> --edge-of-baking-over-staking <value>
-
-
-If the delegated funds exceed 9 times the delegate’s own stake, the delegate is *overdelegated*. If the staked funds from external stakers exceed the proportion defined by the delegate, the delegate is *overstaked*.
-See details and consequences in :ref:`staking_policy_configuration`.
-
-On testnets, when you obtain coins from :ref:`a faucet<faucet>`, if
-you are lucky to obtain more than the minimum required to be a
-delegate, you can register the obtained account as a delegate.
-Otherwise, you need to ask the faucet for more accounts and delegate
-them to the first.
-
 
 .. _DelegateRegistration:
 
@@ -164,12 +133,19 @@ Register and check your rights
 To run a delegate, you first need to register as one using
 your user account::
 
-   octez-client register key bob as delegate
+   octez-client register key mybaker as delegate
 
-You also need to stake some tez, as explained above, so as to have at least ``MINIMAL_STAKE = 6000`` :ref:`baking power <minimal_baking_power>`, taking into account your own and all your delegators' staked balances, as well as their delegated balances with a lesser weight.
+You also need to stake some tez, at least ``MINIMAL_FROZEN_STAKE`` (see :ref:`ps_constants`), and to have at least ``MINIMAL_STAKE = 6000`` :ref:`baking power <minimal_baking_power>`, taking into account your own and all your delegators' staked balances, as well as their delegated balances with a lesser weight.
+
+On testnets, when you obtain coins from :ref:`a faucet<faucet>`, if
+you are lucky to obtain more than the minimum required to be a
+delegate, you can stake the minimum amount by yourself and keep the rest for fees.
+Otherwise, you need to ask the faucet for more accounts and delegate
+them to the first.
+
 Most commonly, you would stake (at least) the needed amount from your own tez, without waiting for delegators::
 
-   octez-client stake 6000 for bob
+   octez-client stake 6000 for mybaker
 
 Once you registered and staked tez, you need to wait the end of the current cycle plus ``CONSENSUS_RIGHTS_DELAY = 2`` cycles,
 for your rights to be considered.
@@ -184,23 +160,28 @@ cycle, up to 2 cycles in the future.
 Sometimes there is no consensus at a round, so it is worth considering also
 baking rights at higher rounds, like 2 in the example above.
 
-.. _inactive_delegates:
+Configure the staking policy
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Inactive delegates
-~~~~~~~~~~~~~~~~~~
+A delegate may choose to accept (or not) staked funds from external stakers.
+Both the delegate's own stake and the stake from external stakers can be
+:ref:`slashed<slashing>` (that is, partially lost), when the delegate misbehaves (see :ref:`accuser_run`).
 
-If a delegate doesn't show any sign of activity for :ref:`TOLERATED_INACTIVITY_PERIOD <ps_constants>` cycles,
-it is marked **inactive** and its rights are removed.
-This mechanism is important to remove inactive delegates and reallocate
-their rights to the active ones so that the network is always working
-smoothly.
-Normally even a baker with the minimal stake should perform enough
-operations during this period to remain active.
-If for some reason your delegate is marked inactive you can reactivate
-it simply by re-registering again like above.
+Delegates can set two parameters by configuring their :ref:`staking policy <staking_policy_configuration>`:
 
-To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and attesting slots assigned to it, using a :ref:`Tezos block explorer <block_explorers>`.
-Alternatively, you may use the baking rights RPC and the attesting rights RPC (see :doc:`../api/openapi`), which is able to return a list of baking/attesting slots for a given delegate (see :ref:`example <DelegateRegistration>`).
+- the maximum ratio of external stake over their own stake: a factor between 0 and 9, by default 0, which means that:
+
+  + for any factor *f*, the delegate accepts *f* times its own stake from external stakers
+  + by default, delegates don't allow external staking
+- the proportion of rewards kept by the delegator (the rest being paid to external stakers): a factor between 0 and 1, by default 1.
+
+These parameters are configured as follows::
+
+  octez-client set delegate parameters for  <delegate> --limit-of-staking-over-baking <value> --edge-of-baking-over-staking <value>
+
+If the delegated funds exceed 9 times the delegate’s own stake, the delegate is *overdelegated*. If the staked funds from external stakers exceed the proportion defined by the delegate, the delegate is *overstaked*.
+See details and consequences in :ref:`staking_policy_configuration`.
+
 
 .. _baker_run:
 
@@ -217,20 +198,46 @@ During its run, the baker bakes blocks (by selecting transactions from
 the mempool and arranging them in a new block) and emits consensus
 operations like attestations. It does so whenever the associated
 accounts have the necessary rights.
+In our case, we already set up and funded a baker account called "mybaker".
 
-Let's launch the daemon pointing to the standard node directory and
-baking for user *bob*::
+For its operation, the baker daemon needs to communicate with an Octez node using RPCs.
+Therefore, you must indicate a node endpoint whose RPC interface is available.
+The most common way is to :ref:`run a node locally <quickstart_node>`, ensuring its RPC port is open for local calls (e.g. ``--rpc-addr 127.0.0.1``).
 
-   octez-baker-<PROTO_HASH> run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass --without-dal
+Bakers are also supposed to run a DAL node before running the baker daemon, to expand the amount of data that Tezos can distribute without causing congestion on layer 1.
+Therefore, first :doc:`start a DAL node <../shell/dal_run>`.
+
+Typically, you run an attester DAL node as follows::
+
+    octez-dal-node run --endpoint <node-endpoint> --attester-profiles=<baker-addr>
+
+Once the DAL node runs, we can launch the baker daemon pointing to the standard node directory and
+baking for user "mybaker"::
+
+   octez-baker-<PROTO_HASH> run with local node ~/.tezos-node mybaker --liquidity-baking-toggle-vote pass
 
 where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
 
-Note that the baker needs direct access to
-the node data directory for performance reasons (to reduce the number of RPC calls to the node).
-Note also that since version 13.0, option ``--liquidity-baking-toggle-vote`` is mandatory, see :ref:`the changelog <changes_13_0_rc1_baker>`.
-Note that ``--liquidity-baking-toggle-vote`` must be placed
-**after** ``run`` on the command-line.
-Note that option ``--without-dal`` exists since version 21.3 and will be mandatory starting from 22.0.
+Note that:
+
+- the baker needs direct access to the node data directory for performance reasons (to reduce the number of RPC calls to the node).
+- since version 13.0, option ``--liquidity-baking-toggle-vote`` is mandatory, see :ref:`the changelog <changes_13_0_rc1_baker>`.
+- option ``--liquidity-baking-toggle-vote`` must be placed **after** ``run`` on the command-line.
+- starting with version 22.0 it is recommended to run the Octez node with a DAL node (opting out requires the explicit option ``--without-dal``).
+
+Quickstart baker
+~~~~~~~~~~~~~~~~
+
+Putting together all the above instructions, you may want to quickly start a baker daemon on a testnet such as ghostnet as follows (after :ref:`starting an Octez node <quickstart_node>`)::
+
+    octez-client gen keys mybaker
+    BAKER_ADDRESS=$(octez-client show address mybaker | grep Hash | cut -d' ' -f2)
+    # Fund BAKER_ADDRESS with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+    octez-client register key mybaker as delegate
+    octez-client stake 6000 for mybaker
+    octez-dal-node run --endpoint http://127.0.0.1:8732 --attester-profiles=$BAKER_ADDRESS
+    octez-baker-PsRiotum run with local node $HOME/.tezos-node mybaker --liquidity-baking-toggle-vote pass --dal-node http://127.0.0.1:10732
+
 
 .. warning::
 
@@ -250,6 +257,24 @@ The baker uses the same format of configuration file as the client (see :ref:`cl
 .. warning::
 
     When running a baker, it is recommended to carefully save the nonces generated by the baker as part of the :doc:`consensus protocol <../active/consensus>`, to be able to reveal the nonces before the end of the cycle even if the baker is restarted (e.g., on another machine), so as to avoid losing :ref:`attestation rewards <slashing>`.
+
+.. _inactive_delegates:
+
+Inactive delegates
+~~~~~~~~~~~~~~~~~~
+
+If a delegate doesn't show any sign of activity for :ref:`TOLERATED_INACTIVITY_PERIOD <ps_constants>` cycles,
+it is marked **inactive** and its rights are removed.
+This mechanism is important to remove inactive delegates and reallocate
+their rights to the active ones so that the network is always working
+smoothly.
+Normally even a baker with the minimal stake should perform enough
+operations during this period to remain active.
+If for some reason your delegate is marked inactive you can reactivate
+it simply by re-registering again like above.
+
+To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and attesting slots assigned to it, using a :ref:`Tezos block explorer <block_explorers>`.
+Alternatively, you may use the baking rights RPC and the attesting rights RPC (see :doc:`../api/openapi`), which is able to return a list of baking/attesting slots for a given delegate (see :ref:`example <DelegateRegistration>`).
 
 
 .. _accuser_run:
