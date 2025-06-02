@@ -824,6 +824,53 @@ let test_tezlink_transfer =
     ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
   unit
 
+let test_tezlink_transfer_and_wait =
+  let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
+  register_tezlink_test
+    ~title:"Test Tezlink transfer and wait for inclusion"
+    ~tags:["kernel"; "transfer"; "wait"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~time_between_blocks:(Time_between_blocks 0.1)
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let amount = Tez.one in
+  (* The branch of the operation injected by the client is the
+     grand-parent of the current block. Looking for operation hashes
+     relies on the operation_hashes RPC which is not implemented for
+     the genesis block. For this reason, we wait for block level 3
+     before building the operation to ensure that the operation's
+     branch is not genesis. *)
+  let* () = Evm_node.wait_for_blueprint_applied sequencer 3 in
+  let* () =
+    Client.transfer
+      ~wait:"2"
+      ~endpoint
+      ~amount
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      client
+  in
+  let* balance1 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  let* balance2 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
+  in
+  Check.(
+    (Tez.to_mutez balance1
+    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount)
+      int)
+    ~error_msg:"Wrong balance for bootstrap1: exptected %R, actual %L" ;
+  Check.((Tez.to_mutez balance2 = Tez.to_mutez amount) int)
+    ~error_msg:"Wrong balance for bootstrap2: exptected %R, actual %L" ;
+  unit
+
 let test_tezlink_reveal =
   register_tezlink_test
     ~title:"Test Tezlink reveal"
@@ -916,6 +963,7 @@ let () =
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
   test_tezlink_transfer [Alpha] ;
+  test_tezlink_transfer_and_wait [Alpha] ;
   test_tezlink_reveal [Alpha] ;
   test_tezlink_block_info [Alpha] ;
   test_tezlink_storage [Alpha] ;
