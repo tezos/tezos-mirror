@@ -39,6 +39,9 @@ Available services:
                 Access the counter of a contract, if any. 
             - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/manager_key
                 Access the manager of an implicit contract. 
+          - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance
+              Returns the expected issued tez for the provided block and the
+              next 'consensus_rights_delay' cycles (in mutez) 
         - GET /tezlink/chains/<chain_id>/blocks/<block_id>/hash
             The block's hash, its unique identifier. 
         - GET /tezlink/chains/<chain_id>/blocks/<block_id>/header
@@ -123,6 +126,9 @@ Available services:
               Access the counter of a contract, if any. 
           - GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/manager_key
               Access the manager of an implicit contract. 
+        - GET /chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance
+            Returns the expected issued tez for the provided block and the
+            next 'consensus_rights_delay' cycles (in mutez) 
       - GET /chains/<chain_id>/blocks/<block_id>/hash
           The block's hash, its unique identifier. 
       - GET /chains/<chain_id>/blocks/<block_id>/header
