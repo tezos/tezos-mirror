@@ -917,6 +917,12 @@ let post_bls_aggregate_public_keys pks_with_proofs =
   let group_pkh = JSON.(json |-> "public_key_hash" |> as_string) in
   (group_pk, group_pkh)
 
+let post_bls_aggregate_proofs ~pk proofs =
+  let proofs = List.map (fun proof -> `String proof) proofs in
+  let pk_with_proofs = [("public_key", `String pk); ("proofs", `A proofs)] in
+  let data = `O pk_with_proofs in
+  make ~data:(Data data) POST ["bls"; "aggregate_proofs"] JSON.as_string
+
 let post_bls_threshold_signatures ~pk ~msg id_signatures =
   let id_signatures =
     List.map

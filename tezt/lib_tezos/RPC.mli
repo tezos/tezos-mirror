@@ -821,6 +821,9 @@ val post_bls_check_proof : pk:string -> proof:string -> unit -> bool t
 val post_bls_aggregate_public_keys :
   (string * string) list -> (string * string) t
 
+(** RPC: [POST /bls/aggregate_proofs] *)
+val post_bls_aggregate_proofs : pk:string -> string list -> string t
+
 (** RPC: [POST /bls/threshold_signatures] *)
 val post_bls_threshold_signatures :
   pk:string -> msg:string -> (int * string) list -> string t

@@ -4622,6 +4622,19 @@ let aggregate_bls_public_keys client pks_with_proofs =
   let group_pkh = JSON.(output |-> "public_key_hash" |> as_string) in
   return (group_pk, group_pkh)
 
+let spawn_aggregate_bls_proofs ~pk client (proofs : string list) =
+  let proofs = List.map (fun proof -> `String proof) proofs in
+  let pk_with_proofs = [("public_key", `String pk); ("proofs", `A proofs)] in
+  let json_batch = `O pk_with_proofs |> JSON.encode_u in
+  spawn_command client @@ ["aggregate"; "bls"; "proofs"; json_batch]
+
+let aggregate_bls_proofs ~pk client proofs =
+  let* s =
+    spawn_aggregate_bls_proofs ~pk client proofs
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim s)
+
 let spawn_share_bls_secret_key ~sk ~n ~m client =
   spawn_command client
   @@ [

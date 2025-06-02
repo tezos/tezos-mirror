@@ -3346,10 +3346,13 @@ val create_bls_proof : ?override_pk:string -> signer:string -> t -> string Lwt.t
 val check_bls_proof :
   ?override_pk:string -> pk:string -> proof:string -> t -> unit Lwt.t
 
-(** Run [octez-client aggregate public keys <pks_with_proofs>].
+(** Run [octez-client aggregate bls public keys <pks_with_proofs>].
     Returns [(aggregated_public_key, aggregated_public_key_hash)]. *)
 val aggregate_bls_public_keys :
   t -> (string * string) list -> (string * string) Lwt.t
+
+(** Run [octez-client aggregate bls proofs <pk_with_proofs>]. *)
+val aggregate_bls_proofs : pk:string -> t -> string list -> string Lwt.t
 
 (** Run [octez-client share bls secret key <sk> between <n> shares
     with threshold <m>]. *)
