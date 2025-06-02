@@ -27,24 +27,55 @@ let job_test ?dependencies ?rules () =
 module Release = struct
   (** Jobs and pipelines to release SDK bindings for each supported language *)
 
+  let macos_variables : Gitlab_ci.Types.variables =
+    [("TAGS", "saas-macos-medium-m1")]
+
   let jobs_build_sdk =
+    let job = job ~stage:Stages.build in
+
     let build_python_sdk =
+      let artifacts =
+        Gitlab_ci.Util.artifacts ["contrib/sdk-bindings/rust/target/wheels/*"]
+      in
+
       let linux : tezos_job =
         job
           ~__POS__
           ~name:"build_python_sdk_linux"
           ~description:"Build Python SDK for Linux"
-          ~stage:Stages.build
           ~image:Images.rust_sdk_bindings
-          ~artifacts:
-            (Gitlab_ci.Util.artifacts
-               ["contrib/sdk-bindings/rust/target/wheels/*"])
+          ~artifacts
           ~before_script:
             ["export CARGO_NET_OFFLINE=false"; ". $HOME/.venv/bin/activate"]
           ["make -C contrib/sdk-bindings/rust -f python.mk build"]
         |> enable_cargo_cache |> enable_sccache
       in
-      [linux]
+
+      let macos : tezos_job =
+        job
+          ~__POS__
+          ~name:"build_python_sdk_macos"
+          ~description:"Build Python SDK on macOS"
+          ~image:Images.macosx_14
+          ~variables:macos_variables
+          ~tag:Dynamic
+          ~artifacts
+          ~before_script:
+            [
+              "export CARGO_NET_OFFLINE=false";
+              "export CARGO_HOME=$HOME/.cargo";
+              "python3 -m venv $HOME/.venv";
+              ". $HOME/.venv/bin/activate";
+              "curl https://sh.rustup.rs -sSf | sh -s -- -y";
+              ". $HOME/.cargo/env";
+              "pip install maturin==1.5.1";
+              "brew install sccache";
+            ]
+          ["make -C contrib/sdk-bindings/rust -f python.mk build"]
+        |> enable_cargo_cache |> enable_sccache
+      in
+
+      [linux; macos]
     in
     build_python_sdk
 
@@ -85,5 +116,5 @@ module Release = struct
         "Release tag pipeline for SDK-bindings.\n\n\
          Created when the release manager pushes a tag in the format \
          tezos-sdk-vX.Y.Z. Creates and publishes releases on each supported \
-         package manager. Supported package manager are: 'TestPyPI'"
+         package manager. Supported package managers are: 'TestPyPI'"
 end

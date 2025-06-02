@@ -66,6 +66,48 @@ build_python_sdk_linux:
     paths:
     - contrib/sdk-bindings/rust/target/wheels/*
 
+build_python_sdk_macos:
+  image: macos-14-xcode-15
+  stage: build
+  tags:
+  - $TAGS
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - export CARGO_NET_OFFLINE=false
+  - export CARGO_HOME=$HOME/.cargo
+  - python3 -m venv $HOME/.venv
+  - . $HOME/.venv/bin/activate
+  - curl https://sh.rustup.rs -sSf | sh -s -- -y
+  - . $HOME/.cargo/env
+  - pip install maturin==1.5.1
+  - brew install sccache
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C contrib/sdk-bindings/rust -f python.mk build
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    TAGS: saas-macos-medium-m1
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    paths:
+    - contrib/sdk-bindings/rust/target/wheels/*
+
 publish_sdk:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
   stage: publish
@@ -74,9 +116,11 @@ publish_sdk:
   needs:
   - oc.docker:rust-sdk-bindings:amd64
   - build_python_sdk_linux
+  - build_python_sdk_macos
   dependencies:
   - oc.docker:rust-sdk-bindings:amd64
   - build_python_sdk_linux
+  - build_python_sdk_macos
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
