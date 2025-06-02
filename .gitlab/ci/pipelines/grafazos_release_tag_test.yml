@@ -71,7 +71,7 @@ build_grafazos_dashboards:
     when: on_success
 
 gitlab:release:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish_release_gitlab
   tags:
   - gcp

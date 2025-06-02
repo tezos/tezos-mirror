@@ -261,7 +261,7 @@ docker:merge_manifests:
     CI_DOCKER_HUB: "false"
 
 gitlab:release:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish_release_gitlab
   tags:
   - gcp
