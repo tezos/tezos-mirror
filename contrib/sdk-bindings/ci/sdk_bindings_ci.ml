@@ -33,8 +33,27 @@ module Release = struct
   let windows_variables : Gitlab_ci.Types.variables =
     [("TAGS", "saas-windows-medium-amd64"); ("SHELL", "powershell")]
 
+  let job_check_matching_tag : tezos_job =
+    job
+      ~__POS__
+      ~name:"check_sdk_version"
+      ~description:
+        "Check that the tag match the `tezos-bindings` Rust package version"
+      ~image:Images.datadog_ci
+      ~stage:Stages.start
+      [
+        "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+        "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+         pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
+        "./contrib/sdk-bindings/scripts/ci/check_tag_version.sh";
+      ]
+
   let jobs_build_sdk =
-    let job = job ~stage:Stages.build in
+    let job =
+      job
+        ~stage:Stages.build
+        ~dependencies:(Dependent [Job job_check_matching_tag])
+    in
 
     let build_python_sdk =
       let artifacts =
@@ -133,7 +152,7 @@ module Release = struct
       ~before_script:[". $HOME/.venv/bin/activate"]
       ["make -C contrib/sdk-bindings publish"]
 
-  let jobs = jobs_build_sdk @ [job_publish_sdk]
+  let jobs = [job_check_matching_tag] @ jobs_build_sdk @ [job_publish_sdk]
 
   (* Matches Tezos SDK release tags, e.g. [tezos-sdk-v1.2.0]. *)
   let tag_re = "/^tezos-sdk-v\\d+\\.\\d+\\.\\d+$/"
