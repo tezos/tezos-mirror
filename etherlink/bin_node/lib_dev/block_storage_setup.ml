@@ -82,7 +82,11 @@ let enable ~keep_alive ?evm_node_endpoint store =
     if enable_fallback && key = tmp_world_state_path ^ "/transactions_receipts"
     then
       Lwt_preemptive.run_in_main @@ fun () ->
-      let* pred = Evm_state.current_block_height tree in
+      let* pred =
+        Evm_state.current_block_height
+          ~root:Durable_storage_path.etherlink_root
+          tree
+      in
       let n = Ethereum_types.Qty.next pred in
       let+ block = get_block_exn n in
       let s = Ethereum_types.hash_to_bytes block.receiptRoot in
@@ -91,7 +95,11 @@ let enable ~keep_alive ?evm_node_endpoint store =
       enable_fallback && key = tmp_world_state_path ^ "/transactions_objects"
     then
       Lwt_preemptive.run_in_main @@ fun () ->
-      let* pred = Evm_state.current_block_height tree in
+      let* pred =
+        Evm_state.current_block_height
+          ~root:Durable_storage_path.etherlink_root
+          tree
+      in
       let n = Ethereum_types.Qty.next pred in
       let+ block = get_block_exn n in
       let s = Ethereum_types.hash_to_bytes block.transactionRoot in

@@ -11,7 +11,7 @@
 use std::borrow::Cow;
 
 use crate::block_storage;
-use crate::chains::ChainFamily;
+use crate::chains::{ChainFamily, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
 use crate::fees::simulation_add_gas_for_fees;
 use crate::l2block::L2Block;
 use crate::storage::{
@@ -399,7 +399,11 @@ impl Evaluation {
             }
         }
 
-        let constants = match block_storage::read_current(host, &ChainFamily::Evm) {
+        let constants = match block_storage::read_current(
+            host,
+            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            &ChainFamily::Evm,
+        ) {
             Ok(L2Block::Etherlink(block)) => {
                 // Timestamp is taken from the simulation caller if provided.
                 // If the timestamp is missing, because of an older evm-node,

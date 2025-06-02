@@ -158,13 +158,14 @@ end) : Services_backend_sig.Backend = struct
       | _ -> failwith "Inconsistent simulation results"
   end
 
-  let block_param_to_block_number
+  let block_param_to_block_number ~chain_family
       (block_param : Ethereum_types.Block_parameter.extended) =
     let open Lwt_result_syntax in
+    let root = Durable_storage_path.root_of_chain_family chain_family in
     let read_from_block_parameter param =
       let* state = Reader.get_state ~block:(Block_parameter param) () in
       let* value =
-        Reader.read state Durable_storage_path.Block.current_number
+        Reader.read state (Durable_storage_path.Block.current_number ~root)
       in
       match value with
       | Some value ->
@@ -176,12 +177,12 @@ end) : Services_backend_sig.Backend = struct
     | Block_hash {hash; _} -> (
         let* state = Reader.get_state ~block:(Block_parameter Latest) () in
         let* value =
-          Reader.read state (Durable_storage_path.Block.by_hash hash)
+          Reader.read state (Durable_storage_path.Block.by_hash ~root hash)
         in
         match value with
         | Some value ->
-            let block = Ethereum_types.block_from_rlp value in
-            return block.number
+            let block = L2_types.block_from_bytes ~chain_family value in
+            return (L2_types.block_number block)
         | None ->
             failwith
               "Missing state for block %a"

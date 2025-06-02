@@ -72,9 +72,10 @@ val execute_and_inspect :
   t ->
   bytes option list tzresult Lwt.t
 
-(** [current_block_height evm_state] returns the height of the latest block
-    produced by the kernel. *)
-val current_block_height : t -> Ethereum_types.quantity Lwt.t
+(** [current_block_height ~root evm_state] returns the height of the latest 
+    block produced by the kernel at [root]. *)
+val current_block_height :
+  root:Durable_storage_path.path -> t -> Ethereum_types.quantity Lwt.t
 
 (** Same as {!current_block_height} for the block hash. *)
 val current_block_hash :
@@ -135,10 +136,11 @@ val preload_kernel : t -> unit Lwt.t
 val get_delayed_inbox_item :
   t -> Ethereum_types.hash -> Evm_events.Delayed_transaction.t tzresult Lwt.t
 
-(**[clear_block_storage block state] removes the parent of [block], and all
-   durable storage information stored for [block], if this function is called
-   they need to be store elsewhere, mainly it consists in transactions. *)
-val clear_block_storage : 'transaction_object L2_types.block -> t -> t Lwt.t
+(** [clear_block_storage chain_family block state] removes the parent of [block],
+    and all durable storage information stored for [block], if this function is
+    called they need to be store elsewhere, mainly it consists in transactions. *)
+val clear_block_storage :
+  L2_types.chain_family -> 'transaction_object L2_types.block -> t -> t Lwt.t
 
 (** [storage_version tree] returns the current storage version set by the
     kernel. This storage version is used by the EVM node to determine whether a

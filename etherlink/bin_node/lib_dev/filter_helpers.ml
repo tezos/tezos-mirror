@@ -91,6 +91,7 @@ let validate_range log_filter_config
   | {from_block; to_block; _} ->
       let get_block_number block_param =
         Rollup_node_rpc.block_param_to_block_number
+          ~chain_family:L2_types.EVM
           (Block_parameter
              (Option.value ~default:Block_parameter.Latest block_param))
       in

@@ -48,7 +48,11 @@ let local_head_too_old ?remote_head ~evm_node_endpoint
         return (Qty remote_head)
     | None | Some _ ->
         (* See {Note keep_alive} *)
-        Batch.call (module Block_number) ~keep_alive:true ~evm_node_endpoint ()
+        Batch.call
+          (module Generic_block_number)
+          ~keep_alive:true
+          ~evm_node_endpoint
+          ()
   in
   return
     ( is_too_old ~remote:remote_head_number ~next:next_blueprint_number,

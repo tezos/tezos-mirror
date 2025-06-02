@@ -14,6 +14,7 @@ use crate::migration::storage_migration;
 use crate::stage_one::fetch_blueprints;
 use crate::storage::{read_sequencer_pool_address, PRIVATE_FLAG_PATH};
 use anyhow::Context;
+use chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use delayed_inbox::DelayedInbox;
 use fallback_upgrade::fallback_backup_kernel;
 use inbox::StageOneStatus;
@@ -29,7 +30,6 @@ use storage::{
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
-use tezos_evm_runtime::safe_storage::WORLD_STATE_PATH;
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
@@ -173,9 +173,14 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(
     host: &mut Host,
     minimum_base_fee_per_gas: U256,
 ) -> U256 {
-    use chains::ChainFamily;
+    use chains::{ChainConfigTrait, EvmChainConfig};
 
-    match block_storage::read_current(host, &ChainFamily::Evm) {
+    let chain_config = EvmChainConfig::default();
+    match block_storage::read_current(
+        host,
+        &chain_config.storage_root_path(),
+        &chain_config.get_chain_family(),
+    ) {
         Ok(current_block) => {
             let current_base_fee_per_gas = current_block.base_fee_per_gas();
             if current_base_fee_per_gas < minimum_base_fee_per_gas {
@@ -359,12 +364,16 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
 
     let world_state_subkeys = host
         .host
-        .store_count_subkeys(&WORLD_STATE_PATH)
+        .store_count_subkeys(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)
         .expect("The kernel failed to read the number of /evm/world_state subkeys");
 
     if world_state_subkeys == 0 {
         host.host
-            .store_write(&WORLD_STATE_PATH, "Un festival de GADT".as_bytes(), 0)
+            .store_write(
+                &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                "Un festival de GADT".as_bytes(),
+                0,
+            )
             .unwrap();
     }
 

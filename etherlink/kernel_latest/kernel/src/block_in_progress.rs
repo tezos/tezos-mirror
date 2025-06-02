@@ -7,6 +7,7 @@
 
 use crate::apply::{TransactionObjectInfo, TransactionReceiptInfo};
 use crate::block_storage;
+use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
@@ -481,7 +482,7 @@ impl EthBlockInProgress {
             base_fee_per_gas,
         );
         let new_block = L2Block::Etherlink(Box::new(new_block));
-        block_storage::store_current(host, &new_block)
+        block_storage::store_current(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH, &new_block)
             .context("Failed to store the current block")?;
         Ok(new_block)
     }

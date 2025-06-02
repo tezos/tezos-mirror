@@ -224,7 +224,12 @@ module Worker = struct
         ~base:(rollup_node_endpoint self)
         durable_state_value
         ((), Block_id.Level rollup_block_lvl)
-        {key = Durable_storage_path.Block.current_number}
+        {
+          key =
+            Durable_storage_path.Block.current_number
+            (* TODO: Remove etherlink root *)
+              ~root:Durable_storage_path.etherlink_root;
+        }
         ()
     in
     match finalized_current_number with

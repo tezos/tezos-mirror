@@ -39,6 +39,7 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
+use tezos_smart_rollup_host::path::Path;
 
 #[derive(Debug, PartialEq)]
 pub struct ProxyInboxContent {
@@ -377,6 +378,7 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
     host: &mut impl Runtime,
     input: Input<Mode>,
     inbox_content: &mut Mode::Inbox,
+    root: &impl Path,
     chain_family: &ChainFamily,
     garbage_collect_blocks: bool,
 ) -> anyhow::Result<()> {
@@ -392,7 +394,7 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
             clear_events(host)?;
             if garbage_collect_blocks {
                 log!(host, Debug, "Garbage collection of old blocks");
-                crate::block_storage::garbage_collect_blocks(host, chain_family)?;
+                crate::block_storage::garbage_collect_blocks(host, root, chain_family)?;
             }
             store_last_info_per_level_timestamp(host, info.info.predecessor_timestamp)?;
             store_l1_level(host, info.level)?
@@ -466,6 +468,7 @@ fn read_and_dispatch_input<
                 host,
                 input,
                 res,
+                &chain_configuration.storage_root_path(),
                 &chain_configuration.get_chain_family(),
                 garbage_collect_blocks,
             )?;

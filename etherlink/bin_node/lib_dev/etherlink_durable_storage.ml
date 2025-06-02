@@ -8,6 +8,8 @@
 open Durable_storage
 open Ethereum_types
 
+let root = Durable_storage_path.etherlink_root
+
 let balance read address =
   inspect_durable_and_decode_default
     ~default:(Ethereum_types.Qty Z.zero)
@@ -53,7 +55,7 @@ let code read address =
             decode)
 
 let current_block_number read =
-  Durable_storage.block_number read Durable_storage_path.Block.Current
+  Durable_storage.block_number ~root read Durable_storage_path.Block.Current
 
 let un_qty (Qty z) = z
 
@@ -83,6 +85,7 @@ let transaction_receipt read ?block_hash tx_hash =
             inspect_durable_and_decode
               read
               (Durable_storage_path.Indexes.block_by_number
+                 ~root
                  (Nth (un_qty temp_receipt.blockNumber)))
               decode_block_hash
           in
@@ -118,6 +121,7 @@ let transaction_object read tx_hash =
         inspect_durable_and_decode
           read
           (Durable_storage_path.Indexes.block_by_number
+             ~root
              (Nth (un_qty blockNumber)))
           decode_block_hash
       in
@@ -154,11 +158,11 @@ let populate_tx_objects read ~full_transaction_object
 
 let blocks_by_number read ~full_transaction_object ~number =
   let open Lwt_result_syntax in
-  let* (Ethereum_types.Qty level) = block_number read number in
+  let* (Ethereum_types.Qty level) = block_number ~root read number in
   let* block_hash_opt =
     inspect_durable_and_decode_opt
       read
-      (Durable_storage_path.Indexes.block_by_number (Nth level))
+      (Durable_storage_path.Indexes.block_by_number ~root (Nth level))
       decode_block_hash
   in
   match block_hash_opt with
@@ -167,7 +171,7 @@ let blocks_by_number read ~full_transaction_object ~number =
       let* block_opt =
         inspect_durable_and_decode_opt
           read
-          (Durable_storage_path.Block.by_hash block_hash)
+          (Durable_storage_path.Block.by_hash ~root block_hash)
           Ethereum_types.block_from_rlp
       in
       match block_opt with
@@ -185,7 +189,7 @@ let block_by_hash read ~full_transaction_object block_hash =
   let* block_opt =
     inspect_durable_and_decode_opt
       read
-      (Durable_storage_path.Block.by_hash block_hash)
+      (Durable_storage_path.Block.by_hash ~root block_hash)
       Ethereum_types.block_from_rlp
   in
   match block_opt with

@@ -12,6 +12,12 @@ open Ethereum_types
 
 type path = string
 
+val tezlink_root : path
+
+val etherlink_root : path
+
+val root_of_chain_family : L2_types.chain_family -> path
+
 val reboot_counter : string
 
 val evm_node_flag : path
@@ -89,18 +95,18 @@ module Block : sig
   type number = Current | Nth of Z.t
 
   (** Path to the given block. *)
-  val by_hash : block_hash -> path
+  val by_hash : root:path -> block_hash -> path
 
   (** Path to the current block number. *)
-  val current_number : path
+  val current_number : root:path -> path
 
   (** Path to the current block hash. *)
-  val current_hash : path
+  val current_hash : root:path -> path
 end
 
 module Indexes : sig
   (** Make the path to the indexed block hash. *)
-  val block_by_number : Block.number -> path
+  val block_by_number : root:path -> Block.number -> path
 end
 
 module Transaction_receipt : sig

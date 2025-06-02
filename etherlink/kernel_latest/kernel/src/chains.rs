@@ -32,6 +32,9 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::block::TezBlock;
 
+pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
+    RefPath::assert_from(b"/evm/world_state");
+
 pub const TEZLINK_SAFE_STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/tezlink");
 
 #[derive(Clone, Copy, Debug)]
@@ -177,6 +180,8 @@ pub trait ChainConfigTrait: Debug {
     fn get_chain_id(&self) -> U256;
 
     fn get_chain_family(&self) -> ChainFamily;
+
+    fn storage_root_path(&self) -> RefPath;
 
     fn fmt_with_family(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let chain_family = self.get_chain_family();
@@ -340,6 +345,10 @@ impl ChainConfigTrait for EvmChainConfig {
     ) -> PrecompileBTreeMap<Host> {
         precompile_set::<Host>(enable_fa_bridge)
     }
+
+    fn storage_root_path(&self) -> RefPath {
+        ETHERLINK_SAFE_STORAGE_ROOT_PATH
+    }
 }
 
 impl EvmChainConfig {
@@ -448,7 +457,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
         let tezblock = TezBlock::new(number, timestamp, previous_hash);
         let new_block = L2Block::Tezlink(tezblock);
-        crate::block_storage::store_current(host, &new_block)
+        let root = self.storage_root_path();
+        crate::block_storage::store_current(host, &root, &new_block)
             .context("Failed to store the current block")?;
         Ok(BlockComputationResult::Finished {
             included_delayed_transactions: vec![],
@@ -469,6 +479,10 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _enable_fa_bridge: bool,
     ) -> PrecompileBTreeMap<Host> {
         PrecompileBTreeMap::new()
+    }
+
+    fn storage_root_path(&self) -> RefPath {
+        TEZLINK_SAFE_STORAGE_ROOT_PATH
     }
 }
 
