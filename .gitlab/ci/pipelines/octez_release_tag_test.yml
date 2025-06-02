@@ -949,7 +949,7 @@ opam:release:
   - ./scripts/ci/opam-release.sh --dry-run
 
 publish:release-page:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish_release
   tags:
   - gcp
@@ -957,11 +957,9 @@ publish:release-page:
   - when: manual
     allow_failure: true
   needs:
-  - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
   timeout: 60 minutes
