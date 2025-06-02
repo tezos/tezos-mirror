@@ -271,18 +271,16 @@ end
 (* TODO: #7875
    Import from the protocol once it is exposed instead of copying it here. *)
 module Constants_services = struct
-  module RPC_path = Tezos_rpc.Path
-  module RPC_service = Tezos_rpc.Service
-  module RPC_query = Tezos_rpc.Query
-
   let custom_root =
-    (RPC_path.(open_root / "context" / "constants")
-      : tezlink_rpc_context RPC_path.context)
+    let open Tezos_rpc in
+    (Path.(open_root / "context" / "constants")
+      : tezlink_rpc_context Path.context)
 
   let all =
-    RPC_service.get_service
+    let open Tezos_rpc in
+    Service.get_service
       ~description:"All constants"
-      ~query:RPC_query.empty
+      ~query:Query.empty
       ~output:Alpha_context.Constants.encoding
       custom_root
 end
@@ -397,7 +395,7 @@ module Imported_services = struct
         unit,
         unit,
         Block_hash.t * Time.Protocol.t )
-      Constants_services.RPC_service.t =
+      Tezos_rpc.Service.t =
     import_service Tezos_shell_services.Monitor_services.S.bootstrapped
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
@@ -411,7 +409,7 @@ module Imported_services = struct
         int32 option * Alpha_context.packed_operation * Chain_id.t * int,
         Alpha_context.packed_protocol_data * Imported_protocol.operation_receipt
       )
-      Constants_services.RPC_service.t =
+      Tezos_rpc.Service.t =
     import_service Imported_protocol_plugin.RPC.Scripts.S.simulate_operation
 
   let monitor_heads :
