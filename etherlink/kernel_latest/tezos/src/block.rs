@@ -180,10 +180,12 @@ impl TezBlock {
 
 #[cfg(test)]
 mod tests {
-    use primitive_types::U256;
+    use primitive_types::{H256, U256};
     use tezos_smart_rollup::types::Timestamp;
 
-    use super::TezBlock;
+    use crate::operation_result::{OperationResult, OperationResultSum, RevealSuccess};
+
+    use super::{AppliedOperation, TezBlock};
 
     pub fn block_roundtrip(block: TezBlock) {
         let bytes = block
@@ -194,16 +196,40 @@ mod tests {
         assert_eq!(block, decoded_block, "Roundtrip failed on {:?}", block)
     }
 
-    fn dummy_tezblock() -> TezBlock {
+    fn dummy_applied_operation() -> AppliedOperation {
+        let hash = H256::random();
+        let data = crate::operation::make_dummy_reveal_operation();
+        let receipt = OperationResultSum::Reveal(OperationResult {
+            balance_updates: vec![],
+            result: crate::operation_result::ContentResult::Applied(RevealSuccess {
+                consumed_gas: 0u64.into(),
+            }),
+        });
+        AppliedOperation {
+            hash,
+            data,
+            receipt,
+        }
+    }
+
+    fn dummy_tezblock(operations: Vec<AppliedOperation>) -> TezBlock {
         let number = U256::one();
         let timestamp = Timestamp::from(0);
         let previous_hash = TezBlock::genesis_block_hash();
-        TezBlock::new(number, timestamp, previous_hash, vec![])
+        TezBlock::new(number, timestamp, previous_hash, operations)
             .expect("Block creation should have succeeded")
     }
 
     #[test]
+    fn test_empty_block_rlp_roundtrip() {
+        block_roundtrip(dummy_tezblock(vec![]));
+    }
+
+    #[test]
     fn test_block_rlp_roundtrip() {
-        block_roundtrip(dummy_tezblock());
+        block_roundtrip(dummy_tezblock(vec![
+            dummy_applied_operation(),
+            dummy_applied_operation(),
+        ]));
     }
 }
