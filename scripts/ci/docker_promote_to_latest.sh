@@ -5,21 +5,23 @@ set -eu
 
 current_dir=$(cd "$(dirname "${0}")" && pwd)
 
+ci_commit_tag=$(git tag --points-at HEAD)
+
+export CI_COMMIT_TAG="${ci_commit_tag}"
+
 . scripts/ci/docker.env
 
 # shellcheck source=./scripts/ci/docker.sh
 . "${current_dir}/docker.sh"
 
-# shellcheck source=./scripts/ci/octez-release.sh
-. ./scripts/ci/octez-release.sh
-
 ## The goal of this script is to retag existing Docker images (do not rebuild them)
-target_tag='latest'
+target_tag="${1:-latest}"
 
-gitlab_release=$(git tag --points-at HEAD | grep -oE '^octez-v[0-9]{1,4}\.[0-9]{1,4}$' || :)
+# shellcheck source=./scripts/ci/octez-release.sh
+. "${2:-./scripts/ci/octez-release.sh}"
 
 if [ -z "${gitlab_release}" ]; then
-  echo "Error: could not find valid tag like octez-vX.Y at branch HEAD"
+  echo "Error: could not find valid tag like *-vX.Y at branch HEAD"
   exit 1
 fi
 
