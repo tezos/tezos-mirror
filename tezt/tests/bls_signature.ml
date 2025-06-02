@@ -266,12 +266,22 @@ module Local_helpers = struct
     Log.info ~color:Log.Color.FG.gray "receipt for %s:\n%s" op_hash receipt ;
     return op_hash
 
-  let create_bls_proofs ~(signers : Account.key list) client =
+  let create_bls_proofs ?override_pk ~(signers : Account.key list) client =
     Lwt_list.map_s
       (fun (signer : Account.key) ->
-        let* proof = Client.create_bls_proof ~signer:signer.alias client in
+        let* proof =
+          Client.create_bls_proof ?override_pk ~signer:signer.alias client
+        in
         return (signer.public_key, proof))
       signers
+
+  let create_bls_proof_group_pk ~group_pk ~(signers : Account.key list) client =
+    let* pks_with_proofs =
+      create_bls_proofs ~override_pk:group_pk ~signers client
+    in
+    let _pks, proofs = List.split pks_with_proofs in
+    let* group_proof = Client.aggregate_bls_signatures client proofs in
+    return group_proof
 
   let check_bls_proofs ~kind client pk_with_proofs =
     match kind with
@@ -831,8 +841,17 @@ let test_all_stakers_sign_staking_operation_external_delegate ~kind =
       ~receiver:group_staker.public_key_hash
       client
   in
+  (* Create a proof for revealing a public key *)
+  let* group_mk_proof =
+    Local_helpers.create_bls_proof_group_pk
+      ~group_pk:group_pk_bls
+      ~signers:accounts
+      client
+  in
   (* reveal key for group_staker *)
-  let* op_reveal = Local_helpers.mk_op_reveal group_staker client in
+  let* op_reveal =
+    Local_helpers.mk_op_reveal ~proof:group_mk_proof group_staker client
+  in
   let* _op_hash =
     Local_helpers.inject_aggregate_bls_sign_op
       ~kind
@@ -921,8 +940,17 @@ let test_all_stakers_sign_staking_operation_consensus_key ~kind =
       ~receiver:group_staker.public_key_hash
       client
   in
+  (* Create a proof for revealing a public key *)
+  let* group_mk_proof =
+    Local_helpers.create_bls_proof_group_pk
+      ~group_pk:group_pk_bls
+      ~signers:accounts
+      client
+  in
   (* reveal key for group_staker *)
-  let* op_reveal = Local_helpers.mk_op_reveal group_staker client in
+  let* op_reveal =
+    Local_helpers.mk_op_reveal ~proof:group_mk_proof group_staker client
+  in
   let* _op_hash =
     Local_helpers.inject_aggregate_bls_sign_op
       ~kind
@@ -1061,6 +1089,13 @@ let test_all_stakers_sign_staking_operation_consensus_key_batch ~kind =
   let* proof_ck =
     Client.create_bls_proof ~signer:delegate_consensus_key.alias client
   in
+  (* create a proof for revealing a public key *)
+  let* group_mk_proof =
+    Local_helpers.create_bls_proof_group_pk
+      ~group_pk:group_pk_bls
+      ~signers:accounts
+      client
+  in
 
   (* reveal key for group_staker *)
   (* set delegate for group_staker to group_staker *)
@@ -1070,6 +1105,7 @@ let test_all_stakers_sign_staking_operation_consensus_key_batch ~kind =
     Local_helpers.mk_reveal_delegation_stake_update_ck_in_batch
       ~delegate:group_staker
       ~delegate_consensus_key
+      ~proof_mk:group_mk_proof
       ~proof_ck
       ~amount:(Tez.of_int 140_000)
       client
@@ -1404,15 +1440,15 @@ let register ~protocols =
   test_single_staker_sign_staking_operation_external_delegate protocols ;
   test_single_staker_sign_staking_operation_consensus_key protocols ;
   test_single_staker_sign_staking_operation_consensus_key_op_core protocols ;
-  (* test_all_stakers_sign_staking_operation_external_delegate *)
-  (*   ~kind:Client *)
-  (*   protocols ; *)
-  (* test_all_stakers_sign_staking_operation_external_delegate ~kind:RPC protocols ; *)
-  (* test_all_stakers_sign_staking_operation_consensus_key ~kind:Client protocols ; *)
-  (* test_all_stakers_sign_staking_operation_consensus_key ~kind:RPC protocols ; *)
-  (* test_all_stakers_sign_staking_operation_consensus_key_batch *)
-  (*   ~kind:Client *)
-  (*   protocols ; *)
+  test_all_stakers_sign_staking_operation_external_delegate
+    ~kind:Client
+    protocols ;
+  test_all_stakers_sign_staking_operation_external_delegate ~kind:RPC protocols ;
+  test_all_stakers_sign_staking_operation_consensus_key ~kind:Client protocols ;
+  test_all_stakers_sign_staking_operation_consensus_key ~kind:RPC protocols ;
+  test_all_stakers_sign_staking_operation_consensus_key_batch
+    ~kind:Client
+    protocols ;
   test_threshold_number_stakers_sign_staking_operation_external_delegate
     ~kind:Client
     protocols ;
