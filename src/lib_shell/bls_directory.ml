@@ -44,6 +44,13 @@ let build_rpc_directory () =
         else None
       in
       return res) ;
+  register0 Bls_services.S.aggregate_proofs (fun () pk_with_pops ->
+      let aggregated_proof = Bls.aggregate_signature_opt pk_with_pops.proofs in
+      match aggregated_proof with
+      | Some proof ->
+          let is_valid = check_public_key_with_proof pk_with_pops.pk proof in
+          if is_valid then return aggregated_proof else return_none
+      | None -> return_none) ;
   register0 Bls_services.S.threshold_signatures (fun () inp ->
       let sigs =
         List.map

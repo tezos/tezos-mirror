@@ -16,6 +16,8 @@ module S : sig
     pkh : Bls.Public_key_hash.t;
   }
 
+  type public_key_with_proofs = {pk : Bls.Public_key.t; proofs : Bls.t list}
+
   type threshold_signature_share = {id : int; signature : Bls.t}
 
   type threshold_signature = {
@@ -39,6 +41,15 @@ module S : sig
       public_key_and_public_key_hash option )
     Tezos_rpc.Service.t
 
+  val aggregate_proofs :
+    ( [`POST],
+      unit,
+      unit,
+      unit,
+      public_key_with_proofs,
+      Bls.t option )
+    Tezos_rpc.Service.t
+
   val threshold_signatures :
     ( [`POST],
       unit,
@@ -59,6 +70,11 @@ val aggregate_public_keys :
   #Tezos_rpc.Context.simple ->
   S.public_key_with_proof list ->
   S.public_key_and_public_key_hash option tzresult Lwt.t
+
+val aggregate_proofs :
+  #Tezos_rpc.Context.simple ->
+  S.public_key_with_proofs ->
+  Bls.t option tzresult Lwt.t
 
 val threshold_signatures :
   #Tezos_rpc.Context.simple ->
