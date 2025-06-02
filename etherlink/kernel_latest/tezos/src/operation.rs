@@ -233,9 +233,48 @@ impl Decodable for Operation {
 }
 
 #[cfg(test)]
+fn make_dummy_operation(
+    operation: OperationContent,
+    signature: UnknownSignature,
+) -> Operation {
+    use crate::block::TezBlock;
+
+    let branch = TezBlock::genesis_block_hash();
+
+    // Public key hash in b58 for 0002298c03ed7d454a101eb7022bc95f7e5f41ac78
+    let source = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+        .expect("Public key hash conversion should succeeded");
+
+    Operation {
+        branch,
+        content: ManagerOperation {
+            source,
+            fee: 1_u64.into(),
+            counter: 10_u64.into(),
+            gas_limit: 68_u64.into(),
+            storage_limit: 45_u64.into(),
+            operation,
+        },
+        signature,
+    }
+}
+
+#[cfg(test)]
+pub fn make_dummy_reveal_operation() -> Operation {
+    let pk = PublicKey::from_b58check(
+        "edpkuT1qccDweCHnvgjLuNUHERpZmEaFZfbWvTzj2BxmTgQBZjaDFD",
+    )
+    .expect("Public key creation should have succeeded");
+
+    let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
+
+    make_dummy_operation(OperationContent::Reveal { pk }, signature)
+}
+
+#[cfg(test)]
 mod tests {
     use super::{ManagerOperation, Operation, OperationContent};
-    use crate::block::TezBlock;
+    use crate::operation::make_dummy_reveal_operation;
     use primitive_types::H256;
     use rlp::{Decodable, Rlp, RlpStream};
     use tezos_crypto_rs::{
@@ -243,41 +282,6 @@ mod tests {
         public_key::PublicKey,
     };
     use tezos_smart_rollup::types::PublicKeyHash;
-
-    fn make_dummy_operation(
-        operation: OperationContent,
-        signature: UnknownSignature,
-    ) -> Operation {
-        let branch = TezBlock::genesis_block_hash();
-
-        // Public key hash in b58 for 0002298c03ed7d454a101eb7022bc95f7e5f41ac78
-        let source = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
-            .expect("Public key hash conversion should succeeded");
-
-        Operation {
-            branch,
-            content: ManagerOperation {
-                source,
-                fee: 1_u64.into(),
-                counter: 10_u64.into(),
-                gas_limit: 68_u64.into(),
-                storage_limit: 45_u64.into(),
-                operation,
-            },
-            signature,
-        }
-    }
-
-    fn make_dummy_reveal_operation() -> Operation {
-        let pk = PublicKey::from_b58check(
-            "edpkuT1qccDweCHnvgjLuNUHERpZmEaFZfbWvTzj2BxmTgQBZjaDFD",
-        )
-        .expect("Public key creation should have succeeded");
-
-        let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
-
-        make_dummy_operation(OperationContent::Reveal { pk }, signature)
-    }
 
     #[test]
     fn operation_rlp_roundtrip() {
