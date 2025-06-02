@@ -511,7 +511,7 @@ let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
   let open Lwt_result_syntax in
   let config : Configuration_file.t = Node_context.get_config ctxt in
   let Types.Slot_id.{slot_index; slot_level = published_level} = slot_id in
-  match config.http_backup_uris with
+  match config.slots_backup_uris with
   | [] ->
       (* Fail if no http backup URI is configured. *)
       fail Errors.not_found
@@ -519,7 +519,7 @@ let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
       (* We fetch the expected commitment hash from the published slot header on
          L1 if [trust_http_backup_uris] is false. *)
       let* expected_commitment_hash =
-        (if config.trust_http_backup_uris then return_none
+        (if config.trust_slots_backup_uris then return_none
          else
            let+ res = get_commitment_from_slot_id ctxt slot_id in
            Option.some res)

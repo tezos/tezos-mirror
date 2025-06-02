@@ -255,31 +255,33 @@ module Term = struct
 
   let endpoint = arg_to_cmdliner endpoint_arg
 
-  let http_backup_uris_arg =
+  let slots_backup_uris_arg =
     let decoder, printer = uri_format in
     make_arg_list
       ~doc:
-        "List of HTTP base URIs to fetch missing DAL slots if they are \
-         unavailable locally or cannot be reconstructed from shards. This \
-         option can be specified multiple times to provide fallback sources."
+        "List of base URIs to fetch missing DAL slots if they are unavailable \
+         locally or cannot be reconstructed from shards. Supported URI schemes \
+         include 'http://', 'https://', and 'file://'. The option accepts a \
+         list of fallback sources separated with commas."
       ~placeholder:"URI"
       ~parse:decoder
       ~pp:printer
-      "http-printer"
+      "slots-backup-uri"
 
-  let http_backup_uris = arg_list_to_cmdliner http_backup_uris_arg
+  let slots_backup_uris = arg_list_to_cmdliner slots_backup_uris_arg
 
-  let trust_http_backup_uris_switch =
+  let trust_slots_backup_uris_switch =
     make_switch
       ~doc:
-        "If set, skip cryptographic verification of slots downloaded from HTTP \
-         backup URIs. Default is false. This can speed up slot retrieval when \
-         replaying history or for debugging purposes, but should be used with \
-         caution for normal operation or in the context of refutation games \
-         (unless the HTTP source is fully trusted)."
-      "trust-http-backup-uris"
+        "If set, skip cryptographic verification of slots downloaded from the \
+         backup URIs provided via --slots-backup-uri. This can speed up slot \
+         retrieval when replaying history or for debugging purposes. Use with \
+         caution during normal operation or when data integrity is critical, \
+         unless the backup source is fully trusted."
+      "trust-slots-backup-uris"
 
-  let trust_http_backup_uris = switch_to_cmdliner trust_http_backup_uris_switch
+  let trust_slots_backup_uris =
+    switch_to_cmdliner trust_slots_backup_uris_switch
 
   let ignore_l1_config_peers_switch =
     make_switch
@@ -510,7 +512,7 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
-       $ public_addr $ endpoint $ http_backup_uris $ trust_http_backup_uris
+       $ public_addr $ endpoint $ slots_backup_uris $ trust_slots_backup_uris
        $ metrics_addr $ attester_profile $ operator_profile $ observer_profile
        $ bootstrap_profile $ peers $ history_mode $ service_name
        $ service_namespace $ fetch_trusted_setup $ verbose
@@ -664,8 +666,8 @@ type options = {
   listen_addr : P2p_point.Id.t option;
   public_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
-  http_backup_uris : Uri.t list;
-  trust_http_backup_uris : bool;
+  slots_backup_uris : Uri.t list;
+  trust_slots_backup_uris : bool;
   profile : Profile_manager.unresolved_profile option;
   metrics_addr : P2p_point.Id.t option;
   peers : string list;
@@ -679,7 +681,7 @@ type options = {
 }
 
 let cli_options_to_options data_dir rpc_addr expected_pow listen_addr
-    public_addr endpoint http_backup_uris trust_http_backup_uris metrics_addr
+    public_addr endpoint slots_backup_uris trust_slots_backup_uris metrics_addr
     attesters operators observers bootstrap_flag peers history_mode service_name
     service_namespace fetch_trusted_setup verbose ignore_l1_config_peers =
   let open Result_syntax in
@@ -711,8 +713,8 @@ let cli_options_to_options data_dir rpc_addr expected_pow listen_addr
       listen_addr;
       public_addr;
       endpoint;
-      http_backup_uris;
-      trust_http_backup_uris;
+      slots_backup_uris;
+      trust_slots_backup_uris;
       profile;
       metrics_addr;
       peers;
@@ -735,8 +737,8 @@ let merge
       listen_addr;
       public_addr;
       endpoint;
-      http_backup_uris;
-      trust_http_backup_uris;
+      slots_backup_uris;
+      trust_slots_backup_uris;
       metrics_addr;
       profile;
       peers;
@@ -760,12 +762,12 @@ let merge
           ~lower_prio:configuration.profile
           ~higher_prio:from_cli
   in
-  let http_backup_uris, trust_http_backup_uris =
+  let slots_backup_uris, trust_slots_backup_uris =
     (* backup URIs from the CLI, if any, are favored over the ones in the
        config file. *)
-    if List.is_empty http_backup_uris then
-      (configuration.http_backup_uris, configuration.trust_http_backup_uris)
-    else (http_backup_uris, trust_http_backup_uris)
+    if List.is_empty slots_backup_uris then
+      (configuration.slots_backup_uris, configuration.trust_slots_backup_uris)
+    else (slots_backup_uris, trust_slots_backup_uris)
   in
   {
     configuration with
@@ -775,8 +777,8 @@ let merge
     public_addr = Option.value ~default:configuration.public_addr public_addr;
     expected_pow = Option.value ~default:configuration.expected_pow expected_pow;
     endpoint = Option.value ~default:configuration.endpoint endpoint;
-    http_backup_uris;
-    trust_http_backup_uris;
+    slots_backup_uris;
+    trust_slots_backup_uris;
     profile;
     (* metrics are disabled unless a metrics_addr option is specified *)
     metrics_addr;
@@ -847,7 +849,7 @@ let main_run subcommand cli_options =
 
 let commands =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
-      endpoint http_backup_uris trust_http_backup_uris metrics_addr attesters
+      endpoint slots_backup_uris trust_slots_backup_uris metrics_addr attesters
       operators observers bootstrap_flag peers history_mode service_name
       service_namespace fetch_trusted_setup verbose ignore_l1_config_peers =
     match
@@ -858,8 +860,8 @@ let commands =
         listen_addr
         public_addr
         endpoint
-        http_backup_uris
-        trust_http_backup_uris
+        slots_backup_uris
+        trust_slots_backup_uris
         metrics_addr
         attesters
         operators

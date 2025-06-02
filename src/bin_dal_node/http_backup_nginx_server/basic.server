@@ -8,7 +8,7 @@
 ##
 ##   <URI>/v0/slots/by_published_level/<published_level>_<slot_index>_<slot_size>
 ##
-## This layout is expected by the `--http-backup` option of the DAL node.
+## This layout is expected by the `--slots-backup-uri` option of the DAL node.
 
 # How to deploy?
 

@@ -72,8 +72,8 @@ type t = {
   peers : string list;
   expected_pow : float;
   endpoint : Uri.t;
-  http_backup_uris : Uri.t list;
-  trust_http_backup_uris : bool;
+  slots_backup_uris : Uri.t list;
+  trust_slots_backup_uris : bool;
   metrics_addr : P2p_point.Id.t option;
   profile : Profile_manager.unresolved_profile;
   history_mode : history_mode;
@@ -129,8 +129,8 @@ let default =
     peers = default_peers;
     expected_pow = default_expected_pow;
     endpoint = default_endpoint;
-    http_backup_uris = [];
-    trust_http_backup_uris = false;
+    slots_backup_uris = [];
+    trust_slots_backup_uris = false;
     metrics_addr = None;
     history_mode = default_history_mode;
     profile = Profile_manager.Empty;
@@ -171,8 +171,8 @@ let encoding : t Data_encoding.t =
            peers;
            expected_pow;
            endpoint;
-           http_backup_uris;
-           trust_http_backup_uris;
+           slots_backup_uris;
+           trust_slots_backup_uris;
            metrics_addr;
            history_mode;
            profile;
@@ -191,8 +191,8 @@ let encoding : t Data_encoding.t =
           peers,
           expected_pow,
           endpoint,
-          http_backup_uris,
-          trust_http_backup_uris,
+          slots_backup_uris,
+          trust_slots_backup_uris,
           metrics_addr ),
         ( history_mode,
           profile,
@@ -210,8 +210,8 @@ let encoding : t Data_encoding.t =
              peers,
              expected_pow,
              endpoint,
-             http_backup_uris,
-             trust_http_backup_uris,
+             slots_backup_uris,
+             trust_slots_backup_uris,
              metrics_addr ),
            ( history_mode,
              profile,
@@ -230,8 +230,8 @@ let encoding : t Data_encoding.t =
         peers;
         expected_pow;
         endpoint;
-        http_backup_uris;
-        trust_http_backup_uris;
+        slots_backup_uris;
+        trust_slots_backup_uris;
         metrics_addr;
         history_mode;
         profile;
@@ -281,12 +281,12 @@ let encoding : t Data_encoding.t =
              uri_encoding
              default_endpoint)
           (dft
-             "http_backup_uris"
+             "slots_backup_uris"
              ~description:"Optional HTTP endpoints to fetch missing slots from."
              (list uri_encoding)
              [])
           (dft
-             "trust_http_backup_uris"
+             "trust_slots_backup_uris"
              ~description:
                "Whether to trust the data downlaoded from the provided HTTP \
                 backup URIs."
