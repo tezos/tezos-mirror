@@ -2,30 +2,35 @@
 #
 # SPDX-License-Identifier: MIT
 
+MAKE_RUST = $(MAKE) -C rust/
+MAKE_PYTHON = $(MAKE) -C rust/ -f python.mk
+MAKE_KOTLIN = $(MAKE) -C kotlin/demo/
+MAKE_SWIFT = $(MAKE) -C swift/
+
 .PHONY: check
 check:
-	@make -C rust/ check
+	@$(MAKE_RUST) check
 
 .PHONY: bindings
 bindings:
-	@make -C rust/ generate-bindings
+	@$(MAKE_RUST) generate-bindings
 
 .PHONY: clean
 clean:
-	@make -C rust/ clean
-	@make -C python/ clean
-	@make -C kotlin/demo clean
-	@make -C swift clean
+	@$(MAKE_RUST) clean
+	@$(MAKE_PYTHON) clean
+	@$(MAKE_KOTLIN) clean
+	@$(MAKE_SWIFT) clean
 
 .PHONY: test
 test: test-rust test-bindings
 
 .PHONY: test-rust
 test-rust:
-	@make -C rust/ test
+	@$(MAKE_RUST) test
 
 .PHONY: test-bindings
 test-bindings: bindings
-	@make -C python/ test
-	@make -C kotlin/demo test
-	@make -C swift test
+	@$(MAKE_PYTHON) test
+	@$(MAKE_KOTLIN) test
+	@$(MAKE_SWIFT) test

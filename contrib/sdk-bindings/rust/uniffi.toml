@@ -1,3 +1,6 @@
+[bindings.python]
+cdylib_name = "tezos_sdk"
+
 [bindings.kotlin]
 package_name = "org.example.tezos"
 cdylib_name = "tezos"

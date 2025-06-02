@@ -1,0 +1,20 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "tezos-sdk"
+description = "Tezos SDK"
+license = "MIT"
+authors = [
+    { name = "Functori", email = "<contact@functori.com>" }
+]
+homepage = "https://tezos.com/"
+repository = "https://gitlab.com/tezos/tezos"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dynamic = ["version"]

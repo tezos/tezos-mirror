@@ -21,6 +21,7 @@ pkgs.mkShell.override {
     pkgs.python39
     pkgs.python39Packages.pytest
     pkgs.yapf
+    pkgs.maturin
 
     # Kotlin
     pkgs.kotlin
@@ -33,4 +34,15 @@ pkgs.mkShell.override {
     pkgs.swiftPackages.Foundation
     pkgs.swiftPackages.XCTest
   ];
+
+  # Maturin requires a python environment to install
+  shellHook = ''
+    if [ ! -d .venv ]; then
+      python -m venv .venv
+      source .venv/bin/activate
+      pip install pytest
+    else
+      source .venv/bin/activate
+    fi
+  '';
 }

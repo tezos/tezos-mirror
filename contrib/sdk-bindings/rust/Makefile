@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: MIT
 
+MAKE_PYTHON = $(MAKE) -f python.mk
+
 .PHONY: check
 check:
 	@cargo fmt --check
@@ -20,6 +22,10 @@ OUT_DIR = uniffi_generated_files
 generate-%: build
 	@cargo run --features uniffi/cli --bin uniffi-bindgen -- generate --language $* --out-dir ../$*/$(OUT_DIR)/ --library $(TEZOS_LIB)
 	@cp $(TEZOS_LIB) ../$*/$(OUT_DIR)/libtezos.so
+
+.PHONY: generate-python
+generate-python:
+	$(MAKE_PYTHON) build
 
 .PHONY: generate-bindings
 generate-bindings: generate-python generate-kotlin generate-swift

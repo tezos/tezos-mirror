@@ -27,6 +27,7 @@ RUN apt-get update && \
     sccache \
     # Python requirements
     python3 python3-venv \
+    pipx \
     # Kotlin requirements
     openjdk-17-jdk \
     # Swift dependencies
@@ -57,6 +58,13 @@ ENV PATH=/root/.cargo/bin:$PATH
 # install pytest
 RUN python3 -m venv .venv && \
     ./.venv/bin/pip install pytest
+
+# install maturin
+ARG MATURIN_VERSION=1.5.1
+RUN pipx ensurepath
+RUN pipx install maturin==${MATURIN_VERSION}
+
+ENV PATH="/root/.local/bin/:$PATH"
 
 # install swift
 ARG SWIFT_VERSION=6.0.3
