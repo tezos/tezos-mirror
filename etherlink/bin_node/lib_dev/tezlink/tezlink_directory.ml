@@ -211,13 +211,13 @@ let wrap conv impl p q i =
 let register ~service ~impl dir = Tezos_rpc.Directory.register dir service impl
 
 let register_with_conversion ~service ~impl ~convert_output dir =
-  Tezos_rpc.Directory.register dir service (wrap convert_output impl)
+  register ~service ~impl:(wrap convert_output impl) dir
+
+let opt_register ~service ~impl dir =
+  Tezos_rpc.Directory.opt_register dir service impl
 
 let opt_register_with_conversion ~service ~impl ~convert_output dir =
-  Tezos_rpc.Directory.opt_register
-    dir
-    service
-    (wrap (Option.map_e convert_output) impl)
+  opt_register ~service ~impl:(wrap (Option.map_e convert_output) impl) dir
 
 let register_dynamic ~root_dir ~path dir_of_path =
   Tezos_rpc.Directory.register_dynamic_directory root_dir path dir_of_path
@@ -383,15 +383,21 @@ let build_block_static_directory ~l2_chain_id
          let*? chain = check_chain chain in
          let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
          let*? block = check_block block in
-         let* operations = Backend.operations chain ~chain_id block in
+         let consensus_operation_hashes = [] in
+         let voting_operation_hashes = [] in
+         let anonymous_operation_hashes = [] in
+         let* manager_operation_hashes =
+           let+ operations = Backend.operations chain ~chain_id block in
+           List.map
+             (fun (op : Tezos_services.Block_services.operation) -> op.hash)
+             operations
+         in
          return
            [
-             [];
-             [];
-             [];
-             List.map
-               (fun (op : Tezos_services.Block_services.operation) -> op.hash)
-               operations;
+             consensus_operation_hashes;
+             voting_operation_hashes;
+             anonymous_operation_hashes;
+             manager_operation_hashes;
            ])
 
 let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
