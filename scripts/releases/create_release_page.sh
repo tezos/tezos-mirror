@@ -17,8 +17,6 @@ if [ -z "${versions_list_filename}" ]; then
   exit 1
 fi
 
-sudo apk add pandoc jq
-
 # [versions] is a 2D array representation of the [$versions_list_filename] JSON:
 # - one line per release or release candidate
 # - each line has four elements: "[major].[minor] [rc] [latest] [announcement]"

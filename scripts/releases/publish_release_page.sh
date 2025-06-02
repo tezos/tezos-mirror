@@ -24,9 +24,6 @@ if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
   exit 1
 fi
 
-#TODO: Add to docker image ?
-sudo apk add aws-cli
-
 aws s3 cp s3://"${S3_BUCKET}"/"$versions_list_filename" "./$versions_list_filename"
 
 # If it's a release, we actually push the assets to the s3 bucket
@@ -41,9 +38,6 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
   if [ -z "${gitlab_release}" ]; then
     echo "This is not an Octez release. No assets will be added to the release page."
   else
-
-    #TODO: Add to docker image ?
-    sudo apk add gawk jq
 
     announcement="https://octez.tezos.com/docs/releases/version-${gitlab_release_major_version}.html"
 
