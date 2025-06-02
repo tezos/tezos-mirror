@@ -275,13 +275,17 @@ module Local_helpers = struct
         return (signer.public_key, proof))
       signers
 
-  let create_bls_proof_group_pk ~group_pk ~(signers : Account.key list) client =
+  let create_bls_proof_group_pk ~kind ~group_pk ~(signers : Account.key list)
+      client =
     let* pks_with_proofs =
       create_bls_proofs ~override_pk:group_pk ~signers client
     in
     let _pks, proofs = List.split pks_with_proofs in
-    let* group_proof = Client.aggregate_bls_signatures client proofs in
-    return group_proof
+    match kind with
+    | Client -> Client.aggregate_bls_proofs ~pk:group_pk client proofs
+    | RPC ->
+        Client.RPC.call client
+        @@ RPC.post_bls_aggregate_proofs ~pk:group_pk proofs
 
   let check_bls_proofs ~kind client pk_with_proofs =
     match kind with
@@ -849,6 +853,7 @@ let test_all_stakers_sign_staking_operation_external_delegate ~kind =
   (* Create a proof for revealing a public key *)
   let* group_mk_proof =
     Local_helpers.create_bls_proof_group_pk
+      ~kind
       ~group_pk:group_pk_bls
       ~signers:accounts
       client
@@ -948,6 +953,7 @@ let test_all_stakers_sign_staking_operation_consensus_key ~kind =
   (* Create a proof for revealing a public key *)
   let* group_mk_proof =
     Local_helpers.create_bls_proof_group_pk
+      ~kind
       ~group_pk:group_pk_bls
       ~signers:accounts
       client
@@ -1097,6 +1103,7 @@ let test_all_stakers_sign_staking_operation_consensus_key_batch ~kind =
   (* create a proof for revealing a public key *)
   let* group_mk_proof =
     Local_helpers.create_bls_proof_group_pk
+      ~kind
       ~group_pk:group_pk_bls
       ~signers:accounts
       client
