@@ -34,8 +34,8 @@ module EIP_2930 = struct
     value : quantity;
     access_list : access list;
     v : quantity;
-    r : hex;
-    s : hex;
+    r : quantity;
+    s : quantity;
   }
 
   let encoding =
@@ -117,8 +117,8 @@ module EIP_2930 = struct
             (req "value" quantity_encoding)
             (req "accessList" (list access_encoding))
             (req "v" quantity_encoding)
-            (req "r" hex_encoding)
-            (req "s" hex_encoding)))
+            (req "r" quantity_encoding)
+            (req "s" quantity_encoding)))
 end
 
 module EIP_1559 = struct
@@ -138,8 +138,8 @@ module EIP_1559 = struct
     access_list : access list;
     input : hex;
     v : quantity;
-    r : hex;
-    s : hex;
+    r : quantity;
+    s : quantity;
   }
 
   let encoding =
@@ -235,8 +235,8 @@ module EIP_1559 = struct
             (req "accessList" (list access_encoding))
             (req "input" hex_encoding)
             (req "v" quantity_encoding)
-            (req "r" hex_encoding)
-            (req "s" hex_encoding)))
+            (req "r" quantity_encoding)
+            (req "s" quantity_encoding)))
 end
 
 type t =

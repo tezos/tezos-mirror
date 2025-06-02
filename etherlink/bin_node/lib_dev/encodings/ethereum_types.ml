@@ -365,11 +365,11 @@ type legacy_transaction_object = {
   nonce : quantity;
   to_ : address option;
   transactionIndex : quantity option;
-      (* It can be null if it's in a pending block. *)
+  (* It can be null if it's in a pending block. *)
   value : quantity;
   v : quantity;
-  r : hex;
-  s : hex;
+  r : quantity;
+  s : quantity;
 }
 
 let legacy_transaction_object_from_rlp_item block_hash rlp_item =
@@ -410,8 +410,8 @@ let legacy_transaction_object_from_rlp_item block_hash rlp_item =
       (* The signature is taken from the raw transaction, that is encoded in big
          endian. *)
       let v = decode_number_be v in
-      let r = decode_hex r in
-      let s = decode_hex s in
+      let r = decode_number_be r in
+      let s = decode_number_be s in
       {
         blockHash = block_hash;
         blockNumber = block_number;
@@ -507,8 +507,8 @@ let legacy_transaction_object_encoding =
        (obj4
           (req "value" quantity_encoding)
           (req "v" quantity_encoding)
-          (req "r" hex_encoding)
-          (req "s" hex_encoding)))
+          (req "r" quantity_encoding)
+          (req "s" quantity_encoding)))
 
 type 'transaction_object block_transactions =
   | TxHash of hash list

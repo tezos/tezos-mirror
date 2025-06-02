@@ -33,8 +33,8 @@ type transaction = {
       (** Access list are not yet supported. Even if the kernel does not
           support them, we need to decode them to verify the signature. *)
   v : Z.t;
-  r : bytes;
-  s : bytes;
+  r : Z.t;
+  s : Z.t;
 }
 
 (** [decode_legacy bytes] tries to decode [bytes] into a {!transaction}. *)
