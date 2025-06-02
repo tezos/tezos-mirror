@@ -2055,10 +2055,12 @@ dependencies = [
 name = "tezos-execution-latest"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "hex",
  "nom",
  "num-bigint",
  "primitive-types",
+ "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup",
  "tezos-smart-rollup-host",
@@ -2066,6 +2068,7 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_tezlink_latest",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

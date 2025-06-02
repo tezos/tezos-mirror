@@ -5,6 +5,7 @@
 //! Tezos operations
 
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
+/// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
 use std::fmt::Debug;
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom as tezos_nom;
@@ -23,7 +24,7 @@ pub enum ValidityError {
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
-pub enum ManagerError {
+pub enum ApplyOperationError {
     PreviouslyRevealedKey(PublicKey),
     InconsistentHash(PublicKeyHash),
     InconsistentPublicKey(PublicKeyHash),
@@ -32,7 +33,7 @@ pub enum ManagerError {
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub enum OperationError {
     Validation(ValidityError),
-    Manager(ManagerError),
+    Apply(ApplyOperationError),
 }
 
 impl From<ValidityError> for OperationError {
@@ -41,19 +42,19 @@ impl From<ValidityError> for OperationError {
     }
 }
 
-impl From<ManagerError> for OperationError {
-    fn from(value: ManagerError) -> Self {
-        Self::Manager(value)
+impl From<ApplyOperationError> for OperationError {
+    fn from(value: ApplyOperationError) -> Self {
+        Self::Apply(value)
     }
 }
 
-pub trait ManagerKind {
+pub trait OperationKind {
     type Success: PartialEq + Debug + BinWriter + for<'a> NomReader<'a>;
 
     fn kind() -> Self;
 }
 
-/// Empty struct to implement [ManagerKind] trait for Reveal
+/// Empty struct to implement [OperationKind] trait for Reveal
 #[derive(PartialEq, Debug)]
 pub struct Reveal;
 
@@ -67,7 +68,7 @@ pub struct RevealContent {
     pk: PublicKey,
 }
 
-impl ManagerKind for Reveal {
+impl OperationKind for Reveal {
     type Success = RevealSuccess;
 
     fn kind() -> Self {
@@ -75,10 +76,10 @@ impl ManagerKind for Reveal {
     }
 }
 
-// Inspired from `src/proto_alpha/lib_protocol/apply_operation_result.ml`
+// Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
-pub enum OperationStatus<M: ManagerKind> {
+pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
     Failed(Vec<OperationError>),
 }
@@ -87,25 +88,41 @@ pub enum OperationStatus<M: ManagerKind> {
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub enum Balance {
     Account(Contract),
-    BlockFees,
+    Block,
 }
 
-/// Depending of the sign of [credited], the account is credited or debited
+/// Depending of the sign of [changes], the balance is credited or debited
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub struct BalanceUpdate {
     pub balance: Balance,
-    pub credited: Zarith,
+    pub changes: Zarith,
 }
 
-// Inspired from `src/proto_alpha/lib_protocol/apply_results.ml`
+// Inspired from `Manager_operation_result` case in 'kind contents_result type
+// from `src/proto_alpha/lib_protocol/apply_results.ml` file.
 // Still need to implement internal_results
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
-pub struct ManagerReceipt<M: ManagerKind> {
+pub struct OperationResult<M: OperationKind> {
     pub balance_updates: Vec<BalanceUpdate>,
-    pub result: OperationStatus<M>,
+    pub result: ContentResult<M>,
 }
 
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
-pub enum OperationReceipt {
-    RevealReceipt(ManagerReceipt<Reveal>),
+pub enum OperationResultSum {
+    Reveal(OperationResult<Reveal>),
+}
+
+pub fn produce_operation_result<M: OperationKind>(
+    result: Result<M::Success, OperationError>,
+) -> OperationResult<M> {
+    match result {
+        Ok(success) => OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(success),
+        },
+        Err(operation_error) => OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Failed(vec![operation_error]),
+        },
+    }
 }
