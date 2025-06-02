@@ -55,6 +55,20 @@ let public_key_with_proof_encoding =
        (req "public_key" Signature.Bls.Public_key.encoding)
        (req "proof" Signature.Bls.encoding))
 
+type public_key_with_proofs = {
+  pk : Signature.Bls.Public_key.t;
+  proofs : Signature.Bls.t list;
+}
+
+let public_key_with_proofs_encoding =
+  let open Data_encoding in
+  conv
+    (fun {pk; proofs} -> (pk, proofs))
+    (fun (pk, proofs) -> {pk; proofs})
+    (obj2
+       (req "public_key" Signature.Bls.Public_key.encoding)
+       (req "proofs" (list Signature.Bls.encoding)))
+
 type public_key_and_public_key_hash = {
   pk : Signature.Bls.Public_key.t;
   pkh : Signature.Bls.Public_key_hash.t;
@@ -225,6 +239,32 @@ let commands () =
               return_unit
           | None -> cctxt#error "Failed to aggregate the public keys"
         else cctxt#error "Failed to check proofs");
+    command
+      ~group
+      ~desc:"Aggregate BLS proofs"
+      no_options
+      (prefixes ["aggregate"; "bls"; "proofs"]
+      @@ Client_proto_args.json_encoded_param
+           ~name:"input"
+           ~desc:"a public key and a list of proofs crafted for this public key"
+           public_key_with_proofs_encoding
+      @@ stop)
+      (fun () pk_with_proofs (cctxt : #Protocol_client_context.full) ->
+        let aggregated_proof =
+          Signature.Bls.aggregate_signature_opt pk_with_proofs.proofs
+        in
+        match aggregated_proof with
+        | Some proof ->
+            let is_valid =
+              check_public_key_with_proof pk_with_proofs.pk proof
+            in
+            if is_valid then
+              let*! () =
+                cctxt#message "%a" Signature.pp (Signature.Bls proof)
+              in
+              return_unit
+            else cctxt#error "Aggregated proof is invalid"
+        | None -> cctxt#error "Failed to aggregate the proofs");
     command
       ~group
       ~desc:
