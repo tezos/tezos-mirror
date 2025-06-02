@@ -135,18 +135,20 @@ module Make (SimulationBackend : SimulationBackend) = struct
       Etherlink_durable_storage.da_fee_per_byte
         (SimulationBackend.read simulation_state)
     in
-    let* (Qty gas_price) =
+    let* (Qty minimum_base_fee_per_gas) =
       (* In future iterations of the kernel, the default value will be
          written to the storage. This default value will no longer need to
          be declared here. *)
       let path = Durable_storage_path.minimum_base_fee_per_gas in
-      let* gas_price_opt = read_qty path in
-      match gas_price_opt with
+      let* minimum_base_feer_per_gas_opt = read_qty path in
+      match minimum_base_feer_per_gas_opt with
       | None ->
           return (Ethereum_types.quantity_of_z (Z.of_string "1_000_000_000"))
-      | Some gas_price -> return gas_price
+      | Some minimum_base_feer_per_gas -> return minimum_base_feer_per_gas
     in
-    let da_fee = Fees.gas_for_fees ~da_fee_per_byte ~gas_price tx_data in
+    let da_fee =
+      Fees.gas_for_fees ~da_fee_per_byte ~minimum_base_fee_per_gas tx_data
+    in
     return da_fee
 
   let rec confirm_gas ~timestamp ~maximum_gas_per_transaction

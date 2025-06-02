@@ -231,6 +231,9 @@ let pop_valid_tx ~chain_family
         ~initial_validation_state
   | EVM ->
       let read = Evm_state.read head_info.evm_state in
+      let* minimum_base_fee_per_gas =
+        Etherlink_durable_storage.minimum_base_fee_per_gas read
+      in
       let* base_fee_per_gas = Etherlink_durable_storage.base_fee_per_gas read in
       let* maximum_gas_limit =
         Etherlink_durable_storage.maximum_gas_per_transaction read
@@ -239,6 +242,7 @@ let pop_valid_tx ~chain_family
       let config =
         Validate.
           {
+            minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
             base_fee_per_gas;
             maximum_gas_limit;
             da_fee_per_byte;

@@ -8,6 +8,11 @@
 
 ### RPCs changes
 
+- Aligns the validation logic of the node wrt. the execution gas limit with the
+  one implemented in Dionysus. That is, the execution gas is now derived from
+  the gas limit of a transaction by removing the inclusion fees paid with the
+  minimum base fee per gas (not the current one).  (!18184)
+
 ### Metrics changes
 
 ### Execution changes

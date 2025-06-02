@@ -7,7 +7,7 @@
 (*****************************************************************************)
 
 let gas_for_fees ~da_fee_per_byte:(Ethereum_types.Qty da_fee_per_byte)
-    ~gas_price ?access_list tx_data =
+    ~minimum_base_fee_per_gas ?access_list tx_data =
   (* The computation of the gas_for_fees comes from the kernel in fees.rs
      in the gas_for_fees function *)
   (* Constants defined in the kernel: *)
@@ -33,4 +33,4 @@ let gas_for_fees ~da_fee_per_byte:(Ethereum_types.Qty da_fee_per_byte)
     Z.mul da_fee_per_byte size
   in
   let fees = da_fee ?access_list da_fee_per_byte tx_data in
-  Z.cdiv fees gas_price
+  Z.cdiv fees minimum_base_fee_per_gas
