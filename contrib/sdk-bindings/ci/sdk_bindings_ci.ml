@@ -30,6 +30,9 @@ module Release = struct
   let macos_variables : Gitlab_ci.Types.variables =
     [("TAGS", "saas-macos-medium-m1")]
 
+  let windows_variables : Gitlab_ci.Types.variables =
+    [("TAGS", "saas-windows-medium-amd64"); ("SHELL", "powershell")]
+
   let jobs_build_sdk =
     let job = job ~stage:Stages.build in
 
@@ -75,7 +78,37 @@ module Release = struct
         |> enable_cargo_cache |> enable_sccache
       in
 
-      [linux; macos]
+      let windows : tezos_job =
+        job
+          ~__POS__
+          ~name:"build_python_sdk_windows"
+          ~description:"Build Python SDK on Windows"
+          ~variables:windows_variables
+          ~tag:Dynamic
+          ~datadog:false
+          ~artifacts
+          ~before_script:
+            [
+              (* Install Rust *)
+              "[Environment]::SetEnvironmentVariable('CARGO_NET_OFFLINE','false')";
+              "[Environment]::SetEnvironmentVariable('CARGO_HOME','.cargo')";
+              {|$env:Path = "$Env:CI_PROJECT_DIR\.cargo\bin;$env:Path"|};
+              "Invoke-WebRequest -Uri https://win.rustup.rs -OutFile \
+               rustup-init.exe";
+              "./rustup-init.exe -y";
+              "Remove-Item rustup-init.exe";
+              (* Install Maturin *)
+              "pip install maturin==1.5.1";
+              (* Install make *)
+              "choco install make";
+            ]
+          [
+            "make -C $Env:CI_PROJECT_DIR/contrib/sdk-bindings/rust -f \
+             python.mk build";
+          ]
+      in
+
+      [linux; macos; windows]
     in
     build_python_sdk
 

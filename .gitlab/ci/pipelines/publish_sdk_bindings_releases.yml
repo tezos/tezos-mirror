@@ -108,6 +108,32 @@ build_python_sdk_macos:
     paths:
     - contrib/sdk-bindings/rust/target/wheels/*
 
+build_python_sdk_windows:
+  stage: build
+  tags:
+  - $TAGS
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - '[Environment]::SetEnvironmentVariable(''CARGO_NET_OFFLINE'',''false'')'
+  - '[Environment]::SetEnvironmentVariable(''CARGO_HOME'',''.cargo'')'
+  - $env:Path = "$Env:CI_PROJECT_DIR\.cargo\bin;$env:Path"
+  - Invoke-WebRequest -Uri https://win.rustup.rs -OutFile rustup-init.exe
+  - ./rustup-init.exe -y
+  - Remove-Item rustup-init.exe
+  - pip install maturin==1.5.1
+  - choco install make
+  script:
+  - make -C $Env:CI_PROJECT_DIR/contrib/sdk-bindings/rust -f python.mk build
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    TAGS: saas-windows-medium-amd64
+    SHELL: powershell
+  artifacts:
+    paths:
+    - contrib/sdk-bindings/rust/target/wheels/*
+
 publish_sdk:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
   stage: publish
@@ -117,10 +143,12 @@ publish_sdk:
   - oc.docker:rust-sdk-bindings:amd64
   - build_python_sdk_linux
   - build_python_sdk_macos
+  - build_python_sdk_windows
   dependencies:
   - oc.docker:rust-sdk-bindings:amd64
   - build_python_sdk_linux
   - build_python_sdk_macos
+  - build_python_sdk_windows
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
