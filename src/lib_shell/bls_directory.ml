@@ -44,11 +44,17 @@ let build_rpc_directory () =
         else None
       in
       return res) ;
-  register0 Bls_services.S.threshold_signatures (fun () sigs ->
+  register0 Bls_services.S.threshold_signatures (fun () inp ->
       let sigs =
         List.map
-          (fun (s : Bls_services.S.threshold_signature) -> (s.id, s.signature))
-          sigs
+          (fun (s : Bls_services.S.threshold_signature_share) ->
+            (s.id, s.signature))
+          inp.signature_shares
       in
-      return @@ Bls.threshold_signature_opt sigs) ;
+      let threshold_signature = Bls.threshold_signature_opt sigs in
+      match threshold_signature with
+      | Some signature ->
+          let is_valid = Bls.check inp.pk signature inp.msg in
+          if is_valid then return threshold_signature else return_none
+      | None -> return_none) ;
   !dir
