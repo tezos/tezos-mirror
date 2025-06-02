@@ -51,7 +51,6 @@ RUN apk update \
     eudev-dev \
     git \
     gmp-dev \
-    jq \
     libev-dev \
     libffi-dev \
     libtool \
@@ -67,7 +66,6 @@ RUN apk update \
     tar \
     unzip \
     wget \
-    curl \
     xz \
     zlib-dev \
     zlib-static \

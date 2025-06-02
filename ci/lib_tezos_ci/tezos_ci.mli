@@ -670,6 +670,8 @@ module Images : sig
 
     val runtime : Image.t
 
+    val monitoring : Image.t
+
     val prebuild : Image.t
 
     val build : Image.t
