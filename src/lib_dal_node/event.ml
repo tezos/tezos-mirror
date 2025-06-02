@@ -253,9 +253,21 @@ open struct
       ~prefix_name_with_section:true
       ~name:"no_plugin"
       ~msg:"could not resolve plugin for protocol {proto_hash}"
-      ~level:Error
+      ~level:Warning
       ~pp1:Protocol_hash.pp_short
       ("proto_hash", Protocol_hash.encoding)
+
+  let no_protocol_constants =
+    declare_2
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"no_protocol_constants"
+      ~msg:
+        "could not get the constants for protocol {proto_hash} at level {level}"
+      ~level:Warning
+      ~pp1:Protocol_hash.pp_short
+      ("proto_hash", Protocol_hash.encoding)
+      ("level", Data_encoding.int32)
 
   let unexpected_protocol_plugin =
     declare_0
@@ -1146,6 +1158,9 @@ let emit_protocol_plugin_resolved ~proto_hash ~start_level =
   emit protocol_plugin_resolved (proto_hash, start_level)
 
 let emit_no_protocol_plugin ~proto_hash = emit no_protocol_plugin proto_hash
+
+let emit_no_protocol_constnts ~proto_hash ~level =
+  emit no_protocol_constants (proto_hash, level)
 
 let emit_unexpected_protocol_plugin () = emit unexpected_protocol_plugin ()
 

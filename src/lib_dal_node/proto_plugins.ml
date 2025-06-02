@@ -35,7 +35,9 @@ end
 
 let singleton = Plugins.add Plugins.empty
 
-type error += No_plugin_for_proto of {proto_hash : Protocol_hash.t}
+type error +=
+  | No_plugin_for_proto of {proto_hash : Protocol_hash.t}
+  | No_constants_for_proto of {proto_hash : Protocol_hash.t}
 
 let () =
   register_error_kind
@@ -51,12 +53,42 @@ let () =
         proto_hash)
     Data_encoding.(obj1 (req "proto_hash" Protocol_hash.encoding))
     (function No_plugin_for_proto {proto_hash} -> Some proto_hash | _ -> None)
-    (fun proto_hash -> No_plugin_for_proto {proto_hash})
+    (fun proto_hash -> No_plugin_for_proto {proto_hash}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.no_constants_for_proto"
+    ~title:"DAL node: no constants for protocol"
+    ~description:"DAL node: no constants for the protocol %a"
+    ~pp:(fun ppf proto_hash ->
+      Format.fprintf
+        ppf
+        "No constants for the protocol %a."
+        Protocol_hash.pp
+        proto_hash)
+    Data_encoding.(obj1 (req "proto_hash" Protocol_hash.encoding))
+    (function
+      | No_constants_for_proto {proto_hash} -> Some proto_hash | _ -> None)
+    (fun proto_hash -> No_constants_for_proto {proto_hash})
 
 let last_failed_protocol = ref None
 
-let resolve_plugin_by_hash ?(emit_failure_event = true) ~start_level proto_hash
-    =
+let get_constants_for_plugin ?(emit_failure_event = true) cctxt plugin level
+    proto_hash =
+  let open Lwt_result_syntax in
+  let block = `Level level in
+  let (module Plugin : Dal_plugin.T) = plugin in
+  let*! proto_parameters_res = Plugin.get_constants `Main block cctxt in
+  match proto_parameters_res with
+  | Ok proto_parameters -> return proto_parameters
+  | Error _ ->
+      let*! () =
+        if emit_failure_event then
+          Event.emit_no_protocol_constnts ~proto_hash ~level
+        else Lwt.return_unit
+      in
+      tzfail @@ No_constants_for_proto {proto_hash}
+
+let resolve_plugin_by_hash ?(emit_failure_event = true) proto_hash =
   let open Lwt_result_syntax in
   let plugin_opt = Dal_plugin.get proto_hash in
   match plugin_opt with
@@ -70,32 +102,35 @@ let resolve_plugin_by_hash ?(emit_failure_event = true) ~start_level proto_hash
             else Lwt.return_unit
       in
       tzfail (No_plugin_for_proto {proto_hash})
-  | Some plugin ->
-      let*! () = Event.emit_protocol_plugin_resolved ~proto_hash ~start_level in
-      return plugin
+  | Some plugin -> return plugin
 
 let may_add cctxt plugins ~first_level ~proto_level =
   let open Lwt_result_syntax in
-  let add first_level =
+  let try_add_new_plugin first_level =
     let* protocols =
       Chain_services.Blocks.protocols cctxt ~block:(`Level first_level) ()
     in
     let proto_hash = protocols.next_protocol in
-    let* ((module Plugin) as plugin) =
-      resolve_plugin_by_hash proto_hash ~start_level:first_level
+    let* plugin = resolve_plugin_by_hash proto_hash in
+    let* proto_parameters =
+      get_constants_for_plugin cctxt plugin first_level proto_hash
     in
-    let+ proto_parameters =
-      Plugin.get_constants `Main (`Level first_level) cctxt
+    let*! () =
+      Event.emit_protocol_plugin_resolved ~proto_hash ~start_level:first_level
     in
-    Plugins.add plugins ~proto_level ~first_level plugin proto_parameters
+    return
+    @@ Plugins.add plugins ~proto_level ~first_level plugin proto_parameters
   in
   let plugin_opt = Plugins.LevelMap.min_binding_opt plugins in
   match plugin_opt with
-  | None -> add first_level
-  | Some (_, Plugins.{proto_level = prev_proto_level; _})
-    when prev_proto_level < proto_level ->
-      add first_level
-  | _ -> return plugins
+  | None -> try_add_new_plugin first_level
+  | Some (_, Plugins.{proto_level = prev_proto_level; _}) ->
+      if prev_proto_level < proto_level then
+        (* A new protocol has been activated on L1. Add its DAL plugin. *)
+        try_add_new_plugin first_level
+      else
+        (* We already have a plugin for the current protocol. *)
+        return plugins
 
 type error += No_plugin_for_level of {level : int32}
 
@@ -136,21 +171,27 @@ let add_plugin_for_proto cctxt plugins
       {protocol; proto_level; activation_block = _, activation_level}
     highest_level =
   let open Lwt_result_syntax in
-  let* plugin =
-    resolve_plugin_by_hash
+  let* plugin = resolve_plugin_by_hash ~emit_failure_event:false protocol in
+  let* proto_parameters =
+    get_constants_for_plugin
       ~emit_failure_event:false
+      cctxt
+      plugin
+      highest_level
       protocol
+  in
+  let*! () =
+    Event.emit_protocol_plugin_resolved
+      ~proto_hash:protocol
       ~start_level:activation_level
   in
-  let block = `Level highest_level in
-  let (module Plugin) = plugin in
-  let+ proto_parameters = Plugin.get_constants `Main block cctxt in
-  Plugins.add
-    plugins
-    ~first_level:activation_level
-    ~proto_level
-    plugin
-    proto_parameters
+  return
+  @@ Plugins.add
+       plugins
+       ~first_level:activation_level
+       ~proto_level
+       plugin
+       proto_parameters
 
 let get_supported_proto_plugins cctxt ~head_level =
   let open Lwt_result_syntax in
@@ -169,7 +210,11 @@ let get_supported_proto_plugins cctxt ~head_level =
         let highest_level = Int32.pred level in
         match res with
         | Ok plugins -> return (plugins, highest_level)
-        | Error [No_plugin_for_proto {proto_hash}]
+        | Error
+            [
+              ( No_plugin_for_proto {proto_hash}
+              | No_constants_for_proto {proto_hash} );
+            ]
           when Protocol_hash.equal proto_hash protocol_info.protocol ->
             fail (`End_loop_ok plugins)
         | Error err -> fail (`End_loop_nok err))
