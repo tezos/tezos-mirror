@@ -152,6 +152,35 @@ let check_header ~previous_header ~current_header ~chain_id ~current_timestamp =
           "Expected the timestamp of the current_block to be %R, but got %L"
   | _ -> ()
 
+(* Block info contains a raw header that differs slightly from the header returned by
+   the header RPC.
+   We need to append the hash and chain_id fields to our raw_header so that the function
+   check_header doesn't fail. *)
+let block_info_to_header block_info =
+  let raw_header = JSON.(block_info |-> "header") in
+  let hash_raw_header = JSON.(put ("hash", block_info |-> "hash") raw_header) in
+  let header =
+    JSON.(put ("chain_id", block_info |-> "chain_id") hash_raw_header)
+  in
+  header
+
+let check_block_info ~previous_block_info ~current_block_info ~chain_id
+    ~current_timestamp =
+  let () =
+    check_header
+      ~previous_header:(block_info_to_header previous_block_info)
+      ~current_header:(block_info_to_header current_block_info)
+      ~chain_id
+      ~current_timestamp
+  in
+  (* For now operations are converted to dummy string as the list should be empty.
+     We convert to string operations to use the Check module *)
+  let operations =
+    JSON.(current_block_info |-> "operations" |> as_list |> List.map as_string)
+  in
+  Check.((operations = []) (list string))
+    ~error_msg:"List of operations is expected to be empty for now"
+
 let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
   | Proxy ->

@@ -87,6 +87,15 @@ val check_header :
   current_timestamp:string option ->
   unit
 
+(** [check_block_info ~previous_block_info ~current_block_info] checks that two
+    consecutive block's info are consistent. *)
+val check_block_info :
+  previous_block_info:JSON.t ->
+  current_block_info:JSON.t ->
+  chain_id:int option ->
+  current_timestamp:string option ->
+  unit
+
 (** [next_evm_level ~evm_node ~sc_rollup_node ~client] moves
     [evm_node] to the next L2 level. *)
 val next_evm_level :
