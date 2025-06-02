@@ -241,6 +241,8 @@ For both producers and bakers, it is essential to maintain good connectivity by 
 
 - If you're not using the ``--public-addr`` argument, ensure that the NAT forwarding rule uses the same external and internal ports.
 
+- If you are running two DAL nodes on a network that uses NAT, set up the NAT rules to forward the P2P ports of the DAL nodes to different public ports.
+
 DAL and the Ledger
 ^^^^^^^^^^^^^^^^^^
 
