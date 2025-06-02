@@ -626,8 +626,8 @@ let register_block_services ~l2_chain_id
          ~impl:(fun {chain; block} () () ->
            let*? chain = check_chain chain in
            let*? block = check_block block in
-           let* header = Backend.header chain block in
-           Lwt_result_syntax.return (header, chain))
+           let* tezlink_block = Backend.block chain block in
+           Lwt_result_syntax.return (tezlink_block, chain))
          ~convert_output:
            (Protocol_types.Block_header.tezlink_block_to_block_header
               ~l2_chain_id)
