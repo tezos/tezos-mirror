@@ -54,7 +54,7 @@ type config_t = {
     promotion_supermajority : nat;
     (*
         The address of the contract managing the delegation of rights.
-        This contract must at least have a view called "list_delegates"
+        This contract must at least have a view called "list_voters"
         of type : address * address option -> address list
     *)
     delegation_contract : address;

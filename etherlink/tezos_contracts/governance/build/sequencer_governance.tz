@@ -152,7 +152,7 @@
              SOME ;
              SENDER ;
              PAIR ;
-             VIEW "list_delegates" (list address) ;
+             VIEW "list_voters" (list address) ;
              IF_NONE
                { PUSH string "ASSERTION_FAILURE_DELEGATION_CONTRACT_MISSING_OR_INCONSISTENT" ;
                  FAILWITH }

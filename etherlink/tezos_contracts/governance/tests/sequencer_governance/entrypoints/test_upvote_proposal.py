@@ -287,10 +287,10 @@ class CommitteeGovernanceUpvoteProposalTestCase(BaseTestCase):
 
         # Period index: 0. Block: 2 of 5
         whitelist = {governance.address}
-        delegation.using(delegator).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
 
-        assert delegation.is_delegate(pkh(delegate), pkh(delegator), governance.address)
+        assert delegation.is_voting_key_of(pkh(delegate), pkh(delegator), governance.address)
 
         # Period index: 0. Block: 3 of 5
         payload = {
@@ -335,15 +335,15 @@ class CommitteeGovernanceUpvoteProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator1).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator1).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
 
-        assert delegation.is_delegate(pkh(delegate), pkh(delegator1), governance.address)
+        assert delegation.is_voting_key_of(pkh(delegate), pkh(delegator1), governance.address)
 
-        delegation.using(delegator2).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator2).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
 
-        assert delegation.is_delegate(pkh(delegate), pkh(delegator2), governance.address)
+        assert delegation.is_voting_key_of(pkh(delegate), pkh(delegator2), governance.address)
 
         payload = {
             'sequencer_pk': 'edpkurcgafZ2URyB6zsm5d1YqmLt9r1Lk89J81N6KpyMaUzXWEsv1X',
@@ -375,10 +375,10 @@ class CommitteeGovernanceUpvoteProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
 
-        assert delegation.is_delegate(pkh(delegate), pkh(delegator), governance.address)
+        assert delegation.is_voting_key_of(pkh(delegate), pkh(delegator), governance.address)
 
         payload = {
             'sequencer_pk': 'edpkurcgafZ2URyB6zsm5d1YqmLt9r1Lk89J81N6KpyMaUzXWEsv1X',
@@ -412,7 +412,7 @@ class CommitteeGovernanceUpvoteProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
 
         payload1 = {
@@ -453,9 +453,9 @@ class CommitteeGovernanceUpvoteProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator1).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator1).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
-        delegation.using(delegator2).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator2).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
 
         payload1 = {
@@ -504,9 +504,9 @@ class CommitteeGovernanceUpvoteProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator1).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator1).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
-        delegation.using(delegator2).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator2).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
 
         payload = {

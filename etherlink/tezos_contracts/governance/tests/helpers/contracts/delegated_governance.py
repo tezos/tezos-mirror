@@ -21,13 +21,13 @@ class DelegatedGovernance(ContractHelper):
         print(f'file :  {filename}')
         return originate_from_file(filename, client, storage)
     
-    def set_delegate(self, delegate : str, is_delegate : bool, opt_addresses: Optional[set[str]] = None) -> ContractCall:
+    def set_voting_key(self, delegate : str, is_delegate : bool, opt_addresses: Optional[set[str]] = None) -> ContractCall:
         """Adds or removes the caller's address to the set associated with the address in the big_map"""
 
         return self.contract.default(delegate, is_delegate, opt_addresses)
     
-    def is_delegate(self, delegate : str, voter : str, contract : Optional[set[str]]):
-        return self.contract.is_delegate(delegate, voter, contract).run_view()
+    def is_voting_key_of(self, delegate : str, voter : str, contract : Optional[set[str]]):
+        return self.contract.is_voting_key_of(delegate, voter, contract).run_view()
     
-    def list_delegates(self, delegate : str, contract : Optional[set[str]]):
-        return self.contract.list_delegates(delegate, contract).run_view()
+    def list_voters(self, delegate : str, contract : Optional[set[str]]):
+        return self.contract.list_voters(delegate, contract).run_view()

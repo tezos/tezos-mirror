@@ -247,7 +247,7 @@ class CommitteeGovernanceNewProposalTestCase(BaseTestCase):
         no_baker = self.bootstrap_no_baker()
         delegation = self.deploy_delegated_governance()
         
-        delegation.using(baker).set_delegate(pkh(no_baker), True, None).send()
+        delegation.using(baker).set_voting_key(pkh(no_baker), True, None).send()
         self.bake_block()
 
         governance_started_at_level = self.get_current_level() + 1
@@ -304,9 +304,9 @@ class CommitteeGovernanceNewProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator1).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator1).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
-        delegation.using(delegator2).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator2).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
 
         payload = {
@@ -346,7 +346,7 @@ class CommitteeGovernanceNewProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
 
         payload = {
@@ -386,9 +386,9 @@ class CommitteeGovernanceNewProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator1).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator1).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
-        delegation.using(delegator2).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(delegator2).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
 
         payload = {

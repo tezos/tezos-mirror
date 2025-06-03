@@ -78,7 +78,7 @@
          UPDATE ;
          NIL operation ;
          PAIR } ;
-  view "is_delegate"
+  view "is_voting_key_of"
        (pair address address (option address))
        bool
        { UNPAIR ;
@@ -99,7 +99,7 @@
                    { UNPAIR ;
                      IF { IF_NONE { DROP ; PUSH bool True } { SWAP ; MEM } }
                         { IF_NONE { DROP ; PUSH bool True } { SWAP ; MEM ; NOT } } } } } } ;
-  view "list_delegates"
+  view "list_voters"
        (pair address (option address))
        (list address)
        { UNPAIR ;

@@ -209,10 +209,10 @@ class KernelGovernanceNewProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator).set_delegate(pkh(proposer_delegate), True, whitelist).send()
+        delegation.using(delegator).set_voting_key(pkh(proposer_delegate), True, whitelist).send()
         self.bake_block()
 
-        assert delegation.is_delegate(pkh(proposer_delegate), pkh(delegator), governance.address)
+        assert delegation.is_voting_key_of(pkh(proposer_delegate), pkh(delegator), governance.address)
 
         kernel_root_hash = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
 
@@ -237,9 +237,9 @@ class KernelGovernanceNewProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator1).set_delegate(pkh(proposer_delegate), True, whitelist).send()
+        delegation.using(delegator1).set_voting_key(pkh(proposer_delegate), True, whitelist).send()
         self.bake_block()
-        delegation.using(delegator2).set_delegate(pkh(proposer_delegate), True, whitelist).send()
+        delegation.using(delegator2).set_voting_key(pkh(proposer_delegate), True, whitelist).send()
         self.bake_block()
 
         kernel_hash = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
@@ -269,9 +269,9 @@ class KernelGovernanceNewProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(baker1).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(baker1).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
-        delegation.using(baker2).set_delegate(pkh(delegate), True, whitelist).send()
+        delegation.using(baker2).set_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
 
         kernel1 = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')

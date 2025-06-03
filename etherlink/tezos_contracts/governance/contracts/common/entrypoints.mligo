@@ -15,7 +15,7 @@ let new_proposal
     let _ = Validation.assert_no_tez_in_transaction () in
     let { voting_context; finished_voting; last_winner } = Voting.get_voting_state storage in
     let proposal_period = Voting.get_proposal_period voting_context in
-    let potential_proposers = Voting.get_delegates storage.config.delegation_contract in
+    let potential_proposers = Voting.get_voters storage.config.delegation_contract in
     let (proposers, total_voting_power, real_voting_power) =
        Voting.filter_proposers potential_proposers proposal_period storage.config in
     let _ = Validation.assert_voting_power_positive total_voting_power in
@@ -40,7 +40,7 @@ let upvote_proposal
     let _ = Validation.assert_no_tez_in_transaction () in
     let { voting_context; finished_voting; last_winner } = Voting.get_voting_state storage in
     let proposal_period = Voting.get_proposal_period voting_context in
-    let potential_upvoters = Voting.get_delegates storage.config.delegation_contract in
+    let potential_upvoters = Voting.get_voters storage.config.delegation_contract in
     let (upvoters, total_voting_power, protocol_already_upvoted_addresses) =
           Voting.filter_upvoters payload potential_upvoters proposal_period storage.config in
     let _ = Validation.assert_voting_power_positive total_voting_power in
@@ -73,7 +73,7 @@ let vote
     let _ = Validation.assert_no_tez_in_transaction () in
     let voting_state = Voting.get_voting_state storage in
     let voting_context = voting_state.voting_context in
-    let potential_voters = Voting.get_delegates storage.config.delegation_contract in
+    let potential_voters = Voting.get_voters storage.config.delegation_contract in
     let (voters, total_voting_power) = Voting.filter_voters potential_voters voting_context in
     let _ = Validation.assert_voting_power_positive total_voting_power in
     let _ = Assert.Error.assert (Map.size voters > 0n) Errors.promotion_already_voted in

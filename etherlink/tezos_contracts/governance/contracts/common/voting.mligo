@@ -142,11 +142,11 @@ let init_new_voting_state
             }
 
 
-let get_delegates
+let get_voters
         (delegation_contract : address)
         : address list =
         match
-          Tezos.call_view "list_delegates" (Tezos.get_sender (), Some (Tezos.get_self_address ())) delegation_contract
+          Tezos.call_view "list_voters" (Tezos.get_sender (), Some (Tezos.get_self_address ())) delegation_contract
         with
           | None ->  failwith Errors.no_delegate_contract
           | Some l -> Tezos.get_sender()::l
