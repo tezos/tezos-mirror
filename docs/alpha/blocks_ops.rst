@@ -80,7 +80,8 @@ phases required to agree on the next block.
 
 - An ``Attestation`` operation implements a vote for a candidate block
   for which a preattestation quorum certificate (PQC) has been
-  observed.
+  observed. These operations also hold information on :doc:`DAL attestations <../shell/dal_bakers>`
+  when the attesting baker participates in the DAL.
 
 .. _voting_operations_alpha:
 
