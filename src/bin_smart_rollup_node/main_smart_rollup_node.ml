@@ -652,6 +652,16 @@ let list_metrics_command =
   let*! () = ctxt#message "%s" metrics in
   return_unit
 
+let replay_block_command =
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:"Replay a given L1 block."
+    (args1 data_dir_arg)
+    (prefixes ["replay"; "block"] @@ Cli.block_hash_or_level_param @@ stop)
+    (fun data_dir block cctxt ->
+      Rollup_node_daemon.Replay.replay_block ~data_dir cctxt block)
+
 let sc_rollup_commands () =
   [
     config_init_command;
@@ -667,6 +677,7 @@ let sc_rollup_commands () =
     snapshot_info;
     openapi_command;
     list_metrics_command;
+    replay_block_command;
   ]
   @ Repair.commands
 

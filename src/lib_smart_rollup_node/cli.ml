@@ -613,3 +613,16 @@ let unsafe_disable_wasm_kernel_checks_switch :
 
 let level_param next =
   Tezos_clic.param ~name:"level" ~desc:"Level" positive_int32_parameter next
+
+let block_hash_or_level_param next =
+  Tezos_clic.param
+    ~name:"block_or_level"
+    ~desc:"An L1 block hash or a level"
+    (Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
+         let open Lwt_result_syntax in
+         match Int32.of_string_opt s with
+         | Some l -> return (`Level l)
+         | None ->
+             let*? b = Block_hash.of_b58check s in
+             return (`Hash b)))
+    next
