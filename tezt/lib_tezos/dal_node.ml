@@ -33,6 +33,7 @@ module Parameters = struct
     public_addr : string option;
     metrics_addr : string;
     l1_node_endpoint : Endpoint.t;
+    disable_shard_validation : bool;
     mutable pending_ready : unit option Lwt.u list;
     runner : Runner.t option;
   }
@@ -48,6 +49,12 @@ type history_mode = Full | Auto | Custom of int
 
 open Parameters
 include Daemon.Make (Parameters)
+
+let check_error ?exit_code ?msg dal_node =
+  match dal_node.status with
+  | Not_running ->
+      Test.fail "DAL node %s is not running, it has no stderr" (name dal_node)
+  | Running {process; _} -> Process.check_error ?exit_code ?msg process
 
 let wait dal_node =
   match dal_node.status with
@@ -281,7 +288,8 @@ let handle_event dal_node {name; value = _; timestamp = _} =
 
 let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
     ?name ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host)
-    ?rpc_port ?listen_addr ?public_addr ?metrics_addr ~l1_node_endpoint () =
+    ?rpc_port ?listen_addr ?public_addr ?metrics_addr
+    ?(disable_shard_validation = false) ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -314,6 +322,7 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
         public_addr;
         metrics_addr;
         pending_ready = [];
+        disable_shard_validation;
         l1_node_endpoint;
         runner;
       }
@@ -324,7 +333,7 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
 (* TODO: have rpc_addr here, like for others. *)
 let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
     ?data_dir ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port
-    ?listen_addr ?public_addr ?metrics_addr ~node () =
+    ?listen_addr ?public_addr ?metrics_addr ?disable_shard_validation ~node () =
   create_from_endpoint
     ?runner
     ~path
@@ -337,6 +346,7 @@ let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
     ?listen_addr
     ?public_addr
     ?metrics_addr
+    ?disable_shard_validation
     ~l1_node_endpoint:(Node.as_rpc_endpoint node)
     ()
 
@@ -356,10 +366,13 @@ let make_arguments node =
     "--metrics-addr";
     metrics_addr node;
   ]
+  @ (match public_addr node with
+    | None -> []
+    | Some addr -> ["--public-addr"; addr])
   @
-  match public_addr node with
-  | None -> []
-  | Some addr -> ["--public-addr"; addr]
+  if node.persistent_state.disable_shard_validation then
+    ["--disable-shard-validation"]
+  else []
 
 let do_runlike_command ?env ?(event_level = `Debug) node arguments =
   if node.status <> Not_running then

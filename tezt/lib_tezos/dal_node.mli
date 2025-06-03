@@ -48,6 +48,7 @@ val create :
   ?listen_addr:string ->
   ?public_addr:string ->
   ?metrics_addr:string ->
+  ?disable_shard_validation:bool ->
   node:Node.t ->
   unit ->
   t
@@ -64,6 +65,7 @@ val create_from_endpoint :
   ?listen_addr:string ->
   ?public_addr:string ->
   ?metrics_addr:string ->
+  ?disable_shard_validation:bool ->
   l1_node_endpoint:Endpoint.t ->
   unit ->
   t
@@ -140,6 +142,12 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 (** [is_running_not_ready dal_node] returns true if the given node is
     running but its status is not ready *)
 val is_running_not_ready : t -> bool
+
+(** Wait until a DAL node terminates and check its status.
+
+    If the DAL node is not running,
+    or if the [Process.check_error] function fails, fail the test. *)
+val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
 (** Wait until a node terminates and return its status. If the node is not
     running, make the test fail. *)
