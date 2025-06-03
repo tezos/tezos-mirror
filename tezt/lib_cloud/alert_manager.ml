@@ -226,6 +226,11 @@ let run alerts =
       in
       Lwt.return_some t
 
+let _reload t =
+  Log.info "Alert_manager: reloading" ;
+  write_configuration t ;
+  Process.run "curl" ["-X"; "POST"; "http://127.0.0.1:9093/-/reload"]
+
 let shutdown () =
   let* () = Docker.kill "alert-manager" |> Process.check in
   Lwt.return_unit
