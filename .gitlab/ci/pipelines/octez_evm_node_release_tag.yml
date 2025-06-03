@@ -117,7 +117,7 @@ oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_ramfs
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes

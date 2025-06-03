@@ -671,6 +671,7 @@ let jobs pipeline_type =
       ~__POS__
       ~arch:Amd64
       ~cpu:Very_high
+      ~storage:Ramfs
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
         (* Even though not many tests depend on static executables, some
