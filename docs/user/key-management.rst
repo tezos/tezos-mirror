@@ -313,6 +313,11 @@ However, it is also possible to register as a delegate and immediately set the c
 There can be multiple pending updates: it is possible to have multiple pending consensus keys for multiple future cycles.
 A subsequent update within the same cycle takes precedence over the initial one.
 
+Note that registering a tz4 consensus key, just like revealing a tz4 public key, requires a proof of
+possession. This is the signature of the consensus public key using the consensus private key, and it
+ensures ownership of the key. This process is done automatically by the client, and the proof is included in
+the receipt of the update operation.
+
 Baking With a Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
