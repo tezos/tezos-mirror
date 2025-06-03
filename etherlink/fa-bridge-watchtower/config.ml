@@ -188,10 +188,10 @@ let load_file ~data_dir =
     let config = Data_encoding.Json.destruct encoding json in
     return_some config
 
-(** [patch_config ~secret_key ~evm_node_endpoint config] updates the
-    configuration with the provided secret key and EVM node endpoint if they are
-    present.  Returns the updated configuration. *)
-let patch_config ~secret_key ~evm_node_endpoint config =
+(** [patch_config ~secret_key ~evm_node_endpoint ~monitor_all_deposits config]
+    updates the configuration with the provided secret key and EVM node endpoint
+    if they are present.  Returns the updated configuration. *)
+let patch_config ~secret_key ~evm_node_endpoint ~monitor_all_deposits config =
   let config =
     Option.fold secret_key ~none:config ~some:(fun secret_key ->
         {config with secret_key = Some secret_key})
@@ -199,5 +199,8 @@ let patch_config ~secret_key ~evm_node_endpoint config =
   let config =
     Option.fold evm_node_endpoint ~none:config ~some:(fun evm_node_endpoint ->
         {config with evm_node_endpoint})
+  in
+  let config =
+    if monitor_all_deposits then {config with monitor_all_deposits} else config
   in
   config
