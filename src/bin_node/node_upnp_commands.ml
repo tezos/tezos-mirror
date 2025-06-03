@@ -16,6 +16,7 @@ type mapping_options = {
   local_addr : string option;
   lease_duration : int option;
   description : string option;
+  any_net_port : bool;
 }
 
 (* The duration depends on UPNP/IGV version:
@@ -105,9 +106,30 @@ let patch_config ?data_dir config_file ?listen_addr ?advertised_net_port () =
     ?advertised_net_port
     config_file
 
+let map_port gateway ~local_addr ~local_port ~external_port ~lease_duration
+    ~description ~any_net_port =
+  if any_net_port then
+    Octez_igd_next.Igd_next_gen.gateway_map_any_port
+      gateway
+      Udp
+      ~local_addr
+      ~local_port
+      ~lease_duration
+      ~description
+  else
+    Octez_igd_next.Igd_next_gen.gateway_map_port
+      gateway
+      Udp
+      ~local_addr
+      ~local_port
+      ~external_port
+      ~lease_duration
+      ~description
+    |> Result.map (fun () -> external_port)
+
 let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
-    {local_addr; lease_duration; description} ?data_dir ?config_file
-    ?listen_addr ?advertised_net_port () =
+    {local_addr; lease_duration; description; any_net_port} ?data_dir
+    ?config_file ?listen_addr ?advertised_net_port () =
   let open Lwt_result_syntax in
   let gateway =
     Octez_igd_next.Igd_next_gen.search_gateway
@@ -138,17 +160,17 @@ let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
   in
   let external_port = Option.value ~default:local_port advertised_net_port in
   let port =
-    Octez_igd_next.Igd_next_gen.gateway_map_port
+    map_port
       gateway
-      Udp
       ~local_addr
       ~local_port
       ~external_port
       ~lease_duration
       ~description:(Option.value ~default:default_description description)
+      ~any_net_port
   in
   match port with
-  | Ok () ->
+  | Ok external_port ->
       (* Note that the external IP can be retrieved from the gateway, but it
          avoids leaking it in the logs. *)
       Format.printf
@@ -156,7 +178,13 @@ let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
         external_port
         local_addr
         local_port ;
-      let* _ = patch_config config_file ?listen_addr ?advertised_net_port () in
+      let* _ =
+        patch_config
+          config_file
+          ?listen_addr
+          ~advertised_net_port:external_port
+          ()
+      in
       return_unit
   | Error e -> failwith "%s" e
 
@@ -175,6 +203,9 @@ module Term = struct
   open Cmdliner
 
   let docs = "UPNP OPTIONS"
+
+  let exclusive_parameters =
+    "--any-net-port and --advertised-net-port are exclusive."
 
   let bind_addr =
     let doc = "The URL at which this instance can be reached." in
@@ -226,6 +257,15 @@ module Term = struct
       & opt (some int) None
       & info ~docs ~doc ~docv:"SEC" ["lease-duration"])
 
+  let any_net_port =
+    let doc =
+      "Asks the gateway to map any available port instead, and update the \
+       configuration according to the result. This option should be used in \
+       priority at first invocation of the command, as it ensures an available \
+       port is selected by the gateway." ^ exclusive_parameters
+    in
+    Arg.(value & flag & info ~docs ~doc ~docv:"SEC" ["any-net-port"])
+
   let description =
     let doc =
       "Name of the mapping, used by UPNP clients/routers to document the \
@@ -251,23 +291,27 @@ module Term = struct
 
   let mapping_options =
     let open Term.Syntax in
-    let+ local_addr and+ lease_duration and+ description in
-    {local_addr; lease_duration; description}
+    let+ local_addr and+ lease_duration and+ description and+ any_net_port in
+    {local_addr; lease_duration; description; any_net_port}
 
   let process config_file data_dir listen_addr advertised_net_port
       search_options mapping_options =
-    match
-      map_port_cmd
-        search_options
-        mapping_options
-        ?data_dir
-        ?config_file
-        ?listen_addr
-        ?advertised_net_port
-        ()
-    with
-    | Ok () -> `Ok ()
-    | Error e -> `Error (true, Format.asprintf "%a" Error_monad.pp_print_trace e)
+    if advertised_net_port <> None && mapping_options.any_net_port then
+      `Error (false, exclusive_parameters)
+    else
+      match
+        map_port_cmd
+          search_options
+          mapping_options
+          ?data_dir
+          ?config_file
+          ?listen_addr
+          ?advertised_net_port
+          ()
+      with
+      | Ok () -> `Ok ()
+      | Error e ->
+          `Error (true, Format.asprintf "%a" Error_monad.pp_print_trace e)
 
   let term =
     Term.(
