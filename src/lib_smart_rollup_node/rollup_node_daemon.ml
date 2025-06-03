@@ -935,6 +935,23 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
   run state
 
 module Replay = struct
+  let preload_wasmer node_ctxt l2_block =
+    let open Lwt_result_syntax in
+    match node_ctxt.Node_context.kind with
+    | Example_arith | Riscv -> return_unit
+    | Wasm_2_0_0 ->
+        Format.eprintf
+          "Preloading \
+           kernel............................................................. \
+           %!" ;
+        let* () =
+          Wasm_2_0_0_utilities.preload_kernel
+            node_ctxt
+            l2_block.Sc_rollup_block.header
+        in
+        Format.eprintf "[\x1B[1;32mOK\x1B[0m]@." ;
+        return_unit
+
   let mk_node_ctxt ~data_dir cctxt block =
     let open Lwt_result_syntax in
     let* store = Store.init Read_only ~data_dir in
@@ -1022,7 +1039,7 @@ module Replay = struct
   let process_time_treshold =
     Ptime.Span.of_float_s 0.5 |> WithExceptions.Option.get ~loc:__LOC__
 
-  let replay_block_aux ?(verbose = false) node_ctxt block =
+  let replay_block_aux ?(preload = false) ?(verbose = false) node_ctxt block =
     let open Lwt_result_syntax in
     let* hash, level =
       match block with
@@ -1033,8 +1050,9 @@ module Replay = struct
           let+ l = Node_context.level_of_hash node_ctxt h in
           (h, l)
     in
-    let start_timestamp = Time.System.now () in
     let* block = Node_context.get_full_l2_block node_ctxt hash in
+    let* () = when_ preload @@ fun () -> preload_wasmer node_ctxt block in
+    let start_timestamp = Time.System.now () in
     if verbose then
       Format.eprintf
         "@[<v 2>\x1B[1mReplaying block: \x1B[0m@,%a@,@]@."
@@ -1176,7 +1194,7 @@ module Replay = struct
   let replay_block ~data_dir cctxt block =
     let open Lwt_result_syntax in
     let* node_ctxt = mk_node_ctxt ~data_dir cctxt block in
-    replay_block_aux ~verbose:true node_ctxt block
+    replay_block_aux ~preload:true ~verbose:true node_ctxt block
 
   let replay_blocks ~data_dir cctxt start_level end_level =
     let open Lwt_result_syntax in
@@ -1186,5 +1204,11 @@ module Replay = struct
         (Int32.sub end_level start_level |> Int32.to_int |> succ)
         (fun x -> Int32.add (Int32.of_int x) start_level)
     in
-    List.iter_es (fun l -> replay_block_aux node_ctxt (`Level l)) levels
+    let first = ref true in
+    List.iter_es
+      (fun l ->
+        let preload = !first in
+        first := false ;
+        replay_block_aux ~preload node_ctxt (`Level l))
+      levels
 end

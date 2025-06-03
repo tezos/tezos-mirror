@@ -5470,6 +5470,7 @@ let octez_smart_rollup_node_lib =
         octez_crawler |> open_;
         octez_workers |> open_;
         octez_smart_rollup_lib |> open_;
+        octez_scoru_wasm_fast;
       ]
 
 let wasm_helpers_intf_modules = ["wasm_utils_intf"]

@@ -148,6 +148,29 @@ let dump_durable_storage ~block ~data_dir ~file =
   let* () = Installer_config.to_file instrs ~output:file in
   return_unit
 
+let preload_kernel (node_ctxt : _ Node_context.t) header =
+  let open Lwt_result_syntax in
+  let* pvm_state =
+    get_wasm_pvm_state
+      node_ctxt.context
+      header.Sc_rollup_block.block_hash
+      header.context
+  in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_level node_ctxt header.level
+  in
+  let*! durable =
+    Plugin.Pvm.Wasm_2_0_0.decode_durable_state
+      Tezos_scoru_wasm.Wasm_pvm.durable_storage_encoding
+      pvm_state
+  in
+  let*! () =
+    Tezos_scoru_wasm_fast.Exec.preload_kernel
+      ~hooks:Tezos_scoru_wasm.Hooks.no_hooks
+      durable
+  in
+  return_unit
+
 let patch_durable_storage ~data_dir ~key ~value =
   let open Lwt_result_syntax in
   (* Loads the state of the head. *)
