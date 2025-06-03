@@ -11,6 +11,7 @@ type receiver =
       channel : string;
           (** Slack channel to send notifications to, use '#' for public channel. *)
       api_url : string;  (** Slack notification configuration. *)
+      bot_token : string option;
     }
   | Null
 
@@ -41,13 +42,23 @@ type alert = {alert : Prometheus.alert; route : route option}
 
 let alert ?route alert = {alert; route}
 
-let slack_receiver ?channel ~name ~api_url () =
+let slack_webhook_receiver ?channel ~name ~api_url () =
   let channel =
     match channel with
     | None -> {|{{ range .Alerts }}{{ .Annotations.description }}{{ end }}|}
     | Some channel -> channel
   in
-  Slack {name; channel; api_url}
+  Slack {name; channel; api_url; bot_token = None}
+
+(* https://prometheus.io/docs/alerting/latest/configuration/#slack_config *)
+let slack_bottoken_receiver ~name ~channel ~bot_token =
+  Slack
+    {
+      name;
+      channel;
+      api_url = "https://api.slack.com/methods/chat.postMessage";
+      bot_token = Some bot_token;
+    }
 
 let null_receiver = Null
 
@@ -73,15 +84,31 @@ let jingoo_receiver_template receiver =
   let open Jingoo.Jg_types in
   let config_template = function
     | Null -> []
-    | Slack {name = _; channel; api_url} ->
+    | Slack {name = _; channel; api_url; bot_token} ->
         [
           ( "config",
             Tobj
-              [
-                ("type", Tstr "slack");
-                ("api_url", Tstr api_url);
-                ("channel", Tstr channel);
-              ] );
+              ([
+                 ("type", Tstr "slack");
+                 ("api_url", Tstr api_url);
+                 ("channel", Tstr channel);
+               ]
+              @
+              match bot_token with
+              | None -> []
+              | Some bot_token ->
+                  [
+                    ( "http_config",
+                      Tobj
+                        [
+                          ( "authorization",
+                            Tobj
+                              [
+                                ("type", Tstr "Bearer");
+                                ("credentials", Tstr bot_token);
+                              ] );
+                        ] );
+                  ]) );
         ]
   in
   Tobj ([("name", Tstr (name_of_receiver receiver))] @ config_template receiver)
