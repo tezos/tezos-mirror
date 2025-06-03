@@ -388,3 +388,22 @@ let log_rotation =
        Default is 300 if a log-file is specified.\n\
       \       Set to 0 to completely disable log-rotation"
     300
+
+let section =
+  Clap.section
+    ~description:"Define report and alert managing options"
+    "Cloud reporting and alerting options"
+
+let slack_channel_id =
+  Clap.optional_string
+    ~section
+    ~long:"slack-channel-id"
+    ~description:"The Slack channel id to send reports and alerts on"
+    ()
+
+let slack_bot_token =
+  Clap.optional_string
+    ~section
+    ~long:"slack-bot-token"
+    ~description:"The Slack bot token used to send reports and alerts"
+    ()

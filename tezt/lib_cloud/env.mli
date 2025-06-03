@@ -143,6 +143,9 @@ val binaries_path : string
 (** Equivalent to [Cli.log_rotation] *)
 val log_rotation : int
 
+(** Notification backend, slack_channel_id and slack_bot_token *)
+val notifier : Types.notifier
+
 (** [init ()] initialises and deploys a Docker registry using Terraform, only
     when the [mode] is either [`Remote_orchestrator_remote_agents] or
     [`Local_orchestrator_remote_agents]. *)

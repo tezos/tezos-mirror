@@ -40,7 +40,10 @@ type t = {
   otel : Otel.t option;
   jaeger : Jaeger.t option;
   deployement : Deployement.t option;
+  notifier : Types.notifier;
 }
+
+let notifier t = t.notifier
 
 let shutdown ?exn t =
   let* () =
@@ -270,6 +273,7 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
       otel;
       jaeger;
       deployement = Some deployement;
+      notifier = Env.notifier;
     }
   in
   let sigint = sigint () in
@@ -620,6 +624,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
           alert_manager = None;
           chronos = None;
           deployement = None;
+          notifier = Env.notifier;
         }
   | Some configurations -> (
       let* ssh_public_key = Ssh.public_key () in

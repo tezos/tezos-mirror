@@ -209,6 +209,9 @@ module Cloud : sig
 
   (** Register a chronos task *)
   val register_chronos_task : t -> Chronos.task -> unit
+
+  (** Returns the [Types.notifier] *)
+  val notifier : t -> Types.notifier
 end
 
 module Prometheus : sig

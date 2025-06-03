@@ -146,3 +146,9 @@ val log_rotation : int
 
 (** The hostname of the host accessed by ssh on which to deploy *)
 val ssh_host : string option
+
+(** Slack channel id to send notifications on *)
+val slack_channel_id : string option
+
+(** Slack authentication token to allow publication *)
+val slack_bot_token : string option
