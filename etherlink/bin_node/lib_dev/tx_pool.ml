@@ -992,4 +992,9 @@ module Tx_container = struct
     pop_transactions ~maximum_cumulative_size
 end
 
-let tx_container = Services_backend_sig.Evm_tx_container (module Tx_container)
+let tx_container (type f) ~(chain_family : f L2_types.chain_family) :
+    f Services_backend_sig.tx_container tzresult =
+  let open Result_syntax in
+  match chain_family with
+  | EVM -> return @@ Services_backend_sig.Evm_tx_container (module Tx_container)
+  | Michelson -> error_with "Tx pool not supported in Tezlink"

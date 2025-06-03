@@ -304,7 +304,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
         in
         return (false, tx_container)
     | None, None ->
-        let tx_container = Tx_pool.tx_container in
+        let*? tx_container = Tx_pool.tx_container ~chain_family:EVM in
         let* () =
           Tx_pool.start
             ~tx_pool_parameters:

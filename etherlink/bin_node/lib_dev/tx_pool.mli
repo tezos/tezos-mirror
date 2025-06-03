@@ -53,4 +53,6 @@ val mode : unit -> mode tzresult Lwt.t
 
 (** wrapper of the Tx_pool to be compatible with the Tx_container
     signature for the services. *)
-val tx_container : L2_types.evm_chain_family Services_backend_sig.tx_container
+val tx_container :
+  chain_family:'f L2_types.chain_family ->
+  'f Services_backend_sig.tx_container tzresult

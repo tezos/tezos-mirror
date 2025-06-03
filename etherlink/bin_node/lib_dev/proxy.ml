@@ -215,8 +215,8 @@ let main
                 chain_family = Ex_chain_family chain_family;
               }
         in
-        return
-          (Some Tx_pool.pop_and_inject_transactions_lazy, Tx_pool.tx_container)
+        let*? tx_container = Tx_pool.tx_container ~chain_family:EVM in
+        return (Some Tx_pool.pop_and_inject_transactions_lazy, tx_container)
     | enable_send_raw_transaction, evm_node_endpoint, _ ->
         let evm_node_endpoint =
           if enable_send_raw_transaction then evm_node_endpoint else None

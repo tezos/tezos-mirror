@@ -209,22 +209,27 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       init_from_snapshot
   in
 
-  let start_tx_container, tx_container, ping_tx_pool =
+  let*? start_tx_container, tx_container, ping_tx_pool =
+    let open Result_syntax in
     match config.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
         let start, tx_container = Tx_queue.tx_container ~chain_family:EVM in
-        ( (fun ~tx_pool_parameters:_ ->
-            start ~config:tx_queue_config ~keep_alive:config.keep_alive ()),
-          tx_container,
-          false )
+        return
+          ( (fun ~tx_pool_parameters:_ ->
+              start ~config:tx_queue_config ~keep_alive:config.keep_alive ()),
+            tx_container,
+            false )
     | None ->
         if config.finalized_view then
-          ( (fun ~tx_pool_parameters:_ -> return_unit),
-            container_forward_tx
-              ~keep_alive:config.keep_alive
-              ~evm_node_endpoint,
-            false )
-        else (Tx_pool.start, Tx_pool.tx_container, true)
+          return
+            ( (fun ~tx_pool_parameters:_ -> Lwt_result_syntax.return_unit),
+              container_forward_tx
+                ~keep_alive:config.keep_alive
+                ~evm_node_endpoint,
+              false )
+        else
+          let* tx_container = Tx_pool.tx_container ~chain_family:EVM in
+          return (Tx_pool.start, tx_container, true)
   in
 
   let* _loaded =
