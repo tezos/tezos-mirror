@@ -311,12 +311,12 @@ However, it is also possible to register as a delegate and immediately set the c
    octez-client register key <mananger_key> as delegate with consensus key <consensus_key>
 
 There can be multiple pending updates: it is possible to have multiple pending consensus keys for multiple future cycles.
-A subsequent update within the same cycle takes precedences over the initial one.
+A subsequent update within the same cycle takes precedence over the initial one.
 
 Baking With a Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In your baker's command, replace the delegate's manager key alias with the consenus key alias::
+In your baker's command, replace the delegate's manager key alias with the consensus key alias::
 
    octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
 
