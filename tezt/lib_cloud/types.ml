@@ -99,8 +99,7 @@ module Agent_configuration = struct
 
   let default_max_run_duration = Some 7200
 
-  let default_gcp_binaries_path =
-    Filename.get_temp_dir_name () // "tezt-runners"
+  let default_gcp_binaries_path = Path.tmp_dir // "tezt-runners"
 
   let make ~os ~binaries_path ?max_run_duration ~machine_type ~docker_image
       ~name () =

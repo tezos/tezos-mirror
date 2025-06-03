@@ -253,7 +253,7 @@ let register_rules ?(group_name = default_group_name) ?interval rules t =
 let start ~alerts agents =
   (* We do not use the Temp.dir so that the base directory is predictable and
      can be mounted by the proxy VM if [--proxy] is used. *)
-  let dir = Filename.get_temp_dir_name () // "prometheus" in
+  let dir = Path.tmp_dir // "prometheus" in
   (* Group alerts by group name. *)
   let groups =
     let groups = Hashtbl.create 10 in
@@ -380,9 +380,7 @@ let export_snapshot {snapshot_filename; name; port; _} =
   let json = JSON.parse ~origin:"Prometheus.export" stdout in
   let snapshot_name = JSON.(json |-> "data" |-> "name" |> as_string) in
   let destination =
-    Option.value
-      ~default:(Filename.get_temp_dir_name () // snapshot_name)
-      snapshot_filename
+    Option.value ~default:(Path.tmp_dir // snapshot_name) snapshot_filename
   in
   let* () =
     Docker.cp

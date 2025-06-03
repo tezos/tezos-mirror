@@ -86,8 +86,7 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
                  proxy_agent
                  ~source:dashboard
                  ~destination:
-                   (Filename.get_temp_dir_name ()
-                   // "grafana" // "dashboards"
+                   (Path.tmp_dir // "grafana" // "dashboards"
                    // Filename.basename dashboard)
              in
              Lwt.return_unit)

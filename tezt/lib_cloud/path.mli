@@ -5,6 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** The 'tmp' directory used by the library. This directory should be the same
+    on the local machine and the VMs. *)
+val tmp_dir : string
+
 (** Path to the directory containing the terraform script to setup the
     docker registry. *)
 val terraform_docker_registry : string

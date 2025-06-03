@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Path = Path
 module Agent = Agent
 module Types = Types
 module Chronos = Chronos
