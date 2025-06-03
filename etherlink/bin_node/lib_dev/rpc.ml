@@ -276,6 +276,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       ~tick_interval:0.05
   and* () =
     Blueprints_follower.start
+      ~chain_family
       ~ping_tx_pool
       ~time_between_blocks
       ~evm_node_endpoint
