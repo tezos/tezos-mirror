@@ -135,6 +135,10 @@ your user account::
 
    octez-client register key mybaker as delegate
 
+.. note::
+
+   It is possible to also register a :ref:`consensus key <consensus_key_details>` and/or a :ref:`companion key <companion_key>` at this step.
+
 You also need to stake some tez, at least ``MINIMAL_FROZEN_STAKE`` (see :ref:`ps_constants`), and to have at least ``MINIMAL_STAKE = 6000`` :ref:`baking power <minimal_baking_power>`, taking into account your own and all your delegators' staked balances, as well as their delegated balances with a lesser weight.
 
 On testnets, when you obtain coins from :ref:`a faucet<faucet>`, if
