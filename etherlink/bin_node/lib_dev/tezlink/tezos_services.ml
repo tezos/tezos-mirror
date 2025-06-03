@@ -438,6 +438,16 @@ module Imported_services = struct
       Tezos_rpc.Service.t =
     import_service Tezos_shell_services.Shell_services.Blocks.S.protocols
 
+  let _contract_info :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context * Tezos_types.Contract.t,
+        Imported_protocol_plugin.Contract_services.S.normalize_types_query,
+        unit,
+        Imported_protocol_plugin.Contract_services.info )
+      Tezos_rpc.Service.t =
+    Tezos_rpc.Service.subst1 Imported_protocol_plugin.Contract_services.S.info
+
   let balance :
       ( [`GET],
         tezlink_rpc_context,
