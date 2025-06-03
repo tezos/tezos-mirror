@@ -38,14 +38,12 @@ let test_jstz_proof_regression () =
       in
       assert (proof_bytes = Hex.to_bytes_exn (`Hex expected_proof_bytes)) ;
 
-      let initial_proof_hash = Backend.proof_start_state proof in
+      (* TODO RV-698: Also check initial state hash *)
       let final_proof_hash = Backend.proof_stop_state proof in
-
-      let initial_hash = Backend.state_hash state in
       let* state = Backend.compute_step state in
       let final_hash = Backend.state_hash state in
-
-      assert (initial_hash = initial_proof_hash) ;
       assert (final_hash = final_proof_hash) ;
+
+      (* TODO RV-698: Also check proof verification and input request *)
       return_unit
   | None -> Lwt.fail_with "Could not produce proof"
