@@ -7,7 +7,9 @@
 
 let ( // ) = Tezt.Base.( // )
 
-let tmp_dir = Filename.get_temp_dir_name ()
+(* Use a hard-coded temporary directory path in order to ensure consistency
+   across machines. *)
+let tmp_dir = "/tmp"
 
 (* All paths are given relatively to the Tezos project root. *)
 
