@@ -855,7 +855,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         | Alpha -> []
         | _ ->
             (* There is no point in testing the multichain feature on non-alpha protocols *)
-            [(if enable_multichain then Tag.ci_disabled else Tag.slow)])
+            [(if enable_multichain then Tag.ci_disabled else Tag.extra)])
       ~__FILE__
       ~uses:(fun protocol -> uses protocol @ additional_uses)
       body

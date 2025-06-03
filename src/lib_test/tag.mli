@@ -104,3 +104,7 @@ val unix : string
 
     This tag should be used for tests that take more than 2 minutes in the CI. *)
 val slow : string
+
+(** ["extra"]: Tag for tests that are not run on every merge request (MR) due to their
+    proximity to other similar tests that are already included. These tests will only run in the scheduled pipeline. *)
+val extra : string
