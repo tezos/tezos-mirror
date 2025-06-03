@@ -17,8 +17,15 @@ let build_rpc_directory () =
   let register0 s f =
     dir := Tezos_rpc.Directory.register !dir s (fun () p q -> f p q)
   in
-  register0 Bls_services.S.aggregate_signatures (fun () sigs ->
-      return @@ Bls.aggregate_signature_opt sigs) ;
+  register0 Bls_services.S.aggregate_signatures (fun () inp ->
+      let aggregated_signature =
+        Bls.aggregate_signature_opt inp.signature_shares
+      in
+      match aggregated_signature with
+      | Some signature ->
+          let is_valid = Bls.check inp.pk signature inp.msg in
+          if is_valid then return aggregated_signature else return_none
+      | None -> return_none) ;
   register0 Bls_services.S.check_proof (fun () pk_with_proof ->
       return @@ check_public_key_with_proof pk_with_proof.pk pk_with_proof.proof) ;
   register0 Bls_services.S.aggregate_public_keys (fun () pks_with_pops ->

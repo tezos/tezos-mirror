@@ -74,11 +74,30 @@ module S = struct
          (req "message" bytes)
          (req "signature_shares" (list threshold_signature_share_encoding)))
 
+  type aggregate_signature = {
+    pk : Bls.Public_key.t;
+    msg : Bytes.t;
+    signature_shares : Bls.t list;
+  }
+
+  let aggregate_signature_encoding =
+    let open Data_encoding in
+    conv
+      (fun {pk; msg; signature_shares} -> (pk, msg, signature_shares))
+      (fun (pk, msg, signature_shares) -> {pk; msg; signature_shares})
+      (obj3
+         (req "public_key" Bls.Public_key.encoding)
+         (req "message" bytes)
+         (req "signature_shares" (list Bls.encoding)))
+
   let aggregate_signatures =
     Tezos_rpc.Service.post_service
-      ~description:"Aggregate BLS signatures"
+      ~description:
+        "Aggregate BLS signatures. Return null if the signatures cannot be \
+         aggregated, or if their aggregation is not a valid signature for the \
+         provided public key and message."
       ~query:Tezos_rpc.Query.empty
-      ~input:(list Bls.encoding)
+      ~input:aggregate_signature_encoding
       ~output:(option Bls.encoding)
       Tezos_rpc.Path.(path / "aggregate_signatures")
 

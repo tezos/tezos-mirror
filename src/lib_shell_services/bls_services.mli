@@ -26,8 +26,20 @@ module S : sig
     signature_shares : threshold_signature_share list;
   }
 
+  type aggregate_signature = {
+    pk : Bls.Public_key.t;
+    msg : Bytes.t;
+    signature_shares : Bls.t list;
+  }
+
   val aggregate_signatures :
-    ([`POST], unit, unit, unit, Bls.t list, Bls.t option) Tezos_rpc.Service.t
+    ( [`POST],
+      unit,
+      unit,
+      unit,
+      aggregate_signature,
+      Bls.t option )
+    Tezos_rpc.Service.t
 
   val check_proof :
     ([`POST], unit, unit, unit, public_key_with_proof, bool) Tezos_rpc.Service.t
@@ -61,7 +73,9 @@ module S : sig
 end
 
 val aggregate_signatures :
-  #Tezos_rpc.Context.simple -> Bls.t list -> Bls.t option tzresult Lwt.t
+  #Tezos_rpc.Context.simple ->
+  S.aggregate_signature ->
+  Bls.t option tzresult Lwt.t
 
 val check_proof :
   #Tezos_rpc.Context.simple -> S.public_key_with_proof -> bool tzresult Lwt.t
