@@ -713,7 +713,9 @@ end) : Internal_event.SINK with type t = t = struct
         match
           List.find
             (fun (prefix, _) ->
-              Internal_event.Section.is_prefix ~prefix section)
+              Internal_event.Section.is_prefix
+                ~prefix
+                (Internal_event.Section.append section M.simple_name))
             kvl
         with
         | None ->
