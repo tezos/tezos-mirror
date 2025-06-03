@@ -571,6 +571,45 @@ let partition_consensus_operations_on_reproposal consensus_operations =
     (None, None, [], [], [])
     consensus_operations
 
+module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
+
+(* [filter_best_attestations_per_slot] deduplicates a list of attestation
+   operations by selecting, for each slot, the attestation with the highest
+   number of DAL-attested slots. *)
+let filter_best_attestations_per_slot attestations =
+  let dal_attested_slot_count = function
+    | None -> 0
+    | Some dal_content ->
+        Dal.Attestation.number_of_attested_slots dal_content.attestation
+  in
+  let slot_map =
+    List.fold_left
+      (fun slot_map
+           (({protocol_data; _} : Kind.attestation operation) as attestation) ->
+        let slot, dal_count =
+          match protocol_data.contents with
+          | Single (Attestation {consensus_content; dal_content}) ->
+              (consensus_content.slot, dal_attested_slot_count dal_content)
+        in
+        SlotMap.update
+          slot
+          (function
+            | None -> Some attestation
+            | Some ({protocol_data; _} : Kind.attestation operation) as
+              current_value -> (
+                match protocol_data.contents with
+                | Single (Attestation {dal_content; _}) ->
+                    let current_dal_count =
+                      dal_attested_slot_count dal_content
+                    in
+                    if dal_count > current_dal_count then Some attestation
+                    else current_value))
+          slot_map)
+      SlotMap.empty
+      attestations
+  in
+  SlotMap.fold (fun _slot attestation acc -> attestation :: acc) slot_map []
+
 (* [aggregate_attestations_on_proposal attestations] replaces all eligible
    attestations from [attestations] by a single Attestations_aggregate.
    Attestations are assumed to target the same shell, level, round and
@@ -580,7 +619,10 @@ let aggregate_attestations_on_proposal attestations =
   let eligible_attestations, remaining_attestations =
     partition_consensus_operations_on_proposal attestations
   in
-  let* aggregate_opt = aggregate_attestations eligible_attestations in
+  let* aggregate_opt =
+    eligible_attestations |> filter_best_attestations_per_slot
+    |> aggregate_attestations
+  in
   match aggregate_opt with
   | Some aggregate ->
       let open Operation_pool in
@@ -641,6 +683,9 @@ let aggregate_preattestations_on_reproposal aggregate_opt
 
 let aggregate_attestations_on_reproposal aggregate_opt eligible_attestations =
   let open Result_syntax in
+  let eligible_attestations =
+    filter_best_attestations_per_slot eligible_attestations
+  in
   match (aggregate_opt, eligible_attestations) with
   | None, [] -> return_none
   | None, _ :: _ ->
