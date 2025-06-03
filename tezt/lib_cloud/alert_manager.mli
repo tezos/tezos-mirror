@@ -58,6 +58,9 @@ val alert : ?route:route -> Prometheus.alert -> alert
 (** The alert manager service. *)
 type t
 
+(** Add an alert (and reload the service) *)
+val add_alert : t -> alert:alert -> unit Lwt.t
+
 (** [run alerts] starts a new docker container in
     the background, using the latest Prometheus Alert Manager image.
     Activates the given [alerts]. *)

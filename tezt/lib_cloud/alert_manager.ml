@@ -76,7 +76,7 @@ let default_route =
 
 type t = {
   configuration_file : string;
-  routes : (Prometheus.alert * route) list;
+  mutable routes : (Prometheus.alert * route) list;
   receivers : receiver list;
   default_receiver : receiver;
 }
@@ -228,7 +228,7 @@ let run ?(default_receiver = null_receiver) alerts =
       in
       Lwt.return_some t
 
-let _reload t =
+let reload t =
   Log.info "Alert_manager: reloading" ;
   write_configuration t ;
   Process.run "curl" ["-X"; "POST"; "http://127.0.0.1:9093/-/reload"]
@@ -237,3 +237,10 @@ let shutdown () =
   Log.info "Alert_manager: shutting down" ;
   let* () = Docker.kill "alert-manager" |> Process.check in
   Lwt.return_unit
+
+let add_alert t ~alert =
+  Log.info "Alert_manager: adding alert" ;
+  let {alert; route = route'} = alert in
+  let route' = Option.value ~default:(route t.default_receiver) route' in
+  t.routes <- (alert, route') :: t.routes ;
+  reload t
