@@ -27,6 +27,7 @@ val is_tx_valid :
   Lwt.t
 
 type validation_config = {
+  minimum_base_fee_per_gas : Ethereum_types.quantity;
   base_fee_per_gas : Ethereum_types.quantity;
   maximum_gas_limit : Ethereum_types.quantity;
   da_fee_per_byte : Ethereum_types.quantity;

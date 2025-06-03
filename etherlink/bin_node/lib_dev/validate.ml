@@ -35,7 +35,7 @@ let validate_nonce ~next_nonce:(Qty next_nonce)
   else return (Error "Nonce too low")
 
 let validate_gas_limit ~maximum_gas_limit:(Qty maximum_gas_limit)
-    ~da_fee_per_byte ~base_fee_per_gas:(Qty gas_price)
+    ~da_fee_per_byte ~minimum_base_fee_per_gas:(Qty minimum_base_fee_per_gas)
     (transaction : Transaction.transaction) :
     (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
@@ -45,7 +45,7 @@ let validate_gas_limit ~maximum_gas_limit:(Qty maximum_gas_limit)
     Fees.gas_for_fees
       ~da_fee_per_byte
       ~access_list:transaction.access_list
-      ~gas_price
+      ~minimum_base_fee_per_gas
       transaction.data
   in
   let** execution_gas_limit =
@@ -121,15 +121,16 @@ let validate_stateless ~next_nonce ~max_number_of_chunks backend_rpc transaction
   let** () = validate_tx_data_size ~max_number_of_chunks transaction in
   return (Ok ())
 
-let validate_balance_and_gas ~base_fee_per_gas ~maximum_gas_limit
-    ~da_fee_per_byte ~transaction ~from_balance:(Qty from_balance) =
+let validate_balance_and_gas ~minimum_base_fee_per_gas ~base_fee_per_gas
+    ~maximum_gas_limit ~da_fee_per_byte ~transaction
+    ~from_balance:(Qty from_balance) =
   let open Lwt_result_syntax in
   let** () = validate_max_fee_per_gas ~base_fee_per_gas transaction in
   let** () =
     validate_gas_limit
       ~maximum_gas_limit
       ~da_fee_per_byte
-      ~base_fee_per_gas
+      ~minimum_base_fee_per_gas
       transaction
   in
   let** total_cost =
@@ -145,6 +146,9 @@ let validate_with_state_from_backend
       caller
       Block_parameter.(Block_parameter Latest)
   in
+  let* minimum_base_fee_per_gas =
+    Backend_rpc.Etherlink.minimum_base_fee_per_gas ()
+  in
   let* base_fee_per_gas = Backend_rpc.Etherlink.base_fee_per_gas () in
   let* state = Backend_rpc.Reader.get_state () in
   let* maximum_gas_limit =
@@ -156,6 +160,7 @@ let validate_with_state_from_backend
   in
   let** _total_cost =
     validate_balance_and_gas
+      ~minimum_base_fee_per_gas:(Qty minimum_base_fee_per_gas)
       ~base_fee_per_gas
       ~maximum_gas_limit
       ~da_fee_per_byte
@@ -210,6 +215,7 @@ let is_tx_valid ?max_number_of_chunks
   valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx
 
 type validation_config = {
+  minimum_base_fee_per_gas : Ethereum_types.quantity;
   base_fee_per_gas : Ethereum_types.quantity;
   maximum_gas_limit : Ethereum_types.quantity;
   da_fee_per_byte : Ethereum_types.quantity;
@@ -256,6 +262,7 @@ let validate_balance_gas_nonce_with_validation_state validation_state
   in
   let** total_cost =
     validate_balance_and_gas
+      ~minimum_base_fee_per_gas:validation_state.config.minimum_base_fee_per_gas
       ~base_fee_per_gas:validation_state.config.base_fee_per_gas
       ~maximum_gas_limit:validation_state.config.maximum_gas_limit
       ~da_fee_per_byte:validation_state.config.da_fee_per_byte
