@@ -12,7 +12,7 @@
 val gas_used_for_da_fees :
   da_fee_per_byte:Ethereum_types.quantity ->
   base_fee_per_gas:Z.t ->
-  ?access_list:('a * 'b trace) trace ->
+  ?access_list:Transaction.access_list_item list ->
   bytes ->
   Z.t
 

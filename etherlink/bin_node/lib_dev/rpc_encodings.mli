@@ -222,6 +222,14 @@ module Get_transaction_receipt :
     with type input = Ethereum_types.hash
      and type output = Transaction_receipt.t option
 
+type gas_info = {
+  execution_gas : Ethereum_types.quantity;
+  inclusion_gas : Ethereum_types.quantity;
+}
+
+module Get_transaction_gas_info :
+  METHOD with type input = Ethereum_types.hash and type output = gas_info option
+
 module Get_transaction_by_hash :
   METHOD
     with type input = Ethereum_types.hash

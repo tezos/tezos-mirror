@@ -699,6 +699,57 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
               rpc_ok receipt
             in
             build_with_input ~f module_ parameters
+        | Get_transaction_gas_info.Method ->
+            let f tx_hash =
+              let* receipt =
+                Backend_rpc.Etherlink_block_storage.transaction_receipt tx_hash
+              in
+              let* object_ =
+                Backend_rpc.Etherlink_block_storage.transaction_object tx_hash
+              in
+              match (receipt, object_) with
+              | Some receipt, Some object_ -> (
+                  let tx_data =
+                    Transaction_object.input object_
+                    |> Ethereum_types.hex_to_real_bytes
+                  in
+                  let* block =
+                    let (Qty number) = receipt.blockNumber in
+                    Backend_rpc.Etherlink_block_storage.nth_block
+                      ~full_transaction_object:false
+                      number
+                  in
+                  let* state = Backend_rpc.Reader.get_state () in
+                  let* da_fee_per_byte_bytes =
+                    Backend_rpc.Reader.read
+                      state
+                      Durable_storage_path.da_fee_per_byte
+                  in
+                  match (da_fee_per_byte_bytes, block.baseFeePerGas) with
+                  | Some da_fee_per_byte_bytes, Some (Qty base_fee_per_gas) ->
+                      let da_fee_per_byte =
+                        Helpers.decode_z_le da_fee_per_byte_bytes
+                      in
+                      let da_fees =
+                        Fees.gas_used_for_da_fees
+                          ~da_fee_per_byte:(Qty da_fee_per_byte)
+                          ~base_fee_per_gas
+                          tx_data
+                      in
+                      let (Qty gas_used) = receipt.gasUsed in
+                      rpc_ok
+                        (Some
+                           {
+                             execution_gas = Qty (Z.sub gas_used da_fees);
+                             inclusion_gas = Qty da_fees;
+                           })
+                  | _, _ ->
+                      rpc_error
+                        (Rpc_errors.internal_error
+                           "could not find all necessary inputs"))
+              | _, _ -> rpc_ok None
+            in
+            build_with_input ~f module_ parameters
         | Get_transaction_by_hash.Method ->
             let f tx_hash =
               let* transaction_object = Tx_container.find tx_hash in

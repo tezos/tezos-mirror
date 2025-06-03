@@ -15,6 +15,9 @@
 - Fix encoding of signature fields `r` and `s` in transactions to use
   [quantities](https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash),
   _i.e._ compressed without leading zeros. (!18178)
+* Adds the Etherlink-specific `tez_getTransactionGasInfo` RPC to determine how
+  many units of gas were used to execute a given (included) transaction, and
+  how many units of gas were paid for covering the inclusion fees. (!18212)
 
 ### Metrics changes
 
