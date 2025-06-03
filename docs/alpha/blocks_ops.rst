@@ -195,7 +195,9 @@ manager operations are the only fee-paying and
 
 - The ``Reveal`` operation reveals the public key of the sending
   manager. Knowing this public key is indeed necessary to check the signature
-  of future operations signed by this manager.
+  of future operations signed by this manager. Additionally, when revealing a tz4 public key,
+  the manager must also include a proof of possession, which is the signature
+  of the public key itself.
 - The ``Transaction`` operation allows users to transfer tez
   between accounts, to invoke a smart contract, or to invoke :ref:`pseudo-operations <pseudo_operations_alpha>` on user accounts.
 - The ``Delegation`` operation allows users to designate a :ref:`delegate<def_delegate_alpha>` (a
