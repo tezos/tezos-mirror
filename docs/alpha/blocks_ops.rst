@@ -206,7 +206,7 @@ manager operations are the only fee-paying and
   :ref:`consensus key<consensus_key_alpha>`, which is a dedicated key
   for signing blocks and consensus-related operations.
 - The ``Update_companion_key`` operation allows users to register a
-  companion key, which is a dedicated key (introduced in protocol S)
+  :ref:`companion key<companion_key>`, which is a dedicated key (introduced in protocol S)
   for signing the DAL specific part of consensus operations,
   when using a tz4 consensus key.
 - The ``Origination`` operation is used to
