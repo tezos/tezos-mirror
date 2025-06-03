@@ -591,6 +591,37 @@ let test_tezlink_protocols =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
+let test_tezlink_expected_issuance =
+  register_tezlink_test
+    ~title:"Test the mocked expected issuance rpc"
+    ~tags:["rpc"; "issuance"; "mock"]
+  @@ fun {sequencer; _} _protocol ->
+  (* call the rpc and parse the result *)
+  let rpc () =
+    let path =
+      "/tezlink/chains/main/blocks/head/context/issuance/expected_issuance"
+    in
+    let* res =
+      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    return @@ JSON.parse ~origin:"curl" res
+  in
+
+  let* res = rpc () in
+  let rewards = JSON.(res |> as_list) in
+  (* The mock assumes we stay in cycle 0 for now *)
+  Check.(
+    JSON.(List.hd rewards |-> "cycle" |> as_int = 0)
+      int
+      ~error_msg:"Expected %R but got %L") ;
+
+  Check.(
+    (List.length rewards = 3)
+      int
+      ~error_msg:"Expected %R (consensus_rights_delay + 1) but got %L") ;
+  unit
+
 let test_tezlink_balance =
   register_tezlink_test
     ~title:"Test of the balance rpc"
@@ -13768,6 +13799,7 @@ let () =
   test_tezlink_manager_key [Alpha] ;
   test_tezlink_counter [Alpha] ;
   test_tezlink_protocols [Alpha] ;
+  test_tezlink_expected_issuance [Alpha] ;
   test_tezlink_monitor_heads [Alpha] ;
   test_tezlink_version [Alpha] ;
   test_tezlink_header [Alpha] ;
