@@ -244,7 +244,6 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
   in
   let* alert_manager =
     match alerts with
-    | [] -> Lwt.return_none
     | _ ->
         let* alert_manager = Alert_manager.run alerts in
         Lwt.return alert_manager
