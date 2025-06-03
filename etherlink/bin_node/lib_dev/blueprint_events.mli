@@ -17,11 +17,11 @@ val publisher_is_ready : unit -> unit Lwt.t
     will not accept requests anymore. *)
 val publisher_shutdown : unit -> unit Lwt.t
 
-(** [blueprint_applied block duration] advertizes that a blueprint
-    leading to [block] has been applied in [duration] time onto the
-    local state. *)
+(** [blueprint_applied block execution_gas duration] advertizes that a blueprint
+    leading to [block] requiring [execution_gas] to be executed has been
+    applied in [duration] time onto the local state. *)
 val blueprint_applied :
-  'transaction_object L2_types.block -> Time.System.Span.t -> unit Lwt.t
+  'transaction_object L2_types.block -> Z.t -> Time.System.Span.t -> unit Lwt.t
 
 (** [blueprint_replayed ~execution_gas ~process_time ~diverged number]
     advertises that the node was able to replay the blueprint for level [number]. *)

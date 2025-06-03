@@ -21,6 +21,8 @@
 
 ### Metrics changes
 
+- Advertises the execution gas used on new blueprint application. (!18213)
+
 ### Execution changes
 
 * `replay blueprint` and `replay blueprints` now log the execution gas, process
