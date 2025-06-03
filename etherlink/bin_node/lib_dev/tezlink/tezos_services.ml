@@ -221,6 +221,20 @@ module Protocol_types = struct
         ~dst:encoding
         ~src:Data_encoding.z
   end
+
+  module Contract = struct
+    let make_info (contract_balance, counter_z) =
+      let open Result_syntax in
+      let open Imported_protocol_plugin.Contract_services in
+      let* counter = Counter.of_z counter_z in
+      return
+        {
+          balance = contract_balance;
+          delegate = None;
+          counter = Some counter;
+          script = None;
+        }
+  end
 end
 
 (** [wrap conversion service_implementation] changes the output type
