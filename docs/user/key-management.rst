@@ -57,6 +57,9 @@ In Ledger Live install ``Tezos Wallet`` from the applications list.
 To install the ``Tezos Baking`` app, you need to enable Developer Mode in the Ledger Live settings.
 Then you can install the app from the Manager tab in the Ledger Live.
 
+.. warning::
+
+    Ledger does not support tz4 addresses. If you wish to use a tz4 address, consider using an alternative method.
 
 Tezos Wallet app
 ~~~~~~~~~~~~~~~~
