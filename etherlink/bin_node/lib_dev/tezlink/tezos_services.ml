@@ -452,7 +452,8 @@ module Imported_services = struct
       Tezos_rpc.Service.t =
     import_service Tezos_shell_services.Shell_services.Blocks.S.protocols
 
-  let _contract_info :
+  (* Queries will be ignored for now. *)
+  let contract_info :
       ( [`GET],
         tezlink_rpc_context,
         tezlink_rpc_context * Tezos_types.Contract.t,
@@ -655,6 +656,15 @@ let register_block_services ~l2_chain_id
            let*? `Main = check_chain chain in
            let*? _block = check_block block in
            protocols ())
+    |> register_with_conversion
+         ~service:Imported_services.contract_info
+         ~impl:(fun ({block; chain}, contract) _query () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let* balance = Backend.balance chain block contract in
+           let* counter = Backend.counter chain block contract in
+           return (balance, counter))
+         ~convert_output:Protocol_types.Contract.make_info
     |> register
          ~service:Imported_services.balance
          ~impl:(fun ({chain; block}, contract) _ _ ->
