@@ -21,9 +21,10 @@ let install_finalizer ~(tx_container : _ Services_backend_sig.tx_container)
   let* () = Tx_container.shutdown () in
   Evm_context.shutdown ()
 
-let container_forward_tx ~evm_node_endpoint ~keep_alive :
-    L2_types.evm_chain_family Services_backend_sig.tx_container =
-  Services_backend_sig.Evm_tx_container
+let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
+    ~evm_node_endpoint ~keep_alive :
+    f Services_backend_sig.tx_container tzresult =
+  let (module Tx_container) =
     (module struct
       type address = Ethereum_types.address
 
@@ -72,7 +73,17 @@ let container_forward_tx ~evm_node_endpoint ~keep_alive :
 
       let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
         Lwt_result_syntax.return_unit
-    end)
+    end : Services_backend_sig.Tx_container
+      with type address = Ethereum_types.address
+       and type legacy_transaction_object =
+         Ethereum_types.legacy_transaction_object
+       and type transaction_object = Transaction_object.t)
+  in
+  let open Result_syntax in
+  match chain_family with
+  | EVM -> return @@ Services_backend_sig.Evm_tx_container (module Tx_container)
+  | Michelson ->
+      error_with "Proxy.container_forward_tx not implemented for Tezlink"
 
 let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
     ~(tx_container :
@@ -221,7 +232,10 @@ let main
         let evm_node_endpoint =
           if enable_send_raw_transaction then evm_node_endpoint else None
         in
-        return @@ (None, container_forward_tx ~evm_node_endpoint ~keep_alive)
+        let*? tx_container =
+          container_forward_tx ~chain_family:EVM ~evm_node_endpoint ~keep_alive
+        in
+        return (None, tx_container)
   in
   let () =
     Rollup_node_follower.start
