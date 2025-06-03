@@ -116,7 +116,7 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
               let path_prefix =
                 manager |> Signature.V1.Public_key.hash
                 |> Tezos_types.Contract.of_implicit
-                |> Tezlink_services_impl.Path.account
+                |> Tezlink_durable_storage.Path.account
                 |> String.split_on_char '/' |> clean_path
               in
               make_instr ~path_prefix (Some (key, converter value))
