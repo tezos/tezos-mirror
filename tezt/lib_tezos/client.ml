@@ -4562,12 +4562,21 @@ let bake_until_cycle_end ~target_cycle ?keys ?node client =
 
   bake_until_level ~target_level ?keys ?node client
 
-let spawn_aggregate_bls_signatures client signatures =
-  spawn_command client @@ ["aggregate"; "bls"; "signatures"] @ signatures
+let spawn_aggregate_bls_signatures ~pk ~msg client signatures =
+  let signatures = List.map (fun signature -> `String signature) signatures in
+  let pk_msg_sig =
+    [
+      ("public_key", `String pk);
+      ("message", `String msg);
+      ("signature_shares", `A signatures);
+    ]
+  in
+  let json_batch = `O pk_msg_sig |> JSON.encode_u in
+  spawn_command client @@ ["aggregate"; "bls"; "signatures"; json_batch]
 
-let aggregate_bls_signatures client signatures =
+let aggregate_bls_signatures ~pk ~msg client signatures =
   let* s =
-    spawn_aggregate_bls_signatures client signatures
+    spawn_aggregate_bls_signatures ~pk ~msg client signatures
     |> Process.check_and_read_stdout
   in
   return (String.trim s)

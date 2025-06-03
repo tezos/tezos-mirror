@@ -812,7 +812,8 @@ val get_chain_block_helper_total_baking_power :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [POST /bls/aggregate_signatures] *)
-val post_bls_aggregate_signatures : string list -> string t
+val post_bls_aggregate_signatures :
+  pk:string -> msg:string -> string list -> string t
 
 (** RPC: [POST /bls/check_proof] *)
 val post_bls_check_proof : pk:string -> proof:string -> unit -> bool t

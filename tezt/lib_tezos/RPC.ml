@@ -896,8 +896,16 @@ let get_chain_block_helper_total_baking_power ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "total_baking_power"]
     Fun.id
 
-let post_bls_aggregate_signatures sigs =
-  let data = `A (List.map (fun sig_ -> `String sig_) sigs) in
+let post_bls_aggregate_signatures ~pk ~msg sigs =
+  let signatures = List.map (fun signature -> `String signature) sigs in
+  let pk_msg_sig =
+    [
+      ("public_key", `String pk);
+      ("message", `String msg);
+      ("signature_shares", `A signatures);
+    ]
+  in
+  let data = `O pk_msg_sig in
   make ~data:(Data data) POST ["bls"; "aggregate_signatures"] JSON.as_string
 
 let post_bls_check_proof ~pk ~proof () =

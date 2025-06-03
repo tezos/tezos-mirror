@@ -3337,7 +3337,8 @@ module RPC : sig
 end
 
 (** Run [octez-client aggregate bls signatures <signatures>]. *)
-val aggregate_bls_signatures : t -> string list -> string Lwt.t
+val aggregate_bls_signatures :
+  pk:string -> msg:string -> t -> string list -> string Lwt.t
 
 (** Run [octez-client create bls proof for <signer>]. *)
 val create_bls_proof : ?override_pk:string -> signer:string -> t -> string Lwt.t
