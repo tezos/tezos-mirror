@@ -34,7 +34,7 @@ let job_gitlab_release =
 let job_release_page ~test () =
   job
     ~__POS__
-    ~image:Images.CI.test
+    ~image:Images.ci_release
     ~stage:Stages.publish_release
     ~description:
       "A job  to update the Grafazos release page. If running in a test \

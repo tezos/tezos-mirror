@@ -60,7 +60,7 @@ let monitoring_child_pipeline =
 let job_release_page ~test ?dependencies () =
   job
     ~__POS__
-    ~image:Images.CI.test
+    ~image:Images.ci_release
     ~stage:Stages.publish_release
     ~description:
       "A job  to update the Octez release page. If running in a test pipleine, \
