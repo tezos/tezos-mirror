@@ -4,17 +4,18 @@
 
 set -euo pipefail
 
-DATAGOG_RELEASE="${DATAGOG_RELEASE:-v3.4.0}"
-EXPECTED_SHA256="${DATADOG_CI_SHA256:-94de024fe9826e7a4023cfa3ad60f3cf08310ffb2c061c2703a025bbb2532c5f}"
+DATAGOG_RELEASE="v3.4.0"
 
 # Detect architecture
 ARCH=$(uname -m)
 case "$ARCH" in
 x86_64)
   PLATFORM="x64"
+  EXPECTED_SHA256="94de024fe9826e7a4023cfa3ad60f3cf08310ffb2c061c2703a025bbb2532c5f"
   ;;
 aarch64)
   PLATFORM="arm64"
+  EXPECTED_SHA256="b90082a9f0a363c17cb0945b4c26745c07d6756ff0239623b8074c5f35d65f45"
   ;;
 *)
   echo "Unsupported architecture: $ARCH" >&2
@@ -27,10 +28,12 @@ TARGET_PATH="/usr/local/bin/datadog-ci"
 TMP_FILE="$(mktemp)"
 
 # Download datadog-ci
-echo "Downloading datadog-ci for $PLATFORM..."
-curl -L -Ss --fail "https://github.com/DataDog/datadog-ci/releases/download/$DATAGOG_RELEASE/datadog-ci_linux-$PLATFORM" -o "$TMP_FILE"
+URL="https://github.com/DataDog/datadog-ci/releases/download/$DATAGOG_RELEASE/datadog-ci_linux-$PLATFORM"
+echo "Downloading datadog-ci for $PLATFORM $URL..."
 
-DOWNLOADED_SHA256=$(sha256sum "$TMP_FILE" | awk '{print $1}')
+curl -L -Ss --fail "$URL" -o "$TMP_FILE"
+
+DOWNLOADED_SHA256=$(sha256sum "$TMP_FILE" | cut -d ' ' -f1)
 if [[ "$DOWNLOADED_SHA256" != "$EXPECTED_SHA256" ]]; then
   echo "SHA256 mismatch!"
   echo "Expected: $EXPECTED_SHA256"
@@ -43,3 +46,5 @@ mv "$TMP_FILE" "$TARGET_PATH"
 chmod +x "$TARGET_PATH"
 
 echo "datadog-ci installed successfully to $TARGET_PATH"
+
+/usr/local/bin/datadog-ci --version
