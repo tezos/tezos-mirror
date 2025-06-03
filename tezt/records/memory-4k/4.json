@@ -10,9 +10,10 @@
       "swap"
     ],
     "successful_runs": {
-      "total_time": "23337361",
+      "total_time": "25550878",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 3191360000
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
@@ -31,9 +32,10 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "47322572",
+      "total_time": "29727679",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 1796860000
   },
   {
     "file": "tezt/tests/storage_snapshots.ml",
@@ -51,13 +53,14 @@
       "storage"
     ],
     "successful_runs": {
-      "total_time": "70144673",
+      "total_time": "76654670",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 1783303000
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Quebeca: Testing DAL L1 integration (Use all available slots)",
+    "title": "R022-: Testing DAL L1 integration (Use all available slots)",
     "tags": [
       "regression",
       "admin_client",
@@ -65,17 +68,18 @@
       "dal",
       "memory_4k",
       "node",
-      "quebeca",
+      "r022",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "31458961",
+      "total_time": "26394093",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4125535000
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Quebeca: Testing DAL node (observer triggers amplification (without lost shards))",
+    "title": "R022-: Testing DAL node (observer triggers amplification (without lost shards))",
     "tags": [
       "admin_client",
       "amplification",
@@ -84,18 +88,19 @@
       "dal_node",
       "memory_4k",
       "node",
-      "quebeca",
+      "r022",
       "simple",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "40600989",
+      "total_time": "32245586",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4565642000
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL node (garbage collection of shards for producer and attester)",
+    "title": "Quebec: Testing DAL node (garbage collection of shards for producer and attester)",
     "tags": [
       "admin_client",
       "attester",
@@ -105,13 +110,14 @@
       "gc",
       "memory_4k",
       "node",
-      "parisc",
+      "quebec",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "41275487",
+      "total_time": "195020847",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4418559000
   },
   {
     "file": "tezt/tests/dal.ml",
@@ -129,8 +135,9 @@
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "41153876",
+      "total_time": "194883743",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4554639000
   }
 ]
