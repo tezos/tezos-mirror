@@ -16,7 +16,13 @@ module S : sig
     pkh : Bls.Public_key_hash.t;
   }
 
-  type threshold_signature = {id : int; signature : Bls.t}
+  type threshold_signature_share = {id : int; signature : Bls.t}
+
+  type threshold_signature = {
+    pk : Signature.Bls.Public_key.t;
+    msg : Bytes.t;
+    signature_shares : threshold_signature_share list;
+  }
 
   val aggregate_signatures :
     ([`POST], unit, unit, unit, Bls.t list, Bls.t option) Tezos_rpc.Service.t
@@ -38,7 +44,7 @@ module S : sig
       unit,
       unit,
       unit,
-      threshold_signature list,
+      threshold_signature,
       Bls.t option )
     Tezos_rpc.Service.t
 end
@@ -56,5 +62,5 @@ val aggregate_public_keys :
 
 val threshold_signatures :
   #Tezos_rpc.Context.simple ->
-  S.threshold_signature list ->
+  S.threshold_signature ->
   Bls.t option tzresult Lwt.t

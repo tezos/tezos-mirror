@@ -356,7 +356,7 @@ module Local_helpers = struct
     | RPC ->
         Client.RPC.call client @@ RPC.post_bls_aggregate_signatures signatures
 
-  let sign_and_recover_threshold_signature ~kind ~watermark
+  let sign_and_recover_threshold_signature ~kind ~watermark ~group_pk
       ~(signers : (int * Account.key) list) (msg : bytes) client =
     let signatures =
       List.map
@@ -368,10 +368,14 @@ module Local_helpers = struct
           (id, signature))
         signers
     in
+    let prefix = Tezos_crypto.Signature.bytes_of_watermark watermark in
+    let msg = Bytes.cat prefix msg |> Hex.of_bytes |> Hex.show in
     match kind with
-    | Client -> Client.threshold_bls_signatures client signatures
+    | Client ->
+        Client.threshold_bls_signatures ~pk:group_pk ~msg client signatures
     | RPC ->
-        Client.RPC.call client @@ RPC.post_bls_threshold_signatures signatures
+        Client.RPC.call client
+        @@ RPC.post_bls_threshold_signatures ~pk:group_pk ~msg signatures
 
   let inject_bls_group_sign_op ~baker ~group_signature (op : Operation.t) client
       =
@@ -401,7 +405,7 @@ module Local_helpers = struct
     in
     inject_bls_group_sign_op ~baker ~group_signature op client
 
-  let inject_threshold_bls_sign_op ~kind ~baker
+  let inject_threshold_bls_sign_op ~kind ~baker ~group_pk
       ~(signers : (int * Account.key) list) (op : Operation.t) client =
     let* op_hex = Operation.hex op client in
     let manager_op = Hex.to_bytes op_hex in
@@ -409,6 +413,7 @@ module Local_helpers = struct
       sign_and_recover_threshold_signature
         ~kind
         ~watermark:Generic_operation
+        ~group_pk
         ~signers
         manager_op
         client
@@ -1182,6 +1187,7 @@ let test_threshold_number_stakers_sign_staking_operation_external_delegate ~kind
     Local_helpers.inject_threshold_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers
       op_reveal
       client
@@ -1194,6 +1200,7 @@ let test_threshold_number_stakers_sign_staking_operation_external_delegate ~kind
     Local_helpers.inject_threshold_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers
       op_set_delegate
       client
@@ -1209,6 +1216,7 @@ let test_threshold_number_stakers_sign_staking_operation_external_delegate ~kind
     Local_helpers.inject_threshold_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers
       op_stake
       client
@@ -1269,6 +1277,7 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key ~kind =
     Local_helpers.inject_threshold_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers
       op_reveal
       client
@@ -1284,6 +1293,7 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key ~kind =
     Local_helpers.inject_threshold_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers
       op_set_delegate
       client
@@ -1299,6 +1309,7 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key ~kind =
     Local_helpers.inject_threshold_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers
       op_stake
       client
@@ -1326,6 +1337,7 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key ~kind =
     Local_helpers.inject_threshold_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers
       op_update_consensus_key
       client
@@ -1416,6 +1428,7 @@ let test_threshold_number_stakers_sign_staking_operation_consensus_key_batch
     Local_helpers.inject_threshold_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers
       op_batch
       client

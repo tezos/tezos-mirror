@@ -917,17 +917,21 @@ let post_bls_aggregate_public_keys pks_with_proofs =
   let group_pkh = JSON.(json |-> "public_key_hash" |> as_string) in
   (group_pk, group_pkh)
 
-let post_bls_threshold_signatures id_signatures =
-  let data =
-    `A
-      (List.map
-         (fun (id, signature) ->
-           `O
-             [
-               ("id", `Float (float_of_int id)); ("signature", `String signature);
-             ])
-         id_signatures)
+let post_bls_threshold_signatures ~pk ~msg id_signatures =
+  let id_signatures =
+    List.map
+      (fun (id, signature) ->
+        `O [("id", `Float (float_of_int id)); ("signature", `String signature)])
+      id_signatures
   in
+  let pk_msg_sig =
+    [
+      ("public_key", `String pk);
+      ("message", `String msg);
+      ("signature_shares", `A id_signatures);
+    ]
+  in
+  let data = `O pk_msg_sig in
   make ~data:(Data data) POST ["bls"; "threshold_signatures"] JSON.as_string
 
 let get_chain_block_context_big_map ?(chain = "main") ?(block = "head") ~id

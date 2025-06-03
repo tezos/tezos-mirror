@@ -96,14 +96,30 @@ let threshold_keys_encoding =
        (req "proof" Signature.Bls.encoding)
        (req "secret_shares" (list threshold_secret_key_encoding)))
 
-type threshold_signature = {id : int; signature : Signature.Bls.t}
+type threshold_signature_share = {id : int; signature : Signature.Bls.t}
 
-let threshold_signature_encoding =
+let threshold_signature_share_encoding =
   let open Data_encoding in
   conv
     (fun {id; signature} -> (id, signature))
     (fun (id, signature) -> {id; signature})
     (obj2 (req "id" int8) (req "signature" Signature.Bls.encoding))
+
+type threshold_signature = {
+  pk : Signature.Bls.Public_key.t;
+  msg : Bytes.t;
+  signature_shares : threshold_signature_share list;
+}
+
+let threshold_signature_encoding =
+  let open Data_encoding in
+  conv
+    (fun {pk; msg; signature_shares} -> (pk, msg, signature_shares))
+    (fun (pk, msg, signature_shares) -> {pk; msg; signature_shares})
+    (obj3
+       (req "public_key" Signature.Bls.Public_key.encoding)
+       (req "message" bytes)
+       (req "signature_shares" (list threshold_signature_share_encoding)))
 
 let check_public_key_with_proof pk ?override_pk proof =
   Signature.Bls.pop_verify pk ?msg:override_pk (Signature.Bls.to_bytes proof)
@@ -247,30 +263,37 @@ let commands () =
         return_unit);
     command
       ~group
-      ~desc:"Threshold BLS signatures"
+      ~desc:
+        "Construct a threshold BLS signature from signature shares and check \
+         if it is a valid signature of a message under a public key"
       no_options
       (prefixes ["threshold"; "bls"; "signatures"]
       @@ Client_proto_args.json_encoded_param
-           ~name:"list of BLS identifiers with signatures"
-           ~desc:"list of BLS identifier (int) and B58 encoded BLS signature"
-           (Data_encoding.list threshold_signature_encoding)
+           ~name:"input"
+           ~desc:"a public key, a message and a list of signature shares"
+           threshold_signature_encoding
       @@ stop)
-      (fun () sigs (cctxt : #Protocol_client_context.full) ->
+      (fun () inp (cctxt : #Protocol_client_context.full) ->
         let open Lwt_result_syntax in
         let* sigs =
           List.map_es
-            (fun (s : threshold_signature) -> return (s.id, s.signature))
-            sigs
+            (fun (s : threshold_signature_share) -> return (s.id, s.signature))
+            inp.signature_shares
         in
         let threshold_signature = Signature.Bls.threshold_signature_opt sigs in
         match threshold_signature with
         | Some threshold_signature ->
-            let*! () =
-              cctxt#message
-                "%a"
-                Signature.pp
-                (Signature.Bls threshold_signature)
+            let is_valid =
+              Signature.Bls.check inp.pk threshold_signature inp.msg
             in
-            return_unit
+            if is_valid then
+              let*! () =
+                cctxt#message
+                  "%a"
+                  Signature.pp
+                  (Signature.Bls threshold_signature)
+              in
+              return_unit
+            else cctxt#error "Failed to produce the threshold signature"
         | None -> cctxt#error "Failed to produce the threshold signature");
   ]

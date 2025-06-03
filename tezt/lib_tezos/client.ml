@@ -4657,19 +4657,26 @@ let share_bls_secret_key ~sk ~n ~m client =
   in
   return (group_pk, group_pkh, proof, secret_shares)
 
-let spawn_threshold_bls_signatures client id_signatures =
+let spawn_threshold_bls_signatures ~pk ~msg client id_signatures =
   let id_signatures =
     List.map
       (fun (id, signature) ->
         `O [("id", `Float (float_of_int id)); ("signature", `String signature)])
       id_signatures
   in
-  let json_batch = `A id_signatures |> JSON.encode_u in
+  let pk_msg_sig =
+    [
+      ("public_key", `String pk);
+      ("message", `String msg);
+      ("signature_shares", `A id_signatures);
+    ]
+  in
+  let json_batch = `O pk_msg_sig |> JSON.encode_u in
   spawn_command client @@ ["threshold"; "bls"; "signatures"; json_batch]
 
-let threshold_bls_signatures client id_signatures =
+let threshold_bls_signatures ~pk ~msg client id_signatures =
   let* s =
-    spawn_threshold_bls_signatures client id_signatures
+    spawn_threshold_bls_signatures ~pk ~msg client id_signatures
     |> Process.check_and_read_stdout
   in
   return (String.trim s)

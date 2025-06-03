@@ -38,14 +38,30 @@ module S = struct
          (req "public_key" Bls.Public_key.encoding)
          (req "public_key_hash" Bls.Public_key_hash.encoding))
 
-  type threshold_signature = {id : int; signature : Bls.t}
+  type threshold_signature_share = {id : int; signature : Bls.t}
 
-  let threshold_signature_encoding =
+  let threshold_signature_share_encoding =
     let open Data_encoding in
     conv
       (fun {id; signature} -> (id, signature))
       (fun (id, signature) -> {id; signature})
       (obj2 (req "id" Data_encoding.int8) (req "signature" Bls.encoding))
+
+  type threshold_signature = {
+    pk : Signature.Bls.Public_key.t;
+    msg : Bytes.t;
+    signature_shares : threshold_signature_share list;
+  }
+
+  let threshold_signature_encoding =
+    let open Data_encoding in
+    conv
+      (fun {pk; msg; signature_shares} -> (pk, msg, signature_shares))
+      (fun (pk, msg, signature_shares) -> {pk; msg; signature_shares})
+      (obj3
+         (req "public_key" Signature.Bls.Public_key.encoding)
+         (req "message" bytes)
+         (req "signature_shares" (list threshold_signature_share_encoding)))
 
   let aggregate_signatures =
     Tezos_rpc.Service.post_service
@@ -75,7 +91,7 @@ module S = struct
     Tezos_rpc.Service.post_service
       ~description:"Threshold BLS signatures"
       ~query:Tezos_rpc.Query.empty
-      ~input:(list threshold_signature_encoding)
+      ~input:threshold_signature_encoding
       ~output:(option Bls.encoding)
       Tezos_rpc.Path.(path / "threshold_signatures")
 end
