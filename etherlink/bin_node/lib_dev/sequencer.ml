@@ -34,7 +34,7 @@ let install_finalizer_seq server_public_finalizer server_private_finalizer
   let* () = Signals_publisher.shutdown () in
   return_unit
 
-let loop_sequencer backend
+let loop_sequencer chain_family backend
     (module Tx_container : Services_backend_sig.Tx_container) ?sandbox_config
     time_between_blocks =
   let open Lwt_result_syntax in
@@ -42,6 +42,7 @@ let loop_sequencer backend
   | Some {parent_chain = Some evm_node_endpoint; _} ->
       let*! head = Evm_context.head_info () in
       Blueprints_follower.start
+        ~chain_family
         ~ping_tx_pool:false
         ~time_between_blocks
         ~evm_node_endpoint
@@ -401,6 +402,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
   let* () =
     loop_sequencer
+      chain_family
       backend
       tx_container
       ?sandbox_config
