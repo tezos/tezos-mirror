@@ -135,6 +135,22 @@ let threshold_signature_encoding =
        (req "message" bytes)
        (req "signature_shares" (list threshold_signature_share_encoding)))
 
+type aggregate_signature = {
+  pk : Signature.Bls.Public_key.t;
+  msg : Bytes.t;
+  signature_shares : Signature.Bls.t list;
+}
+
+let aggregate_signature_encoding =
+  let open Data_encoding in
+  conv
+    (fun {pk; msg; signature_shares} -> (pk, msg, signature_shares))
+    (fun (pk, msg, signature_shares) -> {pk; msg; signature_shares})
+    (obj3
+       (req "public_key" Signature.Bls.Public_key.encoding)
+       (req "message" bytes)
+       (req "signature_shares" (list Signature.Bls.encoding)))
+
 let check_public_key_with_proof pk ?override_pk proof =
   Signature.Bls.pop_verify pk ?msg:override_pk (Signature.Bls.to_bytes proof)
 
@@ -143,24 +159,34 @@ let commands () =
   [
     command
       ~group
-      ~desc:"Aggregate BLS signatures"
+      ~desc:
+        "Construct an aggregate BLS signature from signature shares and check \
+         if it is a valid signature of a message under a public key"
       no_options
       (prefixes ["aggregate"; "bls"; "signatures"]
-      @@ seq_of_param
-      @@ signature_parameter
-           ~name:"BLS signature"
-           ~desc:"B58 encoded BLS signature")
-      (fun () sigs (cctxt : #Protocol_client_context.full) ->
-        let aggregated_signature = Signature.Bls.aggregate_signature_opt sigs in
+      @@ Client_proto_args.json_encoded_param
+           ~name:"input"
+           ~desc:"a public key, a message and a list of signature shares"
+           aggregate_signature_encoding
+      @@ stop)
+      (fun () inp (cctxt : #Protocol_client_context.full) ->
+        let aggregated_signature =
+          Signature.Bls.aggregate_signature_opt inp.signature_shares
+        in
         match aggregated_signature with
         | Some aggregated_signature ->
-            let*! () =
-              cctxt#message
-                "%a"
-                Signature.pp
-                (Signature.Bls aggregated_signature)
+            let is_valid =
+              Signature.Bls.check inp.pk aggregated_signature inp.msg
             in
-            return_unit
+            if is_valid then
+              let*! () =
+                cctxt#message
+                  "%a"
+                  Signature.pp
+                  (Signature.Bls aggregated_signature)
+              in
+              return_unit
+            else cctxt#error "Failed to aggregate the signatures"
         | None -> cctxt#error "Failed to aggregate the signatures");
     command
       ~group
