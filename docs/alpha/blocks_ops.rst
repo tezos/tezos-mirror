@@ -83,6 +83,13 @@ phases required to agree on the next block.
   observed. These operations also hold information on :doc:`DAL attestations <../shell/dal_bakers>`
   when the attesting baker participates in the DAL.
 
+Starting in protocol S, blocks will also be able to include these operations in an aggregated form.
+If the attesting baker uses a tz4 consensus key, thanks to the BLS signature scheme,
+its attestation can be aggregated with all the other tz4 pre/attestations,
+which helps reducing the size and validation time of blocks without compromising on
+security. A valid block can include at most one aggregated preattestation
+and at most one aggregated attestation.
+
 .. _voting_operations_alpha:
 
 Voting Operations
