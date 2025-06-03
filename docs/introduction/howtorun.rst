@@ -224,6 +224,7 @@ Note that:
 - since version 13.0, option ``--liquidity-baking-toggle-vote`` is mandatory, see :ref:`the changelog <changes_13_0_rc1_baker>`.
 - option ``--liquidity-baking-toggle-vote`` must be placed **after** ``run`` on the command-line.
 - starting with version 22.0 it is recommended to run the Octez node with a DAL node (opting out requires the explicit option ``--without-dal``).
+- starting with version 23.0, and the activation of protocol S, when running a baker with the DAL activated, and a tz4 consensus key, it is required to have also a tz4 :ref:`companion key <companion_key>` registered for the delegate to produce DAL attestations. Otherwise the baker will only produce regular attestations, without any DAL information, and the baker will be seen as not participating in the DAL.
 
 Quickstart baker
 ~~~~~~~~~~~~~~~~
