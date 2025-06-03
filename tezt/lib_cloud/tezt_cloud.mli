@@ -57,8 +57,12 @@ module Alert : sig
   type receiver
 
   (* A slack receiver can be configured via a webhook. *)
-  val slack_receiver :
+  val slack_webhook_receiver :
     ?channel:string -> name:string -> api_url:string -> unit -> receiver
+
+  (* A slack receiver can be configured via a bot token. *)
+  val slack_bottoken_receiver :
+    name:string -> channel:string -> bot_token:string -> receiver
 
   (* This is a dummy receiver. *)
   val null_receiver : receiver

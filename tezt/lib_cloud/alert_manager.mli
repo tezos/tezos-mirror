@@ -10,11 +10,17 @@
     format. *)
 type receiver
 
-(** [slack_receiver ?channel ~name ~api_url ~title ~text] creates a
-    [receiver] named [name], sending notifications on the URL defined
-    by [api_url]. [channel] is a placeholder. *)
-val slack_receiver :
+(** [slack_webhook_receiver ?channel ~name ~api_url] creates a [receiver] named
+    [name], sending notifications on the URL defined by [api_url]. [channel] is
+    a placeholder. *)
+val slack_webhook_receiver :
   ?channel:string -> name:string -> api_url:string -> unit -> receiver
+
+(** [slack_bottoken_receiver ~name ~channel ~bot_token] creates a
+    [receiver] named [name], sending notifications on channel [channel] using
+    [bot_token] authentication: https://api.slack.com/concepts/token-types *)
+val slack_bottoken_receiver :
+  name:string -> channel:string -> bot_token:string -> receiver
 
 val null_receiver : receiver
 
