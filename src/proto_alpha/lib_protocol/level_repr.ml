@@ -154,6 +154,35 @@ let create_cycle_eras cycle_eras =
 
 let add_cycle_era new_era cycle_eras = create_cycle_eras (new_era :: cycle_eras)
 
+let current_era = function [] -> assert false | cycle_era :: _ -> cycle_era
+
+let update_cycle_eras cycle_eras ~(level : int32) ~prev_blocks_per_cycle
+    ~new_blocks_per_cycle ~prev_blocks_per_commitment ~new_blocks_per_commitment
+    =
+  let previous_era = current_era cycle_eras in
+  (* making sure that previous protocol's constants match the last cycle era *)
+  assert (Compare.Int32.(prev_blocks_per_cycle = previous_era.blocks_per_cycle)) ;
+  assert (
+    Compare.Int32.(
+      prev_blocks_per_commitment = previous_era.blocks_per_commitment)) ;
+  let current_cycle =
+    let level_position =
+      Int32.sub level (Raw_level_repr.to_int32 previous_era.first_level)
+    in
+    Cycle_repr.add
+      previous_era.first_cycle
+      (Int32.to_int (Int32.div level_position prev_blocks_per_cycle))
+  in
+  let new_cycle_era =
+    {
+      first_level = Raw_level_repr.of_int32_exn (Int32.succ level);
+      first_cycle = Cycle_repr.succ current_cycle;
+      blocks_per_cycle = new_blocks_per_cycle;
+      blocks_per_commitment = new_blocks_per_commitment;
+    }
+  in
+  add_cycle_era new_cycle_era cycle_eras
+
 let cycle_era_encoding =
   let open Data_encoding in
   conv
@@ -191,8 +220,6 @@ let cycle_eras_encoding =
       | Ok eras -> Ok eras
       | Error _ -> Error "Invalid cycle eras")
     (Data_encoding.list cycle_era_encoding)
-
-let current_era = function [] -> assert false | cycle_era :: _ -> cycle_era
 
 let root_level cycle_eras =
   let first_era = List.last_opt cycle_eras in

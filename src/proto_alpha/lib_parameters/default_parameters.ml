@@ -282,7 +282,15 @@ let constants_mainnet : Constants.Parametric.t =
 
        Last updated in protocol R. *)
     blocks_per_cycle = 10800l;
-    blocks_per_commitment = 240l;
+    (* Each [blocks_per_commitment] blocks, the block producer has to commit on
+       a nonce. Currently we target 128 nonces per cycle in order to ensure the
+       nonces are produced by sufficiently many different bakers.
+       (blocks_per_commitment = blocks_per_cycle / 128)
+
+       Don't forget to update cycles-eras when updating this parameter.
+       Last updated in protocol S.
+    *)
+    blocks_per_commitment = 84l;
     (* Duration in levels of the nonce revelation phase (which precedes the VDF
        phase).
        Last updated in protocol S. *)

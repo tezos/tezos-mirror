@@ -90,6 +90,22 @@ val create_cycle_eras : cycle_era list -> cycle_eras tzresult
 (** Add a new cycle era *)
 val add_cycle_era : cycle_era -> cycle_eras -> cycle_eras tzresult
 
+(** update cycle eras when blocks_per_commitment and/or blocks_per_cycle change
+    at a given level, usually at protocol change.
+
+    - Level must belong to the latest era.
+    - prev_blocks_per_cycle and prev_blocks_per_commitment (of the previous
+    protocol) must be the ones of the last era.
+*)
+val update_cycle_eras :
+  cycle_eras ->
+  level:int32 ->
+  prev_blocks_per_cycle:int32 ->
+  new_blocks_per_cycle:int32 ->
+  prev_blocks_per_commitment:int32 ->
+  new_blocks_per_commitment:int32 ->
+  cycle_eras tzresult
+
 (** Returns the current era *)
 val current_era : cycle_eras -> cycle_era
 
@@ -114,7 +130,7 @@ val level_from_raw : cycle_eras:cycle_eras -> Raw_level_repr.t -> level
 (** Returns the annotated level corresponding to a raw level and an
    offset. A positive offset corresponds to a higher level.
    Fails with [Negative_level_and_offset_sum] if the sum of the raw_level and the offset is negative.
-   Fails with [Level_not_in_alpha] if the sum of the raw_level and the offset 
+   Fails with [Level_not_in_alpha] if the sum of the raw_level and the offset
    is a level before the first level in the Alpha family of protocols. *)
 val level_from_raw_with_offset :
   cycle_eras:cycle_eras -> offset:int32 -> Raw_level_repr.t -> level tzresult

@@ -154,7 +154,7 @@ Randomness generation parameters
    * - Parameter name
      - Parameter value
    * - ``BLOCKS_PER_COMMITMENT``
-     - 240 blocks
+     - 84 blocks
    * - ``NONCE_REVELATION_THRESHOLD``
      - 300 blocks
    * -  ``MAX_ANON_OPS_PER_BLOCK``
