@@ -34,6 +34,8 @@ type t
     [Custom (i)] : keeps the shards during [i] blocks *)
 type history_mode = Full | Auto | Custom of int
 
+val disable_shard_validation_environment_variable : string
+
 (** Creates a DAL node *)
 
 val create :

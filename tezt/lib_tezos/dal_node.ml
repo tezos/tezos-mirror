@@ -50,6 +50,9 @@ type history_mode = Full | Auto | Custom of int
 open Parameters
 include Daemon.Make (Parameters)
 
+let disable_shard_validation_environment_variable =
+  "TEZOS_DISABLE_SHARD_VALIDATION_I_KNOW_WHAT_I_AM_DOING"
+
 let check_error ?exit_code ?msg dal_node =
   match dal_node.status with
   | Not_running ->
