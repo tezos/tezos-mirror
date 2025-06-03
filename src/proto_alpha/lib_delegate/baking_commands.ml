@@ -617,6 +617,11 @@ let baker_args =
     pre_emptive_forge_time_arg
     remote_calls_timeout_arg
 
+(* /*\ DO NOT MODIFY /!\
+
+   If you do, you need to have the command in sync with the agnostic baker one. This command
+   is meant to removed, the source of truth is the agnostic baker.
+*)
 let run_baker ?(recommend_agnostic_baker = true)
     ( pidfile,
       node_version_check_bypass,
@@ -719,6 +724,11 @@ let run_baker ?(recommend_agnostic_baker = true)
     ~state_recorder
     delegates
 
+(* /*\ DO NOT MODIFY /!\
+
+   If you do, you need to have the command in sync with the agnostic baker one. This command
+   is meant to removed, the source of truth is the agnostic baker.
+*)
 let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
   let open Tezos_clic in
   let group =
@@ -759,6 +769,11 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
         Client_daemon.VDF.run cctxt ~chain:cctxt#chain ~keep_alive);
   ]
 
+(* /*\ DO NOT MODIFY /!\
+
+   If you do, you need to have the command in sync with the agnostic baker one. This command
+   is meant to removed, the source of truth is the agnostic baker.
+*)
 let accuser_commands () =
   let open Tezos_clic in
   let group =
