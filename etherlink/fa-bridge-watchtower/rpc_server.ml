@@ -354,9 +354,31 @@ let () =
     "/unclaimed"
     Data_encoding.(list (merge_objs Encodings.deposit Encodings.log_info))
     ~description:"List unclaimed deposits"
-  @@ fun _ _ ctx ->
+    ~query:
+      (* TODO: query parameters are reported by hand for now *)
+      [
+        {
+          parameter =
+            {
+              name = "ignore_whitelist";
+              description = Some "List deposits independently of whitelist";
+              schema = Tezos_openapi.Openapi.Schema.boolean ();
+            };
+          required = false;
+        };
+      ]
+  @@ fun req _ ctx ->
   let open Lwt_result_syntax in
-  let* deposits = Db.Deposits.get_unclaimed_full ctx.db in
+  let ignore_whitelist =
+    Dream.query req "ignore_whitelist"
+    |> Option.map bool_of_string
+    |> Option.value ~default:false
+  in
+  let* deposits =
+    if ignore_whitelist then
+      Db.Deposits.get_unclaimed_full_ignore_whitelist ctx.db
+    else Db.Deposits.get_unclaimed_full ctx.db
+  in
   List.map_es
     (fun (deposit, log) ->
       let+ deposit = deposit_with_token_info ctx deposit in
@@ -414,11 +436,23 @@ let () =
   let receiver =
     Dream.query req "receiver" |> Option.map Ethereum_types.Address.of_string
   in
+  let ignore_whitelist =
+    Dream.query req "ignore_whitelist"
+    |> Option.map bool_of_string
+    |> Option.value ~default:false
+  in
   let* deposits =
-    match receiver with
-    | None -> Db.Deposits.list ctx.db ~limit ~offset
-    | Some receiver ->
+    match (receiver, ignore_whitelist) with
+    | None, false -> Db.Deposits.list ctx.db ~limit ~offset
+    | Some receiver, false ->
         Db.Deposits.list_by_receiver ctx.db receiver ~limit ~offset
+    | None, true -> Db.Deposits.list_ignore_whitelist ctx.db ~limit ~offset
+    | Some receiver, true ->
+        Db.Deposits.list_by_receiver_ignore_whitelist
+          ctx.db
+          receiver
+          ~limit
+          ~offset
   in
   List.map_es
     (fun Db.{deposit; log_info; claimed} ->
