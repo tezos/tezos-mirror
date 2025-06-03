@@ -78,6 +78,7 @@ type t = {
   configuration_file : string;
   routes : (Prometheus.alert * route) list;
   receivers : receiver list;
+  default_receiver : receiver;
 }
 
 let jingoo_receiver_template receiver =
@@ -189,7 +190,7 @@ let receivers_of_alerts alerts =
   |> List.map (fun route -> route.receiver)
   |> List.sort_uniq compare
 
-let run alerts =
+let run ?(default_receiver = null_receiver) alerts =
   let alert_manager_configuration_directory =
     Filename.get_temp_dir_name () // "alert_manager"
   in
@@ -200,7 +201,7 @@ let run alerts =
   Log.info "Alert_manager: run with configuration file %s" configuration_file ;
   let routes = routes_of_alerts alerts in
   let receivers = receivers_of_alerts alerts in
-  let t = {configuration_file; routes; receivers} in
+  let t = {configuration_file; routes; default_receiver; receivers} in
   match receivers with
   | [Null] -> Lwt.return_none
   | _ ->

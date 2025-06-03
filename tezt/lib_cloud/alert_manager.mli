@@ -61,7 +61,7 @@ type t
 (** [run alerts] starts a new docker container in
     the background, using the latest Prometheus Alert Manager image.
     Activates the given [alerts]. *)
-val run : alert list -> t option Lwt.t
+val run : ?default_receiver:receiver -> alert list -> t option Lwt.t
 
 (** [shutdown t] shutdowns the alert manager service. *)
 val shutdown : unit -> unit Lwt.t
