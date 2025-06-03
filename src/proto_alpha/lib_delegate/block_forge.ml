@@ -396,10 +396,13 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
     in
     return (shell_header, operations, manager_operations_infos, payload_hash)
 
-(* [aggregate_preattestations preattestations] aggregate [preattestations] in a
-   single Preattestations_aggregate operation. Each operation in
-   [preattestations] is assumed to be eligible for aggregation, meaning that it
-   includes a BLS signature. *)
+(* [aggregate_preattestations preattestations] constructs a single
+   Preattestations_aggregate operation from the given list of [preattestations].
+
+   Each preattestation is assumed to carry a valid BLS signature. All
+   preattestations are assumed to target the same branch, level, round, and
+   block payload hash. The list is assumed to be conflict-free: i.e., each
+   delegate contributes at most one preattestation. *)
 let aggregate_preattestations eligible_preattestations =
   let open Result_syntax in
   let aggregate =
@@ -436,10 +439,13 @@ let aggregate_preattestations eligible_preattestations =
           return (Some {shell; protocol_data = Operation_data protocol_data})
       | None -> tzfail Baking_errors.Signature_aggregation_failure)
 
-(* [aggregate_attestations attestations] aggregate [attestations] in a
-   single Attestations_aggregate operation. Each operation in [attestations] is
-   assumed to be eligible for aggregation, meaning that it :
-   - must include a BLS signature *)
+(* [aggregate_attestations attestations] constructs a single
+   Attestations_aggregate operation from the given list of [attestations].
+
+   Each attestation is assumed to carry a valid BLS signature. All attestations
+   are assumed to target the same branch, level, round, and block payload hash.
+   The list is assumed to be conflict-free: i.e., each delegate contributes at
+   most one attestation. *)
 let aggregate_attestations eligible_attestations =
   let open Result_syntax in
   let aggregate =
@@ -612,7 +618,8 @@ let filter_best_attestations_per_slot attestations =
 
 (* [aggregate_attestations_on_proposal attestations] replaces all eligible
    attestations from [attestations] by a single Attestations_aggregate.
-   Attestations are assumed to target the same shell, level, round and
+
+   All attestations are assumed to target the same branch, level, round and
    block_payload_hash. *)
 let aggregate_attestations_on_proposal attestations =
   let open Result_syntax in
@@ -732,10 +739,13 @@ let aggregate_attestations_on_reproposal aggregate_opt eligible_attestations =
           return_some attestations_aggregate
       | None -> tzfail Baking_errors.Signature_aggregation_failure)
 
-(* [aggregate_consensus_operations_on_reproposal consensus_operations] replaces all
-   eligible attestations from [consensus_operations] by a single
-   Attestations_aggregate. Attestations are assumed to target the same shell,
-   level, round and block_payload_hash. *)
+(* [aggregate_consensus_operations_on_reproposal consensus_operations] replaces
+   all eligible attestations in [consensus_operations] with a single
+   Attestations_aggregate, and all eligible preattestation by a single
+   Preattestations_aggregate.
+
+   All operations are assumed to target the same branch, level, round and
+   block_payload_hash. *)
 let aggregate_consensus_operations_on_reproposal consensus_operations =
   let open Result_syntax in
   let ( attestations_aggregate_opt,
