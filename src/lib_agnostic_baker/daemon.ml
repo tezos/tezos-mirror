@@ -67,19 +67,9 @@ module Baker_agent : AGENT with type command = baker_command = struct
   let run_command (module Plugin : Protocol_plugin_sig.S) cctxt command =
     match command with
     | Run_with_local_node {data_dir; args; sources} ->
-        let baking_mode = Some data_dir in
-        Plugin.Baker_commands_helpers.run_baker
-          ~configuration:args
-          ~baking_mode
-          ~sources
-          ~cctxt
+        Command_run.run_baker (module Plugin) args (Some data_dir) sources cctxt
     | Run_remotely {args; sources} ->
-        let baking_mode = None in
-        Plugin.Baker_commands_helpers.run_baker
-          ~configuration:args
-          ~baking_mode
-          ~sources
-          ~cctxt
+        Command_run.run_baker (module Plugin) args None sources cctxt
     | Run_vdf {pidfile; keep_alive} ->
         Command_run.may_lock_pidfile pidfile @@ fun () ->
         Plugin.Baker_commands_helpers.run_vdf_daemon ~cctxt ~keep_alive

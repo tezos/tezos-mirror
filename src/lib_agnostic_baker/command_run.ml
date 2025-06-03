@@ -132,3 +132,76 @@ let check_dal_node =
         | Error _ ->
             last_check_successful := false ;
             result_emit Events.Commands.unreachable_dal_node ctxt#base)
+
+let create_dal_node_rpc_ctxt endpoint =
+  let open Tezos_rpc_http_client_unix in
+  let rpc_config =
+    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
+  in
+  let media_types =
+    Tezos_rpc_http.Media_type.Command_line.of_command_line rpc_config.media_type
+  in
+  new RPC_client_unix.http_ctxt rpc_config media_types
+
+let run_baker (module Plugin : Protocol_plugin_sig.S)
+    Configuration.
+      {
+        pidfile;
+        node_version_check_bypass;
+        node_version_allowed;
+        minimal_fees;
+        minimal_nanotez_per_gas_unit;
+        minimal_nanotez_per_byte;
+        force_apply_from_round;
+        keep_alive;
+        liquidity_baking_vote;
+        adaptive_issuance_vote;
+        per_block_vote_file;
+        extra_operations;
+        dal_node_endpoint;
+        without_dal;
+        state_recorder;
+        pre_emptive_forge_time;
+        remote_calls_timeout;
+      } baking_mode sources cctxt =
+  let open Lwt_result_syntax in
+  may_lock_pidfile pidfile @@ fun () ->
+  let* () =
+    check_node_version cctxt node_version_check_bypass node_version_allowed
+  in
+  let*! per_block_vote_file =
+    if per_block_vote_file = None then
+      (* If the votes file was not explicitly given, we
+         look into default locations. *)
+      Per_block_vote_file.lookup_default_vote_file_path cctxt
+    else Lwt.return per_block_vote_file
+  in
+  (* We don't let the user run the baker without providing some
+     option (CLI, file path, or file in default location) for
+     the per-block votes. *)
+  let* votes =
+    Per_block_vote_file.load_per_block_votes_config
+      ~default_liquidity_baking_vote:liquidity_baking_vote
+      ~default_adaptive_issuance_vote:adaptive_issuance_vote
+      ~per_block_vote_file
+  in
+  let dal_node_rpc_ctxt =
+    Option.map create_dal_node_rpc_ctxt dal_node_endpoint
+  in
+  let* () = check_dal_node without_dal dal_node_rpc_ctxt in
+  Plugin.Baker_commands_helpers.run_baker
+    cctxt
+    ?dal_node_rpc_ctxt
+    ~minimal_fees
+    ~minimal_nanotez_per_gas_unit
+    ~minimal_nanotez_per_byte
+    ~votes
+    ?extra_operations
+    ?pre_emptive_forge_time
+    ?force_apply_from_round
+    ?remote_calls_timeout
+    ~chain:cctxt#chain
+    ?context_path:baking_mode
+    ~keep_alive
+    ~state_recorder
+    sources
