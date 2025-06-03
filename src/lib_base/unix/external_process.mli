@@ -24,6 +24,9 @@ module Make (P : External_process_parameters.S) : sig
       to receive and answer requests. *)
   val init : P.parameters -> process_path:string -> t tzresult Lwt.t
 
+  (** [pid p] returns the PID of the hypervisee process. *)
+  val pid : t -> int
+
   (** [send_request p req] sends the request [req] to the external process [p],
       waits for the answer from the process and returns the result.  *)
   val send_request :

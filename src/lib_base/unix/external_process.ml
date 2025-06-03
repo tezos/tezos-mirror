@@ -235,6 +235,7 @@ module Make (P : External_process_parameters.S) = struct
   }
 
   type hypervisee = {
+    pid : int;
     input : Lwt_io.output_channel;
     output : Lwt_io.input_channel;
   }
@@ -245,6 +246,7 @@ module Make (P : External_process_parameters.S) = struct
     external_process : external_process;
     mutable hypervisee : hypervisee;
     lock : Lwt_mutex.t;
+    mutable restarting : unit tzresult Lwt_condition.t option;
   }
 
   (* The shutdown_timeout is used when closing the external
@@ -479,7 +481,12 @@ module Make (P : External_process_parameters.S) = struct
           process_hypervisee_init hypervisee_input hypervisee_output parameters
         in
         let*! () = Events.(emit hypervisee_initialized hypervisee_pid) in
-        return {input = hypervisee_input; output = hypervisee_output})
+        return
+          {
+            pid = hypervisee_pid;
+            input = hypervisee_input;
+            output = hypervisee_output;
+          })
       (fun exn ->
         let*! () =
           match external_process.process#state with
@@ -498,49 +505,65 @@ module Make (P : External_process_parameters.S) = struct
 
   let restart_hypervisee ~stop_hypervisee p =
     let open Lwt_result_syntax in
-    Lwt.catch
-      (fun () ->
-        (* Terminate the hypervisee. *)
-        let*! () =
-          if stop_hypervisee then
-            Lwt_unix_socket.send
-              p.hypervisee.input
-              P.request_encoding
-              P.terminate_request
-          else Lwt.return_unit
-        in
-        (* Ask the hypervisor to make sure the hypervisee is terminated. *)
-        let hypervisor_request = Hypervisor_params.Params.Stop_hypervisee in
-        let*! () =
-          Lwt_unix_socket.send
-            p.external_process.input
-            Hypervisor_params.Params.request_encoding
-            (Erequest hypervisor_request)
-        in
-        let* (), _profiler =
-          Lwt_unix_socket.recv_result
-            p.external_process.output
-            Data_encoding.(
-              tup2
-                (Hypervisor_params.Params.result_encoding hypervisor_request)
-                (option
-                   (tup2
-                      (option Profiler.report_encoding)
-                      (option Profiler.report_encoding))))
-        in
-        let*! () = Lwt_io.close p.hypervisee.output in
-        (* Restart the hypervisee. *)
-        let* hypervisee = start_hypervisee p.external_process p.parameters in
-        p.hypervisee <- hypervisee ;
-        return_unit)
-      (fun exn ->
-        let*! () =
-          match p.external_process.process#state with
-          | Running -> Lwt.return_unit
-          | Exited (WEXITED 127) -> Lwt.return_unit
-          | Exited status -> Events.(emit process_exited_abnormally status)
-        in
-        fail_with_exn exn)
+    match p.restarting with
+    | Some restart ->
+        (* The hypervisor is already in the process of restarting the
+           hypervisee. Simply wait for it to be done. *)
+        Lwt_condition.wait restart
+    | None ->
+        let restart_cond = Lwt_condition.create () in
+        p.restarting <- Some restart_cond ;
+        Lwt.catch
+          (fun () ->
+            (* Terminate the hypervisee. *)
+            let*! () =
+              if stop_hypervisee then
+                Lwt_unix_socket.send
+                  p.hypervisee.input
+                  P.request_encoding
+                  P.terminate_request
+              else Lwt.return_unit
+            in
+            (* Ask the hypervisor to make sure the hypervisee is terminated. *)
+            let hypervisor_request = Hypervisor_params.Params.Stop_hypervisee in
+            let*! () =
+              Lwt_unix_socket.send
+                p.external_process.input
+                Hypervisor_params.Params.request_encoding
+                (Erequest hypervisor_request)
+            in
+            let* (), _profiler =
+              Lwt_unix_socket.recv_result
+                p.external_process.output
+                Data_encoding.(
+                  tup2
+                    (Hypervisor_params.Params.result_encoding
+                       hypervisor_request)
+                    (option
+                       (tup2
+                          (option Profiler.report_encoding)
+                          (option Profiler.report_encoding))))
+            in
+            let*! () = Lwt_io.close p.hypervisee.output in
+            (* Restart the hypervisee. *)
+            let* hypervisee =
+              start_hypervisee p.external_process p.parameters
+            in
+            p.hypervisee <- hypervisee ;
+            Lwt_condition.broadcast restart_cond (Ok ()) ;
+            p.restarting <- None ;
+            return_unit)
+          (fun exn ->
+            let*! () =
+              match p.external_process.process#state with
+              | Running -> Lwt.return_unit
+              | Exited (WEXITED 127) -> Lwt.return_unit
+              | Exited status -> Events.(emit process_exited_abnormally status)
+            in
+            let res = error_with_exn exn in
+            Lwt_condition.broadcast restart_cond res ;
+            p.restarting <- None ;
+            Lwt.return res)
 
   (* Sends the given request to the external process. If the request
      failed to be fulfilled, the status of the external process is
@@ -551,35 +574,38 @@ module Make (P : External_process_parameters.S) = struct
       let prequest = P.Erequest request in
       Lwt.catch
         (fun () ->
+          let* () =
+            (* Wait for any pending restart *)
+            match p.restarting with
+            | Some restart -> Lwt_condition.wait restart
+            | None -> return_unit
+          in
           (* Make sure that the promise is not cancelled between a send
              and recv *)
-          Lwt.protected
-            (Lwt_mutex.with_lock p.lock (fun () ->
-                 let now = Time.System.now () in
-                 let*! () = Events.(emit request_for prequest) in
-                 let*! () =
-                   Lwt_unix_socket.send
-                     p.hypervisee.input
-                     P.request_encoding
-                     prequest
-                 in
-                 let*! res =
-                   Lwt_unix_socket.recv_result
-                     p.hypervisee.output
-                     Data_encoding.(
-                       tup2
-                         (P.result_encoding request)
-                         (option
-                            (tup2
-                               (option Profiler.report_encoding)
-                               (option Profiler.report_encoding))))
-                 in
-                 let timespan =
-                   let then_ = Time.System.now () in
-                   Ptime.diff then_ now
-                 in
-                 let*! () = Events.(emit request_result (prequest, timespan)) in
-                 Lwt.return res)))
+          Lwt.protected @@ Lwt_mutex.with_lock p.lock
+          @@ fun () ->
+          let now = Time.System.now () in
+          let*! () = Events.(emit request_for prequest) in
+          let*! () =
+            Lwt_unix_socket.send p.hypervisee.input P.request_encoding prequest
+          in
+          let*! res =
+            Lwt_unix_socket.recv_result
+              p.hypervisee.output
+              Data_encoding.(
+                tup2
+                  (P.result_encoding request)
+                  (option
+                     (tup2
+                        (option Profiler.report_encoding)
+                        (option Profiler.report_encoding))))
+          in
+          let timespan =
+            let then_ = Time.System.now () in
+            Ptime.diff then_ now
+          in
+          let*! () = Events.(emit request_result (prequest, timespan)) in
+          Lwt.return res)
         (fun exn ->
           if retried then fail_with_exn exn
           else
@@ -591,6 +617,8 @@ module Make (P : External_process_parameters.S) = struct
 
   let restart_hypervisee = restart_hypervisee ~stop_hypervisee:true
 
+  let pid p = p.hypervisee.pid
+
   (* The initialization phase aims to configure the external process
      and start its associated process. This will result in the call
      of [process_handshake] and [process_init]. *)
@@ -600,7 +628,15 @@ module Make (P : External_process_parameters.S) = struct
     let* external_process = start_process ~process_path parameters in
     let* hypervisee = start_hypervisee external_process parameters in
     let*! () = Events.(emit init ()) in
-    return {parameters; process_path; external_process; hypervisee; lock}
+    return
+      {
+        parameters;
+        process_path;
+        external_process;
+        hypervisee;
+        lock;
+        restarting = None;
+      }
 
   let reconfigure_event_logging process config =
     let open Lwt_result_syntax in
