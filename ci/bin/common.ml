@@ -583,7 +583,7 @@ let changeset_mir_tzt =
      (no need to test that we pass the -static flag twice)
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
-let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
+let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal) ?storage
     ?(executable_files = "script-inputs/octez-released-executables")
     ?(experimental_executables = "script-inputs/octez-experimental-executables")
     ?version_executable ?(release = false) ?rules ?dependencies ?retry () :
@@ -611,6 +611,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
     ~stage:Stages.build
     ~arch
     ~cpu
+    ?storage
     ~name
     ?retry
     ~image:Images.CI.build
@@ -653,8 +654,8 @@ type docker_build_type =
   | Test_manual
 
 (** Creates a Docker build job of the given [arch] and [docker_build_type]. *)
-let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
-    tezos_job =
+let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?storage
+    docker_build_type : tezos_job =
   let arch_string = arch_to_string_alt arch in
   let ci_docker_hub =
     match docker_build_type with
@@ -709,6 +710,7 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
     ~__POS__
     ~stage
     ~arch
+    ?storage
     ~name
     ~variables
     ["./scripts/ci/docker_release.sh"]
@@ -741,7 +743,7 @@ type bin_package_group = A | B
 
 let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
 
-let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu
+let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
     ?(release = false) ?dependencies () =
   let arch_string = arch_to_string arch in
   let name =
@@ -804,6 +806,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu
       ~arch
       ?retry
       ?cpu
+      ?storage
       ~name
       ~image:Images.CI.build
       ~before_script:
@@ -823,10 +826,22 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu
 (** {2 Shared jobs} *)
 
 let job_build_arm64_release ?rules () : tezos_job =
-  job_build_dynamic_binaries ?rules ~__POS__ ~arch:Arm64 ~release:true ()
+  job_build_dynamic_binaries
+    ?rules
+    ~__POS__
+    ~arch:Arm64
+    ~storage:Ramfs
+    ~release:true
+    ()
 
 let job_build_arm64_exp_dev_extra ?rules () : tezos_job =
-  job_build_dynamic_binaries ?rules ~__POS__ ~arch:Arm64 ~release:false ()
+  job_build_dynamic_binaries
+    ?rules
+    ~__POS__
+    ~arch:Arm64
+    ~storage:Ramfs
+    ~release:false
+    ()
 
 let job_build_kernels ?rules () : tezos_job =
   job

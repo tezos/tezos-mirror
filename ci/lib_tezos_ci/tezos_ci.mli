@@ -304,6 +304,10 @@ type tag =
       (** GCP prod AMD64 runner, suitable for jobs needing very high CPU. *)
   | Gcp_very_high_cpu_dev
       (** GCP dev AMD64 runner, suitable for jobs needing very high CPU. *)
+  | Gcp_very_high_cpu_ramfs
+      (** GCP prod AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
+  | Gcp_very_high_cpu_ramfs_dev
+      (** GCP dev AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
   | Aws_specific
       (** AWS runners, in cases where a CI is legacy or not suitable for GCP. *)
   | Dynamic
@@ -381,6 +385,10 @@ type cpu =
   | High  (** Target GCP high runner pool. *)
   | Very_high  (** Target GCP very high runner pool. *)
 
+type storage =
+  | Network  (** Target default storage runner pool. *)
+  | Ramfs  (** Target ramfs storage runner pool. *)
+
 (** Define a job.
 
     This smart constructor for {!Gitlab_ci.Types.job} additionally:
@@ -437,6 +445,7 @@ val job :
   ?timeout:Gitlab_ci.Types.time_interval ->
   ?tag:tag ->
   ?cpu:cpu ->
+  ?storage:storage ->
   ?git_strategy:git_strategy ->
   ?coverage:string ->
   ?retry:Gitlab_ci.Types.retry ->
@@ -536,6 +545,7 @@ val job_docker_authenticated :
   ?dependencies:dependencies ->
   ?image_dependencies:Image.t list ->
   ?arch:arch ->
+  ?storage:storage ->
   ?tag:tag ->
   ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
   ?parallel:Gitlab_ci.Types.parallel ->
@@ -654,7 +664,7 @@ module Images : sig
   val jsonnet : Image.t
 
   module CI : sig
-    val job_docker_ci : arch -> tezos_job
+    val job_docker_ci : arch -> ?storage:storage -> unit -> tezos_job
 
     val runtime : Image.t
 
