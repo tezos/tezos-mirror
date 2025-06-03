@@ -12,6 +12,9 @@
   one implemented in Dionysus. That is, the execution gas is now derived from
   the gas limit of a transaction by removing the inclusion fees paid with the
   minimum base fee per gas (not the current one).  (!18184)
+- Fix encoding of signature fields `r` and `s` in transactions to use
+  [quantities](https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash),
+  _i.e._ compressed without leading zeros. (!18178)
 
 ### Metrics changes
 
