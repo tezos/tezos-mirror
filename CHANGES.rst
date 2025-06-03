@@ -42,6 +42,9 @@ Node
 - Added RPC ``POST /bls/threshold_signatures`` to recover a BLS
   threshold signature. (MR :gl:`!17467`)
 
+- Fixed a race condition in the external process restart mechanism which would
+  prevent the validator from properly restarting. (MR :gl:`!15322`)
+
 Client
 ------
 
