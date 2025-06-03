@@ -25,6 +25,76 @@
 
 module Types = Tezos_dal_node_services.Types
 
+module Term : sig
+  type env = {docs : string; doc : string; name : string}
+
+  type 'a arg = {
+    default : 'a option;
+    short : char option;
+    long : string;
+    extra_long : string list;
+    parse : string -> ('a, string) result;
+    doc : string;
+    placeholder : string;
+    pp : Format.formatter -> 'a -> unit;
+    env : env option;
+  }
+
+  type 'a arg_list = {
+    default : 'a trace;
+    short : char option;
+    long : string;
+    extra_long : string list;
+    parse : string -> ('a, string) result;
+    doc : string;
+    placeholder : string;
+    pp : Format.formatter -> 'a -> unit;
+    env : env option;
+  }
+
+  type switch = {long : string; extra_long : string list; doc : string}
+
+  val data_dir_arg : string arg
+
+  val rpc_addr_arg : P2p_point.Id.t arg
+
+  val expected_pow_arg : float arg
+
+  val net_addr_arg : P2p_point.Id.t arg
+
+  val public_addr_arg : P2p_point.Id.t arg
+
+  val endpoint_arg : Uri.t arg
+
+  val http_backup_uris_arg : Uri.t arg_list
+
+  val trust_http_backup_uris_switch : switch
+
+  val ignore_l1_config_peers_switch : switch
+
+  val attester_profile_arg : Signature.public_key_hash arg_list
+
+  val operator_profile_arg : int arg_list
+
+  val observer_profile_arg : int trace arg
+
+  val bootstrap_profile_switch : switch
+
+  val peers_arg : string arg_list
+
+  val metrics_addr_arg : P2p_point.Id.t arg
+
+  val history_mode_arg : Configuration_file.history_mode arg
+
+  val service_name_arg : string arg
+
+  val service_namespace_arg : string arg
+
+  val fetch_trusted_setup_arg : bool arg
+
+  val verbose_switch : switch
+end
+
 (** {2 Command-line options} *)
 
 (** This module declares the main commands of the DAL node. For each
@@ -75,6 +145,30 @@ type options = {
     options. *)
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
 
-(** [commands ~run] attaches a callback to each subcommands of the DAL
-    node. *)
-val make : run:(t -> options -> unit Cmdliner.Term.ret) -> unit Cmdliner.Cmd.t
+val cli_options_to_options :
+  string option ->
+  P2p_point.Id.t option ->
+  float option ->
+  P2p_point.Id.t option ->
+  P2p_point.Id.t option ->
+  Uri.t option ->
+  Uri.t list ->
+  bool ->
+  P2p_point.Id.t option ->
+  Signature.public_key_hash trace ->
+  int trace ->
+  int trace option ->
+  bool ->
+  string trace ->
+  Configuration_file.history_mode option ->
+  string option ->
+  string option ->
+  bool option ->
+  bool ->
+  bool ->
+  (options, bool * string) result
+
+val run : ?disable_logging:bool -> t -> options -> unit tzresult Lwt.t
+
+(** Subcommands of the DAL node *)
+val commands : unit Cmdliner.Cmd.t

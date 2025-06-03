@@ -5697,6 +5697,7 @@ let octez_agnostic_baker_lib =
         octez_stdlib_unix |> open_;
         octez_shell_services |> open_;
         octez_dal_node_services;
+        octez_dal_node_lib;
       ]
 
 (* PROTOCOL PACKAGES *)
@@ -8589,7 +8590,11 @@ let _octez_agnostic_baker =
         | Active, V _ -> false
         | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) -> true
       in
-      let targets = List.filter_map Fun.id [Protocol.agnostic_baker protocol] in
+      let targets =
+        List.filter_map
+          Fun.id
+          [Protocol.agnostic_baker protocol; Protocol.dal protocol]
+      in
       if is_optional then List.map optional targets else targets
     in
     List.map deps_for_protocol Protocol.all |> List.flatten

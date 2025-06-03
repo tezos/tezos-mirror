@@ -1366,12 +1366,12 @@ opam:all_2:
   parallel:
     matrix:
     - package:
-      - octez-smart-rollup-wasm-debugger-lib
       - octez-smart-rollup-node-lib
-      - octez-smart-rollup-node-alpha
       - octez-smart-rollup-node-PtParisB
-      - octez-protocol-alpha-libs
-      - octez-protocol-022-PsRiotum-libs
+      - octez-smart-rollup-node-PtNairob
+      - octez-smart-rollup-node-PsQuebec
+      - octez-smart-rollup-node-PsParisC
+      - octez-smart-rollup-node-Proxford
       - octez-protocol-021-PsQuebec-libs
       - octez-protocol-020-PsParisC-libs
       - octez-protocol-019-PtParisB-libs
@@ -1436,11 +1436,11 @@ opam:all_1:
   parallel:
     matrix:
     - package:
-      - octez-smart-rollup-node-PtNairob
+      - octez-smart-rollup-wasm-debugger-lib
+      - octez-smart-rollup-node-alpha
       - octez-smart-rollup-node-PsRiotum
-      - octez-smart-rollup-node-PsQuebec
-      - octez-smart-rollup-node-PsParisC
-      - octez-smart-rollup-node-Proxford
+      - octez-protocol-alpha-libs
+      - octez-protocol-022-PsRiotum-libs
 
 opam:all_3:
   image: ${ci_image_name}/prebuild:${ci_image_tag}

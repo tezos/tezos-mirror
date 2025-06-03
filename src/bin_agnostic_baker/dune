@@ -14,10 +14,17 @@
   octez-shell-libs.client-base-unix
   octez-baker-lib
   octez-libs.octez-profiler
+  (select void_for_linking-octez-protocol-021-PsQuebec-libs-dal from
+   (octez-protocol-021-PsQuebec-libs.dal -> void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty)
+   (-> void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty))
   octez-protocol-022-PsRiotum-libs.agnostic-baker
+  octez-protocol-022-PsRiotum-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-agnostic-baker from
    (octez-protocol-alpha-libs.agnostic-baker -> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)
-   (-> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)))
+   (-> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty))
+  (select void_for_linking-octez-protocol-alpha-libs-dal from
+   (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (link_flags
@@ -37,4 +44,6 @@
 (rule
  (action
   (progn
-   (write-file void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty ""))))
+   (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty "")
+   (write-file void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty "")
+   (write-file void_for_linking-octez-protocol-alpha-libs-dal.empty ""))))

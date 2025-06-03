@@ -222,17 +222,20 @@ let update_and_register_profiles ctxt =
   let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
   return_unit
 
-let run ~data_dir ~configuration_override =
+let run ?(disable_logging = false) ~data_dir ~configuration_override () =
   let open Lwt_result_syntax in
-  let log_cfg = Tezos_base_unix.Logs_simple_config.default_cfg in
-  let internal_events =
-    Tezos_base_unix.Internal_event_unix.make_with_defaults
-      ~enable_default_daily_logs_at:Filename.Infix.(data_dir // "daily_logs")
-      ~log_cfg
-      ()
-  in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
+    if disable_logging then Lwt.return_unit
+    else
+      let log_cfg = Tezos_base_unix.Logs_simple_config.default_cfg in
+      let internal_events =
+        Tezos_base_unix.Internal_event_unix.make_with_defaults
+          ~enable_default_daily_logs_at:
+            Filename.Infix.(data_dir // "daily_logs")
+          ~log_cfg
+          ()
+      in
+      Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
   let*! () = Event.emit_starting_node () in
   let* ({
