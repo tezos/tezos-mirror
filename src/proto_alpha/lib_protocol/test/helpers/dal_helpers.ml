@@ -72,6 +72,23 @@ let derive_dal_parameters (reference : Cryptobox.parameters) ~redundancy_factor
 let content_slot_id = function
   | Hist.Unpublished id | Published {header = {id; _}; _} -> id
 
+let dal_attestation slot_indexes =
+  let open Alpha_context.Dal in
+  List.fold_left
+    (fun acc slot_index -> Attestation.commit acc slot_index)
+    Attestation.empty
+    slot_indexes
+
+let has_assigned_shards ctxt ?level pkh =
+  let open Lwt_result_syntax in
+  let* dal_committee = Context.Dal.shards ctxt ?level ~delegates:[pkh] () in
+  match dal_committee with
+  | [] -> return_false
+  | [({delegate; _} : Plugin.RPC.Dal.S.shards_assignment)] ->
+      assert (Signature.Public_key_hash.equal pkh delegate) ;
+      return_true
+  | _ -> fail [Test_failure "unexpected Dal.shards RPC result"]
+
 module Make (Parameters : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 

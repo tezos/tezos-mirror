@@ -628,9 +628,7 @@ let test_two_attestations_with_same_attester () =
   let* _genesis, attested_block = init_genesis ~dal_enable:true () in
   let* op1 = Op.raw_attestation attested_block in
   let dal_content =
-    let attestation =
-      Dal.Attestation.commit Dal.Attestation.empty Dal.Slot_index.zero
-    in
+    let attestation = Dal_helpers.dal_attestation [Dal.Slot_index.zero] in
     {attestation}
   in
   let* op2 = Op.raw_attestation ~dal_content attested_block in
@@ -653,13 +651,13 @@ let test_two_attestations_with_same_attester () =
   in
   Assert.proto_error ~loc:__LOC__ res error
 
-(* Check that if an attester includes some DAL content but is not in the DAL
-   committee, then an error is returned at block validation.
+(* Check that if an attester includes some DAL content but they have no assigned
+   shards, then an error is returned at block validation.
 
    Note that we change the value of [consensus_committee_size] because with the
    default test parameters, [consensus_committee_size = 25 < 64 =
    number_of_shards], so that test would not work! *)
-let test_attester_not_in_dal_committee () =
+let test_attester_with_no_assigned_shards () =
   let open Lwt_result_syntax in
   let bal_high = 80_000_000_000L in
   let bal_low = 08_000_000_000L in
@@ -692,20 +690,14 @@ let test_attester_not_in_dal_committee () =
   let pkh = Stdlib.List.hd contracts |> Context.Contract.pkh in
   let rec iter b i =
     let* committee = Context.get_attesters (B b) in
-    let* dal_committee = Context.Dal.shards (B b) () in
     let in_committee =
       List.exists
         (fun del ->
           Signature.Public_key_hash.equal pkh del.RPC.Validators.delegate)
         committee
     in
-    let in_dal_committee =
-      List.exists
-        (fun ({delegate; _} : Plugin.RPC.Dal.S.shards_assignment) ->
-          Signature.Public_key_hash.equal pkh delegate)
-        dal_committee
-    in
-    if in_committee && not in_dal_committee then
+    let* has_assigned_shards = Dal_helpers.has_assigned_shards (B b) pkh in
+    if in_committee && not has_assigned_shards then
       let dal_content = {attestation = Dal.Attestation.empty} in
       let* op = Op.attestation ~delegate:pkh ~dal_content b in
       let* ctxt = Incremental.begin_construction b in
@@ -769,7 +761,7 @@ let test_dal_attestation_threshold () =
   let* b = Block.bake genesis ~operation:op in
   let* b = Block.bake_n (attestation_lag - 1) b in
   let* dal_committee = Context.Dal.shards (B b) () in
-  let attestation = Dal.Attestation.commit Dal.Attestation.empty slot_index in
+  let attestation = Dal_helpers.dal_attestation [slot_index] in
   let dal_content = {attestation} in
   let min_power = attestation_threshold * number_of_shards / 100 in
   Log.info "Number of minimum required attested shards: %d" min_power ;
@@ -994,9 +986,9 @@ let tests =
       `Quick
       test_two_attestations_with_same_attester;
     Tztest.tztest
-      "attester not in DAL committee"
+      "attester without assigned shards"
       `Quick
-      test_attester_not_in_dal_committee;
+      test_attester_with_no_assigned_shards;
     Tztest.tztest
       "DAL attestation_threshold"
       `Quick
