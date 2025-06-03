@@ -275,13 +275,17 @@ module Local_helpers = struct
         return (signer.public_key, proof))
       signers
 
-  let create_bls_proof_group_pk ~group_pk ~(signers : Account.key list) client =
+  let create_bls_proof_group_pk ~kind ~group_pk ~(signers : Account.key list)
+      client =
     let* pks_with_proofs =
       create_bls_proofs ~override_pk:group_pk ~signers client
     in
     let _pks, proofs = List.split pks_with_proofs in
-    let* group_proof = Client.aggregate_bls_signatures client proofs in
-    return group_proof
+    match kind with
+    | Client -> Client.aggregate_bls_proofs ~pk:group_pk client proofs
+    | RPC ->
+        Client.RPC.call client
+        @@ RPC.post_bls_aggregate_proofs ~pk:group_pk proofs
 
   let check_bls_proofs ~kind client pk_with_proofs =
     match kind with
@@ -342,7 +346,7 @@ module Local_helpers = struct
     Tezos_crypto.Signature.Bls sk
     |> Tezos_crypto.Signature.Secret_key.to_b58check
 
-  let sign_and_aggregate_signatures ~kind ~watermark
+  let sign_and_aggregate_signatures ~kind ~watermark ~group_pk
       ~(signers : Account.key list) (msg : bytes) client =
     let signatures =
       List.map
@@ -351,10 +355,14 @@ module Local_helpers = struct
           |> Tezos_crypto.Signature.to_b58check)
         signers
     in
+    let prefix = Tezos_crypto.Signature.bytes_of_watermark watermark in
+    let msg = Bytes.cat prefix msg |> Hex.of_bytes |> Hex.show in
     match kind with
-    | Client -> Client.aggregate_bls_signatures client signatures
+    | Client ->
+        Client.aggregate_bls_signatures ~pk:group_pk ~msg client signatures
     | RPC ->
-        Client.RPC.call client @@ RPC.post_bls_aggregate_signatures signatures
+        Client.RPC.call client
+        @@ RPC.post_bls_aggregate_signatures ~pk:group_pk ~msg signatures
 
   let sign_and_recover_threshold_signature ~kind ~watermark ~group_pk
       ~(signers : (int * Account.key) list) (msg : bytes) client =
@@ -391,14 +399,15 @@ module Local_helpers = struct
     Log.info ~color:Log.Color.FG.gray "receipt for %s:\n%s" op_hash receipt ;
     return op_hash
 
-  let inject_aggregate_bls_sign_op ~kind ~baker ~(signers : Account.key list)
-      (op : Operation.t) client =
+  let inject_aggregate_bls_sign_op ~kind ~baker ~group_pk
+      ~(signers : Account.key list) (op : Operation.t) client =
     let* op_hex = Operation.hex op client in
     let manager_op = Hex.to_bytes op_hex in
     let* group_signature =
       sign_and_aggregate_signatures
         ~kind
         ~watermark:Generic_operation
+        ~group_pk
         ~signers
         manager_op
         client
@@ -849,6 +858,7 @@ let test_all_stakers_sign_staking_operation_external_delegate ~kind =
   (* Create a proof for revealing a public key *)
   let* group_mk_proof =
     Local_helpers.create_bls_proof_group_pk
+      ~kind
       ~group_pk:group_pk_bls
       ~signers:accounts
       client
@@ -861,6 +871,7 @@ let test_all_stakers_sign_staking_operation_external_delegate ~kind =
     Local_helpers.inject_aggregate_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers:accounts
       op_reveal
       client
@@ -873,6 +884,7 @@ let test_all_stakers_sign_staking_operation_external_delegate ~kind =
     Local_helpers.inject_aggregate_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers:accounts
       op_set_delegate
       client
@@ -888,6 +900,7 @@ let test_all_stakers_sign_staking_operation_external_delegate ~kind =
     Local_helpers.inject_aggregate_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers:accounts
       op_stake
       client
@@ -948,6 +961,7 @@ let test_all_stakers_sign_staking_operation_consensus_key ~kind =
   (* Create a proof for revealing a public key *)
   let* group_mk_proof =
     Local_helpers.create_bls_proof_group_pk
+      ~kind
       ~group_pk:group_pk_bls
       ~signers:accounts
       client
@@ -960,6 +974,7 @@ let test_all_stakers_sign_staking_operation_consensus_key ~kind =
     Local_helpers.inject_aggregate_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers:accounts
       op_reveal
       client
@@ -975,6 +990,7 @@ let test_all_stakers_sign_staking_operation_consensus_key ~kind =
     Local_helpers.inject_aggregate_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers:accounts
       op_set_delegate
       client
@@ -990,6 +1006,7 @@ let test_all_stakers_sign_staking_operation_consensus_key ~kind =
     Local_helpers.inject_aggregate_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers:accounts
       op_stake
       client
@@ -1017,6 +1034,7 @@ let test_all_stakers_sign_staking_operation_consensus_key ~kind =
     Local_helpers.inject_aggregate_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers:accounts
       op_update_consensus_key
       client
@@ -1097,6 +1115,7 @@ let test_all_stakers_sign_staking_operation_consensus_key_batch ~kind =
   (* create a proof for revealing a public key *)
   let* group_mk_proof =
     Local_helpers.create_bls_proof_group_pk
+      ~kind
       ~group_pk:group_pk_bls
       ~signers:accounts
       client
@@ -1119,6 +1138,7 @@ let test_all_stakers_sign_staking_operation_consensus_key_batch ~kind =
     Local_helpers.inject_aggregate_bls_sign_op
       ~kind
       ~baker:default_baker
+      ~group_pk:group_pk_bls
       ~signers:accounts
       op_batch
       client

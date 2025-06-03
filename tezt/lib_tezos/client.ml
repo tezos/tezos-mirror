@@ -4562,12 +4562,21 @@ let bake_until_cycle_end ~target_cycle ?keys ?node client =
 
   bake_until_level ~target_level ?keys ?node client
 
-let spawn_aggregate_bls_signatures client signatures =
-  spawn_command client @@ ["aggregate"; "bls"; "signatures"] @ signatures
+let spawn_aggregate_bls_signatures ~pk ~msg client signatures =
+  let signatures = List.map (fun signature -> `String signature) signatures in
+  let pk_msg_sig =
+    [
+      ("public_key", `String pk);
+      ("message", `String msg);
+      ("signature_shares", `A signatures);
+    ]
+  in
+  let json_batch = `O pk_msg_sig |> JSON.encode_u in
+  spawn_command client @@ ["aggregate"; "bls"; "signatures"; json_batch]
 
-let aggregate_bls_signatures client signatures =
+let aggregate_bls_signatures ~pk ~msg client signatures =
   let* s =
-    spawn_aggregate_bls_signatures client signatures
+    spawn_aggregate_bls_signatures ~pk ~msg client signatures
     |> Process.check_and_read_stdout
   in
   return (String.trim s)
@@ -4621,6 +4630,19 @@ let aggregate_bls_public_keys client pks_with_proofs =
   let group_pk = JSON.(output |-> "public_key" |> as_string) in
   let group_pkh = JSON.(output |-> "public_key_hash" |> as_string) in
   return (group_pk, group_pkh)
+
+let spawn_aggregate_bls_proofs ~pk client (proofs : string list) =
+  let proofs = List.map (fun proof -> `String proof) proofs in
+  let pk_with_proofs = [("public_key", `String pk); ("proofs", `A proofs)] in
+  let json_batch = `O pk_with_proofs |> JSON.encode_u in
+  spawn_command client @@ ["aggregate"; "bls"; "proofs"; json_batch]
+
+let aggregate_bls_proofs ~pk client proofs =
+  let* s =
+    spawn_aggregate_bls_proofs ~pk client proofs
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim s)
 
 let spawn_share_bls_secret_key ~sk ~n ~m client =
   spawn_command client
