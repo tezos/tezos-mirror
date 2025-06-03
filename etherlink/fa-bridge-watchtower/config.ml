@@ -28,6 +28,7 @@ type t = {
   secret_key : secret_key option;  (** Optional secret key for signing *)
   whitelist : whitelist_item list option;
       (** Optional list of whitelisted addresses *)
+  monitor_all_deposits : bool;  (** Whether to store all deposits in the DB.  *)
 }
 
 let ctxt = Efunc_core.Eth.Crypto.context ()
@@ -73,6 +74,7 @@ let default =
     rpc = default_rpc_config;
     secret_key = default_secret_key;
     whitelist = default_whitelist;
+    monitor_all_deposits = false;
   }
 
 let rpc_encoding =
@@ -109,14 +111,22 @@ let encoding =
            rpc;
            secret_key;
            whitelist;
+           monitor_all_deposits;
          } ->
-      (evm_node_endpoint, gas_limit, max_fee_per_gas, rpc, secret_key, whitelist))
+      ( evm_node_endpoint,
+        gas_limit,
+        max_fee_per_gas,
+        rpc,
+        secret_key,
+        whitelist,
+        monitor_all_deposits ))
     (fun ( evm_node_endpoint,
            gas_limit,
            max_fee_per_gas,
            rpc,
            secret_key,
-           whitelist ) ->
+           whitelist,
+           monitor_all_deposits ) ->
       {
         evm_node_endpoint;
         gas_limit;
@@ -124,8 +134,9 @@ let encoding =
         rpc;
         secret_key;
         whitelist;
+        monitor_all_deposits;
       })
-    (obj6
+    (obj7
        (dft
           "evm_node_endpoint"
           ~description:"URL of the EVM node"
@@ -157,7 +168,12 @@ let encoding =
        (opt
           "whitelist"
           ~description:"Optional list of whitelisted items"
-          (list whitelist_item_encoding)))
+          (list whitelist_item_encoding))
+       (dft
+          "monitor_all_deposits"
+          ~description:"Monitor and store all deposits in the DB."
+          bool
+          false))
 
 (** [load_file ~data_dir] attempts to load the configuration file from the
     specified data directory. Returns [None] if the file doesn't exist or [Some

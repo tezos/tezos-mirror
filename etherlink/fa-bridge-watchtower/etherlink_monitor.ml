@@ -873,7 +873,8 @@ let start db ~config ~notify_ws_change ~first_block =
         sk = secret_key;
         chain_id;
         gas_limit = Z.of_int64 config.gas_limit;
-        whitelist = config.whitelist;
+        whitelist =
+          (if config.monitor_all_deposits then None else config.whitelist);
         nonce = Ethereum_types.Qty.zero;
       }
     in
