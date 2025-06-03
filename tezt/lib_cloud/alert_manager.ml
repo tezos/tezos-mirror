@@ -197,6 +197,7 @@ let run alerts =
   let configuration_file =
     alert_manager_configuration_directory // "alert_manager.yml"
   in
+  Log.info "Alert_manager: run with configuration file %s" configuration_file ;
   let routes = routes_of_alerts alerts in
   let receivers = receivers_of_alerts alerts in
   let t = {configuration_file; routes; receivers} in
@@ -232,5 +233,6 @@ let _reload t =
   Process.run "curl" ["-X"; "POST"; "http://127.0.0.1:9093/-/reload"]
 
 let shutdown () =
+  Log.info "Alert_manager: shutting down" ;
   let* () = Docker.kill "alert-manager" |> Process.check in
   Lwt.return_unit
