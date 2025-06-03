@@ -110,6 +110,9 @@ Baker
 Agnostic Baker
 --------------
 
+- Add support for ``run dal` and all other commands of the ``octez-dal-node`` to
+  the baker. (MR :gl:`!18050`)
+
 - Add ``run accuser`` command to replicate the behaviour of the accuser.
   (MR :gl:`!17767`)
 
