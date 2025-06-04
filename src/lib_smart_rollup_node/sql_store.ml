@@ -610,6 +610,13 @@ module Outbox_messages = struct
       ON CONFLICT (outbox_level) DO UPDATE SET messages = $2
       |sql}
 
+    let delete =
+      (level ->. unit)
+      @@ {sql|
+      DELETE FROM outbox_messages
+      where outbox_level = ?
+      |sql}
+
     let range =
       (t2 level level ->* t2 level messages_per_level)
       @@ {sql|
@@ -651,6 +658,10 @@ module Outbox_messages = struct
   let register_outbox_messages ?conn store ~outbox_level ~indexes =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.register (outbox_level, indexes)
+
+  let delete_outbox_messages ?conn store ~outbox_level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete outbox_level
 
   let set_outbox_message_executed ?conn store ~outbox_level ~index =
     let open Lwt_result_syntax in

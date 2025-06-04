@@ -672,8 +672,14 @@ let set_outbox_message_executed {store; _} ~outbox_level ~index =
 
 let register_outbox_messages {store; _} ~outbox_level ~indexes =
   let open Lwt_result_syntax in
-  let*? indexes = Bitset.from_list indexes in
-  Store.Outbox_messages.register_outbox_messages store ~outbox_level ~indexes
+  if indexes = [] then
+    (* Remove any previously added messages for this level (e.g. in case of
+       reorg) because there aren't any in this level. *)
+    Store.Outbox_messages.delete_outbox_messages store ~outbox_level
+  else
+    (* Overwrite (or add) messages for this level. *)
+    let*? indexes = Bitset.from_list indexes in
+    Store.Outbox_messages.register_outbox_messages store ~outbox_level ~indexes
 
 let get_executable_pending_outbox_messages ?outbox_level
     {store; lcc; current_protocol; _} =
