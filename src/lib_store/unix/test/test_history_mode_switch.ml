@@ -319,8 +319,8 @@ let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
   | p, n when History_mode.equal p n -> return_unit
   | _ -> assert false
 
-let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake
-    (store_dir, context_root_dir) store ~patch_context =
+let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake (store_dir, data_dir)
+    store ~patch_context =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
   let*! genesis_block = Store.Chain.genesis_block chain_store in
@@ -338,7 +338,7 @@ let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake
         let* () =
           Store.may_switch_history_mode
             ~store_dir
-            ~context_root_dir
+            ~data_dir
             genesis
             ~new_history_mode:to_hm
         in
@@ -365,7 +365,7 @@ let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake
         ~history_mode:to_hm
         ~patch_context
         ~store_dir
-        ~context_root_dir
+        ~data_dir
         ~allow_testchains:false
         genesis
     in

@@ -471,7 +471,7 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
     ~operation_metadata_size_limit (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
   let store_root = Data_version.store_dir config.data_dir in
-  let context_root_dir = config.data_dir in
+  let data_dir = config.data_dir in
   let protocol_root = Data_version.protocol_dir config.data_dir in
   let genesis = config.blockchain_network.genesis in
   let (validator_env : Block_validator_process.validator_environment) =
@@ -488,7 +488,7 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
       let* store =
         Store.init
           ~store_dir:store_root
-          ~context_root_dir
+          ~data_dir
           ~allow_testchains:false
           ~readonly
           genesis
@@ -509,7 +509,6 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
                    data_dir = config.data_dir;
                    readonly;
                    genesis;
-                   context_root_dir = config.data_dir;
                    protocol_root;
                    sandbox_parameters = None;
                    user_activated_upgrades =
@@ -528,7 +527,7 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
       let* store =
         Store.init
           ~store_dir:store_root
-          ~context_root_dir
+          ~data_dir
           ~allow_testchains:false
           ~readonly
           ~commit_genesis

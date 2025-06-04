@@ -800,7 +800,7 @@ let run_baker
   in
   let* () = check_dal_node without_dal dal_node_rpc_ctxt in
   let* delegates = get_delegates cctxt sources in
-  let context_path =
+  let data_dir_path =
     match baking_mode with
     | Local {local_data_dir_path} -> Some local_data_dir_path
     | Remote -> None
