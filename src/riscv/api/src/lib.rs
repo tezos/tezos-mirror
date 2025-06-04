@@ -23,9 +23,11 @@ use octez_riscv::pvm::node_pvm::NodePvm;
 use octez_riscv::pvm::node_pvm::PvmStorage;
 use octez_riscv::pvm::node_pvm::PvmStorageError;
 use octez_riscv::state_backend::owned_backend::Owned;
+use octez_riscv::state_backend::proof_backend::proof::MerkleProof;
 use octez_riscv::state_backend::proof_backend::proof::Proof as OctezRiscvProof;
 use octez_riscv::state_backend::proof_backend::proof::deserialise_proof;
 use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
+use octez_riscv::state_backend::verify_backend::Verifier;
 use octez_riscv::storage;
 use octez_riscv::storage::StorageError;
 use pointer_apply::ApplyReadOnly;
@@ -156,7 +158,20 @@ pub enum InputRequest {
     NeedsReveal(BytesWrapper),
 }
 
-ocaml::custom!(InputRequest);
+impl From<octez_riscv::pvm::InputRequest> for InputRequest {
+    fn from(request: octez_riscv::pvm::InputRequest) -> Self {
+        match request {
+            octez_riscv::pvm::InputRequest::NoInputRequired => InputRequest::NoInputRequired,
+            octez_riscv::pvm::InputRequest::Initial => InputRequest::Initial,
+            octez_riscv::pvm::InputRequest::FirstAfter { level, counter } => {
+                InputRequest::FirstAfter(level, counter)
+            }
+            octez_riscv::pvm::InputRequest::NeedsReveal(data) => {
+                InputRequest::NeedsReveal(BytesWrapper(data))
+            }
+        }
+    }
+}
 
 // This representation guarantees that on the OCaml side, when converting to `Raw_level_repr.t`
 // no runtime exceptions will be thrown.
@@ -179,8 +194,6 @@ pub struct OutputInfo {
     pub message_index: u64,
     pub outbox_level: RawLevel,
 }
-
-ocaml::custom!(OutputInfo);
 
 /// A value of this type is generated as part of successfully verifying an output proof.
 #[derive(ocaml::ToValue)]
@@ -495,6 +508,8 @@ pub unsafe fn octez_riscv_storage_export_snapshot(
 struct Proof {
     final_state_hash: Hash,
     serialised_proof: Box<[u8]>,
+    /// When deserialising a proof in the protocol, a verifier backend and its [`MerkleProof`] are needed for the rest of the API.
+    verifier: Option<(NodePvm<Verifier>, MerkleProof)>,
 }
 
 impl From<OctezRiscvProof> for Proof {
@@ -502,6 +517,27 @@ impl From<OctezRiscvProof> for Proof {
         Proof {
             final_state_hash: proof.final_state_hash(),
             serialised_proof: serialise_proof(&proof).collect(),
+            verifier: None,
+        }
+    }
+}
+
+impl Proof {
+    /// Obtain the [`NodePvm`] and [`MerkleProof`] for this proof.
+    ///
+    /// Create them from the raw proof bytes if they do not exist yet.
+    fn get_or_create_verifier(&mut self) -> Result<(&NodePvm<Verifier>, &MerkleProof), String> {
+        match &mut self.verifier {
+            Some((node_pvm, merkle_tree)) => Ok((node_pvm, merkle_tree)),
+
+            other => {
+                let (octez_riscv_proof, node_pvm) =
+                    deserialise_proof(self.serialised_proof.iter().copied())
+                        .map_err(|e| e.to_string())?;
+                let merkle_tree = octez_riscv_proof.into_tree();
+                let (node_pvm, merkle_tree) = other.get_or_insert((node_pvm, merkle_tree));
+                Ok((node_pvm, merkle_tree))
+            }
         }
     }
 }
@@ -511,7 +547,7 @@ ocaml::custom!(Proof);
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
 pub fn octez_riscv_proof_start_state(_proof: Pointer<Proof>) -> [u8; 32] {
-    // TODO: RV-690 Proof start state is not implemented yet
+    // TODO: RV-698 Proof start state is not implemented yet
     todo!()
 }
 
@@ -534,17 +570,22 @@ pub fn octez_riscv_produce_proof(
 
 #[ocaml::func]
 #[ocaml::sig("input option -> proof -> input_request option")]
-// Allow some warnings while this method goes through iterations.
-#[expect(
-    unused_variables,
-    reason = "There are some gaps in this method while it is being iterated on"
-)]
 pub fn octez_riscv_verify_proof(
     input: Option<Input>,
-    proof: Pointer<Proof>,
-) -> Option<Pointer<InputRequest>> {
-    // TODO: RV-556: Return an `InputRequest`
-    todo!()
+    mut proof: Pointer<Proof>,
+) -> Option<InputRequest> {
+    let input = input.map(|i| i.into());
+
+    let final_state_hash = proof.as_ref().final_state_hash;
+    let (node_pvm, merkle_tree) = proof.as_mut().get_or_create_verifier().ok()?;
+    let input_request = node_pvm.clone().verify_proof(
+        merkle_tree,
+        &final_state_hash,
+        input,
+        &mut PvmHooks::default(),
+    )?;
+
+    Some(InputRequest::from(input_request))
 }
 
 #[ocaml::func]
@@ -561,13 +602,12 @@ pub unsafe fn octez_riscv_serialise_proof(proof: Pointer<Proof>) -> BytesWrapper
 pub fn octez_riscv_deserialise_proof(bytes: &[u8]) -> Result<Pointer<Proof>, String> {
     let iter = bytes.iter().cloned();
 
-    // TODO: RV-612 Save the verifier returned from deserialisation in the returned Proof
-    // in order to be able to generate an input request at verification.
-    let (proof, _) = deserialise_proof(iter).map_err(|e| e.to_string())?;
+    let (proof, verifier) = deserialise_proof(iter).map_err(|e| e.to_string())?;
 
     Ok(Proof {
         final_state_hash: proof.final_state_hash(),
         serialised_proof: bytes.into(),
+        verifier: Some((verifier, proof.into_tree())),
     }
     .into())
 }
@@ -576,7 +616,7 @@ pub fn octez_riscv_deserialise_proof(bytes: &[u8]) -> Result<Pointer<Proof>, Str
 #[ocaml::sig("output_proof -> output_info")]
 pub fn octez_riscv_output_info_of_output_proof(
     _output_proof: Pointer<OutputProof>,
-) -> Result<Pointer<OutputInfo>, String> {
+) -> Result<OutputInfo, String> {
     todo!()
 }
 
@@ -588,9 +628,7 @@ pub fn octez_riscv_state_of_output_proof(_output_proof: Pointer<OutputProof>) ->
 
 #[ocaml::func]
 #[ocaml::sig("output_proof -> output option")]
-pub fn octez_riscv_verify_output_proof(
-    _output_proof: Pointer<OutputProof>,
-) -> Option<Pointer<Output>> {
+pub fn octez_riscv_verify_output_proof(_output_proof: Pointer<OutputProof>) -> Option<Output> {
     todo!()
 }
 
