@@ -22,7 +22,7 @@ module Path = struct
 
   let balance contract = account contract ^ "/balance"
 
-  let manager_key contract = account contract ^ "/manager_key"
+  let manager contract = account contract ^ "/manager"
 
   let counter contract = account contract ^ "/counter"
 end
@@ -34,11 +34,11 @@ let balance read c =
     (Path.balance c)
     (Data_encoding.Binary.of_bytes_exn Tez.encoding)
 
-let manager_key read c =
+let manager read c =
   Durable_storage.inspect_durable_and_decode_opt
     read
-    (Path.manager_key c)
-    (Data_encoding.Binary.of_bytes_exn Signature.V1.Public_key.encoding)
+    (Path.manager c)
+    (Data_encoding.Binary.of_bytes_exn Manager.encoding)
 
 let counter read c =
   Durable_storage.inspect_durable_and_decode_default

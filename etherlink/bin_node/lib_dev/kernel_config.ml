@@ -126,10 +126,10 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
               tez_bootstrap_balance
               (Data_encoding.Binary.to_string_exn Tezos_types.Tez.encoding)
             @ make_account_field
-                "manager_key"
-                manager
+                "manager"
+                (Tezos_types.Manager.Public_key manager)
                 (Data_encoding.Binary.to_string_exn
-                   Signature.V1.Public_key.encoding)
+                   Tezos_types.Manager.encoding)
             @ make_account_field
                 "counter"
                 Z.zero
