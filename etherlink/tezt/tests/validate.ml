@@ -498,7 +498,7 @@ let test_validate_gas_limit =
     send_transaction_and_fail_upon_sequencer_validation
       ~raw_tx:not_enough_gas_limit
       sequencer
-      ~expected_error:"Invalid gas_limit for da_fees"
+      ~expected_error:"Not enough gas for inclusion fees"
       ~error_msg:
         "The transaction has not enough gas to pay da_fees, it should fail"
   in
@@ -527,7 +527,7 @@ let test_validate_gas_limit =
     send_transaction_and_fail_upon_sequencer_validation
       ~raw_tx:not_enough_access_list_tx
       sequencer
-      ~expected_error:"Invalid gas_limit for da_fees"
+      ~expected_error:"Not enough gas for inclusion fees"
       ~error_msg:
         "The transaction has not enough gas to pay da_fees for access_list, it \
          should fail"
