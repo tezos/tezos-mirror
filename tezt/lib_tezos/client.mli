@@ -345,6 +345,14 @@ module Admin : sig
   val spawn_connect_address :
     ?endpoint:endpoint -> peer:Node.t -> t -> Process.t
 
+  (** Connect a P2P node to another peer. *)
+  val connect_p2p_node_address :
+    ?endpoint:endpoint -> peer:P2p_node.t -> t -> unit Lwt.t
+
+  (** Same as [connect_p2p_node_address], but do not wait for the process to exit. *)
+  val spawn_connect_p2p_node_address :
+    ?endpoint:endpoint -> peer:P2p_node.t -> t -> Process.t
+
   (** Kick a peer.
 
       [peer] is the identity of the peer to kick.

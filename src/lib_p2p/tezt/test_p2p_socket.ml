@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune exec src/lib_p2p/tezt/main.exe
+    Invocation:   dune exec src/lib_p2p/tezt/main.exe -- --file test_p2p_socket.ml
     Subject:      Sockets and client-server communications.
 *)
 

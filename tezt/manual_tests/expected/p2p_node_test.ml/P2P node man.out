@@ -1,0 +1,61 @@
+
+./_build/default/src/bin_p2p_node/main_p2p_node.exe
+Usage:
+  main_p2p_node.exe command [command options]
+  main_p2p_node.exe --help (for global options)
+  main_p2p_node.exe command --help (for command options)
+  main_p2p_node.exe --version (for version information)
+
+To browse the documentation:
+  main_p2p_node.exe man (for a list of commands)
+  main_p2p_node.exe man -v 3 (for the full manual)
+
+
+
+./_build/default/src/bin_p2p_node/main_p2p_node.exe --help
+Usage:
+  main_p2p_node.exe command [command options]
+  main_p2p_node.exe --help (for global options)
+  main_p2p_node.exe command --help (for command options)
+  main_p2p_node.exe --version (for version information)
+
+To browse the documentation:
+  main_p2p_node.exe man (for a list of commands)
+  main_p2p_node.exe man -v 3 (for the full manual)
+
+
+
+./_build/default/src/bin_p2p_node/main_p2p_node.exe man
+Usage:
+  main_p2p_node.exe command [command options]
+  main_p2p_node.exe --help (for global options)
+  main_p2p_node.exe command --help (for command options)
+  main_p2p_node.exe --version (for version information)
+
+To browse the documentation:
+  main_p2p_node.exe man (for a list of commands)
+  main_p2p_node.exe man -v 3 (for the full manual)
+
+Access the documentation:
+
+  man [<keyword>...]
+    Print documentation of commands.
+    <keyword>: keyword to search for
+    -v --verbosity <0|1|2|3>: level of details
+    --format <plain|colors|html>: the manual's output format
+
+Commands related to the octez P2P node.:
+
+  run 
+    Run the octez-p2p-node
+    --net-addr <ADDR:PORT|:PORT>: P2P address that the node listens on.
+      Defaults to 19732
+    --peers <ADDR:PORT|:PORT, ADDR2:PORT2|:PORT2 ...>: Comma-separated list
+      of peer addresses to accept connections from.
+    --discovery-addr <ADDR:PORT|:PORT>: The UDP address and port used for
+      local peer discovery.
+    --rpc-addr <ADDR:PORT|:PORT>: The RPC address and port. Defaults to
+      18732
+    --ping-interval <int>: If this is set, the P2P node will ping its
+      connected peers at this interval of time. Defaults to 10
+      seconds.

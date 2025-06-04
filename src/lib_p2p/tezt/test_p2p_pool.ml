@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune exec src/lib_p2p/test/test_p2p_pool.exe
+    Invocation:   dune exec src/lib_p2p/tezt/main.exe -- --file test_p2p_pool.ml
     Dependencies: src/lib_p2p/test/process.ml
     Subject:      Testing of the Pool
                   Each test launches nodes in separate process, each node
