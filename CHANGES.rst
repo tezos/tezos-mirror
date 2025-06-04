@@ -228,6 +228,8 @@ Smart Rollup node
 Smart Rollup WASM Debugger
 --------------------------
 
+- Moved from Released to Unreleased and removed the deb/rpm packages
+
 Data Availability Layer (DAL)
 -----------------------------
 
