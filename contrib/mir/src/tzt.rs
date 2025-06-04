@@ -45,7 +45,7 @@ pub enum TztTestError<'a> {
     ),
     /// An error happened, when the test expected a success.
     UnexpectedError(TestError<'a>),
-    /// Execution completed succesfully, when the test expected an error.
+    /// Execution completed successfully, when the test expected an error.
     UnexpectedSuccess(ErrorExpectation<'a>, IStack<'a>),
     /// Expected one error, but got another.
     ExpectedDifferentError(ErrorExpectation<'a>, TestError<'a>),
@@ -64,7 +64,7 @@ impl fmt::Display for TztTestError<'_> {
             UnexpectedSuccess(e, stk) => {
                 write!(
                     f,
-                    "Expected an error but none occured. Expected {} but ended with stack {:?}.",
+                    "Expected an error but none occurred. Expected {} but ended with stack {:?}.",
                     e, stk
                 )
             }
@@ -516,7 +516,7 @@ fn execute_tzt_test_code<'a>(
     Ok((t_stack, i_stack))
 }
 
-/// Run a [TztTest]. If the test is succesful, the result is `Ok(())`.
+/// Run a [TztTest]. If the test is successful, the result is `Ok(())`.
 /// Otherwise, it returns [TztTestError]. An [Arena] must be supplied, it will
 /// be used for storing the results of `UNPACK`, which may end up as part of the
 /// error.

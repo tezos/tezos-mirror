@@ -37,7 +37,7 @@ pub enum Micheline<'a> {
 Arena has an unfortunate pothole related to alloc_extend: if the iterator
 itself tries to allocate in the arena, it will panic.
 
-To avoid triggering it accidentally, the mehtod has an error attached via
+To avoid triggering it accidentally, the method has an error attached via
 clippy. When it's known to be safe, `allow` directive is added on the call.
 */
 
