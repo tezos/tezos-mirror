@@ -324,7 +324,6 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
       data_dir = config.data_dir;
       internal_events;
       store_root = Data_version.store_dir config.data_dir;
-      context_root_dir = config.data_dir;
       protocol_root = Data_version.protocol_dir config.data_dir;
       p2p = p2p_config;
       target;
@@ -338,7 +337,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
     | Some history_mode when force_history_mode_switch ->
         Store.may_switch_history_mode
           ~store_dir:node_config.store_root
-          ~context_root_dir:config.data_dir
+          ~data_dir:config.data_dir
           genesis
           ~new_history_mode:history_mode
     | _ -> return_unit

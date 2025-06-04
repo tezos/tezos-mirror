@@ -2016,7 +2016,7 @@ module type Snapshot_exporter = sig
     ?rolling:bool ->
     block:Block_services.block ->
     store_dir:string ->
-    context_root_dir:string ->
+    data_dir:string ->
     chain_name:Distributed_db_version.Name.t ->
     progress_display_mode:Animation.progress_display_mode ->
     Genesis.t ->
@@ -2461,11 +2461,11 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let* () = Event.(emit floating_blocks_exported) () in
     return_ok_unit
 
-  let export_context snapshot_exporter ~context_root_dir context_hash =
+  let export_context snapshot_exporter ~data_dir context_hash =
     let open Lwt_result_syntax in
     let*! () = Event.(emit exporting_context) () in
     let*! context_index =
-      Context_ops.init ~kind:`Disk ~readonly:true context_root_dir
+      Context_ops.init ~kind:`Disk ~readonly:true ~data_dir ()
     in
     let is_gc_allowed = Context_ops.is_gc_allowed context_index in
     let* () =
@@ -2483,8 +2483,8 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let*! () = Event.(emit context_exported) () in
     return_unit
 
-  let export_rolling snapshot_exporter ~store_dir ~context_root_dir ~block
-      ~rolling genesis =
+  let export_rolling snapshot_exporter ~store_dir ~data_dir ~block ~rolling
+      genesis =
     let open Lwt_result_syntax in
     let export_rolling_f chain_store =
       let* () = check_history_mode chain_store ~rolling in
@@ -2550,10 +2550,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         Store.Block.resulting_context_hash chain_store export_block
       in
       let* () =
-        export_context
-          snapshot_exporter
-          ~context_root_dir
-          pred_resulting_context_hash
+        export_context snapshot_exporter ~data_dir pred_resulting_context_hash
       in
       return
         ( export_mode,
@@ -2571,7 +2568,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
            (return_unit, floating_block_stream) ) =
       Store.Unsafe.open_for_snapshot_export
         ~store_dir
-        ~context_root_dir
+        ~data_dir
         genesis
         ~locked_f:export_rolling_f
     in
@@ -2583,7 +2580,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         protocol_levels,
         (return_unit, floating_block_stream) )
 
-  let export_full snapshot_exporter ~store_dir ~context_root_dir ~block ~rolling
+  let export_full snapshot_exporter ~store_dir ~data_dir ~block ~rolling
       ~progress_display_mode genesis =
     let open Lwt_result_syntax in
     let export_full_f chain_store =
@@ -2655,7 +2652,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           let* () =
             export_context
               snapshot_exporter
-              ~context_root_dir
+              ~data_dir
               pred_resulting_context_hash
           in
           return
@@ -2684,7 +2681,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
            should_filter_indexes ) =
       Store.Unsafe.open_for_snapshot_export
         ~store_dir
-        ~context_root_dir
+        ~data_dir
         genesis
         ~locked_f:export_full_f
     in
@@ -2738,8 +2735,8 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         tzfail
           (Invalid_chain_store_export (chain_id, Naming.dir_path store_dir))
 
-  let export ?snapshot_path ?(rolling = false) ~block ~store_dir
-      ~context_root_dir ~chain_name ~progress_display_mode genesis =
+  let export ?snapshot_path ?(rolling = false) ~block ~store_dir ~data_dir
+      ~chain_name ~progress_display_mode genesis =
     let open Lwt_result_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let* () = ensure_valid_export_chain_dir store_dir chain_id in
@@ -2763,7 +2760,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               export_rolling
                 snapshot_exporter
                 ~store_dir
-                ~context_root_dir
+                ~data_dir
                 ~block
                 ~rolling
                 genesis
@@ -2771,7 +2768,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               export_full
                 snapshot_exporter
                 ~store_dir
-                ~context_root_dir
+                ~data_dir
                 ~block
                 ~rolling
                 ~progress_display_mode
@@ -2987,7 +2984,7 @@ module type IMPORTER = sig
 
   val load_block_data : t -> block_data tzresult Lwt.t
 
-  val restore_context : t -> dst_context_root_dir:string -> unit tzresult Lwt.t
+  val restore_context : t -> dst_data_dir:string -> unit tzresult Lwt.t
 
   val load_protocol_table :
     t -> Protocol_levels.protocol_info Protocol_levels.t tzresult Lwt.t
@@ -3076,7 +3073,7 @@ module Raw_importer : IMPORTER = struct
         | Some v -> return v
         | None -> tzfail (Cannot_read {kind = `Block_data; path = file}))
 
-  let restore_context t ~dst_context_root_dir =
+  let restore_context t ~dst_data_dir =
     let open Lwt_result_syntax in
     let context_file_path =
       Naming.(snapshot_context_file t.snapshot_dir |> file_path)
@@ -3084,7 +3081,7 @@ module Raw_importer : IMPORTER = struct
     let*! () =
       Lwt_utils_unix.copy_dir
         context_file_path
-        (Tezos_context_ops.Context_ops.context_dir dst_context_root_dir)
+        (Tezos_context_ops.Context_ops.context_dir dst_data_dir)
     in
     return_unit
 
@@ -3406,25 +3403,23 @@ module Tar_importer : IMPORTER = struct
         | None -> tzfail (Cannot_read {kind = `Block_data; path = filename}))
     | None -> tzfail (Cannot_read {kind = `Block_data; path = filename})
 
-  let restore_context t ~dst_context_root_dir =
+  let restore_context t ~dst_data_dir =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_unix.mkdir
-        (Tezos_context_ops.Context_ops.context_dir dst_context_root_dir)
+        (Tezos_context_ops.Context_ops.context_dir dst_data_dir)
         snapshot_dir_perm
     in
     let index =
       Filename.concat
-        (Tezos_context_ops.Context_ops.context_dir dst_context_root_dir)
+        (Tezos_context_ops.Context_ops.context_dir dst_data_dir)
         "index"
     in
     let*! () = Lwt_unix.mkdir index snapshot_dir_perm in
     let*! context_files =
       Onthefly.find_files_with_common_path t.tar ~pattern:"context"
     in
-    let dst_dir =
-      Tezos_context_ops.Context_ops.context_dir dst_context_root_dir
-    in
+    let dst_dir = Tezos_context_ops.Context_ops.context_dir dst_data_dir in
     let*! () =
       List.iter_s
         (fun file ->
@@ -3687,7 +3682,7 @@ module type Snapshot_importer = sig
     ?block:Block_hash.t ->
     ?check_consistency:bool ->
     dst_store_dir:[`Store_dir] Naming.directory ->
-    dst_context_root_dir:string ->
+    dst_data_dir:string ->
     chain_name:Distributed_db_version.Name.t ->
     configured_history_mode:History_mode.t option ->
     user_activated_upgrades:User_activated.upgrades ->
@@ -3905,7 +3900,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     return block_validation_result
 
   let restore_and_apply_context snapshot_importer protocol_levels
-      ?user_expected_block ~dst_context_root_dir ~user_activated_upgrades
+      ?user_expected_block ~dst_data_dir ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
       ~patch_context ~check_consistency snapshot_metadata genesis chain_id =
     let open Lwt_result_syntax in
@@ -3955,8 +3950,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         Animation.three_dots
           ~progress_display_mode:Auto
           ~msg:"Importing context"
-        @@ fun () ->
-        Importer.restore_context snapshot_importer ~dst_context_root_dir
+        @@ fun () -> Importer.restore_context snapshot_importer ~dst_data_dir
       in
       let*! () =
         if Context_ops.do_not_use__is_duo () then
@@ -3965,9 +3959,9 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
              in "brassaia_context" *)
           Lwt_utils_unix.copy_dir
             (* Copy the context directory in the brassaia_context directory *)
-            (Tezos_context_ops.Context_ops.context_dir dst_context_root_dir)
+            (Tezos_context_ops.Context_ops.context_dir dst_data_dir)
             (Tezos_context_ops.Context_ops.do_not_use__brassaia_dir
-               dst_context_root_dir)
+               dst_data_dir)
         else Lwt.return_unit
       in
       let*! context_index =
@@ -3976,7 +3970,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           ~readonly:false
           ~index_log_size:default_index_log_size
           ?patch_context
-          dst_context_root_dir
+          ~data_dir:dst_data_dir
+          ()
       in
       let* genesis_ctxt_hash =
         Context_ops.commit_genesis
@@ -3994,8 +3989,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           let*! () =
             Context_ops.integrity_check
               ?ppf:None
-              ~root:
-                (Tezos_context_ops.Context_ops.context_dir dst_context_root_dir)
+              ~root:(Tezos_context_ops.Context_ops.context_dir dst_data_dir)
               ~auto_repair:false
               ~always:false
               ~heads:(Some [Context_hash.to_b58check imported_context_hash])
@@ -4031,8 +4025,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
   (* TODO parallelise in another process *)
   (* TODO? remove patch context *)
   let import ~snapshot_path ?patch_context ?block:user_expected_block
-      ?(check_consistency = true) ~dst_store_dir ~dst_context_root_dir
-      ~chain_name ~configured_history_mode ~user_activated_upgrades
+      ?(check_consistency = true) ~dst_store_dir ~dst_data_dir ~chain_name
+      ~configured_history_mode ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
       ~progress_display_mode (genesis : Genesis.t) =
     let open Lwt_result_syntax in
@@ -4128,7 +4122,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         snapshot_importer
         protocol_levels
         ?user_expected_block
-        ~dst_context_root_dir
+        ~dst_data_dir
         ~user_activated_upgrades
         ~user_activated_protocol_overrides
         ~operation_metadata_size_limit
@@ -4273,8 +4267,8 @@ let snapshot_file_kind ~snapshot_path =
         let* () = is_valid_uncompressed_snapshot snapshot_file in
         return Tar)
 
-let export ?snapshot_path export_format ?rolling ~block ~store_dir
-    ~context_root_dir ~chain_name ~progress_display_mode genesis =
+let export ?snapshot_path export_format ?rolling ~block ~store_dir ~data_dir
+    ~chain_name ~progress_display_mode genesis =
   let (module Exporter) =
     match export_format with
     | Tar -> (module Make_snapshot_exporter (Tar_exporter) : Snapshot_exporter)
@@ -4285,7 +4279,7 @@ let export ?snapshot_path export_format ?rolling ~block ~store_dir
     ?rolling
     ~block
     ~store_dir
-    ~context_root_dir
+    ~data_dir
     ~chain_name
     ~progress_display_mode
     genesis
@@ -4301,7 +4295,7 @@ let read_snapshot_header ~snapshot_path =
   Loader.load_snapshot_header ~snapshot_path
 
 let import ~snapshot_path ?patch_context ?block ?check_consistency
-    ~dst_store_dir ~dst_context_root_dir ~chain_name ~configured_history_mode
+    ~dst_store_dir ~dst_data_dir ~chain_name ~configured_history_mode
     ~user_activated_upgrades ~user_activated_protocol_overrides
     ~operation_metadata_size_limit ~progress_display_mode genesis =
   let open Lwt_result_syntax in
@@ -4318,7 +4312,7 @@ let import ~snapshot_path ?patch_context ?block ?check_consistency
     ?block
     ?check_consistency
     ~dst_store_dir
-    ~dst_context_root_dir
+    ~dst_data_dir
     ~chain_name
     ~configured_history_mode
     ~user_activated_upgrades

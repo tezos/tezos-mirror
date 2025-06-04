@@ -1824,10 +1824,8 @@ let context_dirs = ref []
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     ?block_cache_limit ?disable_context_pruning:_ ?maintenance_delay:_
-    ~store_dir ~context_root_dir ~allow_testchains genesis =
-  let context_dir =
-    Tezos_context_ops.Context_ops.context_dir context_root_dir
-  in
+    ~store_dir ~data_dir ~allow_testchains genesis =
+  let context_dir = Tezos_context_ops.Context_ops.context_dir data_dir in
   let open Lwt_result_syntax in
   if List.mem ~equal:String.equal context_dir !context_dirs then
     Format.kasprintf
@@ -1845,16 +1843,13 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
             ~kind:`Memory
             ~readonly:true
             ?patch_context
-            context_root_dir
+            ~data_dir
+            ()
         in
         Lwt.return (context_index, commit_genesis)
     | None ->
         let*! context_index =
-          Context_ops.init
-            ~kind:`Memory
-            ~readonly
-            ?patch_context
-            context_root_dir
+          Context_ops.init ~kind:`Memory ~readonly ?patch_context ~data_dir ()
         in
         let commit_genesis ~chain_id =
           Context_ops.commit_genesis
@@ -1893,7 +1888,7 @@ let close_store global_store =
   Lwt_watcher.shutdown_input global_store.global_block_watcher ;
   Lwt.return_unit
 
-let may_switch_history_mode ~store_dir:_ ~context_root_dir:_ _genesis
+let may_switch_history_mode ~store_dir:_ ~data_dir:_ _genesis
     ~new_history_mode:_ =
   Stdlib.failwith "may_switch_history_mode: unimplemented"
 

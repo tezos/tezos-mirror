@@ -128,7 +128,6 @@ type config = {
   data_dir : string;
   internal_events : Tezos_base.Internal_event_config.t;
   store_root : string;
-  context_root_dir : string;
   protocol_root : string;
   patch_context :
     (Tezos_protocol_environment.Context.t ->
@@ -219,7 +218,6 @@ let create ?(sandboxed = false) ?sandbox_parameters
       data_dir;
       internal_events;
       store_root;
-      context_root_dir;
       protocol_root;
       patch_context;
       p2p = p2p_params;
@@ -257,7 +255,7 @@ let create ?(sandboxed = false) ?sandbox_parameters
           ?patch_context
           ?history_mode
           ~store_dir:store_root
-          ~context_root_dir
+          ~data_dir
           ~allow_testchains:start_testchain
           ~readonly:false
           ~disable_context_pruning
@@ -279,7 +277,6 @@ let create ?(sandboxed = false) ?sandbox_parameters
                    data_dir;
                    readonly = false;
                    genesis;
-                   context_root_dir;
                    protocol_root;
                    sandbox_parameters;
                    user_activated_upgrades;
@@ -299,7 +296,7 @@ let create ?(sandboxed = false) ?sandbox_parameters
           ?history_mode
           ~commit_genesis
           ~store_dir:store_root
-          ~context_root_dir
+          ~data_dir
           ~allow_testchains:start_testchain
           ~readonly:false
           ~disable_context_pruning

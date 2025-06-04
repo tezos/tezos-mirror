@@ -25,7 +25,6 @@
 (*****************************************************************************)
 
 type parameters = {
-  context_root_dir : string;
   protocol_root : string;
   genesis : Genesis.t;
   readonly : bool;

@@ -52,7 +52,6 @@ let init_config (* (f : 'a -> unit -> unit Lwt.t) *) f test_dir switch () :
       internal_events = Tezos_base.Internal_event_config.stdout;
       data_dir = test_dir;
       store_root = test_dir // "store";
-      context_root_dir = test_dir;
       protocol_root = test_dir // "protocol";
       patch_context = None;
       p2p = None;

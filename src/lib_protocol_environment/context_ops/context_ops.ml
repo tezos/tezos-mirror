@@ -91,9 +91,9 @@ let do_not_use__is_duo () =
   | "duo" -> true
   | _ | (exception Not_found) -> false
 
-let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
+let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
   let open Lwt_syntax in
-  let irmin_dir = irmin_context_dir context_root_dir in
+  let irmin_dir = irmin_context_dir data_dir in
   let init_context () =
     let* () = Events.(emit initializing_context) ("irmin", irmin_dir) in
     let patch_context =
@@ -107,7 +107,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
     Context.init ?patch_context ?readonly ?index_log_size irmin_dir
   in
 
-  let brassaia_dir = brassaia_context_dir context_root_dir in
+  let brassaia_dir = brassaia_context_dir data_dir in
   let init_brassaia_context () =
     let* () = Events.(emit initializing_context) ("brassaia", brassaia_dir) in
     let patch_context =
@@ -153,8 +153,10 @@ let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
       Duo_memory_index {irmin_index; brassaia_index}
 
 (* Wrapper over init that uses an environment variable ('TEZOS_CONTEXT_BACKEND')
-   to select the backend between Memory|Brassaia_memory and Disk|Brassaia *)
-let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
+   to select the backend between Memory|Brassaia_memory and Disk|Brassaia.
+   [data_dir] stands for the root directory in which the context directory is
+   expected to be find. *)
+let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
   let open Lwt_syntax in
   (* Gather the initialisation profiling otherwise aggregates will behave
      like records and create a section for each call *)
@@ -168,16 +170,17 @@ let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
             ?patch_context
             ?readonly
             ?index_log_size
-            context_root_dir
+            ~data_dir
+            ()
       | `Memory ->
           init
             ~kind:`Brassaia_memory
             ?patch_context
             ?readonly
             ?index_log_size
-            context_root_dir
-      | _ ->
-          init ~kind ?patch_context ?readonly ?index_log_size context_root_dir)
+            ~data_dir
+            ()
+      | _ -> init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ())
   | "duo" -> (
       match kind with
       | `Disk ->
@@ -187,7 +190,8 @@ let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
             ?patch_context
             ?readonly
             ?index_log_size
-            context_root_dir
+            ~data_dir
+            ()
       | `Memory ->
           let* () = Events.(emit warning_experimental) () in
           init
@@ -195,11 +199,11 @@ let init ~kind ?patch_context ?readonly ?index_log_size context_root_dir =
             ?patch_context
             ?readonly
             ?index_log_size
-            context_root_dir
-      | _ ->
-          init ~kind ?patch_context ?readonly ?index_log_size context_root_dir)
+            ~data_dir
+            ()
+      | _ -> init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ())
   | _ | (exception Not_found) ->
-      init ~kind ?patch_context ?readonly ?index_log_size context_root_dir
+      init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ()
 
 let index (context : Environment_context.t) =
   match[@profiler.span_f {verbosity = Notice} ["context_ops"; "index"]]

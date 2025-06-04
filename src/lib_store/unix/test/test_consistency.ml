@@ -135,7 +135,7 @@ let init_protocols store history_mode =
   return all_proto_levels
 
 let test_protocol_level_consistency_drop_one history_mode nth
-    (store_dir, context_root_dir) store =
+    (store_dir, data_dir) store =
   let open Lwt_result_syntax in
   assert (nth < 5) ;
   let* _ = init_protocols store history_mode in
@@ -164,7 +164,7 @@ let test_protocol_level_consistency_drop_one history_mode nth
       ~patch_context:dummy_patch_context
       ~history_mode
       ~store_dir
-      ~context_root_dir
+      ~data_dir
       ~allow_testchains:true
       genesis
   in
@@ -221,7 +221,7 @@ let check_protocol_levels_availability chain_store ~expected_protocols
   return_unit
 
 let test_protocol_level_consistency_remove_file history_mode
-    (store_dir, context_root_dir) store =
+    (store_dir, data_dir) store =
   let open Lwt_result_syntax in
   let* expected_protocols = init_protocols store history_mode in
   let open Store_types in
@@ -244,7 +244,7 @@ let test_protocol_level_consistency_remove_file history_mode
       ~patch_context:dummy_patch_context
       ~history_mode
       ~store_dir
-      ~context_root_dir
+      ~data_dir
       ~allow_testchains:true
       genesis
   in
