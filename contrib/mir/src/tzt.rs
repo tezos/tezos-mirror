@@ -158,7 +158,7 @@ fn typecheck_stack<'a>(
 
 impl<'a> Parser<'a> {
     /// Parse top-level definition of a TZT test.
-    pub fn parse_tzt_test(&'a self, src: &'a str) -> Result<TztTest, Box<dyn Error + '_>> {
+    pub fn parse_tzt_test(&'a self, src: &'a str) -> Result<TztTest<'a>, Box<dyn Error + 'a>> {
         tztTestEntitiesParser::new()
             .parse(&self.arena, spanned_lexer(src))?
             .try_into()
