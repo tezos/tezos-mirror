@@ -25,7 +25,7 @@
 
 <!-- Explain how to test you MR, preferably manually or by running a test. -->
 
-/assign @ArnaudBihan @brahima.dibassi @jtcoolen @lthms @luciano.freitas @mebsout @pe.cornilleau @phink @rafoo\_ @rodibozman @sribaroud @thomas.plisson
+/assign @ArnaudBihan @brahima.dibassi @jtcoolen @lthms @luciano.freitas @mebsout @phink @rafoo\_ @rodibozman @sribaroud @thomas.plisson
 /unassign me
 
 
