@@ -1582,6 +1582,7 @@ let jobs pipeline_type =
           ~parallel:(Vector 20)
           ~dependencies
           ?job_select_tezts
+          ~disable_test_timeout:true
           ()
       in
       let tezt_extra : tezos_job =

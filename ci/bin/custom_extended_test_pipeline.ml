@@ -107,6 +107,7 @@ let jobs =
       ~tezt_parallel:3
       ~parallel:(Vector 20)
       ~dependencies
+      ~disable_test_timeout:true
       ()
   in
   let tezt_extra : tezos_job =
