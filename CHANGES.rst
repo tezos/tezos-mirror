@@ -45,6 +45,10 @@ Node
 - Fixed a race condition in the external process restart mechanism which would
   prevent the validator from properly restarting. (MR :gl:`!15322`)
 
+- Small mempool optimization: conflicts between two valid consensus
+  operations are now always resolved in favor of the preexisting
+  operation, regardless of contents. (MR :gl:`!18208`)
+
 Client
 ------
 
