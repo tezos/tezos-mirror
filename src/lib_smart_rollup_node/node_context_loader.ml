@@ -84,7 +84,9 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
   let* () = update_metadata metadata ~data_dir in
   let* store = Node_context.Node_store.init store_access ~data_dir in
   let dal_cctxt =
-    Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
+    Option.map
+      Tezos_dal_node_lib.Dal_node_client.make_unix_cctxt
+      dal_node_endpoint
   in
   let*? (module Plugin : Protocol_plugin_sig.S) =
     Protocol_plugins.proto_plugin_for_protocol current_protocol.hash

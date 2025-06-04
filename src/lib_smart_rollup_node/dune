@@ -46,7 +46,8 @@
   octez-l2-libs.octez-smart-rollup-node-lib.store
   octez-crawler
   octez-libs.tezos-workers
-  octez-l2-libs.smart-rollup)
+  octez-l2-libs.smart-rollup
+  octez-l2-libs.scoru-wasm-fast)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -55,7 +56,6 @@
   -open Tezos_crypto
   -open Tezos_client_base
   -open Tezos_client_base_unix
-  -open Tezos_dal_node_lib
   -open Octez_injector
   -open Tezos_version_value
   -open Tezos_layer2_store

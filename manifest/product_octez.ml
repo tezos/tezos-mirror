@@ -5462,7 +5462,7 @@ let octez_smart_rollup_node_lib =
         octez_openapi;
         octez_node_config;
         prometheus_app;
-        octez_dal_node_lib |> open_;
+        octez_dal_node_lib;
         octez_injector_lib |> open_;
         octez_version_value |> open_;
         octez_layer2_store |> open_;
@@ -5470,6 +5470,7 @@ let octez_smart_rollup_node_lib =
         octez_crawler |> open_;
         octez_workers |> open_;
         octez_smart_rollup_lib |> open_;
+        octez_scoru_wasm_fast;
       ]
 
 let wasm_helpers_intf_modules = ["wasm_utils_intf"]

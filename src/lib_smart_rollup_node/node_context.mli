@@ -89,7 +89,7 @@ type 'a t = {
   config : Configuration.t;  (** Inlined configuration for the rollup node. *)
   cctxt : Client_context.full;  (** Client context used by the rollup node. *)
   degraded : bool Reference.rw;  (** Track if node running in degraded mode. *)
-  dal_cctxt : Dal_node_client.cctxt option;
+  dal_cctxt : Tezos_dal_node_lib.Dal_node_client.cctxt option;
       (** DAL client context to query the dal node, if the rollup node supports
           the DAL. *)
   data_dir : string;  (** Node data dir. *)

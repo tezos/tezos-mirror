@@ -92,7 +92,7 @@ type 'a t = {
   config : Configuration.t;
   cctxt : Client_context.full;
   degraded : bool Reference.rw;
-  dal_cctxt : Dal_node_client.cctxt option;
+  dal_cctxt : Tezos_dal_node_lib.Dal_node_client.cctxt option;
   data_dir : string;
   l1_ctxt : Layer1.t;
   genesis_info : genesis_info;

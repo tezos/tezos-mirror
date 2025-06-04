@@ -933,3 +933,282 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
   let* () = Node_context.save_protocols_from_l1 node_ctxt in
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer state in
   run state
+
+module Replay = struct
+  let preload_wasmer node_ctxt l2_block =
+    let open Lwt_result_syntax in
+    match node_ctxt.Node_context.kind with
+    | Example_arith | Riscv -> return_unit
+    | Wasm_2_0_0 ->
+        Format.eprintf
+          "Preloading \
+           kernel............................................................. \
+           %!" ;
+        let* () =
+          Wasm_2_0_0_utilities.preload_kernel
+            node_ctxt
+            l2_block.Sc_rollup_block.header
+        in
+        Format.eprintf "[\x1B[1;32mOK\x1B[0m]@." ;
+        return_unit
+
+  let mk_node_ctxt ~data_dir cctxt block =
+    let open Lwt_result_syntax in
+    let* store = Store.init Read_only ~data_dir in
+    let opt_get msg = function
+      | None -> error_with "Could not find %s" msg
+      | Some s -> Ok s
+    in
+    let* level =
+      match block with
+      | `Hash h ->
+          let* l = Store.L2_blocks.find_level store h in
+          let*? l = opt_get "level" l in
+          return l
+      | `Level l -> return l
+    in
+    let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+    let*? metadata =
+      match metadata with
+      | None -> error_with "Missing metadata file for snapshot node context"
+      | Some m -> Ok m
+    in
+    let* protocol = Store.Protocols.proto_of_level store level in
+    let*? protocol = opt_get "protocol" protocol in
+    Format.eprintf "Using protocol %a@." Protocol_hash.pp protocol.protocol ;
+    let*? (module Plugin) =
+      Protocol_plugins.proto_plugin_for_protocol protocol.protocol
+    in
+    let*! () = Store.close store in
+    let* constants =
+      Plugin.Layer1_helpers.retrieve_constants ~block:(`Level level) cctxt
+    in
+    let*? l1_ctxt =
+      Layer1.create
+        ~name:"sc_rollup_node_replay"
+        ~reconnection_delay:1.
+        ~l1_blocks_cache_size:2
+        cctxt
+    in
+    let config_file = Configuration.config_filename ~data_dir None in
+    let* configuration =
+      Configuration.Cli.create_or_read_config
+        ~config_file
+        ~rpc_addr:None
+        ~rpc_port:None
+        ~acl_override:None
+        ~metrics_addr:None
+        ~disable_performance_metrics:false
+        ~loser_mode:None
+        ~reconnection_delay:None
+        ~dal_node_endpoint:None
+        ~pre_images_endpoint:None
+        ~injector_retention_period:None
+        ~injector_attempts:None
+        ~injection_ttl:None
+        ~mode:None
+        ~sc_rollup_address:None
+        ~boot_sector_file:None
+        ~operators:[]
+        ~index_buffer_size:None
+        ~irmin_cache_size:None
+        ~log_kernel_debug:true
+        ~unsafe_disable_wasm_kernel_checks:false
+        ~no_degraded:true
+        ~gc_frequency:None
+        ~history_mode:None
+        ~allowed_origins:None
+        ~allowed_headers:None
+        ~apply_unsafe_patches:false
+        ~bail_on_disagree:false
+    in
+    Node_context_loader.init
+      cctxt
+      ~data_dir
+      ~irmin_cache_size:10
+      ~store_access:Read_only
+      ~context_access:Read_only
+      l1_ctxt
+      metadata.genesis_info
+      ~lcc:{commitment = Commitment.Hash.zero; level = 0l}
+      ~lpc:None
+      metadata.kind
+      {hash = protocol.protocol; proto_level = protocol.proto_level; constants}
+      configuration
+
+  let process_time_treshold =
+    Ptime.Span.of_float_s 0.5 |> WithExceptions.Option.get ~loc:__LOC__
+
+  let replay_block_aux ?(preload = false) ?(verbose = false) node_ctxt block =
+    let open Lwt_result_syntax in
+    let* hash, level =
+      match block with
+      | `Level l ->
+          let+ h = Node_context.hash_of_level node_ctxt l in
+          (h, l)
+      | `Hash h ->
+          let+ l = Node_context.level_of_hash node_ctxt h in
+          (h, l)
+    in
+    let* block = Node_context.get_full_l2_block node_ctxt hash in
+    let* () = when_ preload @@ fun () -> preload_wasmer node_ctxt block in
+    let start_timestamp = Time.System.now () in
+    if verbose then
+      Format.eprintf
+        "@[<v 2>\x1B[1mReplaying block: \x1B[0m@,%a@,@]@."
+        Data_encoding.Json.pp
+        (Data_encoding.Json.construct Sc_rollup_block.full_encoding block)
+    else
+      Format.eprintf
+        "\x1B[1mReplaying block \x1B[1;36m%ld\x1B[0m (%a)  %!"
+        level
+        Block_hash.pp
+        hash ;
+    let* rollup_ctxt =
+      Node_context.checkout_context node_ctxt block.header.predecessor
+    in
+    let* (module Plugin) =
+      Protocol_plugins.proto_plugin_for_level node_ctxt block.header.level
+    in
+    let* ctxt, _num_messages, num_ticks, initial_tick =
+      Interpreter.process_head
+        (module Plugin)
+        node_ctxt
+        rollup_ctxt
+        ~predecessor:
+          Layer1.
+            {
+              level = Int32.pred block.header.level;
+              hash = block.header.predecessor;
+            }
+        Layer1.{level = block.header.level; hash = block.header.block_hash}
+        (block.content.inbox, block.content.messages)
+    in
+    let get_pvm_state ctxt =
+      let*! pvm_state = Context.PVMState.find ctxt in
+      let*? pvm_state =
+        match pvm_state with
+        | Some pvm_state -> Ok pvm_state
+        | None ->
+            error_with
+              "PVM state at level %ld is not available"
+              block.header.level
+      in
+      let*! compressed_state = Plugin.Pvm.state_hash node_ctxt.kind pvm_state in
+      return compressed_state
+    in
+    let* commitment =
+      Publisher.create_commitment_if_necessary
+        (module Plugin)
+        node_ctxt
+        block.header.level
+        ~predecessor:block.header.predecessor
+        ctxt
+    in
+    let commitment_hash = Option.map Commitment.hash commitment in
+    let stop_timestamp = Time.System.now () in
+    let time = Ptime.diff stop_timestamp start_timestamp in
+    let* stored_commitment =
+      Option.map_es
+        (fun c -> Node_context.get_commitment node_ctxt c)
+        block.header.commitment_hash
+    in
+    let* block_ctxt =
+      Node_context.checkout_context node_ctxt block.header.block_hash
+    in
+    let failed = ref false in
+    if num_ticks <> block.num_ticks then (
+      Format.eprintf
+        "Computed block has %Ld ticks but stored as %Ld ticks@."
+        num_ticks
+        block.num_ticks ;
+      failed := true) ;
+    if Z.Compare.(initial_tick <> block.initial_tick) then (
+      Format.eprintf
+        "Computed block starts with initial tick %a but stored with initial \
+         tick %a@."
+        Z.pp_print
+        initial_tick
+        Z.pp_print
+        block.initial_tick ;
+      failed := true) ;
+    let pp_opt pp fmt = function
+      | None -> Format.pp_print_string fmt "None"
+      | Some a -> pp fmt a
+    in
+    if
+      not
+      @@ Option.equal
+           Commitment.Hash.equal
+           commitment_hash
+           block.header.commitment_hash
+    then (
+      Format.eprintf
+        "Computed block has commitment %a but stored with commitment %a@."
+        (pp_opt Commitment.pp)
+        commitment
+        (pp_opt Commitment.pp)
+        stored_commitment ;
+      failed := true) ;
+    let* pvm_state = get_pvm_state ctxt in
+    let* stored_pvm_state = get_pvm_state block_ctxt in
+    if State_hash.(pvm_state <> stored_pvm_state) then (
+      Format.eprintf
+        "Computed block has PVM state %a but stored with PVM state %a@."
+        State_hash.pp
+        pvm_state
+        State_hash.pp
+        stored_pvm_state ;
+      failed := true) ;
+
+    if !failed then failwith "Replayed block differed from the one on disk"
+    else
+      let block_time =
+        (Reference.get node_ctxt.current_protocol).constants.minimal_block_delay
+        |> Int64.to_float
+      in
+      let color_time =
+        let time_f = Ptime.Span.to_float_s time in
+        if time_f > 2. *. block_time then "\x1B[1;7;31m"
+        else if time_f > block_time then "\x1B[1;31m"
+        else if time_f > block_time /. 2. then "\x1B[31m"
+        else if time_f > block_time /. 5. then "\x1B[33m"
+        else "\x1B[0m"
+      in
+      if not verbose then
+        Format.eprintf
+          "[\x1B[1;32mOK\x1B[0m] %s %a \x1B[0m@."
+          color_time
+          Ptime.Span.pp
+          time
+      else
+        Format.eprintf
+          "\x1B[32mReplayed block %ld \x1B[1msuccessfully\x1B[0m in \
+           %s%a\x1B[0m!@."
+          level
+          color_time
+          Ptime.Span.pp
+          time ;
+      return_unit
+
+  let replay_block ~data_dir cctxt block =
+    let open Lwt_result_syntax in
+    let* node_ctxt = mk_node_ctxt ~data_dir cctxt block in
+    replay_block_aux ~preload:true ~verbose:true node_ctxt block
+
+  let replay_blocks ~data_dir cctxt start_level end_level =
+    let open Lwt_result_syntax in
+    let* node_ctxt = mk_node_ctxt ~data_dir cctxt (`Level start_level) in
+    let levels =
+      Stdlib.List.init
+        (Int32.sub end_level start_level |> Int32.to_int |> succ)
+        (fun x -> Int32.add (Int32.of_int x) start_level)
+    in
+    let first = ref true in
+    List.iter_es
+      (fun l ->
+        let preload = !first in
+        first := false ;
+        replay_block_aux ~preload node_ctxt (`Level l))
+      levels
+end
