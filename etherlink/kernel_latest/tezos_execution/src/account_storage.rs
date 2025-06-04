@@ -178,10 +178,10 @@ impl TezlinkImplicitAccount {
         host: &mut impl Runtime,
         context: &context::Context,
         contract: &Contract,
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<bool, tezos_storage::error::Error> {
         let mut account = Self::from_contract(context, contract)?;
         if account.allocated(host)? {
-            return Ok(());
+            return Ok(true);
         }
         account.set_balance(host, &0_u64.into())?;
         // Only implicit accounts have counter and manager keys
@@ -190,7 +190,7 @@ impl TezlinkImplicitAccount {
             account.set_counter(host, &0u64.into())?;
             account.set_manager_public_key_hash(host, pkh)?;
         }
-        Ok(())
+        Ok(false)
     }
 }
 
