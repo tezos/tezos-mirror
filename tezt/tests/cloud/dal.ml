@@ -5,6 +5,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Prerequisite:
+
+   In order to be able to run the following test successfully, you need to make
+   sure that your environment is well configured. To do so, have a look at the
+   tezt/lib_cloud/README.md documentation.
+
+   Additionally, if you are running the test you must ensure that:
+   - DAL_TRUSTED_SETUP_PATH contains the expected data -- this can be done by
+     running `./scripts/install_dal_trusted_setup.sh`
+   - smart rollup binaries are available -- requires to run `make -f kernels.mk
+     build-deps` and `make -f kernels.mk kernel_sdk`
+*)
+
 module Cryptobox = Dal_common.Cryptobox
 module Helpers = Dal_common.Helpers
 module Cli = Scenarios_cli
