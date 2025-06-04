@@ -114,10 +114,12 @@ module Dal = struct
 
   let fetch_trusted_setup = arg_to_clic fetch_trusted_setup_arg
 
+  let disable_shard_validation = switch_to_clic disable_shard_validation_switch
+
   let verbose = switch_to_clic verbose_switch
 
   let args =
-    Tezos_clic.args20
+    Tezos_clic.args21
       data_dir
       rpc_addr
       expected_pow
@@ -136,6 +138,7 @@ module Dal = struct
       service_name
       service_namespace
       fetch_trusted_setup
+      disable_shard_validation
       verbose
       ignore_l1_config_peers
 
@@ -167,6 +170,7 @@ module Dal = struct
             service_name,
             service_namespace,
             fetch_trusted_setup,
+            disable_shard_validation,
             verbose,
             ignore_l1_config_peers )
           _cctxt
@@ -195,6 +199,7 @@ module Dal = struct
               service_name
               service_namespace
               fetch_trusted_setup
+              disable_shard_validation
               verbose
               ignore_l1_config_peers
           in

@@ -222,7 +222,8 @@ let update_and_register_profiles ctxt =
   let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
   return_unit
 
-let run ?(disable_logging = false) ~data_dir ~configuration_override () =
+let run ?(disable_logging = false) ?(disable_shard_validation = false) ~data_dir
+    ~configuration_override () =
   let open Lwt_result_syntax in
   let*! () =
     if disable_logging then Lwt.return_unit
@@ -429,6 +430,10 @@ let run ?(disable_logging = false) ~data_dir ~configuration_override () =
   (* Set crypto box share size hook. *)
   Value_size_hooks.set_share_size
     (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
+  let*! () =
+    if disable_shard_validation then Event.emit_shard_validation_is_disabled ()
+    else Lwt.return_unit
+  in
   let ctxt =
     Node_context.init
       config
@@ -442,6 +447,8 @@ let run ?(disable_logging = false) ~data_dir ~configuration_override () =
       cctxt
       ~last_finalized_level:head_level
       ~network_name
+      ~disable_shard_validation
+      ()
   in
   let* () =
     match Profile_manager.get_profiles profile_ctxt with
