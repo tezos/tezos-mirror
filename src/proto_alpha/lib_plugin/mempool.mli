@@ -99,15 +99,17 @@ val pre_filter :
 (** Return a conflict handler for {!Protocol.Mempool.add_operation}
     (see {!Protocol.Mempool.conflict_handler}).
 
-    For non-manager operations, select the greater operation according
-    to {!Protocol.Alpha_context.Operation.compare}.
+    - Preattestations and attestations are never replaced.
 
-    A manager operation is replaced only when the new operation's fee
-    and fee/gas ratio both exceed (or match) the old operation's metrics
-    multiplied by the [replace_by_fee] factor specified in the {!config}.
+    - For other non-manager operations, select the greater operation
+      according to {!Protocol.Alpha_context.Operation.compare}.
 
-    Precondition: both operations must be individually valid (to be
-    able to call {!Protocol.Alpha_context.Operation.compare}). *)
+    - A manager operation is replaced only when the new operation's
+      fee and fee/gas ratio both exceed (or match) the old operation's
+      metrics multiplied by the [replace_by_fee] factor specified in the
+      {!config}.
+
+    Precondition: both operations must be individually valid. *)
 val conflict_handler : config -> Protocol.Mempool.conflict_handler
 
 (** The purpose of this module is to provide the
