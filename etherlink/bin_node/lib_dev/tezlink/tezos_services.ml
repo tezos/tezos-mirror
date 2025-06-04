@@ -271,20 +271,112 @@ end
 (* TODO: #7875
    Import from the protocol once it is exposed instead of copying it here. *)
 module Constants_services = struct
-  module RPC_path = Tezos_rpc.Path
-  module RPC_service = Tezos_rpc.Service
-  module RPC_query = Tezos_rpc.Query
-
-  let custom_root =
-    (RPC_path.(open_root / "context" / "constants")
-      : tezlink_rpc_context RPC_path.context)
+  let custom_root : tezlink_rpc_context Tezos_rpc.Path.context =
+    Tezos_rpc.Path.(open_root / "context" / "constants")
 
   let all =
-    RPC_service.get_service
+    let open Tezos_rpc in
+    Service.get_service
       ~description:"All constants"
-      ~query:RPC_query.empty
+      ~query:Query.empty
       ~output:Alpha_context.Constants.encoding
       custom_root
+end
+
+(* Copied from src/proto_alpha/lib_plugin/adaptive_issuance_services.ml. *)
+(* TODO: #7875
+   It's exposed in proto_alpha, but not in the plugin of Rio. Import when we
+   move to a protocol that exposes it. *)
+module Adaptive_issuance_services = struct
+  module Cycle = Protocol_types.Cycle
+  module Tez = Tezos_types.Tez
+
+  type expected_rewards = {
+    cycle : Cycle.t;
+    baking_reward_fixed_portion : Tez.t;
+    baking_reward_bonus_per_slot : Tez.t;
+    attesting_reward_per_slot : Tez.t;
+    dal_attesting_reward_per_shard : Tez.t;
+    seed_nonce_revelation_tip : Tez.t;
+    vdf_revelation_tip : Tez.t;
+  }
+
+  let dummy_reward i =
+    {
+      cycle = i;
+      baking_reward_fixed_portion = Tez.one;
+      baking_reward_bonus_per_slot = Tez.one;
+      attesting_reward_per_slot = Tez.one;
+      dal_attesting_reward_per_shard = Tez.one;
+      seed_nonce_revelation_tip = Tez.one;
+      vdf_revelation_tip = Tez.one;
+    }
+
+  let consensus_rights_delay =
+    Tezlink_constants.all_constants.parametric.consensus_rights_delay
+
+  let dummy_rewards current_cycle =
+    List.init ~when_negative_length:[] (consensus_rights_delay + 1) (fun i ->
+        dummy_reward Cycle.(add (of_int32_exn current_cycle) i))
+
+  let expected_rewards_encoding : expected_rewards Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {
+             cycle;
+             baking_reward_fixed_portion;
+             baking_reward_bonus_per_slot;
+             attesting_reward_per_slot;
+             dal_attesting_reward_per_shard;
+             seed_nonce_revelation_tip;
+             vdf_revelation_tip;
+           } ->
+        ( cycle,
+          baking_reward_fixed_portion,
+          baking_reward_bonus_per_slot,
+          attesting_reward_per_slot,
+          seed_nonce_revelation_tip,
+          vdf_revelation_tip,
+          dal_attesting_reward_per_shard ))
+      (fun ( cycle,
+             baking_reward_fixed_portion,
+             baking_reward_bonus_per_slot,
+             attesting_reward_per_slot,
+             seed_nonce_revelation_tip,
+             vdf_revelation_tip,
+             dal_attesting_reward_per_shard ) ->
+        {
+          cycle;
+          baking_reward_fixed_portion;
+          baking_reward_bonus_per_slot;
+          attesting_reward_per_slot;
+          dal_attesting_reward_per_shard;
+          seed_nonce_revelation_tip;
+          vdf_revelation_tip;
+        })
+      (obj7
+         (req "cycle" Cycle.encoding)
+         (req "baking_reward_fixed_portion" Tez.encoding)
+         (req "baking_reward_bonus_per_slot" Tez.encoding)
+         (req "attesting_reward_per_slot" Tez.encoding)
+         (req "seed_nonce_revelation_tip" Tez.encoding)
+         (req "vdf_revelation_tip" Tez.encoding)
+         (req "dal_attesting_reward_per_shard" Tez.encoding))
+
+  let expected_issuance_path =
+    let open Tezos_rpc in
+    (Path.(open_root / "context" / "issuance" / "expected_issuance")
+      : tezlink_rpc_context Path.context)
+
+  let expected_issuance =
+    let open Tezos_rpc in
+    Service.get_service
+      ~description:
+        "Returns the expected issued tez for the provided block and the next \
+         'consensus_rights_delay' cycles (in mutez)"
+      ~query:Query.empty
+      ~output:(Data_encoding.list expected_rewards_encoding)
+      expected_issuance_path
 end
 
 (* This is where we import service declarations from the protocol. *)
@@ -397,7 +489,7 @@ module Imported_services = struct
         unit,
         unit,
         Block_hash.t * Time.Protocol.t )
-      Constants_services.RPC_service.t =
+      Tezos_rpc.Service.t =
     import_service Tezos_shell_services.Monitor_services.S.bootstrapped
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
@@ -411,7 +503,7 @@ module Imported_services = struct
         int32 option * Alpha_context.packed_operation * Chain_id.t * int,
         Alpha_context.packed_protocol_data * Imported_protocol.operation_receipt
       )
-      Constants_services.RPC_service.t =
+      Tezos_rpc.Service.t =
     import_service Imported_protocol_plugin.RPC.Scripts.S.simulate_operation
 
   let monitor_heads :
@@ -546,6 +638,11 @@ let register_block_services ~l2_chain_id
            let*? block = check_block block in
            Backend.block_hash chain block)
          ~convert_output:Protocol_types.ethereum_to_tezos_block_hash
+    |> register
+         ~service:Adaptive_issuance_services.expected_issuance
+         ~impl:(fun _ () () ->
+           (* The mock assumes we stay in cycle 0 for now *)
+           Lwt.return @@ Adaptive_issuance_services.dummy_rewards Int32.zero)
     |> register
        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
        (* We need a proper implementation *)
