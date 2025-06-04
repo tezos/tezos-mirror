@@ -15,6 +15,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
 mod bin;
+mod constraints;
 mod enc;
 mod encoding;
 mod make;

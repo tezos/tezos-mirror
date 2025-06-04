@@ -18,11 +18,6 @@ version = "0.6.0"
 path = "./encoding-derive"
 default-features = false
 
-[workspace.dependencies.tezos_crypto_rs]
-version = "0.6.0"
-path = "./crypto"
-default-features = false
-
 [workspace.dependencies.nom]
 version = "7.1"
 
