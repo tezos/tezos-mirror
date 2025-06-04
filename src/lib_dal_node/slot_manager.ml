@@ -30,6 +30,8 @@ type error +=
   | Invalid_slot_size of {provided : int; expected : int}
   | Invalid_degree of string
   | No_prover_SRS
+  | Unable_to_fetch_the_commitment_of_slot_id of Types.Slot_id.t
+  | No_commitment_published_on_l1_for_slot_id of Types.Slot_id.t
 
 let () =
   register_error_kind
@@ -105,7 +107,46 @@ let () =
          or observer) to be able to compute proofs.")
     Data_encoding.empty
     (function No_prover_SRS -> Some () | _ -> None)
-    (fun () -> No_prover_SRS)
+    (fun () -> No_prover_SRS) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.unable_to_fetch_the_commitment_of_slot_id"
+    ~title:"Unable to fetch the commitment of slot id"
+    ~description:
+      "The node is unable to fetch the commitment of the given slot id."
+    ~pp:(fun ppf (published_level, slot_index) ->
+      Format.fprintf
+        ppf
+        "The node is unable to retrieve the commitment of the slot published \
+         at level %ld and index %d from memory, SQLite store or the L1 \
+         context."
+        published_level
+        slot_index)
+    Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
+    (function
+      | Unable_to_fetch_the_commitment_of_slot_id id ->
+          Some (id.slot_level, id.slot_index)
+      | _ -> None)
+    (fun (slot_level, slot_index) ->
+      Unable_to_fetch_the_commitment_of_slot_id {slot_level; slot_index}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.No_commitment_published_on_l1_for_slot_id"
+    ~title:"No commitment published on L1 for slot id"
+    ~description:"No commitment was published on L1 for the given slot id."
+    ~pp:(fun ppf (published_level, slot_index) ->
+      Format.fprintf
+        ppf
+        "There is no commitment published on L1 at level %ld and index %d."
+        published_level
+        slot_index)
+    Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
+    (function
+      | No_commitment_published_on_l1_for_slot_id id ->
+          Some (id.slot_level, id.slot_index)
+      | _ -> None)
+    (fun (slot_level, slot_index) ->
+      No_commitment_published_on_l1_for_slot_id {slot_level; slot_index})
 
 type slot = bytes
 
@@ -271,9 +312,173 @@ let try_fetch_slot_from_http_backup ~slot_size ~published_level ~slot_index
         in
         return_none
 
-let get_commitment_from_slot_id _ctxt _slot_id =
-  (* TODO in follow-up MRs *)
-  assert false
+(* Attempt to retrieve the commitment associated with [slot_id] from the
+   in-memory finalized commitments store.
+
+   This function queries the local in-memory cache that holds the finalized
+   commitments for previously published slots. It is typically faster than
+   accessing the on-disk skip list or querying the L1 context.
+
+   Returns [Some commitment] if a commitment for the given [slot_id] is found in
+   memory, [None] otherwise. *)
+let try_get_commitment_of_slot_id_from_memory ctxt slot_id =
+  let store = Node_context.get_store ctxt in
+  Store.Slot_id_cache.find_opt (Store.finalized_commitments store) slot_id
+
+(* Try to retrieve the slot header associated with [slot_id], based on the local
+   skip list cell stored in the SQLite store.
+
+   Steps:
+   - Fetch the skip list cell for the given [attested_level] and slot index from
+     the SQLite store.
+   - Decode the cell using the DAL plugin.
+   - Return the extracted slot header, if available.
+
+    Returns [None] if the cell is not found in the store. *)
+let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
+    ctxt ~attested_level slot_id =
+  let open Lwt_result_syntax in
+  let* cell_bytes_opt =
+    Store.Skip_list_cells.find_by_slot_id_opt
+      (Node_context.get_store ctxt)
+      ~attested_level
+      ~slot_index:slot_id.Types.Slot_id.slot_index
+  in
+  match cell_bytes_opt with
+  | None -> return_none
+  | Some cell_bytes ->
+      Dal_proto_types.Skip_list_cell.to_proto
+        Plugin.Skip_list.cell_encoding
+        cell_bytes
+      |> Plugin.Skip_list.slot_header_of_cell |> return
+
+(* Retrieve the slot header for [slot_id] by accessing the skip list cells
+   produced during [attested_level] and stored in in the L1 context).
+
+   Steps:
+   - Retrieve the skip list cells for [attested_level] using the plugin from L1.
+   - Locate the one matching the [slot_index] of [slot_id].
+   - Extract and return the slot header via the plugin. *)
+let try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
+    ~dal_constants ~attested_level slot_id =
+  let open Lwt_result_syntax in
+  let Types.Slot_id.{slot_level; slot_index} = slot_id in
+  let* cells_of_level =
+    let pred_published_level = Int32.pred slot_level in
+    Plugin.Skip_list.cells_of_level
+      ~attested_level
+      (Node_context.get_tezos_node_cctxt ctxt)
+      ~dal_constants
+      ~pred_publication_level_dal_constants:
+        (lazy
+          (Lwt.return
+          @@ Node_context.get_proto_parameters
+               ctxt
+               ~level:(`Level pred_published_level)))
+  in
+  match
+    List.find_all
+      (fun (_hash, _cell, cell_slot_index) -> cell_slot_index = slot_index)
+      cells_of_level
+  with
+  | [(_cell_hash, cell, _slot_index)] ->
+      Plugin.Skip_list.slot_header_of_cell cell |> return
+  | _ ->
+      (* This should not happen (unless the slot index is not valid). In fact,
+         the skip list delta for a level contains exactly [number_of_slots]
+         items: one per slot index. *)
+      let number_of_slots = dal_constants.number_of_slots in
+      if slot_index < 0 || slot_index >= number_of_slots then
+        tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
+      else (* Should not be reachable *)
+        assert false
+
+(* Attempt to retrieve the commitment hash associated with the published slot
+   header identified by [slot_id].
+
+   Retrieval order:
+    1. Attempt to get the header from the local SQLite skip list.
+    2. If not found, fall back to fetching it from the L1 skip list context.
+
+    Returns [Some commitment] if found and matches the [slot_id], [None]
+    otherwise. Performs assertions to ensure the returned slot header matches
+    the requested [slot_id]. *)
+let try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt dal_constants
+    slot_id ~attested_level =
+  let open Lwt_result_syntax in
+  let*! published_slot_header_opt =
+    let*! from_sqlite =
+      try_get_slot_header_from_indexed_skip_list
+        dal_plugin
+        ctxt
+        ~attested_level
+        slot_id
+    in
+    match from_sqlite with
+    | Ok (Some _header as res) -> return res
+    | _ ->
+        try_get_slot_header_from_L1_skip_list
+          dal_plugin
+          ctxt
+          ~dal_constants
+          ~attested_level
+          slot_id
+  in
+  match published_slot_header_opt with
+  | Ok (Some Dal_plugin.{published_level; slot_index; commitment}) ->
+      (* These invariants are expected to hold by design. *)
+      assert (Int32.equal published_level slot_id.slot_level) ;
+      assert (Int.equal slot_index slot_id.slot_index) ;
+      return_some commitment
+  | Ok None ->
+      (* The function(s) above succeeded, but nothing was found as "published". *)
+      return_none
+  | Error error -> tzfail error
+
+(* This function attempts to retrieve the commitment associated to a (published)
+   slot whose id is given in [slot_id]. For that, we check in various places:
+   in-memory store, sqlite3 skip lists store, and L1 context. *)
+let get_commitment_from_slot_id ctxt slot_id =
+  let open Lwt_result_syntax in
+  match try_get_commitment_of_slot_id_from_memory ctxt slot_id with
+  | Some res -> return res
+  | None -> (
+      let published_level = slot_id.Types.Slot_id.slot_level in
+      let*? dal_plugin, dal_constants =
+        Node_context.get_plugin_and_parameters_for_level
+          ctxt
+          ~level:published_level
+      in
+      let attested_level =
+        Int32.add
+          published_level
+          (Int32.of_int dal_constants.Types.attestation_lag)
+      in
+      let*! res =
+        try_get_commitment_of_slot_id_from_skip_list
+          dal_plugin
+          ctxt
+          dal_constants
+          slot_id
+          ~attested_level
+      in
+      match res with
+      | Ok (Some res) -> return res
+      | Ok None ->
+          (* Here, we managed to fetch the skip list cell, but nothing was
+             published at the given slot id. *)
+          tzfail @@ No_commitment_published_on_l1_for_slot_id slot_id
+      | Error error ->
+          (* Here, we encountered an error which could be due to various
+             reasons, like not having sufficient L1 history to fetch the skip
+             list cell. *)
+          let*! () =
+            Event.emit_failed_to_retrieve_commitment_of_slot_id
+              ~published_level:slot_id.slot_level
+              ~slot_index:slot_id.slot_index
+              ~error
+          in
+          Unable_to_fetch_the_commitment_of_slot_id slot_id |> tzfail)
 
 let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
   let open Lwt_result_syntax in
@@ -287,8 +492,11 @@ let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
       (* We fetch the expected commitment hash from the published slot header on
          L1 if [trust_http_backup_uris] is false. *)
       let* expected_commitment_hash =
-        if config.trust_http_backup_uris then return_none
-        else get_commitment_from_slot_id ctxt slot_id
+        (if config.trust_http_backup_uris then return_none
+         else
+           let+ res = get_commitment_from_slot_id ctxt slot_id in
+           Option.some res)
+        |> Errors.other_lwt_result
       in
       let* slot_opt =
         List.find_map_es
