@@ -69,6 +69,17 @@ impl TezlinkImplicitAccount {
         Ok(path.into())
     }
 
+    pub fn from_public_key_hash(
+        context: &context::Context,
+        pkh: &PublicKeyHash,
+    ) -> Result<Self, tezos_storage::error::Error> {
+        let index = context::contracts::index(context)?;
+        // The conversion from pkh to contract should always succeed
+        let contract = Contract::Implicit(pkh.clone());
+        let path = concat(&index, &account_path(&contract)?)?;
+        Ok(path.into())
+    }
+
     /// Get the **counter** for the Tezlink account.
     pub fn counter(
         &self,

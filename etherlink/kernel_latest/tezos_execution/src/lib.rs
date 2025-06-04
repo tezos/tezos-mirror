@@ -7,7 +7,7 @@ use tezos_crypto_rs::{base58::FromBase58CheckError, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_tezlink::{
     operation::{ManagerOperation, Operation, OperationContent},
     operation_result::{
@@ -137,9 +137,7 @@ pub fn apply_operation<Host: Runtime>(
         source
     );
 
-    let contract = Contract::from_b58check(&source.to_b58check())?;
-    let mut account =
-        account_storage::TezlinkImplicitAccount::from_contract(context, &contract)?;
+    let mut account = TezlinkImplicitAccount::from_public_key_hash(context, source)?;
 
     log!(host, Debug, "Verifying that the operation is valid");
 
