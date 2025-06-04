@@ -151,8 +151,8 @@ type legacy_transaction_object = {
   transactionIndex : quantity option;
   value : quantity;
   v : quantity;
-  r : hex;
-  s : hex;
+  r : quantity;
+  s : quantity;
 }
 
 val legacy_transaction_object_encoding :

@@ -25,8 +25,8 @@ type object_fields = {
   nonce : quantity;
   value : quantity;
   v : quantity;
-  r : hex;
-  s : hex;
+  r : quantity;
+  s : quantity;
 }
 
 (** This is the merge of a {!Transaction_receipt.t} and

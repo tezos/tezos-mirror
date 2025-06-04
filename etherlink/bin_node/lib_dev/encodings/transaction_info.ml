@@ -25,8 +25,8 @@ type object_fields = {
   nonce : quantity;
   value : quantity;
   v : quantity;
-  r : hex;
-  s : hex;
+  r : quantity;
+  s : quantity;
 }
 
 type t = {
@@ -162,5 +162,5 @@ let object_fields_encoding =
        (req "nonce" quantity_encoding)
        (req "value" quantity_encoding)
        (req "v" quantity_encoding)
-       (req "r" hex_encoding)
-       (req "s" hex_encoding))
+       (req "r" quantity_encoding)
+       (req "s" quantity_encoding))
