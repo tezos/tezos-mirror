@@ -143,10 +143,9 @@ as explained in :doc:`./services`.
 
 To remove the Octez packages you can simply run the following command.
 
-.. literalinclude:: install-bin-deb.sh
-   :language: shell
-   :start-after: [test autopurge]
-   :end-before: [check autopurge]
+::
+
+  sudo apt-get autopurge -y octez-baker
 
 If migrating from Serokell packages you can check out migration documentation
 :doc:`./serokell`.
@@ -201,16 +200,20 @@ as in ``export distribution=RC/rockylinux``
 
 Then, to install the binaries, run the following commands:
 
-.. literalinclude:: install-bin-rpm.sh
-   :language: shell
-   :start-after: [install octez]
-   :end-before: [end install octez]
+::
+
+  dnf -y install octez-node
+  dnf -y install octez-client
+  dnf -y install octez-baker
+  dnf -y install octez-dal-node
+  dnf -y install octez-smart-rollup-node
 
 To remove the Octez packages you can simply run the following command.
 
-.. literalinclude:: install-bin-rpm.sh
-   :language: shell
-   :start-after: [test autopurge]
+::
+
+  dnf -y remove octez-node octez-client octez-baker \
+                octez-dal-node octez-smart-rollup-node
 
 To upgrade packages, use ``dnf update``.
 If runnning Octez as services, see also how to :ref:`restart them <services_upgrade>`.

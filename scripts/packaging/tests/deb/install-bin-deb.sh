@@ -79,3 +79,23 @@ fi
 # This file include the systemd tests and diagnistic common
 # to both rpm and deb
 . scripts/packaging/tests/tests-systemd-common.inc.sh
+
+apt-get autopurge -y octez-node
+apt-get autopurge -y octez-baker
+
+printf "Check if the user tezos was removed:"
+if id tezos > /dev/null 2>&1; then
+  echo "Tezos user not correctly removed"
+  id tezos
+  exit 1
+else
+  echo "Ok."
+fi
+
+printf "Check if the datadir was correctly removed:"
+if [ -e /var/tezos ]; then
+  echo "Datadir /var/tezos not correctly removed"
+  ls -la /var/tezos
+else
+  echo "Ok."
+fi

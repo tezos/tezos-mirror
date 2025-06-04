@@ -32,8 +32,8 @@ gzip %{buildroot}%{_mandir}/man1/octez-accuser.1
 install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-accuser@.service %{buildroot}/usr/lib/systemd/system/octez-accuser@.service
 install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker@.service %{buildroot}/usr/lib/systemd/system/octez-baker@.service
 install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.service %{buildroot}/usr/lib/systemd/system/octez-baker.service
-install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-agnostic-baker.service %{buildroot}/usr/lib/systemd/system/octez-baker.octez-agnostic-baker.service
-install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-agnostic-accuser.service %{buildroot}/usr/lib/systemd/system/octez-baker.octez-agnostic-accuser.service
+install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-agnostic-baker.service %{buildroot}/usr/lib/systemd/system/octez-agnostic-baker.service
+install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-agnostic-accuser.service %{buildroot}/usr/lib/systemd/system/octez-agnostic-accuser.service
 install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.octez-accuser.default %{buildroot}/etc/default/octez-accuser
 install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.default %{buildroot}/etc/default/octez-baker
 %files
@@ -48,8 +48,8 @@ install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.default %{buildroot}/etc/def
 /usr/lib/systemd/system/octez-accuser@.service
 /usr/lib/systemd/system/octez-baker@.service
 /usr/lib/systemd/system/octez-baker.service
-/usr/lib/systemd/system/octez-baker.octez-agnostic-baker.service
-/usr/lib/systemd/system/octez-baker.octez-agnostic-accuser.service
+/usr/lib/systemd/system/octez-agnostic-baker.service
+/usr/lib/systemd/system/octez-agnostic-accuser.service
 /etc/default/octez-accuser
 /etc/default/octez-baker
 %postun

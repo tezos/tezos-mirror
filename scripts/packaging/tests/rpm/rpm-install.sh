@@ -37,7 +37,12 @@ rpm --import "$REPO/$DISTRO/octez.asc"
 
 dnf -y install sudo procps util-linux
 
-dnf -y install octez-client octez-node octez-baker
+dnf -y install \
+  octez-client \
+  octez-node \
+  octez-dal-node \
+  octez-baker \
+  octez-smart-rollup-node
 
 #shellcheck disable=SC2129,SC1091
 echo "NETWORK=ghostnet" >> /etc/default/octez-node
@@ -65,3 +70,9 @@ if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
   . scripts/packaging/tests/tests-systemd-common.inc.sh
 
 fi
+
+dnf -y remove octez-node \
+  octez-client \
+  octez-baker \
+  octez-dal-node \
+  octez-smart-rollup-node
