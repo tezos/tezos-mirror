@@ -601,24 +601,49 @@ let better_fees_and_ratio config old_gas old_fee new_gas new_fee =
   Q.compare new_fee bumped_old_fee >= 0
   && Q.compare new_ratio bumped_old_ratio >= 0
 
-(** [conflict_handler config] returns a conflict handler for
-    {!Mempool.add_operation} (see {!Mempool.conflict_handler}).
+(* Identifies operations that should never get replaced by a
+   conflicting operation in the mempool.
 
-    - For non-manager operations, we select the greater operation
-      according to {!Operation.compare}.
+   Precondition: [op] is valid (otherwise this mechanism could be used
+   to censure another account's operation). *)
+let do_not_replace op =
+  let (Operation_data protocol_data) = op.protocol_data in
+  match protocol_data.contents with
+  | Single (Preattestation _ | Attestation _) ->
+      (* Two attestations (resp. two preattestations) conflict iff
+         they have the same level, round, and slot. There is never any
+         reason for a delegate to issue two different conflicting
+         (pre)attestations. So for efficiency's sake, the mempool can
+         immediately resolve such conflicts by keeping the old
+         operations. (Note that the conflict handler is only called on
+         two valid operations, with valid signatures, so it's not
+         possible for someone else to block a delegate's attestations
+         by injecting one on their behalf.) *)
+      true
+  | Single (Attestations_aggregate _) ->
+      (* This operation is refused in mempool mode anyway. *)
+      false
+  | Single
+      ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
+      | Vdf_revelation _ | Double_preattestation_evidence _
+      | Double_attestation_evidence _ | Double_baking_evidence _
+      | Dal_entrapment_evidence _ | Activate_account _ | Drain_delegate _
+      | Manager_operation _ )
+  | Cons (Manager_operation _, _) ->
+      false
 
-    - A manager operation is replaced only when the new operation's
-      fee and fee/gas ratio both exceed the old operation's by at least a
-      factor of [config.replace_by_fee_factor] (see {!better_fees_and_ratio}).
+(* See mli for this function's specification.
 
-    Precondition: both operations must be individually valid (because
-    of the call to {!Operation.compare}). *)
+   Note that the precondition (both operations are individually valid)
+   is required by the calls to both {!do_not_replace} and
+   {!Operation.compare}. *)
 let conflict_handler config : Mempool.conflict_handler =
   let open Result_syntax in
   fun ~existing_operation ~new_operation ->
     let (_ : Operation_hash.t), old_op = existing_operation in
     let (_ : Operation_hash.t), new_op = new_operation in
-    if is_manager_operation old_op && is_manager_operation new_op then
+    if do_not_replace old_op then `Keep
+    else if is_manager_operation old_op && is_manager_operation new_op then
       let new_op_is_better =
         let* old_fee, old_gas_limit = compute_fee_and_gas_limit old_op in
         let* new_fee, new_gas_limit = compute_fee_and_gas_limit new_op in
