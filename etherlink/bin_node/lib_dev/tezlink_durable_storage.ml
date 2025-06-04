@@ -47,7 +47,7 @@ let counter read c =
     ~default:Z.one
     read
     (Path.counter c)
-    (Data_encoding.Binary.of_bytes_exn Data_encoding.z)
+    (Data_encoding.Binary.of_bytes_exn Data_encoding.n)
 
 let nth_block read n =
   let open Lwt_result_syntax in
