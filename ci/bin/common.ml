@@ -983,6 +983,29 @@ module Tezt = struct
       | None -> ("--without-select-tezts", dependencies)
     in
     let retry = if retry = 0 then None else Some {max = retry; when_ = []} in
+    let junit_tags =
+      (* List of tags to include in JUnit reports that we send to DataDog. *)
+      [
+        (* Tags that change the job that runs the test.
+           Useful to be able to filter on only a specific job type in DataDog. *)
+        "flaky";
+        "time_sensitive";
+        "slow";
+        "extra";
+        (* Tags that denote the owner of tests.
+           Useful in case we want to send alerts to specific teams. *)
+        "infrastructure";
+        "layer1";
+        "tezos2";
+        "etherlink";
+      ]
+    in
+    let junit_tags =
+      junit_tags
+      |> List.map (fun tag ->
+             Printf.sprintf " --junit-tag 'dd_tags[tezt-tag.%s]=%s'" tag tag)
+      |> String.concat ""
+    in
     job
       ?timeout
       ~__POS__
@@ -1045,7 +1068,7 @@ module Tezt = struct
            --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
            tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
            ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn \
-           5_000_000_000";
+           5_000_000_000" ^ junit_tags;
       ]
 
   (** Tezt tag selector string.
