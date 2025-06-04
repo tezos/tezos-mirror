@@ -60,7 +60,6 @@ fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::
 
 impl TezlinkImplicitAccount {
     // We must provide the context object to get the full path in the durable storage
-    #[allow(dead_code)]
     pub fn from_contract(
         context: &context::Context,
         contract: &Contract,
@@ -71,7 +70,6 @@ impl TezlinkImplicitAccount {
     }
 
     /// Get the **counter** for the Tezlink account.
-    #[allow(dead_code)]
     pub fn counter(
         &self,
         host: &impl Runtime,
@@ -81,7 +79,6 @@ impl TezlinkImplicitAccount {
     }
 
     /// Set the **counter** for the Tezlink account.
-    #[allow(dead_code)]
     pub fn set_counter(
         &mut self,
         host: &mut impl Runtime,
@@ -92,7 +89,6 @@ impl TezlinkImplicitAccount {
     }
 
     /// Get the **balance** of an account in Mutez held by the account.
-    #[allow(dead_code)]
     pub fn balance(
         &self,
         host: &impl Runtime,
@@ -102,7 +98,6 @@ impl TezlinkImplicitAccount {
     }
 
     /// Set the **balance** of an account in Mutez held by the account.
-    #[allow(dead_code)]
     pub fn set_balance(
         &mut self,
         host: &mut impl Runtime,
@@ -112,7 +107,6 @@ impl TezlinkImplicitAccount {
         store_bin(balance, host, &path)
     }
 
-    #[allow(dead_code)]
     pub fn manager(
         &self,
         host: &impl Runtime,
