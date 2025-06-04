@@ -491,6 +491,7 @@ type configuration = {
   bootstrap_dal_node_identity_file : string option;
   external_rpc : bool;
   dal_incentives : bool;
+  disable_shard_validation : bool;
 }
 
 type bootstrap = {
@@ -2161,8 +2162,16 @@ let init_public_network cloud (configuration : configuration)
         let* dal_node =
           if not configuration.with_dal then Lwt.return_none
           else
+            let disable_shard_validation =
+              configuration.disable_shard_validation
+            in
             let* dal_node =
-              Dal_node.Agent.create ~name:"bootstrap-dal-node" cloud agent ~node
+              Dal_node.Agent.create
+                ~name:"bootstrap-dal-node"
+                cloud
+                agent
+                ~node
+                ~disable_shard_validation
             in
 
             let* () =
@@ -2184,6 +2193,7 @@ let init_public_network cloud (configuration : configuration)
                 ?otel
                 ~memtrace:configuration.memtrace
                 ~event_level:`Notice
+                ~disable_shard_validation
                 dal_node
             in
             Lwt.return_some dal_node
@@ -2389,6 +2399,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           cloud
           agent
           ~node:bootstrap_node
+          ~disable_shard_validation:configuration.disable_shard_validation
       in
       Lwt.return_some dal_node
     else Lwt.return_none
@@ -2489,6 +2500,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           ?otel
           ~memtrace:configuration.memtrace
           ~event_level:`Notice
+          ~disable_shard_validation:configuration.disable_shard_validation
           dal_bootstrap_node
   in
   let* () =
@@ -2555,6 +2567,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
         Dal_node.Agent.create
           ~name:(Format.asprintf "baker-dal-node-%d" i)
           ~node
+          ~disable_shard_validation:configuration.disable_shard_validation
           cloud
           agent
       in
@@ -2572,6 +2585,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
           ?otel
           ~memtrace:configuration.memtrace
           ~event_level:`Notice
+          ~disable_shard_validation:configuration.disable_shard_validation
           dal_node
       in
       Lwt.return_some dal_node
@@ -2658,6 +2672,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
     Dal_node.Agent.create
       ~name:(Format.asprintf "producer-dal-node-%i" i)
       ~node
+      ~disable_shard_validation:configuration.disable_shard_validation
       cloud
       agent
   in
@@ -2699,6 +2714,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       ?otel
       ~memtrace:configuration.memtrace
       ~event_level:`Notice
+      ~disable_shard_validation:configuration.disable_shard_validation
       dal_node
   in
   let () = toplog "Init producer %s: DAL node is ready" name in
@@ -2734,6 +2750,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
     Dal_node.Agent.create
       ~name:(Format.asprintf "observer-dal-node-%i" i)
       ~node
+      ~disable_shard_validation:configuration.disable_shard_validation
       cloud
       agent
   in
@@ -2766,6 +2783,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
       ?otel
       ~memtrace:configuration.memtrace
       ~event_level:`Notice
+      ~disable_shard_validation:configuration.disable_shard_validation
       dal_node
   in
   let* () =
@@ -3709,6 +3727,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let bakers = Cli.bakers in
     let external_rpc = Cli.node_external_rpc_server in
     let dal_incentives = Cli.dal_incentives in
+    let disable_shard_validation = Cli.disable_shard_validation in
     let t =
       {
         with_dal;
@@ -3734,6 +3753,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         bootstrap_dal_node_identity_file;
         external_rpc;
         dal_incentives;
+        disable_shard_validation;
       }
     in
     (t, etherlink)

@@ -177,7 +177,7 @@ module Dal_node = struct
   module Agent = struct
     let create_from_endpoint ?(group = "DAL") ?net_port
         ?(path = Uses.path Constant.octez_dal_node) ?name ?rpc_port
-        ~l1_node_endpoint cloud agent =
+        ?disable_shard_validation ~l1_node_endpoint cloud agent =
       let* path = Agent.copy agent ~source:path in
       let* () =
         Cloud.register_binary
@@ -209,6 +209,7 @@ module Dal_node = struct
           ~rpc_port
           ~metrics_addr
           ~listen_addr
+          ?disable_shard_validation
           ~l1_node_endpoint
           ()
       in
@@ -217,15 +218,17 @@ module Dal_node = struct
       Cloud.service_register ~name ~executable agent ;
       Lwt.return node
 
-    let create ?net_port ?path ?name ~node agent =
+    let create ?net_port ?path ?name ?disable_shard_validation ~node agent =
       create_from_endpoint
         ?net_port
         ?path
         ?name
+        ?disable_shard_validation
         ~l1_node_endpoint:(Node.as_rpc_endpoint node)
         agent
 
-    let run ?otel ?(memtrace = false) ?event_level dal_node =
+    let run ?otel ?(memtrace = false) ?event_level
+        ?(disable_shard_validation = false) dal_node =
       let name = name dal_node in
       let filename =
         Format.asprintf "%s/%s-trace.ctf" (Filename.get_temp_dir_name ()) name
@@ -246,7 +249,17 @@ module Dal_node = struct
               ]
               |> List.to_seq |> String_map.of_seq
         in
-        String_map.union (fun _ _ _ -> None) otel_env memtrace_env
+        let disable_shard_validation_env =
+          if disable_shard_validation then
+            String_map.singleton
+              "TEZOS_DISABLE_SHARD_VALIDATION_I_KNOW_WHAT_I_AM_DOING"
+              "yes"
+          else String_map.empty
+        in
+        String_map.union
+          (fun _ _ _ -> None)
+          (String_map.union (fun _ _ _ -> None) otel_env memtrace_env)
+          disable_shard_validation_env
       in
       let* () = run ~env ?event_level dal_node in
       (* Update the state in the service manager *)
