@@ -13,6 +13,7 @@ a:hover {
 :root {
     --feedback-modal-footer-link: #0D61FF;
     --biel-bot-footer-link: rgb(27, 85, 126);
+    --biel-bot-content-z-index: 1040;
 }
 
 /* sidebar
