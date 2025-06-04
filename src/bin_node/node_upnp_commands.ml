@@ -99,12 +99,25 @@ let resolve_ports config_file ?listen_addr ?advertised_net_port () =
   in
   return (port, advertised_net_port)
 
-let patch_config ?data_dir config_file ?listen_addr ?advertised_net_port () =
-  Octez_node_config.Config_file.update
-    ?data_dir
-    ?listen_addr
-    ?advertised_net_port
-    config_file
+let patch_config ?data_dir ?config_filename config_file ?listen_addr
+    ?advertised_net_port () =
+  let open Lwt_result_syntax in
+  let* config_file =
+    Octez_node_config.Config_file.update
+      ?data_dir
+      ?listen_addr
+      ?advertised_net_port
+      config_file
+  in
+  let* () = Config_validation.check config_file in
+  let config_filename =
+    Option.value
+      ~default:
+        Filename.Infix.(
+          config_file.data_dir // Data_version.default_config_file_name)
+      config_filename
+  in
+  Config_file.write config_filename config_file
 
 let map_port gateway ~local_addr ~local_port ~external_port ~lease_duration
     ~description ~any_net_port =
@@ -178,7 +191,7 @@ let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
         external_port
         local_addr
         local_port ;
-      let* _ =
+      let* () =
         patch_config
           config_file
           ?listen_addr
