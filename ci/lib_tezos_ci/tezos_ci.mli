@@ -664,8 +664,6 @@ module Images : sig
   module CI : sig
     val job_docker_ci : arch -> tezos_job
 
-    val mk_ci_image : image_path:string -> Image.t
-
     val runtime : Image.t
 
     val monitoring : Image.t
