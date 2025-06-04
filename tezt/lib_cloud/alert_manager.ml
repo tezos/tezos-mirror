@@ -76,8 +76,9 @@ let default_route =
 
 type t = {
   configuration_file : string;
-  routes : (Prometheus.alert * route) list;
+  mutable routes : (Prometheus.alert * route) list;
   receivers : receiver list;
+  default_receiver : receiver;
 }
 
 let jingoo_receiver_template receiver =
@@ -189,7 +190,7 @@ let receivers_of_alerts alerts =
   |> List.map (fun route -> route.receiver)
   |> List.sort_uniq compare
 
-let run alerts =
+let run ?(default_receiver = null_receiver) alerts =
   let alert_manager_configuration_directory =
     Filename.get_temp_dir_name () // "alert_manager"
   in
@@ -197,9 +198,10 @@ let run alerts =
   let configuration_file =
     alert_manager_configuration_directory // "alert_manager.yml"
   in
+  Log.info "Alert_manager: run with configuration file %s" configuration_file ;
   let routes = routes_of_alerts alerts in
   let receivers = receivers_of_alerts alerts in
-  let t = {configuration_file; routes; receivers} in
+  let t = {configuration_file; routes; default_receiver; receivers} in
   match receivers with
   | [Null] -> Lwt.return_none
   | _ ->
@@ -226,6 +228,19 @@ let run alerts =
       in
       Lwt.return_some t
 
+let reload t =
+  Log.info "Alert_manager: reloading" ;
+  write_configuration t ;
+  Process.run "curl" ["-X"; "POST"; "http://127.0.0.1:9093/-/reload"]
+
 let shutdown () =
+  Log.info "Alert_manager: shutting down" ;
   let* () = Docker.kill "alert-manager" |> Process.check in
   Lwt.return_unit
+
+let add_alert t ~alert =
+  Log.info "Alert_manager: adding alert" ;
+  let {alert; route = route'} = alert in
+  let route' = Option.value ~default:(route t.default_receiver) route' in
+  t.routes <- (alert, route') :: t.routes ;
+  reload t

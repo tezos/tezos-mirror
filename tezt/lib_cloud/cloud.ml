@@ -244,7 +244,6 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
   in
   let* alert_manager =
     match alerts with
-    | [] -> Lwt.return_none
     | _ ->
         let* alert_manager = Alert_manager.run alerts in
         Lwt.return alert_manager
@@ -855,3 +854,8 @@ let register_chronos_task t task =
   match t.chronos with
   | None -> ()
   | Some chronos -> Chronos.add_task chronos task
+
+let add_alert cloud ~alert =
+  match cloud.alert_manager with
+  | None -> Lwt.return_unit
+  | Some alert_manager -> Alert_manager.add_alert alert_manager ~alert

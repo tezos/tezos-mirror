@@ -183,6 +183,8 @@ module Cloud : sig
 
   val open_telemetry_endpoint : t -> string option
 
+  val add_alert : t -> alert:Alert.t -> unit Lwt.t
+
   (** [register_binary t ?agents ?group name] register a binary for individual
     process monitoring via prometheus process exporter.
     [group] will allow to put process in process groups, is currently not used.

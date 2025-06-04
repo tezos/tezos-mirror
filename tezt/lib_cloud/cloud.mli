@@ -23,6 +23,9 @@ val register :
   (t -> unit Lwt.t) ->
   unit
 
+(** Dynamically add an alert *)
+val add_alert : t -> alert:Alert_manager.alert -> unit Lwt.t
+
 val agents : t -> Agent.t list
 
 val push_metric :
