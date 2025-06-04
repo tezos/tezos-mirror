@@ -267,6 +267,9 @@ Smart Rollup node
   ``/local/outbox/pending`` and ``/local/outbox/pending/executable``. (MR
   :gl:`!17279`)
 
+- Fix issue with reorgs and outbox messages execution (e.g. withdrawals on
+  Etherlink) when messages are not in the new chain. (MR :gl:`!17961`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
