@@ -798,7 +798,7 @@ let test_tezlink_header =
   let endpoint =
     Client.(
       Foreign_endpoint
-        {(Evm_node.rpc_endpoint_record sequencer) with path = "tezlink"})
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
 
   let*@ n = Rpc.produce_block sequencer in
@@ -821,6 +821,46 @@ let test_tezlink_header =
   @@ check_header
        ~previous_header:block_1
        ~current_header:block_2
+       ~chain_id
+       ~current_timestamp:(Some current_timestamp)
+
+let test_tezlink_block_info =
+  register_tezlink_test
+    ~title:"Test of the block_info rpc"
+    ~tags:["rpc"; "block_info"]
+  @@ fun {sequencer; client; l2_chains; _} _protocol ->
+  let chain_id =
+    match l2_chains with
+    | [l2_chain] -> Some l2_chain.l2_chain_id
+    | _ -> Test.fail ~__LOC__ "Expected one l2 chain"
+  in
+
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+
+  let*@ n = Rpc.produce_block sequencer in
+  let* () = Evm_node.wait_for_blueprint_applied sequencer n in
+  let current_timestamp =
+    Tezos_base.Time.(
+      System.now () |> System.to_protocol |> Protocol.to_notation)
+  in
+  let*@ n = Rpc.produce_block ~timestamp:current_timestamp sequencer in
+  let* () = Evm_node.wait_for_blueprint_applied sequencer n in
+  let* block_1 =
+    Client.RPC.call ~hooks ~endpoint client
+    @@ RPC.get_chain_block ~block:"head~1" ()
+  in
+  let* block_2 =
+    Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block ()
+  in
+
+  return
+  @@ check_block_info
+       ~previous_block_info:block_1
+       ~current_block_info:block_2
        ~chain_id
        ~current_timestamp:(Some current_timestamp)
 
@@ -872,7 +912,7 @@ let test_tezlink_monitor_heads =
   let open Lwt.Syntax in
   (* Prepare the RPC endpoint *)
   let rpc_info = Evm_node.rpc_endpoint_record sequencer in
-  let endpoint = Client.Foreign_endpoint {rpc_info with path = "tezlink"} in
+  let endpoint = Client.Foreign_endpoint {rpc_info with path = "/tezlink"} in
 
   let total_headers = 4 in
 
@@ -13809,4 +13849,5 @@ let () =
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;
-  test_eip2930_storage_access [Alpha]
+  test_eip2930_storage_access [Alpha] ;
+  test_tezlink_block_info [Alpha]
