@@ -653,8 +653,6 @@ module Images : sig
 
   val macosx_14 : Image.t
 
-  val stage : Stage.t
-
   val client_libs_dependencies : Image.t
 
   val rust_toolchain : Image.t
