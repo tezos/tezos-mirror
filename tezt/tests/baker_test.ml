@@ -1133,6 +1133,145 @@ let attestations_aggregation_on_reproposal =
   in
   unit
 
+(* Test that the baker handle conflicting consensus operations. *)
+let conflicting_consensus_operations =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"conflicting consensus operations"
+    ~tags:[team; "baker"; "attestation"; "aggregation"; "conflict"]
+    ~supports:Protocol.(From_protocol 023)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  let consensus_rights_delay = 1 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      [
+        (["allow_tz4_delegate_enable"], `Bool true);
+        (["aggregate_attestation"], `Bool true);
+        (* Diminish some constants to activate consensus keys faster,
+           and make round durations as small as possible *)
+        (["minimal_block_delay"], `String "4");
+        (["delay_increment_per_round"], `String "0");
+        (["blocks_per_cycle"], `Int 2);
+        (["nonce_revelation_threshold"], `Int 1);
+        (["consensus_rights_delay"], `Int consensus_rights_delay);
+        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+      ]
+  in
+  let* node, client =
+    Client.init_with_protocol
+      `Client
+      ~additional_revealed_bootstrap_account_count:1
+      ~protocol
+      ~parameter_file
+      ~timestamp:Now
+      ()
+  in
+  let* _ = Node.wait_for_level node 1 in
+  Log.info
+    "Generate BLS keys and assign them as consensus keys for bootstrap 1 to 2" ;
+  let* consensus_key1 =
+    Client.update_fresh_consensus_key ~algo:"bls" bootstrap1 client
+  in
+  let* consensus_key2 =
+    Client.update_fresh_consensus_key ~algo:"bls" bootstrap2 client
+  in
+  let keys =
+    public_key_hashes
+      [
+        consensus_key1;
+        consensus_key2;
+        bootstrap1;
+        bootstrap2;
+        bootstrap3;
+        bootstrap4;
+        bootstrap5;
+      ]
+  in
+  let* () = Client.bake_for_and_wait ~keys client in
+  let* companion_key1 =
+    Client.update_fresh_companion_key ~algo:"bls" bootstrap1 client
+  in
+  Log.info "Bake until BLS consensus keys are activated" ;
+  let* _ = Client.bake_for_and_wait ~keys ~count:6 client in
+  Log.info "Launch a baker with bootstrap3, bootstrap4 and bootstrap5" ;
+  let* _baker =
+    Agnostic_baker.init
+      ~delegates:(public_key_hashes [bootstrap3; bootstrap4; bootstrap5])
+      node
+      client
+  in
+  let* level = Client.bake_for_and_wait_level ~keys client in
+  (* BLS consensus keys are now activated *)
+  let* slots = Operation.Consensus.get_slots_by_consensus_key ~level client in
+  let* round = fetch_round client in
+  let* branch = Operation.Consensus.get_branch ~attested_level:level client in
+  let* block_payload_hash =
+    Operation.Consensus.get_block_payload_hash
+      ~block:(string_of_int level)
+      client
+  in
+  Log.info "Attesting for bootstrap1 at level %d round %d@." level round ;
+  let* _ =
+    Operation.Consensus.(
+      let slot = first_slot ~slots consensus_key1 in
+      attest_for
+        ~protocol
+        ~branch
+        ~slot
+        ~level
+        ~round
+        ~block_payload_hash
+        consensus_key1
+        client)
+  in
+  Log.info "Attesting for bootstrap2 at level %d round %d@." level round ;
+  let* _ =
+    Operation.Consensus.(
+      let slot = first_slot ~slots consensus_key2 in
+      attest_for
+        ~protocol
+        ~branch
+        ~slot
+        ~level
+        ~round
+        ~block_payload_hash
+        consensus_key2
+        client)
+  in
+  Log.info
+    "Attesting again for bootstrap1 at level %d round %d with a dal \
+     attestation.@."
+    level
+    round ;
+  let dal_attestation = Array.init 16 (fun _ -> true) in
+  let* _ =
+    Operation.Consensus.(
+      let slot = first_slot ~slots consensus_key1 in
+      attest_for
+        ~protocol
+        ~branch
+        ~slot
+        ~level
+        ~round
+        ~block_payload_hash
+        ~dal_attestation
+        ~companion_key:companion_key1
+        consensus_key1
+        client)
+  in
+  let* _ = Node.wait_for_level node (level + 1) in
+  let* () =
+    check_consensus_operations
+      ~expected_attestations_committee:[bootstrap1; bootstrap2]
+      ~expected_dal_attestations:
+        [(bootstrap1, z_of_bool_vector dal_attestation)]
+      client
+  in
+  unit
+
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
@@ -1147,4 +1286,5 @@ let register ~protocols =
   force_apply_from_round protocols ;
   simple_attestations_aggregation protocols ;
   prequorum_check_levels protocols ;
-  attestations_aggregation_on_reproposal protocols
+  attestations_aggregation_on_reproposal protocols ;
+  conflicting_consensus_operations protocols
