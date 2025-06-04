@@ -1479,6 +1479,15 @@ module Blocks = struct
       Option.map_es (block_with_objects store) block_opt
     else return (Option.map Transaction_object.block_from_legacy block_opt)
 
+  let get_with_level ~full_transaction_object store (Ethereum_types.Qty level) =
+    let open Lwt_result_syntax in
+    let* block_opt =
+      find_with_level ~full_transaction_object store (Qty level)
+    in
+    match block_opt with
+    | Some block -> return block
+    | None -> failwith "Could not find block %a" Z.pp_print level
+
   let tez_find_with_level store level =
     let open Lwt_result_syntax in
     let* block_opt =

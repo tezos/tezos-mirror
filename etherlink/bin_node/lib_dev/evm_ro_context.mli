@@ -59,6 +59,16 @@ val ro_backend :
   Configuration.t ->
   (module Services_backend_sig.S)
 
+type replay_result =
+  | Replay_success of {
+      block : Ethereum_types.legacy_transaction_object L2_types.block;
+      evm_state : Evm_state.t;
+      diverged : bool;
+      process_time : Ptime.span;
+      execution_gas : Ethereum_types.quantity;
+    }
+  | Replay_failure
+
 val replay :
   t ->
   ?log_file:string ->
@@ -66,7 +76,7 @@ val replay :
   ?alter_evm_state:
     (Irmin_context.tree -> (Irmin_context.tree, tztrace) result Lwt.t) ->
   Ethereum_types.quantity ->
-  (Evm_state.apply_result, tztrace) result Lwt.t
+  replay_result tzresult Lwt.t
 
 val evm_services_methods :
   t -> Configuration.time_between_blocks -> Rpc_server.evm_services_methods

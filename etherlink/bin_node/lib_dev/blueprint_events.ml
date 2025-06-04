@@ -46,6 +46,22 @@ let blueprint_application =
     ("block_hash", Ethereum_types.block_hash_encoding)
     ("process_time", Time.System.Span.encoding)
 
+let blueprint_replayed =
+  declare_4
+    ~section
+    ~name:"blueprint_replayed"
+    ~msg:
+      "blueprint {level} consuming {execution_gas} gas replayed in \
+       {process_time} {diverged} divergence"
+    ~level:Notice
+    ~pp3:Time.System.Span.pp_hum
+    ~pp4:(fun fmt diverged ->
+      Format.pp_print_string fmt (if diverged then "with" else "without"))
+    ("level", Data_encoding.n)
+    ("execution_gas", Data_encoding.n)
+    ("process_time", Time.System.Span.encoding)
+    ("diverged", Data_encoding.bool)
+
 let blueprint_injection =
   declare_1
     ~section
@@ -207,6 +223,10 @@ let blueprint_applied block process_time =
           Z.zero,
           block.hash,
           process_time )
+
+let blueprint_replayed ~execution_gas:(Ethereum_types.Qty execution_gas)
+    ~process_time ~diverged (Ethereum_types.Qty level) =
+  emit blueprint_replayed (level, execution_gas, process_time, diverged)
 
 let invalid_blueprint_produced level = emit invalid_blueprint_produced level
 

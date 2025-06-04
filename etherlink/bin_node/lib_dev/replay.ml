@@ -74,15 +74,16 @@ let main ~disable_da_fees ?kernel ?kernel_verbosity ~data_dir ~number ?profile
         Evm_ro_context.replay ro_ctxt ?profile ~alter_evm_state current
       in
       match apply_result with
-      | Apply_success {block; _} ->
-          Format.printf
-            "Replaying blueprint %a led to block %a\n%!"
-            Ethereum_types.pp_quantity
-            current
-            Ethereum_types.pp_block_hash
-            (L2_types.block_hash block) ;
+      | Replay_success {diverged; process_time; execution_gas; _} ->
+          let*! () =
+            Blueprint_events.blueprint_replayed
+              ~execution_gas
+              ~process_time
+              ~diverged
+              current
+          in
           replay_upto Ethereum_types.Qty.(next current)
-      | Apply_failure ->
+      | Replay_failure ->
           failwith
             "Could not replay blueprint %a"
             Ethereum_types.pp_quantity
