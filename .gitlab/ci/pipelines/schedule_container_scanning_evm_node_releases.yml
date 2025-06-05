@@ -57,7 +57,7 @@ container_scanning:
   - gtcs scan
   variables:
     GIT_STRATEGY: fetch
-    CS_IMAGE: tezos/tezos:octez-evm-node-v0.28
+    CS_IMAGE: tezos/tezos:octez-evm-node-latest
     SECURE_LOG_LEVEL: info
     CS_DOCKERFILE_PATH: build.Dockerfile
   artifacts:
@@ -81,4 +81,4 @@ container_scanning_slack_notification:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   script:
-  - . ./scripts/ci/container_scanning_slack_notification.sh tezos/tezos:octez-evm-node-v0.28
+  - . ./scripts/ci/container_scanning_slack_notification.sh tezos/tezos:octez-evm-node-latest
