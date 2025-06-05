@@ -1037,52 +1037,50 @@ open struct
       ("slot_index", Data_encoding.int31)
       ("error", Data_encoding.list Error_monad.trace_encoding)
 
-  let slot_from_http_backup_has_unexpected_size =
+  let slot_from_backup_has_unexpected_size =
     declare_5
       ~section
       ~prefix_name_with_section:true
-      ~name:"slot_from_http_backup_has_unexpected_size"
+      ~name:"slot_from_backup_has_unexpected_size"
       ~msg:
         "The content of the slot published at level {published_level} and \
-         index {slot_index} fetched from {http_backup_uri} has a bad size. \
+         index {slot_index} fetched from {backup_uri} has a bad size. \
          Expected:{expected_size}, got: {obtained_size}."
       ~level:Warning
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
-      ("http_backup_uri", Data_encoding.string)
+      ("backup_uri", Data_encoding.string)
       ("expected_size", Data_encoding.int31)
       ("obtained_size", Data_encoding.int31)
 
-  let slot_from_http_backup_has_unexpected_commitment =
+  let slot_from_backup_has_unexpected_commitment =
     declare_5
       ~section
       ~prefix_name_with_section:true
-      ~name:"slot_from_http_backup_has_unexpected_commitment"
+      ~name:"slot_from_backup_has_unexpected_commitment"
       ~msg:
         "The content of the slot published at level {published_level} and \
-         index {slot_index} fetched from {http_backup_uri} has a bad \
-         commitment. Expected:{expected_commitment}, got: \
-         {obtained_commitment}."
+         index {slot_index} fetched from {backup_uri} has a bad commitment. \
+         Expected:{expected_commitment}, got: {obtained_commitment}."
       ~level:Warning
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
-      ("http_backup_uri", Data_encoding.string)
+      ("backup_uri", Data_encoding.string)
       ("expected_commitment", Cryptobox.Commitment.encoding)
       ("obtained_commitment", Cryptobox.Commitment.encoding)
 
-  let fetching_slot_from_http_backup_failed =
+  let fetching_slot_from_backup_failed =
     declare_4
       ~section
       ~prefix_name_with_section:true
-      ~name:"fetching_slot_from_http_backup_failed"
+      ~name:"fetching_slot_from_backup_failed"
       ~msg:
         "Fetching the content of the slot published at level {published_level} \
-         and index {slot_index} from {http_backup_uri} failed with status \
-         {status}."
+         and index {slot_index} from {backup_uri} failed with status {status}."
       ~level:Warning
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
-      ("http_backup_uri", Data_encoding.string)
+      ("backup_uri", Data_encoding.string)
       ("status", Data_encoding.string)
 end
 
@@ -1094,33 +1092,33 @@ let emit_failed_to_retrieve_commitment_of_slot_id ~published_level ~slot_index
     failed_to_retrieve_commitment_of_slot_id
     (published_level, slot_index, error)
 
-let emit_slot_from_http_backup_has_unexpected_size ~published_level ~slot_index
-    ~http_backup_uri ~expected_size ~obtained_size =
+let emit_slot_from_backup_has_unexpected_size ~published_level ~slot_index
+    ~backup_uri ~expected_size ~obtained_size =
   emit
-    slot_from_http_backup_has_unexpected_size
+    slot_from_backup_has_unexpected_size
     ( published_level,
       slot_index,
-      Uri.to_string http_backup_uri,
+      Uri.to_string backup_uri,
       expected_size,
       obtained_size )
 
-let emit_slot_from_http_backup_has_unexpected_commitment ~published_level
-    ~slot_index ~http_backup_uri ~expected_commitment ~obtained_commitment =
+let emit_slot_from_backup_has_unexpected_commitment ~published_level ~slot_index
+    ~backup_uri ~expected_commitment ~obtained_commitment =
   emit
-    slot_from_http_backup_has_unexpected_commitment
+    slot_from_backup_has_unexpected_commitment
     ( published_level,
       slot_index,
-      Uri.to_string http_backup_uri,
+      Uri.to_string backup_uri,
       expected_commitment,
       obtained_commitment )
 
-let emit_fetching_slot_from_http_backup_failed ~published_level ~slot_index
-    ~http_backup_uri ~status =
+let emit_fetching_slot_from_backup_failed ~published_level ~slot_index
+    ~backup_uri ~status =
   emit
-    fetching_slot_from_http_backup_failed
+    fetching_slot_from_backup_failed
     ( published_level,
       slot_index,
-      Uri.to_string http_backup_uri,
+      Uri.to_string backup_uri,
       Cohttp.Code.string_of_status status )
 
 let emit_starting_node () = emit starting_node ()

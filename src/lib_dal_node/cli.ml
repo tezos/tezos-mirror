@@ -762,12 +762,9 @@ let merge
           ~lower_prio:configuration.profile
           ~higher_prio:from_cli
   in
-  let slots_backup_uris, trust_slots_backup_uris =
-    (* backup URIs from the CLI, if any, are favored over the ones in the
-       config file. *)
-    if List.is_empty slots_backup_uris then
-      (configuration.slots_backup_uris, configuration.trust_slots_backup_uris)
-    else (slots_backup_uris, trust_slots_backup_uris)
+  let slots_backup_uris = slots_backup_uris @ configuration.slots_backup_uris in
+  let trust_slots_backup_uris =
+    trust_slots_backup_uris || configuration.trust_slots_backup_uris
   in
   {
     configuration with
