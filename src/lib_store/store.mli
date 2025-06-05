@@ -220,9 +220,7 @@ type chain_store
       Default: Disabled
 *)
 val init :
-  ?patch_context:
-    (Context_ops.Environment_context.t ->
-    Context_ops.Environment_context.t tzresult Lwt.t) ->
+  ?patch_context:(Context_ops.t -> Context_ops.t tzresult Lwt.t) ->
   ?commit_genesis:(chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t) ->
   ?history_mode:History_mode.t ->
   ?readonly:bool ->
