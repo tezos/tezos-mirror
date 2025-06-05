@@ -11,6 +11,7 @@ Indeed, by default:
 - Private keys are stored unencrypted in file ``$OCTEZ_CLIENT_DIR/secret_keys``.
 - The client uses these keys to sign user operations (e.g. transfers) by itself.
 - The baker daemon uses these keys to automatically sign its operations (e.g. (pre-)attestations).
+- The baker's own key is used to sign consensus operations and :doc:`DAL <../shell/dal>` attestations.
 
 The solutions provided to strengthen the security of the default key management and signing are the following:
 
@@ -23,6 +24,8 @@ The solutions provided to strengthen the security of the default key management 
 - If you don't have a hardware wallet, the option ``--encrypted`` of the client offers a first protection for storing your keys.
 
 - A separate signer daemon allows to decouple the client and baker from the signing process.
+
+- Separate keys (known as "consensus key" and "companion key") can be used to sign consensus operations and/or DAL attestations, respectively.
 
   In particular, this allows executing the signer remotely (that is, on a different machine than the client and/or the baker), perhaps less exposed to attacks.
 
@@ -311,12 +314,17 @@ However, it is also possible to register as a delegate and immediately set the c
    octez-client register key <mananger_key> as delegate with consensus key <consensus_key>
 
 There can be multiple pending updates: it is possible to have multiple pending consensus keys for multiple future cycles.
-A subsequent update within the same cycle takes precedences over the initial one.
+A subsequent update within the same cycle takes precedence over the initial one.
+
+Note that registering a tz4 consensus key, just like revealing a tz4 public key, requires a proof of
+possession. This is the signature of the consensus public key using the consensus private key, and it
+ensures ownership of the key. This process is done automatically by the client, and the proof is included in
+the receipt of the update operation.
 
 Baking With a Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In your baker's command, replace the delegate's manager key alias with the consenus key alias::
+In your baker's command, replace the delegate's manager key alias with the consensus key alias::
 
    octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
 
@@ -343,6 +351,43 @@ The drain operation has no effect on the frozen balance.
 
 A fixed fraction of the drained delegate’s spendable balance is transferred as fees to the baker that includes the operation,
 i.e. the maximum between 1 tez or 1% of the spendable balance.
+
+.. _companion_key:
+
+Companion Key
+-------------
+
+Starting with protocol S, bakers will be able to register a second key called the *companion key*. It is a tz4 key,
+whose purpose is to sign DAL specific content in consensus operations. This key is required for delegates with
+a tz4 consensus key that wish to participate in the DAL.
+
+More precisely, if a delegate has an active tz4 consensus key, but no companion key is active,
+or if it is missing from the client set of known keys, the baker
+will still be able to produce attestations, but without any DAL attestations.
+In other words, even if the baker is connected to a DAL node and receives attestable slots for the delegate,
+since the companion key is not available, it will not be able to include a DAL attestation in its
+consensus operation, and will only send a regular attestation.
+
+Any delegate, regardless of their kind of address, can register a companion key,
+it will only be used when necessary. There is no downside in doing so, because ``drain delegate``
+only applies to consensus keys, not companion keys.
+
+The command to update the companion key is::
+
+   octez-client set companion key for <manager_key> to <companion_key>
+
+Since a companion key has to be a tz4, this command will also create a proof of possession and include it in the operation.
+
+A companion key takes the same amount of time as a consensus key to become activated, which is
+up to ``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles (see :ref:`cs_constants`).
+
+Alternatively, like for consensus keys, it is possible to register a companion key when registering as a delegate::
+
+   octez-client register key <mananger_key> as delegate with companion key <companion_key>
+
+It is even possible to register both a consensus key and a companion key, with the following command::
+
+   octez-client register key <mananger_key> as delegate with consensus key <consensus_key> and companion key <companion_key>
 
 .. _activate_fundraiser_account:
 
