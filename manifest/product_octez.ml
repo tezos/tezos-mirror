@@ -1917,6 +1917,13 @@ let octez_lib_upnp =
         octez_stdlib_unix |> open_;
       ]
 
+let octez_lib_upnp_args =
+  public_lib
+    "octez-lib-upnp-args"
+    ~path:"src/lib_upnp/args"
+    ~synopsis:"UPNP support: Cmdliner shared args"
+    ~deps:[cmdliner]
+
 let octez_base_p2p_identity_file =
   octez_lib
     "base.p2p-identity-file"
@@ -8621,6 +8628,7 @@ let _octez_node =
          octez_base_p2p_identity_file |> open_;
          memtrace;
          octez_lib_upnp;
+         octez_lib_upnp_args;
        ]
       @ protocol_deps)
     ~linkall:true

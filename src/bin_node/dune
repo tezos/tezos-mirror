@@ -40,6 +40,7 @@
   octez-libs.base.p2p-identity-file
   memtrace
   octez-lib-upnp
+  octez-lib-upnp-args
   (select void_for_linking-tezos-protocol-genesis-embedded-protocol from
    (tezos-protocol-genesis.embedded-protocol -> void_for_linking-tezos-protocol-genesis-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-genesis-embedded-protocol.empty))

@@ -1836,6 +1836,7 @@ opam:all_7:
       - octez-riscv-api
       - octez-protocol-compiler-compat
       - octez-libs
+      - octez-lib-upnp-args
       - octez-internal-libs
       - octez-igd-next
       - octez-distributed-lwt-internal
