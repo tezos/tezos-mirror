@@ -66,7 +66,11 @@ let caqti_lwt = external_lib "caqti-lwt" V.(at_least "2.0.1")
 
 let caqti_lwt_unix = external_sublib caqti_lwt "caqti-lwt.unix"
 
-let caqti_sqlite = external_lib "caqti-driver-sqlite3" V.(at_least "2.0.1")
+let caqti_sqlite =
+  (* We have evidence that latest version of Caqti Sqlite introduces
+     flakiness/hanged connections, at least for the EVM Node. We’ll revert the
+     upperbound once we have identified the issue. *)
+  external_lib "caqti-driver-sqlite3" V.(at_least "2.0.1" && less_than "2.2.0")
 
 let caqti_postgresql =
   external_lib "caqti-driver-postgresql" V.(at_least "2.0.1")
