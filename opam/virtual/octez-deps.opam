@@ -28,7 +28,7 @@ depends: [
   "camlzip" { >= "1.12" & < "1.13" }
   "caqti"
   "caqti-driver-postgresql" { >= "2.0.1" }
-  "caqti-driver-sqlite3" { >= "2.0.1" }
+  "caqti-driver-sqlite3" { >= "2.0.1" & < "2.2.0" }
   "caqti-dynload"
   "caqti-lwt" { >= "2.0.1" }
   "checkseum" { != "0.5.0" }

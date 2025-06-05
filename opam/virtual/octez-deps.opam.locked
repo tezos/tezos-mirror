@@ -43,11 +43,11 @@ depends: [
   "ca-certs" {= "1.0.1"}
   "camlp-streams" {= "5.0.1"}
   "camlzip" {= "1.12"}
-  "caqti" {= "2.2.4"}
-  "caqti-driver-postgresql" {= "2.2.4"}
-  "caqti-driver-sqlite3" {= "2.2.4"}
+  "caqti" {= "2.1.2"}
+  "caqti-driver-postgresql" {= "2.1.2"}
+  "caqti-driver-sqlite3" {= "2.1.1"}
   "caqti-dynload" {= "2.0.1"}
-  "caqti-lwt" {= "2.2.4"}
+  "caqti-lwt" {= "2.1.1"}
   "checkseum" {= "0.5.2"}
   "clap" {= "0.3.0"}
   "class_group_vdf" {= "0.0.5"}
