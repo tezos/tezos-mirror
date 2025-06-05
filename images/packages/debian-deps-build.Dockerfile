@@ -18,6 +18,9 @@ ENV APT_PROXY=${APT_PROXY:-false}
 COPY --chown=tezos:tezos \
   images/scripts/install_datadog_static.sh \
   images/scripts/install_sccache_static.sh \
+  images/scripts/install_opam_static.sh \
+  scripts/kiss-fetch.sh \
+  scripts/kiss-logs.sh \
   /tmp/
 
 # we trust sw distributors
@@ -41,7 +44,8 @@ RUN echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy &&
     rm -rf /var/lib/apt/lists/*
 
 RUN /tmp/install_sccache_static.sh && \
-    /tmp/install_datadog_static.sh
+    /tmp/install_datadog_static.sh && \
+    /tmp/install_opam_static.sh
 
 COPY --link scripts/version.sh /root/tezos/scripts/
 
@@ -66,8 +70,14 @@ COPY --link opam /root/tezos/
 
 WORKDIR /root/tezos
 
+ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
+ENV OPAMFETCH="/tmp/kiss-fetch.sh"
+
 #hadolint ignore=SC2154, SC1091
 RUN . ./scripts/version.sh && \
     eval $(opam env) && \
     . "/root/.cargo/env" && \
-    make build-deps
+    make build-deps && \
+# print kisscache stats
+    /tmp/kiss-logs.sh /tmp/kiss.log \
+    && rm -f /tmp/kiss.log
