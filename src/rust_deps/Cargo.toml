@@ -16,3 +16,6 @@ path = "../rustzcash_deps"
 
 [dependencies.octez-riscv-api]
 path = "../riscv/api"
+
+[dependencies.rust_igd_next]
+path = "./rust_igd_next"

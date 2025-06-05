@@ -50,6 +50,8 @@ src/riscv/api/octez_riscv_api.ml
 src/riscv/api/octez_riscv_api.mli
 etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.ml
 etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.mli
+src/rust_deps/rust_igd_next/ocaml-api/igd_next_gen.ml
+src/rust_deps/rust_igd_next/ocaml-api/igd_next_gen.mli
 EOF
 )
 
