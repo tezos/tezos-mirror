@@ -127,6 +127,16 @@ let node_version_check_bypass =
     ~msg:"Compatibility between node version and baker version by passed"
     ()
 
+let unused_cli_adaptive_issuance_vote =
+  declare_0
+    ~section
+    ~name:"unused_cli_adaptive_issuance_vote"
+    ~level:Warning
+    ~msg:
+      "Adaptive issuance is now enabled, voting is no longer necessary. Please \
+       remove the argument from the CLI."
+    ()
+
 (* Debug *)
 let node_version_check =
   declare_4
@@ -181,13 +191,15 @@ module Per_block_votes = struct
       ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
-  let adaptive_issuance_vote =
-    declare_1
+  let unused_config_adaptive_issuance_vote =
+    declare_0
       ~section
-      ~name:"read_adaptive_issuance_vote"
-      ~level:Notice
-      ~msg:"read adaptive issuance vote = {value}"
-      ("value", Per_block_votes.adaptive_issuance_vote_encoding)
+      ~name:"unused_config_adaptive_issuance_vote"
+      ~level:Warning
+      ~msg:
+        "Adaptive issuance is now enabled, voting is no longer necessary. \
+         Please remove the vote from your configuration vote file."
+      ()
 end
 
 module Commands = struct
