@@ -13,11 +13,15 @@ ENV BLST_PORTABLE=true
 # https://gitlab.com/dannywillems/ocaml-bls12-381/-/merge_requests/135/
 ENV BLST_PORTABLE=true
 
+ARG APT_PROXY
+ENV APT_PROXY=${APT_PROXY:-false}
 # we trust sw distributors
 # We install sccache as a static binary because at the moment of writing
 # the package sccache is not available on ubuntu jammy
 #hadolint ignore=DL3008,DL3009
-RUN apt-get update && \
+
+RUN echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy && \
+    apt-get update && \
     ARCH=$(uname -m) && \
     case "$ARCH" in \
         x86_64) export PLATFORM="x64" ;; \
