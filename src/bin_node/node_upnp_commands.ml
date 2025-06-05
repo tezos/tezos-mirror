@@ -119,8 +119,8 @@ let patch_config ?data_dir ?config_filename config_file ?listen_addr
   in
   Config_file.write config_filename config_file
 
-let map_port gateway ~local_addr ~local_port ~external_port ~lease_duration
-    ~description ~any_net_port =
+let choose_map_port gateway ~local_addr ~local_port ~external_port
+    ~lease_duration ~description ~any_net_port =
   if any_net_port then
     Octez_igd_next.Igd_next_gen.gateway_map_any_port
       gateway
@@ -140,9 +140,9 @@ let map_port gateway ~local_addr ~local_port ~external_port ~lease_duration
       ~description
     |> Result.map (fun () -> external_port)
 
-let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
-    {local_addr; lease_duration; description; any_net_port} ?data_dir
-    ?config_file ?listen_addr ?advertised_net_port () =
+let map_port ?bind_addr ?broadcast_addr ?timeout ?single_search_timeout
+    ?local_addr ?lease_duration ~description ~local_port ~external_port
+    ~any_net_port () =
   let open Lwt_result_syntax in
   let gateway =
     Octez_igd_next.Igd_next_gen.search_gateway
@@ -167,23 +167,45 @@ let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
         else Ok (Int32.of_int l)
     | None -> Ok default_lease_duration
   in
-  let* config_file = resolve_config_file ?data_dir ?config_file () in
-  let* local_port, advertised_net_port =
-    resolve_ports config_file ?listen_addr ?advertised_net_port ()
-  in
-  let external_port = Option.value ~default:local_port advertised_net_port in
   let port =
-    map_port
+    choose_map_port
       gateway
       ~local_addr
       ~local_port
       ~external_port
       ~lease_duration
-      ~description:(Option.value ~default:default_description description)
+      ~description
       ~any_net_port
   in
   match port with
-  | Ok external_port ->
+  | Ok port -> return (local_addr, port)
+  | Error e -> failwith "%s" e
+
+let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
+    {local_addr; lease_duration; description; any_net_port} ?data_dir
+    ?config_file ?listen_addr ?advertised_net_port () =
+  let open Lwt_result_syntax in
+  let* config_file = resolve_config_file ?data_dir ?config_file () in
+  let* local_port, advertised_net_port =
+    resolve_ports config_file ?listen_addr ?advertised_net_port ()
+  in
+  let external_port = Option.value ~default:local_port advertised_net_port in
+  let*! port =
+    map_port
+      ?bind_addr
+      ?broadcast_addr
+      ?timeout
+      ?single_search_timeout
+      ?local_addr
+      ?lease_duration
+      ~description:(Option.value ~default:default_description description)
+      ~local_port
+      ~external_port
+      ~any_net_port
+      ()
+  in
+  match port with
+  | Ok (local_addr, external_port) ->
       (* Note that the external IP can be retrieved from the gateway, but it
          avoids leaking it in the logs. *)
       Format.printf
@@ -199,7 +221,7 @@ let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
           ()
       in
       return_unit
-  | Error e -> failwith "%s" e
+  | Error e -> fail e
 
 let map_port_cmd search_options mapping_options ?data_dir ?config_file
     ?listen_addr ?advertised_net_port () =
