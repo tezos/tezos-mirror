@@ -34,8 +34,7 @@ type incremental = {
   header : Tezos_base.Block_header.shell_header;
 }
 
-val load_context :
-  context_root_path:string -> Abstract_context_index.t tzresult Lwt.t
+val load_context : data_dir:string -> Abstract_context_index.t tzresult Lwt.t
 
 (** Make sure that the given context is consistent by trying to read in it *)
 val check_context_consistency :

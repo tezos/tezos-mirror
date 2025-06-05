@@ -371,7 +371,7 @@ let attestation_quorum state =
 let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?force_apply_from_round ?(force = false) ?(minimal_timestamp = false)
-    ?extra_operations ?context_root_path ?state_recorder delegates =
+    ?extra_operations ?data_dir ?state_recorder delegates =
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let cache = Baking_cache.Block_cache.create 10 in
@@ -381,7 +381,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
-      ?context_root_path
+      ?data_dir
       ?force_apply_from_round
       ~force
       ?extra_operations
@@ -772,7 +772,7 @@ let rec baking_minimal_timestamp ~count state
 let bake (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?force_apply_from_round ?force ?(minimal_timestamp = false)
-    ?extra_operations ?(monitor_node_mempool = true) ?context_root_path
+    ?extra_operations ?(monitor_node_mempool = true) ?data_dir
     ?dal_node_endpoint ?(count = 1) ?votes ?state_recorder delegates =
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
@@ -781,7 +781,7 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
-      ?context_root_path
+      ?data_dir
       ?force_apply_from_round
       ?force
       ?extra_operations
