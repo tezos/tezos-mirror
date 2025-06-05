@@ -75,6 +75,7 @@ blueprint_application:
           "txs_nb": integer ∈ [-2^30, 2^30],
           "gas_used": $positive_bignum,
           "block_hash": $unistring,
+          "execution_gas": $positive_bignum,
           "process_time": $timespan.system } }
     $positive_bignum:
       /* Positive big number

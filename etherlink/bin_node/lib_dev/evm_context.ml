@@ -624,15 +624,26 @@ module State = struct
         return_true
     | None -> return_false
 
-  let store_block_unsafe conn evm_state block =
+  let execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_ =
+    let da_fees =
+      Fees.gas_used_for_da_fees
+        ~da_fee_per_byte
+        ~base_fee_per_gas
+        Ethereum_types.(object_.input |> hex_to_real_bytes)
+    in
+    let (Qty gas_used) = receipt.Transaction_receipt.gasUsed in
+    Z.sub gas_used da_fees
+
+  let store_block_unsafe ~base_fee_per_gas ~da_fee_per_byte conn evm_state block
+      =
     let open Lwt_result_syntax in
     (* Store the block itself. *)
     let* () = Evm_store.Blocks.store conn block in
     (* Store all transactions from the block. *)
     match block.transactions with
     | Ethereum_types.TxHash hashes ->
-        List.map_es
-          (fun hash ->
+        List.fold_left_map_es
+          (fun cumulative_execution_gas hash ->
             let* receipt =
               let* receipt_opt =
                 Etherlink_durable_storage.transaction_receipt
@@ -658,7 +669,16 @@ module State = struct
             in
             let info = Transaction_info.of_receipt_and_object receipt object_ in
             let* () = Evm_store.Transactions.store conn info in
-            return receipt)
+            return
+              ( Z.add
+                  cumulative_execution_gas
+                  (execution_gas
+                     ~base_fee_per_gas
+                     ~da_fee_per_byte
+                     receipt
+                     object_),
+                receipt ))
+          Z.zero
           hashes
     | TxFull _ ->
         (* Block must be read without the transactions objects. Even though
@@ -794,17 +814,34 @@ module State = struct
             {number = block_number; timestamp; payload}
         in
 
-        let* evm_state, receipts =
+        let* evm_state, receipts, execution_gas =
           if not ctxt.legacy_block_storage then
-            let* receipts =
+            let* execution_gas, receipts =
               match block with
-              | Eth block -> store_block_unsafe conn evm_state block
-              | Tez block -> store_tez_block_unsafe conn block
+              | Eth block ->
+                  let* da_fee_per_byte =
+                    Etherlink_durable_storage.da_fee_per_byte
+                      (read_from_state evm_state)
+                  in
+                  let* (Qty base_fee_per_gas) =
+                    Etherlink_durable_storage.base_fee_per_gas
+                      (read_from_state evm_state)
+                  in
+                  store_block_unsafe
+                    ~da_fee_per_byte
+                    ~base_fee_per_gas
+                    conn
+                    evm_state
+                    block
+              | Tez block ->
+                  let+ receipts = store_tez_block_unsafe conn block in
+                  (* TODO: support extracting the execution gas *)
+                  (Z.zero, receipts)
             in
             let*! evm_state =
               Evm_state.clear_block_storage chain_family block evm_state
             in
-            return (evm_state, receipts)
+            return (evm_state, receipts, execution_gas)
           else
             let*! receipts =
               match block with
@@ -816,7 +853,7 @@ module State = struct
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
                   Lwt.return []
             in
-            return (evm_state, receipts)
+            return (evm_state, receipts, Z.zero)
         in
         List.iter (Lwt_watcher.notify receipt_watcher) receipts ;
 
@@ -834,7 +871,13 @@ module State = struct
         let* context, split_info =
           commit_next_head ctxt conn timestamp evm_state
         in
-        return (evm_state, context, block, applied_kernel_upgrade, split_info)
+        return
+          ( evm_state,
+            context,
+            block,
+            applied_kernel_upgrade,
+            split_info,
+            execution_gas )
     | Apply_failure (* Did not produce a block *) ->
         let*! () =
           if is_sequencer ctxt then
@@ -919,50 +962,60 @@ module State = struct
   let rec apply_blueprint ?(events = []) ctxt conn timestamp payload
       delayed_transactions : 'a L2_types.block tzresult Lwt.t =
     let open Lwt_result_syntax in
-    Misc.with_timing_f_e Blueprint_events.blueprint_applied @@ fun () ->
-    let* evm_state, context, current_block, applied_kernel_upgrade, split_info =
-      let* () = apply_evm_events conn ctxt events in
-      apply_blueprint_store_unsafe
-        ctxt
-        conn
-        timestamp
-        payload
-        delayed_transactions
-    in
-    let kernel_upgrade =
-      match ctxt.session.pending_upgrade with
-      | Some {injected_before; kernel_upgrade}
-        when injected_before = ctxt.session.next_blueprint_number ->
-          Some kernel_upgrade
-      | _ -> None
-    in
+    let+ current_block, _execution_gas =
+      Misc.with_timing_f_e (fun (block, execution_gas) ->
+          Blueprint_events.blueprint_applied block execution_gas)
+      @@ fun () ->
+      let* ( evm_state,
+             context,
+             current_block,
+             applied_kernel_upgrade,
+             split_info,
+             execution_gas ) =
+        let* () = apply_evm_events conn ctxt events in
+        apply_blueprint_store_unsafe
+          ctxt
+          conn
+          timestamp
+          payload
+          delayed_transactions
+      in
+      let kernel_upgrade =
+        match ctxt.session.pending_upgrade with
+        | Some {injected_before; kernel_upgrade}
+          when injected_before = ctxt.session.next_blueprint_number ->
+            Some kernel_upgrade
+        | _ -> None
+      in
 
-    let* current_block =
-      match current_block with
-      | Eth block ->
-          let*? current_block =
-            Transaction_object.reconstruct_block payload block
-          in
-          return (L2_types.Eth current_block)
-      | Tez block -> return (L2_types.Tez block)
-    in
+      let* current_block =
+        match current_block with
+        | Eth block ->
+            let*? current_block =
+              Transaction_object.reconstruct_block payload block
+            in
+            return (L2_types.Eth current_block)
+        | Tez block -> return (L2_types.Tez block)
+      in
 
-    let*! () =
-      on_new_head
-        ?split_info
-        ctxt
-        ~applied_upgrade:applied_kernel_upgrade
-        evm_state
-        context
-        current_block
-        {
-          delayed_transactions;
-          kernel_upgrade;
-          blueprint =
-            {number = ctxt.session.next_blueprint_number; timestamp; payload};
-        }
+      let*! () =
+        on_new_head
+          ?split_info
+          ctxt
+          ~applied_upgrade:applied_kernel_upgrade
+          evm_state
+          context
+          current_block
+          {
+            delayed_transactions;
+            kernel_upgrade;
+            blueprint =
+              {number = ctxt.session.next_blueprint_number; timestamp; payload};
+          }
+      in
+      return (current_block, execution_gas)
     in
-    return current_block
+    current_block
 
   and apply_evm_event_unsafe ctxt conn evm_state event latest_finalized_level =
     let open Lwt_result_syntax in

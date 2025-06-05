@@ -26,7 +26,7 @@ let publisher_shutdown =
     ()
 
 let blueprint_application =
-  declare_6
+  declare_7
     ~name:"blueprint_application"
     ~section
     ~msg:"head is now {level}, applied in {process_time}{timestamp}"
@@ -38,12 +38,13 @@ let blueprint_application =
         let age = Ptime.diff now timestamp in
         Format.fprintf fmt " (%a old)" Ptime.Span.pp age
       else ())
-    ~pp6:Time.System.Span.pp_hum
+    ~pp7:Time.System.Span.pp_hum
     ("level", Data_encoding.n)
     ("timestamp", Time.Protocol.rfc_encoding)
     ("txs_nb", Data_encoding.int31)
     ("gas_used", Data_encoding.n)
     ("block_hash", Ethereum_types.block_hash_encoding)
+    ("execution_gas", Data_encoding.n)
     ("process_time", Time.System.Span.encoding)
 
 let blueprint_replayed =
@@ -197,7 +198,7 @@ let blueprint_injected_on_DAL ~level ~nb_chunks =
 let blueprint_injection_failed level trace =
   emit blueprint_injection_failure (level, trace)
 
-let blueprint_applied block process_time =
+let blueprint_applied block execution_gas process_time =
   let open Ethereum_types in
   match block with
   | L2_types.Eth block ->
@@ -212,6 +213,7 @@ let blueprint_applied block process_time =
           count_txs block.transactions,
           Qty.to_z block.gasUsed,
           block.hash,
+          execution_gas,
           process_time )
   | Tez block ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
@@ -222,6 +224,7 @@ let blueprint_applied block process_time =
           0,
           Z.zero,
           block.hash,
+          execution_gas,
           process_time )
 
 let blueprint_replayed ~execution_gas:(Ethereum_types.Qty execution_gas)
