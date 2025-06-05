@@ -83,6 +83,12 @@ been produced for the correct expected public keys. This allows for numerous
 applications like mutli-signatures schemes, multi-party key exchanges,
 signatures compaction, etc. BLS is notably used by Zcash and Ethereum 2.0.
 
+Starting in protocol S, ``tz4`` addresses can be used by bakers, to forge blocks
+and :ref:`consensus operations <consensus_operations_alpha>`. The aggregatable property of BLS signatures is used with
+consensus operations to reduce the size signatures take in each block. Such bakers that
+also wish to participate in the DAL are required to register a :ref:`companion key <companion_key>`,
+that is used to sign the DAL specific attestation and aggregate it with the regular attestation.
+
 Smart contracts
 ~~~~~~~~~~~~~~~
 
