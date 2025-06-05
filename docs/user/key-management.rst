@@ -11,6 +11,7 @@ Indeed, by default:
 - Private keys are stored unencrypted in file ``$OCTEZ_CLIENT_DIR/secret_keys``.
 - The client uses these keys to sign user operations (e.g. transfers) by itself.
 - The baker daemon uses these keys to automatically sign its operations (e.g. (pre-)attestations).
+- The baker's own key is used to sign consensus operations and :doc:`DAL <../shell/dal>` attestations.
 
 The solutions provided to strengthen the security of the default key management and signing are the following:
 
@@ -23,6 +24,8 @@ The solutions provided to strengthen the security of the default key management 
 - If you don't have a hardware wallet, the option ``--encrypted`` of the client offers a first protection for storing your keys.
 
 - A separate signer daemon allows to decouple the client and baker from the signing process.
+
+- Separate keys (known as "consensus key" and "companion key") can be used to sign consensus operations and/or DAL attestations, respectively.
 
   In particular, this allows executing the signer remotely (that is, on a different machine than the client and/or the baker), perhaps less exposed to attacks.
 
