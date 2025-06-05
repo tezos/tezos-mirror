@@ -288,6 +288,12 @@ conflicts: [
 available: os-family != "windows"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 pin-depends: [
-  "stdcompat.19"
-  "git+https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99"
+  [
+    "base.v0.16.4"
+    "git+https://github.com/vch9/base.git#1d0cdedec2a8c63608d3c34531565903d5918ff6"
+  ]
+  [
+    "stdcompat.19"
+    "git+https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99"
+  ]
 ]
