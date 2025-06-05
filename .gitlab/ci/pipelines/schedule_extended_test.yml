@@ -3169,7 +3169,10 @@ tezt:
     ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
     ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
-    5_000_000_000
+    5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
   - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
@@ -3232,7 +3235,10 @@ tezt-time-sensitive:
     ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
     ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
-    5_000_000_000
+    5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
   - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
@@ -3293,7 +3299,11 @@ tezt-slow:
     --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak
     'dd_tags[memory.peak]' --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky'
+    --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive' --junit-tag 'dd_tags[tezt-tag.slow]=slow'
+    --junit-tag 'dd_tags[tezt-tag.extra]=extra' --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure'
+    --junit-tag 'dd_tags[tezt-tag.layer1]=layer1' --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2'
+    --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -slow
@@ -3353,7 +3363,10 @@ tezt-extra:
     ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
     ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
-    5_000_000_000
+    5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -extra
@@ -3413,7 +3426,10 @@ tezt-flaky:
     ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
     ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
-    5_000_000_000
+    5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
   - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
@@ -3471,7 +3487,10 @@ tezt:static-binaries:
     ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
     ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
-    5_000_000_000
+    5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: ""
