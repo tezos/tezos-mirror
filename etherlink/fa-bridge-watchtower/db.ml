@@ -10,7 +10,7 @@ open Caqti_request.Infix
 open Caqti_type.Std
 
 (** Current version for migrations. *)
-let version = 0
+let version = 1
 
 module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
 
@@ -304,7 +304,7 @@ module Deposits = struct
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       |sql}
 
-    let unclaimed =
+    let unclaimed_ignore_whitelist =
       (unit ->* deposit)
       @@ {sql|
       SELECT
@@ -314,7 +314,22 @@ module Deposits = struct
       ORDER BY nonce DESC
       |sql}
 
-    let unclaimed_full =
+    let unclaimed =
+      (unit ->* deposit)
+      @@ {sql|
+      SELECT
+       d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount
+      FROM deposits d
+      JOIN whitelist w
+      ON (
+       (d.proxy = w.proxy or w.proxy IS NULL)
+       AND
+       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
+      where d.exec_transactionHash IS NULL
+      ORDER BY nonce DESC
+      |sql}
+
+    let unclaimed_full_ignore_whitelist =
       (unit ->* t2 deposit log_info)
       @@ {sql|
       SELECT
@@ -326,7 +341,24 @@ module Deposits = struct
       ORDER BY nonce DESC
       |sql}
 
-    let list =
+    let unclaimed_full =
+      (unit ->* t2 deposit log_info)
+      @@ {sql|
+      SELECT
+       nonce, d.proxy, d.ticket_hash, receiver, amount,
+       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
+       log_blockNumber, log_removed
+      FROM deposits d
+      JOIN whitelist w
+      ON (
+       (d.proxy = w.proxy or w.proxy IS NULL)
+       AND
+       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
+      where exec_transactionHash IS NULL
+      ORDER BY nonce DESC
+      |sql}
+
+    let list_ignore_whitelist =
       (t2 int int ->* deposit_log)
       @@ {sql|
       SELECT
@@ -339,7 +371,25 @@ module Deposits = struct
       ORDER BY nonce DESC LIMIT ? OFFSET ?
       |sql}
 
-    let list_by_receiver =
+    let list =
+      (t2 int int ->* deposit_log)
+      @@ {sql|
+      SELECT
+       nonce, d.proxy, d.ticket_hash, receiver, amount,
+       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
+       log_blockNumber, log_removed,
+       exec_transactionHash, exec_transactionIndex, exec_blockHash,
+       exec_blockNumber
+      FROM deposits d
+      JOIN whitelist w
+      ON (
+       (d.proxy = w.proxy or w.proxy IS NULL)
+       AND
+       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
+      ORDER BY nonce DESC LIMIT ? OFFSET ?
+      |sql}
+
+    let list_by_receiver_ignore_whitelist =
       (t3 address int int ->* deposit_log)
       @@ {sql|
       SELECT
@@ -349,6 +399,25 @@ module Deposits = struct
        exec_transactionHash, exec_transactionIndex, exec_blockHash,
        exec_blockNumber
       FROM deposits
+      WHERE receiver = ?
+      ORDER BY nonce DESC LIMIT ? OFFSET ?
+      |sql}
+
+    let list_by_receiver =
+      (t3 address int int ->* deposit_log)
+      @@ {sql|
+      SELECT
+       nonce, d.proxy, d.ticket_hash, receiver, amount,
+       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
+       log_blockNumber, log_removed,
+       exec_transactionHash, exec_transactionIndex, exec_blockHash,
+       exec_blockNumber
+      FROM deposits d
+      JOIN whitelist w
+      ON (
+       (d.proxy = w.proxy or w.proxy IS NULL)
+       AND
+       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
       WHERE receiver = ?
       ORDER BY nonce DESC LIMIT ? OFFSET ?
       |sql}
@@ -393,10 +462,6 @@ module Deposits = struct
     with_connection db conn @@ fun conn ->
     Sqlite.Db.rev_collect_list conn Q.unclaimed_full ()
 
-  let set_claimed ?conn db nonce execution_info =
-    with_connection db conn @@ fun conn ->
-    Sqlite.Db.exec conn Q.set_claimed (execution_info, nonce)
-
   let list ?conn db ~limit ~offset =
     with_connection db conn @@ fun conn ->
     Sqlite.Db.collect_list conn Q.list (limit, offset)
@@ -404,6 +469,29 @@ module Deposits = struct
   let list_by_receiver ?conn db addr ~limit ~offset =
     with_connection db conn @@ fun conn ->
     Sqlite.Db.collect_list conn Q.list_by_receiver (addr, limit, offset)
+
+  let get_unclaimed_ignore_whitelist ?conn db =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.unclaimed_ignore_whitelist ()
+
+  let get_unclaimed_full_ignore_whitelist ?conn db =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.unclaimed_full_ignore_whitelist ()
+
+  let list_ignore_whitelist ?conn db ~limit ~offset =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.list_ignore_whitelist (limit, offset)
+
+  let list_by_receiver_ignore_whitelist ?conn db addr ~limit ~offset =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.collect_list
+      conn
+      Q.list_by_receiver_ignore_whitelist
+      (addr, limit, offset)
+
+  let set_claimed ?conn db nonce execution_info =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.set_claimed (execution_info, nonce)
 
   let delete_before ?conn db level =
     with_connection db conn @@ fun conn ->
@@ -441,4 +529,45 @@ module Pointers = struct
     let get ?conn db =
       with_connection db conn @@ fun conn -> Sqlite.Db.find conn Q.get ()
   end
+end
+
+module Whitelist = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (t2 (option address) (option hash) ->. unit)
+      @@ {sql|
+      INSERT INTO whitelist
+      (proxy, ticket_hash)
+      VALUES (?, ?)
+      |sql}
+
+    let clear = (unit ->. unit) @@ {sql| DELETE FROM whitelist |sql}
+  end
+
+  let insert ?conn db pth =
+    with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.insert pth
+
+  let clear ?conn db =
+    with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.clear ()
+
+  let register db (whitelist : Config.whitelist_item list option) =
+    let open Lwt_result_syntax in
+    with_transaction db @@ fun conn ->
+    let* () = clear ~conn db in
+    match whitelist with
+    | None ->
+        (* Matches every deposit log *)
+        insert ~conn db (None, None)
+    | Some whitelist ->
+        List.iter_es
+          (fun {Config.proxy; ticket_hashes} ->
+            match ticket_hashes with
+            | None -> insert ~conn db (proxy, None)
+            | Some ticket_hashes ->
+                List.iter_es
+                  (fun ticket_hash -> insert ~conn db (proxy, Some ticket_hash))
+                  ticket_hashes)
+          whitelist
 end

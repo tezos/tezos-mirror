@@ -82,6 +82,12 @@ module Arg = struct
     @@ Tezos_clic.parameter (fun _ x ->
            Lwt_result.return (Ethereum_types.Qty (Z.of_string x)))
 
+  let monitor_all_deposits =
+    Tezos_clic.switch
+      ~long:"monitor-all-deposits"
+      ~doc:"Monitor and store all deposits in the DB."
+      ()
+
   let level_param ~desc =
     Tezos_clic.param ~name:"level" ~desc
     @@ Tezos_clic.parameter (fun _ x ->
@@ -147,21 +153,34 @@ let run_command =
   om_command
     ~group:run_group
     ~desc:"Start FA bridge watchtower"
-    (args3 Arg.evm_node_endpoint Arg.secret_key Arg.first_block)
+    (args4
+       Arg.evm_node_endpoint
+       Arg.secret_key
+       Arg.first_block
+       Arg.monitor_all_deposits)
     (prefixes ["run"] @@ stop)
-    (fun {data_dir; verbosity} (evm_node_endpoint, secret_key, first_block) _ ->
+    (fun {data_dir; verbosity}
+         (evm_node_endpoint, secret_key, first_block, monitor_all_deposits)
+         _ ->
       let open Lwt_result_syntax in
       let* loaded_config = Config.load_file ~data_dir in
       let config = Option.value ~default:Config.default loaded_config in
       let*! () = log_config ~verbosity ~data_dir in
       let* db = Db.init ~data_dir `Read_write in
-      let config = Config.patch_config config ~secret_key ~evm_node_endpoint in
+      let config =
+        Config.patch_config
+          config
+          ~secret_key
+          ~evm_node_endpoint
+          ~monitor_all_deposits
+      in
       let* () =
         match config.secret_key with
         | Some _ -> return_unit
         | None ->
             failwith "secret key not provided neither in config, cli nor env"
       in
+      let* () = Db.Whitelist.register db config.whitelist in
       let*! notify_ws_change =
         match config.rpc with
         | None -> Lwt.return ignore
