@@ -26,7 +26,7 @@ module type BAKER_COMMANDS_HELPERS = sig
     ?pre_emptive_forge_time:Q.t ->
     ?force_apply_from_round:int ->
     ?remote_calls_timeout:Q.t ->
-    ?context_path:string ->
+    ?data_dir:string ->
     ?state_recorder:bool ->
     chain:Shell_services.chain ->
     keep_alive:bool ->
