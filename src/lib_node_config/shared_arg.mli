@@ -99,6 +99,10 @@ val process_command : unit tzresult Lwt.t -> unit Cmdliner.Term.ret
 module Term : sig
   val args : t Cmdliner.Term.t
 
+  val listen_addr : string option Cmdliner.Term.t
+
+  val advertised_net_port : int option Cmdliner.Term.t
+
   val data_dir : string option Cmdliner.Term.t
 
   val config_file : string option Cmdliner.Term.t

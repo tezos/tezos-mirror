@@ -5,4 +5,8 @@ open! Bigarray
 (* file: lib.rs *)
 
 type gateway
+type protocol = Tcp | Udp
 external search_gateway: bind_addr:string option -> broadcast_address: string option -> timeout:float option -> single_search_timeout: float option -> (gateway, string) result = "search_gateway"
+external gateway_map_port: gateway -> protocol -> local_addr:string -> local_port:int -> external_port:int -> lease_duration:int32 -> description:string -> (unit, string) result = "gateway_map_port_bytecode" "gateway_map_port"
+external gateway_map_any_port: gateway -> protocol -> local_addr:string -> local_port:int -> lease_duration:int32 -> description:string -> (int, string) result = "gateway_map_any_port_bytecode" "gateway_map_any_port"
+external gateway_ip: gateway -> string = "gateway_ip"

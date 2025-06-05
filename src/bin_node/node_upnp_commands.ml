@@ -5,31 +5,171 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type options = {
+type discovery_options = {
   bind_addr : string option;
   broadcast_addr : string option;
   timeout : float option;
   single_search_timeout : float option;
 }
 
-let search_gateway {bind_addr; broadcast_addr; timeout; single_search_timeout}
-    () =
-  match
+type mapping_options = {
+  local_addr : string option;
+  lease_duration : int option;
+  description : string option;
+}
+
+(* The duration depends on UPNP/IGV version:
+   - If the gateway implements v1, the lease is unlimited
+   - If the gateway implements v2, the lease is the maximum allocated time,
+   which is 604800 seconds, i.e. one week.
+
+   See specification at
+   https://upnp.org/specs/gw/UPnP-gw-WANIPConnection-v2-Service.pdf, paragraph
+   2.3.16.
+*)
+let default_lease_duration = 0l
+
+let default_description = "octez-node P2P"
+
+(* This is a ugly hack to get the IP assigned to the machine as seen by the
+   gateway. It avoids having to give it manually.
+
+   The idea is simple: open a socket to the gateway, on any port. The socket
+   information will contain the IP used by the network interface to open the
+   connection. Technically it should work even if the address is unreachable.
+
+   Technically opening a socket on any distant address should work, but opening
+   it to the gateway ensures the right network interface is used.
+*)
+let get_local_network_ip gateway_ip =
+  let open Lwt_syntax in
+  let sockaddr = Unix.ADDR_INET (Unix.inet_addr_of_string gateway_ip, 80) in
+  let sock = Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM 0 in
+  Lwt.finalize
+    (fun () ->
+      let* () = Lwt_unix.connect sock sockaddr in
+      let local_sockaddr = Lwt_unix.getsockname sock in
+      match local_sockaddr with
+      | Unix.ADDR_INET (addr, _) -> return_some (Unix.string_of_inet_addr addr)
+      | _ -> return_none)
+    (fun () -> Lwt_unix.close sock)
+
+let handle_local_address gateway local_addr =
+  let open Lwt_result_syntax in
+  match local_addr with
+  | Some local_addr -> return local_addr
+  | None -> (
+      let gateway_ip = Octez_igd_next.Igd_next_gen.gateway_ip gateway in
+      let*! addr = get_local_network_ip gateway_ip in
+      match addr with
+      | Some a -> return a
+      | None ->
+          failwith
+            "Cannot determine machine network address, please give it using \
+             the option `--local-addr`.")
+
+let resolve_config_file ?data_dir ?config_file () =
+  let open Lwt_result_syntax in
+  let* _, config_file =
+    Shared_arg.resolve_data_dir_and_config_file ?data_dir ?config_file ()
+  in
+  return config_file
+
+(* Returns the port where the P2P server is listening, and the port advertised
+   to peer, taking in priority the ports given with the CLI. *)
+let resolve_ports config_file ?listen_addr ?advertised_net_port () =
+  let open Lwt_result_syntax in
+  let* port =
+    let* listening_addrs =
+      Option.either
+        listen_addr
+        config_file.Octez_node_config.Config_file.p2p.listen_addr
+      |> Option.map_es Octez_node_config.Config_file.resolve_listening_addrs
+    in
+    match listening_addrs with
+    | None | Some [] ->
+        failwith "P2P server is disabled, port mapping is irrelevant"
+    | Some ((_addr, port) :: _) -> return port
+  in
+  let advertised_net_port =
+    Option.either
+      advertised_net_port
+      config_file.Octez_node_config.Config_file.p2p.advertised_net_port
+  in
+  return (port, advertised_net_port)
+
+let patch_config ?data_dir config_file ?listen_addr ?advertised_net_port () =
+  Octez_node_config.Config_file.update
+    ?data_dir
+    ?listen_addr
+    ?advertised_net_port
+    config_file
+
+let map_port {bind_addr; broadcast_addr; timeout; single_search_timeout}
+    {local_addr; lease_duration; description} ?data_dir ?config_file
+    ?listen_addr ?advertised_net_port () =
+  let open Lwt_result_syntax in
+  let gateway =
     Octez_igd_next.Igd_next_gen.search_gateway
       ~bind_addr
       ~broadcast_address:broadcast_addr
       ~timeout
       ~single_search_timeout
-  with
-  | Ok _ ->
-      Format.printf "Gateway found\n%!" ;
-      Lwt.return_unit
-  | Error e ->
-      Format.eprintf "Cannot find gateway: %s\n%!" e ;
-      Lwt.return_unit
+  in
+  let*? gateway =
+    match gateway with
+    | Ok g -> Ok g
+    | Error e -> error_with "Cannot find gateway: %s" e
+  in
+  let* local_addr = handle_local_address gateway local_addr in
+  let*? lease_duration =
+    match lease_duration with
+    | Some l ->
+        if l >= 1 lsl 31 then
+          error_with
+            "Please use a duration less than or equal to %ld seconds."
+            Int32.max_int
+        else Ok (Int32.of_int l)
+    | None -> Ok default_lease_duration
+  in
+  let* config_file = resolve_config_file ?data_dir ?config_file () in
+  let* local_port, advertised_net_port =
+    resolve_ports config_file ?listen_addr ?advertised_net_port ()
+  in
+  let external_port = Option.value ~default:local_port advertised_net_port in
+  let port =
+    Octez_igd_next.Igd_next_gen.gateway_map_port
+      gateway
+      Udp
+      ~local_addr
+      ~local_port
+      ~external_port
+      ~lease_duration
+      ~description:(Option.value ~default:default_description description)
+  in
+  match port with
+  | Ok () ->
+      (* Note that the external IP can be retrieved from the gateway, but it
+         avoids leaking it in the logs. *)
+      Format.printf
+        "Redirecting <external_ip>:%d to %s:%d\n%!"
+        external_port
+        local_addr
+        local_port ;
+      let* _ = patch_config config_file ?listen_addr ?advertised_net_port () in
+      return_unit
+  | Error e -> failwith "%s" e
 
-let search_gateway options () =
-  Tezos_base_unix.Event_loop.main_run (search_gateway options)
+let map_port_cmd search_options mapping_options ?data_dir ?config_file
+    ?listen_addr ?advertised_net_port () =
+  Tezos_base_unix.Event_loop.main_run
+    (map_port
+       search_options
+       mapping_options
+       ?data_dir
+       ?config_file
+       ?listen_addr
+       ?advertised_net_port)
 
 module Term = struct
   open Cmdliner
@@ -68,7 +208,35 @@ module Term = struct
       & opt (some float) None
       & info ~docs ~doc ~docv:"SEC" ["single-search-timeout"])
 
-  let options =
+  let local_addr =
+    let doc = "Local network IP address on which the redirection is done." in
+    Arg.(
+      value
+      & opt (some string) None
+      & info ~docs ~doc ~docv:"ADDR" ["local-addr"])
+
+  let lease_duration =
+    let doc =
+      "Lease duration of the mapping, in seconds. Defaults to `0` which either \
+       corresponds to an unlimited lease if the gateway implements UPNP/IGD \
+       v1, or 604800 seconds for UPNP/IGD v2."
+    in
+    Arg.(
+      value
+      & opt (some int) None
+      & info ~docs ~doc ~docv:"SEC" ["lease-duration"])
+
+  let description =
+    let doc =
+      "Name of the mapping, used by UPNP clients/routers to document the \
+       redirection."
+    in
+    Arg.(
+      value
+      & opt (some string) None
+      & info ~docs ~doc ~docv:"DESC" ["mapping-description"])
+
+  let search_options =
     let open Term.Syntax in
     let+ bind_addr
     and+ broadcast_addr
@@ -81,9 +249,32 @@ module Term = struct
       single_search_timeout;
     }
 
-  let process options = `Ok (search_gateway options ())
+  let mapping_options =
+    let open Term.Syntax in
+    let+ local_addr and+ lease_duration and+ description in
+    {local_addr; lease_duration; description}
 
-  let term = Term.(ret (const process $ options))
+  let process config_file data_dir listen_addr advertised_net_port
+      search_options mapping_options =
+    match
+      map_port_cmd
+        search_options
+        mapping_options
+        ?data_dir
+        ?config_file
+        ?listen_addr
+        ?advertised_net_port
+        ()
+    with
+    | Ok () -> `Ok ()
+    | Error e -> `Error (true, Format.asprintf "%a" Error_monad.pp_print_trace e)
+
+  let term =
+    Term.(
+      ret
+        (const process $ Shared_arg.Term.config_file $ Shared_arg.Term.data_dir
+       $ Shared_arg.Term.listen_addr $ Shared_arg.Term.advertised_net_port
+       $ search_options $ mapping_options))
 end
 
 module Manpage = struct
@@ -100,7 +291,7 @@ module Manpage = struct
   (* Note that this command is temporary as a proof of concept, and will evolve
      into a full-fledge port mapping command. As such, the documentation is
      minimal for now as it doesn't make sense. *)
-  let info = Cmdliner.Cmd.info ~doc:"Experimental" ~man "search-gateway"
+  let info = Cmdliner.Cmd.info ~doc:"Experimental" ~man "map-port"
 end
 
 let cmd = Cmdliner.Cmd.v Manpage.info Term.term

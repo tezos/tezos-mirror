@@ -4,15 +4,26 @@
 
 use std::{error::Error, net::SocketAddr, str::FromStr, time::*};
 
-use igd_next::{self, SearchError, SearchOptions};
+use igd_next::{self, PortMappingProtocol, SearchError, SearchOptions};
 use ocaml::{Pointer, Runtime, Value};
 
 #[ocaml::sig]
 pub struct Gateway(igd_next::Gateway);
 
+ocaml::custom!(Gateway);
+
 unsafe impl ocaml::ToValue for Gateway {
     fn to_value(&self, rt: &Runtime) -> Value {
         Pointer::alloc(self.0.clone()).to_value(rt)
+    }
+}
+
+unsafe impl ocaml::FromValue for Gateway {
+    fn from_value(v: Value) -> Self {
+        unsafe {
+            let ptr: *const igd_next::Gateway = v.abstract_ptr_val();
+            Gateway((*ptr).clone())
+        }
     }
 }
 
@@ -73,4 +84,85 @@ pub fn search_gateway(
         Ok(g) => Ok(Gateway(g)),
         Err(err) => Err(err.to_string()),
     }
+}
+
+#[ocaml::sig("Tcp | Udp")]
+#[derive(ocaml::FromValue, ocaml::ToValue)]
+pub enum Protocol {
+    Tcp,
+    Udp,
+}
+
+impl From<Protocol> for PortMappingProtocol {
+    fn from(p: Protocol) -> Self {
+        match p {
+            Protocol::Tcp => PortMappingProtocol::TCP,
+            Protocol::Udp => PortMappingProtocol::UDP,
+        }
+    }
+}
+
+/// Add a port mapping.
+///
+/// The local_addr:local_port is the address where the traffic is sent to.
+/// The lease_duration parameter is in seconds. A value of 0 is infinite or
+/// 604800 seconds, according to the gateway version.
+#[ocaml::func]
+#[ocaml::sig(
+    "gateway -> protocol -> local_addr:string -> local_port:int -> external_port:int -> lease_duration:int32 -> description:string -> (unit, string) result"
+)]
+pub fn gateway_map_port(
+    gateway: &Gateway,
+    protocol: Protocol,
+    local_addr: &str,
+    local_port: u16,
+    external_port: u16,
+    lease_duration: u32,
+    description: &str,
+) -> Result<(), String> {
+    let local_addr = parse_addr(&format!("{local_addr}:{local_port}"))?;
+    gateway
+        .0
+        .add_port(
+            protocol.into(),
+            external_port,
+            local_addr,
+            lease_duration,
+            description,
+        )
+        .map_err(|e| e.to_string())
+}
+
+/// Add a port mapping with any external port.
+///
+/// The local_addr:local_port is the address where the traffic is sent to.
+/// The lease_duration parameter is in seconds. A value of 0 is infinite or
+/// 604800 seconds, according to the gateway version.
+///
+/// # Returns
+///
+/// The external port that was mapped on success. Otherwise an error.
+#[ocaml::func]
+#[ocaml::sig(
+    "gateway -> protocol -> local_addr:string -> local_port:int -> lease_duration:int32 -> description:string -> (int, string) result"
+)]
+pub fn gateway_map_any_port(
+    gateway: &Gateway,
+    protocol: Protocol,
+    local_addr: &str,
+    local_port: u16,
+    lease_duration: u32,
+    description: &str,
+) -> Result<u16, String> {
+    let local_addr = parse_addr(&format!("{local_addr}:{local_port}"))?;
+    gateway
+        .0
+        .add_any_port(protocol.into(), local_addr, lease_duration, description)
+        .map_err(|e| e.to_string())
+}
+
+#[ocaml::func]
+#[ocaml::sig("gateway -> string")]
+pub fn gateway_ip(gateway: &Gateway) -> String {
+    gateway.0.addr.ip().to_string()
 }
