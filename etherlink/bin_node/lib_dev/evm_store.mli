@@ -143,6 +143,14 @@ module Blocks : sig
     Ethereum_types.quantity ->
     Transaction_object.t Ethereum_types.block option tzresult Lwt.t
 
+  (* See {!find_with_level}. Fails if the block is absent from the store
+     instead of returning [None]. *)
+  val get_with_level :
+    full_transaction_object:bool ->
+    conn ->
+    Ethereum_types.quantity ->
+    Transaction_object.t Ethereum_types.block tzresult Lwt.t
+
   (** [tez_find_with_level conn level] returns the block of level [level]
       if it's present in the storage. *)
   val tez_find_with_level :

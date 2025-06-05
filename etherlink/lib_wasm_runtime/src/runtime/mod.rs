@@ -227,7 +227,7 @@ pub fn load_runtime(
             }))
         }
         Some(_) | None => {
-            let kernel = kernels_cache.load(&engine, host.tree())?;
+            let (kernel, _) = kernels_cache.load(&engine, host.tree())?;
             let runtime = WasmRuntime::new(&engine, host, kernel, entrypoint)?;
             Ok(Box::new(runtime))
         }

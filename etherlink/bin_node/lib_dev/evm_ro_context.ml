@@ -424,6 +424,57 @@ let pvm_config ctxt =
     ~destination:ctxt.smart_rollup_address
     ()
 
+let execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_ =
+  let da_fees =
+    Fees.gas_used_for_da_fees
+      ~da_fee_per_byte
+      ~base_fee_per_gas
+      Ethereum_types.(Transaction_object.input object_ |> hex_to_real_bytes)
+  in
+  let (Qty gas_used) = receipt.Transaction_receipt.gasUsed in
+  Z.sub gas_used da_fees
+
+let cumulative_execution_gas ~base_fee_per_gas ~da_fee_per_byte ctxt =
+  let open Lwt_result_syntax in
+  function
+  | L2_types.Eth block ->
+      let hashes =
+        match block.transactions with
+        | TxFull _l -> assert false
+        | TxHash l -> l
+      in
+      let+ result =
+        List.fold_left_es
+          (fun cumulative_execution_gas hash ->
+            let* object_ =
+              Evm_store.(
+                use ctxt.store @@ fun conn -> Transactions.find_object conn hash)
+            in
+            let object_ = WithExceptions.Option.get ~loc:__LOC__ object_ in
+            let+ receipt =
+              Evm_store.(
+                use ctxt.store @@ fun conn ->
+                Transactions.find_receipt conn hash)
+            in
+            let receipt = WithExceptions.Option.get ~loc:__LOC__ receipt in
+            Z.add cumulative_execution_gas
+            @@ execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_)
+          Z.zero
+          hashes
+      in
+      Ethereum_types.Qty result
+  | Tez _ -> return (Ethereum_types.Qty Z.zero)
+
+type replay_result =
+  | Replay_success of {
+      block : Ethereum_types.legacy_transaction_object L2_types.block;
+      evm_state : Evm_state.t;
+      diverged : bool;
+      process_time : Ptime.span;
+      execution_gas : Ethereum_types.quantity;
+    }
+  | Replay_failure
+
 let replay ctxt ?(log_file = "replay") ?profile
     ?(alter_evm_state = Lwt_result_syntax.return) (Ethereum_types.Qty number) =
   let open Lwt_result_syntax in
@@ -434,23 +485,71 @@ let replay ctxt ?(log_file = "replay") ?profile
     Evm_store.use ctxt.store @@ fun conn ->
     Evm_store.Blueprints.get_with_events conn (Qty number)
   in
+  let* expected_block =
+    if ctxt.block_storage_sqlite3 then
+      Evm_store.use ctxt.store @@ fun conn ->
+      Evm_store.Blocks.get_with_level
+        ~full_transaction_object:false
+        conn
+        (Qty number)
+    else failwith "Todo: support legacy mode"
+  in
   let log_file = Printf.sprintf "%s_%s" log_file (Z.to_string number) in
-  Evm_state.apply_blueprint
-    ~log_file
-    ?profile
-    ~data_dir:ctxt.data_dir
-    ~chain_family:EVM
-    ~config:(pvm_config ctxt)
-    ~native_execution_policy:ctxt.native_execution_policy
-    evm_state
-    blueprint.blueprint.payload
+  let*! () = Evm_state.preload_kernel evm_state in
+  let process_time = ref (Ptime.Span.of_int_s 0) in
+  let* apply_result =
+    Misc.with_timing (fun dt ->
+        process_time := dt ;
+        Lwt.return_unit)
+    @@ fun () ->
+    Evm_state.apply_blueprint
+      ~log_file
+      ?profile
+      ~data_dir:ctxt.data_dir
+      ~chain_family:EVM
+      ~config:(pvm_config ctxt)
+      ~native_execution_policy:ctxt.native_execution_policy
+      evm_state
+      blueprint.blueprint.payload
+  in
+  match apply_result with
+  | Apply_success {block; evm_state} ->
+      let* (Qty base_fee_per_gas) =
+        Etherlink_durable_storage.base_fee_per_gas (fun path ->
+            let*! result = Evm_state.inspect evm_state path in
+            return result)
+      in
+      let* da_fee_per_byte =
+        Etherlink_durable_storage.da_fee_per_byte (fun path ->
+            let*! result = Evm_state.inspect evm_state path in
+            return result)
+      in
+      let* execution_gas =
+        cumulative_execution_gas ~base_fee_per_gas ~da_fee_per_byte ctxt block
+      in
+      return
+        (Replay_success
+           {
+             block;
+             evm_state;
+             diverged = L2_types.block_hash block <> expected_block.hash;
+             process_time = !process_time;
+             execution_gas;
+           })
+  | Apply_failure -> return Replay_failure
 
 let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     =
   let module Executor = struct
     let pvm_config = pvm_config ctxt
 
-    let replay = replay ctxt
+    let replay ?log_file ?profile ?alter_evm_state number =
+      let open Lwt_result_syntax in
+      let+ result = replay ctxt ?log_file ?profile ?alter_evm_state number in
+      match result with
+      | Replay_success {block; evm_state; _} ->
+          Evm_state.Apply_success {block; evm_state}
+      | Replay_failure -> Apply_failure
 
     let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
       let open Lwt_result_syntax in

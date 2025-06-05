@@ -23,6 +23,15 @@ val publisher_shutdown : unit -> unit Lwt.t
 val blueprint_applied :
   'transaction_object L2_types.block -> Time.System.Span.t -> unit Lwt.t
 
+(** [blueprint_replayed ~execution_gas ~process_time ~diverged number]
+    advertises that the node was able to replay the blueprint for level [number]. *)
+val blueprint_replayed :
+  execution_gas:Ethereum_types.quantity ->
+  process_time:Time.System.Span.t ->
+  diverged:bool ->
+  Ethereum_types.quantity ->
+  unit Lwt.t
+
 (** [blueprint_injected level] advertizes that a blueprint for level
     [level] has been forwarded to a rollup node  *)
 val blueprint_injected : Z.t -> unit Lwt.t

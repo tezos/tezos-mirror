@@ -20,6 +20,10 @@
 
 ### Execution changes
 
+* `replay blueprint` and `replay blueprints` now log the execution gas, process
+  time and whether or not the produced block diverged from the canonical one
+  for each replayed blueprint. (!18215)
+
 ### Storage changes
 
 ### Documentation changes

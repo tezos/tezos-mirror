@@ -396,9 +396,11 @@ let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
 let preload_kernel evm_state =
   let open Lwt_syntax in
-  let* () = Wasm_runtime.preload_kernel evm_state in
-  let* version = kernel_version evm_state in
-  Events.preload_kernel version
+  let* loaded = Wasm_runtime.preload_kernel evm_state in
+  if loaded then
+    let* version = kernel_version evm_state in
+    Events.preload_kernel version
+  else return_unit
 
 let get_delayed_inbox_item evm_state hash =
   let open Lwt_result_syntax in

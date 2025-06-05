@@ -233,6 +233,25 @@ blueprint_publisher_shutdown:
     { /* blueprint_publisher_shutdown version 0 */
       "blueprint_publisher_shutdown.v0": any }
   
+blueprint_replayed:
+  description: blueprint {level} consuming {execution_gas} gas replayed in {process_time} {diverged} divergence
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* blueprint_replayed version 0 */
+      "blueprint_replayed.v0":
+        { "level": $positive_bignum,
+          "execution_gas": $positive_bignum,
+          "process_time": $timespan.system,
+          "diverged": boolean } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+  
 blueprints_follower_failed:
   description: blueprint follower failed with {trace}
   level: fatal

@@ -6,6 +6,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [gas_used_for_da_fees ~da_fee_per_byte ~base_fee_per_gas ?access_list
+    tx_data] computes the amount of gas unit taken by the kernel to reimburse
+    the sequencer for its L1 costs, given the provided [base_fee_per_gas]. *)
+val gas_used_for_da_fees :
+  da_fee_per_byte:Ethereum_types.quantity ->
+  base_fee_per_gas:Z.t ->
+  ?access_list:('a * 'b trace) trace ->
+  bytes ->
+  Z.t
+
 (** [da_fees_gas_limit_overhead ~da_fee_per_byte ~base_fee_per_gas ?access_list tx_data]
     returns the overhead (in gas unit) to be added to the execution gas limit.
     This overhead will be used by the kernel to reimburse the sequencer for its
