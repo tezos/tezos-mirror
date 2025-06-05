@@ -80,7 +80,15 @@ phases required to agree on the next block.
 
 - An ``Attestation`` operation implements a vote for a candidate block
   for which a preattestation quorum certificate (PQC) has been
-  observed.
+  observed. These operations also hold information on :doc:`DAL attestations <../shell/dal_bakers>`
+  when the attesting baker participates in the DAL.
+
+Starting in protocol S, blocks will also be able to include these operations in an aggregated form.
+If the attesting baker uses a tz4 consensus key, thanks to the BLS signature scheme,
+its attestation can be aggregated with all the other tz4 pre/attestations,
+which helps reducing the size and validation time of blocks without compromising on
+security. A valid block can include at most one aggregated preattestation
+and at most one aggregated attestation.
 
 .. _voting_operations_alpha:
 
@@ -187,7 +195,9 @@ manager operations are the only fee-paying and
 
 - The ``Reveal`` operation reveals the public key of the sending
   manager. Knowing this public key is indeed necessary to check the signature
-  of future operations signed by this manager.
+  of future operations signed by this manager. Additionally, when revealing a tz4 public key,
+  the manager must also include a proof of possession, which is the signature
+  of the public key itself.
 - The ``Transaction`` operation allows users to transfer tez
   between accounts, to invoke a smart contract, or to invoke :ref:`pseudo-operations <pseudo_operations_alpha>` on user accounts.
 - The ``Delegation`` operation allows users to designate a :ref:`delegate<def_delegate_alpha>` (a
@@ -195,6 +205,10 @@ manager operations are the only fee-paying and
 - The ``Update_consensus_key`` operation allows users to register a
   :ref:`consensus key<consensus_key_alpha>`, which is a dedicated key
   for signing blocks and consensus-related operations.
+- The ``Update_companion_key`` operation allows users to register a
+  companion key, which is a dedicated key (introduced in protocol S)
+  for signing the DAL specific part of consensus operations,
+  when using a tz4 consensus key.
 - The ``Origination`` operation is used to
   :ref:`originate<def_origination_alpha>`, that is to deploy, smart contracts
   in the Tezos blockchain.
