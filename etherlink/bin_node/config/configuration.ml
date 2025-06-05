@@ -177,6 +177,7 @@ type experimental_features = {
   l2_chains : l2_chain list option;
   enable_tx_queue : tx_queue option;
   periodic_snapshot_path : string option;
+  otel_profiling : bool;
 }
 
 type sequencer = {
@@ -324,6 +325,7 @@ let default_experimental_features =
     l2_chains = default_l2_chains;
     enable_tx_queue = Some default_tx_queue;
     periodic_snapshot_path = None;
+    otel_profiling = false;
   }
 
 let default_rpc_addr = "127.0.0.1"
@@ -1012,6 +1014,7 @@ let experimental_features_encoding =
            l2_chains : l2_chain list option;
            enable_tx_queue;
            periodic_snapshot_path;
+           otel_profiling;
          } ->
       ( ( drop_duplicate_on_injection,
           blueprints_publisher_order_enabled,
@@ -1023,7 +1026,8 @@ let experimental_features_encoding =
           spawn_rpc,
           l2_chains,
           enable_tx_queue,
-          periodic_snapshot_path ) ))
+          periodic_snapshot_path,
+          otel_profiling ) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
@@ -1034,7 +1038,8 @@ let experimental_features_encoding =
              spawn_rpc,
              l2_chains,
              enable_tx_queue,
-             periodic_snapshot_path ) ) ->
+             periodic_snapshot_path,
+             otel_profiling ) ) ->
       {
         drop_duplicate_on_injection;
         blueprints_publisher_order_enabled;
@@ -1045,6 +1050,7 @@ let experimental_features_encoding =
         l2_chains;
         enable_tx_queue;
         periodic_snapshot_path;
+        otel_profiling;
       })
     (merge_objs
        (obj6
@@ -1095,7 +1101,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj5
+       (obj6
           (dft
              "rpc_server"
              ~description:
@@ -1125,7 +1131,12 @@ let experimental_features_encoding =
              "periodic_snapshot_path"
              ~description:"Path to the periodic snapshot file"
              (option string)
-             default_experimental_features.periodic_snapshot_path)))
+             default_experimental_features.periodic_snapshot_path)
+          (dft
+             "otel_profiling"
+             ~description:"Enable or disable opentelemetry profiling"
+             bool
+             default_experimental_features.otel_profiling)))
 
 let proxy_encoding =
   let open Data_encoding in

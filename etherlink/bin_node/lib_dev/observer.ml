@@ -153,6 +153,8 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot () =
   let open Lwt_result_syntax in
   let open Configuration in
+  if config.experimental_features.otel_profiling then
+    Otel.initialize_telemetry ~service_name:"observer" ;
   let*? {
           evm_node_endpoint;
           threshold_encryption_bundler_endpoint;

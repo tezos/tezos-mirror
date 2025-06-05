@@ -494,6 +494,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_result_syntax in
   let open Ethereum_types in
+  Opentelemetry_lwt.Trace.with_ method_ @@ fun _scope ->
   let*! value =
     match
       map_method_name ~rpc_server_family ~restrict:rpc.restricted_rpcs method_

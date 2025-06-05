@@ -160,6 +160,8 @@ let container_forward_request ~public_endpoint ~private_endpoint ~keep_alive :
 let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
+  if config.experimental_features.otel_profiling then
+    Otel.initialize_telemetry ~service_name:"rpc" ;
   let* time_between_blocks =
     Evm_services.get_time_between_blocks
       ~fallback:(Time_between_blocks 10.)
