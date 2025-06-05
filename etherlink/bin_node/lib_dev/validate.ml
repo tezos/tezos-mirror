@@ -41,19 +41,17 @@ let validate_gas_limit ~maximum_gas_limit:(Qty maximum_gas_limit)
   let open Lwt_result_syntax in
   (* Constants defined in the kernel: *)
   let gas_limit = transaction.gas_limit in
-  let gas_for_da_fees =
-    Fees.gas_for_fees
+  let**? execution_gas_limit =
+    (* since Dionysus, the execution gas limit is always computed from the
+       minimum base fee per gas *)
+    Fees.execution_gas_limit
       ~da_fee_per_byte
       ~access_list:transaction.access_list
       ~minimum_base_fee_per_gas
+      ~gas_limit
       transaction.data
   in
-  let** execution_gas_limit =
-    if Z.gt gas_limit gas_for_da_fees then
-      return (Ok (Z.sub gas_limit gas_for_da_fees))
-    else return (Error "Invalid gas_limit for da_fees")
-  in
-  if Z.leq execution_gas_limit maximum_gas_limit then return (Ok ())
+  if Compare.Z.(execution_gas_limit <= maximum_gas_limit) then return (Ok ())
   else
     return
       (Error

@@ -125,7 +125,8 @@ module Make (SimulationBackend : SimulationBackend) = struct
       The whole point of this function is to avoid an unncessary call
       to the WASM PVM to improve the performances.
   *)
-  let gas_for_fees simulation_state tx_data : (Z.t, tztrace) result Lwt.t =
+  let da_fees_gas_limit_overhead simulation_state tx_data :
+      (Z.t, tztrace) result Lwt.t =
     let open Lwt_result_syntax in
     let read_qty path =
       let+ bytes = SimulationBackend.read simulation_state path in
@@ -147,7 +148,10 @@ module Make (SimulationBackend : SimulationBackend) = struct
       | Some minimum_base_feer_per_gas -> return minimum_base_feer_per_gas
     in
     let da_fee =
-      Fees.gas_for_fees ~da_fee_per_byte ~minimum_base_fee_per_gas tx_data
+      Fees.da_fees_gas_limit_overhead
+        ~da_fee_per_byte
+        ~minimum_base_fee_per_gas
+        tx_data
     in
     return da_fee
 
@@ -212,7 +216,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
             | Some (Hash (Hex data)) -> `Hex data |> Hex.to_bytes_exn
             | None -> Bytes.empty
           in
-          let* da_fees = gas_for_fees simulation_state tx_data in
+          let* da_fees = da_fees_gas_limit_overhead simulation_state tx_data in
           let (Qty gas) = gas in
           return @@ quantity_of_z @@ Z.add gas da_fees
     | Ok (Ok {gas_used = None; _}) ->
