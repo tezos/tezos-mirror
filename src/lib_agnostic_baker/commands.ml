@@ -88,9 +88,9 @@ module Dal = struct
 
   let endpoint = arg_to_clic endpoint_arg
 
-  let http_backup_uris = arg_list_to_clic http_backup_uris_arg
+  let slots_backup_uris = arg_list_to_clic slots_backup_uris_arg
 
-  let trust_http_backup_uris = switch_to_clic trust_http_backup_uris_switch
+  let trust_slots_backup_uris = switch_to_clic trust_slots_backup_uris_switch
 
   let ignore_l1_config_peers = switch_to_clic ignore_l1_config_peers_switch
 
@@ -124,8 +124,8 @@ module Dal = struct
       net_addr
       public_addr
       endpoint
-      http_backup_uris
-      trust_http_backup_uris
+      slots_backup_uris
+      trust_slots_backup_uris
       metrics_addr
       attester_profile
       operator_profile

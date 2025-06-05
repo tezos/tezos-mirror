@@ -212,45 +212,70 @@ let get_slot_content_from_shards cryptobox store slot_id =
   in
   return slot
 
-let fetch_slot_from_http_uri ~slot_size ~published_level ~slot_index
-    http_backup_uri =
-  let open Lwt_syntax in
-  let url =
-    Uri.with_path
-      http_backup_uri
-      String.(
-        concat
-          "/"
-          [
-            "v0";
-            "slots";
-            "by_published_level";
-            Format.sprintf "%ld_%d_%d" published_level slot_index slot_size;
-          ])
-  in
-  let* resp, body = Cohttp_lwt_unix.Client.get url in
-  match resp.status with
-  | `OK ->
-      let* body_str = Cohttp_lwt.Body.to_string body in
-      return_some (Bytes.of_string body_str)
-  | #Cohttp.Code.status_code as status ->
-      (* Consume the body of the request in case of failure to avoid leaking stream!
-         See https://github.com/mirage/ocaml-cohttp/issues/730 *)
-      let* _ = Cohttp_lwt.Body.drain_body body in
-      let* () =
-        Event.emit_fetching_slot_from_http_backup_failed
-          ~published_level
-          ~slot_index
-          ~http_backup_uri
-          ~status
+let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
+    backup_uri =
+  let open Lwt_result_syntax in
+  match Uri.scheme backup_uri with
+  | Some "file" ->
+      let slot_filename =
+        Format.sprintf
+          "%s/%ld_%d_%d"
+          (Uri.path_and_query backup_uri)
+          published_level
+          slot_index
+          slot_size
       in
-      return_none
+      if Sys.file_exists slot_filename then
+        let*! content =
+          Lwt.catch
+            (fun () ->
+              let*! res =
+                Lwt_io.with_file ~mode:Lwt_io.Input slot_filename Lwt_io.read
+              in
+              Lwt.return_some (Bytes.of_string res))
+            (fun _ -> Lwt.return_none)
+        in
+        return content
+      else return_none
+  | Some ("http" | "https") -> (
+      let url =
+        Uri.with_path
+          backup_uri
+          String.(
+            concat
+              "/"
+              [
+                "v0";
+                "slots";
+                "by_published_level";
+                Format.sprintf "%ld_%d_%d" published_level slot_index slot_size;
+              ])
+      in
+      let*! resp, body = Cohttp_lwt_unix.Client.get url in
+      match resp.status with
+      | `OK ->
+          let*! body_str = Cohttp_lwt.Body.to_string body in
+          return_some (Bytes.of_string body_str)
+      | #Cohttp.Code.status_code as status ->
+          (* Consume the body of the request in case of failure to avoid leaking stream!
+             See https://github.com/mirage/ocaml-cohttp/issues/730 *)
+          let*! _ = Cohttp_lwt.Body.drain_body body in
+          let*! () =
+            Event.emit_fetching_slot_from_backup_failed
+              ~published_level
+              ~slot_index
+              ~backup_uri
+              ~status
+          in
+          return_none)
+  | Some s ->
+      tzfail (Exn (Failure (Format.sprintf "URI scheme %S not supported" s)))
+  | None -> tzfail (Exn (Failure (Format.sprintf "Bad URI. No URI scheme")))
 
-let try_fetch_slot_from_http_backup ~slot_size ~published_level ~slot_index
-    cryptobox expected_commitment_hash http_backup_uri =
+let try_fetch_slot_from_backup ~slot_size ~published_level ~slot_index cryptobox
+    expected_commitment_hash backup_uri =
   let open Lwt_result_syntax in
   let fetch_and_sanitize_slot_content () =
-    let open Lwt_syntax in
     (* /!\ Warning: We are fetching the slot content as stored by another DAL
        node on disk into its store/slot_store/ directory. Currently the
        home-made KVS we use appends extra bytes at the beginning of each
@@ -260,11 +285,11 @@ let try_fetch_slot_from_http_backup ~slot_size ~published_level ~slot_index
        - fetch the exact slot content, without encoding artifacts when written
          to disk. *)
     let* slot_opt =
-      fetch_slot_from_http_uri
+      fetch_slot_from_backup_uri
         ~slot_size
         ~published_level
         ~slot_index
-        http_backup_uri
+        backup_uri
     in
     match slot_opt with
     | None -> return_none
@@ -274,11 +299,11 @@ let try_fetch_slot_from_http_backup ~slot_size ~published_level ~slot_index
         in
         let obtained_size = Bytes.length slot_bytes in
         if expected_size != obtained_size then
-          let* () =
-            Event.emit_slot_from_http_backup_has_unexpected_size
+          let*! () =
+            Event.emit_slot_from_backup_has_unexpected_size
               ~published_level
               ~slot_index
-              ~http_backup_uri
+              ~backup_uri
               ~expected_size
               ~obtained_size
           in
@@ -290,11 +315,13 @@ let try_fetch_slot_from_http_backup ~slot_size ~published_level ~slot_index
                Key_value_store.file_prefix_bitset_size
                slot_size
   in
-  let*! slot_opt = fetch_and_sanitize_slot_content () in
+  let* slot_opt =
+    fetch_and_sanitize_slot_content () |> Errors.other_lwt_result
+  in
   match (slot_opt, expected_commitment_hash) with
   | None, _ -> return_none
   | Some slot, None ->
-      (* We trust the http server, no extra checks to do. *)
+      (* We trust the backup URI, no extra checks to do. *)
       return_some slot
   | Some slot, Some expected_commitment ->
       let*? polynomial = polynomial_from_slot cryptobox slot in
@@ -303,10 +330,10 @@ let try_fetch_slot_from_http_backup ~slot_size ~published_level ~slot_index
         return_some slot
       else
         let*! () =
-          Event.emit_slot_from_http_backup_has_unexpected_commitment
+          Event.emit_slot_from_backup_has_unexpected_commitment
             ~published_level
             ~slot_index
-            ~http_backup_uri
+            ~backup_uri
             ~expected_commitment
             ~obtained_commitment
         in
@@ -480,19 +507,19 @@ let get_commitment_from_slot_id ctxt slot_id =
           in
           Unable_to_fetch_the_commitment_of_slot_id slot_id |> tzfail)
 
-let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
+let fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id =
   let open Lwt_result_syntax in
   let config : Configuration_file.t = Node_context.get_config ctxt in
   let Types.Slot_id.{slot_index; slot_level = published_level} = slot_id in
-  match config.http_backup_uris with
+  match config.slots_backup_uris with
   | [] ->
-      (* Fail if no http backup URI is configured. *)
+      (* Fail if no backup URI is configured. *)
       fail Errors.not_found
-  | http_backup_uris -> (
+  | backup_uris -> (
       (* We fetch the expected commitment hash from the published slot header on
-         L1 if [trust_http_backup_uris] is false. *)
+         L1 if [trust_slots_backup_uris] is false. *)
       let* expected_commitment_hash =
-        (if config.trust_http_backup_uris then return_none
+        (if config.trust_slots_backup_uris then return_none
          else
            let+ res = get_commitment_from_slot_id ctxt slot_id in
            Option.some res)
@@ -501,14 +528,14 @@ let fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id =
       let* slot_opt =
         List.find_map_es
           (fun uri ->
-            try_fetch_slot_from_http_backup
+            try_fetch_slot_from_backup
               cryptobox
               ~slot_size
               ~published_level
               ~slot_index
               expected_commitment_hash
               uri)
-          http_backup_uris
+          backup_uris
       in
       match slot_opt with
       | None -> fail Errors.not_found
@@ -542,7 +569,7 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
       match res_shard_store with
       | Some (Ok slot) -> return slot
       | Some (Error _) | None ->
-          fetch_slot_from_http_backups ctxt cryptobox ~slot_size slot_id)
+          fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id)
 
 (* Main functions *)
 

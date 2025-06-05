@@ -66,9 +66,9 @@ module Term : sig
 
   val endpoint_arg : Uri.t arg
 
-  val http_backup_uris_arg : Uri.t arg_list
+  val slots_backup_uris_arg : Uri.t arg_list
 
-  val trust_http_backup_uris_switch : switch
+  val trust_slots_backup_uris_switch : switch
 
   val ignore_l1_config_peers_switch : switch
 
@@ -116,12 +116,13 @@ type options = {
   public_addr : P2p_point.Id.t option;
       (** The endpoint on which the DAL node can be contacted by other DAL nodes. *)
   endpoint : Uri.t option;  (** The endpoint on which to contact the L1 node. *)
-  http_backup_uris : Uri.t list;
-      (** (Optional) URIs to use as HTTP backup sources for slot data retrieval,
-          in case the slot is missing locally and reconstruction from shards is
-          not possible. *)
-  trust_http_backup_uris : bool;
-      (** Whether to trust the data downlaoded from the provided HTTP backup URIs. *)
+  slots_backup_uris : Uri.t list;
+      (** (Optional) URIs to use as backup sources for slot data retrieval, in
+          case the slot is missing locally and reconstruction from shards is not
+          possible. Supported URI schemes include [http], [https], and
+          [file]. *)
+  trust_slots_backup_uris : bool;
+      (** Whether to trust the data downlaoded from the provided slots backup URIs. *)
   profile : Profile_manager.unresolved_profile option;
       (** Profiles of the DAL node used for tracking shards. *)
   metrics_addr : P2p_point.Id.t option;  (** Metrics server endpoint. *)

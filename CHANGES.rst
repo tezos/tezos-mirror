@@ -315,6 +315,14 @@ DAL node
   ``delegate`` which restrict the output mesh to topics related to specified slot index
   or delegate pkh (MR :gl:`!17770`).
 
+- The DAL node now supports retrieving missing slot content from backup URIs
+  specified via the ``--slots-backup-uri`` option. Current supported URI schemes
+  include http(s):// and file://, allowing both remote and local fallback
+  sources. An optional ``--trust-slots-backup-uris`` flag can be used to skip
+  cryptographic verification of retrieved data. This is especially useful when
+  replaying history or debugging. (MRs :gl:`!18059`, :gl:`!18074`, :gl:`!18124`
+  and :gl:`!18181`).
+
 Miscellaneous
 -------------
 
