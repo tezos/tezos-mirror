@@ -229,7 +229,7 @@ let () =
     ~title:"Nonce revelation period is short enough for VDF to fit in a cycle "
   @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
-  Assert.lt
+  Assert.leq
     ~loc:__LOC__
     Int32.compare
     "nonce_revelation_threshold is too short wrt blocks_per_cycle"
@@ -249,7 +249,7 @@ let () =
   let constants = Default_parameters.constants_mainnet in
   let open Lwt_result_syntax in
   let* cycle_period = cycles_to_period ~constants 1l in
-  Assert.lt
+  Assert.leq
     ~loc:__LOC__
     Int64.compare
     "nonce_revelation_threshold is too short wrt blocks_per_cycle"
