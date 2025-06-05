@@ -525,6 +525,36 @@ module Get_transaction_receipt = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+type gas_info = {
+  execution_gas : Ethereum_types.quantity;
+  inclusion_gas : Ethereum_types.quantity;
+}
+
+let gas_info_encoding =
+  Data_encoding.(
+    conv
+      (fun {execution_gas; inclusion_gas} -> (execution_gas, inclusion_gas))
+      (fun (execution_gas, inclusion_gas) -> {execution_gas; inclusion_gas})
+    @@ obj2
+         (req "execution_gas" Ethereum_types.quantity_encoding)
+         (req "inclusion_gas" Ethereum_types.quantity_encoding))
+
+module Get_transaction_gas_info = struct
+  open Ethereum_types
+
+  type input = hash
+
+  type output = gas_info option
+
+  let input_encoding = Data_encoding.tup1 hash_encoding
+
+  let output_encoding = Data_encoding.option gas_info_encoding
+
+  let method_ = "tez_getTransactionGasInfo"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Get_transaction_by_hash = struct
   open Ethereum_types
 
@@ -1067,6 +1097,7 @@ let evm_supported_methods : (module METHOD) list =
     (module Get_logs);
     (module Get_uncle_count_by_block_hash);
     (module Get_uncle_count_by_block_number);
+    (module Get_transaction_gas_info);
     (module Get_transaction_receipt);
     (module Get_transaction_by_hash);
     (module Get_transaction_by_block_hash_and_index);
