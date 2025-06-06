@@ -66,7 +66,11 @@ let caqti_lwt = external_lib "caqti-lwt" V.(at_least "2.0.1")
 
 let caqti_lwt_unix = external_sublib caqti_lwt "caqti-lwt.unix"
 
-let caqti_sqlite = external_lib "caqti-driver-sqlite3" V.(at_least "2.0.1")
+let caqti_sqlite =
+  (* We have evidence that latest version of Caqti Sqlite introduces
+     flakiness/hanged connections, at least for the EVM Node. We’ll revert the
+     upperbound once we have identified the issue. *)
+  external_lib "caqti-driver-sqlite3" V.(at_least "2.0.1" && less_than "2.2.0")
 
 let caqti_postgresql =
   external_lib "caqti-driver-postgresql" V.(at_least "2.0.1")
@@ -352,9 +356,7 @@ let () =
     [
       external_lib "merlin" V.(at_least "4.18");
       external_lib "ocaml-lsp-server" V.(at_least "1.20.1");
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7085
-         remove constraint on odoc version when odoc bug is solved *)
-      external_lib "odoc" V.(at_least "2.4.2");
+      external_lib "odoc" V.(at_least "2.4.2" && less_than "3.0.0");
       external_lib "ocp-indent" V.True;
       external_lib "merge-fmt" V.True;
     ]

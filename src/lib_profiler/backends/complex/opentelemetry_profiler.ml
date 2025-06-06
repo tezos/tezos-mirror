@@ -61,7 +61,10 @@ let trace_operation op ?attrs =
 let update_scope s f =
   match s with
   | Some s ->
-      Ambient_context.with_binding Opentelemetry.Scope.ambient_scope_key s f
+      Opentelemetry_ambient_context.with_binding
+        Opentelemetry.Scope.ambient_scope_key
+        s
+        f
   | None -> f ()
 
 type config = {service_name : string; verbosity : Profiler.verbosity}

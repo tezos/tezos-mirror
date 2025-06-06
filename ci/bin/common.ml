@@ -1219,7 +1219,13 @@ module Documentation = struct
            ~expire_in:(Duration (Hours 1))
            (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
            ["docs/_build/api/odoc/"; "docs/odoc.log"])
-      ["make -C docs " ^ target]
+      [
+        "export OPAMFETCH='wget'";
+        "opam remote add default https://opam.ocaml.org/";
+        "opam update";
+        "opam install --yes odoc.2.4.4";
+        "make -C docs " ^ target;
+      ]
     |> enable_cargo_cache |> enable_sccache
 
   (** Create the manuals job.
