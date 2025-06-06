@@ -14,7 +14,7 @@ strum.workspace = true
 ocaml.workspace = true
 
 [dependencies.octez-riscv]
-path = "../lib"
+git = "https://github.com/tezos/riscv-pvm.git"
 
 [dependencies.ocaml-sys]
 # We don't care about the version. Ideally this gets pinned to what `ocaml` needs.

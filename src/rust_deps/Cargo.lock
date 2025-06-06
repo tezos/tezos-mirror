@@ -2592,6 +2592,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv"
 version = "0.0.0"
+source = "git+https://github.com/tezos/riscv-pvm.git#314c54e7a340c4a29af3317573272cbf834053bd"
 dependencies = [
  "arbitrary-int",
  "bincode",
@@ -3884,6 +3885,7 @@ checksum = "23d434d3f8967a09480fb04132ebe0a3e088c173e6d0ee7897abbdf4eab0f8b9"
 [[package]]
 name = "tezos-smart-rollup-build-utils"
 version = "0.2.2"
+source = "git+https://github.com/tezos/riscv-pvm.git#314c54e7a340c4a29af3317573272cbf834053bd"
 dependencies = [
  "rustc_version",
 ]
@@ -3891,10 +3893,12 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-constants"
 version = "0.2.2"
+source = "git+https://github.com/tezos/riscv-pvm.git#314c54e7a340c4a29af3317573272cbf834053bd"
 
 [[package]]
 name = "tezos-smart-rollup-core"
 version = "0.2.2"
+source = "git+https://github.com/tezos/riscv-pvm.git#314c54e7a340c4a29af3317573272cbf834053bd"
 dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-constants",
@@ -3903,6 +3907,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-encoding"
 version = "0.2.2"
+source = "git+https://github.com/tezos/riscv-pvm.git#314c54e7a340c4a29af3317573272cbf834053bd"
 dependencies = [
  "hex",
  "nom 7.1.3",
@@ -3921,6 +3926,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-host"
 version = "0.2.2"
+source = "git+https://github.com/tezos/riscv-pvm.git#314c54e7a340c4a29af3317573272cbf834053bd"
 dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
@@ -3932,6 +3938,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-mock"
 version = "0.2.2"
+source = "git+https://github.com/tezos/riscv-pvm.git#314c54e7a340c4a29af3317573272cbf834053bd"
 dependencies = [
  "hex",
  "tezos-smart-rollup-core",
@@ -3944,6 +3951,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-utils"
 version = "0.2.2"
+source = "git+https://github.com/tezos/riscv-pvm.git#314c54e7a340c4a29af3317573272cbf834053bd"
 dependencies = [
  "clap 4.5.21",
  "hex",
@@ -3960,6 +3968,7 @@ dependencies = [
 [[package]]
 name = "tezos_crypto_rs"
 version = "0.6.0"
+source = "git+https://github.com/tezos/riscv-pvm.git#314c54e7a340c4a29af3317573272cbf834053bd"
 dependencies = [
  "anyhow",
  "bs58 0.5.1",
@@ -3984,6 +3993,7 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding"
 version = "0.6.0"
+source = "git+https://github.com/tezos/riscv-pvm.git#314c54e7a340c4a29af3317573272cbf834053bd"
 dependencies = [
  "bit-vec",
  "bitvec",
@@ -4000,6 +4010,7 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding_derive"
 version = "0.6.0"
+source = "git+https://github.com/tezos/riscv-pvm.git#314c54e7a340c4a29af3317573272cbf834053bd"
 dependencies = [
  "lazy_static",
  "once_cell",

@@ -26,23 +26,8 @@ SANDBOX_ENABLE_FEATURES ?=
 NIGHTLY_VERSION = nightly-2025-01-30
 
 .PHONY: build
-build: riscv-dummy.elf riscv-sandbox
+build: 
 	@cargo build --release --workspace $(NATIVE_OPT) $(EXTRA_FLAGS)
-	@make -C jstz build
-
-.PHONY: riscv-sandbox
-riscv-sandbox::
-	@cargo build --release --package riscv-sandbox $(NATIVE_OPT) $(SANDBOX_ENABLE_FEATURES:%=-F%)
-	@ln -f target/$(NATIVE_TARGET)/release/riscv-sandbox $@
-
-.PHONY: riscv-sandbox.prof
-riscv-sandbox.prof::
-	@cargo build --profile profiling --package riscv-sandbox $(SANDBOX_ENABLE_FEATURES:%=-F%)
-	@ln -f target/profiling/riscv-sandbox $@
-
-riscv-dummy.elf::
-	@make -C dummy_kernel build
-	@ln -f dummy_kernel/target/riscv64gc-unknown-linux-musl/release/riscv-dummy $@
 
 # Update checked-in binaries
 .PHONY: update-assets
@@ -50,13 +35,13 @@ update-assets: assets/riscv-dummy.elf assets/jstz
 
 # Update the compiled dummy kernel used in CI tests
 assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
-	@make -C dummy_kernel build
-	@cp dummy_kernel/target/riscv64gc-unknown-linux-musl/release/riscv-dummy $@
+	@cargo install --config .cargo/config.toml --locked --git https://github.com/tezos/riscv-pvm.git --branch ole/github --target riscv64gc-unknown-linux-musl --root assets riscv-dummy 
+	@mv assets/bin/riscv-dummy $@
 	@sha256sum $@ > $@.checksum
 
 assets/jstz assets/jstz.checksum::
-	@make -C jstz build-kernel
-	@cp jstz/target/riscv64gc-unknown-linux-musl/release/jstz $@
+	@cargo install --config .cargo/config.toml --locked --git https://github.com/tezos/riscv-pvm.git --branch ole/github --target riscv64gc-unknown-linux-musl --root assets jstz 
+	@mv assets/bin/jstz $@
 	@sha256sum $@ > $@.checksum
 
 .PHONY: build-deps
@@ -77,28 +62,12 @@ endif
 	# 'rustup toolchain install' (Rustup 1.28+) will install the toolchain. 
 	@find . -iname 'rust-toolchain*' -execdir sh -c "rustup show active-toolchain || rustup toolchain install" \; 2>/dev/null
 
-	@make -C jstz build-deps
-
 	# Coverage deps
 	@./scripts/isa-suite-coverage.sh -d
 
 .PHONY: test
 test: build
 	@cargo test --workspace $(EXTRA_FLAGS)
-	@make -C dummy_kernel test
-	@make -C jstz test
-
-.PHONY: test-long
-test-long:
-	@cargo test --release $(EXTRA_FLAGS) -- test_jstz_determinism test_jstz_proofs_one_step --nocapture --ignored
-
-.PHONY: test-miri
-test-miri:
-	@cargo +$(NIGHTLY_VERSION) miri test $(EXTRA_FLAGS) -- miri
-
-.PHONY: coverage
-coverage:
-	@./scripts/isa-suite-coverage.sh
 
 .PHONY: check
 check:
@@ -109,9 +78,6 @@ check:
 	@cargo check --workspace --all-targets $(CHECK_FLAGS) $(EXTRA_FLAGS)
 	@cargo clippy --workspace --all-targets $(CHECK_FLAGS) $(EXTRA_FLAGS) -- --deny warnings
 	@cargo doc --document-private-items --no-deps $(CHECK_FLAGS) $(EXTRA_FLAGS)
-
-	@make -C dummy_kernel check
-	@make -C jstz check
 
 .PHONY: audit
 audit:
@@ -126,6 +92,3 @@ audit:
 .PHONY: clean
 clean:
 	@cargo clean
-	@make -C dummy_kernel clean
-	@make -C jstz clean
-	@rm -f riscv-sandbox riscv-dummy.elf
