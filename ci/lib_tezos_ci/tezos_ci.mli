@@ -659,6 +659,8 @@ module Images : sig
 
   val rust_sdk_bindings : Image.t
 
+  val trivy : Image.t
+
   val jsonnet : Image.t
 
   module CI : sig
