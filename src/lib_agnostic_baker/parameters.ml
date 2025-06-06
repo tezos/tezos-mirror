@@ -89,6 +89,7 @@ let active_protocols =
   [
     "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg";
     "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7";
+    "Ps3BVMUNQhj15D1VXdFnjP91y11jYShkZRJnBx3N7koz2dKRndB";
     "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
   ]
 
