@@ -5,11 +5,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Review note: might have to rename this, I was not very inspired kekw *)
 type validation_mode =
-  | Stateless
-      (** Minimal validation, includes chain id, nonce, and sender checks *)
-  | Full  (** Combination of both *)
+  | Minimal
+      (** Minimal validation, includes:
+      - chain id is valid
+      - nonce is superior to current one
+      - sender is an EOA
+      - transaction data is not too large *)
+  | Full
+      (** Full validation, is minimal validation plus:
+      - balance is enough
+      - max_fee_per_gas is inferior to current gas price *)
 
 (** [is_tx_valid backend_rpc tx_raw] validates the transaction
     [tx_raw] and returns the next allowed nonce for the sender of the

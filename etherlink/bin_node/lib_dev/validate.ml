@@ -110,7 +110,7 @@ let validate_tx_data_size ~max_number_of_chunks
     return @@ Error "Transaction data exceeded the allowed size."
   else return (Ok ())
 
-let validate_stateless ~next_nonce ~max_number_of_chunks backend_rpc transaction
+let minimal_validation ~next_nonce ~max_number_of_chunks backend_rpc transaction
     ~caller =
   let open Lwt_result_syntax in
   let** () = validate_chain_id backend_rpc transaction in
@@ -136,7 +136,7 @@ let validate_balance_and_gas ~minimum_base_fee_per_gas ~base_fee_per_gas
   in
   return (Ok total_cost)
 
-let validate_with_state_from_backend
+let validate_balance_and_gas_with_backend
     (module Backend_rpc : Services_backend_sig.S) transaction ~caller =
   let open Lwt_result_syntax in
   let* from_balance =
@@ -167,7 +167,7 @@ let validate_with_state_from_backend
   in
   return (Ok ())
 
-type validation_mode = Stateless | Full
+type validation_mode = Minimal | Full
 
 let valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx =
   let open Lwt_result_syntax in
@@ -182,8 +182,8 @@ let valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx =
   in
   let** () =
     match mode with
-    | Stateless ->
-        validate_stateless
+    | Minimal ->
+        minimal_validation
           ~max_number_of_chunks
           backend_rpc
           ~next_nonce
@@ -191,14 +191,16 @@ let valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx =
           ~caller
     | Full ->
         let** () =
-          validate_stateless
+          minimal_validation
             ~max_number_of_chunks
             ~next_nonce
             backend_rpc
             tx
             ~caller
         in
-        let** () = validate_with_state_from_backend backend_rpc tx ~caller in
+        let** () =
+          validate_balance_and_gas_with_backend backend_rpc tx ~caller
+        in
         return (Ok ())
   in
 
