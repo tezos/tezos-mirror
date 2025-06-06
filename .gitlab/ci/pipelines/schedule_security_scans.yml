@@ -3,7 +3,29 @@
 
 stages:
 - start
+- images
 - test
+
+oc.docker:ci:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 90 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - ./images/ci_create_ci_images.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
 
 datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
@@ -97,3 +119,30 @@ container_scanning_master:
   artifacts:
     paths:
     - gl-container-scanning-report-master.json
+
+container_scanning_merge_reports:
+  image: ${ci_image_name}/monitoring:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  - container_scanning_latest
+  - container_scanning_octez-evm-node-latest
+  - container_scanning_master
+  dependencies:
+  - oc.docker:ci:amd64
+  - container_scanning_latest
+  - container_scanning_octez-evm-node-latest
+  - container_scanning_master
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - 'jq --slurp ''{ version: .[0].version, scan: .[0].scan, vulnerabilities: map(.vulnerabilities[]),
+    remediations: map(.remediations[])}'' gl-container-scanning-report-latest.json
+    gl-container-scanning-report-octez-evm-node-latest.json gl-container-scanning-report-master.json
+    > gl-container-scanning-report.json'
+  artifacts:
+    reports:
+      container_scanning: gl-container-scanning-report.json
