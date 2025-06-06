@@ -98,7 +98,7 @@ let octez_baker_rio =
   Uses.make ~tag:"baker_psriotum" ~path:"./octez-baker-PsRiotum" ()
 
 let octez_baker_seoul =
-  Uses.make ~tag:"baker_seoul" ~path:"./octez-baker-seoul" ()
+  Uses.make ~tag:"baker_ptseoulo" ~path:"./octez-baker-PtSEouLo" ()
 
 let octez_baker_alpha =
   Uses.make ~tag:"baker_alpha" ~path:"./octez-baker-alpha" ()
