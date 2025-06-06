@@ -936,7 +936,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) R022 (* Alpha predecessor *)
+  | (* Alpha predecessor *) Seoul (* Alpha predecessor *)
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -953,8 +953,8 @@ let check_and_update_protocol_version ctxt =
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
         else if Compare.String.(s = "alpha_current") then return (Alpha, ctxt)
-        else if (* Alpha predecessor *) Compare.String.(s = "r022_022") then
-          return (R022, ctxt) (* Alpha predecessor *)
+        else if (* Alpha predecessor *) Compare.String.(s = "seoul") then
+          return (Seoul, ctxt) (* Alpha predecessor *)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -985,21 +985,6 @@ let get_previous_protocol_constants ctxt =
 (* Start of code to remove at next automatic protocol snapshot *)
 
 (* Please add here any code that should be removed at the next automatic protocol snapshot *)
-
-let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~new_blocks_per_cycle
-    ~new_blocks_per_commitment ~prev_blocks_per_commitment =
-  let open Lwt_result_syntax in
-  let* cycle_eras = get_cycle_eras ctxt in
-  let*? new_cycle_eras =
-    Level_repr.update_cycle_eras
-      cycle_eras
-      ~level
-      ~prev_blocks_per_cycle
-      ~new_blocks_per_cycle
-      ~prev_blocks_per_commitment
-      ~new_blocks_per_commitment
-  in
-  set_cycle_eras ctxt new_cycle_eras
 
 (* End of code to remove at next automatic protocol snapshot *)
 
@@ -1329,7 +1314,13 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return (ctxt, Some c)
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | R022 ->
+    | Seoul ->
+        (*
+            FIXME chain_id is used for Q to Seoul migration and nomore after.
+            We ignored for automatic stabilisation, should it be removed in
+            Beta?
+        *)
+        ignore chain_id ;
         let module Previous = Constants_parametric_previous_repr in
         let*! c = get_previous_protocol_constants ctxt in
         let dal =
@@ -1508,89 +1499,59 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             dal_rewards_weight;
           }
         in
-        let ({
-               consensus_rights_delay;
-               blocks_preservation_cycles;
-               delegate_parameters_activation_delay;
-               tolerated_inactivity_period;
-               blocks_per_cycle;
-               blocks_per_commitment;
-               nonce_revelation_threshold = _;
-               cycles_per_voting_period;
-               hard_gas_limit_per_operation;
-               hard_gas_limit_per_block;
-               proof_of_work_threshold;
-               minimal_stake;
-               minimal_frozen_stake;
-               vdf_difficulty = _;
-               origination_size;
-               max_operations_time_to_live;
-               issuance_weights = _;
-               cost_per_byte;
-               hard_storage_limit_per_operation;
-               quorum_min;
-               quorum_max;
-               min_proposal_quorum;
-               liquidity_baking_subsidy;
-               liquidity_baking_toggle_ema_threshold;
-               minimal_block_delay;
-               delay_increment_per_round;
-               consensus_committee_size;
-               consensus_threshold_size;
-               minimal_participation_ratio;
-               limit_of_delegation_over_baking;
-               percentage_of_frozen_deposits_slashed_per_double_baking;
-               max_slashing_per_block;
-               max_slashing_threshold;
-               (* The `testnet_dictator` should absolutely be None on mainnet *)
-               testnet_dictator;
-               initial_seed;
-               cache_script_size;
-               cache_stake_distribution_cycles;
-               cache_sampler_state_cycles;
-               dal = _;
-               sc_rollup = _;
-               zk_rollup = _;
-               adaptive_issuance = _;
-               direct_ticket_spending_enable;
-               aggregate_attestation = _;
-               allow_tz4_delegate_enable = _;
-               all_bakers_attest_activation_level;
-             }
-              : Previous.t) =
-          c
-        in
-        let should_migrate_blocks_per_commitment =
-          Compare.Int32.(
-            blocks_per_cycle = 10800l && blocks_per_commitment = 240l)
-        in
-        let prev_blocks_per_commitment = blocks_per_commitment in
-        let new_blocks_per_commitment =
-          if should_migrate_blocks_per_commitment then 84l
-          else prev_blocks_per_commitment
-        in
-        let* ctxt =
-          if should_migrate_blocks_per_commitment then
-            update_cycle_eras
-              ctxt
-              level
-              ~prev_blocks_per_cycle:blocks_per_cycle
-              ~new_blocks_per_cycle:blocks_per_cycle
-              ~prev_blocks_per_commitment
-              ~new_blocks_per_commitment
-          else return ctxt
-        in
-
         let constants =
-          let nonce_revelation_threshold, vdf_difficulty =
-            if Compare.Int32.(c.nonce_revelation_threshold = 960l) then
-              let vdf_difficulty =
-                Int64.div (Int64.mul c.vdf_difficulty 3L) 10L
-              in
-              (300l, vdf_difficulty)
-            else (c.nonce_revelation_threshold, c.vdf_difficulty)
+          let ({
+                 consensus_rights_delay;
+                 blocks_preservation_cycles;
+                 delegate_parameters_activation_delay;
+                 tolerated_inactivity_period;
+                 blocks_per_cycle;
+                 blocks_per_commitment;
+                 nonce_revelation_threshold;
+                 cycles_per_voting_period;
+                 hard_gas_limit_per_operation;
+                 hard_gas_limit_per_block;
+                 proof_of_work_threshold;
+                 minimal_stake;
+                 minimal_frozen_stake;
+                 vdf_difficulty;
+                 origination_size;
+                 max_operations_time_to_live;
+                 issuance_weights = _;
+                 cost_per_byte;
+                 hard_storage_limit_per_operation;
+                 quorum_min;
+                 quorum_max;
+                 min_proposal_quorum;
+                 liquidity_baking_subsidy;
+                 liquidity_baking_toggle_ema_threshold;
+                 minimal_block_delay;
+                 delay_increment_per_round;
+                 consensus_committee_size;
+                 consensus_threshold_size;
+                 minimal_participation_ratio;
+                 limit_of_delegation_over_baking;
+                 percentage_of_frozen_deposits_slashed_per_double_baking;
+                 max_slashing_per_block;
+                 max_slashing_threshold;
+                 (* The `testnet_dictator` should absolutely be None on mainnet *)
+                 testnet_dictator;
+                 initial_seed;
+                 cache_script_size;
+                 cache_stake_distribution_cycles;
+                 cache_sampler_state_cycles;
+                 dal = _;
+                 sc_rollup = _;
+                 zk_rollup = _;
+                 adaptive_issuance = _;
+                 direct_ticket_spending_enable;
+                 aggregate_attestation = _;
+                 allow_tz4_delegate_enable = _;
+                 all_bakers_attest_activation_level;
+               }
+                : Previous.t) =
+            c
           in
-          let blocks_per_commitment = new_blocks_per_commitment in
           {
             Constants_parametric_repr.consensus_rights_delay;
             blocks_preservation_cycles;
