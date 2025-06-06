@@ -197,14 +197,7 @@ let double_attestation_wrong_block_payload_hash =
     ~__FILE__
     ~title:"double attestation using wrong block_payload_hash"
     ~tags:
-      [
-        Tag.layer1;
-        "double";
-        "attestation";
-        "accuser";
-        "block_payload_hash";
-        "node";
-      ]
+      [team; "double"; "attestation"; "accuser"; "block_payload_hash"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   double_consensus_wrong_block_payload_hash attest_utils protocol
@@ -215,12 +208,7 @@ let double_preattestation_wrong_block_payload_hash =
     ~title:"double preattestation using wrong block_payload_hash"
     ~tags:
       [
-        Tag.layer1;
-        "double";
-        "preattestation";
-        "accuser";
-        "block_payload_hash";
-        "node";
+        team; "double"; "preattestation"; "accuser"; "block_payload_hash"; "node";
       ]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
@@ -276,7 +264,7 @@ let double_attestation_wrong_branch =
   Protocol.register_test
     ~__FILE__
     ~title:"double attestation using wrong branch"
-    ~tags:[Tag.layer1; "double"; "attestation"; "accuser"; "branch"; "node"]
+    ~tags:[team; "double"; "attestation"; "accuser"; "branch"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_branch attest_utils protocol
 
@@ -284,7 +272,7 @@ let double_preattestation_wrong_branch =
   Protocol.register_test
     ~__FILE__
     ~title:"double preattestation using wrong branch"
-    ~tags:[Tag.layer1; "double"; "preattestation"; "accuser"; "branch"; "node"]
+    ~tags:[team; "double"; "preattestation"; "accuser"; "branch"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_branch preattest_utils protocol
 
@@ -295,7 +283,7 @@ let operation_too_old =
   Protocol.register_test
     ~__FILE__
     ~title:"operation too old"
-    ~tags:[Tag.layer1; "accuser"; "old"; "operation"]
+    ~tags:[team; "accuser"; "old"; "operation"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol ~protocol `Client () in
@@ -358,7 +346,7 @@ let operation_too_far_in_future =
   Protocol.register_test
     ~__FILE__
     ~title:"operation too far in the future"
-    ~tags:[Tag.layer1; "accuser"; "future"; "operation"]
+    ~tags:[team; "accuser"; "future"; "operation"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol ~protocol `Client () in
@@ -533,7 +521,7 @@ let attestation_and_aggregation_wrong_payload_hash =
   Protocol.register_test
     ~__FILE__
     ~title:"attestation and aggregation wrong payload hash"
-    ~tags:[Tag.layer1; "attestation"; "aggregation"]
+    ~tags:[team; "attestation"; "aggregation"]
     ~supports:Protocol.(From_protocol 023)
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
@@ -642,7 +630,7 @@ let double_aggregation_wrong_payload_hash =
   Protocol.register_test
     ~__FILE__
     ~title:"double aggregation wrong payload hash"
-    ~tags:[Tag.layer1; "double"; "aggregation"]
+    ~tags:[team; "double"; "aggregation"]
     ~supports:Protocol.(From_protocol 023)
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
