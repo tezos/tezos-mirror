@@ -8,26 +8,9 @@
 
 ### RPCs changes
 
-- Aligns the validation logic of the node wrt. the execution gas limit with the
-  one implemented in Dionysus. That is, the execution gas is now derived from
-  the gas limit of a transaction by removing the inclusion fees paid with the
-  minimum base fee per gas (not the current one).  (!18184)
-- Fix encoding of signature fields `r` and `s` in transactions to use
-  [quantities](https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash),
-  _i.e._ compressed without leading zeros. (!18178)
-* Adds the Etherlink-specific `tez_getTransactionGasInfo` RPC to determine how
-  many units of gas were used to execute a given (included) transaction, and
-  how many units of gas were paid for covering the inclusion fees. (!18212)
-
 ### Metrics changes
 
-- Advertises the execution gas used on new blueprint application. (!18213)
-
 ### Execution changes
-
-* `replay blueprint` and `replay blueprints` now log the execution gas, process
-  time and whether or not the produced block diverged from the canonical one
-  for each replayed blueprint. (!18215)
 
 ### Storage changes
 
@@ -39,6 +22,48 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.29 (2025-06-06)
+
+This release of the EVM node more accurately computes the inclusion fee gas
+(e.g. in `eth_estimateGas`) which should sort out issues with transactions being
+ignored by the sequencer. This release also fixes RPCs encoding of compressed
+transactions to better follow the spec and fixes a regression with the RPC
+server (which manifests as non responding RPCs) introduced by a dependency
+upgrade in 0.28. Finally, this release adds a new RPC and metric to better track
+the _gas consumed by execution_ of transactions and blocks (_i.e._ without
+inclusion gas) which impacts gas prices.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+### RPCs changes
+
+- Aligns the validation logic of the node wrt. the execution gas limit with the
+  one implemented in Dionysus. That is, the execution gas is now derived from
+  the gas limit of a transaction by removing the inclusion fees paid with the
+  minimum base fee per gas (not the current one).  (!18184)
+- Fix encoding of signature fields `r` and `s` in transactions to use
+  [quantities](https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash),
+  _i.e._ compressed without leading zeros. (!18178)
+- Adds the Etherlink-specific `tez_getTransactionGasInfo` RPC to determine how
+  many units of gas were used to execute a given (included) transaction, and
+  how many units of gas were paid for covering the inclusion fees. (!18212)
+
+### Metrics changes
+
+- Advertises the execution gas used on new blueprint application. (!18213)
+
+### Execution changes
+
+- `replay blueprint` and `replay blueprints` now log the execution gas, process
+  time and whether or not the produced block diverged from the canonical one
+  for each replayed blueprint. (!18215)
+
+### Dependencies
+
+- Downgrade [caqti](https://github.com/paurkedal/ocaml-caqti) from 2.2.4 to
+  2.1.2 which fixes instabilities (deadlocks) in the RPC server. (!18226)
 
 ## Version 0.28 (2025-05-28)
 
