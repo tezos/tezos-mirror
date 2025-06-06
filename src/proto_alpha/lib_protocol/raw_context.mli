@@ -96,7 +96,7 @@ val prepare :
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) Seoul (* Alpha predecessor *)
+  | (* Alpha predecessor *) S023 (* Alpha predecessor *)
 
 (** Prepares the context for the first block of the protocol.
 
