@@ -65,7 +65,7 @@ let loop_sequencer chain_family backend
         let* () =
           List.iter_es
             (fun raw_tx ->
-              let* res = Validate.is_tx_valid backend ~mode:Stateless raw_tx in
+              let* res = Validate.is_tx_valid backend ~mode:Minimal raw_tx in
               match res with
               | Ok (next_nonce, txn_obj) ->
                   let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
@@ -358,8 +358,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
          block_producer instead of in the RPC. This allows for a more
          accurate validation as it's delayed up to when the block is
          created. *)
-      (if Configuration.is_tx_queue_enabled configuration then Stateless
-       else Full)
+      (if Configuration.is_tx_queue_enabled configuration then Minimal else Full)
       configuration
       tx_container
       (backend, smart_rollup_address_typed)

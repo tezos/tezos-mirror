@@ -152,7 +152,7 @@ let main
   end) in
   let validation_mode =
     match config.proxy.evm_node_endpoint with
-    | Some _base -> Validate.Stateless
+    | Some _base -> Validate.Minimal
     | None -> Validate.Full
   in
   let* l2_chain_id, chain_family =

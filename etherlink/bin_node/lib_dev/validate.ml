@@ -110,45 +110,19 @@ let validate_tx_data_size ~max_number_of_chunks
     return @@ Error "Transaction data exceeded the allowed size."
   else return (Ok ())
 
-let validate_stateless ~next_nonce ~max_number_of_chunks backend_rpc transaction
+let minimal_validation ~next_nonce ~max_number_of_chunks backend_rpc transaction
     ~caller =
   let open Lwt_result_syntax in
   let** () = validate_chain_id backend_rpc transaction in
   let** () = validate_nonce ~next_nonce transaction in
   let** () = validate_sender_not_a_contract backend_rpc caller in
   let** () = validate_tx_data_size ~max_number_of_chunks transaction in
-  return (Ok ())
-
-let validate_balance_and_gas ~minimum_base_fee_per_gas ~base_fee_per_gas
-    ~maximum_gas_limit ~da_fee_per_byte ~transaction
-    ~from_balance:(Qty from_balance) =
-  let open Lwt_result_syntax in
-  let** () = validate_max_fee_per_gas ~base_fee_per_gas transaction in
-  let** () =
-    validate_gas_limit
-      ~maximum_gas_limit
-      ~da_fee_per_byte
-      ~minimum_base_fee_per_gas
-      transaction
-  in
-  let** total_cost =
-    validate_balance_is_enough transaction ~balance:from_balance
-  in
-  return (Ok total_cost)
-
-let validate_with_state_from_backend
-    (module Backend_rpc : Services_backend_sig.S) transaction ~caller =
-  let open Lwt_result_syntax in
-  let* from_balance =
-    Backend_rpc.Etherlink.balance
-      caller
-      Block_parameter.(Block_parameter Latest)
-  in
-  let* minimum_base_fee_per_gas =
-    Backend_rpc.Etherlink.minimum_base_fee_per_gas ()
-  in
-  let* base_fee_per_gas = Backend_rpc.Etherlink.base_fee_per_gas () in
+  let (module Backend_rpc : Services_backend_sig.S) = backend_rpc in
   let* state = Backend_rpc.Reader.get_state () in
+  let* minimum_base_fee_per_gas =
+    Etherlink_durable_storage.minimum_base_fee_per_gas
+      (Backend_rpc.Reader.read state)
+  in
   let* maximum_gas_limit =
     Etherlink_durable_storage.maximum_gas_per_transaction
       (Backend_rpc.Reader.read state)
@@ -156,18 +130,58 @@ let validate_with_state_from_backend
   let* da_fee_per_byte =
     Etherlink_durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
   in
-  let** _total_cost =
-    validate_balance_and_gas
-      ~minimum_base_fee_per_gas:(Qty minimum_base_fee_per_gas)
-      ~base_fee_per_gas
+  let** () =
+    validate_gas_limit
       ~maximum_gas_limit
       ~da_fee_per_byte
+      ~minimum_base_fee_per_gas:(Qty minimum_base_fee_per_gas)
+      transaction
+  in
+  return (Ok ())
+
+let validate_balance_and_max_fee_per_gas ~base_fee_per_gas ~transaction
+    ~from_balance:(Qty from_balance) =
+  let open Lwt_result_syntax in
+  let** () = validate_max_fee_per_gas ~base_fee_per_gas transaction in
+  let** total_cost =
+    validate_balance_is_enough transaction ~balance:from_balance
+  in
+  return (Ok total_cost)
+
+let validate_balance_and_gas_with_backend
+    (module Backend_rpc : Services_backend_sig.S) transaction ~caller =
+  let open Lwt_result_syntax in
+  let* from_balance =
+    Backend_rpc.Etherlink.balance
+      caller
+      Block_parameter.(Block_parameter Latest)
+  in
+  let* base_fee_per_gas = Backend_rpc.Etherlink.base_fee_per_gas () in
+  let** _total_cost =
+    validate_balance_and_max_fee_per_gas
+      ~base_fee_per_gas
       ~transaction
       ~from_balance
   in
   return (Ok ())
 
-type validation_mode = Stateless | With_state | Full
+let full_validation ~next_nonce ~max_number_of_chunks backend_rpc transaction
+    ~caller =
+  let open Lwt_result_syntax in
+  let** () =
+    minimal_validation
+      ~next_nonce
+      ~max_number_of_chunks
+      backend_rpc
+      transaction
+      ~caller
+  in
+  let** () =
+    validate_balance_and_gas_with_backend backend_rpc transaction ~caller
+  in
+  return (Ok ())
+
+type validation_mode = Minimal | Full
 
 let valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx =
   let open Lwt_result_syntax in
@@ -182,25 +196,15 @@ let valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx =
   in
   let** () =
     match mode with
-    | Stateless ->
-        validate_stateless
+    | Minimal ->
+        minimal_validation
           ~max_number_of_chunks
           backend_rpc
           ~next_nonce
           tx
           ~caller
-    | With_state -> validate_with_state_from_backend backend_rpc tx ~caller
     | Full ->
-        let** () =
-          validate_stateless
-            ~max_number_of_chunks
-            ~next_nonce
-            backend_rpc
-            tx
-            ~caller
-        in
-        let** () = validate_with_state_from_backend backend_rpc tx ~caller in
-        return (Ok ())
+        full_validation ~next_nonce ~max_number_of_chunks backend_rpc tx ~caller
   in
 
   return (Ok (next_nonce, tx_object))
@@ -259,11 +263,8 @@ let validate_balance_gas_nonce_with_validation_state validation_state
         return balance
   in
   let** total_cost =
-    validate_balance_and_gas
-      ~minimum_base_fee_per_gas:validation_state.config.minimum_base_fee_per_gas
+    validate_balance_and_max_fee_per_gas
       ~base_fee_per_gas:validation_state.config.base_fee_per_gas
-      ~maximum_gas_limit:validation_state.config.maximum_gas_limit
-      ~da_fee_per_byte:validation_state.config.da_fee_per_byte
       ~transaction
       ~from_balance:(Qty from_balance)
   in
