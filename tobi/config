@@ -50,14 +50,14 @@ kaitai: client-libs/kaitai-ocaml/src, client-libs/kaitai-ocaml/test
 kaitai-of-data-encoding: client-libs/lib_kaitai_of_data_encoding, client-libs/lib_kaitai_of_data_encoding/test
 octez-accuser: src/bin_agnostic_accuser
 octez-accuser-PsRiotum: src/proto_022_PsRiotum/bin_accuser
+octez-accuser-PtSEouLo: src/proto_023_PtSEouLo/bin_accuser
 octez-accuser-alpha: src/proto_alpha/bin_accuser
-octez-accuser-seoul: src/proto_seoul/bin_accuser
 octez-alcotezt: tezt/lib_alcotezt
 octez-baker: src/bin_agnostic_baker
 octez-baker-PsRiotum: src/proto_022_PsRiotum/bin_baker
+octez-baker-PtSEouLo: src/proto_023_PtSEouLo/bin_baker
 octez-baker-alpha: src/proto_alpha/bin_baker
 octez-baker-lib: src/lib_agnostic_baker
-octez-baker-seoul: src/proto_seoul/bin_baker
 octez-client: src/bin_client
 octez-codec: src/bin_codec
 octez-codec-kaitai: client-libs/bin_codec_kaitai
@@ -102,10 +102,10 @@ octez-protocol-019-PtParisB-libs: src/proto_019_PtParisB/lib_client, src/proto_0
 octez-protocol-020-PsParisC-libs: src/proto_020_PsParisC/lib_client, src/proto_020_PsParisC/lib_client_commands, src/proto_020_PsParisC/lib_client_sapling, src/proto_020_PsParisC/lib_layer2_utils, src/proto_020_PsParisC/lib_plugin, src/proto_020_PsParisC/lib_sc_rollup, src/proto_020_PsParisC/lib_sc_rollup_layer2
 octez-protocol-021-PsQuebec-libs: src/proto_021_PsQuebec/lib_client, src/proto_021_PsQuebec/lib_client_commands, src/proto_021_PsQuebec/lib_client_sapling, src/proto_021_PsQuebec/lib_dal, src/proto_021_PsQuebec/lib_layer2_utils, src/proto_021_PsQuebec/lib_plugin, src/proto_021_PsQuebec/lib_sc_rollup, src/proto_021_PsQuebec/lib_sc_rollup_layer2
 octez-protocol-022-PsRiotum-libs: src/proto_022_PsRiotum/lib_agnostic_baker, src/proto_022_PsRiotum/lib_client, src/proto_022_PsRiotum/lib_client/test, src/proto_022_PsRiotum/lib_client_commands, src/proto_022_PsRiotum/lib_client_sapling, src/proto_022_PsRiotum/lib_dal, src/proto_022_PsRiotum/lib_dal/test, src/proto_022_PsRiotum/lib_delegate, src/proto_022_PsRiotum/lib_delegate/test, src/proto_022_PsRiotum/lib_delegate/test/mockup_simulator, src/proto_022_PsRiotum/lib_delegate/test/tenderbrute, src/proto_022_PsRiotum/lib_delegate/test/tenderbrute/lib, src/proto_022_PsRiotum/lib_layer2_utils, src/proto_022_PsRiotum/lib_plugin, src/proto_022_PsRiotum/lib_plugin/test, src/proto_022_PsRiotum/lib_protocol/test/helpers, src/proto_022_PsRiotum/lib_sc_rollup, src/proto_022_PsRiotum/lib_sc_rollup_layer2
+octez-protocol-023-PtSEouLo-libs: src/proto_023_PtSEouLo/lib_agnostic_baker, src/proto_023_PtSEouLo/lib_client, src/proto_023_PtSEouLo/lib_client/test, src/proto_023_PtSEouLo/lib_client_commands, src/proto_023_PtSEouLo/lib_client_sapling, src/proto_023_PtSEouLo/lib_dal, src/proto_023_PtSEouLo/lib_dal/test, src/proto_023_PtSEouLo/lib_delegate, src/proto_023_PtSEouLo/lib_delegate/test, src/proto_023_PtSEouLo/lib_delegate/test/mockup_simulator, src/proto_023_PtSEouLo/lib_delegate/test/tenderbrute, src/proto_023_PtSEouLo/lib_delegate/test/tenderbrute/lib, src/proto_023_PtSEouLo/lib_layer2_utils, src/proto_023_PtSEouLo/lib_plugin, src/proto_023_PtSEouLo/lib_plugin/test, src/proto_023_PtSEouLo/lib_protocol/test/helpers, src/proto_023_PtSEouLo/lib_sc_rollup, src/proto_023_PtSEouLo/lib_sc_rollup_layer2
 octez-protocol-alpha-libs: src/proto_alpha/lib_agnostic_baker, src/proto_alpha/lib_client, src/proto_alpha/lib_client/test, src/proto_alpha/lib_client_commands, src/proto_alpha/lib_client_sapling, src/proto_alpha/lib_dal, src/proto_alpha/lib_dal/test, src/proto_alpha/lib_delegate, src/proto_alpha/lib_delegate/test, src/proto_alpha/lib_delegate/test/mockup_simulator, src/proto_alpha/lib_delegate/test/tenderbrute, src/proto_alpha/lib_delegate/test/tenderbrute/lib, src/proto_alpha/lib_layer2_utils, src/proto_alpha/lib_plugin, src/proto_alpha/lib_plugin/test, src/proto_alpha/lib_protocol/test/helpers, src/proto_alpha/lib_sc_rollup, src/proto_alpha/lib_sc_rollup_layer2
 octez-protocol-compiler: src/lib_protocol_compiler, src/lib_protocol_compiler/bin, src/lib_protocol_compiler/hashes, src/lib_protocol_compiler/registerer
 octez-protocol-compiler-compat: src/lib_protocol_compiler/compat
-octez-protocol-seoul-libs: src/proto_seoul/lib_agnostic_baker, src/proto_seoul/lib_client, src/proto_seoul/lib_client/test, src/proto_seoul/lib_client_commands, src/proto_seoul/lib_client_sapling, src/proto_seoul/lib_dal, src/proto_seoul/lib_dal/test, src/proto_seoul/lib_delegate, src/proto_seoul/lib_delegate/test, src/proto_seoul/lib_delegate/test/mockup_simulator, src/proto_seoul/lib_delegate/test/tenderbrute, src/proto_seoul/lib_delegate/test/tenderbrute/lib, src/proto_seoul/lib_layer2_utils, src/proto_seoul/lib_plugin, src/proto_seoul/lib_plugin/test, src/proto_seoul/lib_protocol/test/helpers, src/proto_seoul/lib_sc_rollup, src/proto_seoul/lib_sc_rollup_layer2
 octez-requester-tests: src/lib_requester/test
 octez-riscv-api: src/lib_riscv/api
 octez-riscv-pvm: src/lib_riscv/pvm
@@ -123,9 +123,9 @@ octez-smart-rollup-node-PsQuebec: src/proto_021_PsQuebec/lib_sc_rollup_node
 octez-smart-rollup-node-PsRiotum: src/proto_022_PsRiotum/lib_sc_rollup_node
 octez-smart-rollup-node-PtNairob: src/proto_017_PtNairob/lib_sc_rollup_node
 octez-smart-rollup-node-PtParisB: src/proto_019_PtParisB/lib_sc_rollup_node
+octez-smart-rollup-node-PtSEouLo: src/proto_023_PtSEouLo/lib_sc_rollup_node
 octez-smart-rollup-node-alpha: src/proto_alpha/lib_sc_rollup_node
 octez-smart-rollup-node-lib: src/lib_smart_rollup_node
-octez-smart-rollup-node-seoul: src/proto_seoul/lib_sc_rollup_node
 octez-smart-rollup-wasm-debugger: src/bin_wasm_debugger
 octez-smart-rollup-wasm-debugger-lib: src/lib_wasm_debugger
 octez-smart-rollup-wasm-debugger-plugin: src/bin_wasm_debugger/plugin
@@ -138,23 +138,23 @@ octogram: src/bin_octogram, src/lib_octogram
 proto-manager: devtools/proto_manager
 tezos-benchmark: src/lib_benchmark
 tezos-benchmark-022-PsRiotum: src/proto_022_PsRiotum/lib_benchmark, src/proto_022_PsRiotum/lib_benchmark/test
+tezos-benchmark-023-PtSEouLo: src/proto_023_PtSEouLo/lib_benchmark, src/proto_023_PtSEouLo/lib_benchmark/test
 tezos-benchmark-alpha: src/proto_alpha/lib_benchmark, src/proto_alpha/lib_benchmark/test
 tezos-benchmark-examples: src/lib_benchmark/example
-tezos-benchmark-seoul: src/proto_seoul/lib_benchmark, src/proto_seoul/lib_benchmark/test
 tezos-benchmark-tests: src/lib_benchmark/test
 tezos-benchmark-type-inference-022-PsRiotum: src/proto_022_PsRiotum/lib_benchmark/lib_benchmark_type_inference, src/proto_022_PsRiotum/lib_benchmark/lib_benchmark_type_inference/test
+tezos-benchmark-type-inference-023-PtSEouLo: src/proto_023_PtSEouLo/lib_benchmark/lib_benchmark_type_inference, src/proto_023_PtSEouLo/lib_benchmark/lib_benchmark_type_inference/test
 tezos-benchmark-type-inference-alpha: src/proto_alpha/lib_benchmark/lib_benchmark_type_inference, src/proto_alpha/lib_benchmark/lib_benchmark_type_inference/test
-tezos-benchmark-type-inference-seoul: src/proto_seoul/lib_benchmark/lib_benchmark_type_inference, src/proto_seoul/lib_benchmark/lib_benchmark_type_inference/test
 tezos-benchmarks-proto-022-PsRiotum: src/proto_022_PsRiotum/lib_benchmarks_proto
+tezos-benchmarks-proto-023-PtSEouLo: src/proto_023_PtSEouLo/lib_benchmarks_proto
 tezos-benchmarks-proto-alpha: src/proto_alpha/lib_benchmarks_proto
-tezos-benchmarks-proto-seoul: src/proto_seoul/lib_benchmarks_proto
 tezos-client-demo-counter: src/proto_demo_counter/lib_client
 tezos-client-genesis: src/proto_genesis/lib_client
 tezos-dal-node-lib: src/lib_dal_node, src/lib_dal_node/gossipsub, src/lib_dal_node/test/
 tezos-dal-node-services: src/lib_dal_node_services
 tezos-injector-022-PsRiotum: src/proto_022_PsRiotum/lib_injector
+tezos-injector-023-PtSEouLo: src/proto_023_PtSEouLo/lib_injector
 tezos-injector-alpha: src/proto_alpha/lib_injector
-tezos-injector-seoul: src/proto_seoul/lib_injector
 tezos-lazy-containers-tests: src/lib_lazy_containers/test
 tezos-micheline-rewriting: src/lib_benchmark/lib_micheline_rewriting, src/lib_benchmark/lib_micheline_rewriting/test
 tezos-openapi: src/lib_openapi
@@ -184,14 +184,14 @@ tezos-protocol-020-PsParisC: src/proto_020_PsParisC/lib_parameters, src/proto_02
 tezos-protocol-021-PsQuebec: src/proto_021_PsQuebec/lib_parameters, src/proto_021_PsQuebec/lib_protocol
 tezos-protocol-022-PsRiotum: src/proto_022_PsRiotum/lib_parameters, src/proto_022_PsRiotum/lib_protocol
 tezos-protocol-022-PsRiotum-tests: src/proto_022_PsRiotum/lib_protocol/test/integration, src/proto_022_PsRiotum/lib_protocol/test/integration/consensus, src/proto_022_PsRiotum/lib_protocol/test/integration/gas, src/proto_022_PsRiotum/lib_protocol/test/integration/michelson, src/proto_022_PsRiotum/lib_protocol/test/integration/operations, src/proto_022_PsRiotum/lib_protocol/test/integration/validate, src/proto_022_PsRiotum/lib_protocol/test/pbt, src/proto_022_PsRiotum/lib_protocol/test/regression, src/proto_022_PsRiotum/lib_protocol/test/unit
+tezos-protocol-023-PtSEouLo: src/proto_023_PtSEouLo/lib_parameters, src/proto_023_PtSEouLo/lib_protocol
+tezos-protocol-023-PtSEouLo-tests: src/proto_023_PtSEouLo/lib_protocol/test/integration, src/proto_023_PtSEouLo/lib_protocol/test/integration/consensus, src/proto_023_PtSEouLo/lib_protocol/test/integration/gas, src/proto_023_PtSEouLo/lib_protocol/test/integration/michelson, src/proto_023_PtSEouLo/lib_protocol/test/integration/operations, src/proto_023_PtSEouLo/lib_protocol/test/integration/validate, src/proto_023_PtSEouLo/lib_protocol/test/pbt, src/proto_023_PtSEouLo/lib_protocol/test/regression, src/proto_023_PtSEouLo/lib_protocol/test/unit
 tezos-protocol-alpha: src/proto_alpha/lib_parameters, src/proto_alpha/lib_protocol
 tezos-protocol-alpha-tests: src/proto_alpha/lib_protocol/test/integration, src/proto_alpha/lib_protocol/test/integration/consensus, src/proto_alpha/lib_protocol/test/integration/gas, src/proto_alpha/lib_protocol/test/integration/michelson, src/proto_alpha/lib_protocol/test/integration/operations, src/proto_alpha/lib_protocol/test/integration/validate, src/proto_alpha/lib_protocol/test/pbt, src/proto_alpha/lib_protocol/test/regression, src/proto_alpha/lib_protocol/test/unit
 tezos-protocol-demo-counter: src/proto_demo_counter/lib_protocol
 tezos-protocol-demo-noops: src/proto_demo_noops/lib_protocol
 tezos-protocol-genesis: src/proto_genesis/lib_protocol
-tezos-protocol-seoul: src/proto_seoul/lib_parameters, src/proto_seoul/lib_protocol
-tezos-protocol-seoul-tests: src/proto_seoul/lib_protocol/test/integration, src/proto_seoul/lib_protocol/test/integration/consensus, src/proto_seoul/lib_protocol/test/integration/gas, src/proto_seoul/lib_protocol/test/integration/michelson, src/proto_seoul/lib_protocol/test/integration/operations, src/proto_seoul/lib_protocol/test/integration/validate, src/proto_seoul/lib_protocol/test/pbt, src/proto_seoul/lib_protocol/test/regression, src/proto_seoul/lib_protocol/test/unit
-tezos-sc-rollup-node-test: src/proto_022_PsRiotum/lib_sc_rollup_node/test, src/proto_alpha/lib_sc_rollup_node/test, src/proto_seoul/lib_sc_rollup_node/test
+tezos-sc-rollup-node-test: src/proto_022_PsRiotum/lib_sc_rollup_node/test, src/proto_023_PtSEouLo/lib_sc_rollup_node/test, src/proto_alpha/lib_sc_rollup_node/test
 tezos-scoru-wasm-regressions: src/lib_scoru_wasm/regressions
 tezos-smart-rollup-node-lib-test: src/lib_smart_rollup_node/test/
 tezos-tooling: devtools/benchmarks-tools/occupy_memory, devtools/benchmarks-tools/purge_disk_cache, devtools/gas_parameter_diff/bin, devtools/git-gas-diff/bin, src/tooling

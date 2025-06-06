@@ -27,6 +27,8 @@ depends: [
   "tezos-protocol-000-Ps9mPmXa" { = version }
   "tezos-protocol-022-PsRiotum" { = version }
   "octez-protocol-022-PsRiotum-libs" { = version }
+  "tezos-protocol-023-PtSEouLo" { = version }
+  "octez-protocol-023-PtSEouLo-libs" { = version }
 ]
 depopts: [
   "tezos-protocol-genesis"
@@ -70,8 +72,6 @@ depopts: [
   "octez-protocol-020-PsParisC-libs"
   "tezos-protocol-021-PsQuebec"
   "octez-protocol-021-PsQuebec-libs"
-  "tezos-protocol-seoul"
-  "octez-protocol-seoul-libs"
   "tezos-protocol-alpha"
   "octez-protocol-alpha-libs"
 ]
@@ -117,8 +117,6 @@ conflicts: [
   "octez-protocol-020-PsParisC-libs" { != version }
   "tezos-protocol-021-PsQuebec" { != version }
   "octez-protocol-021-PsQuebec-libs" { != version }
-  "tezos-protocol-seoul" { != version }
-  "octez-protocol-seoul-libs" { != version }
   "tezos-protocol-alpha" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]

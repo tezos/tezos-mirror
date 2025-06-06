@@ -22,6 +22,7 @@ depends: [
   "octez-alcotezt" {with-test}
   "octez-shell-libs" {with-test}
   "octez-smart-rollup-node-PsRiotum" {with-test}
+  "octez-smart-rollup-node-PtSEouLo" {with-test}
 ]
 depopts: [
   "octez-smart-rollup-node-PtNairob" {with-test}
@@ -29,7 +30,6 @@ depopts: [
   "octez-smart-rollup-node-PtParisB" {with-test}
   "octez-smart-rollup-node-PsParisC" {with-test}
   "octez-smart-rollup-node-PsQuebec" {with-test}
-  "octez-smart-rollup-node-seoul" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}
 ]
 build: [

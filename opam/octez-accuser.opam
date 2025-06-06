@@ -16,13 +16,12 @@ depends: [
   "octez-shell-libs" { = version }
   "octez-baker-lib" { = version }
   "octez-protocol-022-PsRiotum-libs" { = version }
+  "octez-protocol-023-PtSEouLo-libs" { = version }
 ]
 depopts: [
-  "octez-protocol-seoul-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
-  "octez-protocol-seoul-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

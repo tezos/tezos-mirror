@@ -20,9 +20,9 @@
   (select void_for_linking-octez_injector_PsRiotum from
    (octez_injector_PsRiotum -> void_for_linking-octez_injector_PsRiotum.empty)
    (-> void_for_linking-octez_injector_PsRiotum.empty))
-  (select void_for_linking-octez_injector_seoul from
-   (octez_injector_seoul -> void_for_linking-octez_injector_seoul.empty)
-   (-> void_for_linking-octez_injector_seoul.empty))
+  (select void_for_linking-octez_injector_PtSEouLo from
+   (octez_injector_PtSEouLo -> void_for_linking-octez_injector_PtSEouLo.empty)
+   (-> void_for_linking-octez_injector_PtSEouLo.empty))
   (select void_for_linking-octez_injector_alpha from
    (octez_injector_alpha -> void_for_linking-octez_injector_alpha.empty)
    (-> void_for_linking-octez_injector_alpha.empty)))
@@ -45,5 +45,5 @@
  (action
   (progn
    (write-file void_for_linking-octez_injector_PsRiotum.empty "")
-   (write-file void_for_linking-octez_injector_seoul.empty "")
+   (write-file void_for_linking-octez_injector_PtSEouLo.empty "")
    (write-file void_for_linking-octez_injector_alpha.empty ""))))

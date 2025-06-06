@@ -1,0 +1,37 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_023_PtSEouLo_mockup_simulator)
+ (public_name octez-protocol-023-PtSEouLo-libs.bakings.mockup-simulator)
+ (libraries
+  octez-libs.base
+  tezos-protocol-023-PtSEouLo.protocol
+  octez-protocol-023-PtSEouLo-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-023-PtSEouLo-libs.baking
+  octez-libs.stdlib-unix
+  octez-shell-libs.client-base-unix
+  tezos-protocol-023-PtSEouLo.parameters
+  octez-shell-libs.mockup
+  octez-shell-libs.mockup-proxy
+  octez-shell-libs.mockup-commands
+  octez-protocol-023-PtSEouLo-libs.baking.tenderbrute
+  tezt.core)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_023_PtSEouLo
+  -open Tezos_protocol_023_PtSEouLo.Protocol
+  -open Tezos_client_023_PtSEouLo
+  -open Tezos_client_commands
+  -open Tezos_baking_023_PtSEouLo
+  -open Tezos_stdlib_unix
+  -open Tezos_client_base_unix
+  -open Tezos_protocol_023_PtSEouLo_parameters
+  -open Tenderbrute_023_PtSEouLo
+  -open Tezt_core))
+
+(rule
+ (targets client_keys.ml)
+ (action (write-file %{targets} "include Tezos_client_base.Client_keys_v2")))

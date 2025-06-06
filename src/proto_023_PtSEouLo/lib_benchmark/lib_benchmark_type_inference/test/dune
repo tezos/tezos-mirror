@@ -1,0 +1,31 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names test_uf test_inference)
+ (libraries
+  octez-rust-deps
+  bls12-381.archive
+  octez-libs.micheline
+  tezos-micheline-rewriting
+  tezos-benchmark-type-inference-023-PtSEouLo
+  tezos-protocol-023-PtSEouLo.protocol
+  octez-libs.error-monad
+  octez-protocol-023-PtSEouLo-libs.client)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_micheline
+  -open Tezos_benchmark_type_inference_023_PtSEouLo))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-type-inference-023-PtSEouLo)
+ (action (run %{dep:./test_uf.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-type-inference-023-PtSEouLo)
+ (action (run %{dep:./test_inference.exe})))

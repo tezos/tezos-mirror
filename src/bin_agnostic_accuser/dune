@@ -14,9 +14,7 @@
   octez-shell-libs.client-base-unix
   octez-baker-lib
   octez-protocol-022-PsRiotum-libs.agnostic-baker
-  (select void_for_linking-octez-protocol-seoul-libs-agnostic-baker from
-   (octez-protocol-seoul-libs.agnostic-baker -> void_for_linking-octez-protocol-seoul-libs-agnostic-baker.empty)
-   (-> void_for_linking-octez-protocol-seoul-libs-agnostic-baker.empty))
+  octez-protocol-023-PtSEouLo-libs.agnostic-baker
   (select void_for_linking-octez-protocol-alpha-libs-agnostic-baker from
    (octez-protocol-alpha-libs.agnostic-baker -> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)))
@@ -38,5 +36,4 @@
 (rule
  (action
   (progn
-   (write-file void_for_linking-octez-protocol-seoul-libs-agnostic-baker.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty ""))))
