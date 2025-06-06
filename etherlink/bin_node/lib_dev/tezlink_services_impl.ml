@@ -4,26 +4,6 @@
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
-open Tezos_types
-
-module Path = struct
-  (** [to_path encoding value] uses [encoding] to encode [value] in
-      hexadecimal *)
-  let to_path encoding value =
-    let raw_key = Data_encoding.Binary.to_bytes_exn encoding value in
-    let (`Hex s) = Hex.of_bytes raw_key in
-    s
-
-  let account contract =
-    "/tezlink/context/contracts/index/" ^ to_path Contract.encoding contract
-
-  let balance contract = account contract ^ "/balance"
-
-  let manager contract = account contract ^ "/manager"
-
-  let counter contract = account contract ^ "/counter"
-end
-
 module type Backend = sig
   include Durable_storage.READER
 
