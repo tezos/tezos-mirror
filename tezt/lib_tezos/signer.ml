@@ -166,16 +166,17 @@ let run signer =
     | None -> []
     | Some port -> ["--port"; Int.to_string port]
   in
-  let local_args =
-    match Uri.path signer.persistent_state.uri with
-    | "" -> []
-    | path -> ["--socket"; path]
-  in
   let launch_mode_args =
     match signer.persistent_state.launch_mode with
     | None | Some Http -> ["launch"; "http"; "signer"] @ host_args @ port_args
     | Some Socket -> ["launch"; "socket"; "signer"] @ host_args @ port_args
-    | Some Local -> ["launch"; "local"; "signer"] @ local_args
+    | Some Local ->
+        let socket_args =
+          match Uri.path signer.persistent_state.uri with
+          | "" -> []
+          | path -> ["--socket"; path]
+        in
+        ["launch"; "local"; "signer"] @ socket_args
   in
   let magic_bytes_args =
     match signer.persistent_state.magic_byte with
