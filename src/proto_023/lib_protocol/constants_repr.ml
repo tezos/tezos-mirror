@@ -24,7 +24,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-let version_value = "seoul"
+let version_value = "s023_023"
 
 let version = "v1"
 
