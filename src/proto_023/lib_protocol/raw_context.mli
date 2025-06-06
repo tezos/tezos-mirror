@@ -36,11 +36,11 @@
     block but not persisted across blocks, always stored in
     RAM. The gas counter is here.
 
-    [Seoul_context.t] is actually implemented as [Raw_context.t].
-    The difference is that Seoul_context.mli does not expose this
-    so functions manipulating an Seoul_context.t are guaranteed
+    [S023_context.t] is actually implemented as [Raw_context.t].
+    The difference is that S023_context.mli does not expose this
+    so functions manipulating an S023_context.t are guaranteed
     to only access the context through the storage modules
-    exposed in Seoul_context.mli. These modules are in charge of
+    exposed in S023_context.mli. These modules are in charge of
     maintaining invariants over the structure of the context. *)
 
 (** {1 Errors} *)
@@ -95,8 +95,8 @@ val prepare :
 
 type previous_protocol =
   | Genesis of Parameters_repr.t
-  | Seoul
-  | (* Seoul predecessor *) R022 (* Seoul predecessor *)
+  | S023
+  | (* S023 predecessor *) R022 (* S023 predecessor *)
 
 (** Prepares the context for the first block of the protocol.
 
