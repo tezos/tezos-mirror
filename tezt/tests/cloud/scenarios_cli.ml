@@ -85,6 +85,8 @@ module type Dal = sig
   val dal_incentives : bool
 
   val proxy_localhost : bool
+
+  val disable_shard_validation : bool
 end
 
 module Dal () : Dal = struct
@@ -407,6 +409,13 @@ module Dal () : Dal = struct
         "All agents run on the proxy VM if the proxy mode is activated. This \
          can be used to solve a bug with the Tezt Cloud library. This option \
          will be removed once the bug is fixed"
+      false
+
+  let disable_shard_validation =
+    Clap.flag
+      ~section
+      ~set_long:"disable-shard-validation"
+      ~description:"All DAL nodes will bypass the shard validation stage."
       false
 end
 

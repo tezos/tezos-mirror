@@ -25,6 +25,19 @@
 
 module Types = Tezos_dal_node_services.Types
 
+(** This variable is used to disable DAL shard validation at runtime. When activated,
+    Gossipsub messages (i.e. shards) are always considered valid. This can be risky
+    as the DAL node would no longer validate the shards and therefore should be used
+    only for testing purposes and/or with extreme care. *)
+let disable_shard_validation_environment_variable =
+  "TEZOS_DISABLE_SHARD_VALIDATION_I_KNOW_WHAT_I_AM_DOING"
+
+let disable_shard_validation =
+  match Sys.getenv_opt disable_shard_validation_environment_variable with
+  | None -> false
+  | Some x -> (
+      match String.lowercase_ascii x with "yes" | "y" -> true | _ -> false)
+
 module Term = struct
   type env = {docs : string; doc : string; name : string}
 
@@ -498,6 +511,19 @@ module Term = struct
 
   let fetch_trusted_setup = arg_to_cmdliner fetch_trusted_setup_arg
 
+  let disable_shard_validation_switch =
+    make_switch
+      ~doc:
+        "Disable the shard verification. This is used conjoyintly with the \
+         `TEZOS_DISABLE_SHARD_VERIFICATION_I_KNOW_WHAT_I_AM_DOING` environment \
+         variable. To actually disable the shard verification this option must \
+         be used and the environment variable must be set. If only the \
+         environment variable is set, the DAL node will refuse to start. "
+      "disable-shard-validation"
+
+  let disable_shard_validation =
+    switch_to_cmdliner disable_shard_validation_switch
+
   let verbose_switch =
     make_switch
       ~doc:
@@ -515,8 +541,8 @@ module Term = struct
        $ public_addr $ endpoint $ slots_backup_uris $ trust_slots_backup_uris
        $ metrics_addr $ attester_profile $ operator_profile $ observer_profile
        $ bootstrap_profile $ peers $ history_mode $ service_name
-       $ service_namespace $ fetch_trusted_setup $ verbose
-       $ ignore_l1_config_peers))
+       $ service_namespace $ fetch_trusted_setup $ disable_shard_validation
+       $ verbose $ ignore_l1_config_peers))
 end
 
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
@@ -676,6 +702,7 @@ type options = {
   service_namespace : string option;
   experimental_features : experimental_features;
   fetch_trusted_setup : bool option;
+  disable_shard_validation : bool;
   verbose : bool;
   ignore_l1_config_peers : bool;
 }
@@ -683,7 +710,8 @@ type options = {
 let cli_options_to_options data_dir rpc_addr expected_pow listen_addr
     public_addr endpoint slots_backup_uris trust_slots_backup_uris metrics_addr
     attesters operators observers bootstrap_flag peers history_mode service_name
-    service_namespace fetch_trusted_setup verbose ignore_l1_config_peers =
+    service_namespace fetch_trusted_setup disable_shard_validation verbose
+    ignore_l1_config_peers =
   let open Result_syntax in
   let profile = Controller_profiles.make ~attesters ~operators ?observers () in
   let* profile =
@@ -723,6 +751,7 @@ let cli_options_to_options data_dir rpc_addr expected_pow listen_addr
       service_namespace;
       experimental_features = ();
       fetch_trusted_setup;
+      disable_shard_validation;
       verbose;
       ignore_l1_config_peers;
     }
@@ -747,6 +776,7 @@ let merge
       service_namespace;
       experimental_features;
       fetch_trusted_setup;
+      disable_shard_validation = _;
       verbose;
       ignore_l1_config_peers;
     } configuration =
@@ -817,8 +847,24 @@ let run ?disable_logging subcommand cli_options =
           ~default:Configuration_file.default.data_dir
           cli_options.data_dir
       in
+      let* () =
+        if disable_shard_validation && not cli_options.disable_shard_validation
+        then
+          failwith
+            "DAL shard validation is disabled but the option \
+             '--disable-shard-validation' was not provided."
+        else if
+          (not disable_shard_validation) && cli_options.disable_shard_validation
+        then
+          failwith
+            "DAL shard validation is enabled but the environment variable %s \
+             was not set."
+            disable_shard_validation_environment_variable
+        else return_unit
+      in
       Daemon.run
         ?disable_logging
+        ~disable_shard_validation
         ~data_dir
         ~configuration_override:(merge cli_options)
         ()
@@ -848,7 +894,8 @@ let commands =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint slots_backup_uris trust_slots_backup_uris metrics_addr attesters
       operators observers bootstrap_flag peers history_mode service_name
-      service_namespace fetch_trusted_setup verbose ignore_l1_config_peers =
+      service_namespace fetch_trusted_setup disable_shard_validation verbose
+      ignore_l1_config_peers =
     match
       cli_options_to_options
         data_dir
@@ -869,6 +916,7 @@ let commands =
         service_name
         service_namespace
         fetch_trusted_setup
+        disable_shard_validation
         verbose
         ignore_l1_config_peers
     with

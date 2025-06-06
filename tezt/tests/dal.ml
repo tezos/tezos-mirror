@@ -260,6 +260,10 @@ let wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index =
   in
   Lwt.join promises
 
+let wait_for_shard_validation_is_disabled dal_node =
+  Dal_node.wait_for dal_node "shard_validation_is_disabled.v0" (fun _json ->
+      Some ())
+
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
    The functions below are duplicated from sc_rollup.ml.
    They should be moved to a common submodule. *)
@@ -590,8 +594,11 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
   f rollup_address sc_rollup_node
 
 let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
-    ?bootstrap_profile ?history_mode tezos_node =
-  let dal_node = Dal_node.create ?name ~node:tezos_node () in
+    ?bootstrap_profile ?history_mode ?(wait_ready = true) ?env
+    ?disable_shard_validation tezos_node =
+  let dal_node =
+    Dal_node.create ?name ?disable_shard_validation ~node:tezos_node ()
+  in
   let* () =
     Dal_node.init_config
       ?peers
@@ -601,11 +608,12 @@ let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
       ?history_mode
       dal_node
   in
-  let* () = Dal_node.run ~event_level:`Debug dal_node ~wait_ready:true in
+  let* () = Dal_node.run ?env ~event_level:`Debug dal_node ~wait_ready in
   return dal_node
 
 let with_dal_node ?peers ?attester_profiles ?operator_profiles
-    ?bootstrap_profile ?history_mode tezos_node f key =
+    ?bootstrap_profile ?history_mode ?wait_ready ?env ?disable_shard_validation
+    tezos_node f key =
   let* dal_node =
     make_dal_node
       ?peers
@@ -613,6 +621,9 @@ let with_dal_node ?peers ?attester_profiles ?operator_profiles
       ?operator_profiles
       ?bootstrap_profile
       ?history_mode
+      ?wait_ready
+      ?env
+      ?disable_shard_validation
       tezos_node
   in
   f key dal_node
@@ -668,7 +679,8 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
     ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
     ?event_sections_levels ?operator_profiles ?history_mode ?prover
-    ?l1_history_mode variant scenario =
+    ?l1_history_mode ?wait_ready ?env ?disable_shard_validation variant scenario
+    =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
   test
@@ -706,7 +718,14 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
-      with_dal_node ?bootstrap_profile ?operator_profiles ?history_mode node
+      with_dal_node
+        ?bootstrap_profile
+        ?operator_profiles
+        ?history_mode
+        ?wait_ready
+        ?env
+        ?disable_shard_validation
+        node
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
@@ -10117,6 +10136,26 @@ let use_mockup_node_for_getting_attestable_slots _protocol dal_parameters
     ~error_msg:"Unexpected DAL attestation: expected %L, got %R" ;
   unit
 
+let test_disable_shard_validation_wrong_cli _protocol _parameters _cryptobox
+    _node _client dal_node =
+  Dal_node.check_error
+    dal_node
+    ~msg:
+      (rex
+         ".* DAL shard validation is disabled but the option \
+          '--disable-shard-validation' was not provided.*")
+
+let test_disable_shard_validation_wrong_env _protocol _parameters _cryptobox
+    _node _client dal_node =
+  Dal_node.check_error
+    dal_node
+    ~msg:
+      (rex
+      @@ Format.sprintf
+           ".* DAL shard validation is enabled but the environment variable %s \
+            was not set.*"
+           Dal_node.disable_shard_validation_environment_variable)
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -10528,6 +10567,37 @@ let register ~protocols =
     ~activation_timestamp:Now
     "mockup get_attestable_slots"
     use_mockup_node_for_getting_attestable_slots
+    protocols ;
+
+  (* Scenarios for disabling shard validation *)
+  scenario_with_layer1_and_dal_nodes
+    ~operator_profiles:[0]
+    ~wait_ready:false
+    ~env:
+      (String_map.singleton
+         Dal_node.disable_shard_validation_environment_variable
+         "yes")
+    "DAL node disable shard validation wrong CLI"
+    test_disable_shard_validation_wrong_cli
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~operator_profiles:[0]
+    ~wait_ready:false
+    ~disable_shard_validation:true
+    "DAL node disable shard validation wrong env"
+    test_disable_shard_validation_wrong_env
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~operator_profiles:[0]
+    ~wait_ready:true
+    ~env:
+      (String_map.singleton
+         Dal_node.disable_shard_validation_environment_variable
+         "yes")
+    ~disable_shard_validation:true
+    "DAL node disable shard validation correct CLI"
+    (fun _protocol _parameters _cryptobox _node _client dal_node ->
+      Dal_node.terminate dal_node)
     protocols
 
 let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =

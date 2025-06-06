@@ -43,11 +43,12 @@ type t = {
   (* the highest finalized level the DAL node is aware of (except at start-up, where
      it is the highest level the node is aware of) *)
   mutable l1_crawler_status : L1_crawler_status.t;
+  disable_shard_validation : bool;
 }
 
 let init config ~network_name profile_ctxt cryptobox
     shards_proofs_precomputation proto_plugins store gs_worker transport_layer
-    cctxt ~last_finalized_level =
+    cctxt ~last_finalized_level ?(disable_shard_validation = false) () =
   {
     config;
     network_name;
@@ -65,6 +66,7 @@ let init config ~network_name profile_ctxt cryptobox
     profile_ctxt;
     last_finalized_level;
     l1_crawler_status = Unknown;
+    disable_shard_validation;
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
@@ -236,6 +238,8 @@ let warn_if_attesters_not_delegates ctxt controller_profiles =
           return_unit
         else return_unit)
       pkh_set
+
+let get_disable_shard_validation ctxt = ctxt.disable_shard_validation
 
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =

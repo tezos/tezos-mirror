@@ -23,50 +23,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* [gossipsub_app_message_payload_validation cryptobox message message_id]
-   allows checking whether the given [message] identified by [message_id] is
-   valid with the current [cryptobox] parameters. The validity check is done
-   by verifying that the shard in the message effectively belongs to the
-   commitment given by [message_id]. *)
-let gossipsub_app_message_payload_validation cryptobox message_id message =
-  let Types.Message.{share; shard_proof} = message in
-  let Types.Message_id.{commitment; shard_index; _} = message_id in
-  let shard = Cryptobox.{share; index = shard_index} in
-  let res =
-    Dal_metrics.sample_time
-      ~sampling_frequency:Constants.shards_verification_sampling_frequency
-      ~metric_updater:Dal_metrics.update_shards_verification_time
-      ~to_sample:(fun () ->
-        Cryptobox.verify_shard cryptobox commitment shard shard_proof)
-  in
-  match res with
-  | Ok () -> `Valid
-  | Error err ->
-      let validation_error =
-        match err with
-        | `Invalid_degree_strictly_less_than_expected {given; expected} ->
-            Format.sprintf
-              "Invalid_degree_strictly_less_than_expected. Given: %d, \
-               expected: %d"
-              given
-              expected
-        | `Invalid_shard -> "Invalid_shard"
-        | `Shard_index_out_of_range s ->
-            Format.sprintf "Shard_index_out_of_range(%s)" s
-        | `Shard_length_mismatch -> "Shard_length_mismatch"
-        | `Prover_SRS_not_loaded -> "Prover_SRS_not_loaded"
-      in
-      Event.emit_dont_wait__message_validation_error
-        ~message_id
-        ~validation_error ;
-      `Invalid
-  | exception exn ->
-      (* Don't crash if crypto raised an exception. *)
-      let validation_error = Printexc.to_string exn in
-      Event.emit_dont_wait__message_validation_error
-        ~message_id
-        ~validation_error ;
-      `Invalid
+(** [gossipsub_app_message_payload_validation ~disable_shard_validation cryptobox message
+    message_id] allows checking whether the given [message] identified by
+    [message_id] is valid with the current [cryptobox] parameters. The validity check is
+    done by verifying that the shard in the message effectively belongs to the
+    commitment given by [message_id]. The whole validation can be bypassed if
+    [~disable_shard_validation] is set to [true]. *)
+let gossipsub_app_message_payload_validation ~disable_shard_validation cryptobox
+    message_id message =
+  if disable_shard_validation then `Valid
+  else
+    let Types.Message.{share; shard_proof} = message in
+    let Types.Message_id.{commitment; shard_index; _} = message_id in
+    let shard = Cryptobox.{share; index = shard_index} in
+    let res =
+      Dal_metrics.sample_time
+        ~sampling_frequency:Constants.shards_verification_sampling_frequency
+        ~metric_updater:Dal_metrics.update_shards_verification_time
+        ~to_sample:(fun () ->
+          Cryptobox.verify_shard cryptobox commitment shard shard_proof)
+    in
+    match res with
+    | Ok () -> `Valid
+    | Error err ->
+        let validation_error =
+          match err with
+          | `Invalid_degree_strictly_less_than_expected {given; expected} ->
+              Format.sprintf
+                "Invalid_degree_strictly_less_than_expected. Given: %d, \
+                 expected: %d"
+                given
+                expected
+          | `Invalid_shard -> "Invalid_shard"
+          | `Shard_index_out_of_range s ->
+              Format.sprintf "Shard_index_out_of_range(%s)" s
+          | `Shard_length_mismatch -> "Shard_length_mismatch"
+          | `Prover_SRS_not_loaded -> "Prover_SRS_not_loaded"
+        in
+        Event.emit_dont_wait__message_validation_error
+          ~message_id
+          ~validation_error ;
+        `Invalid
+    | exception exn ->
+        (* Don't crash if crypto raised an exception. *)
+        let validation_error = Printexc.to_string exn in
+        Event.emit_dont_wait__message_validation_error
+          ~message_id
+          ~validation_error ;
+        `Invalid
 
 let gossipsub_message_id_commitment_validation ctxt proto_parameters message_id
     =
@@ -129,16 +133,16 @@ let gossipsub_message_id_validation ctxt proto_parameters message_id =
       gossipsub_message_id_topic_validation ctxt proto_parameters message_id
   | other -> other
 
-(* [gossipsub_app_messages_validation ctxt cryptobox head_level
-   attestation_lag ?message ~message_id ()] checks for the validity of the
-   given message (if any) and message id.
+(** [gossipsub_app_messages_validation ctxt cryptobox head_level
+    attestation_lag ?message ~message_id ()] checks for the validity of the
+    given message (if any) and message id.
 
-   First, the message id's validity is checked if the application cares about
-   it and is not outdated (Otherwise `Unknown or `Outdated is returned,
-   respectively). This is done thanks to
-   {!gossipsub_message_id_validation}. Then, if a message is given,
-   {!gossipsub_app_message_payload_validation} is used to check its
-   validity. *)
+    First, the message id's validity is checked if the application cares about
+    it and is not outdated (Otherwise `Unknown or `Outdated is returned,
+    respectively). This is done thanks to
+    {!gossipsub_message_id_validation}. Then, if a message is given,
+    {!gossipsub_app_message_payload_validation} is used to check its
+    validity. *)
 let gossipsub_app_messages_validation ctxt cryptobox head_level proto_parameters
     ?message ~message_id () =
   if Node_context.is_bootstrap_node ctxt then
@@ -170,7 +174,11 @@ let gossipsub_app_messages_validation ctxt cryptobox head_level proto_parameters
               message
               ~none:`Valid
               ~some:
-                (gossipsub_app_message_payload_validation cryptobox message_id)
+                (gossipsub_app_message_payload_validation
+                   ~disable_shard_validation:
+                     (Node_context.get_disable_shard_validation ctxt)
+                   cryptobox
+                   message_id)
           in
           (if res = `Valid then
              let store = Node_context.get_store ctxt in

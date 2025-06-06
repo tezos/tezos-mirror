@@ -6,8 +6,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [run ?disable_logging ~data_dir ~configuration_override] starts a DAL node
-    with the given data directory and function to generate an initial configuration.
+(** [run ?disable_logging ?disable_shard_validation ~data_dir ~configuration_override ()]
+    starts a DAL node with the given data directory and function to generate an initial
+    configuration.
 
     This function performs the following steps:
 
@@ -28,10 +29,13 @@
 
     - Starts the RPC server to handle incoming RPC requests;
 
-    - Connects the Gossipsub worker with the P2P layer and to the crawler.
+    - Connects the Gossipsub worker with the P2P layer and to the crawler;
+
+    - Can disable the shard validation using [?disable_shard_validation].
 *)
 val run :
   ?disable_logging:bool ->
+  ?disable_shard_validation:bool ->
   data_dir:string ->
   configuration_override:(Configuration_file.t -> Configuration_file.t) ->
   unit ->

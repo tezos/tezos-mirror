@@ -1082,6 +1082,15 @@ open struct
       ("slot_index", Data_encoding.int31)
       ("backup_uri", Data_encoding.string)
       ("status", Data_encoding.string)
+
+  let shard_validation_is_disabled =
+    declare_0
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"shard_validation_is_disabled"
+      ~msg:"shard validation is disabled"
+      ~level:Warning
+      ()
 end
 
 (* DAL node event emission functions *)
@@ -1380,3 +1389,5 @@ let emit_start_catchup ~start_level ~end_level ~levels_to_clean_up =
 let emit_catching_up ~current_level = emit catching_up current_level
 
 let emit_end_catchup () = emit end_catchup ()
+
+let emit_shard_validation_is_disabled () = emit shard_validation_is_disabled ()

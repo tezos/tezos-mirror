@@ -41,6 +41,8 @@ val init :
   Gossipsub.Transport_layer.t ->
   Tezos_rpc.Context.generic ->
   last_finalized_level:int32 ->
+  ?disable_shard_validation:bool ->
+  unit ->
   t
 
 (** Returns all the registered plugins *)
@@ -201,6 +203,10 @@ val version : t -> Types.Version.t
     any) that is not that of a L1-registered delegate. *)
 val warn_if_attesters_not_delegates :
   t -> Controller_profiles.t -> unit tzresult Lwt.t
+
+(** [get_disable_shard_validation ctxt] returns whether we should disable shard
+    validation in the DAL node. *)
+val get_disable_shard_validation : t -> bool
 
 (** Module for P2P-related accessors.  *)
 module P2P : sig

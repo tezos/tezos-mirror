@@ -92,6 +92,8 @@ module Term : sig
 
   val fetch_trusted_setup_arg : bool arg
 
+  val disable_shard_validation_switch : switch
+
   val verbose_switch : switch
 end
 
@@ -131,10 +133,12 @@ type options = {
   service_name : string option;
       (** Name of the service provided by this node. *)
   service_namespace : string option;  (** Namespace for the service. *)
-  experimental_features : experimental_features;  (** Experimental features.  *)
+  experimental_features : experimental_features;  (** Experimental features. *)
   fetch_trusted_setup : bool option;
       (** Should the trusted setup be installed if required and invalid?
-      In case of [None] at init it is considered as yes.*)
+      In case of [None] at init it is considered as yes. *)
+  disable_shard_validation : bool;
+      (** Should the crypto shard verification against commitment hashes be bypassed. *)
   verbose : bool;
       (** Emit events related to connections. Default value is false. *)
   ignore_l1_config_peers : bool;
@@ -165,6 +169,7 @@ val cli_options_to_options :
   string option ->
   string option ->
   bool option ->
+  bool ->
   bool ->
   bool ->
   (options, bool * string) result
