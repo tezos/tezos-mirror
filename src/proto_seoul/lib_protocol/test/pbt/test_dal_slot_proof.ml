@@ -273,7 +273,7 @@ struct
 end
 
 let () =
-  let open Tezos_protocol_alpha_parameters.Default_parameters in
+  let open Tezos_protocol_seoul_parameters.Default_parameters in
   let module Test = Make (struct
     let name = "test"
 

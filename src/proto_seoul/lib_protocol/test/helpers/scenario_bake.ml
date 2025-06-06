@@ -362,7 +362,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
       (Block.current_cycle block)
   in
   let* attesters =
-    let open Tezos_raw_protocol_alpha.Alpha_context in
+    let open Tezos_raw_protocol_seoul.Alpha_context in
     let* ctxt = Context.get_alpha_ctxt (B previous_block) in
     List.filter_map_es
       (fun op ->
