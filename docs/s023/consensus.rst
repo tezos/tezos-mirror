@@ -50,12 +50,12 @@ length in the `technical report <https://arxiv.org/abs/2001.11965>`_ and in a
 post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
 
-.. _tb_validator_seoul:
+.. _tb_validator_s023:
 
 Tenderbake is executed for each new block level by a "committee" whose members
 are called *validators*, which are delegates selected at random based on their
 stake, in much the same way as endorsers were selected in Emmy*. We let
-``CONSENSUS_COMMITTEE_SIZE`` be the number of validator :ref:`slots<rights_seoul>` per level.
+``CONSENSUS_COMMITTEE_SIZE`` be the number of validator :ref:`slots<rights_s023>` per level.
 Furthermore, we use ``CONSENSUS_THRESHOLD`` to denote two thirds of ``CONSENSUS_COMMITTEE_SIZE``.
 
 For each level, Tenderbake proceeds in rounds. Each *round* represents an
@@ -79,13 +79,13 @@ Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 
 Schematically, a round consists in the following steps:
 
-.. _candidate_block_seoul:
+.. _candidate_block_s023:
 
 * a validator designated for that round injects a *candidate block* (representing a proposal) and consensus operations (representing votes) into the node to which it is attached, which then
 * diffuses those blocks and consensus operations to other nodes of the network, and thus
 * communicates them to the validators attached to those nodes, to carry out voting on which block to accept.
 
-.. _quorum_seoul:
+.. _quorum_s023:
 
 Unlike Emmy*, Tenderbake has `two types of
 votes <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
@@ -105,7 +105,7 @@ the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
 
-.. _finality_seoul:
+.. _finality_s023:
 
 Transaction and block finality
 ------------------------------
@@ -122,7 +122,7 @@ Consequently, to agree on a block, that is, on both the payload and the header, 
 confirmation, and thus guarantees
 **block finality after 2 confirmations**.
 
-.. _time_between_blocks_seoul:
+.. _time_between_blocks_s023:
 
 Time between blocks
 -------------------
@@ -140,7 +140,7 @@ should be taken at round 0, meaning that the time between blocks would be
 :math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
 
-.. _active_stake_seoul:
+.. _active_stake_s023:
 
 Validator selection
 -------------------
@@ -151,17 +151,17 @@ power is a function of all tez owned by the delegate and its
 delegators, with :doc:`staked<staking>` tez weighted more than
 non-staked tez, and there are additional considerations such as
 overstaking and overdelegation; see the :ref:`baking power
-formula<baking_power_overview_seoul>`.
+formula<baking_power_overview_s023>`.
 
 The baking rights are determined
-:ref:`CONSENSUS_RIGHTS_DELAY<cs_constants_seoul>` in advance, which is
-currently ``2`` :ref:`cycles<def_cycle_seoul>`. More
+:ref:`CONSENSUS_RIGHTS_DELAY<cs_constants_s023>` in advance, which is
+currently ``2`` :ref:`cycles<def_cycle_s023>`. More
 precisely, at the end of cycle ``n`` and beginning of cycle ``n+1``,
 the baking rights for cycle ``n+1+CONSENSUS_RIGHTS_DELAY=n+3`` are
 :doc:`randomly generated<randomness_generation>` based on the current
 :doc:`baking power<baking_power>` of each delegate that meets the
 :ref:`minimal power and own staked
-requirements<minimal_baking_power_seoul>`.
+requirements<minimal_baking_power_s023>`.
 
 
 Economic Incentives
@@ -224,7 +224,7 @@ However, two conditions must be met:
 - the validator has revealed its nonces, and
 - the validator has been present during the cycle.
 
-Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_seoul>`
+Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_s023>`
 from Emmy*.
 The second condition is new. We say that a delegate is *present* during a cycle
 if the attesting power (that is, the number of validator slots at the
@@ -233,7 +233,7 @@ cycle represents at least ``MINIMAL_PARTICIPATION_RATIO`` of the delegate's expe
 validator slots for the current cycle (which is ``BLOCKS_PER_CYCLE *
 CONSENSUS_COMMITTEE_SIZE * active_stake / total_active_stake``).
 
-The concrete values for rewards depend on the issuance which is dynamically adjusted by :ref:`Adaptive Issuance<adaptive_issuance_seoul>`.
+The concrete values for rewards depend on the issuance which is dynamically adjusted by :ref:`Adaptive Issuance<adaptive_issuance_s023>`.
 For each block it issues an amount ``total_rewards`` of rewarded tez, that varies with
 the total amount of tez at stake on the chain.
 To obtain some concrete values, we will use as an example the issuance before Adaptive Issuance,
@@ -277,7 +277,7 @@ included during that cycle has been ``651,456`` slots. Given that this number is
 bigger than the minimum required (``756,000 * 2 / 3``), it receives an attesting
 reward of ``756,000 * 0.000761 = 575.316`` tez for that cycle.
 
-.. _slashing_seoul:
+.. _slashing_s023:
 
 Slashing
 ^^^^^^^^
@@ -301,12 +301,12 @@ If a delegate's deposit is smaller than the slashed amount, the deposit is
 simply emptied.
 
 The evidence for double signing at a given level can be collected by
-any :ref:`accuser<def_accuser_seoul>` and included as a *denunciation*
+any :ref:`accuser<def_accuser_s023>` and included as a *denunciation*
 operation in a block in the same cycle as the double signing or in the
 ``DENUNCIATION_PERIOD`` next cycles.
 
 As soon as a delegate is denounced for any double signing, it is
-immediately :ref:`forbidden<new_forbidden_period_seoul>` from both baking
+immediately :ref:`forbidden<new_forbidden_period_s023>` from both baking
 and attesting for at least 2 cycles.
 
 The actual slashing and denunciation rewarding happen at the end of
@@ -321,21 +321,21 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
-.. _fitness_section_seoul:
+.. _fitness_section_s023:
 
 Fitness
 -------
 
 The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.
 The current version of the fitness is 2 (version 0 was used by Emmy, and version 1 by Emmy+ and Emmy*).
-The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_seoul>`.
+The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_s023>`.
 In Emmy*, only the level mattered.
 But in Tenderbake, we need to, for instance, allow for new blocks at the same level to be accepted by nodes.
 Therefore the fitness also includes the block's round (as the fifth component).
-Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_seoul>`.
+Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_s023>`.
 Therefore the fitness also includes the opposite of predecessor block's round as the forth component (the predecessor is taken for technical reasons).
 Finally, to (partially) enforce :ref:`the rule on
-re-proposals<quorum_seoul>`, the fitness also includes, as the third
+re-proposals<quorum_s023>`, the fitness also includes, as the third
 component, the round at which a preattestation quorum was observed by
 the baker, if any (this component can therefore be empty). By the way,
 preattestations are present in a block if and only if the locked round
@@ -362,7 +362,7 @@ inner sequences). So the first fitness is smaller than the second one,
 because of the third component, the empty bitstring being smaller than
 any other bitstring.
 
-.. _cs_constants_seoul:
+.. _cs_constants_s023:
 
 Consensus related protocol parameters
 -------------------------------------
@@ -408,14 +408,14 @@ Consensus related protocol parameters
    * - ``UNSTAKE_FINALIZATION_DELAY`` [#derived_cs+sd]_
      - 3 cycles
 
-The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_seoul>`.
+The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_s023>`.
 
 .. [#derived_cs] These :ref:`derived constants
-                 <protocol_constants_seoul>` are automatically set to
+                 <protocol_constants_s023>` are automatically set to
                  the same value as ``CONSENSUS_RIGHTS_DELAY``.
 
 .. [#derived_cs+sd] This :ref:`derived constant
-                    <protocol_constants_seoul>` is automatically set
+                    <protocol_constants_s023>` is automatically set
                     to ``CONSENSUS_RIGHTS_DELAY + SLASHING_DELAY``.
 
 

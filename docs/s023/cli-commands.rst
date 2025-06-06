@@ -16,7 +16,7 @@ using shell commands such as (:ref:`indicating the appropriate protocol <octez_c
 	The protocol-independent tools are documented :doc:`here <../shell/cli-commands>`.
 
 
-.. _client_manual_seoul:
+.. _client_manual_s023:
 
 Client manual
 =============
@@ -27,7 +27,7 @@ This is the manual page of the command line tool ``octez-client``. See :ref:`how
          :file: octez-client.html
 
 
-.. _baker_manual_seoul:
+.. _baker_manual_s023:
 
 Baker manual
 ============
@@ -38,7 +38,7 @@ This is the manual page of the baker command line tool. See :ref:`baker_run` for
          :file: octez-baker.html
 
 
-.. _accuser_manual_seoul:
+.. _accuser_manual_s023:
 
 Accuser manual
 ==============

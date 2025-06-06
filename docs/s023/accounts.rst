@@ -17,7 +17,7 @@ addresses:
 Finally, addresses prefixed with ``sr1`` identify :doc:`Smart Rollups
 <./smart_rollups>`.
 
-.. _user_accounts_seoul:
+.. _user_accounts_s023:
 
 User accounts
 ~~~~~~~~~~~~~
@@ -84,7 +84,7 @@ applications like mutli-signatures schemes, multi-party key exchanges,
 signatures compaction, etc. BLS is notably used by Zcash and Ethereum 2.0.
 
 Starting in protocol S, ``tz4`` addresses can be used by bakers, to forge blocks
-and :ref:`consensus operations <consensus_operations_seoul>`. The aggregatable property of BLS signatures is used with
+and :ref:`consensus operations <consensus_operations_s023>`. The aggregatable property of BLS signatures is used with
 consensus operations to reduce the size signatures take in each block. Such bakers that
 also wish to participate in the DAL are required to register a :ref:`companion key <companion_key>`,
 that is used to sign the DAL specific attestation and aggregate it with the regular attestation.
@@ -93,4 +93,4 @@ Smart contracts
 ~~~~~~~~~~~~~~~
 
 A transaction to a smart contract
-address can provide data and optionally some tokens, and triggers the execution of the code, which may read and update the storage. The transaction can succeed or fail, according to the :ref:`transaction semantics <transaction_semantics_seoul>`.
+address can provide data and optionally some tokens, and triggers the execution of the code, which may read and update the storage. The transaction can succeed or fail, according to the :ref:`transaction semantics <transaction_semantics_s023>`.

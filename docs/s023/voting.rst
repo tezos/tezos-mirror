@@ -35,7 +35,7 @@ The five periods are as follows:
   At the end of a **proposal period**, if participation reaches a
   :ref:`proposal quorum <proposal_quorum>`, the proposal with most support is
   selected and we move to an **exploration period**. Note that support is
-  measured in the :ref:`voting power <voting_power_seoul>` that delegates supporting the
+  measured in the :ref:`voting power <voting_power_s023>` that delegates supporting the
   proposal have. E.g., a proposal supported by a single delegate with 600,000 tz of voting power
   has more support than a proposal supported by two delegates with 100,000 tz
   each of voting power.
@@ -110,7 +110,7 @@ might be introduced, a different selection mechanism may be used, the quorum
 requirement might differ, etc.
 
 
-.. _voting_power_seoul:
+.. _voting_power_s023:
 
 Voting Power
 ------------
@@ -121,8 +121,8 @@ all its delegators (including the delegate itself of course), no
 matter whether they are :doc:`staked<staking>` or not.
 
 More precisely, the voting power of a delegate during a voting period
-is the sum of its :ref:`total_staked<total_staked_seoul>` and
-:ref:`total_delegated<total_delegated_seoul>` amounts, measured in
+is the sum of its :ref:`total_staked<total_staked_s023>` and
+:ref:`total_delegated<total_delegated_s023>` amounts, measured in
 *mutez*, and snapshotted at the beginning of the voting period. (Note
 the differences from the validator selection for consensus, which is
 based on the more complex :doc:`baking power<baking_power>` instead,
@@ -166,7 +166,7 @@ Note that Pass ballots do not count towards or against the super-majority;
 they still counts towards participation and quorum.
 
 More details can be found in the file
-:src:`src/proto_seoul/lib_protocol/amendment.ml`.
+:src:`src/proto_023_PtSEouLo/lib_protocol/amendment.ml`.
 
 
 The Hash and the Protocol
@@ -264,7 +264,7 @@ above, the quorum is adaptive and that low participation would lower the
 quorum of the next vote.
 
 More details on the operations can be found in
-:src:`src/proto_seoul/lib_protocol/operation_repr.ml`.
+:src:`src/proto_023_PtSEouLo/lib_protocol/operation_repr.ml`.
 The binary format is described by
 ``octez-client describe unsigned operation``.
 
@@ -352,7 +352,7 @@ Further details and explanations on the voting procedure can be found at:
 - `Tezos Governance <https://www.tezosagora.org/learn#an-introduction-to-tezos-governance>`_ on Tezos Agora.
 
 For more details on the client commands refer to the manual at
-:ref:`client_manual_seoul`.
+:ref:`client_manual_s023`.
 
 For vote related RPCs check the :doc:`rpc` under the prefix
 ``votes/``.
