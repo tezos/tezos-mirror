@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:  Protocol (aggregate)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+    Invocation: dune exec src/proto_seoul/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_aggregate.ml
 *)
 

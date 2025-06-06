@@ -28,7 +28,7 @@
 (** Testing
     -------
     Component:    Protocol (baking)
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
+    Invocation:   dune exec src/proto_seoul/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_baking.ml
     Subject:      Bakers and baking/voting power-related tests, based on RPCs.
                   Note that more detailed tests on baking rewards can be found
