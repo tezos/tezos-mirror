@@ -16,6 +16,7 @@ depends: [
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
   "octez-protocol-022-PsRiotum-libs" { = version }
+  "octez-protocol-023-PtSEouLo-libs" { = version }
 ]
 depopts: [
   "tezos-client-genesis"

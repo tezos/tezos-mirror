@@ -1243,6 +1243,7 @@ opam:all_6:
       - tezos-protocol-demo-noops
       - tezos-protocol-demo-counter
       - tezos-protocol-alpha
+      - tezos-openapi
       - tezos-dal-node-services
       - tezos-benchmark
       - octez-shell-libs
@@ -1368,14 +1369,15 @@ opam:all_2:
       - octez-smart-rollup-node-PtParisB
       - octez-smart-rollup-node-PtNairob
       - octez-smart-rollup-node-PsQuebec
+      - octez-smart-rollup-node-PsParisC
+      - octez-smart-rollup-node-Proxford
+      - octez-protocol-alpha-libs
       - octez-protocol-021-PsQuebec-libs
       - octez-protocol-020-PsParisC-libs
       - octez-protocol-019-PtParisB-libs
       - octez-protocol-018-Proxford-libs
       - octez-protocol-017-PtNairob-libs
       - octez-protocol-016-PtMumbai-libs
-      - octez-protocol-002-PsYLVpVv-libs
-      - octez-protocol-001-PtCJ7pwo-libs
       - octez-protocol-000-Ps9mPmXa-libs
       - octez-injector
       - octez-baker-lib
@@ -1435,10 +1437,9 @@ opam:all_1:
     matrix:
     - package:
       - octez-smart-rollup-node-alpha
+      - octez-smart-rollup-node-PtSEouLo
       - octez-smart-rollup-node-PsRiotum
-      - octez-smart-rollup-node-PsParisC
-      - octez-smart-rollup-node-Proxford
-      - octez-protocol-alpha-libs
+      - octez-protocol-023-PtSEouLo-libs
       - octez-protocol-022-PsRiotum-libs
 
 opam:all_3:
@@ -1495,7 +1496,6 @@ opam:all_3:
   parallel:
     matrix:
     - package:
-      - tezos-client-demo-counter
       - octez-rpc-process
       - octez-protocol-015-PtLimaPt-libs
       - octez-protocol-014-PtKathma-libs
@@ -1510,6 +1510,8 @@ opam:all_3:
       - octez-protocol-005-PsBabyM1-libs
       - octez-protocol-004-Pt24m4xi-libs
       - octez-protocol-003-PsddFKi3-libs
+      - octez-protocol-002-PsYLVpVv-libs
+      - octez-protocol-001-PtCJ7pwo-libs
 
 opam:exec_4:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1633,6 +1635,7 @@ opam:all_4:
       - tezos-protocol-000-Ps9mPmXa
       - tezos-dal-node-lib
       - tezos-client-genesis
+      - tezos-client-demo-counter
       - octez-node-config
       - octez-crawler
 
@@ -1695,8 +1698,10 @@ opam:exec_1:
       - octez-dal-node
       - octez-codec
       - octez-client
+      - octez-baker-PtSEouLo
       - octez-baker-PsRiotum
       - octez-baker
+      - octez-accuser-PtSEouLo
       - octez-accuser-PsRiotum
       - octez-accuser
 
@@ -1754,6 +1759,7 @@ opam:all_5:
   parallel:
     matrix:
     - package:
+      - tezos-protocol-023-PtSEouLo
       - tezos-protocol-022-PsRiotum
       - tezos-protocol-021-PsQuebec
       - tezos-protocol-020-PsParisC
@@ -1825,7 +1831,6 @@ opam:all_7:
     matrix:
     - package:
       - tezt-tezos
-      - tezos-openapi
       - octez-rustzcash-deps
       - octez-rust-deps
       - octez-riscv-api

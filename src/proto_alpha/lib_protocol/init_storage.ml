@@ -125,28 +125,6 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
 (* Start of code to remove at next automatic protocol snapshot *)
 
 (* Please add here any code that should be removed at the next automatic protocol snapshot *)
-let update_delegate_sampler_state_value_type_from_R_to_S ctxt =
-  let open Lwt_result_syntax in
-  Storage.Delegate_sampler_state_up_to_R.fold
-    ctxt
-    ~order:`Undefined
-    ~init:(ok ctxt)
-    ~f:(fun cycle sampler ctxt ->
-      let*? ctxt in
-      let sampler =
-        Sampler.map
-          (fun {Storage.delegate; consensus_pk; consensus_pkh} ->
-            {
-              Delegate_consensus_key.delegate;
-              consensus_pk;
-              consensus_pkh;
-              companion_pk = None;
-              companion_pkh = None;
-            })
-          sampler
-      in
-      let* ctxt = Storage.Delegate_sampler_state.update ctxt cycle sampler in
-      return ctxt)
 
 (* End of code to remove at next automatic protocol snapshot *)
 
@@ -249,7 +227,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         return (ctxt, [])
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | R022 ->
+    | S023 ->
         let* ctxt =
           Storage.Tenderbake.First_level_of_protocol.update ctxt level
         in
@@ -257,7 +235,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
-        let* ctxt = update_delegate_sampler_state_value_type_from_R_to_S ctxt in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in

@@ -16,6 +16,7 @@ depends: [
   "octez-shell-libs" { = version }
   "octez-baker-lib" { = version }
   "octez-protocol-022-PsRiotum-libs" { = version }
+  "octez-protocol-023-PtSEouLo-libs" { = version }
 ]
 depopts: [
   "octez-protocol-021-PsQuebec-libs"

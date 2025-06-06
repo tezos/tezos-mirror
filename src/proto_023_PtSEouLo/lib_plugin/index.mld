@@ -1,0 +1,17 @@
+{0 Octez-protocol-023-PtSEouLo-libs: octez protocol 023-PtSEouLo libraries}
+
+This is a package containing some libraries related to the Tezos 023-PtSEouLo protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_023_PtSEouLo_test_helpers}Tezos_023_PtSEouLo_test_helpers}: Protocol testing framework
+- {{!module-Tezos_agnostic_baker_023_PtSEouLo}Tezos_agnostic_baker_023_PtSEouLo}: Protocol specific library for the Agnostic Baker
+- {{!module-Tezos_baking_023_PtSEouLo}Tezos_baking_023_PtSEouLo}: Base library for `tezos-baker/accuser`
+- {{!module-Tezos_baking_023_PtSEouLo_commands}Tezos_baking_023_PtSEouLo_commands}: Protocol-specific commands for baking
+- {{!module-Tezos_client_023_PtSEouLo}Tezos_client_023_PtSEouLo}: Protocol specific library for `octez-client`
+- {{!module-Tezos_dal_023_PtSEouLo}Tezos_dal_023_PtSEouLo}: Protocol specific library for the Data availability Layer
+- {{!module-Tezos_layer2_utils_023_PtSEouLo}Tezos_layer2_utils_023_PtSEouLo}: Protocol specific library for Layer 2 utils
+- {{!module-Tezos_protocol_plugin_023_PtSEouLo}Tezos_protocol_plugin_023_PtSEouLo}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_023_PtSEouLo_registerer}Tezos_protocol_plugin_023_PtSEouLo_registerer}: Protocol plugin registerer
+- {{!module-Tezos_smart_rollup_023_PtSEouLo}Tezos_smart_rollup_023_PtSEouLo}: Protocol specific library of helpers for `tezos-smart-rollup`
+- {{!module-Tezos_smart_rollup_layer2_023_PtSEouLo}Tezos_smart_rollup_layer2_023_PtSEouLo}: Protocol specific library for `tezos-smart-rollup`

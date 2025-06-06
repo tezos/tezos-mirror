@@ -1,0 +1,4 @@
+set_delegate_parameters, 0, 790.470000
+stake, 0, 3628.920000
+unstake, 0, 4248.920000
+finalize_unstake, 0, 1728.854000

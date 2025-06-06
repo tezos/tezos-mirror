@@ -27,6 +27,8 @@ depends: [
   "tezos-protocol-000-Ps9mPmXa" { = version }
   "tezos-protocol-022-PsRiotum" { = version }
   "octez-protocol-022-PsRiotum-libs" { = version }
+  "tezos-protocol-023-PtSEouLo" { = version }
+  "octez-protocol-023-PtSEouLo-libs" { = version }
 ]
 depopts: [
   "tezos-protocol-genesis"

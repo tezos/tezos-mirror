@@ -1305,7 +1305,7 @@ module Local_helpers = struct
 end
 
 let test_unstaked_requests_many_delegates () =
-  let migrate_from = Protocol.R022 in
+  let migrate_from = Option.get Protocol.(previous_protocol Alpha) in
   let migrate_to = Protocol.Alpha in
 
   Test.register
@@ -1424,7 +1424,7 @@ let test_unstaked_requests_many_delegates () =
   unit
 
 let test_unstaked_requests_and_min_delegated () =
-  let migrate_from = Protocol.R022 in
+  let migrate_from = Option.get Protocol.(previous_protocol Alpha) in
   let migrate_to = Protocol.Alpha in
 
   Test.register
@@ -1611,8 +1611,8 @@ let test_unstaked_requests_and_min_delegated () =
   unit
 
 let test_reveal_migration () =
-  let migrate_from = Protocol.R022 in
-  let migrate_to = Protocol.Alpha in
+  let migrate_from = Option.get Protocol.(previous_protocol S023) in
+  let migrate_to = Protocol.S023 in
 
   Test.register
     ~__FILE__

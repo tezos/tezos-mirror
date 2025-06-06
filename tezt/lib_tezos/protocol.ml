@@ -25,11 +25,12 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = R022 | Alpha
+type t = S023 | R022 | Alpha
 
-let all = [R022; Alpha]
+let all = [S023; R022; Alpha]
 
-let encoding = Data_encoding.string_enum [("alpha", Alpha); ("r022", R022)]
+let encoding =
+  Data_encoding.string_enum [("alpha", Alpha); ("s023", S023); ("r022", R022)]
 
 type constants =
   | Constants_sandbox
@@ -43,11 +44,14 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function Alpha -> "Alpha" | R022 -> "R022"
+let name = function Alpha -> "Alpha" | S023 -> "S023" | R022 -> "R022"
 
-let number = function R022 -> 022 | Alpha -> 023
+let number = function R022 -> 022 | S023 -> 023 | Alpha -> 024
 
-let directory = function R022 -> "proto_022_PsRiotum" | Alpha -> "proto_alpha"
+let directory = function
+  | R022 -> "proto_022_PsRiotum"
+  | Alpha -> "proto_alpha"
+  | S023 -> "proto_023_PtSEouLo"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -55,6 +59,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | R022 -> "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7"
+  | S023 -> "PtSEouLov7Fp6XoqXUBqd7XzggUpUarSMcSUsR5MarqspqiuQBY"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let short_hash protocol_hash =
@@ -267,7 +272,10 @@ let write_parameter_file :
   JSON.encode_to_file_u output_file parameters ;
   Lwt.return output_file
 
-let previous_protocol = function Alpha -> Some R022 | R022 -> None
+let previous_protocol = function
+  | Alpha -> Some S023
+  | S023 -> Some R022
+  | R022 -> None
 
 let has_predecessor p = previous_protocol p <> None
 

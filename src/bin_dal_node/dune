@@ -17,6 +17,7 @@
    (octez-protocol-021-PsQuebec-libs.dal -> void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty)
    (-> void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty))
   octez-protocol-022-PsRiotum-libs.dal
+  octez-protocol-023-PtSEouLo-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-dal from
    (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))

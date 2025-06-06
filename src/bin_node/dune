@@ -166,6 +166,8 @@
    (-> void_for_linking-octez-protocol-021-PsQuebec-libs-plugin-registerer.empty))
   tezos-protocol-022-PsRiotum.embedded-protocol
   octez-protocol-022-PsRiotum-libs.plugin-registerer
+  tezos-protocol-023-PtSEouLo.embedded-protocol
+  octez-protocol-023-PtSEouLo-libs.plugin-registerer
   (select void_for_linking-tezos-protocol-alpha-embedded-protocol from
    (tezos-protocol-alpha.embedded-protocol -> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty))

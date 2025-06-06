@@ -37,4 +37,5 @@ let is_proto_test file =
   | Some "020_PsParisC" -> ["parisc"]
   | Some "021_PsQuebec" -> ["quebec"]
   | Some "022_PsRiotum" -> ["r022"]
+  | Some "023_PtSEouLo" -> ["s023"]
   | Some _ -> assert false

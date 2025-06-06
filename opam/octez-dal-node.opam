@@ -16,6 +16,7 @@ depends: [
   "tezos-dal-node-lib" { = version }
   "memtrace"
   "octez-protocol-022-PsRiotum-libs" { = version }
+  "octez-protocol-023-PtSEouLo-libs" { = version }
 ]
 depopts: [
   "octez-protocol-021-PsQuebec-libs"

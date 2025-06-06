@@ -33,6 +33,7 @@ let version_for_protocol : Pvm_input_kind.protocol -> Wasm_pvm_state.version =
   | ParisB -> V4
   | ParisC -> V4
   | Proto_alpha -> V5
+  | S023 -> V5
   | R022 -> V5
   | Quebec -> V5
 

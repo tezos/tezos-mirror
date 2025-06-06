@@ -19,6 +19,8 @@
    (-> void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty))
   octez-protocol-022-PsRiotum-libs.agnostic-baker
   octez-protocol-022-PsRiotum-libs.dal
+  octez-protocol-023-PtSEouLo-libs.agnostic-baker
+  octez-protocol-023-PtSEouLo-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-agnostic-baker from
    (octez-protocol-alpha-libs.agnostic-baker -> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty))

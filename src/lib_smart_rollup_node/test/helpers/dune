@@ -32,6 +32,7 @@
    (octez_smart_rollup_node_PsQuebec -> void_for_linking-octez_smart_rollup_node_PsQuebec.empty)
    (-> void_for_linking-octez_smart_rollup_node_PsQuebec.empty))
   octez_smart_rollup_node_PsRiotum
+  octez_smart_rollup_node_PtSEouLo
   (select void_for_linking-octez_smart_rollup_node_alpha from
    (octez_smart_rollup_node_alpha -> void_for_linking-octez_smart_rollup_node_alpha.empty)
    (-> void_for_linking-octez_smart_rollup_node_alpha.empty)))
