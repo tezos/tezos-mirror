@@ -10,6 +10,7 @@ use crate::{
         DelayedTransactionFetchingResult, EVMBlockHeader, TezBlockHeader,
     },
     delayed_inbox::DelayedInbox,
+    error,
     fees::MINIMUM_BASE_FEE_PER_GAS,
     l2block::L2Block,
     simulation::start_simulation_mode,
@@ -25,12 +26,19 @@ use evm_execution::{
 };
 use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, Encodable};
-use std::fmt::{Debug, Display};
+use std::{
+    collections::VecDeque,
+    fmt::{Debug, Display},
+};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_execution::context;
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
-use tezos_tezlink::block::TezBlock;
+use tezos_tezlink::{
+    block::{AppliedOperation, TezBlock},
+    operation::Operation,
+};
 
 pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state");
@@ -85,6 +93,8 @@ pub struct TezBlockInProgress {
     number: U256,
     timestamp: Timestamp,
     previous_hash: H256,
+    applied: Vec<AppliedOperation>,
+    operations: VecDeque<Operation>,
 }
 
 impl BlockInProgressTrait for TezBlockInProgress {
@@ -116,26 +126,44 @@ impl TransactionsTrait for crate::transaction::Transactions {
 }
 
 #[derive(Debug)]
-pub struct TezTransactions {}
+pub struct TezTransactions(pub Vec<Operation>);
 
 impl TransactionsTrait for TezTransactions {
-    fn extend(&mut self, _: Self) {}
+    fn extend(&mut self, other: Self) {
+        let TezTransactions(ref mut ops) = self;
+        let TezTransactions(other) = other;
+        ops.extend(other)
+    }
 
     fn number_of_txs(&self) -> usize {
-        0
+        let TezTransactions(operations) = self;
+        operations.len()
     }
 }
 
 impl Encodable for TezTransactions {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        let Self {} = self;
-        stream.begin_list(0);
+        let Self(operations) = self;
+        stream.begin_list(operations.len());
+        for op in operations {
+            // We don't want the kernel to panic if there's an error
+            // and we can't print a log as we don't have access to
+            // the host. So we just ignore the result.
+            let _ = op.rlp_append(stream);
+        }
     }
 }
 
 impl Decodable for TezTransactions {
-    fn decode(_decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        Ok(Self {})
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        if !decoder.is_list() {
+            return Err(rlp::DecoderError::RlpExpectedToBeList);
+        }
+        let operations = decoder
+            .iter()
+            .map(|rlp| Operation::decode(&rlp))
+            .collect::<Result<Vec<Operation>, rlp::DecoderError>>()?;
+        Ok(TezTransactions(operations))
     }
 }
 
@@ -398,10 +426,13 @@ impl ChainConfigTrait for MichelsonChainConfig {
         header: Self::ChainHeader,
         blueprint: Blueprint<Self::Transactions>,
     ) -> Self::BlockInProgress {
+        let TezTransactions(operations) = blueprint.transactions;
         TezBlockInProgress {
             number: current_block_number,
             timestamp: blueprint.timestamp,
             previous_hash: header.hash,
+            applied: vec![],
+            operations: VecDeque::from(operations),
         }
     }
 
@@ -413,15 +444,23 @@ impl ChainConfigTrait for MichelsonChainConfig {
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transactions>, usize)>
     {
         Ok((
-            DelayedTransactionFetchingResult::Ok(TezTransactions {}),
+            DelayedTransactionFetchingResult::Ok(TezTransactions(vec![])),
             current_blueprint_size,
         ))
     }
 
     fn transactions_from_bytes(
-        _bytes: Vec<Vec<u8>>,
+        bytes: Vec<Vec<u8>>,
     ) -> anyhow::Result<Self::Transactions> {
-        Ok(TezTransactions {})
+        let operations = bytes
+            .iter()
+            .map(|bytes| {
+                Operation::try_from_bytes(bytes).map_err(|decode_error| {
+                    error::Error::NomReadError(format!("{:?}", decode_error))
+                })
+            })
+            .collect::<Result<Vec<Operation>, error::Error>>()?;
+        Ok(TezTransactions(operations))
     }
 
     fn read_block_in_progress(
@@ -447,6 +486,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
             number,
             timestamp,
             previous_hash,
+            mut applied,
+            mut operations,
         } = block_in_progress;
         log!(
             host,
@@ -455,7 +496,31 @@ impl ChainConfigTrait for MichelsonChainConfig {
             number
         );
 
-        let tezblock = TezBlock::new(number, timestamp, previous_hash);
+        let context = context::Context::from(&self.storage_root_path())?;
+
+        // Compute operations that are in the block in progress
+        while !operations.is_empty() {
+            // Retrieve the next operation in the VecDequeue
+            let operation = operations.pop_front().ok_or(error::Error::Reboot)?;
+
+            // Try to apply the operation with the tezos_execution crate, return a receipt
+            // on whether it failed or not
+            let receipt = tezos_execution::apply_operation(host, &context, &operation)?;
+
+            // Compute the hash of the operation
+            let hash = operation.hash()?;
+
+            // Add the applied operation in the block in progress
+            let applied_operation = AppliedOperation {
+                hash,
+                data: operation,
+                receipt,
+            };
+            applied.push(applied_operation);
+        }
+
+        // Create a Tezos block from the block in progess
+        let tezblock = TezBlock::new(number, timestamp, previous_hash, applied)?;
         let new_block = L2Block::Tezlink(tezblock);
         let root = self.storage_root_path();
         crate::block_storage::store_current(host, &root, &new_block)

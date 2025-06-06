@@ -92,7 +92,7 @@ fn store_block(
         index.push_value(host, block.hash().as_bytes())?;
     }
     let path = path::path(root, block.hash())?;
-    let bytes = block.to_bytes();
+    let bytes = block.to_bytes()?;
     Ok(host.store_write_all(&path, &bytes)?)
 }
 

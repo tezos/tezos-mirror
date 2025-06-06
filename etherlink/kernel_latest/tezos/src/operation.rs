@@ -9,6 +9,8 @@ use nom::combinator::map;
 use nom::error::{ErrorKind, ParseError};
 use nom::{bytes::complete::take, Finish};
 use primitive_types::H256;
+use rlp::Decodable;
+use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{HashType, UnknownSignature};
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
@@ -205,50 +207,94 @@ impl Operation {
     }
 }
 
+impl Operation {
+    // The `rlp_append` function from the Encodable trait can't fail but `to_bytes`
+    // return a result. To avoid unwraping and risk a panic we're not implementing
+    // the trait exactly, but we expose a serialization function.
+    pub fn rlp_append(&self, s: &mut rlp::RlpStream) -> Result<(), BinError> {
+        let bytes = self.to_bytes()?;
+        s.append(&bytes);
+        Ok(())
+    }
+
+    pub fn hash(&self) -> Result<H256, BinError> {
+        let serialized_op = self.to_bytes()?;
+        let op_hash = digest_256(&serialized_op);
+        Ok(H256::from_slice(&op_hash))
+    }
+}
+
+impl Decodable for Operation {
+    fn decode(rlp: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        let raw: Vec<u8> = rlp.as_val()?;
+        Operation::try_from_bytes(&raw)
+            .map_err(|_| rlp::DecoderError::Custom("Operation::try_from_bytes failed"))
+    }
+}
+
+#[cfg(test)]
+fn make_dummy_operation(
+    operation: OperationContent,
+    signature: UnknownSignature,
+) -> Operation {
+    use crate::block::TezBlock;
+
+    let branch = TezBlock::genesis_block_hash();
+
+    // Public key hash in b58 for 0002298c03ed7d454a101eb7022bc95f7e5f41ac78
+    let source = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+        .expect("Public key hash conversion should succeeded");
+
+    Operation {
+        branch,
+        content: ManagerOperation {
+            source,
+            fee: 1_u64.into(),
+            counter: 10_u64.into(),
+            gas_limit: 68_u64.into(),
+            storage_limit: 45_u64.into(),
+            operation,
+        },
+        signature,
+    }
+}
+
+#[cfg(test)]
+pub fn make_dummy_reveal_operation() -> Operation {
+    let pk = PublicKey::from_b58check(
+        "edpkuT1qccDweCHnvgjLuNUHERpZmEaFZfbWvTzj2BxmTgQBZjaDFD",
+    )
+    .expect("Public key creation should have succeeded");
+
+    let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
+
+    make_dummy_operation(OperationContent::Reveal { pk }, signature)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{ManagerOperation, Operation, OperationContent};
-    use crate::block::TezBlock;
+    use crate::operation::make_dummy_reveal_operation;
     use primitive_types::H256;
+    use rlp::{Decodable, Rlp, RlpStream};
     use tezos_crypto_rs::{
         hash::{HashType, UnknownSignature},
         public_key::PublicKey,
     };
     use tezos_smart_rollup::types::PublicKeyHash;
 
-    fn make_dummy_operation(
-        operation: OperationContent,
-        signature: UnknownSignature,
-    ) -> Operation {
-        let branch = TezBlock::genesis_block_hash();
-
-        // Public key hash in b58 for 0002298c03ed7d454a101eb7022bc95f7e5f41ac78
-        let source = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
-            .expect("Public key hash conversion should succeed");
-
-        Operation {
-            branch,
-            content: ManagerOperation {
-                source,
-                fee: 1_u64.into(),
-                counter: 10_u64.into(),
-                gas_limit: 68_u64.into(),
-                storage_limit: 45_u64.into(),
-                operation,
-            },
-            signature,
-        }
-    }
-
-    fn make_dummy_reveal_operation() -> Operation {
-        let pk = PublicKey::from_b58check(
-            "edpkuT1qccDweCHnvgjLuNUHERpZmEaFZfbWvTzj2BxmTgQBZjaDFD",
-        )
-        .expect("Public key creation should have succeed");
-
-        let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
-
-        make_dummy_operation(OperationContent::Reveal { pk }, signature)
+    #[test]
+    fn operation_rlp_roundtrip() {
+        let operation = make_dummy_reveal_operation();
+        let mut stream = RlpStream::new();
+        operation
+            .rlp_append(&mut stream)
+            .expect("rlp_append should have succeeded");
+        let bytes = stream.as_raw();
+        let rlp = Rlp::new(bytes);
+        let decoded_operation =
+            Operation::decode(&rlp).expect("Decoding operation should have succeeded");
+        assert_eq!(operation, decoded_operation);
     }
 
     #[test]
@@ -257,9 +303,9 @@ mod tests {
 
         let bytes = operation
             .to_bytes()
-            .expect("Encoding reveal operation should have succeed");
+            .expect("Encoding reveal operation should have succeeded");
         let operation_from_bytes = Operation::try_from_bytes(&bytes)
-            .expect("Decoding reveal operation should have succeed");
+            .expect("Decoding reveal operation should have succeeded");
 
         assert_eq!(operation, operation_from_bytes);
     }

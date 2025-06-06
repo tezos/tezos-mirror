@@ -46,10 +46,11 @@ end
 
 module Tezos_block : sig
   type t = {
-    level : int32;
     hash : Ethereum_types.block_hash;
+    level : int32;
     timestamp : Time.Protocol.t;
     parent_hash : Ethereum_types.block_hash;
+    operations : bytes;
   }
 
   val decode_block_hash : bytes -> Ethereum_types.block_hash
