@@ -7953,6 +7953,8 @@ let hash = Protocol.hash
 
   let _022_PsRiotum = active (Name.v "PsRiotum" 022)
 
+  let _seoul = active (Name.dev "seoul")
+
   let alpha = active (Name.dev "alpha")
 
   let all = List.rev !all_rev
