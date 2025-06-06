@@ -1118,6 +1118,11 @@ let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
               "coverage_report"
               reports1.coverage_report
               reports2.coverage_report;
+          container_scanning =
+            opt_combine_fail
+              "container_scanning"
+              reports1.container_scanning
+              reports2.container_scanning;
         }
       in
       {

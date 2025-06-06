@@ -202,12 +202,13 @@ let enc_coverage : coverage_report -> value =
     ]
 
 let enc_report : reports -> value =
- fun {dotenv; junit; coverage_report} ->
+ fun {dotenv; junit; coverage_report; container_scanning} ->
   obj_flatten
     [
       opt "dotenv" string dotenv;
       opt "junit" string junit;
       opt "coverage_report" enc_coverage coverage_report;
+      opt "container_scanning" string container_scanning;
     ]
 
 let enc_artifacts : artifacts -> value =

@@ -76,7 +76,14 @@ let trigger_job ?needs ?inherit_ ?rules ?stage ?variables ?when_
 
 let artifacts ?expire_in ?reports ?when_ ?expose_as ?name paths =
   (match (reports, paths) with
-  | Some {dotenv = None; junit = None; coverage_report = None}, [] ->
+  | ( Some
+        {
+          dotenv = None;
+          junit = None;
+          coverage_report = None;
+          container_scanning = None;
+        },
+      [] ) ->
       failwith
         "Attempted to register an artifact with no reports or paths -- this \
          doesn't make any sense"
@@ -90,12 +97,12 @@ let artifacts ?expire_in ?reports ?when_ ?expose_as ?name paths =
     name;
   }
 
-let reports ?dotenv ?junit ?coverage_report () =
-  (match (dotenv, junit, coverage_report) with
-  | None, None, None ->
+let reports ?dotenv ?junit ?coverage_report ?container_scanning () =
+  (match (dotenv, junit, coverage_report, container_scanning) with
+  | None, None, None, None ->
       failwith
         "Attempted to register a empty [reports] -- this doesn't make any sense"
   | _ -> ()) ;
-  {dotenv; junit; coverage_report}
+  {dotenv; junit; coverage_report; container_scanning}
 
 let cache ?(policy = Pull_push) ~key paths = {key; paths; policy}

@@ -119,11 +119,13 @@ val artifacts :
 
     - [dotenv:] is omitted if [dotenv] is [None].
     - [junit:] is omitted if [junit] is [None].
-    - [coverage_report:] is omitted if [coverage_report] is [None]. *)
+    - [coverage_report:] is omitted if [coverage_report] is [None].
+    - [container_scanning:] is omitted if [container_scanning] is [None]. *)
 val reports :
   ?dotenv:string ->
   ?junit:string ->
   ?coverage_report:coverage_report ->
+  ?container_scanning:string ->
   unit ->
   reports
 
