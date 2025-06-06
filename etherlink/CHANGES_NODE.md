@@ -1,15 +1,38 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+### Configuration changes
+
+### RPCs changes
+
+### Metrics changes
+
+### Execution changes
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
 ## Version 0.29 (2025-06-06)
 
 This release of the EVM node more accurately computes the inclusion fee gas
 (e.g. in `eth_estimateGas`) which should sort out issues with transactions being
 ignored by the sequencer. This release also fixes RPCs encoding of compressed
-transactions to better follow the spec and fixes an regresssion (which manifests
-as non responding RPCs) with the RPC server introduced by a dependency upgrade
-in 0.28. Finally, this release adds a new RPC and metric to better track the
-_gas consumed by execution_ of transactions and blocks (_i.e._ without inclusion
-gas) which impacts gas prices.
+transactions to better follow the spec and fixes a regression with the RPC
+server (which manifests as non responding RPCs) introduced by a dependency
+upgrade in 0.28. Finally, this release adds a new RPC and metric to better track
+the _gas consumed by execution_ of transactions and blocks (_i.e._ without
+inclusion gas) which impacts gas prices.
 
 This release will not apply any migration to the node’s store (version 20),
 meaning it is possible to downgrade to the previous version.
