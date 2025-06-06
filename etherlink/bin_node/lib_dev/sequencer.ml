@@ -138,8 +138,9 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel ?sandbox_config () =
   let open Lwt_result_syntax in
   let open Configuration in
-  if configuration.experimental_features.otel_profiling then
-    Otel.initialize_telemetry ~service_name:"sequencer" ;
+  Option.iter
+    (Otel.initialize_telemetry ~service_name:"sequencer")
+    configuration.experimental_features.otel_profiling ;
   let is_sandbox = Option.is_some sandbox_config in
   let {rollup_node_endpoint; keep_alive; _} = configuration in
   let*? sequencer_config = Configuration.sequencer_config_exn configuration in

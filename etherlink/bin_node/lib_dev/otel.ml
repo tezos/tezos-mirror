@@ -7,6 +7,6 @@
 
 open Opentelemetry
 
-let initialize_telemetry ~service_name =
+let initialize_telemetry ~service_name config =
   Globals.service_name := service_name ;
-  Opentelemetry_client_cohttp_lwt.setup ()
+  Opentelemetry_client_cohttp_lwt.setup ~config ()

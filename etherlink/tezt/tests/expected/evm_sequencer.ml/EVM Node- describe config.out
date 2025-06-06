@@ -173,7 +173,28 @@
         /* tx queue enable */,
       "periodic_snapshot_path"?:
         /* Path to the periodic snapshot file */
-        $unistring /* Some */ || null /* None */ },
+        $unistring /* Some */ || null /* None */,
+      "otel_profiling"?:
+        /* Enable or disable opentelemetry profiling */
+        /* specified */
+        { /* Some */
+          "debug"?: boolean /* Enable debug mode */,
+          "url_traces"?: $unistring /* URL to send traces */,
+          "url_metrics"?: $unistring /* URL to send metrics */,
+          "url_logs"?: $unistring /* URL to send logs */,
+          "headers"?:
+            [ [ $unistring, $unistring ] ... ]
+            /* API headers sent to the endpoint */,
+          "batch_traces"?: integer ∈ [-2^30, 2^30] /* Batch traces */,
+          "batch_metrics"?: integer ∈ [-2^30, 2^30] /* Batch metrics */,
+          "batch_logs"?: integer ∈ [-2^30, 2^30] /* Batch logs */,
+          "batch_timeout_ms"?:
+            integer ∈ [-2^30, 2^30]
+            /* Milliseconds after which we emit a batch, even incomplete */ }
+        || null
+        /* None */
+        || boolean
+        /* default */ },
   "proxy"?:
     { "finalized_view"?:
         boolean

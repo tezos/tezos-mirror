@@ -24,7 +24,8 @@
       "max_lifespan": 100000,
       "tx_per_addr_limit": "100000"
     },
-    "periodic_snapshot_path": null
+    "periodic_snapshot_path": null,
+    "otel_profiling": null
   },
   "proxy": {
     "ignore_block_param": false
@@ -87,7 +88,8 @@
       "max_lifespan": 100000,
       "tx_per_addr_limit": "100000"
     },
-    "periodic_snapshot_path": null
+    "periodic_snapshot_path": null,
+    "otel_profiling": null
   },
   "proxy": {
     "ignore_block_param": false
@@ -143,7 +145,8 @@
       "max_lifespan": 100000,
       "tx_per_addr_limit": "100000"
     },
-    "periodic_snapshot_path": null
+    "periodic_snapshot_path": null,
+    "otel_profiling": null
   },
   "proxy": {
     "evm_node_endpoint": "hidden",
