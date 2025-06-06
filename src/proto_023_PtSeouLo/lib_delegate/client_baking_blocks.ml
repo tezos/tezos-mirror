@@ -152,10 +152,10 @@ module Block_seen_event = struct
   module Event = Internal_event.Make (Definition)
 end
 
-let monitor_applied_blocks cctxt ?chains ?protocols ~next_protocols () =
+let monitor_applied_blocks cctxt ?chains ?protocols () =
   let open Lwt_result_syntax in
   let* block_stream, stop =
-    Monitor_services.applied_blocks cctxt ?chains ?protocols ?next_protocols ()
+    Monitor_services.applied_blocks cctxt ?chains ?protocols ()
   in
   return
     ( Lwt_stream.map_s

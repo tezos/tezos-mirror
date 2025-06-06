@@ -775,6 +775,12 @@ let double_aggregation_wrong_payload_hash =
   in
   unit
 
+let accuser_processed_block accuser =
+  Accuser.wait_for accuser "accuser_processed_block.v0" (fun _json -> Some ())
+
+let daemon_stop accuser =
+  Accuser.wait_for accuser "daemon_stop.v0" (fun _json -> Some ())
+
 let accusers_migration_test ~migrate_from ~migrate_to =
   let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
   (* Migration level is set arbitrarily *)
@@ -799,16 +805,26 @@ let accusers_migration_test ~migrate_from ~migrate_to =
   let* accuser1 =
     Accuser.init ~protocol:migrate_from ~event_level:`Debug node
   in
+  let accuser1_processed_block = accuser_processed_block accuser1 in
+  let accuser1_stop = daemon_stop accuser1 in
   let* accuser2 = Accuser.init ~protocol:migrate_to ~event_level:`Debug node in
+  let accuser2_processed_block = accuser_processed_block accuser2 in
+
+  Log.info "Bake %d levels" (migration_level - 1) ;
+  let* () =
+    repeat (migration_level - 1) (fun () ->
+        let* () = Client.bake_for_and_wait client in
+        accuser1_processed_block)
+  in
 
   Log.info
-    "Bake %d levels to migrate from %s to %s"
-    migration_level
+    "Bake one more level to migrate from %s to %s"
     (Protocol.tag migrate_from)
     (Protocol.tag migrate_to) ;
-  let* () =
-    repeat migration_level (fun () -> Client.bake_for_and_wait client)
-  in
+  let* () = Client.bake_for_and_wait client in
+
+  Log.info "After migration, old protocol accuser should have stopped" ;
+  let* () = accuser1_stop in
 
   Log.info "Bake a few more levels into the new protocol" ;
   let* () =
@@ -820,9 +836,9 @@ let accusers_migration_test ~migrate_from ~migrate_to =
             ~key:[Constant.bootstrap1.alias]
             client
         in
-        Client.bake_for_and_wait client)
+        let* () = Client.bake_for_and_wait client in
+        accuser2_processed_block)
   in
-  let* () = Accuser.terminate accuser1 in
   let* () = Accuser.terminate accuser2 in
   unit
 
