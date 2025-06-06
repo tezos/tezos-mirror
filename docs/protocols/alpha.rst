@@ -2,7 +2,7 @@ Protocol Alpha
 ==============
 
 This page documents the changes brought by protocol Alpha with respect
-to Seoul (see :ref:`naming_convention`).
+to S023 (see :ref:`naming_convention`).
 
 For changes brought by Quebec with respect to Paris, see :doc:`../protocols/021_quebec`.
 
