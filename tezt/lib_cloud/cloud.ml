@@ -557,6 +557,13 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
     ?tasks f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
   let* () = Env.init () in
+  let* vms =
+    match vms with
+    | None -> Lwt.return_none
+    | Some vms ->
+        let* vms in
+        Lwt.return_some vms
+  in
   let vms =
     match (vms, Env.vms) with
     | None, None | None, Some _ -> None

@@ -34,7 +34,7 @@ module type Dal = sig
 
   val bootstrap : bool
 
-  val stake : int list
+  val stake : Network.stake_repartition
 
   val bakers : string list
 
@@ -130,24 +130,26 @@ module Dal () : Dal = struct
          \"produce every level\"."
       1
 
+  let parse_network = function
+    | "mainnet" -> Some `Mainnet
+    | "ghostnet" -> Some `Ghostnet
+    | "rionet" -> Some `Rionet
+    | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
+        (* format:  weeklynet-2025-01-29 (with dashes) *)
+        let date = String.sub s 10 10 in
+        Some (`Weeklynet date)
+    | s when String.length s = 16 && String.sub s 0 8 = "nextnet-" ->
+        (* format: nextnet-20250203  (without dashes) *)
+        let date = String.sub s 8 8 in
+        Some (`Nextnet date)
+    | "sandbox" -> Some `Sandbox
+    | _ -> None
+
   let network_typ : Network.t Clap.typ =
     Clap.typ
       ~name:"network"
       ~dummy:`Ghostnet
-      ~parse:(function
-        | "mainnet" -> Some `Mainnet
-        | "ghostnet" -> Some `Ghostnet
-        | "rionet" -> Some `Rionet
-        | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
-            (* format:  weeklynet-2025-01-29 (with dashes) *)
-            let date = String.sub s 10 10 in
-            Some (`Weeklynet date)
-        | s when String.length s = 16 && String.sub s 0 8 = "nextnet-" ->
-            (* format: nextnet-20250203  (without dashes) *)
-            let date = String.sub s 8 8 in
-            Some (`Nextnet date)
-        | "sandbox" -> Some `Sandbox
-        | _ -> None)
+      ~parse:parse_network
       ~show:Network.to_string
 
   let network =
@@ -176,17 +178,55 @@ module Dal () : Dal = struct
       ~set_long:"bootstrap"
       (match network with `Sandbox -> true | _ -> false)
 
+  let stake_repartition_typ : Network.stake_repartition Clap.typ =
+    let open Network in
+    let parse_public_network (net : string) : public option =
+      try Option.map to_public (parse_network net) with _ -> None
+    in
+    Clap.typ
+      ~name:"stake_repartition"
+      ~dummy:(Custom [100])
+      ~parse:(fun str ->
+        (* If it is a list of int, then a custom repartition has been selected. *)
+        let int_list_regexp = Str.regexp {|\([0-9]+,\( ?\)\)*[0-9]+$|} in
+        if Str.string_match int_list_regexp str 0 then
+          Some
+            (Custom (str |> String.split_on_char ',' |> List.map int_of_string))
+          (* Else we expect a network name, potentially followed by how many bakers should be created. *)
+        else
+          match String.split_on_char '_' str with
+          | [network] ->
+              Option.map
+                (fun network -> Mimic {network; max_nb_bakers = None})
+                (parse_public_network network)
+          | [network; n_str] -> (
+              try
+                let n = int_of_string n_str in
+                Option.map
+                  (fun network -> Mimic {network; max_nb_bakers = Some n})
+                  (parse_public_network network)
+              with _ -> None)
+          | _ -> None)
+      ~show:(function
+        | Custom l ->
+            l |> List.map string_of_int |> String.concat (String.make 1 ',')
+        | Mimic {network; max_nb_bakers = None} -> Network.to_string network
+        | Mimic {network; max_nb_bakers = Some n} ->
+            Format.sprintf "%s_%d" (Network.to_string network) n)
+
   let stake =
     Clap.default
       ~section
       ~long:"stake"
-      ~placeholder:"<integer>, <integer>, <integer>, ..."
+      ~placeholder:"<integer>, <integer>, <integer>, ...|<network>(_<integer>)?"
       ~description:
-        "Specify the stake repartition. Each number specifies the number of \
-         shares held by one baker. The total stake is given by the sum of all \
-         shares."
-      (Clap.list_of_int ~dummy:[100] "stake")
-      (match network with `Sandbox -> [100] | _ -> [])
+        "Specify the stake distribution. If a list of integers is provided, \
+         each number specifies the number of shares held by one baker. The \
+         total stake is proportional to the sum of all shares. If a network is \
+         provided share repartitions is the same as on this network (truncated \
+         to the N biggest delegates if <network>_<N> is given)."
+      stake_repartition_typ
+      (match network with `Sandbox -> Custom [100] | _ -> Custom [])
 
   let bakers =
     Clap.list_string

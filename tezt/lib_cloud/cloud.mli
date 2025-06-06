@@ -13,7 +13,7 @@ type t
 val register :
   ?proxy_files:string list ->
   ?proxy_args:string list ->
-  ?vms:Agent.Configuration.t list ->
+  ?vms:Agent.Configuration.t list Lwt.t ->
   __FILE__:string ->
   title:string ->
   tags:string list ->
