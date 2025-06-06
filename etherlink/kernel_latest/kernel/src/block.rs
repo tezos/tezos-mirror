@@ -124,7 +124,8 @@ fn can_fit_in_reboot(
     tx_gas_limit: u64,
 ) -> bool {
     let max_gas_per_reboot = U256::from(max_gas_per_reboot(limits));
-    used_gas_in_run + U256::from(tx_gas_limit) <= max_gas_per_reboot
+    let capped_gas_limit = u64::min(tx_gas_limit, limits.maximum_gas_limit);
+    used_gas_in_run + U256::from(capped_gas_limit) <= max_gas_per_reboot
 }
 
 #[allow(clippy::too_many_arguments)]
