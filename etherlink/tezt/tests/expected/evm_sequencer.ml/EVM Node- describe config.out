@@ -318,7 +318,15 @@
     boolean
     /* When enabled, the node only expose blocks that are finalized, i.e.,
        the `latest` block parameter becomes a synonym for `finalized`. */,
-  "history"?: $history_mode /* History mode of the EVM node */ }
+  "history"?: $history_mode /* History mode of the EVM node */,
+  "db"?:
+    { /* Database connection configuration */
+      "pool_size"?:
+        integer ∈ [-2^30, 2^30]
+        /* Size of the database connection pool, defaults to 8 */,
+      "max_conn_reuse_count"?:
+        integer ∈ [-2^30, 2^30]
+        /* Maximum number of times a connection can be reused */ } }
 $bignum:
   /* Big number
      Decimal representation of a big number */
