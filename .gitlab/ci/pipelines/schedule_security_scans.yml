@@ -3,6 +3,7 @@
 
 stages:
 - start
+- test
 
 datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
@@ -18,3 +19,81 @@ datadog_pipeline_trace:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+
+container_scanning_latest:
+  image: aquasec/trivy:latest
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - . ./scripts/ci/container_scanning_generate_reports.sh
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: .trivycache/
+    FULL_IMAGE_NAME: tezos/tezos:latest
+    REPORT: gl-container-scanning-report-latest.json
+  artifacts:
+    paths:
+    - gl-container-scanning-report-latest.json
+
+container_scanning_octez-evm-node-latest:
+  image: aquasec/trivy:latest
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - . ./scripts/ci/container_scanning_generate_reports.sh
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: .trivycache/
+    FULL_IMAGE_NAME: tezos/tezos:octez-evm-node-latest
+    REPORT: gl-container-scanning-report-octez-evm-node-latest.json
+  artifacts:
+    paths:
+    - gl-container-scanning-report-octez-evm-node-latest.json
+
+container_scanning_master:
+  image: aquasec/trivy:latest
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - . ./scripts/ci/container_scanning_generate_reports.sh
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: .trivycache/
+    FULL_IMAGE_NAME: tezos/tezos:master
+    REPORT: gl-container-scanning-report-master.json
+  artifacts:
+    paths:
+    - gl-container-scanning-report-master.json
