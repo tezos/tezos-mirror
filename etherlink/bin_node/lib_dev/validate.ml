@@ -167,7 +167,7 @@ let validate_with_state_from_backend
   in
   return (Ok ())
 
-type validation_mode = Stateless | With_state | Full
+type validation_mode = Stateless | Full
 
 let valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx =
   let open Lwt_result_syntax in
@@ -189,7 +189,6 @@ let valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx =
           ~next_nonce
           tx
           ~caller
-    | With_state -> validate_with_state_from_backend backend_rpc tx ~caller
     | Full ->
         let** () =
           validate_stateless

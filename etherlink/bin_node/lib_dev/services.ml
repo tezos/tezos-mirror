@@ -1092,17 +1092,17 @@ let dispatch_private_request (rpc_server_family : Rpc_types.rpc_server_family)
               in
               return @@ Ok (next_nonce, transaction_object)
             in
-            (* If the tx_queue is enabled the `with_state` validation
-               will be done in the block producer *)
+            (* If the tx_queue is enabled the validation is done by
+               the block producer *)
             if Configuration.is_tx_queue_enabled config then get_nonce ()
             else
+              (* With the legacy tx_pool we do the full validation
+                 when receiving the transaction even if it was already
+                 partially done by the attached rpc node. *)
               let* mode = Tx_pool.mode () in
               match mode with
               | Sequencer ->
-                  Validate.is_tx_valid
-                    (module Backend_rpc)
-                    ~mode:With_state
-                    raw_txn
+                  Validate.is_tx_valid (module Backend_rpc) ~mode:Full raw_txn
               | _ -> get_nonce ()
           in
           let transaction = Ethereum_types.hex_encode_string raw_txn in

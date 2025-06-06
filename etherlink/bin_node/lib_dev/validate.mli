@@ -9,7 +9,6 @@
 type validation_mode =
   | Stateless
       (** Minimal validation, includes chain id, nonce, and sender checks *)
-  | With_state  (** State related validation, includes fees and gas checks *)
   | Full  (** Combination of both *)
 
 (** [is_tx_valid backend_rpc tx_raw] validates the transaction
