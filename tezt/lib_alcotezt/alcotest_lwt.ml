@@ -47,7 +47,7 @@ let test_case_sync name speed_level body =
 
 type 'a test = string * 'a test_case list
 
-let run ~__FILE__ library_name tests =
+let run ~__FILE__ ?(tags = []) library_name tests =
   let proto_tags = Alcotezt_utils.is_proto_test __FILE__ in
   (tests
   |> List.iter @@ fun (test_name, test_cases) ->
@@ -56,7 +56,7 @@ let run ~__FILE__ library_name tests =
         let tags =
           "alcotezt"
           :: (match speed_level with `Quick -> ["quick"] | `Slow -> ["slow"])
-          @ proto_tags
+          @ proto_tags @ tags
         in
         let title = sf "%s: %s (%s)" library_name test_name test_case_name in
         Test.register ~__FILE__ ~title ~tags @@ fun () -> body ()) ;
