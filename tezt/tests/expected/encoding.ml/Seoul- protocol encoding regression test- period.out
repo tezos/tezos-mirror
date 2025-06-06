@@ -1,0 +1,12 @@
+
+./octez-codec encode seoul.period from '"2789"'
+0000000000000ae5
+
+./octez-codec decode seoul.period from 0000000000000ae5
+"2789"
+
+./octez-codec encode seoul.period from '"0"'
+0000000000000000
+
+./octez-codec decode seoul.period from 0000000000000000
+"0"

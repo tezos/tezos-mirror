@@ -1,0 +1,2 @@
+
+./octez-client --wait none publish commitment from bootstrap1 for smart rollup '[SMART_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 2 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
