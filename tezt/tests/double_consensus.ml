@@ -775,6 +775,60 @@ let double_aggregation_wrong_payload_hash =
   in
   unit
 
+let accusers_migration_test ~migrate_from ~migrate_to =
+  let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
+  (* Migration level is set arbitrarily *)
+  let migration_level = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  Test.register
+    ~__FILE__
+    ~title:
+      (Format.asprintf
+         "accuser works correctly under migration from %s to %s"
+         (Protocol.tag migrate_from)
+         (Protocol.tag migrate_to))
+    ~tags:
+      [team; "migration"; Protocol.tag migrate_from; Protocol.tag migrate_to]
+    ~uses:[Protocol.accuser migrate_from; Protocol.accuser migrate_to]
+  @@ fun () ->
+  let* client, node =
+    Protocol_migration.user_migratable_node_init ~migration_level ~migrate_to ()
+  in
+  let* () = Client.activate_protocol ~protocol:migrate_from client in
+
+  Log.info "Initialise accusers for the two protocols" ;
+  let* accuser1 =
+    Accuser.init ~protocol:migrate_from ~event_level:`Debug node
+  in
+  let* accuser2 = Accuser.init ~protocol:migrate_to ~event_level:`Debug node in
+
+  Log.info
+    "Bake %d levels to migrate from %s to %s"
+    migration_level
+    (Protocol.tag migrate_from)
+    (Protocol.tag migrate_to) ;
+  let* () =
+    repeat migration_level (fun () -> Client.bake_for_and_wait client)
+  in
+
+  Log.info "Bake a few more levels into the new protocol" ;
+  let* () =
+    repeat 5 (fun () ->
+        let* () =
+          Client.attest_for
+            ~protocol:migrate_to
+            ~force:true
+            ~key:[Constant.bootstrap1.alias]
+            client
+        in
+        Client.bake_for_and_wait client)
+  in
+  let* () = Accuser.terminate accuser1 in
+  let* () = Accuser.terminate accuser2 in
+  unit
+
+let register_migration ~migrate_from ~migrate_to =
+  accusers_migration_test ~migrate_from ~migrate_to
+
 let register ~protocols =
   double_attestation_wrong_block_payload_hash protocols ;
   double_preattestation_wrong_block_payload_hash protocols ;
