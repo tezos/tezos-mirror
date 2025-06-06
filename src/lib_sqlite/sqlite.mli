@@ -30,11 +30,20 @@ type perm = Read_only of {pool_size : int} | Read_write
     SQLite database is updated if necessary to match the requested
     configuration. With [`Identity], the journal mode is left untouched.
 
-    If [perm] is [Read_only], then SQL requests requiring write access will
-    fail. With [Read_write], they will succeed as expected.
+    If [perm] is [`Read_only], then SQL requests requiring write access will
+    fail. With [`Read_write], they will succeed as expected.
+
+    [pool_size] defaults to 8 and is the size of the connection pool.
+
+    If [?max_conn_reuse_count:n] is provided, every connection in the pool will
+    be reused at most [n] times, after which it will be disposed of.
 *)
 val init :
-  path:string -> perm:perm -> (conn -> unit tzresult Lwt.t) -> t tzresult Lwt.t
+  path:string ->
+  perm:perm ->
+  ?max_conn_reuse_count:int ->
+  (conn -> unit tzresult Lwt.t) ->
+  t tzresult Lwt.t
 
 val close : t -> unit Lwt.t
 

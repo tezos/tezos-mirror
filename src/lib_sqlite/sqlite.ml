@@ -38,23 +38,37 @@ let () =
 exception Connection_error of Caqti_error.load_or_connect
 
 module Pool = struct
-  type t = Caqti_lwt.connection Lwt_pool.t
+  type pool_conn = {conn : Caqti_lwt.connection; mutable use_count : int}
 
-  let validate (module Db : Caqti_lwt.CONNECTION) = Db.validate ()
+  type t = pool_conn Lwt_pool.t
 
-  let check (module Db : Caqti_lwt.CONNECTION) is_ok = Db.check is_ok
+  let validate ~max_use_count
+      ({conn = (module Db : Caqti_lwt.CONNECTION); _} as p) =
+    let open Lwt_syntax in
+    p.use_count <- p.use_count + 1 ;
+    match max_use_count with
+    | Some max when p.use_count > max -> return_false
+    | _ -> Db.validate ()
 
-  let dispose (module Db : Caqti_lwt.CONNECTION) = Db.disconnect ()
+  let check {conn = (module Db : Caqti_lwt.CONNECTION); _} is_ok =
+    Db.check is_ok
+
+  let dispose {conn = (module Db : Caqti_lwt.CONNECTION); _} = Db.disconnect ()
 
   let connect uri =
     let open Lwt_syntax in
     let* res = Caqti_lwt_unix.connect uri in
     match res with
-    | Ok conn -> return conn
+    | Ok conn -> return {conn; use_count = 0}
     | Error e -> Lwt.fail (Connection_error e)
 
-  let create size uri =
-    Lwt_pool.create size ~validate ~check ~dispose (fun () -> connect uri)
+  let create ?max_use_count size uri =
+    Lwt_pool.create
+      size
+      ~validate:(validate ~max_use_count)
+      ~check
+      ~dispose
+      (fun () -> connect uri)
 end
 
 type sqlite_journal_mode = Wal | Other
@@ -71,7 +85,7 @@ module Db = struct
   let use_pool (pool : Pool.t) (k : Caqti_lwt.connection -> 'a tzresult Lwt.t) =
     let open Lwt_result_syntax in
     Lwt.catch
-      (fun () -> Lwt_pool.use pool k)
+      (fun () -> Lwt_pool.use pool (fun p -> k p.Pool.conn))
       (function
         | Connection_error err -> tzfail (Caqti_error (Caqti_error.show err))
         | e -> fail_with_exn e)
@@ -208,7 +222,7 @@ let vacuum ~conn ~output_db_file =
 let vacuum_self ~conn =
   with_connection conn @@ fun conn -> Db.exec conn Q.vacuum_self ()
 
-let init ~path ~perm migration_code =
+let init ~path ~perm ?max_conn_reuse_count migration_code =
   let open Lwt_result_syntax in
   let uri = uri path perm in
   let pool_size =
@@ -221,7 +235,7 @@ let init ~path ~perm migration_code =
            1. *)
         1
   in
-  let db_pool = Pool.create pool_size uri in
+  let db_pool = Pool.create pool_size ?max_use_count:max_conn_reuse_count uri in
   let store = Pool {db_pool} in
   use store @@ fun conn ->
   let* () = set_wal_journal_mode conn in
