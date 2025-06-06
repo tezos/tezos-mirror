@@ -89,10 +89,6 @@ let network_parameters_templates_dir =
   Filename.current_dir_name // "devtools" // "testnet_experiment_tools"
   // "activation_parameters_templates"
 
-let protocol_seoul_parameters_template =
-  Filename.current_dir_name // "src" // "proto_seoul" // "parameters"
-  // "mainnet_parameters.json"
-
 let protocol_alpha_parameters_template =
   Filename.current_dir_name // "src" // "proto_alpha" // "parameters"
   // "mainnet_parameters.json"
@@ -104,7 +100,11 @@ let network_activation_parameters_templates protocol_hash =
         (Filename.concat
            network_parameters_templates_dir
            "proto_022_PsRiotum_mainnet.json")
-  | Tezt_tezos.Protocol.Seoul -> Some protocol_seoul_parameters_template
+  | Tezt_tezos.Protocol.S023 ->
+      Some
+        (Filename.concat
+           network_parameters_templates_dir
+           "proto_023_PtSEouLo_mainnet.json")
   | Tezt_tezos.Protocol.Alpha ->
       (* Fetching the network parameters from the src/proto_alpha directory,
          to be sure that we are in synch with current protocl parameters. *)
