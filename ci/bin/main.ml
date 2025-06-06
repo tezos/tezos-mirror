@@ -45,8 +45,8 @@ let variables : variables =
     ("jsonnet_image_name", "${GCP_REGISTRY}/${CI_PROJECT_PATH}/jsonnet");
     ( "client_libs_dependencies_image_name",
       "${GCP_REGISTRY}/${CI_PROJECT_PATH}/client-libs-dependencies" );
-    ("GIT_STRATEGY", "fetch");
-    ("GIT_DEPTH", "1");
+    ("GIT_STRATEGY", "clone");
+    ("GIT_DEPTH", "0");
     ("GET_SOURCES_ATTEMPTS", "2");
     ("ARTIFACT_DOWNLOAD_ATTEMPTS", "2");
     (* Sets the number of tries before failing opam downloads. *)
