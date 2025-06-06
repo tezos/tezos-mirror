@@ -86,6 +86,15 @@ export OPAMSOLVERTIMEOUT="${OPAMSOLVERTIMEOUT:-600}"
 echo "---- Pinning stdcompat"
 opam pin add https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99 -n -y
 
+# Pin base to a commit that's compatible with latest versions of Mac OS.
+#
+# Base has a mechanism to detect if `-mpopcnt` is compatible with `cc`, it works
+# partially on recent versions of base. The version pinned is a fork of
+# `v0.16.4` cherry-picking a work-in-progress pull request that improves the
+# mechanism to check `-mpopcnt` compatibility.
+echo "---- Pinning base"
+opam pin add https://github.com/vch9/base.git#1d0cdedec2a8c63608d3c34531565903d5918ff6 -y
+
 # Ask opam to find a solution that covers both:
 # - 'octez-deps', so that we can compile Octez;
 # - 'octez-dev-deps', so that the solution is compatible with tools that devs
