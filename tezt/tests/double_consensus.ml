@@ -81,7 +81,7 @@ let get_double_consensus_denounciation_hash protocol consensus_name client =
   | None -> failwith "Denunciation not found in the mempool"
   | Some op -> return op
 
-let double_attestation_init
+let double_consensus_init
     (consensus_for :
       ?endpoint:Client.endpoint ->
       ?protocol:Protocol.t ->
@@ -143,7 +143,7 @@ let preattest_utils =
 let double_consensus_wrong_block_payload_hash
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
   let* (client, accuser), (branch, level, round, slots, _block_payload_hash) =
-    double_attestation_init consensus_for consensus_name protocol ()
+    double_consensus_init consensus_for consensus_name protocol ()
   in
   let* header =
     Client.RPC.call client @@ RPC.get_chain_block_header ~block:"head~2" ()
@@ -229,7 +229,7 @@ let double_preattestation_wrong_block_payload_hash =
 let double_consensus_wrong_branch
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
   let* (client, accuser), (_branch, level, round, slots, block_payload_hash) =
-    double_attestation_init consensus_for consensus_name protocol ()
+    double_consensus_init consensus_for consensus_name protocol ()
   in
   let* branch = Operation.Manager.get_branch ~offset:4 client in
   Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
