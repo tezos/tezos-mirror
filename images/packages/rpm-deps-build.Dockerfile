@@ -23,6 +23,8 @@ COPY scripts/ci/bin_packages_rpm_dependencies.sh \
 COPY images/scripts/install_sccache_static.sh \
      images/scripts/install_datadog_static.sh \
      images/scripts/install_opam_static.sh \
+     scripts/kiss-fetch.sh \
+     scripts/kiss-logs.sh \
      /tmp/
 
 RUN scripts/ci/bin_packages_rpm_dependencies.sh
@@ -54,7 +56,13 @@ COPY --link opam /root/tezos/
 
 WORKDIR /root/tezos
 
+ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
+ENV OPAMFETCH="/tmp/kiss-fetch.sh"
+
 #hadolint ignore=SC2154, SC1091
 RUN eval $(opam env) && \
     . "/root/.cargo/env" && \
-    make build-deps
+    make build-deps && \
+# print kisscache stats
+    /tmp/kiss-logs.sh /tmp/kiss.log \
+    && rm -f /tmp/kiss.log
