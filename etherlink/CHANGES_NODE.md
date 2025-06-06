@@ -12,6 +12,9 @@
 
 ### Execution changes
 
+- Node validation always checks that the gas limit are set correctly.
+  (!18236)
+
 ### Storage changes
 
 ### Documentation changes

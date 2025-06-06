@@ -11,7 +11,8 @@ type validation_mode =
       - chain id is valid
       - nonce is superior to current one
       - sender is an EOA
-      - transaction data is not too large *)
+      - transaction data is not too large
+      - gas limit is valid with minimum gas price  *)
   | Full
       (** Full validation, is minimal validation plus:
       - balance is enough
