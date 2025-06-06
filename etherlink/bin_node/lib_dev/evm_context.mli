@@ -45,7 +45,7 @@ val start :
   ?kernel_path:Wasm_debugger.kernel ->
   data_dir:string ->
   ?smart_rollup_address:string ->
-  store_perm:[`Read_only | `Read_write] ->
+  store_perm:Sqlite.perm ->
   ?sequencer_wallet:Client_keys.sk_uri * Client_context.wallet ->
   ?snapshot_url:string ->
   tx_container:(module Services_backend_sig.Tx_container) ->

@@ -378,7 +378,8 @@ let init_skip_list_cells_store node_store_dir =
     ~padded_encoded_cell_size
     ~encoded_hash_size
 
-let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
+let init_sqlite_skip_list_cells_store ?(perm = Octez_sqlite.Sqlite.Read_write)
+    data_dir =
   Dal_store_sqlite3.Skip_list_cells.init
     ~data_dir:(Filename.concat data_dir "skip_list_store")
     ~perm
@@ -505,7 +506,7 @@ let migration_skip_list_test () =
   let t2 = Unix.gettimeofday () in
   Log.info "Execution time for generating %d elements: %f seconds" n (t2 -. t1) ;
   let* sql_store =
-    Dal_store_sqlite3.Skip_list_cells.init ~data_dir ~perm:`Read_write ()
+    Dal_store_sqlite3.Skip_list_cells.init ~data_dir ~perm:Read_write ()
   in
   let t1 = Unix.gettimeofday () in
   let* () = Store_migrations.migrate_skip_list_store kvs_store sql_store in

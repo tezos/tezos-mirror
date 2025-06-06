@@ -127,7 +127,7 @@ let run_command =
          _ ->
       let open Lwt_result_syntax in
       let*! () = log_config ~verbosity ~data_dir in
-      let* db = Db.init ~data_dir `Read_write in
+      let* db = Db.init ~data_dir Read_write in
       Etherlink_monitor.start
         db
         ~evm_node_endpoint

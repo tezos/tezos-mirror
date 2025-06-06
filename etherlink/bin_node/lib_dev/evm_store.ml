@@ -872,7 +872,7 @@ let init ~data_dir ~perm () =
     let* migrations = Migrations.missing_migrations conn in
     let*? () =
       match (perm, migrations) with
-      | `Read_only, _ :: _ ->
+      | Read_only _, _ :: _ ->
           error_with
             "The store has %d missing migrations but was opened in read-only \
              mode."

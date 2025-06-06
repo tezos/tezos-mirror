@@ -28,13 +28,9 @@ module Skip_list_cells : sig
     located under [data_dir]. If no store is located in [data_dir], an
     empty store is created.
 
-    If [perm] is [`Read_only], then SQL requests requiring write access will
-    fail. With [`Read_write], they will succeed as expected. *)
-  val init :
-    data_dir:string ->
-    perm:[`Read_only | `Read_write] ->
-    unit ->
-    t tzresult Lwt.t
+    If [perm] is [Read_only], then SQL requests requiring write access will
+    fail. With [Read_write], they will succeed as expected. *)
+  val init : data_dir:string -> perm:Sqlite.perm -> unit -> t tzresult Lwt.t
 
   (** [close t] closes the store by freeing all resources and closing
     database connections. *)

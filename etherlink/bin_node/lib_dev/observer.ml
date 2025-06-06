@@ -209,7 +209,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
-      ~store_perm:`Read_write
+      ~store_perm:Read_write
       ?snapshot_url
       ~tx_container
       ()
