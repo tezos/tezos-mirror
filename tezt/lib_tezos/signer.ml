@@ -31,6 +31,7 @@ module Parameters = struct
     keys : Account.key list;
     magic_byte : string option;
     allow_list_known_keys : bool;
+    allow_to_prove_possession : bool;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -94,7 +95,8 @@ let import_secret_key signer (key : Account.key) =
   spawn_import_secret_key signer key |> Process.check
 
 let create ?name ?color ?event_pipe ?base_dir ?uri ?runner ?magic_byte
-    ?(allow_list_known_keys = false) ?(keys = [Constant.bootstrap1]) () =
+    ?(allow_list_known_keys = false) ?(allow_to_prove_possession = false)
+    ?(keys = [Constant.bootstrap1]) () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
@@ -117,6 +119,7 @@ let create ?name ?color ?event_pipe ?base_dir ?uri ?runner ?magic_byte
         pending_ready = [];
         magic_byte;
         allow_list_known_keys;
+        allow_to_prove_possession;
       }
   in
   on_event signer (handle_readiness signer) ;
@@ -148,6 +151,11 @@ let run signer =
       ["--allow-list-known-keys"]
     else []
   in
+  let allow_to_prove_possession_args =
+    if signer.persistent_state.allow_to_prove_possession then
+      ["--allow-to-prove-possession"]
+    else []
+  in
   let arguments =
     [
       "--base-dir";
@@ -159,6 +167,7 @@ let run signer =
       host;
     ]
     @ port_args @ magic_bytes_args @ allow_list_known_keys_args
+    @ allow_to_prove_possession_args
   in
   let arguments =
     if !passfile = "" then arguments
@@ -189,7 +198,7 @@ let wait_for_ready signer =
       check_event signer "Signer started." promise
 
 let init ?name ?color ?event_pipe ?base_dir ?uri ?runner ?keys ?magic_byte
-    ?allow_list_known_keys () =
+    ?allow_list_known_keys ?allow_to_prove_possession () =
   let* signer =
     create
       ?name
@@ -201,6 +210,7 @@ let init ?name ?color ?event_pipe ?base_dir ?uri ?runner ?keys ?magic_byte
       ?keys
       ?magic_byte
       ?allow_list_known_keys
+      ?allow_to_prove_possession
       ()
   in
   let* () = run signer in

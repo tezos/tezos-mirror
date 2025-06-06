@@ -1121,6 +1121,11 @@ let list_known_remote_keys client uri =
   in
   return addresses
 
+let spawn_set_consensus_key ?(wait = "none") client ~account ~key =
+  spawn_command
+    client
+    ["--wait"; wait; "set"; "consensus"; "key"; "for"; account; "to"; key]
+
 let gen_and_show_keys ?alias ?sig_alg client =
   let* alias = gen_keys ?alias ?sig_alg client in
   show_address ~alias client

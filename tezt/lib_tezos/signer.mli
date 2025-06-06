@@ -60,6 +60,7 @@ val init :
   ?keys:Account.key list ->
   ?magic_byte:string ->
   ?allow_list_known_keys:bool ->
+  ?allow_to_prove_possession:bool ->
   unit ->
   t Lwt.t
 

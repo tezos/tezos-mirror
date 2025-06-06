@@ -105,6 +105,14 @@ let allow_list_known_keys_switch =
     ~long:"allow-list-known-keys"
     ()
 
+let allow_to_prove_possession_switch =
+  Tezos_clic.switch
+    ~doc:
+      "allow remote request for the proof of possession of a known public key \
+       hash"
+    ~long:"allow-to-prove-possession"
+    ()
+
 let pidfile_arg =
   Tezos_clic.arg
     ~doc:"write process id in file"
@@ -133,11 +141,12 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
       command
         ~group
         ~desc:"Launch a signer daemon over a TCP socket."
-        (args7
+        (args8
            pidfile_arg
            magic_bytes_arg
            high_watermark_switch
            allow_list_known_keys_switch
+           allow_to_prove_possession_switch
            (default_arg
               ~doc:"listening address or host name"
               ~short:'a'
@@ -170,6 +179,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
                magic_bytes,
                check_high_watermark,
                allow_list_known_keys,
+               allow_to_prove_possession,
                host,
                port,
                timeout )
@@ -183,6 +193,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
               ?magic_bytes
               ?signing_version:signing_version_for_test
               ~allow_list_known_keys
+              ~allow_to_prove_possession
               ~check_high_watermark
               ~require_auth
               ~timeout
@@ -191,11 +202,12 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
       command
         ~group
         ~desc:"Launch a signer daemon over a local Unix socket."
-        (args5
+        (args6
            pidfile_arg
            magic_bytes_arg
            high_watermark_switch
            allow_list_known_keys_switch
+           allow_to_prove_possession_switch
            (default_arg
               ~doc:"path to the local socket file"
               ~short:'s'
@@ -208,6 +220,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
                magic_bytes,
                check_high_watermark,
                allow_list_known_keys,
+               allow_to_prove_possession,
                path )
              cctxt ->
           may_setup_pidfile pidfile @@ fun () ->
@@ -219,6 +232,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
               ?magic_bytes
               ?signing_version:signing_version_for_test
               ~allow_list_known_keys
+              ~allow_to_prove_possession
               ~check_high_watermark
               ~require_auth
           in
@@ -226,11 +240,12 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
       command
         ~group
         ~desc:"Launch a signer daemon over HTTP."
-        (args6
+        (args7
            pidfile_arg
            magic_bytes_arg
            high_watermark_switch
            allow_list_known_keys_switch
+           allow_to_prove_possession_switch
            (default_arg
               ~doc:"listening address or host name"
               ~short:'a'
@@ -252,6 +267,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
                magic_bytes,
                check_high_watermark,
                allow_list_known_keys,
+               allow_to_prove_possession,
                host,
                port )
              cctxt ->
@@ -265,15 +281,17 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
             ?signing_version:signing_version_for_test
             ~check_high_watermark
             ~allow_list_known_keys
+            ~allow_to_prove_possession
             ~require_auth);
       command
         ~group
         ~desc:"Launch a signer daemon over HTTPS."
-        (args6
+        (args7
            pidfile_arg
            magic_bytes_arg
            high_watermark_switch
            allow_list_known_keys_switch
+           allow_to_prove_possession_switch
            (default_arg
               ~doc:"listening address or host name"
               ~short:'a'
@@ -310,6 +328,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
                magic_bytes,
                check_high_watermark,
                allow_list_known_keys,
+               allow_to_prove_possession,
                host,
                port )
              cert
@@ -327,6 +346,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
             ?signing_version:signing_version_for_test
             ~check_high_watermark
             ~allow_list_known_keys
+            ~allow_to_prove_possession
             ~require_auth);
       command
         ~group
