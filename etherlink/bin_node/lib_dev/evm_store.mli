@@ -9,14 +9,19 @@
 (** The EVM node’s store is built around and SQLite database. *)
 include module type of Sqlite
 
-(** [init ~data_dir ~perm ()] returns a handler to the EVM node store located
-    under [data_dir]. If no store is located in [data_dir], an empty store is
-    created. Also returns if the store was created ([true]) or was already
-    existing ([false]).
+(** [init ?max_conn_reuse_count ~data_dir ~perm ()] returns a handler to the EVM
+    node store located under [data_dir]. If no store is located in [data_dir],
+    an empty store is created. Also returns if the store was created ([true]) or
+    was already existing ([false]).
 
     If [perm] is [Read_only], then SQL requests requiring write access will
     fail. With [Read_write], they will succeed as expected. *)
-val init : data_dir:string -> perm:perm -> unit -> t tzresult Lwt.t
+val init :
+  ?max_conn_reuse_count:int ->
+  data_dir:string ->
+  perm:perm ->
+  unit ->
+  t tzresult Lwt.t
 
 (** name of the sqlite file *)
 val sqlite_file_name : string
