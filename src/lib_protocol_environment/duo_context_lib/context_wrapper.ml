@@ -5,12 +5,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type CONTEXT = sig
+  val name : string
+
+  include Tezos_context_sigs.Context.TEZOS_CONTEXT
+
+  val checkout : index -> Context_hash.t -> t option Lwt.t
+
+  val checkout_exn : index -> Context_hash.t -> t Lwt.t
+end
+
 module type IRMIN_CONTEXT =
-  Tezos_context_sigs.Context.TEZOS_CONTEXT
-    with type memory_context_tree := Tezos_context_memory.Context.tree
+  CONTEXT with type memory_context_tree := Tezos_context_memory.Context.tree
 
 module type BRASSAIA_CONTEXT =
-  Tezos_context_sigs.Context.TEZOS_CONTEXT
+  CONTEXT
     with type memory_context_tree :=
       Tezos_context_brassaia_memory.Tezos_context_memory.Context.tree
 
@@ -37,10 +46,13 @@ module Events = struct
       ("function", Data_encoding.string)
 end
 
-module Make
+module MakeContext
     (Irmin_Context : IRMIN_CONTEXT)
     (Brassaia_Context : BRASSAIA_CONTEXT) =
 struct
+  let name =
+    Printf.sprintf "duo(%s, %s)" Irmin_Context.name Brassaia_Context.name
+
   open Lwt_syntax
 
   type index = {
@@ -1486,21 +1498,40 @@ struct
        [@profiler.span_s {verbosity = Notice} ["brassaia"; "merkle_tree_v2"]])
     in
     proof1
+
+  let checkout index context_hash =
+    let* irmin_context =
+      (Irmin_Context.checkout
+         index.irmin_index
+         context_hash
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "checkout"]])
+    in
+    let* brassaia_context =
+      (Brassaia_Context.checkout
+         index.brassaia_index
+         context_hash
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "checkout"]])
+    in
+    match (irmin_context, brassaia_context) with
+    | Some irmin_context, Some brassaia_context ->
+        Lwt.return_some {irmin_context; brassaia_context}
+    | _ -> Lwt.return_none
+
+  let checkout_exn index context_hash =
+    let* irmin_context =
+      (Irmin_Context.checkout_exn
+         index.irmin_index
+         context_hash
+       [@profiler.span_s {verbosity = Notice} ["irmin"; "checkout_exn"]])
+    in
+    let* brassaia_context =
+      (Brassaia_Context.checkout_exn
+         index.brassaia_index
+         context_hash
+       [@profiler.span_s {verbosity = Notice} ["brassaia"; "checkout_exn"]])
+    in
+    Lwt.return {irmin_context; brassaia_context}
+
+  (* Have the interface compatible with Tezos_protocol_environment.Register *)
+  let set_protocol = add_protocol
 end
-
-module Context =
-  Make (Tezos_context.Context) (Tezos_context_brassaia.Tezos_context.Context)
-module Context_binary =
-  Make
-    (Tezos_context.Context_binary)
-    (Tezos_context_brassaia.Tezos_context.Context_binary)
-
-module Memory_context =
-  Make
-    (Tezos_context_memory.Context)
-    (Tezos_context_brassaia_memory.Tezos_context_memory.Context)
-
-(* module Memory_context_binary = *)
-(*   Make *)
-(*     (Tezos_context_memory.Context_binary) *)
-(*     (Tezos_context_brassaia_memory.Tezos_context_memory.Context_binary) *)
