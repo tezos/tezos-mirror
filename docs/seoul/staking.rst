@@ -11,7 +11,7 @@ Staking mechanism
 Staking is an evolution of the existing Tezos :doc:`Liquid Proof-of-Stake
 mechanism <proof_of_stake>`. It
 introduces a new role for network participants, called **staker**,
-complementary to the existing :ref:`delegate <def_delegate_alpha>`
+complementary to the existing :ref:`delegate <def_delegate_seoul>`
 (also known as *baker*) and *delegator* roles. A staker must also be a
 *delegator* – that is, they must first choose a delegate.
 
@@ -28,8 +28,8 @@ This ratio is defined by the protocol constant ``EDGE_OF_STAKING_OVER_DELEGATION
 
 Unlike delegated funds, staked funds are considered to contribute to the
 security deposit associated with their chosen delegate. Thus, they are
-subject to :ref:`slashing <slashing_alpha>` if
-the delegate misbehaves by :ref:`double-signing <def_double_signing_alpha>`
+subject to :ref:`slashing <slashing_seoul>` if
+the delegate misbehaves by :ref:`double-signing <def_double_signing_seoul>`
 block proposals or consensus operations, and are subject to the same
 withdrawal delays – colloquially, they are "frozen".
 
@@ -43,14 +43,14 @@ slashed funds. The chosen value prevents adversarial delegates from
 abusing the slashing mechanism for profit at the expense of their
 stakers.
 
-:ref:`Participation rewards <adaptive_rewards_alpha>` are automatically shared
+:ref:`Participation rewards <adaptive_rewards_seoul>` are automatically shared
 between delegates and their stakers. Staker's rewards are proportional to their
 participation in the delegate's total staked at the time the rewards are given.
 This means that the staker gets rewards for staked tez as soon as they are staked,
 and stops receiving rewards as soon as the tez are unstaked, disregarding the
 fact that baking rights for the delegate are computed with some delays.
 *Delegates* :ref:`configure their staking
-policy <staking_policy_configuration_alpha>` by setting staking parameters
+policy <staking_policy_configuration_seoul>` by setting staking parameters
 which regulate whether they accept stakers (the default being to reject
 them), and if so, up to which fraction of their total staking balance.
 They can also configure which proportion of the staking rewards from other stakers is set
@@ -62,16 +62,16 @@ stakers.
 This entails that staked funds are frozen until manually
 unfrozen by stakers. This is a two step process which spans for at least
 ``UNSTAKE_FINALIZATION_DELAY`` cycles (cf. :ref:`Staked funds
-management <staked_funds_management_alpha>`).
+management <staked_funds_management_seoul>`).
 
-.. _pseudo_operations_alpha:
+.. _pseudo_operations_seoul:
 
 A user interface is provided for delegates and stakers to interact
 with the mechanism. It is based on four *pseudo-operations*: ``stake``,
 ``unstake``, ``finalize_unstake``, and ``set_delegate_parameters``.
 Pseudo-operations are self-transfers: a transfer operation where the
 destination matches the source – each involving a special entry-point of
-the same name introduced for :ref:`user accounts <def_user_account_alpha>`.
+the same name introduced for :ref:`user accounts <def_user_account_seoul>`.
 This approach was chosen to minimize the work required by wallets,
 custodians, exchanges, and other parties to support the functionality.
 
@@ -79,7 +79,7 @@ custodians, exchanges, and other parties to support the functionality.
 stakers. In other words, smart contracts cannot stake funds (they can
 of course still delegate them).
 
-.. _staking_policy_configuration_alpha:
+.. _staking_policy_configuration_seoul:
 
 Staking policy configuration
 ----------------------------
@@ -123,7 +123,7 @@ stake) nor its consequence on voting and baking powers. That is,
 overdelegated funds are not counted towards a delegate baking power, but
 they do increase their voting power.
 
-.. _staked_funds_management_alpha:
+.. _staked_funds_management_seoul:
 
 Staked funds management
 -----------------------
@@ -179,7 +179,7 @@ a.k.a. **unfinalizable**.
 
 After ``UNSTAKE_FINALIZATION_DELAY + 1`` cycles (more precisely, after
 the cycle in which the unstake was requested has ended and then
-another :ref:`UNSTAKE_FINALIZATION_DELAY<cs_constants_alpha>` full
+another :ref:`UNSTAKE_FINALIZATION_DELAY<cs_constants_seoul>` full
 cycles have passed), unstaked frozen tokens are no longer considered
 at stake nor slashable. They are said then to be both **unstaked** and
 **finalizable**.

@@ -3,7 +3,7 @@
 :math:`\newcommand\exp[1]{\F{exp}{#1}}`
 
 
-.. _adaptive_issuance_alpha:
+.. _adaptive_issuance_seoul:
 
 =================
 Adaptive Issuance
@@ -34,7 +34,7 @@ ratio of staked tez to the total supply. This lets issuance roughly
 match the *actual* security budget the chain requires, the amount needed
 to encourage participants to stake and produce blocks, but *no more*.
 
-At the end of each blockchain :ref:`cycle <def_cycle_alpha>`, the
+At the end of each blockchain :ref:`cycle <def_cycle_seoul>`, the
 regular issuance is adjusted, to nudge the staked ratio towards a
 protocol-defined target (set at 50% starting in the Paris
 protocol). Participation rewards are recomputed to match that
@@ -43,19 +43,19 @@ emission rates increase, incentivizing participants to stake funds to
 re-approach the target. Conversely, incentives decrease as the ratio
 increases beyond the target.
 
-.. _adaptive_issuance_rate_alpha:
+.. _adaptive_issuance_rate_seoul:
 
 Adaptive issuance rate
 ----------------------
 
 The adaptive issuance rate determines, at the end
 of cycle :math:`\IL{c}`, the issuance for cycle :math:`\IL{c + 3}`. The
-adaptive issuance rate is the sum of a :ref:`static rate <static_rate_alpha>`
-and a :ref:`dynamic rate <dynamic_rate_alpha>`. This value is kept within
+adaptive issuance rate is the sum of a :ref:`static rate <static_rate_seoul>`
+and a :ref:`dynamic rate <dynamic_rate_seoul>`. This value is kept within
 a minimal and a maximal value, to ensure nominal emissions remain within
 reasonable bounds.
 
-.. _staked_ratio_alpha:
+.. _staked_ratio_seoul:
 
 Staked ratio
 ............
@@ -70,14 +70,14 @@ The **staked ratio** is the ratio of staked tez to the total supply. It is compu
 Where:
 
 - ``issuance_modification_delay`` is a :ref:`derived protocol
-  constant<protocol_constants_alpha>` which is set to the same value
-  as ``CONSENSUS_RIGHTS_DELAY`` (see :ref:`active_stake_alpha`), that
+  constant<protocol_constants_seoul>` which is set to the same value
+  as ``CONSENSUS_RIGHTS_DELAY`` (see :ref:`active_stake_seoul`), that
   is, 2 cycles.
 
 - ``total_supply(cycle)`` returns the total supply of tez at the end of the given ``cycle``.
 - ``total_frozen_stake(cycle)`` returns the total frozen stake at the given ``cycle``.
 
-.. _static_rate_alpha:
+.. _static_rate_seoul:
 
 Static rate
 ...........
@@ -95,7 +95,7 @@ The static rate is defined as follows:
 
 The choice of a scaling factor ensures that the curve takes reasonable values for plausible staked ratios. Moreover, since Adaptive Issuance is activated with a dynamic rate of 0, and at current staked ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from the issuance rate (~4.6%) from the Oxford protocol (before the activation of Adaptive Issuance).
 
-.. _dynamic_rate_alpha:
+.. _dynamic_rate_seoul:
 
 Dynamic rate
 ............
@@ -124,9 +124,9 @@ Where:
 - ``days_per_cycle`` denotes the minimal duration in days of a Tezos cycle, assuming all blocks in the cycle are produced at the minimal allowed time – that is, every 8 seconds in Quebec.
 - ``growth_rate`` controls the speed at which the dynamic rate adjusts. The value is set so that a one percentage point deviation of the staked ratio changes the dynamic rate by 0.01 percentage points per day.
 
-In a nutshell, ``dynamic_rate(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[48%; 52%]``. Note that to ensure that the issuance rate is kept within :ref:`the minimum and maximum bounds <minimum_and_maximum_rates_alpha>`, the dynamic rate might be adjusted accordingly. More precisely, if :ref:`the issuance rate <issuance_rate_alpha>` would surpass the maximum issuance allowed for a given cycle, then ``dynamic_rate(c)`` would be reduced to keep the issuance rate within the bounds (this part of the formula has been omitted from the above pseudocode for brevity).
+In a nutshell, ``dynamic_rate(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[48%; 52%]``. Note that to ensure that the issuance rate is kept within :ref:`the minimum and maximum bounds <minimum_and_maximum_rates_seoul>`, the dynamic rate might be adjusted accordingly. More precisely, if :ref:`the issuance rate <issuance_rate_seoul>` would surpass the maximum issuance allowed for a given cycle, then ``dynamic_rate(c)`` would be reduced to keep the issuance rate within the bounds (this part of the formula has been omitted from the above pseudocode for brevity).
 
-.. _minimum_and_maximum_rates_alpha:
+.. _minimum_and_maximum_rates_seoul:
 
 Minimum and maximum rates
 ..........................
@@ -209,7 +209,7 @@ Where:
   below this bound for the initial period.
 - ``issuance_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
-.. _adaptive_maximum_alpha:
+.. _adaptive_maximum_seoul:
 
 Adaptive Maximum
 ................
@@ -276,7 +276,7 @@ The function that defines the adaptive maximum is:
 .. note::
 
   Until the final value of the :ref:`minimum
-  rate<minimum_and_maximum_rates_alpha>` is reached, it is possible,
+  rate<minimum_and_maximum_rates_seoul>` is reached, it is possible,
   with a high enough staked ratio, for the corresponding adaptive
   maximum to be smaller than the minimum rate. If this happens, then
   the minimum rate takes priority, that is, the total issuance rate
@@ -285,7 +285,7 @@ The function that defines the adaptive maximum is:
   while fully satisfying the minimum rate.
 
 
-.. _issuance_rate_alpha:
+.. _issuance_rate_seoul:
 
 Issuance rate
 ......................
@@ -294,8 +294,8 @@ Finally, as mentioned before, the nominal adaptive issuance rate [1]_
 for a cycle ``c + issuance_modification_delay + 1`` is defined as the sum
 of the static rate and the dynamic rate computed for the cycle ``c``,
 bounded within the :ref:`minimum and maximum rates
-<minimum_and_maximum_rates_alpha>`, along with the :ref:`adaptive
-maximum <adaptive_maximum_alpha>`, computed for the cycle ``c + 1``.
+<minimum_and_maximum_rates_seoul>`, along with the :ref:`adaptive
+maximum <adaptive_maximum_seoul>`, computed for the cycle ``c + 1``.
 
 .. code-block:: python
 
@@ -309,7 +309,7 @@ maximum <adaptive_maximum_alpha>`, computed for the cycle ``c + 1``.
     return max( min(total_rate, maximum_rate), minimum_rate )
 
 
-.. _adaptive_rewards_alpha:
+.. _adaptive_rewards_seoul:
 
 Adaptive rewards
 ----------------
@@ -320,9 +320,9 @@ constants. With the new mechanism, the adaptive issuance rate provides
 instead a budget for the whole cycle, which gets allocated equally to
 each block of the cycle and distributed between the various rewards,
 in proportion to their relative :ref:`weights
-<rewards_weights_alpha>`.
+<rewards_weights_seoul>`.
 
-.. _rewards_weights_alpha:
+.. _rewards_weights_seoul:
 
 Reward weights
 ..............
@@ -415,7 +415,7 @@ Where:
 
 
 **Nonce and VDF revelation tips.** The rewards allocated to delegates
-for contributing to :ref:`random seed generation <randomness_generation_alpha>`
+for contributing to :ref:`random seed generation <randomness_generation_seoul>`
 (that is, for revealing nonce seeds and posting VDF proofs) are not paid
 each block, but rather every 192 blocks.
 
