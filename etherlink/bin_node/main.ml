@@ -1047,6 +1047,27 @@ let kernel_from_args network kernel =
         | Mainnet -> Some (In_memory Evm_node_supported_installers.mainnet)
         | Testnet -> None))
 
+let add_tezlink_to_node_configuration tezlink_chain_id configuration =
+  let open Configuration in
+  let experimental_features =
+    {
+      configuration.experimental_features with
+      l2_chains =
+        Option.either
+          configuration.experimental_features.l2_chains
+          (Some
+             [
+               {
+                 chain_id = Chain_id Z.(of_int tezlink_chain_id);
+                 chain_family = Michelson;
+               };
+             ]);
+      spawn_rpc =
+        Option.either configuration.experimental_features.spawn_rpc (Some 12345);
+    }
+  in
+  {configuration with experimental_features}
+
 let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
@@ -1109,6 +1130,17 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     | None ->
         (* We are running in sequencer mode (not in sandbox mode), we need to disable native execution *)
         sequencer_disable_native_execution configuration
+    | Some Evm_node_lib_dev.Sequencer.{tezlink = Some chain_id; _} ->
+        (* We are running a tezlink sandbox, we need to activate tezlink node *)
+        let configuration =
+          add_tezlink_to_node_configuration chain_id configuration
+        in
+        (* We need to save the configuration to the data_dir, as we spawn a rpc
+           server based on the data_dir *)
+        let*! _ =
+          Configuration.save ~force:true ~data_dir configuration config_file
+        in
+        Lwt.return configuration
     | _ -> Lwt.return configuration
   in
   let* () = websocket_checks configuration in
@@ -2499,6 +2531,7 @@ let sandbox_command =
             parent_chain;
             disable_da_fees;
             kernel_verbosity;
+            tezlink = None;
           }
       in
       let config_file = config_filename ~data_dir config_file in
@@ -2537,6 +2570,8 @@ let sandbox_command =
         ~sandbox_config
         ~finalized_view
         config_file)
+
+let tezlink_sandbox_chain_id = 12
 
 let tezlink_sandbox_command =
   let open Tezos_clic in
@@ -2603,6 +2638,7 @@ let tezlink_sandbox_command =
             parent_chain = None;
             disable_da_fees;
             kernel_verbosity;
+            tezlink = Some tezlink_sandbox_chain_id;
           }
       in
       let config_file = config_filename ~data_dir config_file in

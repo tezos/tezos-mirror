@@ -15,6 +15,7 @@ type sandbox_config = {
   parent_chain : Uri.t option;
   disable_da_fees : bool;
   kernel_verbosity : Events.kernel_log_level option;
+  tezlink : int option;
 }
 
 let install_finalizer_seq server_public_finalizer server_private_finalizer
@@ -109,6 +110,30 @@ let loop_sequencer chain_family backend
           in
           loop Misc.(now ()))
 
+let activate_tezlink chain_id =
+  let open Lwt_result_syntax in
+  let* () =
+    Evm_context.patch_state
+      ~key:"/evm/feature_flags/enable_multichain"
+      ~value:""
+      ()
+  in
+  let* () =
+    Evm_context.patch_state
+      ~key:"/evm/chain_id"
+      ~value:
+        Ethereum_types.(
+          encode_u256_le (Qty Z.(of_int chain_id)) |> String.of_bytes)
+      ()
+  in
+  let* () =
+    Evm_context.patch_state
+      ~key:(Format.sprintf "/evm/chain_configurations/%d/chain_family" chain_id)
+      ~value:"Michelson"
+      ()
+  in
+  return_unit
+
 let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel ?sandbox_config () =
   let open Lwt_result_syntax in
@@ -169,6 +194,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           funded_addresses;
           disable_da_fees;
           kernel_verbosity;
+          tezlink;
           _;
         } ->
         let* () = Evm_context.patch_sequencer_key pk in
@@ -213,6 +239,9 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
             ~value:
               Ethereum_types.(encode_u256_le (Qty Z.zero) |> String.of_bytes)
             ()
+        in
+        let* () =
+          Option.iter_es (fun chain_id -> activate_tezlink chain_id) tezlink
         in
         return_unit
     | None -> return_unit
