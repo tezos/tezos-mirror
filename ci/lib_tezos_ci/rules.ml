@@ -66,6 +66,9 @@ let schedule_extended_baker_remote_mode_tests =
 let schedule_test_release =
   scheduled && var "TZ_SCHEDULE_KIND" == str "TEST_RELEASE"
 
+let schedule_security_scans =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "SECURITY_SCANS"
+
 let schedule_container_scanning_master =
   scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_MASTER"
 

@@ -86,6 +86,14 @@ val schedule_extended_baker_remote_mode_tests : If.t
     [TZ_SCHEDULE_KIND] set to [TEST_RELEASE]. *)
 val schedule_test_release : If.t
 
+(** A rule that is true for scheduled pipelines that trigger security
+    scans of various Docker images: `tezos/tezos:master`,
+    `tezos/tezos:latest`, `tezos/tezos:octez-evm-node-latest`.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [SECURITY_SCANS]. *)
+val schedule_security_scans : If.t
+
 (** A rule that is true for scheduled pipelines that scan
     `tezos/tezos:master` Docker image.
 
