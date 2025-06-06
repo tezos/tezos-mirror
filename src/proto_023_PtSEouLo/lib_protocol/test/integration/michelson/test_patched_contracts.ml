@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Migration (patched scripts)
-    Invocation:   dune exec src/proto_seoul/lib_protocol/test/integration/michelson/main.exe \
+    Invocation:   dune exec src/proto_023_PtSEouLo/lib_protocol/test/integration/michelson/main.exe \
                   -- --file test_patched_contracts.ml
     Subject:      Migration
 *)

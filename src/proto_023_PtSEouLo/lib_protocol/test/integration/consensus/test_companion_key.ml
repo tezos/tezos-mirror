@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (delegate_storage)
-    Invocation: dune exec src/proto_seoul/lib_protocol/test/integration/consensus/main.exe \
+    Invocation: dune exec src/proto_023_PtSEouLo/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_companion_key.ml
     Subject:    Companion key test: registration, usage, etc
  *)

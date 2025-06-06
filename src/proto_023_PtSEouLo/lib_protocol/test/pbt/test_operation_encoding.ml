@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_seoul/lib_protocol/test/pbt/main.exe \
+    Invocation:   dune exec src/proto_023_PtSEouLo/lib_protocol/test/pbt/main.exe \
                   -- --file test_operation_encoding.ml
     Subject:      Encoding for operations
 *)

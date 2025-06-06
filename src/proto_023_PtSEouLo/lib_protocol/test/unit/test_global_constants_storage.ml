@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Global table of constants
-    Invocation:   dune exec src/proto_seoul/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_023_PtSEouLo/lib_protocol/test/unit/main.exe \
                   -- --file test_global_constants_storage.ml
     Dependencies: contract_hash.ml
     Subject:      Test the global table of constants

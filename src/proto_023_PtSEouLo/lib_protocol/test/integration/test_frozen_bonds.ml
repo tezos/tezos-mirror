@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:  Protocol (token)
-    Invocation: dune exec src/proto_seoul/lib_protocol/test/integration/main.exe \
+    Invocation: dune exec src/proto_023_PtSEouLo/lib_protocol/test/integration/main.exe \
                  -- --file test_frozen_bonds.ml
     Subject:    Frozen bonds applicable to contracts and part of their stake.
 *)

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Operation_repr
-    Invocation:   dune exec src/proto_seoul/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_023_PtSEouLo/lib_protocol/test/unit/main.exe \
                   -- --file test_operation_repr.ml
     Dependencies: --
     Subject:      To test the modules (including the top-level)

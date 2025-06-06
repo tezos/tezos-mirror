@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Michelson)
-    Invocation: dune exec src/proto_seoul/lib_protocol/test/integration/michelson/main.exe \
+    Invocation: dune exec src/proto_023_PtSEouLo/lib_protocol/test/integration/michelson/main.exe \
                   -- --file test_lazy_storage_diff.ml
     Subject:    Test lazy storage
 *)
