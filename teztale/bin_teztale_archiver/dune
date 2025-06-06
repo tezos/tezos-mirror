@@ -87,6 +87,9 @@
   (select PsRiotum_machine.ml from
    (octez-protocol-022-PsRiotum-libs.client -> PsRiotum_machine.real.ml)
    (-> PsRiotum_machine.no.ml))
+  (select seoul_machine.ml from
+   (octez-protocol-seoul-libs.client -> seoul_machine.real.ml)
+   (-> seoul_machine.no.ml))
   (select alpha_machine.ml from
    (octez-protocol-alpha-libs.client -> alpha_machine.real.ml)
    (-> alpha_machine.no.ml)))
@@ -134,6 +137,8 @@
     next_machine.real.ml))))
 
 (rule (action (write-file alpha_machine.no.ml "module M = struct end")))
+
+(rule (action (write-file seoul_machine.no.ml "module M = struct end")))
 
 (rule (action (write-file PsRiotum_machine.no.ml "module M = struct end")))
 

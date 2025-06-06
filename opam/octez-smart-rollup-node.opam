@@ -24,6 +24,7 @@ depopts: [
   "octez-smart-rollup-node-PtParisB"
   "octez-smart-rollup-node-PsParisC"
   "octez-smart-rollup-node-PsQuebec"
+  "octez-smart-rollup-node-seoul"
   "octez-smart-rollup-node-alpha"
 ]
 conflicts: [
@@ -32,6 +33,7 @@ conflicts: [
   "octez-smart-rollup-node-PtParisB" { != version }
   "octez-smart-rollup-node-PsParisC" { != version }
   "octez-smart-rollup-node-PsQuebec" { != version }
+  "octez-smart-rollup-node-seoul" { != version }
   "octez-smart-rollup-node-alpha" { != version }
 ]
 build: [

@@ -2,6 +2,8 @@ etherlink-governance-observer
 octez-evm-node
 octez-accuser-alpha
 octez-baker-alpha
+octez-accuser-seoul
+octez-baker-seoul
 octez-teztale-snitch
 octez-teztale-archiver
 octez-teztale-server

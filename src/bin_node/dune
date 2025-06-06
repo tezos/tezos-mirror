@@ -166,6 +166,12 @@
    (-> void_for_linking-octez-protocol-021-PsQuebec-libs-plugin-registerer.empty))
   tezos-protocol-022-PsRiotum.embedded-protocol
   octez-protocol-022-PsRiotum-libs.plugin-registerer
+  (select void_for_linking-tezos-protocol-seoul-embedded-protocol from
+   (tezos-protocol-seoul.embedded-protocol -> void_for_linking-tezos-protocol-seoul-embedded-protocol.empty)
+   (-> void_for_linking-tezos-protocol-seoul-embedded-protocol.empty))
+  (select void_for_linking-octez-protocol-seoul-libs-plugin-registerer from
+   (octez-protocol-seoul-libs.plugin-registerer -> void_for_linking-octez-protocol-seoul-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-seoul-libs-plugin-registerer.empty))
   (select void_for_linking-tezos-protocol-alpha-embedded-protocol from
    (tezos-protocol-alpha.embedded-protocol -> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty))
@@ -247,6 +253,8 @@
    (write-file void_for_linking-octez-protocol-020-PsParisC-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-021-PsQuebec-embedded-protocol.empty "")
    (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-plugin-registerer.empty "")
+   (write-file void_for_linking-tezos-protocol-seoul-embedded-protocol.empty "")
+   (write-file void_for_linking-octez-protocol-seoul-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-alpha-embedded-protocol.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty ""))))
 

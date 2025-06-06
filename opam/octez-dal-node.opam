@@ -19,11 +19,13 @@ depends: [
 ]
 depopts: [
   "octez-protocol-021-PsQuebec-libs"
+  "octez-protocol-seoul-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }
   "octez-protocol-021-PsQuebec-libs" { != version }
+  "octez-protocol-seoul-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

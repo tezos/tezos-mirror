@@ -18,9 +18,11 @@ depends: [
   "octez-protocol-022-PsRiotum-libs" { = version }
 ]
 depopts: [
+  "octez-protocol-seoul-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
+  "octez-protocol-seoul-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

@@ -1,0 +1,85 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_seoul_lib_protocol_test_pbt_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  bls12-381.archive
+  octez-libs.base
+  octez-libs.micheline
+  octez-protocol-seoul-libs.client
+  tezos-protocol-seoul.protocol
+  octez-libs.tezos-context.merkle_proof_encoding
+  octez-libs.test-helpers
+  octez-protocol-seoul-libs.test-helpers
+  octez-alcotezt
+  qcheck-alcotest
+  tezos-benchmark
+  tezos-benchmark-seoul
+  tezos-benchmark-type-inference-seoul
+  octez-protocol-seoul-libs.smart-rollup
+  octez-libs.crypto-dal
+  octez-libs.base-test-helpers
+  tezos-protocol-seoul.parameters)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_micheline
+  -open Tezos_client_seoul
+  -open Tezos_protocol_seoul
+  -open Tezos_test_helpers
+  -open Tezos_seoul_test_helpers
+  -open Octez_alcotezt
+  -open Tezos_benchmark_seoul
+  -open Tezos_benchmark_type_inference_seoul
+  -open Tezos_smart_rollup_seoul
+  -open Tezos_crypto_dal
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_seoul_parameters)
+ (modules
+  liquidity_baking_pbt
+  saturation_fuzzing
+  test_merkle_list
+  test_gas_properties
+  test_sampler
+  test_script_comparison
+  test_script_roundtrip
+  test_tez_repr
+  test_sc_rollup_tick_repr
+  test_sc_rollup_encoding
+  test_sc_rollup_inbox
+  test_refutation_game
+  test_carbonated_map
+  test_zk_rollup_encoding
+  test_dal_slot_proof
+  test_compare_operations
+  test_operation_encoding
+  test_balance_updates_encoding
+  test_bytes_conversion))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  octez-rust-deps
+  src_proto_seoul_lib_protocol_test_pbt_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-seoul-tests)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

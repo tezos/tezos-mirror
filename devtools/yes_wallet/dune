@@ -11,6 +11,7 @@
   octez-node-config
   octez-shell-libs.store
   tezos-protocol-022-PsRiotum.protocol
+  tezos-protocol-seoul.protocol
   tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags
