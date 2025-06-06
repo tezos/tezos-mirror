@@ -1118,6 +1118,11 @@ let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
               "coverage_report"
               reports1.coverage_report
               reports2.coverage_report;
+          container_scanning =
+            opt_combine_fail
+              "container_scanning"
+              reports1.container_scanning
+              reports2.container_scanning;
         }
       in
       {
@@ -1380,6 +1385,10 @@ module Images_external = struct
      - https://docs.gitlab.com/ee/ci/runners/hosted_runners/macos.html#supported-macos-images
      - https://gitlab-org.gitlab.io/ci-cd/shared-runners/images/macos-image-inventory/macos-14-xcode-15/ *)
   let macosx_14 = Image.mk_external ~image_path:"macos-14-xcode-15"
+
+  (* Image used in [schedule_security_scans] pipeline. Trivy scans
+     Docker images and codebase for CVEs and SBOMs. *)
+  let trivy = Image.mk_external ~image_path:"aquasec/trivy:latest"
 end
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []

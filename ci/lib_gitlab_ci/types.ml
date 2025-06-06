@@ -95,6 +95,7 @@ type reports = {
   dotenv : string option;
   junit : string option;
   coverage_report : coverage_report option;
+  container_scanning : string option;
 }
 
 type image = Image of string

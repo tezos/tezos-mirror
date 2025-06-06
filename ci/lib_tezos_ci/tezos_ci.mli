@@ -653,20 +653,18 @@ module Images : sig
 
   val macosx_14 : Image.t
 
-  val stage : Stage.t
-
   val client_libs_dependencies : Image.t
 
   val rust_toolchain : Image.t
 
   val rust_sdk_bindings : Image.t
 
+  val trivy : Image.t
+
   val jsonnet : Image.t
 
   module CI : sig
     val job_docker_ci : arch -> tezos_job
-
-    val mk_ci_image : image_path:string -> Image.t
 
     val runtime : Image.t
 
