@@ -195,6 +195,7 @@ module VM = struct
   end
 
   let init () =
+    let () = Log.report "Terraform.VM.init" in
     Process.run ~name ~color "terraform" (chdir Path.terraform_vm @ ["init"])
 
   let deploy ~auto_approve ~max_run_duration ~machine_type ~base_port

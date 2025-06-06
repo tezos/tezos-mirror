@@ -212,6 +212,7 @@ module Remote = struct
                (vm_configuration, List.of_seq seq, Seq.length seq) ))
     in
     let* () = Terraform.Docker_registry.init () in
+    let* () = Terraform.VM.Workspace.select "default" in
     let* () = Terraform.VM.init () in
     let workspaces_names = workspaces_info |> Seq.map fst |> List.of_seq in
     let tezt_cloud = Env.tezt_cloud in
