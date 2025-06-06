@@ -2312,7 +2312,7 @@ let fund_arg =
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.eth_address
 
 let sandbox_config_args =
-  Tezos_clic.args16
+  Tezos_clic.args12
     preimages_arg
     preimages_endpoint_arg
     native_execution_policy_arg
@@ -2323,12 +2323,15 @@ let sandbox_config_args =
     (kernel_arg ())
     wallet_dir_arg
     (Client_config.password_filename_arg ())
+    disable_da_fees_arg
+    kernel_verbosity_arg
+
+let etherlink_sandbox_config_args =
+  Tezos_clic.args4
     (supported_network_arg ())
     init_from_snapshot_arg
     fund_arg
     replicate_arg
-    disable_da_fees_arg
-    kernel_verbosity_arg
 
 let sequencer_command =
   let open Tezos_clic in
@@ -2423,7 +2426,9 @@ let sandbox_command =
       "Start the EVM node in sandbox mode. The sandbox mode is a \
        sequencer-like mode that produces blocks with a fake key and no rollup \
        node connection."
-    (merge_options common_config_args sandbox_config_args)
+    (merge_options
+       common_config_args
+       (merge_options sandbox_config_args etherlink_sandbox_config_args))
     (prefixes ["run"; "sandbox"] stop)
     (fun ( ( data_dir,
              config_file,
@@ -2446,22 +2451,19 @@ let sandbox_command =
              blacklisted_rpcs,
              whitelisted_rpcs,
              finalized_view ),
-           ( preimages,
-             preimages_endpoint,
-             native_execution_policy,
-             time_between_blocks,
-             max_number_of_chunks,
-             private_rpc_port,
-             genesis_timestamp,
-             kernel,
-             wallet_dir,
-             password_filename,
-             network,
-             init_from_snapshot,
-             funded_addresses,
-             main_endpoint,
-             disable_da_fees,
-             kernel_verbosity ) )
+           ( ( preimages,
+               preimages_endpoint,
+               native_execution_policy,
+               time_between_blocks,
+               max_number_of_chunks,
+               private_rpc_port,
+               genesis_timestamp,
+               kernel,
+               wallet_dir,
+               password_filename,
+               disable_da_fees,
+               kernel_verbosity ),
+             (network, init_from_snapshot, funded_addresses, main_endpoint) ) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
