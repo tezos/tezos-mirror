@@ -25,11 +25,12 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = R022 | Alpha
+type t = Seoul | R022 | Alpha
 
-let all = [R022; Alpha]
+let all = [Seoul; R022; Alpha]
 
-let encoding = Data_encoding.string_enum [("alpha", Alpha); ("r022", R022)]
+let encoding =
+  Data_encoding.string_enum [("alpha", Alpha); ("seoul", Seoul); ("r022", R022)]
 
 type constants =
   | Constants_sandbox
@@ -43,11 +44,14 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function Alpha -> "Alpha" | R022 -> "R022"
+let name = function Alpha -> "Alpha" | Seoul -> "Seoul" | R022 -> "R022"
 
-let number = function R022 -> 022 | Alpha -> 023
+let number = function R022 -> 022 | Seoul -> 023 | Alpha -> 024
 
-let directory = function R022 -> "proto_022_PsRiotum" | Alpha -> "proto_alpha"
+let directory = function
+  | R022 -> "proto_022_PsRiotum"
+  | Alpha -> "proto_alpha"
+  | Seoul -> "proto_seoul"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -55,6 +59,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | R022 -> "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7"
+  | Seoul -> "Ps3BVMUNQhj15D1VXdFnjP91y11jYShkZRJnBx3N7koz2dKRndB"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let short_hash protocol_hash =
@@ -75,7 +80,10 @@ let parameter_file ?(constants = default_constants) protocol =
   let name = constants_to_string constants in
   sf "src/%s/parameters/%s-parameters.json" (directory protocol) name
 
-let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
+let daemon_name = function
+  | Alpha -> "alpha"
+  | Seoul -> "seoul"
+  | p -> String.sub (hash p) 0 8
 
 let protocol_dependent_uses ~tag ~path =
   let make protocol =
@@ -94,6 +102,7 @@ let accuser = protocol_dependent_uses ~tag:"accuser_" ~path:"./octez-accuser-"
 
 let encoding_prefix = function
   | Alpha -> "alpha"
+  | Seoul -> "seoul"
   | p -> sf "%03d-%s" (number p) (String.sub (hash p) 0 8)
 
 type parameter_overrides =
@@ -267,7 +276,10 @@ let write_parameter_file :
   JSON.encode_to_file_u output_file parameters ;
   Lwt.return output_file
 
-let previous_protocol = function Alpha -> Some R022 | R022 -> None
+let previous_protocol = function
+  | Alpha -> Some Seoul
+  | Seoul -> Some R022
+  | R022 -> None
 
 let has_predecessor p = previous_protocol p <> None
 

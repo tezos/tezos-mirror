@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = R022 | Alpha
+type t = Seoul | R022 | Alpha
 
 val encoding : t Data_encoding.t
 
