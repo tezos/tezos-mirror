@@ -221,6 +221,20 @@ module Protocol_types = struct
         ~dst:encoding
         ~src:Data_encoding.z
   end
+
+  module Contract = struct
+    let make_info (contract_balance, counter_z) =
+      let open Result_syntax in
+      let open Imported_protocol_plugin.Contract_services in
+      let* counter = Counter.of_z counter_z in
+      return
+        {
+          balance = contract_balance;
+          delegate = None;
+          counter = Some counter;
+          script = None;
+        }
+  end
 end
 
 (** [wrap conversion service_implementation] changes the output type
@@ -438,6 +452,17 @@ module Imported_services = struct
       Tezos_rpc.Service.t =
     import_service Tezos_shell_services.Shell_services.Blocks.S.protocols
 
+  (* Queries will be ignored for now. *)
+  let contract_info :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context * Tezos_types.Contract.t,
+        Imported_protocol_plugin.Contract_services.S.normalize_types_query,
+        unit,
+        Imported_protocol_plugin.Contract_services.info )
+      Tezos_rpc.Service.t =
+    Tezos_rpc.Service.subst1 Imported_protocol_plugin.Contract_services.S.info
+
   let balance :
       ( [`GET],
         tezlink_rpc_context,
@@ -631,6 +656,15 @@ let register_block_services ~l2_chain_id
            let*? `Main = check_chain chain in
            let*? _block = check_block block in
            protocols ())
+    |> register_with_conversion
+         ~service:Imported_services.contract_info
+         ~impl:(fun ({block; chain}, contract) _query () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let* balance = Backend.balance chain block contract in
+           let* counter = Backend.counter chain block contract in
+           return (balance, counter))
+         ~convert_output:Protocol_types.Contract.make_info
     |> register
          ~service:Imported_services.balance
          ~impl:(fun ({chain; block}, contract) _ _ ->

@@ -664,6 +664,21 @@ let account_rpc sequencer account key =
   in
   return @@ JSON.parse ~origin:"curl_protocols" res
 
+let test_tezlink_contract_info =
+  register_tezlink_test
+    ~title:"Test of the contract info rpc"
+    ~tags:["rpc"; "contract"; "info"]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; _} _protocol ->
+  (* call the balance rpc and check the result *)
+  let* valid_info = account_rpc sequencer Constant.bootstrap1 "" in
+  let balance = JSON.(valid_info |-> "balance" |> as_int) in
+  let counter = JSON.(valid_info |-> "counter" |> as_int) in
+
+  Check.((balance = 3800000000000) int ~error_msg:"Expected %R but got %L") ;
+  Check.((counter = 0) int ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let test_tezlink_manager_key =
   register_tezlink_test
     ~title:"Test of the manager_key rpc"
@@ -13835,6 +13850,7 @@ let () =
   test_block_producer_validation [Alpha] ;
   test_durable_storage_consistency [Alpha] ;
   test_tezlink_current_level [Alpha] ;
+  test_tezlink_contract_info [Alpha] ;
   test_tezlink_balance [Alpha] ;
   test_tezlink_manager_key [Alpha] ;
   test_tezlink_counter [Alpha] ;
