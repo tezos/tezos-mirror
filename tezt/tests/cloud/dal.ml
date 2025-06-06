@@ -1131,6 +1131,9 @@ let get_metrics t infos_per_level metrics =
   }
 
 module Monitoring_app = struct
+  (* time interval in hours at which to submit report *)
+  let report_interval = 6
+
   let pp_delegate fmt delegate_pkh =
     match Hashtbl.find_opt aliases delegate_pkh with
     | None -> Format.fprintf fmt "`%s`" delegate_pkh
@@ -1311,9 +1314,10 @@ module Monitoring_app = struct
     let fetch_slot_info ~slot_index =
       let query s =
         Format.sprintf
-          "increase(tezt_total_%s_commitments_per_slot{slot_index=\"%d\"}[6h])"
+          "increase(tezt_total_%s_commitments_per_slot{slot_index=\"%d\"}[%dh])"
           s
           slot_index
+          report_interval
       in
       let decoder = decoder_prometheus_float in
       let* attested =
@@ -1347,7 +1351,10 @@ module Monitoring_app = struct
 
     let fetch_dal_commitments_total_info () =
       let query s =
-        Format.sprintf {|increase(tezt_dal_commitments_total{kind="%s"}[6h])|} s
+        Format.sprintf
+          {|increase(tezt_dal_commitments_total{kind="%s"}[%dh])|}
+          s
+          report_interval
       in
       let decoder = decoder_prometheus_float in
       let* attested =
@@ -1366,12 +1373,27 @@ module Monitoring_app = struct
         view_ratio_attested_over_published
           (`attested attested, `published published)
       in
-      let view =
+      let ratio_view =
         (Format.sprintf
            "• Percentage of attested over published DAL commitments: %s")
           (Option.value ~default:"unk" ratio)
       in
-      Lwt.return view
+      let slot_size = 126_944 (* TODO: do not hard-code this *) in
+      let bandwidth =
+        Option.map
+          (fun x ->
+            Format.sprintf
+              "%.2f"
+              (x *. float_of_int slot_size
+              /. float_of_int (1024 * report_interval * 3600)))
+          attested
+      in
+      let bandwidth_view =
+        Format.sprintf
+          "• Bandwidth: %s KiB/s"
+          (Option.value ~default:"unk" bandwidth)
+      in
+      Lwt.return (ratio_view, bandwidth_view)
 
     let pp_stake fmt stake_ratio =
       Format.fprintf fmt "`%.2f%%` stake" (stake_ratio *. 100.)
@@ -1399,20 +1421,23 @@ module Monitoring_app = struct
     let fetch_baker_info ~tz1 ~origin =
       let query =
         Format.sprintf
-          "sum_over_time(tezt_dal_commitments_attested{attester=\"%s\"}[6h])"
+          "sum_over_time(tezt_dal_commitments_attested{attester=\"%s\"}[%dh])"
           tz1
+          report_interval
       in
       let* attested = fetch ~decoder:decoder_prometheus_float ~query ~origin in
       let query =
         Format.sprintf
-          "sum_over_time(tezt_dal_commitments_published{attester=\"%s\"}[6h])"
+          "sum_over_time(tezt_dal_commitments_published{attester=\"%s\"}[%dh])"
           tz1
+          report_interval
       in
       let* published = fetch ~decoder:decoder_prometheus_float ~query ~origin in
       let query =
         Format.sprintf
-          "avg_over_time(tezt_dal_attestation_sent{attester=\"%s\"}[6h])"
+          "avg_over_time(tezt_dal_attestation_sent{attester=\"%s\"}[%dh])"
           tz1
+          report_interval
       in
       let* dal_attestation_ratio =
         fetch ~decoder:decoder_prometheus_float ~query ~origin
@@ -1563,20 +1588,16 @@ module Monitoring_app = struct
       let network = configuration.network in
       let title_info =
         Format.sprintf
-          "*DAL report* for the *%s* network over the last 6 hours."
+          "*DAL report* for the *%s* network over the last %d hours."
           (String.capitalize_ascii (Network.to_string network))
+          report_interval
       in
-      let network_info =
-        Format.sprintf
-          "• Network: %s"
-          (String.capitalize_ascii (Network.to_string network))
-      in
-      let* ratio_dal_commitments_total_info =
+      let* ratio_dal_commitments_total_info, bandwidth_info =
         fetch_dal_commitments_total_info ()
       in
       let* slots_info = fetch_slots_info () in
       let network_overview_info =
-        network_info :: ratio_dal_commitments_total_info :: slots_info
+        bandwidth_info :: ratio_dal_commitments_total_info :: slots_info
       in
       let data =
         let open Format_app in
@@ -1623,11 +1644,8 @@ module Monitoring_app = struct
                 endpoint
                 ()
             in
-            Chronos.task
-              ~name:"network-overview"
-              ~tm:"0 0-23/6 * * *"
-              ~action
-              ()
+            let tm = Format.sprintf "0 0-23/%d * * *" report_interval in
+            Chronos.task ~name:"network-overview" ~tm ~action ()
           in
           Cloud.register_chronos_task cloud task
   end
