@@ -270,7 +270,7 @@ module M018 = Proxford_machine.M
 module M019 = PtParisB_machine.M
 module M020 = PsParisC_machine.M
 module M022 = PsRiotum_machine.M
-module Mseoul = Seoul_machine.M
+module M023 = PtSEouLo_machine.M
 module Malpha = Alpha_machine.M
 module M021 = PsQuebec_machine.M
 
