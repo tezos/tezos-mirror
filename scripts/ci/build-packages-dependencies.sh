@@ -53,17 +53,8 @@ docker build \
 LATEST_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 LATEST_TAG_GENERIC="${CI_COMMIT_REF_SLUG}"
 
-# Enforce image rebuild ignoring inputs changes (i.e. rebuild the image
-# for security updates purposes)
-skip_registry_cache_check=${DOCKER_FORCE_BUILD:-"false"}
-
-if [ "$skip_registry_cache_check" != "true" ]; then
-  echo "Checking for existance of image $DEP_IMAGE:$LATEST_TAG"
-  docker buildx imagetools inspect "$DEP_IMAGE:$LATEST_TAG" || export IMAGE_EXISTS="false"
-else
-  export IMAGE_EXISTS="false"
-  echo "Force rebuild of CI images, using no cached layers"
-fi
+echo "Checking for existance of image $DEP_IMAGE:$LATEST_TAG"
+docker buildx imagetools inspect "$DEP_IMAGE:$LATEST_TAG" || export IMAGE_EXISTS="false"
 
 if [ "$IMAGE_EXISTS" = "false" ]; then
   echo "Creating image manifesto for $DEP_IMAGE:$LATEST_TAG"
