@@ -168,7 +168,7 @@ let gen_dal_slots_history () =
   let open Gen in
   let open Dal_slot_repr in
   let constants : Alpha_context.Constants.Parametric.t =
-    Tezos_protocol_seoul_parameters.Default_parameters.constants_test
+    Tezos_protocol_023_PtSEouLo_parameters.Default_parameters.constants_test
   in
   let number_of_slots = constants.dal.number_of_slots in
   (* Generate a list of (level * confirmed slot ID * public key hash *

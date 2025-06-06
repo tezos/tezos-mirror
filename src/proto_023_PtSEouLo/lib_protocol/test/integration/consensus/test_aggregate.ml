@@ -76,7 +76,7 @@ let find_preattestations_aggregate_result receipt =
   let result_opt =
     List.find_map
       (function
-        | Tezos_protocol_seoul__Protocol.Apply_results.Operation_metadata
+        | Tezos_protocol_023_PtSEouLo__Protocol.Apply_results.Operation_metadata
             {
               contents =
                 Single_result (Preattestations_aggregate_result _ as result);
@@ -93,7 +93,7 @@ let find_attestations_aggregate_result receipt =
   let result_opt =
     List.find_map
       (function
-        | Tezos_protocol_seoul__Protocol.Apply_results.Operation_metadata
+        | Tezos_protocol_023_PtSEouLo__Protocol.Apply_results.Operation_metadata
             {
               contents =
                 Single_result (Attestations_aggregate_result _ as result);
@@ -111,7 +111,8 @@ type 'kind aggregate =
   | Attestation : Alpha_context.Kind.attestations_aggregate aggregate
 
 let check_aggregate_result (type kind) (kind : kind aggregate) ~committee
-    (result : kind Tezos_protocol_seoul__Protocol.Apply_results.contents_result)
+    (result :
+      kind Tezos_protocol_023_PtSEouLo__Protocol.Apply_results.contents_result)
     =
   let open Lwt_result_syntax in
   match (kind, result) with
@@ -182,7 +183,7 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~committee
 let check_preattestations_aggregate_result ~committee
     (result :
       Alpha_context.Kind.preattestations_aggregate
-      Tezos_protocol_seoul__Protocol.Apply_results.contents_result) =
+      Tezos_protocol_023_PtSEouLo__Protocol.Apply_results.contents_result) =
   check_aggregate_result Preattestation ~committee result
 
 (* [check_attestations_aggregate_result ~committee result] verifies that
@@ -193,7 +194,7 @@ let check_preattestations_aggregate_result ~committee
 let check_attestations_aggregate_result ~committee
     (result :
       Alpha_context.Kind.attestations_aggregate
-      Tezos_protocol_seoul__Protocol.Apply_results.contents_result) =
+      Tezos_protocol_023_PtSEouLo__Protocol.Apply_results.contents_result) =
   check_aggregate_result Attestation ~committee result
 
 (* [find_attester_with_bls_key attesters] returns the first attester with a BLS
