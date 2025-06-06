@@ -1,0 +1,10 @@
+[{
+  "action": "alloc",
+  "big_map": "0",
+  "key_type": [{
+    "prim": "nat"
+  }],
+  "value_type": [{
+    "prim": "unit"
+  }]
+}]
