@@ -2538,6 +2538,110 @@ let sandbox_command =
         ~finalized_view
         config_file)
 
+let tezlink_sandbox_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.run
+    ~desc:
+      "Start the EVM node in tezlink sandbox mode. The sandbox mode is a \
+       sequencer-like mode that produces blocks with a fake key and no rollup \
+       node connection."
+    (merge_options common_config_args sandbox_config_args)
+    (prefixes ["run"; "tezlink"; "sandbox"] stop)
+    (fun ( ( data_dir,
+             config_file,
+             rpc_addr,
+             rpc_port,
+             rpc_batch_limit,
+             cors_origins,
+             cors_headers,
+             enable_websocket,
+             log_filter_max_nb_blocks,
+             log_filter_max_nb_logs,
+             log_filter_chunk_size,
+             keep_alive,
+             rollup_node_endpoint,
+             tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             verbose,
+             restricted_rpcs,
+             blacklisted_rpcs,
+             whitelisted_rpcs,
+             finalized_view ),
+           ( preimages,
+             preimages_endpoint,
+             native_execution_policy,
+             time_between_blocks,
+             max_number_of_chunks,
+             private_rpc_port,
+             genesis_timestamp,
+             kernel,
+             wallet_dir,
+             password_filename,
+             disable_da_fees,
+             kernel_verbosity ) )
+         () ->
+      let open Lwt_result_syntax in
+      let* restricted_rpcs =
+        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
+      in
+      let rollup_node_endpoint =
+        Option.value ~default:Uri.empty rollup_node_endpoint
+      in
+      let _pkh, pk, sk =
+        Tezos_crypto.Signature.(generate_key ~algo:Ed25519) ()
+      in
+      let sandbox_config =
+        Evm_node_lib_dev.Sequencer.
+          {
+            public_key = pk;
+            secret_key = sk;
+            init_from_snapshot = None;
+            network = None;
+            funded_addresses = [];
+            parent_chain = None;
+            disable_da_fees;
+            kernel_verbosity;
+          }
+      in
+      let config_file = config_filename ~data_dir config_file in
+      start_sequencer
+        ?password_filename
+        ~wallet_dir
+        ~data_dir
+        ?rpc_addr
+        ?rpc_port
+        ?rpc_batch_limit
+        ?cors_origins
+        ?cors_headers
+        ?enable_websocket
+        ?tx_pool_timeout_limit
+        ?tx_pool_addr_limit
+        ?tx_pool_tx_per_addr_limit
+        ~keep_alive
+        ~rollup_node_endpoint
+        ~verbose
+        ?preimages
+        ?preimages_endpoint
+        ?native_execution_policy
+        ?time_between_blocks
+        ?max_number_of_chunks
+        ?private_rpc_port
+        ~max_blueprints_lag:100_000_000
+        ~max_blueprints_ahead:100_000_000
+        ~max_blueprints_catchup:100_000_000
+        ~catchup_cooldown:100_000_000
+        ?log_filter_max_nb_blocks
+        ?log_filter_max_nb_logs
+        ?log_filter_chunk_size
+        ?genesis_timestamp
+        ?restricted_rpcs
+        ?kernel
+        ~sandbox_config
+        ~finalized_view
+        config_file)
+
 let observer_run_args =
   Tezos_clic.args12
     private_rpc_port_arg
@@ -3022,6 +3126,7 @@ let in_development_commands = []
 let commands =
   [
     sandbox_command;
+    tezlink_sandbox_command;
     proxy_command;
     sequencer_command;
     observer_command;
