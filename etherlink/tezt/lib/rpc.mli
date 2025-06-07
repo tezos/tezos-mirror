@@ -226,6 +226,18 @@ val get_transaction_receipt :
   Evm_node.t ->
   (Transaction.transaction_receipt option, error) result Lwt.t
 
+(** [get_transaction_gas_info evm_node ~tx_hash] calls
+    [tez_getTransactionGasInfo]. Returns the execution gas and the
+    inclusion gas corresponding to [tx_hash] if a transaction receipt
+    is found. *)
+val get_transaction_gas_info :
+  ?websocket:Websocket.t ->
+  tx_hash:string ->
+  Evm_node.t ->
+  (* todo: use labeled tuples once we use OCaml 5.4 *)
+  (([`Inclusion_gas of int64] * [`Execution_gas of int64]) option, error) result
+  Lwt.t
+
 (** [estimate_gas eth_call evm_node] calls [eth_estimateGas] with [eth_call]
     as payload. *)
 val estimate_gas :
