@@ -3308,7 +3308,7 @@ let test_refutation protocols ~kind =
               (inputs_for 10)
               ~final_level:80
               ~reset_honest_on:
-                [("smart_rollup_node_conflict_detected.v0", 2, None)]
+                [("smart_rollup_node_conflict_detected.v0", 3, None)]
               ~priority:`Priority_honest );
           ( "degraded_new",
             refutation_scenario_parameters
@@ -3451,7 +3451,7 @@ let test_bailout_refutation protocols =
        (inputs_for 10)
        ~final_level:80
        ~reset_honest_on:
-         [("smart_rollup_node_conflict_detected.v0", 2, Some Bailout)]
+         [("smart_rollup_node_conflict_detected.v0", 3, Some Bailout)]
        ~priority:`Priority_honest)
     protocols
 
