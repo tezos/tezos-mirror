@@ -465,9 +465,9 @@ let test_validate_pay_for_fees_max_fee_per_gas =
       ~value:Wei.zero
       ()
   in
-  (* As the transaction has the maximum gas possible 30M. If the DA fees
-     are wrongly calculted it would consider that the execution gas limit
-     is more than 30M, and result in a failure. *)
+  (* As the transaction has the maximum gas possible 30M. If the DA
+     fees are wrongly calculated it would consider that the execution
+     gas limit is more than 30M, and result in a failure. *)
   let* () = send_transaction_and_wait_confirmation ~raw_tx sequencer in
   unit
 
