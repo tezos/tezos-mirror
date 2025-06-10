@@ -53,6 +53,8 @@ module Key = struct
   let pp fmt {alias; id; _} =
     Format.fprintf fmt "'%s' (%a)" alias Signature.Public_key_hash.pp id
 
+  let is_bls t = Signature.Public_key_hash.is_bls (Key_id.to_pkh t.id)
+
   module Set = struct
     include Set.Make (struct
       type nonrec t = t
@@ -132,14 +134,18 @@ module Delegate = struct
          (req "consensus_key" Key.encoding_for_logging__cannot_decode)
          (opt "companion_key" Key.encoding_for_logging__cannot_decode))
 
-  let pp fmt {manager_key; consensus_key; companion_key} =
+  let pp_without_companion_key fmt
+      {manager_key; consensus_key; companion_key = _} =
     Format.fprintf
       fmt
       "%a@ with@ consensus key@ %a"
       Maybe_known_key.pp
       manager_key
       Key.pp
-      consensus_key ;
+      consensus_key
+
+  let pp fmt ({manager_key = _; consensus_key = _; companion_key} as t) =
+    pp_without_companion_key fmt t ;
     match companion_key with
     | None -> ()
     | Some companion_key ->

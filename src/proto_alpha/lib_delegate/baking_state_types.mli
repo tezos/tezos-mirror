@@ -54,6 +54,8 @@ module Key : sig
 
   val pp : Format.formatter -> t -> unit
 
+  val is_bls : t -> bool
+
   module Set : Set.S with type elt = t
 end
 
@@ -80,6 +82,10 @@ module Delegate : sig
   val encoding_for_logging__cannot_decode : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
+
+  (** Prints the manager key and consensus key but not the companion
+      key. *)
+  val pp_without_companion_key : Format.formatter -> t -> unit
 
   (** Builds a {!t} from an element of the output of
       {!Plugin.RPC.Validators.get}, if the consensus key is present in

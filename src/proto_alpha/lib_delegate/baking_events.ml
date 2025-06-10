@@ -36,6 +36,77 @@ let pp_int64 fmt n = Format.fprintf fmt "%Ld" n
 
 let waiting_color = Internal_event.Magenta
 
+module Op_info_for_logging = struct
+  type kind = Preattestation | Attestation_without_dal | Attestation_with_dal
+
+  type t = {
+    kind : kind;
+    level : Protocol.Alpha_context.Raw_level.t;
+    round : Protocol.Alpha_context.Round.t;
+    delegate : Delegate.t;
+  }
+
+  let pp_kind fmt = function
+    | Preattestation -> Format.fprintf fmt "preattestation"
+    | Attestation_without_dal -> Format.fprintf fmt "attestation (without DAL)"
+    | Attestation_with_dal -> Format.fprintf fmt "attestation (with DAL)"
+
+  let pp fmt {kind; delegate; level; round} =
+    let companion_key_is_relevant =
+      match kind with
+      | Attestation_with_dal -> Key.is_bls delegate.consensus_key
+      | Attestation_without_dal | Preattestation -> false
+    in
+    Format.fprintf
+      fmt
+      "%a@ for level %a, round %a@ for delegate@ %a"
+      pp_kind
+      kind
+      Protocol.Alpha_context.Raw_level.pp
+      level
+      Protocol.Alpha_context.Round.pp
+      round
+      (if companion_key_is_relevant then Delegate.pp
+       else Delegate.pp_without_companion_key)
+      delegate
+
+  let kind_encoding =
+    Data_encoding.string_enum
+      [
+        ("preattestation", Preattestation);
+        ("attestation_without_dal", Attestation_without_dal);
+        ("attestation_with_dal", Attestation_with_dal);
+      ]
+
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {kind; level; round; delegate} -> (kind, level, round, delegate))
+      (fun (kind, level, round, delegate) -> {kind; level; round; delegate})
+      (obj4
+         (req "op_kind" kind_encoding)
+         (req "level" Protocol.Alpha_context.Raw_level.encoding)
+         (req "round" Protocol.Alpha_context.Round.encoding)
+         (req "delegate" Delegate.encoding_for_logging__cannot_decode))
+
+  let of_unsigned_consensus_vote
+      (unsigned_consensus_vote : unsigned_consensus_vote) =
+    let kind =
+      match unsigned_consensus_vote.vote_kind with
+      | Preattestation -> Preattestation
+      | Attestation ->
+          if Option.is_some unsigned_consensus_vote.dal_content then
+            Attestation_with_dal
+          else Attestation_without_dal
+    in
+    {
+      kind;
+      delegate = unsigned_consensus_vote.delegate;
+      level = unsigned_consensus_vote.vote_consensus_content.level;
+      round = unsigned_consensus_vote.vote_consensus_content.round;
+    }
+end
+
 module Commands = struct
   include Internal_event.Simple
 
@@ -887,24 +958,23 @@ module Actions = struct
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
 
-  let consensus_vote_injected =
-    declare_5
+  let consensus_op_injected =
+    declare_2
       ~section
-      ~name:"consensus_vote_injected"
+      ~name:"consensus_operation_injected"
       ~level:Notice
-      ~msg:
-        "injected {vote_kind} {ophash} for {delegate} for level {level}, round \
-         {round}"
-      ~pp1:pp_consensus_vote_kind
-      ("vote_kind", consensus_vote_kind_encoding)
-      ~pp2:Operation_hash.pp
-      ("ophash", Operation_hash.encoding)
-      ~pp3:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
-      ~pp4:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp5:Round.pp
-      ("round", Round.encoding)
+      ~msg:"injected {operation_information}{operation_hash}"
+      ~pp1:Op_info_for_logging.pp
+      ("operation_information", Op_info_for_logging.encoding)
+      ~pp2:(fun fmt oph ->
+        Format.fprintf fmt "@ (operation hash: %a)" Operation_hash.pp oph)
+      ("operation_hash", Operation_hash.encoding)
+
+  let emit_consensus_op_injected unsigned_consensus_op ophash =
+    emit
+      consensus_op_injected
+      ( Op_info_for_logging.of_unsigned_consensus_vote unsigned_consensus_op,
+        ophash )
 
   let attach_dal_attestation =
     declare_5
