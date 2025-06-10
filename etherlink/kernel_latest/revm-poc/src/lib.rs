@@ -5,6 +5,7 @@
 mod database;
 mod precompile_provider;
 mod storage_helpers;
+mod world_state_handler;
 
 #[cfg(test)]
 mod test {
