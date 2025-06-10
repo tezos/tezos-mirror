@@ -4,6 +4,7 @@
 
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 
+use mir::ast::michelson_address::entrypoint;
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use nom::combinator::map;
 use nom::error::{ErrorKind, ParseError};
@@ -20,6 +21,13 @@ use tezos_data_encoding::{
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct Parameter {
+    pub entrypoint: entrypoint::Entrypoint,
+    #[encoding(dynamic, bytes)]
+    pub value: Vec<u8>,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct RevealContent {
     pub pk: PublicKey,
 }
@@ -32,7 +40,7 @@ pub struct RevealContent {
 pub struct TransferContent {
     pub amount: Narith,
     pub destination: Contract,
-    pub parameter: Option<()>,
+    pub parameter: Option<Parameter>,
 }
 
 pub enum OperationContent {
