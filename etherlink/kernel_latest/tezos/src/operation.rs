@@ -85,7 +85,7 @@ impl Operation {
 
 impl Operation {
     // The `rlp_append` function from the Encodable trait can't fail but `to_bytes`
-    // return a result. To avoid unwraping and risk a panic we're not implementing
+    // return a result. To avoid unwrapping and risk a panic we're not implementing
     // the trait exactly, but we expose a serialization function.
     pub fn rlp_append(&self, s: &mut rlp::RlpStream) -> Result<(), BinError> {
         let bytes = self.to_bytes()?;
@@ -353,7 +353,7 @@ mod tests {
         let operation_bytes = hex::decode("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed842426e5cab86b00ba3bed311a5d7b06dc4daf3c94c5c406927e4bcf920202a90100009d05b06ea36a6ad464d94dc07a38b77b80b577c1ae51bbd8d20105cd5aed496c1da02ac8f6e1541c363874bcde7e90e1f959c8f28ab52ec3fdbbf7d54b1dad4004f2b70da27ce35de18d77ea9efee413b5fb2b2a858be4d95e45acfe47a73b0d").unwrap();
 
         let operation = Operation::try_from_bytes(&operation_bytes)
-            .expect("Decoding operation should have succeded");
+            .expect("Decoding operation should have succeeded");
 
         assert_eq!(operation, expected_operation);
     }
@@ -400,7 +400,7 @@ mod tests {
         let operation_bytes = hex::decode("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed842426e5cab86c00e7670f32038107a59a2b9cfefae36ea21f5aa63c8b0201a90100c0843d000002298c03ed7d454a101eb7022bc95f7e5f41ac780026d58f30f5f8caf70878ad4efc82d71cff01b76e584958411e5a89ea2a8908e37ffc28f0af92fa651c32f6cc7362d9c735344d590360864fbf0b156c3443b108").unwrap();
 
         let operation = Operation::try_from_bytes(&operation_bytes)
-            .expect("Decoding operation should have succeded");
+            .expect("Decoding operation should have succeeded");
 
         assert_eq!(operation, expected_operation);
 

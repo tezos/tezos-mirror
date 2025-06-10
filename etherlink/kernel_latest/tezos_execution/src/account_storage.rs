@@ -328,7 +328,7 @@ mod test {
             &balance_array,
         );
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -354,7 +354,7 @@ mod test {
         counter.bin_write(&mut bytes).unwrap();
         set_bootstrap1_key(&mut host, &RefPath::assert_from(b"/counter"), &bytes);
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -376,7 +376,7 @@ mod test {
 
         let balance = 4579_u64.into();
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -402,7 +402,7 @@ mod test {
 
         let counter: Narith = 6u64.into();
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -434,7 +434,7 @@ mod test {
             &public_key_hexa,
         );
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -460,7 +460,7 @@ mod test {
     fn test_set_read_manager_public_key() {
         let mut host = MockKernelHost::default();
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         // Create an account for bootstrap1
@@ -474,7 +474,7 @@ mod test {
 
         let () = account
             .set_manager_public_key(&mut host, &public_key)
-            .expect("set_manager_public_key shoud have succeeded");
+            .expect("set_manager_public_key should have succeeded");
 
         let manager = Manager::Revealed(public_key);
 
@@ -489,7 +489,7 @@ mod test {
     fn test_set_read_manager_public_key_hash() {
         let mut host = MockKernelHost::default();
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         // Create an account for bootstrap1
@@ -505,7 +505,7 @@ mod test {
 
         let () = account
             .set_manager_public_key_hash(&mut host, &pkh)
-            .expect("set_manager_public_key_hash shoud have succeeded");
+            .expect("set_manager_public_key_hash should have succeeded");
 
         let manager = Manager::NotRevealed(pkh);
 
@@ -520,7 +520,7 @@ mod test {
     fn test_account_initialization() {
         let mut host = MockKernelHost::default();
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         // Create an account for bootstrap1

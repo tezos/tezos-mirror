@@ -78,7 +78,7 @@ pub enum EncodingError {
     Entrypoint(EntrypointError),
     #[error("Invalid serialization")]
     Bin(BinError),
-    // BinWriter error comes from the storage crate wich need to
+    // BinWriter error comes from the storage crate which need to
     // implement PartialEq + Display which is why we're keeping a
     // String instead of a BinError
     #[error("Storage error: Failed to encode a value with BinWriter: {0}")]
