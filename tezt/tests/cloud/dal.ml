@@ -543,7 +543,7 @@ type etherlink = {
   accounts : Tezt_etherlink.Eth_account.t Array.t;
 }
 
-type public_key_hash = string
+type public_key_hash = PKH of string
 
 type commitment_info = {commitment : string; publisher_pkh : string}
 
@@ -690,7 +690,9 @@ let pp_metrics t
   t.bakers
   |> List.iter (fun {account; stake; _} ->
          let pkh = account.Account.public_key_hash in
-         match Hashtbl.find_opt ratio_attested_commitments_per_baker pkh with
+         match
+           Hashtbl.find_opt ratio_attested_commitments_per_baker (PKH pkh)
+         with
          | None -> Log.info "We lack information about %s" pkh
          | Some {published_slots; attested_slots; _} ->
              let alias =
@@ -774,7 +776,7 @@ let push_metrics t
       (if value then 1. else 0.)
   in
   Hashtbl.iter
-    (fun public_key_hash
+    (fun (PKH public_key_hash)
          {attested_slots; published_slots; in_committee; attestation_with_dal} ->
       if in_committee then (
         let labels = get_labels public_key_hash in
@@ -2067,7 +2069,7 @@ let get_infos_per_level t ~level ~metadata =
     |> Seq.map (fun operation ->
            let public_key_hash = get_public_key_hash operation in
            let dal_attestation = get_dal_attestation operation in
-           (public_key_hash, dal_attestation))
+           (PKH public_key_hash, dal_attestation))
     |> Hashtbl.of_seq
   in
   let* etherlink_operator_balance_sum =
