@@ -70,3 +70,4 @@ COPY ./smart-rollup-installer $BINARIES_DESTINATION_PATH/smart-rollup-installer
 COPY ./octez-evm-node  $BINARIES_DESTINATION_PATH/octez-evm-node
 COPY ./octez-teztale-archiver $BINARIES_DESTINATION_PATH/octez-teztale-archiver
 COPY ./octez-teztale-server $BINARIES_DESTINATION_PATH/octez-teztale-server
+COPY ./floodgate $BINARIES_DESTINATION_PATH/octez-teztale-server
