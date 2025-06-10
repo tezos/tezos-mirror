@@ -34,6 +34,7 @@ module Parameters = struct
     metrics_addr : string;
     l1_node_endpoint : Endpoint.t;
     disable_shard_validation : bool;
+    disable_amplification : bool;
     mutable pending_ready : unit option Lwt.u list;
     runner : Runner.t option;
   }
@@ -310,7 +311,8 @@ let handle_event dal_node {name; value = _; timestamp = _} =
 let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
     ?name ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host)
     ?rpc_port ?listen_addr ?public_addr ?metrics_addr
-    ?(disable_shard_validation = false) ~l1_node_endpoint () =
+    ?(disable_shard_validation = false) ?(disable_amplification = false)
+    ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -344,6 +346,7 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
         metrics_addr;
         pending_ready = [];
         disable_shard_validation;
+        disable_amplification;
         l1_node_endpoint;
         runner;
       }
@@ -354,7 +357,8 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
 (* TODO: have rpc_addr here, like for others. *)
 let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
     ?data_dir ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port
-    ?listen_addr ?public_addr ?metrics_addr ?disable_shard_validation ~node () =
+    ?listen_addr ?public_addr ?metrics_addr ?disable_shard_validation
+    ?disable_amplification ~node () =
   create_from_endpoint
     ?runner
     ~path
@@ -368,6 +372,7 @@ let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
     ?public_addr
     ?metrics_addr
     ?disable_shard_validation
+    ?disable_amplification
     ~l1_node_endpoint:(Node.as_rpc_endpoint node)
     ()
 
@@ -390,9 +395,12 @@ let make_arguments node =
   @ (match public_addr node with
     | None -> []
     | Some addr -> ["--public-addr"; addr])
+  @ (if node.persistent_state.disable_shard_validation then
+       ["--disable-shard-validation"]
+     else [])
   @
-  if node.persistent_state.disable_shard_validation then
-    ["--disable-shard-validation"]
+  if node.persistent_state.disable_amplification then
+    ["--disable-amplification"]
   else []
 
 let do_runlike_command ?env ?(event_level = `Debug) node arguments =
