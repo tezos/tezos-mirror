@@ -595,7 +595,8 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
 
 let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
     ?bootstrap_profile ?history_mode ?(wait_ready = true) ?env
-    ?disable_shard_validation tezos_node =
+    ?disable_shard_validation ?(event_level = `Debug) ?slots_backup_uris
+    ?trust_slots_backup_uris tezos_node =
   let dal_node =
     Dal_node.create ?name ?disable_shard_validation ~node:tezos_node ()
   in
@@ -606,9 +607,11 @@ let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
       ?operator_profiles
       ?bootstrap_profile
       ?history_mode
+      ?slots_backup_uris
+      ?trust_slots_backup_uris
       dal_node
   in
-  let* () = Dal_node.run ?env ~event_level:`Debug dal_node ~wait_ready in
+  let* () = Dal_node.run ?env ~event_level dal_node ~wait_ready in
   return dal_node
 
 let with_dal_node ?peers ?attester_profiles ?operator_profiles
@@ -4814,6 +4817,323 @@ let test_restart_dal_node _protocol dal_parameters _cryptobox node client
       dal_node
       ~number_of_slots:dal_parameters.number_of_slots
       ~expected_levels:[]
+
+(** Test: dal_slots_retrievability
+
+    This test checks that a DAL node can retrieve historical slot data using the
+    --slots-backup-uri option, from various archive sources (file:// URIs), and
+    appropriately validates slot integrity when --trust-slots-backup-uris is
+    disabled.
+
+    The test proceeds in three phases:
+
+    A. Node setup:
+       - Launch 3 DAL producer nodes (dal_pub1, dal_pub2, dal_pub3),
+         each publishing a distinct slot (index 1, 2, 3 respectively).
+       - Launch 4 DAL fetcher nodes:
+         - valid_dal_fetcher_1_2: untrusted sources, has access to dal_pub1
+           and dal_pub2
+         - valid_dal_fetcher_3_trusted: trusted sources, access to dal_pub3
+         - invalid_dal_fetcher_bad_uri: untrusted sources, invalid URI
+         - invalid_dal_fetcher_bad_uri_trusted: trusted sources, invalid URI
+
+    B. Slot publication:
+       - Each dal_pubX publishes one slot at the same published_level.
+       - A few blocks are baked to reach finality and ensure the slots are
+         attested and commitments are available in memory, sqlite, and L1 context.
+
+    C. Retrieval and validation checks:
+       C.1 - Fetch valid slots via memory cache
+       C.2 - Fetch valid slots after restarting the DAL node (sqlite skip list)
+       C.3 - Fetch valid slots after removing sqlite DB (L1 skip list)
+       C.4 - Fetch slot from trusted archive (no validation)
+       C.5 - Attempt to fetch from a missing archive (expected 404)
+       C.6 - Tamper slot content to trigger commitment mismatch (expected 404)
+       C.7 - Tamper slot size to trigger size mismatch (expected 404)
+       C.8 - Use invalid archive URI (expected 500 with resolution errors)
+       C.9 - Try to fetch slot with no commitment on L1 (expected 500)
+       C.10 - Use unregistered plugin for old level (expected 500)
+       C.11 - Try future level (expected 404)
+       C.12 - Try out-of-bounds slot index (expected 404)
+*)
+let dal_slots_retrievability =
+  (* Helper to run the RPC that fetches a slot from a given DAL node *)
+  let get_slot_rpc dal_node ~published_level ~slot_index =
+    Dal_RPC.(
+      call_raw dal_node
+      @@ get_level_slot_content ~slot_level:published_level ~slot_index)
+  in
+
+  (* Wait for a specific event in DAL node logs *)
+  let wait_for_event_promise dal_node event_name =
+    Dal_node.wait_for
+      dal_node
+      (Format.sprintf "dal_%s.v0" event_name)
+      (fun _event -> Some ())
+  in
+
+  (* Assert the fetch succeeded with HTTP 200 *)
+  let fetch_succeeded ~__LOC__ promise =
+    let* RPC_core.{code; body; _} = promise in
+    if code = 200 then unit
+    else
+      Test.fail ~__LOC__ "Unexpected response %d instead of 200.\n%s" code body
+  in
+
+  (* Assert the fetch failed with 404, optionally wait for expected event *)
+  let fetch_404_expected ~__LOC__ ?expected_event promise =
+    let* RPC_core.{code; body; _} = promise in
+    if code = 404 then Option.value expected_event ~default:unit
+    else
+      Test.fail ~__LOC__ "Unexpected response %d instead of 404.\n%s" code body
+  in
+
+  (* Assert the fetch failed with 500, optionally check error message and wait for event *)
+  let fetch_500_expected ~__LOC__ ?expected_error ?expected_event promise =
+    let* RPC_core.{code; body; _} = promise in
+    if code = 500 then
+      let () =
+        match expected_error with
+        | Some msg ->
+            Check.((body =~ rex msg) ~error_msg:"expected error =~ %R, got %L")
+        | None -> ()
+      in
+      Option.value expected_event ~default:unit
+    else
+      Test.fail ~__LOC__ "Unexpected response %d instead of 500.\n%s" code body
+  in
+
+  (* Main test body *)
+  fun _protocol dal_parameters _cryptobox l1_node client original_dal_node ->
+    (* A. NODE SETUP *)
+    let* () = Dal_node.terminate original_dal_node in
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let number_of_slots = dal_parameters.number_of_slots in
+    let attestation_lag = dal_parameters.attestation_lag in
+
+    let mk_dal_pub ~idx ~name =
+      make_dal_node ~operator_profiles:[idx] ~name l1_node
+    in
+    let slots_store_path dal_node =
+      Format.sprintf "/%s/store/slot_store" @@ Dal_node.data_dir dal_node
+    in
+    let slots_store_uri dal_node =
+      Format.sprintf "file://%s" @@ slots_store_path dal_node
+    in
+
+    let* dal_pub1 = mk_dal_pub ~idx:1 ~name:"dal_pub1" in
+    let* dal_pub2 = mk_dal_pub ~idx:2 ~name:"dal_pub2" in
+    let* dal_pub3 = mk_dal_pub ~idx:3 ~name:"dal_pub3" in
+    let archive1 = slots_store_uri dal_pub1 in
+    let archive2 = slots_store_uri dal_pub2 in
+    let archive3 = slots_store_uri dal_pub3 in
+
+    (* Launch four fetchers with different backup configurations *)
+    let* valid_dal_fetcher_1_2 =
+      make_dal_node
+        ~operator_profiles:[0]
+        ~name:"valid_dal_fetcher_1_2"
+        ~slots_backup_uris:[archive1; archive2]
+        ~event_level:`Notice
+        l1_node
+    in
+    let* valid_dal_fetcher_3_trusted =
+      make_dal_node
+        ~operator_profiles:[0]
+        ~name:"valid_dal_fetcher_3_trusted"
+        ~slots_backup_uris:[archive3]
+        ~trust_slots_backup_uris:true
+        ~event_level:`Notice
+        l1_node
+    in
+    let* invalid_dal_fetcher_bad_uri =
+      make_dal_node
+        ~operator_profiles:[5]
+        ~name:"invalid_dal_fetcher_bad_uri"
+        ~slots_backup_uris:["http://some-fake.endpoint"]
+        ~event_level:`Notice
+        l1_node
+    in
+    let* invalid_dal_fetcher_bad_uri_trusted =
+      make_dal_node
+        ~operator_profiles:[6]
+        ~name:"invalid_dal_fetcher_bad_uri_trusted"
+        ~slots_backup_uris:["http://some-fake.endpoint"]
+        ~trust_slots_backup_uris:true
+        ~event_level:`Notice
+        l1_node
+    in
+
+    (* B. SLOT PUBLICATION *)
+    let* start_level = Node.get_level l1_node in
+    let published_level = start_level + 1 in
+    let* () =
+      Lwt_list.iteri_p
+        (fun idx dal_publisher ->
+          let pub_idx = idx + 1 in
+          let source = Account.Bootstrap.keys.(pub_idx) in
+          let* _commit =
+            Format.sprintf "Slot<%d, %d> is cool ..." published_level pub_idx
+            |> Helpers.make_slot ~slot_size
+            |> Helpers.publish_and_store_slot
+                 client
+                 dal_publisher
+                 source
+                 ~index:pub_idx
+          in
+          unit)
+        [dal_pub1; dal_pub2; dal_pub3]
+    in
+    let* () = bake_for ~count:(attestation_lag + 2) client in
+
+    (* C. RETRIEVAL & VALIDATION *)
+    let check_valid_dal_fetcher_1_2 ~__LOC__ =
+      Lwt_list.iter_s
+        (fun slot_index ->
+          get_slot_rpc valid_dal_fetcher_1_2 ~published_level ~slot_index
+          |> fetch_succeeded ~__LOC__)
+        [1; 2]
+    in
+
+    (* C.1 Fetch valid slots via memory cache *)
+    let* () =
+      Log.info "C.1: memory cache" ;
+      check_valid_dal_fetcher_1_2 ~__LOC__
+    in
+
+    (* C.2 Restart and fetch via SQLite skip list *)
+    let* () =
+      Log.info "C.2: sqlite skip list" ;
+      let* () = Dal_node.terminate valid_dal_fetcher_1_2 in
+      let* () = Dal_node.run valid_dal_fetcher_1_2 in
+      check_valid_dal_fetcher_1_2 ~__LOC__
+    in
+
+    (* C.3 Remove sqlite DB and fetch via L1 skip list *)
+    let* () =
+      Log.info "C.3: L1 skip list" ;
+      let skip_db =
+        Format.sprintf "%s/store/skip_list_store"
+        @@ Dal_node.data_dir valid_dal_fetcher_1_2
+      in
+      let () = Sys.command ("rm -rf " ^ skip_db) |> ignore in
+      let* () = Dal_node.terminate valid_dal_fetcher_1_2 in
+      let* () = Dal_node.run valid_dal_fetcher_1_2 in
+      check_valid_dal_fetcher_1_2 ~__LOC__
+    in
+
+    (* C.4 Fetch from trusted archive (no validation) *)
+    let* () =
+      Log.info "C.4: trusted archive" ;
+      get_slot_rpc valid_dal_fetcher_3_trusted ~published_level ~slot_index:3
+      |> fetch_succeeded ~__LOC__
+    in
+
+    (* C.5 Missing archive for a slot index: expect 404 *)
+    let* () =
+      Log.info "C.5: missing archive for slot index 3" ;
+      get_slot_rpc valid_dal_fetcher_1_2 ~published_level ~slot_index:3
+      |> fetch_404_expected ~__LOC__
+    in
+
+    let slot_path dal ~slot_index =
+      Format.sprintf
+        "%s/%d_%d_%d"
+        (slots_store_path dal)
+        published_level
+        slot_index
+        slot_size
+    in
+    (* C.6 Tamper slot1 content: expect 404 + event *)
+    let* () =
+      Log.info "C.6: Tamper slot1 content" ;
+      let () =
+        Sys.command
+          (Format.sprintf
+             "cp %s %s"
+             (slot_path dal_pub2 ~slot_index:2)
+             (slot_path dal_pub1 ~slot_index:1))
+        |> fun exit_code -> assert (exit_code = 0)
+      in
+      let expected_event =
+        wait_for_event_promise
+          valid_dal_fetcher_1_2
+          "slot_from_backup_has_unexpected_commitment"
+      in
+      get_slot_rpc valid_dal_fetcher_1_2 ~published_level ~slot_index:1
+      |> fetch_404_expected ~__LOC__ ~expected_event
+    in
+
+    (* C.7 Tamper slot2 size: expect 404 + event *)
+    let* () =
+      Log.info "C.7: Tamper slot2 size" ;
+      let () =
+        Sys.command ("echo bad > " ^ slot_path dal_pub2 ~slot_index:2) |> ignore
+      in
+      let expected_event =
+        wait_for_event_promise
+          valid_dal_fetcher_1_2
+          "slot_from_backup_has_unexpected_size"
+      in
+      get_slot_rpc valid_dal_fetcher_1_2 ~published_level ~slot_index:2
+      |> fetch_404_expected ~__LOC__ ~expected_event
+    in
+
+    (* C.8 Invalid URI (untrusted): expect 500 *)
+    let* () =
+      Log.info "C.8: invalid URI trusted & untrusted" ;
+      let* () =
+        get_slot_rpc invalid_dal_fetcher_bad_uri ~published_level ~slot_index:2
+        |> fetch_500_expected
+             ~__LOC__
+             ~expected_error:"resolution failed: name resolution failed"
+      in
+      get_slot_rpc
+        invalid_dal_fetcher_bad_uri_trusted
+        ~published_level
+        ~slot_index:2
+      |> fetch_500_expected
+           ~__LOC__
+           ~expected_error:"resolution failed: name resolution failed"
+    in
+
+    (* C.9 No commitment on L1 on the given slot index: expect 500 *)
+    let* () =
+      Log.info "C.9: no commitment on L1" ;
+      get_slot_rpc invalid_dal_fetcher_bad_uri ~published_level ~slot_index:4
+      |> fetch_500_expected
+           ~__LOC__
+           ~expected_error:"No_commitment_published_on_l1_for_slot_id"
+    in
+
+    (* C.10 No DAL plugin for level 0: expect 500 *)
+    let* () =
+      Log.info "C.10: no DAL plugin" ;
+      get_slot_rpc valid_dal_fetcher_1_2 ~published_level:0 ~slot_index:1
+      |> fetch_500_expected ~__LOC__ ~expected_error:"no_plugin_for_given_level"
+    in
+
+    (* C.11 Future level: expect 404 *)
+    let* () =
+      Log.info "C.11: future level" ;
+      get_slot_rpc
+        valid_dal_fetcher_3_trusted
+        ~published_level:1000000
+        ~slot_index:1
+      |> fetch_404_expected ~__LOC__
+    in
+
+    (* C.12 Out-of-bounds slot index: expect 404 *)
+    let* () =
+      Log.info "C.12: out-of-bounds index" ;
+      get_slot_rpc
+        valid_dal_fetcher_3_trusted
+        ~published_level
+        ~slot_index:number_of_slots
+      |> fetch_404_expected ~__LOC__
+    in
+
+    unit
 
 let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
     dal_bootstrap =
@@ -10472,6 +10792,16 @@ let register ~protocols =
     ~bootstrap_profile:true
     "restart DAL node (bootstrap)"
     test_restart_dal_node
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["http"; "backup"; "retrievability"]
+    ~operator_profiles:[0]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    ~number_of_slots:8
+    ~attestation_threshold:0
+    "fetching slots from backup sources"
+    dal_slots_retrievability
     protocols ;
 
   (* Tests with all nodes *)
