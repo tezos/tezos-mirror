@@ -11,6 +11,9 @@
 
 ### RPCs changes
 
+- Add field `gasPrice` to EIP-1559 transactions for compatibility with older
+  tools and hardhat in particular. (!18255)
+
 ### Metrics changes
 
 ### Execution changes
