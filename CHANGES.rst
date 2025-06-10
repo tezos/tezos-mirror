@@ -237,9 +237,6 @@ Smart Rollup node
   multiple L1 blocks. The results are compared with what the rollup node has
   stored on disk. (MR :gl:`!18160`)
 
-- Fix issue with reorgs and outbox messages execution (e.g. withdrawals on
-  Etherlink) when messages are not in the new chain. (MR :gl:`!17961`)
-
 Smart Rollup WASM Debugger
 --------------------------
 

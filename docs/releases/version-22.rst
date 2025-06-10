@@ -122,6 +122,7 @@ Alternatively, you can run them individually. For instance, to start only the ba
 Changelog
 ---------
 
+- `Version 22.1 <../CHANGES.html#version-22-1>`_
 - `Version 22.0 <../CHANGES.html#version-22-0>`_
 - `Version 22.0~rc3 <../CHANGES.html#version-22-0-rc3>`_
 - `Version 22.0~rc2 <../CHANGES.html#version-22-0-rc2>`_
