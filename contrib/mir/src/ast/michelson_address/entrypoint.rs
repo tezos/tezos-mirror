@@ -51,6 +51,57 @@ impl Default for Entrypoint {
     }
 }
 
+#[derive(Copy, Clone)]
+enum EntrypointTag {
+    Default = 0,
+    Root = 1,
+    Do = 2,
+    SetDelegate = 3,
+    RemoveDelegate = 4,
+    Deposit = 5,
+    Stake = 6,
+    Unstake = 7,
+    FinalizeUnstake = 8,
+    SetDelegateParameters = 9,
+    Custom = 255,
+}
+
+impl EntrypointTag {
+    #[allow(dead_code)]
+    fn from_str(name: &str) -> Self {
+        match name {
+            "" | DEFAULT_EP_NAME => Self::Default,
+            "root" => Self::Root,
+            "do" => Self::Do,
+            "set_delegate" => Self::SetDelegate,
+            "remove_delegate" => Self::RemoveDelegate,
+            "deposit" => Self::Deposit,
+            "stake" => Self::Stake,
+            "unstake" => Self::Unstake,
+            "finalize_unstake" => Self::FinalizeUnstake,
+            "set_delegate_parameters" => Self::SetDelegateParameters,
+            _ => Self::Custom,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn to_str(self) -> &'static str {
+        match self {
+            Self::Default => DEFAULT_EP_NAME,
+            Self::Root => "root",
+            Self::Do => "do",
+            Self::SetDelegate => "set_delegate",
+            Self::RemoveDelegate => "remove_delegate",
+            Self::Deposit => "deposit",
+            Self::Stake => "stake",
+            Self::Unstake => "unstake",
+            Self::FinalizeUnstake => "finalize_unstake",
+            Self::SetDelegateParameters => "set_delegate_parameters",
+            Self::Custom => "custom",
+        }
+    }
+}
+
 impl Entrypoint {
     /// Returns `true` if entrypoint is the default entrypoint.
     pub fn is_default(&self) -> bool {
