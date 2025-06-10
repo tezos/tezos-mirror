@@ -106,10 +106,17 @@ let spawn_command dal_node =
     ~color:dal_node.color
     dal_node.path
 
+let mk_backup_uris_args sources =
+  if List.is_empty sources then []
+  else ["--slots-backup-uri"; String.concat "," sources]
+
+let mk_trust_slots_backup_uris flag =
+  if flag then ["--trust-slots-backup-uris"] else []
+
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(operator_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
-    dal_node =
+    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false) dal_node =
   spawn_command dal_node
   @@ [
        "config";
@@ -144,6 +151,8 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          String.concat "," (List.map string_of_int operator_profiles);
        ])
   @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
+  @ mk_backup_uris_args slots_backup_uris
+  @ mk_trust_slots_backup_uris trust_slots_backup_uris
   @
   match history_mode with
   | None -> []
@@ -153,7 +162,8 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
 
 let spawn_config_update ?(peers = []) ?(attester_profiles = [])
     ?(operator_profiles = []) ?(observer_profiles = [])
-    ?(bootstrap_profile = false) ?history_mode dal_node =
+    ?(bootstrap_profile = false) ?history_mode ?(slots_backup_uris = [])
+    ?(trust_slots_backup_uris = false) dal_node =
   spawn_command dal_node @@ ["config"; "update"]
   @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
   @ (if attester_profiles = [] then []
@@ -171,6 +181,8 @@ let spawn_config_update ?(peers = []) ?(attester_profiles = [])
          String.concat "," (List.map string_of_int operator_profiles);
        ])
   @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
+  @ mk_backup_uris_args slots_backup_uris
+  @ mk_trust_slots_backup_uris trust_slots_backup_uris
   @
   match history_mode with
   | None -> []
@@ -189,7 +201,8 @@ module Config_file = struct
 end
 
 let init_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
-    ?observer_profiles ?bootstrap_profile ?history_mode dal_node =
+    ?observer_profiles ?bootstrap_profile ?history_mode ?slots_backup_uris
+    ?trust_slots_backup_uris dal_node =
   let process =
     spawn_config_init
       ?expected_pow
@@ -199,12 +212,15 @@ let init_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
       ?observer_profiles
       ?bootstrap_profile
       ?history_mode
+      ?slots_backup_uris
+      ?trust_slots_backup_uris
       dal_node
   in
   Process.check process
 
 let update_config ?peers ?attester_profiles ?operator_profiles
-    ?observer_profiles ?bootstrap_profile ?history_mode dal_node =
+    ?observer_profiles ?bootstrap_profile ?history_mode ?slots_backup_uris
+    ?trust_slots_backup_uris dal_node =
   let process =
     spawn_config_update
       ?peers
@@ -213,6 +229,8 @@ let update_config ?peers ?attester_profiles ?operator_profiles
       ?observer_profiles
       ?bootstrap_profile
       ?history_mode
+      ?slots_backup_uris
+      ?trust_slots_backup_uris
       dal_node
   in
   Process.check process
