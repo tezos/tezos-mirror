@@ -43,7 +43,7 @@ type fees_config = {
 }
 
 type validation_config =
-  | Local of {context_root_path : string}
+  | Local of {data_dir : string}
   | Node
   | ContextIndex of Abstract_context_index.t
 
@@ -104,7 +104,7 @@ val make :
   ?minimal_nanotez_per_gas_unit:Q.t ->
   ?minimal_nanotez_per_byte:Q.t ->
   ?nonce:nonce_config ->
-  ?context_root_path:string ->
+  ?data_dir:string ->
   ?retries_on_failure:int ->
   ?user_activated_upgrades:(int32 * Protocol_hash.t) list ->
   ?votes:per_block_votes_config ->

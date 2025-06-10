@@ -21,7 +21,6 @@ type config = {
   data_dir : string;
   internal_events : Tezos_base.Internal_event_config.t;
   store_root : string;
-  context_root_dir : string;
   protocol_root : string;
   patch_context :
     (Tezos_protocol_environment.Context.t ->

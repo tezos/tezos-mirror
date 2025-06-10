@@ -90,13 +90,8 @@ module Processing = struct
     | _ -> Lwt.return r
 
   let initial_state
-      {
-        External_validation.context_root_dir;
-        genesis;
-        readonly;
-        sandbox_parameters;
-        _;
-      } =
+      ({genesis; readonly; sandbox_parameters; data_dir; _} :
+        External_validation.parameters) =
     let open Lwt_result_syntax in
     let sandbox_parameters =
       Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
@@ -107,7 +102,8 @@ module Processing = struct
         ~patch_context:(fun ctxt ->
           Patch_context.patch_context genesis sandbox_parameters ctxt)
         ~readonly
-        context_root_dir
+        ~data_dir
+        ()
     in
     let headless =
       Tezos_profiler.Profiler.instance

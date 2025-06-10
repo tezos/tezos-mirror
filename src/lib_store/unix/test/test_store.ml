@@ -777,13 +777,13 @@ let test_live_blocks store_dir =
       ~json:(Default_parameters.json_of_parameters test_parameters)
   in
   let dst_store_dir = store_dir // "store" in
-  let dst_context_root_dir = store_dir in
+  let dst_data_dir = store_dir in
   let* store =
     Store.init
       ~patch_context
       ~readonly:false
       ~store_dir:dst_store_dir
-      ~context_root_dir:dst_context_root_dir
+      ~data_dir:dst_data_dir
       ~allow_testchains:false
       genesis
   in

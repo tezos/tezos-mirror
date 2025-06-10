@@ -176,17 +176,15 @@ type chain_store
 (** {3 Initialization} *)
 
 (** [init ?patch_context ?commit_genesis ?history_mode ?readonly
-    ?block_cache_limit ?disable_context_pruning ?maintenance_delay
-    ~store_dir ~context_root_dir ~allow_testchains genesis] initializes the
-    store and a main chain store. If [store_dir] (resp. [context_root_dir])
-    does not exist, a fresh store (resp. context) is
-    created. Otherwise, it loads the store (resp. context) from
-    reading the adequate directory. If [allow_testchains] is passed,
-    the store will be able to fork chains and instantiate testchain's
-    sub chain stores, for all chains contained in the store. The chain
-    store created is based on the [genesis] provided. Its chain
-    identifier will be computed using the {!Chain_id.of_block_hash}
-    function.
+    ?block_cache_limit ?disable_context_pruning ?maintenance_delay ~store_dir
+    ~data_dir ~allow_testchains genesis] initializes the store and a main chain
+    store. If [store_dir] (resp. [data_dir]) does not exist, a fresh store
+    (resp. context) is created. Otherwise, it loads the store (resp. context)
+    from reading the adequate directory. If [allow_testchains] is passed, the
+    store will be able to fork chains and instantiate testchain's sub chain
+    stores, for all chains contained in the store. The chain store created is
+    based on the [genesis] provided. Its chain identifier will be computed using
+    the {!Chain_id.of_block_hash} function.
 
     @param patch_context the handle called when initializing the
     context. It usually is passed when creating a sandboxed chain.
@@ -232,7 +230,7 @@ val init :
   ?disable_context_pruning:bool ->
   ?maintenance_delay:Storage_maintenance.delay ->
   store_dir:string ->
-  context_root_dir:string ->
+  data_dir:string ->
   allow_testchains:bool ->
   Genesis.t ->
   store tzresult Lwt.t
@@ -257,12 +255,12 @@ val main_chain_store : store -> chain_store
     already closed, this function is idempotent. *)
 val close_store : store -> unit Lwt.t
 
-(** [may_switch_history_mode ?patch_context ~store_dir ~context_root_dir
-    genesis ~new_history_mode] tries switching the store located at
-    [store_dir] (if present) to [new_history_mode] when possible. *)
+(** [may_switch_history_mode ?patch_context ~store_dir ~data_dir genesis
+    ~new_history_mode] tries switching the store located at [store_dir] (if
+    present) to [new_history_mode] when possible. *)
 val may_switch_history_mode :
   store_dir:string ->
-  context_root_dir:string ->
+  data_dir:string ->
   Genesis.t ->
   new_history_mode:History_mode.t ->
   unit tzresult Lwt.t

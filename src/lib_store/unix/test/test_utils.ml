@@ -229,14 +229,14 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
   let*! r =
     run (fun base_dir ->
         let store_dir = base_dir // "store" in
-        let context_root_dir = base_dir in
+        let data_dir = base_dir in
         let* store =
           Store.init
             ?block_cache_limit
             ~patch_context
             ~history_mode
             ~store_dir
-            ~context_root_dir
+            ~data_dir
             ~allow_testchains
             genesis
         in
@@ -252,7 +252,7 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
             in
             Lwt.return (Error err))
           (fun () ->
-            let* () = k (store_dir, context_root_dir) store in
+            let* () = k (store_dir, data_dir) store in
             Format.printf "Invariants check before closing@." ;
             let* () =
               if manual_close then return_unit
@@ -265,7 +265,7 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
               Store.init
                 ~history_mode
                 ~store_dir
-                ~context_root_dir
+                ~data_dir
                 ~allow_testchains
                 genesis
             in
@@ -315,13 +315,13 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
   let*! r =
     run (fun base_dir ->
         let store_dir = base_dir // "store" in
-        let context_root_dir = base_dir in
+        let data_dir = base_dir in
         let* store =
           Store.init
             ~history_mode
             ~patch_context
             ~store_dir
-            ~context_root_dir
+            ~data_dir
             ~allow_testchains
             ~maintenance_delay:Disabled
             genesis
@@ -335,7 +335,7 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
             Lwt.return (Error err))
           (fun () ->
             Lwt.finalize
-              (fun () -> k (store_dir, context_root_dir) store)
+              (fun () -> k (store_dir, data_dir) store)
               (fun () ->
                 let*! () =
                   Lwt.catch

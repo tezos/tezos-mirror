@@ -51,7 +51,6 @@ let with_node f =
         patch_context = None;
         data_dir = dir;
         store_root = dir / "store";
-        context_root_dir = dir;
         protocol_root = dir / "protocol";
         p2p = None;
         target = None;

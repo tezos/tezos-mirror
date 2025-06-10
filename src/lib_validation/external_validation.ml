@@ -27,7 +27,6 @@
 let name = "validator"
 
 type parameters = {
-  context_root_dir : string;
   protocol_root : string;
   genesis : Genesis.t;
   readonly : bool;
@@ -148,7 +147,6 @@ let parameters_encoding =
   let open Data_encoding in
   conv
     (fun {
-           context_root_dir;
            protocol_root;
            genesis;
            readonly;
@@ -159,20 +157,19 @@ let parameters_encoding =
            sandbox_parameters;
            internal_events;
          } ->
-      ( (context_root_dir, protocol_root, genesis, readonly, data_dir),
+      ( (protocol_root, genesis, readonly, data_dir),
         ( user_activated_upgrades,
           user_activated_protocol_overrides,
           operation_metadata_size_limit,
           sandbox_parameters,
           internal_events ) ))
-    (fun ( (context_root_dir, protocol_root, genesis, readonly, data_dir),
+    (fun ( (protocol_root, genesis, readonly, data_dir),
            ( user_activated_upgrades,
              user_activated_protocol_overrides,
              operation_metadata_size_limit,
              sandbox_parameters,
              internal_events ) ) ->
       {
-        context_root_dir;
         protocol_root;
         genesis;
         readonly;
@@ -184,8 +181,7 @@ let parameters_encoding =
         internal_events;
       })
   @@ merge_objs
-       (obj5
-          (req "context_root_dir" string)
+       (obj4
           (req "protocol_root" string)
           (req "genesis" Genesis.encoding)
           (req "readonly" bool)
