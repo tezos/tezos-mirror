@@ -176,6 +176,9 @@ module EIP_1559 = struct
             gas ),
           ( max_fee_per_gas,
             max_priority_fee_per_gas,
+            Some max_fee_per_gas
+            (* Other providers set gasPrice as the effectiveGasPrice, but this
+               information is only available in the receipt. *),
             access_list,
             input,
             v,
@@ -193,6 +196,7 @@ module EIP_1559 = struct
                gas ),
              ( max_fee_per_gas,
                max_priority_fee_per_gas,
+               _gas_price,
                access_list,
                input,
                v,
@@ -229,9 +233,16 @@ module EIP_1559 = struct
             (req "to" (option address_encoding))
             (req "value" quantity_encoding)
             (req "gas" quantity_encoding))
-         (obj7
+         (obj8
             (req "maxFeePerGas" quantity_encoding)
             (req "maxPriorityFeePerGas" quantity_encoding)
+            (opt
+               "gasPrice"
+               quantity_encoding
+               ~description:
+                 "Identical to maxFeePerGas. Purely for compatibility with \
+                  hardhat although the spec specifies this should be null for \
+                  EIP 1559.")
             (req "accessList" (list access_encoding))
             (req "input" hex_encoding)
             (req "v" quantity_encoding)
