@@ -4,6 +4,7 @@
 
 mod database;
 mod precompile_provider;
+mod storage_helpers;
 
 #[cfg(test)]
 mod test {
