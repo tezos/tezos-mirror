@@ -60,7 +60,6 @@ fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::
 
 impl TezlinkImplicitAccount {
     // We must provide the context object to get the full path in the durable storage
-    #[allow(dead_code)]
     pub fn from_contract(
         context: &context::Context,
         contract: &Contract,
@@ -70,8 +69,18 @@ impl TezlinkImplicitAccount {
         Ok(path.into())
     }
 
+    pub fn from_public_key_hash(
+        context: &context::Context,
+        pkh: &PublicKeyHash,
+    ) -> Result<Self, tezos_storage::error::Error> {
+        let index = context::contracts::index(context)?;
+        // The conversion from pkh to contract should always succeed
+        let contract = Contract::Implicit(pkh.clone());
+        let path = concat(&index, &account_path(&contract)?)?;
+        Ok(path.into())
+    }
+
     /// Get the **counter** for the Tezlink account.
-    #[allow(dead_code)]
     pub fn counter(
         &self,
         host: &impl Runtime,
@@ -81,7 +90,6 @@ impl TezlinkImplicitAccount {
     }
 
     /// Set the **counter** for the Tezlink account.
-    #[allow(dead_code)]
     pub fn set_counter(
         &mut self,
         host: &mut impl Runtime,
@@ -92,7 +100,6 @@ impl TezlinkImplicitAccount {
     }
 
     /// Get the **balance** of an account in Mutez held by the account.
-    #[allow(dead_code)]
     pub fn balance(
         &self,
         host: &impl Runtime,
@@ -102,7 +109,6 @@ impl TezlinkImplicitAccount {
     }
 
     /// Set the **balance** of an account in Mutez held by the account.
-    #[allow(dead_code)]
     pub fn set_balance(
         &mut self,
         host: &mut impl Runtime,
@@ -112,7 +118,6 @@ impl TezlinkImplicitAccount {
         store_bin(balance, host, &path)
     }
 
-    #[allow(dead_code)]
     pub fn manager(
         &self,
         host: &impl Runtime,
@@ -173,10 +178,10 @@ impl TezlinkImplicitAccount {
         host: &mut impl Runtime,
         context: &context::Context,
         contract: &Contract,
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<bool, tezos_storage::error::Error> {
         let mut account = Self::from_contract(context, contract)?;
         if account.allocated(host)? {
-            return Ok(());
+            return Ok(true);
         }
         account.set_balance(host, &0_u64.into())?;
         // Only implicit accounts have counter and manager keys
@@ -185,7 +190,7 @@ impl TezlinkImplicitAccount {
             account.set_counter(host, &0u64.into())?;
             account.set_manager_public_key_hash(host, pkh)?;
         }
-        Ok(())
+        Ok(false)
     }
 }
 

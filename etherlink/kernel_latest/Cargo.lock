@@ -2699,6 +2699,7 @@ dependencies = [
  "hex",
  "nom",
  "num-bigint",
+ "num-traits",
  "primitive-types",
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
