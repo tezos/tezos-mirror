@@ -80,4 +80,11 @@ let run ~name agent =
   let name = config name in
   (* Run logrotate as root in the docker container *)
   Log.info "Teztcloud.Logrotate: executing task %s" name ;
-  Agent.docker_run_command agent "logrotate" [name] |> Process.check
+  Lwt.catch
+    (fun () ->
+      Agent.docker_run_command agent "logrotate" [name] |> Process.check)
+    (fun exn ->
+      Log.error
+        "Teztcloud.Logrotate: logrotate failed with %s"
+        (Printexc.to_string exn) ;
+      Lwt.return_unit)
