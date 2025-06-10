@@ -10,7 +10,7 @@ let config name = Format.asprintf "/etc/logrotate.d/%s" name
 let write_config ~name ?pidfile ?max_rotations ?max_size ~target_file agent =
   let open Jingoo in
   let template =
-    {|{{ target_file }} {
+    {|"{{ target_file }}" {
 # Rotates logs every day
   daily
 {% if has_max_size %}
