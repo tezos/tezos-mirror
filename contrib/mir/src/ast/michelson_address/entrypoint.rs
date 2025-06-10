@@ -12,7 +12,14 @@ use std::collections::HashMap;
 
 use crate::ast::annotations::FieldAnnotation;
 use crate::ast::Type;
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::combinator::{map, map_res, verify};
+use nom::multi::length_data;
+use nom::number::complete::u8 as nom_u8;
+use nom::sequence::preceded;
 
+use tezos_data_encoding::nom::{NomReader, NomResult};
 use super::ByteReprError;
 
 /// Structure representing address entrypoint on a Tezos address, in other
@@ -99,6 +106,51 @@ impl EntrypointTag {
             Self::SetDelegateParameters => "set_delegate_parameters",
             Self::Custom => "custom",
         }
+    }
+}
+
+impl NomReader<'_> for Entrypoint {
+    fn nom_read(input: &[u8]) -> NomResult<Self> {
+        alt((
+            map(tag([EntrypointTag::Default as u8]), |_| {
+                Entrypoint::default()
+            }),
+            map(tag([EntrypointTag::Root as u8]), |_| {
+                Entrypoint("root".into())
+            }),
+            map(tag([EntrypointTag::Do as u8]), |_| Entrypoint("do".into())),
+            map(tag([EntrypointTag::SetDelegate as u8]), |_| {
+                Entrypoint("set_delegate".into())
+            }),
+            map(tag([EntrypointTag::RemoveDelegate as u8]), |_| {
+                Entrypoint("remove_delegate".into())
+            }),
+            map(tag([EntrypointTag::Deposit as u8]), |_| {
+                Entrypoint("deposit".into())
+            }),
+            map(tag([EntrypointTag::Stake as u8]), |_| {
+                Entrypoint("stake".into())
+            }),
+            map(tag([EntrypointTag::Unstake as u8]), |_| {
+                Entrypoint("unstake".into())
+            }),
+            map(tag([EntrypointTag::FinalizeUnstake as u8]), |_| {
+                Entrypoint("finalize_unstake".into())
+            }),
+            map(tag([EntrypointTag::SetDelegateParameters as u8]), |_| {
+                Entrypoint("set_delegate_parameters".into())
+            }),
+            preceded(
+                tag([EntrypointTag::Custom as u8]),
+                map(
+                    verify(
+                        map_res(length_data(nom_u8), std::str::from_utf8),
+                        |s: &str| check_ep_name(s.as_bytes()).is_ok(),
+                    ),
+                    |s| Entrypoint(s.to_owned()),
+                ),
+            ),
+        ))(input)
     }
 }
 
