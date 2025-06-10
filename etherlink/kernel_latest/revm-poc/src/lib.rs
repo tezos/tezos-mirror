@@ -80,7 +80,7 @@ mod test {
         println!("evm.transact:\n {:?}", out);
 
         let tracer = GasInspector::default();
-        let precompiles = precompile_provider::Dummy {};
+        let precompiles = precompile_provider::EtherlinkPrecompiles::new();
         let mut evm = evm.with_inspector(tracer).with_precompiles(precompiles);
         let _ = evm.transact(&tx);
 
