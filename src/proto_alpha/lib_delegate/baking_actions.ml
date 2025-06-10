@@ -877,11 +877,6 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
   let chain_id = state.global_state.chain_id in
   let unsigned_consensus_vote = signed_consensus_vote.unsigned_consensus_vote in
   let delegate = unsigned_consensus_vote.delegate in
-  let vote_consensus_content = unsigned_consensus_vote.vote_consensus_content in
-  let level, round =
-    ( Raw_level.to_int32 vote_consensus_content.level,
-      vote_consensus_content.round )
-  in
   protect
     ~on_error:(fun err ->
       let*! () =
@@ -906,10 +901,7 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
                 | Attestation -> "attestation"))])
       in
       let*! () =
-        Events.(
-          emit
-            consensus_vote_injected
-            (unsigned_consensus_vote.vote_kind, oph, delegate, level, round))
+        Events.emit_consensus_op_injected unsigned_consensus_vote oph
       in
       return_unit)
 
