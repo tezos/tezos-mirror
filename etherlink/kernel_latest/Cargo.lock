@@ -1222,6 +1222,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
+name = "format_no_std"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ae45e32b0bfe2c62c805f8e87027b5aa08562000326edbc5b421ab6d92873a7"
+
+[[package]]
 name = "funty"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2158,8 +2164,13 @@ dependencies = [
 name = "revm-etherlink-poc"
 version = "0.1.0"
 dependencies = [
+ "format_no_std",
+ "primitive-types",
  "revm",
+ "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
+ "tezos-smart-rollup-storage",
+ "tezos_ethereum_latest",
 ]
 
 [[package]]

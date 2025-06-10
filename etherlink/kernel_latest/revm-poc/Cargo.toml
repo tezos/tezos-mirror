@@ -13,5 +13,14 @@ license = "MIT"
 # VM
 revm = { version = "25.0.0", default-features = false }
 
+# Types
+primitive-types.workspace = true
+tezos_ethereum.workspace = true
+
 # SDK
+tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-storage.workspace = true
+
+# Miscs
+format_no_std = { version = "1.2.0" }
