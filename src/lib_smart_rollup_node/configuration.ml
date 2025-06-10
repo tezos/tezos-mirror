@@ -67,6 +67,11 @@ type outbox_message_filter =
       entrypoint : outbox_entrypoint_filter;
     }
 
+type otel_profiling = {
+  enable : bool;
+  config : Opentelemetry_client_cohttp_lwt.Config.t;
+}
+
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
@@ -101,6 +106,7 @@ type t = {
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
   bail_on_disagree : bool;
+  otel_profiling : otel_profiling;
 }
 
 type error += Empty_operation_kinds_for_custom_mode
@@ -252,6 +258,9 @@ let default_gc_parameters =
 let default_history_mode = Full
 
 let default_execute_outbox_filter = []
+
+let default_otel_profiling =
+  {enable = false; config = Opentelemetry_client_cohttp_lwt.Config.make ()}
 
 let string_of_history_mode = function Archive -> "archive" | Full -> "full"
 
@@ -495,6 +504,47 @@ let outbox_messages_filter_encoding =
 let execute_outbox_messages_filter_encoding =
   Data_encoding.list outbox_messages_filter_encoding
 
+let otel_profiling_encoding =
+  let open Data_encoding in
+  let open Opentelemetry_client_cohttp_lwt.Config in
+  conv
+    (fun {
+           enable;
+           config =
+             {debug; url_traces; headers; batch_traces; batch_timeout_ms; _};
+         } ->
+      ( enable,
+        Some debug,
+        Some url_traces,
+        Some headers,
+        Some batch_traces,
+        Some batch_timeout_ms ))
+    (fun (enable, debug, url_traces, headers, batch_traces, batch_timeout_ms) ->
+      let config =
+        Opentelemetry_client_cohttp_lwt.Config.make
+          ?debug
+          ?url_traces
+          ?headers
+          ?batch_traces
+          ?batch_timeout_ms
+          ()
+      in
+      {enable; config})
+  @@ obj6
+       (dft "enable" ~description:"Enable opentelemetry profiling" bool false)
+       (opt "debug" ~description:"Enable debug mode" bool)
+       (opt "url_traces" ~description:"URL to send traces" string)
+       (opt
+          "headers"
+          ~description:"API headers sent to the endpoint"
+          (list (tup2 string string)))
+       (opt "batch_traces" ~description:"Batch traces" (option int31))
+       (opt
+          "batch_timeout_ms"
+          ~description:
+            "Milliseconds after which we emit a batch, even incomplete"
+          int31)
+
 let encoding default_display : t Data_encoding.t =
   let open Data_encoding in
   let dft =
@@ -539,6 +589,7 @@ let encoding default_display : t Data_encoding.t =
            history_mode;
            cors;
            bail_on_disagree;
+           otel_profiling;
          } ->
       ( ( ( sc_rollup_address,
             boot_sector_file,
@@ -568,8 +619,12 @@ let encoding default_display : t Data_encoding.t =
               irmin_cache_size,
               log_kernel_debug,
               unsafe_disable_wasm_kernel_checks ),
-            (no_degraded, gc_parameters, history_mode, cors, bail_on_disagree)
-          ) ) ))
+            ( no_degraded,
+              gc_parameters,
+              history_mode,
+              cors,
+              bail_on_disagree,
+              otel_profiling ) ) ) ))
     (fun ( ( ( sc_rollup_address,
                boot_sector_file,
                operators,
@@ -598,8 +653,12 @@ let encoding default_display : t Data_encoding.t =
                  irmin_cache_size,
                  log_kernel_debug,
                  unsafe_disable_wasm_kernel_checks ),
-               (no_degraded, gc_parameters, history_mode, cors, bail_on_disagree)
-             ) ) ) ->
+               ( no_degraded,
+                 gc_parameters,
+                 history_mode,
+                 cors,
+                 bail_on_disagree,
+                 otel_profiling ) ) ) ) ->
       {
         sc_rollup_address;
         boot_sector_file;
@@ -634,6 +693,7 @@ let encoding default_display : t Data_encoding.t =
         history_mode;
         cors;
         bail_on_disagree;
+        otel_profiling;
       })
     (merge_objs
        (merge_objs
@@ -732,7 +792,7 @@ let encoding default_display : t Data_encoding.t =
                    "unsafe-disable-wasm-kernel-checks"
                    Data_encoding.bool
                    false))
-             (obj5
+             (obj6
                 (dft "no-degraded" Data_encoding.bool false)
                 (dft
                    "gc-parameters"
@@ -740,7 +800,12 @@ let encoding default_display : t Data_encoding.t =
                    default_gc_parameters)
                 (opt "history-mode" history_mode_encoding)
                 (dft "cors" cors_encoding Resto_cohttp.Cors.default)
-                (dft "bail-on-disagree" bool false)))))
+                (dft "bail-on-disagree" bool false)
+                (dft
+                   "otel_profiling"
+                   ~description:"Enable or disable opentelemetry profiling"
+                   otel_profiling_encoding
+                   default_otel_profiling)))))
 
 let encoding_no_default = encoding `Show
 
@@ -925,6 +990,7 @@ module Cli = struct
                 Option.value ~default:default.allowed_origins allowed_origins;
             };
         bail_on_disagree;
+        otel_profiling = default_otel_profiling;
       }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
