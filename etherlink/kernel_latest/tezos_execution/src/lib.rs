@@ -11,9 +11,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::{
-    operation::{
-        ManagerOperation, Operation, OperationContent, RevealContent, TransferContent,
-    },
+    operation::{ManagerOperation, OperationContent, RevealContent, TransferContent},
     operation_result::{
         produce_operation_result, Balance, BalanceUpdate, OperationError,
         OperationResultSum, Reveal, RevealError, RevealSuccess, TransferError,
@@ -210,7 +208,7 @@ fn transfer<Host: Runtime>(
 pub fn apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
-    operation: &Operation,
+    operation: ManagerOperation<OperationContent>,
 ) -> Result<OperationResultSum, ApplyKernelError> {
     let ManagerOperation {
         source,
@@ -219,7 +217,7 @@ pub fn apply_operation<Host: Runtime>(
         gas_limit: _,
         storage_limit: _,
         operation: content,
-    } = &operation.content;
+    } = operation;
 
     log!(
         host,
@@ -228,11 +226,11 @@ pub fn apply_operation<Host: Runtime>(
         source
     );
 
-    let mut account = TezlinkImplicitAccount::from_public_key_hash(context, source)?;
+    let mut account = TezlinkImplicitAccount::from_public_key_hash(context, &source)?;
 
     log!(host, Debug, "Verifying that the operation is valid");
 
-    let validity_result = is_valid_tezlink_operation(host, &account, fee, counter)?;
+    let validity_result = is_valid_tezlink_operation(host, &account, &fee, &counter)?;
 
     if let Err(validity_err) = validity_result {
         log!(host, Debug, "Operation is invalid, exiting apply_operation");
@@ -247,7 +245,7 @@ pub fn apply_operation<Host: Runtime>(
 
     let receipt = match content {
         OperationContent::Reveal(RevealContent { pk }) => {
-            let reveal_result = reveal(host, source, &mut account, pk)?;
+            let reveal_result = reveal(host, &source, &mut account, &pk)?;
             let manager_result = produce_operation_result(reveal_result);
             OperationResultSum::Reveal(manager_result)
         }
@@ -256,7 +254,8 @@ pub fn apply_operation<Host: Runtime>(
             destination,
             parameter: _,
         }) => {
-            let transfer_result = transfer(host, context, source, amount, destination)?;
+            let transfer_result =
+                transfer(host, context, &source, &amount, &destination)?;
             let manager_result = produce_operation_result(transfer_result);
             OperationResultSum::Transfer(manager_result)
         }
@@ -401,9 +400,12 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, src, pk);
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), &operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation.content,
+        )
+        .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -433,9 +435,12 @@ mod tests {
         // Fees are too high for source's balance
         let operation = make_reveal_operation(100, 1, 4, 5, src, pk);
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), &operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation.content,
+        )
+        .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -465,9 +470,12 @@ mod tests {
         // Counter is incoherent for source's counter
         let operation = make_reveal_operation(15, 15, 4, 5, src, pk);
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), &operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation.content,
+        )
+        .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -502,9 +510,12 @@ mod tests {
 
         // Applying the operation
         let operation = make_reveal_operation(15, 1, 4, 5, src, pk.clone());
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), &operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation.content,
+        )
+        .expect("apply_operation should not have failed with a kernel error");
 
         // Reveal operation should fail
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
@@ -543,9 +554,12 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, src, pk);
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), &operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation.content,
+        )
+        .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -576,9 +590,12 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, src.clone(), pk);
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), &operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation.content,
+        )
+        .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -613,9 +630,12 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, src, pk.clone());
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), &operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation.content,
+        )
+        .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -658,9 +678,12 @@ mod tests {
             Contract::Implicit(dest),
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), &operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation.content,
+        )
+        .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![],
@@ -706,9 +729,12 @@ mod tests {
             Contract::Implicit(dest),
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), &operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation.content,
+        )
+        .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![],

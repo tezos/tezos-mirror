@@ -23,7 +23,7 @@ use tezos_smart_rollup::types::{Contract, PublicKey};
 pub const REVEAL_TAG: u8 = 107_u8;
 pub const TRANSFER_TAG: u8 = 108_u8;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct RevealContent {
     pub pk: PublicKey,
 }
@@ -32,14 +32,14 @@ pub struct RevealContent {
 /// to consistently call them transfers to avoid confusion with the
 /// Ethereum notion of transaction which is more generic as it also
 /// encompasses the case of originations.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct TransferContent {
     pub amount: Narith,
     pub destination: Contract,
     pub parameter: Option<()>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum OperationContent {
     Reveal(RevealContent),
     Transfer(TransferContent),
@@ -109,7 +109,7 @@ impl BinWriter for OperationContent {
 
 // In Tezlink, we'll only support ManagerOperation so we don't
 // have to worry about other operations
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct ManagerOperation<C> {
     pub source: PublicKeyHash,
     pub fee: Narith,
