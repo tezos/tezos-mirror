@@ -91,6 +91,7 @@ type error +=
   | Inconsistent_imported_block of Block_hash.t * Block_hash.t
   | Invalid_chain_store_export of Chain_id.t * string
   | Cannot_export_snapshot_format
+  | Cannot_checkout_imported_context of Context_hash.t
 
 let () =
   let open Data_encoding in
@@ -592,7 +593,22 @@ let () =
          exports. ")
     unit
     (function Cannot_export_snapshot_format -> Some () | _ -> None)
-    (fun () -> Cannot_export_snapshot_format)
+    (fun () -> Cannot_export_snapshot_format) ;
+  register_error_kind
+    `Permanent
+    ~id:"Snapshot.cannot_checkout_imported_context"
+    ~title:"Cannot checkout imported context"
+    ~description:"Cannot checkout imported context"
+    ~pp:(fun ppf h ->
+      Format.fprintf
+        ppf
+        "Cannot checkout imported context %a. The imported data directory is \
+         incorrect."
+        Context_hash.pp
+        h)
+    (obj1 (req "context_hash" Context_hash.encoding))
+    (function Cannot_checkout_imported_context h -> Some h | _ -> None)
+    (fun h -> Cannot_checkout_imported_context h)
 
 (* This module handles snapshot's versioning system. *)
 module Version = struct
@@ -3981,6 +3997,17 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           ~protocol:genesis.protocol
       in
       let* () =
+        (* As Irmin's integrity check is not actively checking that the
+           requested context hash is well stored, we do it manually. *)
+        let*! ctxt_opt =
+          Context_ops.checkout context_index imported_context_hash
+        in
+        match ctxt_opt with
+        | Some (_ : Context_ops.t) -> return_unit
+        | None ->
+            tzfail (Cannot_checkout_imported_context imported_context_hash)
+      in
+      let* () =
         if check_consistency then
           Animation.three_dots
             ~progress_display_mode:Auto
@@ -3988,8 +4015,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           @@ fun () ->
           let*! () =
             Context_ops.integrity_check
-              ?ppf:None
-              ~root:(Tezos_context_ops.Context_ops.context_dir dst_data_dir)
+              ~ppf:Format.std_formatter
+              ~root:dst_data_dir
               ~auto_repair:false
               ~always:false
               ~heads:(Some [Context_hash.to_b58check imported_context_hash])
