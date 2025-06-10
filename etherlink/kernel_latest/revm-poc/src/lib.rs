@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod precompile_provider;
+
 #[cfg(test)]
 mod test {
     use revm::{
@@ -13,6 +15,8 @@ mod test {
         state::AccountInfo,
         Context, ExecuteEvm, MainBuilder, MainContext,
     };
+
+    use crate::precompile_provider;
 
     #[test]
     fn test_revm_usage() {
@@ -70,7 +74,8 @@ mod test {
         println!("evm.transact:\n {:?}", out);
 
         let tracer = GasInspector::default();
-        let mut evm = evm.with_inspector(tracer);
+        let precompiles = precompile_provider::Dummy {};
+        let mut evm = evm.with_inspector(tracer).with_precompiles(precompiles);
         let _ = evm.transact(&tx);
 
         println!("evm.transact with inspector:\n{:?}", evm.inspector);
