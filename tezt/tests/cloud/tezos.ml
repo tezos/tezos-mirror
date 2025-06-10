@@ -230,9 +230,7 @@ module Dal_node = struct
     let run ?otel ?(memtrace = false) ?event_level
         ?(disable_shard_validation = false) dal_node =
       let name = name dal_node in
-      let filename =
-        Format.asprintf "%s/%s-trace.ctf" (Filename.get_temp_dir_name ()) name
-      in
+      let filename = Format.asprintf "%s/%s-trace.ctf" Path.tmp_dir name in
       let env =
         let memtrace_env =
           if memtrace then String_map.singleton "MEMTRACE" filename

@@ -191,9 +191,7 @@ let receivers_of_alerts alerts =
   |> List.sort_uniq compare
 
 let run ?(default_receiver = null_receiver) alerts =
-  let alert_manager_configuration_directory =
-    Filename.get_temp_dir_name () // "alert_manager"
-  in
+  let alert_manager_configuration_directory = Path.tmp_dir // "alert_manager" in
   let* () = Process.run "mkdir" ["-p"; alert_manager_configuration_directory] in
   let configuration_file =
     alert_manager_configuration_directory // "alert_manager.yml"

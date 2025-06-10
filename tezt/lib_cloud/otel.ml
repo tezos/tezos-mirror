@@ -23,7 +23,7 @@ let configuration ~jaeger =
 receivers:
   otlp:
     protocols:
-      http:  
+      http:
         endpoint: "0.0.0.0:55681"
 
 exporters:
@@ -55,12 +55,8 @@ extensions:
     jaeger
 
 let run ~jaeger =
-  let* () =
-    Process.run "mkdir" ["-p"; Filename.get_temp_dir_name () // "otel"]
-  in
-  let configuration_file =
-    Filename.get_temp_dir_name () // "otel" // "otel-config.yaml"
-  in
+  let* () = Process.run "mkdir" ["-p"; Path.tmp_dir // "otel"] in
+  let configuration_file = Path.tmp_dir // "otel" // "otel-config.yaml" in
   let contents = configuration ~jaeger in
   write_file configuration_file ~contents ;
   let* () =

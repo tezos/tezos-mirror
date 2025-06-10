@@ -59,9 +59,7 @@ let default_source =
     Env.prometheus_port
 
 let provisioning_directory sources =
-  let provisioning_directory =
-    Filename.get_temp_dir_name () // "grafana" // "provisioning"
-  in
+  let provisioning_directory = Path.tmp_dir // "grafana" // "provisioning" in
   let provisioning_file =
     provisioning_directory // "datasources" // "datasource.yml"
   in
@@ -79,7 +77,7 @@ let shutdown _t = Process.run "docker" ["kill"; "grafana"]
 let dashboards_filepaths () =
   let path =
     if Env.mode = `Remote_orchestrator_local_agents then
-      Filename.get_temp_dir_name () // "grafana" // "dashboards"
+      Path.tmp_dir // "grafana" // "dashboards"
     else Path.grafana_dashboards
   in
   let* output = Process.run_and_read_stdout "ls" [path] in
@@ -91,12 +89,8 @@ let dashboards_filepaths () =
 
 let run ?(sources = [default_source]) () =
   let cmd = "docker" in
-  let* () =
-    Process.run "mkdir" ["-p"; Filename.get_temp_dir_name () // "grafana"]
-  in
-  let dashboard_directory =
-    Filename.get_temp_dir_name () // "grafana" // "dashboards"
-  in
+  let* () = Process.run "mkdir" ["-p"; Path.tmp_dir // "grafana"] in
+  let dashboard_directory = Path.tmp_dir // "grafana" // "dashboards" in
   let* () =
     Process.run "mkdir" ["-p"; dashboard_directory |> Filename.dirname]
   in
