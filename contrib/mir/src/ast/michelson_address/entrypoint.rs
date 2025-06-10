@@ -464,4 +464,40 @@ mod tests {
         assert_eq!(output, expected);
     }
 
+    #[test]
+    fn test_round_trip_custom_entrypoint() {
+        let original = Entrypoint("test_ep".into());
+        let mut output = vec![];
+        original.bin_write(&mut output).unwrap();
+
+        let parsed = Entrypoint::nom_read(&output).unwrap().1;
+        assert_eq!(original, parsed);
+    }
+
+    #[test]
+    fn test_round_trip_all_known_entrypoints() {
+        let entrypoints = [
+            EntrypointTag::Default,
+            EntrypointTag::Root,
+            EntrypointTag::Do,
+            EntrypointTag::SetDelegate,
+            EntrypointTag::RemoveDelegate,
+            EntrypointTag::Deposit,
+            EntrypointTag::Stake,
+            EntrypointTag::Unstake,
+            EntrypointTag::FinalizeUnstake,
+            EntrypointTag::SetDelegateParameters,
+        ];
+
+        for &ep_tag in entrypoints.iter() {
+            let ep_name = ep_tag.to_str();
+            let ep = Entrypoint(ep_name.into());
+
+            let mut output = vec![];
+            ep.bin_write(&mut output).unwrap();
+
+            let parsed = Entrypoint::nom_read(&output).unwrap().1;
+            assert_eq!(ep, parsed);
+        }
+    }
 }
