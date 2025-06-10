@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod database;
 mod precompile_provider;
 
 #[cfg(test)]
@@ -16,6 +17,7 @@ mod test {
         Context, ExecuteEvm, MainBuilder, MainContext,
     };
 
+    use crate::database::EtherlinkVMDB;
     use crate::precompile_provider;
 
     #[test]
@@ -76,6 +78,60 @@ mod test {
         let tracer = GasInspector::default();
         let precompiles = precompile_provider::Dummy {};
         let mut evm = evm.with_inspector(tracer).with_precompiles(precompiles);
+        let _ = evm.transact(&tx);
+
+        println!("evm.transact with inspector:\n{:?}", evm.inspector);
+    }
+
+    #[test]
+    #[should_panic] // as the implementation contains dummy unimplented!()
+    fn db_test_case() {
+        let block = BlockEnv {
+            number: U256::from(11),
+            beneficiary: Address::ZERO,
+            timestamp: U256::from(12),
+            gas_limit: 1_000_000,
+            basefee: 10,
+            difficulty: U256::ZERO,
+            prevrandao: Some(FixedBytes::new([0; 32])),
+            blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
+        };
+
+        let tx = TxEnv {
+            tx_type: 2,
+            caller: Address::ZERO,
+            gas_limit: block.gas_limit,
+            gas_price: 45,
+            kind: TxKind::Call(Address::ZERO),
+            value: U256::ZERO,
+            data: Bytes::new(),
+            nonce: 0,
+            chain_id: Some(1),
+            access_list: AccessList(vec![]),
+            gas_priority_fee: None,
+            blob_hashes: vec![],
+            max_fee_per_blob_gas: 45,
+            authorization_list: vec![],
+        };
+
+        let mut db = EtherlinkVMDB::new();
+
+        let mut cfg = CfgEnv::default();
+        cfg.spec = SpecId::PRAGUE;
+
+        let mut evm = Context::mainnet()
+            .with_block(&block)
+            .with_tx(&tx)
+            .with_db(&mut db)
+            .with_cfg(cfg)
+            .build_mainnet();
+
+        let out = evm.transact(&tx);
+
+        println!("evm.transact:\n {:?}", out);
+
+        let tracer = GasInspector::default();
+        let mut evm = evm.with_inspector(tracer);
         let _ = evm.transact(&tx);
 
         println!("evm.transact with inspector:\n{:?}", evm.inspector);
