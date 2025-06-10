@@ -12,20 +12,36 @@ type t
 (** A direct connection to the database, allowing to interact with it. *)
 type conn
 
+(** Permission mode for database access.
+
+    Note that SQLite uses file-level locking for write operations. When using
+    [Read_write] mode, write operations will acquire an exclusive lock on the
+    database file, preventing other processes from writing to it
+    simultaneously. In this case the pool size is always 1.
+    In [Read_only] mode, multiple processes can read concurrently. *)
+type perm = Read_only of {pool_size : int} | Read_write
+
 (** {2 Initialization and backup} *)
 
-(** [init ~path ~perm migratrion] returns a handler to the database located at
-    [path] and executes the given [migration] code.
+(** [init ~path ~perm migratrion] returns a handler to the database
+    located at [path] and executes the given [migration] code.
 
     If [sqlite_journal_mode] is [`Force mode], then the journal mode of the
     SQLite database is updated if necessary to match the requested
     configuration. With [`Identity], the journal mode is left untouched.
 
     If [perm] is [`Read_only], then SQL requests requiring write access will
-    fail. With [`Read_write], they will succeed as expected. *)
+    fail. With [`Read_write], they will succeed as expected.
+
+    [pool_size] defaults to 8 and is the size of the connection pool.
+
+    If [?max_conn_reuse_count:n] is provided, every connection in the pool will
+    be reused at most [n] times, after which it will be disposed of.
+*)
 val init :
   path:string ->
-  perm:[`Read_only | `Read_write] ->
+  perm:perm ->
+  ?max_conn_reuse_count:int ->
   (conn -> unit tzresult Lwt.t) ->
   t tzresult Lwt.t
 

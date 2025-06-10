@@ -233,6 +233,8 @@ type rpc = {
   restricted_rpcs : restricted_rpcs;
 }
 
+type db = {pool_size : int; max_conn_reuse_count : int option}
+
 type t = {
   public_rpc : rpc;
   private_rpc : rpc option;
@@ -253,6 +255,7 @@ type t = {
   fee_history : fee_history;
   finalized_view : bool;
   history_mode : history_mode option;
+  db : db;
 }
 
 let is_tx_queue_enabled {experimental_features = {enable_tx_queue; _}; _} =
@@ -357,6 +360,8 @@ let default_rpc ?(rpc_port = default_rpc_port) ?(rpc_addr = default_rpc_addr)
     restricted_rpcs;
     max_active_connections;
   }
+
+let default_db = {pool_size = 8; max_conn_reuse_count = None}
 
 let default_max_active_connections =
   Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.default
@@ -1346,6 +1351,25 @@ let websockets_config_encoding =
              frames a client can send in a given time interval."
           websocket_rate_limit_encoding))
 
+let db_encoding =
+  let open Data_encoding in
+  conv
+    (fun {pool_size; max_conn_reuse_count} -> (pool_size, max_conn_reuse_count))
+    (fun (pool_size, max_conn_reuse_count) -> {pool_size; max_conn_reuse_count})
+    (obj2
+       (dft
+          "pool_size"
+          ~description:
+            (Format.sprintf
+               "Size of the database connection pool, defaults to %d"
+               default_db.pool_size)
+          int31
+          default_db.pool_size)
+       (opt
+          "max_conn_reuse_count"
+          ~description:"Maximum number of times a connection can be reused"
+          int31))
+
 let encoding ?network data_dir : t Data_encoding.t =
   let open Data_encoding in
   let observer_field name encoding =
@@ -1382,6 +1406,7 @@ let encoding ?network data_dir : t Data_encoding.t =
            kernel_execution;
            finalized_view;
            history_mode;
+           db;
          } ->
       ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
         ( ( tx_pool_timeout_limit,
@@ -1398,7 +1423,8 @@ let encoding ?network data_dir : t Data_encoding.t =
             private_rpc,
             websockets,
             finalized_view,
-            history_mode ) ) ))
+            history_mode,
+            db ) ) ))
     (fun ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
@@ -1414,7 +1440,8 @@ let encoding ?network data_dir : t Data_encoding.t =
                private_rpc,
                websockets,
                finalized_view,
-               history_mode ) ) ) ->
+               history_mode,
+               db ) ) ) ->
       {
         public_rpc;
         private_rpc;
@@ -1435,6 +1462,7 @@ let encoding ?network data_dir : t Data_encoding.t =
         kernel_execution;
         finalized_view;
         history_mode;
+        db;
       })
     (merge_objs
        (obj4
@@ -1492,7 +1520,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                 default_experimental_features)
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "fee_history" fee_history_encoding default_fee_history))
-          (obj6
+          (obj7
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding ?network data_dir)
@@ -1515,7 +1543,12 @@ let encoding ?network data_dir : t Data_encoding.t =
              (opt
                 "history"
                 ~description:"History mode of the EVM node"
-                history_mode_encoding))))
+                history_mode_encoding)
+             (dft
+                "db"
+                ~description:"Database connection configuration"
+                db_encoding
+                default_db))))
 
 let pp_print_json ~data_dir fmt config =
   let json =
@@ -1728,6 +1761,7 @@ module Cli = struct
       fee_history = default_fee_history;
       finalized_view = default_finalized_view;
       history_mode = None;
+      db = default_db;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
@@ -2035,6 +2069,7 @@ module Cli = struct
       fee_history = configuration.fee_history;
       finalized_view = finalized_view || configuration.finalized_view;
       history_mode = Option.either history_mode configuration.history_mode;
+      db = configuration.db;
     }
 
   let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins

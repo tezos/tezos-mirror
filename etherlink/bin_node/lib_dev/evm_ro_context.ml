@@ -88,9 +88,16 @@ let network_sanity_check ~network ctxt =
 
   return_unit
 
-let load ?network ?smart_rollup_address ~data_dir configuration =
+let load ?network ?smart_rollup_address ~data_dir
+    (configuration : Configuration.t) =
   let open Lwt_result_syntax in
-  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
+  let* store =
+    Evm_store.init
+      ~data_dir
+      ~perm:(Read_only {pool_size = configuration.db.pool_size})
+      ?max_conn_reuse_count:configuration.db.max_conn_reuse_count
+      ()
+  in
   let* index =
     Irmin_context.(
       load ~cache_size:100_000 Read_only (Evm_state.irmin_store_path ~data_dir))
@@ -111,7 +118,7 @@ let load ?network ?smart_rollup_address ~data_dir configuration =
       store;
       index;
       data_dir;
-      preimages = configuration.Configuration.kernel_execution.preimages;
+      preimages = configuration.kernel_execution.preimages;
       preimages_endpoint = configuration.kernel_execution.preimages_endpoint;
       native_execution_policy =
         configuration.kernel_execution.native_execution_policy;

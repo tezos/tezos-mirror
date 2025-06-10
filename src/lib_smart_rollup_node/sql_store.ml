@@ -351,7 +351,9 @@ let init (type m) (mode : m Store_sigs.mode) ~data_dir : m t tzresult Lwt.t =
     return_unit
   in
   let perm =
-    match mode with Read_only -> `Read_only | Read_write -> `Read_write
+    match mode with
+    | Read_only -> Sqlite.Read_only {pool_size = 8}
+    | Read_write -> Sqlite.Read_write
   in
   Sqlite.init ~path ~perm migration
 
@@ -1340,7 +1342,7 @@ let export_store ~data_dir ~output_db_file =
   let* () = Sqlite.vacuum ~conn ~output_db_file in
   (* Remove operator specific information *)
   let* store =
-    Sqlite.init ~path:output_db_file ~perm:`Read_write (fun _ -> return_unit)
+    Sqlite.init ~path:output_db_file ~perm:Read_write (fun _ -> return_unit)
   in
   let* () = State.LPC.delete store in
   let* () = Sqlite.use store @@ fun conn -> Sqlite.vacuum_self ~conn in

@@ -191,6 +191,12 @@ type rpc = {
   restricted_rpcs : restricted_rpcs;
 }
 
+type db = {
+  pool_size : int;  (** Size of the database connection pool *)
+  max_conn_reuse_count : int option;
+      (** Maximum number of times a connection can be reused *)
+}
+
 type t = {
   public_rpc : rpc;
   private_rpc : rpc option;
@@ -211,6 +217,7 @@ type t = {
   fee_history : fee_history;
   finalized_view : bool;
   history_mode : history_mode option;
+  db : db;
 }
 
 val is_tx_queue_enabled : t -> bool

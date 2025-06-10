@@ -1737,7 +1737,7 @@ let patch_kernel_command =
           Evm_context.start
             ~configuration
             ~data_dir
-            ~store_perm:`Read_write
+            ~store_perm:Read_write
             ~tx_container:(module Evm_node_lib_dev.Tx_queue.Tx_container)
             ()
         in
@@ -2792,7 +2792,7 @@ let switch_history_mode_command =
         else Ok ()
       in
       let config_file = config_filename ~data_dir config_file in
-      let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
+      let* store = Evm_store.init ~data_dir ~perm:Read_write () in
       let* () =
         Evm_store.use store @@ fun conn ->
         let* config =
@@ -2852,7 +2852,7 @@ let patch_state_command =
           Evm_context.start
             ~configuration
             ~data_dir
-            ~store_perm:`Read_write
+            ~store_perm:Read_write
             ~tx_container:(module Evm_node_lib_dev.Tx_queue.Tx_container)
             ()
         in
@@ -2941,7 +2941,7 @@ let debug_print_store_schemas_command =
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
       Lwt_utils_unix.with_tempdir "store" @@ fun data_dir ->
-      let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
+      let* store = Evm_store.init ~data_dir ~perm:Read_write () in
       let* schemas = Evm_store.(use store Schemas.get_all) in
       let output = String.concat ";\n\n" schemas in
       Format.printf "%s\n" output ;

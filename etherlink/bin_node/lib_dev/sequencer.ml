@@ -154,7 +154,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ?kernel_path:kernel
       ~data_dir
       ?smart_rollup_address:rollup_node_smart_rollup_address
-      ~store_perm:`Read_write
+      ~store_perm:Read_write
       ~sequencer_wallet:(sequencer_config.sequencer, cctxt)
       ?snapshot_url
       ~tx_container

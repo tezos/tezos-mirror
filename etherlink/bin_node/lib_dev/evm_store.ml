@@ -850,7 +850,7 @@ end
 
 let sqlite_file_name = "store.sqlite"
 
-let init ~data_dir ~perm () =
+let init ?max_conn_reuse_count ~data_dir ~perm () =
   let open Lwt_result_syntax in
   let path = data_dir // sqlite_file_name in
   let*! exists = Lwt_unix.file_exists path in
@@ -872,7 +872,7 @@ let init ~data_dir ~perm () =
     let* migrations = Migrations.missing_migrations conn in
     let*? () =
       match (perm, migrations) with
-      | `Read_only, _ :: _ ->
+      | Read_only _, _ :: _ ->
           error_with
             "The store has %d missing migrations but was opened in read-only \
              mode."
@@ -892,7 +892,7 @@ let init ~data_dir ~perm () =
     in
     return_unit
   in
-  Sqlite.init ~path ~perm migration
+  Sqlite.init ?max_conn_reuse_count ~path ~perm migration
 
 module Context_hashes = struct
   let store store number hash =

@@ -65,7 +65,7 @@ val withdrawal_log_encoding : withdrawal_log Data_encoding.t
 
 (** Initialize the database by creating it if it doesn't exist and applying
     migrations when needed. *)
-val init : data_dir:string -> [`Read_only | `Read_write] -> t tzresult Lwt.t
+val init : data_dir:string -> Sqlite.perm -> t tzresult Lwt.t
 
 module Withdrawals : sig
   val store : ?conn:Sqlite.conn -> t -> withdrawal_log -> unit tzresult Lwt.t

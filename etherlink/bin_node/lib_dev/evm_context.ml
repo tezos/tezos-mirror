@@ -23,7 +23,7 @@ type parameters = {
   kernel_path : Wasm_debugger.kernel option;
   data_dir : string;
   smart_rollup_address : string option;
-  store_perm : [`Read_only | `Read_write];
+  store_perm : Sqlite.perm;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
   snapshot_url : string option;
   tx_container : (module Services_backend_sig.Tx_container);
@@ -1406,7 +1406,7 @@ module State = struct
           in
           match history_mode with
           | Some h ->
-              let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
+              let* store = Evm_store.init ~data_dir ~perm:Read_write () in
               let* () =
                 Evm_store.use store @@ fun conn ->
                 Evm_store.Metadata.store_history_mode conn h
@@ -1545,7 +1545,9 @@ module State = struct
 
     let* () =
       unless legacy_block_storage (fun () ->
-          let* ro_store = Evm_store.init ~data_dir ~perm:`Read_only () in
+          let* ro_store =
+            Evm_store.init ~data_dir ~perm:(Read_only {pool_size = 1}) ()
+          in
           let* evm_node_endpoint =
             if is_sequencer ctxt then return_none
             else
@@ -1571,7 +1573,7 @@ module State = struct
 
   let reset ~data_dir ~l2_level =
     let open Lwt_result_syntax in
-    let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
+    let* store = Evm_store.init ~data_dir ~perm:Read_write () in
     Evm_store.use store @@ fun conn ->
     Evm_store.with_transaction conn @@ fun store ->
     Evm_store.reset_after store ~l2_level
@@ -2146,7 +2148,7 @@ let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
     | None -> failwith "The block hash was not found"
   in
   (* Init the store *)
-  let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
+  let* store = Evm_store.init ~data_dir ~perm:Read_write () in
   Evm_store.(
     use store @@ fun conn ->
     let* () = Block_storage_mode.force_legacy conn in
@@ -2225,7 +2227,7 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
       ~configuration
       ~data_dir
       ~smart_rollup_address
-      ~store_perm:`Read_write
+      ~store_perm:Read_write
       ~tx_container
       ()
   in

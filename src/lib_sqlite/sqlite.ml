@@ -35,10 +35,41 @@ let () =
     (function File_already_exists path -> Some path | _ -> None)
     (fun path -> File_already_exists path)
 
-type pool =
-  ( Caqti_lwt.connection,
-    [Caqti_error.connect | `K_error of tztrace] )
-  Caqti_lwt_unix.Pool.t
+exception Connection_error of Caqti_error.load_or_connect
+
+module Pool = struct
+  type pool_conn = {conn : Caqti_lwt.connection; mutable use_count : int}
+
+  type t = pool_conn Lwt_pool.t
+
+  let validate ~max_use_count
+      ({conn = (module Db : Caqti_lwt.CONNECTION); _} as p) =
+    let open Lwt_syntax in
+    p.use_count <- p.use_count + 1 ;
+    match max_use_count with
+    | Some max when p.use_count > max -> return_false
+    | _ -> Db.validate ()
+
+  let check {conn = (module Db : Caqti_lwt.CONNECTION); _} is_ok =
+    Db.check is_ok
+
+  let dispose {conn = (module Db : Caqti_lwt.CONNECTION); _} = Db.disconnect ()
+
+  let connect uri =
+    let open Lwt_syntax in
+    let* res = Caqti_lwt_unix.connect uri in
+    match res with
+    | Ok conn -> return {conn; use_count = 0}
+    | Error e -> Lwt.fail (Connection_error e)
+
+  let create ?max_use_count size uri =
+    Lwt_pool.create
+      size
+      ~validate:(validate ~max_use_count)
+      ~check
+      ~dispose
+      (fun () -> connect uri)
+end
 
 type sqlite_journal_mode = Wal | Other
 
@@ -51,28 +82,13 @@ module Db = struct
     | Ok p -> return p
     | Error err -> fail [Caqti_error (Caqti_error.show err)]
 
-  let wrap_caqti_result (p : ('a, Caqti_error.t) result) : 'a tzresult Lwt.t =
+  let use_pool (pool : Pool.t) (k : Caqti_lwt.connection -> 'a tzresult Lwt.t) =
     let open Lwt_result_syntax in
-    match p with
-    | Ok p -> return p
-    | Error err -> fail [Caqti_error (Caqti_error.show err)]
-
-  let use_pool (pool : pool) (k : Caqti_lwt.connection -> 'a tzresult Lwt.t) =
-    let open Lwt_result_syntax in
-    let*! res =
-      Caqti_lwt_unix.Pool.use
-        (fun conn ->
-          let*! res = k conn in
-          match res with
-          | Ok res -> return res
-          | Error err -> fail (`K_error err))
-        pool
-    in
-    match res with
-    | Ok err -> return err
-    | Error (`K_error err) -> fail err
-    | Error (#Caqti_error.connect as err) ->
-        fail [Caqti_error (Caqti_error.show err)]
+    Lwt.catch
+      (fun () -> Lwt_pool.use pool (fun p -> k p.Pool.conn))
+      (function
+        | Connection_error err -> tzfail (Caqti_error (Caqti_error.show err))
+        | e -> fail_with_exn e)
 
   let start (module Db : Caqti_lwt.CONNECTION) =
     wrap_caqti_lwt_result @@ Db.start ()
@@ -108,7 +124,7 @@ module Db = struct
     wrap_caqti_lwt_result @@ Db.iter_s req f x
 end
 
-type t = Pool : {db_pool : pool} -> t
+type t = Pool : {db_pool : Pool.t} -> t
 
 type conn =
   | Raw_connection of (module Caqti_lwt.CONNECTION)
@@ -172,9 +188,11 @@ module Q = struct
   end
 end
 
+type perm = Read_only of {pool_size : int} | Read_write
+
 let uri path perm =
   let write_perm =
-    match perm with `Read_only -> false | `Read_write -> true
+    match perm with Read_only _ -> false | Read_write -> true
   in
   Uri.of_string Format.(sprintf "sqlite3:%s?write=%b" path write_perm)
 
@@ -186,6 +204,8 @@ let set_wal_journal_mode store =
   let* _wal = Db.find conn Q.Journal_mode.set_wal () in
   return_unit
 
+let close (Pool {db_pool}) = Lwt_pool.clear db_pool
+
 let vacuum ~conn ~output_db_file =
   let open Lwt_result_syntax in
   let*! exists = Lwt_unix.file_exists output_db_file in
@@ -194,25 +214,30 @@ let vacuum ~conn ~output_db_file =
     with_connection conn @@ fun conn ->
     Db.exec conn Q.vacuum_request output_db_file
   in
-  let* db_pool =
-    Db.wrap_caqti_result
-    @@ Caqti_lwt_unix.connect_pool (uri output_db_file `Read_write)
-  in
-  let* () = use (Pool {db_pool}) set_wal_journal_mode in
+  let db = Pool {db_pool = Pool.create 1 (uri output_db_file Read_write)} in
+  let* () = use db set_wal_journal_mode in
+  let*! () = close db in
   return_unit
 
 let vacuum_self ~conn =
   with_connection conn @@ fun conn -> Db.exec conn Q.vacuum_self ()
 
-let init ~path ~perm migration_code =
+let init ~path ~perm ?max_conn_reuse_count migration_code =
   let open Lwt_result_syntax in
-  let* db_pool =
-    Db.wrap_caqti_result @@ Caqti_lwt_unix.connect_pool (uri path perm)
+  let uri = uri path perm in
+  let pool_size =
+    match perm with
+    | Read_only {pool_size} -> pool_size
+    | Read_write ->
+        (* When using [Read_write] mode, write operations will acquire an
+           exclusive lock on the database file, preventing other processes from
+           writing to it simultaneously. In this case the pool size is always
+           1. *)
+        1
   in
+  let db_pool = Pool.create pool_size ?max_use_count:max_conn_reuse_count uri in
   let store = Pool {db_pool} in
   use store @@ fun conn ->
   let* () = set_wal_journal_mode conn in
   let* () = with_transaction conn migration_code in
   return store
-
-let close (Pool {db_pool}) = Caqti_lwt_unix.Pool.drain db_pool

@@ -610,7 +610,7 @@ let slots {slots; _} = slots
 
 let traps {traps; _} = traps
 
-let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
+let init_sqlite_skip_list_cells_store ?(perm = Sqlite.Read_write) data_dir =
   let open Lwt_result_syntax in
   let open Filename.Infix in
   let skip_list_cells_data_dir = data_dir // Stores_dirs.skip_list_cells in

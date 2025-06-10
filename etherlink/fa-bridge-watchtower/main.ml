@@ -166,7 +166,7 @@ let run_command =
       let* loaded_config = Config.load_file ~data_dir in
       let config = Option.value ~default:Config.default loaded_config in
       let*! () = log_config ~verbosity ~data_dir in
-      let* db = Db.init ~data_dir `Read_write in
+      let* db = Db.init ~data_dir Read_write in
       let config =
         Config.patch_config
           config
@@ -200,7 +200,7 @@ let reset_command =
   @@ fun {data_dir; verbosity} () level _ ->
   let open Lwt_result_syntax in
   let*! () = log_config ~verbosity ~data_dir in
-  let* db = Db.init ~data_dir `Read_write in
+  let* db = Db.init ~data_dir Read_write in
   let* last_level = Db.Pointers.L2_head.get db in
   if Ethereum_types.Qty.(last_level < level) then
     failwith

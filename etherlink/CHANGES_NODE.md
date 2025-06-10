@@ -6,6 +6,9 @@
 
 ### Configuration changes
 
+- New field `"db"` which allows to configure some parameters for the database
+  such as the connection pool size and the connection reuse limit. (!18235)
+
 ### RPCs changes
 
 ### Metrics changes
