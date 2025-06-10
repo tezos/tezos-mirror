@@ -73,6 +73,7 @@ type t = {
           messages from remote peers. *)
   ignore_l1_config_peers : bool;
       (** Ignore the boot(strap) peers provided by L1. *)
+  disable_amplification : bool;  (** Disable amplification. *)
 }
 
 (** [default] is the default configuration. *)

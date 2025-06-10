@@ -84,6 +84,7 @@ type t = {
   fetch_trusted_setup : bool;
   verbose : bool;
   ignore_l1_config_peers : bool;
+  disable_amplification : bool;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -141,6 +142,7 @@ let default =
     fetch_trusted_setup = default_fetch_trusted_setup;
     verbose = false;
     ignore_l1_config_peers = false;
+    disable_amplification = false;
   }
 
 let uri_encoding : Uri.t Data_encoding.t =
@@ -183,6 +185,7 @@ let encoding : t Data_encoding.t =
            fetch_trusted_setup;
            verbose;
            ignore_l1_config_peers;
+           disable_amplification;
          } ->
       ( ( data_dir,
           rpc_addr,
@@ -202,7 +205,8 @@ let encoding : t Data_encoding.t =
           experimental_features,
           fetch_trusted_setup,
           verbose,
-          ignore_l1_config_peers ) ))
+          ignore_l1_config_peers,
+          disable_amplification ) ))
     (fun ( ( data_dir,
              rpc_addr,
              listen_addr,
@@ -221,7 +225,8 @@ let encoding : t Data_encoding.t =
              experimental_features,
              fetch_trusted_setup,
              verbose,
-             ignore_l1_config_peers ) ) ->
+             ignore_l1_config_peers,
+             disable_amplification ) ) ->
       {
         data_dir;
         rpc_addr;
@@ -242,6 +247,7 @@ let encoding : t Data_encoding.t =
         fetch_trusted_setup;
         verbose;
         ignore_l1_config_peers;
+        disable_amplification;
       })
     (merge_objs
        (obj10
@@ -297,7 +303,7 @@ let encoding : t Data_encoding.t =
              ~description:"The point for the DAL node metrics server"
              (Encoding.option P2p_point.Id.encoding)
              None))
-       (obj9
+       (obj10
           (dft
              "history_mode"
              ~description:"The history mode for the DAL node"
@@ -339,7 +345,12 @@ let encoding : t Data_encoding.t =
              "ignore_l1_config_peers"
              ~description:"Ignore the boot(strap) peers provided by L1"
              bool
-             default.ignore_l1_config_peers)))
+             default.ignore_l1_config_peers)
+          (dft
+             "disable_amplification"
+             ~description:"Disable amplification"
+             bool
+             default.disable_amplification)))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

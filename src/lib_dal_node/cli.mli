@@ -94,6 +94,8 @@ module Term : sig
 
   val disable_shard_validation_switch : switch
 
+  val disable_amplification_switch : switch
+
   val verbose_switch : switch
 end
 
@@ -143,6 +145,8 @@ type options = {
       (** Emit events related to connections. Default value is false. *)
   ignore_l1_config_peers : bool;
       (** Ignore the boot(strap) peers provided by L1. *)
+  disable_amplification : bool;
+      (** Disable amplification. Default value is false. *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type
@@ -169,6 +173,7 @@ val cli_options_to_options :
   string option ->
   string option ->
   bool option ->
+  bool ->
   bool ->
   bool ->
   bool ->

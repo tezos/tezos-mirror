@@ -532,7 +532,12 @@ module Term = struct
 
   let verbose = switch_to_cmdliner verbose_switch
 
-  (* Experimental features. *)
+  let disable_amplification_switch =
+    make_switch
+      ~doc:"Disables shard amplification. Default value is false."
+      "disable-amplification"
+
+  let disable_amplification = switch_to_cmdliner disable_amplification_switch
 
   let term process =
     Cmdliner.Term.(
@@ -542,7 +547,7 @@ module Term = struct
        $ metrics_addr $ attester_profile $ operator_profile $ observer_profile
        $ bootstrap_profile $ peers $ history_mode $ service_name
        $ service_namespace $ fetch_trusted_setup $ disable_shard_validation
-       $ verbose $ ignore_l1_config_peers))
+       $ verbose $ ignore_l1_config_peers $ disable_amplification))
 end
 
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
@@ -705,13 +710,14 @@ type options = {
   disable_shard_validation : bool;
   verbose : bool;
   ignore_l1_config_peers : bool;
+  disable_amplification : bool;
 }
 
 let cli_options_to_options data_dir rpc_addr expected_pow listen_addr
     public_addr endpoint slots_backup_uris trust_slots_backup_uris metrics_addr
     attesters operators observers bootstrap_flag peers history_mode service_name
     service_namespace fetch_trusted_setup disable_shard_validation verbose
-    ignore_l1_config_peers =
+    ignore_l1_config_peers disable_amplification =
   let open Result_syntax in
   let profile = Controller_profiles.make ~attesters ~operators ?observers () in
   let* profile =
@@ -754,6 +760,7 @@ let cli_options_to_options data_dir rpc_addr expected_pow listen_addr
       disable_shard_validation;
       verbose;
       ignore_l1_config_peers;
+      disable_amplification;
     }
 
 let merge_experimental_features _ _configuration = ()
@@ -779,6 +786,7 @@ let merge
       disable_shard_validation = _;
       verbose;
       ignore_l1_config_peers;
+      disable_amplification;
     } configuration =
   let profile =
     match profile with
@@ -825,6 +833,8 @@ let merge
     verbose = configuration.verbose || verbose;
     ignore_l1_config_peers =
       configuration.ignore_l1_config_peers || ignore_l1_config_peers;
+    disable_amplification =
+      configuration.disable_amplification || disable_amplification;
   }
 
 let wrap_with_error main_promise =
@@ -895,7 +905,7 @@ let commands =
       endpoint slots_backup_uris trust_slots_backup_uris metrics_addr attesters
       operators observers bootstrap_flag peers history_mode service_name
       service_namespace fetch_trusted_setup disable_shard_validation verbose
-      ignore_l1_config_peers =
+      ignore_l1_config_peers disable_amplification =
     match
       cli_options_to_options
         data_dir
@@ -919,6 +929,7 @@ let commands =
         disable_shard_validation
         verbose
         ignore_l1_config_peers
+        disable_amplification
     with
     | Ok options -> main_run subcommand options
     | Error msg -> `Error msg
