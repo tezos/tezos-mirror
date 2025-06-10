@@ -425,6 +425,22 @@ mod tests {
     }
 
     #[test]
+    fn test_bin_write_known_entrypoints() {
+        let tests = [
+            (Entrypoint::default(), vec![EntrypointTag::Default as u8]),
+            (Entrypoint("root".into()), vec![EntrypointTag::Root as u8]),
+            (Entrypoint("do".into()), vec![EntrypointTag::Do as u8]),
+            (Entrypoint("stake".into()), vec![EntrypointTag::Stake as u8]),
+        ];
+
+        for (entrypoint, expected) in tests.iter() {
+            let mut output = vec![];
+            entrypoint.bin_write(&mut output).unwrap();
+            assert_eq!(&output, expected);
+        }
+    }
+
+    #[test]
     fn test_nom_read_custom_entrypoint() {
         let input = vec![EntrypointTag::Custom as u8, 5, b'h', b'e', b'l', b'l', b'o'];
         let expected = Entrypoint("hello".into());
@@ -432,4 +448,20 @@ mod tests {
         let result = Entrypoint::nom_read(&input).unwrap();
         assert_eq!(result.1, expected);
     }
+
+    #[test]
+    fn test_bin_write_custom_entrypoint() {
+        let entrypoint = Entrypoint("my_custom_ep".into());
+        let mut output = vec![];
+        entrypoint.bin_write(&mut output).unwrap();
+
+        let expected = {
+            let mut exp = vec![EntrypointTag::Custom as u8, 12]; // 12 bytes for "my_custom_ep"
+            exp.extend_from_slice(b"my_custom_ep");
+            exp
+        };
+
+        assert_eq!(output, expected);
+    }
+
 }
