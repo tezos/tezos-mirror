@@ -391,4 +391,28 @@ mod tests {
             Err(ByteReprError::WrongFormat(_))
         ));
     }
+
+    #[test]
+    fn test_nom_read_known_entrypoints() {
+        let tests = [
+            (vec![EntrypointTag::Default as u8], Entrypoint::default()),
+            (vec![EntrypointTag::Root as u8], Entrypoint("root".into())),
+            (vec![EntrypointTag::Do as u8], Entrypoint("do".into())),
+            (vec![EntrypointTag::Stake as u8], Entrypoint("stake".into())),
+        ];
+
+        for (input, expected) in tests.iter() {
+            let result = Entrypoint::nom_read(input).unwrap();
+            assert_eq!(&result.1, expected);
+        }
+    }
+
+    #[test]
+    fn test_nom_read_custom_entrypoint() {
+        let input = vec![EntrypointTag::Custom as u8, 5, b'h', b'e', b'l', b'l', b'o'];
+        let expected = Entrypoint("hello".into());
+
+        let result = Entrypoint::nom_read(&input).unwrap();
+        assert_eq!(result.1, expected);
+    }
 }
