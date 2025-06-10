@@ -8,7 +8,6 @@ stages:
 - build
 - test
 - test_coverage
-- doc
 - manual
 
 oc.docker:ci:amd64:
@@ -4254,9 +4253,9 @@ oc.unified_coverage:
     expose_as: Coverage report
   coverage: '/Coverage: ([^%]+%)/'
 
-oc.install_python_bookworm:
+documentation:install_python_bookworm:
   image: debian:bookworm
-  stage: doc
+  stage: test
   tags:
   - gcp
   rules:
@@ -4301,7 +4300,7 @@ oc.install_python_bookworm:
 
 documentation:odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -4385,7 +4384,7 @@ documentation:odoc:
 
 documentation:manuals:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -4438,7 +4437,7 @@ documentation:manuals:
 
 documentation:docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -4520,7 +4519,7 @@ documentation:docgen:
 
 documentation:build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -4570,7 +4569,7 @@ documentation:build_all:
 
 documentation:linkcheck:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: test
   tags:
   - gcp
   rules:

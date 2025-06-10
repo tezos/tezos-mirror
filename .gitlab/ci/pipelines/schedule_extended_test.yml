@@ -8,7 +8,6 @@ stages:
 - build
 - test
 - packaging
-- doc
 
 oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -3440,9 +3439,9 @@ tezt:static-binaries:
       junit: $JUNIT
     when: always
 
-oc.install_python_noble:
+documentation:install_python_noble:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
-  stage: doc
+  stage: test
   tags:
   - gcp
   rules:
@@ -3455,9 +3454,9 @@ oc.install_python_noble:
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
-oc.install_python_jammy:
+documentation:install_python_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
-  stage: doc
+  stage: test
   tags:
   - gcp
   rules:
@@ -3470,9 +3469,9 @@ oc.install_python_jammy:
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
-oc.install_python_bookworm:
+documentation:install_python_bookworm:
   image: debian:bookworm
-  stage: doc
+  stage: test
   tags:
   - gcp
   rules:
@@ -3487,7 +3486,7 @@ oc.install_python_bookworm:
 
 documentation:odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -3530,7 +3529,7 @@ documentation:odoc:
 
 documentation:manuals:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -3565,7 +3564,7 @@ documentation:manuals:
 
 documentation:docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -3606,7 +3605,7 @@ documentation:docgen:
 
 documentation:build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -3638,7 +3637,7 @@ documentation:build_all:
 
 documentation:linkcheck:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: test
   tags:
   - gcp
   rules:

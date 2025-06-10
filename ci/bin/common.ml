@@ -1182,7 +1182,7 @@ module Documentation = struct
       ~__POS__
       ~name:"documentation:odoc"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.build
       ?dependencies
       ?rules
       ~before_script:(before_script ~eval_opam:true [])
@@ -1212,7 +1212,7 @@ module Documentation = struct
       ~__POS__
       ~name:"documentation:manuals"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.build
       ?dependencies
       ?rules
       ~before_script:(before_script ~eval_opam:true [])
@@ -1242,7 +1242,7 @@ module Documentation = struct
       ~__POS__
       ~name:"documentation:docgen"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.build
       ?dependencies
       ?rules
       ~before_script:(before_script ~eval_opam:true [])
@@ -1274,7 +1274,7 @@ module Documentation = struct
       ~__POS__
       ~name:"documentation:build_all"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.build
       ~dependencies
       ?rules
       ~before_script:(before_script ~eval_opam:true ~init_python_venv:true [])
@@ -1298,7 +1298,7 @@ module Documentation = struct
       ~__POS__
       ~name:"documentation:linkcheck"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.test
       ~dependencies
         (* Warning: the [documentation:linkcheck] job must have at least the same
            restrictions in the rules as [documentation:build_all], otherwise the CI
@@ -1324,9 +1324,9 @@ module Documentation = struct
     let dependencies = mk_artifact_dependencies ?dependencies [job_build_all] in
     job
       ~__POS__
-      ~name:"publish:documentation"
+      ~name:"documentation:publish"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.publishing
       ~dependencies
       ~before_script:
         (before_script
