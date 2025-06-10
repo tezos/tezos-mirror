@@ -85,24 +85,34 @@ let register ~title ~registered ~tx_per_call =
         let*@ n = Rpc.block_number sequencer in
 
         let open Lwt_result_syntax in
-        let*@ total_gas =
+        let*@ total_inclusion_gas, total_execution_gas =
           List.fold_left_es
-            (fun total tx_hash ->
-              let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
-              match receipt with
-              | Some {gasUsed; _} -> return (Int64.add total gasUsed)
+            (fun ((total_inclusion, total_execution) as total) tx_hash ->
+              let*@ gas_info =
+                Rpc.get_transaction_gas_info ~tx_hash sequencer
+              in
+              match gas_info with
+              | Some (`Inclusion_gas inclusion_gas, `Execution_gas execution_gas)
+                ->
+                  return
+                    Int64.
+                      ( add inclusion_gas total_inclusion,
+                        add execution_gas total_execution )
               | None ->
                   Log.warn "Receipt is missing." ;
                   return total)
-            0L
+            (0L, 0L)
             tx_hashes
         in
 
         Log.report
-          "Block %ld included %d tx for a total of %Ld gas = %s from %s"
+          "Block %ld included %d tx for a total of %Ld inclusion gas, %Ld \
+           execution gas, %Ld total gas = %s from %s"
           n
           txn
-          total_gas
+          total_inclusion_gas
+          total_execution_gas
+          (Int64.add total_inclusion_gas total_execution_gas)
           signature
           label ;
         unit)
