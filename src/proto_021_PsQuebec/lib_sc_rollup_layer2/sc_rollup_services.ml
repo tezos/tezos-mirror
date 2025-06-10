@@ -323,6 +323,8 @@ module Block = struct
   module Helpers = struct
     type nonrec prefix = prefix
 
+    let prefix = prefix
+
     let path = path / "helpers"
 
     let outbox_proof_simple =

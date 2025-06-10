@@ -36,12 +36,6 @@ module type PARAM = sig
   type subcontext
 
   val context_of_prefix : context -> prefix -> subcontext tzresult Lwt.t
-end
-
-(** Parameter signature to use with {!Make_directory}, where the prefix is
-    given. *)
-module type PARAM_PREFIX = sig
-  include PARAM
 
   val prefix : (unit, prefix) Tezos_rpc.Path.t
 end
@@ -81,7 +75,7 @@ end
 
 (** This module is a helper to register your endpoints and
     build a resulting top level directory eventually. *)
-module Make_directory (S : PARAM_PREFIX) : sig
+module Make_directory (S : PARAM) : sig
   include module type of Make_sub_directory (S)
 
   (** Build a top-level directory from a sub-directory by prefixing it with
