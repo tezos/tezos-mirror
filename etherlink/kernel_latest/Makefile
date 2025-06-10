@@ -47,6 +47,10 @@ else
 	@cargo build --release --package evm-evaluation
 endif
 
+.PHONY: build-revm-poc
+build-revm-poc:
+	@cargo build --target wasm32-unknown-unknown --package revm-etherlink-poc
+
 .PHONY: build-deps
 build-deps:
 	# 'rustup show' will install the toolchain in addition to showing

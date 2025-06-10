@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
-# SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2024-2025 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -123,3 +123,7 @@ sequencer.wasm::
 octez-dsn-node:
 	@cd etherlink/bin_dsn_node; cargo build --release $(NATIVE_OPT)
 	@cp etherlink/bin_dsn_node/target/$(NATIVE_TARGET)/release/dsn-node octez-dsn-node
+
+.PHONY: revm-poc
+revm-poc:
+	@$(MAKE) -C ${KERNEL_DIR} build-revm-poc

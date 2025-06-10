@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = 'revm-etherlink-poc'
+version = '0.1.0'
+edition = '2021'
+license = "MIT"
+
+[dependencies]
+
+# VM
+revm = { version = "24.0.1", default-features = false }
+
+# SDK
+tezos-smart-rollup-host.workspace = true
