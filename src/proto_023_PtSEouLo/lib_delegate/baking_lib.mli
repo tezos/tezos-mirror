@@ -38,7 +38,7 @@ val bake :
   ?minimal_timestamp:bool ->
   ?extra_operations:Baking_configuration.Operations_source.t ->
   ?monitor_node_mempool:bool ->
-  ?context_path:string ->
+  ?data_dir:string ->
   (* Number of baked blocks. Defaults to 1. *)
   ?count:int ->
   ?votes:Baking_configuration.per_block_votes_config ->
@@ -67,7 +67,7 @@ val propose :
   ?force:bool ->
   ?minimal_timestamp:bool ->
   ?extra_operations:Baking_configuration.Operations_source.t ->
-  ?context_path:string ->
+  ?data_dir:string ->
   ?state_recorder:Baking_configuration.state_recorder_config ->
   Baking_state_types.Key.t list ->
   unit tzresult Lwt.t

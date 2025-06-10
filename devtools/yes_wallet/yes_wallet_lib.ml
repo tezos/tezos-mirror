@@ -464,7 +464,7 @@ let get_context ?level ~network_opt base_dir =
       (fun () ->
         Tezos_store.Store.init
           ~store_dir:(Filename.concat base_dir "store")
-          ~context_root_dir:base_dir
+          ~data_dir:base_dir
           ~allow_testchains:true
           ~readonly:true
           genesis)

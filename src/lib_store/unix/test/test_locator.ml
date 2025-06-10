@@ -70,11 +70,11 @@ let init_chain ?(history_mode = History_mode.Archive) base_dir =
   let open Filename.Infix in
   let open Lwt_syntax in
   let store_dir = base_dir // "store" in
-  let context_root_dir = base_dir in
+  let data_dir = base_dir in
   let* r =
     Store.init
       ~store_dir
-      ~context_root_dir
+      ~data_dir
       ~history_mode
       ~allow_testchains:true
       ~patch_context
@@ -478,7 +478,7 @@ let test_protocol_locator base_dir =
   let* () =
     Store.may_switch_history_mode
       ~store_dir:(base_dir // "store")
-      ~context_root_dir:base_dir
+      ~data_dir:base_dir
       genesis
       ~new_history_mode:(Rolling (Some {offset = 0}))
   in

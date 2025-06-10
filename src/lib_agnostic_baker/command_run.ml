@@ -205,7 +205,7 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
     ?force_apply_from_round
     ?remote_calls_timeout
     ~chain:cctxt#chain
-    ?context_path:baking_mode
+    ?data_dir:baking_mode
     ~keep_alive
     ~state_recorder
     sources

@@ -625,8 +625,8 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
     Baking_state.(
       match config.Baking_configuration.validation with
       | Node -> return Node
-      | Local {context_path} ->
-          let* index = Baking_simulator.load_context ~context_path in
+      | Local {data_dir} ->
+          let* index = Baking_simulator.load_context ~data_dir in
           return (Local index)
       | ContextIndex index -> return (Local index))
   in

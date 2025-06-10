@@ -43,8 +43,9 @@ val context_dir : string -> string
     to copy the imported "context" to "brassaia_context" in duo mode *)
 val do_not_use__brassaia_dir : string -> string
 
-(** [init] uses an environment variable ('TEZOS_CONTEXT_BACKEND')
-    to select the `Disk backend between `Shell and `Brassaia *)
+(** [init] uses an environment variable ('TEZOS_CONTEXT_BACKEND') to select the
+    `Disk backend between `Shell and `Brassaia. [data_dir] stands for the root
+    directory in which the context directory is expected to be find. *)
 val init :
   kind:[< `Brassaia | `Brassaia_memory | `Disk | `Memory > `Disk `Memory] ->
   ?patch_context:
@@ -52,7 +53,8 @@ val init :
     (Tezos_protocol_environment.Context.t, tztrace) result Lwt.t) ->
   ?readonly:bool ->
   ?index_log_size:int ->
-  string ->
+  data_dir:string ->
+  unit ->
   index Lwt.t
 
 val index : t -> index
