@@ -47,7 +47,7 @@ pub fn generate_nom_read_for_data(
 
 fn generate_nom_read(encoding: &Encoding) -> TokenStreamWithConstraints {
     match encoding {
-        Encoding::Unit => unreachable!(),
+        Encoding::Unit(span) => generate_unit_nom_read(*span).into(),
         Encoding::Primitive(primitive, span) => {
             generate_primitive_nom_read(*primitive, *span).into()
         }
@@ -84,6 +84,10 @@ fn get_primitive_byte_mapping(kind: PrimitiveEncoding) -> Option<&'static str> {
     PRIMITIVE_BYTES_MAPPING
         .iter()
         .find_map(|(k, s)| if kind == *k { Some(*s) } else { None })
+}
+
+fn generate_unit_nom_read(span: Span) -> TokenStream {
+    quote_spanned!(span=> tezos_data_encoding::nom::unit)
 }
 
 fn generate_primitive_nom_read(kind: PrimitiveEncoding, span: Span) -> TokenStream {
@@ -271,8 +275,8 @@ fn generate_enum_nom_read(encoding: &EnumEncoding) -> TokenStreamWithConstraints
 fn generate_tag_nom_read(tag: &Tag<'_>, enum_name: &syn::Ident) -> TokenStreamWithConstraints {
     let tag_name = tag.name;
     match &tag.encoding {
-        Encoding::Unit => {
-            quote_spanned!(tag_name.span()=> |bytes| Ok((bytes, #enum_name::#tag_name))).into()
+        Encoding::Unit(span) => {
+            quote_spanned!(*span=> |bytes| Ok((bytes, #enum_name::#tag_name))).into()
         }
         encoding => {
             generate_nom_read(encoding).map_stream(|nom_read| {

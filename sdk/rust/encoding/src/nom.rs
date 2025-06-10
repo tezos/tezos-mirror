@@ -231,6 +231,10 @@ impl NomReader<'_> for Narith {
     }
 }
 
+pub fn unit(input: NomInput) -> NomResult<()> {
+    Ok((input, ()))
+}
+
 /// Reads a boolean value.
 #[inline(always)]
 pub fn boolean(input: NomInput) -> NomResult<bool> {

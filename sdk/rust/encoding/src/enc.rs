@@ -283,6 +283,10 @@ pub fn bytes<T: AsRef<[u8]>>(bytes: T, out: &mut Vec<u8>) -> BinResult {
     Ok(())
 }
 
+pub fn unit(_: &(), _: &mut Vec<u8>) -> BinResult {
+    Ok(())
+}
+
 pub fn boolean(b: &bool, out: &mut Vec<u8>) -> BinResult {
     put_byte(
         if *b {

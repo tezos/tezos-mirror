@@ -90,7 +90,11 @@ fn make_field(field: &syn::Field) -> Result<FieldEncoding> {
 fn make_type_encoding<'a>(ty: &'a syn::Type, meta: &mut Vec<syn::Meta>) -> Result<Encoding<'a>> {
     match ty {
         syn::Type::Path(type_path) => make_type_path_encoding(&type_path.path, meta),
-        _ => Err(error_spanned(ty, "Unsupported type")),
+        syn::Type::Tuple(syn::TypeTuple {
+            paren_token: _,
+            elems,
+        }) if elems.is_empty() => Ok(Encoding::Unit(ty.span())),
+        _ => Err(error_spanned(ty, format!("Unsupported type: {:?}", ty))),
     }
 }
 
@@ -470,7 +474,7 @@ fn make_tag<'a>(
         syn::Fields::Unnamed(fields) => {
             return Err(error_spanned(fields, "Only single field is supported"))
         }
-        syn::Fields::Unit => Encoding::Unit,
+        syn::Fields::Unit => Encoding::Unit(variant.span()),
     };
     Ok(Tag {
         id: syn::LitInt::new(&id.to_string(), variant.span()),

@@ -120,6 +120,21 @@ mod enum_large_tags {
     }
 }
 
+mod struct_unit {
+    use super::*;
+
+    #[derive(Debug, PartialEq, BinWriter, NomReader)]
+    struct Unit {
+        unit: (),
+    }
+
+    #[test]
+    fn test_roundtrip() {
+        check_roundtrip(Unit { unit: () });
+        check_serialization(Unit { unit: () }, &[])
+    }
+}
+
 mod struct_dynamic {
     use super::*;
 

@@ -35,7 +35,7 @@ pub fn generate_bin_write_for_data(
 
 fn generate_bin_write(encoding: &Encoding) -> TokenStreamWithConstraints {
     match encoding {
-        Encoding::Unit => unreachable!(),
+        Encoding::Unit(span) => generate_unit_bin_write(*span).into(),
         Encoding::Primitive(primitive, span) => {
             generate_primitive_bin_write(*primitive, *span).into()
         }
@@ -68,6 +68,10 @@ fn generate_bin_write(encoding: &Encoding) -> TokenStreamWithConstraints {
 
 fn generate_bytes_bin_write(span: Span) -> TokenStream {
     quote_spanned!(span=> tezos_data_encoding::enc::bytes)
+}
+
+fn generate_unit_bin_write(span: Span) -> TokenStream {
+    quote_spanned!(span=> tezos_data_encoding::enc::unit)
 }
 
 fn generate_primitive_bin_write(kind: PrimitiveEncoding, span: Span) -> TokenStream {
@@ -161,8 +165,8 @@ fn generate_tag_bin_write(
     let tag_id = &tag.id;
     let name = format!("{}::{}", enum_name, tag_name);
     match &tag.encoding {
-        Encoding::Unit => {
-            quote_spanned!(tag_name.span()=>
+        Encoding::Unit(span) => {
+            quote_spanned!(*span=>
                            #enum_name::#tag_name => tezos_data_encoding::enc::variant(#name, #tag_encoding)(&#tag_id, out)
             ).into()
         }
