@@ -20,27 +20,36 @@ use tezos_data_encoding::{
 use tezos_smart_rollup::types::PublicKeyHash;
 use tezos_smart_rollup::types::{Contract, PublicKey};
 
+pub const REVEAL_TAG: u8 = 107_u8;
+pub const TRANSFER_TAG: u8 = 108_u8;
+
 #[derive(PartialEq, Debug)]
-pub enum OperationContent {
-    Reveal {
-        pk: PublicKey,
-    },
-    Transfer {
-        amount: Narith,
-        destination: Contract,
-        parameter: Option<()>,
-    },
+pub struct RevealContent {
+    pub pk: PublicKey,
 }
 
-pub const REVEAL_TAG: u8 = 107_u8;
+/// Transfers are often called "transactions" in the protocol, we try
+/// to consistently call them transfers to avoid confusion with the
+/// Ethereum notion of transaction which is more generic as it also
+/// encompasses the case of originations.
+#[derive(PartialEq, Debug)]
+pub struct TransferContent {
+    pub amount: Narith,
+    pub destination: Contract,
+    pub parameter: Option<()>,
+}
 
-pub const TRANSFER_TAG: u8 = 108_u8;
+#[derive(PartialEq, Debug)]
+pub enum OperationContent {
+    Reveal(RevealContent),
+    Transfer(TransferContent),
+}
 
 impl OperationContent {
     pub fn tag(&self) -> u8 {
         match self {
-            Self::Reveal { pk: _ } => REVEAL_TAG,
-            Self::Transfer { .. } => TRANSFER_TAG,
+            Self::Reveal(_) => REVEAL_TAG,
+            Self::Transfer(_) => TRANSFER_TAG,
         }
     }
 
@@ -48,7 +57,7 @@ impl OperationContent {
         match tag {
             REVEAL_TAG => {
                 let (array, pk) = PublicKey::nom_read(bytes)?;
-                NomResult::Ok((array, Self::Reveal { pk }))
+                NomResult::Ok((array, Self::Reveal(RevealContent { pk })))
             }
             TRANSFER_TAG => {
                 let (input, amount) = Narith::nom_read(bytes)?;
@@ -58,11 +67,11 @@ impl OperationContent {
                     tezos_nom::optional_field(|input| Ok((input, ())))(input)?;
                 NomResult::Ok((
                     input,
-                    Self::Transfer {
+                    Self::Transfer(TransferContent {
                         amount,
                         destination,
                         parameter,
-                    },
+                    }),
                 ))
             }
             _ => Err(nom::Err::Error(tezos_nom::NomError::invalid_tag(
@@ -77,15 +86,15 @@ impl OperationContent {
 impl BinWriter for OperationContent {
     fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
         match self {
-            Self::Reveal { pk } => {
+            Self::Reveal(RevealContent { pk }) => {
                 pk.bin_write(data)?;
                 Ok(())
             }
-            Self::Transfer {
+            Self::Transfer(TransferContent {
                 amount,
                 destination,
                 parameter,
-            } => {
+            }) => {
                 amount.bin_write(data)?;
                 destination.bin_write(data)?;
                 // TODO: parameter should be a Michelson expr, for now just use unit
@@ -329,7 +338,7 @@ pub fn make_dummy_reveal_operation() -> Operation {
 
     let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
 
-    make_dummy_operation(OperationContent::Reveal { pk }, signature)
+    make_dummy_operation(OperationContent::Reveal(RevealContent { pk }), signature)
 }
 
 #[cfg(test)]
@@ -397,12 +406,12 @@ mod tests {
                 .unwrap(),
                 fee: 274_u64.into(),
                 counter: 2_u64.into(),
-                operation: OperationContent::Reveal {
+                operation: OperationContent::Reveal(RevealContent {
                     pk: PublicKey::from_b58check(
                         "edpkuqNrmPPcy2S3G1uKYnxmg7Gov3c8q7AABKRs9EtTVtfDg5Fu7R",
                     )
                     .unwrap(),
-                },
+                }),
                 gas_limit: 169_u64.into(),
                 storage_limit: 0_u64.into(),
             },
@@ -442,14 +451,14 @@ mod tests {
                 .unwrap(),
                 fee: 267_u64.into(),
                 counter: 1_u64.into(),
-                operation: OperationContent::Transfer {
+                operation: OperationContent::Transfer(TransferContent {
                     amount: 1000000_u64.into(),
                     destination: Contract::from_b58check(
                         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                     )
                     .unwrap(),
                     parameter: None,
-                },
+                }),
                 gas_limit: 169_u64.into(),
                 storage_limit: 0_u64.into(),
             },

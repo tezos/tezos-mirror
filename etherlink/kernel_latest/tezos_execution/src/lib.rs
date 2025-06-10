@@ -11,7 +11,9 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::{
-    operation::{ManagerOperation, Operation, OperationContent},
+    operation::{
+        ManagerOperation, Operation, OperationContent, RevealContent, TransferContent,
+    },
     operation_result::{
         produce_operation_result, Balance, BalanceUpdate, OperationError,
         OperationResultSum, Reveal, RevealError, RevealSuccess, TransferError,
@@ -244,16 +246,16 @@ pub fn apply_operation<Host: Runtime>(
     log!(host, Debug, "Operation is valid");
 
     let receipt = match content {
-        OperationContent::Reveal { pk } => {
+        OperationContent::Reveal(RevealContent { pk }) => {
             let reveal_result = reveal(host, source, &mut account, pk)?;
             let manager_result = produce_operation_result(reveal_result);
             OperationResultSum::Reveal(manager_result)
         }
-        OperationContent::Transfer {
+        OperationContent::Transfer(TransferContent {
             amount,
             destination,
             parameter: _,
-        } => {
+        }) => {
             let transfer_result = transfer(host, context, source, amount, destination)?;
             let manager_result = produce_operation_result(transfer_result);
             OperationResultSum::Transfer(manager_result)
@@ -272,7 +274,10 @@ mod tests {
     use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
     use tezos_tezlink::{
         block::TezBlock,
-        operation::{BlockHash, ManagerOperation, Operation, OperationContent},
+        operation::{
+            BlockHash, ManagerOperation, Operation, OperationContent, RevealContent,
+            TransferContent,
+        },
         operation_result::{
             Balance, BalanceUpdate, ContentResult, OperationResult, OperationResultSum,
             RevealError, RevealSuccess, TransferError, TransferSuccess,
@@ -327,7 +332,7 @@ mod tests {
             gas_limit,
             storage_limit,
             source,
-            OperationContent::Reveal { pk },
+            OperationContent::Reveal(RevealContent { pk }),
         )
     }
 
@@ -346,11 +351,11 @@ mod tests {
             gas_limit,
             storage_limit,
             source,
-            OperationContent::Transfer {
+            OperationContent::Transfer(TransferContent {
                 amount,
                 destination,
                 parameter: None,
-            },
+            }),
         )
     }
 

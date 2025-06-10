@@ -653,6 +653,8 @@ mod tests {
     use tezos_tezlink::operation::ManagerOperation;
     use tezos_tezlink::operation::Operation;
     use tezos_tezlink::operation::OperationContent;
+    use tezos_tezlink::operation::RevealContent;
+    use tezos_tezlink::operation::TransferContent;
 
     fn make_operation(
         fee: u64,
@@ -693,7 +695,7 @@ mod tests {
             gas_limit,
             storage_limit,
             source,
-            OperationContent::Reveal { pk },
+            OperationContent::Reveal(RevealContent { pk }),
         )
     }
 
@@ -712,11 +714,11 @@ mod tests {
             gas_limit,
             storage_limit,
             source,
-            OperationContent::Transfer {
+            OperationContent::Transfer(TransferContent {
                 amount,
                 destination,
                 parameter: None,
-            },
+            }),
         )
     }
 
