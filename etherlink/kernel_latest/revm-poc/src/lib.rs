@@ -17,14 +17,14 @@ mod test {
     #[test]
     fn test_revm_usage() {
         let block = BlockEnv {
-            number: 11,
+            number: U256::from(11),
             beneficiary: Address::ZERO,
-            timestamp: 12,
+            timestamp: U256::from(12),
             gas_limit: 1_000_000,
             basefee: 10,
             difficulty: U256::ZERO,
             prevrandao: Some(FixedBytes::new([0; 32])),
-            blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, true)),
+            blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
         };
 
         let tx = TxEnv {
