@@ -30,6 +30,8 @@ module type Dal = sig
 
   val network : Network.t
 
+  val snapshot : string option
+
   val bootstrap : bool
 
   val stake : int list
@@ -156,6 +158,15 @@ module Dal () : Dal = struct
       ~description:"Allow to specify a network to use for the scenario"
       network_typ
       `Sandbox
+
+  let snapshot =
+    Clap.optional_string
+      ~section
+      ~long:"snapshot"
+      ~description:
+        "Snapshot file, which is stored locally, to initiate the scenario with \
+         some data"
+      ()
 
   let bootstrap =
     Clap.flag
