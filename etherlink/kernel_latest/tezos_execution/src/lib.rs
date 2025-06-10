@@ -271,7 +271,7 @@ mod tests {
     use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
     use tezos_tezlink::{
         block::TezBlock,
-        operation::{ManagerOperation, Operation, OperationContent},
+        operation::{BlockHash, ManagerOperation, Operation, OperationContent},
         operation_result::{
             Balance, BalanceUpdate, ContentResult, OperationResult, OperationResultSum,
             RevealError, RevealSuccess, TransferError, TransferSuccess,
@@ -295,7 +295,7 @@ mod tests {
         source: PublicKeyHash,
         content: OperationContent,
     ) -> Operation {
-        let branch = TezBlock::genesis_block_hash();
+        let branch = BlockHash::from(TezBlock::genesis_block_hash());
         // No need a real signature for now
         let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
         Operation {

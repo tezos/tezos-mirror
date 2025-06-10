@@ -174,7 +174,7 @@ impl NomReader<'_> for ManagerOperation<OperationContent> {
 
 #[derive(PartialEq, Debug)]
 pub struct Operation {
-    pub branch: H256,
+    pub branch: BlockHash,
     pub content: ManagerOperation<OperationContent>,
     pub signature: UnknownSignature,
 }
@@ -183,9 +183,8 @@ pub struct Operation {
 impl BinWriter for Operation {
     fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
         // Encode branch field
-        let branch: [u8; 32] = self.branch.to_fixed_bytes();
+        self.branch.bin_write(data)?;
 
-        data.extend_from_slice(&branch);
         self.content.bin_write(data)?;
 
         // In an operation, the signature is always encoded as an UnknownSignature
@@ -205,8 +204,7 @@ impl BinWriter for Operation {
 // TODO: !17672, derive all NomReader and BinWriter implementations in this module.
 impl NomReader<'_> for Operation {
     fn nom_read(bytes: &[u8]) -> NomResult<Self> {
-        let (bytes, branch) =
-            map(take::<usize, &[u8], NomError>(32_usize), H256::from_slice)(bytes)?;
+        let (bytes, branch) = BlockHash::nom_read(bytes)?;
 
         // We'll use the returned slice to decode the signature
         let (bytes, content) = ManagerOperation::nom_read(bytes)?;
@@ -267,6 +265,31 @@ impl Decodable for Operation {
     }
 }
 
+#[derive(PartialEq, Debug)]
+pub struct BlockHash(H256);
+
+impl NomReader<'_> for BlockHash {
+    fn nom_read(bytes: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+        let (bytes, hash) =
+            map(take::<usize, &[u8], NomError>(32_usize), H256::from_slice)(bytes)?;
+        Ok((bytes, Self(hash)))
+    }
+}
+
+impl BinWriter for BlockHash {
+    fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
+        let hash: [u8; 32] = self.0.to_fixed_bytes();
+        data.extend_from_slice(&hash);
+        Ok(())
+    }
+}
+
+impl From<H256> for BlockHash {
+    fn from(hash: H256) -> Self {
+        Self(hash)
+    }
+}
+
 #[cfg(test)]
 fn make_dummy_operation(
     operation: OperationContent,
@@ -274,7 +297,7 @@ fn make_dummy_operation(
 ) -> Operation {
     use crate::block::TezBlock;
 
-    let branch = TezBlock::genesis_block_hash();
+    let branch = BlockHash::from(TezBlock::genesis_block_hash());
 
     // Public key hash in b58 for 0002298c03ed7d454a101eb7022bc95f7e5f41ac78
     let source = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
@@ -308,7 +331,7 @@ pub fn make_dummy_reveal_operation() -> Operation {
 
 #[cfg(test)]
 mod tests {
-    use super::{ManagerOperation, Operation, OperationContent};
+    use super::*;
     use crate::operation::make_dummy_reveal_operation;
     use primitive_types::H256;
     use rlp::{Decodable, Rlp, RlpStream};
@@ -360,7 +383,7 @@ mod tests {
             "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU",
         )
         .unwrap();
-        let branch = H256::from_slice(&branch_vec);
+        let branch = BlockHash::from(H256::from_slice(&branch_vec));
         let signature = UnknownSignature::from_base58_check("sigRs6WkPHqKEuEhMQTmjhMZWn3b7TzYNXMozAaEHty7amNPa1Cw9QPQa84mN7kuBue3uwjxCUyHeaMeaY99Hq11GQ4jCx4x").unwrap();
         let expected_operation = Operation {
             branch,
@@ -405,7 +428,7 @@ mod tests {
             "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU",
         )
         .unwrap();
-        let branch = H256::from_slice(&branch_vec);
+        let branch = BlockHash::from(H256::from_slice(&branch_vec));
         let signature = UnknownSignature::from_base58_check("sigT4yGRRhiMZCjGigdhopaXkshKrwDbYrPw3jGFZGkjpvpT57a6KmLa4mFVKBTNHR8NrmyMEt9Pgusac5HLqUoJie2MB5Pd").unwrap();
         let expected_operation = Operation {
             branch,
