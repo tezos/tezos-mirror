@@ -11,7 +11,7 @@ license = "MIT"
 [dependencies]
 
 # VM
-revm = { version = "24.0.1", default-features = false }
+revm = { version = "25.0.0", default-features = false }
 
 # SDK
 tezos-smart-rollup-host.workspace = true
