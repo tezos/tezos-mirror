@@ -9,6 +9,7 @@ mod world_state_handler;
 
 #[cfg(test)]
 mod test {
+    use primitive_types::{H160 as PH160, U256 as PU256};
     use revm::{
         context::{transaction::AccessList, BlockEnv, CfgEnv, TxEnv},
         context_interface::block::BlobExcessGasAndPrice,
@@ -18,9 +19,12 @@ mod test {
         state::AccountInfo,
         Context, ExecuteEvm, MainBuilder, MainContext,
     };
+    use tezos_ethereum::block::{BlockConstants, BlockFees};
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     use crate::database::EtherlinkVMDB;
     use crate::precompile_provider;
+    use crate::world_state_handler::new_world_state_handler;
 
     #[test]
     fn test_revm_usage() {
@@ -116,7 +120,17 @@ mod test {
             authorization_list: vec![],
         };
 
-        let mut db = EtherlinkVMDB::new();
+        let mut host = MockKernelHost::default();
+        let block_constants = BlockConstants::first_block(
+            PU256::from(1),
+            PU256::from(1),
+            BlockFees::new(PU256::from(1), PU256::from(1), PU256::from(1)),
+            1_000_000,
+            PH160::from([0; 20]),
+        );
+        let mut world_state_handler = new_world_state_handler();
+        let mut db =
+            EtherlinkVMDB::new(&mut host, &block_constants, &mut world_state_handler);
 
         let mut cfg = CfgEnv::default();
         cfg.spec = SpecId::PRAGUE;
