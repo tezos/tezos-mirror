@@ -19,7 +19,9 @@ use nom::multi::length_data;
 use nom::number::complete::u8 as nom_u8;
 use nom::sequence::preceded;
 
+use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::{NomReader, NomResult};
+
 use super::ByteReprError;
 
 /// Structure representing address entrypoint on a Tezos address, in other
@@ -106,6 +108,21 @@ impl EntrypointTag {
             Self::SetDelegateParameters => "set_delegate_parameters",
             Self::Custom => "custom",
         }
+    }
+}
+
+impl BinWriter for Entrypoint {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
+        let tag = EntrypointTag::from_str(&self.0);
+        output.push(tag as u8);
+
+        if matches!(tag, EntrypointTag::Custom) {
+            let bytes = self.0.as_bytes();
+            output.push(bytes.len() as u8);
+            output.extend_from_slice(bytes);
+        }
+
+        Ok(())
     }
 }
 
