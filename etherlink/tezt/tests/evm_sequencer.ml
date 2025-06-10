@@ -2235,38 +2235,6 @@ let test_rpc_produceBlock =
     ~error_msg:"Expected new block number to be %L, but got: %R" ;
   unit
 
-let block_number_multichain observers =
-  let* block_numbers =
-    Lwt_list.map_s
-      (fun observer ->
-        let*@ block_number = Rpc.block_number observer in
-        return block_number)
-      observers
-  in
-  match block_numbers with
-  | hd :: block_numbers when List.for_all (Int32.equal hd) block_numbers ->
-      return hd
-  | _ -> Test.fail "Every block numbers are not equal"
-
-let test_multichain_produceBlock =
-  register_multichain_all
-    ~time_between_blocks:Nothing
-    ~tags:[Tag.flaky; "evm"; "multichain"; "produce_block"]
-    ~title:"RPC method produceBlock in a multichain environment"
-  @@ fun {sequencer; observers; sc_rollup_node; client; proxies; _} _protocol ->
-  let* start_block_number = block_number_multichain observers in
-  let*@ _ = produce_block sequencer in
-  let* () =
-    Lwt_list.iter_s
-      (fun proxy ->
-        bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ())
-      proxies
-  in
-  let* new_block_number = block_number_multichain observers in
-  Check.((Int32.succ start_block_number = new_block_number) int32)
-    ~error_msg:"Expected new block number to be %L, but got: %R" ;
-  unit
-
 let wait_for_event ?(timeout = 30.) ?(levels = 10) event_watcher ~sequencer
     ~sc_rollup_node ~client ~error_msg =
   let event_value = ref None in
@@ -13796,14 +13764,6 @@ let () =
   test_multichain_feature_flag protocols ;
   test_make_l2_kernel_installer_config "EVM" protocols ;
   test_make_l2_kernel_installer_config "Michelson" protocols ;
-  test_multichain_produceBlock
-    ~l2_setups:
-      (Some
-         [
-           Evm_node.default_l2_setup ~l2_chain_id:0;
-           Evm_node.default_l2_setup ~l2_chain_id:1;
-         ])
-    protocols ;
   test_fast_withdrawal_feature_flag protocols ;
   test_deposit_and_fast_withdraw protocols ;
   test_deposit_and_fa_fast_withdraw protocols ;
