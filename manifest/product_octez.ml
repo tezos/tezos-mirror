@@ -5145,6 +5145,7 @@ let octez_layer2_irmin_context =
         octez_context_sigs;
         octez_context_helpers;
         octez_layer2_store |> open_;
+        opentelemetry_lwt;
       ]
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
@@ -5271,6 +5272,7 @@ let octez_crawler =
         octez_stdlib_unix |> open_;
         octez_client_base |> open_;
         octez_shell;
+        opentelemetry_lwt;
       ]
 
 let octez_dal_node_lib =
@@ -5412,6 +5414,7 @@ let octez_injector_lib =
         octez_shell;
         octez_crawler |> open_;
         octez_signer_backends;
+        opentelemetry_lwt;
       ]
 
 let performance_metrics =
@@ -5526,6 +5529,9 @@ let octez_smart_rollup_node_lib =
         octez_workers |> open_;
         octez_smart_rollup_lib |> open_;
         octez_scoru_wasm_fast;
+        opentelemetry_lwt;
+        opentelemetry_client_cohttp_lwt;
+        opentelemetry_ambient_context_lwt;
       ]
 
 let wasm_helpers_intf_modules = ["wasm_utils_intf"]
