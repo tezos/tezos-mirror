@@ -10,7 +10,7 @@ let config name = Format.asprintf "/etc/logrotate.d/%s" name
 let write_config ~name ?pidfile ?max_rotations ?max_size ~target_file agent =
   let open Jingoo in
   let template =
-    {|{{ target_file }} {
+    {|"{{ target_file }}" {
 # Rotates logs every day
   daily
 {% if has_max_size %}
@@ -80,4 +80,11 @@ let run ~name agent =
   let name = config name in
   (* Run logrotate as root in the docker container *)
   Log.info "Teztcloud.Logrotate: executing task %s" name ;
-  Agent.docker_run_command agent "logrotate" [name] |> Process.check
+  Lwt.catch
+    (fun () ->
+      Agent.docker_run_command agent "logrotate" [name] |> Process.check)
+    (fun exn ->
+      Log.error
+        "Teztcloud.Logrotate: logrotate failed with %s"
+        (Printexc.to_string exn) ;
+      Lwt.return_unit)
