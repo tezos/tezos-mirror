@@ -553,6 +553,10 @@ module Make (Parameters : PARAMETERS) = struct
     let safety_guard = safety_guard_of_operations operations in
     let module Proto_client = (val state.proto_client) in
     let*! simulation_result =
+      Opentelemetry_lwt.Trace.with_
+        ~service_name:"Injector"
+        "Proto_client.simulate_operations"
+      @@ fun _ ->
       Proto_client.simulate_operations
         state.cctxt
         ~force
@@ -652,6 +656,8 @@ module Make (Parameters : PARAMETERS) = struct
       (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
     let*! simulation_result =
+      Opentelemetry_lwt.Trace.with_ ~service_name:"Injector" "simulate"
+      @@ fun _ ->
       trace (Step_failed "simulation")
       @@ simulate_operations state signer operations
     in
@@ -865,6 +871,7 @@ module Make (Parameters : PARAMETERS) = struct
         let module Proto_client = (val state.proto_client) in
         Proto_client.max_operation_data_length) () =
     let open Lwt_result_syntax in
+    Opentelemetry_lwt.Trace.with_ ~service_name:"Injector" "inject" @@ fun _ ->
     let signers = available_signers state in
     let* ops_batch =
       get_n_ops_batch_from_queue ~size_limit state (List.length signers)
@@ -1149,6 +1156,8 @@ module Make (Parameters : PARAMETERS) = struct
   let on_new_tezos_head state
       ({block_hash = head_hash; level = head_level} as head) =
     let open Lwt_result_syntax in
+    Opentelemetry_lwt.Trace.with_ ~service_name:"Injector" "on_new_tezos_head"
+    @@ fun _ ->
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
     let () = metrics_get_signers_balance state head.level in
     set_metrics state ;
