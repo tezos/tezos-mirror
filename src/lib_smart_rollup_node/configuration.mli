@@ -326,6 +326,7 @@ module Cli : sig
     apply_unsafe_patches:bool ->
     unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
+    profiling:bool option ->
     t tzresult Lwt.t
 
   val create_or_read_config :
@@ -360,5 +361,6 @@ module Cli : sig
     apply_unsafe_patches:bool ->
     unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
+    profiling:bool option ->
     t tzresult Lwt.t
 end

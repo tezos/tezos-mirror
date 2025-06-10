@@ -921,7 +921,7 @@ module Cli = struct
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
       ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling =
     let open Lwt_result_syntax in
     let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
@@ -990,7 +990,10 @@ module Cli = struct
                 Option.value ~default:default.allowed_origins allowed_origins;
             };
         bail_on_disagree;
-        otel_profiling = default_otel_profiling;
+        otel_profiling =
+          (match profiling with
+          | None -> default_otel_profiling
+          | Some enable -> {default_otel_profiling with enable});
       }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
@@ -1000,7 +1003,7 @@ module Cli = struct
       ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
       ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
       ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -1098,6 +1101,10 @@ module Cli = struct
                   allowed_origins;
             };
         bail_on_disagree = bail_on_disagree || configuration.bail_on_disagree;
+        otel_profiling =
+          (match profiling with
+          | None -> configuration.otel_profiling
+          | Some enable -> {configuration.otel_profiling with enable});
       }
 
   let create_or_read_config ~config_file ~rpc_addr ~rpc_port ~acl_override
@@ -1107,7 +1114,7 @@ module Cli = struct
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
       ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling =
     let open Lwt_result_syntax in
     let*! exists_config = Lwt_unix.file_exists config_file in
     if exists_config then
@@ -1144,6 +1151,7 @@ module Cli = struct
           ~apply_unsafe_patches
           ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
+          ~profiling
       in
       return configuration
     else
@@ -1195,6 +1203,7 @@ module Cli = struct
           ~apply_unsafe_patches
           ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
+          ~profiling
       in
       return config
 end

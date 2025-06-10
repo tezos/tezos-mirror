@@ -960,7 +960,7 @@ module Replay = struct
         Format.eprintf "[\x1B[1;32mOK\x1B[0m]@." ;
         return_unit
 
-  let mk_node_ctxt ~data_dir cctxt block =
+  let mk_node_ctxt ~data_dir ~profiling cctxt block =
     let open Lwt_result_syntax in
     let* store = Store.init Read_only ~data_dir in
     let opt_get msg = function
@@ -1029,6 +1029,7 @@ module Replay = struct
         ~allowed_headers:None
         ~apply_unsafe_patches:false
         ~bail_on_disagree:false
+        ~profiling
     in
     setup_opentelemetry configuration ;
     Node_context_loader.init
@@ -1200,14 +1201,16 @@ module Replay = struct
           time ;
       return_unit
 
-  let replay_block ~data_dir cctxt block =
+  let replay_block ~data_dir ?profiling cctxt block =
     let open Lwt_result_syntax in
-    let* node_ctxt = mk_node_ctxt ~data_dir cctxt block in
+    let* node_ctxt = mk_node_ctxt ~profiling ~data_dir cctxt block in
     replay_block_aux ~preload:true ~verbose:true node_ctxt block
 
-  let replay_blocks ~data_dir cctxt start_level end_level =
+  let replay_blocks ~data_dir ?profiling cctxt start_level end_level =
     let open Lwt_result_syntax in
-    let* node_ctxt = mk_node_ctxt ~data_dir cctxt (`Level start_level) in
+    let* node_ctxt =
+      mk_node_ctxt ~profiling ~data_dir cctxt (`Level start_level)
+    in
     let levels =
       Stdlib.List.init
         (Int32.sub end_level start_level |> Int32.to_int |> succ)
