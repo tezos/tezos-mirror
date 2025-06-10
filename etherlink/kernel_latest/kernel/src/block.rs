@@ -676,7 +676,8 @@ mod tests {
                 operation: content,
                 gas_limit: gas_limit.into(),
                 storage_limit: storage_limit.into(),
-            },
+            }
+            .into(),
             signature,
         }
     }

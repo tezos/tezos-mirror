@@ -508,7 +508,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             let receipt = tezos_execution::apply_operation(
                 host,
                 &context,
-                operation.content.clone(),
+                operation.content.clone().into(),
             )?;
 
             // Compute the hash of the operation

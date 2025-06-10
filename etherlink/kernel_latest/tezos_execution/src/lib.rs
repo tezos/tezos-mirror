@@ -312,7 +312,8 @@ mod tests {
                 operation: content,
                 gas_limit: gas_limit.into(),
                 storage_limit: storage_limit.into(),
-            },
+            }
+            .into(),
             signature,
         }
     }
@@ -403,7 +404,7 @@ mod tests {
         let receipt = apply_operation(
             &mut host,
             &context::Context::init_context(),
-            operation.content,
+            operation.content.into(),
         )
         .expect("apply_operation should not have failed with a kernel error");
 
@@ -438,7 +439,7 @@ mod tests {
         let receipt = apply_operation(
             &mut host,
             &context::Context::init_context(),
-            operation.content,
+            operation.content.into(),
         )
         .expect("apply_operation should not have failed with a kernel error");
 
@@ -473,7 +474,7 @@ mod tests {
         let receipt = apply_operation(
             &mut host,
             &context::Context::init_context(),
-            operation.content,
+            operation.content.into(),
         )
         .expect("apply_operation should not have failed with a kernel error");
 
@@ -513,7 +514,7 @@ mod tests {
         let receipt = apply_operation(
             &mut host,
             &context::Context::init_context(),
-            operation.content,
+            operation.content.into(),
         )
         .expect("apply_operation should not have failed with a kernel error");
 
@@ -557,7 +558,7 @@ mod tests {
         let receipt = apply_operation(
             &mut host,
             &context::Context::init_context(),
-            operation.content,
+            operation.content.into(),
         )
         .expect("apply_operation should not have failed with a kernel error");
 
@@ -593,7 +594,7 @@ mod tests {
         let receipt = apply_operation(
             &mut host,
             &context::Context::init_context(),
-            operation.content,
+            operation.content.into(),
         )
         .expect("apply_operation should not have failed with a kernel error");
 
@@ -633,7 +634,7 @@ mod tests {
         let receipt = apply_operation(
             &mut host,
             &context::Context::init_context(),
-            operation.content,
+            operation.content.into(),
         )
         .expect("apply_operation should not have failed with a kernel error");
 
@@ -681,7 +682,7 @@ mod tests {
         let receipt = apply_operation(
             &mut host,
             &context::Context::init_context(),
-            operation.content,
+            operation.content.into(),
         )
         .expect("apply_operation should not have failed with a kernel error");
 
@@ -732,7 +733,7 @@ mod tests {
         let receipt = apply_operation(
             &mut host,
             &context::Context::init_context(),
-            operation.content,
+            operation.content.into(),
         )
         .expect("apply_operation should not have failed with a kernel error");
 

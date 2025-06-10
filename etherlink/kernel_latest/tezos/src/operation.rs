@@ -187,7 +187,7 @@ impl NomReader<'_> for ManagerOperation<OperationContent> {
 #[derive(PartialEq, Debug)]
 pub struct Operation {
     pub branch: BlockHash,
-    pub content: ManagerOperation<OperationContent>,
+    pub content: ManagerOperationContent,
     pub signature: UnknownSignature,
 }
 
@@ -197,7 +197,8 @@ impl BinWriter for Operation {
         // Encode branch field
         self.branch.bin_write(data)?;
 
-        self.content.bin_write(data)?;
+        let content: ManagerOperation<OperationContent> = self.content.clone().into();
+        content.bin_write(data)?;
 
         // In an operation, the signature is always encoded as an UnknownSignature
         // 'bin_write' function for signature adds 4 bytes for the size which
@@ -229,7 +230,7 @@ impl NomReader<'_> for Operation {
             bytes,
             Operation {
                 branch,
-                content,
+                content: content.into(),
                 signature,
             },
         ))
@@ -296,6 +297,102 @@ impl BinWriter for BlockHash {
     }
 }
 
+/**
+
+There is a distance between the binary format of manager operations
+and what we want to manipulate when applying them. The former is
+imposed by the protocol and corresponds to this
+ManagerOperationContent struct. The latter is
+ManagerOperation<OperationContent> and is the input type of the
+apply_operation function (in the lib.rs file of the tezos_execution
+crate).
+
+There are some fields common to all manager operations and some fields
+specific to each kind of operation. A lot can be done about a manager
+operation (in particular checking the signature and debiting the fees)
+before we dispatch on the operation kind but the binary format starts
+with the operation-kind tag, then the generic fields, and finally the
+kind-specific fields.
+
+*/
+#[derive(PartialEq, Debug, Clone)]
+pub enum ManagerOperationContent {
+    Reveal(ManagerOperation<RevealContent>),
+    Transfer(ManagerOperation<TransferContent>),
+}
+
+impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
+    fn from(op: ManagerOperation<OperationContent>) -> Self {
+        let ManagerOperation {
+            source,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            operation,
+        } = op;
+        match operation {
+            OperationContent::Reveal(c) => {
+                ManagerOperationContent::Reveal(ManagerOperation {
+                    source,
+                    fee,
+                    counter,
+                    gas_limit,
+                    storage_limit,
+                    operation: c,
+                })
+            }
+            OperationContent::Transfer(c) => {
+                ManagerOperationContent::Transfer(ManagerOperation {
+                    source,
+                    fee,
+                    counter,
+                    gas_limit,
+                    storage_limit,
+                    operation: c,
+                })
+            }
+        }
+    }
+}
+
+impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
+    fn from(op: ManagerOperationContent) -> Self {
+        match op {
+            ManagerOperationContent::Reveal(ManagerOperation {
+                source,
+                fee,
+                counter,
+                gas_limit,
+                storage_limit,
+                operation: c,
+            }) => ManagerOperation {
+                source,
+                fee,
+                counter,
+                gas_limit,
+                storage_limit,
+                operation: OperationContent::Reveal(c),
+            },
+            ManagerOperationContent::Transfer(ManagerOperation {
+                source,
+                fee,
+                counter,
+                gas_limit,
+                storage_limit,
+                operation: c,
+            }) => ManagerOperation {
+                source,
+                fee,
+                counter,
+                gas_limit,
+                storage_limit,
+                operation: OperationContent::Transfer(c),
+            },
+        }
+    }
+}
+
 impl From<H256> for BlockHash {
     fn from(hash: H256) -> Self {
         Self(hash)
@@ -324,7 +421,8 @@ fn make_dummy_operation(
             gas_limit: 68_u64.into(),
             storage_limit: 45_u64.into(),
             operation,
-        },
+        }
+        .into(),
         signature,
     }
 }
@@ -399,22 +497,22 @@ mod tests {
         let signature = UnknownSignature::from_base58_check("sigRs6WkPHqKEuEhMQTmjhMZWn3b7TzYNXMozAaEHty7amNPa1Cw9QPQa84mN7kuBue3uwjxCUyHeaMeaY99Hq11GQ4jCx4x").unwrap();
         let expected_operation = Operation {
             branch,
-            content: ManagerOperation {
+            content: ManagerOperationContent::Reveal(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1cckAZtxYwxAfwQuHnabTWfbp2ScWobxHH",
                 )
                 .unwrap(),
                 fee: 274_u64.into(),
                 counter: 2_u64.into(),
-                operation: OperationContent::Reveal(RevealContent {
+                operation: RevealContent {
                     pk: PublicKey::from_b58check(
                         "edpkuqNrmPPcy2S3G1uKYnxmg7Gov3c8q7AABKRs9EtTVtfDg5Fu7R",
                     )
                     .unwrap(),
-                }),
+                },
                 gas_limit: 169_u64.into(),
                 storage_limit: 0_u64.into(),
-            },
+            }),
             signature,
         };
 
@@ -444,24 +542,24 @@ mod tests {
         let signature = UnknownSignature::from_base58_check("sigT4yGRRhiMZCjGigdhopaXkshKrwDbYrPw3jGFZGkjpvpT57a6KmLa4mFVKBTNHR8NrmyMEt9Pgusac5HLqUoJie2MB5Pd").unwrap();
         let expected_operation = Operation {
             branch,
-            content: ManagerOperation {
+            content: ManagerOperationContent::Transfer(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
                 )
                 .unwrap(),
                 fee: 267_u64.into(),
                 counter: 1_u64.into(),
-                operation: OperationContent::Transfer(TransferContent {
+                operation: TransferContent {
                     amount: 1000000_u64.into(),
                     destination: Contract::from_b58check(
                         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                     )
                     .unwrap(),
                     parameter: None,
-                }),
+                },
                 gas_limit: 169_u64.into(),
                 storage_limit: 0_u64.into(),
-            },
+            }),
             signature,
         };
 
