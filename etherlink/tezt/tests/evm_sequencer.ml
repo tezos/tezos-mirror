@@ -554,18 +554,7 @@ let test_tezlink_current_level =
   let* res = rpc_current_level "3" ~offset:1 in
   let* () = check_current_level res 4 in
   let* res = rpc_current_level "genesis" in
-  let err = JSON.(res |> as_list |> List.hd) in
-  Check.(
-    JSON.(
-      err |-> "id" |> as_string
-      = "evm_node.dev.tezlink.unsupported_block_parameter")
-      string
-      ~error_msg:"Should have failed: expected %R but got %L") ;
-  Check.(
-    JSON.(err |-> "block" |> as_string = "genesis")
-      string
-      ~error_msg:"Should have failed: expected %R but got %L") ;
-
+  let* () = check_current_level res 0 in
   unit
 
 let test_tezlink_protocols =
@@ -587,6 +576,33 @@ let test_tezlink_protocols =
   let* res = rpc_protocols () in
   Check.(
     JSON.(res |-> "protocol" |> as_string = protocol_hash)
+      string
+      ~error_msg:"Expected %R but got %L") ;
+  unit
+
+let test_tezlink_genesis_block_arg =
+  register_tezlink_test
+    ~title:"Test of the genesis block argument"
+    ~tags:["rpc"; "genesis"; "protocols"]
+  @@ fun {sequencer; _} _protocol ->
+  (* call the protocols rpc and parse the result *)
+  let rpc_protocols block_arg =
+    let path =
+      Format.sprintf "/tezlink/chains/main/blocks/%s/protocols" block_arg
+    in
+    let* res =
+      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    return @@ JSON.parse ~origin:"curl_protocols" res
+  in
+
+  let* res_genesis = rpc_protocols "genesis" in
+  let* res_0 = rpc_protocols "0" in
+  Check.(
+    JSON.(
+      res_genesis |-> "protocol" |> as_string
+      = (res_0 |-> "protocol" |> as_string))
       string
       ~error_msg:"Expected %R but got %L") ;
   unit
@@ -13874,6 +13890,7 @@ let () =
   test_tezlink_manager_key [Alpha] ;
   test_tezlink_counter [Alpha] ;
   test_tezlink_protocols [Alpha] ;
+  test_tezlink_genesis_block_arg [Alpha] ;
   test_tezlink_expected_issuance [Alpha] ;
   test_tezlink_monitor_heads [Alpha] ;
   test_tezlink_version [Alpha] ;
