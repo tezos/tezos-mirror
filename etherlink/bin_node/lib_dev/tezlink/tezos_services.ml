@@ -51,32 +51,87 @@ module Mock = struct
   let protocol_data : Imported_protocol.Block_header_repr.protocol_data =
     {contents; signature}
 
-  let receipts =
-    Imported_protocol.Apply_results.Operation_metadata
-      {
-        contents =
-          Single_result
+  module Operation_metadata = struct
+    open Imported_protocol.Apply_results
+    open Alpha_context
+
+    type error += Unsupported_operation_kind of string
+
+    let () =
+      register_error_kind
+        `Permanent
+        ~id:"evm_node.dev.tezlink.unsupported_operation_kind"
+        ~title:"Unsupported operation kind"
+        ~description:
+          "In a RPC call, an operation of unsupported kind was given."
+        ~pp:(fun ppf s -> Format.fprintf ppf "Unsupported operation kind: %s" s)
+        Data_encoding.(obj1 (req "message" string))
+        (function
+          | Unsupported_operation_kind message -> Some message | _ -> None)
+        (fun message -> Unsupported_operation_kind message)
+
+    let consumed_gas = Gas.Arith.zero
+
+    let manager_op_result (type kind) (contents : kind manager_operation) :
+        kind successful_manager_operation_result tzresult =
+      let open Result_syntax in
+      match contents with
+      | Reveal _ -> return (Reveal_result {consumed_gas})
+      | Transaction _ ->
+          return
+            (Transaction_result
+               (Transaction_to_contract_result
+                  {
+                    storage = None;
+                    lazy_storage_diff = None;
+                    balance_updates = [];
+                    ticket_receipt = [];
+                    originated_contracts = [];
+                    consumed_gas;
+                    storage_size = Z.zero;
+                    paid_storage_size_diff = Z.zero;
+                    allocated_destination_contract = true;
+                  }))
+      | _ ->
+          tzfail
+            (Unsupported_operation_kind
+               "only supported kinds are 'reveal' and 'transaction'")
+
+    let contents_result (type kind) (contents : kind contents) :
+        kind contents_result tzresult =
+      let open Result_syntax in
+      match contents with
+      | Manager_operation {operation; _} ->
+          let* result = manager_op_result operation in
+          return
             (Manager_operation_result
                {
                  balance_updates = [];
-                 operation_result =
-                   Applied
-                     (Transaction_result
-                        (Transaction_to_contract_result
-                           {
-                             storage = None;
-                             lazy_storage_diff = None;
-                             balance_updates = [];
-                             ticket_receipt = [];
-                             originated_contracts = [];
-                             consumed_gas = Alpha_context.Gas.Arith.zero;
-                             storage_size = Z.zero;
-                             paid_storage_size_diff = Z.zero;
-                             allocated_destination_contract = true;
-                           }));
                  internal_operation_results = [];
-               });
-      }
+                 operation_result = Applied result;
+               })
+      | _ ->
+          tzfail
+            (Unsupported_operation_kind "only manager operations are supported")
+
+    let rec contents_list_result :
+        type kind. kind contents_list -> kind contents_result_list tzresult =
+     fun contents ->
+      let open Result_syntax in
+      match contents with
+      | Single contents ->
+          let* result = contents_result contents in
+          return (Single_result result)
+      | Cons (contents, contents_list) ->
+          let* result = contents_result contents in
+          let* result_list = contents_list_result contents_list in
+          return (Cons_result (result, result_list))
+
+    let operation_metadata (Operation_data op) =
+      let open Result_syntax in
+      let* contents = contents_list_result op.contents in
+      return (Operation_metadata {contents})
+  end
 end
 
 (* Module importing, amending, and converting, protocol types. Those types
@@ -717,13 +772,18 @@ let register_block_services ~l2_chain_id
        (* We need a proper implementation *)
          ~service:Imported_services.simulate_operation
          ~impl:(fun
-             {block = _; chain = _}
+             {block; chain}
              _param
              ( _blocks_before_activation,
                operation,
                _chain_id,
                _operation_inclusion_latency )
-           -> return (operation.protocol_data, Mock.receipts))
+           ->
+           let*? _chain = check_chain chain in
+           let*? _block = check_block block in
+           let op = operation.protocol_data in
+           let*? mock_result = Mock.Operation_metadata.operation_metadata op in
+           return (op, mock_result))
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7993 *)
     (* RPCs at directory level doesn't appear properly in the describe RPC *)
     |> register_with_conversion
