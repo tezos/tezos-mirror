@@ -696,6 +696,7 @@ let check_chain =
 let check_block =
   let open Result_syntax in
   function
+  | `Genesis -> return (`Level 0l)
   | `Level l -> return (`Level l)
   | `Head offset -> return (`Head (Int32.of_int offset))
   | block ->
