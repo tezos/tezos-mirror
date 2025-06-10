@@ -430,6 +430,8 @@ let handle_request_error rq =
 let register_messages ?order ~drop_duplicate messages =
   let open Lwt_result_syntax in
   let*? w = worker () in
+  Opentelemetry_lwt.Trace.with_ ~service_name:"Batcher" "register_messages"
+  @@ fun _ ->
   Worker.Queue.push_request_and_wait
     w
     (Request.Register {order; messages; drop_duplicate})
@@ -443,6 +445,8 @@ let produce_batches () =
       return_unit
   | Error e -> fail e
   | Ok w ->
+      Opentelemetry_lwt.Trace.with_ ~service_name:"Batcher" "produce_batches"
+      @@ fun _ ->
       Worker.Queue.push_request_and_wait w Request.Produce_batches
       |> handle_request_error
 
