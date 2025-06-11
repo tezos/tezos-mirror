@@ -4,6 +4,7 @@
 
 use crate::{
     block_storage::{get_block_hash, BLOCKS_STORED},
+    code_storage::CodeStorage,
     world_state_handler::{account_path, StorageAccount, WorldStateHandler},
 };
 
@@ -62,9 +63,11 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
         Ok(Some(account_info))
     }
 
-    fn code_by_hash(&mut self, _code_hash: B256) -> Result<Bytecode, Self::Error> {
-        // TODO: use code storage when implemented
-        unimplemented!()
+    fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
+        let code_storage = CodeStorage::new(&code_hash);
+        let bytecode = code_storage.get_code(self.host);
+
+        Ok(bytecode)
     }
 
     fn storage(
