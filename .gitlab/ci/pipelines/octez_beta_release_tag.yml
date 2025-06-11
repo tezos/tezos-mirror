@@ -263,6 +263,7 @@ gitlab:release:
   tags:
   - gcp
   needs:
+  - docker:merge_manifests
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
   - oc.install-release-homebrew
