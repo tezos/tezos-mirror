@@ -14,11 +14,16 @@ use tezos_smart_rollup_host::{
     runtime::Runtime,
 };
 
+use crate::storage_helpers::{bytes_hash, read_u64_le, write_u64_le};
+
 /// Path where EVM codes' are stored.
 const EVM_CODES_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/eth_codes");
 
 /// Path to the EVM bytecode.
 const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
+
+/// Path to the number of accounts that use specific bytecodes.
+const REFERENCE_PATH: RefPath = RefPath::assert_from(b"/ref_count");
 
 fn code_hash_path(code_hash: &B256) -> OwnedPath {
     let code_hash_path_string = format!("/{}", code_hash);
@@ -46,6 +51,33 @@ impl CodeStorage {
     fn exists(&self, host: &impl Runtime) -> bool {
         let store_has_code = host.store_has(&self.path).unwrap();
         store_has_code.is_some()
+    }
+
+    fn get_ref_count(&self, host: &mut impl Runtime) -> u64 {
+        let reference_path = concat(&self.path, &REFERENCE_PATH).unwrap();
+        read_u64_le(host, &reference_path)
+    }
+
+    fn set_ref_count(&self, host: &mut impl Runtime, number_ref: u64) {
+        let reference_path = concat(&self.path, &REFERENCE_PATH).unwrap();
+        write_u64_le(host, &reference_path, number_ref)
+    }
+
+    fn increment_code_usage(&self, host: &mut impl Runtime) {
+        let number_reference = self.get_ref_count(host);
+        let number_reference = number_reference.saturating_add(1u64);
+        self.set_ref_count(host, number_reference)
+    }
+
+    pub fn add(host: &mut impl Runtime, bytecode: &[u8]) -> B256 {
+        let code_hash = bytes_hash(bytecode);
+        let code = Self::new(&code_hash);
+        if code.exists(host) {
+            let code_path = concat(&code.path, &CODE_PATH).unwrap();
+            host.store_write_all(&code_path, bytecode).unwrap();
+        };
+        code.increment_code_usage(host);
+        code_hash
     }
 
     pub fn get_code(&self, host: &impl Runtime) -> Bytecode {
