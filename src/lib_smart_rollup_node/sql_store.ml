@@ -365,8 +365,10 @@ module Commitments = struct
   module Q = struct
     open Types
 
+    let table = "commitments" (* For opentelemetry *)
+
     let insert =
-      (t2 commitment_hash commitment ->. unit)
+      (t2 commitment_hash commitment ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       REPLACE INTO commitments
       (hash, compressed_state, inbox_level, predecessor, number_of_ticks)
@@ -374,7 +376,7 @@ module Commitments = struct
       |sql}
 
     let select =
-      (commitment_hash ->? commitment)
+      (commitment_hash ->? commitment) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT compressed_state, inbox_level, predecessor, number_of_ticks
       FROM commitments
@@ -382,13 +384,13 @@ module Commitments = struct
       |sql}
 
     let delete_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       DELETE FROM commitments WHERE inbox_level < ?
       |sql}
 
     let lcc =
-      (unit ->? commitment)
+      (unit ->? commitment) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT compressed_state, inbox_level, predecessor, number_of_ticks
       FROM commitments
@@ -397,7 +399,7 @@ module Commitments = struct
       |sql}
 
     let lpc =
-      (unit ->? commitment)
+      (unit ->? commitment) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT compressed_state, inbox_level, predecessor, number_of_ticks
       FROM commitments
@@ -438,6 +440,8 @@ module Commitments_published_at_levels = struct
   module Q = struct
     open Types
 
+    let table = "commitments_published_at_levels" (* For opentelemetry *)
+
     let publication_levels =
       product (fun first_published_at_level published_at_level ->
           {first_published_at_level; published_at_level})
@@ -446,7 +450,7 @@ module Commitments_published_at_levels = struct
       @@ proj_end
 
     let register =
-      (t2 commitment_hash publication_levels ->. unit)
+      (t2 commitment_hash publication_levels ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       REPLACE INTO commitments_published_at_levels
       (commitment_hash, first_published_at_level, published_at_level)
@@ -454,7 +458,7 @@ module Commitments_published_at_levels = struct
       |sql}
 
     let select =
-      (commitment_hash ->? publication_levels)
+      (commitment_hash ->? publication_levels) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT first_published_at_level, published_at_level
       FROM commitments_published_at_levels
@@ -462,7 +466,7 @@ module Commitments_published_at_levels = struct
       |sql}
 
     let first_published =
-      (commitment_hash ->? level)
+      (commitment_hash ->? level) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT first_published_at_level
       FROM commitments_published_at_levels
@@ -471,7 +475,7 @@ module Commitments_published_at_levels = struct
       |sql}
 
     let delete_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       DELETE FROM commitments_published_at_levels
       WHERE first_published_at_level < ?
@@ -499,8 +503,10 @@ module Inboxes = struct
   module Q = struct
     open Types
 
+    let table = "inboxes" (* For opentelemetry *)
+
     let insert =
-      (t2 inbox_hash inbox ->. unit)
+      (t2 inbox_hash inbox ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       REPLACE INTO inboxes
       (hash, inbox_level, history_proof)
@@ -508,7 +514,7 @@ module Inboxes = struct
       |sql}
 
     let select =
-      (inbox_hash ->? inbox)
+      (inbox_hash ->? inbox) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT inbox_level, history_proof
       FROM inboxes
@@ -516,7 +522,7 @@ module Inboxes = struct
       |sql}
 
     let select_by_block_hash =
-      (block_hash ->? inbox)
+      (block_hash ->? inbox) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT i.inbox_level, i.history_proof
       FROM inboxes as i
@@ -525,7 +531,7 @@ module Inboxes = struct
       |sql}
 
     let delete_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       DELETE FROM inboxes WHERE inbox_level < ?
       |sql}
@@ -555,8 +561,12 @@ module Messages = struct
   module Q = struct
     open Types
 
+    let table = "messages" (* For opentelemetry *)
+
     let insert =
       (t3 payload_hashes_hash level messages_list ->. unit)
+        ~name:__FUNCTION__
+        ~table
       @@ {sql|
       REPLACE INTO messages
       (payload_hashes_hash, inbox_level, message_list)
@@ -564,7 +574,7 @@ module Messages = struct
       |sql}
 
     let select =
-      (payload_hashes_hash ->? messages_list)
+      (payload_hashes_hash ->? messages_list) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT message_list
       FROM messages
@@ -572,7 +582,7 @@ module Messages = struct
       |sql}
 
     let delete_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       DELETE FROM messages WHERE inbox_level < ?
       |sql}
@@ -597,6 +607,8 @@ module Outbox_messages = struct
   module Q = struct
     open Types
 
+    let table = "outbox_messages" (* For opentelemetry *)
+
     let messages_per_level =
       product (fun messages executed_messages -> {messages; executed_messages})
       @@ proj bitset (fun m -> m.messages)
@@ -604,7 +616,7 @@ module Outbox_messages = struct
       @@ proj_end
 
     let register =
-      (t2 level bitset ->. unit)
+      (t2 level bitset ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       INSERT INTO outbox_messages
       (outbox_level, messages, executed_messages)
@@ -613,14 +625,14 @@ module Outbox_messages = struct
       |sql}
 
     let delete =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       DELETE FROM outbox_messages
       where outbox_level = ?
       |sql}
 
     let range =
-      (t2 level level ->* t2 level messages_per_level)
+      (t2 level level ->* t2 level messages_per_level) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT outbox_level, messages, executed_messages
       FROM outbox_messages
@@ -629,7 +641,7 @@ module Outbox_messages = struct
       |sql}
 
     let select_executed =
-      (level ->? bitset)
+      (level ->? bitset) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT executed_messages
       FROM outbox_messages
@@ -637,7 +649,7 @@ module Outbox_messages = struct
       |sql}
 
     let update_executed =
-      (t2 level bitset ->. unit)
+      (t2 level bitset ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       UPDATE outbox_messages
       SET executed_messages = $2
@@ -692,6 +704,8 @@ module Protocols = struct
   module Q = struct
     open Types
 
+    let table = "protocols" (* For opentelemetry *)
+
     let proto_info =
       product (fun protocol proto_level first_level first_is_activation ->
           let level =
@@ -708,7 +722,7 @@ module Protocols = struct
       @@ proj_end
 
     let insert =
-      (proto_info ->. unit)
+      (proto_info ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       REPLACE INTO protocols
       (hash, proto_level, first_level, first_is_activation)
@@ -716,7 +730,7 @@ module Protocols = struct
       |sql}
 
     let select =
-      (protocol_hash ->? proto_info)
+      (protocol_hash ->? proto_info) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT hash, proto_level, first_level, first_is_activation
       FROM protocols
@@ -724,7 +738,7 @@ module Protocols = struct
       |sql}
 
     let proto_of_level =
-      (level ->? proto_info)
+      (level ->? proto_info) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT hash, proto_level, first_level, first_is_activation
       FROM protocols
@@ -734,7 +748,7 @@ module Protocols = struct
       |sql}
 
     let last =
-      (unit ->? proto_info)
+      (unit ->? proto_info) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT hash, proto_level, first_level, first_is_activation
       FROM protocols
@@ -761,6 +775,8 @@ module Dal_slots_headers = struct
   module Q = struct
     open Types
 
+    let table = "dal_slots_headers" (* For opentelemetry *)
+
     let slot_header =
       let open Dal.Slot_header in
       product (fun index published_level commitment ->
@@ -771,7 +787,7 @@ module Dal_slots_headers = struct
       @@ proj_end
 
     let insert =
-      (t2 block_hash slot_header ->. unit)
+      (t2 block_hash slot_header ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       REPLACE INTO dal_slots_headers
       (block_hash, slot_index, published_level, slot_commitment)
@@ -779,7 +795,7 @@ module Dal_slots_headers = struct
       |sql}
 
     let find_slot_header =
-      (t2 block_hash dal_slot_index ->? slot_header)
+      (t2 block_hash dal_slot_index ->? slot_header) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT slot_index, published_level, slot_commitment
       FROM dal_slots_headers
@@ -787,7 +803,7 @@ module Dal_slots_headers = struct
       |sql}
 
     let select_slot_headers =
-      (block_hash ->* slot_header)
+      (block_hash ->* slot_header) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT slot_index, published_level, slot_commitment
       FROM dal_slots_headers
@@ -796,7 +812,7 @@ module Dal_slots_headers = struct
       |sql}
 
     let select_slot_indexes =
-      (block_hash ->* dal_slot_index)
+      (block_hash ->* dal_slot_index) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT slot_index
       FROM dal_slots_headers
@@ -826,8 +842,12 @@ module Dal_slots_statuses = struct
   module Q = struct
     open Types
 
+    let table = "dal_slots_headers" (* For opentelemetry *)
+
     let insert =
       (t3 block_hash dal_slot_index dal_slot_status ->. unit)
+        ~name:__FUNCTION__
+        ~table
       @@ {sql|
       REPLACE INTO dal_slots_statuses
       (block_hash, slot_index, attested)
@@ -836,6 +856,8 @@ module Dal_slots_statuses = struct
 
     let find_slot_status =
       (t2 block_hash dal_slot_index ->? dal_slot_status)
+        ~name:__FUNCTION__
+        ~table
       @@ {sql|
       SELECT attested
       FROM dal_slots_statuses
@@ -844,6 +866,8 @@ module Dal_slots_statuses = struct
 
     let select_slot_statuses =
       (block_hash ->* t2 dal_slot_index dal_slot_status)
+        ~name:__FUNCTION__
+        ~table
       @@ {sql|
       SELECT slot_index, attested
       FROM dal_slots_statuses
@@ -869,8 +893,10 @@ module L2_levels = struct
   module Q = struct
     open Types
 
+    let table = "l2_levels" (* For opentelemetry *)
+
     let insert =
-      (t2 level block_hash ->. unit)
+      (t2 level block_hash ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       REPLACE INTO l2_levels
       (level, block_hash)
@@ -878,7 +904,7 @@ module L2_levels = struct
       |sql}
 
     let select =
-      (level ->? block_hash)
+      (level ->? block_hash) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT block_hash
       FROM l2_levels
@@ -886,7 +912,7 @@ module L2_levels = struct
       |sql}
 
     let delete_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       DELETE FROM l2_levels WHERE level < ?
       |sql}
@@ -908,6 +934,8 @@ end
 module L2_blocks = struct
   module Q = struct
     open Types
+
+    let table = "l2_levels" (* For opentelemetry *)
 
     let l2_block =
       let open Sc_rollup_block in
@@ -953,7 +981,7 @@ module L2_blocks = struct
       @@ proj_end
 
     let insert =
-      (l2_block ->. unit)
+      (l2_block ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       REPLACE INTO l2_blocks
       (block_hash, level, predecessor, commitment_hash,
@@ -963,7 +991,7 @@ module L2_blocks = struct
       |sql}
 
     let select =
-      (block_hash ->? l2_block)
+      (block_hash ->? l2_block) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT
        block_hash, level, predecessor, commitment_hash,
@@ -974,7 +1002,7 @@ module L2_blocks = struct
       |sql}
 
     let select_by_level =
-      (level ->? l2_block)
+      (level ->? l2_block) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT
        block_hash, level, predecessor, commitment_hash,
@@ -985,7 +1013,7 @@ module L2_blocks = struct
       |sql}
 
     let select_level =
-      (block_hash ->? level)
+      (block_hash ->? level) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT level
       FROM l2_blocks
@@ -993,7 +1021,7 @@ module L2_blocks = struct
       |sql}
 
     let select_context =
-      (block_hash ->? context_hash)
+      (block_hash ->? context_hash) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT context
       FROM l2_blocks
@@ -1001,7 +1029,7 @@ module L2_blocks = struct
       |sql}
 
     let select_head =
-      (unit ->? l2_block)
+      (unit ->? l2_block) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT
        b.block_hash, b.level, b.predecessor, b.commitment_hash,
@@ -1013,7 +1041,7 @@ module L2_blocks = struct
       |sql}
 
     let select_finalized =
-      (unit ->? l2_block)
+      (unit ->? l2_block) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT
        b.block_hash, b.level, b.predecessor, b.commitment_hash,
@@ -1025,7 +1053,7 @@ module L2_blocks = struct
       |sql}
 
     let select_level_and_predecessor =
-      (block_hash ->? t2 level block_hash)
+      (block_hash ->? t2 level block_hash) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT level, predecessor
       FROM l2_blocks
@@ -1034,6 +1062,8 @@ module L2_blocks = struct
 
     let select_full =
       (block_hash ->? t4 l2_block (option commitment) inbox messages_list)
+        ~name:__FUNCTION__
+        ~table
       @@ {sql|
       SELECT
        b.block_hash, b.level, b.predecessor, b.commitment_hash,
@@ -1053,7 +1083,7 @@ module L2_blocks = struct
       |sql}
 
     let delete_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       DELETE FROM l2_blocks WHERE level < ?
       |sql}
@@ -1125,8 +1155,10 @@ module State = struct
   struct
     open Types
 
+    let table = "rollup_node_state" (* For opentelemetry *)
+
     let set_level =
-      (level ->. unit)
+      (level ->. unit) ~name:(String.concat "." [__FUNCTION__; N.name]) ~table
       @@ Format.sprintf
            {sql|REPLACE INTO rollup_node_state (name, level) VALUES (%S, ?)|sql}
            N.name
@@ -1138,19 +1170,21 @@ module State = struct
            N.name
 
     let set_value type_ =
-      (type_ ->. unit)
+      (type_ ->. unit) ~name:(String.concat "." [__FUNCTION__; N.name]) ~table
       @@ Format.sprintf
            {sql|REPLACE INTO rollup_node_state (name, value) VALUES (%S, ?)|sql}
            N.name
 
     let get_value type_ =
-      (unit ->? type_)
+      (unit ->? type_) ~name:(String.concat "." [__FUNCTION__; N.name]) ~table
       @@ Format.sprintf
            {sql|SELECT value from rollup_node_state WHERE name = %S|sql}
            N.name
 
     let set_both type_ =
       (t2 type_ level ->. unit)
+        ~name:(String.concat "." [__FUNCTION__; N.name])
+        ~table
       @@ Format.sprintf
            {sql|
          REPLACE INTO rollup_node_state (name, value, level)
@@ -1160,12 +1194,14 @@ module State = struct
 
     let get_both type_ =
       (unit ->? t2 type_ level)
+        ~name:(String.concat "." [__FUNCTION__; N.name])
+        ~table
       @@ Format.sprintf
            {sql|SELECT value, level from rollup_node_state WHERE name = %S|sql}
            N.name
 
     let delete =
-      (unit ->. unit)
+      (unit ->. unit) ~name:(String.concat "." [__FUNCTION__; N.name]) ~table
       @@ Format.sprintf
            {sql|DELETE from rollup_node_state WHERE name = %S|sql}
            N.name
