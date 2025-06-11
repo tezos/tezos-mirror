@@ -107,6 +107,68 @@ module Op_info_for_logging = struct
     }
 end
 
+let pp_unsigned_consensus_vote fmt unsigned_consensus_vote =
+  Op_info_for_logging.(
+    pp fmt (of_unsigned_consensus_vote unsigned_consensus_vote))
+
+let pp_signed_consensus_vote fmt {unsigned_consensus_vote; _} =
+  pp_unsigned_consensus_vote fmt unsigned_consensus_vote
+
+let pp_forge_event fmt = function
+  | Block_ready {signed_block_header; round; delegate; _} ->
+      Format.fprintf
+        fmt
+        "block ready@ at level %ld, round %a@ for@ delegate@ %a "
+        signed_block_header.shell.level
+        Round.pp
+        round
+        Delegate.pp
+        delegate
+  | Preattestation_ready signed_op | Attestation_ready signed_op ->
+      Format.fprintf
+        fmt
+        "operation ready:@ %a"
+        pp_signed_consensus_vote
+        signed_op
+
+let pp_event fmt =
+  let open Baking_state in
+  function
+  | New_valid_proposal proposal ->
+      Format.fprintf
+        fmt
+        "new valid proposal received: %a"
+        pp_block_info
+        proposal.block
+  | New_head_proposal proposal ->
+      Format.fprintf
+        fmt
+        "new head proposal received: %a"
+        pp_block_info
+        proposal.block
+  | Prequorum_reached (candidate, preattestations) ->
+      Format.fprintf
+        fmt
+        "prequorum reached with %d preattestations for %a at round %a"
+        (List.length preattestations)
+        Block_hash.pp
+        candidate.Operation_worker.hash
+        Round.pp
+        candidate.round_watched
+  | Quorum_reached (candidate, attestations) ->
+      Format.fprintf
+        fmt
+        "quorum reached with %d attestations for %a at round %a"
+        (List.length attestations)
+        Block_hash.pp
+        candidate.Operation_worker.hash
+        Round.pp
+        candidate.round_watched
+  | New_forge_event forge_event ->
+      Format.fprintf fmt "new forge event: %a" pp_forge_event forge_event
+  | Timeout kind ->
+      Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind
+
 module Commands = struct
   include Internal_event.Simple
 
