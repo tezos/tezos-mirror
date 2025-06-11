@@ -45,9 +45,10 @@ Run commands:
       [--private-rpc-port <PORT>]
       [--genesis-timestamp <[TIMESTAMP]>]
       [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
-      [-f --password-filename <filename>] [--network <network>]
+      [-f --password-filename <filename>] [--disable-da-fees]
+      [--kernel-verbosity <info>] [--network <network>]
       [--init-from-snapshot [snapshot url]] [--fund <0x...>]
-      [--replicate [url]] [--disable-da-fees] [--kernel-verbosity <info>]
+      [--replicate [url]]
     Start the EVM node in sandbox mode. The sandbox mode is a sequencer-like
     mode that produces blocks with a fake key and no rollup node connection.
     --data-dir <data-dir>: The path to the EVM node data directory.
@@ -114,6 +115,9 @@ Run commands:
       Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR`
       if it exists, or `$HOME/.tezos-client` otherwise.
     -f --password-filename <filename>: path to the password filename
+    --disable-da-fees: Disable DA fees for this replay.
+    --kernel-verbosity <info>: Sets kernel's logging verbosity, either
+      `fatal`, `error`, `info`, `debug`.
     --network <network>: The network the EVM node will be connecting to. Can
       be `mainnet` or `testnet`.
       If set, defaults to the value of EVM_NODE_NETWORK.
@@ -133,6 +137,91 @@ Run commands:
     --replicate [url]: Replicate a chain in real time from the EVM node whose
       address is provided.
       Defaults to `the official relay endpoint if --network is used`.
+  
+  run tezlink sandbox [--data-dir <data-dir>] [--config-file <path>]
+      [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
+      [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
+      [--private-rpc-port <PORT>]
+      [--genesis-timestamp <[TIMESTAMP]>]
+      [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
+      [-f --password-filename <filename>] [--disable-da-fees]
+      [--kernel-verbosity <info>]
+    Start the EVM node in tezlink sandbox mode. The sandbox mode is a
+    sequencer-like mode that produces blocks with a fake key and no rollup
+    node connection.
+    --data-dir <data-dir>: The path to the EVM node data directory.
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --config-file <path>: Path to a configuration file. Defaults to
+      `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+    --rpc-addr <ADDR>: The EVM node server rpc address.
+    --rpc-port <PORT>: The EVM node server rpc port.
+    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
+      single batch. Can either be `unlimited` or a positive integer.
+    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
+    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
+    --ws [BOOL?]: Enable websockets server when present or set to
+      true.
+      Defaults to ``true` when the switch is present, and is `false`
+      otherwise`.
+    --max-number-blocks <100>: Maximum number of blocks kept in the log.
+    --max-number-logs <1000>: Maximum number of logs kept.
+    --chunk-size <10>: Blocks to be filtered are split in chunks, which will
+      be filtered in sequence. Within each chunk, the block filtering is done
+      concurrently.
+    -K --keep-alive: Keep the EVM node process alive even if the connection
+      is lost with the rollup node.
+    --rollup-node-endpoint <url>: The address of a rollup node.
+    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the
+      transaction pool (in seconds).
+    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the
+      transaction pool.
+    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user
+      address inside the transaction pool.
+    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
+    --restricted-rpcs <regexp>: Disable methods that matches the given
+      Perl-like regular expression. Cannot be used with --whitelisted-rpcs or
+      --blacklisted-rpcs.
+    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of
+      the provided list. Cannot be used with --restricted-rpcs or
+      --whitelisted-rpcs.
+    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not
+      part of the provided list. Cannot be used with --restricted-rpcs or
+      --blacklisted-rpcs.
+    --finalized-view: If the flag is set, the node will use the latest final
+      state of the rollup, not its current HEAD, for any read-only operation.
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages
+      directory.
+    --preimages-endpoint <url>: The address of a service which provides
+      pre-images for the rollup. Missing pre-images will be downloaded
+      remotely if they are not already present on disk.
+    -n --native-execution-policy <policy>: Policy regarding the use of native
+      execution for supported kernels. Can be `never`, `rpcs_only` or
+      `always`.
+    --time-between-blocks <10.>: Interval (in seconds) at which the sequencer
+      creates an empty block by default. If set to `none`, blocks are
+      produced on demand only (see private method produceBlock).
+    --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
+    --private-rpc-port <PORT>: The EVM node private server rpc port.
+    --genesis-timestamp <[TIMESTAMP]>: Timestamp used for the
+      genesis block, uses machine's clock if not provided.
+    --kernel <evm_kernel.wasm>: Path to the EVM kernel used to launch the
+      PVM, it will be loaded from storage afterward.
+    -d --wallet-dir <path>: The directory where the Tezos client stores all
+      its wallet data.
+      Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR`
+      if it exists, or `$HOME/.tezos-client` otherwise.
+    -f --password-filename <filename>: path to the password filename
     --disable-da-fees: Disable DA fees for this replay.
     --kernel-verbosity <info>: Sets kernel's logging verbosity, either
       `fatal`, `error`, `info`, `debug`.
