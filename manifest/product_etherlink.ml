@@ -196,7 +196,14 @@ let evm_node_migrations =
     "evm_node_migrations"
     ~path:"etherlink/bin_node/migrations"
     ~synopsis:"SQL migrations for the EVM node store"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; caqti_lwt; crunch; re]
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        caqti_lwt;
+        crunch;
+        re;
+        octez_sqlite |> open_;
+      ]
     ~dune:
       Dune.
         [
