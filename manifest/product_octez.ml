@@ -1901,6 +1901,29 @@ let octez_base_unix =
     ~inline_tests_libraries:[bls12_381_archive]
     ~inline_tests_link_flags:["-cclib"; "-lblst"]
 
+let octez_lib_upnp =
+  public_lib
+    "octez-lib-upnp"
+    ~path:"src/lib_upnp"
+    ~synopsis:"UPNP support"
+    ~deps:
+      [
+        octez_rust_igd_next |> open_;
+        octez_stdlib |> open_;
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
+        octez_lwt_result_stdlib |> open_;
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
+        octez_stdlib_unix |> open_;
+      ]
+
+let octez_lib_upnp_args =
+  public_lib
+    "octez-lib-upnp-args"
+    ~path:"src/lib_upnp/args"
+    ~synopsis:"UPNP support: Cmdliner shared args"
+    ~deps:[cmdliner]
+
 let octez_base_p2p_identity_file =
   octez_lib
     "base.p2p-identity-file"
@@ -8604,7 +8627,8 @@ let _octez_node =
          uri;
          octez_base_p2p_identity_file |> open_;
          memtrace;
-         octez_rust_igd_next;
+         octez_lib_upnp;
+         octez_lib_upnp_args;
        ]
       @ protocol_deps)
     ~linkall:true

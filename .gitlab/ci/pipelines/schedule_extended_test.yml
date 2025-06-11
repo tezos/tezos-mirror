@@ -1242,13 +1242,13 @@ opam:all_6:
       - tezos-protocol-demo-noops
       - tezos-protocol-demo-counter
       - tezos-protocol-alpha
-      - tezos-openapi
       - tezos-dal-node-services
       - tezos-benchmark
       - octez-shell-libs
       - octez-riscv-pvm
       - octez-proto-libs
       - octez-performance-metrics
+      - octez-lib-upnp
       - octez-l2-libs
       - efunc_core
       - dal_node_migrations
@@ -1830,11 +1830,13 @@ opam:all_7:
     matrix:
     - package:
       - tezt-tezos
+      - tezos-openapi
       - octez-rustzcash-deps
       - octez-rust-deps
       - octez-riscv-api
       - octez-protocol-compiler-compat
       - octez-libs
+      - octez-lib-upnp-args
       - octez-internal-libs
       - octez-igd-next
       - octez-distributed-lwt-internal

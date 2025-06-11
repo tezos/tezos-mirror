@@ -43,6 +43,8 @@
 (package (name octez-injector-server))
 (package (name octez-internal-libs))
 (package (name octez-l2-libs))
+(package (name octez-lib-upnp))
+(package (name octez-lib-upnp-args))
 (package (name octez-libs))
 (package (name octez-node))
 (package (name octez-node-config))

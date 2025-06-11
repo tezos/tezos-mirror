@@ -23,7 +23,8 @@ depends: [
   "lwt-exit"
   "uri" { >= "3.1.0" }
   "memtrace"
-  "octez-igd-next" { = version }
+  "octez-lib-upnp" { = version }
+  "octez-lib-upnp-args" { = version }
   "tezos-protocol-000-Ps9mPmXa" { = version }
   "tezos-protocol-022-PsRiotum" { = version }
   "octez-protocol-022-PsRiotum-libs" { = version }
