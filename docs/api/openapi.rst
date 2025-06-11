@@ -44,7 +44,7 @@ Shell RPCs
 The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `rpc-openapi <../_static/rpc-openapi.html>`__ (version 22.0)
+- `rpc-openapi <../_static/rpc-openapi.html>`__ (version 22.1)
 - `rpc-openapi-dev <../_static/rpc-openapi-dev.html>`__ (version master)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
@@ -55,12 +55,12 @@ Rio RPCs
 The OpenAPI specifications for RPCs which are specific to the Rio (``PsRiotum``)
 protocol can be found at:
 
-- `rio-openapi <../_static/rio-openapi.html>`__ (version 22.0)
+- `rio-openapi <../_static/rio-openapi.html>`__ (version 22.1)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Rio protocol proposal can be found at:
 
-- `rio-mempool-openapi <../_static/rio-mempool-openapi.html>`__ (version 22.0)
+- `rio-mempool-openapi <../_static/rio-mempool-openapi.html>`__ (version 22.1)
 
 Alpha RPCs
 ----------
@@ -91,7 +91,7 @@ Rio RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Rio
 (``PsRiotum``) protocol can be found at:
 
-- `rio-smart-rollup-node-openapi <../_static/rio-smart-rollup-node-openapi.html>`__ (version 22.0)
+- `rio-smart-rollup-node-openapi <../_static/rio-smart-rollup-node-openapi.html>`__ (version 22.1)
 
 Alpha RPCs
 ----------
@@ -107,7 +107,7 @@ DAL Node
 The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
-- `dal-node-openapi <../_static/dal-node-openapi.html>`__ (version 22.0)
+- `dal-node-openapi <../_static/dal-node-openapi.html>`__ (version 22.1)
 - `dal-node-openapi <../_static/dal-node-openapi-dev.html>`__ (version master)
 
 .. _openapi_generate:
