@@ -216,7 +216,11 @@ let outbox_message_match_filter (message : Outbox_message.summary)
 let publish_executable_messages (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   let operator = Node_context.get_operator node_ctxt Executing_outbox in
-  unless (operator = None) @@ fun () ->
+  let executes =
+    Option.is_some operator
+    && not (List.is_empty node_ctxt.config.execute_outbox_messages_filter)
+  in
+  when_ executes @@ fun () ->
   (* Configured to execute outbox messages *)
   let lcc = Reference.get node_ctxt.lcc in
   let* lcc_block_hash = Node_context.hash_of_level node_ctxt lcc.level in
@@ -245,7 +249,13 @@ let publish_executable_messages (node_ctxt : _ Node_context.t) =
                   List.assoc ~equal:Int.equal message_index outbox
                 in
                 match message with
-                | None -> assert false
+                | None ->
+                    let*! () =
+                      Commitment_event.outbox_message_missing
+                        ~outbox_level
+                        ~message_index
+                    in
+                    return_unit
                 | Some (Whitelist_update _) ->
                     (* Don't execute whitelist updates as this is done by
                        {!publish_execute_whitelist_update_message}. *)

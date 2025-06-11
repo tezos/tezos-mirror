@@ -171,6 +171,10 @@ module Outbox_messages : sig
     indexes:Bitset.t ->
     unit tzresult Lwt.t
 
+  (** Delete outbox messages for a given outbox level. *)
+  val delete_outbox_messages :
+    ?conn:Sqlite.conn -> rw -> outbox_level:int32 -> unit tzresult Lwt.t
+
   (** Register an outbox message as executed by its outbox level and its index
       in the outbox. *)
   val set_outbox_message_executed :

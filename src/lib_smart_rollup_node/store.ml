@@ -275,6 +275,9 @@ module Outbox_messages = struct
   let register_outbox_messages s ~outbox_level ~indexes =
     Outbox_messages.register_outbox_messages (write_to s) ~outbox_level ~indexes
 
+  let delete_outbox_messages s ~outbox_level =
+    Outbox_messages.delete_outbox_messages (write_to s) ~outbox_level
+
   let set_outbox_message_executed s ~outbox_level ~index =
     let open Lwt_result_syntax in
     match read_from s with
