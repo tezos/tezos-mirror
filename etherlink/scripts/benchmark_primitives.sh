@@ -26,6 +26,10 @@ Arguments:
   precompiled           Contracts that invoke EVM precompiles:
                         ECRecover, SHA256, RIPEMD160, MODEXP, BLAKE2f.
 
+  solidity_basics       Contracts to test basic language constructs
+                        (e.g. loops, conditionals, events) without precompiles
+                        or gas-heavy operations.
+
 Example:
   $0 4 gas_sinks results.png --clean
 EOF

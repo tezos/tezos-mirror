@@ -4,33 +4,28 @@
 : > data_gas.tmp
 
 dir="$1"
-output="${2:-out.png}"
+graph_dir="$2"
+chunk_size="${3:-30}"
 
 usage() {
   cat << EOF
 Usage:
-  $0 <csv_directory> [output_file.png]
+  $0 <csv_directory> <graph_dir> [chunk_size]
 
 Arguments:
-  csv_directory     Path to the directory containing CSV logs
-                    (e.g., data_dir/kernel_logs).
-  output_file.png   (Optional) Output image file for the graph.
-                    Defaults to 'out.png' if not provided.
-
-Example:
-  $0 sandbox_evm_node1/kernel_logs results.png
+  csv_directory     Path to the directory containing CSV logs (e.g., data_dir/kernel_logs).
+  graph_dir         Output directory for graph chunks.
+  chunk_size        (Optional) Number of blocks per graph. Defaults to 30.
 EOF
   exit 1
 }
 
-if [ -z "$dir" ]; then
-  echo "Usage: $0 <csv_directory> [output_file.png]"
-  exit 1
+if [ "$#" -lt 2 ]; then
+  usage
 fi
 
-# Process CSV files
 i=0
-for file in "$dir"/*.csv; do
+find "$dir" -maxdepth 1 -name '*.csv' | sort -V | while IFS= read -r file; do
   [ -f "$file" ] || continue
   echo "Processing: $file"
   base=$(basename "$file")
@@ -67,10 +62,20 @@ for file in "$dir"/*.csv; do
   i=$((i + 1))
 done
 
-# Plot with gnuplot
-gnuplot -persist << EOF
+mkdir -p "$graph_dir"
+
+max_index=$(awk 'BEGIN {max=0} {if ($1+0 > max) max=$1} END {print max}' data_ticks.tmp)
+for ((start = 0; start <= max_index; start += chunk_size)); do
+  end=$((start + chunk_size - 1))
+  if ((end > max_index)); then end=$max_index; fi
+
+  block_start=$(awk -v idx="$start" '$1 == idx { print $3; exit }' data_ticks.tmp)
+  block_end=$(awk -v idx="$end" '$1 == idx { print $3; exit }' data_ticks.tmp)
+  output_file="${graph_dir}/blocks_${block_start}_to_${block_end}.png"
+
+  gnuplot -persist << EOF
 set terminal pngcairo size 800,600
-set output '$output'
+set output '$output_file'
 
 set xlabel "Replay ID"
 set xtics rotate by -45
@@ -82,22 +87,15 @@ set y2tics
 set ylabel "Ticks Used (% of 3e10)"
 set y2label "Gas Used (% of 3e7)"
 
-# Map x-index to numeric IDs
-set xtics ($(awk '!seen[$1]++ { printf "\"%s\" %d\n", $3, $1 }' data_ticks.tmp | paste -sd, -))
+set xtics ($(awk -v s="$start" -v e="$end" '$1 >= s && $1 <= e { printf "\"%s\" %d\n", $3, $1 }' data_ticks.tmp | paste -sd, -))
 
 plot \
-    'data_ticks.tmp' using 1:(\$2 / 30000000000.0 * 100) title 'Ticks (%)' with linespoints pt 7 lc rgb 'blue' axes x1y1, \
-    'data_gas.tmp' using 1:(\$2 / 30000000.0 * 100) title 'Gas (%)' with linespoints pt 7 lc rgb 'red' axes x1y2
+    "< awk -v s=$start -v e=$end '\$1 >= s && \$1 <= e' data_ticks.tmp" using 1:(\$2 / 30000000000.0 * 100) title 'Ticks (%)' with linespoints pt 7 lc rgb 'blue' axes x1y1, \
+    "< awk -v s=$start -v e=$end '\$1 >= s && \$1 <= e' data_gas.tmp" using 1:(\$2 / 30000000.0 * 100) title 'Gas (%)' with linespoints pt 7 lc rgb 'red' axes x1y2
+
+# set xrange [$start:$end]
 EOF
 
-# Open image
-if command -v xdg-open > /dev/null; then
-  xdg-open "$output"
-elif command -v open > /dev/null; then
-  open "$output"
-else
-  echo "Graph saved to $output (could not auto-open)"
-fi
+done
 
-# Cleanup
 rm -f data_ticks.tmp data_gas.tmp

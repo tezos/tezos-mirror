@@ -22,4 +22,8 @@ let () =
     ~title:"precompiled"
     ~registered:Primitives.registered_precompiled
     ~tx_per_call:1 ;
+  Producer.register
+    ~title:"solidity_basics"
+    ~registered:Primitives.registered_solidity_basics
+    ~tx_per_call:1 ;
   Test.run ()
