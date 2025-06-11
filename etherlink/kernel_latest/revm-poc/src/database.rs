@@ -10,7 +10,7 @@ use crate::{
 
 use revm::{
     primitives::{Address, HashMap, StorageKey, StorageValue, B256},
-    state::{Account, AccountInfo, Bytecode},
+    state::{Account, AccountInfo, AccountStatus, Bytecode, EvmStorageSlot},
     Database, DatabaseCommit,
 };
 use std::convert::Infallible;
@@ -97,7 +97,39 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
 }
 
 impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
-    fn commit(&mut self, _changes: HashMap<Address, Account>) {
-        unimplemented!()
+    fn commit(&mut self, changes: HashMap<Address, Account>) {
+        for (
+            address,
+            Account {
+                info,
+                storage,
+                status,
+                ..
+            },
+        ) in changes
+        {
+            match status {
+                // The account is marked as touched, the changes should be commited
+                // to the database.
+                AccountStatus::Touched => {
+                    let mut storage_account = StorageAccount::from_address(&address);
+                    storage_account.set_info(self.host, info);
+
+                    for (key, EvmStorageSlot { present_value, .. }) in storage {
+                        storage_account.set_storage(self.host, &key, &present_value);
+                    }
+                }
+                AccountStatus::Created
+                | AccountStatus::CreatedLocal
+                | AccountStatus::SelfDestructed
+                | AccountStatus::SelfDestructedLocal
+                | AccountStatus::LoadedAsNotExisting
+                | AccountStatus::Cold => {
+                    // Local changes only, nothing is commited
+                    // TODO: Double check for [Created] case.
+                }
+                _ => panic!("Undefined account status"),
+            }
+        }
     }
 }
