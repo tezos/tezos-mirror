@@ -181,10 +181,21 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           init_from_snapshot
     | None -> Result.return_none
   in
-  let* tx_container =
+  (* The Tx_pool parameters are ignored by the start function when a
+     Tx_queue is configured.
+
+     TODO: simplify start_tx_container when removing the Tx_pool. *)
+  let start_tx_container, tx_container =
     match configuration.experimental_features.enable_tx_queue with
-    | Some _tx_queue_config -> return Tx_queue.tx_container
-    | None -> return Tx_pool.tx_container
+    | Some tx_queue_config ->
+        let start, tx_container = Tx_queue.tx_container in
+        ( (fun ~tx_pool_parameters:_ ->
+            start
+              ~config:tx_queue_config
+              ~keep_alive:configuration.keep_alive
+              ()),
+          tx_container )
+    | None -> (Tx_pool.start, Tx_pool.tx_container)
   in
   let (module Tx_container) =
     Services_backend_sig.tx_container_module tx_container
@@ -338,24 +349,18 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     Backend.single_chain_id_and_family ~config:configuration ~enable_multichain
   in
   let* () =
-    match configuration.experimental_features.enable_tx_queue with
-    | Some tx_queue_config ->
-        Tx_queue.start
-          ~config:tx_queue_config
-          ~keep_alive:configuration.keep_alive
-          ()
-    | None ->
-        Tx_pool.start
-          {
-            backend;
-            smart_rollup_address = smart_rollup_address_b58;
-            mode = Sequencer;
-            tx_timeout_limit = configuration.tx_pool_timeout_limit;
-            tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
-            tx_pool_tx_per_addr_limit =
-              Int64.to_int configuration.tx_pool_tx_per_addr_limit;
-            chain_family = Ex_chain_family chain_family;
-          }
+    start_tx_container
+      ~tx_pool_parameters:
+        {
+          backend;
+          smart_rollup_address = smart_rollup_address_b58;
+          mode = Sequencer;
+          tx_timeout_limit = configuration.tx_pool_timeout_limit;
+          tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit =
+            Int64.to_int configuration.tx_pool_tx_per_addr_limit;
+          chain_family = Ex_chain_family chain_family;
+        }
   in
   Metrics.init
     ~mode:"sequencer"

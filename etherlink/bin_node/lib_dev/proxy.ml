@@ -188,13 +188,10 @@ let main
         config.experimental_features.enable_tx_queue )
     with
     | true, None, Some tx_queue_config ->
+        let start, tx_container = Tx_queue.tx_container in
         let* () =
-          Tx_queue.start
-            ~config:tx_queue_config
-            ~keep_alive:config.keep_alive
-            ()
+          start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
         in
-        let tx_container = Tx_queue.tx_container in
         return
         @@ ( Some
                (fun () ->
@@ -206,16 +203,17 @@ let main
     | true, None, None ->
         let* () =
           Tx_pool.start
-            {
-              backend = (module Rollup_node_rpc);
-              smart_rollup_address;
-              mode = Proxy;
-              tx_timeout_limit = config.tx_pool_timeout_limit;
-              tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-              tx_pool_tx_per_addr_limit =
-                Int64.to_int config.tx_pool_tx_per_addr_limit;
-              chain_family = Ex_chain_family chain_family;
-            }
+            ~tx_pool_parameters:
+              {
+                backend = (module Rollup_node_rpc);
+                smart_rollup_address;
+                mode = Proxy;
+                tx_timeout_limit = config.tx_pool_timeout_limit;
+                tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+                tx_pool_tx_per_addr_limit =
+                  Int64.to_int config.tx_pool_tx_per_addr_limit;
+                chain_family = Ex_chain_family chain_family;
+              }
         in
         return
           (Some Tx_pool.pop_and_inject_transactions_lazy, Tx_pool.tx_container)

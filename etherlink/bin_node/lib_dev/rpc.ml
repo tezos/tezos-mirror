@@ -214,30 +214,30 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
 
         return (false, forward_request)
     | None, Some tx_queue_config ->
+        let start, tx_container = Tx_queue.tx_container in
         let* () =
-          Tx_queue.start
-            ~config:tx_queue_config
-            ~keep_alive:config.keep_alive
-            ()
+          start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
         in
-        return (false, Tx_queue.tx_container)
+        return (false, tx_container)
     | None, None ->
+        let tx_container = Tx_pool.tx_container in
         let* () =
           Tx_pool.start
-            {
-              backend = rpc_backend;
-              smart_rollup_address =
-                Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
-                  ctxt.smart_rollup_address;
-              mode = Relay;
-              tx_timeout_limit = config.tx_pool_timeout_limit;
-              tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-              tx_pool_tx_per_addr_limit =
-                Int64.to_int config.tx_pool_tx_per_addr_limit;
-              chain_family = Ex_chain_family chain_family;
-            }
+            ~tx_pool_parameters:
+              {
+                backend = rpc_backend;
+                smart_rollup_address =
+                  Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+                    ctxt.smart_rollup_address;
+                mode = Relay;
+                tx_timeout_limit = config.tx_pool_timeout_limit;
+                tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+                tx_pool_tx_per_addr_limit =
+                  Int64.to_int config.tx_pool_tx_per_addr_limit;
+                chain_family = Ex_chain_family chain_family;
+              }
         in
-        return (true, Tx_pool.tx_container)
+        return (true, tx_container)
   in
 
   let* () = set_metrics_level ctxt in

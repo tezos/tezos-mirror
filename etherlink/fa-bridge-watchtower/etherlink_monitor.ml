@@ -54,7 +54,7 @@ end
 module Tx_queue = struct
   include Tx_queue
 
-  let (Services_backend_sig.Evm_tx_container tx_container) = tx_container
+  let start, Services_backend_sig.Evm_tx_container tx_container = tx_container
 
   let ( let**? ) v f =
     let open Lwt_result_syntax in

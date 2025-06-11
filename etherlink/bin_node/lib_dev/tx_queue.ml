@@ -1209,10 +1209,9 @@ module Eth_tx_container =
       let chain_name = "etherlink"
     end)
 
-let start = Eth_tx_container.start
-
 let tx_container =
-  Services_backend_sig.Evm_tx_container (module Eth_tx_container)
+  ( Eth_tx_container.start,
+    Services_backend_sig.Evm_tx_container (module Eth_tx_container) )
 
 module Internal_for_tests = struct
   module Nonce_bitset = Nonce_bitset
