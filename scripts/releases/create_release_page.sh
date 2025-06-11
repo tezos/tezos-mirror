@@ -8,7 +8,7 @@ if [ -z "${S3_BUCKET:-}" ]; then
 fi
 
 # If [URL] is not defined, we use the [S3_BUCKET] address.
-URL="${URL:-${S3_BUCKET}}"
+URL="${URL:-${S3_BUCKET}${BUCKET_PATH}}"
 
 versions_list_filename="${1:-}"
 
@@ -50,9 +50,9 @@ while read -r version rc latest announcement; do
   for arch in x86_64 arm64; do
     echo "### $arch" >> index.md
 
-    aws s3 cp "s3://${S3_BUCKET}/octez-v${version}/binaries/${arch}/sha256sums.txt" "./sha256sums.txt"
+    aws s3 cp "s3://${S3_BUCKET}${BUCKET_PATH}/octez-v${version}/binaries/${arch}/sha256sums.txt" "./sha256sums.txt"
 
-    for binary in $(aws s3 ls "s3://${S3_BUCKET}/octez-v${version}/binaries/${arch}/" --recursive | awk '{print $NF}'); do
+    for binary in $(aws s3 ls "s3://${S3_BUCKET}${BUCKET_PATH}/octez-v${version}/binaries/${arch}/" --recursive | awk '{print $NF}'); do
       binary_name=$(basename "$binary")
       # Write sha256sum only if it's an actual binary (and not a checksums file)
       if [[ "$binary_name" != "sha256sums.txt" ]]; then
@@ -77,4 +77,4 @@ while read -r version rc latest announcement; do
 done <<< "$(printf "%s\n" "${versions[@]}")"
 
 echo "Generating html file."
-pandoc index.md -s --template="./docs/release_page/template.html" --metadata title="Octez Releases" --css=style.css -o index.html
+pandoc index.md -s --template="./docs/release_page/template.html" --metadata=title="Octez Releases" --metadata=path="${BUCKET_PATH}" --css=style.css -o index.html
