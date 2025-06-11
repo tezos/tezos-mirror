@@ -8,7 +8,6 @@
 
 open Filename.Infix
 open Sqlite
-open Caqti_request.Infix
 open Caqti_type.Std
 
 let sqlite_file_name = "store.sqlite"
@@ -16,6 +15,8 @@ let sqlite_file_name = "store.sqlite"
 type conn = Sqlite.conn
 
 module Q = struct
+  open Sqlite.Request
+
   let table_exists =
     (string ->! bool)
     @@ {|
@@ -155,16 +156,16 @@ let with_connection store conn =
       fun k -> Sqlite.use store @@ fun conn -> Sqlite.with_connection conn k
 
 module Skip_list_cells = struct
-  type nonrec t = t
+  type t = Sqlite.t
 
   open Types
 
   module Q = struct
+    open Sqlite.Request
     open Dal_proto_types
     open Tezos_dal_node_services.Types
 
-    let find_opt :
-        (Skip_list_hash.t, Skip_list_cell.t, [`Zero | `One]) Caqti_request.t =
+    let find_opt : (Skip_list_hash.t, Skip_list_cell.t, [`Zero | `One]) t =
       (skip_list_hash ->? skip_list_cell)
       @@ {sql|
       SELECT cell
@@ -173,7 +174,7 @@ module Skip_list_cells = struct
       |sql}
 
     let find_by_slot_id_opt :
-        (level * slot_index, Skip_list_cell.t, [`One | `Zero]) Caqti_request.t =
+        (level * slot_index, Skip_list_cell.t, [`One | `Zero]) t =
       let open Caqti_type.Std in
       (t2 attested_level dal_slot_index ->? skip_list_cell)
       @@ {sql|
@@ -186,7 +187,7 @@ module Skip_list_cells = struct
       )|sql}
 
     let insert_skip_list_slot :
-        (level * slot_index * Skip_list_hash.t, unit, [`Zero]) Caqti_request.t =
+        (level * slot_index * Skip_list_hash.t, unit, [`Zero]) t =
       (t3 attested_level dal_slot_index skip_list_hash ->. unit)
       @@ {sql|
       INSERT INTO skip_list_slots
@@ -196,7 +197,7 @@ module Skip_list_cells = struct
       |sql}
 
     let insert_skip_list_cell :
-        (Skip_list_hash.t * Skip_list_cell.t, unit, [`Zero]) Caqti_request.t =
+        (Skip_list_hash.t * Skip_list_cell.t, unit, [`Zero]) t =
       (t2 skip_list_hash skip_list_cell ->. unit)
       @@ {sql|
       INSERT INTO skip_list_cells
@@ -205,7 +206,7 @@ module Skip_list_cells = struct
       ON CONFLICT(hash) DO UPDATE SET cell = $2
       |sql}
 
-    let delete_skip_list_cell : (level, unit, [`Zero]) Caqti_request.t =
+    let delete_skip_list_cell : (level, unit, [`Zero]) t =
       (attested_level ->. unit)
       @@ {sql|
       DELETE FROM skip_list_cells
@@ -215,7 +216,7 @@ module Skip_list_cells = struct
         WHERE attested_level = $1)
       |sql}
 
-    let delete_skip_list_slot : (level, unit, [`Zero]) Caqti_request.t =
+    let delete_skip_list_slot : (level, unit, [`Zero]) t =
       (attested_level ->. unit)
       @@ {sql|
       DELETE FROM skip_list_slots
@@ -305,10 +306,10 @@ module Skip_list_cells = struct
 
   module Internal_for_tests = struct
     module Q = struct
+      open Sqlite.Request
       open Dal_proto_types
 
-      let skip_list_hash_exists :
-          (Skip_list_hash.t, bool, [`One]) Caqti_request.t =
+      let skip_list_hash_exists : (Skip_list_hash.t, bool, [`One]) t =
         (skip_list_hash ->! bool)
         @@ {sql|
     SELECT EXISTS (

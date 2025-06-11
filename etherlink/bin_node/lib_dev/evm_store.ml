@@ -166,7 +166,7 @@ type metadata = {
 }
 
 module Q = struct
-  open Caqti_request.Infix
+  open Sqlite.Request
   open Caqti_type.Std
   open Ethereum_types
 

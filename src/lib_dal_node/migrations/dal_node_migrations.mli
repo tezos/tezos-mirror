@@ -10,7 +10,7 @@
 module type S = sig
   val name : string
 
-  val up : (unit, unit, [`Zero]) Caqti_request.t list
+  val up : (unit, unit, [`Zero]) Sqlite.Request.t list
 end
 
 type migration = (module S)

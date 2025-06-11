@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Caqti_request.Infix
+open Sqlite.Request
 open Caqti_type.Std
 
 let re_t = Re.(compile @@ Posix.re "[0-9]{3}_([a-z0-9_]+).sql")
@@ -13,7 +13,7 @@ let re_t = Re.(compile @@ Posix.re "[0-9]{3}_([a-z0-9_]+).sql")
 module type S = sig
   val name : string
 
-  val up : (unit, unit, [`Zero]) Caqti_request.t list
+  val up : (unit, unit, [`Zero]) Sqlite.Request.t list
 end
 
 type migration = (module S)

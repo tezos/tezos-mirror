@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Caqti_request.Infix
+open Sqlite.Request
 open Caqti_type.Std
 
 module Events = struct
