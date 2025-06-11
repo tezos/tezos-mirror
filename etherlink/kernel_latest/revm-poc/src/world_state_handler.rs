@@ -9,15 +9,15 @@ use revm::{
 };
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, RefPath},
-    runtime::{Runtime, RuntimeError},
+    runtime::{Runtime, RuntimeError, ValueType},
 };
 use tezos_smart_rollup_storage::storage::Storage;
 
-use crate::storage_helpers::{
-    read_b256_be_default, read_u256_le_default, read_u64_le_default,
+use crate::{
+    code_storage::CodeStorage,
+    storage_helpers::{read_b256_be_default, read_u256_le_default, read_u64_le_default},
 };
 
-#[cfg(test)]
 /// Path where EVM accounts are stored.
 pub const EVM_ACCOUNTS_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/eth_accounts");
@@ -73,8 +73,7 @@ pub struct StorageAccount {
 }
 
 impl StorageAccount {
-    #[cfg(test)]
-    pub fn _from_address(address: &Address) -> Self {
+    pub fn from_address(address: &Address) -> Self {
         let path = concat(&EVM_ACCOUNTS_PATH, &account_path(address)).unwrap();
         path.into()
     }
@@ -84,14 +83,38 @@ impl StorageAccount {
         read_u256_le_default(host, &path, BALANCE_DEFAULT_VALUE)
     }
 
+    pub fn set_balance(&mut self, host: &mut impl Runtime, new_balance: U256) {
+        let path = concat(&self.path, &BALANCE_PATH).unwrap();
+        host.store_write_all(&path, &new_balance.to_le_bytes::<{ U256::BYTES }>())
+            .unwrap()
+    }
+
     pub fn nonce(&self, host: &impl Runtime) -> u64 {
         let path = concat(&self.path, &NONCE_PATH).unwrap();
         read_u64_le_default(host, &path, NONCE_DEFAULT_VALUE)
     }
 
+    pub fn set_nonce(&mut self, host: &mut impl Runtime, nonce: u64) {
+        let path = concat(&self.path, &NONCE_PATH).unwrap();
+
+        let value_bytes: [u8; 8] = nonce.to_le_bytes();
+
+        host.store_write_all(&path, &value_bytes).unwrap()
+    }
+
     pub fn code_hash(&self, host: &impl Runtime) -> B256 {
         let path = concat(&self.path, &CODE_HASH_PATH).unwrap();
         read_b256_be_default(host, &path, KECCAK_EMPTY)
+    }
+
+    pub fn code_exists(&self, host: &impl Runtime) -> bool {
+        let path = concat(&self.path, &CODE_HASH_PATH).unwrap();
+
+        match host.store_has(&path) {
+            Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) => true,
+            Ok(Some(ValueType::Subtree) | None) => false,
+            Err(err) => panic!("{err:?}"),
+        }
     }
 
     pub fn code(&self, host: &impl Runtime) -> Option<Bytecode> {
@@ -105,10 +128,23 @@ impl StorageAccount {
                 Some(Bytecode::new_raw_checked(Bytes::from(bytes)).unwrap())
             }
             Err(RuntimeError::PathNotFound) => {
-                // TODO: add code storage when implemented
-                panic!("Hashconsing not implemented yet")
+                let code_hash = self.code_hash(host);
+                let code_storage = CodeStorage::new(&code_hash);
+                Some(code_storage.get_code(host))
             }
             Err(err) => panic!("{err:?}"),
+        }
+    }
+
+    pub fn set_code(&mut self, host: &mut impl Runtime, code: &[u8]) {
+        if self.code_exists(host) {
+            panic!("code already set")
+        } else {
+            let code_hash = CodeStorage::add(host, code);
+            let code_hash_bytes: [u8; 32] = code_hash.into();
+            let code_hash_path = concat(&self.path, &CODE_HASH_PATH).unwrap();
+            host.store_write_all(&code_hash_path, &code_hash_bytes)
+                .unwrap()
         }
     }
 
@@ -121,6 +157,21 @@ impl StorageAccount {
         }
     }
 
+    pub fn set_info(&mut self, host: &mut impl Runtime, new_infos: AccountInfo) {
+        let AccountInfo {
+            balance,
+            nonce,
+            code,
+            ..
+        } = new_infos;
+
+        self.set_balance(host, balance);
+        self.set_nonce(host, nonce);
+        // TODO: setting an already existing code will cause issues, catch
+        // the error here when it's implemented.
+        self.set_code(host, code.unwrap_or_default().bytes_slice());
+    }
+
     pub fn storage_path(&self, index: &U256) -> OwnedPath {
         let storage_path = concat(&self.path, &STORAGE_ROOT_PATH).unwrap();
         let index_path = path_from_u256(index);
@@ -130,6 +181,13 @@ impl StorageAccount {
     pub fn get_storage(&self, host: &impl Runtime, index: &U256) -> U256 {
         let path = self.storage_path(index);
         read_u256_le_default(host, &path, STORAGE_DEFAULT_VALUE)
+    }
+
+    pub fn set_storage(&mut self, host: &mut impl Runtime, index: &U256, value: &U256) {
+        let path = self.storage_path(index);
+        let value_bytes = value.to_le_bytes::<{ U256::BYTES }>();
+
+        host.store_write_all(&path, &value_bytes).unwrap()
     }
 }
 
