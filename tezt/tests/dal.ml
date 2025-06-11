@@ -596,9 +596,14 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
 let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
     ?bootstrap_profile ?history_mode ?(wait_ready = true) ?env
     ?disable_shard_validation ?(event_level = `Debug) ?slots_backup_uris
-    ?trust_slots_backup_uris tezos_node =
+    ?trust_slots_backup_uris ?disable_amplification tezos_node =
   let dal_node =
-    Dal_node.create ?name ?disable_shard_validation ~node:tezos_node ()
+    Dal_node.create
+      ?name
+      ?disable_shard_validation
+      ~node:tezos_node
+      ?disable_amplification
+      ()
   in
   let* () =
     Dal_node.init_config
@@ -616,7 +621,7 @@ let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
 
 let with_dal_node ?peers ?attester_profiles ?operator_profiles
     ?bootstrap_profile ?history_mode ?wait_ready ?env ?disable_shard_validation
-    tezos_node f key =
+    ?disable_amplification tezos_node f key =
   let* dal_node =
     make_dal_node
       ?peers
@@ -627,6 +632,7 @@ let with_dal_node ?peers ?attester_profiles ?operator_profiles
       ?wait_ready
       ?env
       ?disable_shard_validation
+      ?disable_amplification
       tezos_node
   in
   f key dal_node
@@ -682,8 +688,8 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
     ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
     ?event_sections_levels ?operator_profiles ?history_mode ?prover
-    ?l1_history_mode ?wait_ready ?env ?disable_shard_validation variant scenario
-    =
+    ?l1_history_mode ?wait_ready ?env ?disable_shard_validation
+    ?disable_amplification variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
   test
@@ -728,6 +734,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?wait_ready
         ?env
         ?disable_shard_validation
+        ?disable_amplification
         node
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
@@ -740,7 +747,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?minimal_block_delay ?delay_increment_per_round ?activation_timestamp
     ?bootstrap_profile ?operator_profiles ?smart_rollup_timeout_period_in_blocks
     ?(regression = true) ?prover ?attestation_threshold ?l1_history_mode variant
-    scenario =
+    ?disable_amplification scenario =
   let description = "Testing DAL rollup and node with L1" in
   let tags = if List.mem team tags then tags else team :: tags in
   test
@@ -781,7 +788,11 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         ~protocol
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
-      with_dal_node ?bootstrap_profile ?operator_profiles node
+      with_dal_node
+        ?bootstrap_profile
+        ?operator_profiles
+        ?disable_amplification
+        node
       @@ fun key dal_node ->
       ( with_fresh_rollup ~pvm_name ~dal_node
       @@ fun sc_rollup_address sc_rollup_node ->
@@ -3291,7 +3302,9 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   let* current_level = Node.get_level l1_node in
   Log.info "[e2e.startup] current level is %d@." current_level ;
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
-  let bootstrap_dal_node = Dal_node.create ~node:l1_node () in
+  let bootstrap_dal_node =
+    Dal_node.create ~node:l1_node ~disable_amplification:true ()
+  in
   let operator_profiles = [slot_index] in
   let* () =
     Dal_node.init_config
@@ -3308,7 +3321,9 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
       l1_client =
     extra_node_operators
     |> Lwt_list.map_p (fun key_opt ->
-           let fresh_dal_node = Dal_node.create ~node:l1_node () in
+           let fresh_dal_node =
+             Dal_node.create ~node:l1_node ~disable_amplification:true ()
+           in
            let* () =
              match key_opt with
              | Some _ ->
@@ -7865,13 +7880,19 @@ module Refutations = struct
     let honest_operator_key = Constant.bootstrap5.public_key_hash in
     (* We have two DAL nodes in producer mode *)
     let* honest_dal_node =
-      make_dal_node ~name:"dal-honest" ~peers:[] ~operator_profiles:[0; 1] node
+      make_dal_node
+        ~name:"dal-honest"
+        ~peers:[]
+        ~operator_profiles:[0; 1]
+        ~disable_amplification:true
+        node
     in
     let* faulty_dal_node =
       make_dal_node
         ~name:"dal-faulty"
         ~peers:[Dal_node.listen_addr honest_dal_node]
         ~operator_profiles:[0; 1]
+        ~disable_amplification:true
         node
     in
 
@@ -8052,6 +8073,7 @@ module Refutations = struct
       ~commitment_period:5
       ~smart_rollup_timeout_period_in_blocks:20
       ~l1_history_mode:Default_with_refutation
+      ~disable_amplification:true
       ~tags:[Tag.slow]
       (scenario ~refute_operations_priority)
       protocols

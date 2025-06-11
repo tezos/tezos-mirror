@@ -116,10 +116,12 @@ module Dal = struct
 
   let disable_shard_validation = switch_to_clic disable_shard_validation_switch
 
+  let disable_amplification = switch_to_clic disable_amplification_switch
+
   let verbose = switch_to_clic verbose_switch
 
   let args =
-    Tezos_clic.args21
+    Tezos_clic.args22
       data_dir
       rpc_addr
       expected_pow
@@ -141,6 +143,7 @@ module Dal = struct
       disable_shard_validation
       verbose
       ignore_l1_config_peers
+      disable_amplification
 
   let commands =
     let open Tezos_clic in
@@ -172,7 +175,8 @@ module Dal = struct
             fetch_trusted_setup,
             disable_shard_validation,
             verbose,
-            ignore_l1_config_peers )
+            ignore_l1_config_peers,
+            disable_amplification )
           _cctxt
         ->
           let attester_profile = Option.value ~default:[] attester_profile in
@@ -202,6 +206,7 @@ module Dal = struct
               disable_shard_validation
               verbose
               ignore_l1_config_peers
+              disable_amplification
           in
           match options with
           | Ok options -> Cli.run ~disable_logging:true cmd options

@@ -104,6 +104,10 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
   let shards_timing_table =
     Dal_metrics.Slot_id_bounded_map.create timing_table_size
   in
+  let disable_amplification =
+    let config = Node_context.get_config node_ctxt in
+    config.disable_amplification
+  in
   let shards_handler shards =
     let save_and_notify = Store.Shards.write_all shards in
     fun Types.Message.{share; _}
@@ -137,9 +141,14 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
         when Controller_profiles.is_observed_slot slot_index profile -> (
           match amplificator with
           | None ->
-              let*! () = Event.emit_amplificator_uninitialized () in
+              let*! () =
+                if not disable_amplification then
+                  Event.emit_amplificator_uninitialized ()
+                else Lwt.return_unit
+              in
               return_unit
           | Some amplificator ->
+              assert (not disable_amplification) ;
               Amplificator.try_amplification
                 commitment
                 slot_metrics
@@ -467,7 +476,7 @@ let run ?(disable_logging = false) ?(disable_shard_validation = false) ~data_dir
      This forks a process and should be kept early to avoid copying opened file
      descriptors. *)
   let* amplificator =
-    if is_prover_profile then
+    if is_prover_profile && not config.disable_amplification then
       let* amplificator = Amplificator.make ctxt in
       return_some amplificator
     else return_none

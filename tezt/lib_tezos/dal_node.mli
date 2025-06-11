@@ -51,6 +51,7 @@ val create :
   ?public_addr:string ->
   ?metrics_addr:string ->
   ?disable_shard_validation:bool ->
+  ?disable_amplification:bool ->
   node:Node.t ->
   unit ->
   t
@@ -68,6 +69,7 @@ val create_from_endpoint :
   ?public_addr:string ->
   ?metrics_addr:string ->
   ?disable_shard_validation:bool ->
+  ?disable_amplification:bool ->
   l1_node_endpoint:Endpoint.t ->
   unit ->
   t
