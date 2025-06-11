@@ -1,4 +1,4 @@
-Version 22.0
+Version 22.1
 ============
 
 Changes
@@ -14,6 +14,15 @@ Version 22 introduces the following changes or new features:
   (4) The default :doc:`history mode <../user/history_modes>` is now ``Rolling`` instead of ``Full``.
   (5) **New experimental agnostic baker executable**. (See :ref:`the experimental agnostic baker section <agnostic_baker_v22>`)
   (6) Release of the new Debian and RPM packages. (See :ref:`the packages section <packages_v22>`)
+
+Octez v22.1
+"""""""""""
+
+Octez v22.1 is a minor releases aiming to fix some issues reporting when compiling from sources.
+In particular, it allows to install (or update) the ``ocamlfind`` dependency correctly to its latest version.
+It also fixes an issue with Homebrew formulas, which was affecting deployment on Mac OS X systems.
+
+In addition, v22.1 improves the snapshot import UX and fixes an issue in the rollup affecting the execution of outbox messages during chain reorganisations.
 
 .. _protocol_support_v22:
 
@@ -79,14 +88,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v22.0
+  git checkout octez-v22.1
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v22.0`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v22.1`` Docker images of Octez.
 
 
 .. _packages_v22:
@@ -113,6 +122,7 @@ Alternatively, you can run them individually. For instance, to start only the ba
 Changelog
 ---------
 
+- `Version 22.1 <../CHANGES.html#version-22-1>`_
 - `Version 22.0 <../CHANGES.html#version-22-0>`_
 - `Version 22.0~rc3 <../CHANGES.html#version-22-0-rc3>`_
 - `Version 22.0~rc2 <../CHANGES.html#version-22-0-rc2>`_

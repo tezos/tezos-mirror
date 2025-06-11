@@ -3,6 +3,15 @@
 Changelog
 '''''''''
 
+Version 22.1
+============
+
+Smart Rollup node
+-----------------
+
+- Fixed an issue with the execution of outbox messages (e.g. withdrawals on
+  Etherlink) during reorgs, when messages are not in the new chain. (MR :gl:`!17961`)
+
 Version 22.0
 ============
 
