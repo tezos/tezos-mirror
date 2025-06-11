@@ -10,7 +10,6 @@ use revm::{
     Database, DatabaseCommit,
 };
 use std::convert::Infallible;
-use tezos_ethereum::block::BlockConstants;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 pub struct EtherlinkVMDB<'a, Host: Runtime> {
@@ -18,8 +17,6 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     host: &'a mut Host,
     /// EVM world state handler
     world_state_handler: &'a mut WorldStateHandler,
-    /// Constants for the current block
-    block: &'a BlockConstants,
 }
 
 // See: https://github.com/rust-lang/rust-clippy/issues/5787
@@ -28,12 +25,10 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
     #[cfg(test)]
     pub fn new(
         host: &'a mut Host,
-        block: &'a BlockConstants,
         world_state_handler: &'a mut WorldStateHandler,
     ) -> Self {
         EtherlinkVMDB {
             host,
-            block,
             world_state_handler,
         }
     }

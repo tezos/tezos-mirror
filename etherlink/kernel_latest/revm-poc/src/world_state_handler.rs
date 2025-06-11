@@ -17,6 +17,7 @@ use crate::storage_helpers::{
     read_b256_be_default, read_u256_le_default, read_u64_le_default,
 };
 
+#[cfg(test)]
 /// Path where EVM accounts are stored.
 pub const EVM_ACCOUNTS_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/eth_accounts");
@@ -72,7 +73,8 @@ pub struct StorageAccount {
 }
 
 impl StorageAccount {
-    pub fn from_address(address: &Address) -> Self {
+    #[cfg(test)]
+    pub fn _from_address(address: &Address) -> Self {
         let path = concat(&EVM_ACCOUNTS_PATH, &account_path(address)).unwrap();
         path.into()
     }
@@ -138,6 +140,7 @@ impl From<OwnedPath> for StorageAccount {
 
 pub type WorldStateHandler = Storage<StorageAccount>;
 
+#[cfg(test)]
 pub fn new_world_state_handler() -> WorldStateHandler {
     Storage::<StorageAccount>::init(&EVM_ACCOUNTS_PATH).unwrap()
 }
