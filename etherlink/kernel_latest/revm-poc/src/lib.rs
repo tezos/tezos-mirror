@@ -4,6 +4,8 @@
 
 mod database;
 mod precompile_provider;
+mod storage_helpers;
+mod world_state_handler;
 
 #[cfg(test)]
 mod test {
@@ -16,9 +18,11 @@ mod test {
         state::AccountInfo,
         Context, ExecuteEvm, MainBuilder, MainContext,
     };
+    use tezos_evm_runtime::runtime::MockKernelHost;
 
     use crate::database::EtherlinkVMDB;
     use crate::precompile_provider;
+    use crate::world_state_handler::new_world_state_handler;
 
     #[test]
     fn test_revm_usage() {
@@ -114,7 +118,9 @@ mod test {
             authorization_list: vec![],
         };
 
-        let mut db = EtherlinkVMDB::new();
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler();
+        let mut db = EtherlinkVMDB::new(&mut host, &mut world_state_handler);
 
         let mut cfg = CfgEnv::default();
         cfg.spec = SpecId::PRAGUE;
