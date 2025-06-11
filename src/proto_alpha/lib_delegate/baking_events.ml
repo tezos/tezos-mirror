@@ -1122,16 +1122,19 @@ module Actions = struct
       ("trace", Error_monad.trace_encoding)
       ~pp2:Error_monad.pp_print_trace
 
-  let signing_consensus_vote =
-    declare_2
+  let signing_consensus_op =
+    declare_1
       ~section
-      ~name:"signing_consensus_vote"
+      ~name:"signing_consensus_operation"
       ~level:Info
-      ~msg:"signing {vote_kind} for {delegate}"
-      ~pp1:pp_consensus_vote_kind
-      ("vote_kind", consensus_vote_kind_encoding)
-      ~pp2:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
+      ~msg:"signing {operation_information}"
+      ~pp1:Op_info_for_logging.pp
+      ("operation_information", Op_info_for_logging.encoding)
+
+  let emit_signing_consensus_op unsigned_consensus_op =
+    emit
+      signing_consensus_op
+      (Op_info_for_logging.of_unsigned_consensus_vote unsigned_consensus_op)
 
   let invalid_json_file =
     declare_1
