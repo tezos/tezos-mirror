@@ -23,9 +23,9 @@ aws s3 ls "s3://${S3_BUCKET}/"
 aws s3 cp s3://"${S3_BUCKET}"/"$versions_list_filename" "./versions.json"
 
 major="22"
-minor="0"
+minor="1"
 announcement="https://octez.tezos.com/docs/releases/version-22.html"
-gitlab_release="octez-v22.0"
+gitlab_release="octez-v22.1"
 
 jq ". += [{\"major\":${major}, \"minor\":${minor}, \"latest\":true, \"announcement\":\"${announcement}\"}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
 
@@ -35,10 +35,10 @@ aws s3 ls "s3://${S3_BUCKET}/"
 
 aws s3 ls "s3://${S3_BUCKET}/octez-v22.0-rc3/binaries/arm64/"
 
-wget -O "octez-arm.zip" "https://gitlab.com/tezos/tezos/-/jobs/9643344730//artifacts/download"
+wget -O "octez-arm.zip" "https://gitlab.com/tezos/tezos/-/jobs/10316771839/artifacts/download"
 unzip "./octez-arm.zip"
 
-wget -O "octez-x86.zip" "https://gitlab.com/tezos/tezos/-/jobs/9643344728/artifacts/download"
+wget -O "octez-x86.zip" "https://gitlab.com/tezos/tezos/-/jobs/10316771835/artifacts/download"
 unzip "./octez-x86.zip"
 
 # Upload binaries to S3 bucket
