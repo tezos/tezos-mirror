@@ -56,8 +56,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}"
+        }
       }
     },
     "/chains/{chain_id}/active_peers_heads": {
@@ -124,8 +123,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/active_peers_heads"
+        }
       }
     },
     "/chains/{chain_id}/blocks": {
@@ -196,8 +194,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/blocks"
+        }
       }
     },
     "/chains/{chain_id}/chain_id": {
@@ -240,8 +237,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/chain_id"
+        }
       }
     },
     "/chains/{chain_id}/delegators_contribution/{int32}/{pkh}": {
@@ -343,8 +339,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/delegators_contribution/{int32}/{pkh}"
+        }
       }
     },
     "/chains/{chain_id}/invalid_blocks": {
@@ -403,8 +398,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/invalid_blocks"
+        }
       }
     },
     "/chains/{chain_id}/invalid_blocks/{block_hash}": {
@@ -469,8 +463,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/invalid_blocks/{block_hash}"
+        }
       },
       "delete": {
         "description": "Remove an invalid block for the tezos storage",
@@ -516,8 +509,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/invalid_blocks/{block_hash}"
+        }
       }
     },
     "/chains/{chain_id}/is_bootstrapped": {
@@ -567,8 +559,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/is_bootstrapped"
+        }
       }
     },
     "/chains/{chain_id}/levels/caboose": {
@@ -620,8 +611,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/levels/caboose"
+        }
       }
     },
     "/chains/{chain_id}/levels/checkpoint": {
@@ -673,8 +663,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/levels/checkpoint"
+        }
       }
     },
     "/chains/{chain_id}/levels/savepoint": {
@@ -726,8 +715,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/levels/savepoint"
+        }
       }
     },
     "/chains/{chain_id}/protocols": {
@@ -802,8 +790,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/protocols"
+        }
       }
     },
     "/chains/{chain_id}/protocols/{Protocol_hash}": {
@@ -884,8 +871,7 @@
               }
             }
           }
-        },
-        "summary": "/chains/{chain_id}/protocols/{Protocol_hash}"
+        }
       }
     },
     "/config": {
@@ -1625,8 +1611,7 @@
               }
             }
           }
-        },
-        "summary": "/config"
+        }
       }
     },
     "/config/history_mode": {
@@ -1666,8 +1651,7 @@
               }
             }
           }
-        },
-        "summary": "/config/history_mode"
+        }
       }
     },
     "/config/logging": {
@@ -1733,8 +1717,7 @@
               }
             }
           }
-        },
-        "summary": "/config/logging"
+        }
       }
     },
     "/config/network/dal": {
@@ -1775,8 +1758,7 @@
               }
             }
           }
-        },
-        "summary": "/config/network/dal"
+        }
       }
     },
     "/config/network/user_activated_protocol_overrides": {
@@ -1820,8 +1802,7 @@
               }
             }
           }
-        },
-        "summary": "/config/network/user_activated_protocol_overrides"
+        }
       }
     },
     "/config/network/user_activated_upgrades": {
@@ -1867,8 +1848,7 @@
               }
             }
           }
-        },
-        "summary": "/config/network/user_activated_upgrades"
+        }
       }
     },
     "/errors": {
@@ -1893,8 +1873,7 @@
               }
             }
           }
-        },
-        "summary": "/errors"
+        }
       }
     },
     "/fetch_protocol/{Protocol_hash}": {
@@ -1930,8 +1909,7 @@
               }
             }
           }
-        },
-        "summary": "/fetch_protocol/{Protocol_hash}"
+        }
       }
     },
     "/health/ready": {
@@ -1966,8 +1944,7 @@
               }
             }
           }
-        },
-        "summary": "/health/ready"
+        }
       }
     },
     "/injection/block": {
@@ -2054,8 +2031,7 @@
               }
             }
           }
-        },
-        "summary": "/injection/block"
+        }
       }
     },
     "/injection/operation": {
@@ -2116,8 +2092,7 @@
               }
             }
           }
-        },
-        "summary": "/injection/operation"
+        }
       }
     },
     "/injection/protocol": {
@@ -2199,8 +2174,7 @@
               }
             }
           }
-        },
-        "summary": "/injection/protocol"
+        }
       }
     },
     "/monitor/active_chains": {
@@ -2275,8 +2249,7 @@
               }
             }
           }
-        },
-        "summary": "/monitor/active_chains"
+        }
       }
     },
     "/monitor/applied_blocks": {
@@ -2358,8 +2331,7 @@
               }
             }
           }
-        },
-        "summary": "/monitor/applied_blocks"
+        }
       }
     },
     "/monitor/bootstrapped": {
@@ -2398,8 +2370,7 @@
               }
             }
           }
-        },
-        "summary": "/monitor/bootstrapped"
+        }
       }
     },
     "/monitor/heads/{chain_id}": {
@@ -2508,8 +2479,7 @@
               }
             }
           }
-        },
-        "summary": "/monitor/heads/{chain_id}"
+        }
       }
     },
     "/monitor/protocols": {
@@ -2541,8 +2511,7 @@
               }
             }
           }
-        },
-        "summary": "/monitor/protocols"
+        }
       }
     },
     "/monitor/received_blocks/{chain_id}": {
@@ -2588,8 +2557,7 @@
               }
             }
           }
-        },
-        "summary": "/monitor/received_blocks/{chain_id}"
+        }
       }
     },
     "/monitor/validated_blocks": {
@@ -2671,8 +2639,7 @@
               }
             }
           }
-        },
-        "summary": "/monitor/validated_blocks"
+        }
       }
     },
     "/network/connections": {
@@ -2764,8 +2731,7 @@
               }
             }
           }
-        },
-        "summary": "/network/connections"
+        }
       }
     },
     "/network/connections/{peer_id}": {
@@ -2865,8 +2831,7 @@
               }
             }
           }
-        },
-        "summary": "/network/connections/{peer_id}"
+        }
       },
       "delete": {
         "description": "Forced close of the current P2P connection to the given peer.",
@@ -2911,8 +2876,7 @@
               }
             }
           }
-        },
-        "summary": "/network/connections/{peer_id}"
+        }
       }
     },
     "/network/full_stat": {
@@ -4075,8 +4039,7 @@
               }
             }
           }
-        },
-        "summary": "/network/full_stat"
+        }
       }
     },
     "/network/greylist": {
@@ -4104,8 +4067,7 @@
               }
             }
           }
-        },
-        "summary": "/network/greylist"
+        }
       }
     },
     "/network/greylist/ips": {
@@ -4157,8 +4119,7 @@
               }
             }
           }
-        },
-        "summary": "/network/greylist/ips"
+        }
       }
     },
     "/network/greylist/peers": {
@@ -4188,8 +4149,7 @@
               }
             }
           }
-        },
-        "summary": "/network/greylist/peers"
+        }
       }
     },
     "/network/log": {
@@ -4729,8 +4689,7 @@
               }
             }
           }
-        },
-        "summary": "/network/log"
+        }
       }
     },
     "/network/peers": {
@@ -5735,8 +5694,7 @@
               }
             }
           }
-        },
-        "summary": "/network/peers"
+        }
       }
     },
     "/network/peers/{peer_id}": {
@@ -6729,8 +6687,7 @@
               }
             }
           }
-        },
-        "summary": "/network/peers/{peer_id}"
+        }
       },
       "patch": {
         "description": "Change the permissions of a given peer. With `{acl: ban}`: blacklist the given peer and remove it from the whitelist if present. With `{acl: open}`: removes the peer from the blacklist and whitelist. With `{acl: trust}`: trust the given peer permanently and remove it from the blacklist if present. The peer cannot be blocked (but its host IP still can).",
@@ -7740,8 +7697,7 @@
               }
             }
           }
-        },
-        "summary": "/network/peers/{peer_id}"
+        }
       }
     },
     "/network/peers/{peer_id}/banned": {
@@ -7779,8 +7735,7 @@
               }
             }
           }
-        },
-        "summary": "/network/peers/{peer_id}/banned"
+        }
       }
     },
     "/network/peers/{peer_id}/log": {
@@ -7829,8 +7784,7 @@
               }
             }
           }
-        },
-        "summary": "/network/peers/{peer_id}/log"
+        }
       }
     },
     "/network/points": {
@@ -7880,8 +7834,7 @@
               }
             }
           }
-        },
-        "summary": "/network/points"
+        }
       }
     },
     "/network/points/{point}": {
@@ -7999,8 +7952,7 @@
               }
             }
           }
-        },
-        "summary": "/network/points/{point}"
+        }
       },
       "put": {
         "description": "Connect to a peer",
@@ -8056,8 +8008,7 @@
               }
             }
           }
-        },
-        "summary": "/network/points/{point}"
+        }
       },
       "patch": {
         "description": "Change the connectivity state of a given `IP:addr`. With `{acl : ban}`: blacklist the given address and remove it from the whitelist if present. With `{acl: open}`: removes an address from the blacklist and whitelist. With `{acl: trust}`: trust a given address permanently and remove it from the blacklist if present. With `{peer_id: <id>}` set the peerId of the point. Connections from this address can still be closed on authentication if the peer is greylisted. ",
@@ -8195,8 +8146,7 @@
               }
             }
           }
-        },
-        "summary": "/network/points/{point}"
+        }
       }
     },
     "/network/points/{point}/banned": {
@@ -8234,8 +8184,7 @@
               }
             }
           }
-        },
-        "summary": "/network/points/{point}/banned"
+        }
       }
     },
     "/network/points/{point}/log": {
@@ -8284,8 +8233,7 @@
               }
             }
           }
-        },
-        "summary": "/network/points/{point}/log"
+        }
       }
     },
     "/network/self": {
@@ -8317,8 +8265,7 @@
               }
             }
           }
-        },
-        "summary": "/network/self"
+        }
       }
     },
     "/network/stat": {
@@ -8370,8 +8317,7 @@
               }
             }
           }
-        },
-        "summary": "/network/stat"
+        }
       }
     },
     "/profiler/registered_backend": {
@@ -8447,8 +8393,7 @@
               }
             }
           }
-        },
-        "summary": "/profiler/registered_backend"
+        }
       }
     },
     "/protocols": {
@@ -8478,8 +8423,7 @@
               }
             }
           }
-        },
-        "summary": "/protocols"
+        }
       }
     },
     "/protocols/{Protocol_hash}": {
@@ -8548,8 +8492,7 @@
               }
             }
           }
-        },
-        "summary": "/protocols/{Protocol_hash}"
+        }
       }
     },
     "/protocols/{Protocol_hash}/environment": {
@@ -8589,8 +8532,7 @@
               }
             }
           }
-        },
-        "summary": "/protocols/{Protocol_hash}/environment"
+        }
       }
     },
     "/stats/gc": {
@@ -8717,8 +8659,7 @@
               }
             }
           }
-        },
-        "summary": "/stats/gc"
+        }
       }
     },
     "/stats/memory": {
@@ -8810,8 +8751,7 @@
               }
             }
           }
-        },
-        "summary": "/stats/memory"
+        }
       }
     },
     "/version": {
@@ -8963,8 +8903,7 @@
               }
             }
           }
-        },
-        "summary": "/version"
+        }
       }
     },
     "/workers/block_validator": {
@@ -9225,8 +9164,7 @@
               }
             }
           }
-        },
-        "summary": "/workers/block_validator"
+        }
       }
     },
     "/workers/chain_validators": {
@@ -9522,8 +9460,7 @@
               }
             }
           }
-        },
-        "summary": "/workers/chain_validators"
+        }
       }
     },
     "/workers/chain_validators/{chain_id}": {
@@ -9769,8 +9706,7 @@
               }
             }
           }
-        },
-        "summary": "/workers/chain_validators/{chain_id}"
+        }
       }
     },
     "/workers/chain_validators/{chain_id}/ddb": {
@@ -9896,8 +9832,7 @@
               }
             }
           }
-        },
-        "summary": "/workers/chain_validators/{chain_id}/ddb"
+        }
       }
     },
     "/workers/chain_validators/{chain_id}/peers_validators": {
@@ -10218,8 +10153,7 @@
               }
             }
           }
-        },
-        "summary": "/workers/chain_validators/{chain_id}/peers_validators"
+        }
       }
     },
     "/workers/chain_validators/{chain_id}/peers_validators/{peer_id}": {
@@ -10514,8 +10448,7 @@
               }
             }
           }
-        },
-        "summary": "/workers/chain_validators/{chain_id}/peers_validators/{peer_id}"
+        }
       }
     },
     "/workers/prevalidators": {
@@ -10811,8 +10744,7 @@
               }
             }
           }
-        },
-        "summary": "/workers/prevalidators"
+        }
       }
     },
     "/workers/prevalidators/{chain_id}": {
@@ -11292,8 +11224,7 @@
               }
             }
           }
-        },
-        "summary": "/workers/prevalidators/{chain_id}"
+        }
       }
     }
   },
