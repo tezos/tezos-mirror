@@ -57,8 +57,9 @@ pub fn write_u64_le(host: &mut impl Runtime, path: &impl Path, value: u64) {
 
 pub fn read_u64_le(host: &impl Runtime, path: &impl Path) -> u64 {
     let mut bytes = [0; std::mem::size_of::<u64>()];
-    host.store_read_slice(path, 0, bytes.as_mut_slice())
-        .unwrap();
+    // TODO: return a proper error here, and handle cases where it's
+    // acceptable to not have a value yet and return a default value.
+    let _ = host.store_read_slice(path, 0, bytes.as_mut_slice());
     u64::from_le_bytes(bytes)
 }
 

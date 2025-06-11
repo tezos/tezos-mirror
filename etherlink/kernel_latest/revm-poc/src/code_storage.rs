@@ -26,7 +26,7 @@ const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 const REFERENCE_PATH: RefPath = RefPath::assert_from(b"/ref_count");
 
 fn code_hash_path(code_hash: &B256) -> OwnedPath {
-    let code_hash_path_string = format!("/{}", code_hash);
+    let code_hash_path_string = format!("/{:x}", code_hash);
     OwnedPath::try_from(code_hash_path_string).unwrap()
 }
 
@@ -82,9 +82,9 @@ impl CodeStorage {
 
     pub fn get_code(&self, host: &impl Runtime) -> Bytecode {
         if self.exists(host) {
-            let code1_path = concat(&self.path, &CODE_PATH).unwrap();
+            let code_path = concat(&self.path, &CODE_PATH).unwrap();
             Bytecode::new_raw_checked(Bytes::from(
-                host.store_read_all(&code1_path).unwrap(),
+                host.store_read_all(&code_path).unwrap_or_default(),
             ))
             .unwrap()
         } else {

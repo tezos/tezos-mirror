@@ -18,6 +18,7 @@ use crate::{
     storage_helpers::{read_b256_be_default, read_u256_le_default, read_u64_le_default},
 };
 
+#[cfg(test)]
 /// Path where EVM accounts are stored.
 pub const EVM_ACCOUNTS_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/eth_accounts");
@@ -73,11 +74,6 @@ pub struct StorageAccount {
 }
 
 impl StorageAccount {
-    pub fn from_address(address: &Address) -> Self {
-        let path = concat(&EVM_ACCOUNTS_PATH, &account_path(address)).unwrap();
-        path.into()
-    }
-
     pub fn balance(&self, host: &impl Runtime) -> U256 {
         let path = concat(&self.path, &BALANCE_PATH).unwrap();
         read_u256_le_default(host, &path, BALANCE_DEFAULT_VALUE)
@@ -138,7 +134,8 @@ impl StorageAccount {
 
     pub fn set_code(&mut self, host: &mut impl Runtime, code: &[u8]) {
         if self.code_exists(host) {
-            panic!("code already set")
+            // TODO: return a proper error here and handle it when it does
+            // make sense.
         } else {
             let code_hash = CodeStorage::add(host, code);
             let code_hash_bytes: [u8; 32] = code_hash.into();
