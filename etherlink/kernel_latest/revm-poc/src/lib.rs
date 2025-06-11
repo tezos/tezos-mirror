@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 mod block_storage;
+mod code_storage;
 mod database;
 mod precompile_provider;
 mod storage_helpers;
