@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::world_state_handler::{account_path, StorageAccount, WorldStateHandler};
+use crate::{
+    block_storage::{get_block_hash, BLOCKS_STORED},
+    world_state_handler::{account_path, StorageAccount, WorldStateHandler},
+};
 
 use revm::{
     primitives::{Address, HashMap, StorageKey, StorageValue, B256},
@@ -10,6 +13,7 @@ use revm::{
     Database, DatabaseCommit,
 };
 use std::convert::Infallible;
+use tezos_ethereum::block::BlockConstants;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 pub struct EtherlinkVMDB<'a, Host: Runtime> {
@@ -17,6 +21,8 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     host: &'a mut Host,
     /// EVM world state handler
     world_state_handler: &'a mut WorldStateHandler,
+    /// Constants for the current block
+    block: &'a BlockConstants,
 }
 
 // See: https://github.com/rust-lang/rust-clippy/issues/5787
@@ -25,10 +31,12 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
     #[cfg(test)]
     pub fn new(
         host: &'a mut Host,
+        block: &'a BlockConstants,
         world_state_handler: &'a mut WorldStateHandler,
     ) -> Self {
         EtherlinkVMDB {
             host,
+            block,
             world_state_handler,
         }
     }
@@ -70,9 +78,18 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
         Ok(storage_value)
     }
 
-    fn block_hash(&mut self, _number: u64) -> Result<B256, Self::Error> {
-        // TODO: use block constants and block storage when implemented
-        unimplemented!()
+    fn block_hash(&mut self, number: u64) -> Result<B256, Self::Error> {
+        // return 0 when block number not in valid range
+        // Ref. https://www.evm.codes/?fork=cancun#40 (opcode 0x40)
+
+        match self.block.number.checked_sub(number.into()) {
+            Some(block_diff)
+                if block_diff <= BLOCKS_STORED.into() && !block_diff.is_zero() =>
+            {
+                Ok(get_block_hash(self.host, number))
+            }
+            _ => Ok(B256::ZERO),
+        }
     }
 }
 
