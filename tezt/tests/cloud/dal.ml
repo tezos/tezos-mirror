@@ -51,22 +51,6 @@ let name_of = function
       Format.asprintf "etherlink-dal-operator-%d" slot_index
   | Etherlink_producer i -> Format.asprintf "etherlink-producer-%d" i
 
-(* fixme: use the stdlib List.take once we use OCaml 5.3 *)
-let take n l =
-  let rec loop acc = function
-    | 0, _ | _, [] -> List.rev acc
-    | n, x :: xs -> loop (x :: acc) (pred n, xs)
-  in
-  loop [] (n, l)
-
-let take_and_drop n l =
-  let rec bis acc n = function
-    | [] -> (List.rev acc, [])
-    | hd :: tl as l ->
-        if n = 0 then (List.rev acc, l) else bis (hd :: acc) (n - 1) tl
-  in
-  bis [] n l
-
 module Disconnect = struct
   module IMap = Map.Make (Int)
 
@@ -2014,7 +1998,7 @@ module Monitoring_app = struct
               in
               (* To avoid spawning a high number of RPCs simultaneously, we treat 2 delegates at each level. *)
               let to_treat_now, treat_later =
-                take_and_drop 2 !to_treat_delegates
+                Tezos_stdlib.TzList.split_n 2 !to_treat_delegates
               in
               let* () = Lwt_list.iter_p treat_delegate to_treat_now in
               match treat_later with
@@ -2490,8 +2474,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     in
     let bootstrap_accounts =
       List.mapi
-        (fun i key ->
-          (key, Some (List.nth stake i * 1_000_000_000_000)))
+        (fun i key -> (key, Some (List.nth stake i * 1_000_000_000_000)))
         (List.flatten baker_accounts)
     in
     let additional_bootstrap_accounts =
@@ -2578,7 +2561,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       etherlink_batching_operator_keys )
 
 let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
-    account i agent =
+    accounts i agent =
   let* stake =
     match stake with
     | None ->
@@ -3839,7 +3822,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         let distribution =
           match max_nb_bakers with
           | None -> distribution
-          | Some n -> take n distribution
+          | Some n -> Tezos_stdlib.TzList.take_n n distribution
         in
         return distribution
   in
