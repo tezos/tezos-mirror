@@ -136,7 +136,7 @@ module Node = struct
   include Node
 
   let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~rpc_external
-      ~name network cloud agent =
+      ~name network ~snapshot cloud agent =
     toplog "Inititializing an L1 node for %s" name ;
     match network with
     | #Network.public -> (
@@ -187,61 +187,83 @@ module Node = struct
             let* () = may_copy_node_identity_file agent node identity_file in
             toplog "Initializing node configuration for %s" name ;
             let* () = Node.config_init node [] in
-            toplog "Trying to download a rolling snapshot for %s" name ;
-            let* exit_status =
-              Process.spawn
-                ?runner:(runner_of_agent agent)
-                "wget"
-                [
-                  "-O";
-                  "snapshot_file";
-                  sf "%s/rolling" (Network.snapshot_service network);
-                ]
-              |> Process.wait
+            let* snapshot_file_path =
+              match snapshot with
+              | Some snapshot_path ->
+                  toplog "Using locally stored snapshot file: %s" snapshot_path ;
+                  Tezt_cloud.Agent.copy
+                    agent
+                    ~destination:snapshot_path
+                    ~source:snapshot_path
+              | None ->
+                  toplog "Trying to download a rolling snapshot for %s" name ;
+                  let downloaded_snapshot_file_path = "snapshot_file" in
+                  let* exit_status =
+                    Process.spawn
+                      ?runner:(runner_of_agent agent)
+                      "wget"
+                      [
+                        "-O";
+                        downloaded_snapshot_file_path;
+                        sf "%s/rolling" (Network.snapshot_service network);
+                      ]
+                    |> Process.wait
+                  in
+                  let* () =
+                    match exit_status with
+                    | WEXITED 0 -> Lwt.return_unit
+                    | WEXITED code ->
+                        toplog
+                          "Could not download the snapshot for %s: wget exit \
+                           code: %d\n\
+                           Starting without snapshot. It could last long \
+                           before the node is bootstrapped"
+                          name
+                          code ;
+                        Lwt.return_unit
+                    | status -> (
+                        match Process.validate_status status with
+                        | Ok () -> Lwt.return_unit
+                        | Error (`Invalid_status reason) ->
+                            failwith @@ Format.sprintf "wget: %s" reason)
+                  in
+                  return downloaded_snapshot_file_path
             in
             let* () =
-              match exit_status with
-              | WEXITED 0 ->
-                  toplog "Importing the snapshot for %s" name ;
+              toplog "Importing the snapshot for %s" name ;
+              let* () =
+                try
                   let* () =
-                    try
-                      let* () =
-                        Node.snapshot_import ~no_check:true node "snapshot_file"
-                      in
-                      let () =
-                        toplog "Snapshot import succeeded for %s." name
-                      in
-                      let* _ =
-                        Process.wait (Process.spawn "rm" ["snapshot_file"])
-                      in
-                      Lwt.return_unit
-                    with _ ->
-                      (* Failing to import the snapshot could happen on a
-                                 very young Weeklynet, before the first snapshot is
-                                 available. In this case bootstrapping from the
-                                 genesis block is OK. *)
-                      let () =
+                    Node.snapshot_import ~no_check:true node snapshot_file_path
+                  in
+                  let () = toplog "Snapshot import succeeded for %s." name in
+                  let* () =
+                    match snapshot with
+                    | Some _ -> Lwt.return_unit
+                    | None ->
+                        (* Delete the snapshot downloaded locally *)
                         toplog
-                          "Snapshot import failed for %s, the node will be \
-                           bootstrapped from genesis."
-                          name
-                      in
-                      Lwt.return_unit
+                          "Deleting downloaded snapshot (%s)"
+                          snapshot_file_path ;
+                        let* (_ignored_exit_status : Unix.process_status) =
+                          Process.wait (Process.spawn "rm" [snapshot_file_path])
+                        in
+                        Lwt.return_unit
                   in
                   Lwt.return_unit
-              | WEXITED code ->
-                  toplog
-                    "Could not download the snapshot for %s: wget exit code: %d\n\
-                     Starting without snapshot. It could last long before the \
-                     node is bootstrapped"
-                    name
-                    code ;
+                with _ ->
+                  (* Failing to import the snapshot could happen on a very young
+                     Weeklynet, before the first snapshot is available. In this
+                     case bootstrapping from the genesis block is OK. *)
+                  let () =
+                    toplog
+                      "Snapshot import failed for %s, the node will be \
+                       bootstrapped from genesis."
+                      name
+                  in
                   Lwt.return_unit
-              | status -> (
-                  match Process.validate_status status with
-                  | Ok () -> Lwt.return_unit
-                  | Error (`Invalid_status reason) ->
-                      failwith @@ Format.sprintf "wget: %s" reason)
+              in
+              Lwt.return_unit
             in
             toplog "Launching the node %s." name ;
             let* () =
@@ -479,6 +501,7 @@ type configuration = {
      reconnection delay *)
   disconnect : (int * int) option;
   network : Network.t;
+  snapshot : string option;
   bootstrap : bool;
   teztale : bool;
   memtrace : bool;
@@ -543,7 +566,7 @@ type etherlink = {
   accounts : Tezt_etherlink.Eth_account.t Array.t;
 }
 
-type public_key_hash = string
+type public_key_hash = PKH of string
 
 type commitment_info = {commitment : string; publisher_pkh : string}
 
@@ -690,7 +713,9 @@ let pp_metrics t
   t.bakers
   |> List.iter (fun {account; stake; _} ->
          let pkh = account.Account.public_key_hash in
-         match Hashtbl.find_opt ratio_attested_commitments_per_baker pkh with
+         match
+           Hashtbl.find_opt ratio_attested_commitments_per_baker (PKH pkh)
+         with
          | None -> Log.info "We lack information about %s" pkh
          | Some {published_slots; attested_slots; _} ->
              let alias =
@@ -774,7 +799,7 @@ let push_metrics t
       (if value then 1. else 0.)
   in
   Hashtbl.iter
-    (fun public_key_hash
+    (fun (PKH public_key_hash)
          {attested_slots; published_slots; in_committee; attestation_with_dal} ->
       if in_committee then (
         let labels = get_labels public_key_hash in
@@ -2067,7 +2092,7 @@ let get_infos_per_level t ~level ~metadata =
     |> Seq.map (fun operation ->
            let public_key_hash = get_public_key_hash operation in
            let dal_attestation = get_dal_attestation operation in
-           (public_key_hash, dal_attestation))
+           (PKH public_key_hash, dal_attestation))
     |> Hashtbl.of_seq
   in
   let* etherlink_operator_balance_sum =
@@ -2156,6 +2181,7 @@ let init_public_network cloud (configuration : configuration)
             ~rpc_external:configuration.external_rpc
             ~name:"bootstrap-node"
             configuration.network
+            ~snapshot:configuration.snapshot
             cloud
             agent
         in
@@ -2385,6 +2411,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~dal_config
       ~name
       configuration.network
+      ~snapshot:configuration.snapshot
       cloud
       agent
   in
@@ -2557,6 +2584,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       ~name:(Format.asprintf "baker-node-%d" i)
       ~rpc_external:configuration.external_rpc
       configuration.network
+      ~snapshot:configuration.snapshot
       cloud
       agent
   in
@@ -2650,6 +2678,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
       ~rpc_external:configuration.external_rpc
       configuration.network
+      ~snapshot:configuration.snapshot
       cloud
       agent
   in
@@ -2743,6 +2772,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
       ~arguments:[Peer bootstrap.node_p2p_endpoint]
       ~rpc_external:configuration.external_rpc
       configuration.network
+      ~snapshot:configuration.snapshot
       cloud
       agent
   in
@@ -2799,8 +2829,8 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   in
   Lwt.return {node; dal_node; topic}
 
-let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
-    ~memtrace ~rpc_external ~cloud =
+let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
+    ~otel ~memtrace ~rpc_external ~cloud =
   match dal_slots with
   | [] ->
       toplog "Etherlink will run without DAL support" ;
@@ -2819,6 +2849,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
           ~rpc_external
           network
+          ~snapshot
           cloud
           agent
       in
@@ -2854,6 +2885,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
           ~rpc_external
           network
+          ~snapshot
           cloud
           agent
       in
@@ -2882,6 +2914,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
                      ]
                    ~rpc_external
                    network
+                   ~snapshot
                    cloud
                    agent
                in
@@ -2919,6 +2952,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
         [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
       ~rpc_external:configuration.external_rpc
       configuration.network
+      ~snapshot:configuration.snapshot
       cloud
       agent
   in
@@ -2973,6 +3007,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ~next_agent
       ~dal_slots:etherlink_configuration.etherlink_dal_slots
       ~network:configuration.network
+      ~snapshot:configuration.snapshot
       ~rpc_external:configuration.external_rpc
       ~otel
       ~memtrace:configuration.memtrace
@@ -3693,6 +3728,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let etherlink_producers = Cli.etherlink_producers in
     let disconnect = Cli.disconnect in
     let network = Cli.network in
+    let snapshot = Cli.snapshot in
     let bootstrap = Cli.bootstrap in
     let etherlink_dal_slots = Cli.etherlink_dal_slots in
     let teztale = Cli.teztale in
@@ -3741,6 +3777,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         producer_machine_type;
         disconnect;
         network;
+        snapshot;
         bootstrap;
         teztale;
         memtrace;
