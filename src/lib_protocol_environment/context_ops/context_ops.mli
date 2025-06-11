@@ -5,11 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Environment_context = Tezos_protocol_environment.Context
-
 val err_implementation_mismatch : expected:string -> got:string -> 'a
 
-type t = Environment_context.t
+type t = Tezos_protocol_environment.Context.t
+
+type block_cache = Tezos_protocol_environment.Context.block_cache
 
 (** Values of type [index] are used to [checkout] contexts specified by their hash. *)
 type index
@@ -48,9 +48,7 @@ val do_not_use__brassaia_dir : string -> string
     directory in which the context directory is expected to be find. *)
 val init :
   kind:[< `Brassaia | `Brassaia_memory | `Disk | `Memory > `Disk `Memory] ->
-  ?patch_context:
-    (Tezos_protocol_environment.Context.t ->
-    (Tezos_protocol_environment.Context.t, tztrace) result Lwt.t) ->
+  ?patch_context:(t -> (t, tztrace) result Lwt.t) ->
   ?readonly:bool ->
   ?index_log_size:int ->
   data_dir:string ->
@@ -78,11 +76,7 @@ val find : t -> Context.key -> Context.value option Lwt.t
     If [k] was already bound in [t] to a value that is physically equal
     to [v], the result of the function is a promise that resolves to
     [t]. Otherwise, the previous binding of [k] in [t] disappears. *)
-val add :
-  t ->
-  Context.key ->
-  Context.value ->
-  Tezos_protocol_environment.Context.t Lwt.t
+val add : t -> Context.key -> Context.value -> t Lwt.t
 
 (** [fold ?depth t root ~order ~init ~f] recursively folds over the trees
       and values of [t]. The [f] callbacks are called with a key relative
@@ -110,31 +104,23 @@ val fold_value :
   f:(Context.key -> (unit -> Context.value option Lwt.t) -> 'a -> 'a Lwt.t) ->
   'a Lwt.t
 
-val add_protocol :
-  t -> Protocol_hash.t -> Tezos_protocol_environment.Context.t Lwt.t
+val add_protocol : t -> Protocol_hash.t -> t Lwt.t
 
 val get_protocol : t -> Protocol_hash.t Lwt.t
 
-val add_predecessor_block_metadata_hash :
-  t -> Block_metadata_hash.t -> Tezos_protocol_environment.Context.t Lwt.t
+val add_predecessor_block_metadata_hash : t -> Block_metadata_hash.t -> t Lwt.t
 
 val add_predecessor_ops_metadata_hash :
-  t ->
-  Operation_metadata_list_list_hash.t ->
-  Tezos_protocol_environment.Context.t Lwt.t
+  t -> Operation_metadata_list_list_hash.t -> t Lwt.t
 
 val hash : time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t
 
 val get_test_chain : t -> Test_chain_status.t Lwt.t
 
-val add_test_chain :
-  t -> Test_chain_status.t -> Tezos_protocol_environment.Context.t Lwt.t
+val add_test_chain : t -> Test_chain_status.t -> t Lwt.t
 
 val fork_test_chain :
-  t ->
-  protocol:Protocol_hash.t ->
-  expiration:Time.Protocol.t ->
-  Tezos_protocol_environment.Context.t Lwt.t
+  t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
 
 val commit :
   time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t Lwt.t
@@ -210,11 +196,9 @@ val commit_genesis :
   protocol:Protocol_hash.t ->
   Context_hash.t tzresult Lwt.t
 
-val checkout :
-  index -> Context_hash.t -> Tezos_protocol_environment.Context.t option Lwt.t
+val checkout : index -> Context_hash.t -> t option Lwt.t
 
-val checkout_exn :
-  index -> Context_hash.t -> Tezos_protocol_environment.Context.t Lwt.t
+val checkout_exn : index -> Context_hash.t -> t Lwt.t
 
 val exists : index -> Context_hash.t -> bool Lwt.t
 
