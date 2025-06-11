@@ -12,7 +12,8 @@
   octez-libs.rpc-http
   octez-libs.rpc-http-server
   octez-libs.stdlib-unix
-  octez-evm-node-libs.evm_node_lib_dev_encoding)
+  octez-evm-node-libs.evm_node_lib_dev_encoding
+  octez-libs.opentelemetry-client-cohttp-lwt)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

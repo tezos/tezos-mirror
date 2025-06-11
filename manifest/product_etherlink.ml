@@ -12,6 +12,7 @@ open Manifest
 open Externals
 open Internals
 open Product_cohttp
+open Product_opentelemetry
 open Product_octez
 open Product_prometheus
 open Product_websocket
@@ -122,6 +123,7 @@ let wasm_runtime_callbacks =
         octez_base_unix;
         octez_layer2_irmin_context |> open_;
         Product_cohttp.cohttp_lwt_unix;
+        opentelemetry_lwt;
       ]
 
 let _wasm_runtime_callbacks_tests =
@@ -279,6 +281,7 @@ let evm_node_config =
         octez_rpc_http_server;
         octez_stdlib_unix |> open_;
         evm_node_lib_dev_encoding |> open_;
+        opentelemetry_client_cohttp_lwt;
       ]
 
 let evm_node_lib_dev =
@@ -323,6 +326,8 @@ let evm_node_lib_dev =
         supported_installers;
         wasm_runtime;
         performance_metrics;
+        opentelemetry_client_cohttp_lwt;
+        opentelemetry_lwt;
       ]
 
 let _octez_evm_node_tests =

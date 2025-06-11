@@ -181,6 +181,7 @@ depends: [
   "ohex" {= "0.2.0"}
   "opam-file-format" {= "2.1.6"}
   "opentelemetry" {= "0.11.2"}
+  "opentelemetry-lwt" {= "0.11.2"}
   "optint" {= "0.3.0"}
   "ordering" {= "3.19.0"}
   "parsexp" {= "v0.16.0"}

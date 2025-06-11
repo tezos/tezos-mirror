@@ -86,6 +86,7 @@ depends: [
   "ocplib-endian"
   "opam-file-format" { >= "2.1.6" }
   "opentelemetry"
+  "opentelemetry-lwt"
   "optint"
   "ppx_deriving"
   "ppx_expect"

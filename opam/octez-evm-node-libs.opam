@@ -19,6 +19,7 @@ depends: [
   "octez-libs"
   "lwt_log"
   "octez-l2-libs"
+  "opentelemetry-lwt"
   "crunch" { >= "3.3.0" }
   "caqti-lwt" { >= "2.0.1" }
   "re" { >= "1.10.0" }

@@ -177,6 +177,7 @@ type experimental_features = {
   l2_chains : l2_chain list option;
   enable_tx_queue : tx_queue option;
   periodic_snapshot_path : string option;
+  otel_profiling : Opentelemetry_client_cohttp_lwt.Config.t option;
 }
 
 type sequencer = {
@@ -324,6 +325,7 @@ let default_experimental_features =
     l2_chains = default_l2_chains;
     enable_tx_queue = Some default_tx_queue;
     periodic_snapshot_path = None;
+    otel_profiling = None;
   }
 
 let default_rpc_addr = "127.0.0.1"
@@ -439,6 +441,89 @@ let default_fee_history = {max_count = Limit 1024; max_past = None}
 
 let make_pattern_restricted_rpcs raw =
   Pattern {raw; regex = Re.Perl.compile_pat raw}
+
+let otel_config_encoding =
+  let open Data_encoding in
+  let open Opentelemetry_client_cohttp_lwt.Config in
+  conv
+    (fun {
+           debug;
+           url_traces;
+           url_metrics;
+           url_logs;
+           headers;
+           batch_traces;
+           batch_metrics;
+           batch_logs;
+           batch_timeout_ms;
+         } ->
+      ( Some debug,
+        Some url_traces,
+        Some url_metrics,
+        Some url_logs,
+        Some headers,
+        batch_traces,
+        batch_metrics,
+        batch_logs,
+        Some batch_timeout_ms ))
+    (fun ( debug,
+           url_traces,
+           url_metrics,
+           url_logs,
+           headers,
+           batch_traces,
+           batch_metrics,
+           batch_logs,
+           batch_timeout_ms ) ->
+      Opentelemetry_client_cohttp_lwt.Config.make
+        ?debug
+        ?url_traces
+        ?url_metrics
+        ?url_logs
+        ?headers
+        ~batch_traces
+        ~batch_metrics
+        ~batch_logs
+        ?batch_timeout_ms
+        ())
+  @@ obj9
+       (opt "debug" ~description:"Enable debug mode" bool)
+       (opt "url_traces" ~description:"URL to send traces" string)
+       (opt "url_metrics" ~description:"URL to send metrics" string)
+       (opt "url_logs" ~description:"URL to send logs" string)
+       (opt
+          "headers"
+          ~description:"API headers sent to the endpoint"
+          (list (tup2 string string)))
+       (opt "batch_traces" ~description:"Batch traces" int31)
+       (opt "batch_metrics" ~description:"Batch metrics" int31)
+       (opt "batch_logs" ~description:"Batch logs" int31)
+       (opt
+          "batch_timeout_ms"
+          ~description:
+            "Milliseconds after which we emit a batch, even incomplete"
+          int31)
+
+let otel_config_opt_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"specified"
+        Json_only
+        (option otel_config_encoding)
+        (function
+          | Some otel_config -> Some (Some otel_config) | None -> Some None)
+        Fun.id;
+      case
+        ~title:"default"
+        Json_only
+        bool
+        (function _ -> None)
+        (function
+          | true -> Some (Opentelemetry_client_cohttp_lwt.Config.make ())
+          | _ -> None);
+    ]
 
 let limit_encoding =
   let open Data_encoding in
@@ -1012,6 +1097,7 @@ let experimental_features_encoding =
            l2_chains : l2_chain list option;
            enable_tx_queue;
            periodic_snapshot_path;
+           otel_profiling;
          } ->
       ( ( drop_duplicate_on_injection,
           blueprints_publisher_order_enabled,
@@ -1023,7 +1109,8 @@ let experimental_features_encoding =
           spawn_rpc,
           l2_chains,
           enable_tx_queue,
-          periodic_snapshot_path ) ))
+          periodic_snapshot_path,
+          otel_profiling ) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
@@ -1034,7 +1121,8 @@ let experimental_features_encoding =
              spawn_rpc,
              l2_chains,
              enable_tx_queue,
-             periodic_snapshot_path ) ) ->
+             periodic_snapshot_path,
+             otel_profiling ) ) ->
       {
         drop_duplicate_on_injection;
         blueprints_publisher_order_enabled;
@@ -1045,6 +1133,7 @@ let experimental_features_encoding =
         l2_chains;
         enable_tx_queue;
         periodic_snapshot_path;
+        otel_profiling;
       })
     (merge_objs
        (obj6
@@ -1095,7 +1184,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj5
+       (obj6
           (dft
              "rpc_server"
              ~description:
@@ -1125,7 +1214,12 @@ let experimental_features_encoding =
              "periodic_snapshot_path"
              ~description:"Path to the periodic snapshot file"
              (option string)
-             default_experimental_features.periodic_snapshot_path)))
+             default_experimental_features.periodic_snapshot_path)
+          (dft
+             "otel_profiling"
+             ~description:"Enable or disable opentelemetry profiling"
+             otel_config_opt_encoding
+             default_experimental_features.otel_profiling)))
 
 let proxy_encoding =
   let open Data_encoding in
