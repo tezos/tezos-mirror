@@ -4,17 +4,22 @@ build-backend = "maturin"
 
 [project]
 name = "tezos-sdk"
-description = "Tezos SDK"
-license = "MIT"
+description = "Python bindings for Tezos cryptographic primitives and operations, built with Rust"
+readme = "README-python.md"
+license = { file = "../../../LICENSES/MIT.txt" }
 authors = [
-    { name = "Functori", email = "<contact@functori.com>" }
+    { name = "Functori", email = "contact@functori.com" }
 ]
-homepage = "https://tezos.com/"
-repository = "https://gitlab.com/tezos/tezos"
 requires-python = ">=3.8"
+keywords = ["tezos", "blockchain", "cryptography", "rust", "sdk"]
 classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Software Development"
 ]
 dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://tezos.com"
+Source = "https://gitlab.com/tezos/tezos"
