@@ -845,9 +845,10 @@ let jobs pipeline_type =
             ~rules:[job_rule ~when_:Always ()]
             ()
     in
-    let job_build_teztale ~arch =
+    let job_build_teztale ?cpu ~arch () =
       Teztale.Common.job_build
         ~arch
+        ?cpu
         ~rules:(make_rules ~manual:Yes ~changes:Teztale.Common.changeset ())
         ()
     in
@@ -865,8 +866,8 @@ let jobs pipeline_type =
       job_tezt_fetch_records;
       build_octez_source;
       job_build_grafazos;
-      job_build_teztale ~arch:Amd64;
-      job_build_teztale ~arch:Arm64;
+      job_build_teztale ~arch:Amd64 ~cpu:Very_high ();
+      job_build_teztale ~arch:Arm64 ();
       job_evm_static_x86_64_experimental;
       job_evm_static_arm64_experimental;
       job_build_layer1_profiling ();
