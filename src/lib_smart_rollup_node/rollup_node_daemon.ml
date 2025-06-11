@@ -130,6 +130,12 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
     (head : Layer1.header) =
   let open Lwt_result_syntax in
   let level = head.level in
+  Opentelemetry_lwt.Trace.with_ "process_unseen_block" @@ fun scope ->
+  Opentelemetry.Scope.add_attrs scope (fun () ->
+      [
+        ("rollup_node.block_hash", `String (Block_hash.to_b58check head.hash));
+        ("rollup_node.block_level", `Int (Int32.to_int level));
+      ]) ;
   let* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up state head in
   let* rollup_ctxt = previous_context node_ctxt ~predecessor in
@@ -370,6 +376,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
     List.iter_es
       (fun (block, to_prefetch) ->
         let module Plugin = (val state.plugin) in
+        Opentelemetry_lwt.Trace.with_ "process_block" @@ fun _ ->
         Plugin.Layer1_helpers.prefetch_tezos_blocks
           node_ctxt.l1_ctxt
           to_prefetch ;
