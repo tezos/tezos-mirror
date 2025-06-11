@@ -1,0 +1,82 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+workflow:
+  rules:
+  - if: $foo != "bar" || $foo == "bar"
+    when: always
+
+stages:
+- start
+- images
+
+datadog_pipeline_trace:
+  image: datadog/ci:v2.44.0
+  stage: start
+  tags:
+  - gcp
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
+
+oc.base-images.debian:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp_very_high_cpu
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: debian
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - unstable
+      - bookworm
+
+oc.base-images.ubuntu:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp_very_high_cpu
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: ubuntu
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - noble
+      - jammy

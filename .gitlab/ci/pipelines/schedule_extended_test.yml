@@ -1826,6 +1826,17 @@ trigger:homebrew:
     include: .gitlab/ci/pipelines/homebrew.yml
     strategy: depend
 
+trigger:base_images:
+  stage: images
+  variables:
+    PIPELINE_TYPE: base_images
+  rules:
+  - when: always
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/base_images.yml
+    strategy: depend
+
 kaitai_checks:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
