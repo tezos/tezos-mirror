@@ -61,7 +61,7 @@ let job_release_page ~test ?dependencies () =
   job
     ~__POS__
     ~image:Images.ci_release
-    ~stage:Stages.publish_release
+    ~stage:Stages.publish
     ~description:
       "A job  to update the Octez release page. If running in a test pipleine, \
        the assets are pushed in the [release-page-test.nomadic-labs.com] \
@@ -171,7 +171,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job
       ~__POS__
       ~image:Images.ci_release
-      ~stage:Stages.publish_release_gitlab
+      ~stage:Stages.publish
       ~interruptible:false
       ~dependencies
       ~name:"gitlab:release"
@@ -190,7 +190,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job
       ~__POS__
       ~image:Images.ci_release
-      ~stage:Stages.publish_package_gitlab
+      ~stage:Stages.publish
       ~interruptible:false
       ~dependencies
       ?before_script
@@ -234,7 +234,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job
       ~__POS__
       ~image:Images.CI.prebuild
-      ~stage:Stages.publish_release
+      ~stage:Stages.publish
       ~description:
         "Update opam package descriptions on tezos/tezos opam-repository fork.\n\n\
          This job does preliminary work for releasing Octez opam packages on \
@@ -345,7 +345,7 @@ let octez_evm_node_jobs ?(test = false) () =
     job
       ~__POS__
       ~image:Images.ci_release
-      ~stage:Stages.publish_release_gitlab
+      ~stage:Stages.publish
       ~interruptible:false
       ~dependencies
       ~name:"gitlab:octez-evm-node-release"
@@ -356,7 +356,7 @@ let octez_evm_node_jobs ?(test = false) () =
     job_docker_authenticated
       ~__POS__
       ~dependencies:(Dependent [Job job_docker_merge])
-      ~stage:Stages.publish_release
+      ~stage:Stages.publish
       ~name:"docker:promote_to_latest"
       ~ci_docker_hub
       [

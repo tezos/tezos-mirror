@@ -564,20 +564,12 @@ module Stages : sig
 
   val packaging : Stage.t
 
-  val publishing : Stage.t
+  val publish : Stage.t
 
   val publishing_tests : Stage.t
 
   (* Scanning vulnerabilities of Docker images. *)
   val scan : Stage.t
-
-  val prepare_release : Stage.t
-
-  val publish_release_gitlab : Stage.t
-
-  val publish_release : Stage.t
-
-  val publish_package_gitlab : Stage.t
 
   val manual : Stage.t
 end

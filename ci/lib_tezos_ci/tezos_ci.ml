@@ -1291,19 +1291,11 @@ module Stages = struct
 
   let packaging = Stage.register "packaging"
 
-  let publishing = Stage.register "publishing"
+  let publish = Stage.register "publish"
 
   let publishing_tests = Stage.register "publishing_tests"
 
   let scan = Stage.register "scan"
-
-  let prepare_release = Stage.register "prepare_release"
-
-  let publish_release_gitlab = Stage.register "publish_release_gitlab"
-
-  let publish_release = Stage.register "publish_release"
-
-  let publish_package_gitlab = Stage.register "publish_package_gitlab"
 
   let manual = Stage.register "manual"
 end

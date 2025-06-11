@@ -66,7 +66,7 @@ let archs_variables pipeline =
   | Full | Release -> [("ARCHITECTURES", String.concat " " all)]
 
 (* Push .deb artifacts to storagecloud apt repository. *)
-let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
+let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ?dependencies ~prefix ~variables ~image script : tezos_job =
   let variables =
     variables @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")] @ [("PREFIX", prefix)]
@@ -343,7 +343,7 @@ let jobs pipeline_type =
   in
   let test_ubuntu_packages_jobs =
     (* in merge pipelines we tests only debian. ubuntu packages
-       are built and tested in the sheduled pipelines*)
+       are built and tested in the scheduled pipelines*)
     [
       job_lintian
         ~__POS__

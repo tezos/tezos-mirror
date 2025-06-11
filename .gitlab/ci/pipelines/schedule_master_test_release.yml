@@ -5,9 +5,7 @@ stages:
 - start
 - images
 - build
-- publishing
-- prepare_release
-- publish_package_gitlab
+- publish
 
 oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -240,7 +238,7 @@ oc.install-release-homebrew:
 
 docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: prepare_release
+  stage: publish
   tags:
   - gcp
   needs:
@@ -261,7 +259,7 @@ docker:merge_manifests:
 
 gitlab:publish:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish_package_gitlab
+  stage: publish
   tags:
   - gcp
   needs:
@@ -404,7 +402,7 @@ oc.build-data_packages:
 
 apt_repo_debian:
   image: debian:bookworm
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:
@@ -517,7 +515,7 @@ oc.build-ubuntu:
 
 apt_repo_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:
@@ -700,7 +698,7 @@ oc.build-rockylinux-data:
 
 rpm_repo_rockylinux:
   image: rockylinux:9.3
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:
@@ -886,7 +884,7 @@ oc.build-fedora-data:
 
 rpm_repo_fedora:
   image: fedora:39
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:

@@ -10,7 +10,7 @@ stages:
 - start
 - images
 - build
-- publishing
+- publish
 - publishing_tests
 
 datadog_pipeline_trace:
@@ -181,7 +181,7 @@ oc.build-rockylinux-data:
 
 rpm_repo_rockylinux:
   image: rockylinux:9.3
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:
@@ -367,7 +367,7 @@ oc.build-fedora-data:
 
 rpm_repo_fedora:
   image: fedora:39
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:

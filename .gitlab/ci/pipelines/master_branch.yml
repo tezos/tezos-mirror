@@ -6,8 +6,7 @@ stages:
 - images
 - build
 - test_coverage
-- publishing
-- prepare_release
+- publish
 - manual
 
 oc.docker:ci:amd64:
@@ -389,7 +388,7 @@ oc.docker:arm64:
 
 docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: prepare_release
+  stage: publish
   tags:
   - gcp
   needs:
@@ -623,7 +622,7 @@ documentation:build_all:
 
 documentation:publish:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   rules:

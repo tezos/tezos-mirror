@@ -3,7 +3,7 @@
 
 stages:
 - start
-- publish_release
+- publish
 
 datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
@@ -22,7 +22,7 @@ datadog_pipeline_trace:
 
 publish:release-page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish_release
+  stage: publish
   tags:
   - gcp
   rules:

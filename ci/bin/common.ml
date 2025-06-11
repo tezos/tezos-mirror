@@ -717,7 +717,7 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
     ~job_docker_arm64 : tezos_job =
   job_docker_authenticated
     ~__POS__
-    ~stage:Stages.prepare_release
+    ~stage:Stages.publish
     ~name:"docker:merge_manifests"
       (* This job merges the images produced in the jobs
          [docker:{amd64,arm64}] into a single multi-architecture image, and
@@ -730,7 +730,7 @@ let job_docker_promote_to_latest ?dependencies ~ci_docker_hub () : tezos_job =
   job_docker_authenticated
     ~__POS__
     ?dependencies
-    ~stage:Stages.publish_release
+    ~stage:Stages.publish
     ~name:"docker:promote_to_latest"
     ~ci_docker_hub
     ["./scripts/ci/docker_promote_to_latest.sh"]
@@ -1326,7 +1326,7 @@ module Documentation = struct
       ~__POS__
       ~name:"documentation:publish"
       ~image:Images.CI.test
-      ~stage:Stages.publishing
+      ~stage:Stages.publish
       ~dependencies
       ~before_script:
         (before_script
