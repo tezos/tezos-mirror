@@ -98,10 +98,11 @@ impl StorageAccount {
         let path = concat(&self.path, &CODE_PATH).unwrap();
 
         match host.store_read_all(&path) {
-            Ok(bytes) =>
-            // TODO: we don't support EIP-7702 nor EOF related code.
-            {
-                Some(Bytecode::new_legacy(Bytes::from(bytes)))
+            Ok(bytes) => {
+                // NB: [new_raw_checked] here is great as it's backward-compatible
+                // but also future proof. It will check if the decoded bytes is
+                // a legacy code, an EIP-7702 EOA's code or an EOF code.
+                Some(Bytecode::new_raw_checked(Bytes::from(bytes)).unwrap())
             }
             Err(RuntimeError::PathNotFound) => {
                 // TODO: add code storage when implemented
