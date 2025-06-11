@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use revm::primitives::{B256, U256};
+use revm::primitives::{alloy_primitives::Keccak256, B256, U256};
 use tezos_smart_rollup_host::{
     path::Path,
     runtime::{Runtime, RuntimeError},
@@ -48,4 +48,22 @@ pub fn read_b256_be_default(
         Some(v) => v,
         None => default,
     }
+}
+
+pub fn write_u64_le(host: &mut impl Runtime, path: &impl Path, value: u64) {
+    host.store_write_all(path, value.to_le_bytes().as_slice())
+        .unwrap()
+}
+
+pub fn read_u64_le(host: &impl Runtime, path: &impl Path) -> u64 {
+    let mut bytes = [0; std::mem::size_of::<u64>()];
+    host.store_read_slice(path, 0, bytes.as_mut_slice())
+        .unwrap();
+    u64::from_le_bytes(bytes)
+}
+
+pub fn bytes_hash(bytes: &[u8]) -> B256 {
+    let mut keccak = Keccak256::new();
+    keccak.update(bytes);
+    keccak.finalize()
 }
