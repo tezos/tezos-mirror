@@ -70,6 +70,8 @@ Secp256r1. This is one of the curves for EcDSA recommended by NIST. It is also
 often the only cryptographic scheme supported by HSMs (Hardware Security
 Modules) of cloud providers.
 
+.. _tz4_accounts_s023:
+
 ``tz4``: BLS
 ''''''''''''
 

@@ -25,21 +25,15 @@ This protocol requires an updated protocol environment version (V15) from R vers
   ``add_valid_operation`` which are the result of splitting ``add_operation`` in
   two steps.
 
-
-Client
-------
-
-- Added ``octez-client set companion key for <delegate> to <bls_key>``, setting a
-  companion key for the given delegate. (MR :gl:`!17320`)
-
 Smart Rollups
 -------------
 
 Data Availability Layer
 -----------------------
 
-- Receipt of the DAL rewards is conditioned by the receipt of the attestation
-  rewards. (MR :gl:`!17934`)
+- DAL rewards are no longer distributed to bakers that are not
+  eligible for attestation rewards for the same cycle. (MR
+  :gl:`!17934`)
 
 
 Adaptive Issuance
@@ -48,7 +42,7 @@ Adaptive Issuance
 Michelson
 ---------
 
-- A new instruction named ``IS_IMPLICIT_ACCOUNT`` has been added, it
+- A new instruction named ``IS_IMPLICIT_ACCOUNT`` has been added. It
   provides a conversion from type ``address`` to type
   ``key_hash``. (MR :gl:`!12436`)
 
@@ -58,9 +52,73 @@ Gas improvements
 Breaking Changes
 ----------------
 
-- Unrevealed tz4 addresses. Starting in this protocol, tz4 addresses need a proof of possession
-  provided at revelation. This forces existing tz4 addresses to provide such a proof. This does
-  not change anything about the revelation of new addresses, or non-tz4 addresses. (MR :gl:`!18078`)
+- All existing tz4 addresses have been unrevealed. Indeed, starting in
+  this protocol, tz4 addresses need a proof of possession provided in
+  the reveal operation. This change ensures that existing tz4
+  addresses will also have to provide such a proof before sending
+  other operations. This does not change anything about the revelation
+  of new addresses, or non-tz4 addresses. (MR :gl:`!18078`)
+
+Operations
+----------
+
+- Added new operation kinds :ref:`Preattestations_aggregate and
+  Attestations_aggregate<consensus_operations_aggregate_s023>`. (MRs
+  :gl:`!15244`, :gl:`!17485`)
+
+- The ``Reveal`` operation has a new optional ``proof`` field, which
+  is required if (and only if) the manager key is a :ref:`tz4 (BLS
+  key)<tz4_accounts_s023>`. This results in an increase of gas cost
+  per reveal of a tz4 public key. (MR :gl:`!18095`)
+
+- The optional ``proof`` field of the ``Update_consensus_key``
+  operation is now required if (and only if) the new consensus key is
+  a :ref:`tz4 (BLS key)<tz4_accounts_s023>`. Its encoding now
+  exclusively accepts BLS signatures. (MR :gl:`!17360`)
+
+- Added a new manager operation kind ``Update_companion_key``,
+  allowing managers to register a :ref:`companion
+  key<companion_key>`. (MR :gl:`!17320`)
+
+- In order to enable denunciations of aggregated consensus operations,
+  the ``Double_preattestation_evidence`` and
+  ``Double_attestation_evidence`` operations have been replaced with a
+  new ``Double_consensus_operation_evidence`` operation. This new
+  operation contains a denounced slot and two denounced consensus
+  operations. For the evidence to be valid, the denounced operations
+  must both be preattestations (each one may be aggregated or not) or
+  both be attestations. Moreover, both must involve the denounced
+  slot, that is, be either a standalone operation for this slot or an
+  aggregate whose committee includes this slot. (MR :gl:`!18032`)
+
+- The ``Dal_entrapment_evidence`` operation has a new
+  ``consensus_slot`` field, and its ``attestation`` field may now
+  contain any kind of consensus operation. For the evidence to be
+  valid, ``attestation`` must be either a standalone attestation for
+  ``consensus_slot``, or an attestations aggregate whose committee
+  includes ``consensus_slot``. (MR :gl:`!18073`)
+
+Operation receipts
+------------------
+
+- Reworked the receipts for the
+  ``Double_consensus_operation_evidence`` and
+  ``Double_baking_evidence`` operations (MR :gl:`!18103`):
+
+  - The ``balance_updates`` field has been removed, because these
+    operations no longer produce them since the Oxford protocol.
+
+  - The ``forbidden_delegate`` field has been renamed to
+    ``punished_delegate`` and is no longer optional, because
+    forbidding the punished delegate has been systematic since the
+    Paris protocol.
+
+  - A new ``rewarded_delegate`` field has been added, because it's no
+    longer easily retrievable from the balance updates since Oxford.
+
+  - A new ``misbehaviour`` field has been added, containing the
+    misbehaviour's level, round, and kind
+    (double-baking/double-attesting/double-preattesting).
 
 RPC Changes
 -----------
@@ -86,70 +144,6 @@ RPC Changes
   /chains/<chain>/blocks/<block>/helpers/total_baking_power`` to retrieve the
   total baking power for the current cycle. (MR :gl:`!17553`)
 
-Operations
-----------
-
-- Added new operations ``Preattestations_aggregate`` and
-  ``Attestations_aggregate``. (MR :gl:`!15244`, :gl:`!17485`)
-
-- The optional ``proof`` field of the ``Update_consensus_key``
-  operation is now required if (and only if) the new consensus key is
-  a tz4 (BLS key). Its encoding now exclusively accepts BLS
-  signatures. (MR :gl:`!17360`)
-
-- Extended the ``Update_consensus_key`` manager operation with a ``kind``
-  field to support updating a delegate's companion key in addition to the
-  consensus key. The ``kind`` field distinguishes between the two types
-  of key updates. (MR :gl:`!17320`)
-
-- In order to enable denunciations of aggregated consensus operations,
-  the ``Double_preattestation_evidence`` and
-  ``Double_attestation_evidence`` operations have been replaced with a
-  new ``Double_consensus_operation_evidence`` operation. This new
-  operation contains a denounced slot and two denounced consensus
-  operations. For the evidence to be valid, the denounced operations
-  must both be preattestations (each one may be aggregated or not) or
-  both be attestations. Moreover, both must involve the denounced
-  slot, that is, be either a standalone operation for this slot or an
-  aggregate whose committee includes this slot. (MR :gl:`!18032`)
-
-- The ``Dal_entrapment_evidence`` operation has a new
-  ``consensus_slot`` field, and its ``attestation`` field may now
-  contain any kind of consensus operation. For the evidence to be
-  valid, ``attestation`` must be either a standalone attestation for
-  ``consensus_slot``, or an attestations aggregate whose committee
-  includes ``consensus_slot``. (MR :gl:`!18073`)
-
-- The ``Reveal`` operation has a new optional ``proof`` field required
-  for tz4 public keys. This results in an increase of gas cost per
-  revealing tz4 public keys. (MR :gl:`!18095`)
-
-Operation receipts
-------------------
-
-- Adds receipt for ``companion_key`` update. The receipt is similar to a consensus
-  key update, with the ``kind`` field used to differientiate between both.
-  (MR :gl:`!17320`)
-
-- Reworked the receipts for the
-  ``Double_consensus_operation_evidence`` and
-  ``Double_baking_evidence`` operations (MR :gl:`!18103`):
-
-  - The ``balance_updates`` field has been removed, because these
-    operations no longer produce them since the Oxford protocol.
-
-  - The ``forbidden_delegate`` field has been renamed to
-    ``punished_delegate`` and is no longer optional, because
-    forbidding the punished delegate has been systematic since the
-    Paris protocol.
-
-  - A new ``rewarded_delegate`` field has been added, because it's no
-    longer easily retrievable from the balance updates since Oxford.
-
-  - A new ``misbehaviour`` field has been added, containing the
-    misbehaviour's level, round, and kind
-    (double-baking/double-attesting/double-preattesting).
-
 Errors
 ------
 
@@ -161,7 +155,7 @@ Protocol parameters
   matching the reduction of the cycle length in Rio. Reduced accordingly the VDF
   difficulty as well. (:gl:`!18003`)
 
-- reduced blocks per commitment to 84, bringing back the number of nonces per
+- Reduced blocks per commitment to 84, bringing back the number of nonces per
   cycle to 128. (:gl:`!18147`)
 
 Bug Fixes
@@ -170,23 +164,27 @@ Bug Fixes
 Minor Changes
 -------------
 
-- Allow ``finalise_unstake`` to be performed by any account (:gl:`!17950`). This allows finalisation
-  of unstake requests to be done automatically by a third party - for example a finalisation bot.
+- The :ref:`finalize_unstake
+  pseudo-operation<staked_funds_management_s023>` can now be performed
+  by any account, not just the owner of the unstaked funds. This
+  allows finalization of unstake requests to be done automatically by
+  a third party - for example a finalization bot. (MR :gl:`!17950`)
 
-- Consensus operations with non-minimal slots are filtered by mempools
-  (MR :gl:`!18040`).
+- Consensus operations with non-minimal slots are now filtered by
+  mempools (MR :gl:`!18040`).
 
 - Consensus operations with different slots are no longer considered a
-  punishable misbehaviour (MR :gl:`!18043`)
+  punishable misbehaviour. (MR :gl:`!18043`)
 
 Internal
 --------
 
-- Added ``octez_riscv_pvm`` as a dependency for the protocol environment (:gl:`!15918`)
+- Added ``octez_riscv_pvm`` as a dependency for the protocol
+  environment. (MR :gl:`!15918`)
 
 - Added ``companion_key`` for delegates. These keys are used to build attestations for tz4
   addresses, and are registered the same way as consensus keys. They are used at validation
   time for the consensus, so the type of the storage ``delegate_sampler_state`` had to be
   updated. (MR :gl:`!17213`)
 
-- Moved remaining RPC implementations to the protocol plugin. (:gl:`!14079`)
+- Moved remaining RPC implementations to the protocol plugin. (MR :gl:`!14079`)
