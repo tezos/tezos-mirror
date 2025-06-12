@@ -58,18 +58,23 @@ Breaking Changes
 Operations
 ----------
 
-- Added new operations ``Preattestations_aggregate`` and
-  ``Attestations_aggregate``. (MR :gl:`!15244`, :gl:`!17485`)
+- Added new operation kinds :ref:`Preattestations_aggregate and
+  Attestations_aggregate<consensus_operations_aggregate_s023>`. (MRs
+  :gl:`!15244`, :gl:`!17485`)
+
+- The ``Reveal`` operation has a new optional ``proof`` field, which
+  is required if (and only if) the manager key is a :ref:`tz4 (BLS
+  key)<tz4_accounts_s023>`. This results in an increase of gas cost
+  per reveal of a tz4 public key. (MR :gl:`!18095`)
 
 - The optional ``proof`` field of the ``Update_consensus_key``
   operation is now required if (and only if) the new consensus key is
-  a tz4 (BLS key). Its encoding now exclusively accepts BLS
-  signatures. (MR :gl:`!17360`)
+  a :ref:`tz4 (BLS key)<tz4_accounts_s023>`. Its encoding now
+  exclusively accepts BLS signatures. (MR :gl:`!17360`)
 
-- Extended the ``Update_consensus_key`` manager operation with a ``kind``
-  field to support updating a delegate's companion key in addition to the
-  consensus key. The ``kind`` field distinguishes between the two types
-  of key updates. (MR :gl:`!17320`)
+- Added a new manager operation kind ``Update_companion_key``,
+  allowing managers to register a :ref:`companion
+  key<companion_key>`. (MR :gl:`!17320`)
 
 - In order to enable denunciations of aggregated consensus operations,
   the ``Double_preattestation_evidence`` and
@@ -88,10 +93,6 @@ Operations
   valid, ``attestation`` must be either a standalone attestation for
   ``consensus_slot``, or an attestations aggregate whose committee
   includes ``consensus_slot``. (MR :gl:`!18073`)
-
-- The ``Reveal`` operation has a new optional ``proof`` field required
-  for tz4 public keys. This results in an increase of gas cost per
-  revealing tz4 public keys. (MR :gl:`!18095`)
 
 Operation receipts
 ------------------
