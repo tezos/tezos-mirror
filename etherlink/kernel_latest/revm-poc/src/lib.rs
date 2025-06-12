@@ -13,13 +13,15 @@ mod world_state_handler;
 mod test {
     use primitive_types::{H160 as PH160, U256 as PU256};
     use revm::{
-        context::{transaction::AccessList, BlockEnv, CfgEnv, TxEnv},
+        context::{transaction::AccessList, BlockEnv, CfgEnv, ContextTr, TxEnv},
         context_interface::block::BlobExcessGasAndPrice,
         database::{CacheDB, EmptyDB},
         inspector::inspectors::GasInspector,
-        primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, U256},
+        primitives::{
+            hardfork::SpecId, hex::FromHex, Address, Bytes, FixedBytes, TxKind, U256,
+        },
         state::AccountInfo,
-        Context, ExecuteEvm, MainBuilder, MainContext,
+        Context, Database, ExecuteCommitEvm, ExecuteEvm, MainBuilder, MainContext,
     };
     use tezos_ethereum::block::{BlockConstants, BlockFees};
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -92,26 +94,28 @@ mod test {
     }
 
     #[test]
-    #[should_panic] // as the implementation contains dummy unimplented!()
     fn db_test_case() {
         let block = BlockEnv {
             number: U256::from(11),
             beneficiary: Address::ZERO,
             timestamp: U256::from(12),
             gas_limit: 1_000_000,
-            basefee: 10,
+            basefee: 0,
             difficulty: U256::ZERO,
             prevrandao: Some(FixedBytes::new([0; 32])),
             blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
         };
 
+        let destination =
+            Address::from_hex("eeeeee9ec4769a09a76a83c7bc42b185872860ee").unwrap();
+
         let tx = TxEnv {
             tx_type: 2,
             caller: Address::ZERO,
             gas_limit: block.gas_limit,
-            gas_price: 45,
-            kind: TxKind::Call(Address::ZERO),
-            value: U256::ZERO,
+            gas_price: 1,
+            kind: TxKind::Call(destination),
+            value: U256::from(5),
             data: Bytes::new(),
             nonce: 0,
             chain_id: Some(1),
@@ -134,6 +138,15 @@ mod test {
         let mut db =
             EtherlinkVMDB::new(&mut host, &block_constants, &mut world_state_handler);
 
+        let account_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+
+        db.insert_account_info(tx.caller, account_info);
+
         let mut cfg = CfgEnv::default();
         cfg.spec = SpecId::PRAGUE;
 
@@ -144,14 +157,21 @@ mod test {
             .with_cfg(cfg)
             .build_mainnet();
 
-        let out = evm.transact(&tx);
+        let account_1 = evm.db_mut().basic(Address::ZERO).unwrap().unwrap();
+        let account_2 = evm.db_mut().basic(destination).unwrap().unwrap();
 
-        println!("evm.transact:\n {:?}", out);
+        assert_eq!(account_1.balance, U256::MAX);
+        assert_eq!(account_2.balance, U256::ZERO);
 
-        let tracer = GasInspector::default();
-        let mut evm = evm.with_inspector(tracer);
-        let _ = evm.transact(&tx);
+        let _ = evm.transact_commit(&tx).unwrap();
 
-        println!("evm.transact with inspector:\n{:?}", evm.inspector);
+        let account_1 = evm.db_mut().basic(Address::ZERO).unwrap().unwrap();
+        let account_2 = evm.db_mut().basic(destination).unwrap().unwrap();
+
+        assert_eq!(
+            account_1.balance,
+            U256::MAX.checked_sub(U256::from(5)).unwrap()
+        );
+        assert_eq!(account_2.balance, U256::from(5));
     }
 }
