@@ -169,9 +169,9 @@ module Db = struct
             [("db.operation.name", `String op_name)]) ;
         f (Some scope)
 
-  let trace_req trace ?op_name fallback_name req f =
+  let trace_req trace ?scope ?op_name fallback_name req f =
     let name = Option.value req.name ~default:fallback_name in
-    trace ?trace_id:None ?parent:None ?scope:None name @@ fun scope ->
+    trace ?trace_id:None ?parent:None ?scope name @@ fun scope ->
     match scope with
     | None -> f None
     | Some scope ->
@@ -203,36 +203,36 @@ module Db = struct
     trace_with trace ~op_name:"ROLLBACK" "Sqlite.rollback" @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.rollback ()
 
-  let exec {conn = (module Db); trace} req arg =
-    trace_req trace "Sqlite.Db.exec" req @@ fun _ ->
+  let exec ?scope {conn = (module Db); trace} req arg =
+    trace_req ?scope trace "Sqlite.Db.exec" req @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.exec req.req arg
 
-  let find {conn = (module Db); trace} req arg =
-    trace_req trace "Sqlite.Db.find" ~op_name:"find" req @@ fun _ ->
+  let find ?scope {conn = (module Db); trace} req arg =
+    trace_req ?scope trace "Sqlite.Db.find" ~op_name:"find" req @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.find req.req arg
 
-  let find_opt {conn = (module Db); trace} req arg =
-    trace_req trace "Sqlite.Db.find_opt" ~op_name:"find" req @@ fun _ ->
+  let find_opt ?scope {conn = (module Db); trace} req arg =
+    trace_req ?scope trace "Sqlite.Db.find_opt" ~op_name:"find" req @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.find_opt req.req arg
 
-  let collect_list {conn = (module Db); trace} req arg =
-    trace_req trace "Sqlite.Db.collect_list" ~op_name:"collect" req @@ fun _ ->
-    wrap_caqti_lwt_result @@ Db.collect_list req.req arg
+  let collect_list ?scope {conn = (module Db); trace} req arg =
+    trace_req ?scope trace "Sqlite.Db.collect_list" ~op_name:"collect" req
+    @@ fun _ -> wrap_caqti_lwt_result @@ Db.collect_list req.req arg
 
-  let rev_collect_list {conn = (module Db); trace} req arg =
-    trace_req trace "Sqlite.Db.rev_collect_list" ~op_name:"collect" req
+  let rev_collect_list ?scope {conn = (module Db); trace} req arg =
+    trace_req ?scope trace "Sqlite.Db.rev_collect_list" ~op_name:"collect" req
     @@ fun _ -> wrap_caqti_lwt_result @@ Db.rev_collect_list req.req arg
 
-  let fold {conn = (module Db); trace} req f x acc =
-    trace_req trace "Sqlite.Db.fold" ~op_name:"iter" req @@ fun _ ->
+  let fold ?scope {conn = (module Db); trace} req f x acc =
+    trace_req ?scope trace "Sqlite.Db.fold" ~op_name:"iter" req @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.fold req.req f x acc
 
-  let fold_s {conn = (module Db); trace} req f x acc =
-    trace_req trace "Sqlite.Db.fold_s" ~op_name:"iter" req @@ fun _ ->
+  let fold_s ?scope {conn = (module Db); trace} req f x acc =
+    trace_req ?scope trace "Sqlite.Db.fold_s" ~op_name:"iter" req @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.fold_s req.req f x acc
 
-  let iter_s {conn = (module Db); trace} req f x =
-    trace_req trace "Sqlite.Db.iter_s" ~op_name:"iter" req @@ fun _ ->
+  let iter_s ?scope {conn = (module Db); trace} req f x =
+    trace_req ?scope trace "Sqlite.Db.iter_s" ~op_name:"iter" req @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.iter_s req.req f x
 end
 

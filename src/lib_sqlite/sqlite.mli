@@ -166,16 +166,26 @@ module Db : sig
   (** [exec req x] performs [req] with parameters [x] and checks that no rows
       are returned. *)
   val exec :
-    conn -> ('a, unit, [< `Zero]) Request.t -> 'a -> unit tzresult Lwt.t
+    ?scope:Opentelemetry.Scope.t ->
+    conn ->
+    ('a, unit, [< `Zero]) Request.t ->
+    'a ->
+    unit tzresult Lwt.t
 
   (** [find req x] performs [req] with parameters [x], checks that a single row
       is retured, and returns it. *)
-  val find : conn -> ('a, 'b, [< `One]) Request.t -> 'a -> 'b tzresult Lwt.t
+  val find :
+    ?scope:Opentelemetry.Scope.t ->
+    conn ->
+    ('a, 'b, [< `One]) Request.t ->
+    'a ->
+    'b tzresult Lwt.t
 
   (** [find_opt req x] performs [req] with parameters [x] and returns either
       [None] if no rows are returned or [Some y] if a single now [y] is returned
       and fails otherwise. *)
   val find_opt :
+    ?scope:Opentelemetry.Scope.t ->
     conn ->
     ('a, 'b, [< `One | `Zero]) Request.t ->
     'a ->
@@ -185,6 +195,7 @@ module Db : sig
       a list of rows in order of retrieval.  The accumulation is tail recursive
       but slightly less efficient than {!rev_collect_list}. *)
   val collect_list :
+    ?scope:Opentelemetry.Scope.t ->
     conn ->
     ('a, 'b, [< `Many | `One | `Zero]) Request.t ->
     'a ->
@@ -195,6 +206,7 @@ module Db : sig
       accumulation is tail recursive and slighly more efficient than
       {!collect_list}. *)
   val rev_collect_list :
+    ?scope:Opentelemetry.Scope.t ->
     conn ->
     ('a, 'b, [< `Many | `One | `Zero]) Request.t ->
     'a ->
@@ -204,6 +216,7 @@ module Db : sig
       through the composition of [f y] across the result rows [y] in the order
       of retrieval. *)
   val fold :
+    ?scope:Opentelemetry.Scope.t ->
     conn ->
     ('a, 'b, [< `Many | `One | `Zero]) Request.t ->
     ('b -> 'c -> 'c) ->
@@ -221,6 +234,7 @@ module Db : sig
       has just run out of connections.  An alternative is to collect the rows
       first e.g. with {!fold} and do the nested queries after exiting.*)
   val fold_s :
+    ?scope:Opentelemetry.Scope.t ->
     conn ->
     ('a, 'b, [< `Many | `One | `Zero]) Request.t ->
     ('b -> 'c -> ('c, Caqti_error.t) result Lwt.t) ->
@@ -234,6 +248,7 @@ module Db : sig
       Please see the warning in {!fold_s} about resource usage in the
       callback. *)
   val iter_s :
+    ?scope:Opentelemetry.Scope.t ->
     conn ->
     ('a, 'b, [< `Many | `One | `Zero]) Request.t ->
     ('b -> (unit, Caqti_error.t) result Lwt.t) ->
