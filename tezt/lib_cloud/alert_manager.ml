@@ -261,8 +261,12 @@ let shutdown () =
   Lwt.return_unit
 
 let add_alert t ~alert =
-  Log.info "%s: adding alert" section ;
   let {alert; route = route'} = alert in
   let route' = Option.value ~default:(route t.default_receiver) route' in
+  let {receiver; _} = route' in
+  Log.info
+    "%s: adding alert with receiver: %s"
+    section
+    (name_of_receiver receiver) ;
   t.routes <- (alert, route') :: t.routes ;
   reload t
