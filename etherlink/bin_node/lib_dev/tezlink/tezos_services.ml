@@ -631,6 +631,17 @@ module Imported_services = struct
         Tezlink_protocols.Shell_impl.version * Block_services.block_info )
       Tezos_rpc.Service.t =
     import_service Block_services.S.info
+
+  let get_storage_normalized :
+      ( [`POST],
+        tezlink_rpc_context,
+        tezlink_rpc_context * Tezos_types.Contract.t,
+        unit,
+        Imported_protocol.Script_ir_unparser.unparsing_mode,
+        Alpha_context.Script.expr option )
+      Tezos_rpc.Service.t =
+    Tezos_rpc.Service.subst1
+      Imported_protocol_plugin.RPC.Contract.S.get_storage_normalized
 end
 
 let chain_directory_path = Tezos_shell_services.Chain_services.path
@@ -726,6 +737,14 @@ let register_block_services ~l2_chain_id
            let*? chain = check_chain chain in
            let*? block = check_block block in
            Backend.balance chain block contract)
+    |> register
+         ~service:Imported_services.get_storage_normalized
+           (* TODO: #7995
+              Take unparsing_mode argument into account *)
+         ~impl:(fun ({chain; block}, contract) () _unparsing_mode ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           Backend.get_storage chain block contract)
     |> register
          ~service:Imported_services.manager_key
          ~impl:(fun ({chain; block}, contract) _ _ ->

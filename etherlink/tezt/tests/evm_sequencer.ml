@@ -447,8 +447,8 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
-let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts scenario
-    protocols =
+let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts
+    ?tez_bootstrap_contracts scenario protocols =
   register_all
     ~enable_tx_queue:Evm_node.(Enable false)
       (*Tx queue is not yet compatible with tezlink *)
@@ -461,6 +461,7 @@ let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts scenario
           (Evm_node.default_l2_setup ~l2_chain_id:12) with
           l2_chain_family = "Michelson";
           tez_bootstrap_accounts;
+          tez_bootstrap_contracts;
         };
       ]
     ~use_multichain:Register_with_feature
@@ -581,12 +582,11 @@ let test_tezlink_protocols =
     in
     return @@ JSON.parse ~origin:"curl_protocols" res
   in
+  let protocol_hash = Protocol.hash Michelson_contracts.tezlink_protocol in
 
   let* res = rpc_protocols () in
   Check.(
-    JSON.(
-      res |-> "protocol" |> as_string
-      = "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7")
+    JSON.(res |-> "protocol" |> as_string = protocol_hash)
       string
       ~error_msg:"Expected %R but got %L") ;
   unit
@@ -648,6 +648,25 @@ let test_tezlink_balance =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
   in
   Check.((Tez.to_mutez invalid_res = 0) int ~error_msg:"Expected %R but got %L") ;
+  unit
+
+let test_tezlink_storage =
+  let contract = (Michelson_contracts.bootstraps ()).(0) in
+  register_tezlink_test
+    ~title:"Test of the storage rpc"
+    ~tags:["rpc"; "storage"]
+    ~tez_bootstrap_contracts:[contract]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* storage = Client.contract_storage ~endpoint contract.address client in
+  Check.(
+    (String.trim storage = String.trim contract.initial_storage)
+      string
+      ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
 let account_rpc sequencer account key =
@@ -7039,7 +7058,7 @@ let test_sequencer_dont_read_level_twice =
       client
   in
 
-  (* We bake two blocks, so thet the EVM node can process the deposit and
+  (* We bake two blocks, so that the EVM node can process the deposit and
      create a blueprint with it. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
@@ -12671,7 +12690,7 @@ let test_spawn_rpc =
   in
   let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
   let*@ size = Rpc.produce_block sequencer in
-  Check.((size = 1) int) ~error_msg:"block size sould be 1" ;
+  Check.((size = 1) int) ~error_msg:"block size should be 1" ;
   let* () = Evm_node.wait_for_blueprint_applied sequencer 1 in
   let* () = Evm_node.wait_for_blueprint_applied observer 1 in
   let*@ _seq_block = Rpc.get_block_by_number ~block:"1" sequencer in
@@ -13865,5 +13884,6 @@ let () =
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;
-  test_eip2930_storage_access [Alpha] ;
-  test_tezlink_block_info [Alpha]
+  test_tezlink_block_info [Alpha] ;
+  test_tezlink_storage [Alpha] ;
+  test_eip2930_storage_access [Alpha]

@@ -80,6 +80,17 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let `Main = chain in
     Tezlink_durable_storage.balance (read ~block) c
 
+  let get_storage chain block c =
+    (* TODO: #7986
+       Support unparsing_mode argument. *)
+    let `Main = chain in
+
+    Durable_storage.inspect_durable_and_decode
+      (read ~block)
+      (Tezlink_durable_storage.Path.storage c)
+      (Data_encoding.Binary.of_bytes_opt
+         Tezlink_imports.Alpha_context.Script.expr_encoding)
+
   let manager_key chain block c =
     let open Lwt_result_syntax in
     (* TODO: #7831 !17664

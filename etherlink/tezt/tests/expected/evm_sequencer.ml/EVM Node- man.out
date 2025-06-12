@@ -715,7 +715,7 @@ Snapshots commands:
     --compress-on-the-fly: Produce a compressed snapshot on the fly. The
       rollup node will use less disk space to produce the snapshot but will
       lock the rollup node (if running) for a longer time. Without this
-      option, producing a snaphsot requires the available disk space to be
+      option, producing a snapshot requires the available disk space to be
       around the size of the data dir.
     --uncompressed: Produce an uncompressed snapshot.
   
@@ -894,7 +894,9 @@ Kernel commands:
       [--maximum-gas-per-transaction <30000...>]
       [--eth-bootstrap-balance <9999000000000000000000>]
       [--eth-bootstrap-account <0x...>] [--tez-bootstrap-balance <3800000>]
-      [--tez-bootstrap-account <edp...>] [--set-code <0x...,0x....>]
+      [--tez-bootstrap-account <edp...>]
+      [--tez-bootstrap-contract <KT1...,0x...,0x....>]
+      [--set-code <0x...,0x....>]
       [--world-state-path </evm/world_state/<chain_id>>] [--l2-chain-id <1>]
       [--l2-chain-family <EVM>]
     Produce a file containing the part of the kernel configuration
@@ -918,6 +920,9 @@ Kernel commands:
       Defaults to `3800000`.
     --tez-bootstrap-account <edp...>: Add a tezlink bootstrap account in the
       installer config.
+    --tez-bootstrap-contract <KT1...,0x...,0x....>: Add a tezlink bootstrap
+      contract in the installer config passing the address to be used, the
+      script and initial storage comma separated.
     --set-code <0x...,0x....>: Add code to an account in the installer
       config.
     --world-state-path </evm/world_state/<chain_id>>: Value for

@@ -284,9 +284,38 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
   in
   return output
 
-let generate_l2_kernel_config (l2_setup : Evm_node.l2_setup) =
+let generate_l2_kernel_config (l2_setup : Evm_node.l2_setup) client =
   let l2_config =
     Temp.file (Format.sprintf "l2-%d-config.yaml" l2_setup.l2_chain_id)
+  in
+  let* tez_bootstrap_contracts =
+    match l2_setup.tez_bootstrap_contracts with
+    | None -> none
+    | Some contracts ->
+        let* result =
+          Lwt_list.map_s
+            (fun Evm_node.{address; path; initial_storage} ->
+              let script = Tezt_core.Base.read_file path in
+              let* code =
+                Client.convert_script
+                  ~script
+                  ~src_format:`Michelson
+                  ~dst_format:`Binary
+                  client
+              in
+              let* initial_storage_binary =
+                Client.convert_data
+                  ~data:initial_storage
+                  ~src_format:`Michelson
+                  ~dst_format:`Binary
+                  client
+              in
+              Lwt.return
+                (String.trim address ^ "," ^ String.trim code ^ ","
+                ^ String.trim initial_storage_binary))
+            contracts
+        in
+        some result
   in
   let*! () =
     Evm_node.make_l2_kernel_installer_config
@@ -298,6 +327,7 @@ let generate_l2_kernel_config (l2_setup : Evm_node.l2_setup) =
       ?da_fee_per_byte:l2_setup.da_fee_per_byte
       ?eth_bootstrap_accounts:l2_setup.eth_bootstrap_accounts
       ?tez_bootstrap_accounts:l2_setup.tez_bootstrap_accounts
+      ?tez_bootstrap_contracts
       ?world_state_path:l2_setup.world_state_path
       ~output:l2_config
       ()
@@ -309,9 +339,11 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
     ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
-    ~sequencer ~preimages_dir ?evm_version ~kernel () =
+    ~sequencer ~preimages_dir ?evm_version ~kernel ~client () =
   let l2_chain_ids = List.map (fun l2 -> l2.Evm_node.l2_chain_id) l2_setups in
-  let* l2_configs = Lwt_list.map_s generate_l2_kernel_config l2_setups in
+  let* l2_configs =
+    Lwt_list.map_s (fun s -> generate_l2_kernel_config s client) l2_setups
+  in
   let rollup_config = Temp.file "rollup-config.yaml" in
   (* To keep backwards compatibility, we also write to the current durable storage
      paths the variables that have been moved if we have a single chain. *)
@@ -339,6 +371,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
           if world_state_path = Some "/evm/world_state" then None
           else eth_bootstrap_accounts
         in
+
         ( minimum_base_fee_per_gas,
           da_fee_per_byte,
           sequencer_pool_address,
@@ -396,7 +429,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ~enable_dal ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?dal_slots
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~preimages_dir ~kernel
-    ?evm_version () =
+    ?evm_version ~client () =
   if not enable_multichain then (
     assert (List.length l2_chains = 1) ;
     let chain_config = List.hd l2_chains in
@@ -442,6 +475,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?evm_version
       ~preimages_dir
       ~kernel
+      ~client
       ()
 
 let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
@@ -490,6 +524,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~default:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
       preimages_dir
   in
+
   let* output =
     setup_kernel
       ~l1_contracts
@@ -510,6 +545,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?enable_fa_bridge
       ~preimages_dir
       ~kernel
+      ~client
       ()
   in
   let* sc_rollup_address =
@@ -751,12 +787,12 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?delayed_inbox_min_levels ?max_number_of_chunks
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?sequencer ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
-    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
-    ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
-    ?(additional_uses = []) ?rollup_history_mode ~enable_dal
+    ?tez_bootstrap_contracts ?sequencer ?sequencer_pool_address ~kernel ?da_fee
+    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ?commitment_period ?challenge_window ?(threshold_encryption = false)
+    ?(uses = uses) ?(additional_uses = []) ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ~l2_setups ?rpc_server ?websockets ?history_mode
     ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path body ~title ~tags
@@ -787,6 +823,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
             maximum_gas_per_transaction;
             eth_bootstrap_accounts = Some eth_bootstrap_accounts;
             tez_bootstrap_accounts = Some tez_bootstrap_accounts;
+            tez_bootstrap_contracts;
           };
         ]
     | Some l2_chains -> l2_chains
