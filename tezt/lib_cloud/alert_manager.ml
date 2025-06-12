@@ -108,12 +108,8 @@ let jingoo_receiver_template receiver =
                     ( "http_config",
                       Tobj
                         [
-                          ( "authorization",
-                            Tobj
-                              [
-                                ("type", Tstr "Bearer");
-                                ("credentials", Tstr bot_token);
-                              ] );
+                          ("type", Tstr "Bearer");
+                          ("credentials", Tstr bot_token);
                         ] );
                   ]) );
         ]

@@ -33,13 +33,18 @@ receivers:
     slack_configs:
     - channel: '{{ receiver.config.channel }}'
       api_url: '{{ receiver.config.api_url }}'
-
       {%- if receiver.config.text %}
       text: '{{ receiver.config.text|safe }}'
       {%- endif -%}
       {%- if receiver.config.title %}
       title: '{{ receiver.config.title }}'
       {%- endif -%}
+      {%- if receiver.config.http_config %}
+      http_config:
+        authorization:
+          type: '{{ receiver.config.http_config.type }}'
+          credentials: '{{ receiver.config.http_config.credentials }}'
+      {% endif -%}
   {% endif -%}
 {% endfor %}
 
