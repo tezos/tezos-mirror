@@ -31,8 +31,9 @@ Smart Rollups
 Data Availability Layer
 -----------------------
 
-- Receipt of the DAL rewards is conditioned by the receipt of the attestation
-  rewards. (MR :gl:`!17934`)
+- DAL rewards are no longer distributed to bakers that are not
+  eligible for attestation rewards for the same cycle. (MR
+  :gl:`!17934`)
 
 
 Adaptive Issuance
@@ -41,7 +42,7 @@ Adaptive Issuance
 Michelson
 ---------
 
-- A new instruction named ``IS_IMPLICIT_ACCOUNT`` has been added, it
+- A new instruction named ``IS_IMPLICIT_ACCOUNT`` has been added. It
   provides a conversion from type ``address`` to type
   ``key_hash``. (MR :gl:`!12436`)
 
@@ -51,9 +52,12 @@ Gas improvements
 Breaking Changes
 ----------------
 
-- Unrevealed tz4 addresses. Starting in this protocol, tz4 addresses need a proof of possession
-  provided at revelation. This forces existing tz4 addresses to provide such a proof. This does
-  not change anything about the revelation of new addresses, or non-tz4 addresses. (MR :gl:`!18078`)
+- All existing tz4 addresses have been unrevealed. Indeed, starting in
+  this protocol, tz4 addresses need a proof of possession provided in
+  the reveal operation. This change ensures that existing tz4
+  addresses will also have to provide such a proof before sending
+  other operations. This does not change anything about the revelation
+  of new addresses, or non-tz4 addresses. (MR :gl:`!18078`)
 
 Operations
 ----------
@@ -96,10 +100,6 @@ Operations
 
 Operation receipts
 ------------------
-
-- Adds receipt for ``companion_key`` update. The receipt is similar to a consensus
-  key update, with the ``kind`` field used to differientiate between both.
-  (MR :gl:`!17320`)
 
 - Reworked the receipts for the
   ``Double_consensus_operation_evidence`` and
@@ -155,7 +155,7 @@ Protocol parameters
   matching the reduction of the cycle length in Rio. Reduced accordingly the VDF
   difficulty as well. (:gl:`!18003`)
 
-- reduced blocks per commitment to 84, bringing back the number of nonces per
+- Reduced blocks per commitment to 84, bringing back the number of nonces per
   cycle to 128. (:gl:`!18147`)
 
 Bug Fixes
@@ -164,23 +164,27 @@ Bug Fixes
 Minor Changes
 -------------
 
-- Allow ``finalise_unstake`` to be performed by any account (:gl:`!17950`). This allows finalisation
-  of unstake requests to be done automatically by a third party - for example a finalisation bot.
+- The :ref:`finalize_unstake
+  pseudo-operation<staked_funds_management_s023>` can now be performed
+  by any account, not just the owner of the unstaked funds. This
+  allows finalization of unstake requests to be done automatically by
+  a third party - for example a finalization bot. (MR :gl:`!17950`)
 
-- Consensus operations with non-minimal slots are filtered by mempools
-  (MR :gl:`!18040`).
+- Consensus operations with non-minimal slots are now filtered by
+  mempools (MR :gl:`!18040`).
 
 - Consensus operations with different slots are no longer considered a
-  punishable misbehaviour (MR :gl:`!18043`)
+  punishable misbehaviour. (MR :gl:`!18043`)
 
 Internal
 --------
 
-- Added ``octez_riscv_pvm`` as a dependency for the protocol environment (:gl:`!15918`)
+- Added ``octez_riscv_pvm`` as a dependency for the protocol
+  environment. (MR :gl:`!15918`)
 
 - Added ``companion_key`` for delegates. These keys are used to build attestations for tz4
   addresses, and are registered the same way as consensus keys. They are used at validation
   time for the consensus, so the type of the storage ``delegate_sampler_state`` had to be
   updated. (MR :gl:`!17213`)
 
-- Moved remaining RPC implementations to the protocol plugin. (:gl:`!14079`)
+- Moved remaining RPC implementations to the protocol plugin. (MR :gl:`!14079`)
