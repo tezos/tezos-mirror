@@ -57,6 +57,16 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
         let mut storage_account = self.get_or_create_account(address);
         storage_account.set_info(self.host, info);
     }
+
+    #[cfg(test)]
+    pub fn storage_slot(
+        &self,
+        address: Address,
+        storage_key: StorageKey,
+    ) -> StorageValue {
+        let storage_account = self.get_or_create_account(address);
+        storage_account.get_storage(self.host, &storage_key)
+    }
 }
 
 impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
