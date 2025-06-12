@@ -40,8 +40,6 @@ let validate_gas_limit ~storage_version
     (transaction : Transaction.transaction) :
     (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
-  (* Constants defined in the kernel: *)
-  let gas_limit = transaction.gas_limit in
   let**? execution_gas_limit =
     (* since Dionysus, the execution gas limit is always computed from the
        minimum base fee per gas *)
@@ -49,7 +47,7 @@ let validate_gas_limit ~storage_version
       ~da_fee_per_byte
       ~access_list:transaction.access_list
       ~minimum_base_fee_per_gas
-      ~gas_limit
+      ~gas_limit:transaction.gas_limit
       transaction.data
   in
   if storage_version < 35 then
