@@ -10610,6 +10610,13 @@ let test_describe_endpoint =
   let* (_ : string) =
     Client.rpc_list ~hooks ~endpoint:tezlink_endpoint client
   in
+  let* (_ : string) =
+    Client.rpc_list
+      ~hooks
+      ~endpoint:tezlink_endpoint
+      ~url:"chains/main/blocks/head"
+      client
+  in
   unit
 
 let test_relay_restricted_rpcs =
