@@ -34,6 +34,12 @@ receivers:
     - channel: '{{ receiver.config.channel }}'
       api_url: '{{ receiver.config.api_url }}'
 
+      {%- if receiver.config.text %}
+      text: '{{ receiver.config.text|safe }}'
+      {%- endif -%}
+      {%- if receiver.config.title %}
+      title: '{{ receiver.config.title }}'
+      {%- endif -%}
   {% endif -%}
 {% endfor %}
 

@@ -12,15 +12,31 @@ type receiver
 
 (** [slack_webhook_receiver ?channel ~name ~api_url] creates a [receiver] named
     [name], sending notifications on the URL defined by [api_url]. [channel] is
-    a placeholder. *)
+    a placeholder.
+    [title] is a custom template for the message title sent on slack
+    [text] is a custom template for the message body sent on slack *)
 val slack_webhook_receiver :
-  ?channel:string -> name:string -> api_url:string -> unit -> receiver
+  ?channel:string ->
+  name:string ->
+  api_url:string ->
+  ?title:string ->
+  ?text:string ->
+  unit ->
+  receiver
 
 (** [slack_bottoken_receiver ~name ~channel ~bot_token] creates a
     [receiver] named [name], sending notifications on channel [channel] using
-    [bot_token] authentication: https://api.slack.com/concepts/token-types *)
+    [bot_token] authentication: https://api.slack.com/concepts/token-types
+    [title] is a custom template for the message title sent on slack
+    [text] is a custom template for the message sent on slack *)
 val slack_bottoken_receiver :
-  name:string -> channel:string -> bot_token:string -> receiver
+  name:string ->
+  channel:string ->
+  bot_token:string ->
+  ?title:string ->
+  ?text:string ->
+  unit ->
+  receiver
 
 val null_receiver : receiver
 
