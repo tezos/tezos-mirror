@@ -82,7 +82,7 @@ let send_transaction_and_wait_confirmation ~raw_tx sequencer =
     let*@ _ = produce_block sequencer in
     unit
   and* _hash = wait_for_confirmed in
-  unit
+  return hash
 
 let test_validate_compressed_sig =
   register ~title:"Validate compressed signature" ~tags:["signature"; "caller"]
@@ -207,7 +207,7 @@ let test_validate_chain_id =
           "0x01f86782053980843b9aca008261a8945d66ec78664f4a0b0929a41270316a6cd4d8bd4b8080c001a05ba2acb79e66aaadd076b1ee6fdf09f5cb95541e2b24504209f89908b50a84dea0492d8cf5c29b5ec44b4730eebfb62ddf5ce486d5b8729c50a8002d6219f76412"
     | Eip1559 -> make_tx_chain_id ~chain_id:1337 ~legacy:false
   in
-  let* () =
+  let* _hash =
     send_transaction_and_wait_confirmation ~raw_tx:valid_chain_id sequencer
   in
 
@@ -318,7 +318,7 @@ let test_validate_max_fee_per_gas =
           "0x01f86782053980843b9aca008261a8945d66ec78664f4a0b0929a41270316a6cd4d8bd4b8080c001a05ba2acb79e66aaadd076b1ee6fdf09f5cb95541e2b24504209f89908b50a84dea0492d8cf5c29b5ec44b4730eebfb62ddf5ce486d5b8729c50a8002d6219f76412"
     | Eip1559 -> make_tx_gas_price ~gas_price:base_fee_per_gas ~legacy:false
   in
-  let* () =
+  let* _hash =
     send_transaction_and_wait_confirmation ~raw_tx:gas_price_enough sequencer
   in
   unit
@@ -395,7 +395,7 @@ let test_validate_pay_for_fees =
     | Eip1559 ->
         make_tx_pay_fees ~nonce:0 ~legacy:false ~gas_price:base_fee_per_gas ()
   in
-  let* () =
+  let* _hash =
     send_transaction_and_wait_confirmation ~raw_tx:enough_funds sequencer
   in
   (* But it's the gas price provided by the user that's necessary, not
@@ -468,7 +468,7 @@ let test_validate_pay_for_fees_max_fee_per_gas =
   (* As the transaction has the maximum gas possible 30M. If the DA
      fees are wrongly calculated it would consider that the execution
      gas limit is more than 30M, and result in a failure. *)
-  let* () = send_transaction_and_wait_confirmation ~raw_tx sequencer in
+  let* _hash = send_transaction_and_wait_confirmation ~raw_tx sequencer in
   unit
 
 let test_validate_gas_limit =
