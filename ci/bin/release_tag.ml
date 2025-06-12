@@ -173,7 +173,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~image:Images.ci_release
       ~stage:Stages.publish
       ~interruptible:false
-      ~dependencies
+      ~dependencies:(Dependent (Job job_docker_merge :: dependencies))
       ~name:"gitlab:release"
       ?variables
       [
@@ -192,7 +192,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~image:Images.ci_release
       ~stage:Stages.publish
       ~interruptible:false
-      ~dependencies
+      ~dependencies:(Dependent dependencies)
       ?before_script
       ?variables
       ~name:"gitlab:publish"
@@ -208,12 +208,11 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
   let jobs_debian_repository = Debian_repository.jobs Release in
   let job_gitlab_release_or_publish =
     let dependencies =
-      Dependent
-        [
-          Artifacts job_static_x86_64_release;
-          Artifacts job_static_arm64_release;
-          Artifacts job_build_homebrew_release;
-        ]
+      [
+        Artifacts job_static_x86_64_release;
+        Artifacts job_static_arm64_release;
+        Artifacts job_build_homebrew_release;
+      ]
     in
     match release_tag_pipeline_type with
     | Non_release_tag | Schedule_test -> job_gitlab_publish ~dependencies ()
