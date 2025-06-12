@@ -207,24 +207,29 @@ let run ?(default_receiver = null_receiver) alerts =
   | _ ->
       write_configuration t ;
       let* () =
-        Process.run
-          "docker"
-          [
-            "run";
-            "-v";
-            "/tmp/alert_manager:/tmp/alert_manager";
-            "--rm";
-            "-d";
-            "--network";
-            "host";
-            "--name";
-            "alert-manager";
-            "-p";
-            "9093-9093";
-            "prom/alertmanager:latest";
-            "--config.file";
-            configuration_file;
-          ]
+        Lwt.catch
+          (fun () ->
+            Process.run
+              "docker"
+              [
+                "run";
+                "-v";
+                "/tmp/alert_manager:/tmp/alert_manager";
+                "--rm";
+                "-d";
+                "--network";
+                "host";
+                "--name";
+                "alert-manager";
+                "-p";
+                "9093-9093";
+                "prom/alertmanager:latest";
+                "--config.file";
+                configuration_file;
+              ])
+          (fun exn ->
+            Log.error "Alert_manager:%s" (Printexc.to_string exn) ;
+            Lwt.return_unit)
       in
       Lwt.return_some t
 
