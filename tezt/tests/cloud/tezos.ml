@@ -544,6 +544,22 @@ module Sc_rollup_helpers = struct
         ?config
         installee
 
+    let prepare_installer_kernel_with_multiple_setup_file ?output ~preimages_dir
+        ?configs installee agent =
+      let* installee = Agent.copy agent ~source:installee in
+      let* smart_rollup_installer_path =
+        Agent.copy agent ~source:(Uses.path Constant.smart_rollup_installer)
+      in
+      let runner = Agent.runner agent in
+      prepare_installer_kernel_with_multiple_setup_file
+        ?output
+        ~smart_rollup_installer_path
+        ?runner
+        ~boot_sector:`Filename
+        ~preimages_dir
+        ?configs
+        installee
+
     let prepare_installer_kernel ~preimages_dir ?config installee agent =
       prepare_installer_kernel_with_arbitrary_file
         ~preimages_dir
