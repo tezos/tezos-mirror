@@ -138,7 +138,7 @@ The protocol parameter ``TRAPS_FRACTION`` controls the fraction of shards marked
 Bakers detect traps by retrieving shard content via their DAL node and applying the trap function. A trap invalidates the corresponding attestation: the baker should not attest a slot if one of the slot’s shards assigned to him is a trap.
 
 The ``DAL_entrapment_evidence`` accusation operation can be used to accuse a baker of wrongly attesting a slot due to an undetected trap.
-This accusation operation includes the attestation operation containing the wrongly attested slot, the slot index, and the undetected shard.
+This accusation operation includes the offending attestation operation (either individual or part of an :ref:`aggregate<consensus_operations_alpha>`), the offending baker's consensus slot, the wrongly attested DAL slot, and the undetected shard.
 
 As for double-signing accusations, any baker can include a DAL accusation in its block.
 Accusations can be included during a period of ``DENUNCIATION_PERIOD`` cycles after the misbehavior event, which is that of the corresponding attestation operation.

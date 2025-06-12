@@ -83,7 +83,7 @@ phases required to agree on the next block.
   observed. These operations also hold information on :doc:`DAL attestations <../shell/dal_bakers>`
   when the attesting baker participates in the DAL.
 
-Starting in protocol S, blocks will also be able to include these operations in an aggregated form.
+Starting in protocol S, blocks are also able to include these operations in an aggregated form, using operations ``Attestations_aggregate`` and ``Preattestations_aggregate``.
 If the attesting baker uses a tz4 consensus key, thanks to the BLS signature scheme,
 its attestation can be aggregated with all the other tz4 pre/attestations,
 which helps reducing the size and validation time of blocks without compromising on
@@ -139,21 +139,21 @@ Further details on the latter operation's implementation and semantics
 are provided in the :ref:`random seed generation
 protocol<randomness_generation_alpha>`.
 
-Three operations in this class are used to :ref:`punish participants
+Two operations in this class are used to :ref:`punish participants
 which engage in Byzantine behaviour<slashing_alpha>` -- notably
 delegates which :ref:`"double sign" <def_double_signing_alpha>` blocks, or emit
 conflicting :ref:`consensus operations<consensus_operations_alpha>`:
 
-- The ``Double_preattestation_evidence`` operation allows for accusing
-  a delegate of having *double-preattested* -- i.e., of having
-  preattested two different block candidates, at the same level and at
+- The ``Double_consensus_operation_evidence`` operation allows for accusing
+  a delegate of having *double-preattested* or *double-attested* -- i.e., of having
+  preattested, or respectively attested, two different block candidates, at the same level and at
   the same round. The bulk of the evidence, the two arguments
-  provided, consists of the two offending preattestations.
-
-- Similarly, the ``Double_attestation_evidence`` operation allows for
-  accusing a delegate of having *double-attested* -- i.e., of having
-  attested two different block candidates at the same level and the
-  same round -- by providing the two offending attestations.
+  provided, consists of the two offending preattestations, respectively attestations.
+  
+  Beside the two offending operations, there is a ``slot`` field containing the delegate's slot used in the offending operations.
+  More precisely, each offending operation may be either a standalone operation for this slot, or an :ref:`aggregate operation<consensus_operations_alpha>` containing this slot in its committee.
+  
+  In protocols older than S, there were two operations, ``Double_preattestation_evidence`` and ``Double_attestation_evidence``, instead of ``Double_consensus_operation_evidence``, which did not exist.
 
 - The ``Double_baking_evidence`` allows for accusing a delegate of
   having "double-baked" a block -- i.e., of having signed two
@@ -173,6 +173,8 @@ consensus-signing responsibility, to **empty** its delegate
 account. This operation is used as a deterrent to ensure that a
 delegate secures its consensus key as much as its manager (or main)
 key.
+
+The DAL also adds the anonymous operation ``DAL_entrapment_evidence``, see :doc:`./dal_support`.
 
 .. _manager_operations_alpha:
 
@@ -205,6 +207,7 @@ manager operations are the only fee-paying and
 - The ``Update_consensus_key`` operation allows users to register a
   :ref:`consensus key<consensus_key_alpha>`, which is a dedicated key
   for signing blocks and consensus-related operations.
+  When the new consensus key is a tz4 (BLS key), the optional ``proof`` field must contain a proof of possession, which is the signature of the public key itself.
 - The ``Update_companion_key`` operation allows users to register a
   :ref:`companion key<companion_key>`, which is a dedicated key (introduced in protocol S)
   for signing the DAL specific part of consensus operations,
@@ -222,6 +225,7 @@ manager operations are the only fee-paying and
 - The ``Event`` operation enables sending event-like information to
   external applications from Tezos smart contracts -- see
   :doc:`Contract Events<event>` for further detail.
+- The ``DAL_publish_commitment`` operation (see :doc:`./dal_support`)
 
 Moreover, all operations necessary to implement Tezos' *enshrined*
 Layer 2 solutions into the economic protocol are also manager
