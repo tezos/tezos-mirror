@@ -16,6 +16,7 @@
      running `./scripts/install_dal_trusted_setup.sh`
    - smart rollup binaries are available -- requires to run `make -f kernels.mk
      build-deps` and `make -f kernels.mk kernel_sdk`
+   - floodgate binaries are available -- `make build-floodgate`
 *)
 
 module Cryptobox = Dal_common.Cryptobox
