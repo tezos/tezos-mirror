@@ -2190,6 +2190,108 @@ let may_copy_dal_node_identity_file agent node = function
       in
       Lwt.return_unit
 
+let fund_producers_accounts (bootstrap : bootstrap) configuration
+    accounts_to_fund =
+  if List.length accounts_to_fund > 0 then
+    let () = toplog "Funding the producer accounts" in
+    let fundraiser_key =
+      match configuration.fundraiser with
+      | None ->
+          Test.fail
+            "No fundraiser key was specified. Please use either `--fundraiser` \
+             or the variable environment `TEZT_CLOUD_FUNDRAISER` to specified \
+             an unencrypted secret key of an account having funds to run the \
+             scenario"
+      | Some key -> key
+    in
+    let* () =
+      Client.import_secret_key
+        bootstrap.client
+        (Unencrypted fundraiser_key)
+        ~alias:"fundraiser"
+    in
+    let () = toplog "Revealing the fundraiser public key" in
+    let* () =
+      let*? process = Client.reveal ~src:"fundraiser" bootstrap.client in
+      let* _ = Process.wait process in
+      Lwt.return_unit
+    in
+    let* fundraiser =
+      Client.show_address ~alias:"fundraiser" bootstrap.client
+    in
+    let () = toplog "Fetching fundraiser's counter" in
+    let* counter =
+      Operation.get_next_counter ~source:fundraiser bootstrap.client
+    in
+    let () = toplog "Fetching fundraiser's balance" in
+    let* _balance =
+      Client.get_balance_for ~account:"fundraiser" bootstrap.client
+    in
+    let () = toplog "Injecting the batch" in
+    let* _op_hash =
+      accounts_to_fund
+      |> List.map (fun (dest, amount) ->
+             Operation.Manager.transfer ~amount ~dest ())
+      |> Operation.Manager.make_batch ~source:fundraiser ~counter
+      |> Fun.flip (Operation.Manager.inject ~dont_wait:true) bootstrap.client
+    in
+    (* Wait a bit. *)
+    let () = toplog "Waiting 10 seconds" in
+    let* () = Lwt_unix.sleep 10. in
+    let () = toplog "Waiting 10 seconds: done" in
+    Lwt.return_unit
+  else
+    let () =
+      toplog "Skipping batch injection because there is no account to fund"
+    in
+    Lwt.return_unit
+
+let init_producer_accounts (bootstrap : bootstrap) configuration =
+  let () = toplog "Initializing the producers" in
+  match configuration.producer_key with
+  | None ->
+      Client.stresstest_gen_keys
+        ~alias_prefix:"dal_producer"
+        (List.length configuration.dal_node_producers)
+        bootstrap.client
+  | Some producer_key -> (
+      match configuration.dal_node_producers with
+      | [_] ->
+          let* () =
+            Client.import_secret_key
+              bootstrap.client
+              (Unencrypted producer_key)
+              ~alias:"producer_key"
+          in
+          let* account =
+            Client.show_address ~alias:"producer_key" bootstrap.client
+          in
+          return [account]
+      | _ ->
+          Test.fail
+            "A producer key can only be used if there is exactly one slot on \
+             which data are produced.")
+
+let init_etherlink_operators (bootstrap : bootstrap) etherlink_configuration =
+  let* etherlink_rollup_operator_key =
+    if etherlink_configuration <> None then
+      let () = toplog "Generating a key pair for Etherlink operator" in
+      Client.stresstest_gen_keys
+        ~alias_prefix:"etherlink_operator"
+        1
+        bootstrap.client
+    else Lwt.return_nil
+  in
+  let* etherlink_batching_operator_keys =
+    if etherlink_configuration <> None then
+      Client.stresstest_gen_keys
+        ~alias_prefix:"etherlink_batching"
+        20
+        bootstrap.client
+    else Lwt.return []
+  in
+  return (etherlink_rollup_operator_key, etherlink_batching_operator_keys)
+
 let init_public_network cloud (configuration : configuration)
     etherlink_configuration teztale agent network =
   toplog "Init public network" ;
@@ -2322,48 +2424,9 @@ let init_public_network cloud (configuration : configuration)
           bootstrap.client)
       stake
   in
-  let () = toplog "Initializing the producers" in
-  let* producer_accounts =
-    match configuration.producer_key with
-    | None ->
-        Client.stresstest_gen_keys
-          ~alias_prefix:"dal_producer"
-          (List.length configuration.dal_node_producers)
-          bootstrap.client
-    | Some producer_key -> (
-        match configuration.dal_node_producers with
-        | [_] ->
-            let* () =
-              Client.import_secret_key
-                bootstrap.client
-                (Unencrypted producer_key)
-                ~alias:"producer_key"
-            in
-            let* account =
-              Client.show_address ~alias:"producer_key" bootstrap.client
-            in
-            return [account]
-        | _ ->
-            Test.fail
-              "A producer key can only be used if there is exactly one slot on \
-               which data are produced.")
-  in
-  let* etherlink_rollup_operator_key =
-    if etherlink_configuration <> None then
-      let () = toplog "Generating a key pair for Etherlink operator" in
-      Client.stresstest_gen_keys
-        ~alias_prefix:"etherlink_operator"
-        1
-        bootstrap.client
-    else Lwt.return_nil
-  in
-  let* etherlink_batching_operator_keys =
-    if etherlink_configuration <> None then
-      Client.stresstest_gen_keys
-        ~alias_prefix:"etherlink_batching"
-        20
-        bootstrap.client
-    else Lwt.return []
+  let* producer_accounts = init_producer_accounts bootstrap configuration in
+  let* etherlink_rollup_operator_key, etherlink_batching_operator_keys =
+    init_etherlink_operators bootstrap etherlink_configuration
   in
   let accounts_to_fund =
     (if configuration.producer_key = None then
@@ -2378,63 +2441,9 @@ let init_public_network cloud (configuration : configuration)
         (fun batcher -> (batcher, 10 * 1_000_000))
         etherlink_batching_operator_keys
   in
+  let* () = fund_producers_accounts bootstrap configuration accounts_to_fund in
   let etherlink_rollup_operator_key =
     match etherlink_rollup_operator_key with key :: _ -> Some key | [] -> None
-  in
-  let* () =
-    if List.length accounts_to_fund > 0 then
-      let () = toplog "Funding the producer accounts" in
-      let fundraiser_key =
-        match configuration.fundraiser with
-        | None ->
-            Test.fail
-              "No fundraiser key was specified. Please use either \
-               `--fundraiser` or the variable environment \
-               `TEZT_CLOUD_FUNDRAISER` to specified an unencrypted secret key \
-               of an account having funds to run the scenario"
-        | Some key -> key
-      in
-      let* () =
-        Client.import_secret_key
-          bootstrap.client
-          (Unencrypted fundraiser_key)
-          ~alias:"fundraiser"
-      in
-      let () = toplog "Revealing the fundraiser public key" in
-      let* () =
-        let*? process = Client.reveal ~src:"fundraiser" bootstrap.client in
-        let* _ = Process.wait process in
-        Lwt.return_unit
-      in
-      let* fundraiser =
-        Client.show_address ~alias:"fundraiser" bootstrap.client
-      in
-      let () = toplog "Fetching fundraiser's counter" in
-      let* counter =
-        Operation.get_next_counter ~source:fundraiser bootstrap.client
-      in
-      let () = toplog "Fetching fundraiser's balance" in
-      let* _balance =
-        Client.get_balance_for ~account:"fundraiser" bootstrap.client
-      in
-      let () = toplog "Injecting the batch" in
-      let* _op_hash =
-        accounts_to_fund
-        |> List.map (fun (dest, amount) ->
-               Operation.Manager.transfer ~amount ~dest ())
-        |> Operation.Manager.make_batch ~source:fundraiser ~counter
-        |> Fun.flip (Operation.Manager.inject ~dont_wait:true) bootstrap.client
-      in
-      (* Wait a bit. *)
-      let () = toplog "Waiting 10 seconds" in
-      let* () = Lwt_unix.sleep 10. in
-      let () = toplog "Waiting 10 seconds: done" in
-      Lwt.return_unit
-    else
-      let () =
-        toplog "Skipping batch injection because there is no account to fund"
-      in
-      Lwt.return_unit
   in
   Lwt.return
     ( bootstrap,
