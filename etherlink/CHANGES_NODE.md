@@ -46,6 +46,11 @@ meaning it is possible to downgrade to the previous version.
 
 - Add field `gasPrice` to EIP-1559 transactions for compatibility with older
   tools and hardhat in particular. (!18255)
+- After the next kernel upgrade, the system will accept transactions
+  submitted via `eth_sendRawTransaction` even when users specify gas
+  limits that exceed the maximum allowed threshold. During execution,
+  any gas limit above the maximum will be automatically capped at the
+  maximum permitted value. (!18179)
 
 ### Metrics changes
 
@@ -58,6 +63,10 @@ meaning it is possible to downgrade to the previous version.
 
 - Node validation always checks that the gas limit are set correctly.
   (!18236)
+- Gas limit validation changes. After the next kernel upgrade, the
+  validation mechanism that automatically rejects transactions with
+  over-estimated gas limits exceeding the maximum threshold will be
+  disabled. (!18179)
 
 ### Storage changes
 
