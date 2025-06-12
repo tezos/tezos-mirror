@@ -40,6 +40,8 @@ let validate_gas_limit ~storage_version
     (transaction : Transaction.transaction) :
     (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
+  (* Computing the execution gas limit validates that the gas limit is
+     sufficient to cover the inclusion fees. *)
   let**? execution_gas_limit =
     (* since Dionysus, the execution gas limit is always computed from the
        minimum base fee per gas *)
