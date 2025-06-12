@@ -160,8 +160,24 @@ let jingoo_routes_template routes =
       ("routes", Tlist (List.map jingoo_route_template routes));
     ]
 
+let routes_of_alerts alerts =
+  alerts
+  |> List.filter_map (fun alert ->
+         Option.map (fun route -> (alert.alert, route)) alert.route)
+  |> List.sort_uniq compare
+
+let receivers_of_alerts alerts =
+  alerts
+  |> List.filter_map (fun alert -> alert.route)
+  |> List.map (fun route -> route.receiver)
+  |> List.sort_uniq compare
+
 let jingoo_configuration_template t =
-  let receivers = List.sort_uniq compare (null_receiver :: t.receivers) in
+  let receivers = null_receiver :: t.receivers in
+  let receivers =
+    receivers @ List.map (fun (_, route) -> route.receiver) t.routes
+  in
+  let receivers = List.sort_uniq compare receivers in
   let open Jingoo.Jg_types in
   [
     ("receivers", Tlist (List.map jingoo_receiver_template receivers));
@@ -181,18 +197,6 @@ let write_configuration t =
       Stdlib.seek_out oc 0 ;
       output_string oc content)
 
-let routes_of_alerts alerts =
-  alerts
-  |> List.filter_map (fun alert ->
-         Option.map (fun route -> (alert.alert, route)) alert.route)
-  |> List.sort_uniq compare
-
-let receivers_of_alerts alerts =
-  alerts
-  |> List.filter_map (fun alert -> alert.route)
-  |> List.map (fun route -> route.receiver)
-  |> List.sort_uniq compare
-
 let run ?(default_receiver = null_receiver) alerts =
   let alert_manager_configuration_directory = Path.tmp_dir // "alert_manager" in
   let* () = Process.run "mkdir" ["-p"; alert_manager_configuration_directory] in
@@ -201,7 +205,9 @@ let run ?(default_receiver = null_receiver) alerts =
   in
   Log.info "Alert_manager: run with configuration file %s" configuration_file ;
   let routes = routes_of_alerts alerts in
-  let receivers = receivers_of_alerts alerts in
+  let receivers =
+    List.sort_uniq compare (default_receiver :: receivers_of_alerts alerts)
+  in
   let t = {configuration_file; routes; default_receiver; receivers} in
   match receivers with
   | [Null] -> Lwt.return_none
@@ -242,7 +248,7 @@ let reload t =
       Process.run "curl" ["-X"; "POST"; "http://127.0.0.1:9093/-/reload"])
     (fun exn ->
       Log.error
-        "%s: Could not reload prometheus, curl returned: %s"
+        "%s: Could not reload alert_manager, curl returned: %s"
         section
         (Printexc.to_string exn) ;
       Lwt.return_unit)
@@ -268,5 +274,5 @@ let add_alert t ~alert =
     "%s: adding alert with receiver: %s"
     section
     (name_of_receiver receiver) ;
-  t.routes <- (alert, route') :: t.routes ;
+  t.routes <- List.sort_uniq compare ((alert, route') :: t.routes) ;
   reload t
