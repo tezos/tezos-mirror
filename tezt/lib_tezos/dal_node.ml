@@ -35,6 +35,7 @@ module Parameters = struct
     l1_node_endpoint : Endpoint.t;
     disable_shard_validation : bool;
     disable_amplification : bool;
+    ignore_pkhs : string list option;
     mutable pending_ready : unit option Lwt.u list;
     runner : Runner.t option;
   }
@@ -53,6 +54,9 @@ include Daemon.Make (Parameters)
 
 let disable_shard_validation_environment_variable =
   "TEZOS_DISABLE_SHARD_VALIDATION_I_KNOW_WHAT_I_AM_DOING"
+
+let ignore_topics_environment_variable =
+  "TEZOS_IGNORE_TOPICS_I_KNOW_WHAT_I_AM_DOING"
 
 let check_error ?exit_code ?msg dal_node =
   match dal_node.status with
@@ -312,7 +316,7 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
     ?name ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host)
     ?rpc_port ?listen_addr ?public_addr ?metrics_addr
     ?(disable_shard_validation = false) ?(disable_amplification = false)
-    ~l1_node_endpoint () =
+    ?ignore_pkhs ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -347,6 +351,7 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
         pending_ready = [];
         disable_shard_validation;
         disable_amplification;
+        ignore_pkhs;
         l1_node_endpoint;
         runner;
       }
@@ -358,7 +363,7 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
 let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
     ?data_dir ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port
     ?listen_addr ?public_addr ?metrics_addr ?disable_shard_validation
-    ?disable_amplification ~node () =
+    ?disable_amplification ?ignore_pkhs ~node () =
   create_from_endpoint
     ?runner
     ~path
@@ -373,6 +378,7 @@ let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
     ?metrics_addr
     ?disable_shard_validation
     ?disable_amplification
+    ?ignore_pkhs
     ~l1_node_endpoint:(Node.as_rpc_endpoint node)
     ()
 
@@ -398,10 +404,13 @@ let make_arguments node =
   @ (if node.persistent_state.disable_shard_validation then
        ["--disable-shard-validation"]
      else [])
-  @
-  if node.persistent_state.disable_amplification then
-    ["--disable-amplification"]
-  else []
+  @ (if node.persistent_state.disable_amplification then
+       ["--disable-amplification"]
+     else [])
+  @ Option.fold
+      ~none:[]
+      ~some:(fun pkhs -> "--ignore-topics" :: [String.concat "," pkhs])
+      node.persistent_state.ignore_pkhs
 
 let do_runlike_command ?env ?(event_level = `Debug) node arguments =
   if node.status <> Not_running then

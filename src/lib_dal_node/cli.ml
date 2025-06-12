@@ -25,6 +25,12 @@
 
 module Types = Tezos_dal_node_services.Types
 
+let env_value_starts_with_yes ~env_var =
+  match Sys.getenv_opt env_var with
+  | None -> false
+  | Some x -> (
+      match String.lowercase_ascii x with "yes" | "y" -> true | _ -> false)
+
 (** This variable is used to disable DAL shard validation at runtime. When activated,
     Gossipsub messages (i.e. shards) are always considered valid. This can be risky
     as the DAL node would no longer validate the shards and therefore should be used
@@ -33,10 +39,15 @@ let disable_shard_validation_environment_variable =
   "TEZOS_DISABLE_SHARD_VALIDATION_I_KNOW_WHAT_I_AM_DOING"
 
 let disable_shard_validation =
-  match Sys.getenv_opt disable_shard_validation_environment_variable with
-  | None -> false
-  | Some x -> (
-      match String.lowercase_ascii x with "yes" | "y" -> true | _ -> false)
+  env_value_starts_with_yes
+    ~env_var:disable_shard_validation_environment_variable
+
+(** This variable is used to instruct the DAL node to not propagate messages
+    belonging to certain topics. This activates only when the variable is used
+    in conjunction with the corresponding CLI argument. *)
+let env_var_ignore_topics = "TEZOS_IGNORE_TOPICS_I_KNOW_WHAT_I_AM_DOING"
+
+let env_ignore_topics = env_value_starts_with_yes ~env_var:env_var_ignore_topics
 
 module Term = struct
   type env = {docs : string; doc : string; name : string}
@@ -318,7 +329,7 @@ module Term = struct
         else arg
       in
       match Signature.Public_key_hash.of_b58check_opt arg with
-      | None -> Error "Unrecognized profile"
+      | None -> Error "Unrecognized pkh format"
       | Some pkh -> Ok pkh
     in
     (decoder, attester_profile_printer)
@@ -539,6 +550,19 @@ module Term = struct
 
   let disable_amplification = switch_to_cmdliner disable_amplification_switch
 
+  let ignore_topics_arg =
+    let parse, pp = attester_profile_format in
+    make_arg_list
+      ~doc:
+        "The producer Octez DAL node will not publish shards for the provided \
+         pkhs. This argument is for testing purposes only."
+      ~placeholder:"PKH1,PKH2,..."
+      ~pp
+      ~parse
+      "ignore-topics"
+
+  let ignore_topics = arg_list_to_cmdliner ignore_topics_arg
+
   let term process =
     Cmdliner.Term.(
       ret
@@ -547,7 +571,8 @@ module Term = struct
        $ metrics_addr $ attester_profile $ operator_profile $ observer_profile
        $ bootstrap_profile $ peers $ history_mode $ service_name
        $ service_namespace $ fetch_trusted_setup $ disable_shard_validation
-       $ verbose $ ignore_l1_config_peers $ disable_amplification))
+       $ verbose $ ignore_l1_config_peers $ disable_amplification
+       $ ignore_topics))
 end
 
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
@@ -711,13 +736,14 @@ type options = {
   verbose : bool;
   ignore_l1_config_peers : bool;
   disable_amplification : bool;
+  ignore_topics : Signature.public_key_hash list;
 }
 
 let cli_options_to_options data_dir rpc_addr expected_pow listen_addr
     public_addr endpoint slots_backup_uris trust_slots_backup_uris metrics_addr
     attesters operators observers bootstrap_flag peers history_mode service_name
     service_namespace fetch_trusted_setup disable_shard_validation verbose
-    ignore_l1_config_peers disable_amplification =
+    ignore_l1_config_peers disable_amplification ignore_topics =
   let open Result_syntax in
   let profile = Controller_profiles.make ~attesters ~operators ?observers () in
   let* profile =
@@ -761,6 +787,7 @@ let cli_options_to_options data_dir rpc_addr expected_pow listen_addr
       verbose;
       ignore_l1_config_peers;
       disable_amplification;
+      ignore_topics;
     }
 
 let merge_experimental_features _ _configuration = ()
@@ -787,6 +814,7 @@ let merge
       verbose;
       ignore_l1_config_peers;
       disable_amplification;
+      ignore_topics = _;
     } configuration =
   let profile =
     match profile with
@@ -872,9 +900,26 @@ let run ?disable_logging subcommand cli_options =
             disable_shard_validation_environment_variable
         else return_unit
       in
+      let* ignore_pkhs =
+        if env_ignore_topics && List.is_empty cli_options.ignore_topics then
+          failwith
+            "The environment variable to ignore topics %s was set, but the \
+             option '--ignore-topics' was not provided."
+            env_var_ignore_topics
+        else if
+          (not env_ignore_topics)
+          && (not @@ List.is_empty cli_options.ignore_topics)
+        then
+          failwith
+            "The option '--ignore-topics' was provided, but the environment \
+             variable to ignore topics %s was not set."
+            env_var_ignore_topics
+        else return cli_options.ignore_topics
+      in
       Daemon.run
         ?disable_logging
         ~disable_shard_validation
+        ~ignore_pkhs
         ~data_dir
         ~configuration_override:(merge cli_options)
         ()
@@ -905,7 +950,7 @@ let commands =
       endpoint slots_backup_uris trust_slots_backup_uris metrics_addr attesters
       operators observers bootstrap_flag peers history_mode service_name
       service_namespace fetch_trusted_setup disable_shard_validation verbose
-      ignore_l1_config_peers disable_amplification =
+      ignore_l1_config_peers disable_amplification ignore_pkhs =
     match
       cli_options_to_options
         data_dir
@@ -930,6 +975,7 @@ let commands =
         verbose
         ignore_l1_config_peers
         disable_amplification
+        ignore_pkhs
     with
     | Ok options -> main_run subcommand options
     | Error msg -> `Error msg

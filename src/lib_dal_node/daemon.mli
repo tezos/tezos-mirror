@@ -6,9 +6,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [run ?disable_logging ?disable_shard_validation ~data_dir ~configuration_override ()]
-    starts a DAL node with the given data directory and function to generate an initial
-    configuration.
+(** [run ?disable_logging ?disable_shard_validation ~ignore_pkhs ~data_dir
+    ~configuration_override ()] starts a DAL node with the given data directory
+    and function to generate an initial configuration.
 
     This function performs the following steps:
 
@@ -32,10 +32,13 @@
     - Connects the Gossipsub worker with the P2P layer and to the crawler;
 
     - Can disable the shard validation using [?disable_shard_validation].
+
+    - Does not propagate message with topics related to the pkhs in [ignore_pkhs].
 *)
 val run :
   ?disable_logging:bool ->
   ?disable_shard_validation:bool ->
+  ignore_pkhs:Signature.public_key_hash list ->
   data_dir:string ->
   configuration_override:(Configuration_file.t -> Configuration_file.t) ->
   unit ->

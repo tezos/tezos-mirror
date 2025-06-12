@@ -596,13 +596,14 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
 let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
     ?bootstrap_profile ?history_mode ?(wait_ready = true) ?env
     ?disable_shard_validation ?(event_level = `Debug) ?slots_backup_uris
-    ?trust_slots_backup_uris ?disable_amplification tezos_node =
+    ?trust_slots_backup_uris ?disable_amplification ?ignore_pkhs tezos_node =
   let dal_node =
     Dal_node.create
       ?name
       ?disable_shard_validation
-      ~node:tezos_node
       ?disable_amplification
+      ?ignore_pkhs
+      ~node:tezos_node
       ()
   in
   let* () =
@@ -621,7 +622,7 @@ let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
 
 let with_dal_node ?peers ?attester_profiles ?operator_profiles
     ?bootstrap_profile ?history_mode ?wait_ready ?env ?disable_shard_validation
-    ?disable_amplification tezos_node f key =
+    ?disable_amplification ?ignore_pkhs tezos_node f key =
   let* dal_node =
     make_dal_node
       ?peers
@@ -633,6 +634,7 @@ let with_dal_node ?peers ?attester_profiles ?operator_profiles
       ?env
       ?disable_shard_validation
       ?disable_amplification
+      ?ignore_pkhs
       tezos_node
   in
   f key dal_node
@@ -689,7 +691,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
     ?event_sections_levels ?operator_profiles ?history_mode ?prover
     ?l1_history_mode ?wait_ready ?env ?disable_shard_validation
-    ?disable_amplification variant scenario =
+    ?disable_amplification ?ignore_pkhs variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
   test
@@ -735,6 +737,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?env
         ?disable_shard_validation
         ?disable_amplification
+        ?ignore_pkhs
         node
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
@@ -10498,6 +10501,28 @@ let test_disable_shard_validation_wrong_env _protocol _parameters _cryptobox
             was not set.*"
            Dal_node.disable_shard_validation_environment_variable)
 
+let test_ignore_topics_wrong_cli _protocol _parameters _cryptobox _node _client
+    dal_node =
+  Dal_node.check_error
+    dal_node
+    ~msg:
+      (rex
+      @@ Format.sprintf
+           ".* The environment variable to ignore topics %s was set, but the \
+            option '--ignore-topics' was not provided.*"
+           Dal_node.ignore_topics_environment_variable)
+
+let test_ignore_topics_wrong_env _protocol _parameters _cryptobox _node _client
+    dal_node =
+  Dal_node.check_error
+    dal_node
+    ~msg:
+      (rex
+      @@ Format.sprintf
+           ".* The option '--ignore-topics' was provided, but the environment \
+            variable to ignore topics %s was not set.*"
+           Dal_node.ignore_topics_environment_variable)
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -10948,6 +10973,41 @@ let register ~protocols =
          "yes")
     ~disable_shard_validation:true
     "DAL node disable shard validation correct CLI"
+    (fun _protocol _parameters _cryptobox _node _client dal_node ->
+      Dal_node.terminate dal_node)
+    protocols ;
+
+  (* Scenarios for --ignore-topics *)
+  scenario_with_layer1_and_dal_nodes
+    ~operator_profiles:[0]
+    ~wait_ready:false
+    ~env:
+      (String_map.singleton Dal_node.ignore_topics_environment_variable "yes")
+    "DAL node ignore topics wrong CLI"
+    test_ignore_topics_wrong_cli
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~operator_profiles:[0]
+    ~wait_ready:false
+    ~ignore_pkhs:
+      [
+        Constant.bootstrap1.Account.public_key_hash;
+        Constant.bootstrap2.Account.public_key_hash;
+      ]
+    "DAL node ignore topics wrong env"
+    test_ignore_topics_wrong_env
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~operator_profiles:[0]
+    ~wait_ready:true
+    ~env:
+      (String_map.singleton Dal_node.ignore_topics_environment_variable "yes")
+    ~ignore_pkhs:
+      [
+        Constant.bootstrap1.Account.public_key_hash;
+        Constant.bootstrap2.Account.public_key_hash;
+      ]
+    "DAL node ignore topics correct CLI"
     (fun _protocol _parameters _cryptobox _node _client dal_node ->
       Dal_node.terminate dal_node)
     protocols

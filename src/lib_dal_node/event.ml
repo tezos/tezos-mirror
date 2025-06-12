@@ -32,6 +32,13 @@ let pp_int_list fmt l =
     fmt
     l
 
+let pp_pkh_list fmt l =
+  Format.pp_print_list
+    ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+    Signature.Public_key_hash.pp
+    fmt
+    l
+
 (* DAL node event definitions *)
 
 open struct
@@ -1091,6 +1098,16 @@ open struct
       ~msg:"shard validation is disabled"
       ~level:Warning
       ()
+
+  let ignoring_pkhs =
+    declare_1
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"ignoring_pkhs"
+      ~msg:"The node will not propagate shards assigned to {delegates}."
+      ~level:Warning
+      ("delegates", Data_encoding.list Signature.Public_key_hash.encoding)
+      ~pp1:pp_pkh_list
 end
 
 (* DAL node event emission functions *)
@@ -1391,3 +1408,5 @@ let emit_catching_up ~current_level = emit catching_up current_level
 let emit_end_catchup () = emit end_catchup ()
 
 let emit_shard_validation_is_disabled () = emit shard_validation_is_disabled ()
+
+let emit_ignoring_pkhs ~pkhs = emit ignoring_pkhs pkhs

@@ -120,8 +120,10 @@ module Dal = struct
 
   let verbose = switch_to_clic verbose_switch
 
+  let ignore_topics = arg_list_to_clic ignore_topics_arg
+
   let args =
-    Tezos_clic.args22
+    Tezos_clic.args23
       data_dir
       rpc_addr
       expected_pow
@@ -144,6 +146,7 @@ module Dal = struct
       verbose
       ignore_l1_config_peers
       disable_amplification
+      ignore_topics
 
   let commands =
     let open Tezos_clic in
@@ -176,13 +179,15 @@ module Dal = struct
             disable_shard_validation,
             verbose,
             ignore_l1_config_peers,
-            disable_amplification )
+            disable_amplification,
+            ignore_topics )
           _cctxt
         ->
           let attester_profile = Option.value ~default:[] attester_profile in
           let operator_profile = Option.value ~default:[] operator_profile in
           let http_backup_uris = Option.value ~default:[] http_backup_uris in
           let peers = Option.value ~default:[] peers in
+          let ignore_topics = Option.value ~default:[] ignore_topics in
           let options =
             Cli.cli_options_to_options
               data_dir
@@ -207,6 +212,7 @@ module Dal = struct
               verbose
               ignore_l1_config_peers
               disable_amplification
+              ignore_topics
           in
           match options with
           | Ok options -> Cli.run ~disable_logging:true cmd options

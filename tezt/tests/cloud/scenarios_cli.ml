@@ -84,11 +84,11 @@ module type Dal = sig
 
   val with_dal : bool
 
-  val dal_incentives : bool
-
   val proxy_localhost : bool
 
   val disable_shard_validation : bool
+
+  val ignore_pkhs : string list
 end
 
 module Dal () : Dal = struct
@@ -402,15 +402,6 @@ module Dal () : Dal = struct
          such as [--producers]."
       true
 
-  let dal_incentives =
-    Clap.flag
-      ~section
-      ~set_long:"dal-incentives"
-      ~unset_long:"no-dal-incentives"
-      ~description:"Activate the DAL incentives"
-      (* Activate by default DAL incentives on Alpha. *)
-      (protocol = Protocol.Alpha)
-
   let proxy_localhost =
     Clap.flag
       ~section
@@ -428,6 +419,16 @@ module Dal () : Dal = struct
       ~set_long:"disable-shard-validation"
       ~description:"All DAL nodes will bypass the shard validation stage."
       false
+
+  let ignore_pkhs =
+    Clap.list_string
+      ~section
+      ~long:"ignore-pkhs"
+      ~placeholder:"<pkh> <pkh>"
+      ~description:
+        "Specify a list of public key hashes for which all the producers will \
+         not publish the associated shards."
+      ()
 end
 
 module type Layer1 = sig

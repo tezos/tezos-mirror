@@ -44,11 +44,13 @@ type t = {
      it is the highest level the node is aware of) *)
   mutable l1_crawler_status : L1_crawler_status.t;
   disable_shard_validation : bool;
+  ignore_pkhs : Signature.Public_key_hash.Set.t;
 }
 
 let init config ~network_name profile_ctxt cryptobox
     shards_proofs_precomputation proto_plugins store gs_worker transport_layer
-    cctxt ~last_finalized_level ?(disable_shard_validation = false) () =
+    cctxt ~last_finalized_level ?(disable_shard_validation = false) ~ignore_pkhs
+    () =
   {
     config;
     network_name;
@@ -67,6 +69,7 @@ let init config ~network_name profile_ctxt cryptobox
     last_finalized_level;
     l1_crawler_status = Unknown;
     disable_shard_validation;
+    ignore_pkhs;
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
@@ -187,6 +190,8 @@ let get_ongoing_amplifications ctxt = ctxt.ongoing_amplifications
 
 let set_ongoing_amplifications ctxt ongoing_amplifications =
   ctxt.ongoing_amplifications <- ongoing_amplifications
+
+let get_ignore_pkhs ctxt = ctxt.ignore_pkhs
 
 let fetch_committee ctxt ~level =
   let open Lwt_result_syntax in

@@ -228,7 +228,7 @@ module Dal_node = struct
         agent
 
     let run ?otel ?(memtrace = false) ?event_level
-        ?(disable_shard_validation = false) dal_node =
+        ?(disable_shard_validation = false) ?ignore_pkhs dal_node =
       let name = name dal_node in
       let filename = Format.asprintf "%s/%s-trace.ctf" Path.tmp_dir name in
       let env =
@@ -250,14 +250,25 @@ module Dal_node = struct
         let disable_shard_validation_env =
           if disable_shard_validation then
             String_map.singleton
-              "TEZOS_DISABLE_SHARD_VALIDATION_I_KNOW_WHAT_I_AM_DOING"
+              Dal_node.disable_shard_validation_environment_variable
               "yes"
           else String_map.empty
+        in
+        let ignore_topics_env =
+          match ignore_pkhs with
+          | Some (_ :: _) ->
+              String_map.singleton
+                Dal_node.ignore_topics_environment_variable
+                "yes"
+          | _ -> String_map.empty
         in
         String_map.union
           (fun _ _ _ -> None)
           (String_map.union (fun _ _ _ -> None) otel_env memtrace_env)
-          disable_shard_validation_env
+          (String_map.union
+             (fun _ _ _ -> None)
+             disable_shard_validation_env
+             ignore_topics_env)
       in
       let* () = run ~env ?event_level dal_node in
       (* Update the state in the service manager *)

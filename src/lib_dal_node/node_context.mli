@@ -42,6 +42,7 @@ val init :
   Tezos_rpc.Context.generic ->
   last_finalized_level:int32 ->
   ?disable_shard_validation:bool ->
+  ignore_pkhs:Signature.Public_key_hash.Set.t ->
   unit ->
   t
 
@@ -157,6 +158,9 @@ val get_ongoing_amplifications : t -> Types.Slot_id.Set.t
 (** [set_ongoing_amplification ctxt ongoing_amplifications] set the slot ids for
     which there are ongoing amplifications. *)
 val set_ongoing_amplifications : t -> Types.Slot_id.Set.t -> unit
+
+(** Retrieves the set of pkhs whose messages are not propagated. *)
+val get_ignore_pkhs : t -> Signature.Public_key_hash.Set.t
 
 (** [storage_period ctxt proto_parameters] returns for how many levels should
     the node store data about attested slots. This depends on the node's profile
