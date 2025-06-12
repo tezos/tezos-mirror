@@ -401,11 +401,11 @@ let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
   in
   return res
 
-let spawn_rpc_list ?endpoint ?hooks client =
-  spawn_command ?endpoint ?hooks client ["rpc"; "list"]
+let spawn_rpc_list ?endpoint ?hooks ?url client =
+  spawn_command ?endpoint ?hooks client (["rpc"; "list"] @ Option.to_list url)
 
-let rpc_list ?endpoint ?hooks client =
-  spawn_rpc_list ?endpoint ?hooks client |> Process.check_and_read_stdout
+let rpc_list ?endpoint ?hooks ?url client =
+  spawn_rpc_list ?endpoint ?hooks ?url client |> Process.check_and_read_stdout
 
 let spawn_rpc_schema ?log_command ?log_status_on_exit ?log_output
     ?(better_errors = false) ?endpoint ?hooks ?env ?protocol_hash meth path
