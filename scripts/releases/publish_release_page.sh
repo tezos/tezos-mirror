@@ -24,7 +24,7 @@ if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
   exit 1
 fi
 
-aws s3 cp s3://"${S3_BUCKET}"/"$versions_list_filename" "./$versions_list_filename"
+aws s3 cp s3://"${S3_BUCKET}""${BUCKET_PATH}"/"$versions_list_filename" "./$versions_list_filename"
 
 # If it's a release, we actually push the assets to the s3 bucket
 if [ -n "${CI_COMMIT_TAG}" ]; then
@@ -56,16 +56,16 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
 
     # Upload binaries to S3 bucket
     echo "Uploading binaries..."
-    aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
-    aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
+    aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
+    aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
 
     # Create and push archives
     tar -czf "${gitlab_release}.tar.gz" --transform 's|^\octez-binaries/x86_64/|octez/|' octez-binaries/x86_64/*
-    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
+    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
     sha256sum "${gitlab_release}.tar.gz" >> "./x86_64_sha256sums.txt"
     tar -czf "${gitlab_release}.tar.gz" --transform 's|^\octez-binaries/arm64/|octez/|' octez-binaries/arm64/*
     sha256sum "${gitlab_release}.tar.gz" >> "./arm64_sha256sums.txt"
-    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
+    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
 
     # Push checksums for x86_64 binaries
     echo "Generating checksums for x86_64 binaries"
@@ -73,7 +73,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
       filename=$(basename "$binary")
       [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./x86_64_sha256sums.txt"
     done
-    aws s3 cp "./x86_64_sha256sums.txt" "s3://${S3_BUCKET}/${gitlab_release}/binaries/x86_64/sha256sums.txt"
+    aws s3 cp "./x86_64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/x86_64/sha256sums.txt"
 
     # Push checksums for arm64 binaries
     echo "Generating checksums for arm64 binaries"
@@ -81,7 +81,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
       filename=$(basename "$binary")
       [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./arm64_sha256sums.txt"
     done
-    aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/sha256sums.txt"
+    aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/arm64/sha256sums.txt"
 
   fi
 else
@@ -91,7 +91,7 @@ fi
 "${script_dir}"/create_release_page.sh "$versions_list_filename"
 
 echo "Syncing files to remote s3 bucket"
-if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}/" --region "${REGION}"; then
+if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" && aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
   echo "Deployment successful!"
 else
   echo "Deployment failed. Please check the configuration and try again."
