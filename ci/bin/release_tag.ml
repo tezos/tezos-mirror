@@ -69,6 +69,10 @@ let job_release_page ~test ?dependencies () =
        its [index.html] is updated accordingly."
     ~name:"publish:release-page"
     ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Days 1))
+         ["./index.md"; "index.html"])
     ?dependencies
     ~variables:
       (if test then

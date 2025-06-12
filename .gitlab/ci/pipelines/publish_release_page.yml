@@ -38,3 +38,8 @@ publish:release-page:
     S3_BUCKET: site-prod.octez.tezos.com/releases
     URL: octez.tezos.com
     DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - ./index.md
+    - index.html
