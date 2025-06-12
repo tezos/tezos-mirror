@@ -44,8 +44,10 @@ COPY --chown=tezos:nogroup opentelemetry tezos/opentelemetry
 COPY --chown=tezos:nogroup resto tezos/resto
 COPY --chown=tezos:nogroup prometheus tezos/prometheus
 COPY --chown=tezos:nogroup teztale tezos/teztale
+COPY --chown=tezos:nogroup contrib tezos/contrib
 ENV GIT_SHORTREF=${GIT_SHORTREF}
 ENV GIT_DATETIME=${GIT_DATETIME}
+
 ENV GIT_VERSION=${GIT_VERSION}
 RUN opam exec -- make -C tezos release OCTEZ_EXECUTABLES="${OCTEZ_EXECUTABLES}" OCTEZ_BIN_DIR=bin
 # Gather the parameters of all active protocols in 1 place
@@ -61,6 +63,7 @@ COPY --chown=tezos:nogroup kernels.mk etherlink.mk evm_kernel/
 COPY --chown=tezos:nogroup src evm_kernel/src
 COPY --chown=tezos:nogroup sdk/rust evm_kernel/sdk/rust
 COPY --chown=tezos:nogroup etherlink evm_kernel/etherlink
+COPY --chown=tezos:nogroup contrib evm_kernel/contrib
 RUN make -C evm_kernel -f etherlink.mk build-deps \
   && make -C evm_kernel -f etherlink.mk EVM_CONFIG=etherlink/config/dailynet.yaml evm_installer.wasm \
   && make -C evm_kernel -f etherlink.mk evm_benchmark_kernel.wasm
