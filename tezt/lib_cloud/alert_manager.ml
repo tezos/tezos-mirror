@@ -58,7 +58,7 @@ let slack_bottoken_receiver ~name ~channel ~bot_token ?title ?text () =
     {
       name;
       channel;
-      api_url = "https://api.slack.com/methods/chat.postMessage";
+      api_url = "https://slack.com/api/chat.postMessage";
       bot_token = Some bot_token;
       title;
       text;
