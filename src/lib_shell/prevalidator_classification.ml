@@ -106,7 +106,7 @@ let create parameters =
 
 let is_empty
     {
-      (* All fields are intentionaly mentioned, so that we get a warning
+      (* All fields are intentionally mentioned, so that we get a warning
          when we add a field. This will force to think whether this
          function needs to be updated or not. *)
       parameters = _;
@@ -155,7 +155,7 @@ let is_known_unparsable oph classes =
   Operation_hash.Set.mem oph classes.unparsable
 
 (* Removing an operation is currently used for operations which are
-   banned (this can only be achieved by the adminstrator of the
+   banned (this can only be achieved by the administrator of the
    node). *)
 let remove oph classes =
   match Map.find oph classes.in_mempool with
