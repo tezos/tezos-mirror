@@ -242,12 +242,19 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
       let () = Chronos.start chronos in
       Some chronos
   in
-  let* alert_manager =
-    match alerts with
-    | _ ->
-        let* alert_manager = Alert_manager.run alerts in
-        Lwt.return alert_manager
+  let notifier = Env.notifier in
+  (* TODO: change Alert_manager to accept notifier directly *)
+  let default_receiver =
+    match notifier with
+    | Notifier_null -> Alert_manager.null_receiver
+    | Notifier_slack {name; slack_bot_token; slack_channel_id} ->
+        Alert_manager.slack_bottoken_receiver
+          ~name
+          ~channel:slack_channel_id
+          ~bot_token:slack_bot_token
+          ()
   in
+  let* alert_manager = Alert_manager.run ~default_receiver alerts in
   let* grafana =
     if Env.grafana then
       let* grafana = Grafana.run () in
@@ -272,7 +279,7 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
       otel;
       jaeger;
       deployement = Some deployement;
-      notifier = Env.notifier;
+      notifier;
     }
   in
   let sigint = sigint () in
