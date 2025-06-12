@@ -2,12 +2,18 @@
 
 ## Version NEXT
 
+Its storage version is 35.
+
 ### Features
 
 - The EVM now supports optional access lists.
   See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930). (!17766)
 - Introduces a new feature flag to enable REVM as the EVM execution
   engine instead of Sputnik. (!18384)
+- The validation mechanism that automatically rejects transactions
+  with over-estimated gas limits exceeding the maximum threshold will
+  be disabled. During execution, any gas limit above the maximum will
+  be automatically capped at the maximum permitted value. (!18179)
 
 ### Bug fixes
 
