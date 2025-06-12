@@ -531,7 +531,7 @@ type baker = {
   node : Node.t;
   dal_node : Dal_node.t option;
   baker : Agnostic_baker.t;
-  account : Account.key;
+  accounts : Account.key list;
   stake : int;
 }
 
@@ -711,24 +711,30 @@ let pp_metrics t
   Log.info
     "Ratio published commitments last level: %f"
     ratio_published_commitments_last_level ;
-  t.bakers
-  |> List.iter (fun {account; stake; _} ->
-         let pkh = account.Account.public_key_hash in
-         match
-           Hashtbl.find_opt ratio_attested_commitments_per_baker (PKH pkh)
-         with
-         | None -> Log.info "We lack information about %s" pkh
-         | Some {published_slots; attested_slots; _} ->
-             let alias =
-               Hashtbl.find_opt aliases account.Account.public_key_hash
-               |> Option.value ~default:account.Account.public_key_hash
-             in
-             Log.info
-               "Ratio for %s (with stake %d): %a"
-               alias
-               stake
-               pp_ratio
-               (attested_slots, published_slots)) ;
+  List.iter
+    (fun {accounts; stake; baker; _} ->
+      let baker_name = Agnostic_baker.name baker in
+      List.iter
+        (fun account ->
+          let pkh = account.Account.public_key_hash in
+          match
+            Hashtbl.find_opt ratio_attested_commitments_per_baker (PKH pkh)
+          with
+          | None -> Log.info "We lack information about %s" pkh
+          | Some {published_slots; attested_slots; _} ->
+              let alias =
+                Hashtbl.find_opt aliases account.Account.public_key_hash
+                |> Option.value ~default:account.Account.public_key_hash
+              in
+              Log.info
+                "%s: Ratio for %s (with stake %d): %a"
+                baker_name
+                alias
+                stake
+                pp_ratio
+                (attested_slots, published_slots))
+        accounts)
+    t.bakers ;
   Log.info
     "Sum of balances of the Etherlink operator: %s tez"
     (Tez.to_string etherlink_operator_balance_sum) ;
@@ -2200,7 +2206,6 @@ let init_public_network cloud (configuration : configuration)
                 ~node
                 ~disable_shard_validation
             in
-
             let* () =
               Dal_node.init_config
                 ~expected_pow:26.
@@ -2264,10 +2269,14 @@ let init_public_network cloud (configuration : configuration)
   in
   let () = toplog "Initializing the bakers" in
   let* baker_accounts =
-    Client.stresstest_gen_keys
-      ~alias_prefix:"baker"
-      (List.length configuration.stake)
-      bootstrap.client
+    Lwt_list.mapi_s
+      (fun i _stake ->
+        (* We assume that a baker holds only one key. *)
+        Client.stresstest_gen_keys
+          ~alias_prefix:(Format.sprintf "baker-%d" i)
+          1
+          bootstrap.client)
+      configuration.stake
   in
   let () = toplog "Initializing the producers" in
   let* producer_accounts =
@@ -2441,10 +2450,14 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   in
   let* client = Client.init ~endpoint:(Node bootstrap_node) () in
   let* baker_accounts =
-    Client.stresstest_gen_keys
-      ~alias_prefix:"baker"
-      (List.length configuration.stake)
-      client
+    Lwt_list.mapi_s
+      (fun i _stake ->
+        (* We assume that a baker holds only one key. *)
+        Client.stresstest_gen_keys
+          ~alias_prefix:(Format.sprintf "baker-%d" i)
+          1
+          client)
+      configuration.stake
   in
   let* producer_accounts =
     Client.stresstest_gen_keys
@@ -2470,7 +2483,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       List.mapi
         (fun i key ->
           (key, Some (List.nth configuration.stake i * 1_000_000_000_000)))
-        baker_accounts
+        (List.flatten baker_accounts)
     in
     let additional_bootstrap_accounts =
       List.map
@@ -2527,7 +2540,6 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       agent
       "bootstrap"
   in
-
   let node_rpc_endpoint =
     Endpoint.make
       ~scheme:"http"
@@ -2556,7 +2568,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       etherlink_batching_operator_keys )
 
 let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
-    account i agent =
+    accounts i agent =
   let stake =
     match stake with
     | None -> List.nth configuration.stake i
@@ -2588,10 +2600,13 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
           cloud
           agent
       in
+      let attester_profiles =
+        List.map (fun account -> account.Account.public_key_hash) accounts
+      in
       let* () =
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow configuration.network)
-          ~attester_profiles:[account.Account.public_key_hash]
+          ~attester_profiles
           ~peers:[bootstrap.dal_node_p2p_endpoint |> Option.get]
           (* Invariant: Option.get don't fail because t.configuration.dal is true *)
           dal_node
@@ -2619,23 +2634,30 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
             ~node_name:(Node.name node)
             ~node_port:(Node.rpc_port node)
         in
-        Teztale.update_alias
-          teztale
-          ~address:account.Account.public_key_hash
-          ~alias:account.Account.alias
+        Lwt_list.iter_s
+          (fun account ->
+            Teztale.update_alias
+              teztale
+              ~address:account.Account.public_key_hash
+              ~alias:account.Account.alias)
+          accounts
   in
   let* client = Client.Agent.create agent in
   let* () =
-    Client.import_secret_key
-      client
-      account.Account.secret_key
-      ~alias:account.alias
+    Lwt_list.iter_s
+      (fun account ->
+        Client.import_secret_key
+          client
+          account.Account.secret_key
+          ~alias:account.alias)
+      accounts
   in
+  let delegates = List.map (fun account -> account.Account.alias) accounts in
   let* baker =
     let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
     Agnostic_baker.Agent.init
       ~name:(Format.asprintf "baker-%d" i)
-      ~delegates:[account.Account.alias]
+      ~delegates
       ~client
       ?dal_node_rpc_endpoint
       node
@@ -2650,7 +2672,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       agent
       (Format.asprintf "baker-%d" i)
   in
-  Lwt.return {node; dal_node; baker; account; stake}
+  Lwt.return {node; dal_node; baker; accounts; stake}
 
 let init_producer cloud configuration ~bootstrap teztale account i slot_index
     agent =
@@ -3369,10 +3391,23 @@ let init ~(configuration : configuration) etherlink_configuration cloud
         let client = Client.create () in
         let alias = Format.asprintf "baker-%02d" i in
         let* () = Client.import_secret_key client sk ~alias in
-        let* account = Client.show_address ~alias client in
+        let* accounts =
+          let* addresses = Client.list_known_addresses client in
+          Lwt_list.map_s
+            (fun (alias, _) -> Client.show_address ~alias client)
+            addresses
+        in
         (* A bit random, to fix later. *)
         let stake = 1 in
-        init_baker ~stake cloud configuration ~bootstrap teztale account i agent)
+        init_baker
+          ~stake
+          cloud
+          configuration
+          ~bootstrap
+          teztale
+          accounts
+          i
+          agent)
       (List.combine bakers_agents configuration.bakers)
   in
   let bakers = fresh_bakers @ bakers_with_secret_keys in
@@ -3470,7 +3505,9 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     Option.map Disconnect.init configuration.disconnect
   in
   let* init_aliases =
-    let accounts = List.map (fun ({account; _} : baker) -> account) bakers in
+    let accounts =
+      List.concat_map (fun ({accounts; _} : baker) -> accounts) bakers
+    in
     Network.aliases ~accounts configuration.network
   in
   let* versions = Network.versions configuration.network in
@@ -3521,7 +3558,9 @@ let clean_up t level =
 
 let update_bakers_infos t =
   let* new_aliases =
-    let accounts = List.map (fun ({account; _} : baker) -> account) t.bakers in
+    let accounts =
+      List.(concat_map (fun ({accounts; _} : baker) -> accounts) t.bakers)
+    in
     Network.aliases ~accounts t.configuration.network
   in
   let* versions = Network.versions t.configuration.network in
