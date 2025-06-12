@@ -658,6 +658,9 @@ pub mod interpret_cost {
             .as_gas_cost()?,
             (V::Or(..), _) => incomparable(),
 
+            #[cfg(feature = "bls")]
+            (V::Bls12381Fr(_) | V::Bls12381G1(_) | V::Bls12381G2(_), _) => incomparable(),
+
             (
                 V::List(..)
                 | V::Set(..)
@@ -666,10 +669,7 @@ pub mod interpret_cost {
                 | V::Contract(_)
                 | V::Operation(_)
                 | V::Ticket(_)
-                | V::Lambda(_)
-                | V::Bls12381Fr(_)
-                | V::Bls12381G1(_)
-                | V::Bls12381G2(_),
+                | V::Lambda(_),
                 _,
             ) => incomparable(),
         })
@@ -837,6 +837,7 @@ pub mod interpret_cost {
             Key::Ed25519(..) => 65800 + ((len >> 3) + len),
             Key::Secp256k1(..) => 51600 + ((len >> 3) + len),
             Key::P256(..) => 341000 + ((len >> 3) + len),
+            #[cfg(feature = "bls")]
             Key::Bls(..) => 1570000 + (len * 3),
         }
         .as_gas_cost()

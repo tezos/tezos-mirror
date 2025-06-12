@@ -100,6 +100,9 @@ alloy-sol-types = { version = "0.7.7", default-features = false, features = [
 ] }
 alloy-primitives = { version = "0.7.7", default-features = false }
 
+# mir without bls
+mir = { path = "../../contrib/mir", default-features = false }
+
 [profile.release]
 # Will apply heavy LTO which attempts to perform optimizations across all crates
 # within the dependency graph.

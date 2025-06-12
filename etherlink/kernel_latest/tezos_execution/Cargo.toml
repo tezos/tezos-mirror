@@ -29,3 +29,4 @@ primitive-types.workspace = true
 tezos-smart-rollup.workspace = true
 tezos_tezlink.workspace = true
 tezos-evm-logging.workspace = true
+mir.workspace = true

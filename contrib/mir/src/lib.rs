@@ -133,6 +133,7 @@
 //! <https://gitlab.com/tezos/tezos/-/tree/master/contrib/mir/examples>
 
 pub mod ast;
+#[cfg(feature = "bls")]
 pub mod bls;
 pub mod context;
 pub mod gas;

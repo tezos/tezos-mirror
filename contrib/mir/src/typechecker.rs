@@ -29,13 +29,15 @@ use crate::ast::micheline::{
     micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
 };
 use crate::ast::michelson_address::AddressHash;
+use crate::ast::*;
+#[cfg(feature = "bls")]
+use crate::bls;
 use crate::context::Ctx;
 use crate::gas::OutOfGas;
 use crate::gas::{self, tc_cost, Gas};
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::stack::*;
-use crate::{ast::*, bls};
 
 /// Typechecker error type.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -517,13 +519,19 @@ fn parse_ty_with_entrypoints<'a>(
         App(signature, [], _) => Type::Signature,
         App(signature, ..) => unexpected()?,
 
+        #[cfg(feature = "bls")]
         App(bls12_381_fr, [], _) => Type::Bls12381Fr,
+        #[cfg(feature = "bls")]
         App(bls12_381_fr, ..) => unexpected()?,
 
+        #[cfg(feature = "bls")]
         App(bls12_381_g1, [], _) => Type::Bls12381G1,
+        #[cfg(feature = "bls")]
         App(bls12_381_g1, ..) => unexpected()?,
 
+        #[cfg(feature = "bls")]
         App(bls12_381_g2, [], _) => Type::Bls12381G2,
+        #[cfg(feature = "bls")]
         App(bls12_381_g2, ..) => unexpected()?,
 
         Seq(..)
@@ -770,14 +778,17 @@ pub(crate) fn typecheck_instruction<'a>(
             pop!();
             I::Add(overloads::Add::MutezMutez)
         }
+        #[cfg(feature = "bls")]
         (App(ADD, [], _), [.., T::Bls12381Fr, T::Bls12381Fr]) => {
             pop!();
             I::Add(overloads::Add::Bls12381Fr)
         }
+        #[cfg(feature = "bls")]
         (App(ADD, [], _), [.., T::Bls12381G1, T::Bls12381G1]) => {
             pop!();
             I::Add(overloads::Add::Bls12381G1)
         }
+        #[cfg(feature = "bls")]
         (App(ADD, [], _), [.., T::Bls12381G2, T::Bls12381G2]) => {
             pop!();
             I::Add(overloads::Add::Bls12381G2)
@@ -821,33 +832,40 @@ pub(crate) fn typecheck_instruction<'a>(
             stack.push(T::Mutez);
             I::Mul(overloads::Mul::MutezNat)
         }
+        #[cfg(feature = "bls")]
         (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381G1]) => {
             stack.drop_top(2);
             stack.push(T::Bls12381G1);
             I::Mul(overloads::Mul::Bls12381G1Bls12381Fr)
         }
+        #[cfg(feature = "bls")]
         (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381G2]) => {
             stack.drop_top(2);
             stack.push(T::Bls12381G2);
             I::Mul(overloads::Mul::Bls12381G2Bls12381Fr)
         }
+        #[cfg(feature = "bls")]
         (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381Fr]) => {
             pop!();
             I::Mul(overloads::Mul::Bls12381FrBls12381Fr)
         }
+        #[cfg(feature = "bls")]
         (App(MUL, [], _), [.., T::Bls12381Fr, T::Nat]) => {
             pop!();
             I::Mul(overloads::Mul::NatBls12381Fr)
         }
+        #[cfg(feature = "bls")]
         (App(MUL, [], _), [.., T::Bls12381Fr, T::Int]) => {
             pop!();
             I::Mul(overloads::Mul::IntBls12381Fr)
         }
+        #[cfg(feature = "bls")]
         (App(MUL, [], _), [.., T::Nat, T::Bls12381Fr]) => {
             stack.drop_top(2);
             stack.push(T::Bls12381Fr);
             I::Mul(overloads::Mul::Bls12381FrNat)
         }
+        #[cfg(feature = "bls")]
         (App(MUL, [], _), [.., T::Int, T::Bls12381Fr]) => {
             stack.drop_top(2);
             stack.push(T::Bls12381Fr);
@@ -897,8 +915,11 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         // NB: stack type doesn't change in these NEG overloads
         (App(NEG, [], _), [.., T::Int]) => I::Neg(overloads::Neg::Int),
+        #[cfg(feature = "bls")]
         (App(NEG, [], _), [.., T::Bls12381G1]) => I::Neg(overloads::Neg::Bls12381G1),
+        #[cfg(feature = "bls")]
         (App(NEG, [], _), [.., T::Bls12381G2]) => I::Neg(overloads::Neg::Bls12381G2),
+        #[cfg(feature = "bls")]
         (App(NEG, [], _), [.., T::Bls12381Fr]) => I::Neg(overloads::Neg::Bls12381Fr),
         (App(NEG, [], _), [.., _]) => no_overload!(NEG),
         (App(NEG, [], _), []) => no_overload!(NEG, len 1),
@@ -1231,6 +1252,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack[0] = Type::Int;
             I::Int(overloads::Int::Nat)
         }
+        #[cfg(feature = "bls")]
         (App(INT, [], _), [.., T::Bls12381Fr]) => {
             stack[0] = Type::Int;
             I::Int(overloads::Int::Bls12381Fr)
@@ -2130,6 +2152,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EMIT, [_], _), []) => no_overload!(EMIT, len 1),
         (App(EMIT, [_, _, ..], _), _) => unexpected_micheline!(),
 
+        #[cfg(feature = "bls")]
         (App(PAIRING_CHECK, [], _), [.., T::List(ty)])
             if match ty.as_ref() {
                 T::Pair(p) => matches!(p.as_ref(), (T::Bls12381G1, T::Bls12381G2)),
@@ -2139,6 +2162,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack[0] = T::Bool;
             I::PairingCheck
         }
+        #[cfg(feature = "bls")]
         (App(PAIRING_CHECK, [], _), [.., t]) => no_overload!(
             PAIRING_CHECK,
             TypesNotEqual(
@@ -2146,7 +2170,9 @@ pub(crate) fn typecheck_instruction<'a>(
                 t.clone()
             )
         ),
+        #[cfg(feature = "bls")]
         (App(PAIRING_CHECK, [], _), []) => no_overload!(PAIRING_CHECK, len 1),
+        #[cfg(feature = "bls")]
         (App(PAIRING_CHECK, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(CREATE_CONTRACT, [cs], _), [.., new_storage, T::Mutez, T::Option(opt_keyhash)])
@@ -2453,18 +2479,22 @@ pub(crate) fn typecheck_value<'a>(
                 _ => return Err(invalid_value_for_type!()),
             }
         }
+        #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Int(i)) => {
             ctx.gas.consume(gas::tc_cost::BLS_FR)?;
             TV::Bls12381Fr(bls::Fr::from_big_int(i))
         }
+        #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_FR)?;
             TV::Bls12381Fr(bls::Fr::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
+        #[cfg(feature = "bls")]
         (T::Bls12381G1, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_G1)?;
             TV::new_bls12381_g1(bls::G1::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
+        #[cfg(feature = "bls")]
         (T::Bls12381G2, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::BLS_G2)?;
             TV::new_bls12381_g2(bls::G2::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
@@ -2624,20 +2654,26 @@ fn typecheck_map_common<'a, V, F>(
 where
     F: Fn(&Micheline<'a>, &mut Ctx) -> Result<V, TcError>,
 {
-    ctx.gas
-        .consume(gas::tc_cost::construct_map(key_type.size_for_gas(), vs.len())?)?;
+    ctx.gas.consume(gas::tc_cost::construct_map(
+        key_type.size_for_gas(),
+        vs.len(),
+    )?)?;
 
     let ctx_cell = std::cell::RefCell::new(ctx);
-    let tc_elt = |mich: &Micheline<'a>, local_ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
-        match mich {
-            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
-                let k = typecheck_value(k_expr, local_ctx, key_type)?;
-                let v = check_parse_value(v_expr, local_ctx)?;
-                Ok((k, v))
+    let tc_elt =
+        |mich: &Micheline<'a>, local_ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
+            match mich {
+                Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
+                    let k = typecheck_value(k_expr, local_ctx, key_type)?;
+                    let v = check_parse_value(v_expr, local_ctx)?;
+                    Ok((k, v))
+                }
+                _ => Err(TcError::InvalidEltForMap(
+                    format!("{mich:?}"),
+                    map_ty.clone(),
+                )),
             }
-            _ => Err(TcError::InvalidEltForMap(format!("{mich:?}"), map_ty.clone())),
-        }
-    };
+        };
 
     // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
     // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
@@ -2684,7 +2720,10 @@ fn typecheck_big_map<'a>(
                     Ok(Some(v))
                 }
                 Micheline::App(Prim::None, [], _) => Ok(None),
-                _ => Err(TcError::InvalidEltForMap(format!("{val_expr:?}"), map_ty.clone())),
+                _ => Err(TcError::InvalidEltForMap(
+                    format!("{val_expr:?}"),
+                    map_ty.clone(),
+                )),
             }
         } else {
             typecheck_value(val_expr, local_ctx, value_type).map(Some)

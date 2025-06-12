@@ -50,7 +50,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse Michelson code or value into [Micheline].
-    pub fn parse(&'a self, src: &'a str) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
+    pub fn parse(
+        &'a self,
+        src: &'a str,
+    ) -> Result<Micheline<'a>, ParseError<usize, Tok<'a>, ParserError>> {
         syntax::MichelineNakedParser::new().parse(&self.arena, spanned_lexer(src))
     }
 
@@ -60,7 +63,7 @@ impl<'a> Parser<'a> {
     pub fn parse_top_level(
         &'a self,
         src: &'a str,
-    ) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
+    ) -> Result<Micheline<'a>, ParseError<usize, Tok<'a>, ParserError>> {
         syntax::MichelineTopLevelParser::new().parse(&self.arena, spanned_lexer(src))
     }
 }

@@ -61,6 +61,8 @@ tezos_data_encoding.workspace = true
 
 proptest = { workspace = true, optional = true }
 
+mir.workspace = true
+
 [dev-dependencies]
 tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-panic-hook.workspace = true
