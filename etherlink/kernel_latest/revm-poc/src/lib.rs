@@ -13,7 +13,10 @@ mod world_state_handler;
 mod test {
     use primitive_types::{H160 as PH160, U256 as PU256};
     use revm::{
-        context::{transaction::AccessList, BlockEnv, CfgEnv, ContextTr, TxEnv},
+        context::{
+            result::ExecutionResult, transaction::AccessList, BlockEnv, CfgEnv,
+            ContextTr, LocalContext, TxEnv,
+        },
         context_interface::block::BlobExcessGasAndPrice,
         database::{CacheDB, EmptyDB},
         inspector::inspectors::GasInspector,
@@ -21,44 +24,152 @@ mod test {
             hardfork::SpecId, hex::FromHex, Address, Bytes, FixedBytes, TxKind, U256,
         },
         state::AccountInfo,
-        Context, Database, ExecuteCommitEvm, ExecuteEvm, MainBuilder, MainContext,
+        Context, Database, ExecuteCommitEvm, ExecuteEvm, Journal, MainBuilder,
+        MainContext,
     };
     use tezos_ethereum::block::{BlockConstants, BlockFees};
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use utilities::{block_env, etherlink_vm_db, evm, tx_env};
 
     use crate::database::EtherlinkVMDB;
     use crate::precompile_provider;
     use crate::world_state_handler::new_world_state_handler;
 
-    #[test]
-    fn test_revm_usage() {
-        let block = BlockEnv {
-            number: U256::from(11),
-            beneficiary: Address::ZERO,
-            timestamp: U256::from(12),
-            gas_limit: 1_000_000,
-            basefee: 10,
-            difficulty: U256::ZERO,
-            prevrandao: Some(FixedBytes::new([0; 32])),
-            blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
+    const ETHERLINK_CHAIN_ID: u64 = 42793;
+    const DEFAULT_SPEC_ID: SpecId = SpecId::PRAGUE;
+
+    mod utilities {
+        use revm::{
+            context::Evm,
+            handler::{instructions::EthInstructions, EthPrecompiles},
+            interpreter::interpreter::EthInterpreter,
         };
 
-        let tx = TxEnv {
-            tx_type: 2,
-            caller: Address::ZERO,
-            gas_limit: block.gas_limit,
-            gas_price: 45,
-            kind: TxKind::Call(Address::ZERO),
-            value: U256::ZERO,
-            data: Bytes::new(),
-            nonce: 0,
-            chain_id: Some(1),
-            access_list: AccessList(vec![]),
-            gas_priority_fee: None,
-            blob_hashes: vec![],
-            max_fee_per_blob_gas: 45,
-            authorization_list: vec![],
-        };
+        use super::*;
+
+        pub(crate) fn block_env(number: Option<U256>, gas_limit: u64) -> BlockEnv {
+            BlockEnv {
+                number: number.unwrap_or(U256::from(1)),
+                beneficiary: Address::ZERO,
+                timestamp: U256::from(0),
+                gas_limit,
+                basefee: 0,
+                difficulty: U256::ZERO,
+                prevrandao: Some(FixedBytes::new([0; 32])),
+                blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
+            }
+        }
+
+        pub(crate) fn tx_env(
+            caller: Address,
+            destination: Option<Address>,
+            gas_limit: u64,
+            gas_price: u128,
+            value: U256,
+            data: Bytes,
+            nonce: Option<u64>,
+        ) -> TxEnv {
+            let kind = match destination {
+                Some(address) => TxKind::Call(address),
+                None => TxKind::Create,
+            };
+
+            TxEnv {
+                tx_type: 2,
+                caller,
+                gas_limit,
+                gas_price,
+                kind,
+                value,
+                data,
+                nonce: nonce.unwrap_or_default(),
+                chain_id: Some(ETHERLINK_CHAIN_ID),
+                access_list: AccessList(vec![]),
+                gas_priority_fee: None,
+                blob_hashes: vec![],
+                max_fee_per_blob_gas: 10,
+                authorization_list: vec![],
+            }
+        }
+
+        pub(crate) fn block_constants(block_env: &BlockEnv) -> BlockConstants {
+            BlockConstants::first_block(
+                PU256::from_little_endian(block_env.number.as_le_slice()),
+                PU256::from(1),
+                BlockFees::new(
+                    PU256::from(1),
+                    PU256::from(block_env.basefee),
+                    PU256::from(1),
+                ),
+                block_env.gas_limit,
+                PH160::from(block_env.beneficiary.into_array()),
+            )
+        }
+
+        pub(crate) fn etherlink_vm_db<'a>(
+            block_env: &BlockEnv,
+        ) -> EtherlinkVMDB<'a, MockKernelHost> {
+            let host = Box::leak(Box::new(MockKernelHost::default()));
+            let world_state_handler = Box::leak(Box::new(new_world_state_handler()));
+            let block_constants = Box::leak(Box::new(block_constants(block_env)));
+
+            EtherlinkVMDB::new(host, block_constants, world_state_handler)
+        }
+
+        type EvmContext<'a> = Evm<
+            Context<&'a BlockEnv, &'a TxEnv, CfgEnv, EtherlinkVMDB<'a, MockKernelHost>>,
+            (),
+            EthInstructions<
+                EthInterpreter,
+                Context<
+                    &'a BlockEnv,
+                    &'a TxEnv,
+                    CfgEnv,
+                    EtherlinkVMDB<'a, MockKernelHost>,
+                >,
+            >,
+            EthPrecompiles,
+        >;
+
+        pub(crate) fn evm<'a>(
+            db: EtherlinkVMDB<'a, MockKernelHost>,
+            block: &'a BlockEnv,
+            tx: &'a TxEnv,
+        ) -> EvmContext<'a> {
+            let cfg = CfgEnv::new()
+                .with_chain_id(ETHERLINK_CHAIN_ID)
+                .with_spec(DEFAULT_SPEC_ID);
+
+            let context: Context<
+                BlockEnv,
+                TxEnv,
+                CfgEnv,
+                EtherlinkVMDB<'a, MockKernelHost>,
+                Journal<EtherlinkVMDB<'a, MockKernelHost>>,
+                (),
+                LocalContext,
+            > = Context::new(db, DEFAULT_SPEC_ID);
+
+            context
+                .with_block(block)
+                .with_tx(tx)
+                .with_cfg(cfg)
+                .build_mainnet()
+        }
+    }
+
+    #[test]
+    fn test_revm_usage() {
+        let block = block_env(None, 1_000_000);
+        let tx = tx_env(
+            Address::ZERO,
+            Some(Address::ZERO),
+            block.gas_limit,
+            0,
+            U256::ZERO,
+            Bytes::new(),
+            None,
+        );
 
         let mut db = CacheDB::new(EmptyDB::default());
 
@@ -94,49 +205,25 @@ mod test {
     }
 
     #[test]
-    fn db_test_case() {
-        let block = BlockEnv {
-            number: U256::from(11),
-            beneficiary: Address::ZERO,
-            timestamp: U256::from(12),
-            gas_limit: 1_000_000,
-            basefee: 0,
-            difficulty: U256::ZERO,
-            prevrandao: Some(FixedBytes::new([0; 32])),
-            blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
-        };
-
+    fn test_simple_transfer() {
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         let destination =
-            Address::from_hex("eeeeee9ec4769a09a76a83c7bc42b185872860ee").unwrap();
+            Address::from_hex("2222222222222222222222222222222222222222").unwrap();
+        let value = U256::from(5);
 
-        let tx = TxEnv {
-            tx_type: 2,
-            caller: Address::ZERO,
-            gas_limit: block.gas_limit,
-            gas_price: 1,
-            kind: TxKind::Call(destination),
-            value: U256::from(5),
-            data: Bytes::new(),
-            nonce: 0,
-            chain_id: Some(1),
-            access_list: AccessList(vec![]),
-            gas_priority_fee: None,
-            blob_hashes: vec![],
-            max_fee_per_blob_gas: 45,
-            authorization_list: vec![],
-        };
-
-        let mut host = MockKernelHost::default();
-        let block_constants = BlockConstants::first_block(
-            PU256::from(1),
-            PU256::from(1),
-            BlockFees::new(PU256::from(1), PU256::from(1), PU256::from(1)),
-            1_000_000,
-            PH160::from([0; 20]),
+        let block = block_env(None, 1_000_000);
+        let tx = tx_env(
+            caller,
+            Some(destination),
+            block.gas_limit,
+            0,
+            value,
+            Bytes::new(),
+            None,
         );
-        let mut world_state_handler = new_world_state_handler();
-        let mut db =
-            EtherlinkVMDB::new(&mut host, &block_constants, &mut world_state_handler);
+
+        let mut db = etherlink_vm_db(&block);
 
         let account_info = AccountInfo {
             balance: U256::MAX,
@@ -145,33 +232,37 @@ mod test {
             code: None,
         };
 
-        db.insert_account_info(tx.caller, account_info);
+        db.insert_account_info(caller, account_info);
 
-        let mut cfg = CfgEnv::default();
-        cfg.spec = SpecId::PRAGUE;
+        let mut evm = evm(db, &block, &tx);
 
-        let mut evm = Context::mainnet()
-            .with_block(&block)
-            .with_tx(&tx)
-            .with_db(&mut db)
-            .with_cfg(cfg)
-            .build_mainnet();
+        let account_caller_pre_tx = evm.db_mut().basic(caller).unwrap().unwrap();
+        let account_destination_pre_tx =
+            evm.db_mut().basic(destination).unwrap().unwrap();
 
-        let account_1 = evm.db_mut().basic(Address::ZERO).unwrap().unwrap();
-        let account_2 = evm.db_mut().basic(destination).unwrap().unwrap();
+        // Check balances before executing the transfer
+        assert_eq!(account_caller_pre_tx.balance, U256::MAX);
+        assert_eq!(account_destination_pre_tx.balance, U256::ZERO);
 
-        assert_eq!(account_1.balance, U256::MAX);
-        assert_eq!(account_2.balance, U256::ZERO);
+        let execution_result = evm.transact_commit(&tx).unwrap();
 
-        let _ = evm.transact_commit(&tx).unwrap();
+        // Check the outcome of the transaction
+        match execution_result {
+            ExecutionResult::Success { .. } => (),
+            ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
+                panic!("Simple transfer should have succeeded")
+            }
+        }
 
-        let account_1 = evm.db_mut().basic(Address::ZERO).unwrap().unwrap();
-        let account_2 = evm.db_mut().basic(destination).unwrap().unwrap();
+        // Check balances after executing the transfer
+        let account_caller_post_tx = evm.db_mut().basic(caller).unwrap().unwrap();
+        let account_destination_post_tx =
+            evm.db_mut().basic(destination).unwrap().unwrap();
 
         assert_eq!(
-            account_1.balance,
-            U256::MAX.checked_sub(U256::from(5)).unwrap()
+            account_caller_post_tx.balance,
+            U256::MAX.checked_sub(value).unwrap()
         );
-        assert_eq!(account_2.balance, U256::from(5));
+        assert_eq!(account_destination_post_tx.balance, value);
     }
 }
