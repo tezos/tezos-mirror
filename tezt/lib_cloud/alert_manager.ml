@@ -4,6 +4,7 @@
 (* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
 (*                                                                           *)
 (*****************************************************************************)
+let section = "Alert_manager"
 
 type receiver =
   | Slack of {
@@ -234,7 +235,7 @@ let run ?(default_receiver = null_receiver) alerts =
       Lwt.return_some t
 
 let reload t =
-  Log.info "Alert_manager: reloading" ;
+  Log.info "%s: reloading" section ;
   write_configuration t ;
   Process.run "curl" ["-X"; "POST"; "http://127.0.0.1:9093/-/reload"]
 
@@ -244,7 +245,7 @@ let shutdown () =
   Lwt.return_unit
 
 let add_alert t ~alert =
-  Log.info "Alert_manager: adding alert" ;
+  Log.info "%s: adding alert" section ;
   let {alert; route = route'} = alert in
   let route' = Option.value ~default:(route t.default_receiver) route' in
   t.routes <- (alert, route') :: t.routes ;
