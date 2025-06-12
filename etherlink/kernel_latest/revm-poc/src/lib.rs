@@ -13,7 +13,10 @@ mod world_state_handler;
 mod test {
     use primitive_types::{H160 as PH160, U256 as PU256};
     use revm::{
-        context::{transaction::AccessList, BlockEnv, CfgEnv, ContextTr, TxEnv},
+        context::{
+            result::ExecutionResult, transaction::AccessList, BlockEnv, CfgEnv,
+            ContextTr, LocalContext, TxEnv,
+        },
         context_interface::block::BlobExcessGasAndPrice,
         database::{CacheDB, EmptyDB},
         inspector::inspectors::GasInspector,
@@ -21,14 +24,139 @@ mod test {
             hardfork::SpecId, hex::FromHex, Address, Bytes, FixedBytes, TxKind, U256,
         },
         state::AccountInfo,
-        Context, Database, ExecuteCommitEvm, ExecuteEvm, MainBuilder, MainContext,
+        Context, Database, ExecuteCommitEvm, ExecuteEvm, Journal, MainBuilder,
+        MainContext,
     };
     use tezos_ethereum::block::{BlockConstants, BlockFees};
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use utilities::{block_env, etherlink_vm_db, evm, tx_env};
 
     use crate::database::EtherlinkVMDB;
     use crate::precompile_provider;
     use crate::world_state_handler::new_world_state_handler;
+
+    const ETHERLINK_CHAIN_ID: u64 = 42793;
+    const DEFAULT_SPEC_ID: SpecId = SpecId::PRAGUE;
+
+    mod utilities {
+        use revm::{
+            context::Evm,
+            handler::{instructions::EthInstructions, EthPrecompiles},
+            interpreter::interpreter::EthInterpreter,
+        };
+
+        use super::*;
+
+        pub(crate) fn block_env(number: Option<U256>, gas_limit: u64) -> BlockEnv {
+            BlockEnv {
+                number: number.unwrap_or(U256::from(1)),
+                beneficiary: Address::ZERO,
+                timestamp: U256::from(0),
+                gas_limit,
+                basefee: 0,
+                difficulty: U256::ZERO,
+                prevrandao: Some(FixedBytes::new([0; 32])),
+                blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
+            }
+        }
+
+        pub(crate) fn tx_env(
+            caller: Address,
+            destination: Option<Address>,
+            gas_limit: u64,
+            gas_price: u128,
+            value: U256,
+            data: Bytes,
+            nonce: Option<u64>,
+        ) -> TxEnv {
+            let kind = match destination {
+                Some(address) => TxKind::Call(address),
+                None => TxKind::Create,
+            };
+
+            TxEnv {
+                tx_type: 2,
+                caller,
+                gas_limit,
+                gas_price,
+                kind,
+                value,
+                data,
+                nonce: nonce.unwrap_or_default(),
+                chain_id: Some(ETHERLINK_CHAIN_ID),
+                access_list: AccessList(vec![]),
+                gas_priority_fee: None,
+                blob_hashes: vec![],
+                max_fee_per_blob_gas: 10,
+                authorization_list: vec![],
+            }
+        }
+
+        pub(crate) fn block_constants(block_env: &BlockEnv) -> BlockConstants {
+            BlockConstants::first_block(
+                PU256::from_little_endian(block_env.number.as_le_slice()),
+                PU256::from(1),
+                BlockFees::new(
+                    PU256::from(1),
+                    PU256::from(block_env.basefee),
+                    PU256::from(1),
+                ),
+                block_env.gas_limit,
+                PH160::from(block_env.beneficiary.into_array()),
+            )
+        }
+
+        pub(crate) fn etherlink_vm_db<'a>(
+            block_env: &BlockEnv,
+        ) -> EtherlinkVMDB<'a, MockKernelHost> {
+            let host = Box::leak(Box::new(MockKernelHost::default()));
+            let world_state_handler = Box::leak(Box::new(new_world_state_handler()));
+            let block_constants = Box::leak(Box::new(block_constants(block_env)));
+
+            EtherlinkVMDB::new(host, block_constants, world_state_handler)
+        }
+
+        type EvmContext<'a> = Evm<
+            Context<&'a BlockEnv, &'a TxEnv, CfgEnv, EtherlinkVMDB<'a, MockKernelHost>>,
+            (),
+            EthInstructions<
+                EthInterpreter,
+                Context<
+                    &'a BlockEnv,
+                    &'a TxEnv,
+                    CfgEnv,
+                    EtherlinkVMDB<'a, MockKernelHost>,
+                >,
+            >,
+            EthPrecompiles,
+        >;
+
+        pub(crate) fn evm<'a>(
+            db: EtherlinkVMDB<'a, MockKernelHost>,
+            block: &'a BlockEnv,
+            tx: &'a TxEnv,
+        ) -> EvmContext<'a> {
+            let cfg = CfgEnv::new()
+                .with_chain_id(ETHERLINK_CHAIN_ID)
+                .with_spec(DEFAULT_SPEC_ID);
+
+            let context: Context<
+                BlockEnv,
+                TxEnv,
+                CfgEnv,
+                EtherlinkVMDB<'a, MockKernelHost>,
+                Journal<EtherlinkVMDB<'a, MockKernelHost>>,
+                (),
+                LocalContext,
+            > = Context::new(db, DEFAULT_SPEC_ID);
+
+            context
+                .with_block(block)
+                .with_tx(tx)
+                .with_cfg(cfg)
+                .build_mainnet()
+        }
+    }
 
     #[test]
     fn test_revm_usage() {
