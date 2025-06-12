@@ -97,6 +97,9 @@ Client
   proof of possession for the bls key instead of asking the client to compute
   it. (MR :gl:`!18084`)
 
+- Added ``octez-client set companion key for <delegate> to <bls_key>``, setting a
+  companion key for the given delegate. (MR :gl:`!17320`)
+
 Signer
 ------
 
