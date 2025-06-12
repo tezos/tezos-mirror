@@ -398,7 +398,7 @@ module Dal_reverse_proxy = struct
                  |> Seq.map (fun (slot_index, endpoint) ->
                         Context_block
                           ( sf
-                              {|if ($query_string ~ "slot_index=%d")|}
+                              "if ($query_string ~ \"slot_index=%d\")"
                               slot_index,
                             [Directive (sf "proxy_pass %s" endpoint)] ))
                  |> List.of_seq );
