@@ -832,12 +832,19 @@ let register_binary cloud ?agents ?(group = "tezt-cloud") ~name () =
    node to the corresponding agent *)
 let agents_by_service_name = Hashtbl.create 10
 
-let service_register ~name ~executable agent =
+let service_name agent name = Format.asprintf "%s-%s" (Agent.name agent) name
+
+let service_register ~name ~executable ?on_alive_callback agent =
   match Agent.service_manager agent with
   | None -> ()
   | Some service_manager ->
       let () = Hashtbl.add agents_by_service_name name agent in
-      Service_manager.register_service ~name ~executable service_manager
+      let name = service_name agent name in
+      Service_manager.register_service
+        ~name
+        ~executable
+        ?on_alive_callback
+        service_manager
 
 let notify_service_start ~name ~pid =
   match Hashtbl.find_opt agents_by_service_name name with
@@ -846,6 +853,7 @@ let notify_service_start ~name ~pid =
       match Agent.service_manager agent with
       | None -> ()
       | Some service_manager ->
+          let name = service_name agent name in
           Service_manager.notify_start_service ~name ~pid service_manager)
 
 let notify_service_stop ~name =
@@ -855,6 +863,7 @@ let notify_service_stop ~name =
       match Agent.service_manager agent with
       | None -> ()
       | Some service_manager ->
+          let name = service_name agent name in
           Service_manager.notify_stop_service ~name service_manager)
 
 let register_chronos_task t task =
@@ -865,4 +874,19 @@ let register_chronos_task t task =
 let add_alert cloud ~alert =
   match cloud.alert_manager with
   | None -> Lwt.return_unit
-  | Some alert_manager -> Alert_manager.add_alert alert_manager ~alert
+  | Some alert_manager -> (
+      match cloud.prometheus with
+      | None ->
+          Log.warn
+            "Alert_manager is enabled without prometheus. No alerts will be \
+             fired" ;
+          Alert_manager.add_alert alert_manager ~alert
+      | Some prometheus ->
+          (* TODO: clean the prometheus and alert_manager api, this is ugly *)
+          let Alert_manager.{alert = alert'; _} = alert in
+          let* () =
+            Prometheus.register_rules
+              [Prometheus.rule_of_alert alert']
+              prometheus
+          in
+          Alert_manager.add_alert alert_manager ~alert)
