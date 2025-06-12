@@ -489,7 +489,711 @@ let raw_protocol_encoding =
        (req "protocol" Protocol_hash.encoding)
        (req "next_protocol" Protocol_hash.encoding))
 
+module type S = sig
+  val path : (unit, chain_prefix * block) Tezos_rpc.Path.t
+
+  module Proto : PROTO
+
+  module Next_proto : PROTO
+
+  type raw_block_header = {
+    shell : Block_header.shell_header;
+    protocol_data : Proto.block_header_data;
+  }
+
+  type block_header = {
+    chain_id : Chain_id.t;
+    hash : Block_hash.t;
+    shell : Block_header.shell_header;
+    protocol_data : Proto.block_header_data;
+  }
+
+  type block_metadata = {
+    protocol_data : Proto.block_header_metadata;
+    test_chain_status : Test_chain_status.t;
+    max_operations_ttl : int;
+    max_operation_data_length : int;
+    max_block_header_length : int;
+    operation_list_quota : operation_list_quota list;
+  }
+
+  type operation_receipt =
+    | Empty
+    | Too_large
+    | Receipt of Proto.operation_receipt
+
+  type operation = {
+    chain_id : Chain_id.t;
+    hash : Operation_hash.t;
+    shell : Operation.shell_header;
+    protocol_data : Proto.operation_data;
+    receipt : operation_receipt;
+  }
+
+  type block_info = {
+    chain_id : Chain_id.t;
+    hash : Block_hash.t;
+    header : raw_block_header;
+    metadata : block_metadata option;
+    operations : operation list list;
+  }
+
+  val block_info_encoding : (version * block_info) Data_encoding.t
+
+  open Tezos_rpc.Context
+
+  val info :
+    #simple ->
+    ?version:version ->
+    ?force_metadata:bool ->
+    ?metadata:[`Always | `Never] ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    block_info tzresult Lwt.t
+
+  val hash :
+    #simple ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    Block_hash.t tzresult Lwt.t
+
+  val raw_header :
+    #simple -> ?chain:chain -> ?block:block -> unit -> Bytes.t tzresult Lwt.t
+
+  val header :
+    #simple ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    block_header tzresult Lwt.t
+
+  val metadata :
+    #simple ->
+    ?version:version ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    block_metadata tzresult Lwt.t
+
+  val metadata_hash :
+    #simple ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    Block_metadata_hash.t tzresult Lwt.t
+
+  val resulting_context_hash :
+    #simple ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    Context_hash.t tzresult Lwt.t
+
+  module Header : sig
+    val shell_header :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      unit ->
+      Block_header.shell_header tzresult Lwt.t
+
+    val protocol_data :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      unit ->
+      Proto.block_header_data tzresult Lwt.t
+
+    val raw_protocol_data :
+      #simple -> ?chain:chain -> ?block:block -> unit -> Bytes.t tzresult Lwt.t
+  end
+
+  module Operations : sig
+    val operations :
+      #simple ->
+      ?version:version ->
+      ?force_metadata:bool ->
+      ?metadata:[`Always | `Never] ->
+      ?chain:chain ->
+      ?block:block ->
+      unit ->
+      operation list list tzresult Lwt.t
+
+    val operations_in_pass :
+      #simple ->
+      ?version:version ->
+      ?force_metadata:bool ->
+      ?metadata:[`Always | `Never] ->
+      ?chain:chain ->
+      ?block:block ->
+      int ->
+      operation list tzresult Lwt.t
+
+    val operation :
+      #simple ->
+      ?version:version ->
+      ?force_metadata:bool ->
+      ?metadata:[`Always | `Never] ->
+      ?chain:chain ->
+      ?block:block ->
+      int ->
+      int ->
+      operation tzresult Lwt.t
+  end
+
+  module Operation_hashes : sig
+    val operation_hashes :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      unit ->
+      Operation_hash.t list list tzresult Lwt.t
+
+    val operation_hashes_in_pass :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      int ->
+      Operation_hash.t list tzresult Lwt.t
+
+    val operation_hash :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      int ->
+      int ->
+      Operation_hash.t tzresult Lwt.t
+  end
+
+  module Operation_metadata_hashes : sig
+    val root :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      unit ->
+      Operation_metadata_list_list_hash.t tzresult Lwt.t
+
+    val operation_metadata_hashes :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      unit ->
+      Operation_metadata_hash.t list list tzresult Lwt.t
+
+    val operation_metadata_hashes_in_pass :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      int ->
+      Operation_metadata_hash.t list tzresult Lwt.t
+
+    val operation_metadata_hash :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      int ->
+      int ->
+      Operation_metadata_hash.t tzresult Lwt.t
+  end
+
+  module Context : sig
+    val read :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      ?depth:int ->
+      string list ->
+      Proof.raw_context tzresult Lwt.t
+
+    val merkle_tree :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      ?holey:bool ->
+      string list ->
+      Proof.tree Proof.t option tzresult Lwt.t
+  end
+
+  module Helpers : sig
+    module Forge : sig
+      val block_header :
+        #Tezos_rpc.Context.simple ->
+        ?chain:chain ->
+        ?block:block ->
+        Block_header.t ->
+        Bytes.t tzresult Lwt.t
+    end
+
+    module Preapply : sig
+      val block :
+        #simple ->
+        ?chain:chain ->
+        ?block:block ->
+        ?sort:bool ->
+        ?timestamp:Time.Protocol.t ->
+        protocol_data:Next_proto.block_header_data ->
+        Next_proto.operation list list ->
+        (Block_header.shell_header * error Preapply_result.t list) tzresult
+        Lwt.t
+
+      val operations :
+        #simple ->
+        ?chain:chain ->
+        ?block:block ->
+        ?version:version ->
+        Next_proto.operation list ->
+        (Next_proto.operation_data * Next_proto.operation_receipt) list tzresult
+        Lwt.t
+    end
+
+    val complete :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      string ->
+      string list tzresult Lwt.t
+  end
+
+  module Mempool : sig
+    type t = {
+      validated : (Operation_hash.t * Next_proto.operation) list;
+      refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      outdated : (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_delayed : (Next_proto.operation * error list) Operation_hash.Map.t;
+      unprocessed : Next_proto.operation Operation_hash.Map.t;
+    }
+
+    (** Call RPC GET /chains/[chain]/mempool/pending_operations
+
+    - Default [version] is [0].
+    - Default [validated] is [true].
+    - Default [branch_delayed] is [true].
+    - Default [branch_refused] is [true].
+    - Default [refused] is [true].
+    - Default [outdated] is [true].
+    - Default [validation_passes] is [[]]
+    - Default [sources] is [[]]
+    - Default [operation_hash] is [[]]*)
+    val pending_operations :
+      #simple ->
+      ?chain:chain ->
+      ?version:version ->
+      ?validated:bool ->
+      ?branch_delayed:bool ->
+      ?branch_refused:bool ->
+      ?refused:bool ->
+      ?outdated:bool ->
+      ?validation_passes:int list ->
+      ?sources:string list ->
+      ?operation_hash:string list ->
+      unit ->
+      t tzresult Lwt.t
+
+    (** Call RPC POST /chains/[chain]/mempool/ban_operation *)
+    val ban_operation :
+      #simple ->
+      ?chain:chain ->
+      Operation_hash.t ->
+      unit Tezos_error_monad.Error_monad.tzresult Lwt.t
+
+    (** Call RPC POST /chains/[chain]/mempool/unban_operation *)
+    val unban_operation :
+      #simple ->
+      ?chain:chain ->
+      Operation_hash.t ->
+      unit Tezos_error_monad.Error_monad.tzresult Lwt.t
+
+    (** Call RPC POST /chains/[chain]/mempool/unban_all_operations *)
+    val unban_all_operations :
+      #simple ->
+      ?chain:chain ->
+      unit ->
+      unit Tezos_error_monad.Error_monad.tzresult Lwt.t
+
+    (** Call RPC GET /chains/[chain]/mempool/monitor_operations *)
+    val monitor_operations :
+      #streamed ->
+      ?chain:chain ->
+      ?version:version ->
+      ?validated:bool ->
+      ?branch_delayed:bool ->
+      ?branch_refused:bool ->
+      ?refused:bool ->
+      ?outdated:bool ->
+      ?validation_passes:int list ->
+      ?sources:string list ->
+      unit ->
+      (((Operation_hash.t * Next_proto.operation) * error trace option) list
+       Lwt_stream.t
+      * stopper)
+      tzresult
+      Lwt.t
+
+    (** Call RPC POST /chains/[chain]/mempool/request_operations *)
+    val request_operations :
+      #simple ->
+      ?chain:chain ->
+      ?peer_id:P2p_peer.Id.t ->
+      unit ->
+      unit tzresult Lwt.t
+  end
+
+  val live_blocks :
+    #simple ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    Block_hash.Set.t tzresult Lwt.t
+
+  module S : sig
+    val hash :
+      ([`GET], prefix, prefix, unit, unit, Block_hash.t) Tezos_rpc.Service.t
+
+    val info :
+      ( [`GET],
+        prefix,
+        prefix,
+        < version : version
+        ; force_metadata : bool
+        ; metadata : [`Always | `Never] option >,
+        unit,
+        version * block_info )
+      Tezos_rpc.Service.t
+
+    val header :
+      ([`GET], prefix, prefix, unit, unit, block_header) Tezos_rpc.Service.t
+
+    val raw_header :
+      ([`GET], prefix, prefix, unit, unit, Bytes.t) Tezos_rpc.Service.t
+
+    val metadata :
+      ( [`GET],
+        prefix,
+        prefix,
+        < version : version >,
+        unit,
+        version * block_metadata )
+      Tezos_rpc.Service.t
+
+    val metadata_hash :
+      ( [`GET],
+        prefix,
+        prefix,
+        unit,
+        unit,
+        Block_metadata_hash.t )
+      Tezos_rpc.Service.t
+
+    val protocols :
+      ([`GET], prefix, prefix, unit, unit, protocols) Tezos_rpc.Service.t
+
+    val resulting_context_hash :
+      ([`GET], prefix, prefix, unit, unit, Context_hash.t) Tezos_rpc.Service.t
+
+    module Header : sig
+      val shell_header :
+        ( [`GET],
+          prefix,
+          prefix,
+          unit,
+          unit,
+          Block_header.shell_header )
+        Tezos_rpc.Service.t
+
+      val protocol_data :
+        ( [`GET],
+          prefix,
+          prefix,
+          unit,
+          unit,
+          Proto.block_header_data )
+        Tezos_rpc.Service.t
+
+      val raw_protocol_data :
+        ([`GET], prefix, prefix, unit, unit, Bytes.t) Tezos_rpc.Service.t
+    end
+
+    module Operations : sig
+      val operations :
+        ( [`GET],
+          prefix,
+          prefix,
+          < version : version
+          ; force_metadata : bool
+          ; metadata : [`Always | `Never] option >,
+          unit,
+          version * operation list list )
+        Tezos_rpc.Service.t
+
+      val operations_in_pass :
+        ( [`GET],
+          prefix,
+          prefix * int,
+          < version : version
+          ; force_metadata : bool
+          ; metadata : [`Always | `Never] option >,
+          unit,
+          version * operation list )
+        Tezos_rpc.Service.t
+
+      val operation :
+        ( [`GET],
+          prefix,
+          (prefix * int) * int,
+          < version : version
+          ; force_metadata : bool
+          ; metadata : [`Always | `Never] option >,
+          unit,
+          version * operation )
+        Tezos_rpc.Service.t
+    end
+
+    module Operation_hashes : sig
+      val operation_hashes :
+        ( [`GET],
+          prefix,
+          prefix,
+          unit,
+          unit,
+          Operation_hash.t list list )
+        Tezos_rpc.Service.t
+
+      val operation_hashes_in_pass :
+        ( [`GET],
+          prefix,
+          prefix * int,
+          unit,
+          unit,
+          Operation_hash.t list )
+        Tezos_rpc.Service.t
+
+      val operation_hash :
+        ( [`GET],
+          prefix,
+          (prefix * int) * int,
+          unit,
+          unit,
+          Operation_hash.t )
+        Tezos_rpc.Service.t
+    end
+
+    module Operation_metadata_hashes : sig
+      val root :
+        ( [`GET],
+          prefix,
+          prefix,
+          unit,
+          unit,
+          Operation_metadata_list_list_hash.t )
+        Tezos_rpc.Service.t
+
+      val operation_metadata_hashes :
+        ( [`GET],
+          prefix,
+          prefix,
+          unit,
+          unit,
+          Operation_metadata_hash.t list list )
+        Tezos_rpc.Service.t
+
+      val operation_metadata_hashes_in_pass :
+        ( [`GET],
+          prefix,
+          prefix * int,
+          unit,
+          unit,
+          Operation_metadata_hash.t list )
+        Tezos_rpc.Service.t
+
+      val operation_metadata_hash :
+        ( [`GET],
+          prefix,
+          (prefix * int) * int,
+          unit,
+          unit,
+          Operation_metadata_hash.t )
+        Tezos_rpc.Service.t
+    end
+
+    module Context : sig
+      val read :
+        ( [`GET],
+          prefix,
+          prefix * string list,
+          < depth : int option >,
+          unit,
+          Proof.raw_context )
+        Tezos_rpc.Service.t
+
+      val merkle_tree :
+        ( [`GET],
+          prefix,
+          prefix * string list,
+          < holey : bool option >,
+          unit,
+          Proof.merkle_tree option )
+        Tezos_rpc.Service.t
+
+      val merkle_tree_v2 :
+        ( [`GET],
+          prefix,
+          prefix * string list,
+          < holey : bool option >,
+          unit,
+          Proof.tree Proof.t option )
+        Tezos_rpc.Service.t
+    end
+
+    module Helpers : sig
+      module Forge : sig
+        val block_header :
+          ( [`POST],
+            prefix,
+            prefix,
+            unit,
+            Block_header.t,
+            Bytes.t )
+          Tezos_rpc.Service.service
+      end
+
+      module Preapply : sig
+        type block_param = {
+          protocol_data : Next_proto.block_header_data;
+          operations : Next_proto.operation list list;
+        }
+
+        val block :
+          ( [`POST],
+            prefix,
+            prefix,
+            < sort_operations : bool ; timestamp : Time.Protocol.t option >,
+            block_param,
+            Block_header.shell_header * error Preapply_result.t list )
+          Tezos_rpc.Service.t
+
+        val operations :
+          ( [`POST],
+            prefix,
+            prefix,
+            < version : version >,
+            Next_proto.operation list,
+            version
+            * (Next_proto.operation_data * Next_proto.operation_receipt) list
+          )
+          Tezos_rpc.Service.t
+      end
+
+      val complete :
+        ( [`GET],
+          prefix,
+          prefix * string,
+          unit,
+          unit,
+          string list )
+        Tezos_rpc.Service.t
+    end
+
+    module Mempool : sig
+      (** Define RPC GET /chains/[chain]/mempool/pending_operations *)
+      val pending_operations :
+        ('a, 'b) Tezos_rpc.Path.t ->
+        ( [`GET],
+          'a,
+          'b,
+          < version : version
+          ; validated : bool
+          ; branch_delayed : bool
+          ; branch_refused : bool
+          ; refused : bool
+          ; outdated : bool
+          ; validation_passes : int list
+          ; sources : string list
+          ; operation_hash : string list >,
+          unit,
+          version * Mempool.t )
+        Tezos_rpc.Service.t
+
+      (** Define RPC POST /chains/[chain]/mempool/ban_operation *)
+      val ban_operation :
+        ('a, 'b) Tezos_rpc.Path.t ->
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) Tezos_rpc.Service.t
+
+      (** Define RPC POST /chains/[chain]/mempool/unban_operation *)
+      val unban_operation :
+        ('a, 'b) Tezos_rpc.Path.t ->
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) Tezos_rpc.Service.t
+
+      (** Define RPC POST /chains/[chain]/mempool/unban_all_operations *)
+      val unban_all_operations :
+        ('a, 'b) Tezos_rpc.Path.t ->
+        ([`POST], 'a, 'b, unit, unit, unit) Tezos_rpc.Service.t
+
+      (** Define RPC GET /chains/[chain]/mempool/monitor_operations *)
+      val monitor_operations :
+        ('a, 'b) Tezos_rpc.Path.t ->
+        ( [`GET],
+          'a,
+          'b,
+          < version : version
+          ; validated : bool
+          ; branch_delayed : bool
+          ; branch_refused : bool
+          ; refused : bool
+          ; outdated : bool
+          ; validation_passes : int list
+          ; sources : string list >,
+          unit,
+          version
+          * ((Operation_hash.t * Next_proto.operation) * error trace option)
+            list )
+        Tezos_rpc.Service.t
+
+      (** Define RPC GET /chains/[chain]/mempool/filter *)
+      val get_filter :
+        ('a, 'b) Tezos_rpc.Path.t ->
+        ( [`GET],
+          'a,
+          'b,
+          < include_default : bool >,
+          unit,
+          Data_encoding.json )
+        Tezos_rpc.Service.t
+
+      (** Define RPC POST /chains/[chain]/mempool/filter *)
+      val set_filter :
+        ('a, 'b) Tezos_rpc.Path.t ->
+        ( [`POST],
+          'a,
+          'b,
+          unit,
+          Data_encoding.json,
+          Data_encoding.json )
+        Tezos_rpc.Service.t
+
+      (** Define RPC POST /chains/[chain]/mempool/request_operations *)
+      val request_operations :
+        ('a, 'b) Tezos_rpc.Path.t ->
+        ( [`POST],
+          'a,
+          'b,
+          < peer_id : P2p_peer_id.t option >,
+          unit,
+          unit )
+        Tezos_rpc.Service.t
+    end
+
+    val live_blocks :
+      ([`GET], prefix, prefix, unit, unit, Block_hash.Set.t) Tezos_rpc.Service.t
+  end
+end
+
 module Make (Proto : PROTO) (Next_proto : PROTO) = struct
+  module Proto = Proto
+  module Next_proto = Next_proto
+
   let protocol_hash = Protocol_hash.to_b58check Proto.hash
 
   let next_protocol_hash = Protocol_hash.to_b58check Next_proto.hash

@@ -132,8 +132,12 @@ val protocols :
   unit ->
   protocols tzresult Lwt.t
 
-module Make (Proto : PROTO) (Next_proto : PROTO) : sig
+module type S = sig
   val path : (unit, chain_prefix * block) Tezos_rpc.Path.t
+
+  module Proto : PROTO
+
+  module Next_proto : PROTO
 
   type raw_block_header = {
     shell : Block_header.shell_header;
@@ -828,6 +832,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ([`GET], prefix, prefix, unit, unit, Block_hash.Set.t) Tezos_rpc.Service.t
   end
 end
+
+module Make (Proto : PROTO) (Next_proto : PROTO) :
+  S with module Proto = Proto and module Next_proto = Next_proto
 
 module Fake_protocol : PROTO
 
