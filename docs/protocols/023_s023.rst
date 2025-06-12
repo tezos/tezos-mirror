@@ -55,30 +55,6 @@ Breaking Changes
   provided at revelation. This forces existing tz4 addresses to provide such a proof. This does
   not change anything about the revelation of new addresses, or non-tz4 addresses. (MR :gl:`!18078`)
 
-RPC Changes
------------
-
-- Added ``GET
-  /chains/<chain_id>/blocks/<block_id>/delegate/<delegate_pkh>/companion_key``,
-  which returns the active companion key of the given delegate. Returns ``none``
-  if key is not yet set. (MR :gl:`!17236`)
-
-- Updated ``GET /chains/<chain_id>/blocks/<block_id>/delegate/<delegate_pkh>/``
-  with the new field ``companion_key`` which returns the active companion key of
-  a given delegate (``none`` if not yet set), and the list of pending updates to
-  that key in the following cycles. (MR :gl:`!17236`)
-
-- Updated ``GET
-  /chains/<chain_id>/blocks/<block_id>/helpers/validators?delegate=<delegate_pkh>&level=<level_id>``
-  with the new optional field ``companion_key``, only present if the
-  delegate has an active companion key and this companion key is
-  needed for crafting and validating attestations at the queried
-  level. (MRs :gl:`!17703`, :gl:`!17957`)
-
-- Added a new RPC ``GET
-  /chains/<chain>/blocks/<block>/helpers/total_baking_power`` to retrieve the
-  total baking power for the current cycle. (MR :gl:`!17553`)
-
 Operations
 ----------
 
@@ -142,6 +118,30 @@ Operation receipts
   - A new ``misbehaviour`` field has been added, containing the
     misbehaviour's level, round, and kind
     (double-baking/double-attesting/double-preattesting).
+
+RPC Changes
+-----------
+
+- Added ``GET
+  /chains/<chain_id>/blocks/<block_id>/delegate/<delegate_pkh>/companion_key``,
+  which returns the active companion key of the given delegate. Returns ``none``
+  if key is not yet set. (MR :gl:`!17236`)
+
+- Updated ``GET /chains/<chain_id>/blocks/<block_id>/delegate/<delegate_pkh>/``
+  with the new field ``companion_key`` which returns the active companion key of
+  a given delegate (``none`` if not yet set), and the list of pending updates to
+  that key in the following cycles. (MR :gl:`!17236`)
+
+- Updated ``GET
+  /chains/<chain_id>/blocks/<block_id>/helpers/validators?delegate=<delegate_pkh>&level=<level_id>``
+  with the new optional field ``companion_key``, only present if the
+  delegate has an active companion key and this companion key is
+  needed for crafting and validating attestations at the queried
+  level. (MRs :gl:`!17703`, :gl:`!17957`)
+
+- Added a new RPC ``GET
+  /chains/<chain>/blocks/<block>/helpers/total_baking_power`` to retrieve the
+  total baking power for the current cycle. (MR :gl:`!17553`)
 
 Errors
 ------
