@@ -248,8 +248,16 @@ let reload t =
       Lwt.return_unit)
 
 let shutdown () =
-  Log.info "Alert_manager: shutting down" ;
-  let* () = Docker.kill "alert-manager" |> Process.check in
+  Log.info "%s: shutting down" section ;
+  let* () =
+    Lwt.catch
+      (fun () -> Docker.kill "alert-manager" |> Process.check)
+      (fun exn ->
+        Log.error
+          "Could not shutdown alert_manager properly: %s"
+          (Printexc.to_string exn) ;
+        Lwt.return_unit)
+  in
   Lwt.return_unit
 
 let add_alert t ~alert =
