@@ -88,5 +88,6 @@ let main () =
   Lwt.return retcode
 
 let () =
-  Stdlib.exit @@ Tezos_base_unix.Event_loop.main_run
+  Stdlib.exit
+  @@ Tezos_base_unix.Event_loop.main_run ~process_name:"p2p node"
   @@ fun () -> Lwt_exit.wrap_and_forward @@ main ()

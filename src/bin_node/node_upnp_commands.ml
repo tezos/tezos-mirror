@@ -105,6 +105,7 @@ let map_port
 let map_port_cmd search_options mapping_options ?data_dir ?config_file
     ?listen_addr ?advertised_net_port () =
   Tezos_base_unix.Event_loop.main_run
+    ~process_name:"node upnp"
     (map_port
        search_options
        mapping_options

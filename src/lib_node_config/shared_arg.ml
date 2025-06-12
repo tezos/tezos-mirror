@@ -259,7 +259,8 @@ let wrap data_dir config_file network connections max_download_speed
 let process_command run =
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
   match
-    Tezos_base_unix.Event_loop.main_run @@ fun () -> Lwt_exit.wrap_and_exit run
+    Tezos_base_unix.Event_loop.main_run ~process_name:"node config" @@ fun () ->
+    Lwt_exit.wrap_and_exit run
   with
   | Ok () -> `Ok ()
   | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)

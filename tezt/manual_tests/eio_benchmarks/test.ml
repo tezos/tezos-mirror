@@ -142,7 +142,10 @@ let run compute worker =
   List.iter (fun (label, algo) -> compute worker label algo) label_and_algos
 
 let () =
-  Tezos_base_unix.Event_loop.main_run ~eio:true @@ fun _env ->
+  Tezos_base_unix.Event_loop.main_run
+    ~process_name:"lwt_worker_lwt_handlers"
+    ~eio:true
+  @@ fun _env ->
   ((* Lwt worker running with Lwt handlers *)
    let () =
      (() [@profiler.record {verbosity = Notice} "lwt_worker_lwt_handlers"])

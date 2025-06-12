@@ -285,7 +285,7 @@ let process socket_dir =
   let main_promise =
     Lwt.catch (fun () -> run socket_dir) (function exn -> fail_with_exn exn)
   in
-  Tezos_base_unix.Event_loop.main_run (fun () ->
+  Tezos_base_unix.Event_loop.main_run ~process_name:"rpc process" (fun () ->
       let*! r = Lwt_exit.wrap_and_exit main_promise in
       match r with
       | Ok () ->

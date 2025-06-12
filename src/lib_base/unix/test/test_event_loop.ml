@@ -25,7 +25,12 @@ let register ~title promise =
   Test.register ~__FILE__ ~title ~tags @@ fun () ->
   match Lwt_unix.fork () with
   | 0 -> (
-      match Tezos_base_unix.Event_loop.main_run ~eio:true promise with
+      match
+        Tezos_base_unix.Event_loop.main_run
+          ~process_name:title
+          ~eio:true
+          promise
+      with
       | () -> exit 0
       | exception _ -> exit 1)
   | pid -> (

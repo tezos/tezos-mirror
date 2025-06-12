@@ -274,6 +274,7 @@ let () =
         Format.err_formatter
         Short) ;
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Tezos_base_unix.Event_loop.main_run (fun () ->
-      Lwt_exit.wrap_and_exit (dispatch (argv ())))
+  Tezos_base_unix.Event_loop.main_run
+    ~process_name:"etherlink fa-bridge watchtower"
+    (fun () -> Lwt_exit.wrap_and_exit (dispatch (argv ())))
   |> handle_error
