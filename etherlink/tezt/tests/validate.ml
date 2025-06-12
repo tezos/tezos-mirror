@@ -506,7 +506,7 @@ let test_validate_gas_limit =
     ~error_msg:
       "The transaction has not enough gas to pay da_fees, it should fail" ;
 
-  (* 300_000_000 gas limit is above the maximum gas_limit for a transaction (even a block) *)
+  (* 300_000_000 gas limit is above the maximum gas_limit for a transaction *)
   let* gas_limit_too_high =
     match tx_type with
     | Legacy -> make_tx_gas_limit ~legacy:true ~gas:300_000_000
