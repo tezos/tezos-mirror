@@ -15,19 +15,20 @@ ENV BLST_PORTABLE=true
 
 ARG APT_PROXY
 ENV APT_PROXY=${APT_PROXY:-false}
+COPY --chown=tezos:tezos \
+  images/scripts/install_datadog_static.sh \
+  images/scripts/install_sccache_static.sh \
+  images/scripts/install_opam_static.sh \
+  scripts/kiss-fetch.sh \
+  scripts/kiss-logs.sh \
+  /tmp/
+
 # we trust sw distributors
 # We install sccache as a static binary because at the moment of writing
 # the package sccache is not available on ubuntu jammy
 #hadolint ignore=DL3008,DL3009
-
 RUN echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy && \
     apt-get update && \
-    ARCH=$(uname -m) && \
-    case "$ARCH" in \
-        x86_64) export PLATFORM="x64" ;; \
-        aarch64) export PLATFORM="arm64" ;; \
-        *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
-    esac && \
     apt-get install --no-install-recommends -y bubblewrap \
       rsync git m4 build-essential \
       patch unzip curl wget ca-certificates \
@@ -40,13 +41,11 @@ RUN echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy &&
       libsqlite3-dev libpq-dev \
       lintian devscripts && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    curl  -L --output sccache.tgz "https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-$ARCH-unknown-linux-musl.tar.gz" && \
-    tar zxvf sccache.tgz && \
-    cp "sccache-v0.8.1-$ARCH-unknown-linux-musl/sccache" /usr/local/bin/sccache && \
-    rm -Rf sccache* && \
-    curl -L --fail "https://github.com/DataDog/datadog-ci/releases/download/v3.4.0/datadog-ci_linux-$PLATFORM" --output "/usr/local/bin/datadog-ci" && \
-    chmod +x /usr/local/bin/datadog-ci
+    rm -rf /var/lib/apt/lists/*
+
+RUN /tmp/install_sccache_static.sh && \
+    /tmp/install_datadog_static.sh && \
+    /tmp/install_opam_static.sh
 
 COPY --link scripts/version.sh /root/tezos/scripts/
 
@@ -71,8 +70,14 @@ COPY --link opam /root/tezos/
 
 WORKDIR /root/tezos
 
+ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
+ENV OPAMFETCH="/tmp/kiss-fetch.sh"
+
 #hadolint ignore=SC2154, SC1091
 RUN . ./scripts/version.sh && \
     eval $(opam env) && \
     . "/root/.cargo/env" && \
-    make build-deps
+    make build-deps && \
+# print kisscache stats
+    /tmp/kiss-logs.sh /tmp/kiss.log \
+    && rm -f /tmp/kiss.log
