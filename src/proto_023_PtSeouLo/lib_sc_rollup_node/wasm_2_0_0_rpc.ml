@@ -24,25 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Rpc_directory_helpers
 open Context_wrapper.Irmin
 
 module Make_RPC
     (Durable_state :
       Wasm_2_0_0_pvm.Durable_state with type state = Irmin_context.tree) =
 struct
-  module Block_directory = Make_sub_directory (struct
-    include Sc_rollup_services.Block
-
-    type context = Node_context.rw
-
-    type subcontext = Node_context.ro * Block_hash.t
-
-    let context_of_prefix node_ctxt (((), block) : prefix) =
-      let open Lwt_result_syntax in
-      let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
-      (Node_context.readonly node_ctxt, block)
-  end)
+  module Block_directory = Rpc_directory.Make_block_directory (struct end)
 
   let get_state (node_ctxt : _ Node_context.t) block_hash =
     let open Lwt_result_syntax in
