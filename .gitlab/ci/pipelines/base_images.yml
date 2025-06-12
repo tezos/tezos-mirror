@@ -42,6 +42,7 @@ oc.base-images.debian:
   variables:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: debian
+    IMAGE_PATH: debian
   retry:
     max: 2
     when:
@@ -70,6 +71,7 @@ oc.base-images.ubuntu:
   variables:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: ubuntu
+    IMAGE_PATH: ubuntu
   retry:
     max: 2
     when:
@@ -80,3 +82,60 @@ oc.base-images.ubuntu:
     - RELEASE:
       - noble
       - jammy
+
+oc.base-images.fedora:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp_very_high_cpu
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.rpm
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: fedora
+    IMAGE_PATH: fedora
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - "39"
+      - "42"
+
+oc.base-images.rockylinux:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp_very_high_cpu
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.rpm
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: rockylinux
+    IMAGE_PATH: rockylinux/rockylinux
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - "9.6"
