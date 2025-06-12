@@ -347,7 +347,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   else
     let* () =
       Blueprints_follower.start
-        ~chain_family
+        ~multichain:enable_multichain
         ~ping_tx_pool
         ~time_between_blocks
         ~evm_node_endpoint

@@ -14,22 +14,22 @@ type handler =
   Blueprint_types.with_events ->
   [`Restart_from of quantity | `Continue] tzresult Lwt.t
 
-(** [start ~chain_family ~time_between_blocks ~evm_node_endpoint ~get_next_blueprint_number k]
+(** [start ~multichain ~time_between_blocks ~evm_node_endpoint ~get_next_blueprint_number k]
     is a never-returning function which iterates over blueprints streamed by
     [evm_node_endpoint], calling [k] for each blueprint in order.
 
     [next_blueprint_number] is the height of the current local head, while
     [time_between_blocks] is used to detect when a connection to
     [evm_node_endpoint] is stalling.
-    [chain_family] is used to know where to retrieve the block number.
+    [multichain] is used to know where to retrieve the block number.
 
     If [ping_tx_pool] is set to [true] (as it is if omitted), then the
     blueprint follower will ping the {!Tx_pool} for every blueprint it
-    receives. Conversly, setting it to [false] allows to call [start] without a
+    receives. Conversely, setting it to [false] allows to call [start] without a
     running {!Tx_pool}. *)
 val start :
   ?ping_tx_pool:bool ->
-  chain_family:L2_types.chain_family ->
+  multichain:bool ->
   time_between_blocks:Configuration.time_between_blocks ->
   evm_node_endpoint:Uri.t ->
   next_blueprint_number:quantity ->
