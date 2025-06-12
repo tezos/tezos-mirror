@@ -46,6 +46,18 @@ module Block_services = struct
       Imported_protocol.mock_protocol_data
 end
 
+module Zero_block_services = struct
+  include
+    Tezos_shell_services.Block_services.Make (Zero_protocol) (Imported_protocol)
+
+  let mock_block_header_data : Proto.block_header_data tzresult =
+    Tezos_types.convert_using_serialization
+      ~name:"block_header_data"
+      ~dst:Proto.block_header_data_encoding
+      ~src:Data_encoding.empty
+      ()
+end
+
 type level = Tezos_types.level
 
 (* Provides mock values necessary for constructing L1 types that contain fields
@@ -299,6 +311,7 @@ module Protocol_types = struct
 end
 
 module Current_block_header = Protocol_types.Make_block_header (Block_services)
+module Zero_block_header = Protocol_types.Make_block_header (Zero_block_services)
 
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
@@ -837,16 +850,34 @@ let register_dynamic_block_services ~l2_chain_id
            Lwt_result_syntax.return (q#version, tezlink_block, chain))
          ~convert_output:
            (Current_block_header.tezlink_block_to_block_info ~l2_chain_id)
+    |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
+           make_env chain block)
   in
+  let dynamic_dir_zero_proto =
+    static_dir
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7993 *)
+    (* RPCs at directory level doesn't appear properly in the describe RPC *)
+    |> register_with_conversion
+         ~service:(import_service Zero_block_services.S.info)
+         ~impl:(fun {block; chain} q () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let* tezlink_block = Backend.block chain block in
+           Lwt_result_syntax.return (q#version, tezlink_block, chain))
+         ~convert_output:
+           (Zero_block_header.tezlink_block_to_block_info ~l2_chain_id)
+    |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
+           make_env chain block)
+  in
+
   let dynamic_dir =
     register_dynamic
       ~root_dir:Tezos_rpc.Directory.empty
       ~path:block_directory_path
-      (fun (((), _chain), _block) ->
-        Lwt.return
-        @@ Tezos_rpc.Directory.map
-             (fun (((), chain), block) -> make_env chain block)
-             dynamic_dir_current_proto)
+      (fun (((), _chain), block) ->
+        match block with
+        | `Genesis | `Level 0l -> Lwt.return dynamic_dir_zero_proto
+        | _ -> Lwt.return dynamic_dir_current_proto)
   in
   Tezos_rpc.Directory.merge base_dir dynamic_dir
 
