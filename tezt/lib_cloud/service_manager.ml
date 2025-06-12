@@ -7,7 +7,7 @@
 
 let section = "Service_manager"
 
-type service = {executable : string; mutable pid : int option}
+type service = {mutable executable : string option; mutable pid : int option}
 
 type t = {
   mutable services : (string, service) Hashtbl.t;
@@ -25,29 +25,36 @@ let run ~name service =
       (* Service is not 'declared' as running, no need to alert *)
       Lwt.return_unit
   | Some pid -> (
+      Log.info "%s: service is running (pid=%d) %s" section pid name ;
       let fn = Format.asprintf "/proc/%d/exe" pid in
       match Unix.readlink fn with
-      | fn ->
-          (* The pid could have been recycled.
-             Checks the value is equal to the executable name provided to
-             ensure this is not the case.
-             Note: Unix.realpath should not return an error, because readlink
-             always returns an existing executable *)
-          let fn = Unix.realpath fn in
-          if fn <> service.executable then
-            let () =
-              Log.error
-                "%s: service %s, identified by pid %d is not the expected \
-                 executable. Probable crash (replaced by %s)"
-                section
-                service.executable
-                pid
-                fn
-            in
-            (* log the error only once, then do not check again *)
-            let () = service.pid <- None in
-            Lwt.return_unit
-          else Lwt.return_unit
+      | fn -> (
+          match service.executable with
+          | None ->
+              (* Allow setting the executable once, in case it was incorrectly
+                 setup at registration (e.g. in docker) *)
+              service.executable <- Some fn ;
+              service.pid <- Some pid ;
+              Lwt.return_unit
+          | Some fn' ->
+              (* The pid might have been recycled.
+                 Checks the value is equal to the executable name provided to
+                 ensure this is not the case.
+                 Note: Unix.realpath should not return an error, because readlink
+                 always returns an existing executable *)
+              let fn = Unix.realpath fn in
+              if fn <> fn' then (
+                Log.error
+                  "%s: service %s, identified by pid %d is not the expected \
+                   executable. Probable crash (replaced by %s)"
+                  section
+                  fn
+                  pid
+                  fn' ;
+                (* log the error only once, then do not check again *)
+                let () = service.pid <- None in
+                Lwt.return_unit)
+              else Lwt.return_unit)
       | exception Unix.(Unix_error (ENOENT, _, _)) ->
           (* The monitored pid is not running anymore *)
           Log.error
@@ -79,10 +86,13 @@ let register_service ~name ~executable t =
   (* Get the real executable name *)
   if Sys.file_exists executable then
     let executable = Unix.realpath executable in
-    let service = {executable; pid = None} in
+    let service = {executable = Some executable; pid = None} in
     let () = Hashtbl.add t.services name service in
     Log.info "%s: Registering service: %s (%s)" section name executable
-  else Log.error "%s: Cannot find executable %s on current system" section name
+  else
+    let service = {executable = None; pid = None} in
+    let () = Hashtbl.add t.services name service in
+    Log.info "%s: Registering service: %s (%s)" section name executable
 
 let notify_start_service ~name ~pid t =
   match Hashtbl.find_opt t.services name with
