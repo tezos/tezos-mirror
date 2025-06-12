@@ -279,14 +279,7 @@ module Node = struct
     let terminate ?timeout node =
       let name = name node in
       (* Notify the Service manager. *)
-      let () =
-        match Node.pid node with
-        | None ->
-            Log.error
-              "Cannot update service %s: no pid. Is the program running ?"
-              name
-        | Some pid -> Cloud.notify_service_start ~name ~pid
-      in
+      Cloud.notify_service_stop ~name ;
       terminate ?timeout node
   end
 end
