@@ -237,7 +237,15 @@ let run ?(default_receiver = null_receiver) alerts =
 let reload t =
   Log.info "%s: reloading" section ;
   write_configuration t ;
-  Process.run "curl" ["-X"; "POST"; "http://127.0.0.1:9093/-/reload"]
+  Lwt.catch
+    (fun () ->
+      Process.run "curl" ["-X"; "POST"; "http://127.0.0.1:9093/-/reload"])
+    (fun exn ->
+      Log.error
+        "%s: Could not reload prometheus, curl returned: %s"
+        section
+        (Printexc.to_string exn) ;
+      Lwt.return_unit)
 
 let shutdown () =
   Log.info "Alert_manager: shutting down" ;
