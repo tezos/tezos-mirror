@@ -16,6 +16,7 @@ type head = {
   next_blueprint_number : Ethereum_types.quantity;
   evm_state : Evm_state.t;
   pending_upgrade : Evm_events.Upgrade.t option;
+  pending_sequencer_upgrade : Evm_events.Sequencer_upgrade.t option;
 }
 
 type ex_tx_container =
@@ -38,6 +39,8 @@ type session_state = {
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
   mutable pending_upgrade : Evm_store.pending_kernel_upgrade option;
+  mutable pending_sequencer_upgrade :
+    Evm_store.pending_sequencer_upgrade option;
   mutable evm_state : Evm_state.t;
   mutable last_split_block : (Ethereum_types.quantity * Time.Protocol.t) option;
       (** Garbage collector session related information. *)
@@ -187,6 +190,7 @@ module State = struct
           next_blueprint_number;
           current_block_hash;
           pending_upgrade;
+          pending_sequencer_upgrade;
           evm_state;
           last_split_block;
         } =
@@ -196,6 +200,7 @@ module State = struct
         next_blueprint_number;
         current_block_hash;
         pending_upgrade;
+        pending_sequencer_upgrade;
         evm_state;
         last_split_block;
       }
@@ -208,6 +213,7 @@ module State = struct
           next_blueprint_number;
           current_block_hash;
           pending_upgrade;
+          pending_sequencer_upgrade;
           evm_state;
           last_split_block;
         } =
@@ -216,6 +222,7 @@ module State = struct
       session.next_blueprint_number <- next_blueprint_number ;
       session.current_block_hash <- current_block_hash ;
       session.pending_upgrade <- pending_upgrade ;
+      session.pending_sequencer_upgrade <- pending_sequencer_upgrade ;
       session.evm_state <- evm_state ;
       session.last_split_block <- last_split_block
 
@@ -229,6 +236,10 @@ module State = struct
           Option.map
             (fun pending_upgrade -> pending_upgrade.Evm_store.kernel_upgrade)
             session.pending_upgrade;
+        pending_sequencer_upgrade =
+          Option.map
+            (fun pending_upgrade -> pending_upgrade.Evm_store.sequencer_upgrade)
+            session.pending_sequencer_upgrade;
       }
 
     let run ctxt (k : t -> Sqlite.conn -> 'a tzresult Lwt.t) : 'a tzresult Lwt.t
@@ -488,6 +499,9 @@ module State = struct
     (* Clear the store. *)
     let* () = Evm_store.reset_after conn ~l2_level in
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
+    let* pending_sequencer_upgrade =
+      Evm_store.Sequencer_upgrades.find_latest_pending conn
+    in
     (* Update mutable session values. *)
     let next_blueprint_number = Ethereum_types.Qty.next l2_level in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
@@ -503,6 +517,7 @@ module State = struct
     ctxt.session.current_block_hash <- current_block_hash ;
     ctxt.session.context <- context ;
     ctxt.session.pending_upgrade <- pending_upgrade ;
+    ctxt.session.pending_sequencer_upgrade <- pending_sequencer_upgrade ;
     return evm_state
 
   let reset_to_finalized_level exit_error ctxt conn =
@@ -601,6 +616,16 @@ module State = struct
           Some upgrade
         else None
 
+  let check_pending_sequencer_upgrade ctxt timestamp =
+    match ctxt.session.pending_sequencer_upgrade with
+    | None -> None
+    | Some sequencer_upgrade ->
+        if
+          Time.Protocol.(
+            sequencer_upgrade.sequencer_upgrade.timestamp <= timestamp)
+        then Some sequencer_upgrade
+        else None
+
   let check_upgrade ctxt evm_state =
     let open Lwt_result_syntax in
     function
@@ -631,6 +656,34 @@ module State = struct
         (* Even if the upgrade failed, we consider it has been applied. *)
         return_true
     | None -> return_false
+
+  let check_sequencer_upgrade ctxt evm_state
+      Evm_events.Sequencer_upgrade.{sequencer = new_sequencer; _} =
+    let open Lwt_result_syntax in
+    let*! bytes =
+      Evm_state.inspect evm_state Durable_storage_path.sequencer_key
+    in
+    let*? current_sequencer =
+      Option.map_e
+        (fun b -> Signature.Public_key.of_b58check (String.of_bytes b))
+        bytes
+    in
+    match current_sequencer with
+    | Some current_sequencer when new_sequencer = current_sequencer ->
+        let*! () =
+          Events.applied_sequencer_upgrade
+            new_sequencer
+            ctxt.session.next_blueprint_number
+        in
+        return_true
+    | _ ->
+        let*! () =
+          Events.failed_sequencer_upgrade
+            ~new_sequencer
+            ~found_sequencer:current_sequencer
+            ctxt.session.next_blueprint_number
+        in
+        return_false
 
   let execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_ =
     let da_fees =
@@ -770,6 +823,54 @@ module State = struct
       Configuration.retrieve_chain_family
         ~l2_chains:ctxt.configuration.experimental_features.l2_chains
     in
+    let* evm_state, applied_sequencer_upgrade =
+      match check_pending_sequencer_upgrade ctxt timestamp with
+      | Some {sequencer_upgrade; _} ->
+          let* evm_state =
+            (* The sequencer upgrade is based on the l1 timestamp
+               found in the inbox. To activate it it's enough to
+               trigger a kernel run with a correct timestamp (>=
+               activation_timstamp) and an empty inbox. The sequencer
+               upgrade is checked in the kernel just after finishing
+               to parse the inbox, there is no need for a blueprint to
+               be applied.
+
+               Also as the application of the sequencer upgrade is
+               done after parsing the blueprint and it clears the
+               storage. If we try to do a run with a blueprint :
+
+               - For the previous sequencer, the blueprint will be
+               validated but removed when the sequencer upgrade is
+               applied.
+
+               - for the new sequencer, the blueprint will not be
+               validated.
+
+               Because of all that it's necessary to do a run with no
+               specified blueprint. *)
+            Evm_state.execute
+              ~execution_timestamp:timestamp
+              ~native_execution:
+                (ctxt.configuration.kernel_execution.native_execution_policy
+               = Configuration.Always)
+              ~data_dir
+              ~config
+              ctxt.session.evm_state
+              []
+          in
+          let* applied_sequencer_upgrade =
+            check_sequencer_upgrade ctxt evm_state sequencer_upgrade
+          in
+          return (evm_state, applied_sequencer_upgrade)
+      | None -> return (ctxt.session.evm_state, false)
+    in
+    let* () =
+      when_ applied_sequencer_upgrade @@ fun () ->
+      Evm_store.Sequencer_upgrades.record_apply
+        conn
+        ctxt.session.next_blueprint_number
+    in
+
     let* try_apply =
       Misc.with_timing
         (fun time -> Lwt.return (time_processed := time))
@@ -781,7 +882,7 @@ module State = struct
             ~data_dir
             ~chain_family
             ~config
-            ctxt.session.evm_state
+            evm_state
             payload)
     in
 
@@ -932,6 +1033,7 @@ module State = struct
             context,
             block,
             applied_kernel_upgrade,
+            applied_sequencer_upgrade,
             split_info,
             execution_gas )
     | Apply_failure (* Did not produce a block *) ->
@@ -942,8 +1044,8 @@ module State = struct
         in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
-  let on_new_head ?split_info ctxt ~applied_upgrade evm_state context block
-      blueprint_with_events =
+  let on_new_head ?split_info ctxt ~applied_kernel_upgrade
+      ~applied_sequencer_upgrade evm_state context block blueprint_with_events =
     let open Lwt_syntax in
     let block_hash = L2_types.block_hash block in
     let (Qty level) = ctxt.session.next_blueprint_number in
@@ -965,7 +1067,9 @@ module State = struct
         ctxt.session.last_split_block <- Some (split_level, split_timestamp))
       split_info ;
     Broadcast.notify_blueprint blueprint_with_events ;
-    if applied_upgrade then ctxt.session.pending_upgrade <- None ;
+    if applied_sequencer_upgrade then
+      ctxt.session.pending_sequencer_upgrade <- None ;
+    if applied_kernel_upgrade then ctxt.session.pending_upgrade <- None ;
     return_unit
 
   type error +=
@@ -1026,6 +1130,7 @@ module State = struct
              context,
              current_block,
              applied_kernel_upgrade,
+             applied_sequencer_upgrade,
              split_info,
              execution_gas ) =
         let* () = apply_evm_events conn ctxt events in
@@ -1044,7 +1149,13 @@ module State = struct
         | _ -> None
       in
 
-      let sequencer_upgrade = (* fixme *) None in
+      let sequencer_upgrade =
+        match ctxt.session.pending_sequencer_upgrade with
+        | Some {injected_before; sequencer_upgrade}
+          when injected_before = ctxt.session.next_blueprint_number ->
+            Some sequencer_upgrade
+        | _ -> None
+      in
 
       let* current_block =
         match current_block with
@@ -1060,7 +1171,8 @@ module State = struct
         on_new_head
           ?split_info
           ctxt
-          ~applied_upgrade:applied_kernel_upgrade
+          ~applied_kernel_upgrade
+          ~applied_sequencer_upgrade
           evm_state
           context
           current_block
@@ -1106,6 +1218,12 @@ module State = struct
         let*! () = Events.pending_upgrade upgrade in
         return (evm_state, latest_finalized_level)
     | Sequencer_upgrade_event sequencer_upgrade ->
+        ctxt.session.pending_sequencer_upgrade <-
+          Some
+            {
+              sequencer_upgrade;
+              injected_before = ctxt.session.next_blueprint_number;
+            } ;
         let payload =
           Evm_events.Sequencer_upgrade.to_bytes sequencer_upgrade
           |> String.of_bytes
@@ -1116,6 +1234,13 @@ module State = struct
             ~value:payload
             evm_state
         in
+        let* () =
+          Evm_store.Sequencer_upgrades.store
+            conn
+            ctxt.session.next_blueprint_number
+            sequencer_upgrade
+        in
+        let*! () = Events.pending_sequencer_upgrade sequencer_upgrade in
         return (evm_state, latest_finalized_level)
     | Blueprint_applied event ->
         blueprint_applied_event ctxt conn evm_state latest_finalized_level event
@@ -1242,7 +1367,11 @@ module State = struct
         conn
         before_flushed_level
     in
-    let lost_sequencer_upgrade = (* fixme *) None in
+    let* lost_sequencer_upgrade =
+      Evm_store.Sequencer_upgrades.find_latest_injected_after
+        conn
+        before_flushed_level
+    in
     (* The kernel has produced a block for level [flushed_level]. The first thing
        to do is go back to an EVM state before this flushed blueprint. *)
     let* (_ : Evm_state.t) =
@@ -1503,6 +1632,9 @@ module State = struct
           failwith "Store has pending confirmation, state is not final")
     in
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
+    let* pending_sequencer_upgrade =
+      Evm_store.Sequencer_upgrades.find_latest_pending conn
+    in
     let* latest = Evm_store.L1_l2_finalized_levels.last conn in
     let finalized_number, l1_level =
       match latest with
@@ -1585,6 +1717,7 @@ module State = struct
             next_blueprint_number;
             current_block_hash;
             pending_upgrade;
+            pending_sequencer_upgrade;
             evm_state;
             last_split_block;
           };

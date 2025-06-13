@@ -14,6 +14,7 @@ type head = {
   next_blueprint_number : Ethereum_types.quantity;
   evm_state : Evm_state.t;
   pending_upgrade : Evm_events.Upgrade.t option;
+  pending_sequencer_upgrade : Evm_events.Sequencer_upgrade.t option;
 }
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}

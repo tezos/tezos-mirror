@@ -24,6 +24,25 @@ val received_upgrade : string -> unit Lwt.t
     upgrade is pending. *)
 val pending_upgrade : Evm_events.Upgrade.t -> unit Lwt.t
 
+(** [pending_sequencer_upgrade upgrade] advertises that the EVM node
+    is aware that a sequencer upgrade is pending. *)
+val pending_sequencer_upgrade : Evm_events.Sequencer_upgrade.t -> unit Lwt.t
+
+(** [applied_sequencer_upgrade sequencer level] advertises that the
+    sequencer of the EVM node successfully upgraded to [sequencer]
+    before the [level]th blueprint. *)
+val applied_sequencer_upgrade :
+  Signature.Public_key.t -> Ethereum_types.quantity -> unit Lwt.t
+
+(** [applied_sequencer_upgrade sequencer level] advertises that the
+    sequencer of the EVM node failed to upgrade to [sequencer] before
+    the [level]th blueprint. *)
+val failed_sequencer_upgrade :
+  new_sequencer:Signature.Public_key.t ->
+  found_sequencer:Signature.Public_key.t option ->
+  Ethereum_types.quantity ->
+  unit Lwt.t
+
 (** [applied_upgrade root_hash level] advertises that the kernel of the EVM
     node successfully upgraded to [root_hash] with the [level]th blueprint. *)
 val applied_upgrade :

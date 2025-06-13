@@ -27,6 +27,9 @@
 
 ### Execution changes
 
+- Node correctly applies an sequencer upgrade EVM event when it sees
+  one. (!18286)
+
 ### Storage changes
 
 ### Documentation changes

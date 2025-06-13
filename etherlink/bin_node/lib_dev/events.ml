@@ -37,6 +37,18 @@ let pending_upgrade =
     ("root_hash", Ethereum_types.hash_encoding)
     ("timestamp", Time.Protocol.encoding)
 
+let pending_sequencer_upgrade =
+  declare_3
+    ~section
+    ~name:"pending_sequencer_upgrade"
+    ~msg:
+      "pending sequencer upgrade to sequencer {sequencer} and pool address \
+       {pool_address} expected to activate at {timestamp}"
+    ~level:Notice
+    ("sequencer", Signature.Public_key.encoding)
+    ("pool_address", Ethereum_types.address_encoding)
+    ("timestamp", Time.Protocol.encoding)
+
 let applied_upgrade =
   declare_2
     ~section
@@ -53,6 +65,28 @@ let failed_upgrade =
     ~msg:"kernel failed to upgrade to {root_hash} with blueprint {level}"
     ~level:Warning
     ("root_hash", Ethereum_types.hash_encoding)
+    ("level", Data_encoding.n)
+
+let applied_sequencer_upgrade =
+  declare_2
+    ~section
+    ~name:"applied_sequencer_upgrade"
+    ~msg:
+      "sequencer successfully upgraded to {sequencer} before blueprint {level}"
+    ~level:Notice
+    ("sequencer", Signature.Public_key.encoding)
+    ("level", Data_encoding.n)
+
+let failed_sequencer_upgrade =
+  declare_3
+    ~section
+    ~name:"failed_sequencer_upgrade"
+    ~msg:
+      "sequencer failed to upgrade to {new_sequencer} before blueprint \
+       {level}. Current sequencer is {current_sequencer}"
+    ~level:Warning
+    ("new_sequencer", Signature.Public_key.encoding)
+    ("current_sequencer", Data_encoding.option Signature.Public_key.encoding)
     ("level", Data_encoding.n)
 
 let ignored_kernel_arg =
@@ -462,11 +496,26 @@ let received_upgrade payload = emit received_upgrade payload
 let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
   emit pending_upgrade (upgrade.hash, upgrade.timestamp)
 
+let pending_sequencer_upgrade
+    (sequencer_upgrade : Evm_events.Sequencer_upgrade.t) =
+  emit
+    pending_sequencer_upgrade
+    ( sequencer_upgrade.sequencer,
+      sequencer_upgrade.pool_address,
+      sequencer_upgrade.timestamp )
+
 let applied_upgrade root_hash Ethereum_types.(Qty level) =
   emit applied_upgrade (root_hash, level)
 
 let failed_upgrade root_hash Ethereum_types.(Qty level) =
   emit failed_upgrade (root_hash, level)
+
+let applied_sequencer_upgrade sequencer Ethereum_types.(Qty level) =
+  emit applied_sequencer_upgrade (sequencer, level)
+
+let failed_sequencer_upgrade ~new_sequencer ~found_sequencer
+    Ethereum_types.(Qty level) =
+  emit failed_sequencer_upgrade (new_sequencer, found_sequencer, level)
 
 let ignored_kernel_arg () = emit ignored_kernel_arg ()
 
