@@ -626,3 +626,13 @@ let block_hash_or_level_param next =
              let*? b = Block_hash.of_b58check s in
              return (`Hash b)))
     next
+
+let profiling_arg : (bool option, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.arg
+    ~long:"profiling"
+    ~placeholder:"BOOL"
+    ~doc:"Enable or disable profiling with opentelemetry"
+  @@ Tezos_clic.parameter (fun (_cctxt : Client_context.full) -> function
+       | "true" -> Lwt_result_syntax.return_true
+       | "false" -> Lwt_result_syntax.return_false
+       | s -> failwith "Invalid value %S for --profiling" s)

@@ -134,11 +134,13 @@ let raw_commit ?(message = "") index tree =
 
 let commit ?message ctxt =
   let open Lwt_syntax in
+  Opentelemetry_lwt.Trace.with_ ~service_name:"Irmin" "commit" @@ fun _ ->
   let+ commit = raw_commit ?message ctxt.index ctxt.tree in
   IStore.Commit.hash commit
 
 let checkout index key =
   let open Lwt_syntax in
+  Opentelemetry_lwt.Trace.with_ ~service_name:"Irmin" "checkout" @@ fun _ ->
   let* o = IStore.Commit.of_hash index.repo key in
   match o with
   | None -> return_none
@@ -296,7 +298,9 @@ module PVMState = struct
 
   let empty () = IStore.Tree.empty ()
 
-  let find ctxt = IStore.Tree.find_tree ctxt.tree key
+  let find ctxt =
+    Opentelemetry_lwt.Trace.with_ ~service_name:"Irmin" "PVMState.find"
+    @@ fun _ -> IStore.Tree.find_tree ctxt.tree key
 
   let get ctxt =
     let open Lwt_syntax in
@@ -305,10 +309,14 @@ module PVMState = struct
     | Some store -> return store
     | None -> Lwt.fail_with "No pvm_state found"
 
-  let lookup tree path = IStore.Tree.find tree path
+  let lookup tree path =
+    Opentelemetry_lwt.Trace.with_ ~service_name:"Irmin" "PVMState.lookup"
+    @@ fun _ -> IStore.Tree.find tree path
 
   let set ctxt state =
     let open Lwt_syntax in
+    Opentelemetry_lwt.Trace.with_ ~service_name:"Irmin" "PVMState.set"
+    @@ fun _ ->
     let+ tree = IStore.Tree.add_tree ctxt.tree key state in
     {ctxt with tree}
 end

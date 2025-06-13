@@ -130,6 +130,12 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
     (head : Layer1.header) =
   let open Lwt_result_syntax in
   let level = head.level in
+  Opentelemetry_lwt.Trace.with_ "process_unseen_block" @@ fun scope ->
+  Opentelemetry.Scope.add_attrs scope (fun () ->
+      [
+        ("rollup_node.block_hash", `String (Block_hash.to_b58check head.hash));
+        ("rollup_node.block_level", `Int (Int32.to_int level));
+      ]) ;
   let* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up state head in
   let* rollup_ctxt = previous_context node_ctxt ~predecessor in
@@ -370,6 +376,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
     List.iter_es
       (fun (block, to_prefetch) ->
         let module Plugin = (val state.plugin) in
+        Opentelemetry_lwt.Trace.with_ "process_block" @@ fun _ ->
         Plugin.Layer1_helpers.prefetch_tezos_blocks
           node_ctxt.l1_ctxt
           to_prefetch ;
@@ -813,6 +820,12 @@ let plugin_of_first_block cctxt (block : Layer1.header) =
   let*? plugin = Protocol_plugins.proto_plugin_for_protocol current_protocol in
   return (current_protocol, plugin)
 
+let setup_opentelemetry Configuration.{otel_profiling = {enable; config}; _} =
+  Opentelemetry.Globals.service_name := "rollup_node" ;
+  Opentelemetry_ambient_context.set_storage_provider
+    (Opentelemetry_ambient_context_lwt.storage ()) ;
+  Opentelemetry_client_cohttp_lwt.setup ~enable ~config ()
+
 let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
     (configuration : Configuration.t) (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
@@ -842,6 +855,7 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
           operator_list)
       (Purpose.operators_bindings configuration.operators)
   in
+  setup_opentelemetry configuration ;
   let* l1_ctxt =
     Layer1.start
       ~name:"sc_rollup_node"
@@ -946,7 +960,7 @@ module Replay = struct
         Format.eprintf "[\x1B[1;32mOK\x1B[0m]@." ;
         return_unit
 
-  let mk_node_ctxt ~data_dir cctxt block =
+  let mk_node_ctxt ~data_dir ~profiling cctxt block =
     let open Lwt_result_syntax in
     let* store = Store.init Read_only ~data_dir in
     let opt_get msg = function
@@ -1015,7 +1029,9 @@ module Replay = struct
         ~allowed_headers:None
         ~apply_unsafe_patches:false
         ~bail_on_disagree:false
+        ~profiling
     in
+    setup_opentelemetry configuration ;
     Node_context_loader.init
       cctxt
       ~data_dir
@@ -1185,14 +1201,16 @@ module Replay = struct
           time ;
       return_unit
 
-  let replay_block ~data_dir cctxt block =
+  let replay_block ~data_dir ?profiling cctxt block =
     let open Lwt_result_syntax in
-    let* node_ctxt = mk_node_ctxt ~data_dir cctxt block in
+    let* node_ctxt = mk_node_ctxt ~profiling ~data_dir cctxt block in
     replay_block_aux ~preload:true ~verbose:true node_ctxt block
 
-  let replay_blocks ~data_dir cctxt start_level end_level =
+  let replay_blocks ~data_dir ?profiling cctxt start_level end_level =
     let open Lwt_result_syntax in
-    let* node_ctxt = mk_node_ctxt ~data_dir cctxt (`Level start_level) in
+    let* node_ctxt =
+      mk_node_ctxt ~profiling ~data_dir cctxt (`Level start_level)
+    in
     let levels =
       Stdlib.List.init
         (Int32.sub end_level start_level |> Int32.to_int |> succ)

@@ -67,11 +67,12 @@ let config_init_command =
           no_degraded_arg
           gc_frequency_arg
           history_mode_arg)
-       (args4
+       (args5
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           bail_on_disagree_switch
-          unsafe_disable_wasm_kernel_checks_switch))
+          unsafe_disable_wasm_kernel_checks_switch
+          profiling_arg))
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -103,7 +104,8 @@ let config_init_command =
            ( allowed_origins,
              allowed_headers,
              bail_on_disagree,
-             unsafe_disable_wasm_kernel_checks ) )
+             unsafe_disable_wasm_kernel_checks,
+             profiling ) )
          mode
          sc_rollup_address
          operators
@@ -144,6 +146,7 @@ let config_init_command =
           ~allowed_headers
           ~apply_unsafe_patches:false
           ~bail_on_disagree
+          ~profiling
       in
       let config_file = Configuration.config_filename ~data_dir config_file in
       let* () = Configuration.save ~force ~config_file config in
@@ -173,7 +176,7 @@ let legacy_run_command =
           metrics_addr_arg
           enable_performance_metrics_arg
           disable_performance_metrics_arg)
-       (args20
+       (args21
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
@@ -193,7 +196,8 @@ let legacy_run_command =
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
           bail_on_disagree_switch
-          unsafe_disable_wasm_kernel_checks_switch))
+          unsafe_disable_wasm_kernel_checks_switch
+          profiling_arg))
     (prefixes ["run"] @@ stop)
     (fun ( ( data_dir,
              config_file,
@@ -224,7 +228,8 @@ let legacy_run_command =
              allowed_headers,
              apply_unsafe_patches,
              bail_on_disagree,
-             unsafe_disable_wasm_kernel_checks ) )
+             unsafe_disable_wasm_kernel_checks,
+             profiling ) )
          cctxt ->
       let* () =
         when_ (enable_performance_metrics && disable_performance_metrics)
@@ -264,6 +269,7 @@ let legacy_run_command =
           ~allowed_headers
           ~apply_unsafe_patches
           ~bail_on_disagree
+          ~profiling
       in
       Rollup_node_daemon.run
         ~data_dir
@@ -295,7 +301,7 @@ let run_command =
           reconnection_delay_arg
           dal_node_endpoint_arg
           pre_images_endpoint_arg)
-       (args16
+       (args17
           injector_retention_period_arg
           injector_attempts_arg
           injection_ttl_arg
@@ -311,7 +317,8 @@ let run_command =
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
           bail_on_disagree_switch
-          unsafe_disable_wasm_kernel_checks_switch))
+          unsafe_disable_wasm_kernel_checks_switch
+          profiling_arg))
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
@@ -343,7 +350,8 @@ let run_command =
              allowed_headers,
              apply_unsafe_patches,
              bail_on_disagree,
-             unsafe_disable_wasm_kernel_checks ) )
+             unsafe_disable_wasm_kernel_checks,
+             profiling ) )
          mode
          sc_rollup_address
          operators
@@ -386,6 +394,7 @@ let run_command =
           ~allowed_headers
           ~apply_unsafe_patches
           ~bail_on_disagree
+          ~profiling
       in
       Rollup_node_daemon.run
         ~data_dir
@@ -657,21 +666,22 @@ let replay_block_command =
   command
     ~group
     ~desc:"Replay a given L1 block."
-    (args1 data_dir_arg)
+    (args2 data_dir_arg Cli.profiling_arg)
     (prefixes ["replay"; "block"] @@ Cli.block_hash_or_level_param @@ stop)
-    (fun data_dir block cctxt ->
-      Rollup_node_daemon.Replay.replay_block ~data_dir cctxt block)
+    (fun (data_dir, profiling) block cctxt ->
+      Rollup_node_daemon.Replay.replay_block ?profiling ~data_dir cctxt block)
 
 let replay_blocks_command =
   let open Tezos_clic in
   command
     ~group
     ~desc:"Replay a sequence of L1 blocks."
-    (args1 data_dir_arg)
+    (args2 data_dir_arg Cli.profiling_arg)
     (prefixes ["replay"; "blocks"; "from"]
     @@ Cli.level_param @@ prefix "to" @@ Cli.level_param @@ stop)
-    (fun data_dir start_level end_level cctxt ->
+    (fun (data_dir, profiling) start_level end_level cctxt ->
       Rollup_node_daemon.Replay.replay_blocks
+        ?profiling
         ~data_dir
         cctxt
         start_level

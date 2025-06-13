@@ -47,7 +47,10 @@
   octez-crawler
   octez-libs.tezos-workers
   octez-l2-libs.smart-rollup
-  octez-l2-libs.scoru-wasm-fast)
+  octez-l2-libs.scoru-wasm-fast
+  opentelemetry-lwt
+  octez-libs.opentelemetry-client-cohttp-lwt
+  opentelemetry.ambient-context.lwt)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

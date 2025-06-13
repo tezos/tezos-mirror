@@ -548,6 +548,13 @@ let timeout_promise service timeout =
   in
   Lwt_result_syntax.tzfail (RPC_timeout {path; timeout})
 
+let trace_name service =
+  let meth =
+    Tezos_rpc.Service.meth service |> Tezos_rpc.Service.string_of_meth
+  in
+  let path = Tezos_rpc.Service.path service |> Resto.Path.to_string in
+  String.concat " " [meth; path]
+
 let client_context_with_timeout (obj : #Client_context.full) timeout :
     Client_context.full =
   let open Lwt_syntax in
@@ -562,6 +569,12 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
           'i ->
           'o tzresult Lwt.t =
       fun service params query body ->
+        let trace_name = trace_name service in
+        Opentelemetry_lwt.Trace.with_
+          ~service_name:"L1_rpc_client"
+          ~kind:Span_kind_client
+          trace_name
+        @@ fun _ ->
         Lwt.pick
           [
             obj#call_service service params query body;
@@ -578,6 +591,12 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
           'i ->
           (unit -> unit) tzresult Lwt.t =
       fun service ~on_chunk ~on_close params query body ->
+        let trace_name = trace_name service in
+        Opentelemetry_lwt.Trace.with_
+          ~service_name:"L1_rpc_client"
+          ~kind:Span_kind_client
+          trace_name
+        @@ fun _ ->
         Lwt.pick
           [
             obj#call_streamed_service
@@ -596,5 +615,13 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
         Lwt_result_syntax.tzfail
           (RPC_timeout {path = Uri.to_string uri; timeout})
       in
+      let trace_name =
+        String.concat " " [Tezos_rpc.Service.string_of_meth meth; Uri.path uri]
+      in
+      Opentelemetry_lwt.Trace.with_
+        ~service_name:"L1_rpc_client"
+        ~kind:Span_kind_client
+        trace_name
+      @@ fun _ ->
       Lwt.pick [obj#generic_media_type_call meth ?body uri; timeout_promise]
   end

@@ -21,6 +21,7 @@ depends: [
   "camlzip" { >= "1.12" & < "1.13" }
   "tar"
   "tar-unix" { >= "2.0.1" & < "3.0.0" }
+  "opentelemetry-lwt"
   "octez-riscv-pvm" { = version }
   "caqti"
   "caqti-lwt" { >= "2.0.1" }

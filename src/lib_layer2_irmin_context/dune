@@ -13,7 +13,8 @@
   octez-libs.tezos-context.encoding
   octez-libs.context.sigs
   octez-libs.tezos-context.helpers
-  octez-l2-libs.layer2_store)
+  octez-l2-libs.layer2_store
+  opentelemetry-lwt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
