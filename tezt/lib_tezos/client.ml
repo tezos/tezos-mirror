@@ -717,7 +717,8 @@ let forget_all_keys ?endpoint client =
 
 module Time = Tezos_base.Time.System
 
-let default_delay = Time.Span.of_seconds_exn (3600. *. 24. *. 365.)
+let default_protocol_activation_delay =
+  Time.Span.of_seconds_exn (3600. *. 24. *. 365.)
 
 type timestamp = Now | Ago of Time.Span.t | At of Time.t
 
@@ -732,7 +733,8 @@ let time_of_timestamp timestamp =
 
 let spawn_activate_protocol ?endpoint ?block ?protocol ?protocol_hash
     ?(fitness = 1) ?(key = Constant.activator.alias)
-    ?(timestamp = Ago default_delay) ?parameter_file client =
+    ?(timestamp = Ago default_protocol_activation_delay) ?parameter_file client
+    =
   let timestamp = time_of_timestamp timestamp in
   let protocol_hash, parameter_file =
     match (protocol, protocol_hash, parameter_file) with

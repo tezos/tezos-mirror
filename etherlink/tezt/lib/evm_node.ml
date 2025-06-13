@@ -1478,8 +1478,8 @@ let patch_config_gc ?history_mode json =
          | Full retention -> `String (Format.sprintf "full:%d" retention))
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
-    ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc ?websockets rollup_node
-    =
+    ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc ?websockets
+    ?extra_arguments rollup_node =
   let evm_node =
     create
       ?name
@@ -1501,7 +1501,7 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
     | Some patch_config -> Config_file.update evm_node patch_config
     | None -> unit
   in
-  let* () = run evm_node in
+  let* () = run ?extra_arguments evm_node in
   return evm_node
 
 let init_from_rollup_node_data_dir ?(omit_delayed_tx_events = false) evm_node
@@ -2009,3 +2009,28 @@ let switch_history_mode evm_node history =
   in
   let process = spawn_command evm_node args in
   {Runnable.value = process; run}
+
+let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
+  let initial_kernel, preimages_dir, private_rpc_port =
+    match mode old_sequencer with
+    | Sequencer {initial_kernel; preimage_dir; private_rpc_port; _} ->
+        (initial_kernel, preimage_dir, private_rpc_port)
+    | _ -> invalid_arg "Evm_node is not a sequencer"
+  in
+  {
+    old_sequencer with
+    name = "observer_sequencer_" ^ fresh_name ();
+    persistent_state =
+      {
+        old_sequencer.persistent_state with
+        mode =
+          Observer
+            {
+              initial_kernel;
+              preimages_dir;
+              private_rpc_port;
+              rollup_node_endpoint = old_sequencer.persistent_state.endpoint;
+            };
+        endpoint = endpoint new_sequencer;
+      };
+  }
