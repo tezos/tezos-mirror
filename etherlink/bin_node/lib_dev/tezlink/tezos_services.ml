@@ -505,7 +505,7 @@ let preapply_operations :
     Tezos_rpc.Service.t =
   import_service Block_services.S.Helpers.Preapply.operations
 
-let _raw_json_cycle :
+let raw_json_cycle :
     ( [`GET],
       tezlink_rpc_context,
       tezlink_rpc_context * Imported_protocol.Cycle_repr.t,

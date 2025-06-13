@@ -41,10 +41,10 @@ let public_key_internal =
   in
   match pk_opt with None -> (* Unreachable *) assert false | Some pk -> pk
 
-let _public_key : Imported_protocol.Alpha_context.public_key =
+let public_key : Imported_protocol.Alpha_context.public_key =
   Ed25519 public_key_internal
 
-let _public_key_hash : Imported_protocol.Alpha_context.public_key_hash =
+let public_key_hash : Imported_protocol.Alpha_context.public_key_hash =
   Ed25519 (Tezos_crypto.Signature.Ed25519.Public_key.hash public_key_internal)
 
 let contents : Alpha_context.Block_header.contents =
@@ -258,7 +258,7 @@ module Storage_repr = struct
       Imported_protocol.Sampler.encoding
         Imported_protocol.Raw_context.consensus_pk_encoding
 
-    let _create_sample_state ~consensus_pks =
+    let create_sample_state ~consensus_pks =
       Imported_protocol.Sampler.create consensus_pks
 
     let selected_stake_distribution_encoding =

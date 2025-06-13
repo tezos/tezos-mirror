@@ -303,6 +303,28 @@ let build_block_static_directory ~l2_chain_id
              ops
          in
          Lwt_result_syntax.return (param#version, receipts))
+  |> register
+       ~service:Tezos_services.raw_json_cycle
+       ~impl:(fun ({block; chain}, _cycle) () () ->
+         let open Tezlink_mock in
+         let*? _chain = check_chain chain in
+         let*? _block = check_block block in
+         let consensus_pk =
+           Imported_protocol.Raw_context.
+             {
+               delegate = public_key_hash;
+               consensus_pk = public_key;
+               consensus_pkh = public_key_hash;
+             }
+         in
+         let delegate_sampler_state =
+           Storage_repr.Cycle.create_sample_state
+             ~consensus_pks:[(consensus_pk, 200000000000L)]
+         in
+         let selected_stake_distribution = [] in
+         Lwt_result.return
+           Storage_repr.Cycle.
+             {delegate_sampler_state; selected_stake_distribution})
 
 let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
     (module Block_header : HEADER) base_dir =
