@@ -138,7 +138,7 @@ module Local_helpers = struct
       "Set delegate for %s to %s."
       src
       delegate.alias ;
-    let*! () = Client.set_delegate ~src ~delegate:delegate.alias client in
+    let* () = Client.set_delegate ~src ~delegate:delegate.alias client in
     let* () = Client.bake_for_and_wait ~keys:[baker] client in
     unit
 

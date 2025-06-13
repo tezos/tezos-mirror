@@ -382,10 +382,10 @@ let test_staking =
       unstake
   in
   log_step 4 "Set delegate for stakers" ;
-  let*! () =
+  let* () =
     Client.set_delegate ~src:staker0.alias ~delegate:"bootstrap2" client_1
   in
-  let*! () =
+  let* () =
     Client.set_delegate ~src:staker1.alias ~delegate:"bootstrap2" client_1
   in
   let* () = bake_n ~endpoint ~protocol client_1 1 in
@@ -1247,7 +1247,7 @@ let test_staking =
           ~ai_vote:On)
   in
 
-  let*! () =
+  let* () =
     Client.set_delegate ~src:staker1.alias ~delegate:"bootstrap3" client_1
   in
   let* () =
@@ -1300,7 +1300,7 @@ let test_fix_delegated_balance =
   let* () = bake_n ~endpoint ~protocol client 1 in
 
   log_step 2 "Preparing delegate account" ;
-  let*! () = Client.set_delegate ~src:delegator.alias ~delegate client in
+  let* () = Client.set_delegate ~src:delegator.alias ~delegate client in
   let* () = bake_n ~endpoint ~protocol client 1 in
   let set_delegate_parameters =
     Client.spawn_set_delegate_parameters ~delegate ~limit:"5" ~edge:"0.5" client
@@ -1324,12 +1324,12 @@ let test_fix_delegated_balance =
   let* () = Process.check ~expect_failure:false stake in
 
   log_step 6 "Delegator delegates to itself" ;
-  let*! () =
+  let* () =
     Client.set_delegate ~src:delegator.alias ~delegate:delegator.alias client
   in
   let* () = bake_n ~endpoint ~protocol client 2 in
 
-  let*! () =
+  let* () =
     Client.set_delegate ~src:delegator2.alias ~delegate:delegator.alias client
   in
   let* () = bake_n ~endpoint ~protocol client 2 in
