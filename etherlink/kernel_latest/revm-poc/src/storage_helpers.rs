@@ -68,3 +68,9 @@ pub fn bytes_hash(bytes: &[u8]) -> B256 {
     keccak.update(bytes);
     keccak.finalize()
 }
+
+pub fn u256_to_le_bytes(value: primitive_types::U256) -> Vec<u8> {
+    let mut bytes = vec![0u8; 32];
+    value.to_little_endian(&mut bytes);
+    bytes
+}
