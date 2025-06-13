@@ -4,3 +4,4 @@
 
 pub mod contract;
 pub mod entrypoint;
+pub mod operation;
