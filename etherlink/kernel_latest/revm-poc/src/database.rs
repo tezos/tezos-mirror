@@ -29,7 +29,6 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
 // See: https://github.com/rust-lang/rust-clippy/issues/5787
 #[allow(clippy::needless_lifetimes)]
 impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
-    #[cfg(test)]
     pub fn new(
         host: &'a mut Host,
         block: &'a BlockConstants,
