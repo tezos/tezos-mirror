@@ -400,7 +400,14 @@ type forge_event =
   | Preattestation_ready of signed_consensus_vote
   | Attestation_ready of signed_consensus_vote
 
-val forge_event_encoding : forge_event Data_encoding.t
+(** Partial encoding for {!forge_event} that omits secret keys to
+    avoid leaking them in event logs; see
+    {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
+
+    Warning: As a consequence, decoding from this encoding will always
+    fail. *)
+val forge_event_encoding_for_logging__cannot_decode :
+  forge_event Data_encoding.t
 
 val pp_forge_event : Format.formatter -> forge_event -> unit
 
@@ -537,7 +544,13 @@ type event =
   | New_forge_event of forge_event
   | Timeout of timeout_kind
 
-val event_encoding : event Data_encoding.t
+(** Partial encoding for {!event} that omits secret keys to avoid
+    leaking them in event logs; see
+    {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
+
+    Warning: As a consequence, decoding from this encoding will always
+    fail. *)
+val event_encoding_for_logging__cannot_decode : event Data_encoding.t
 
 val pp_event : Format.formatter -> event -> unit
 
