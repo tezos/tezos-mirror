@@ -85,4 +85,12 @@ CREATE INDEX idx_start_l2_level
 ON l1_l2_finalized_levels(start_l2_level);
 
 CREATE INDEX idx_end_l2_level
-ON l1_l2_finalized_levels(end_l2_level)
+ON l1_l2_finalized_levels(end_l2_level);
+
+CREATE TABLE sequencer_upgrades (
+  injected_before INT NOT NULL,
+  sequencer TEXT NOT NULL,
+  pool_address TEXT NOT NULL,
+  activation_timestamp INT NOT NULL,
+  applied_before INT
+)

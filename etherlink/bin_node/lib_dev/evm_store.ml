@@ -160,6 +160,11 @@ type pending_kernel_upgrade = {
   injected_before : Ethereum_types.quantity;
 }
 
+type pending_sequencer_upgrade = {
+  sequencer_upgrade : Evm_events.Sequencer_upgrade.t;
+  injected_before : Ethereum_types.quantity;
+}
+
 type metadata = {
   smart_rollup_address : Address.t;
   history_mode : Configuration.history_mode;
@@ -236,6 +241,15 @@ module Q = struct
         Ok (Address (Hex address)))
       string
 
+  let public_key =
+    custom
+      ~encode:(fun public_key ->
+        Ok (Signature.Public_key.to_b58check public_key))
+      ~decode:(fun b58 ->
+        let public_key = Signature.Public_key.of_b58check_exn b58 in
+        Ok public_key)
+      string
+
   let block_hash =
     let open Ethereum_types in
     custom
@@ -295,6 +309,15 @@ module Q = struct
       ~decode:(fun (hash, timestamp) -> Ok Evm_events.Upgrade.{hash; timestamp})
       (t2 root_hash timestamp)
 
+  let sequencer_upgrade =
+    custom
+      ~encode:(fun
+          Evm_events.Sequencer_upgrade.{sequencer; pool_address; timestamp} ->
+        Ok (sequencer, pool_address, timestamp))
+      ~decode:(fun (sequencer, pool_address, timestamp) ->
+        Ok Evm_events.Sequencer_upgrade.{sequencer; pool_address; timestamp})
+      (t3 public_key address timestamp)
+
   let delayed_transaction =
     custom
       ~encode:(fun payload ->
@@ -346,9 +369,22 @@ module Q = struct
   let pending_kernel_upgrade =
     product (fun injected_before hash timestamp ->
         {injected_before; kernel_upgrade = Evm_events.Upgrade.{hash; timestamp}})
-    @@ proj level (fun k -> k.injected_before)
+    @@ proj level (fun (k : pending_kernel_upgrade) -> k.injected_before)
     @@ proj root_hash (fun k -> k.kernel_upgrade.hash)
     @@ proj timestamp (fun k -> k.kernel_upgrade.timestamp)
+    @@ proj_end
+
+  let pending_sequencer_upgrade =
+    product (fun injected_before sequencer pool_address timestamp ->
+        {
+          injected_before;
+          sequencer_upgrade =
+            Evm_events.Sequencer_upgrade.{sequencer; pool_address; timestamp};
+        })
+    @@ proj level (fun (k : pending_sequencer_upgrade) -> k.injected_before)
+    @@ proj public_key (fun k -> k.sequencer_upgrade.sequencer)
+    @@ proj address (fun k -> k.sequencer_upgrade.pool_address)
+    @@ proj timestamp (fun k -> k.sequencer_upgrade.timestamp)
     @@ proj_end
 
   let table_exists =
@@ -401,7 +437,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 20
+    let version = 21
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -514,6 +550,58 @@ module Q = struct
     let clear_before =
       (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM kernel_upgrades WHERE injected_before < ?|}
+  end
+
+  module Sequencer_upgrades = struct
+    let insert =
+      (t4 level public_key address timestamp ->. unit)
+      @@ {|REPLACE INTO sequencer_upgrades (injected_before, sequencer, pool_address, activation_timestamp) VALUES (?, ?, ?, ?)|}
+
+    let activation_levels =
+      (unit ->* level)
+      @@ {|SELECT applied_before
+           FROM sequencer_upgrades
+           WHERE applied_before IS NOT NULL
+           ORDER BY applied_before DESC
+    |}
+
+    let get_latest_unapplied =
+      (unit ->? pending_sequencer_upgrade)
+      @@ {|SELECT injected_before, sequencer, pool_address, activation_timestamp
+           FROM sequencer_upgrades WHERE applied_before IS NULL
+           ORDER BY injected_before DESC
+           LIMIT 1
+    |}
+
+    let find_injected_before =
+      (level ->? sequencer_upgrade)
+      @@ {|SELECT sequencer, pool_address, activation_timestamp
+           FROM sequencer_upgrades WHERE injected_before = ?|}
+
+    let find_latest_injected_after =
+      (level ->? sequencer_upgrade)
+      @@ {|SELECT sequencer, pool_address, activation_timestamp
+           FROM sequencer_upgrades WHERE injected_before > ?
+           ORDER BY injected_before DESC
+           LIMIT 1|}
+
+    let record_apply =
+      (level ->. unit)
+      @@ {|
+      UPDATE sequencer_upgrades SET applied_before = ? WHERE applied_before IS NULL
+    |}
+
+    let clear_after =
+      (level ->. unit)
+      @@ {|DELETE FROM sequencer_upgrades WHERE injected_before > ?|}
+
+    let nullify_after =
+      (level ->. unit)
+      @@ {|UPDATE sequencer_upgrades SET applied_before = NULL WHERE applied_before > ?|}
+
+    let clear_before =
+      (level ->. unit)
+      @@ {|DELETE FROM sequencer_upgrades WHERE injected_before < ?|}
   end
 
   module Delayed_transactions = struct
@@ -1047,6 +1135,49 @@ module Kernel_upgrades = struct
     Db.collect_list conn Q.Kernel_upgrades.activation_levels ()
 end
 
+module Sequencer_upgrades = struct
+  let store store next_blueprint_number (event : Evm_events.Sequencer_upgrade.t)
+      =
+    with_connection store @@ fun conn ->
+    Db.exec
+      conn
+      Q.Sequencer_upgrades.insert
+      ( next_blueprint_number,
+        event.sequencer,
+        event.pool_address,
+        event.timestamp )
+
+  let find_latest_pending store =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Sequencer_upgrades.get_latest_unapplied ()
+
+  let find_injected_before store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Sequencer_upgrades.find_injected_before level
+
+  let find_latest_injected_after store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Sequencer_upgrades.find_latest_injected_after level
+
+  let record_apply store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Sequencer_upgrades.record_apply level
+
+  let clear_after store l2_level =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let* () = Db.exec conn Q.Sequencer_upgrades.clear_after l2_level in
+    Db.exec conn Q.Sequencer_upgrades.nullify_after l2_level
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Sequencer_upgrades.clear_before l2_level
+
+  let activation_levels store =
+    with_connection store @@ fun conn ->
+    Db.collect_list conn Q.Sequencer_upgrades.activation_levels ()
+end
+
 module Delayed_transactions = struct
   let store store next_blueprint_number
       (delayed_transaction : Evm_events.Delayed_transaction.t) =
@@ -1109,8 +1240,9 @@ module Blueprints = struct
     | None -> return None
     | Some blueprint ->
         let* kernel_upgrade = Kernel_upgrades.find_injected_before conn level in
-        let sequencer_upgrade = None in
-        (* todo *)
+        let* sequencer_upgrade =
+          Sequencer_upgrades.find_injected_before conn level
+        in
         let* delayed_transactions = Delayed_transactions.at_level conn level in
         return_some
           Blueprint_types.
@@ -1642,6 +1774,7 @@ let reset_after store ~l2_level =
   let* () = L1_l2_levels_relationships.clear_after store l2_level in
   let* () = L1_l2_finalized_levels.clear_after store l2_level in
   let* () = Kernel_upgrades.clear_after store l2_level in
+  let* () = Sequencer_upgrades.clear_after store l2_level in
   let* () = Delayed_transactions.clear_after store l2_level in
   let* () = Blocks.clear_after store l2_level in
   let* () = Transactions.clear_after store l2_level in
@@ -1664,6 +1797,7 @@ let reset_before store ~l2_level ~history_mode =
         let* () = Blocks.clear_before store l2_level in
         let* () = Transactions.clear_before store l2_level in
         let* () = Kernel_upgrades.clear_before store l2_level in
+        let* () = Sequencer_upgrades.clear_before store l2_level in
         let* () = Delayed_transactions.clear_before store l2_level in
         return_unit
     | _ -> return_unit
