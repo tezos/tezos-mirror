@@ -649,9 +649,12 @@ mod tests {
 
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
     use tezos_tezlink::block::TezBlock;
+    use tezos_tezlink::operation::BlockHash;
     use tezos_tezlink::operation::ManagerOperation;
     use tezos_tezlink::operation::Operation;
     use tezos_tezlink::operation::OperationContent;
+    use tezos_tezlink::operation::RevealContent;
+    use tezos_tezlink::operation::TransferContent;
 
     fn make_operation(
         fee: u64,
@@ -661,7 +664,7 @@ mod tests {
         source: PublicKeyHash,
         content: OperationContent,
     ) -> Operation {
-        let branch = TezBlock::genesis_block_hash();
+        let branch = BlockHash::from(TezBlock::genesis_block_hash());
         // No need a real signature for now
         let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
         Operation {
@@ -673,7 +676,8 @@ mod tests {
                 operation: content,
                 gas_limit: gas_limit.into(),
                 storage_limit: storage_limit.into(),
-            },
+            }
+            .into(),
             signature,
         }
     }
@@ -692,7 +696,7 @@ mod tests {
             gas_limit,
             storage_limit,
             source,
-            OperationContent::Reveal { pk },
+            OperationContent::Reveal(RevealContent { pk }),
         )
     }
 
@@ -711,10 +715,11 @@ mod tests {
             gas_limit,
             storage_limit,
             source,
-            OperationContent::Transfer {
+            OperationContent::Transfer(TransferContent {
                 amount,
                 destination,
-            },
+                parameter: None,
+            }),
         )
     }
 
