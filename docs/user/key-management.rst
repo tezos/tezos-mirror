@@ -384,13 +384,13 @@ Since a companion key has to be a tz4, this command will also create a proof of 
 A companion key takes the same amount of time as a consensus key to become activated, which is
 up to ``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles (see :ref:`cs_constants`).
 
-Alternatively, like for consensus keys, it is possible to register a companion key when registering as a delegate::
+Alternatively, it is possible to register a companion key when registering as a delegate::
 
-   octez-client register key <mananger_key> as delegate with companion key <companion_key>
+   octez-client register key <manager_key> as delegate --companion-key <companion_key>
 
 It is even possible to register both a consensus key and a companion key, with the following command::
 
-   octez-client register key <mananger_key> as delegate with consensus key <consensus_key> and companion key <companion_key>
+   octez-client register key <manager_key> as delegate --consensus-key <consensus_key> --companion-key <companion_key>
 
 .. _activate_fundraiser_account:
 
