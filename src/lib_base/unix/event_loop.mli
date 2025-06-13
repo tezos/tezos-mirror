@@ -49,7 +49,7 @@ val on_main_run : (Eio_unix.Stdenv.base -> Eio.Switch.t -> unit) -> unit
     if [~eio] is set to [true] ([false] by default).
 
     You can't nest [main_run] calls. *)
-val main_run : ?eio:bool -> (unit -> 'a Lwt.t) -> 'a
+val main_run : ?eio:bool -> process_name:string -> (unit -> 'a Lwt.t) -> 'a
 
 (** [main_run_eio] should be used if the code you are running is using
     `Eio` libraries only. It will initialize the `Eio` event loop and run the

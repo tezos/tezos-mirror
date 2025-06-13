@@ -153,7 +153,7 @@ module type EVENT = sig
 
   (** Registers an event of type {!t} to be output when event sinks activate.
       Does not output anything if called after sink activation. *)
-  val emit_at_top_level : t -> unit
+  val emit_at_top_level : ?section:Section.t -> t -> unit
 end
 
 (** Build an event from an event-definition. *)

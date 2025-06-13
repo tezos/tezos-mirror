@@ -353,7 +353,9 @@ let tztest label fn =
   Tztest.tztest label `Quick @@ fun () ->
   match Lwt_unix.fork () with
   | 0 -> (
-      match Tezos_base_unix.Event_loop.main_run ~eio:true fn with
+      match
+        Tezos_base_unix.Event_loop.main_run ~process_name:label ~eio:true fn
+      with
       | Ok () -> exit 0
       | Error _ -> exit 1)
   | pid -> (

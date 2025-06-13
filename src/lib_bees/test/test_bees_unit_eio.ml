@@ -342,8 +342,8 @@ let tztest label fn =
       (* FIXME: do we want to use [Tezos_base_unix.Event_loop.main_run_eio]?
          If so, the tests block at some point. *)
       match
-        Tezos_base_unix.Event_loop.main_run ~eio:true @@ fun () ->
-        Lwt_eio.run_eio fn
+        Tezos_base_unix.Event_loop.main_run ~process_name:label ~eio:true
+        @@ fun () -> Lwt_eio.run_eio fn
       with
       | Ok () -> exit 0
       | Error _ -> exit 1)

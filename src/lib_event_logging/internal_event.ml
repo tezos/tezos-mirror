@@ -221,13 +221,13 @@ module type EVENT = sig
 
   val emit : ?section:Section.t -> t -> unit tzresult Lwt.t
 
-  val emit_at_top_level : t -> unit
+  val emit_at_top_level : ?section:Section.t -> t -> unit
 end
 
 type 'a event_definition = (module EVENT_DEFINITION with type t = 'a)
 
 type top_level_event =
-  | TopLevel : ('a event_definition * 'a) -> top_level_event
+  | TopLevel : ('a event_definition * 'a * Section.t option) -> top_level_event
 
 module type SINK = sig
   type t
@@ -361,7 +361,7 @@ module All_sinks = struct
         active := act :: !active ;
         let* () =
           List.iter_es
-            (fun (TopLevel (ev, x)) -> handle ev None x)
+            (fun (TopLevel (ev, x, section)) -> handle ev section x)
             (List.rev !top_level_events)
         in
         return_unit
@@ -509,9 +509,9 @@ module Make (E : EVENT_DEFINITION) : EVENT with type t = E.t = struct
 
   let emit ?section x = All_sinks.handle (module E) section x
 
-  let emit_at_top_level x =
+  let emit_at_top_level ?section x =
     (* Ensure we only register this event to be emitted once *)
-    let ev = TopLevel ((module E), x) in
+    let ev = TopLevel ((module E), x, section) in
     if not (List.mem ~equal:( = ) ev !All_sinks.top_level_events) then
       All_sinks.top_level_events := ev :: !All_sinks.top_level_events
 
@@ -845,7 +845,7 @@ module Simple = struct
     {
       name;
       emit = (fun () -> Event.emit ?section ());
-      emit_at_top_level = (fun () -> Event.emit_at_top_level ());
+      emit_at_top_level = (fun () -> Event.emit_at_top_level ?section ());
     }
 
   let declare_1 (type a) ?alternative_color ?section
@@ -884,7 +884,8 @@ module Simple = struct
     {
       name;
       emit = (fun parameter -> Event.emit ?section parameter);
-      emit_at_top_level = (fun parameter -> Event.emit_at_top_level parameter);
+      emit_at_top_level =
+        (fun parameter -> Event.emit_at_top_level ?section parameter);
     }
 
   let declare_2 (type a b) ?alternative_color ?section
@@ -931,7 +932,8 @@ module Simple = struct
     {
       name;
       emit = (fun parameters -> Event.emit ?section parameters);
-      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+      emit_at_top_level =
+        (fun parameters -> Event.emit_at_top_level ?section parameters);
     }
 
   let declare_3 (type a b c) ?alternative_color ?section
@@ -981,7 +983,8 @@ module Simple = struct
     {
       name;
       emit = (fun parameters -> Event.emit ?section parameters);
-      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+      emit_at_top_level =
+        (fun parameters -> Event.emit_at_top_level ?section parameters);
     }
 
   let declare_4 (type a b c d) ?alternative_color ?section
@@ -1035,7 +1038,8 @@ module Simple = struct
     {
       name;
       emit = (fun parameters -> Event.emit ?section parameters);
-      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+      emit_at_top_level =
+        (fun parameters -> Event.emit_at_top_level ?section parameters);
     }
 
   let declare_5 (type a b c d e) ?alternative_color ?section
@@ -1094,7 +1098,8 @@ module Simple = struct
     {
       name;
       emit = (fun parameters -> Event.emit ?section parameters);
-      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+      emit_at_top_level =
+        (fun parameters -> Event.emit_at_top_level ?section parameters);
     }
 
   let declare_6 (type a b c d e f) ?alternative_color ?section
@@ -1156,7 +1161,8 @@ module Simple = struct
     {
       name;
       emit = (fun parameters -> Event.emit ?section parameters);
-      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+      emit_at_top_level =
+        (fun parameters -> Event.emit_at_top_level ?section parameters);
     }
 
   let declare_7 (type a b c d e f g) ?alternative_color ?section
@@ -1223,7 +1229,8 @@ module Simple = struct
     {
       name;
       emit = (fun parameters -> Event.emit ?section parameters);
-      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+      emit_at_top_level =
+        (fun parameters -> Event.emit_at_top_level ?section parameters);
     }
 
   let declare_8 (type a b c d e f g h) ?alternative_color ?section
@@ -1293,7 +1300,8 @@ module Simple = struct
     {
       name;
       emit = (fun parameters -> Event.emit ?section parameters);
-      emit_at_top_level = (fun parameters -> Event.emit_at_top_level parameters);
+      emit_at_top_level =
+        (fun parameters -> Event.emit_at_top_level ?section parameters);
     }
 end
 

@@ -942,7 +942,7 @@ let run ?disable_logging subcommand cli_options =
 
 let main_run subcommand cli_options =
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Tezos_base_unix.Event_loop.main_run @@ fun () ->
+  Tezos_base_unix.Event_loop.main_run ~process_name:"dal node" @@ fun () ->
   wrap_with_error @@ run subcommand cli_options
 
 let commands =

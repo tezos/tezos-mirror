@@ -63,7 +63,7 @@ let srcdir =
 let hash, sources =
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
   match
-    Tezos_base_unix.Event_loop.main_run (fun () ->
+    Tezos_base_unix.Event_loop.main_run ~process_name:"read_dir" (fun () ->
         Tezos_base_unix.Protocol_files.read_dir srcdir)
   with
   | Ok (None, proto) -> (Protocol.hash proto, proto)

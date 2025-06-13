@@ -52,7 +52,7 @@ let run name main =
   Stdlib.exit
     (let open Lwt_syntax in
      Lwt.Exception_filter.(set handle_all_except_runtime) ;
-     Tezos_base_unix.Event_loop.main_run (fun () ->
+     Tezos_base_unix.Event_loop.main_run ~process_name:name (fun () ->
          let* r = Lwt_exit.wrap_and_exit main_promise in
          match r with
          | Ok () -> Lwt_exit.exit_and_wait 0

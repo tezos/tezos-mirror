@@ -665,7 +665,8 @@ let run (module M : M)
        Client_config.cli_args ->
        Client_context.full Tezos_clic.command list tzresult Lwt.t) =
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Stdlib.exit @@ Tezos_base_unix.Event_loop.main_run
+  Stdlib.exit
+  @@ Tezos_base_unix.Event_loop.main_run ~process_name:"client"
   @@ fun () -> Lwt_exit.wrap_and_forward @@ main (module M) ~select_commands ()
 
 let lwt_run (module M : M)

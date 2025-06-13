@@ -37,7 +37,8 @@ let init_eio_loop ~env ~switch () =
   instance := Some {env; main_switch = switch} ;
   List.iter (fun callback -> callback env switch) !on_main_run_callbacks
 
-let main_run ?(eio = false) promise =
+let main_run ?(eio = false) ~process_name promise =
+  Gc_setup.set_gc_space_overhead process_name ;
   if eio then (
     let debug = Sys.getenv_opt "LWT_EIO_DEBUG" <> None in
     Eio_posix.run @@ fun env ->
