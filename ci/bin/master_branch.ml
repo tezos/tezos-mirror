@@ -24,7 +24,12 @@ let rules_always = [job_rule ~when_:Always ()]
 
 (* static binaries *)
 let job_static_arm64 =
-  job_build_static_binaries ~__POS__ ~arch:Arm64 ~rules:rules_always ()
+  job_build_static_binaries
+    ~__POS__
+    ~arch:Arm64
+    ~storage:Ramfs
+    ~rules:rules_always
+    ()
 
 let job_static_x86_64 =
   job_build_static_binaries
@@ -65,7 +70,12 @@ let octez_distribution_docker_jobs =
     job_docker_build ~__POS__ ~rules:rules_always ~arch:Amd64 Experimental
   in
   let job_docker_arm64_experimental : tezos_job =
-    job_docker_build ~__POS__ ~rules:rules_always ~arch:Arm64 Experimental
+    job_docker_build
+      ~__POS__
+      ~rules:rules_always
+      ~arch:Arm64
+      ~storage:Ramfs
+      Experimental
   in
   let job_docker_merge_manifests =
     job_docker_merge_manifests
@@ -98,7 +108,12 @@ let jobs =
      {{:https://docs.gitlab.com/ee/ci/jobs/job_troubleshooting.html#jobs-or-pipelines-run-unexpectedly-when-using-changes}
      GitLab Docs: Jobs or pipelines run unexpectedly when using changes}. *)
   let job_static_arm64 =
-    job_build_static_binaries ~__POS__ ~arch:Arm64 ~rules:rules_always ()
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Arm64
+      ~storage:Ramfs
+      ~rules:rules_always
+      ()
   in
   let job_static_x86_64 =
     job_build_static_binaries

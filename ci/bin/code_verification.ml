@@ -685,6 +685,7 @@ let jobs pipeline_type =
     job_build_static_binaries
       ~__POS__
       ~arch:Arm64
+      ~storage:Ramfs
       ~dependencies:dependencies_needs_start (* See rationale above *)
       ~rules:(make_rules ~manual:(On_changes changeset_octez) ())
       ()
@@ -723,6 +724,7 @@ let jobs pipeline_type =
     job
       ~__POS__
       ~arch:Arm64
+      ~storage:Ramfs
       ~name:("etherlink.build:static-" ^ arch_to_string Arm64)
       ~image:Images.CI.build
       ~stage:Stages.build
@@ -845,10 +847,11 @@ let jobs pipeline_type =
             ~rules:[job_rule ~when_:Always ()]
             ()
     in
-    let job_build_teztale ?cpu ~arch () =
+    let job_build_teztale ?cpu ~arch ?storage () =
       Teztale.Common.job_build
         ~arch
         ?cpu
+        ?storage
         ~rules:(make_rules ~manual:Yes ~changes:Teztale.Common.changeset ())
         ()
     in
@@ -867,7 +870,7 @@ let jobs pipeline_type =
       build_octez_source;
       job_build_grafazos;
       job_build_teztale ~arch:Amd64 ~cpu:Very_high ();
-      job_build_teztale ~arch:Arm64 ();
+      job_build_teztale ~arch:Arm64 ~storage:Ramfs ();
       job_evm_static_x86_64_experimental;
       job_evm_static_arm64_experimental;
       job_build_layer1_profiling ();
@@ -1070,7 +1073,7 @@ let jobs pipeline_type =
         make_rules ~changes:changeset_octez ~dependent:true ()
       in
       let job_unit_test ~__POS__ ?(image = Images.CI.build) ?timeout
-          ?parallel_vector ?(rules = rules) ~arch ?(cpu = Normal) ~name
+          ?parallel_vector ?(rules = rules) ~arch ?(cpu = Normal) ?storage ~name
           ~make_targets () : tezos_job =
         let arch_string = arch_to_string arch in
         let script = ["make $MAKE_TARGETS"] in
@@ -1105,6 +1108,7 @@ let jobs pipeline_type =
             ~image
             ~arch
             ~cpu
+            ?storage
             ~dependencies
             ~rules
             ~variables
@@ -1172,6 +1176,7 @@ let jobs pipeline_type =
         job_unit_test
           ~__POS__
           ~name:"oc.unit:non-proto-arm64"
+          ~storage:Ramfs
           ~parallel_vector:2
           ~arch:Arm64 (* The [lib_benchmark] unit tests require Python *)
           ~image:Images.CI.test
@@ -1214,11 +1219,12 @@ let jobs pipeline_type =
       in
       (* "de" stands for data-encoding, since data-encoding is considered
          to be a separate product. *)
-      let de_unit arch =
+      let de_unit arch ?storage () =
         job
           ~__POS__
           ~name:("de.unit:" ^ arch_to_string arch)
           ~arch
+          ?storage
           ~image:Images.CI.test
           ~stage:Stages.test
           ~rules:
@@ -1232,11 +1238,12 @@ let jobs pipeline_type =
           ~before_script:(before_script ~eval_opam:true [])
           ["dune runtest data-encoding"]
       in
-      let resto_unit arch =
+      let resto_unit arch ?storage () =
         job
           ~__POS__
           ~name:("resto.unit:" ^ arch_to_string arch)
           ~arch
+          ?storage
           ~image:Images.CI.test
           ~stage:Stages.test
           ~rules:
@@ -1256,10 +1263,10 @@ let jobs pipeline_type =
         oc_unit_non_proto_arm64;
         oc_unit_webassembly_x86_64;
         oc_unit_protocol_compiles;
-        de_unit Amd64;
-        de_unit Arm64;
-        resto_unit Amd64;
-        resto_unit Arm64;
+        de_unit Amd64 ();
+        de_unit Arm64 ~storage:Ramfs ();
+        resto_unit Amd64 ();
+        resto_unit Arm64 ~storage:Ramfs ();
       ]
     in
     let job_oc_integration_compiler_rejections : tezos_job =
@@ -2086,6 +2093,7 @@ let jobs pipeline_type =
           job_docker_build
             ~__POS__
             ~arch:Arm64
+            ~storage:Ramfs
             ~dependencies:(Dependent [])
             ~rules:(make_rules ~changes:changeset_docker_files ~manual:Yes ())
             Test_manual

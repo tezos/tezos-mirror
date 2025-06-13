@@ -31,7 +31,7 @@ let job_gitlab_release =
       (Dependent
          [
            Artifacts (Common.job_build ~arch:Amd64 ());
-           Artifacts (Common.job_build ~arch:Arm64 ());
+           Artifacts (Common.job_build ~arch:Arm64 ~storage:Ramfs ());
          ])
     ~name:"gitlab:release"
     ["./teztale/scripts/releases/create_gitlab_release.sh"]
@@ -57,7 +57,8 @@ let job_release_page ~test () =
       (Dependent
          [
            Artifacts (Common.job_build ~expire_in:Never ~arch:Amd64 ());
-           Artifacts (Common.job_build ~expire_in:Never ~arch:Arm64 ());
+           Artifacts
+             (Common.job_build ~expire_in:Never ~arch:Arm64 ~storage:Ramfs ());
          ])
     ~variables:
       (if test then
@@ -81,7 +82,7 @@ let jobs ~test () =
   (if test then [] else [job_datadog_pipeline_trace])
   @ [
       Common.job_build ~expire_in:Never ~arch:Amd64 ();
-      Common.job_build ~expire_in:Never ~arch:Arm64 ();
+      Common.job_build ~expire_in:Never ~arch:Arm64 ~storage:Ramfs ();
       job_gitlab_release;
       job_release_page ~test ();
     ]

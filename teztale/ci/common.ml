@@ -14,12 +14,13 @@ let changeset = Changeset.(make ["teztale/**/*"])
 
 (** Job that builds the Teztale executables *)
 let job_build ?rules ?(expire_in = Gitlab_ci.Types.(Duration (Days 1))) ?cpu
-    ~arch () =
+    ~arch ?storage () =
   let arch_string = arch_to_string arch in
   job
     ~__POS__
     ~arch
     ?cpu
+    ?storage
     ~name:("teztale.build:static-" ^ arch_string)
     ~image:Images.CI.build
     ~stage:Stages.build

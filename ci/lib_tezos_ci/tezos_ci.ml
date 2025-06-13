@@ -736,6 +736,8 @@ type tag =
   | Gcp_high_cpu_dev
   | Gcp_very_high_cpu
   | Gcp_very_high_cpu_dev
+  | Gcp_very_high_cpu_ramfs
+  | Gcp_very_high_cpu_ramfs_dev
   | Aws_specific
   | Dynamic
 
@@ -750,6 +752,8 @@ let string_of_tag = function
   | Gcp_high_cpu_dev -> "gcp_high_cpu_dev"
   | Gcp_very_high_cpu -> "gcp_very_high_cpu"
   | Gcp_very_high_cpu_dev -> "gcp_very_high_cpu_dev"
+  | Gcp_very_high_cpu_ramfs -> "gcp_very_high_cpu_ramfs"
+  | Gcp_very_high_cpu_ramfs_dev -> "gcp_very_high_cpu_ramfs_dev"
   | Aws_specific -> "aws_specific"
   | Dynamic -> Gitlab_ci.Var.encode dynamic_tag_var
 
@@ -757,7 +761,8 @@ let string_of_tag = function
 let arch_of_tag = function
   | Gcp_arm64 | Gcp_dev_arm64 -> Some Arm64
   | Gcp | Gcp_dev | Gcp_tezt | Gcp_tezt_dev | Gcp_high_cpu | Gcp_high_cpu_dev
-  | Gcp_very_high_cpu | Gcp_very_high_cpu_dev | Aws_specific ->
+  | Gcp_very_high_cpu | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs
+  | Gcp_very_high_cpu_ramfs_dev | Aws_specific ->
       Some Amd64
   | Dynamic -> None
 
@@ -819,6 +824,11 @@ type cpu =
   | High  (** Target GCP high runner pool. *)
   | Very_high  (** Target GCP very high runner pool. *)
 
+(** The list of storage profiling tags for runners. *)
+type storage =
+  | Network  (** Target default storage runner pool. *)
+  | Ramfs  (** Target ramfs storage runner pool. *)
+
 let enc_git_strategy = function
   | Fetch -> "fetch"
   | Clone -> "clone"
@@ -827,36 +837,58 @@ let enc_git_strategy = function
 let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
     ?cache ?id_tokens ?interruptible ?(dependencies = Staged [])
     ?(image_dependencies = []) ?services ?variables ?rules
-    ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag ?(cpu = Normal) ?git_strategy
-    ?coverage ?retry ?parallel ?description ?(dev_infra = false) ~__POS__ ?image
-    ?template ~stage ~name script : tezos_job =
+    ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag ?(cpu = Normal)
+    ?(storage = Network) ?git_strategy ?coverage ?retry ?parallel ?description
+    ?(dev_infra = false) ~__POS__ ?image ?template ~stage ~name script :
+    tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag =
-    match (arch, tag, cpu) with
-    | Some Arm64, _, (High | Very_high) ->
+    match (arch, tag, cpu, storage) with
+    | Some Arm64, _, (High | Very_high), _ ->
         failwith
           "[job] cannot specify both [arch=Arm64] and [cpu=High] or \
            [cpu=Very_high] in job '%s'."
           name
-    | Some _, Some _, High
-    | None, Some _, High
-    | Some _, None, High
-    | None, None, High ->
+    | Some Arm64, _, _, Network ->
+        failwith
+          "[job] cannot specify both [arch=Arm64] and [storage=Network] in job \
+           '%s'."
+          name
+    | None, None, Normal, Ramfs ->
+        failwith
+          "[job] cannot specify both [cpu=Normal] and [storage=Ramfs] in job \
+           '%s'."
+          name
+    | None, _, High, Ramfs | Some _, _, High, Ramfs ->
+        failwith
+          "[job] cannot specify both [cpu=High] and [storage=Ramfs] in job \
+           '%s'."
+          name
+    | Some _, Some _, High, Network
+    | None, Some _, High, Network
+    | Some _, None, High, Network
+    | None, None, High, Network ->
         if dev_infra then Gcp_high_cpu_dev else Gcp_high_cpu
-    | Some _, Some _, Very_high
-    | None, Some _, Very_high
-    | Some _, None, Very_high
-    | None, None, Very_high ->
+    | Some _, Some _, Very_high, Network
+    | None, Some _, Very_high, Network
+    | Some _, None, Very_high, Network
+    | None, None, Very_high, Network ->
         if dev_infra then Gcp_very_high_cpu_dev else Gcp_very_high_cpu
-    | Some arch, None, Normal -> (
+    | Some _, Some _, Very_high, Ramfs
+    | None, Some _, Very_high, Ramfs
+    | Some _, None, Very_high, Ramfs
+    | None, None, Very_high, Ramfs ->
+        if dev_infra then Gcp_very_high_cpu_ramfs_dev
+        else Gcp_very_high_cpu_ramfs
+    | Some arch, None, Normal, _ -> (
         match arch with
         | Amd64 -> if dev_infra then Gcp_dev else Gcp
         | Arm64 -> Gcp_arm64)
-    | None, Some tag, Normal -> tag
-    | None, None, Normal ->
+    | None, Some tag, _, _ -> tag
+    | None, None, Normal, Network ->
         (* By default, we assume Amd64 runners as given by the [gcp] tag. *)
         Gcp
-    | Some _, Some _, Normal ->
+    | Some _, Some _, Normal, _ ->
         failwith
           "[job] cannot specify both [arch] and [tags] at the same time in job \
            '%s'."
@@ -1398,8 +1430,8 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
     [CI_DOCKER_AUTH] contains the appropriate credentials. *)
 let job_docker_authenticated ?(skip_docker_initialization = false)
     ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies
-    ?image_dependencies ?arch ?tag ?allow_failure ?parallel ?timeout ?retry
-    ?description ?dev_infra ~__POS__ ~stage ~name script : tezos_job =
+    ?image_dependencies ?arch ?storage ?tag ?allow_failure ?parallel ?timeout
+    ?retry ?description ?dev_infra ~__POS__ ~stage ~name script : tezos_job =
   let docker_version = "24.0.7" in
   job
     ?rules
@@ -1407,6 +1439,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ?image_dependencies
     ?artifacts
     ?arch
+    ?storage
     ?tag
     ?allow_failure
     ?parallel
@@ -1514,10 +1547,11 @@ module Images = struct
   let rust_toolchain =
     (* The job that builds the rust_toolchain image.
        This job is automatically included in any pipeline that uses this image. *)
-    let image_builder arch =
+    let image_builder arch ?storage () =
       job_docker_authenticated
         ~__POS__
         ~arch
+        ?storage
         ~skip_docker_initialization:true
         ~stage
         ~name:("oc.docker:rust-toolchain:" ^ arch_to_string_alt arch)
@@ -1534,8 +1568,8 @@ module Images = struct
       "${rust_toolchain_image_name}:${rust_toolchain_image_tag}"
     in
     Image.mk_internal
-      ~image_builder_amd64:(image_builder Amd64)
-      ~image_builder_arm64:(image_builder Arm64)
+      ~image_builder_amd64:(image_builder Amd64 ())
+      ~image_builder_arm64:(image_builder Arm64 ~storage:Ramfs ())
       ~image_path
       ()
 
@@ -1543,10 +1577,11 @@ module Images = struct
   let rust_sdk_bindings =
     (* The job that builds the rust-sdk-bindings image.
        This job is automatically included in any pipeline that uses this image. *)
-    let image_builder arch =
+    let image_builder arch ?storage () =
       job_docker_authenticated
         ~__POS__
         ~arch
+        ?storage
         ~stage
         ~name:("oc.docker:rust-sdk-bindings:" ^ arch_to_string_alt arch)
         ~description:
@@ -1563,8 +1598,8 @@ module Images = struct
       "${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}"
     in
     Image.mk_internal
-      ~image_builder_amd64:(image_builder Amd64)
-      ~image_builder_arm64:(image_builder Arm64)
+      ~image_builder_amd64:(image_builder Amd64 ())
+      ~image_builder_arm64:(image_builder Arm64 ~storage:Ramfs ())
       ~image_path
       ()
 
@@ -1587,7 +1622,7 @@ module Images = struct
   module CI = struct
     (* The job that builds the CI images.
        This job is automatically included in any pipeline that uses any of these images. *)
-    let job_docker_ci arch =
+    let job_docker_ci arch ?storage () =
       let variables = Some [("ARCH", arch_to_string_alt arch)] in
       let retry =
         match arch with
@@ -1601,6 +1636,7 @@ module Images = struct
         ?retry
         ~__POS__
         ~arch
+        ?storage
         ~skip_docker_initialization:true
         ~stage
         ~timeout:(Minutes 90)
@@ -1613,8 +1649,8 @@ module Images = struct
 
     let mk_ci_image ~image_path =
       Image.mk_internal
-        ~image_builder_amd64:(job_docker_ci Amd64)
-        ~image_builder_arm64:(job_docker_ci Arm64)
+        ~image_builder_amd64:(job_docker_ci Amd64 ())
+        ~image_builder_arm64:(job_docker_ci Arm64 ~storage:Ramfs ())
         ~image_path
         ()
 

@@ -53,7 +53,7 @@ let monitoring_child_pipeline =
         job_datadog_pipeline_trace;
         Grafazos_ci.Common.job_build_grafazos ();
         job_build_layer1_profiling ~expire_in:Never ();
-        Teztale.Common.job_build ~expire_in:Never ~arch:Arm64 ();
+        Teztale.Common.job_build ~expire_in:Never ~arch:Arm64 ~storage:Ramfs ();
         Teztale.Common.job_build ~expire_in:Never ~arch:Amd64 ();
       ]
 
@@ -117,6 +117,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~dependencies:(Dependent [])
       ~__POS__
       ~arch:Arm64
+      ~storage:Ramfs
       (if test then Test else Release)
   in
   let job_docker_merge =
@@ -133,6 +134,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~dependencies:(Dependent [])
       ~__POS__
       ~arch:Arm64
+      ~storage:Ramfs
       ~release:true
       ()
   in
@@ -307,6 +309,7 @@ let octez_evm_node_jobs ?(test = false) () =
     job_docker_build
       ~__POS__
       ~arch:Arm64
+      ~storage:Ramfs
       (if test then Test else Octez_evm_node_release)
   in
   let job_docker_merge =
@@ -332,6 +335,7 @@ let octez_evm_node_jobs ?(test = false) () =
     job_build_static_binaries
       ~__POS__
       ~arch:Arm64
+      ~storage:Ramfs
       ~executable_files:"script-inputs/octez-evm-node-executable"
       ~release:true
       ~version_executable:"octez-evm-node"
