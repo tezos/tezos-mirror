@@ -1259,21 +1259,31 @@ let get_delegate ?endpoint ~src client =
   in
   Lwt.return (output =~* rex "(tz[a-zA-Z0-9]+) \\(.*\\)")
 
-let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
-    ?(force_low_fee = false) ?expect_failure ?(simulation = false) ~src
-    ~delegate client =
-  let value =
-    spawn_command
-      ?endpoint
-      client
-      (["--wait"; wait]
-      @ ["set"; "delegate"; "for"; src; "to"; delegate]
-      @ optional_arg "fee" Tez.to_string fee
-      @ optional_arg "fee-cap" Tez.to_string fee_cap
-      @ (if simulation then ["--simulation"] else [])
-      @ if force_low_fee then ["--force-low-fee"] else [])
-  in
-  {value; run = Process.check ?expect_failure}
+let spawn_set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
+    ?(force_low_fee = false) ?(simulation = false) ~src ~delegate client =
+  spawn_command
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["set"; "delegate"; "for"; src; "to"; delegate]
+    @ optional_arg "fee" Tez.to_string fee
+    @ optional_arg "fee-cap" Tez.to_string fee_cap
+    @ (if simulation then ["--simulation"] else [])
+    @ if force_low_fee then ["--force-low-fee"] else [])
+
+let set_delegate ?endpoint ?wait ?fee ?fee_cap ?force_low_fee ?expect_failure
+    ?simulation ~src ~delegate client =
+  spawn_set_delegate
+    ?endpoint
+    ?wait
+    ?fee
+    ?fee_cap
+    ?force_low_fee
+    ?simulation
+    ~src
+    ~delegate
+    client
+  |> Process.check ?expect_failure
 
 let spawn_call_contract ?hooks ?endpoint ?burn_cap ~src ~destination ?entrypoint
     ?arg client =
