@@ -22,6 +22,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+(** Force linking for having Simple_profiler to init few backends by itself *)
+let () = ignore Simple_profiler.headless
+
 let _ =
   (* Memtrace can be activated via the environment variable MEMTRACE
      whose value is the file collecting the trace. The trace can then

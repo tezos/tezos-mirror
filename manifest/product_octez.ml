@@ -9070,6 +9070,7 @@ let _octez_dal_node =
          octez_stdlib_unix |> open_;
          octez_dal_node_lib |> open_;
          memtrace;
+         octez_profiler_backends |> open_;
        ]
       @ protocol_deps)
     ~conflicts:[Conflicts.checkseum]
