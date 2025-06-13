@@ -35,10 +35,66 @@ pub fn forge_message(msg: &str) -> Result<Vec<u8>, Error> {
 
 pub mod operation {
     use super::*;
-    use crate::keys::PublicKeyHash;
+    use crate::keys::{BlsSignature, PublicKey, PublicKeyHash};
     use crate::Error;
     use tezos_data_encoding::enc::BinWriter;
-    use tezos_protocol::operation::{DelegationContent, ManagerOperationContent, OperationContent};
+    use tezos_protocol::operation::{
+        DelegationContent, ManagerOperationContent, OperationContent, RevealContent,
+    };
+
+    #[derive(uniffi::Object, Debug)]
+    pub struct Reveal {
+        pub source: PublicKeyHash,
+        pub fee: u64,
+        pub counter: u64,
+        pub gas_limit: u64,
+        pub storage_limit: u64,
+        pub public_key: PublicKey,
+        pub proof: Option<BlsSignature>,
+    }
+
+    #[uniffi::export]
+    impl Reveal {
+        #[doc = "Build a reveal operation."]
+        #[uniffi::constructor(default(proof = None))]
+        pub fn new(
+            source: &PublicKeyHash,
+            fee: u64,
+            counter: u64,
+            gas_limit: u64,
+            storage_limit: u64,
+            public_key: &PublicKey,
+            proof: Option<Arc<BlsSignature>>,
+        ) -> Self {
+            Self {
+                source: source.clone(),
+                fee,
+                counter,
+                gas_limit,
+                storage_limit,
+                public_key: public_key.clone(),
+                proof: proof.map(|proof| proof.as_ref().clone()),
+            }
+        }
+
+        #[doc = "Forge the operation."]
+        pub fn forge(&self) -> Result<Vec<u8>, Error> {
+            let reveal = OperationContent::Reveal(ManagerOperationContent {
+                source: self.source.0.clone(),
+                fee: self.fee.into(),
+                counter: self.counter.into(),
+                gas_limit: self.gas_limit.into(),
+                storage_limit: self.storage_limit.into(),
+                operation: RevealContent {
+                    pk: self.public_key.0.clone(),
+                    proof: self.proof.clone().map(|proof| proof.0),
+                },
+            });
+            reveal
+                .to_bytes()
+                .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
+        }
+    }
 
     #[derive(uniffi::Object, Debug)]
     pub struct Delegation {
