@@ -30,18 +30,22 @@ module S = struct
 
   let contents =
     Tezos_rpc.Service.get_service
+      ~description:
+        "the interface of a protocol grouped by its implementing modules"
       ~query:Tezos_rpc.Query.empty
       ~output:Protocol.encoding
       Tezos_rpc.Path.(root / "protocols" /: protocols_arg)
 
   let environment =
     Tezos_rpc.Service.get_service
+      ~description:"the protocol environment version required by a protocol"
       ~query:Tezos_rpc.Query.empty
       ~output:Protocol.env_version_encoding
       Tezos_rpc.Path.(root / "protocols" /: protocols_arg / "environment")
 
   let list =
     Tezos_rpc.Service.get_service
+      ~description:"the list of protocols supported by the node"
       ~query:Tezos_rpc.Query.empty
       ~output:(list Protocol_hash.encoding)
       Tezos_rpc.Path.(root / "protocols")
