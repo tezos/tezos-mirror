@@ -275,7 +275,7 @@ module Storage_repr = struct
         Imported_protocol.Raw_context.consensus_pk Imported_protocol.Sampler.t;
     }
 
-    let _sampler_encoding =
+    let sampler_encoding =
       let open Data_encoding in
       conv
         (fun {delegate_sampler_state; selected_stake_distribution} ->
