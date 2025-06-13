@@ -7,6 +7,7 @@ mod code_storage;
 mod database;
 mod precompile_provider;
 mod storage_helpers;
+mod withdrawal;
 mod world_state_handler;
 
 #[cfg(test)]
@@ -18,22 +19,22 @@ mod test {
             ContextTr, LocalContext, TxEnv,
         },
         context_interface::block::BlobExcessGasAndPrice,
-        database::{CacheDB, EmptyDB},
         inspector::inspectors::GasInspector,
         primitives::{
-            hardfork::SpecId, hex::FromHex, Address, Bytes, FixedBytes, TxKind, U256,
+            hardfork::SpecId, hex::FromHex, Address, Bytes, FixedBytes, TxKind, B256,
+            U256,
         },
         state::{AccountInfo, Bytecode},
         Context, Database, ExecuteCommitEvm, ExecuteEvm, Journal, MainBuilder,
-        MainContext,
     };
     use tezos_ethereum::block::{BlockConstants, BlockFees};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use utilities::{block_env, etherlink_vm_db, evm, tx_env};
 
-    use crate::database::EtherlinkVMDB;
-    use crate::precompile_provider;
-    use crate::world_state_handler::new_world_state_handler;
+    use crate::{database::EtherlinkVMDB, precompile_provider::EtherlinkPrecompiles};
+    use crate::{
+        withdrawal::WITHDRAWAL_EVENT_TOPIC, world_state_handler::new_world_state_handler,
+    };
 
     const ETHERLINK_CHAIN_ID: u64 = 42793;
     const DEFAULT_SPEC_ID: SpecId = SpecId::PRAGUE;
@@ -159,19 +160,25 @@ mod test {
     }
 
     #[test]
-    fn test_revm_usage() {
+    fn test_withdrawal_precompile_contract() {
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let destination =
+            Address::from_hex("0xff00000000000000000000000000000000000001").unwrap();
+        let value = U256::from(5);
+
         let block = block_env(None, 1_000_000);
         let tx = tx_env(
-            Address::ZERO,
-            Some(Address::ZERO),
+            caller,
+            Some(destination),
             block.gas_limit,
             0,
-            U256::ZERO,
-            Bytes::new(),
+            value,
+            Bytes::from_hex("cda4fee200112233").unwrap(),
             None,
         );
 
-        let mut db = CacheDB::new(EmptyDB::default());
+        let mut db = etherlink_vm_db(&block);
 
         let account_info = AccountInfo {
             balance: U256::MAX,
@@ -180,28 +187,20 @@ mod test {
             code: None,
         };
 
-        db.insert_account_info(tx.caller, account_info);
+        db.insert_account_info(caller, account_info);
 
-        let mut cfg = CfgEnv::default();
-        cfg.spec = SpecId::PRAGUE;
-
-        let mut evm = Context::mainnet()
-            .with_block(&block)
-            .with_tx(&tx)
-            .with_db(&mut db)
-            .with_cfg(cfg)
-            .build_mainnet();
-
-        let out = evm.transact(&tx);
-
-        println!("evm.transact:\n {:?}", out);
-
+        let evm = evm(db, &block, &tx);
         let tracer = GasInspector::default();
-        let precompiles = precompile_provider::EtherlinkPrecompiles::new();
+        let mut host = MockKernelHost::default();
+        let precompiles = EtherlinkPrecompiles::new(&mut host);
         let mut evm = evm.with_inspector(tracer).with_precompiles(precompiles);
-        let _ = evm.transact(&tx);
+        let execution_result: ExecutionResult = evm.transact(&tx).unwrap();
 
-        println!("evm.transact with inspector:\n{:?}", evm.inspector);
+        let expected_topics = vec![B256::new(WITHDRAWAL_EVENT_TOPIC)];
+        assert_eq!(
+            execution_result.logs().first().unwrap().topics(),
+            expected_topics
+        )
     }
 
     #[test]

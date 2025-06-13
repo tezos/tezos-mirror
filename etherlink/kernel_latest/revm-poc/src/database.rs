@@ -43,15 +43,11 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
     }
 }
 
-impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
-    pub(crate) fn get_or_create_account(&self, address: Address) -> StorageAccount {
-        // TODO: get_account function should be implemented whenever errors are
-        // reintroduced
-        self.world_state_handler
-            .get_or_create(self.host, &account_path(&address))
-            .unwrap()
-    }
+pub trait AccountDatabase: Database {
+    fn get_or_create_account(&self, address: Address) -> StorageAccount;
+}
 
+impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     #[cfg(test)]
     pub fn insert_account_info(&mut self, address: Address, info: AccountInfo) {
         let mut storage_account = self.get_or_create_account(address);
@@ -66,6 +62,16 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     ) -> StorageValue {
         let storage_account = self.get_or_create_account(address);
         storage_account.get_storage(self.host, &storage_key)
+    }
+}
+
+impl<Host: Runtime> AccountDatabase for EtherlinkVMDB<'_, Host> {
+    fn get_or_create_account(&self, address: Address) -> StorageAccount {
+        // TODO: get_account function should be implemented whenever errors are
+        // reintroduced
+        self.world_state_handler
+            .get_or_create(self.host, &account_path(&address))
+            .unwrap()
     }
 }
 

@@ -1,19 +1,24 @@
 use revm::{
-    context::{Cfg, ContextTr},
+    context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
-    interpreter::{CallInput, Gas, InputsImpl, InstructionResult, InterpreterResult},
-    primitives::{hex::FromHex, Address, Bytes, HashSet},
+    interpreter::{CallInput, InputsImpl, InterpreterResult},
+    primitives::{hex::FromHex, Address, HashSet},
 };
+use tezos_evm_runtime::runtime::Runtime;
 
-pub struct EtherlinkPrecompiles {
+use crate::{database::AccountDatabase, withdrawal::withdrawal_precompile};
+
+pub struct EtherlinkPrecompiles<'a, Host: Runtime> {
+    host: &'a mut Host,
     customs: HashSet<Address>,
     builtins: EthPrecompiles,
 }
 
-impl EtherlinkPrecompiles {
+impl<'a, Host: Runtime> EtherlinkPrecompiles<'a, Host> {
     #[allow(dead_code)]
-    pub fn new() -> Self {
+    pub fn new(host: &'a mut Host) -> Self {
         Self {
+            host,
             customs: HashSet::from([
                 // Withdrawals
                 Address::from_hex("0xff00000000000000000000000000000000000001").unwrap(),
@@ -32,31 +37,56 @@ impl EtherlinkPrecompiles {
         self.customs.contains(address) || self.builtins.contains(address)
     }
 
-    fn run_custom_precompile(
-        &self,
-        _context: &mut impl ContextTr,
-        _address: &Address,
+    fn run_custom_precompile<CTX>(
+        &mut self,
+        context: &mut CTX,
+        address: &Address,
         inputs: &InputsImpl,
-        gas_limit: u64,
-    ) -> Result<Option<InterpreterResult>, String> {
-        let _input_bytes = match &inputs.input {
-            CallInput::SharedBuffer(_range) => &[],
-            CallInput::Bytes(bytes) => bytes.iter().as_slice(),
+        is_static: bool,
+        _gas_limit: u64,
+    ) -> Result<Option<InterpreterResult>, String>
+    where
+        CTX: ContextTr,
+        CTX::Db: AccountDatabase,
+    {
+        // NIT: can probably do this more efficiently by keeping an immutable
+        // reference on the slice but next mutable call makes it nontrivial
+        let input_bytes = match &inputs.input {
+            CallInput::SharedBuffer(range) => {
+                if let Some(slice) =
+                    context.local().shared_memory_buffer_slice(range.clone())
+                {
+                    slice.to_vec()
+                } else {
+                    vec![]
+                }
+            }
+            CallInput::Bytes(bytes) => bytes.to_vec(),
         };
 
-        // TODO: precompile logic here
-
-        let result = InterpreterResult {
-            result: InstructionResult::Return,
-            gas: Gas::new(gas_limit),
-            output: Bytes::new(),
-        };
-
-        Ok(Some(result))
+        if address
+            == &Address::from_hex("0xff00000000000000000000000000000000000001").unwrap()
+        {
+            let result = withdrawal_precompile(
+                self.host,
+                &input_bytes,
+                context,
+                is_static,
+                inputs,
+                address,
+            )?;
+            Ok(Some(result))
+        } else {
+            Ok(None)
+        }
     }
 }
 
-impl<CTX: ContextTr> PrecompileProvider<CTX> for EtherlinkPrecompiles {
+impl<Host: Runtime, CTX> PrecompileProvider<CTX> for EtherlinkPrecompiles<'_, Host>
+where
+    CTX: ContextTr,
+    CTX::Db: AccountDatabase,
+{
     type Output = InterpreterResult;
 
     fn set_spec(&mut self, spec: <CTX::Cfg as Cfg>::Spec) -> bool {
@@ -72,7 +102,7 @@ impl<CTX: ContextTr> PrecompileProvider<CTX> for EtherlinkPrecompiles {
         gas_limit: u64,
     ) -> Result<Option<Self::Output>, String> {
         if let Some(custom_result) =
-            self.run_custom_precompile(context, address, inputs, gas_limit)?
+            self.run_custom_precompile(context, address, inputs, is_static, gas_limit)?
         {
             return Ok(Some(custom_result));
         }
