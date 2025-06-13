@@ -966,7 +966,20 @@ val set_delegate :
   src:string ->
   delegate:string ->
   t ->
-  unit Runnable.process
+  unit Lwt.t
+
+(** Same as [set_delegate], but do not wait for the process to exit. *)
+val spawn_set_delegate :
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?fee:Tez.t ->
+  ?fee_cap:Tez.t ->
+  ?force_low_fee:bool ->
+  ?simulation:bool ->
+  src:string ->
+  delegate:string ->
+  t ->
+  Process.t
 
 (** Run [octez-client call <destination> from <src>] *)
 val call_contract :

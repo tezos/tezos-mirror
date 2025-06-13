@@ -223,7 +223,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
       client
   in
   let* () = Client.bake_for_and_wait client in
-  let*! () =
+  let* () =
     Client.set_delegate ~src:delegated_implicit ~delegate:bootstrap1 client
   in
   let* () = Client.bake_for_and_wait client in

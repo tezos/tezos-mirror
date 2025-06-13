@@ -271,7 +271,7 @@ let test_update_companion_key_for_tz4_delegate =
   in
   let* () = Client.bake_for_and_wait client in
   (* set delegate for delegate to delegate *)
-  let*! () =
+  let* () =
     Client.set_delegate ~src:delegate.alias ~delegate:delegate.alias client
   in
   let* () = Client.bake_for_and_wait client in

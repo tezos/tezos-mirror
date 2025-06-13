@@ -492,8 +492,8 @@ module Transfer = struct
       Client.import_secret_key client ~alias secret_key
     in
     let* () = airdrop_and_reveal client [Constant.tz4_account] in
-    let*? set_delegate_process =
-      Client.set_delegate
+    let set_delegate_process =
+      Client.spawn_set_delegate
         client
         ~src:Constant.tz4_account.public_key_hash
         ~delegate:Constant.tz4_account.public_key_hash
@@ -523,8 +523,8 @@ module Transfer = struct
       Client.import_secret_key client ~alias secret_key
     in
     let* () = airdrop_and_reveal client [Constant.tz4_account] in
-    let*? set_delegate_process =
-      Client.set_delegate
+    let set_delegate_process =
+      Client.spawn_set_delegate
         client
         ~src:Constant.tz4_account.public_key_hash
         ~delegate:Constant.tz4_account.public_key_hash

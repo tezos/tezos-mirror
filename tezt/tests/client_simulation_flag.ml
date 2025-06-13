@@ -102,7 +102,7 @@ let test_client =
       client
   in
   let* _delegate = Client.register_delegate ~delegate:delegate.alias client in
-  let*! () =
+  let* () =
     Client.set_delegate
       ~src:"encrypted_account"
       ~delegate:delegate.public_key_hash
@@ -110,8 +110,8 @@ let test_client =
       client
   in
   Log.info "Tests that the client asks for the password w/o --simulation" ;
-  let*? process =
-    Client.set_delegate
+  let process =
+    Client.spawn_set_delegate
       client
       ~src:"encrypted_account"
       ~delegate:delegate.public_key_hash
