@@ -61,7 +61,11 @@ module Name = struct
 end
 
 module Worker = struct
-  include Worker.MakeSingle (Name) (Blueprints_publisher_types.Request) (Types)
+  include
+    Octez_telemetry.Worker.MakeSingle
+      (Name)
+      (Blueprints_publisher_types.Request)
+      (Types)
 
   let rollup_node_endpoint worker = (state worker).rollup_node_endpoint
 

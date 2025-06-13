@@ -37,6 +37,16 @@ module Request = struct
       }
         -> (Ethereum_types.quantity option, tztrace) t
 
+  let name (type a b) (t : (a, b) t) =
+    match t with
+    | Apply_evm_events _ -> "Apply_evm_events"
+    | Apply_blueprint _ -> "Apply_blueprint"
+    | Last_known_L1_level -> "Last_known_l1_level"
+    | Delayed_inbox_hashes -> "Delayed_inbox_hashes"
+    | Patch_state _ -> "Patch_state"
+    | Wasm_pvm_version -> "Wasm_pvm_version"
+    | Potential_observer_reorg _ -> "Potential_observer_reorg"
+
   type view = View : _ t -> view
 
   let view req = View req

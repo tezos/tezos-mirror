@@ -38,7 +38,8 @@ module Name = struct
 end
 
 module Worker =
-  Worker.MakeSingle (Name) (Evm_events_follower_types.Request) (Types)
+  Octez_telemetry.Worker.MakeSingle (Name) (Evm_events_follower_types.Request)
+    (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
