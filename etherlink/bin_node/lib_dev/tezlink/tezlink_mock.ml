@@ -34,6 +34,19 @@ let fitness =
    being replaced by actual data. *)
 let context = Context_hash.of_bytes_exn (Bytes.make 32 '\255')
 
+let public_key_internal =
+  let pk_opt =
+    Tezos_crypto.Signature.Ed25519.Public_key.of_bytes_without_validation
+      (Bytes.make 32 '\000')
+  in
+  match pk_opt with None -> (* Unreachable *) assert false | Some pk -> pk
+
+let _public_key : Imported_protocol.Alpha_context.public_key =
+  Ed25519 public_key_internal
+
+let _public_key_hash : Imported_protocol.Alpha_context.public_key_hash =
+  Ed25519 (Tezos_crypto.Signature.Ed25519.Public_key.hash public_key_internal)
+
 let contents : Alpha_context.Block_header.contents =
   {
     payload_hash = Imported_protocol.Block_payload_hash.zero;
@@ -235,3 +248,69 @@ let version =
       network_version = Network_version.Internal_for_tests.mock ();
       commit_info = Some {commit_hash = ""; commit_date = ""};
     }
+
+(* This module is a fake storage representation, the raw services gives access to the
+   real context. Unfortunately, some values are useless for Tezlink, so we don't want
+   to store them in the durable storage. So let's do their mock here *)
+module Storage_repr = struct
+  module Cycle = struct
+    let delegate_sampler_state_encoding =
+      Imported_protocol.Sampler.encoding
+        Imported_protocol.Raw_context.consensus_pk_encoding
+
+    let _create_sample_state ~consensus_pks =
+      Imported_protocol.Sampler.create consensus_pks
+
+    let selected_stake_distribution_encoding =
+      Data_encoding.(
+        Variable.list
+          (obj2
+             (req "baker" Signature.Public_key_hash.encoding)
+             (req "active_stake" Imported_protocol.Stake_repr.encoding)))
+
+    type storage_cycle = {
+      selected_stake_distribution :
+        (Signature.public_key_hash * Imported_protocol.Stake_repr.t) list;
+      delegate_sampler_state :
+        Imported_protocol.Raw_context.consensus_pk Imported_protocol.Sampler.t;
+    }
+
+    let _sampler_encoding =
+      let open Data_encoding in
+      conv
+        (fun {delegate_sampler_state; selected_stake_distribution} ->
+          ( (),
+            (),
+            delegate_sampler_state,
+            (),
+            (),
+            (),
+            (),
+            selected_stake_distribution,
+            () ))
+        (fun ( (),
+               (),
+               delegate_sampler_state,
+               (),
+               (),
+               (),
+               (),
+               selected_stake_distribution,
+               () ) -> {delegate_sampler_state; selected_stake_distribution})
+        (obj9
+           (req "already_denounced" empty)
+           (req "dal_already_denounced" empty)
+           (req "delegate_sampler_state" delegate_sampler_state_encoding)
+           (req "nonces" empty)
+           (req "pending_consensus_keys" empty)
+           (req "pending_staking_parameters" empty)
+           (req
+              "random_seed"
+              (constant
+                 "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8"))
+           (req
+              "selected_stake_distribution"
+              selected_stake_distribution_encoding)
+           (req "total_active_stake" empty))
+  end
+end
