@@ -35,6 +35,7 @@ depends: [
   "octez-smart-rollup-wasm-debugger-lib"
   "tezos-dal-node-services"
   "octez-performance-metrics"
+  "opentelemetry"
 ]
 conflicts: [
   "websocket"

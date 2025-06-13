@@ -327,6 +327,7 @@ let evm_node_lib_dev =
         wasm_runtime;
         performance_metrics;
         opentelemetry_client_cohttp_lwt;
+        opentelemetry_ambient_context_lwt;
         opentelemetry_lwt;
       ]
 
