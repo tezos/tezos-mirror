@@ -60,7 +60,7 @@ const BALANCE_DEFAULT_VALUE: U256 = U256::ZERO;
 const NONCE_DEFAULT_VALUE: u64 = 0;
 
 pub fn account_path(address: &Address) -> OwnedPath {
-    let path_string = format!("/{:?}", address);
+    let path_string = format!("/{:x}", address);
     OwnedPath::try_from(path_string).unwrap()
 }
 
@@ -132,12 +132,15 @@ impl StorageAccount {
         }
     }
 
-    pub fn set_code(&mut self, host: &mut impl Runtime, code: &[u8]) {
+    pub fn set_code(&mut self, host: &mut impl Runtime, code: Option<Bytecode>) {
         if self.code_exists(host) {
             // TODO: return a proper error here and handle it when it does
             // make sense.
         } else {
-            let code_hash = CodeStorage::add(host, code);
+            let code_hash = match code {
+                None => KECCAK_EMPTY,
+                Some(code) => CodeStorage::add(host, code.bytes_slice()),
+            };
             let code_hash_bytes: [u8; 32] = code_hash.into();
             let code_hash_path = concat(&self.path, &CODE_HASH_PATH).unwrap();
             host.store_write_all(&code_hash_path, &code_hash_bytes)
@@ -166,7 +169,7 @@ impl StorageAccount {
         self.set_nonce(host, nonce);
         // TODO: setting an already existing code will cause issues, catch
         // the error here when it's implemented.
-        self.set_code(host, code.unwrap_or_default().bytes_slice());
+        self.set_code(host, code);
     }
 
     pub fn storage_path(&self, index: &U256) -> OwnedPath {

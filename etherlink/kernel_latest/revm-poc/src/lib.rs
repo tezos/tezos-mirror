@@ -23,7 +23,7 @@ mod test {
         primitives::{
             hardfork::SpecId, hex::FromHex, Address, Bytes, FixedBytes, TxKind, U256,
         },
-        state::AccountInfo,
+        state::{AccountInfo, Bytecode},
         Context, Database, ExecuteCommitEvm, ExecuteEvm, Journal, MainBuilder,
         MainContext,
     };
@@ -264,5 +264,70 @@ mod test {
             U256::MAX.checked_sub(value).unwrap()
         );
         assert_eq!(account_destination_post_tx.balance, value);
+    }
+
+    #[test]
+    fn test_contract_call_sload_sstore() {
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let contract =
+            Address::from_hex("2222222222222222222222222222222222222222").unwrap();
+
+        let block = block_env(None, 10_000_000);
+        let tx = tx_env(
+            caller,
+            Some(contract),
+            block.gas_limit,
+            10,
+            U256::from(0),
+            Bytes::new(),
+            None,
+        );
+
+        let mut db = etherlink_vm_db(&block);
+
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+
+        let contract_info = AccountInfo {
+            balance: U256::ZERO,
+            nonce: 0,
+            // Code hash will be automatically computed and inserted when
+            // inserting the account info into the db.
+            code_hash: Default::default(),
+            // PUSH1 0x42      # Value to store
+            // PUSH1 0x01      # Storage slot index
+            // SSTORE          # Store the value in storage
+            // PUSH1 0x01      # Load from the same storage slot
+            // SLOAD           # Retrieve the value
+            code: Some(Bytecode::new_raw(
+                Bytes::from_hex("6042600155600154").unwrap(),
+            )),
+        };
+
+        db.insert_account_info(caller, caller_info);
+        db.insert_account_info(contract, contract_info);
+
+        let mut evm = evm(db, &block, &tx);
+
+        let execution_result = evm.transact_commit(&tx).unwrap();
+
+        // Check the outcome of the transaction
+        match execution_result {
+            ExecutionResult::Success { gas_used, .. } => {
+                assert!(gas_used > 0);
+            }
+            ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
+                panic!("Simple transfer should have succeeded")
+            }
+        }
+
+        // Check that the storage slot at 0x01 was updated with 0x42
+        let storage_slot_value = evm.db().storage_slot(contract, U256::from(1));
+        assert_eq!(storage_slot_value, U256::from(66));
     }
 }

@@ -72,7 +72,7 @@ impl CodeStorage {
     pub fn add(host: &mut impl Runtime, bytecode: &[u8]) -> B256 {
         let code_hash = bytes_hash(bytecode);
         let code = Self::new(&code_hash);
-        if code.exists(host) {
+        if !code.exists(host) {
             let code_path = concat(&code.path, &CODE_PATH).unwrap();
             host.store_write_all(&code_path, bytecode).unwrap();
         };
