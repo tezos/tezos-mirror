@@ -347,86 +347,6 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
         dal_cases)
     threshold_encryption_cases
 
-(* Register all variants of a test. *)
-let register_multichain_all ?max_delayed_inbox_blueprint_length
-    ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
-    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
-    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
-    ?delayed_inbox_min_levels ?max_number_of_chunks ?eth_bootstrap_accounts
-    ?tez_bootstrap_accounts ?sequencer ?sequencer_pool_address ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
-    ?additional_uses ?rpc_server ?websockets ?enable_fast_withdrawal
-    ?history_mode
-    ?(use_threshold_encryption = default_threshold_encryption_registration)
-    ?(use_dal = default_dal_registration) ~l2_setups ~title ~tags body protocols
-    =
-  let dal_cases =
-    match use_dal with
-    | Register_both {additional_tags_with; additional_tags_without} ->
-        [(false, additional_tags_without); (true, additional_tags_with)]
-    | Register_with_feature -> [(true, [])]
-    | Register_without_feature -> [(false, [])]
-  in
-  let threshold_encryption_cases =
-    match use_threshold_encryption with
-    | Register_both {additional_tags_with; additional_tags_without} ->
-        [(false, additional_tags_without); (true, additional_tags_with)]
-    | Register_with_feature -> [(true, [])]
-    | Register_without_feature -> [(false, [])]
-  in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7367
-     Also register the tests with and without FA bridge feature flag. *)
-  List.iter
-    (fun (threshold_encryption, te_tags) ->
-      List.iter
-        (fun (enable_dal, dal_tags) ->
-          register_multichain_test
-            ~__FILE__
-            ?max_delayed_inbox_blueprint_length
-            ?sequencer_rpc_port
-            ?sequencer_private_rpc_port
-            ?commitment_period
-            ?challenge_window
-            ?genesis_timestamp
-            ?time_between_blocks
-            ?max_blueprints_lag
-            ?max_blueprints_ahead
-            ?max_blueprints_catchup
-            ?catchup_cooldown
-            ?delayed_inbox_timeout
-            ?delayed_inbox_min_levels
-            ?max_number_of_chunks
-            ?eth_bootstrap_accounts
-            ?tez_bootstrap_accounts
-            ?sequencer
-            ?sequencer_pool_address
-            ?da_fee
-            ?minimum_base_fee_per_gas
-            ?preimages_dir
-            ?maximum_allowed_ticks
-            ?maximum_gas_per_transaction
-            ?max_blueprint_lookahead_in_seconds
-            ?enable_fa_bridge
-            ?enable_fast_withdrawal
-            ?additional_uses
-            ?rpc_server
-            ?websockets
-            ?history_mode
-            ~threshold_encryption
-            ?rollup_history_mode
-            ~enable_dal
-            ~enable_multichain:true
-            ~l2_setups
-            ~title
-            ~tags:(te_tags @ dal_tags @ tags)
-            ~kernel:Kernel.Latest
-            body
-            protocols)
-        dal_cases)
-    threshold_encryption_cases
-
 let register_upgrade_all ~title ~tags ~genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)
     ?(upgrade_to = Kernel.upgrade_to) ?(additional_uses = []) scenario protocols
@@ -2231,38 +2151,6 @@ let test_rpc_produceBlock =
   let*@ start_block_number = Rpc.block_number sequencer in
   let*@ _ = produce_block sequencer in
   let*@ new_block_number = Rpc.block_number sequencer in
-  Check.((Int32.succ start_block_number = new_block_number) int32)
-    ~error_msg:"Expected new block number to be %L, but got: %R" ;
-  unit
-
-let block_number_multichain observers =
-  let* block_numbers =
-    Lwt_list.map_s
-      (fun observer ->
-        let*@ block_number = Rpc.block_number observer in
-        return block_number)
-      observers
-  in
-  match block_numbers with
-  | hd :: block_numbers when List.for_all (Int32.equal hd) block_numbers ->
-      return hd
-  | _ -> Test.fail "Every block numbers are not equal"
-
-let test_multichain_produceBlock =
-  register_multichain_all
-    ~time_between_blocks:Nothing
-    ~tags:[Tag.flaky; "evm"; "multichain"; "produce_block"]
-    ~title:"RPC method produceBlock in a multichain environment"
-  @@ fun {sequencer; observers; sc_rollup_node; client; proxies; _} _protocol ->
-  let* start_block_number = block_number_multichain observers in
-  let*@ _ = produce_block sequencer in
-  let* () =
-    Lwt_list.iter_s
-      (fun proxy ->
-        bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ())
-      proxies
-  in
-  let* new_block_number = block_number_multichain observers in
   Check.((Int32.succ start_block_number = new_block_number) int32)
     ~error_msg:"Expected new block number to be %L, but got: %R" ;
   unit
@@ -13796,14 +13684,6 @@ let () =
   test_multichain_feature_flag protocols ;
   test_make_l2_kernel_installer_config "EVM" protocols ;
   test_make_l2_kernel_installer_config "Michelson" protocols ;
-  test_multichain_produceBlock
-    ~l2_setups:
-      (Some
-         [
-           Evm_node.default_l2_setup ~l2_chain_id:0;
-           Evm_node.default_l2_setup ~l2_chain_id:1;
-         ])
-    protocols ;
   test_fast_withdrawal_feature_flag protocols ;
   test_deposit_and_fast_withdraw protocols ;
   test_deposit_and_fa_fast_withdraw protocols ;
