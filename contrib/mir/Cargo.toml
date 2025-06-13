@@ -38,6 +38,13 @@ bls = ["dep:blst", "tezos_crypto_rs/bls"]
 [dev-dependencies]
 proptest = "1.3.1"
 
+# Ignore the lint warning on `#![cfg(not(tarpaulin_include))]` which
+# is the only non-nightly way to locally disable the tarpaulin
+# coverage tool see
+# https://github.com/xd009642/tarpaulin?tab=readme-ov-file#ignoring-code-in-files
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
+
 [[bin]]
 name = "tzt_runner"
 path = "tzt_runner/main.rs"
