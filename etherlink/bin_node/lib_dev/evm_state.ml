@@ -37,6 +37,8 @@ let execute ?(wasm_pvm_fallback = false) ?profile ?(kind = Events.Application)
     ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
     ~native_execution evm_state inbox =
   let open Lwt_result_syntax in
+  Octez_telemetry.Trace.with_tzresult ~service_name:"Evm_state" "execute"
+  @@ fun _ ->
   let path = Filename.concat (kernel_logs_directory ~data_dir) log_file in
   let inbox = List.map (function `Input s -> s) inbox in
   let inbox = List.to_seq [inbox] in
