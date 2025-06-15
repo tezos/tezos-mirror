@@ -4515,6 +4515,22 @@ let _octez_rpc_http_server_tests =
         alcotezt;
       ]
 
+let octez_telemetry =
+  octez_lib
+    "octez-telemetry"
+    ~internal_name:"Octez_telemetry"
+    ~path:"src/lib_telemetry"
+    ~synopsis:"Convenient wrappers to trace Octez libraries with Opentelemetry"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        opentelemetry;
+        opentelemetry_lwt;
+        resto;
+        octez_rpc_http;
+        octez_rpc_http_server;
+      ]
+
 let _bip39_generator =
   private_exe
     "bip39_generator"
@@ -5551,6 +5567,7 @@ let octez_smart_rollup_node_lib =
         opentelemetry_lwt;
         opentelemetry_client_cohttp_lwt;
         opentelemetry_ambient_context_lwt;
+        octez_telemetry;
       ]
 
 let wasm_helpers_intf_modules = ["wasm_utils_intf"]
@@ -9220,22 +9237,6 @@ let _octez_scoru_wasm_debugger =
         bls12_381_archive;
         octez_scoru_wasm_helpers |> open_;
         octez_scoru_wasm_debugger_lib |> open_;
-      ]
-
-let octez_telemetry =
-  octez_lib
-    "octez-telemetry"
-    ~internal_name:"Octez_telemetry"
-    ~path:"src/lib_telemetry"
-    ~synopsis:"Convenient wrappers to trace Octez libraries with Opentelemetry"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives" |> open_;
-        opentelemetry;
-        opentelemetry_lwt;
-        resto;
-        octez_rpc_http;
-        octez_rpc_http_server;
       ]
 
 let _octez_scoru_wasm_regressions =

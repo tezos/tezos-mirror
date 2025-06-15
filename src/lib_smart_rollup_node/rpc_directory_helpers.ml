@@ -59,22 +59,8 @@ module Make_sub_directory (S : PARAM) = struct
         ~kind:Span_kind_server
         ~service_name
         trace_name
-      @@ fun scope ->
-      Opentelemetry.Scope.add_attrs scope (fun () ->
-          let req = Tezos_rpc.Service.forge_partial_request service a q in
-          let path, query =
-            match String.split_on_char '?' (Uri.path_and_query req.uri) with
-            | [] -> ("", `None)
-            | [p] -> (p, `None)
-            | p :: q :: _ -> (p, `String q)
-          in
-          [
-            ("http.request.method", `String meth);
-            ("http.route", `String route);
-            ("url.path", `String path);
-            ("url.query", query);
-          ]) ;
-      f a q i
+        ~attrs:[("http.route", `String route)]
+      @@ fun _scope -> f a q i
     in
     directory := Tezos_rpc.Directory.register !directory service f
 
