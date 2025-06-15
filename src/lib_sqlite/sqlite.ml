@@ -75,6 +75,12 @@ type sqlite_journal_mode = Wal | Other
 
 type t = {
   db_pool : Pool.t;
+  add_attrs :
+    'a.
+    ('a -> Opentelemetry.key_value list) ->
+    'a ->
+    Opentelemetry.Scope.t option ->
+    unit;
   trace :
     'a.
     ?trace_id:Opentelemetry.Trace_id.t ->
@@ -94,6 +100,7 @@ module Request = struct
     op_name : string option;
     table : string option;
     query : string;
+    attrs : 'a -> Opentelemetry.Span.key_value list;
   }
 
   let op_name_of_query q =
@@ -108,25 +115,25 @@ module Request = struct
       | [] -> s
     else s
 
-  let ( ->. ) t u ?name ?table ?oneshot query =
+  let ( ->. ) t u ?name ?table ?(attrs = Fun.const []) ?oneshot query =
     let req = ( ->. ) ?oneshot t u query in
     let name = Option.map shorten_name name in
-    {req; query; name; op_name = op_name_of_query query; table}
+    {req; query; name; op_name = op_name_of_query query; table; attrs}
 
-  let ( ->! ) t u ?name ?table ?oneshot query =
+  let ( ->! ) t u ?name ?table ?(attrs = Fun.const []) ?oneshot query =
     let req = ( ->! ) ?oneshot t u query in
     let name = Option.map shorten_name name in
-    {req; query; name; op_name = op_name_of_query query; table}
+    {req; query; name; op_name = op_name_of_query query; table; attrs}
 
-  let ( ->? ) t u ?name ?table ?oneshot query =
+  let ( ->? ) t u ?name ?table ?(attrs = Fun.const []) ?oneshot query =
     let req = ( ->? ) ?oneshot t u query in
     let name = Option.map shorten_name name in
-    {req; query; name; op_name = op_name_of_query query; table}
+    {req; query; name; op_name = op_name_of_query query; table; attrs}
 
-  let ( ->* ) t u ?name ?table ?oneshot query =
+  let ( ->* ) t u ?name ?table ?(attrs = Fun.const []) ?oneshot query =
     let req = ( ->* ) ?oneshot t u query in
     let name = Option.map shorten_name name in
-    {req; query; name; op_name = op_name_of_query query; table}
+    {req; query; name; op_name = op_name_of_query query; table; attrs}
 end
 
 module Db = struct
@@ -134,6 +141,12 @@ module Db = struct
 
   type conn = {
     conn : (module Caqti_lwt.CONNECTION);
+    add_attrs :
+      'a.
+      ('a -> Opentelemetry.key_value list) ->
+      'a ->
+      Opentelemetry.Scope.t option ->
+      unit;
     trace :
       'a.
       ?trace_id:Opentelemetry.Trace_id.t ->
@@ -191,47 +204,55 @@ module Db = struct
         Opentelemetry.Scope.add_attrs scope attrs ;
         f (Some scope)
 
-  let start {conn = (module Db); trace} =
+  let start {conn = (module Db); trace; _} =
     trace_with trace ~op_name:"start" "Sqlite.start" @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.start ()
 
-  let commit {conn = (module Db); trace} =
+  let commit {conn = (module Db); trace; _} =
     trace_with trace ~op_name:"COMMIT" "Sqlite.commit" @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.commit ()
 
-  let rollback {conn = (module Db); trace} =
+  let rollback {conn = (module Db); trace; _} =
     trace_with trace ~op_name:"ROLLBACK" "Sqlite.rollback" @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.rollback ()
 
-  let exec ?scope {conn = (module Db); trace} req arg =
-    trace_req ?scope trace "Sqlite.Db.exec" req @@ fun _ ->
+  let exec ?scope {conn = (module Db); trace; add_attrs} req arg =
+    trace_req ?scope trace "Sqlite.Db.exec" req @@ fun scope ->
+    add_attrs req.attrs arg scope ;
     wrap_caqti_lwt_result @@ Db.exec req.req arg
 
-  let find ?scope {conn = (module Db); trace} req arg =
-    trace_req ?scope trace "Sqlite.Db.find" ~op_name:"find" req @@ fun _ ->
+  let find ?scope {conn = (module Db); trace; add_attrs} req arg =
+    trace_req ?scope trace "Sqlite.Db.find" ~op_name:"find" req @@ fun scope ->
+    add_attrs req.attrs arg scope ;
     wrap_caqti_lwt_result @@ Db.find req.req arg
 
-  let find_opt ?scope {conn = (module Db); trace} req arg =
-    trace_req ?scope trace "Sqlite.Db.find_opt" ~op_name:"find" req @@ fun _ ->
+  let find_opt ?scope {conn = (module Db); trace; add_attrs} req arg =
+    trace_req ?scope trace "Sqlite.Db.find_opt" ~op_name:"find" req
+    @@ fun scope ->
+    add_attrs req.attrs arg scope ;
     wrap_caqti_lwt_result @@ Db.find_opt req.req arg
 
-  let collect_list ?scope {conn = (module Db); trace} req arg =
+  let collect_list ?scope {conn = (module Db); trace; add_attrs} req arg =
     trace_req ?scope trace "Sqlite.Db.collect_list" ~op_name:"collect" req
-    @@ fun _ -> wrap_caqti_lwt_result @@ Db.collect_list req.req arg
+    @@ fun scope ->
+    add_attrs req.attrs arg scope ;
+    wrap_caqti_lwt_result @@ Db.collect_list req.req arg
 
-  let rev_collect_list ?scope {conn = (module Db); trace} req arg =
+  let rev_collect_list ?scope {conn = (module Db); trace; add_attrs} req arg =
     trace_req ?scope trace "Sqlite.Db.rev_collect_list" ~op_name:"collect" req
-    @@ fun _ -> wrap_caqti_lwt_result @@ Db.rev_collect_list req.req arg
+    @@ fun scope ->
+    add_attrs req.attrs arg scope ;
+    wrap_caqti_lwt_result @@ Db.rev_collect_list req.req arg
 
-  let fold ?scope {conn = (module Db); trace} req f x acc =
+  let fold ?scope {conn = (module Db); trace; _} req f x acc =
     trace_req ?scope trace "Sqlite.Db.fold" ~op_name:"iter" req @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.fold req.req f x acc
 
-  let fold_s ?scope {conn = (module Db); trace} req f x acc =
+  let fold_s ?scope {conn = (module Db); trace; _} req f x acc =
     trace_req ?scope trace "Sqlite.Db.fold_s" ~op_name:"iter" req @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.fold_s req.req f x acc
 
-  let iter_s ?scope {conn = (module Db); trace} req f x =
+  let iter_s ?scope {conn = (module Db); trace; _} req f x =
     trace_req ?scope trace "Sqlite.Db.iter_s" ~op_name:"iter" req @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.iter_s req.req f x
 end
@@ -239,6 +260,8 @@ end
 type conn = Raw_connection of Db.conn | Ongoing_transaction of Db.conn
 
 let no_trace ?trace_id:_ ?parent:_ ?scope:_ _ f = f None
+
+let no_add_attrs _ _ _ = ()
 
 let assert_in_transaction conn =
   match conn with
@@ -270,8 +293,8 @@ let with_transaction conn k =
   | Ongoing_transaction _ ->
       failwith "Internal error: attempting to perform a nested transaction"
 
-let use {db_pool; trace} k =
-  Db.use_pool db_pool @@ fun conn -> k (Raw_connection {conn; trace})
+let use {db_pool; trace; add_attrs} k =
+  Db.use_pool db_pool @@ fun conn -> k (Raw_connection {conn; trace; add_attrs})
 
 (* Internal queries *)
 module Q = struct
@@ -331,7 +354,11 @@ let vacuum ~conn ~output_db_file =
     Db.exec conn Q.vacuum_request output_db_file
   in
   let db =
-    {db_pool = Pool.create 1 (uri output_db_file Read_write); trace = no_trace}
+    {
+      db_pool = Pool.create 1 (uri output_db_file Read_write);
+      trace = no_trace;
+      add_attrs = no_add_attrs;
+    }
   in
   let* () = use db set_wal_journal_mode in
   let*! () = close db in
@@ -353,23 +380,27 @@ let init ~path ~perm ?max_conn_reuse_count migration_code =
            1. *)
         1
   in
-  let trace =
+  let trace, add_attrs =
     if Opentelemetry.Collector.has_backend () then
       let attrs = [("db.system.name", `String "sqlite")] in
-      fun ?trace_id ?parent ?scope name f ->
-        Opentelemetry_lwt.Trace.with_
-          ?trace_id
-          ?parent
-          ?scope
-          ~kind:Span_kind_client
-          ~attrs
-          ~service_name:"Sqlite"
-          name
-          (fun scope -> f (Some scope))
-    else no_trace
+      ( (fun ?trace_id ?parent ?scope name f ->
+          Opentelemetry_lwt.Trace.with_
+            ?trace_id
+            ?parent
+            ?scope
+            ~kind:Span_kind_client
+            ~attrs
+            ~service_name:"Sqlite"
+            name
+            (fun scope -> f (Some scope))),
+        fun f x -> function
+          | Some scope ->
+              Opentelemetry_lwt.Trace.add_attrs scope (fun () -> f x)
+          | None -> () )
+    else (no_trace, no_add_attrs)
   in
   let db_pool = Pool.create pool_size ?max_use_count:max_conn_reuse_count uri in
-  let store = {db_pool; trace} in
+  let store = {db_pool; trace; add_attrs} in
   use store @@ fun conn ->
   let* () = set_wal_journal_mode conn in
   let* () = with_transaction conn migration_code in

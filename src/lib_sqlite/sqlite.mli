@@ -92,6 +92,8 @@ module Request : sig
 
       @param name Optional name for the request for tracing
       @param table Optional table name this request operates on
+      @param attrs Optional function to extract OpenTelemetry attributes from
+        the input
       @param oneshot If true, the request will not be prepared
       @return A request that expects no result rows *)
   val ( ->. ) :
@@ -99,6 +101,7 @@ module Request : sig
     unit Caqti_type.t ->
     ?name:string ->
     ?table:string ->
+    ?attrs:('a -> Opentelemetry.key_value list) ->
     ?oneshot:bool ->
     string ->
     ('a, unit, [`Zero]) t
@@ -109,6 +112,8 @@ module Request : sig
 
       @param name Optional name for the request for tracing
       @param table Optional table name this request operates on
+      @param attrs Optional function to extract OpenTelemetry attributes from
+        the input
       @param oneshot If true, the request will not be prepared
       @return A request that expects exactly one result row *)
   val ( ->! ) :
@@ -116,6 +121,7 @@ module Request : sig
     'b Caqti_type.t ->
     ?name:string ->
     ?table:string ->
+    ?attrs:('a -> Opentelemetry.key_value list) ->
     ?oneshot:bool ->
     string ->
     ('a, 'b, [`One]) t
@@ -126,6 +132,8 @@ module Request : sig
 
       @param name Optional name for the request for tracing
       @param table Optional table name this request operates on
+      @param attrs Optional function to extract OpenTelemetry attributes from
+        the input
       @param oneshot If true, the request will not be prepared
       @return A request that expects zero or one result row *)
   val ( ->? ) :
@@ -133,6 +141,7 @@ module Request : sig
     'b Caqti_type.t ->
     ?name:string ->
     ?table:string ->
+    ?attrs:('a -> Opentelemetry.key_value list) ->
     ?oneshot:bool ->
     string ->
     ('a, 'b, [`One | `Zero]) t
@@ -143,6 +152,8 @@ module Request : sig
 
       @param name Optional name for the request for tracing
       @param table Optional table name this request operates on
+      @param attrs Optional function to extract OpenTelemetry attributes from
+        the input
       @param oneshot If true, the request will not be prepared
       @return A request that can return any number of result rows *)
   val ( ->* ) :
@@ -150,6 +161,7 @@ module Request : sig
     'b Caqti_type.t ->
     ?name:string ->
     ?table:string ->
+    ?attrs:('a -> Opentelemetry.key_value list) ->
     ?oneshot:bool ->
     string ->
     ('a, 'b, [`Many | `One | `Zero]) t
