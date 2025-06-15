@@ -18,7 +18,7 @@ type evm_services_methods = {
 type block_production = [`Single_node | `Disabled]
 
 module Resto = struct
-  let callback server Evm_directory.{dir; extra} =
+  let callback ~port server Evm_directory.{dir; extra} =
     let open Cohttp in
     let open Lwt_syntax in
     let callback_log conn req body =
@@ -31,7 +31,8 @@ module Resto = struct
           let meth = req |> Request.meth |> Code.string_of_method in
           let* body_str = body |> Cohttp_lwt.Body.to_string in
           let* () = Events.callback_log ~uri ~meth ~body:body_str in
-          Tezos_rpc_http_server.RPC_server.resto_callback
+          Octez_telemetry.HTTP_server.resto_callback
+            ~port
             server
             conn
             req
@@ -89,7 +90,7 @@ module Resto = struct
         ~max_active_connections
         ~host
         server
-        ~callback:(callback server directory)
+        ~callback:(callback ~port server directory)
         ~conn_closed
         node
     in
