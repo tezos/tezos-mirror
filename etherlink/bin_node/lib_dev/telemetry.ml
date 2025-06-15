@@ -57,3 +57,21 @@ module Jsonrpc = struct
     | None -> ()) ;
     Lwt.return_error err
 end
+
+module Attributes = struct
+  module Transaction = struct
+    let hash hash =
+      ( "etherlink.transaction.hash",
+        `String (Ethereum_types.hash_to_string hash) )
+  end
+
+  module Block = struct
+    let number (Ethereum_types.Qty number) =
+      ("etherlink.block.number", `Int (Z.to_int number))
+
+    let execution_gas qty =
+      ("etherlink.block.execution_gas", `Int (Z.to_int qty))
+
+    let transaction_count qty = ("etherlink.block.transactions_count", `Int qty)
+  end
+end

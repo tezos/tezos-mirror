@@ -697,6 +697,8 @@ DO UPDATE SET value = excluded.value
       ->. unit)
         ~name:__FUNCTION__
         ~table
+        ~attrs:(fun (_, _, _, hash, _, _, _, _) ->
+          [Telemetry.Attributes.Transaction.hash hash])
       @@ {eos|INSERT INTO transactions (block_hash, block_number, index_, hash, from_, to_, receipt_fields, object_fields) VALUES (?, ?, ?, ?, ?, ?, ?, ?)|eos}
 
     let select_receipt =
