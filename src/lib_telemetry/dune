@@ -10,7 +10,8 @@
   opentelemetry
   opentelemetry-lwt
   octez-libs.resto
-  octez-libs.rpc-http)
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

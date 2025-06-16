@@ -9235,6 +9235,7 @@ let octez_telemetry =
         opentelemetry_lwt;
         resto;
         octez_rpc_http;
+        octez_rpc_http_server;
       ]
 
 let _octez_scoru_wasm_regressions =
