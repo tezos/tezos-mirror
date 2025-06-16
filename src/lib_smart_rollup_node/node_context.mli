@@ -432,6 +432,9 @@ val inbox_of_head :
 val get_inbox_by_block_hash :
   _ t -> Block_hash.t -> Octez_smart_rollup.Inbox.t tzresult Lwt.t
 
+(** Same as {!get_inbox} but uses the inbox level for this inbox instead. *)
+val get_inbox_by_level : _ t -> int32 -> Inbox.t tzresult Lwt.t
+
 (** Returns messages for a payload hash, including protocol messages. *)
 val find_messages :
   _ t -> Merkelized_payload_hashes_hash.t -> string list option tzresult Lwt.t

@@ -178,10 +178,6 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       ctxt
   in
   let* () = maybe_split_context node_ctxt commitment_hash head.level in
-  let* () =
-    unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
-    Plugin.Inbox.same_as_layer_1 node_ctxt head.level inbox
-  in
   let* previous_commitment_hash =
     if level = node_ctxt.genesis_info.level then
       (* Previous commitment for rollup genesis is itself. *)
