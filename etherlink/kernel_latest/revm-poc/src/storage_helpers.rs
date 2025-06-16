@@ -2,20 +2,37 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::Error;
 use revm::primitives::{alloy_primitives::Keccak256, B256, U256};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::{
-    path::Path,
-    runtime::{Runtime, RuntimeError},
+    path::{concat as host_concat, OwnedPath, Path},
+    runtime::RuntimeError,
 };
 
-pub fn read_u64_le_default(host: &impl Runtime, path: &impl Path, default: u64) -> u64 {
+pub fn concat(prefix: &impl Path, suffix: &impl Path) -> Result<OwnedPath, Error> {
+    host_concat(prefix, suffix).map_err(|err| Error::Custom(err.to_string()))
+}
+
+pub fn read_u64_le_default(
+    host: &impl Runtime,
+    path: &impl Path,
+    default: u64,
+) -> Result<u64, Error> {
     match host.store_read_all(path) {
         Ok(bytes) if bytes.len() == std::mem::size_of::<u64>() => {
-            let bytes_array: [u8; std::mem::size_of::<u64>()] = bytes.try_into().unwrap();
-            u64::from_le_bytes(bytes_array)
+            let bytes_array: [u8; std::mem::size_of::<u64>()] = match bytes.try_into() {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    return Err(Error::Custom(format!(
+                        "Bytes array conversion failed with {err:?}",
+                    )))
+                }
+            };
+            Ok(u64::from_le_bytes(bytes_array))
         }
-        Ok(_) | Err(RuntimeError::PathNotFound) => default,
-        Err(err) => panic!("{err:?}"),
+        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
+        Err(err) => Err(Error::Runtime(err)),
     }
 }
 
@@ -23,19 +40,22 @@ pub fn read_u256_le_default(
     host: &impl Runtime,
     path: &impl Path,
     default: U256,
-) -> U256 {
+) -> Result<U256, RuntimeError> {
     match host.store_read_all(path) {
-        Ok(bytes) if bytes.len() == 32 => U256::from_le_slice(&bytes),
-        Ok(_) | Err(RuntimeError::PathNotFound) => default,
-        Err(err) => panic!("{err:?}"),
+        Ok(bytes) if bytes.len() == 32 => Ok(U256::from_le_slice(&bytes)),
+        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
+        Err(runtime_error) => Err(runtime_error),
     }
 }
 
-pub fn read_b256_be_opt(host: &impl Runtime, path: &impl Path) -> Option<B256> {
+pub fn read_b256_be_opt(
+    host: &impl Runtime,
+    path: &impl Path,
+) -> Result<Option<B256>, RuntimeError> {
     match host.store_read_all(path) {
-        Ok(bytes) if bytes.len() == 32 => Some(B256::from_slice(&bytes)),
-        Ok(_) | Err(RuntimeError::PathNotFound) => None,
-        Err(err) => panic!("{err:?}"),
+        Ok(bytes) if bytes.len() == 32 => Ok(Some(B256::from_slice(&bytes))),
+        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(runtime_error) => Err(runtime_error),
     }
 }
 
@@ -43,24 +63,19 @@ pub fn read_b256_be_default(
     host: &impl Runtime,
     path: &impl Path,
     default: B256,
-) -> B256 {
-    match read_b256_be_opt(host, path) {
-        Some(v) => v,
-        None => default,
+) -> Result<B256, RuntimeError> {
+    match read_b256_be_opt(host, path)? {
+        Some(v) => Ok(v),
+        None => Ok(default),
     }
 }
 
-pub fn write_u64_le(host: &mut impl Runtime, path: &impl Path, value: u64) {
+pub fn write_u64_le(
+    host: &mut impl Runtime,
+    path: &impl Path,
+    value: u64,
+) -> Result<(), RuntimeError> {
     host.store_write_all(path, value.to_le_bytes().as_slice())
-        .unwrap()
-}
-
-pub fn read_u64_le(host: &impl Runtime, path: &impl Path) -> u64 {
-    let mut bytes = [0; std::mem::size_of::<u64>()];
-    // TODO: return a proper error here, and handle cases where it's
-    // acceptable to not have a value yet and return a default value.
-    let _ = host.store_read_slice(path, 0, bytes.as_mut_slice());
-    u64::from_le_bytes(bytes)
 }
 
 pub fn bytes_hash(bytes: &[u8]) -> B256 {
