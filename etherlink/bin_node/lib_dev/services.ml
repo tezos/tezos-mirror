@@ -1174,16 +1174,19 @@ let can_process_batch size = function
   | Configuration.Limit l -> size <= l
   | Unlimited -> true
 
-let dispatch_handler (rpc : Configuration.rpc) config tx_container ctx
-    dispatch_request (input : JSONRPC.request batched_request) =
+let dispatch_handler ~service_name (rpc : Configuration.rpc) config tx_container
+    ctx dispatch_request (input : JSONRPC.request batched_request) =
   let open Lwt_syntax in
   match input with
   | Singleton request ->
       let* response = dispatch_request config tx_container ctx request in
       return (Singleton response)
   | Batch requests ->
+      let batch_size = List.length requests in
+      Telemetry.Jsonrpc.trace_batch_with ~service_name ~batch_size
+      @@ fun _scope ->
       let process =
-        if can_process_batch (List.length requests) rpc.batch_limit then
+        if can_process_batch batch_size rpc.batch_limit then
           dispatch_request config tx_container ctx
         else fun req ->
           let value =
@@ -1289,15 +1292,23 @@ let dispatch_private_websocket (rpc_server_family : Rpc_types.rpc_server_family)
   in
   websocket_response_of_response response
 
-let generic_dispatch (rpc : Configuration.rpc) config tx_container ctx dir path
-    dispatch_request =
+let generic_dispatch ~service_name (rpc : Configuration.rpc) config tx_container
+    ctx dir path dispatch_request =
   Evm_directory.register0 dir (dispatch_batch_service ~path) (fun () input ->
-      dispatch_handler rpc config tx_container ctx dispatch_request input
+      dispatch_handler
+        ~service_name
+        rpc
+        config
+        tx_container
+        ctx
+        dispatch_request
+        input
       |> Lwt_result.ok)
 
 let dispatch_public (rpc_server_family : Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) validation config tx_container ctx dir =
   generic_dispatch
+    ~service_name:"public_rpc"
     rpc
     config
     tx_container
@@ -1309,6 +1320,7 @@ let dispatch_public (rpc_server_family : Rpc_types.rpc_server_family)
 let dispatch_private (rpc_server_family : Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) ~block_production config tx_container ctx dir =
   generic_dispatch
+    ~service_name:"private_rpc"
     rpc
     config
     tx_container

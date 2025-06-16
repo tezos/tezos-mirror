@@ -10,6 +10,14 @@
 module Jsonrpc : sig
   open Rpc_encodings
 
+  (** [trace_batch_with ~service_name ~batch_size k] traces the continuation
+      [k] as the handler of a batch of size [batch_size]. *)
+  val trace_batch_with :
+    service_name:string ->
+    batch_size:int ->
+    (Opentelemetry.Scope.t -> 'a Lwt.t) ->
+    'a Lwt.t
+
   (** [trace_dispatch_with ~service_name method_ id k] traces the continuation
       [k] as the handler of the JSON RPC method [method_] sent by a client a
       given [id]. *)

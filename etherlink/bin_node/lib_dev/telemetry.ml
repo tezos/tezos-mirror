@@ -14,6 +14,19 @@ module Jsonrpc = struct
     | Some (JSONRPC.Id_float f) -> `Float f
     | Some (Id_string s) -> `String s
 
+  let trace_batch_with ~service_name ~batch_size =
+    let span_name = Format.sprintf "%s/batch" service_name in
+    Opentelemetry_lwt.Trace.with_
+      ~service_name
+      ~kind:Span_kind_server
+      ~attrs:
+        [
+          ("rpc.system", `String "jsonrpc");
+          ("rpc.jsonrpc.version", `String "2.0");
+          ("rpc.jsonrpc.batch_length", `Int batch_size);
+        ]
+      span_name
+
   let trace_dispatch_with ?(websocket = false) ~service_name method_ id =
     let span_name = Format.sprintf "%s/%s" service_name method_ in
     Opentelemetry_lwt.Trace.with_
