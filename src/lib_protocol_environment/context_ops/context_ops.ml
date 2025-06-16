@@ -46,14 +46,17 @@ module Events = struct
       ()
 end
 
+module Duo_context = Duo_context_lib.Duo_context
+module Duo_memory_context = Duo_context_lib.Duo_memory_context
+
 (** Values of type [index] are used to [checkout] contexts specified by their hash. *)
 type index =
   | Disk_index of Context.index
   | Memory_index of Tezos_context_memory.Context.index
   | Brassaia_index of Brassaia.index
   | Brassaia_memory_index of Brassaia_memory.index
-  | Duo_index of Context_wrapper.Context.index
-  | Duo_memory_index of Context_wrapper.Memory_context.index
+  | Duo_index of Duo_context.index
+  | Duo_memory_index of Duo_memory_context.index
 
 open Environment_context
 
@@ -144,7 +147,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
   | `Duo_index ->
       let* irmin_index = init_context () in
       let+ brassaia_index = init_brassaia_context () in
-      Duo_index {irmin_index; brassaia_index}
+      Duo_index (Duo_context.make_index irmin_index brassaia_index)
   | `Duo_index_memory ->
       let* irmin_index =
         Tezos_context_memory.Context.init ?readonly ?index_log_size irmin_dir
@@ -152,7 +155,8 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
       let+ brassaia_index =
         Brassaia_memory.init ?readonly ?index_log_size brassaia_dir
       in
-      Duo_memory_index {irmin_index; brassaia_index}
+      Duo_memory_index
+        (Duo_memory_context.make_index irmin_index brassaia_index)
 
 (* Wrapper over init that uses an environment variable ('TEZOS_CONTEXT_BACKEND')
    to select the backend between Memory|Brassaia_memory and Disk|Brassaia.
@@ -220,9 +224,9 @@ let index (context : Environment_context.t) =
   | Context {kind = Brassaia_memory_context.Context; ctxt; _} ->
       Brassaia_memory_index (Brassaia_memory.index ctxt)
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      Duo_index (Context_wrapper.Context.index ctxt)
+      Duo_index (Duo_context.index ctxt)
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Duo_memory_index (Context_wrapper.Memory_context.index ctxt)
+      Duo_memory_index (Duo_memory_context.index ctxt)
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let mem (context : Environment_context.t) key =
@@ -233,10 +237,9 @@ let mem (context : Environment_context.t) key =
   | Context {kind = Memory_context.Context; ctxt; _} ->
       Tezos_context_memory.Context.mem ctxt key
   | Context {kind = Brassaia_context.Context; ctxt; _} -> Brassaia.mem ctxt key
-  | Context {kind = Duo_context.Context; ctxt; _} ->
-      Context_wrapper.Context.mem ctxt key
+  | Context {kind = Duo_context.Context; ctxt; _} -> Duo_context.mem ctxt key
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Context_wrapper.Memory_context.mem ctxt key
+      Duo_memory_context.mem ctxt key
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let mem_tree (context : Environment_context.t) key =
@@ -251,9 +254,9 @@ let mem_tree (context : Environment_context.t) key =
   | Context {kind = Brassaia_memory_context.Context; ctxt; _} ->
       Brassaia_memory.mem_tree ctxt key
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      Context_wrapper.Context.mem_tree ctxt key
+      Duo_context.mem_tree ctxt key
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Context_wrapper.Memory_context.mem_tree ctxt key
+      Duo_memory_context.mem_tree ctxt key
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let find (context : Environment_context.t) key =
@@ -266,10 +269,9 @@ let find (context : Environment_context.t) key =
   | Context {kind = Brassaia_context.Context; ctxt; _} -> Brassaia.find ctxt key
   | Context {kind = Brassaia_memory_context.Context; ctxt; _} ->
       Brassaia_memory.find ctxt key
-  | Context {kind = Duo_context.Context; ctxt; _} ->
-      Context_wrapper.Context.find ctxt key
+  | Context {kind = Duo_context.Context; ctxt; _} -> Duo_context.find ctxt key
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Context_wrapper.Memory_context.find ctxt key
+      Duo_memory_context.find ctxt key
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let add (context : Environment_context.t) key data =
@@ -290,11 +292,11 @@ let add (context : Environment_context.t) key data =
       let+ ctxt = Brassaia_memory.add ctxt key data in
       Brassaia_memory_context.wrap_memory_context ctxt
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      let+ ctxt = Context_wrapper.Context.add ctxt key data in
-      Duo_context.wrap_disk_context ctxt
+      let+ ctxt = Duo_context.add ctxt key data in
+      Duo_context.wrap_context ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      let+ ctxt = Context_wrapper.Memory_context.add ctxt key data in
-      Duo_memory_context.wrap_memory_context ctxt
+      let+ ctxt = Duo_memory_context.add ctxt key data in
+      Duo_memory_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let fold_value ?depth (context : Environment_context.t) key ~order ~init ~f =
@@ -319,24 +321,12 @@ let fold_value ?depth (context : Environment_context.t) key ~order ~init ~f =
           let v () = Brassaia_memory.Tree.to_value tree in
           f k v acc)
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      Context_wrapper.Context.fold
-        ?depth
-        ctxt
-        key
-        ~order
-        ~init
-        ~f:(fun k tree acc ->
-          let v () = Context_wrapper.Context.Tree.to_value tree in
+      Duo_context.fold ?depth ctxt key ~order ~init ~f:(fun k tree acc ->
+          let v () = Duo_context.Tree.to_value tree in
           f k v acc)
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Context_wrapper.Memory_context.fold
-        ?depth
-        ctxt
-        key
-        ~order
-        ~init
-        ~f:(fun k tree acc ->
-          let v () = Context_wrapper.Memory_context.Tree.to_value tree in
+      Duo_memory_context.fold ?depth ctxt key ~order ~init ~f:(fun k tree acc ->
+          let v () = Duo_memory_context.Tree.to_value tree in
           f k v acc)
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
@@ -358,11 +348,11 @@ let add_protocol (context : Environment_context.t) proto_hash =
       let+ ctxt = Brassaia_memory.add_protocol ctxt proto_hash in
       Brassaia_memory_context.wrap_memory_context ctxt
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      let+ ctxt = Context_wrapper.Context.add_protocol ctxt proto_hash in
-      Duo_context.wrap_disk_context ctxt
+      let+ ctxt = Duo_context.add_protocol ctxt proto_hash in
+      Duo_context.wrap_context ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      let+ ctxt = Context_wrapper.Memory_context.add_protocol ctxt proto_hash in
-      Duo_memory_context.wrap_memory_context ctxt
+      let+ ctxt = Duo_memory_context.add_protocol ctxt proto_hash in
+      Duo_memory_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let get_protocol (context : Environment_context.t) =
@@ -377,9 +367,9 @@ let get_protocol (context : Environment_context.t) =
   | Context {kind = Brassaia_memory_context.Context; ctxt; _} ->
       Brassaia_memory.get_protocol ctxt
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      Context_wrapper.Context.get_protocol ctxt
+      Duo_context.get_protocol ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Context_wrapper.Memory_context.get_protocol ctxt
+      Duo_memory_context.get_protocol ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let add_predecessor_block_metadata_hash (context : Environment_context.t) hash =
@@ -408,17 +398,13 @@ let add_predecessor_block_metadata_hash (context : Environment_context.t) hash =
       in
       Brassaia_memory_context.wrap_memory_context ctxt
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      let+ ctxt =
-        Context_wrapper.Context.add_predecessor_block_metadata_hash ctxt hash
-      in
-      Duo_context.wrap_disk_context ctxt
+      let+ ctxt = Duo_context.add_predecessor_block_metadata_hash ctxt hash in
+      Duo_context.wrap_context ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       let+ ctxt =
-        Context_wrapper.Memory_context.add_predecessor_block_metadata_hash
-          ctxt
-          hash
+        Duo_memory_context.add_predecessor_block_metadata_hash ctxt hash
       in
-      Duo_memory_context.wrap_memory_context ctxt
+      Duo_memory_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let add_predecessor_ops_metadata_hash (context : Environment_context.t) hash =
@@ -443,17 +429,13 @@ let add_predecessor_ops_metadata_hash (context : Environment_context.t) hash =
       let+ ctxt = Brassaia_memory.add_predecessor_ops_metadata_hash ctxt hash in
       Brassaia_memory_context.wrap_memory_context ctxt
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      let+ ctxt =
-        Context_wrapper.Context.add_predecessor_ops_metadata_hash ctxt hash
-      in
-      Duo_context.wrap_disk_context ctxt
+      let+ ctxt = Duo_context.add_predecessor_ops_metadata_hash ctxt hash in
+      Duo_context.wrap_context ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       let+ ctxt =
-        Context_wrapper.Memory_context.add_predecessor_ops_metadata_hash
-          ctxt
-          hash
+        Duo_memory_context.add_predecessor_ops_metadata_hash ctxt hash
       in
-      Duo_memory_context.wrap_memory_context ctxt
+      Duo_memory_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let hash ~time ?message (context : Environment_context.t) =
@@ -469,9 +451,9 @@ let hash ~time ?message (context : Environment_context.t) =
   | Context {kind = Brassaia_memory_context.Context; ctxt; _} ->
       Brassaia_memory.hash ~time ?message ctxt
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      Context_wrapper.Context.hash ~time ?message ctxt
+      Duo_context.hash ~time ?message ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Context_wrapper.Memory_context.hash ~time ?message ctxt
+      Duo_memory_context.hash ~time ?message ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let get_test_chain (context : Environment_context.t) =
@@ -487,9 +469,9 @@ let get_test_chain (context : Environment_context.t) =
   | Context {kind = Brassaia_memory_context.Context; ctxt; _} ->
       Brassaia_memory.get_test_chain ctxt
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      Context_wrapper.Context.get_test_chain ctxt
+      Duo_context.get_test_chain ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Context_wrapper.Memory_context.get_test_chain ctxt
+      Duo_memory_context.get_test_chain ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let add_test_chain (context : Environment_context.t) status =
@@ -510,11 +492,11 @@ let add_test_chain (context : Environment_context.t) status =
       let+ ctxt = Brassaia_memory.add_test_chain ctxt status in
       Brassaia_memory_context.wrap_memory_context ctxt
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      let+ ctxt = Context_wrapper.Context.add_test_chain ctxt status in
-      Duo_context.wrap_disk_context ctxt
+      let+ ctxt = Duo_context.add_test_chain ctxt status in
+      Duo_context.wrap_context ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      let+ ctxt = Context_wrapper.Memory_context.add_test_chain ctxt status in
-      Duo_memory_context.wrap_memory_context ctxt
+      let+ ctxt = Duo_memory_context.add_test_chain ctxt status in
+      Duo_memory_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let fork_test_chain (context : Environment_context.t) ~protocol ~expiration =
@@ -538,18 +520,13 @@ let fork_test_chain (context : Environment_context.t) ~protocol ~expiration =
       let+ ctxt = Brassaia_memory.fork_test_chain ctxt ~protocol ~expiration in
       Brassaia_memory_context.wrap_memory_context ctxt
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      let+ ctxt =
-        Context_wrapper.Context.fork_test_chain ctxt ~protocol ~expiration
-      in
-      Duo_context.wrap_disk_context ctxt
+      let+ ctxt = Duo_context.fork_test_chain ctxt ~protocol ~expiration in
+      Duo_context.wrap_context ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       let+ ctxt =
-        Context_wrapper.Memory_context.fork_test_chain
-          ctxt
-          ~protocol
-          ~expiration
+        Duo_memory_context.fork_test_chain ctxt ~protocol ~expiration
       in
-      Duo_memory_context.wrap_memory_context ctxt
+      Duo_memory_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let commit ~time ?message (context : Environment_context.t) =
@@ -565,9 +542,9 @@ let commit ~time ?message (context : Environment_context.t) =
   | Context {kind = Brassaia_memory_context.Context; ctxt; _} ->
       Brassaia_memory.commit ~time ?message ctxt
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      Context_wrapper.Context.commit ~time ?message ctxt
+      Duo_context.commit ~time ?message ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Context_wrapper.Memory_context.commit ~time ?message ctxt
+      Duo_memory_context.commit ~time ?message ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let gc context_index context_hash =
@@ -578,9 +555,8 @@ let gc context_index context_hash =
   | Memory_index index -> Tezos_context_memory.Context.gc index context_hash
   | Brassaia_index index -> Brassaia.gc index context_hash
   | Brassaia_memory_index index -> Brassaia_memory.gc index context_hash
-  | Duo_index index -> Context_wrapper.Context.gc index context_hash
-  | Duo_memory_index index ->
-      Context_wrapper.Memory_context.gc index context_hash
+  | Duo_index index -> Duo_context.gc index context_hash
+  | Duo_memory_index index -> Duo_memory_context.gc index context_hash
 
 let wait_gc_completion context_index =
   match[@profiler.span_s
@@ -591,9 +567,8 @@ let wait_gc_completion context_index =
   | Memory_index index -> Tezos_context_memory.Context.wait_gc_completion index
   | Brassaia_index index -> Brassaia.wait_gc_completion index
   | Brassaia_memory_index index -> Brassaia_memory.wait_gc_completion index
-  | Duo_index index -> Context_wrapper.Context.wait_gc_completion index
-  | Duo_memory_index index ->
-      Context_wrapper.Memory_context.wait_gc_completion index
+  | Duo_index index -> Duo_context.wait_gc_completion index
+  | Duo_memory_index index -> Duo_memory_context.wait_gc_completion index
 
 let is_gc_allowed context_index =
   match[@profiler.span_f {verbosity = Notice} ["context_ops"; "is_gc_allowed"]]
@@ -603,8 +578,8 @@ let is_gc_allowed context_index =
   | Memory_index index -> Tezos_context_memory.Context.is_gc_allowed index
   | Brassaia_index index -> Brassaia.is_gc_allowed index
   | Brassaia_memory_index index -> Brassaia_memory.is_gc_allowed index
-  | Duo_index index -> Context_wrapper.Context.is_gc_allowed index
-  | Duo_memory_index index -> Context_wrapper.Memory_context.is_gc_allowed index
+  | Duo_index index -> Duo_context.is_gc_allowed index
+  | Duo_memory_index index -> Duo_memory_context.is_gc_allowed index
 
 let split context_index =
   match[@profiler.span_s {verbosity = Notice} ["context_ops"; "split"]]
@@ -614,8 +589,8 @@ let split context_index =
   | Memory_index index -> Tezos_context_memory.Context.split index
   | Brassaia_index index -> Brassaia.split index
   | Brassaia_memory_index index -> Brassaia_memory.split index
-  | Duo_index index -> Context_wrapper.Context.split index
-  | Duo_memory_index index -> Context_wrapper.Memory_context.split index
+  | Duo_index index -> Duo_context.split index
+  | Duo_memory_index index -> Duo_memory_context.split index
 
 let sync context_index =
   match[@profiler.span_s {verbosity = Notice} ["context_ops"; "sync"]]
@@ -625,8 +600,8 @@ let sync context_index =
   | Memory_index index -> Tezos_context_memory.Context.sync index
   | Brassaia_index index -> Brassaia.sync index
   | Brassaia_memory_index index -> Brassaia_memory.sync index
-  | Duo_index index -> Context_wrapper.Context.sync index
-  | Duo_memory_index index -> Context_wrapper.Memory_context.sync index
+  | Duo_index index -> Duo_context.sync index
+  | Duo_memory_index index -> Duo_memory_context.sync index
 
 let commit_test_chain_genesis (context : Environment_context.t) block_header =
   match[@profiler.span_s
@@ -642,9 +617,9 @@ let commit_test_chain_genesis (context : Environment_context.t) block_header =
   | Context {kind = Brassaia_memory_context.Context; ctxt; _} ->
       Brassaia_memory.commit_test_chain_genesis ctxt block_header
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      Context_wrapper.Context.commit_test_chain_genesis ctxt block_header
+      Duo_context.commit_test_chain_genesis ctxt block_header
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Context_wrapper.Memory_context.commit_test_chain_genesis ctxt block_header
+      Duo_memory_context.commit_test_chain_genesis ctxt block_header
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let compute_testchain_genesis (context : Environment_context.t) block_hash =
@@ -661,9 +636,9 @@ let compute_testchain_genesis (context : Environment_context.t) block_hash =
   | Context {kind = Brassaia_memory_context.Context; _} ->
       Brassaia_memory.compute_testchain_genesis block_hash
   | Context {kind = Duo_context.Context; _} ->
-      Context_wrapper.Context.compute_testchain_genesis block_hash
+      Duo_context.compute_testchain_genesis block_hash
   | Context {kind = Duo_memory_context.Context; _} ->
-      Context_wrapper.Memory_context.compute_testchain_genesis block_hash
+      Duo_memory_context.compute_testchain_genesis block_hash
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let merkle_tree (context : Environment_context.t) leaf_kind path =
@@ -679,9 +654,9 @@ let merkle_tree (context : Environment_context.t) leaf_kind path =
   | Context {kind = Brassaia_memory_context.Context; ctxt; _} ->
       Brassaia_memory.merkle_tree ctxt leaf_kind path
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      Context_wrapper.Context.merkle_tree ctxt leaf_kind path
+      Duo_context.merkle_tree ctxt leaf_kind path
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Context_wrapper.Memory_context.merkle_tree ctxt leaf_kind path
+      Duo_memory_context.merkle_tree ctxt leaf_kind path
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let merkle_tree_v2 (context : Environment_context.t) leaf_kind path =
@@ -697,9 +672,9 @@ let merkle_tree_v2 (context : Environment_context.t) leaf_kind path =
   | Context {kind = Brassaia_memory_context.Context; ctxt; _} ->
       Brassaia_memory.merkle_tree_v2 ctxt leaf_kind path
   | Context {kind = Duo_context.Context; ctxt; _} ->
-      Context_wrapper.Context.merkle_tree_v2 ctxt leaf_kind path
+      Duo_context.merkle_tree_v2 ctxt leaf_kind path
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
-      Context_wrapper.Memory_context.merkle_tree_v2 ctxt leaf_kind path
+      Duo_memory_context.merkle_tree_v2 ctxt leaf_kind path
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let commit_genesis context_index ~chain_id ~time ~protocol =
@@ -718,13 +693,9 @@ let commit_genesis context_index ~chain_id ~time ~protocol =
   | Brassaia_memory_index index ->
       Brassaia_memory.commit_genesis index ~chain_id ~time ~protocol
   | Duo_index index ->
-      Context_wrapper.Context.commit_genesis index ~chain_id ~time ~protocol
+      Duo_context.commit_genesis index ~chain_id ~time ~protocol
   | Duo_memory_index index ->
-      Context_wrapper.Memory_context.commit_genesis
-        index
-        ~chain_id
-        ~time
-        ~protocol
+      Duo_memory_context.commit_genesis index ~chain_id ~time ~protocol
 
 let checkout context_index context_hash =
   let open Lwt_syntax in
@@ -776,9 +747,8 @@ let exists context_index context_hash =
   | Memory_index index -> Tezos_context_memory.Context.exists index context_hash
   | Brassaia_index index -> Brassaia.exists index context_hash
   | Brassaia_memory_index index -> Brassaia_memory.exists index context_hash
-  | Duo_index index -> Context_wrapper.Context.exists index context_hash
-  | Duo_memory_index index ->
-      Context_wrapper.Memory_context.exists index context_hash
+  | Duo_index index -> Duo_context.exists index context_hash
+  | Duo_memory_index index -> Duo_memory_context.exists index context_hash
 
 let close context_index =
   match[@profiler.span_s {verbosity = Notice} ["context_ops"; "close"]]
@@ -788,8 +758,8 @@ let close context_index =
   | Memory_index index -> Tezos_context_memory.Context.close index
   | Brassaia_index index -> Brassaia.close index
   | Brassaia_memory_index index -> Brassaia_memory.close index
-  | Duo_index index -> Context_wrapper.Context.close index
-  | Duo_memory_index index -> Context_wrapper.Memory_context.close index
+  | Duo_index index -> Duo_context.close index
+  | Duo_memory_index index -> Duo_memory_context.close index
 
 let compute_testchain_chain_id (context : Environment_context.t) block_hash =
   match[@profiler.span_f
@@ -805,9 +775,9 @@ let compute_testchain_chain_id (context : Environment_context.t) block_hash =
   | Context {kind = Brassaia_memory_context.Context; _} ->
       Brassaia_memory.compute_testchain_chain_id block_hash
   | Context {kind = Duo_context.Context; _} ->
-      Context_wrapper.Context.compute_testchain_chain_id block_hash
+      Duo_context.compute_testchain_chain_id block_hash
   | Context {kind = Duo_memory_context.Context; _} ->
-      Context_wrapper.Memory_context.compute_testchain_chain_id block_hash
+      Duo_memory_context.compute_testchain_chain_id block_hash
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let export_snapshot context_index context_hash ~path =
@@ -818,10 +788,9 @@ let export_snapshot context_index context_hash ~path =
   | Brassaia_index index -> Brassaia.export_snapshot index context_hash ~path
   | Brassaia_memory_index index ->
       Brassaia_memory.export_snapshot index context_hash ~path
-  | Duo_index index ->
-      Context_wrapper.Context.export_snapshot index context_hash ~path
+  | Duo_index index -> Duo_context.export_snapshot index context_hash ~path
   | Duo_memory_index index ->
-      Context_wrapper.Memory_context.export_snapshot index context_hash ~path
+      Duo_memory_context.export_snapshot index context_hash ~path
 
 let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   let open Lwt_syntax in
