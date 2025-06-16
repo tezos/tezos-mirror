@@ -91,7 +91,7 @@ fi
 "${script_dir}"/create_release_page.sh "$versions_list_filename"
 
 echo "Syncing files to remote s3 bucket"
-if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" && aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
+if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH}/" --cache-control "max-age=30, must-revalidate" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" && aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
   echo "Deployment successful!"
 else
   echo "Deployment failed. Please check the configuration and try again."
