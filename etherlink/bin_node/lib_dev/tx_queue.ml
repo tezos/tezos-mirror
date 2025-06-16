@@ -998,11 +998,6 @@ module Handlers = struct
   let on_close _ = Lwt.return_unit
 end
 
-module Internal_for_tests = struct
-  module Nonce_bitset = Nonce_bitset
-  module Address_nonce = Address_nonce
-end
-
 module Tx_container = struct
   let table = Worker.create_table Queue
 
@@ -1162,3 +1157,8 @@ end
 let start = Tx_container.start
 
 let tx_container = Services_backend_sig.Evm_tx_container (module Tx_container)
+
+module Internal_for_tests = struct
+  module Nonce_bitset = Nonce_bitset
+  module Address_nonce = Address_nonce
+end
