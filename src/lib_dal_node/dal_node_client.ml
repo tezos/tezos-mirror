@@ -25,6 +25,8 @@
 
 open Tezos_dal_node_services
 
+module Profiler = (val Profiler.wrap Dal_profiler.dal_profiler)
+
 class type cctxt = object
   inherit Tezos_rpc.Context.generic
 end
@@ -70,4 +72,9 @@ let post_slot cctxt ?slot_index slot =
       method slot_index = slot_index
     end
   in
-  call cctxt Services.post_slot () query slot
+  (call
+     cctxt
+     Services.post_slot
+     ()
+     query
+     slot [@profiler.aggregate_s {verbosity = Notice} "post_slot"])
