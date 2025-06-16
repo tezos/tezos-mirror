@@ -32,8 +32,8 @@ let event_kernel_log ~kind ~msg =
     (fun (level, msg) -> Events.event_kernel_log ~level ~kind ~msg)
     level_and_msg
 
-let execute ?(wasm_pvm_fallback = false) ?profile ?(kind = Events.Application)
-    ~data_dir ?(log_file = "kernel_log")
+let execute ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
+    ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
     ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
     ~native_execution evm_state inbox =
   let open Lwt_result_syntax in
@@ -111,6 +111,7 @@ let execute ?(wasm_pvm_fallback = false) ?profile ?(kind = Events.Application)
                 match Seq.uncons inbox with Some (x, _) -> x | _ -> []
               in
               Wasm_runtime.run
+                ?l1_timestamp:execution_timestamp
                 ~preimages_dir:config.preimage_directory
                 ?preimages_endpoint:config.preimage_endpoint
                 ~native_execution
