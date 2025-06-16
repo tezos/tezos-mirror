@@ -24,14 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Gs_interface
-
 module Worker = struct
   module Config = Gs_interface.Worker_config
   module Default_parameters = Gs_default_parameters
   module Logging = Gs_logging
   include Gs_interface.Worker_instance
-  module Validate_message_hook = Validate_message_hook
+  module Validate_message_hook = Gs_interface.Validate_message_hook
 end
 
 module Transport_layer = struct
@@ -232,3 +230,5 @@ end
 module Transport_layer_hooks = Gs_transport_connection
 
 let version = Transport_layer_interface.version
+
+module Profiler = Tezos_gossipsub.Profiler

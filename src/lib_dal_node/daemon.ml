@@ -31,13 +31,22 @@ module Profiler = struct
     Dal_profiler.create_reset_block_section Dal_profiler.dal_profiler
 end
 
+module Gossipsub_profiler = struct
+  include
+    (val Tezos_profiler.Profiler.wrap Gossipsub.Profiler.gossipsub_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    Gossipsub.Profiler.(create_reset_block_section gossipsub_profiler)
+end
+
 let[@warning "-32"] may_start_profiler data_dir =
   match Tezos_profiler_unix.Profiler_instance.selected_backends () with
   | Some backends ->
       List.iter
         (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
           let profiler_maker = instance_maker ~directory:data_dir in
-          Dal_profiler.init profiler_maker)
+          Dal_profiler.init profiler_maker ;
+          Gossipsub.Profiler.init profiler_maker)
         backends
   | None -> ()
 
@@ -83,7 +92,12 @@ let on_new_finalized_head ctxt cctxt crawler =
     match next_final_head with
     | None -> Lwt.fail_with "L1 crawler lib shut down"
     | Some (finalized_block_hash, finalized_shell_header) ->
-        () [@profiler.reset_block_section finalized_block_hash] ;
+        ()
+        [@profiler.reset_block_section
+          {profiler_module = Profiler} finalized_block_hash] ;
+        ()
+        [@profiler.reset_block_section
+          {profiler_module = Gossipsub_profiler} finalized_block_hash] ;
         let* () =
           (Block_handler.new_finalized_head
              ctxt
@@ -93,7 +107,9 @@ let on_new_finalized_head ctxt cctxt crawler =
              finalized_block_hash
              finalized_shell_header
              ~launch_time
-           [@profiler.record_s {verbosity = Notice} "new_finalized_head"])
+           [@profiler.record_s
+             {verbosity = Notice; profiler_module = Profiler}
+               "new_finalized_head"])
         in
         loop ()
   in
@@ -267,7 +283,6 @@ let run ?(disable_logging = false) ?(disable_shard_validation = false)
       in
       Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
-  () [@profiler.overwrite may_start_profiler data_dir] ;
   let*! () = Event.emit_starting_node () in
   let* ({
           rpc_addr;
@@ -586,5 +601,6 @@ let run ?(disable_logging = false) ?(disable_shard_validation = false)
   (* Start never-ending monitoring daemons *)
   let version = Tezos_version_value.Bin_version.octez_version_string in
   let*! () = Event.emit_node_is_ready ~network_name ~version in
+  () [@profiler.overwrite may_start_profiler data_dir] ;
   let* () = daemonize [on_new_finalized_head ctxt cctxt crawler] in
   return_unit

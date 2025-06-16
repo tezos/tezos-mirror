@@ -2877,6 +2877,7 @@ let _tezt_self_tests =
     ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
 
 let octez_gossipsub =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_lib
     "tezos-gossipsub"
     ~path:"src/lib_gossipsub"
@@ -2891,7 +2892,10 @@ let octez_gossipsub =
         octez_stdlib_unix |> open_;
         octez_stdlib |> open_;
         octez_version;
+        octez_profiler |> open_;
       ]
+    ~preprocess
+    ~preprocessor_deps
 
 let _octez_gossipsub_test =
   tezt

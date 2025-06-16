@@ -199,3 +199,13 @@ end
 
 (** [version ~network_name] returns the current version of the P2P. *)
 val version : network_name:Distributed_db_version.Name.t -> Network_version.t
+
+module Profiler : sig
+  open Tezos_profiler.Profiler
+
+  val gossipsub_profiler : profiler
+
+  val init : (name:string -> instance option) -> unit
+
+  val create_reset_block_section : profiler -> Block_hash.t * metadata -> unit
+end
