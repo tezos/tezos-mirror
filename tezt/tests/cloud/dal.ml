@@ -138,7 +138,7 @@ module Node = struct
 
   let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~rpc_external
       ~name network ~snapshot ?ppx_profiling cloud agent =
-    toplog "Inititializing an L1 node for %s" name ;
+    toplog "Initializing an L1 node for %s" name ;
     match network with
     | #Network.public -> (
         let network = Network.to_public network in
@@ -3486,7 +3486,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       (List.combine bakers_agents configuration.bakers)
   in
   let bakers = fresh_bakers @ bakers_with_secret_keys in
-  let () = toplog "Init: initializting producers and observers" in
+  let () = toplog "Init: initializing producers and observers" in
   let* producers =
     Lwt_list.mapi_p
       (fun i ((agent, slot_index), account) ->
