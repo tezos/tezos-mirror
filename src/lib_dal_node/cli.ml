@@ -847,9 +847,9 @@ let merge
     metrics_addr;
     peers = peers @ configuration.peers;
     history_mode = Option.value ~default:configuration.history_mode history_mode;
-    service_name = Option.either service_name configuration.service_name;
+    service_name = Option.value ~default:configuration.service_name service_name;
     service_namespace =
-      Option.either service_namespace configuration.service_namespace;
+      Option.value ~default:configuration.service_namespace service_namespace;
     fetch_trusted_setup =
       Option.value
         ~default:configuration.fetch_trusted_setup

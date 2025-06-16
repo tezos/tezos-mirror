@@ -78,8 +78,8 @@ type t = {
   profile : Profile_manager.unresolved_profile;
   history_mode : history_mode;
   version : int;
-  service_name : string option;
-  service_namespace : string option;
+  service_name : string;
+  service_namespace : string;
   experimental_features : experimental_features;
   fetch_trusted_setup : bool;
   verbose : bool;
@@ -117,6 +117,10 @@ let default_metrics_port =
 
 let default_history_mode = Rolling {blocks = `Auto}
 
+let default_service_name = "octez-dal-node"
+
+let default_service_namespace = "octez-dal-node"
+
 let default_experimental_features = ()
 
 let default_fetch_trusted_setup = true
@@ -136,8 +140,8 @@ let default =
     history_mode = default_history_mode;
     profile = Profile_manager.Empty;
     version = current_version;
-    service_name = None;
-    service_namespace = None;
+    service_name = default_service_name;
+    service_namespace = default_service_namespace;
     experimental_features = default_experimental_features;
     fetch_trusted_setup = default_fetch_trusted_setup;
     verbose = false;
@@ -318,13 +322,13 @@ let encoding : t Data_encoding.t =
           (dft
              "service_name"
              ~description:"Name of the service"
-             (Data_encoding.option Data_encoding.string)
-             None)
+             Data_encoding.string
+             default.service_name)
           (dft
              "service_namespace"
              ~description:"Namespace for the service"
-             (Data_encoding.option Data_encoding.string)
-             None)
+             Data_encoding.string
+             default.service_namespace)
           (dft
              "experimental_features"
              ~description:"Experimental features"
