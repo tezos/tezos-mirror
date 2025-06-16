@@ -645,6 +645,11 @@ let get_inbox_by_block_hash node_ctxt hash =
   let* level = level_of_hash node_ctxt hash in
   inbox_of_head node_ctxt {hash; level}
 
+let get_inbox_by_level node_ctxt level =
+  let open Lwt_result_syntax in
+  let* hash = hash_of_level node_ctxt level in
+  inbox_of_head node_ctxt {hash; level}
+
 let find_messages {store; _} payload_hash =
   Store.Messages.find store payload_hash
 

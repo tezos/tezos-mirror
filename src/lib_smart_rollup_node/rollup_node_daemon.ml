@@ -178,10 +178,6 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       ctxt
   in
   let* () = maybe_split_context node_ctxt commitment_hash head.level in
-  let* () =
-    unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
-    Plugin.Inbox.same_as_layer_1 node_ctxt head.hash inbox
-  in
   let* previous_commitment_hash =
     if level = node_ctxt.genesis_info.level then
       (* Previous commitment for rollup genesis is itself. *)
@@ -654,7 +650,8 @@ let rec process_daemon ({node_ctxt; _} as state) =
       | ( Rollup_node_errors.(
             ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
             | Operator_not_in_whitelist | Cannot_patch_pvm_of_public_rollup
-            | Disagree_with_cemented _ | Disagree_with_commitment _ ))
+            | Disagree_with_cemented _ | Disagree_with_commitment _
+            | Inconsistent_inbox _ ))
         | Purpose.Missing_operators _ )
         :: _ as e ->
           fatal_error_exit e

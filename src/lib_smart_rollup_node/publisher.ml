@@ -87,7 +87,10 @@ let sc_rollup_challenge_window node_ctxt =
 let next_commitment_level node_ctxt last_commitment_level =
   add_level last_commitment_level (sc_rollup_commitment_period node_ctxt)
 
-type state = Node_context.rw
+type state = {
+  node_ctxt : Node_context.rw;
+  inbox_checked : unit Commitment.Hash.Table.t;
+}
 
 let tick_of_level (node_ctxt : _ Node_context.t) inbox_level =
   let open Lwt_result_syntax in
@@ -283,7 +286,9 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
         let is_finalized = commitment.inbox_level <= finalized_level in
         (* Only publish commitments that are finalized and not past the curfew *)
         let acc =
-          if is_finalized && not past_curfew then commitment :: acc else acc
+          if is_finalized && not past_curfew then
+            (commitment_hash, commitment) :: acc
+          else acc
         in
         (* We keep the commitment and go back to the previous one. *)
         gather acc commitment.predecessor
@@ -300,16 +305,14 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
       gather [] commitment
 
 let publish_commitment (node_ctxt : _ Node_context.t)
-    (commitment : Octez_smart_rollup.Commitment.t) =
+    (commitment_hash, (commitment : Octez_smart_rollup.Commitment.t)) =
   let open Lwt_result_syntax in
   let publish_operation =
     L1_operation.Publish
       {rollup = node_ctxt.config.sc_rollup_address; commitment}
   in
   let*! () =
-    Commitment_event.publish_commitment
-      (Octez_smart_rollup.Commitment.hash commitment)
-      commitment.inbox_level
+    Commitment_event.publish_commitment commitment_hash commitment.inbox_level
   in
   let* _hash =
     Injector.check_and_add_pending_operation
@@ -333,16 +336,59 @@ let inject_recover_bond (node_ctxt : _ Node_context.t)
   in
   return_unit
 
-let on_publish_commitments (node_ctxt : state) =
+let check_l1_inbox (module Plugin : Protocol_plugin_sig.S) node_ctxt
+    (commitment : Commitment.t) =
+  let open Lwt_result_syntax in
+  let* inbox =
+    Node_context.get_inbox_by_level node_ctxt commitment.inbox_level
+  in
+  Plugin.Inbox.same_as_layer_1 node_ctxt commitment.inbox_level inbox
+
+let run_inbox_checks {node_ctxt; inbox_checked} commitments =
+  let open Lwt_result_syntax in
+  unless (commitments = []) @@ fun () ->
+  let commitments = List.to_seq commitments in
+  (* Narrow table to commitments we care about *)
+  let com_set = commitments |> Seq.map fst |> Commitment.Hash.Set.of_seq in
+  Commitment.Hash.Table.filter_map_inplace
+    (fun hash checked ->
+      if Commitment.Hash.Set.mem hash com_set then Some checked else None)
+    inbox_checked ;
+  (* Run inbox checks for new commitments *)
+  let*? plugin =
+    Protocol_plugins.proto_plugin_for_protocol
+      (Reference.get node_ctxt.current_protocol).hash
+  in
+  Seq.iter_ep
+    (fun (hash, (commitment : Commitment.t)) ->
+      match Commitment.Hash.Table.find inbox_checked hash with
+      | Some () ->
+          (* Already checked *)
+          return_unit
+      | None ->
+          let* () = check_l1_inbox plugin node_ctxt commitment in
+          Commitment.Hash.Table.replace inbox_checked hash () ;
+          return_unit)
+    commitments
+
+let on_publish_commitments ({node_ctxt; _} as state) =
   let open Lwt_result_syntax in
   let* commitments = missing_commitments node_ctxt in
+  let* () = run_inbox_checks state commitments in
   List.iter_es (publish_commitment node_ctxt) commitments
 
 let publish_single_commitment (node_ctxt : _ Node_context.t)
     (commitment : Octez_smart_rollup.Commitment.t) =
+  let open Lwt_result_syntax in
   let lcc = Reference.get node_ctxt.lcc in
   when_ (commitment.inbox_level > lcc.level) @@ fun () ->
-  publish_commitment node_ctxt commitment
+  let hash = Commitment.hash commitment in
+  let*? plugin =
+    Protocol_plugins.proto_plugin_for_protocol
+      (Reference.get node_ctxt.current_protocol).hash
+  in
+  let* () = check_l1_inbox plugin node_ctxt commitment in
+  publish_commitment node_ctxt (hash, commitment)
 
 let recover_bond node_ctxt =
   let open Lwt_result_syntax in
@@ -574,7 +620,7 @@ let cement_commitment (node_ctxt : _ Node_context.t) commitment =
   in
   return_unit
 
-let on_cement_commitments (node_ctxt : state) =
+let on_cement_commitments ({node_ctxt; _} : state) =
   let open Lwt_result_syntax in
   let* cementable_commitments = cementable_commitments node_ctxt in
   List.iter_es (cement_commitment node_ctxt) cementable_commitments
@@ -617,7 +663,9 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch _w () Types.{node_ctxt} = Lwt_result.return node_ctxt
+  let on_launch _w () Types.{node_ctxt} =
+    Lwt_result.return
+      {node_ctxt; inbox_checked = Commitment.Hash.Table.create 31}
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
       [`Continue | `Shutdown] tzresult Lwt.t =
@@ -684,7 +732,7 @@ let worker_add_request condition ~request =
   let open Lwt_result_syntax in
   match worker () with
   | Ok w ->
-      let node_ctxt = Worker.state w in
+      let {node_ctxt; _} = Worker.state w in
       (* Bailout does not publish any commitment it only cement them. *)
       unless
         ((not (condition node_ctxt))
