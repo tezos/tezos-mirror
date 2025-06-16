@@ -27,7 +27,7 @@ oc.docker:jsonnet:amd64:
     reports:
       dotenv: jsonnet_image_tag.env
 
-build_grafazos_dashboards:
+grafazos.build_grafazos_dashboards:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: build
   tags:
@@ -48,15 +48,15 @@ build_grafazos_dashboards:
     - grafazos/output/**/*.json
     when: on_success
 
-gitlab:release:
+grafazos.gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
   - gcp
   needs:
-  - build_grafazos_dashboards
+  - grafazos.build_grafazos_dashboards
   dependencies:
-  - build_grafazos_dashboards
+  - grafazos.build_grafazos_dashboards
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -64,7 +64,7 @@ gitlab:release:
   script:
   - ./grafazos/scripts/releases/create_gitlab_release.sh
 
-publish:release-page:
+grafazos.publish:release-page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
@@ -73,9 +73,9 @@ publish:release-page:
   - when: manual
     allow_failure: true
   needs:
-  - build_grafazos_dashboards
+  - grafazos.build_grafazos_dashboards
   dependencies:
-  - build_grafazos_dashboards
+  - grafazos.build_grafazos_dashboards
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh

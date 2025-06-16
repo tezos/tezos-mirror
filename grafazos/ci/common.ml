@@ -9,6 +9,11 @@ open Gitlab_ci.Util
 open Tezos_ci
 module String_set = Set.Make (String)
 
+(** Prefix used for the jobs name. *)
+let prefix = "grafazos"
+
+let job ~name = job ~name:(prefix ^ "." ^ name)
+
 (** Set of Grafazos files *)
 let changeset_grafazos = Changeset.(make ["grafazos/**/*"])
 

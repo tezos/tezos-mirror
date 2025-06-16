@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 open Tezos_ci
+open Common
 
 let job_datadog_pipeline_trace : tezos_job =
   job
