@@ -11,15 +11,13 @@ let set_voting_key
     (storage : storage) 
     : operation list * storage =
   let _ = Validation.assert_no_tez_in_transaction () in
-  let sender = Tezos.get_sender () in
-  let voting_power =
-      Tezos.voting_power (Converters.address_to_key_hash sender) in
+  let sender = Converters.address_to_key_hash (Tezos.get_sender ()) in
+  let voting_power = Tezos.voting_power sender in
   let _ = Validation.assert_voting_power_positive voting_power in
   let voter_info : voter_info option =
     match opt_addresses, is_voting_key with
       | None, false -> None
-      | None, true -> Some (is_voting_key, None)
-      | Some addresses, is_voting_key -> Some (is_voting_key, Some addresses)
+      | opt_addresses, is_voting_key -> Some (is_voting_key, opt_addresses)
   in
   let updated_voting_keys =
     let voting_keys : (address, voter_info) map =
@@ -46,15 +44,15 @@ let is_voting_key_of
   | None -> false
   | Some voting_key_map ->
         ( match contract, Map.find_opt baker voting_key_map with
-          | _ , None  -> False
-          | None, Some _ -> True
-          | Some _, Some (_,None) -> True
-          | Some c, Some (True,Some whitelist) -> Set.mem c whitelist
-          | Some c, Some (False,Some blacklist) -> not Set.mem c blacklist)
+          | _ , None  -> false
+          | None, Some _ -> true
+          | Some _, Some (_, None) -> true
+          | Some c, Some (true, Some whitelist) -> Set.mem c whitelist
+          | Some c, Some (false, Some blacklist) -> not Set.mem c blacklist)
 
 [@view]
 let list_voters
-    (voter, contract : address* address option)
+    (voter, contract : address * address option)
     (storage : storage)
     : address list =
   match contract, Big_map.find_opt voter storage with

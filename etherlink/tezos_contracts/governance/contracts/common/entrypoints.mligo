@@ -4,7 +4,6 @@
 #import "rollup.mligo" "Rollup"
 #import "events.mligo" "Events"
 #import "validation.mligo" "Validation"
-#import "utils/converters.mligo" "Converters"
 
 
 let new_proposal

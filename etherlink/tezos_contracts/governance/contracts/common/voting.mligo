@@ -225,10 +225,7 @@ let assert_upvoting_allowed
         (config : Storage.config_t)
         (voter : key_hash)
         : unit =
-    let upvotes_count = match Big_map.find_opt voter upvoters_upvotes_count with
-        | Some count -> count
-        | None -> 0n in
-    Assert.Error.assert (upvotes_count < config.upvoting_limit) Errors.upvoting_limit_exceeded
+    Assert.Error.assert (upvoting_allowed upvoters_upvotes_count config voter) Errors.upvoting_limit_exceeded
 
 
 [@inline]
@@ -391,13 +388,10 @@ let filter_voters
        (fun ((voters , total_voting_power), voter_address) ->
                 let voter : key_hash = Converters.address_to_key_hash voter_address in
                 let voting_power : nat = Tezos.voting_power voter in
-                if voting_power > 0n then
-                   if voting_allowed voter then
-                       (Map.add voter voting_power voters, voting_power + total_voting_power)
-                   else
+                if voting_power = 0n || not (voting_allowed voter) then
                    (voters, voting_power + total_voting_power)
                 else
-                   (voters, total_voting_power))
+                   (Map.add voter voting_power voters, voting_power + total_voting_power))
       (Map.empty,0n)
       potential_voters
 
