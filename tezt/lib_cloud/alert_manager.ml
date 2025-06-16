@@ -12,6 +12,8 @@ type receiver =
           (** Slack channel to send notifications to, use '#' for public channel. *)
       api_url : string;  (** Slack notification configuration. *)
       bot_token : string option;
+      text : string option; (* Template of message title shown in slack *)
+      title : string option; (* Template of message body shown in slack *)
     }
   | Null
 
@@ -42,22 +44,24 @@ type alert = {alert : Prometheus.alert; route : route option}
 
 let alert ?route alert = {alert; route}
 
-let slack_webhook_receiver ?channel ~name ~api_url () =
+let slack_webhook_receiver ?channel ~name ~api_url ?title ?text () =
   let channel =
     match channel with
     | None -> {|{{ range .Alerts }}{{ .Annotations.description }}{{ end }}|}
     | Some channel -> channel
   in
-  Slack {name; channel; api_url; bot_token = None}
+  Slack {name; channel; api_url; bot_token = None; title; text}
 
 (* https://prometheus.io/docs/alerting/latest/configuration/#slack_config *)
-let slack_bottoken_receiver ~name ~channel ~bot_token =
+let slack_bottoken_receiver ~name ~channel ~bot_token ?title ?text () =
   Slack
     {
       name;
       channel;
       api_url = "https://api.slack.com/methods/chat.postMessage";
       bot_token = Some bot_token;
+      title;
+      text;
     }
 
 let null_receiver = Null
@@ -85,7 +89,7 @@ let jingoo_receiver_template receiver =
   let open Jingoo.Jg_types in
   let config_template = function
     | Null -> []
-    | Slack {name = _; channel; api_url; bot_token} ->
+    | Slack {name = _; channel; api_url; bot_token; title; text} ->
         [
           ( "config",
             Tobj
@@ -94,6 +98,8 @@ let jingoo_receiver_template receiver =
                  ("api_url", Tstr api_url);
                  ("channel", Tstr channel);
                ]
+              @ Option.fold ~none:[] ~some:(fun v -> [("title", Tstr v)]) title
+              @ Option.fold ~none:[] ~some:(fun v -> [("text", Tstr v)]) text
               @
               match bot_token with
               | None -> []
