@@ -66,6 +66,11 @@ gitlab_upload() {
   fi
 }
 
+# Retrieve GPG keys for repository
+. scripts/ci/repository-keys.sh
+# GPG Signatures
+echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import --
+
 # Loop over architectures
 for architecture in ${architectures}; do
   echo "Upload raw binaries (${architecture})"
@@ -73,6 +78,13 @@ for architecture in ${architectures}; do
   # Loop over binaries
   for binary in ${binaries}; do
     gitlab_upload "octez-binaries/${architecture}/${binary}" "${architecture}-${binary}"
+
+    # GPG Signature
+    echo "$GPG_PASSPHRASE" |
+      gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
+        -u "$GPG_KEY_ID" \
+        --detach-sign "octez-binaries/${architecture}/${binary}"
+    gitlab_upload "octez-binaries/${architecture}/${binary}.sig" "${architecture}-${binary}.sig"
   done
 
   echo "Upload tarball with all binaries (${architecture})"
@@ -83,6 +95,13 @@ for architecture in ${architectures}; do
   cd octez-binaries/
   tar -czf "octez-${architecture}.tar.gz" "octez-${architecture}/"
   gitlab_upload "octez-${architecture}.tar.gz" "${gitlab_octez_binaries_package_name}-linux-${architecture}.tar.gz"
+
+  # GPG Signature
+  echo "$GPG_PASSPHRASE" |
+    gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
+      -u "$GPG_KEY_ID" \
+      --detach-sign "octez-${architecture}.tar.gz"
+  gitlab_upload "octez-${architecture}.tar.gz.sig" "${gitlab_octez_binaries_package_name}-linux-${architecture}.tar.gz.sig"
   cd ..
 done
 
@@ -110,6 +129,13 @@ tar -Oxf "${source_tarball}" "${gitlab_octez_source_package_name}/src/lib_versio
 sha256sum "${source_tarball}" > "${source_tarball}.sha256"
 sha512sum "${source_tarball}" > "${source_tarball}.sha512"
 
+# GPG Signature
+echo "$GPG_PASSPHRASE" |
+  gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
+    -u "$GPG_KEY_ID" \
+    --detach-sign "${source_tarball}"
+
 gitlab_upload "${source_tarball}" "${source_tarball}" "${gitlab_octez_source_package_url}"
 gitlab_upload "${source_tarball}.sha256" "${source_tarball}.sha256" "${gitlab_octez_source_package_url}"
 gitlab_upload "${source_tarball}.sha512" "${source_tarball}.sha512" "${gitlab_octez_source_package_url}"
+gitlab_upload "${source_tarball}.sig" "${source_tarball}.sig" "${gitlab_octez_source_package_url}"
