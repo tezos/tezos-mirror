@@ -10,7 +10,7 @@ stages:
 - packaging
 
 oc.docker:ci:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -31,7 +31,7 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 oc.docker:client-libs-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -51,7 +51,7 @@ oc.docker:client-libs-dependencies:
       dotenv: client_libs_dependencies_image_tag.env
 
 oc.docker:jsonnet:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -72,7 +72,7 @@ oc.docker:jsonnet:amd64:
       dotenv: jsonnet_image_tag.env
 
 oc.docker:rust-toolchain:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -92,7 +92,7 @@ oc.docker:rust-toolchain:amd64:
       dotenv: rust_toolchain_image_tag.env
 
 oc.docker:rust-sdk-bindings:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -113,7 +113,7 @@ oc.docker:rust-sdk-bindings:amd64:
       dotenv: rust_sdk_bindings_image_tag.env
 
 oc.docker:ci:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp_arm64
