@@ -365,7 +365,8 @@ let build :
             @@ Format.asprintf "%a" pp_print_trace err)
       | Ok value -> Result.map (encode (module Method)) value)
     (fun exn ->
-      Lwt.return_error @@ Rpc_errors.invalid_request @@ Printexc.to_string exn)
+      Telemetry.Jsonrpc.return_error @@ Rpc_errors.invalid_request
+      @@ Printexc.to_string exn)
 
 let rpc_ok result = Lwt_result.return @@ Ok result
 
@@ -486,28 +487,33 @@ let process_trace_result trace =
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)
 
-let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) (validation : Validate.validation_mode)
-    (config : Configuration.t)
+let dispatch_request ~websocket
+    (rpc_server_family : Rpc_types.rpc_server_family) (rpc : Configuration.rpc)
+    (validation : Validate.validation_mode) (config : Configuration.t)
     (module Tx_container : Services_backend_sig.Tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_result_syntax in
   let open Ethereum_types in
-  Opentelemetry_lwt.Trace.with_ method_ @@ fun _scope ->
+  Telemetry.Jsonrpc.trace_dispatch_with
+    ~websocket
+    ~service_name:"public_rpc"
+    method_
+    id
+  @@ fun _scope ->
   let*! value =
     match
       map_method_name ~rpc_server_family ~restrict:rpc.restricted_rpcs method_
     with
     | Unknown ->
         Metrics.inc_rpc_method ~name:"unknown" ;
-        Lwt.return_error (Rpc_errors.method_not_found method_)
+        Telemetry.Jsonrpc.return_error (Rpc_errors.method_not_found method_)
     | Unsupported ->
         Metrics.inc_rpc_method ~name:"unsupported" ;
-        Lwt.return_error (Rpc_errors.method_not_supported method_)
+        Telemetry.Jsonrpc.return_error (Rpc_errors.method_not_supported method_)
     | Disabled ->
         Metrics.inc_rpc_method ~name:"disabled" ;
-        Lwt.return_error (Rpc_errors.method_disabled method_)
+        Telemetry.Jsonrpc.return_error (Rpc_errors.method_disabled method_)
     (* Ethereum JSON-RPC API methods we support *)
     | Method (method_rpc, module_) -> (
         Metrics.inc_rpc_method ~name:method_ ;
@@ -811,7 +817,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             build_with_input ~f module_ parameters
         | Send_raw_transaction.Method ->
             if not config.experimental_features.enable_send_raw_transaction then
-              Lwt.return_error
+              Telemetry.Jsonrpc.return_error
               @@ Rpc_errors.transaction_rejected
                    "the node is in read-only mode, it doesn't accept \
                     transactions"
@@ -1014,12 +1020,19 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
   in
   Lwt.return JSONRPC.{value; id}
 
-let dispatch_private_request (rpc_server_family : Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) (config : Configuration.t)
+let dispatch_private_request ~websocket
+    (rpc_server_family : Rpc_types.rpc_server_family) (rpc : Configuration.rpc)
+    (config : Configuration.t)
     (module Tx_container : Services_backend_sig.Tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
+  Telemetry.Jsonrpc.trace_dispatch_with
+    ~websocket
+    ~service_name:"private_rpc"
+    method_
+    id
+  @@ fun _scope ->
   let unsupported () =
     return
       (Error
@@ -1046,7 +1059,8 @@ let dispatch_private_request (rpc_server_family : Rpc_types.rpc_server_family)
                  data = Some (`String method_);
                })
     | Unsupported -> unsupported ()
-    | Disabled -> Lwt.return_error (Rpc_errors.method_disabled method_)
+    | Disabled ->
+        Telemetry.Jsonrpc.return_error (Rpc_errors.method_disabled method_)
     | Method (Produce_block.Method, _) when block_production <> `Single_node ->
         unsupported ()
     | Method (Produce_block.Method, module_) ->
@@ -1247,6 +1261,7 @@ let dispatch_websocket (rpc_server_family : Rpc_types.rpc_server_family)
   | _ ->
       let+ response =
         dispatch_request
+          ~websocket:true
           rpc_server_family
           rpc
           validation
@@ -1263,6 +1278,7 @@ let dispatch_private_websocket (rpc_server_family : Rpc_types.rpc_server_family)
   let open Lwt_syntax in
   let+ response =
     dispatch_private_request
+      ~websocket:true
       rpc_server_family
       ~block_production
       rpc
@@ -1288,7 +1304,7 @@ let dispatch_public (rpc_server_family : Rpc_types.rpc_server_family)
     ctx
     dir
     Path.root
-    (dispatch_request rpc_server_family rpc validation)
+    (dispatch_request ~websocket:false rpc_server_family rpc validation)
 
 let dispatch_private (rpc_server_family : Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) ~block_production config tx_container ctx dir =
@@ -1299,7 +1315,11 @@ let dispatch_private (rpc_server_family : Rpc_types.rpc_server_family)
     ctx
     dir
     Path.(add_suffix root "private")
-    (dispatch_private_request rpc_server_family rpc ~block_production)
+    (dispatch_private_request
+       ~websocket:false
+       rpc_server_family
+       rpc
+       ~block_production)
 
 let generic_websocket_dispatch (config : Configuration.t) tx_container ctx dir
     path dispatch_websocket =
