@@ -314,7 +314,7 @@ let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
   let*! () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let* () =
     Blueprints_follower.start
-      ~chain_family:L2_types.EVM
+      ~multichain:false
       ~ping_tx_pool:false
       ~time_between_blocks
       ~evm_node_endpoint:relay_endpoint
