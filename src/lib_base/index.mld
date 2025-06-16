@@ -21,6 +21,7 @@ It contains the following libraries:
 - {{!module-Mec}Mec}
 - {{!module-Octez_bls12_381_polynomial}Octez_bls12_381_polynomial}: Polynomials over BLS12-381 finite field - Temporary vendored version of Octez
 - {{!module-Octez_srs_extraction}Octez_srs_extraction}
+- {{!module-Octez_telemetry}Octez_telemetry}: Convenient wrappers to trace Octez libraries with Opentelemetry
 - {{!module-Plompiler}Plompiler}
 - {{!module-Plonk}Plonk}: Plonk zero-knowledge proving system
 - {{!module-Polynomial}Polynomial}: Polynomials over finite fields

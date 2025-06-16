@@ -336,6 +336,7 @@ let evm_node_lib_dev =
         opentelemetry_client_cohttp_lwt;
         opentelemetry_ambient_context_lwt;
         opentelemetry_lwt;
+        octez_telemetry;
       ]
 
 let _octez_evm_node_tests =
