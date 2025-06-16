@@ -882,10 +882,6 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         spawn_rpc;
       }
   in
-  on_event evm_node (handle_is_ready_event evm_node) ;
-  on_event evm_node (handle_blueprint_injected_event evm_node) ;
-  on_event evm_node (handle_blueprint_applied_event evm_node) ;
-  on_event evm_node (handle_blueprint_finalized_event evm_node) ;
   evm_node
 
 let name evm_node = evm_node.name
@@ -965,6 +961,10 @@ let run_args evm_node =
   mode_args @ shared_args
 
 let run ?(wait = true) ?(extra_arguments = []) evm_node =
+  on_event evm_node (handle_is_ready_event evm_node) ;
+  on_event evm_node (handle_blueprint_injected_event evm_node) ;
+  on_event evm_node (handle_blueprint_applied_event evm_node) ;
+  on_event evm_node (handle_blueprint_finalized_event evm_node) ;
   let on_terminate _status =
     (* Cancel all event listeners. *)
     trigger_ready evm_node None ;
@@ -984,6 +984,14 @@ let run ?(wait = true) ?(extra_arguments = []) evm_node =
       (fun _ pending_list ->
         List.iter (fun pending -> Lwt.wakeup_later pending None) pending_list)
       pending_blueprint_applied ;
+    let pending_blueprint_finalized =
+      evm_node.persistent_state.pending_blueprint_finalized
+    in
+    evm_node.persistent_state.pending_blueprint_finalized <- Per_level_map.empty ;
+    Per_level_map.iter
+      (fun _ pending_list ->
+        List.iter (fun pending -> Lwt.wakeup_later pending None) pending_list)
+      pending_blueprint_finalized ;
     unit
   in
   let env =
