@@ -35,6 +35,10 @@ const COUNTER_PATH: RefPath = RefPath::assert_from(b"/counter");
 
 const MANAGER_PATH: RefPath = RefPath::assert_from(b"/manager");
 
+const CODE_PATH: RefPath = RefPath::assert_from(b"/data/code");
+
+const STORAGE_PATH: RefPath = RefPath::assert_from(b"/data/storage");
+
 fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::Error> {
     // uses the same encoding as in the octez node's representation of the context
     // see `octez-codec describe alpha.contract binary schema`
@@ -202,6 +206,61 @@ impl TezlinkImplicitAccount {
             account.set_manager_public_key_hash(host, pkh)?;
         }
         Ok(false)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct TezlinkOriginatedAccount {
+    path: OwnedPath,
+}
+
+impl From<OwnedPath> for TezlinkOriginatedAccount {
+    fn from(path: OwnedPath) -> Self {
+        Self { path }
+    }
+}
+
+impl TezlinkAccount for TezlinkOriginatedAccount {
+    #[inline]
+    fn path(&self) -> &OwnedPath {
+        &self.path
+    }
+}
+
+impl TezlinkOriginatedAccount {
+    pub fn from_contract(
+        context: &context::Context,
+        contract: &Contract,
+    ) -> Result<Self, tezos_storage::error::Error> {
+        let index = context::contracts::index(context)?;
+        let path = concat(&index, &account_path(contract)?)?;
+        Ok(path.into())
+    }
+
+    pub fn code(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<Vec<u8>, tezos_storage::error::Error> {
+        let path = concat(self.path(), &CODE_PATH)?;
+        Ok(host.store_read_all(&path)?)
+    }
+
+    pub fn storage(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<Vec<u8>, tezos_storage::error::Error> {
+        let path = concat(self.path(), &STORAGE_PATH)?;
+        Ok(host.store_read_all(&path)?)
+    }
+
+    pub fn set_storage(
+        &self,
+        host: &mut impl Runtime,
+        data: &[u8],
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = concat(self.path(), &STORAGE_PATH)?;
+        host.store_write_all(&path, data)?;
+        Ok(())
     }
 }
 
