@@ -68,11 +68,11 @@ module type INBOX = sig
     tzresult
     Lwt.t
 
-  (** [same_as_layer_1 node_ctxt block node_inbox] ensures that the rollup node
-      agrees with the L1 node that inbox for [block] is [node_inbox]. *)
+  (** [same_as_layer_1 node_ctxt level node_inbox] ensures that the rollup node
+      agrees with the L1 node that inbox for [level] is [node_inbox]. *)
   val same_as_layer_1 :
     _ Node_context.t ->
-    Block_hash.t ->
+    int32 ->
     Octez_smart_rollup.Inbox.t ->
     unit tzresult Lwt.t
 
