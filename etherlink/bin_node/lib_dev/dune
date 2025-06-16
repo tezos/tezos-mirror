@@ -41,7 +41,8 @@
   octez-performance-metrics
   octez-libs.opentelemetry-client-cohttp-lwt
   opentelemetry.ambient-context.lwt
-  opentelemetry-lwt)
+  opentelemetry-lwt
+  octez-libs.octez-telemetry)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

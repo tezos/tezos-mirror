@@ -2634,6 +2634,19 @@ let _octez_workers_tests =
         alcotezt;
       ]
 
+let octez_telemetry =
+  octez_lib
+    "octez-telemetry"
+    ~internal_name:"Octez_telemetry"
+    ~path:"src/lib_telemetry"
+    ~synopsis:"Convenient wrappers to trace Octez libraries with Opentelemetry"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        opentelemetry;
+        opentelemetry_lwt;
+      ]
+
 let octez_bees =
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_lib

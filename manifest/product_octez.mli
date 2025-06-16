@@ -25,6 +25,8 @@ val octez_profiler : Manifest.target
 
 val octez_profiler_backends : Manifest.target
 
+val octez_telemetry : Manifest.target
+
 val octez_clic : Manifest.target
 
 val octez_client_base : Manifest.target
