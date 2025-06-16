@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler = (val Profiler.wrap Dal_profiler.dal_profiler)
+
 (* This function removes from the store the given slot and its
    shards. In case of error, this function emits a warning instead
    of failing. *)
@@ -364,10 +366,11 @@ let process_block_data ctxt cctxt store proto_parameters block_level
     (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
   let* block_info =
-    Plugin.block_info
-      cctxt
-      ~block:(`Level block_level)
-      ~operations_metadata:`Never
+    (Plugin.block_info
+       cctxt
+       ~block:(`Level block_level)
+       ~operations_metadata:`Never
+     [@profiler.record_s {verbosity = Notice} "block_info"])
   in
   let* () =
     if Node_context.supports_refutations ctxt then
@@ -377,21 +380,29 @@ let process_block_data ctxt cctxt store proto_parameters block_level
         proto_parameters
         ~attested_level:block_level
         (module Plugin : Dal_plugin.T)
+      [@profiler.record_s {verbosity = Notice} "store_skip_list_cells"]
     else return_unit
   in
-  let* slot_headers = Plugin.get_published_slot_headers ~block_level cctxt in
+  let* slot_headers =
+    (Plugin.get_published_slot_headers
+       ~block_level
+       cctxt [@profiler.record_s {verbosity = Notice} "slot_headers"])
+  in
   let* () =
-    Slot_manager.store_slot_headers
-      ~number_of_slots:proto_parameters.Types.number_of_slots
-      ~block_level
-      slot_headers
-      store
+    (Slot_manager.store_slot_headers
+       ~number_of_slots:proto_parameters.Types.number_of_slots
+       ~block_level
+       slot_headers
+       store [@profiler.record_s {verbosity = Notice} "store_slot_headers"])
   in
   let* () =
     (* If a slot header was posted to the L1 and we have the corresponding
        data, post it to gossipsub.  Note that this is done independently
        of the profile. *)
-    let level_committee = Node_context.fetch_committee ctxt in
+    let level_committee =
+      (Node_context.fetch_committee
+         ctxt [@profiler.record_f {verbosity = Notice} "fetch_committee"])
+    in
     let slot_size = proto_parameters.cryptobox_parameters.slot_size in
     let gs_worker = Node_context.get_gs_worker ctxt in
     List.iter_es
@@ -399,48 +410,62 @@ let process_block_data ctxt cctxt store proto_parameters block_level
         let slot_id : Types.slot_id =
           {slot_level = published_level; slot_index}
         in
-        Slot_manager.publish_slot_data
-          ctxt
-          ~level_committee
-          ~slot_size
-          gs_worker
-          proto_parameters
-          commitment
-          slot_id)
+        (Slot_manager.publish_slot_data
+           ctxt
+           ~level_committee
+           ~slot_size
+           gs_worker
+           proto_parameters
+           commitment
+           slot_id
+         [@profiler.aggregate_s {verbosity = Notice} "publish_slot_data"]))
       slot_headers
   in
-  let*? dal_attestation = Plugin.dal_attestation block_info in
+  let*? dal_attestation =
+    (Plugin.dal_attestation
+       block_info [@profiler.record_f {verbosity = Notice} "dal_attestation"])
+  in
   let* () =
-    Slot_manager.update_selected_slot_headers_statuses
-      ~block_level
-      ~attestation_lag:proto_parameters.attestation_lag
-      ~number_of_slots:proto_parameters.number_of_slots
-      (Plugin.is_attested dal_attestation)
-      store
+    (Slot_manager.update_selected_slot_headers_statuses
+       ~block_level
+       ~attestation_lag:proto_parameters.attestation_lag
+       ~number_of_slots:proto_parameters.number_of_slots
+       (Plugin.is_attested dal_attestation)
+       store
+     [@profiler.record_s
+       {verbosity = Notice} "update_selected_slot_headers_statuses"])
   in
   let*! () =
-    remove_unattested_slots_and_shards
-      proto_parameters
-      ctxt
-      ~published_level:
-        Int32.(sub block_level (of_int proto_parameters.attestation_lag))
-      (Plugin.is_attested dal_attestation)
+    (remove_unattested_slots_and_shards
+       proto_parameters
+       ctxt
+       ~published_level:
+         Int32.(sub block_level (of_int proto_parameters.attestation_lag))
+       (Plugin.is_attested dal_attestation)
+     [@profiler.record_s
+       {verbosity = Notice} "remove_unattested_slots_and_shards"])
   in
-  let* attestations = Plugin.get_attestations ~block_level cctxt in
+  let* attestations =
+    (Plugin.get_attestations
+       ~block_level
+       cctxt [@profiler.record_s {verbosity = Notice} "get_attestations"])
+  in
   let* () =
-    check_attesters_attested
-      ctxt
-      proto_parameters
-      ~block_level
-      attestations
-      Plugin.is_attested
+    (check_attesters_attested
+       ctxt
+       proto_parameters
+       ~block_level
+       attestations
+       Plugin.is_attested
+     [@profiler.record_s {verbosity = Notice} "check_attesters_attested"])
   in
-  Accuser.inject_entrapment_evidences
-    (module Plugin)
-    attestations
-    ctxt
-    cctxt
-    ~attested_level:block_level
+  (Accuser.inject_entrapment_evidences
+     (module Plugin)
+     attestations
+     ctxt
+     cctxt
+     ~attested_level:block_level
+   [@profiler.record_s {verbosity = Notice} "inject_entrapment_evidences"])
 
 let process_block ctxt cctxt l1_crawler proto_parameters finalized_shell_header
     finalized_block_hash =
@@ -463,6 +488,7 @@ let process_block ctxt cctxt l1_crawler proto_parameters finalized_shell_header
           proto_parameters
           block_level
           (module Plugin)
+        [@profiler.record_s {verbosity = Notice} "process_block_data"]
     else return_unit
   in
   let*? block_round = Plugin.get_round finalized_shell_header.fitness in
@@ -491,13 +517,14 @@ let rec try_process_block ~retries ctxt cctxt l1_crawler proto_parameters
     finalized_shell_header finalized_block_hash =
   let open Lwt_syntax in
   let* res =
-    process_block
-      ctxt
-      cctxt
-      l1_crawler
-      proto_parameters
-      finalized_shell_header
-      finalized_block_hash
+    (process_block
+       ctxt
+       cctxt
+       l1_crawler
+       proto_parameters
+       finalized_shell_header
+       finalized_block_hash
+     [@profiler.record_s {verbosity = Notice} "process_block"])
   in
   match res with
   | Error e when Layer_1.is_connection_error e && retries > 0 ->
@@ -573,6 +600,7 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
         proto_parameters
         finalized_shell_header
         finalized_block_hash
+      [@profiler.record_s {verbosity = Notice} "try_process_block"]
   in
   let end_time = Unix.gettimeofday () in
   Dal_metrics.per_level_processing_time (end_time -. launch_time) ;

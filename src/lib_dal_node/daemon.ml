@@ -82,14 +82,15 @@ let on_new_finalized_head ctxt cctxt crawler =
     | Some (finalized_block_hash, finalized_shell_header) ->
         () [@profiler.reset_block_section finalized_block_hash] ;
         let* () =
-          Block_handler.new_finalized_head
-            ctxt
-            cctxt
-            crawler
-            cryptobox
-            finalized_block_hash
-            finalized_shell_header
-            ~launch_time
+          (Block_handler.new_finalized_head
+             ctxt
+             cctxt
+             crawler
+             cryptobox
+             finalized_block_hash
+             finalized_shell_header
+             ~launch_time
+           [@profiler.record_s {verbosity = Notice} "new_finalized_head"])
         in
         loop ()
   in
