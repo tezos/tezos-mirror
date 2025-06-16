@@ -98,9 +98,14 @@ impl TezlinkImplicitAccount {
         context: &context::Context,
         contract: &Contract,
     ) -> Result<Self, tezos_storage::error::Error> {
-        let index = context::contracts::index(context)?;
-        let path = concat(&index, &account_path(contract)?)?;
-        Ok(path.into())
+        match contract {
+            Contract::Implicit(_) => {
+                let index = context::contracts::index(context)?;
+                let path = concat(&index, &account_path(contract)?)?;
+                Ok(path.into())
+            }
+            _ => Err(tezos_storage::error::Error::OriginatedToImplicit),
+        }
     }
 
     pub fn from_public_key_hash(
@@ -232,9 +237,14 @@ impl TezlinkOriginatedAccount {
         context: &context::Context,
         contract: &Contract,
     ) -> Result<Self, tezos_storage::error::Error> {
-        let index = context::contracts::index(context)?;
-        let path = concat(&index, &account_path(contract)?)?;
-        Ok(path.into())
+        match contract {
+            Contract::Originated(_) => {
+                let index = context::contracts::index(context)?;
+                let path = concat(&index, &account_path(contract)?)?;
+                Ok(path.into())
+            }
+            _ => Err(tezos_storage::error::Error::ImplicitToOriginated),
+        }
     }
 
     pub fn code(

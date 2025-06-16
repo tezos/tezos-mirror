@@ -50,6 +50,10 @@ pub enum AccountStorageError {
     NonceOverflow,
     #[error("Account code already initialised")]
     AccountCodeAlreadySet,
+    #[error("Tried casting an Implicit account into an Originated account")]
+    ImplicitToOriginated,
+    #[error("Tried casting an Originated account into an Implicit account")]
+    OriginatedToImplicit,
 }
 
 impl From<tezos_smart_rollup_storage::StorageError> for AccountStorageError {
@@ -89,6 +93,12 @@ impl From<GenStorageError> for AccountStorageError {
             }
             GenStorageError::InvalidLoadValue { expected, actual } => {
                 AccountStorageError::InvalidLoadValue { expected, actual }
+            }
+            GenStorageError::ImplicitToOriginated => {
+                AccountStorageError::ImplicitToOriginated
+            }
+            GenStorageError::OriginatedToImplicit => {
+                AccountStorageError::OriginatedToImplicit
             }
         }
     }
