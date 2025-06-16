@@ -12,7 +12,6 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
-  "opentelemetry-lwt"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

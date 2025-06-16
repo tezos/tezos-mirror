@@ -55,7 +55,7 @@ module Make_sub_directory (S : PARAM) = struct
     in
     let trace_name = String.concat " " [meth; route] in
     let f a q i =
-      Opentelemetry_lwt.Trace.with_
+      Octez_telemetry.Trace.with_tzresult
         ~kind:Span_kind_server
         ~service_name
         trace_name

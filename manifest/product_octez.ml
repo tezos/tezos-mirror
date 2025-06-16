@@ -5302,7 +5302,7 @@ let octez_crawler =
         octez_stdlib_unix |> open_;
         octez_client_base |> open_;
         octez_shell;
-        opentelemetry_lwt;
+        octez_telemetry;
       ]
 
 let octez_dal_node_lib =
@@ -5449,7 +5449,7 @@ let octez_injector_lib =
         octez_shell;
         octez_crawler |> open_;
         octez_signer_backends;
-        opentelemetry_lwt;
+        octez_telemetry;
       ]
 
 let performance_metrics =
