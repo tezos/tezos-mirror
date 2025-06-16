@@ -137,7 +137,7 @@ module Node = struct
   include Node
 
   let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~rpc_external
-      ~name network ~snapshot cloud agent =
+      ~name network ~snapshot ?ppx_profiling cloud agent =
     toplog "Inititializing an L1 node for %s" name ;
     match network with
     | #Network.public -> (
@@ -160,6 +160,7 @@ module Node = struct
             let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
               Node.Agent.run
+                ?ppx_profiling
                 node
                 [Network (Network.to_octez_network_options network)]
             in
@@ -269,6 +270,7 @@ module Node = struct
             toplog "Launching the node %s." name ;
             let* () =
               Node.Agent.run
+                ?ppx_profiling
                 node
                 (Force_history_mode_switch :: Synchronisation_threshold 1
                :: arguments)
@@ -301,6 +303,7 @@ module Node = struct
             let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
               Node.Agent.run
+                ?ppx_profiling
                 node
                 ([
                    No_bootstrap_peers;
@@ -328,7 +331,7 @@ module Node = struct
                 agent
             in
             let* () = may_copy_node_identity_file agent node identity_file in
-            let* () = Node.Agent.run node [] in
+            let* () = Node.Agent.run ?ppx_profiling node [] in
             let* () = Node.wait_for_ready node in
             Lwt.return node)
 end
@@ -516,6 +519,7 @@ type configuration = {
   external_rpc : bool;
   disable_shard_validation : bool;
   ignore_pkhs : string list;
+  ppx_profiling : bool;
 }
 
 type bootstrap = {
@@ -2189,6 +2193,7 @@ let init_public_network cloud (configuration : configuration)
             ~name:"bootstrap-node"
             configuration.network
             ~snapshot:configuration.snapshot
+            ~ppx_profiling:configuration.ppx_profiling
             cloud
             agent
         in
@@ -2226,6 +2231,7 @@ let init_public_network cloud (configuration : configuration)
                 ~memtrace:configuration.memtrace
                 ~event_level:`Notice
                 ~disable_shard_validation
+                ~ppx_profiling:configuration.ppx_profiling
                 dal_node
             in
             Lwt.return_some dal_node
@@ -2422,6 +2428,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~name
       configuration.network
       ~snapshot:configuration.snapshot
+      ~ppx_profiling:configuration.ppx_profiling
       cloud
       agent
   in
@@ -2530,6 +2537,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           ~memtrace:configuration.memtrace
           ~event_level:`Notice
           ~disable_shard_validation:configuration.disable_shard_validation
+          ~ppx_profiling:configuration.ppx_profiling
           dal_bootstrap_node
   in
   let* () =
@@ -2586,6 +2594,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       ~rpc_external:configuration.external_rpc
       configuration.network
       ~snapshot:configuration.snapshot
+      ~ppx_profiling:configuration.ppx_profiling
       cloud
       agent
   in
@@ -2618,6 +2627,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
           ~memtrace:configuration.memtrace
           ~event_level:`Notice
           ~disable_shard_validation:configuration.disable_shard_validation
+          ~ppx_profiling:configuration.ppx_profiling
           dal_node
       in
       Lwt.return_some dal_node
@@ -2660,6 +2670,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       ~delegates
       ~client
       ?dal_node_rpc_endpoint
+      ~ppx_profiling:configuration.ppx_profiling
       node
       cloud
       agent
@@ -2690,6 +2701,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       ~rpc_external:configuration.external_rpc
       configuration.network
       ~snapshot:configuration.snapshot
+      ~ppx_profiling:configuration.ppx_profiling
       cloud
       agent
   in
@@ -2760,6 +2772,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       ~event_level:`Notice
       ~disable_shard_validation:configuration.disable_shard_validation
       ?ignore_pkhs
+      ~ppx_profiling:configuration.ppx_profiling
       dal_node
   in
   let () = toplog "Init producer %s: DAL node is ready" name in
@@ -2789,6 +2802,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
       ~rpc_external:configuration.external_rpc
       configuration.network
       ~snapshot:configuration.snapshot
+      ~ppx_profiling:configuration.ppx_profiling
       cloud
       agent
   in
@@ -2830,6 +2844,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
       ~memtrace:configuration.memtrace
       ~event_level:`Notice
       ~disable_shard_validation:configuration.disable_shard_validation
+      ~ppx_profiling:configuration.ppx_profiling
       dal_node
   in
   let* () =
@@ -3603,6 +3618,7 @@ let on_new_level t level ~metadata =
               Dal_node.Agent.run
                 ?otel:t.otel
                 ~memtrace:t.configuration.memtrace
+                ~ppx_profiling:t.configuration.ppx_profiling
                 dal_node)
         in
         Lwt.return {t with disconnection_state = Some disconnection_state}
@@ -3797,6 +3813,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let bakers = Cli.bakers in
     let external_rpc = Cli.node_external_rpc_server in
     let disable_shard_validation = Cli.disable_shard_validation in
+    let ppx_profiling = Cli.ppx_profiling in
     let t =
       {
         with_dal;
@@ -3824,6 +3841,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         external_rpc;
         disable_shard_validation;
         ignore_pkhs;
+        ppx_profiling;
       }
     in
     (t, etherlink)

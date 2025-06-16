@@ -5,6 +5,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let ppx_profiler_env =
+  String_map.of_list [("PROFILING", "Debug"); ("PROFILING_BACKEND", "txt")]
+
+let may_add_profiling_to_env ~ppx_profiling =
+  if ppx_profiling then function
+    | None -> Some ppx_profiler_env
+    | Some env ->
+        Some (String_map.union (fun _ _ _ -> None) env ppx_profiler_env)
+  else Fun.id
+
 let create_dir ?runner dir =
   let* () = Process.spawn ?runner "rm" ["-rf"; dir] |> Process.check in
   let* () = Process.spawn ?runner "mkdir" ["-p"; dir] |> Process.check in
@@ -122,11 +132,11 @@ module Node = struct
         arguments
 
     let run ?env ?patch_config ?on_terminate ?event_level ?event_sections_levels
-        node args =
+        ?(ppx_profiling = false) node args =
       let name = name node in
       let* () =
         run
-          ?env
+          ?env:(may_add_profiling_to_env ~ppx_profiling env)
           ?patch_config
           ?on_terminate
           ?event_level
@@ -228,7 +238,8 @@ module Dal_node = struct
         agent
 
     let run ?otel ?(memtrace = false) ?event_level
-        ?(disable_shard_validation = false) ?ignore_pkhs dal_node =
+        ?(disable_shard_validation = false) ?ignore_pkhs
+        ?(ppx_profiling = false) dal_node =
       let name = name dal_node in
       let filename = Format.asprintf "%s/%s-trace.ctf" Path.tmp_dir name in
       let env =
@@ -269,6 +280,11 @@ module Dal_node = struct
              (fun _ _ _ -> None)
              disable_shard_validation_env
              ignore_topics_env)
+      in
+      let env =
+        if ppx_profiling then
+          String_map.union (fun _ _ _ -> None) env ppx_profiler_env
+        else env
       in
       let* () = run ~env ?event_level dal_node in
       (* Update the state in the service manager *)
@@ -475,7 +491,8 @@ module Agnostic_baker = struct
   module Agent = struct
     let init ?(group = "L1") ?env ?name ~delegates
         ?(path = Uses.path Constant.octez_agnostic_baker) ~client
-        ?dal_node_rpc_endpoint ?dal_node_timeout_percentage node cloud agent =
+        ?dal_node_rpc_endpoint ?dal_node_timeout_percentage
+        ?(ppx_profiling = false) node cloud agent =
       let* path = Agent.copy agent ~source:path in
       let* () =
         Cloud.register_binary
@@ -487,7 +504,7 @@ module Agnostic_baker = struct
       in
       let runner = Agent.runner agent in
       init
-        ?env
+        ?env:(may_add_profiling_to_env ~ppx_profiling env)
         ?name
         ~event_level:`Notice
         ?runner

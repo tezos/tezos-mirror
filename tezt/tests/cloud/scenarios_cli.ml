@@ -89,6 +89,8 @@ module type Dal = sig
   val disable_shard_validation : bool
 
   val ignore_pkhs : string list
+
+  val ppx_profiling : bool
 end
 
 module Dal () : Dal = struct
@@ -429,6 +431,15 @@ module Dal () : Dal = struct
         "Specify a list of public key hashes for which all the producers will \
          not publish the associated shards."
       ()
+
+  let ppx_profiling =
+    Clap.flag
+      ~section
+      ~set_long:"ppx-profiling"
+      ~description:
+        "Enable PPX profiling on all components. The level of verbosity is by \
+         default `Debug` and the format of the output is `txt`. "
+      false
 end
 
 module type Layer1 = sig
