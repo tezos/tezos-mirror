@@ -33,6 +33,9 @@ val hex_encoding : hex Data_encoding.t
 (** version of [hex_encoding] that do not add `0x` on encoded values. *)
 val hex_encoding_no0x : hex Data_encoding.t
 
+(** Produced string is prefixed with [0x]. *)
+val hex_to_string : hex -> string
+
 (** Strips the [0x] prefix of a string. *)
 val hex_of_string : string -> hex
 

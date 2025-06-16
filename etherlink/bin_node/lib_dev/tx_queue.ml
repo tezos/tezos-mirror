@@ -36,10 +36,12 @@ type pending_request = {
 
 type callback = all_variant variant_callback
 
+module Tx = Tx_queue_types.Eth_transaction_object
+
 type request = {
   next_nonce : Ethereum_types.quantity;
   payload : Ethereum_types.hex;
-  tx_object : Ethereum_types.legacy_transaction_object;
+  tx_object : Tx.legacy;
   callback : callback;
 }
 
@@ -261,13 +263,12 @@ module Tx_container = struct
     open Ethereum_types
     module S = String.Hashtbl
 
-    type t = Ethereum_types.legacy_transaction_object S.t
+    type t = Tx.legacy S.t
 
     let empty ~start_size = S.create start_size
 
-    let add htbl
-        (({hash = Hash (Hex hash); _} :
-           Ethereum_types.legacy_transaction_object) as tx_object) =
+    let add htbl tx_object =
+      let (Hash (Hex hash)) = Tx.hash_of_tx_object tx_object in
       (* Here we uses `add` and not `replace`. If a transaction is
          submitted multiple times then we register it each time in the
          hashtable. Meaning that for `find` to returns None, we must
@@ -325,11 +326,11 @@ module Tx_container = struct
 
     let empty ~start_size = S.create start_size
 
-    let remove s (Ethereum_types.Address (Hex h)) = S.remove s h
+    let remove s a = S.remove s (Tx.address_to_string a)
 
-    let find s (Ethereum_types.Address (Hex h)) = S.find s h
+    let find s a = S.find s (Tx.address_to_string a)
 
-    let add s (Ethereum_types.Address (Hex h)) i = S.replace s h i
+    let add s a i = S.replace s (Tx.address_to_string a) i
 
     let decrement s address =
       let current = find s address in
@@ -377,13 +378,10 @@ module Tx_container = struct
   module Request = struct
     type ('a, 'b) t =
       | Inject : request -> ((unit, string) result, tztrace) t
-      | Find : {
-          txn_hash : Ethereum_types.hash;
-        }
-          -> (Ethereum_types.legacy_transaction_object option, tztrace) t
+      | Find : {txn_hash : Ethereum_types.hash} -> (Tx.legacy option, tztrace) t
       | Nonce : {
           next_nonce : Ethereum_types.quantity;
-          address : Ethereum_types.address;
+          address : Tx.address;
         }
           -> (Ethereum_types.quantity, tztrace) t
       | Tick : {evm_node_endpoint : endpoint} -> (unit, tztrace) t
@@ -397,12 +395,10 @@ module Tx_container = struct
           validate_tx :
             'a ->
             string ->
-            Ethereum_types.legacy_transaction_object ->
+            Tx.legacy ->
             [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t;
         }
-          -> ( (string * Ethereum_types.legacy_transaction_object) list,
-               tztrace )
-             t
+          -> ((string * Tx.legacy) list, tztrace) t
       | Confirm_transactions : {
           confirmed_txs : Ethereum_types.hash Seq.t;
           clear_pending_queue_after : bool;
@@ -479,7 +475,7 @@ module Tx_container = struct
             (obj3
                (req "request" (constant "nonce"))
                (req "next_nonce" Ethereum_types.quantity_encoding)
-               (req "address" Ethereum_types.address_encoding))
+               (req "address" Tx.address_encoding))
             (function
               | View (Nonce {next_nonce; address}) ->
                   Some ((), next_nonce, address)
@@ -542,8 +538,8 @@ module Tx_container = struct
       | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
       | Tick _ -> fprintf fmt "Tick"
       | Clear -> fprintf fmt "Clear"
-      | Nonce {next_nonce = _; address = Address (Hex address)} ->
-          fprintf fmt "Nonce %s" address
+      | Nonce {next_nonce = _; address} ->
+          fprintf fmt "Nonce %s" (Tx.address_to_string address)
       | Lock_transactions -> Format.fprintf fmt "Locking the transactions"
       | Unlock_transactions -> Format.fprintf fmt "Unlocking the transactions"
       | Is_locked -> Format.fprintf fmt "Checking if the tx queue is locked"
@@ -734,16 +730,19 @@ module Tx_container = struct
       match request with
       | Inject {next_nonce; payload; tx_object; callback} ->
           protect @@ fun () ->
-          Tx_watcher.notify tx_object.hash ;
-          let (Address (Hex addr)) = tx_object.from in
-          let (Qty tx_nonce) = tx_object.nonce in
+          Tx_watcher.notify (Tx.hash_of_tx_object tx_object) ;
+          let addr =
+            Tx.address_to_string (Tx.from_address_of_tx_object tx_object)
+          in
+          let (Qty tx_nonce) = Tx.nonce_of_tx_object tx_object in
           let pending_callback (reason : pending_variant) =
             let open Lwt_syntax in
             let* res =
               match reason with
               | `Dropped ->
                   let* () =
-                    Tx_queue_events.transaction_dropped tx_object.hash
+                    Tx_queue_events.transaction_dropped
+                      (Tx.hash_of_tx_object tx_object)
                   in
                   return
                   @@ Address_nonce.remove
@@ -752,7 +751,8 @@ module Tx_container = struct
                        ~nonce:tx_nonce
               | `Confirmed ->
                   let* () =
-                    Tx_queue_events.transaction_confirmed tx_object.hash
+                    Tx_queue_events.transaction_confirmed
+                      (Tx.hash_of_tx_object tx_object)
                   in
                   return
                   @@ Address_nonce.confirm_nonce
@@ -765,8 +765,12 @@ module Tx_container = struct
               | Ok () -> return_unit
               | Error errs -> Tx_queue_events.callback_error errs
             in
-            Transactions_per_addr.decrement state.tx_per_address tx_object.from ;
-            Transaction_objects.remove state.tx_object tx_object.hash ;
+            Transactions_per_addr.decrement
+              state.tx_per_address
+              (Tx.from_address_of_tx_object tx_object) ;
+            Transaction_objects.remove
+              state.tx_object
+              (Tx.hash_of_tx_object tx_object) ;
             Lwt.dont_wait
               (fun () -> callback (reason :> all_variant))
               (fun exn ->
@@ -781,14 +785,16 @@ module Tx_container = struct
               | `Accepted ->
                   Pending_transactions.add
                     state.pending
-                    tx_object.hash
+                    (Tx.hash_of_tx_object tx_object)
                     pending_callback ;
                   return_ok_unit
               | `Refused ->
                   Transactions_per_addr.decrement
                     state.tx_per_address
-                    tx_object.from ;
-                  Transaction_objects.remove state.tx_object tx_object.hash ;
+                    (Tx.from_address_of_tx_object tx_object) ;
+                  Transaction_objects.remove
+                    state.tx_object
+                    (Tx.hash_of_tx_object tx_object) ;
                   return
                   @@ Address_nonce.remove
                        state.address_nonce
@@ -810,23 +816,32 @@ module Tx_container = struct
           if Compare.Int.(Queue.length state.queue < state.config.max_size) then (
             (* Check number of txs by user in tx_queue. *)
             let nb_txs_in_queue =
-              Transactions_per_addr.find state.tx_per_address tx_object.from
+              Transactions_per_addr.find
+                state.tx_per_address
+                (Tx.from_address_of_tx_object tx_object)
             in
             match nb_txs_in_queue with
             | Some i when i >= state.config.tx_per_addr_limit ->
                 let*! () =
                   Tx_pool_events.txs_per_user_threshold_reached
-                    ~address:(Ethereum_types.Address.to_string tx_object.from)
+                    ~address:
+                      (Ethereum_types.hex_to_string
+                         (Ethereum_types.Hex
+                            (Tx.address_to_string
+                               (Tx.from_address_of_tx_object tx_object))))
                 in
                 return
                   (Error
                      "Limit of transaction for a user was reached. Transaction \
                       is rejected.")
             | Some _ | None ->
-                let*! () = Tx_queue_events.add_transaction tx_object.hash in
+                let*! () =
+                  Tx_queue_events.add_transaction
+                    (Tx.hash_of_tx_object tx_object)
+                in
                 Transactions_per_addr.increment
                   state.tx_per_address
-                  tx_object.from ;
+                  (Tx.from_address_of_tx_object tx_object) ;
                 Transaction_objects.add state.tx_object tx_object ;
                 let Ethereum_types.(Qty next_nonce) = next_nonce in
                 let*? () =
@@ -837,7 +852,11 @@ module Tx_container = struct
                     ~nonce:tx_nonce
                 in
                 Queue.add
-                  {hash = tx_object.hash; payload; queue_callback}
+                  {
+                    hash = Tx.hash_of_tx_object tx_object;
+                    payload;
+                    queue_callback;
+                  }
                   state.queue ;
                 return (Ok ()))
           else
@@ -896,11 +915,14 @@ module Tx_container = struct
           clear state ;
           let*! () = Tx_queue_events.cleared () in
           return_unit
-      | Nonce {next_nonce; address = Address (Hex addr)} ->
+      | Nonce {next_nonce; address} ->
           protect @@ fun () ->
           let Ethereum_types.(Qty next_nonce) = next_nonce in
           let*? next_gap =
-            Address_nonce.next_gap state.address_nonce ~addr ~next_nonce
+            Address_nonce.next_gap
+              state.address_nonce
+              ~addr:(Tx.address_to_string address)
+              ~next_nonce
           in
           return @@ Ethereum_types.Qty next_gap
       | Lock_transactions ->
@@ -915,15 +937,23 @@ module Tx_container = struct
             String.Hashtbl.fold
               (fun hash value acc ->
                 match lookup_fn hash value with
-                | Some (obj : Ethereum_types.legacy_transaction_object) ->
+                | Some (obj : Tx.legacy) ->
                     let existing_nonce_map =
-                      AddressMap.find_opt obj.from acc
-                      |> Option.value ~default:NonceMap.empty
+                      Tx.AddressMap.find_opt
+                        (Tx.from_address_of_tx_object obj)
+                        acc
+                      |> Option.value ~default:Ethereum_types.NonceMap.empty
                     in
                     let updated_nonce_map =
-                      NonceMap.add (Qty.to_z obj.nonce) obj existing_nonce_map
+                      Ethereum_types.NonceMap.add
+                        (Qty.to_z (Tx.nonce_of_tx_object obj))
+                        obj
+                        existing_nonce_map
                     in
-                    AddressMap.add obj.from updated_nonce_map acc
+                    Tx.AddressMap.add
+                      (Tx.from_address_of_tx_object obj)
+                      updated_nonce_map
+                      acc
                 | None -> acc)
               tx_map
               acc
@@ -934,7 +964,7 @@ module Tx_container = struct
             process_transactions
               state.pending
               (fun hash _v -> String.Hashtbl.find_opt state.tx_object hash)
-              AddressMap.empty
+              Tx.AddressMap.empty
           in
 
           (* Process tx_object separately to collect the queued (unmatched) transactions *)
@@ -943,10 +973,10 @@ module Tx_container = struct
               state.tx_object
               (fun hash obj ->
                 if String.Hashtbl.mem state.pending hash then None else Some obj)
-              AddressMap.empty
+              Tx.AddressMap.empty
           in
 
-          return {pending; queued}
+          return (Tx.make_txpool ~pending ~queued)
       | Pop_transactions {validation_state; validate_tx} ->
           protect @@ fun () ->
           if is_locked state then return []
@@ -1067,8 +1097,8 @@ module Tx_container = struct
     Worker.Queue.push_request_and_wait w (Nonce {next_nonce; address})
     |> handle_request_error
 
-  let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
-      (tx_object : Ethereum_types.legacy_transaction_object) txn =
+  let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce tx_object
+      txn =
     let open Lwt_syntax in
     let* worker = worker_promise in
     Worker.Queue.push_request_and_wait
@@ -1080,7 +1110,7 @@ module Tx_container = struct
     let open Lwt_result_syntax in
     let* res = inject ~next_nonce tx_object raw_tx in
     match res with
-    | Ok () -> return (Ok tx_object.hash)
+    | Ok () -> return (Ok (Tx.hash_of_tx_object tx_object))
     | Error errs -> return (Error errs)
 
   let find txn_hash =
@@ -1093,10 +1123,7 @@ module Tx_container = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
        We should instrument the TX queue to return the real
        transaction objects. *)
-    return
-      (Option.map
-         Transaction_object.from_store_transaction_object
-         legacy_tx_object)
+    return (Option.map Tx.transaction_object_from_legacy legacy_tx_object)
 
   let content () =
     let open Lwt_result_syntax in
