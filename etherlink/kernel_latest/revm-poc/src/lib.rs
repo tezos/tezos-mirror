@@ -4,10 +4,11 @@
 
 use database::EtherlinkVMDB;
 use precompile_provider::EtherlinkPrecompiles;
+use revm::context::result::EVMError;
 use revm::{
     context::{
-        result::ExecutionResult, transaction::AccessList, BlockEnv, CfgEnv, Evm,
-        LocalContext, TxEnv,
+        result::ExecutionResult, transaction::AccessList, BlockEnv, CfgEnv,
+        DBErrorMarker, Evm, LocalContext, TxEnv,
     },
     context_interface::block::BlobExcessGasAndPrice,
     handler::{instructions::EthInstructions, EthPrecompiles},
@@ -18,7 +19,9 @@ use revm::{
 use storage_helpers::u256_to_le_bytes;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::runtime::Runtime;
-use world_state_handler::WorldStateHandler;
+use tezos_smart_rollup_host::runtime::RuntimeError;
+use thiserror::Error;
+use world_state_handler::{account_path, WorldStateHandler};
 
 mod block_storage;
 mod code_storage;
@@ -31,6 +34,16 @@ mod world_state_handler;
 const ETHERLINK_CHAIN_ID: u64 = 42793;
 const DEFAULT_SPEC_ID: SpecId = SpecId::PRAGUE;
 const MAX_GAS_PER_TRANSACTION: u64 = 30_000_000;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Runtime error: {0}")]
+    Runtime(#[from] RuntimeError),
+    #[error("Execution error: {0}")]
+    Custom(String),
+}
+
+impl DBErrorMarker for Error {}
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct ExecutionOutcome {
