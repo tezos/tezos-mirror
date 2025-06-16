@@ -2703,7 +2703,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
               ~alias:account.Account.alias)
           accounts
   in
-  let* client = Client.Agent.create agent in
+  let* client = Client.Agent.create ~endpoint:(Node node) agent in
   let* () =
     Lwt_list.iter_s
       (fun account ->
