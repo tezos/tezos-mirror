@@ -5285,7 +5285,7 @@ let octez_crawler =
         octez_stdlib_unix |> open_;
         octez_client_base |> open_;
         octez_shell;
-        opentelemetry_lwt;
+        octez_telemetry;
       ]
 
 let octez_dal_node_lib =
@@ -5427,7 +5427,7 @@ let octez_injector_lib =
         octez_shell;
         octez_crawler |> open_;
         octez_signer_backends;
-        opentelemetry_lwt;
+        octez_telemetry;
       ]
 
 let performance_metrics =
@@ -5545,6 +5545,7 @@ let octez_smart_rollup_node_lib =
         opentelemetry_lwt;
         opentelemetry_client_cohttp_lwt;
         opentelemetry_ambient_context_lwt;
+        octez_telemetry;
       ]
 
 let wasm_helpers_intf_modules = ["wasm_utils_intf"]

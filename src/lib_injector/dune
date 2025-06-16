@@ -17,7 +17,7 @@
   octez-shell-libs.shell
   octez-crawler
   octez-shell-libs.signer-backends
-  opentelemetry-lwt)
+  octez-libs.octez-telemetry)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
