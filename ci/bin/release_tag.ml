@@ -281,6 +281,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job_trigger_monitoring;
   ]
   @ jobs_debian_repository @ jobs_dnf_repository
+  @ Grafazos_ci.Release.jobs ~test ()
   @
   match (test, release_tag_pipeline_type) with
   (* for the moment the apt repository are not official, so we do not add to the release
