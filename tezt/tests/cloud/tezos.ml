@@ -187,7 +187,7 @@ module Dal_node = struct
   module Agent = struct
     let create_from_endpoint ?(group = "DAL") ?net_port
         ?(path = Uses.path Constant.octez_dal_node) ?name ?rpc_port
-        ?disable_shard_validation ~l1_node_endpoint cloud agent =
+        ?disable_shard_validation ?ignore_pkhs ~l1_node_endpoint cloud agent =
       let* path = Agent.copy agent ~source:path in
       let* () =
         Cloud.register_binary
@@ -220,6 +220,7 @@ module Dal_node = struct
           ~metrics_addr
           ~listen_addr
           ?disable_shard_validation
+          ?ignore_pkhs
           ~l1_node_endpoint
           ()
       in
@@ -228,12 +229,14 @@ module Dal_node = struct
       Cloud.service_register ~name ~executable agent ;
       Lwt.return node
 
-    let create ?net_port ?path ?name ?disable_shard_validation ~node agent =
+    let create ?net_port ?path ?name ?disable_shard_validation ?ignore_pkhs
+        ~node agent =
       create_from_endpoint
         ?net_port
         ?path
         ?name
         ?disable_shard_validation
+        ?ignore_pkhs
         ~l1_node_endpoint:(Node.as_rpc_endpoint node)
         agent
 

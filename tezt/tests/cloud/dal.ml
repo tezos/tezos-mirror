@@ -2725,6 +2725,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       ~name:(Format.asprintf "producer-dal-node-%i" i)
       ~node
       ~disable_shard_validation:configuration.disable_shard_validation
+      ~ignore_pkhs:configuration.ignore_pkhs
       cloud
       agent
   in
