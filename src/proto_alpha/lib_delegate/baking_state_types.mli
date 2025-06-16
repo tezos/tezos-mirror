@@ -29,14 +29,14 @@ end
 
 module Key : sig
   type t = private {
-    alias : string option;
+    alias : string;
     id : Key_id.t;
     public_key : Signature.public_key;
     secret_key_uri : Client_keys.sk_uri;
   }
 
   val make :
-    alias:string option ->
+    alias:string ->
     public_key:Signature.public_key ->
     public_key_hash:Signature.public_key_hash ->
     secret_key_uri:Client_keys.sk_uri ->

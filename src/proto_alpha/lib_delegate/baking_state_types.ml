@@ -23,7 +23,7 @@ module Key = struct
   (** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
   type t = {
-    alias : string option;
+    alias : string;
     id : Key_id.t;
     public_key : Signature.Public_key.t;
     secret_key_uri : Client_keys.sk_uri;
@@ -44,15 +44,12 @@ module Key = struct
               logging; decoding is impossible (%s)"
              __LOC__))
       (obj3
-         (req "alias" (option string))
+         (req "alias" string)
          (req "public_key" Signature.Public_key.encoding)
          (req "public_key_hash" Signature.Public_key_hash.encoding))
 
   let pp fmt {alias; id; _} =
-    match alias with
-    | None -> Format.fprintf fmt "%a" Signature.Public_key_hash.pp id
-    | Some alias ->
-        Format.fprintf fmt "%s (%a)" alias Signature.Public_key_hash.pp id
+    Format.fprintf fmt "%s (%a)" alias Signature.Public_key_hash.pp id
 end
 
 module Delegate_id = struct
