@@ -1,5 +1,5 @@
 { parameter (pair address bool (option (set address))) ;
-  storage (big_map address (map address (pair bool (option (set address))))) ;
+  storage (big_map address (map key_hash (pair bool (option (set address))))) ;
   code { UNPAIR ;
          UNPAIR 3 ;
          PUSH string "TEZ_IN_TRANSACTION_DISALLOWED" ;
@@ -41,13 +41,14 @@
          SWAP ;
          IF_NONE { FAILWITH } { SWAP ; DROP } ;
          PUSH string "KEY_HASH_NOT_EQUAL_TO_SOURCE_ADDRESS" ;
-         DUP 3 ;
+         DIG 2 ;
          DUP 3 ;
          IMPLICIT_ACCOUNT ;
          ADDRESS ;
          COMPARE ;
          EQ ;
          IF { DROP } { FAILWITH } ;
+         DUP ;
          VOTING_POWER ;
          PUSH nat 0 ;
          SWAP ;
@@ -57,13 +58,13 @@
          DUP 5 ;
          DUP 3 ;
          GET ;
-         IF_NONE { EMPTY_MAP address (pair bool (option (set address))) } {} ;
-         DIG 4 ;
+         IF_NONE { EMPTY_MAP key_hash (pair bool (option (set address))) } {} ;
+         DUP 5 ;
          IF_NONE
            { DUP 4 ;
-             IF { NONE (set address) ; DIG 4 ; PAIR ; SOME }
-                { DIG 3 ; DROP ; NONE (pair bool (option (set address))) } }
-           { SOME ; DIG 4 ; PAIR ; SOME } ;
+             IF { DIG 4 ; DIG 4 ; PAIR ; SOME }
+                { DIG 3 ; DIG 4 ; DROP 2 ; NONE (pair bool (option (set address))) } }
+           { DROP ; DIG 4 ; DIG 4 ; PAIR ; SOME } ;
          DIG 2 ;
          UPDATE ;
          DIG 2 ;
@@ -72,14 +73,14 @@
          SIZE ;
          COMPARE ;
          EQ ;
-         IF { SWAP ; DROP ; NONE (map address (pair bool (option (set address)))) }
+         IF { SWAP ; DROP ; NONE (map key_hash (pair bool (option (set address)))) }
             { SWAP ; SOME } ;
          DIG 2 ;
          UPDATE ;
          NIL operation ;
          PAIR } ;
   view "is_voting_key_of"
-       (pair address address (option address))
+       (pair address key_hash (option address))
        bool
        { UNPAIR ;
          UNPAIR 3 ;
@@ -101,7 +102,7 @@
                         { IF_NONE { DROP ; PUSH bool True } { SWAP ; MEM ; NOT } } } } } } ;
   view "list_voters"
        (pair address (option address))
-       (list address)
+       (list key_hash)
        { UNPAIR ;
          UNPAIR ;
          DIG 2 ;
@@ -109,11 +110,11 @@
          GET ;
          SWAP ;
          IF_NONE
-           { IF_NONE { NIL address } { NIL address ; SWAP ; ITER { CAR ; CONS } } }
+           { IF_NONE { NIL key_hash } { NIL key_hash ; SWAP ; ITER { CAR ; CONS } } }
            { SWAP ;
              IF_NONE
-               { DROP ; NIL address }
-               { NIL address ;
+               { DROP ; NIL key_hash }
+               { NIL key_hash ;
                  SWAP ;
                  ITER { UNPAIR ;
                         SWAP ;

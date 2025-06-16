@@ -144,12 +144,12 @@ let init_new_voting_state
 
 let get_voters
         (delegation_contract : address)
-        : address list =
+        : key_hash list =
         match
           Tezos.call_view "list_voters" (Tezos.get_sender (), Some (Tezos.get_self_address ())) delegation_contract
         with
           | None ->  failwith Errors.no_delegate_contract
-          | Some l -> Tezos.get_sender()::l
+          | Some l -> (Converters.address_to_key_hash (Tezos.get_sender()))::l
 
 
 type 'pt voting_state_t = {
@@ -331,7 +331,7 @@ let assert_proposal_not_already_upvoted
 
 let filter_proposers
    (type pt)
-   (potential_proposers : address list)
+   (potential_proposers : key_hash list)
    (proposal_period : pt Storage.proposal_period_t)
    (config : Storage.config_t)
    : key_hash set * nat * nat =
@@ -339,8 +339,7 @@ let filter_proposers
           not upvoting_allowed proposal_period.upvoters_upvotes_count config upvoter
    in
    (List.fold_left
-      (fun ((proposers, total_voting_power, real_voting_power), upvoter_address) ->
-           let upvoter : key_hash = Converters.address_to_key_hash upvoter_address in
+      (fun ((proposers, total_voting_power, real_voting_power), upvoter) ->
            let voting_power : nat = Tezos.voting_power upvoter in
            if voting_power = 0n || upvoting_limit_exceeded upvoter then
               (proposers, voting_power + total_voting_power, real_voting_power)
@@ -352,7 +351,7 @@ let filter_proposers
 let filter_upvoters
    (type pt)
    (payload : pt)
-   (potential_upvoters : address list)
+   (potential_upvoters : key_hash list)
    (proposal_period : pt Storage.proposal_period_t)
    (config : Storage.config_t)
    : (key_hash,nat) map * nat * bool =
@@ -363,8 +362,7 @@ let filter_upvoters
       proposal_already_upvoted upvoter payload proposal_period.upvoters_proposals
    in
    (List.fold_left
-       (fun ((upvoters, total_voting_power, protocol_already_upvoted_addresses), upvoter_address) ->
-                let upvoter : key_hash = Converters.address_to_key_hash upvoter_address in
+       (fun ((upvoters, total_voting_power, protocol_already_upvoted_addresses), upvoter) ->
                 let voting_power : nat = Tezos.voting_power upvoter in
                 if voting_power = 0n || upvoting_limit_exceeded upvoter then
                     (upvoters, voting_power + total_voting_power, protocol_already_upvoted_addresses)
@@ -377,7 +375,7 @@ let filter_upvoters
 
 let filter_voters
    (type pt)
-   (potential_voters : address list)
+   (potential_voters : key_hash list)
    (voting_context : pt Storage.voting_context_t)
    : (key_hash,nat) map * nat =
    let promotion_period = get_promotion_period voting_context in
@@ -385,8 +383,7 @@ let filter_voters
         not Big_map.mem voter promotion_period.voters
    in
    List.fold_left
-       (fun ((voters , total_voting_power), voter_address) ->
-                let voter : key_hash = Converters.address_to_key_hash voter_address in
+       (fun ((voters , total_voting_power), voter) ->
                 let voting_power : nat = Tezos.voting_power voter in
                 if voting_power = 0n || not (voting_allowed voter) then
                    (voters, voting_power + total_voting_power)
