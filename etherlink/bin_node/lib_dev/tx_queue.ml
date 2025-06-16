@@ -36,15 +36,6 @@ type pending_request = {
 
 type callback = all_variant variant_callback
 
-module Tx = Tx_queue_types.Eth_transaction_object
-
-type request = {
-  next_nonce : Ethereum_types.quantity;
-  payload : Ethereum_types.hex;
-  tx_object : Tx.legacy;
-  callback : callback;
-}
-
 (** Inject transactions with either RPCs or on a websocket connection. *)
 type endpoint = Services_backend_sig.endpoint =
   | Rpc of Uri.t
@@ -258,7 +249,7 @@ module Address_nonce = struct
     | None -> return next_nonce
 end
 
-module Tx_container = struct
+module Tx_container (Tx : Tx_queue_types.L2_transaction) = struct
   module Transaction_objects = struct
     open Ethereum_types
     module S = String.Hashtbl
@@ -376,6 +367,13 @@ module Tx_container = struct
   end
 
   module Request = struct
+    type request = {
+      next_nonce : Ethereum_types.quantity;
+      payload : Ethereum_types.hex;
+      tx_object : Tx.legacy;
+      callback : callback;
+    }
+
     type ('a, 'b) t =
       | Inject : request -> ((unit, string) result, tztrace) t
       | Find : {txn_hash : Ethereum_types.hash} -> (Tx.legacy option, tztrace) t
@@ -1193,9 +1191,12 @@ module Tx_container = struct
     return_unit
 end
 
-let start = Tx_container.start
+module Eth_tx_container = Tx_container (Tx_queue_types.Eth_transaction_object)
 
-let tx_container = Services_backend_sig.Evm_tx_container (module Tx_container)
+let start = Eth_tx_container.start
+
+let tx_container =
+  Services_backend_sig.Evm_tx_container (module Eth_tx_container)
 
 module Internal_for_tests = struct
   module Nonce_bitset = Nonce_bitset
