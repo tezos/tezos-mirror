@@ -5284,6 +5284,7 @@ let octez_crawler =
       ]
 
 let octez_dal_node_lib =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   public_lib
     "tezos-dal-node-lib"
     ~path:"src/lib_dal_node"
@@ -5322,7 +5323,10 @@ let octez_dal_node_lib =
         prometheus_app;
         prometheus;
         octez_crawler |> open_;
+        octez_profiler |> open_;
       ]
+    ~preprocess
+    ~preprocessor_deps
 
 let _octez_dal_node_lib_test =
   tezt
@@ -9066,6 +9070,7 @@ let _octez_dal_node =
          octez_stdlib_unix |> open_;
          octez_dal_node_lib |> open_;
          memtrace;
+         octez_profiler_backends |> open_;
        ]
       @ protocol_deps)
     ~conflicts:[Conflicts.checkseum]

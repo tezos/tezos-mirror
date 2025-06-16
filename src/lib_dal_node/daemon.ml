@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,6 +23,20 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+module Profiler = struct
+  include (val Profiler.wrap Dal_profiler.dal_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    Dal_profiler.create_reset_block_section Dal_profiler.dal_profiler
+end
+
+let[@warning "-32"] may_start_profiler data_dir =
+  match Tezos_profiler_unix.Profiler_instance.selected_backend () with
+  | Some {instance_maker; _} ->
+      let profiler_maker = instance_maker ~directory:data_dir in
+      Dal_profiler.init profiler_maker
+  | None -> ()
 
 let init_cryptobox config proto_parameters profile =
   let open Lwt_result_syntax in
@@ -65,15 +80,17 @@ let on_new_finalized_head ctxt cctxt crawler =
     match next_final_head with
     | None -> Lwt.fail_with "L1 crawler lib shut down"
     | Some (finalized_block_hash, finalized_shell_header) ->
+        () [@profiler.reset_block_section finalized_block_hash] ;
         let* () =
-          Block_handler.new_finalized_head
-            ctxt
-            cctxt
-            crawler
-            cryptobox
-            finalized_block_hash
-            finalized_shell_header
-            ~launch_time
+          (Block_handler.new_finalized_head
+             ctxt
+             cctxt
+             crawler
+             cryptobox
+             finalized_block_hash
+             finalized_shell_header
+             ~launch_time
+           [@profiler.record_s {verbosity = Notice} "new_finalized_head"])
         in
         loop ()
   in
@@ -247,6 +264,7 @@ let run ?(disable_logging = false) ?(disable_shard_validation = false)
       in
       Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
+  () [@profiler.overwrite may_start_profiler data_dir] ;
   let*! () = Event.emit_starting_node () in
   let* ({
           rpc_addr;
