@@ -654,7 +654,8 @@ let rec process_daemon ({node_ctxt; _} as state) =
       | ( Rollup_node_errors.(
             ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
             | Operator_not_in_whitelist | Cannot_patch_pvm_of_public_rollup
-            | Disagree_with_cemented _ | Disagree_with_commitment _ ))
+            | Disagree_with_cemented _ | Disagree_with_commitment _
+            | Inconsistent_inbox _ ))
         | Purpose.Missing_operators _ )
         :: _ as e ->
           fatal_error_exit e
