@@ -72,7 +72,7 @@ val execute_and_inspect :
   t ->
   bytes option list tzresult Lwt.t
 
-(** [current_block_height ~root evm_state] returns the height of the latest 
+(** [current_block_height ~root evm_state] returns the height of the latest
     block produced by the kernel at [root]. *)
 val current_block_height :
   root:Durable_storage_path.path -> t -> Ethereum_types.quantity Lwt.t
