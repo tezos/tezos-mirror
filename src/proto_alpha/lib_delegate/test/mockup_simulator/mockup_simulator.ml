@@ -966,7 +966,6 @@ let baker_process ~(delegates : Baking_state_types.Key.t list) ~base_dir
   let* () =
     List.iter_es
       (fun ({alias; public_key; id; secret_key_uri} : Baking_state_types.Key.t) ->
-        let name = alias |> WithExceptions.Option.get ~loc:__LOC__ in
         let* public_key_uri = Client_keys.neuterize secret_key_uri in
         let pkh = Baking_state_types.Key_id.to_pkh id in
         Client_keys.register_key
@@ -974,7 +973,7 @@ let baker_process ~(delegates : Baking_state_types.Key.t list) ~base_dir
           ~force:false
           (pkh, public_key_uri, secret_key_uri)
           ~public_key
-          name)
+          alias)
       delegates
   in
   let context_index =
@@ -1289,7 +1288,7 @@ let make_baking_delegate
       (secret : Tezos_mockup_commands.Mockup_wallet.bootstrap_secret) ) :
     Baking_state_types.Key.t =
   Baking_state_types.Key.make
-    ~alias:(Some secret.name)
+    ~alias:secret.name
     ~public_key_hash:account.public_key_hash
     ~public_key:(account.public_key |> WithExceptions.Option.get ~loc:__LOC__)
     ~secret_key_uri:secret.sk_uri
