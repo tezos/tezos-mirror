@@ -26,7 +26,7 @@ let slot_encoding =
       (fun (_, slot_level, slot_index) -> {slot_level; slot_index})
       (tup3 string int32 int31))
 
-let _trace_slot ?(attrs = []) ~name slot_id f =
+let trace_slot ?(attrs = []) ~name slot_id f =
   let trace_id =
     [Data_encoding.Binary.to_bytes_exn slot_encoding slot_id]
     |> Slot_id_hash.hash_bytes |> Slot_id_hash.to_bytes

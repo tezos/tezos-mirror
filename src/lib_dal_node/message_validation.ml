@@ -37,11 +37,21 @@ let gossipsub_app_message_payload_validation ~disable_shard_validation cryptobox
     let Types.Message_id.{commitment; shard_index; _} = message_id in
     let shard = Cryptobox.{share; index = shard_index} in
     let res =
-      Dal_metrics.sample_time
-        ~sampling_frequency:Constants.shards_verification_sampling_frequency
-        ~metric_updater:Dal_metrics.update_shards_verification_time
-        ~to_sample:(fun () ->
-          Cryptobox.verify_shard cryptobox commitment shard shard_proof)
+      (Dal_metrics.sample_time
+         ~sampling_frequency:Constants.shards_verification_sampling_frequency
+         ~metric_updater:Dal_metrics.update_shards_verification_time
+         ~to_sample:(fun () ->
+           Cryptobox.verify_shard cryptobox commitment shard shard_proof)
+      [@profiler.wrap_f
+        {driver_ids = [Opentelemetry]}
+          (Opentelemetry_helpers.trace_slot
+             ~attrs:[("shard_index", `Int shard_index)]
+             ~name:"verify_shard"
+             Types.Slot_id.
+               {
+                 slot_level = message_id.level;
+                 slot_index = message_id.slot_index;
+               })])
     in
     match res with
     | Ok () -> `Valid
