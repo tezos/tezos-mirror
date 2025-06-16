@@ -73,7 +73,90 @@ end
 
 type sqlite_journal_mode = Wal | Other
 
+type t = {
+  db_pool : Pool.t;
+  add_attrs :
+    'a.
+    ('a -> Opentelemetry.key_value list) ->
+    'a ->
+    Opentelemetry.Scope.t option ->
+    unit;
+  trace :
+    'a.
+    ?trace_id:Opentelemetry.Trace_id.t ->
+    ?parent:Opentelemetry.Span_id.t ->
+    ?scope:Opentelemetry.Scope.t ->
+    string ->
+    (Opentelemetry.Scope.t option -> 'a Lwt.t) ->
+    'a Lwt.t;
+}
+
+module Request = struct
+  open Caqti_request.Infix
+
+  type ('a, 'b, +'m) t = {
+    req : ('a, 'b, 'm) Caqti_request.t;
+    name : string option;
+    op_name : string option;
+    table : string option;
+    query : string;
+    attrs : 'a -> Opentelemetry.Span.key_value list;
+  }
+
+  let op_name_of_query q =
+    match Tezos_stdlib.TzString.split ' ' ~limit:1 (String.trim q) with
+    | op :: _ -> Some op
+    | _ -> None
+
+  let shorten_name s =
+    if String.starts_with ~prefix:"Octez" s then
+      match Tezos_stdlib.TzString.split '.' ~limit:1 s |> List.rev with
+      | f :: _ -> f
+      | [] -> s
+    else s
+
+  let ( ->. ) t u ?name ?table ?(attrs = Fun.const []) ?oneshot query =
+    let req = ( ->. ) ?oneshot t u query in
+    let name = Option.map shorten_name name in
+    {req; query; name; op_name = op_name_of_query query; table; attrs}
+
+  let ( ->! ) t u ?name ?table ?(attrs = Fun.const []) ?oneshot query =
+    let req = ( ->! ) ?oneshot t u query in
+    let name = Option.map shorten_name name in
+    {req; query; name; op_name = op_name_of_query query; table; attrs}
+
+  let ( ->? ) t u ?name ?table ?(attrs = Fun.const []) ?oneshot query =
+    let req = ( ->? ) ?oneshot t u query in
+    let name = Option.map shorten_name name in
+    {req; query; name; op_name = op_name_of_query query; table; attrs}
+
+  let ( ->* ) t u ?name ?table ?(attrs = Fun.const []) ?oneshot query =
+    let req = ( ->* ) ?oneshot t u query in
+    let name = Option.map shorten_name name in
+    {req; query; name; op_name = op_name_of_query query; table; attrs}
+end
+
 module Db = struct
+  open Request
+
+  type conn = {
+    conn : (module Caqti_lwt.CONNECTION);
+    add_attrs :
+      'a.
+      ('a -> Opentelemetry.key_value list) ->
+      'a ->
+      Opentelemetry.Scope.t option ->
+      unit;
+    trace :
+      'a.
+      ?trace_id:Opentelemetry.Trace_id.t ->
+      ?parent:Opentelemetry.Span_id.t ->
+      ?scope:Opentelemetry.Scope.t ->
+      string ->
+      (Opentelemetry.Scope.t option -> 'a Lwt.t) ->
+      'a Lwt.t;
+  }
+
   let wrap_caqti_lwt_result (p : ('a, Caqti_error.t) result Lwt.t) :
       'a tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -90,45 +173,95 @@ module Db = struct
         | Connection_error err -> tzfail (Caqti_error (Caqti_error.show err))
         | e -> fail_with_exn e)
 
-  let start (module Db : Caqti_lwt.CONNECTION) =
+  let trace_with trace ~op_name name f =
+    trace ?trace_id:None ?parent:None ?scope:None name @@ fun scope ->
+    match scope with
+    | None -> f None
+    | Some scope ->
+        Opentelemetry.Scope.add_attrs scope (fun () ->
+            [("db.operation.name", `String op_name)]) ;
+        f (Some scope)
+
+  let trace_req trace ?scope ?op_name fallback_name req f =
+    let name = Option.value req.name ~default:fallback_name in
+    trace ?trace_id:None ?parent:None ?scope name @@ fun scope ->
+    match scope with
+    | None -> f None
+    | Some scope ->
+        let attrs () =
+          let op_name = Option.either req.op_name op_name in
+          let attr1 =
+            Option.map (fun s -> ("db.operation.name", `String s)) op_name
+            |> Option.to_list
+          in
+          let attr2 =
+            Option.map (fun s -> ("db.collection.name", `String s)) req.table
+            |> Option.to_list
+          in
+          let attr3 = [("db.query.text", `String req.query)] in
+          attr1 @ attr2 @ attr3
+        in
+        Opentelemetry.Scope.add_attrs scope attrs ;
+        f (Some scope)
+
+  let start {conn = (module Db); trace; _} =
+    trace_with trace ~op_name:"start" "Sqlite.start" @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.start ()
 
-  let commit (module Db : Caqti_lwt.CONNECTION) =
+  let commit {conn = (module Db); trace; _} =
+    trace_with trace ~op_name:"COMMIT" "Sqlite.commit" @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.commit ()
 
-  let rollback (module Db : Caqti_lwt.CONNECTION) =
+  let rollback {conn = (module Db); trace; _} =
+    trace_with trace ~op_name:"ROLLBACK" "Sqlite.rollback" @@ fun _ ->
     wrap_caqti_lwt_result @@ Db.rollback ()
 
-  let exec (module Db : Caqti_lwt.CONNECTION) req arg =
-    wrap_caqti_lwt_result @@ Db.exec req arg
+  let exec ?scope {conn = (module Db); trace; add_attrs} req arg =
+    trace_req ?scope trace "Sqlite.Db.exec" req @@ fun scope ->
+    add_attrs req.attrs arg scope ;
+    wrap_caqti_lwt_result @@ Db.exec req.req arg
 
-  let find (module Db : Caqti_lwt.CONNECTION) req arg =
-    wrap_caqti_lwt_result @@ Db.find req arg
+  let find ?scope {conn = (module Db); trace; add_attrs} req arg =
+    trace_req ?scope trace "Sqlite.Db.find" ~op_name:"find" req @@ fun scope ->
+    add_attrs req.attrs arg scope ;
+    wrap_caqti_lwt_result @@ Db.find req.req arg
 
-  let find_opt (module Db : Caqti_lwt.CONNECTION) req arg =
-    wrap_caqti_lwt_result @@ Db.find_opt req arg
+  let find_opt ?scope {conn = (module Db); trace; add_attrs} req arg =
+    trace_req ?scope trace "Sqlite.Db.find_opt" ~op_name:"find" req
+    @@ fun scope ->
+    add_attrs req.attrs arg scope ;
+    wrap_caqti_lwt_result @@ Db.find_opt req.req arg
 
-  let collect_list (module Db : Caqti_lwt.CONNECTION) req arg =
-    wrap_caqti_lwt_result @@ Db.collect_list req arg
+  let collect_list ?scope {conn = (module Db); trace; add_attrs} req arg =
+    trace_req ?scope trace "Sqlite.Db.collect_list" ~op_name:"collect" req
+    @@ fun scope ->
+    add_attrs req.attrs arg scope ;
+    wrap_caqti_lwt_result @@ Db.collect_list req.req arg
 
-  let rev_collect_list (module Db : Caqti_lwt.CONNECTION) req arg =
-    wrap_caqti_lwt_result @@ Db.rev_collect_list req arg
+  let rev_collect_list ?scope {conn = (module Db); trace; add_attrs} req arg =
+    trace_req ?scope trace "Sqlite.Db.rev_collect_list" ~op_name:"collect" req
+    @@ fun scope ->
+    add_attrs req.attrs arg scope ;
+    wrap_caqti_lwt_result @@ Db.rev_collect_list req.req arg
 
-  let fold (module Db : Caqti_lwt.CONNECTION) req f x acc =
-    wrap_caqti_lwt_result @@ Db.fold req f x acc
+  let fold ?scope {conn = (module Db); trace; _} req f x acc =
+    trace_req ?scope trace "Sqlite.Db.fold" ~op_name:"iter" req @@ fun _ ->
+    wrap_caqti_lwt_result @@ Db.fold req.req f x acc
 
-  let fold_s (module Db : Caqti_lwt.CONNECTION) req f x acc =
-    wrap_caqti_lwt_result @@ Db.fold_s req f x acc
+  let fold_s ?scope {conn = (module Db); trace; _} req f x acc =
+    trace_req ?scope trace "Sqlite.Db.fold_s" ~op_name:"iter" req @@ fun _ ->
+    wrap_caqti_lwt_result @@ Db.fold_s req.req f x acc
 
-  let iter_s (module Db : Caqti_lwt.CONNECTION) req f x =
-    wrap_caqti_lwt_result @@ Db.iter_s req f x
+  let iter_s ?scope {conn = (module Db); trace; _} req f x =
+    trace_req ?scope trace "Sqlite.Db.iter_s" ~op_name:"iter" req @@ fun _ ->
+    wrap_caqti_lwt_result @@ Db.iter_s req.req f x
 end
 
-type t = Pool : {db_pool : Pool.t} -> t
+type conn = Raw_connection of Db.conn | Ongoing_transaction of Db.conn
 
-type conn =
-  | Raw_connection of (module Caqti_lwt.CONNECTION)
-  | Ongoing_transaction of (module Caqti_lwt.CONNECTION)
+let no_trace ?trace_id:_ ?parent:_ ?scope:_ _ f = f None
+
+let no_add_attrs _ _ _ = ()
 
 let assert_in_transaction conn =
   match conn with
@@ -160,12 +293,12 @@ let with_transaction conn k =
   | Ongoing_transaction _ ->
       failwith "Internal error: attempting to perform a nested transaction"
 
-let use (Pool {db_pool}) k =
-  Db.use_pool db_pool @@ fun conn -> k (Raw_connection conn)
+let use {db_pool; trace; add_attrs} k =
+  Db.use_pool db_pool @@ fun conn -> k (Raw_connection {conn; trace; add_attrs})
 
 (* Internal queries *)
 module Q = struct
-  open Caqti_request.Infix
+  open Request
   open Caqti_type.Std
 
   let journal_mode =
@@ -174,17 +307,23 @@ module Q = struct
       ~decode:(function "wal" -> Ok Wal | _ -> Ok Other)
       string
 
-  let vacuum_self = (unit ->. unit) @@ {|VACUUM main|}
+  let vacuum_self =
+    (unit ->. unit) ~name:"Sqlite.vacuum_self" @@ {|VACUUM main|}
 
-  let vacuum_request = (string ->. unit) @@ {|VACUUM main INTO ?|}
+  let vacuum_request =
+    (string ->. unit) ~name:"Sqlite.vacuum_request" @@ {|VACUUM main INTO ?|}
 
   module Journal_mode = struct
-    let get = (unit ->! journal_mode) @@ {|PRAGMA journal_mode|}
+    let get =
+      (unit ->! journal_mode) ~name:"Sqlite.Journal_mode.get"
+      @@ {|PRAGMA journal_mode|}
 
     (* It does not appear possible to write a request {|PRAGMA journal_mode=?|}
        accepted by caqti, sadly. *)
 
-    let set_wal = (unit ->! journal_mode) @@ {|PRAGMA journal_mode=wal|}
+    let set_wal =
+      (unit ->! journal_mode) ~name:"Sqlite.Journal_mode.set_wal"
+      @@ {|PRAGMA journal_mode=wal|}
   end
 end
 
@@ -204,7 +343,7 @@ let set_wal_journal_mode store =
   let* _wal = Db.find conn Q.Journal_mode.set_wal () in
   return_unit
 
-let close (Pool {db_pool}) = Lwt_pool.clear db_pool
+let close {db_pool; _} = Lwt_pool.clear db_pool
 
 let vacuum ~conn ~output_db_file =
   let open Lwt_result_syntax in
@@ -214,7 +353,13 @@ let vacuum ~conn ~output_db_file =
     with_connection conn @@ fun conn ->
     Db.exec conn Q.vacuum_request output_db_file
   in
-  let db = Pool {db_pool = Pool.create 1 (uri output_db_file Read_write)} in
+  let db =
+    {
+      db_pool = Pool.create 1 (uri output_db_file Read_write);
+      trace = no_trace;
+      add_attrs = no_add_attrs;
+    }
+  in
   let* () = use db set_wal_journal_mode in
   let*! () = close db in
   return_unit
@@ -235,8 +380,27 @@ let init ~path ~perm ?max_conn_reuse_count migration_code =
            1. *)
         1
   in
+  let trace, add_attrs =
+    if Opentelemetry.Collector.has_backend () then
+      let attrs = [("db.system.name", `String "sqlite")] in
+      ( (fun ?trace_id ?parent ?scope name f ->
+          Opentelemetry_lwt.Trace.with_
+            ?trace_id
+            ?parent
+            ?scope
+            ~kind:Span_kind_client
+            ~attrs
+            ~service_name:"Sqlite"
+            name
+            (fun scope -> f (Some scope))),
+        fun f x -> function
+          | Some scope ->
+              Opentelemetry_lwt.Trace.add_attrs scope (fun () -> f x)
+          | None -> () )
+    else (no_trace, no_add_attrs)
+  in
   let db_pool = Pool.create pool_size ?max_use_count:max_conn_reuse_count uri in
-  let store = Pool {db_pool} in
+  let store = {db_pool; trace; add_attrs} in
   use store @@ fun conn ->
   let* () = set_wal_journal_mode conn in
   let* () = with_transaction conn migration_code in

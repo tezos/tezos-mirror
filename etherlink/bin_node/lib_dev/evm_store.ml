@@ -166,7 +166,7 @@ type metadata = {
 }
 
 module Q = struct
-  open Caqti_request.Infix
+  open Sqlite.Request
   open Caqti_type.Std
   open Ethereum_types
 
@@ -408,59 +408,69 @@ module Q = struct
   end
 
   module Blueprints = struct
+    let table = "blueprints" (* For opentelemetry *)
+
     let insert =
-      (t3 level timestamp payload ->. unit)
+      (t3 level timestamp payload ->. unit) ~name:__FUNCTION__ ~table
       @@ {eos|INSERT INTO blueprints (id, timestamp, payload) VALUES (?, ?, ?)|eos}
 
     let select =
-      (level ->? t2 payload timestamp)
+      (level ->? t2 payload timestamp) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT payload, timestamp FROM blueprints WHERE id = ?|eos}
 
     let select_range =
-      (t2 level level ->* t2 level payload)
+      (t2 level level ->* t2 level payload) ~name:__FUNCTION__ ~table
       @@ {|SELECT id, payload FROM blueprints
            WHERE ? <= id AND id <= ?
            ORDER BY id ASC|}
 
     let clear_after =
-      (level ->. unit) @@ {|DELETE FROM blueprints WHERE id > ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM blueprints WHERE id > ?|}
 
     let clear_before =
-      (level ->. unit) @@ {|DELETE FROM blueprints WHERE id < ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM blueprints WHERE id < ?|}
   end
 
   module Context_hashes = struct
+    let table = "context_hash" (* For opentelemetry *)
+
     let insert =
-      (t2 level context_hash ->. unit)
+      (t2 level context_hash ->. unit) ~name:__FUNCTION__ ~table
       @@ {eos|REPLACE INTO context_hashes (id, context_hash) VALUES (?, ?)|eos}
 
     let select =
-      (level ->? context_hash)
+      (level ->? context_hash) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT (context_hash) FROM context_hashes WHERE id = ?|eos}
 
     let get_latest =
-      (unit ->? t2 level context_hash)
+      (unit ->? t2 level context_hash) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT id, context_hash FROM context_hashes ORDER BY id DESC LIMIT 1|eos}
 
     let get_earliest =
-      (unit ->? t2 level context_hash)
+      (unit ->? t2 level context_hash) ~name:__FUNCTION__ ~table
       @@ {|SELECT id, context_hash FROM context_hashes
            WHERE id >= 0 ORDER BY id ASC LIMIT 1|}
 
     let clear_after =
-      (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id > ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM context_hashes WHERE id > ?|}
 
     let clear_before =
-      (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id < ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM context_hashes WHERE id < ?|}
   end
 
   module Kernel_upgrades = struct
+    let table = "kernel_updates" (* For opentelemetry *)
+
     let insert =
-      (t3 level root_hash timestamp ->. unit)
+      (t3 level root_hash timestamp ->. unit) ~name:__FUNCTION__ ~table
       @@ {|REPLACE INTO kernel_upgrades (injected_before, root_hash, activation_timestamp) VALUES (?, ?, ?)|}
 
     let activation_levels =
-      (unit ->* level)
+      (unit ->* level) ~name:__FUNCTION__ ~table
       @@ {|SELECT applied_before
            FROM kernel_upgrades
            WHERE applied_before IS NOT NULL
@@ -468,7 +478,7 @@ module Q = struct
     |}
 
     let get_latest_unapplied =
-      (unit ->? pending_kernel_upgrade)
+      (unit ->? pending_kernel_upgrade) ~name:__FUNCTION__ ~table
       @@ {|SELECT injected_before, root_hash, activation_timestamp
            FROM kernel_upgrades WHERE applied_before IS NULL
            ORDER BY injected_before DESC
@@ -476,101 +486,109 @@ module Q = struct
     |}
 
     let find_injected_before =
-      (level ->? upgrade)
+      (level ->? upgrade) ~name:__FUNCTION__ ~table
       @@ {|SELECT root_hash, activation_timestamp
            FROM kernel_upgrades WHERE injected_before = ?|}
 
     let find_latest_injected_after =
-      (level ->? upgrade)
+      (level ->? upgrade) ~name:__FUNCTION__ ~table
       @@ {|SELECT root_hash, activation_timestamp
            FROM kernel_upgrades WHERE injected_before > ?
            ORDER BY injected_before DESC
            LIMIT 1|}
 
     let record_apply =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|
       UPDATE kernel_upgrades SET applied_before = ? WHERE applied_before IS NULL
     |}
 
     let clear_after =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM kernel_upgrades WHERE injected_before > ?|}
 
     let nullify_after =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|UPDATE kernel_upgrades SET applied_before = NULL WHERE applied_before > ?|}
 
     let clear_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM kernel_upgrades WHERE injected_before < ?|}
   end
 
   module Delayed_transactions = struct
+    let table = "delayed_transactions" (* For opentelemetry *)
+
     let insert =
       (t3 level root_hash delayed_transaction ->. unit)
+        ~name:__FUNCTION__
+        ~table
       @@ {|INSERT INTO delayed_transactions (injected_before, hash, payload) VALUES (?, ?, ?)|}
 
     let select_at_level =
-      (level ->* delayed_transaction)
+      (level ->* delayed_transaction) ~name:__FUNCTION__ ~table
       @@ {|SELECT payload FROM delayed_transactions WHERE ? = injected_before|}
 
     let select_at_hash =
-      (root_hash ->? delayed_transaction)
+      (root_hash ->? delayed_transaction) ~name:__FUNCTION__ ~table
       @@ {|SELECT payload FROM delayed_transactions WHERE ? = hash|}
 
     let clear_after =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM delayed_transactions WHERE injected_before > ?|}
 
     let clear_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM delayed_transactions WHERE injected_before < ?|}
   end
 
   module L1_l2_levels_relationships = struct
+    let table = "l1_l2_levels_relationships" (* For opentelemetry *)
+
     let insert =
-      (t2 level l1_level ->. unit)
+      (t2 level l1_level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|INSERT INTO l1_l2_levels_relationships (latest_l2_level, l1_level) VALUES (?, ?)|}
 
     let get =
-      (unit ->! levels)
+      (unit ->! levels) ~name:__FUNCTION__ ~table
       @@ {|SELECT latest_l2_level, l1_level FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
 
     let clear_after =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM l1_l2_levels_relationships WHERE latest_l2_level > ?|}
 
     let clear_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM l1_l2_levels_relationships WHERE latest_l2_level < ?|}
   end
 
   module L1_l2_finalized_levels = struct
+    let table = "l1_l2_finalized_levels" (* For opentelemetry *)
+
     let insert =
-      (t2 l1_level finalized_levels ->. unit)
+      (t2 l1_level finalized_levels ->. unit) ~name:__FUNCTION__ ~table
       @@ {|REPLACE INTO l1_l2_finalized_levels
            (l1_level, start_l2_level, end_l2_level)
            VALUES (?, ?, ?)|}
 
     let get =
-      (l1_level ->? finalized_levels)
+      (l1_level ->? finalized_levels) ~name:__FUNCTION__ ~table
       @@ {|SELECT start_l2_level, end_l2_level
            FROM l1_l2_finalized_levels
            WHERE l1_level = ?|}
 
     let last_l2_level =
-      (unit ->? level)
+      (unit ->? level) ~name:__FUNCTION__ ~table
       @@ {|SELECT MAX(end_l2_level) FROM l1_l2_finalized_levels|}
 
     let last =
-      (unit ->? t2 l1_level finalized_levels)
+      (unit ->? t2 l1_level finalized_levels) ~name:__FUNCTION__ ~table
       @@ {|SELECT l1_level, start_l2_level, end_l2_level
            FROM l1_l2_finalized_levels
            ORDER BY l1_level DESC LIMIT 1|}
 
     let find_l1_level =
-      (level ->? l1_level)
+      (level ->? l1_level) ~name:__FUNCTION__ ~table
       @@ {|SELECT l1_level
            FROM l1_l2_finalized_levels
            WHERE $1 > start_l2_level
@@ -579,6 +597,8 @@ module Q = struct
 
     let list_by_l2_levels =
       (t2 level level ->* t2 l1_level finalized_levels)
+        ~name:__FUNCTION__
+        ~table
       @@ {|SELECT l1_level, start_l2_level, end_l2_level
            FROM l1_l2_finalized_levels
            WHERE start_l2_level >= ?
@@ -587,25 +607,29 @@ module Q = struct
 
     let list_by_l1_levels =
       (t2 l1_level l1_level ->* t2 l1_level finalized_levels)
+        ~name:__FUNCTION__
+        ~table
       @@ {|SELECT l1_level, start_l2_level, end_l2_level
            FROM l1_l2_finalized_levels
            WHERE l1_level BETWEEN ? AND ?
            ORDER BY l1_level ASC|}
 
     let clear_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM l1_l2_finalized_levels
            WHERE start_l2_level < ?|}
 
     let clear_after =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM l1_l2_finalized_levels
            WHERE end_l2_level > ?|}
   end
 
   module Metadata = struct
+    let table = "metadata" (* For opentelemetry *)
+
     let insert_smart_rollup_address =
-      (smart_rollup_address ->. unit)
+      (smart_rollup_address ->. unit) ~name:__FUNCTION__ ~table
       @@ {|
 INSERT INTO metadata (key, value) VALUES ('smart_rollup_address', ?)
 ON CONFLICT(key)
@@ -613,11 +637,11 @@ DO UPDATE SET value = excluded.value
 |}
 
     let get_smart_rollup_address =
-      (unit ->! smart_rollup_address)
+      (unit ->! smart_rollup_address) ~name:__FUNCTION__ ~table
       @@ {|SELECT value from metadata WHERE key = 'smart_rollup_address'|}
 
     let insert_history_mode =
-      (history_mode ->. unit)
+      (history_mode ->. unit) ~name:__FUNCTION__ ~table
       @@ {|
 INSERT INTO metadata (key, value) VALUES ('history_mode', ?)
 ON CONFLICT(key)
@@ -625,11 +649,13 @@ DO UPDATE SET value = excluded.value
 |}
 
     let get_history_mode =
-      (unit ->! history_mode)
+      (unit ->! history_mode) ~name:__FUNCTION__ ~table
       @@ {|SELECT value from metadata WHERE key = 'history_mode'|}
   end
 
   module Transactions = struct
+    let table = "transactions" (* For opentelemetry *)
+
     let receipt_fields =
       custom
         ~encode:(fun payload ->
@@ -659,20 +685,22 @@ DO UPDATE SET value = excluded.value
         string
 
     let insert =
-      t8
-        block_hash
-        level
-        quantity
-        root_hash
-        address
-        (option address)
-        receipt_fields
-        object_fields
-      ->. unit
+      (t8
+         block_hash
+         level
+         quantity
+         root_hash
+         address
+         (option address)
+         receipt_fields
+         object_fields
+      ->. unit)
+        ~name:__FUNCTION__
+        ~table
       @@ {eos|INSERT INTO transactions (block_hash, block_number, index_, hash, from_, to_, receipt_fields, object_fields) VALUES (?, ?, ?, ?, ?, ?, ?, ?)|eos}
 
     let select_receipt =
-      root_hash
+      (root_hash
       ->? t7
             block_hash
             level
@@ -680,22 +708,26 @@ DO UPDATE SET value = excluded.value
             root_hash
             address
             (option address)
-            receipt_fields
+            receipt_fields)
+        ~name:__FUNCTION__
+        ~table
       @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, receipt_fields FROM transactions WHERE hash = ?|eos}
 
     let select_receipts_from_block_number =
-      level
+      (level
       ->* t6
             block_hash
             quantity
             root_hash
             address
             (option address)
-            receipt_fields
+            receipt_fields)
+        ~name:__FUNCTION__
+        ~table
       @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions WHERE block_number = ?|eos}
 
     let select_object =
-      root_hash
+      (root_hash
       ->? t7
             block_hash
             level
@@ -703,105 +735,131 @@ DO UPDATE SET value = excluded.value
             root_hash
             address
             (option address)
-            object_fields
+            object_fields)
+        ~name:__FUNCTION__
+        ~table
       @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, object_fields FROM transactions WHERE hash = ?|eos}
 
     let select_objects_from_block_number =
       (level ->* t5 quantity root_hash address (option address) object_fields)
+        ~name:__FUNCTION__
+        ~table
       @@ {eos|SELECT index_, hash, from_, to_, object_fields FROM transactions WHERE block_number = ?|eos}
 
     let clear_after =
-      (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number > ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM transactions WHERE block_number > ?|}
 
     let clear_before =
-      (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number < ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM transactions WHERE block_number < ?|}
   end
 
   module Block_storage_mode = struct
+    let table = "block_storage_mode" (* For opentelemetry *)
+
     let legacy =
-      (unit ->! Caqti_type.Std.bool)
+      (unit ->! Caqti_type.Std.bool) ~name:__FUNCTION__ ~table
       @@ {|SELECT legacy FROM block_storage_mode|}
 
     let force_legacy =
-      (unit ->. unit) @@ {|UPDATE block_storage_mode SET legacy = 1|}
+      (unit ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|UPDATE block_storage_mode SET legacy = 1|}
   end
 
   module Blocks = struct
+    let table = "blocks" (* For opentelemetry *)
+
     let insert =
-      (t3 level block_hash block ->. unit)
+      (t3 level block_hash block ->. unit) ~name:__FUNCTION__ ~table
       @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
 
     let tez_insert =
-      (t3 level block_hash tezos_block ->. unit)
+      (t3 level block_hash tezos_block ->. unit) ~name:__FUNCTION__ ~table
       @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
 
     let select_with_level =
-      (level ->? block) @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+      (level ->? block) ~name:__FUNCTION__ ~table
+      @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
 
     let tez_select_with_level =
-      (level ->? tezos_block)
+      (level ->? tezos_block) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
 
     let select_with_hash =
-      (block_hash ->? block)
+      (block_hash ->? block) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT block FROM blocks WHERE hash = ?|eos}
 
     let select_hash_of_number =
-      (level ->? block_hash)
+      (level ->? block_hash) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT hash FROM blocks WHERE level = ?|eos}
 
     let select_number_of_hash =
-      (block_hash ->? level)
+      (block_hash ->? level) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT level FROM blocks WHERE hash = ?|eos}
 
-    let clear_after = (level ->. unit) @@ {|DELETE FROM blocks WHERE level > ?|}
+    let clear_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM blocks WHERE level > ?|}
 
     let clear_before =
-      (level ->. unit) @@ {|DELETE FROM blocks WHERE level < ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM blocks WHERE level < ?|}
   end
 
   let context_hash_of_block_hash =
-    (block_hash ->? context_hash)
+    (block_hash ->? context_hash) ~name:__FUNCTION__ ~table:"context_hashes"
     @@ {eos|SELECT c.context_hash from Context_hashes c JOIN Blocks b on c.id = b.level WHERE hash = ?|eos}
 
   module Irmin_chunks = struct
+    let table = "irmin_chunks" (* For opentelemetry *)
+
     let insert =
-      (t2 level timestamp ->. unit)
+      (t2 level timestamp ->. unit) ~name:__FUNCTION__ ~table
       @@ {|INSERT INTO irmin_chunks (level, timestamp) VALUES (?, ?)|}
 
     let nth =
-      (int ->? t2 level timestamp)
+      (int ->? t2 level timestamp) ~name:__FUNCTION__ ~table
       @@ {|SELECT level, timestamp from irmin_chunks ORDER BY level DESC LIMIT 1 OFFSET ?|}
 
     let latest =
-      (unit ->? t2 level timestamp)
+      (unit ->? t2 level timestamp) ~name:__FUNCTION__ ~table
       @@ {|SELECT level, timestamp from irmin_chunks ORDER BY level DESC LIMIT 1|}
 
-    let clear = (unit ->. unit) @@ {|DELETE FROM irmin_chunks|}
+    let clear =
+      (unit ->. unit) ~name:__FUNCTION__ ~table @@ {|DELETE FROM irmin_chunks|}
 
     let clear_after =
-      (level ->. unit) @@ {|DELETE FROM irmin_chunks WHERE level > ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM irmin_chunks WHERE level > ?|}
 
     let clear_before_included =
-      (level ->. unit) @@ {|DELETE FROM irmin_chunks WHERE level <= ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM irmin_chunks WHERE level <= ?|}
   end
 
   module Pending_confirmations = struct
+    let table = "pending_confirmations" (* For opentelemetry *)
+
     let insert =
-      (t2 level block_hash ->. unit)
+      (t2 level block_hash ->. unit) ~name:__FUNCTION__ ~table
       @@ {|INSERT INTO pending_confirmations (level, hash) VALUES (?, ?)|}
 
     let select_with_level =
-      (level ->? block_hash)
+      (level ->? block_hash) ~name:__FUNCTION__ ~table
       @@ {|SELECT hash FROM pending_confirmations WHERE level = ?|}
 
     let delete_with_level =
-      (level ->. unit) @@ {|DELETE FROM pending_confirmations WHERE level = ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM pending_confirmations WHERE level = ?|}
 
-    let clear = (unit ->. unit) @@ {|DELETE FROM pending_confirmations|}
+    let clear =
+      (unit ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM pending_confirmations|}
 
     let count =
-      (unit ->! level) @@ {|SELECT COUNT(*) FROM pending_confirmations|}
+      (unit ->! level) ~name:__FUNCTION__ ~table
+      @@ {|SELECT COUNT(*) FROM pending_confirmations|}
   end
 end
 

@@ -74,29 +74,122 @@ val with_transaction : conn -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
     @raise Assert_failure *)
 val assert_in_transaction : conn -> unit
 
-(** [with_connection conn k] allows to wraps atomic low level accesses to the
-    database from [conn]. [with_connection] can be used in the continuation of
-    {!with_transaction}. *)
-val with_connection : conn -> ((module Caqti_lwt.CONNECTION) -> 'a) -> 'a
-
 (** {2 Database low level queries} *)
+
+(** Module for creating SQL requests with metadata for tracing and debugging.
+    This is a wrapper around Caqti's request system with additional metadata. *)
+module Request : sig
+  (** Type of a SQL request with input type ['a], output type ['b], and
+      multiplicity ['m]. The multiplicity indicates how many rows the request
+      is expected to return:
+      - [`Zero]: No rows
+      - [`One]: Exactly one row
+      - [`Many]: Zero or more rows *)
+  type ('a, 'b, +'m) t constraint 'm = [< `Zero | `One | `Many]
+
+  (** [a ->. unit] creates a request that takes input of type [a] and returns no
+      rows. Useful for INSERT, UPDATE, DELETE operations.
+
+      @param name Optional name for the request for tracing
+      @param table Optional table name this request operates on
+      @param attrs Optional function to extract OpenTelemetry attributes from
+        the input
+      @param oneshot If true, the request will not be prepared
+      @return A request that expects no result rows *)
+  val ( ->. ) :
+    'a Caqti_type.t ->
+    unit Caqti_type.t ->
+    ?name:string ->
+    ?table:string ->
+    ?attrs:('a -> Opentelemetry.key_value list) ->
+    ?oneshot:bool ->
+    string ->
+    ('a, unit, [`Zero]) t
+
+  (** [a ->! b] creates a request that takes input of type [a] and returns
+      exactly one row of type [b]. Useful for SELECT queries that must return
+      exactly one result.
+
+      @param name Optional name for the request for tracing
+      @param table Optional table name this request operates on
+      @param attrs Optional function to extract OpenTelemetry attributes from
+        the input
+      @param oneshot If true, the request will not be prepared
+      @return A request that expects exactly one result row *)
+  val ( ->! ) :
+    'a Caqti_type.t ->
+    'b Caqti_type.t ->
+    ?name:string ->
+    ?table:string ->
+    ?attrs:('a -> Opentelemetry.key_value list) ->
+    ?oneshot:bool ->
+    string ->
+    ('a, 'b, [`One]) t
+
+  (** [a ->? b] creates a request that takes input of type [a] and returns zero
+      or one row of type [b]. Useful for SELECT queries that may not find a
+      result.
+
+      @param name Optional name for the request for tracing
+      @param table Optional table name this request operates on
+      @param attrs Optional function to extract OpenTelemetry attributes from
+        the input
+      @param oneshot If true, the request will not be prepared
+      @return A request that expects zero or one result row *)
+  val ( ->? ) :
+    'a Caqti_type.t ->
+    'b Caqti_type.t ->
+    ?name:string ->
+    ?table:string ->
+    ?attrs:('a -> Opentelemetry.key_value list) ->
+    ?oneshot:bool ->
+    string ->
+    ('a, 'b, [`One | `Zero]) t
+
+  (** [a ->* b] creates a request that takes input of type [a] and returns any
+      number of rows of type [b]. Useful for SELECT queries that return multiple
+      results.
+
+      @param name Optional name for the request for tracing
+      @param table Optional table name this request operates on
+      @param attrs Optional function to extract OpenTelemetry attributes from
+        the input
+      @param oneshot If true, the request will not be prepared
+      @return A request that can return any number of result rows *)
+  val ( ->* ) :
+    'a Caqti_type.t ->
+    'b Caqti_type.t ->
+    ?name:string ->
+    ?table:string ->
+    ?attrs:('a -> Opentelemetry.key_value list) ->
+    ?oneshot:bool ->
+    string ->
+    ('a, 'b, [`Many | `One | `Zero]) t
+end
 
 (** Caqti convenience functions wrapped in the Tezos error monad. See
     {!Caqti_connection_sig.Convenience}.  *)
 module Db : sig
+  (** Type representing a direct connection to the database with tracing
+      capabilities. This is used internally by the connection handling
+      functions. *)
+  type conn
+
   (** [exec req x] performs [req] with parameters [x] and checks that no rows
       are returned. *)
   val exec :
-    (module Caqti_lwt.CONNECTION) ->
-    ('a, unit, [< `Zero]) Caqti_request.t ->
+    ?scope:Opentelemetry.Scope.t ->
+    conn ->
+    ('a, unit, [< `Zero]) Request.t ->
     'a ->
     unit tzresult Lwt.t
 
   (** [find req x] performs [req] with parameters [x], checks that a single row
       is retured, and returns it. *)
   val find :
-    (module Caqti_lwt.CONNECTION) ->
-    ('a, 'b, [< `One]) Caqti_request.t ->
+    ?scope:Opentelemetry.Scope.t ->
+    conn ->
+    ('a, 'b, [< `One]) Request.t ->
     'a ->
     'b tzresult Lwt.t
 
@@ -104,8 +197,9 @@ module Db : sig
       [None] if no rows are returned or [Some y] if a single now [y] is returned
       and fails otherwise. *)
   val find_opt :
-    (module Caqti_lwt.CONNECTION) ->
-    ('a, 'b, [< `One | `Zero]) Caqti_request.t ->
+    ?scope:Opentelemetry.Scope.t ->
+    conn ->
+    ('a, 'b, [< `One | `Zero]) Request.t ->
     'a ->
     'b option tzresult Lwt.t
 
@@ -113,8 +207,9 @@ module Db : sig
       a list of rows in order of retrieval.  The accumulation is tail recursive
       but slightly less efficient than {!rev_collect_list}. *)
   val collect_list :
-    (module Caqti_lwt.CONNECTION) ->
-    ('a, 'b, [< `Many | `One | `Zero]) Caqti_request.t ->
+    ?scope:Opentelemetry.Scope.t ->
+    conn ->
+    ('a, 'b, [< `Many | `One | `Zero]) Request.t ->
     'a ->
     'b list tzresult Lwt.t
 
@@ -123,8 +218,9 @@ module Db : sig
       accumulation is tail recursive and slighly more efficient than
       {!collect_list}. *)
   val rev_collect_list :
-    (module Caqti_lwt.CONNECTION) ->
-    ('a, 'b, [< `Many | `One | `Zero]) Caqti_request.t ->
+    ?scope:Opentelemetry.Scope.t ->
+    conn ->
+    ('a, 'b, [< `Many | `One | `Zero]) Request.t ->
     'a ->
     'b list tzresult Lwt.t
 
@@ -132,8 +228,9 @@ module Db : sig
       through the composition of [f y] across the result rows [y] in the order
       of retrieval. *)
   val fold :
-    (module Caqti_lwt.CONNECTION) ->
-    ('a, 'b, [< `Many | `One | `Zero]) Caqti_request.t ->
+    ?scope:Opentelemetry.Scope.t ->
+    conn ->
+    ('a, 'b, [< `Many | `One | `Zero]) Request.t ->
     ('b -> 'c -> 'c) ->
     'a ->
     'c ->
@@ -149,8 +246,9 @@ module Db : sig
       has just run out of connections.  An alternative is to collect the rows
       first e.g. with {!fold} and do the nested queries after exiting.*)
   val fold_s :
-    (module Caqti_lwt.CONNECTION) ->
-    ('a, 'b, [< `Many | `One | `Zero]) Caqti_request.t ->
+    ?scope:Opentelemetry.Scope.t ->
+    conn ->
+    ('a, 'b, [< `Many | `One | `Zero]) Request.t ->
     ('b -> 'c -> ('c, Caqti_error.t) result Lwt.t) ->
     'a ->
     'c ->
@@ -162,9 +260,15 @@ module Db : sig
       Please see the warning in {!fold_s} about resource usage in the
       callback. *)
   val iter_s :
-    (module Caqti_lwt.CONNECTION) ->
-    ('a, 'b, [< `Many | `One | `Zero]) Caqti_request.t ->
+    ?scope:Opentelemetry.Scope.t ->
+    conn ->
+    ('a, 'b, [< `Many | `One | `Zero]) Request.t ->
     ('b -> (unit, Caqti_error.t) result Lwt.t) ->
     'a ->
     unit tzresult Lwt.t
 end
+
+(** [with_connection conn k] allows to wraps atomic low level accesses to the
+    database from [conn]. [with_connection] can be used in the continuation of
+    {!with_transaction}. *)
+val with_connection : conn -> (Db.conn -> 'a) -> 'a
