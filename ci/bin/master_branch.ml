@@ -36,6 +36,7 @@ let job_static_x86_64 =
     ~__POS__
     ~arch:Amd64
     ~cpu:Very_high
+    ~storage:Ramfs
     ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
     ~rules:rules_always
     ()
@@ -120,6 +121,7 @@ let jobs =
       ~__POS__
       ~arch:Amd64
       ~cpu:Very_high
+      ~storage:Ramfs
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~rules:rules_always
