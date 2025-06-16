@@ -40,6 +40,9 @@ must both be preattestations (each one may be aggregated or not) or
 both be attestations. Moreover, both must involve the denounced
 slot, that is, be either a standalone operation for this slot or an
 aggregate whose committee includes this slot.
+The receipts for these operations have also been reworked, see :ref:`seoul_receipts_changes`.
+
+All existing tz4 addresses are being unrevealed when protocol S is adopted, and they must provide a proof of possession to be revealed again, see :ref:`seoul_breaking_changes`.
 
 Attestations
 ------------
