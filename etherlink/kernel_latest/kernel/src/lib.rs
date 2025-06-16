@@ -295,6 +295,7 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     .context("Failed during stage 1")?
     {
         host.mark_for_reboot()?;
+        #[cfg(not(target_arch = "riscv64"))]
         return Ok(());
     };
 
@@ -329,6 +330,7 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     #[cfg(feature = "benchmark-bypass-stage2")]
     {
         log!(host, Benchmarking, "Shortcircuiting computation");
+        #[cfg(not(target_arch = "riscv64"))]
         return Ok(());
     }
 

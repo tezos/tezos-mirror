@@ -803,6 +803,7 @@ impl<Mode: Parsable> InputResult<Mode> {
                 msg_id,
                 enable_fa_deposits,
             ),
+            InternalInboxMessage::EndOfLevel => InputResult::NoInput,
             _ => InputResult::Unparsable,
         }
     }
