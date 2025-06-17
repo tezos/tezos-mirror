@@ -10,8 +10,8 @@ type parameters = {
   smart_rollup_address : string;
   sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
-  chain_family : L2_types.chain_family;
-  tx_container : (module Services_backend_sig.Tx_container);
+  chain_family : L2_types.ex_chain_family;
+  tx_container : L2_types.evm_chain_family Services_backend_sig.tx_container;
 }
 
 (* The size of a delayed transaction is overapproximated to the maximum size
@@ -216,11 +216,12 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
         in
         return `Drop
 
-let pop_valid_tx ~chain_family
-    ~(tx_container : (module Services_backend_sig.Tx_container))
+let pop_valid_tx (type f) ~(chain_family : f L2_types.chain_family)
+    ~(tx_container :
+       L2_types.evm_chain_family Services_backend_sig.tx_container)
     (head_info : Evm_context.head) ~maximum_cumulative_size =
   let open Lwt_result_syntax in
-  let (module Tx_container) = tx_container in
+  let (Evm_tx_container (module Tx_container)) = tx_container in
   (* Skip validation if chain_family is Michelson. *)
   match chain_family with
   | L2_types.Michelson ->
@@ -268,9 +269,10 @@ let pop_valid_tx ~chain_family
     pool or if [force] is true. *)
 let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
     ~sequencer_key ~force ~timestamp ~delayed_hashes ~remaining_cumulative_size
-    ~(tx_container : (module Services_backend_sig.Tx_container)) head_info =
+    ~(tx_container :
+       L2_types.evm_chain_family Services_backend_sig.tx_container) head_info =
   let open Lwt_result_syntax in
-  let (module Tx_container) = tx_container in
+  let (Evm_tx_container (module Tx_container)) = tx_container in
   let* transactions_and_objects =
     (* Low key optimization to avoid even checking the txpool if there is not
        enough space for the smallest transaction. *)
@@ -323,9 +325,11 @@ let head_info_and_delayed_transactions ~with_delayed_transactions
 
 let produce_block ~chain_family ~cctxt ~smart_rollup_address ~sequencer_key
     ~force ~timestamp ~maximum_number_of_chunks ~with_delayed_transactions
-    ~(tx_container : (module Services_backend_sig.Tx_container)) =
+    ~tx_container =
   let open Lwt_result_syntax in
-  let (module Tx_container) = tx_container in
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
+  in
   let* is_locked = Tx_container.is_locked () in
   if is_locked then
     let*! () = Block_producer_events.production_locked () in
@@ -385,7 +389,7 @@ module Handlers = struct
           smart_rollup_address;
           sequencer_key;
           maximum_number_of_chunks;
-          chain_family;
+          chain_family = Ex_chain_family chain_family;
           tx_container;
         } =
           state

@@ -37,8 +37,8 @@ type error +=
   | Singlechain_node_multichain_kernel
   | Mismatched_chain_family of {
       chain_id : L2_types.chain_id;
-      node_family : L2_types.chain_family;
-      kernel_family : L2_types.chain_family;
+      node_family : L2_types.ex_chain_family;
+      kernel_family : L2_types.ex_chain_family;
     }
   | Dream_rpc_tezlink
 
@@ -159,7 +159,12 @@ let () =
     ~description:
       "The node was configured with a chain family which does not match the \
        one found in the durable storage."
-    ~pp:(fun ppf (chain_id, node_family, kernel_family) ->
+    ~pp:(fun
+        ppf
+        ( chain_id,
+          L2_types.Ex_chain_family node_family,
+          L2_types.Ex_chain_family kernel_family )
+      ->
       Format.fprintf
         ppf
         "The node was configured with the %a chain family for chain %a but the \

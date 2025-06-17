@@ -18,6 +18,9 @@ type head = {
   pending_upgrade : Evm_events.Upgrade.t option;
 }
 
+type ex_tx_container =
+  | Ex_tx_container : _ Services_backend_sig.tx_container -> ex_tx_container
+
 type parameters = {
   configuration : Configuration.t;
   kernel_path : Wasm_debugger.kernel option;
@@ -26,7 +29,7 @@ type parameters = {
   store_perm : Sqlite.perm;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
   snapshot_url : string option;
-  tx_container : (module Services_backend_sig.Tx_container);
+  tx_container : ex_tx_container;
 }
 
 type session_state = {
@@ -49,7 +52,7 @@ type t = {
   session : session_state;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
   legacy_block_storage : bool;
-  tx_container : (module Services_backend_sig.Tx_container);
+  tx_container : ex_tx_container;
 }
 
 let is_sequencer t = Option.is_some t.sequencer_wallet
@@ -257,7 +260,9 @@ module State = struct
     Evm_store.use store @@ fun conn ->
     let* latest = Evm_store.Context_hashes.find_latest conn in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-    let chain_family = Configuration.retrieve_chain_family ~l2_chains in
+    let (Ex_chain_family chain_family) =
+      Configuration.retrieve_chain_family ~l2_chains
+    in
     match latest with
     | Some (Qty latest_blueprint_number, checkpoint) ->
         let*! context = Irmin_context.checkout_exn index checkpoint in
@@ -474,7 +479,10 @@ module State = struct
     let*! evm_state = Irmin_context.PVMState.get context in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
     let* () =
-      let (module Tx_container) = ctxt.tx_container in
+      let (Ex_tx_container tx_container) = ctxt.tx_container in
+      let (module Tx_container) =
+        Services_backend_sig.tx_container_module tx_container
+      in
       Tx_container.clear ()
     in
     (* Clear the store. *)
@@ -483,7 +491,7 @@ module State = struct
     (* Update mutable session values. *)
     let next_blueprint_number = Ethereum_types.Qty.next l2_level in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-    let chain_family =
+    let (Ex_chain_family chain_family) =
       Configuration.retrieve_chain_family
         ~l2_chains:ctxt.configuration.experimental_features.l2_chains
     in
@@ -521,7 +529,7 @@ module State = struct
       if not ctxt.legacy_block_storage then
         Evm_store.Blocks.find_hash_of_number conn (Qty number)
       else
-        let chain_family =
+        let (Ex_chain_family chain_family) =
           Configuration.retrieve_chain_family
             ~l2_chains:ctxt.configuration.experimental_features.l2_chains
         in
@@ -719,7 +727,7 @@ module State = struct
     let time_processed = ref Ptime.Span.zero in
 
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-    let chain_family =
+    let (Ex_chain_family chain_family) =
       Configuration.retrieve_chain_family
         ~l2_chains:ctxt.configuration.experimental_features.l2_chains
     in
@@ -1214,7 +1222,7 @@ module State = struct
     (* Prepare an event list to be reapplied on current head *)
     let events = Evm_events.of_parts delayed_transactions lost_upgrade in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-    let chain_family =
+    let (Ex_chain_family chain_family) =
       Configuration.retrieve_chain_family
         ~l2_chains:ctxt.configuration.experimental_features.l2_chains
     in
@@ -1425,7 +1433,7 @@ module State = struct
 
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
       ?smart_rollup_address ~store_perm ?sequencer_wallet ?snapshot_url
-      ~tx_container () =
+      ~(tx_container : _ Services_backend_sig.tx_container) () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -1539,7 +1547,7 @@ module State = struct
         store;
         sequencer_wallet;
         legacy_block_storage;
-        tx_container;
+        tx_container = Ex_tx_container tx_container;
       }
     in
 
@@ -1761,7 +1769,7 @@ module State = struct
             if not ctxt.legacy_block_storage then
               Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
             else
-              let chain_family =
+              let (Ex_chain_family chain_family) =
                 Configuration.retrieve_chain_family
                   ~l2_chains:ctxt.configuration.experimental_features.l2_chains
               in
@@ -1835,7 +1843,7 @@ module Handlers = struct
         store_perm;
         sequencer_wallet;
         snapshot_url;
-        tx_container;
+        tx_container = Ex_tx_container tx_container;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -2018,7 +2026,7 @@ let worker_wait_for_request req =
 
 let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
     ~store_perm ?sequencer_wallet ?snapshot_url
-    ~(tx_container : (module Services_backend_sig.Tx_container)) () =
+    ~(tx_container : _ Services_backend_sig.tx_container) () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
   let* worker =
@@ -2033,7 +2041,7 @@ let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
         store_perm;
         sequencer_wallet;
         snapshot_url;
-        tx_container;
+        tx_container = Ex_tx_container tx_container;
       }
       (module Handlers)
   in
@@ -2208,7 +2216,7 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
   let* evm_events =
     get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state
   in
-  let chain_family =
+  let (Ex_chain_family chain_family) =
     Configuration.retrieve_chain_family
       ~l2_chains:configuration.Configuration.experimental_features.l2_chains
   in

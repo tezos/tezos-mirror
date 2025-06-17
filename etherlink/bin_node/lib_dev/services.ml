@@ -487,10 +487,11 @@ let process_trace_result trace =
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)
 
-let dispatch_request ~websocket
-    (rpc_server_family : Rpc_types.rpc_server_family) (rpc : Configuration.rpc)
-    (validation : Validate.validation_mode) (config : Configuration.t)
-    (module Tx_container : Services_backend_sig.Tx_container)
+let dispatch_request (type f) ~websocket
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) (validation : Validate.validation_mode)
+    (config : Configuration.t)
+    (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_result_syntax in
@@ -558,7 +559,7 @@ let dispatch_request ~websocket
             build_with_input ~f module_ parameters
         | Generic_block_number.Method ->
             let f (_ : unit option) =
-              let chain_family =
+              let (Ex_chain_family chain_family) =
                 Configuration.retrieve_chain_family
                   ~l2_chains:config.experimental_features.l2_chains
               in
@@ -657,6 +658,14 @@ let dispatch_request ~websocket
             let f (address, block_param) =
               match block_param with
               | Ethereum_types.Block_parameter.(Block_parameter Pending) ->
+                  let* (module Tx_container) =
+                    match tx_container with
+                    | Evm_tx_container m -> return m
+                    | Michelson_tx_container _ ->
+                        failwith
+                          "Unsupported JSONRPC method in Tezlink: \
+                           getTransactionCount"
+                  in
                   let* next_nonce =
                     Backend_rpc.Etherlink.nonce address block_param
                   in
@@ -759,6 +768,14 @@ let dispatch_request ~websocket
             build_with_input ~f module_ parameters
         | Get_transaction_by_hash.Method ->
             let f tx_hash =
+              let* (module Tx_container) =
+                match tx_container with
+                | Evm_tx_container m -> return m
+                | Michelson_tx_container _ ->
+                    failwith
+                      "Unsupported JSONRPC method in Tezlink: \
+                       getTransactionByHash"
+              in
               let* transaction_object = Tx_container.find tx_hash in
               let* transaction_object =
                 match transaction_object with
@@ -844,6 +861,14 @@ let dispatch_request ~websocket
                     in
                     rpc_error (Rpc_errors.transaction_rejected err None)
                 | Ok (next_nonce, transaction_object) -> (
+                    let* (module Tx_container) =
+                      match tx_container with
+                      | Evm_tx_container m -> return m
+                      | Michelson_tx_container _ ->
+                          failwith
+                            "Unsupported JSONRPC method in Tezlink: \
+                             sendRawTransaction"
+                    in
                     let* tx_hash =
                       Tx_container.add ~next_nonce transaction_object ~raw_tx
                     in
@@ -902,6 +927,13 @@ let dispatch_request ~websocket
             build_with_input ~f module_ parameters
         | Txpool_content.Method ->
             let f (_ : unit option) =
+              let* (module Tx_container) =
+                match tx_container with
+                | Evm_tx_container m -> return m
+                | Michelson_tx_container _ ->
+                    failwith
+                      "Unsupported JSONRPC method in Tezlink: txpoolContent"
+              in
               let* txpool_content = Tx_container.content () in
               rpc_ok txpool_content
             in
@@ -1020,10 +1052,10 @@ let dispatch_request ~websocket
   in
   Lwt.return JSONRPC.{value; id}
 
-let dispatch_private_request ~websocket
-    (rpc_server_family : Rpc_types.rpc_server_family) (rpc : Configuration.rpc)
-    (config : Configuration.t)
-    (module Tx_container : Services_backend_sig.Tx_container)
+let dispatch_private_request (type f) ~websocket
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) (config : Configuration.t)
+    (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
@@ -1127,6 +1159,14 @@ let dispatch_private_request ~websocket
               rpc_error (Rpc_errors.transaction_rejected err None)
           | Ok (next_nonce, transaction_object) -> (
               let* tx_hash =
+                let* (module Tx_container) =
+                  match tx_container with
+                  | Evm_tx_container m -> return m
+                  | Michelson_tx_container _ ->
+                      failwith
+                        "Unsupported JSONRPC method in Tezlink: \
+                         injectTransaction"
+                in
                 Tx_container.add
                   ~next_nonce
                   transaction_object
@@ -1214,7 +1254,7 @@ let empty_stream =
 
 let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
 
-let dispatch_websocket (rpc_server_family : Rpc_types.rpc_server_family)
+let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) validation config tx_container ctx
     (input : JSONRPC.request) =
   let open Lwt_syntax in
@@ -1275,9 +1315,10 @@ let dispatch_websocket (rpc_server_family : Rpc_types.rpc_server_family)
       in
       websocket_response_of_response response
 
-let dispatch_private_websocket (rpc_server_family : Rpc_types.rpc_server_family)
-    ~block_production (rpc : Configuration.rpc) config tx_container ctx
-    (input : JSONRPC.request) =
+let dispatch_private_websocket
+    (rpc_server_family : _ Rpc_types.rpc_server_family) ~block_production
+    (rpc : Configuration.rpc) config tx_container ctx (input : JSONRPC.request)
+    =
   let open Lwt_syntax in
   let+ response =
     dispatch_private_request
@@ -1305,8 +1346,9 @@ let generic_dispatch ~service_name (rpc : Configuration.rpc) config tx_container
         input
       |> Lwt_result.ok)
 
-let dispatch_public (rpc_server_family : Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) validation config tx_container ctx dir =
+let dispatch_public (type f) (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) validation config
+    (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_dispatch
     ~service_name:"public_rpc"
     rpc
@@ -1317,8 +1359,10 @@ let dispatch_public (rpc_server_family : Rpc_types.rpc_server_family)
     Path.root
     (dispatch_request ~websocket:false rpc_server_family rpc validation)
 
-let dispatch_private (rpc_server_family : Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) ~block_production config tx_container ctx dir =
+let dispatch_private (type f)
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) ~block_production config
+    (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_dispatch
     ~service_name:"private_rpc"
     rpc
@@ -1345,8 +1389,10 @@ let generic_websocket_dispatch (config : Configuration.t) tx_container ctx dir
         path
         (dispatch_websocket config tx_container ctx)
 
-let dispatch_websocket_public (rpc_server_family : Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) validation config tx_container ctx dir =
+let dispatch_websocket_public (type f)
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) validation config
+    (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_websocket_dispatch
     config
     tx_container
@@ -1355,8 +1401,10 @@ let dispatch_websocket_public (rpc_server_family : Rpc_types.rpc_server_family)
     "/ws"
     (dispatch_websocket rpc_server_family rpc validation)
 
-let dispatch_websocket_private (rpc_server_family : Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) ~block_production config tx_container ctx dir =
+let dispatch_websocket_private (type f)
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) ~block_production config
+    (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_websocket_dispatch
     config
     tx_container
@@ -1365,8 +1413,9 @@ let dispatch_websocket_private (rpc_server_family : Rpc_types.rpc_server_family)
     "/private/ws"
     (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
-let directory ~rpc_server_family ?delegate_health_check_to rpc validation config
-    tx_container backend dir =
+let directory (type f) ~rpc_server_family ?delegate_health_check_to rpc
+    validation config (tx_container : f Services_backend_sig.tx_container)
+    backend dir =
   dir |> version |> configuration config
   |> health_check ?delegate_to:delegate_health_check_to
   |> dispatch_public
@@ -1384,7 +1433,8 @@ let directory ~rpc_server_family ?delegate_health_check_to rpc validation config
        tx_container
        backend
 
-let private_directory ~rpc_server_family rpc config tx_container backend
+let private_directory (type f) ~rpc_server_family rpc config
+    (tx_container : f Services_backend_sig.tx_container) backend
     ~block_production =
   Evm_directory.empty config.experimental_features.rpc_server
   |> version

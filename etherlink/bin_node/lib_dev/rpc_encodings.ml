@@ -264,7 +264,7 @@ end
 module Chain_family = struct
   type input = L2_types.chain_id
 
-  type output = L2_types.chain_family
+  type output = L2_types.ex_chain_family
 
   let input_encoding = Data_encoding.tup1 L2_types.Chain_id.encoding
 
@@ -1197,15 +1197,16 @@ let multichain_sequencer_unsupported_methods =
   in
   evm_unsupported_methods @ diff_method_names
 
-let map_method_name ~rpc_server_family ~restrict method_name =
+let map_method_name (type f)
+    ~(rpc_server_family : f Rpc_types.rpc_server_family) ~restrict method_name =
   let supported_methods, unsupported_methods =
     match rpc_server_family with
     | Rpc_types.Multichain_sequencer_rpc_server ->
         ( multichain_sequencer_supported_methods,
           multichain_sequencer_unsupported_methods )
-    | Rpc_types.Single_chain_node_rpc_server L2_types.EVM ->
+    | Rpc_types.Single_chain_node_rpc_server EVM ->
         (evm_supported_methods, evm_unsupported_methods)
-    | Rpc_types.Single_chain_node_rpc_server L2_types.Michelson ->
+    | Rpc_types.Single_chain_node_rpc_server Michelson ->
         (michelson_supported_methods, michelson_unsupported_methods)
   in
   let disabled =

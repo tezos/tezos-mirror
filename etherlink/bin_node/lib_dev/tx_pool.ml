@@ -231,7 +231,7 @@ type parameters = {
   tx_timeout_limit : int64;
   tx_pool_addr_limit : int;
   tx_pool_tx_per_addr_limit : int;
-  chain_family : L2_types.chain_family;
+  chain_family : L2_types.ex_chain_family;
 }
 
 module Types = struct
@@ -245,7 +245,7 @@ module Types = struct
     tx_pool_addr_limit : int;
     tx_pool_tx_per_addr_limit : int;
     mutable locked : bool;
-    chain_family : L2_types.chain_family;
+    chain_family : L2_types.ex_chain_family;
   }
 
   type nonrec parameters = parameters
@@ -498,11 +498,12 @@ let pop_transactions state ~maximum_cumulative_size =
           pool;
           locked;
           tx_timeout_limit;
+          chain_family;
           _;
         } =
     state
   in
-  if locked || state.chain_family = L2_types.Michelson then return []
+  if locked || chain_family = L2_types.Ex_chain_family Michelson then return []
   else
     (* Get all the addresses in the tx-pool. *)
     let addresses = Pool.addresses pool in
@@ -984,3 +985,5 @@ module Tx_container = struct
       ~initial_validation_state:_ =
     pop_transactions ~maximum_cumulative_size
 end
+
+let tx_container = Services_backend_sig.Evm_tx_container (module Tx_container)

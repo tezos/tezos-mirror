@@ -63,7 +63,7 @@ val make_l2 :
   ?set_account_code:(string * string) list ->
   ?world_state_path:string * string ->
   l2_chain_id:string ->
-  l2_chain_family:L2_types.chain_family ->
+  l2_chain_family:_ L2_types.chain_family ->
   output:string ->
   unit ->
   unit tzresult Lwt.t

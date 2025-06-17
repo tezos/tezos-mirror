@@ -48,7 +48,7 @@ val start :
   store_perm:Sqlite.perm ->
   ?sequencer_wallet:Client_keys.sk_uri * Client_context.wallet ->
   ?snapshot_url:string ->
-  tx_container:(module Services_backend_sig.Tx_container) ->
+  tx_container:_ Services_backend_sig.tx_container ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 
@@ -63,7 +63,7 @@ val init_from_rollup_node :
   omit_delayed_tx_events:bool ->
   data_dir:string ->
   rollup_node_data_dir:string ->
-  tx_container:(module Services_backend_sig.Tx_container) ->
+  tx_container:_ Services_backend_sig.tx_container ->
   unit ->
   unit tzresult Lwt.t
 

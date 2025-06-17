@@ -30,19 +30,30 @@ module Chain_id = struct
     Format.fprintf fmt "Chain_id (%s)" (Z.to_string cid)
 end
 
-type chain_family = EVM | Michelson
+type evm_chain_family = Evm_chain_family
+
+type michelson_chain_family = Michelson_chain_family
+
+type _ chain_family =
+  | EVM : evm_chain_family chain_family
+  | Michelson : michelson_chain_family chain_family
+
+type ex_chain_family = Ex_chain_family : _ chain_family -> ex_chain_family
 
 module Chain_family = struct
-  let to_string = function EVM -> "EVM" | Michelson -> "Michelson"
+  let to_string (type f) : f chain_family -> string = function
+    | EVM -> "EVM"
+    | Michelson -> "Michelson"
 
   let of_string_exn s =
     match String.lowercase_ascii s with
-    | "evm" -> EVM
-    | "michelson" -> Michelson
+    | "evm" -> Ex_chain_family EVM
+    | "michelson" -> Ex_chain_family Michelson
     | _ -> invalid_arg "Chain_family.of_string"
 
   let encoding =
-    Data_encoding.string_enum [("EVM", EVM); ("Michelson", Michelson)]
+    Data_encoding.string_enum
+      [("EVM", Ex_chain_family EVM); ("Michelson", Ex_chain_family Michelson)]
 
   let pp fmt cf = Format.fprintf fmt "%s" (to_string cf)
 end
@@ -128,17 +139,17 @@ let block_number_of_transactions block =
 let block_parent block =
   match block with Eth block -> block.parent | Tez block -> block.parent_hash
 
-let decode_block_hash ~chain_family bytes =
+let decode_block_hash (type f) ~(chain_family : f chain_family) bytes =
   match chain_family with
   | EVM -> Ethereum_types.decode_block_hash bytes
   | Michelson -> Tezos_block.decode_block_hash bytes
 
-let genesis_parent_hash ~chain_family =
+let genesis_parent_hash (type f) ~(chain_family : f chain_family) =
   match chain_family with
   | EVM -> Ethereum_types.genesis_parent_hash
   | Michelson -> Tezos_block.genesis_parent_hash
 
-let block_from_bytes ~chain_family bytes =
+let block_from_bytes (type f) ~(chain_family : f chain_family) bytes =
   match chain_family with
   | EVM ->
       let eth_block = Ethereum_types.block_from_rlp bytes in

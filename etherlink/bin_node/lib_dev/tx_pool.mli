@@ -20,7 +20,7 @@ type parameters = {
   tx_pool_addr_limit : int;  (** Maximum allowed addresses inside the pool. *)
   tx_pool_tx_per_addr_limit : int;
       (** Maximum allowed transactions per address inside the pool. *)
-  chain_family : L2_types.chain_family;
+  chain_family : L2_types.ex_chain_family;
 }
 
 (** [start parameters] starts the tx-pool *)
@@ -53,4 +53,4 @@ val mode : unit -> mode tzresult Lwt.t
 
 (** wrapper of the Tx_pool to be compatible with the Tx_container
     signature for the services. *)
-module Tx_container : Services_backend_sig.Tx_container
+val tx_container : L2_types.evm_chain_family Services_backend_sig.tx_container

@@ -142,7 +142,7 @@ module Chain_id :
 module Chain_family :
   METHOD
     with type input = L2_types.chain_id
-     and type output = L2_types.chain_family
+     and type output = L2_types.ex_chain_family
 
 module Accounts :
   METHOD with type input = unit and type output = Ethereum_types.address list
@@ -378,7 +378,7 @@ type map_result =
   | Disabled
 
 val map_method_name :
-  rpc_server_family:Rpc_types.rpc_server_family ->
+  rpc_server_family:_ Rpc_types.rpc_server_family ->
   restrict:Configuration.restricted_rpcs ->
   string ->
   map_result

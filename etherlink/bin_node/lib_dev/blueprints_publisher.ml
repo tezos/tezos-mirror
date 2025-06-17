@@ -18,7 +18,7 @@ type parameters = {
   keep_alive : bool;
   drop_duplicate : bool;
   order_enabled : bool;
-  tx_container : (module Services_backend_sig.Tx_container);
+  tx_container : L2_types.evm_chain_family Services_backend_sig.tx_container;
 }
 
 type state = {
@@ -39,7 +39,7 @@ type state = {
   mutable cooldown : int;
       (** Do not try to catch-up if [cooldown] is not equal to 0 *)
   enable_dal : bool;
-  tx_container : (module Services_backend_sig.Tx_container);
+  tx_container : L2_types.evm_chain_family Services_backend_sig.tx_container;
 }
 
 module Types = struct
@@ -165,7 +165,9 @@ module Worker = struct
     match rollup_is_lagging_behind self with
     | No_lag | Needs_republish -> return_unit
     | Needs_lock ->
-        let (module Tx_container) = tx_container self in
+        let (module Tx_container) =
+          Services_backend_sig.tx_container_module (tx_container self)
+        in
         Tx_container.lock_transactions ()
 
   let catch_up worker =
@@ -325,7 +327,10 @@ module Handlers = struct
             Worker.decrement_cooldown self ;
             (* If there is no lag or the worker just needs to republish we
                unlock the transaction pool in case it was locked. *)
-            let (module Tx_container) = Worker.tx_container self in
+            let (module Tx_container) =
+              Services_backend_sig.tx_container_module
+                (Worker.tx_container self)
+            in
             Tx_container.unlock_transactions ())
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st

@@ -140,8 +140,9 @@ let monitor_performances ~data_dir =
   in
   Lwt.dont_wait aux (Fun.const ())
 
-let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
-    ~l2_chain_id ?delegate_health_check_to ?evm_services ?data_dir validation
+let start_public_server (type f)
+    ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
+    ?delegate_health_check_to ?evm_services ?data_dir validation
     (config : Configuration.t) tx_container ctxt =
   let open Lwt_result_syntax in
   let*! can_start_performance_metrics =
@@ -163,7 +164,7 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
   let*? () = Rpc_types.check_rpc_server_config rpc_server_family config in
   let* register_tezos_services =
     match rpc_server_family with
-    | Rpc_types.Single_chain_node_rpc_server L2_types.Michelson ->
+    | Rpc_types.Single_chain_node_rpc_server Michelson ->
         let (module Backend : Services_backend_sig.S), _ = ctxt in
         let* l2_chain_id =
           match l2_chain_id with
@@ -174,8 +175,7 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
         @@ Tezos_services.register_tezlink_services
              ~l2_chain_id
              (module Backend.Tezlink)
-    | Single_chain_node_rpc_server L2_types.EVM
-    | Multichain_sequencer_rpc_server ->
+    | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server ->
         return @@ Evm_directory.empty config.experimental_features.rpc_server
   in
   (* If spawn_rpc is defined, use it as intermediate *)
@@ -209,7 +209,7 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
   in
   return finalizer
 
-let start_private_server ~(rpc_server_family : Rpc_types.rpc_server_family)
+let start_private_server ~(rpc_server_family : _ Rpc_types.rpc_server_family)
     ?(block_production = `Disabled) config tx_container ctxt =
   let open Lwt_result_syntax in
   match config.Configuration.private_rpc with

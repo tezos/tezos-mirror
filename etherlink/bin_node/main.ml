@@ -1059,7 +1059,7 @@ let add_tezlink_to_node_configuration tezlink_chain_id configuration =
              [
                {
                  chain_id = Chain_id Z.(of_int tezlink_chain_id);
-                 chain_family = Michelson;
+                 chain_family = Ex_chain_family Michelson;
                };
              ]);
       spawn_rpc =
@@ -1555,7 +1555,7 @@ let init_from_rollup_node_command =
         ~omit_delayed_tx_events
         ~data_dir
         ~rollup_node_data_dir
-        ~tx_container:(module Evm_node_lib_dev.Tx_queue.Tx_container)
+        ~tx_container:Evm_node_lib_dev.Tx_queue.tx_container
         ())
 
 let dump_to_rlp_command =
@@ -1770,7 +1770,7 @@ let patch_kernel_command =
             ~configuration
             ~data_dir
             ~store_perm:Read_write
-            ~tx_container:(module Evm_node_lib_dev.Tx_queue.Tx_container)
+            ~tx_container:Evm_node_lib_dev.Tx_queue.tx_container
             ()
         in
         Evm_context.patch_kernel ?block_number (On_disk kernel_path)
@@ -2114,7 +2114,7 @@ let make_l2_kernel_config_command =
            set_account_code,
            world_state_path,
            l2_chain_id,
-           l2_chain_family )
+           Ex_chain_family l2_chain_family )
          output
          () ->
       let* l2_chain_id =
@@ -3015,7 +3015,7 @@ let patch_state_command =
             ~configuration
             ~data_dir
             ~store_perm:Read_write
-            ~tx_container:(module Evm_node_lib_dev.Tx_queue.Tx_container)
+            ~tx_container:Evm_node_lib_dev.Tx_queue.tx_container
             ()
         in
         Evm_context.patch_state ?block_number ~key ~value ()

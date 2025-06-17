@@ -36,7 +36,7 @@ end
 
 let etherlink_root = World_state.make ""
 
-let root_of_chain_family chain_family =
+let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =
   match chain_family with
   | L2_types.EVM -> etherlink_root
   | L2_types.Michelson -> tezlink_root

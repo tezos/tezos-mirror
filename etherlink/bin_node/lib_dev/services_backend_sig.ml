@@ -16,7 +16,7 @@ module type S = sig
   module Tracer_etherlink : Tracer_sig.S
 
   val block_param_to_block_number :
-    chain_family:L2_types.chain_family ->
+    chain_family:_ L2_types.chain_family ->
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
 
@@ -29,7 +29,8 @@ module type S = sig
   val chain_id : unit -> L2_types.chain_id tzresult Lwt.t
 
   (** [chain_family chain_id] returns chain family defined for the chain with id chain_id. *)
-  val chain_family : L2_types.chain_id -> L2_types.chain_family tzresult Lwt.t
+  val chain_family :
+    L2_types.chain_id -> L2_types.ex_chain_family tzresult Lwt.t
 
   (** [single_chain_id_and_family] should only be called if the
     node is expected to follow a single chain. It compares the
@@ -51,7 +52,7 @@ module type S = sig
   val single_chain_id_and_family :
     config:Configuration.t ->
     enable_multichain:bool ->
-    (L2_types.chain_id option * L2_types.chain_family) tzresult Lwt.t
+    (L2_types.chain_id option * L2_types.ex_chain_family) tzresult Lwt.t
 
   (** [storage_version ()] returns the latest storage version known to the
       current kernel. This can be used to determine which features are and are
@@ -90,7 +91,7 @@ module type Backend = sig
   (** [block_param_to_block_number block_param] returns the block number of the
       block identified by [block_param]. *)
   val block_param_to_block_number :
-    chain_family:L2_types.chain_family ->
+    chain_family:_ L2_types.chain_family ->
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
 
@@ -155,11 +156,11 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
       =
     let open Lwt_result_syntax in
     match (config.experimental_features.l2_chains, enable_multichain) with
-    | None, false -> return (None, L2_types.EVM)
+    | None, false -> return (None, L2_types.Ex_chain_family EVM)
     | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
     | Some [l2_chain], false ->
         let*! () = Events.multichain_node_singlechain_kernel () in
-        return (Some l2_chain.chain_id, L2_types.EVM)
+        return (Some l2_chain.chain_id, L2_types.Ex_chain_family EVM)
     | Some [l2_chain], true ->
         let chain_id = l2_chain.chain_id in
         let* chain_family = chain_family chain_id in
@@ -266,3 +267,45 @@ module type Tx_container = sig
     initial_validation_state:'a ->
     (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 end
+
+(** ['f tx_container] is a GADT parametrized by the same type argument
+    as [L2_types.chain_family]. It is useful to statically guarantee
+    that the launched tx-container uses types compatible with the
+    chain's chain family. *)
+
+type 'f tx_container =
+  | Evm_tx_container :
+      (module Tx_container)
+      -> L2_types.evm_chain_family tx_container
+  | Michelson_tx_container :
+      (module Tx_container)
+      -> L2_types.michelson_chain_family tx_container
+
+(** Some functions of the Tx_container module, such as [add], have
+    interfaces which actually depend on the chain family but many
+    others, such as [clear] don't.
+
+    In the former case, we usually know statically the type of the
+    chain family and hence of the tx-container and we can for example
+    invoke [add] as follows:
+
+    {[
+      let Evm_tx_container (module Tx_container) = tx_container in
+      let** hash = Tx_container.add ~next_nonce ~raw_tx tx_obj in
+    ]}
+
+    In the latter case, statically knowing the type of the chain
+    family is not required and the following [tx_container_module]
+    function can be used to get a [Tx_container] module:
+
+    {[
+      let (module Tx_container) = Services_backend_sig.tx_container_module tx_container in
+      let* () = Tx_container.clear () in
+    ]}
+
+
+*)
+let tx_container_module (type f) (tx_container : f tx_container) =
+  match tx_container with
+  | Evm_tx_container m -> (m :> (module Tx_container))
+  | Michelson_tx_container m -> m
