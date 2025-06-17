@@ -10768,6 +10768,13 @@ let register ~protocols =
     ~tags:["amplification"; "simple"]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
+      (* In this test, receiving all shards should happen before amplification
+         starts. With [minimal_block_delay = 1], it may start 1 second after the
+         first shard is received, which results in flakiness. With
+         [minimal_block_delay = 3], it may start only after 4s (see !18139),
+         which should be enough time for the observer to receive all the
+         shards. *)
+    ~minimal_block_delay:"3"
     "observer triggers amplification (without lost shards)"
     Amplification.test_amplification_without_lost_shards
     protocols ;
