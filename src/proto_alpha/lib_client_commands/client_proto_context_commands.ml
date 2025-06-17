@@ -2320,14 +2320,87 @@ let commands_rw () =
     command
       ~group
       ~desc:"Register the public key hash as a delegate."
-      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (args8
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         fee_parameter_args
+         (Public_key.source_arg
+            ~long:"consensus-key"
+            ~placeholder:"consensus_key"
+            ~doc:"Register the consensus key for the delegate"
+            ())
+         (Public_key.source_arg
+            ~long:"companion-key"
+            ~placeholder:"companion_key"
+            ~doc:"Register the companion key for the delegate"
+            ())
+         consensus_key_pop_arg
+         companion_key_pop_arg)
       (prefixes ["register"; "key"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["as"; "delegate"]
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter) src_pkh cctxt ->
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             fee_parameter,
+             consensus_key,
+             companion_key,
+             consensus_key_pop,
+             companion_key_pop )
+           src_pkh
+           cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
+        let* consensus_keys =
+          match consensus_key with
+          | None -> return None
+          | Some (name_pk_consensus, public_key_consensus) ->
+              let* public_key =
+                match public_key_consensus with
+                | Some pk -> return pk
+                | None -> Client_keys.public_key name_pk_consensus
+              in
+              let* pop_material =
+                match consensus_key_pop with
+                | Some pop -> return_some @@ Either.left pop
+                | None -> (
+                    match public_key with
+                    | Bls _ ->
+                        let pkh = Signature.Public_key.hash public_key in
+                        let* _, _, secret_key_uri =
+                          Client_keys.get_key cctxt pkh
+                        in
+                        return_some @@ Either.right secret_key_uri
+                    | _ -> return_none)
+              in
+              return @@ Some (public_key, pop_material)
+        in
+        let* companion_keys =
+          match companion_key with
+          | None -> return None
+          | Some (name_pk_companion, public_key_companion) ->
+              let* public_key =
+                match public_key_companion with
+                | Some pk -> return pk
+                | None -> Client_keys.public_key name_pk_companion
+              in
+              let* pop_material =
+                match companion_key_pop with
+                | Some pop -> return_some @@ Either.left pop
+                | None -> (
+                    match public_key with
+                    | Bls _ ->
+                        let pkh = Signature.Public_key.hash public_key in
+                        let* _, _, secret_key_uri =
+                          Client_keys.get_key cctxt pkh
+                        in
+                        return_some @@ Either.right secret_key_uri
+                    | _ -> return_none)
+              in
+              return @@ Some (public_key, pop_material)
+        in
         let*! r =
           register_as_delegate
             cctxt
@@ -2339,6 +2412,8 @@ let commands_rw () =
             ~verbose_signing
             ?fee
             ~manager_sk:src_sk
+            ?consensus_keys
+            ?companion_keys
             src_pk
         in
         match r with
@@ -2402,163 +2477,6 @@ let commands_rw () =
             ?fee
             ~manager_sk:src_sk
             ~consensus_keys
-            src_pk
-        in
-        match r with
-        | Ok _ -> return_unit
-        | Error
-            [
-              Environment.Ecoproto_error
-                Delegate_storage.Contract.Active_delegate;
-            ] ->
-            let*! () = cctxt#message "Delegate already activated." in
-            return_unit
-        | Error el -> Lwt.return_error el);
-    command
-      ~group
-      ~desc:"Register the public key hash as a delegate with a companion key."
-      (args5
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         fee_parameter_args
-         companion_key_pop_arg)
-      (prefixes ["register"; "key"]
-      @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
-      @@ prefixes ["as"; "delegate"; "with"; "companion"; "key"]
-      @@ Public_key.source_param ~name:"key" ~desc:"the companion key"
-      @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter, companion_key_pop)
-           src_pkh
-           (name_pk, public_key)
-           cctxt ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
-        let* companion_keys =
-          let* public_key =
-            match public_key with
-            | Some pk -> return pk
-            | None -> Client_keys.public_key name_pk
-          in
-          let* pop_material =
-            match companion_key_pop with
-            | Some pop -> return_some @@ Either.left pop
-            | None -> (
-                match public_key with
-                | Bls _ ->
-                    let pkh = Signature.Public_key.hash public_key in
-                    let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
-                    return_some @@ Either.right secret_key_uri
-                | _ -> return_none)
-          in
-          return (public_key, pop_material)
-        in
-        let*! r =
-          register_as_delegate
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~fee_parameter
-            ~verbose_signing
-            ?fee
-            ~manager_sk:src_sk
-            ~companion_keys
-            src_pk
-        in
-        match r with
-        | Ok _ -> return_unit
-        | Error
-            [
-              Environment.Ecoproto_error
-                Delegate_storage.Contract.Active_delegate;
-            ] ->
-            let*! () = cctxt#message "Delegate already activated." in
-            return_unit
-        | Error el -> Lwt.return_error el);
-    command
-      ~group
-      ~desc:
-        "Register the public key hash as a delegate with a consensus and a \
-         companion key."
-      (args6
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         fee_parameter_args
-         consensus_key_pop_arg
-         companion_key_pop_arg)
-      (prefixes ["register"; "key"]
-      @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
-      @@ prefixes ["as"; "delegate"; "with"; "consensus"; "key"]
-      @@ Public_key.source_param ~name:"key" ~desc:"the consensus key"
-      @@ prefixes ["and"; "companion"; "key"]
-      @@ Public_key.source_param ~name:"key" ~desc:"the companion key"
-      @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             fee_parameter,
-             consensus_key_pop,
-             companion_key_pop )
-           src_pkh
-           (name_pk_consensus, public_key_consensus)
-           (name_pk_companion, public_key_companion)
-           cctxt ->
-        let open Lwt_result_syntax in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
-        let* consensus_keys =
-          let* public_key =
-            match public_key_consensus with
-            | Some pk -> return pk
-            | None -> Client_keys.public_key name_pk_consensus
-          in
-          let* pop_material =
-            match consensus_key_pop with
-            | Some pop -> return_some @@ Either.left pop
-            | None -> (
-                match public_key with
-                | Bls _ ->
-                    let pkh = Signature.Public_key.hash public_key in
-                    let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
-                    return_some @@ Either.right secret_key_uri
-                | _ -> return_none)
-          in
-          return (public_key, pop_material)
-        in
-        let* companion_keys =
-          let* public_key =
-            match public_key_companion with
-            | Some pk -> return pk
-            | None -> Client_keys.public_key name_pk_companion
-          in
-          let* pop_material =
-            match companion_key_pop with
-            | Some pop -> return_some @@ Either.left pop
-            | None -> (
-                match public_key with
-                | Bls _ ->
-                    let pkh = Signature.Public_key.hash public_key in
-                    let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
-                    return_some @@ Either.right secret_key_uri
-                | _ -> return_none)
-          in
-          return (public_key, pop_material)
-        in
-        let*! r =
-          register_as_delegate
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~fee_parameter
-            ~verbose_signing
-            ?fee
-            ~manager_sk:src_sk
-            ~consensus_keys
-            ~companion_keys
             src_pk
         in
         match r with

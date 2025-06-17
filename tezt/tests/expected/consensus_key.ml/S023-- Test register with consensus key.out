@@ -2,7 +2,7 @@
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "0", "counter": "1" }
 
-./octez-client --wait none register key dummy_account_0 as delegate with consensus key dummy_account_1 and companion key dummy_account_2
+./octez-client --wait none register key dummy_account_0 as delegate --consensus-key dummy_account_1 --companion-key dummy_account_2
 Node is bootstrapped.
 Estimated gas: 178.785 units (will add 0 for safety)
 Estimated storage: no bytes added

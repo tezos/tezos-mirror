@@ -3209,9 +3209,8 @@ let spawn_register_key ?hooks ?consensus ?companion owner client =
     match (consensus, companion) with
     | None, None -> []
     | Some pk, None -> ["with"; "consensus"; "key"; pk]
-    | None, Some pk -> ["with"; "companion"; "key"; pk]
-    | Some pk1, Some pk2 ->
-        ["with"; "consensus"; "key"; pk1; "and"; "companion"; "key"; pk2])
+    | None, Some pk -> ["--companion-key"; pk]
+    | Some pk1, Some pk2 -> ["--consensus-key"; pk1; "--companion-key"; pk2])
 
 let register_key ?hooks ?expect_failure ?consensus ?companion owner client =
   spawn_register_key ?hooks ?consensus ?companion owner client

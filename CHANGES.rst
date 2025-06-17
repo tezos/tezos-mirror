@@ -87,12 +87,11 @@ Client
 - Add a new command ``threshold bls signatures`` to recover a BLS
   threshold signature. (MR :gl:`!17467`)
 
-- Added ``octez-client register key <key> as delegate with companion key <bls_key>``,
-  and ``octez-client register key <key> as delegate with consensus key <key> and companion key <bls_key>``,
-  setting a companion key at the same time as registering a given key as a delegate.
-  (MR :gl:`!17960`)
+- Added ``--consensus-key`` and ``--companion-key`` arguments setting
+  companion or consensus key at the same time as registering a given
+  key as a delegate. (MRs :gl:`!17960`, :gl:`!18317`)
 
-- Added ``--consensus-key-pop`` and ``--companion-key-pop`` argument when updating
+- Added ``--consensus-key-pop`` and ``--companion-key-pop`` arguments when updating
   bls consensus or companion key. These argument allow to provide a pre-computed
   proof of possession for the bls key instead of asking the client to compute
   it. (MR :gl:`!18084`)
