@@ -7,14 +7,14 @@ base_template = {
     'homepage': 'https://www.etherlink.com', 
 }
 
-kernel_regular_governance_metadata = base_template | {
-    'name': 'Etherlink Kernel Governance',
-    'description': 'The contract allows bakers to make proposals and vote on the kernel upgrade (kernel hash)',
+kernel_slow_governance_metadata = base_template | {
+    'name': 'Etherlink Slow Kernel Governance',
+    'description': 'The contract allows bakers to make proposals and vote on the kernel upgrade (kernel hash) according to the slow kernel governance process',
 }
 
-kernel_security_governance_metadata = base_template | {
-    'name': 'Etherlink Kernel Security Governance',
-    'description': 'The contract allows bakers to make proposals and vote on the security kernel upgrade (kernel hash)',
+kernel_fast_governance_metadata = base_template | {
+    'name': 'Etherlink Fast Kernel Governance',
+    'description': 'The contract allows bakers to make proposals and vote on the kernel upgrade (kernel hash) according to the fast kernel governance process',
 }
 
 sequencer_governance_metadata = base_template | {
@@ -24,12 +24,12 @@ sequencer_governance_metadata = base_template | {
 
 delegated_governance_metadata = base_template | {
     'name': 'Etherlink Delegated Governance',
-    'description': 'The contract allows bakers to delegate their voting rights to another key.',
+    'description': 'The contract allows bakers to delegate their voting rights to another key',
 }
 
 metadata_by_contract_type = {
-    ContractType.kernel_regular_governance: kernel_regular_governance_metadata,
-    ContractType.kernel_security_governance: kernel_security_governance_metadata,
+    ContractType.kernel_slow_governance: kernel_slow_governance_metadata,
+    ContractType.kernel_fast_governance: kernel_fast_governance_metadata,
     ContractType.sequencer_governance: sequencer_governance_metadata,
     ContractType.delegated_governance: delegated_governance_metadata,
 }

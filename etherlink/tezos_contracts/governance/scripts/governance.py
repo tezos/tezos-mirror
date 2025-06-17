@@ -22,9 +22,9 @@ def conditionnal_requirements(ctx, param, value):
     '--contract',
     required=True,
     type=click.Choice(
-        ["kernel_regular_governance", "kernel_security_governance", "sequencer_governance", "delegated_governance"]
+        ["kernel_slow_governance", "kernel_fast_governance", "sequencer_governance", "delegated_governance"]
     ),
-    help='"kernel_regular_governance", "kernel_security_governance", "sequencer_governance", or "delegated_governance"',
+    help='"kernel_slow_governance", "kernel_fast_governance", "sequencer_governance", or "delegated_governance"',
 )
 @click.option(
     '--period_length',
@@ -153,7 +153,7 @@ def get_blockchain_info(manager: PyTezosClient) -> dict:
     }
 
 def originate_contract(contract_type: ContractType, manager: PyTezosClient, config: dict, metadata: dict):
-    if contract_type in [ContractType.kernel_regular_governance, ContractType.kernel_security_governance]:
+    if contract_type in [ContractType.kernel_slow_governance, ContractType.kernel_fast_governance]:
         return KernelGovernance.originate(manager, config, metadata).send()
     elif contract_type == ContractType.sequencer_governance:
         return SequencerGovernance.originate(manager, config, metadata).send()

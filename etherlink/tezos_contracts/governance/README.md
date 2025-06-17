@@ -24,20 +24,20 @@ poetry run pytest
 poetry run deploy_contract --rpc-url https://rpc.tzkt.io/ghostnet --contract delegated_governance
 ```
 
-### Deploy Kernel Governance contract
+### Deploy Kernel Slow Governance contract
 
 Below, `KT1Em7CJpU7WDKen6PC6haPiJVKyeYPuUv1P` is an example voting rights delegation contract deployed on Ghostnet.
 
 ```
-poetry run deploy_contract --rpc-url https://rpc.tzkt.io/ghostnet --contract kernel_regular_governance --upvoting_limit 20 --period_length 128 --adoption_period_sec 57600 --proposal_quorum_percent 10.5 --promotion_quorum_percent 15.5 --promotion_supermajority_percent 95.7 --delegation_contract KT1Em7CJpU7WDKen6PC6haPiJVKyeYPuUv1P
+poetry run deploy_contract --rpc-url https://rpc.tzkt.io/ghostnet --contract kernel_slow_governance --upvoting_limit 20 --period_length 128 --adoption_period_sec 57600 --proposal_quorum_percent 10.5 --promotion_quorum_percent 15.5 --promotion_supermajority_percent 95.7 --delegation_contract KT1Em7CJpU7WDKen6PC6haPiJVKyeYPuUv1P
 ```
 
-### Deploy Kernel Security Governance contract
+### Deploy Kernel Fast Governance contract
 
 Below, `KT1Em7CJpU7WDKen6PC6haPiJVKyeYPuUv1P` is an example voting rights delegation contract deployed on Ghostnet.
 
 ```
-poetry run deploy_contract --rpc-url https://rpc.tzkt.io/ghostnet --contract kernel_security_governance --upvoting_limit 20 --period_length 128 --adoption_period_sec 57600 --proposal_quorum_percent 10.5 --promotion_quorum_percent 15.5 --promotion_supermajority_percent 95.7 --delegation_contract KT1Em7CJpU7WDKen6PC6haPiJVKyeYPuUv1P
+poetry run deploy_contract --rpc-url https://rpc.tzkt.io/ghostnet --contract kernel_fast_governance --upvoting_limit 20 --period_length 128 --adoption_period_sec 57600 --proposal_quorum_percent 10.5 --promotion_quorum_percent 15.5 --promotion_supermajority_percent 95.7 --delegation_contract KT1Em7CJpU7WDKen6PC6haPiJVKyeYPuUv1P
 ```
 
 ### Deploy Sequencer Committee Governance contract
