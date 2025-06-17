@@ -33,3 +33,25 @@ module Jsonrpc : sig
       related to [err]. *)
   val return_error : JSONRPC.error -> ('a, JSONRPC.error) result Lwt.t
 end
+
+(** OpenTelemetry Etherlink-specific semantics conventions *)
+module Attributes : sig
+  module Transaction : sig
+    (** Hex-encoded hash of the transaction being processed *)
+    val hash : Ethereum_types.hash -> Opentelemetry.key_value
+  end
+
+  (** Tags to add to a span or event handling a given block.  *)
+  module Block : sig
+    (** Integer representation of the block number being processed *)
+    val number : Ethereum_types.quantity -> Opentelemetry.key_value
+
+    (** Integer representation of the amount of gas units necessary to process
+        the block *)
+    val execution_gas : Z.t -> Opentelemetry.key_value
+
+    (** Integer representation of the number of transactions included in the
+        block being processed *)
+    val transaction_count : int -> Opentelemetry.key_value
+  end
+end

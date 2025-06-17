@@ -540,6 +540,11 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
+let tx_queue_event ?attrs name =
+  Opentelemetry_lwt.Event.make
+    ?attrs
+    Format.(sprintf "%s/%s" (String.concat "." Name.base) name)
+
 module Handlers = struct
   open Request
 
@@ -555,7 +560,11 @@ module Handlers = struct
     else
       let rev_batch, callbacks =
         Seq.fold_left
-          (fun (rev_batch, callbacks) {hash = _; payload; queue_callback} ->
+          (fun (rev_batch, callbacks) {hash; payload; queue_callback} ->
+            Octez_telemetry.Trace.add_event (fun () ->
+                tx_queue_event
+                  ~attrs:Telemetry.Attributes.[Transaction.hash hash]
+                  "selected_transaction") ;
             let req_id =
               Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false)
             in

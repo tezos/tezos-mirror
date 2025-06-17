@@ -40,3 +40,15 @@ let with_result ?(message_on_success = Fun.const "Success")
   | res -> Lwt.return res
 
 let with_tzresult = with_result ~message_on_error:message_on_tztrace
+
+let add_attrs f =
+  if Opentelemetry.Collector.has_backend () then
+    match Opentelemetry.Scope.get_ambient_scope () with
+    | Some scope -> Opentelemetry_lwt.Trace.add_attrs scope @@ f
+    | None -> ()
+
+let add_event f =
+  if Opentelemetry.Collector.has_backend () then
+    match Opentelemetry.Scope.get_ambient_scope () with
+    | Some scope -> Opentelemetry_lwt.Trace.add_event scope @@ f
+    | None -> ()

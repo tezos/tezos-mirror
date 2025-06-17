@@ -709,6 +709,9 @@ let dispatch_request (type f) ~websocket
             build_with_input ~f module_ parameters
         | Get_transaction_receipt.Method ->
             let f tx_hash =
+              Octez_telemetry.Trace.add_attrs (fun () ->
+                  Telemetry.Attributes.[Transaction.hash tx_hash]) ;
+
               let* receipt =
                 Backend_rpc.Etherlink_block_storage.transaction_receipt tx_hash
               in
@@ -768,6 +771,10 @@ let dispatch_request (type f) ~websocket
             build_with_input ~f module_ parameters
         | Get_transaction_by_hash.Method ->
             let f tx_hash =
+              Octez_telemetry.Trace.(
+                add_attrs (fun () ->
+                    Telemetry.Attributes.[Transaction.hash tx_hash])) ;
+
               let* (module Tx_container) =
                 match tx_container with
                 | Evm_tx_container m -> return m
@@ -861,6 +868,11 @@ let dispatch_request (type f) ~websocket
                     in
                     rpc_error (Rpc_errors.transaction_rejected err None)
                 | Ok (next_nonce, transaction_object) -> (
+                    Octez_telemetry.Trace.(
+                      add_attrs (fun () ->
+                          Telemetry.Attributes.
+                            [Transaction.hash transaction_object.hash])) ;
+
                     let* (module Tx_container) =
                       match tx_container with
                       | Evm_tx_container m -> return m
@@ -1125,6 +1137,10 @@ let dispatch_private_request (type f) ~websocket
         let f
             ( (transaction_object : Ethereum_types.legacy_transaction_object),
               raw_txn ) =
+          Octez_telemetry.Trace.(
+            add_attrs (fun () ->
+                Telemetry.Attributes.[Transaction.hash transaction_object.hash])) ;
+
           let* is_valid =
             let get_nonce () =
               let* next_nonce =

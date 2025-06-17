@@ -879,6 +879,15 @@ module State = struct
         let* context, split_info =
           commit_next_head ctxt conn timestamp evm_state
         in
+
+        Octez_telemetry.Trace.add_attrs (fun () ->
+            Telemetry.Attributes.
+              [
+                Block.number ctxt.session.next_blueprint_number;
+                Block.transaction_count (List.length receipts);
+                Block.execution_gas execution_gas;
+              ]) ;
+
         return
           ( evm_state,
             context,
