@@ -22,6 +22,27 @@ let copy_files proxy_agent ~scenario_files ~proxy_deployement =
       ~source:proxy_deployement
       ~destination:proxy_deployement
   in
+  (* Set the multiplexing config. Note that we could avoid creating a temporary
+     file by passing these options to the ssh commands via '-o'. *)
+  let tmp_ssh_config = Filename.temp_file "_proxy_ssh_config" "" in
+  let* () =
+    Lwt_io.with_file ~mode:Lwt_io.output tmp_ssh_config (fun oc ->
+        Lwt_io.write
+          oc
+          {|
+Host *
+    ControlMaster auto
+    ControlPath ~/.ssh/master-%r@%h:%p
+    ControlPersist 120
+|})
+  in
+  let* _ =
+    Agent.copy
+      proxy_agent
+      ~source:tmp_ssh_config
+      ~destination:("/root" // ".ssh" // "config")
+  in
+  let* () = Lwt_unix.unlink tmp_ssh_config in
   (* Copying the ssh key is necessary for the proxy agent to connect with the
      other VMs. *)
   let ssh_public_key_filename = Env.ssh_public_key_filename () in
