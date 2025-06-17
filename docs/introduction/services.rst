@@ -140,6 +140,8 @@ following command:
     $ sudo su tezos -c "octez-client gen keys alice"
 
 and the baker will use it automatically.
+Indeed, the baker bakes for all the keys for which it has the private key.
+If you want to avoid this behavior, you can specify a specific baking key by editing the file ``/etc/default/octez-baker`` and assigning a value to variable ``BAKER_KEY``.
 
 Configuring the baker
 ---------------------
