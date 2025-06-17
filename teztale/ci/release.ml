@@ -21,7 +21,8 @@ let job_datadog_pipeline_trace : tezos_job =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
-let job_build_amd64 ?expire_in () = Common.job_build ?expire_in ~arch:Amd64 ()
+let job_build_amd64 ?expire_in () =
+  Common.job_build ?expire_in ~arch:Amd64 ~cpu:Very_high ()
 
 let job_build_arm64 ?expire_in () =
   Common.job_build ?expire_in ~arch:Arm64 ~storage:Ramfs ()
