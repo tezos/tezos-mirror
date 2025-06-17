@@ -50,6 +50,26 @@ module Key = struct
 
   let pp fmt {alias; id; _} =
     Format.fprintf fmt "%s (%a)" alias Signature.Public_key_hash.pp id
+
+  module Set = struct
+    include Set.Make (struct
+      type nonrec t = t
+
+      let compare {id; _} {id = id'; _} = Key_id.compare id id'
+    end)
+
+    let find_pkh pkh s =
+      let exception Found of elt in
+      try
+        iter
+          (fun ({id; _} as delegate) ->
+            if Signature.Public_key_hash.equal pkh (Key_id.to_pkh id) then
+              raise (Found delegate)
+            else ())
+          s ;
+        None
+      with Found d -> Some d
+  end
 end
 
 module Delegate_id = struct
@@ -103,4 +123,51 @@ module Delegate = struct
         str_companion_key
         Delegate_id.pp
         delegate_id
+
+  let companion_key_is_not_in_wallet =
+    let open Internal_event.Simple in
+    declare_2
+      ~section:[Protocol.name; "baker"; "delegates"]
+      ~name:"companion_key_is_not_in_wallet"
+      ~level:Error
+      ~msg:
+        "Companion key {companion_key} is not provided in the wallet but \
+         registered in the protocol for {delegate}"
+      ("delegate", Delegate_id.encoding)
+      ("companion_key", Environment.Bls.Public_key_hash.encoding)
+
+  let of_validator ~known_keys
+      {
+        Plugin.RPC.Validators.consensus_key = consensus_pkh;
+        companion_key = companion_bls_pkh_opt;
+        delegate = manager_pkh;
+        slots = _;
+        level = _;
+      } =
+    let open Lwt_syntax in
+    match Key.Set.find_pkh consensus_pkh known_keys with
+    | None -> return_none
+    | Some consensus_key ->
+        let delegate_id = Delegate_id.of_pkh manager_pkh in
+        let* companion_key =
+          match companion_bls_pkh_opt with
+          | None -> return_none
+          | Some companion_bls_pkh ->
+              let companion_key =
+                Key.Set.find_pkh (Bls companion_bls_pkh) known_keys
+              in
+              let* () =
+                if
+                  Option.is_none companion_key
+                  && Signature.Public_key_hash.is_bls consensus_pkh
+                then
+                  Events.(
+                    emit
+                      companion_key_is_not_in_wallet
+                      (delegate_id, companion_bls_pkh))
+                else return_unit
+              in
+              return companion_key
+        in
+        return_some {consensus_key; delegate_id; companion_key}
 end
