@@ -47,6 +47,3 @@ module Legacy : sig
 end
 
 val make_legacy : with_events -> Legacy.with_events
-
-(* temporary *)
-val of_legacy : Legacy.with_events -> with_events

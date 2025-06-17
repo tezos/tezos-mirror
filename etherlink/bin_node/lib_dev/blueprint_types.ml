@@ -94,9 +94,3 @@ let make_legacy
     ({delayed_transactions; kernel_upgrade; blueprint; sequencer_upgrade = _} :
       with_events) : Legacy.with_events =
   {delayed_transactions; kernel_upgrade; blueprint}
-
-(* temporary *)
-let of_legacy
-    ({delayed_transactions; kernel_upgrade; blueprint} : Legacy.with_events) :
-    with_events =
-  {delayed_transactions; kernel_upgrade; blueprint; sequencer_upgrade = None}

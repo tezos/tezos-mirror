@@ -106,15 +106,14 @@ module Blueprints_sequence = struct
         if is_too_old then
           let* blueprint =
             (* See {Note keep_alive} *)
-            Evm_services.get_blueprint
+            Evm_services.get_blueprint_with_events
               ~keep_alive:true
               ~evm_node_endpoint
               next_blueprint_number
           in
           return
             (Some
-               ( Blueprint_types.of_legacy blueprint,
-                 (* Will be removed in next commits once Evm_services.get_full_blueprint is used *)
+               ( blueprint,
                  (Some remote_head, quantity_succ next_blueprint_number) ))
         else return None)
       (None, next_blueprint_number)
@@ -133,7 +132,7 @@ module Blueprints_sequence = struct
     if is_too_old then
       let*! blueprints =
         (* See {Note keep_alive} *)
-        Evm_services.get_blueprints
+        Evm_services.get_blueprints_with_events
           ~keep_alive:true
           ~evm_node_endpoint
           ~count:500L
@@ -145,7 +144,6 @@ module Blueprints_sequence = struct
              will always return at least one element. *)
           assert false
       | Ok blueprints ->
-          let blueprints = List.map Blueprint_types.of_legacy blueprints in
           let next_chunks =
             make_with_chunks
               ~remote_head

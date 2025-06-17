@@ -1841,7 +1841,7 @@ module State = struct
                 (* Reorganization started on an older block, we
                    traverse the chain backward. *)
                 let* blueprint_pred =
-                  Evm_services.get_blueprint
+                  Evm_services.get_blueprint_with_events
                     ~keep_alive:true
                     ~evm_node_endpoint
                     (Qty pred_number)
@@ -1850,7 +1850,7 @@ module State = struct
                   ~evm_node_endpoint
                   conn
                   ctxt
-                  (Blueprint_types.of_legacy blueprint_pred)
+                  blueprint_pred
               else
                 (* We agree with the blueprint predecessor but not the blueprint,
                    this is the divergence point. *)
