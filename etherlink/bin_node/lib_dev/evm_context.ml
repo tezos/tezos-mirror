@@ -703,6 +703,45 @@ module State = struct
     let* () = Evm_store.Blocks.tez_store conn block in
     return_nil
 
+  (** [store_finalized_levels ... ~l1_level ~start_l2_level
+      ~end_l2_level] will:
+      - store the mapping between the [l1_level] and the
+        [current_blueprint_number] into [L1_l2_levels_relationships]
+        table. This is needed even for nodes not tracking a rollup
+        node because the [Evm_store.Context_hashes.find_finalized]
+        returns the minimum between the current blueprint and the last
+        L2 finalized level known,
+
+      - store the mapping between the [l1_level] and its corresponding
+        L2 level range [start_l2_level; end_l2_level] into
+        [L1_l2_finalized_levels.store],
+
+      - updates [Metrics.l1_level] metrics,
+
+      - broadcast the mapping to the [l1_l2_levels_watcher] stream
+        subscribers. *)
+  let store_finalized_levels ctxt conn ~l1_level ~start_l2_level ~end_l2_level =
+    let open Lwt_result_syntax in
+    let* () =
+      Evm_store.L1_l2_levels_relationships.store
+        conn
+        ~l1_level
+        ~latest_l2_level:(current_blueprint_number ctxt)
+    in
+    let* () =
+      Evm_store.L1_l2_finalized_levels.store
+        conn
+        ~l1_level
+        ~start_l2_level
+        ~end_l2_level
+    in
+    Metrics.set_l1_level ~level:l1_level ;
+    Broadcast.notify_finalized_levels ~l1_level ~start_l2_level ~end_l2_level ;
+    Lwt_watcher.notify
+      l1_l2_levels_watcher
+      {l1_level; start_l2_level; end_l2_level} ;
+    return_unit
+
   (** [apply_blueprint_store_unsafe ctxt payload delayed_transactions] applies
       the blueprint [payload] on the head of [ctxt], and commit the resulting
       state to Irmin and the node’s store.
@@ -1165,26 +1204,13 @@ module State = struct
           Option.iter_es
             (fun l1_level ->
               let* () =
-                Evm_store.L1_l2_levels_relationships.store
-                  conn
-                  ~l1_level
-                  ~latest_l2_level:(current_blueprint_number ctxt)
-              in
-              let* () =
-                Evm_store.L1_l2_finalized_levels.store
+                store_finalized_levels
+                  ctxt
                   conn
                   ~l1_level
                   ~start_l2_level:start_finalized_number
-                  ~end_l2_level:(Qty latest_finalized_number)
+                  ~end_l2_level:(Ethereum_types.Qty latest_finalized_number)
               in
-              Metrics.set_l1_level ~level:l1_level ;
-              Lwt_watcher.notify
-                l1_l2_levels_watcher
-                {
-                  l1_level;
-                  start_l2_level = start_finalized_number;
-                  end_l2_level = Qty latest_finalized_number;
-                } ;
               let*! () =
                 Evm_context_events.processed_l1_level
                   (l1_level, latest_finalized_number)
