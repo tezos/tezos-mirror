@@ -362,7 +362,10 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
         ~time_between_blocks
         ~evm_node_endpoint
         ~next_blueprint_number
-        (on_new_blueprint tx_container evm_node_endpoint)
+        ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
+        ~on_finalized_levels:(fun
+            ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ -> return_unit)
+        ()
     and* () =
       Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
     and* () =

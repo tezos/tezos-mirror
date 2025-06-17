@@ -7,13 +7,20 @@
 
 open Ethereum_types
 
-type handler =
+type on_new_blueprint_handler =
   quantity ->
   Blueprint_types.with_events ->
   [`Restart_from of quantity | `Continue] tzresult Lwt.t
 
+type on_finalized_levels_handler =
+  l1_level:int32 ->
+  start_l2_level:Ethereum_types.quantity ->
+  end_l2_level:Ethereum_types.quantity ->
+  unit tzresult Lwt.t
+
 type parameters = {
-  on_new_blueprint : handler;
+  on_new_blueprint : on_new_blueprint_handler;
+  on_finalized_levels : on_finalized_levels_handler;
   time_between_blocks : Configuration.time_between_blocks;
   evm_node_endpoint : Uri.t;
   ping_tx_pool : bool;
@@ -205,7 +212,7 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection params :
       catchup ~multichain ~next_blueprint_number:level ~first_connection params
   | `Completed next_blueprint_number -> (
       let*! call_result =
-        Evm_services.monitor_blueprints
+        Evm_services.monitor_messages
           ~evm_node_endpoint:params.evm_node_endpoint
           next_blueprint_number
       in
@@ -236,7 +243,16 @@ and stream_loop ~multichain (Qty next_blueprint_number) params stream =
       ]
   in
   match candidate with
-  | Ok (Some blueprint) -> (
+  | Ok (Some (Finalized_levels {l1_level; start_l2_level; end_l2_level})) ->
+      let* () =
+        params.on_finalized_levels ~l1_level ~start_l2_level ~end_l2_level
+      in
+      (stream_loop [@tailcall])
+        ~multichain
+        (Qty next_blueprint_number)
+        params
+        stream
+  | Ok (Some (Blueprint blueprint)) -> (
       let* r = params.on_new_blueprint (Qty next_blueprint_number) blueprint in
       let* () =
         when_ params.ping_tx_pool @@ fun () ->
@@ -268,14 +284,21 @@ and stream_loop ~multichain (Qty next_blueprint_number) params stream =
   | Error err -> fail err
 
 let start ?(ping_tx_pool = true) ~multichain ~time_between_blocks
-    ~evm_node_endpoint ~next_blueprint_number on_new_blueprint =
+    ~evm_node_endpoint ~next_blueprint_number ~on_new_blueprint
+    ~on_finalized_levels () =
   let open Lwt_result_syntax in
   let*! res =
     catchup
       ~multichain
       ~next_blueprint_number
       ~first_connection:true
-      {time_between_blocks; evm_node_endpoint; on_new_blueprint; ping_tx_pool}
+      {
+        time_between_blocks;
+        evm_node_endpoint;
+        on_new_blueprint;
+        on_finalized_levels;
+        ping_tx_pool;
+      }
   in
   (* The blueprint follower should never fail. If it does, we better exit with
      an error. *)

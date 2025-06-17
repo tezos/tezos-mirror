@@ -256,3 +256,20 @@ let monitor_blueprints ~evm_node_endpoint Ethereum_types.(Qty level) =
       ()
   in
   return stream
+
+let monitor_messages ~evm_node_endpoint Ethereum_types.(Qty level) =
+  let open Lwt_result_syntax in
+  let stream, push = Lwt_stream.create () in
+  let on_chunk v = push (Some v) and on_close () = push None in
+  let* _spill_all =
+    Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
+      [Media_type.octet_stream]
+      ~base:evm_node_endpoint
+      message_watcher_service
+      ~on_chunk
+      ~on_close
+      ()
+      (Z.to_int64 level)
+      ()
+  in
+  return stream

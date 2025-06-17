@@ -296,23 +296,30 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       ~time_between_blocks
       ~evm_node_endpoint
       ~next_blueprint_number
-    @@ fun (Qty number) blueprint ->
-    let (Qty level) = blueprint.blueprint.number in
-    if Z.Compare.(number = level) then (
-      let* () =
-        when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
-        Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
-      in
-      Broadcast.notify_blueprint blueprint ;
-      Metrics.set_level ~level:number ;
-      let* () = set_metrics_confirmed_levels ctxt in
-      return `Continue)
-    else
-      let*! () =
-        Blueprint_events.unexpected_blueprint_from_remote_node
-          ~received:blueprint.blueprint.number
-          ~expected:next_blueprint_number
-      in
-      return (`Restart_from (Ethereum_types.Qty number))
+      ~on_new_blueprint:(fun (Qty number) blueprint ->
+        let (Qty level) = blueprint.blueprint.number in
+        if Z.Compare.(number = level) then (
+          let* () =
+            when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
+            Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
+          in
+          Broadcast.notify_blueprint blueprint ;
+          Metrics.set_level ~level:number ;
+          let* () = set_metrics_confirmed_levels ctxt in
+          return `Continue)
+        else
+          let*! () =
+            Blueprint_events.unexpected_blueprint_from_remote_node
+              ~received:blueprint.blueprint.number
+              ~expected:next_blueprint_number
+          in
+          return (`Restart_from (Ethereum_types.Qty number)))
+      ~on_finalized_levels:(fun ~l1_level ~start_l2_level ~end_l2_level ->
+        Broadcast.notify_finalized_levels
+          ~l1_level
+          ~start_l2_level
+          ~end_l2_level ;
+        return_unit)
+      ()
   in
   return_unit
