@@ -13,18 +13,50 @@ module Env = struct
   let add = String_map.add
 
   let may_add cond var value env = if cond then add var value env else env
-end
 
-let ppx_profiler_env enable env =
-  env
-  |> Env.may_add enable "PROFILING" "Debug"
-  |> Env.may_add enable "PROFILING_BACKEND" "txt"
+  let memtrace_env enable filename env = may_add enable "MEMTRACE" filename env
+
+  let otel_env otel_endpoint service_name env =
+    match otel_endpoint with
+    | None -> env
+    | Some endpoint ->
+        add "OTEL" "true" env
+        |> add "OTEL_SERVICE_NAME" service_name
+        |> add "OTEL_EXPORTER_OTLP_ENDPOINT" endpoint
+
+  let disable_shard_validation_env enable env =
+    may_add
+      enable
+      Dal_node.disable_shard_validation_environment_variable
+      "yes"
+      env
+
+  let ignore_topics_env ignore_pkhs env =
+    match ignore_pkhs with
+    | Some (_ :: _) -> add Dal_node.ignore_topics_environment_variable "yes" env
+    | _ -> env
+
+  let ppx_profiler_env enable env =
+    env
+    |> may_add enable "PROFILING" "Debug"
+    |> may_add enable "PROFILING_BACKEND" "txt"
+
+  let initialize_env ~memtrace ~memtrace_output_filename
+      ~disable_shard_validation ~otel_endpoint ~service_name ~ignore_pkhs
+      ~ppx_profiling =
+    empty
+    |> memtrace_env memtrace memtrace_output_filename
+    |> otel_env otel_endpoint service_name
+    |> disable_shard_validation_env disable_shard_validation
+    |> ignore_topics_env ignore_pkhs
+    |> ppx_profiler_env ppx_profiling
+end
 
 let may_add_profiling_to_env ~ppx_profiling = function
   | None ->
-      if ppx_profiling then Some (ppx_profiler_env ppx_profiling Env.empty)
+      if ppx_profiling then Some (Env.ppx_profiler_env ppx_profiling Env.empty)
       else None
-  | Some env -> Some (ppx_profiler_env ppx_profiling env)
+  | Some env -> Some (Env.ppx_profiler_env ppx_profiling env)
 
 let create_dir ?runner dir =
   let* () = Process.spawn ?runner "rm" ["-rf"; dir] |> Process.check in
@@ -259,36 +291,14 @@ module Dal_node = struct
         Format.asprintf "%s/%s-trace.ctf" Path.tmp_dir service_name
       in
       let env =
-        let memtrace_env memtrace memtrace_output_filename env =
-          Env.may_add memtrace "MEMTRACE" memtrace_output_filename env
-        in
-        let otel_env otel_endpoint service_name env =
-          match otel_endpoint with
-          | None -> env
-          | Some endpoint ->
-              Env.add "OTEL" "true" env
-              |> Env.add "OTEL_SERVICE_NAME" service_name
-              |> Env.add "OTEL_EXPORTER_OTLP_ENDPOINT" endpoint
-        in
-        let disable_shard_validation_env enable env =
-          Env.may_add
-            enable
-            Dal_node.disable_shard_validation_environment_variable
-            "yes"
-            env
-        in
-        let ignore_topics_env ignore_pkhs env =
-          match ignore_pkhs with
-          | Some (_ :: _) ->
-              Env.add Dal_node.ignore_topics_environment_variable "yes" env
-          | _ -> env
-        in
-        Env.empty
-        |> memtrace_env memtrace memtrace_output_filename
-        |> otel_env otel service_name
-        |> disable_shard_validation_env disable_shard_validation
-        |> ignore_topics_env ignore_pkhs
-        |> ppx_profiler_env ppx_profiling
+        Env.initialize_env
+          ~memtrace
+          ~memtrace_output_filename
+          ~disable_shard_validation
+          ~otel_endpoint:otel
+          ~service_name
+          ~ignore_pkhs
+          ~ppx_profiling
       in
       let* () = run ~env ?event_level dal_node in
       (* Update the state in the service manager *)
