@@ -63,8 +63,8 @@ module Block_services = struct
     let proposer =
       Imported_protocol.Alpha_context.Consensus_key.
         {
-          delegate = Tezlink_mock.public_key_hash;
-          consensus_pkh = Tezlink_mock.public_key_hash;
+          delegate = Tezlink_mock.bootstrap_account.public_key_hash;
+          consensus_pkh = Tezlink_mock.bootstrap_account.public_key_hash;
         }
     in
     let balance_updates =
@@ -74,11 +74,11 @@ module Block_services = struct
       then
         Tezlink_mock.balance_udpdate_bootstrap
           ~amount:200_000_000_000L
-          ~bootstrap:Tezlink_mock.public_key_hash
+          ~bootstrap:Tezlink_mock.bootstrap_account.public_key_hash
       else
         let amount = Alpha_context.Tez.of_mutez_exn 0L in
         Tezlink_mock.balance_udpdate_rewards
-          ~baker:Tezlink_mock.public_key_hash
+          ~baker:Tezlink_mock.bootstrap_account.public_key_hash
           ~amount
     in
     let* voting_period_info = Tezlink_mock.mock_voting_period_info () in

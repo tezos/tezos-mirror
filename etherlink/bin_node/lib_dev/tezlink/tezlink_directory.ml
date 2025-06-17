@@ -339,12 +339,17 @@ let build_block_static_directory ~l2_chain_id
          let open Tezlink_mock in
          let*? _chain = check_chain chain in
          let*? _block = check_block block in
+         let public_key =
+           match bootstrap_account.public_key with
+           | None -> (* Unreachable *) assert false
+           | Some public_key -> public_key
+         in
          let consensus_pk =
            Imported_protocol.Raw_context.
              {
-               delegate = public_key_hash;
+               delegate = bootstrap_account.public_key_hash;
                consensus_pk = public_key;
-               consensus_pkh = public_key_hash;
+               consensus_pkh = bootstrap_account.public_key_hash;
              }
          in
          let delegate_sampler_state =

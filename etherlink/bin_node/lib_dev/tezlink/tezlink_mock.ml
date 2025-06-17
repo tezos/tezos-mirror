@@ -34,18 +34,32 @@ let fitness =
    being replaced by actual data. *)
 let context = Context_hash.of_bytes_exn (Bytes.make 32 '\255')
 
-let public_key_internal =
-  let pk_opt =
-    Tezos_crypto.Signature.Ed25519.Public_key.of_bytes_without_validation
-      (Bytes.make 32 '\000')
+(* We are introducing a mock bootstrap account, which will be useful for plugging
+   Tzkt on Tezlink. For now, we are using this bootstrap account as the proposer/baker,
+   but this should change. If we decide to introduce real Tezlink bootstrap account,
+   the baker/proposer should be the address zero or the address of the sequencer). *)
+let bootstrap_account =
+  let public_key_internal =
+    let pk_opt =
+      Tezos_crypto.Signature.Ed25519.Public_key.of_bytes_without_validation
+        (Bytes.make 32 '\000')
+    in
+    match pk_opt with None -> (* Unreachable *) assert false | Some pk -> pk
   in
-  match pk_opt with None -> (* Unreachable *) assert false | Some pk -> pk
-
-let public_key : Imported_protocol.Alpha_context.public_key =
-  Ed25519 public_key_internal
-
-let public_key_hash : Imported_protocol.Alpha_context.public_key_hash =
-  Ed25519 (Tezos_crypto.Signature.Ed25519.Public_key.hash public_key_internal)
+  let public_key : Imported_protocol.Alpha_context.public_key =
+    Ed25519 public_key_internal
+  in
+  let public_key_hash : Imported_protocol.Alpha_context.public_key_hash =
+    Ed25519 (Tezos_crypto.Signature.Ed25519.Public_key.hash public_key_internal)
+  in
+  Imported_protocol_parameters.Default_parameters.make_bootstrap_account
+    ( public_key_hash,
+      public_key,
+      (* This amount was arbitrarly chosen according to bootstrap account
+         in L1 sandbox *)
+      Alpha_context.Tez.of_mutez_exn 200000000000L,
+      None,
+      None )
 
 let contents : Alpha_context.Block_header.contents =
   {
