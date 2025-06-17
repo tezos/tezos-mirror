@@ -155,10 +155,12 @@ let directory =
   in
   dir
 
-(* copy-pasted from tezt/lib_tezos/port.ml *)
+(* copy-pasted from tezt/lib_tezos/port.ml + use SO_REUSEADDR *)
 (* TODO port resto tests to Tezt *)
 let fresh_port () =
   let dummy_socket = Unix.(socket PF_INET SOCK_STREAM 0) in
+  (* allows rebinding to a port that is in TIME_WAIT *)
+  Unix.setsockopt dummy_socket Unix.SO_REUSEADDR true ;
   Fun.protect ~finally:(fun () -> Unix.close dummy_socket) @@ fun () ->
   Unix.bind dummy_socket Unix.(ADDR_INET (inet_addr_loopback, 0)) ;
   let addr = Unix.getsockname dummy_socket in
