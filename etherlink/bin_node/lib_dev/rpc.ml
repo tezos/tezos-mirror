@@ -303,7 +303,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
         when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
         Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
       in
-      Broadcast.notify @@ Broadcast.Blueprint blueprint ;
+      Broadcast.notify_blueprint blueprint ;
       Metrics.set_level ~level:number ;
       let* () = set_metrics_confirmed_levels ctxt in
       return `Continue)

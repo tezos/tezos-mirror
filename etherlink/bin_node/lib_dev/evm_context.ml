@@ -925,7 +925,7 @@ module State = struct
       (fun (split_level, split_timestamp) ->
         ctxt.session.last_split_block <- Some (split_level, split_timestamp))
       split_info ;
-    Broadcast.notify @@ Broadcast.Blueprint blueprint_with_events ;
+    Broadcast.notify_blueprint blueprint_with_events ;
     if applied_upgrade then ctxt.session.pending_upgrade <- None ;
     return_unit
 
