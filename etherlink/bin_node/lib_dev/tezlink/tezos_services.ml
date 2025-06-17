@@ -189,7 +189,27 @@ module Protocol_types = struct
   let ethereum_to_tezos_block_hash hash =
     hash |> Ethereum_types.block_hash_to_bytes |> Block_hash.of_string
 
-  module Make_block_header (Block_services : BLOCK_SERVICES) = struct
+  module type HEADER = sig
+    module Block_services : BLOCK_SERVICES
+
+    val tezlink_block_to_shell_header :
+      L2_types.Tezos_block.t -> Block_header.shell_header tzresult
+
+    val tezlink_block_to_block_header :
+      l2_chain_id:L2_types.chain_id ->
+      L2_types.Tezos_block.t * 'b ->
+      Block_services.block_header tzresult
+
+    val tezlink_block_to_block_info :
+      l2_chain_id:L2_types.chain_id ->
+      'a * L2_types.Tezos_block.t * 'b ->
+      ('a * Block_services.block_info) tzresult
+  end
+
+  module Make_block_header (Block_services : BLOCK_SERVICES) :
+    HEADER with module Block_services = Block_services = struct
+    module Block_services = Block_services
+
     let tezlink_block_to_shell_header (block : L2_types.Tezos_block.t) :
         Block_header.shell_header tzresult =
       let open Result_syntax in
@@ -641,18 +661,6 @@ module Imported_services = struct
       Tezos_rpc.Service.t =
     Tezos_shell_services.Monitor_services.S.heads
 
-  let block_info :
-      ( [`GET],
-        tezlink_rpc_context,
-        tezlink_rpc_context,
-        < force_metadata : bool
-        ; metadata : [`Always | `Never] option
-        ; version : Tezlink_protocols.Shell_impl.version >,
-        unit,
-        Tezlink_protocols.Shell_impl.version * Block_services.block_info )
-      Tezos_rpc.Service.t =
-    import_service Block_services.S.info
-
   let get_storage_normalized :
       ( [`POST],
         tezlink_rpc_context,
@@ -827,6 +835,19 @@ let build_block_static_directory ~l2_chain_id
          let*? mock_result = Mock.Operation_metadata.operation_metadata op in
          return (op, mock_result))
 
+let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
+    (module Block_header : Protocol_types.HEADER) base_dir =
+  let open Lwt_result_syntax in
+  base_dir
+  |> register_with_conversion
+       ~service:(import_service Block_header.Block_services.S.info)
+       ~impl:(fun {block; chain} q () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let* tezlink_block = Backend.block chain block in
+         Lwt_result_syntax.return (q#version, tezlink_block, chain))
+       ~convert_output:(Block_header.tezlink_block_to_block_info ~l2_chain_id)
+
 (** We currently support a single target protocol version but we need to handle early blocks (blocks at
     levels 0 and 1) specifically because TzKT expects the `protocol` and `next_protocol` fields of the
     block headers and block metadata at these levels to indicate the hashes of the genesis protocols.
@@ -835,21 +856,15 @@ let build_block_static_directory ~l2_chain_id
     for which a special treatment of early blocks is needed are registered dynamically. *)
 let register_dynamic_block_services ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) base_dir =
-  let open Lwt_result_syntax in
   let static_dir = build_block_static_directory ~l2_chain_id (module Backend) in
   let dynamic_dir_current_proto =
     static_dir
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7993 *)
     (* RPCs at directory level doesn't appear properly in the describe RPC *)
-    |> register_with_conversion
-         ~service:Imported_services.block_info
-         ~impl:(fun {block; chain} q () ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           let* tezlink_block = Backend.block chain block in
-           Lwt_result_syntax.return (q#version, tezlink_block, chain))
-         ~convert_output:
-           (Current_block_header.tezlink_block_to_block_info ~l2_chain_id)
+    |> register_block_info
+         ~l2_chain_id
+         (module Backend)
+         (module Current_block_header)
     |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
            make_env chain block)
   in
@@ -857,15 +872,10 @@ let register_dynamic_block_services ~l2_chain_id
     static_dir
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7993 *)
     (* RPCs at directory level doesn't appear properly in the describe RPC *)
-    |> register_with_conversion
-         ~service:(import_service Zero_block_services.S.info)
-         ~impl:(fun {block; chain} q () ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           let* tezlink_block = Backend.block chain block in
-           Lwt_result_syntax.return (q#version, tezlink_block, chain))
-         ~convert_output:
-           (Zero_block_header.tezlink_block_to_block_info ~l2_chain_id)
+    |> register_block_info
+         ~l2_chain_id
+         (module Backend)
+         (module Zero_block_header)
     |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
            make_env chain block)
   in
