@@ -155,21 +155,30 @@ let directory =
   in
   dir
 
-let port = 8001
+(* copy-pasted from tezt/lib_tezos/port.ml + use SO_REUSEADDR *)
+(* TODO port resto tests to Tezt *)
+let fresh_port () =
+  let dummy_socket = Unix.(socket PF_INET SOCK_STREAM 0) in
+  (* allows rebinding to a port that is in TIME_WAIT *)
+  Unix.setsockopt dummy_socket Unix.SO_REUSEADDR true ;
+  Fun.protect ~finally:(fun () -> Unix.close dummy_socket) @@ fun () ->
+  Unix.bind dummy_socket Unix.(ADDR_INET (inet_addr_loopback, 0)) ;
+  let addr = Unix.getsockname dummy_socket in
+  match addr with ADDR_INET (_, port) -> port | _ -> assert false
 
-let uri = "http://localhost:8001"
+let uri port = "http://localhost:" ^ string_of_int port
 
 let is_ok_result r v =
   match r with `Ok (Some w) -> assert (v = w) | _ -> assert false
 
-let child () =
+let child port =
   let module Client =
     Resto_cohttp_client.Client.Make
       (Encoding)
       (Resto_cohttp_client.Client.OfCohttp (Cohttp_lwt_unix.Client))
   in
   let logger = Client.full_logger Format.err_formatter in
-  let base = Uri.of_string uri in
+  let base = port |> uri |> Uri.of_string in
   let media_types = media_types 1 in
   let open Lwt.Infix in
   Client.call_service media_types ~base ~logger get_foo_bar () () ()
@@ -185,7 +194,7 @@ let child () =
 
 module Server = Resto_cohttp_server.Server.Make (Encoding) (Logger)
 
-let parent pid chunk_size =
+let parent pid port chunk_size =
   let media_types = media_types chunk_size in
   Server.init_and_launch ~media_types directory (`TCP (`Port port))
   >>= fun () ->
@@ -194,13 +203,14 @@ let parent pid chunk_size =
   | _ -> assert false
 
 let test_one_size chunk_size =
+  let port = fresh_port () in
   match Lwt_unix.fork () with
   | 0 -> (
       match Lwt_unix.fork () with
       | 0 ->
           Lwt_unix.sleep 2.0 (* leave time for the server to start *)
-          >>= fun () -> child ()
-      | pid -> parent pid chunk_size)
+          >>= fun () -> child port
+      | pid -> parent pid port chunk_size)
   | pid -> (
       Lwt_unix.waitpid [] pid >>= function
       | _, WEXITED 0 -> Lwt.return ()
