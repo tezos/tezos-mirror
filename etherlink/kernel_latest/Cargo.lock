@@ -2429,7 +2429,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "revm-etherlink-poc"
+name = "revm-etherlink"
 version = "0.1.0"
 dependencies = [
  "format_no_std",
