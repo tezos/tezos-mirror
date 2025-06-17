@@ -51,6 +51,8 @@ module Key : sig
   val encoding_for_logging__cannot_decode : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
+
+  module Set : Set.S with type elt = t
 end
 
 (** {2 Delegates slots type and functions} *)
@@ -86,4 +88,15 @@ module Delegate : sig
   val encoding_for_logging__cannot_decode : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
+
+  (** Builds a {!t} from an element of the output of
+      {!Plugin.RPC.Validators.get}, if the consensus key is present in
+      [known_keys]; otherwise, returns [None].
+
+      If the consensus key is a known BLS key and the validator
+      argument contains a companion key but that companion key is not
+      in [known_keys], emits an error event but nevertheless returns a
+      {!t} where [companion_key = None]. (This function is in Lwt to
+      be able to emit this event.) *)
+  val of_validator : known_keys:Key.Set.t -> RPC.Validators.t -> t option Lwt.t
 end
