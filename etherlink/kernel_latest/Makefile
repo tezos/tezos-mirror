@@ -47,9 +47,9 @@ else
 	@cargo build --release --package evm-evaluation
 endif
 
-.PHONY: build-revm-poc
-build-revm-poc:
-	@cargo build --target wasm32-unknown-unknown --package revm-etherlink-poc
+.PHONY: build-revm
+build-revm:
+	@cargo build --target wasm32-unknown-unknown --package revm-etherlink
 
 .PHONY: build-deps
 build-deps:

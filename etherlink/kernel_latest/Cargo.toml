@@ -17,7 +17,7 @@ members = [
   "indexable_storage",
   "logging",
   "storage",
-  "revm-poc",
+  "revm",
   "runtime",
 ]
 

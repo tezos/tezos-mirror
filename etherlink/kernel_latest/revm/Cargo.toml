@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = 'revm-etherlink-poc'
+name = 'revm-etherlink'
 version = '0.1.0'
 edition = '2021'
 license = "MIT"
