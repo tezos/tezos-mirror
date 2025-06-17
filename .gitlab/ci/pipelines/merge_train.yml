@@ -2715,7 +2715,7 @@ audit_riscv_deps:
 
 check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: build
+  stage: test
   tags:
   - gcp
   rules:

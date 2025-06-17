@@ -1761,7 +1761,6 @@ let jobs pipeline_type =
       in
       let job_check_riscv_kernels : tezos_job =
         make_job_kernel
-          ~stage:Stages.build
           ~__POS__
           ~name:"check_riscv_kernels"
           ~changes:changeset_riscv_kernels
