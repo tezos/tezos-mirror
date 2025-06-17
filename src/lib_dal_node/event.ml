@@ -753,6 +753,24 @@ open struct
       ~level:Info
       ("query_id", Data_encoding.int31)
 
+  let crypto_process_sending_reply_error =
+    declare_1
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"crypto_process_sending_reply_error"
+      ~msg:"cryptographic child process: sending reply error #{query_id}."
+      ~level:Warning
+      ("query_id", Data_encoding.int31)
+
+  let crypto_process_error =
+    declare_1
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"crypto_process_error"
+      ~msg:"cryptographic child process error: #{error}."
+      ~level:Warning
+      ("error", Data_encoding.string)
+
   let main_process_sending_query =
     declare_1
       ~section:(section @ ["crypto"])
@@ -772,6 +790,16 @@ open struct
       ~msg:"main process: received reply #{query_id}."
       ~level:Info
       ("query_id", Data_encoding.int31)
+
+  let main_process_received_reply_error =
+    declare_2
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"main_process_received_reply_error"
+      ~msg:"main process: received reply error on query #{query_id} : {error}."
+      ~level:Warning
+      ("query_id", Data_encoding.int31)
+      ("error", Data_encoding.string)
 
   let main_process_enqueue_query =
     declare_1
@@ -1326,11 +1354,19 @@ let emit_crypto_process_received_query ~query_id =
 let emit_crypto_process_sending_reply ~query_id =
   emit crypto_process_sending_reply query_id
 
+let emit_crypto_process_sending_reply_error ~query_id =
+  emit crypto_process_sending_reply_error query_id
+
+let emit_crypto_process_error ~msg = emit crypto_process_error msg
+
 let emit_main_process_sending_query ~query_id =
   emit main_process_sending_query query_id
 
 let emit_main_process_received_reply ~query_id =
   emit main_process_received_reply query_id
+
+let emit_main_process_received_reply_error ~query_id ~msg =
+  emit main_process_received_reply_error (query_id, msg)
 
 let emit_main_process_enqueue_query ~query_id =
   emit main_process_enqueue_query query_id
