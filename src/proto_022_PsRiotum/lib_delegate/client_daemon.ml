@@ -57,11 +57,14 @@ let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
   Node_rpc.await_protocol_activation cctxt ~chain ()
 
 let[@warning "-32"] may_start_profiler baking_dir =
-  match Tezos_profiler_unix.Profiler_instance.selected_backend () with
-  | Some {instance_maker; _} ->
-      let profiler_maker = instance_maker ~directory:baking_dir in
-      Baking_profiler.activate_all ~profiler_maker ;
-      RPC_profiler.init profiler_maker
+  match Tezos_profiler_unix.Profiler_instance.selected_backends () with
+  | Some backends ->
+      List.iter
+        (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
+          let profiler_maker = instance_maker ~directory:baking_dir in
+          Baking_profiler.activate_all ~profiler_maker ;
+          RPC_profiler.init profiler_maker)
+        backends
   | None -> ()
 
 module Baker = struct

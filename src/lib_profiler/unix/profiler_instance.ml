@@ -102,11 +102,12 @@ let wrap_backend_verbosity instance_maker ~directory ~name =
 type wrapped_instance_maker =
   directory:string -> name:string -> Profiler.instance option
 
-let selected_backend () =
+let selected_backends () =
   let fail s =
     Fmt.failwith
       "@[<v 2>%s.@,\
-       You can set a backend with PROFILING_BACKEND=backend.@,\
+       You can set backends with PROFILING_BACKENDS=<list of ; separated \
+       backends>.@,\
        @[<v 2>Available backends are:@,\
        %a@."
       s
@@ -117,7 +118,7 @@ let selected_backend () =
          [])
   in
   match
-    Sys.getenv_opt "PROFILING_BACKEND" |> Option.map String.lowercase_ascii
+    Sys.getenv_opt "PROFILING_BACKENDS" |> Option.map String.lowercase_ascii
   with
   | None -> (
       match Sys.getenv_opt "PROFILING" with
@@ -126,19 +127,28 @@ let selected_backend () =
           Format.sprintf
             "No backend selected but profilers were enabled in PROFILING."
           |> fail)
-  | Some b -> (
-      match BackendMap.find b !registered_backends with
-      | Some {instance_maker; view} ->
-          Some {instance_maker = wrap_backend_verbosity instance_maker; view}
-      | None ->
-          Format.sprintf "No backend registered for value \"%s\"" b |> fail)
+  | Some backends ->
+      String.split_no_empty ';' backends
+      |> List.fold_left
+           (fun acc backend ->
+             match
+               BackendMap.find (String.trim backend) !registered_backends
+             with
+             | Some {instance_maker; view} ->
+                 {instance_maker = wrap_backend_verbosity instance_maker; view}
+                 :: acc
+             | None ->
+                 Format.sprintf "No backend registered for value \"%s\"" backend
+                 |> fail)
+           []
+      |> Option.some
 
 let () =
   if
     (true [@profiler.overwrite false])
-    && Sys.getenv_opt "PROFILING_BACKEND" <> None
+    && Sys.getenv_opt "PROFILING_BACKENDS" <> None
   then
     Fmt.failwith
-      "The profiling has been enabled with PROFILING_BACKEND='...' but the \
+      "The profiling has been enabled with PROFILING_BACKENDS='...' but the \
        program hasn't been compiled with TEZOS_PPX_PROFILER='...'"
   else ()
