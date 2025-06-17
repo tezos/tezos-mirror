@@ -21,6 +21,13 @@ Available services:
         Get the address of the smart rollup hosting the chain 
     - GET /evm/time_between_blocks
         Get the maximum time between two blocks 
+    - GET /evm/v2/blueprint/<uint63>
+        Fetch the contents of a blueprint with a complete list of events,
+        including sequencer upgrades 
+    - GET /evm/v2/blueprints/range
+        Fetch a sequence of consecutive blueprints with a complete list of
+        events, including sequencer upgrades, starting from (and containing
+        at least the blueprint for) a given level 
   - GET /health_check
       Assess the health of the RPC server 
   + tezlink/
@@ -62,6 +69,7 @@ Dynamic parameter description:
   <chain_id>
       A chain identifier. This is either a chain hash in Base58Check notation
       or a one the predefined aliases: 'main', 'test'. 
+  uint63
   uint63
 
 Warning:

@@ -677,6 +677,10 @@ evm_context_request_failed:
                            $unistring,
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                      "kernel_upgrade"?: [ $unistring, $timestamp.protocol ],
+                     "sequencer_upgrade"?:
+                       [ $Signature.Public_key,
+                         $unistring,
+                         $timestamp.protocol ],
                      "blueprint":
                        { "number": $positive_bignum,
                          "timestamp": $timestamp.protocol,
@@ -2390,6 +2394,10 @@ evm_context_request_failed:
                            $unistring,
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                      "kernel_upgrade"?: [ $unistring, $timestamp.protocol ],
+                     "sequencer_upgrade"?:
+                       [ $Signature.Public_key,
+                         $unistring,
+                         $timestamp.protocol ],
                      "blueprint":
                        { "number": $positive_bignum,
                          "timestamp": $timestamp.protocol,
