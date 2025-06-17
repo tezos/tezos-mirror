@@ -16,6 +16,8 @@ module Key_id : sig
 
   val compare : t -> t -> int
 
+  val equal : t -> t -> bool
+
   val encoding : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
@@ -56,28 +58,18 @@ module Key : sig
 end
 
 (** {2 Delegates slots type and functions} *)
-module Delegate_id : sig
-  type t
-
-  (** Only use at library frontiers *)
-  val of_pkh : Signature.public_key_hash -> t
-
-  (** Only use at library frontiers *)
-  val to_pkh : t -> Signature.public_key_hash
-
-  val equal : t -> t -> bool
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end
+module Delegate_id : module type of Key_id
 
 module Delegate : sig
-  type t = {
+  type manager_key
+
+  type t = private {
+    manager_key : manager_key;
     consensus_key : Key.t;
     companion_key : Key.t option;
-    delegate_id : Delegate_id.t;
   }
+
+  val delegate_id : t -> Delegate_id.t
 
   (** Partial encoding for {!t} that omits secret keys to avoid
       leaking them in event logs; see

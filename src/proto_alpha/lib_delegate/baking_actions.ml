@@ -562,10 +562,11 @@ let may_get_dal_content state consensus_vote =
     ( Raw_level.to_int32 vote_consensus_content.level,
       vote_consensus_content.round )
   in
+  let delegate_id = Delegate.delegate_id delegate in
   let promise_opt =
     List.assoc_opt
       ~equal:Delegate_id.equal
-      delegate.delegate_id
+      delegate_id
       state.level_state.dal_attestable_slots
   in
   match promise_opt with
@@ -585,7 +586,7 @@ let may_get_dal_content state consensus_vote =
              Lwt.return (`RPC_result tz_res));
           ]
       in
-      process_dal_rpc_result state delegate.delegate_id level round res
+      process_dal_rpc_result state delegate_id level round res
 
 let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   let {delegate; vote_consensus_content; _} = consensus_vote in
@@ -718,7 +719,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
                       Events.(
                         emit
                           missing_companion_key_for_dal_with_bls
-                          ( delegate.delegate_id,
+                          ( Delegate.delegate_id delegate,
                             Raw_level.to_int32 vote_consensus_content.level ))
                     in
                     return (None, None)
