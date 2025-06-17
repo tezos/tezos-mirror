@@ -38,6 +38,11 @@ module Blueprints : sig
   val find :
     conn -> Ethereum_types.quantity -> Blueprint_types.t option tzresult Lwt.t
 
+  val find_with_events_legacy :
+    conn ->
+    Ethereum_types.quantity ->
+    Blueprint_types.Legacy.with_events option tzresult Lwt.t
+
   val find_with_events :
     conn ->
     Ethereum_types.quantity ->

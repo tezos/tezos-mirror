@@ -802,6 +802,10 @@ let evm_services_methods ctxt time_between_blocks =
           match res with
           | Ok res -> res
           | Error _ -> Stdlib.failwith "Couldn't fetch next blueprint number");
+      find_blueprint_legacy =
+        (fun level ->
+          Evm_store.use ctxt.store (fun conn ->
+              Evm_store.Blueprints.find_with_events_legacy conn level));
       find_blueprint =
         (fun level ->
           Evm_store.use ctxt.store (fun conn ->

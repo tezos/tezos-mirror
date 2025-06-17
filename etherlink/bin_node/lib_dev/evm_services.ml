@@ -27,7 +27,7 @@ let get_blueprint_service =
   Service.get_service
     ~description:"Fetch the contents of a blueprint"
     ~query:Query.empty
-    ~output:Blueprint_types.with_events_encoding
+    ~output:Blueprint_types.Legacy.with_events_encoding
     Path.(evm_services_root / "blueprint" /: Arg.uint63)
 
 type blueprints_selector = {from_level : int64; count : int64}
@@ -51,7 +51,7 @@ let get_blueprints_service =
       "Fetch a sequence of consecutive blueprints, starting from (and \
        containing at least the blueprint for) a given level"
     ~query
-    ~output:(Data_encoding.list Blueprint_types.with_events_encoding)
+    ~output:(Data_encoding.list Blueprint_types.Legacy.with_events_encoding)
     Path.(evm_services_root / "blueprints" / "range")
 
 let blueprint_watcher_service =
@@ -62,7 +62,7 @@ let blueprint_watcher_service =
   Service.get_service
     ~description:"Watch for new blueprints"
     ~query:level_query
-    ~output:Blueprint_types.with_events_encoding
+    ~output:Blueprint_types.Legacy.with_events_encoding
     Path.(evm_services_root / "blueprints")
 
 let message_watcher_service =
@@ -182,12 +182,14 @@ let register_broadcast_service find_blueprint get_next_blueprint_number dir =
   Evm_directory.streamed_register0 dir message_watcher_service (fun level () ->
       create_broadcast_service get_next_blueprint_number find_blueprint level)
 
-let register get_next_blueprint_number find_blueprint smart_rollup_address
-    time_between_blocks dir =
+let register get_next_blueprint_number find_blueprint_legacy find_blueprint
+    smart_rollup_address time_between_blocks dir =
   register_get_smart_rollup_address_service smart_rollup_address dir
-  |> register_get_blueprint_service find_blueprint
-  |> register_get_blueprints_service find_blueprint
-  |> register_blueprint_watcher_service find_blueprint get_next_blueprint_number
+  |> register_get_blueprint_service find_blueprint_legacy
+  |> register_get_blueprints_service find_blueprint_legacy
+  |> register_blueprint_watcher_service
+       find_blueprint_legacy
+       get_next_blueprint_number
   |> register_get_time_between_block_service time_between_blocks
   |> register_broadcast_service find_blueprint get_next_blueprint_number
 

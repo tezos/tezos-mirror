@@ -22,6 +22,7 @@ type with_events = {
   delayed_transactions : Evm_events.Delayed_transaction.t list;
       (** The delayed transactions to apply before applying the blueprint. *)
   kernel_upgrade : Evm_events.Upgrade.t option;
+  sequencer_upgrade : Evm_events.Sequencer_upgrade.t option;
   blueprint : t;  (** The blueprint to execute. *)
 }
 
@@ -34,3 +35,18 @@ val with_events_encoding : with_events Data_encoding.t
 val with_events_equal : with_events -> with_events -> bool
 
 val events_of_blueprint_with_events : with_events -> Evm_events.t list
+
+module Legacy : sig
+  type with_events = {
+    delayed_transactions : Evm_events.Delayed_transaction.t list;
+    kernel_upgrade : Evm_events.Upgrade.t option;
+    blueprint : t;
+  }
+
+  val with_events_encoding : with_events Data_encoding.t
+end
+
+val make_legacy : with_events -> Legacy.with_events
+
+(* temporary *)
+val of_legacy : Legacy.with_events -> with_events

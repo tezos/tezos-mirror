@@ -1044,6 +1044,8 @@ module State = struct
         | _ -> None
       in
 
+      let sequencer_upgrade = (* fixme *) None in
+
       let* current_block =
         match current_block with
         | Eth block ->
@@ -1065,6 +1067,7 @@ module State = struct
           {
             delayed_transactions;
             kernel_upgrade;
+            sequencer_upgrade;
             blueprint =
               {number = ctxt.session.next_blueprint_number; timestamp; payload};
           }
@@ -1239,6 +1242,7 @@ module State = struct
         conn
         before_flushed_level
     in
+    let lost_sequencer_upgrade = (* fixme *) None in
     (* The kernel has produced a block for level [flushed_level]. The first thing
        to do is go back to an EVM state before this flushed blueprint. *)
     let* (_ : Evm_state.t) =
@@ -1255,7 +1259,12 @@ module State = struct
     (* Clean unreliable delayed inbox *)
     let* () = clear_head_delayed_inbox ctxt in
     (* Prepare an event list to be reapplied on current head *)
-    let events = Evm_events.of_parts delayed_transactions lost_upgrade in
+    let events =
+      Evm_events.of_parts
+        ~delayed_transactions
+        ~kernel_upgrade:lost_upgrade
+        ~sequencer_upgrade:lost_sequencer_upgrade
+    in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
     let (Ex_chain_family chain_family) =
       Configuration.retrieve_chain_family
@@ -1841,7 +1850,7 @@ module State = struct
                   ~evm_node_endpoint
                   conn
                   ctxt
-                  blueprint_pred
+                  (Blueprint_types.of_legacy blueprint_pred)
               else
                 (* We agree with the blueprint predecessor but not the blueprint,
                    this is the divergence point. *)

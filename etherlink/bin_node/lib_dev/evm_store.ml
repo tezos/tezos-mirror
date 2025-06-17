@@ -1090,7 +1090,7 @@ module Blueprints = struct
         Some Blueprint_types.{payload; timestamp; number}
     | None -> None
 
-  let find_with_events conn level =
+  let find_with_events_legacy conn level =
     let open Lwt_result_syntax in
     let* blueprint = find conn level in
     match blueprint with
@@ -1099,7 +1099,22 @@ module Blueprints = struct
         let* kernel_upgrade = Kernel_upgrades.find_injected_before conn level in
         let* delayed_transactions = Delayed_transactions.at_level conn level in
         return_some
-          Blueprint_types.{delayed_transactions; kernel_upgrade; blueprint}
+          Blueprint_types.Legacy.
+            {delayed_transactions; kernel_upgrade; blueprint}
+
+  let find_with_events conn level =
+    let open Lwt_result_syntax in
+    let* blueprint = find conn level in
+    match blueprint with
+    | None -> return None
+    | Some blueprint ->
+        let* kernel_upgrade = Kernel_upgrades.find_injected_before conn level in
+        let sequencer_upgrade = None in
+        (* todo *)
+        let* delayed_transactions = Delayed_transactions.at_level conn level in
+        return_some
+          Blueprint_types.
+            {delayed_transactions; sequencer_upgrade; kernel_upgrade; blueprint}
 
   let get_with_events conn level =
     let open Lwt_result_syntax in

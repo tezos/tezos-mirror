@@ -11,6 +11,9 @@ type evm_services_methods = {
   next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
   find_blueprint :
     Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t;
+  find_blueprint_legacy :
+    Ethereum_types.quantity ->
+    Blueprint_types.Legacy.with_events option tzresult Lwt.t;
   smart_rollup_address : Address.t;
   time_between_blocks : Evm_node_config.Configuration.time_between_blocks;
 }
@@ -158,6 +161,7 @@ let start_public_server (type f)
     | Some impl ->
         Evm_services.register
           impl.next_blueprint_number
+          impl.find_blueprint_legacy
           impl.find_blueprint
           impl.smart_rollup_address
           impl.time_between_blocks

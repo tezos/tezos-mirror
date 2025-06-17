@@ -7,7 +7,7 @@
 (*****************************************************************************)
 
 (** Stream on which only blueprints are broadcasted. *)
-let blueprint_watcher : Blueprint_types.with_events Lwt_watcher.input =
+let blueprint_watcher : Blueprint_types.Legacy.with_events Lwt_watcher.input =
   Lwt_watcher.create_input ()
 
 let create_blueprint_stream () = Lwt_watcher.create_stream blueprint_watcher
@@ -54,7 +54,8 @@ let message_watcher : message Lwt_watcher.input = Lwt_watcher.create_input ()
 let create_broadcast_stream () = Lwt_watcher.create_stream message_watcher
 
 let notify_blueprint b =
-  let () = Lwt_watcher.notify blueprint_watcher b in
+  let legacy = Blueprint_types.make_legacy b in
+  let () = Lwt_watcher.notify blueprint_watcher legacy in
   Lwt_watcher.notify message_watcher (Blueprint b)
 
 let notify_finalized_levels ~l1_level ~start_l2_level ~end_l2_level =

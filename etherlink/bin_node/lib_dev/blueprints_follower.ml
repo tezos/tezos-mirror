@@ -113,7 +113,8 @@ module Blueprints_sequence = struct
           in
           return
             (Some
-               ( blueprint,
+               ( Blueprint_types.of_legacy blueprint,
+                 (* Will be removed in next commits once Evm_services.get_full_blueprint is used *)
                  (Some remote_head, quantity_succ next_blueprint_number) ))
         else return None)
       (None, next_blueprint_number)
@@ -144,6 +145,7 @@ module Blueprints_sequence = struct
              will always return at least one element. *)
           assert false
       | Ok blueprints ->
+          let blueprints = List.map Blueprint_types.of_legacy blueprints in
           let next_chunks =
             make_with_chunks
               ~remote_head

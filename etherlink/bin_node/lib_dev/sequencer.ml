@@ -59,8 +59,9 @@ let loop_sequencer multichain backend
           if Compare.Z.(number = expected_number) then
             let events =
               Evm_events.of_parts
-                blueprint.delayed_transactions
-                blueprint.kernel_upgrade
+                ~delayed_transactions:blueprint.delayed_transactions
+                ~kernel_upgrade:blueprint.kernel_upgrade
+                ~sequencer_upgrade:blueprint.sequencer_upgrade
             in
             let* () = Evm_context.apply_evm_events events in
             let*? all_txns =
