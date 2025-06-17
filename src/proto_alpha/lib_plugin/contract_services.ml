@@ -25,20 +25,27 @@ type info = {
   delegate : public_key_hash option;
   counter : Manager_counter.t option;
   script : Script.t option;
+  revealed : bool option;
 }
 
 let info_encoding =
   let open Data_encoding in
   conv
-    (fun {balance; delegate; script; counter} ->
-      (balance, delegate, script, counter))
-    (fun (balance, delegate, script, counter) ->
-      {balance; delegate; script; counter})
-  @@ obj4
+    (fun {balance; delegate; script; counter; revealed} ->
+      (balance, delegate, script, counter, revealed))
+    (fun (balance, delegate, script, counter, revealed) ->
+      {balance; delegate; script; counter; revealed})
+  @@ obj5
        (req "balance" Tez.encoding)
        (opt "delegate" Signature.Public_key_hash.encoding)
        (opt "script" Script.encoding)
        (opt "counter" Manager_counter.encoding_for_RPCs)
+       (opt
+          ~description:
+            "field present for implicit account only: true means the manager \
+             pk has been revealed"
+          "revealed"
+          bool)
 
 let legacy = Script_ir_translator_config.make ~legacy:true ()
 
@@ -733,12 +740,27 @@ let register () =
       let* delegate = Contract.Delegate.find ctxt contract in
       match contract with
       | Implicit manager ->
+          let* revealed = Contract.is_manager_key_revealed ctxt manager in
           let+ counter = Contract.get_counter ctxt manager in
-          {balance; delegate; script = None; counter = Some counter}
+          {
+            balance;
+            delegate;
+            script = None;
+            counter = Some counter;
+            revealed = Some revealed;
+          }
       | Originated contract -> (
           let* ctxt, script = Contract.get_script ctxt contract in
           match script with
-          | None -> return {balance; delegate; script = None; counter = None}
+          | None ->
+              return
+                {
+                  balance;
+                  delegate;
+                  script = None;
+                  counter = None;
+                  revealed = None;
+                }
           | Some script ->
               let ctxt = Gas.set_unlimited ctxt in
               let+ script, _ctxt =
@@ -751,7 +773,13 @@ let register () =
                   ~normalize_types
                   script
               in
-              {balance; delegate; script = Some script; counter = None})) ;
+              {
+                balance;
+                delegate;
+                script = Some script;
+                counter = None;
+                revealed = None;
+              })) ;
   register1
     ~chunked:false
     S.estimated_own_pending_slashed_amount
