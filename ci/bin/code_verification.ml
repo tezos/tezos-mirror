@@ -1532,6 +1532,9 @@ let jobs pipeline_type =
         make_rules ~dependent:true ~manual:(On_changes changeset_octez) ()
       in
       let coverage_expiry = Duration (Days 3) in
+      let keep_going =
+        match pipeline_type with Schedule_extended_test -> true | _ -> false
+      in
       let tezt : tezos_job =
         Tezt.job
           ~__POS__
@@ -1544,6 +1547,7 @@ let jobs pipeline_type =
           ~timeout:(Minutes 40)
           ~rules
           ~dependencies
+          ~keep_going
           ?job_select_tezts
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
@@ -1560,6 +1564,7 @@ let jobs pipeline_type =
           ~tezt_tests:(Tezt.tests_tag_selector ~time_sensitive:true [])
           ~tezt_variant:"-time_sensitive"
           ~dependencies
+          ~keep_going
           ?job_select_tezts
           ~rules
           ()
@@ -1590,6 +1595,7 @@ let jobs pipeline_type =
           ~tezt_parallel:3
           ~parallel:(Vector 20)
           ~dependencies
+          ~keep_going
           ?job_select_tezts
           ~disable_test_timeout:true
           ()
@@ -1606,6 +1612,7 @@ let jobs pipeline_type =
           ~tezt_parallel:6
           ~parallel:(Vector 10)
           ~dependencies
+          ~keep_going
           ?job_select_tezts
           ()
       in
@@ -1628,6 +1635,7 @@ let jobs pipeline_type =
           ~tezt_retry:3
           ~tezt_parallel:1
           ~dependencies
+          ~keep_going
           ?job_select_tezts
           ~rules:rules_manual
           ~allow_failure:Yes
@@ -1650,6 +1658,7 @@ let jobs pipeline_type =
                  Artifacts job_static_x86_64_experimental;
                  Artifacts job_tezt_fetch_records;
                ])
+          ~keep_going
           ~rules
           ?job_select_tezts
           ~before_script:(before_script ["mv octez-binaries/x86_64/octez-* ."])
