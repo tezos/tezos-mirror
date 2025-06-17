@@ -4,10 +4,11 @@
 
 use database::EtherlinkVMDB;
 use precompile_provider::EtherlinkPrecompiles;
+use revm::context::result::EVMError;
 use revm::{
     context::{
-        result::ExecutionResult, transaction::AccessList, BlockEnv, CfgEnv, Evm,
-        LocalContext, TxEnv,
+        result::ExecutionResult, transaction::AccessList, BlockEnv, CfgEnv,
+        DBErrorMarker, Evm, LocalContext, TxEnv,
     },
     context_interface::block::BlobExcessGasAndPrice,
     handler::{instructions::EthInstructions, EthPrecompiles},
@@ -18,7 +19,9 @@ use revm::{
 use storage_helpers::u256_to_le_bytes;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::runtime::Runtime;
-use world_state_handler::WorldStateHandler;
+use tezos_smart_rollup_host::runtime::RuntimeError;
+use thiserror::Error;
+use world_state_handler::{account_path, WorldStateHandler};
 
 mod block_storage;
 mod code_storage;
@@ -32,6 +35,16 @@ const ETHERLINK_CHAIN_ID: u64 = 42793;
 const DEFAULT_SPEC_ID: SpecId = SpecId::PRAGUE;
 const MAX_GAS_PER_TRANSACTION: u64 = 30_000_000;
 
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Runtime error: {0}")]
+    Runtime(#[from] RuntimeError),
+    #[error("Execution error: {0}")]
+    Custom(String),
+}
+
+impl DBErrorMarker for Error {}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct ExecutionOutcome {
     /// Result of the VM transaction execution.
@@ -41,42 +54,57 @@ pub struct ExecutionOutcome {
     /// transaction fails (or if the transaction doesn't produce any withdrawals).
     // TODO: Replace () by a Withdrawal struct/type.
     pub withdrawals: Vec<()>,
-    /// Number of estimated ticks used at the end of the contract call
-    pub estimated_ticks_used: u64,
 }
 
-fn block_env(block_constants: &BlockConstants) -> BlockEnv {
-    BlockEnv {
+fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, Error> {
+    // TODO: Whenever the switch to REVM is completely made, readapt BlockConstants
+    // structure to match alloy's type. The current structure is highly dependant
+    // on what is needed for Sputnik.
+    let basefee: u64 = match block_constants.base_fee_per_gas().try_into() {
+        Ok(basefee) => basefee,
+        Err(err) => {
+            return Err(Error::Custom(format!(
+                "Invalid base fee per gas conversion: {err:?}"
+            )))
+        }
+    };
+    Ok(BlockEnv {
         number: U256::from_le_slice(&u256_to_le_bytes(block_constants.number)),
         beneficiary: Address::from(block_constants.coinbase.0),
         timestamp: U256::from_le_slice(&u256_to_le_bytes(block_constants.timestamp)),
         gas_limit: block_constants.gas_limit,
-        basefee: block_constants.base_fee_per_gas().try_into().unwrap(),
+        basefee,
         difficulty: U256::ZERO,
         prevrandao: block_constants
             .prevrandao
             .map(|prevrandao| FixedBytes(prevrandao.0)),
         blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
-    }
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
-fn tx_env(
+fn tx_env<'a, Host: Runtime>(
+    host: &'a mut Host,
+    world_state_handler: &'a mut WorldStateHandler,
     caller: Address,
     destination: Option<Address>,
     gas_limit: u64,
     gas_price: u128,
     value: U256,
     data: Bytes,
-    nonce: Option<u64>,
     access_list: AccessList,
-) -> TxEnv {
+) -> Result<TxEnv, Error> {
     let kind = match destination {
         Some(address) => TxKind::Call(address),
         None => TxKind::Create,
     };
 
-    TxEnv {
+    let storage_account = world_state_handler
+        .get_or_create(host, &account_path(&caller))
+        .map_err(|err| Error::Custom(err.to_string()))?;
+    let nonce = storage_account.nonce(host)?;
+
+    Ok(TxEnv {
         tx_type: 2,
         caller,
         gas_limit,
@@ -84,14 +112,14 @@ fn tx_env(
         kind,
         value,
         data,
-        nonce: nonce.unwrap_or_default(),
+        nonce,
         chain_id: Some(ETHERLINK_CHAIN_ID),
         access_list,
         gas_priority_fee: None,
         blob_hashes: vec![],
         max_fee_per_blob_gas: 0,
         authorization_list: vec![],
-    }
+    })
 }
 
 type EvmContext<'a, Host> = Evm<
@@ -142,38 +170,34 @@ pub fn run_transaction<'a, Host: Runtime>(
     gas_limit: Option<u64>,
     effective_gas_price: u128,
     value: U256,
-    nonce: u64,
     tracer: Option<impl InspectEvm>,
     access_list: AccessList,
-) -> ExecutionOutcome {
+) -> Result<ExecutionOutcome, EVMError<Error>> {
     let _ignore_tracer = tracer;
 
-    let block_env = block_env(block_constants);
+    let block_env = block_env(block_constants)?;
     let tx = tx_env(
+        host,
+        world_state_handler,
         caller,
         destination,
         gas_limit.unwrap_or(MAX_GAS_PER_TRANSACTION),
         effective_gas_price,
         value,
         call_data,
-        Some(nonce),
         access_list,
-    );
+    )?;
 
     let db = EtherlinkVMDB::new(host, block_constants, world_state_handler);
 
     let evm = evm(db, &block_env, &tx);
 
-    let execution_result = evm
-        .with_precompiles(precompiles)
-        .transact_commit(&tx)
-        .unwrap();
+    let execution_result = evm.with_precompiles(precompiles).transact_commit(&tx)?;
 
-    ExecutionOutcome {
+    Ok(ExecutionOutcome {
         result: execution_result, // contains logs and gas_used.
         withdrawals: vec![],
-        estimated_ticks_used: 0,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -273,7 +297,8 @@ mod test {
             block_env: &BlockEnv,
         ) -> EtherlinkVMDB<'a, MockKernelHost> {
             let host = Box::leak(Box::new(MockKernelHost::default()));
-            let world_state_handler = Box::leak(Box::new(new_world_state_handler()));
+            let world_state_handler =
+                Box::leak(Box::new(new_world_state_handler().unwrap()));
             let block_constants = Box::leak(Box::new(block_constants(block_env)));
 
             EtherlinkVMDB::new(host, block_constants, world_state_handler)

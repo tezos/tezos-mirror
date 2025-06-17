@@ -6,6 +6,7 @@ use crate::{
     block_storage::{get_block_hash, BLOCKS_STORED},
     code_storage::CodeStorage,
     world_state_handler::{account_path, StorageAccount, WorldStateHandler},
+    Error,
 };
 
 use revm::{
@@ -13,9 +14,12 @@ use revm::{
     state::{Account, AccountInfo, AccountStatus, Bytecode, EvmStorageSlot},
     Database, DatabaseCommit,
 };
-use std::convert::Infallible;
 use tezos_ethereum::block::BlockConstants;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_evm_logging::{
+    log,
+    Level::{Debug, Error as LogError},
+};
+use tezos_evm_runtime::runtime::Runtime;
 
 pub struct EtherlinkVMDB<'a, Host: Runtime> {
     /// Runtime host
@@ -43,14 +47,14 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
 }
 
 pub trait AccountDatabase: Database {
-    fn get_or_create_account(&self, address: Address) -> StorageAccount;
+    fn get_or_create_account(&self, address: Address) -> Result<StorageAccount, Error>;
 }
 
 impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     #[cfg(test)]
     pub fn insert_account_info(&mut self, address: Address, info: AccountInfo) {
-        let mut storage_account = self.get_or_create_account(address);
-        storage_account.set_info(self.host, info);
+        let mut storage_account = self.get_or_create_account(address).unwrap();
+        storage_account.set_info(self.host, info).unwrap()
     }
 
     #[cfg(test)]
@@ -59,34 +63,36 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
         address: Address,
         storage_key: StorageKey,
     ) -> StorageValue {
-        let storage_account = self.get_or_create_account(address);
-        storage_account.get_storage(self.host, &storage_key)
-    }
-}
-
-impl<Host: Runtime> AccountDatabase for EtherlinkVMDB<'_, Host> {
-    fn get_or_create_account(&self, address: Address) -> StorageAccount {
-        // TODO: get_account function should be implemented whenever errors are
-        // reintroduced
-        self.world_state_handler
-            .get_or_create(self.host, &account_path(&address))
+        let storage_account = self.get_or_create_account(address).unwrap();
+        storage_account
+            .get_storage(self.host, &storage_key)
             .unwrap()
     }
 }
 
+impl<Host: Runtime> AccountDatabase for EtherlinkVMDB<'_, Host> {
+    fn get_or_create_account(&self, address: Address) -> Result<StorageAccount, Error> {
+        // TODO: get_account function should be implemented whenever errors are
+        // reintroduced
+        self.world_state_handler
+            .get_or_create(self.host, &account_path(&address))
+            .map_err(|err| Error::Custom(err.to_string()))
+    }
+}
+
 impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
-    type Error = Infallible;
+    type Error = Error;
 
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
-        let storage_account = self.get_or_create_account(address);
-        let account_info = storage_account.info(self.host);
+        let storage_account = self.get_or_create_account(address)?;
+        let account_info = storage_account.info(self.host)?;
 
         Ok(Some(account_info))
     }
 
     fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
-        let code_storage = CodeStorage::new(&code_hash);
-        let bytecode = code_storage.get_code(self.host);
+        let code_storage = CodeStorage::new(&code_hash)?;
+        let bytecode = code_storage.get_code(self.host)?;
 
         Ok(bytecode)
     }
@@ -96,8 +102,8 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
         address: Address,
         index: StorageKey,
     ) -> Result<StorageValue, Self::Error> {
-        let storage_account = self.get_or_create_account(address);
-        let storage_value = storage_account.get_storage(self.host, &index);
+        let storage_account = self.get_or_create_account(address)?;
+        let storage_value = storage_account.get_storage(self.host, &index)?;
 
         Ok(storage_value)
     }
@@ -110,7 +116,7 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
             Some(block_diff)
                 if block_diff <= BLOCKS_STORED.into() && !block_diff.is_zero() =>
             {
-                Ok(get_block_hash(self.host, number))
+                get_block_hash(self.host, number)
             }
             _ => Ok(B256::ZERO),
         }
@@ -132,14 +138,24 @@ impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
             match status {
                 // The account is marked as touched, the changes should be commited
                 // to the database.
-                AccountStatus::Touched => {
-                    let mut storage_account = self.get_or_create_account(address);
-                    storage_account.set_info(self.host, info);
+                AccountStatus::Touched => match self.get_or_create_account(address) {
+                    Ok(mut storage_account) => {
+                        if let Err(err) = storage_account.set_info(self.host, info) {
+                            log!(self.host, LogError, "DatabaseCommit `set_info` error: {err:?}");
+                        }
 
-                    for (key, EvmStorageSlot { present_value, .. }) in storage {
-                        storage_account.set_storage(self.host, &key, &present_value);
+                        for (key, EvmStorageSlot { present_value, .. }) in storage {
+                            if let Err(err) = storage_account.set_storage(
+                                self.host,
+                                &key,
+                                &present_value,
+                            ) {
+                                log!(self.host, LogError, "DatabaseCommit `set_storage` error: {err:?}");
+                            }
+                        }
                     }
-                }
+                    Err(err) => log!(self.host, LogError, "DatabaseCommit `get_or_create_account` error: {err:?}"),
+                },
                 AccountStatus::Created
                 | AccountStatus::CreatedLocal
                 | AccountStatus::SelfDestructed
@@ -149,7 +165,11 @@ impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
                     // Local changes only, nothing is commited
                     // TODO: Double check for [Created] case.
                 }
-                _ => panic!("Undefined account status"),
+                undefined_account_status => log!(
+                    self.host,
+                    Debug,
+                    "DatabaseCommit debug: undefined account status {undefined_account_status:?}"
+                ),
             }
         }
     }
