@@ -704,106 +704,121 @@ let check_block =
         (Unsupported_block_parameter
            (Tezos_shell_services.Block_services.to_string block))
 
-(** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
-let register_block_services ~l2_chain_id
+let register_dynamic ~root_dir ~path dir_of_path =
+  Tezos_rpc.Directory.register_dynamic_directory root_dir path dir_of_path
+
+(** Builds the static part of the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
+let build_block_static_directory ~l2_chain_id
+    (module Backend : Tezlink_backend_sig.S) =
+  let open Lwt_result_syntax in
+  Tezos_rpc.Directory.empty
+  |> register_with_conversion
+       ~service:Imported_services.current_level
+       ~impl:(fun {block; chain} query () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.current_level chain block ~offset:query.offset)
+       ~convert_output:Protocol_types.Level.convert
+  |> register
+       ~service:Imported_services.protocols
+       ~impl:(fun {block; chain} _query () ->
+         let*? `Main = check_chain chain in
+         let*? _block = check_block block in
+         protocols ())
+  |> register_with_conversion
+       ~service:Imported_services.contract_info
+       ~impl:(fun ({block; chain}, contract) _query () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let* balance = Backend.balance chain block contract in
+         let* counter = Backend.counter chain block contract in
+         return (balance, counter))
+       ~convert_output:Protocol_types.Contract.make_info
+  |> register
+       ~service:Imported_services.balance
+       ~impl:(fun ({chain; block}, contract) _ _ ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.balance chain block contract)
+  |> register
+       ~service:Imported_services.get_storage_normalized
+         (* TODO: #7995
+            Take unparsing_mode argument into account *)
+       ~impl:(fun ({chain; block}, contract) () _unparsing_mode ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.get_storage chain block contract)
+  |> register
+       ~service:Imported_services.manager_key
+       ~impl:(fun ({chain; block}, contract) _ _ ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.manager_key chain block contract)
+  |> register_with_conversion
+       ~service:Imported_services.counter
+       ~impl:(fun ({block; chain}, contract) () () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.counter chain block contract)
+       ~convert_output:Protocol_types.Counter.of_z
+  |> register
+       ~service:Imported_services.constants
+       ~impl:(fun {block; chain} () () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.constants chain block)
+  |> register_with_conversion
+       ~service:Imported_services.header
+       ~impl:(fun {chain; block} () () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let* tezlink_block = Backend.block chain block in
+         Lwt_result_syntax.return (tezlink_block, chain))
+       ~convert_output:
+         (Protocol_types.Block_header.tezlink_block_to_block_header
+            ~l2_chain_id)
+  |> opt_register_with_conversion
+       ~service:Imported_services.hash
+       ~impl:(fun {block; chain} () () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.block_hash chain block)
+       ~convert_output:Protocol_types.ethereum_to_tezos_block_hash
+  |> register
+       ~service:Adaptive_issuance_services.expected_issuance
+       ~impl:(fun _ () () ->
+         (* The mock assumes we stay in cycle 0 for now *)
+         Lwt.return @@ Adaptive_issuance_services.dummy_rewards Int32.zero)
+  |> register
+     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
+     (* We need a proper implementation *)
+       ~service:Imported_services.simulate_operation
+       ~impl:(fun
+           {block; chain}
+           _param
+           ( _blocks_before_activation,
+             operation,
+             _chain_id,
+             _operation_inclusion_latency )
+         ->
+         let*? _chain = check_chain chain in
+         let*? _block = check_block block in
+         let op = operation.protocol_data in
+         let*? mock_result = Mock.Operation_metadata.operation_metadata op in
+         return (op, mock_result))
+
+(** We currently support a single target protocol version but we need to handle early blocks (blocks at
+    levels 0 and 1) specifically because TzKT expects the `protocol` and `next_protocol` fields of the
+    block headers and block metadata at these levels to indicate the hashes of the genesis protocols.
+    Patching these fields is unfortunately not doable from within the implementation of the services
+    because these fields are added in the output encodings of the services. For this reason, the services
+    for which a special treatment of early blocks is needed are registered dynamically. *)
+let register_dynamic_block_services ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) base_dir =
   let open Lwt_result_syntax in
-  let dir =
-    Tezos_rpc.Directory.empty
-    |> register_with_conversion
-         ~service:Imported_services.current_level
-         ~impl:(fun {block; chain} query () ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           Backend.current_level chain block ~offset:query.offset)
-         ~convert_output:Protocol_types.Level.convert
-    |> register
-         ~service:Imported_services.protocols
-         ~impl:(fun {block; chain} _query () ->
-           let*? `Main = check_chain chain in
-           let*? _block = check_block block in
-           protocols ())
-    |> register_with_conversion
-         ~service:Imported_services.contract_info
-         ~impl:(fun ({block; chain}, contract) _query () ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           let* balance = Backend.balance chain block contract in
-           let* counter = Backend.counter chain block contract in
-           return (balance, counter))
-         ~convert_output:Protocol_types.Contract.make_info
-    |> register
-         ~service:Imported_services.balance
-         ~impl:(fun ({chain; block}, contract) _ _ ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           Backend.balance chain block contract)
-    |> register
-         ~service:Imported_services.get_storage_normalized
-           (* TODO: #7995
-              Take unparsing_mode argument into account *)
-         ~impl:(fun ({chain; block}, contract) () _unparsing_mode ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           Backend.get_storage chain block contract)
-    |> register
-         ~service:Imported_services.manager_key
-         ~impl:(fun ({chain; block}, contract) _ _ ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           Backend.manager_key chain block contract)
-    |> register_with_conversion
-         ~service:Imported_services.counter
-         ~impl:(fun ({block; chain}, contract) () () ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           Backend.counter chain block contract)
-         ~convert_output:Protocol_types.Counter.of_z
-    |> register
-         ~service:Imported_services.constants
-         ~impl:(fun {block; chain} () () ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           Backend.constants chain block)
-    |> register_with_conversion
-         ~service:Imported_services.header
-         ~impl:(fun {chain; block} () () ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           let* tezlink_block = Backend.block chain block in
-           Lwt_result_syntax.return (tezlink_block, chain))
-         ~convert_output:
-           (Protocol_types.Block_header.tezlink_block_to_block_header
-              ~l2_chain_id)
-    |> opt_register_with_conversion
-         ~service:Imported_services.hash
-         ~impl:(fun {block; chain} () () ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           Backend.block_hash chain block)
-         ~convert_output:Protocol_types.ethereum_to_tezos_block_hash
-    |> register
-         ~service:Adaptive_issuance_services.expected_issuance
-         ~impl:(fun _ () () ->
-           (* The mock assumes we stay in cycle 0 for now *)
-           Lwt.return @@ Adaptive_issuance_services.dummy_rewards Int32.zero)
-    |> register
-       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
-       (* We need a proper implementation *)
-         ~service:Imported_services.simulate_operation
-         ~impl:(fun
-             {block; chain}
-             _param
-             ( _blocks_before_activation,
-               operation,
-               _chain_id,
-               _operation_inclusion_latency )
-           ->
-           let*? _chain = check_chain chain in
-           let*? _block = check_block block in
-           let op = operation.protocol_data in
-           let*? mock_result = Mock.Operation_metadata.operation_metadata op in
-           return (op, mock_result))
+  let static_dir = build_block_static_directory ~l2_chain_id (module Backend) in
+  let dynamic_dir_current_proto =
+    static_dir
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7993 *)
     (* RPCs at directory level doesn't appear properly in the describe RPC *)
     |> register_with_conversion
@@ -816,12 +831,17 @@ let register_block_services ~l2_chain_id
          ~convert_output:
            (Protocol_types.Block.tezlink_block_to_block_info ~l2_chain_id)
   in
-  Tezos_rpc.Directory.prefix
-    block_directory_path
-    (Tezos_rpc.Directory.map
-       (fun (((), chain), block) -> make_env chain block)
-       dir)
-  |> Tezos_rpc.Directory.merge base_dir
+  let dynamic_dir =
+    register_dynamic
+      ~root_dir:Tezos_rpc.Directory.empty
+      ~path:block_directory_path
+      (fun (((), _chain), _block) ->
+        Lwt.return
+        @@ Tezos_rpc.Directory.map
+             (fun (((), chain), block) -> make_env chain block)
+             dynamic_dir_current_proto)
+  in
+  Tezos_rpc.Directory.merge base_dir dynamic_dir
 
 let register_chain_services ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) base_dir =
@@ -878,7 +898,7 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
 let build_dir ~l2_chain_id backend =
   let (module Backend : Tezlink_backend_sig.S) = backend in
   Tezos_rpc.Directory.empty
-  |> register_block_services ~l2_chain_id backend
+  |> register_dynamic_block_services ~l2_chain_id backend
   |> register_chain_services ~l2_chain_id backend
   |> register_with_conversion
        ~service:Imported_services.bootstrapped

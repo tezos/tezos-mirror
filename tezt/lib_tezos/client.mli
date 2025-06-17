@@ -271,12 +271,13 @@ module Spawn : sig
     JSON.t Runnable.process
 end
 
-(** Run [octez-client rpc list]. *)
-val rpc_list : ?endpoint:endpoint -> ?hooks:Process.hooks -> t -> string Lwt.t
+(** Run [octez-client rpc list <url>]. *)
+val rpc_list :
+  ?endpoint:endpoint -> ?hooks:Process.hooks -> ?url:string -> t -> string Lwt.t
 
 (** Same as [rpc_list], but do not wait for the process to exit. *)
 val spawn_rpc_list :
-  ?endpoint:endpoint -> ?hooks:Process.hooks -> t -> Process.t
+  ?endpoint:endpoint -> ?hooks:Process.hooks -> ?url:string -> t -> Process.t
 
 (** Run [octez-client rpc schema]. *)
 val rpc_schema :

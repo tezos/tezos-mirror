@@ -24,48 +24,9 @@ Available services:
   - GET /health_check
       Assess the health of the RPC server 
   + tezlink/
-    + chains/<chain_id>/
-      + blocks/<block_id>/
-        + context/
-          - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/constants
-              All constants 
-          + contracts/<contract_id>/
-            - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/balance
-                The spendable balance of a contract (in mutez), also known as
-                liquid balance. Corresponds to tez owned by the contract that
-                are neither staked, nor in unstaked requests, nor in frozen
-                bonds. Identical to the 'spendable' RPC. 
-            - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/counter
-                Access the counter of a contract, if any. 
-            - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/manager_key
-                Access the manager of an implicit contract. 
-            - POST /tezlink/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/storage/normalized
-                Access the data of the contract and normalize it using the
-                requested unparsing mode. 
-          - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance
-              Returns the expected issued tez for the provided block and the
-              next 'consensus_rights_delay' cycles (in mutez) 
-        - GET /tezlink/chains/<chain_id>/blocks/<block_id>/hash
-            The block's hash, its unique identifier. 
-        - GET /tezlink/chains/<chain_id>/blocks/<block_id>/header
-            The whole block header. 
-        - GET /tezlink/chains/<chain_id>/blocks/<block_id>/helpers/current_level
-            Returns the level of the interrogated block, or the one of a
-            block located `offset` blocks after it in the chain. For
-            instance, the next block if `offset` is 1. The offset cannot be
-            negative. 
-        - POST /tezlink/chains/<chain_id>/blocks/<block_id>/helpers/scripts/simulate_operation
-            Simulate running an operation at some future moment (based on the
-            number of blocks given in the `latency` argument), and return the
-            operation application result. The result is the same as
-            run_operation except for the consumed gas, which depends on the
-            contents of the cache at that future moment. This RPC estimates
-            future gas consumption by trying to predict the state of the
-            cache using some heuristics. 
-        - GET /tezlink/chains/<chain_id>/blocks/<block_id>/protocols
-            Current and next protocol. 
-      - GET /tezlink/chains/<chain_id>/chain_id
-          The chain unique identifier. 
+    - /tezlink/chains/<chain_id>/blocks/<block_id> <dynamic>
+    - GET /tezlink/chains/<chain_id>/chain_id
+        The chain unique identifier. 
     - GET /tezlink/describe
         RPCs documentation and input/output schema 
     - GET /tezlink/monitor/bootstrapped
@@ -85,8 +46,6 @@ Available services:
 
 Dynamic parameter description:
   
-  <contract_id>
-      A contract identifier encoded in b58check. 
   <block_id>
       A block identifier. This can take one of the following
       values:
@@ -114,47 +73,9 @@ Warning:
 
 Available services:
   
-  + chains/<chain_id>/
-    + blocks/<block_id>/
-      + context/
-        - GET /chains/<chain_id>/blocks/<block_id>/context/constants
-            All constants 
-        + contracts/<contract_id>/
-          - GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/balance
-              The spendable balance of a contract (in mutez), also known as
-              liquid balance. Corresponds to tez owned by the contract that
-              are neither staked, nor in unstaked requests, nor in frozen
-              bonds. Identical to the 'spendable' RPC. 
-          - GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/counter
-              Access the counter of a contract, if any. 
-          - GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/manager_key
-              Access the manager of an implicit contract. 
-          - POST /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/storage/normalized
-              Access the data of the contract and normalize it using the
-              requested unparsing mode. 
-        - GET /chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance
-            Returns the expected issued tez for the provided block and the
-            next 'consensus_rights_delay' cycles (in mutez) 
-      - GET /chains/<chain_id>/blocks/<block_id>/hash
-          The block's hash, its unique identifier. 
-      - GET /chains/<chain_id>/blocks/<block_id>/header
-          The whole block header. 
-      - GET /chains/<chain_id>/blocks/<block_id>/helpers/current_level
-          Returns the level of the interrogated block, or the one of a block
-          located `offset` blocks after it in the chain. For instance, the
-          next block if `offset` is 1. The offset cannot be negative. 
-      - POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/simulate_operation
-          Simulate running an operation at some future moment (based on the
-          number of blocks given in the `latency` argument), and return the
-          operation application result. The result is the same as
-          run_operation except for the consumed gas, which depends on the
-          contents of the cache at that future moment. This RPC estimates
-          future gas consumption by trying to predict the state of the cache
-          using some heuristics. 
-      - GET /chains/<chain_id>/blocks/<block_id>/protocols
-          Current and next protocol. 
-    - GET /chains/<chain_id>/chain_id
-        The chain unique identifier. 
+  - /chains/<chain_id>/blocks/<block_id> <dynamic>
+  - GET /chains/<chain_id>/chain_id
+      The chain unique identifier. 
   - GET /monitor/bootstrapped
       Wait for the node to have synchronized its chain with a few peers
       (configured by the node's administrator), streaming head updates that
@@ -170,8 +91,6 @@ Available services:
 
 Dynamic parameter description:
   
-  <contract_id>
-      A contract identifier encoded in b58check. 
   <block_id>
       A block identifier. This can take one of the following
       values:
@@ -188,4 +107,54 @@ Dynamic parameter description:
   <chain_id>
       A chain identifier. This is either a chain hash in Base58Check notation
       or a one the predefined aliases: 'main', 'test'. 
+
+
+./octez-client rpc list chains/main/blocks/head
+
+Available services:
+  
+  + chains/main/blocks/head/
+    + context/
+      - GET /chains/main/blocks/head/context/constants
+          All constants 
+      + contracts/<contract_id>/
+        - GET /chains/main/blocks/head/context/contracts/<contract_id>/balance
+            The spendable balance of a contract (in mutez), also known as
+            liquid balance. Corresponds to tez owned by the contract that are
+            neither staked, nor in unstaked requests, nor in frozen bonds.
+            Identical to the 'spendable' RPC. 
+        - GET /chains/main/blocks/head/context/contracts/<contract_id>/counter
+            Access the counter of a contract, if any. 
+        - GET /chains/main/blocks/head/context/contracts/<contract_id>/manager_key
+            Access the manager of an implicit contract. 
+        - POST /chains/main/blocks/head/context/contracts/<contract_id>/storage/normalized
+            Access the data of the contract and normalize it using the
+            requested unparsing mode. 
+      - GET /chains/main/blocks/head/context/issuance/expected_issuance
+          Returns the expected issued tez for the provided block and the next
+          'consensus_rights_delay' cycles (in mutez) 
+    - GET /chains/main/blocks/head/hash
+        The block's hash, its unique identifier. 
+    - GET /chains/main/blocks/head/header
+        The whole block header. 
+    - GET /chains/main/blocks/head/helpers/current_level
+        Returns the level of the interrogated block, or the one of a block
+        located `offset` blocks after it in the chain. For instance, the next
+        block if `offset` is 1. The offset cannot be negative. 
+    - POST /chains/main/blocks/head/helpers/scripts/simulate_operation
+        Simulate running an operation at some future moment (based on the
+        number of blocks given in the `latency` argument), and return the
+        operation application result. The result is the same as run_operation
+        except for the consumed gas, which depends on the contents of the
+        cache at that future moment. This RPC estimates future gas
+        consumption by trying to predict the state of the cache using some
+        heuristics. 
+    - GET /chains/main/blocks/head/protocols
+        Current and next protocol. 
+
+
+Dynamic parameter description:
+  
+  <contract_id>
+      A contract identifier encoded in b58check. 
 
