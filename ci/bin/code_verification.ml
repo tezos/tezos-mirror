@@ -1247,6 +1247,7 @@ let jobs pipeline_type =
           ?storage
           ~image:Images.CI.test
           ~stage:Stages.test
+          ~timeout:(Minutes 10)
           ~rules:
             (make_rules
                ~changes:

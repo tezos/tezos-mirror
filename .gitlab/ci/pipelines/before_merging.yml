@@ -3513,7 +3513,7 @@ resto.unit:x86_64:
   - oc.build_x86_64-exp-dev-extra
   dependencies:
   - oc.docker:ci:amd64
-  timeout: 60 minutes
+  timeout: 10 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
@@ -3537,7 +3537,7 @@ resto.unit:arm64:
   - oc.build_arm64-exp-dev-extra
   dependencies:
   - oc.docker:ci:arm64
-  timeout: 60 minutes
+  timeout: 10 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
