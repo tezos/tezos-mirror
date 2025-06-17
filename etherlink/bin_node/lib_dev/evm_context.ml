@@ -1961,6 +1961,16 @@ module Handlers = struct
           conn
           ctxt
           blueprint_with_events
+    | Finalized_levels {l1_level; start_l2_level; end_l2_level} ->
+        protect @@ fun () ->
+        let ctxt = Worker.state self in
+        Evm_store.use ctxt.store @@ fun conn ->
+        State.store_finalized_levels
+          ctxt
+          conn
+          ~l1_level
+          ~start_l2_level
+          ~end_l2_level
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -1981,6 +1991,7 @@ module Handlers = struct
       | Patch_state _ -> Eq
       | Wasm_pvm_version -> Eq
       | Potential_observer_reorg _ -> Eq
+      | Finalized_levels _ -> Eq
   end
 
   let on_error (type a b) _self _st (req : (a, b) Request.t) (errs : b) :
@@ -2281,6 +2292,10 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
 let apply_blueprint ?events timestamp payload delayed_transactions =
   worker_wait_for_request
     (Apply_blueprint {events; timestamp; payload; delayed_transactions})
+
+let apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level =
+  worker_wait_for_request
+    (Finalized_levels {l1_level; start_l2_level; end_l2_level})
 
 let head_info () =
   let open Lwt_syntax in
