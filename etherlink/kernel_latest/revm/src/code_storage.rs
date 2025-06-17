@@ -97,4 +97,141 @@ impl CodeStorage {
             Ok(Bytecode::new())
         }
     }
+
+    #[cfg(test)]
+    pub fn decrement_code_usage(&self, host: &mut impl Runtime) -> Result<u64, Error> {
+        let number_reference = self.get_ref_count(host)?;
+        let number_reference = number_reference.saturating_sub(1u64);
+        self.set_ref_count(host, number_reference)?;
+        Ok(number_reference)
+    }
+
+    #[cfg(test)]
+    pub fn delete(host: &mut impl Runtime, code_hash: &B256) -> Result<(), Error> {
+        let code = Self::new(code_hash)?;
+        if code.exists(host)? {
+            let number_reference = code.decrement_code_usage(host)?;
+            // This was the last smart contract using this code
+            if number_reference == 0 {
+                host.store_delete(&code.path)?;
+            };
+        };
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{CodeStorage, REFERENCE_PATH};
+    use crate::storage_helpers::{concat, read_u64_le};
+
+    use revm::{
+        primitives::{alloy_primitives::KECCAK256_EMPTY, Bytes},
+        state::Bytecode,
+    };
+    use tezos_evm_runtime::runtime::MockKernelHost;
+
+    #[test]
+    fn test_empty_contract_hash_matches_default() {
+        let mut host = MockKernelHost::default();
+        let empty_code: Vec<u8> = vec![];
+
+        let found_code_hash = CodeStorage::add(&mut host, &empty_code)
+            .expect("Could not create code storage");
+
+        assert_eq!(found_code_hash, KECCAK256_EMPTY);
+    }
+
+    #[test]
+    fn test_get_code_matches_given() {
+        let mut host = MockKernelHost::default();
+        let code: Vec<u8> = (0..100).collect();
+        let code_hash =
+            CodeStorage::add(&mut host, &code).expect("Could not create code storage");
+        let code_storage =
+            CodeStorage::new(&code_hash).expect("Could not create code storage");
+        let found_code = code_storage
+            .get_code(&host)
+            .expect("Could not retrieve code");
+        assert_eq!(
+            found_code,
+            Bytecode::new_raw_checked(Bytes::from(code))
+                .expect("Bytecode should be decodable")
+        );
+    }
+
+    #[test]
+    fn test_code_ref_is_incremented() {
+        let mut host = MockKernelHost::default();
+        let code: Vec<u8> = (0..100).collect();
+        let code_hash =
+            CodeStorage::add(&mut host, &code).expect("Could not create code storage");
+        let code_storage =
+            CodeStorage::new(&code_hash).expect("Could not find code storage");
+        let ref_path = concat(&code_storage.path, &REFERENCE_PATH).unwrap();
+
+        let ref_count = read_u64_le(&host, &ref_path).expect("Reference count not found");
+        assert_eq!(ref_count, 1u64);
+
+        let second_code_hash =
+            CodeStorage::add(&mut host, &code).expect("Could not create code storage");
+
+        assert_eq!(second_code_hash, code_hash);
+
+        let ref_count = read_u64_le(&host, &ref_path).expect("Reference count not found");
+        assert_eq!(ref_count, 2u64);
+
+        let () = CodeStorage::delete(&mut host, &code_hash)
+            .expect("Could not delete code storage");
+
+        let ref_count = read_u64_le(&host, &ref_path).expect("Reference count not found");
+        assert_eq!(ref_count, 1u64);
+    }
+
+    #[test]
+    fn test_code_is_deleted() {
+        let mut host = MockKernelHost::default();
+
+        let code_storage =
+            CodeStorage::new(&KECCAK256_EMPTY).expect("Could not find code storage");
+
+        let exists = code_storage
+            .exists(&host)
+            .expect("Could not check if contract exists");
+
+        assert!(!exists, "code storage should not exist");
+
+        let code: Vec<u8> = vec![];
+        let _code_hash =
+            CodeStorage::add(&mut host, &code).expect("Could not create code storage");
+
+        let exists = code_storage
+            .exists(&host)
+            .expect("Could not check if contract exists");
+        assert!(exists, "code storage should exist");
+
+        let _code_hash =
+            CodeStorage::add(&mut host, &code).expect("Could not create code storage");
+
+        let exists = code_storage
+            .exists(&host)
+            .expect("Could not check if contract exists");
+        assert!(exists, "code storage should exist");
+
+        let () = CodeStorage::delete(&mut host, &KECCAK256_EMPTY)
+            .expect("Could not delete code storage");
+
+        let exists = code_storage
+            .exists(&host)
+            .expect("Could not check if contract exists");
+        assert!(exists, "code storage should exist");
+
+        let () = CodeStorage::delete(&mut host, &KECCAK256_EMPTY)
+            .expect("Could not delete code storage");
+
+        let exists = code_storage
+            .exists(&host)
+            .expect("Could not check if contract exist");
+        assert!(!exists, "code storage should not exists");
+    }
 }

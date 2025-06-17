@@ -14,6 +14,13 @@ pub fn concat(prefix: &impl Path, suffix: &impl Path) -> Result<OwnedPath, Error
     host_concat(prefix, suffix).map_err(|err| Error::Custom(err.to_string()))
 }
 
+#[cfg(test)]
+pub fn read_u64_le(host: &impl Runtime, path: &impl Path) -> Result<u64, RuntimeError> {
+    let mut bytes = [0; std::mem::size_of::<u64>()];
+    host.store_read_slice(path, 0, bytes.as_mut_slice())?;
+    Ok(u64::from_le_bytes(bytes))
+}
+
 pub fn read_u64_le_default(
     host: &impl Runtime,
     path: &impl Path,
