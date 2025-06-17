@@ -1609,15 +1609,13 @@ let find_command tree initial_arguments =
   let is_option s = is_short_option s || is_long_option s in
   let rec traverse tree arguments acc =
     match (tree, arguments) with
-    | ( ( TStop _ | TSeq _
-        | TNonTerminalSeq {stop = Some _; _}
-        | TPrefix {stop = Some _; _}
-        | TParam {stop = Some _; _} ),
-        ("-h" | "--help") :: _ ) -> (
-        match gather_commands tree with
-        | [] -> assert false
-        | [command] -> tzfail (Help (Some command))
-        | more -> tzfail (Unterminated_command (initial_arguments, more)))
+    | ( ( TStop c
+        | TSeq (c, _)
+        | TNonTerminalSeq {stop = Some c; _}
+        | TPrefix {stop = Some c; _}
+        | TParam {stop = Some c; _} ),
+        ("-h" | "--help") :: _ ) ->
+        tzfail (Help (Some c))
     | TStop c, [] -> return (c, empty_args_dict, initial_arguments)
     | TStop (Command {options; _} as command), remaining -> (
         let* args_dict, unparsed =
