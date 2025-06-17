@@ -56,7 +56,7 @@ teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
