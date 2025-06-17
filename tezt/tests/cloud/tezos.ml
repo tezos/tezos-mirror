@@ -5,15 +5,58 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ppx_profiler_env =
-  String_map.of_list [("PROFILING", "Debug"); ("PROFILING_BACKEND", "txt")]
+module Env = struct
+  type t = string String_map.t
 
-let may_add_profiling_to_env ~ppx_profiling =
-  if ppx_profiling then function
-    | None -> Some ppx_profiler_env
-    | Some env ->
-        Some (String_map.union (fun _ _ _ -> None) env ppx_profiler_env)
-  else Fun.id
+  let empty = String_map.empty
+
+  let add = String_map.add
+
+  let may_add cond var value env = if cond then add var value env else env
+
+  let memtrace_env enable filename env = may_add enable "MEMTRACE" filename env
+
+  let otel_env otel_endpoint service_name env =
+    match otel_endpoint with
+    | None -> env
+    | Some endpoint ->
+        add "OTEL" "true" env
+        |> add "OTEL_SERVICE_NAME" service_name
+        |> add "OTEL_EXPORTER_OTLP_ENDPOINT" endpoint
+
+  let disable_shard_validation_env enable env =
+    may_add
+      enable
+      Dal_node.disable_shard_validation_environment_variable
+      "yes"
+      env
+
+  let ignore_topics_env ignore_pkhs env =
+    match ignore_pkhs with
+    | Some (_ :: _) -> add Dal_node.ignore_topics_environment_variable "yes" env
+    | _ -> env
+
+  let ppx_profiler_env enable env =
+    env
+    |> may_add enable "PROFILING" "Debug"
+    |> may_add enable "PROFILING_BACKEND" "txt"
+
+  let initialize_env ~memtrace ~memtrace_output_filename
+      ~disable_shard_validation ~otel_endpoint ~service_name ~ignore_pkhs
+      ~ppx_profiling =
+    empty
+    |> memtrace_env memtrace memtrace_output_filename
+    |> otel_env otel_endpoint service_name
+    |> disable_shard_validation_env disable_shard_validation
+    |> ignore_topics_env ignore_pkhs
+    |> ppx_profiler_env ppx_profiling
+end
+
+let may_add_profiling_to_env ~ppx_profiling = function
+  | None ->
+      if ppx_profiling then Some (Env.ppx_profiler_env ppx_profiling Env.empty)
+      else None
+  | Some env -> Some (Env.ppx_profiler_env ppx_profiling env)
 
 let create_dir ?runner dir =
   let* () = Process.spawn ?runner "rm" ["-rf"; dir] |> Process.check in
@@ -243,51 +286,19 @@ module Dal_node = struct
     let run ?otel ?(memtrace = false) ?event_level
         ?(disable_shard_validation = false) ?ignore_pkhs
         ?(ppx_profiling = false) dal_node =
-      let name = name dal_node in
-      let filename = Format.asprintf "%s/%s-trace.ctf" Path.tmp_dir name in
-      let env =
-        let memtrace_env =
-          if memtrace then String_map.singleton "MEMTRACE" filename
-          else String_map.empty
-        in
-        let otel_env =
-          match otel with
-          | None -> String_map.empty
-          | Some endpoint ->
-              [
-                ("OTEL", "true");
-                ("OTEL_SERVICE_NAME", name);
-                ("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint);
-              ]
-              |> List.to_seq |> String_map.of_seq
-        in
-        let disable_shard_validation_env =
-          if disable_shard_validation then
-            String_map.singleton
-              Dal_node.disable_shard_validation_environment_variable
-              "yes"
-          else String_map.empty
-        in
-        let ignore_topics_env =
-          match ignore_pkhs with
-          | Some (_ :: _) ->
-              String_map.singleton
-                Dal_node.ignore_topics_environment_variable
-                "yes"
-          | _ -> String_map.empty
-        in
-        String_map.union
-          (fun _ _ _ -> None)
-          (String_map.union (fun _ _ _ -> None) otel_env memtrace_env)
-          (String_map.union
-             (fun _ _ _ -> None)
-             disable_shard_validation_env
-             ignore_topics_env)
+      let service_name = name dal_node in
+      let memtrace_output_filename =
+        Format.asprintf "%s/%s-trace.ctf" Path.tmp_dir service_name
       in
       let env =
-        if ppx_profiling then
-          String_map.union (fun _ _ _ -> None) env ppx_profiler_env
-        else env
+        Env.initialize_env
+          ~memtrace
+          ~memtrace_output_filename
+          ~disable_shard_validation
+          ~otel_endpoint:otel
+          ~service_name
+          ~ignore_pkhs
+          ~ppx_profiling
       in
       let* () = run ~env ?event_level dal_node in
       (* Update the state in the service manager *)
@@ -301,8 +312,8 @@ module Dal_node = struct
                in deployment, unless errors are fatal *)
             Log.error
               "Cannot update service state %s: no pid. Is the program running ?"
-              name
-        | Some pid -> Cloud.notify_service_start ~name ~pid
+              service_name
+        | Some pid -> Cloud.notify_service_start ~name:service_name ~pid
       in
       Lwt.return_unit
 
