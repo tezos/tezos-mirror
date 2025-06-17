@@ -14,6 +14,36 @@ that may be breaking.
 
 In the particular case of RPC changes, you may consult complementary information on :ref:`RPC versioning <rpc_versioning>`, covering how new versions are introduced, the deprecation policy, and a concrete calendar of RPCs planned to be removed.
 
+Denunciation operations
+-----------------------
+
+Protocol S adds new operations and changes the encoding of some existing operations, for instance by adding new fields.
+These changes are related to the support for tz4 BLS addresses and their aggregated signatures.
+
+Backward compatibility
+~~~~~~~~~~~~~~~~~~~~~~
+
+Most of the changes in the encodings of existing operations are either purely added operations (e.g. ``update_companion_key``) or optional fields that should not break (e.g., for operations ``reveal`` and ``update_consensus_key``).
+
+However, tool providers who do not use encodings but rather :doc:`p2p message format <../shell/p2p_api>`, may experience some issues.
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Starting in protocol S, the ``Double_preattestation_evidence`` and
+``Double_attestation_evidence`` operations are replaced with a
+new ``Double_consensus_operation_evidence`` operation, 
+in order to enable denunciations of aggregated consensus operations. This new
+operation contains a denounced slot and two denounced consensus
+operations. For the evidence to be valid, the denounced operations
+must both be preattestations (each one may be aggregated or not) or
+both be attestations. Moreover, both must involve the denounced
+slot, that is, be either a standalone operation for this slot or an
+aggregate whose committee includes this slot.
+The receipts for these operations have also been reworked, see :ref:`seoul_receipts_changes`.
+
+All existing tz4 addresses are being unrevealed when protocol S is adopted, and they must provide a proof of possession to be revealed again, see :ref:`seoul_breaking_changes`.
+
 Attestations
 ------------
 

@@ -49,6 +49,8 @@ Michelson
 Gas improvements
 ----------------
 
+.. _seoul_breaking_changes:
+
 Breaking Changes
 ----------------
 
@@ -97,6 +99,8 @@ Operations
   valid, ``attestation`` must be either a standalone attestation for
   ``consensus_slot``, or an attestations aggregate whose committee
   includes ``consensus_slot``. (MR :gl:`!18073`)
+
+.. _seoul_receipts_changes:
 
 Operation receipts
 ------------------
