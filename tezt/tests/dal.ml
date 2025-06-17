@@ -249,7 +249,7 @@ let wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index =
         in
         let () = incr count in
         let () =
-          Log.info
+          Log.debug
             "Dal node %s has received %d/%d shards"
             (Dal_node.name dal_node)
             !count
@@ -6028,7 +6028,7 @@ module Amplification = struct
         wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index
       in
       let () =
-        Log.info "Dal node %s has received its shards" (Dal_node.name dal_node)
+        Log.debug "Dal node %s has received its shards" (Dal_node.name dal_node)
       in
       unit
     in
@@ -6073,7 +6073,7 @@ module Amplification = struct
       unit
     in
 
-    (* Wait until everyone has reveived the needed shards (first the
+    (* Wait until everyone has received the needed shards (first the
        non-banned attesters, then the observer, and finally the banned
        attesters). *)
     let wait_slot ~published_level ~slot_index =
