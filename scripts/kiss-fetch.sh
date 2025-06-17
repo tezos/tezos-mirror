@@ -28,6 +28,8 @@ mangled_url="${KISSCACHE}/api/v1/fetch?url=${encoded_url}"
 touch /tmp/kiss.log
 chmod a+rw /tmp/kiss.log
 
+KISSFAIL=0
+
 # shellcheck disable=SC2086
 if curl --output /dev/null --silent --head --fail "$KISSCACHE"; then
   # Use curl to fetch the mangled URL
@@ -38,11 +40,15 @@ if curl --output /dev/null --silent --head --fail "$KISSCACHE"; then
     echo "Kisscache hit: curl -L $arguments $mangled_url" >> /tmp/kiss.log
   else
     echo "Kisscache error: curl -L $arguments $mangled_url" >> /tmp/kiss.log
-    echo "Kisscache error: curl -L $arguments $mangled_url"
-    exit 1
+    KISSFAIL=1
   fi
 else
+  KISSFAIL=1
+fi
+
+if [ $KISSFAIL = 1 ]; then
   # Use curl to fetch the original URL
+  # shellcheck disable=SC2086
   curl -L $arguments $original_url
 
   # shellcheck disable=SC2181
@@ -50,7 +56,7 @@ else
     echo "Direct download succeded $original_url" >> /tmp/kiss.log
   else
     echo "Direct download failed $original_url" >> /tmp/kiss.log
-    echo "Direct download failed $original_url"
+    tail -n 10 /tmp/kiss.log 1>&2
     exit 1
   fi
 fi

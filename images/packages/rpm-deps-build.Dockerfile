@@ -18,27 +18,22 @@ RUN dnf -y update &&\
 
 WORKDIR /root/tezos
 COPY ./scripts/version.sh ./scripts/version.sh
-COPY ./scripts/pkg-common/install_opam.sh ./scripts/pkg-common/install_opam.sh
 COPY scripts/ci/bin_packages_rpm_dependencies.sh \
   ./scripts/ci/bin_packages_rpm_dependencies.sh
+COPY images/scripts/install_sccache_static.sh \
+     images/scripts/install_datadog_static.sh \
+     images/scripts/install_opam_static.sh \
+     scripts/kiss-fetch.sh \
+     scripts/kiss-logs.sh \
+     /tmp/
+
 RUN scripts/ci/bin_packages_rpm_dependencies.sh
 
 # we trust sw distributors
 # We install sccache as a static binary because at the moment of writing
-# the package sccache is not available on ubuntu jammy
-#hadolint ignore=DL3008,DL3009
-RUN ARCH=$(uname -m) && \
-    case "$ARCH" in \
-        x86_64) export PLATFORM="x64" ;; \
-        aarch64) export PLATFORM="arm64" ;; \
-        *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
-    esac && \
-    curl  -L --output sccache.tgz "https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-$ARCH-unknown-linux-musl.tar.gz" && \
-    tar zxvf sccache.tgz && \
-    cp "sccache-v0.8.1-$ARCH-unknown-linux-musl/sccache" /usr/local/bin/sccache && \
-    rm -Rf sccache* && \
-    curl -L --fail "https://github.com/DataDog/datadog-ci/releases/download/v3.4.0/datadog-ci_linux-$PLATFORM" --output "/usr/local/bin/datadog-ci" && \
-    chmod +x /usr/local/bin/datadog-ci
+RUN /tmp/install_sccache_static.sh && \
+    /tmp/install_datadog_static.sh && \
+    /tmp/install_opam_static.sh
 
 #hadolint ignore=SC2154
 RUN . ./scripts/version.sh && \
@@ -61,7 +56,13 @@ COPY --link opam /root/tezos/
 
 WORKDIR /root/tezos
 
+ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
+ENV OPAMFETCH="/tmp/kiss-fetch.sh"
+
 #hadolint ignore=SC2154, SC1091
 RUN eval $(opam env) && \
     . "/root/.cargo/env" && \
-    make build-deps
+    make build-deps && \
+# print kisscache stats
+    /tmp/kiss-logs.sh /tmp/kiss.log \
+    && rm -f /tmp/kiss.log
