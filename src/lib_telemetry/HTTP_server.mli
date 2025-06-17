@@ -15,7 +15,8 @@
 
     This function intercepts RPC requests, creates spans with appropriate
     attributes (method, path, status code), and measures the duration of request
-    processing.
+    processing. It also parses the header [traceparent] when present to allow
+    traces across different services.
 
     @param port The port number on which the RPC server is listening
     @param server The Resto RPC server instance

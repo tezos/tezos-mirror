@@ -84,9 +84,20 @@ let resto_callback ~port server ((io, _conn) as iconn) (req : Cohttp.Request.t)
   let open Lwt_syntax in
   let meth = Cohttp.Code.string_of_method req.meth in
   let trace_name = String.concat " " [meth; req.resource] in
+  let traceparent =
+    Cohttp.Header.get req.headers Opentelemetry.Trace_context.Traceparent.name
+    |> Option.map Opentelemetry.Trace_context.Traceparent.of_value
+  in
+  let trace_id, parent =
+    match traceparent with
+    | None | Some (Error _) -> (None, None)
+    | Some (Ok (tid, sid)) -> (Some tid, Some sid)
+  in
   Opentelemetry_lwt.Trace.with_
     ~kind:Span_kind_server
     ~service_name:"HTTP_server"
+    ?trace_id
+    ?parent
     trace_name
   @@ fun scope ->
   Opentelemetry.Scope.add_attrs scope (attributes ~port ~meth io req) ;
