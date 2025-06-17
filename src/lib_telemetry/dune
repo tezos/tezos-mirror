@@ -11,7 +11,8 @@
   opentelemetry-lwt
   octez-libs.resto
   octez-libs.rpc-http
-  octez-libs.rpc-http-server)
+  octez-libs.rpc-http-server
+  octez-libs.tezos-workers)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

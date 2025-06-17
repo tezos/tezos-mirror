@@ -1832,7 +1832,7 @@ module State = struct
           return_none
 end
 
-module Worker = Worker.MakeSingle (Name) (Request) (Types)
+module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 

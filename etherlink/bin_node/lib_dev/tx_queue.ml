@@ -6,8 +6,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_workers
-
 type parameters = {config : Configuration.tx_queue; keep_alive : bool}
 
 type queue_variant = [`Accepted | `Refused]
@@ -408,6 +406,20 @@ module Request = struct
       }
         -> (unit, tztrace) t
 
+  let name (type a b) (t : (a, b) t) =
+    match t with
+    | Inject _ -> "Inject"
+    | Find _ -> "Find"
+    | Nonce _ -> "Nonce"
+    | Tick _ -> "Tick"
+    | Clear -> "Clear"
+    | Lock_transactions -> "Lock_transactions"
+    | Unlock_transactions -> "Unlock_transactions"
+    | Is_locked -> "Is_locked"
+    | Content -> "Content"
+    | Pop_transactions _ -> "Pop_transactions"
+    | Confirm_transactions _ -> "Confirm_transactions"
+
   type view = View : _ t -> view
 
   let view req = View req
@@ -536,7 +548,7 @@ module Request = struct
     | Confirm_transactions _ -> fprintf fmt "Confirming transactions"
 end
 
-module Worker = Worker.MakeSingle (Name) (Request) (Types)
+module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 

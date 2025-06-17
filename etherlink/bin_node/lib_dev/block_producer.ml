@@ -83,6 +83,9 @@ module Request = struct
         (bool * Time.Protocol.t * bool)
         -> ([`Block_produced of int | `No_block], tztrace) t
 
+  let name : type a b. (a, b) t -> string = function
+    | Produce_block _ -> "Produce_block"
+
   type view = View : _ t -> view
 
   let view (req : _ t) = View req
@@ -110,7 +113,7 @@ module Request = struct
   let pp _ppf (View _) = ()
 end
 
-module Worker = Worker.MakeSingle (Name) (Request) (Types)
+module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 

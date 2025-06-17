@@ -4529,6 +4529,7 @@ let octez_telemetry =
         resto;
         octez_rpc_http;
         octez_rpc_http_server;
+        octez_workers;
       ]
 
 let _bip39_generator =

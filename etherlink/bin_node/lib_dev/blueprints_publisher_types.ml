@@ -17,6 +17,11 @@ module Request = struct
     | Publish : {level : Z.t; payload : payload} -> (unit, error trace) t
     | New_rollup_node_block : int32 -> (unit, error trace) t
 
+  let name (type a b) (t : (a, b) t) =
+    match t with
+    | Publish _ -> "Publish"
+    | New_rollup_node_block _ -> "New_rollup_node_block"
+
   type view = View : _ t -> view
 
   let view req = View req
