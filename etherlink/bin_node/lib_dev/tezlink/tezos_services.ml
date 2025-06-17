@@ -707,7 +707,7 @@ let check_block =
 let register_dynamic ~root_dir ~path dir_of_path =
   Tezos_rpc.Directory.register_dynamic_directory root_dir path dir_of_path
 
-(** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
+(** Builds the static part of the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
 let build_block_static_directory ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) =
   let open Lwt_result_syntax in
@@ -807,6 +807,12 @@ let build_block_static_directory ~l2_chain_id
          let*? mock_result = Mock.Operation_metadata.operation_metadata op in
          return (op, mock_result))
 
+(** We currently support a single target protocol version but we need to handle early blocks (blocks at
+    levels 0 and 1) specifically because TzKT expects the `protocol` and `next_protocol` fields of the
+    block headers and block metadata at these levels to indicate the hashes of the genesis protocols.
+    Patching these fields is unfortunately not doable from within the implementation of the services
+    because these fields are added in the output encodings of the services. For this reason, the services
+    for which a special treatment of early blocks is needed are registered dynamically. *)
 let register_dynamic_block_services ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) base_dir =
   let open Lwt_result_syntax in
