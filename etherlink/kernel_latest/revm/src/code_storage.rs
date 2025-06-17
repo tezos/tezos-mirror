@@ -92,8 +92,11 @@ impl CodeStorage {
             Bytecode::new_raw_checked(Bytes::from(host.store_read_all(&code_path)?))
                 .map_err(|err| Error::Custom(err.to_string()))
         } else {
-            // TODO: Double check that legacy code with one STOP instruction
-            // is ok here.
+            // `Bytecode::new()` creates a new legacy analyzed bytecode with exactly
+            // one STOP (`0x00`) opcode.
+            // This is a bit counter-intuitive as if the code doesn't exist we would
+            // expect the code to be empty to match the code hash (KECCAK_EMPTY).
+            // This is an internal mechanism of REVM needed for `LegacyAnalyzedBytecode`.
             Ok(Bytecode::new())
         }
     }
