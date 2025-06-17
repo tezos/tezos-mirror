@@ -509,7 +509,7 @@ module Config_file = struct
     in
     JSON.put ("network", network) old_config
 
-  let set_sandbox_network_with_dal_config
+  let set_network_with_dal_config
       (dal_config : Tezos_crypto_dal.Cryptobox.Config.t) old_config =
     let dal_config_json =
       JSON.annotate
@@ -524,11 +524,17 @@ module Config_file = struct
           ])
     in
     let network =
-      sandbox_network_config
-      |> JSON.annotate ~origin:"set_sandbox_network_with_dal_config"
+      JSON.unannotate JSON.(old_config |-> "network")
+      |> JSON.annotate ~origin:"set_network_with_dal_config"
       |> JSON.put ("dal_config", dal_config_json)
     in
     JSON.put ("network", network) old_config
+
+  let set_sandbox_network old_config =
+    JSON.put
+      ( "network",
+        JSON.annotate ~origin:"set_sandbox_network" sandbox_network_config )
+      old_config
 
   let set_ghostnet_sandbox_network ?user_activated_upgrades () old_config =
     let may_patch_user_activated_upgrades =
@@ -541,6 +547,18 @@ module Config_file = struct
         JSON.annotate
           ~origin:"set_ghostnet_sandbox_network"
           ghostnet_sandbox_network_config
+        |> may_patch_user_activated_upgrades )
+      old_config
+
+  let set_ghostnet_network ?user_activated_upgrades () old_config =
+    let may_patch_user_activated_upgrades =
+      match user_activated_upgrades with
+      | None -> Fun.id
+      | Some upgrade_points -> put_user_activated_upgrades upgrade_points
+    in
+    JSON.put
+      ( "network",
+        JSON.annotate ~origin:"set_ghostnet_network" ghostnet_network_config
         |> may_patch_user_activated_upgrades )
       old_config
 end

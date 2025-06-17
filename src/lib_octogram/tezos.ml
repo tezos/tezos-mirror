@@ -433,7 +433,7 @@ module Start_octez_node = struct
     in
     Node.Config_file.update
       node
-      (Node.Config_file.set_sandbox_network_with_dal_config config)
+      (Node.Config_file.set_network_with_dal_config config)
 
   let setup_octez_node ~network ~sync_threshold ~path_node ~metrics_port
       ~rpc_port ~net_port ~peers ?name ?snapshot ?dal_cryptobox_parameters () =

@@ -292,13 +292,17 @@ module Node = struct
             in
             let* () = Node.config_init node [Cors_origin "*"] in
             let* () =
+              Node.Config_file.update
+                node
+                (Node.Config_file.set_ghostnet_sandbox_network ())
+            in
+            let* () =
               match dal_config with
               | None -> Lwt.return_unit
               | Some config ->
                   Node.Config_file.update
                     node
-                    (Node.Config_file.set_sandbox_network_with_dal_config
-                       config)
+                    (Node.Config_file.set_network_with_dal_config config)
             in
             let* () = may_copy_node_identity_file agent node identity_file in
             let* () =

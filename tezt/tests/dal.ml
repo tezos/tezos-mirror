@@ -465,10 +465,11 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
   let config : Cryptobox.Config.t =
     {activated = true; bootstrap_peers = dal_bootstrap_peers}
   in
+  let* () = Node.Config_file.update node Node.Config_file.set_sandbox_network in
   let* () =
     Node.Config_file.update
       node
-      (Node.Config_file.set_sandbox_network_with_dal_config config)
+      (Node.Config_file.set_network_with_dal_config config)
   in
   let* () = Node.run node ~event_sections_levels node_arguments in
   let* () = Node.wait_for_ready node in
@@ -2312,9 +2313,12 @@ let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
      DAL is not activated. *)
   let config : Cryptobox.Config.t = {activated = true; bootstrap_peers = []} in
   let* () =
+    Node.Config_file.update node2 Node.Config_file.set_sandbox_network
+  in
+  let* () =
     Node.Config_file.update
       node2
-      (Node.Config_file.set_sandbox_network_with_dal_config config)
+      (Node.Config_file.set_network_with_dal_config config)
   in
   let* () = Node.snapshot_import node2 file in
   unit
