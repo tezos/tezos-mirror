@@ -21,6 +21,11 @@ let job_datadog_pipeline_trace : tezos_job =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
+let job_build_amd64 ?expire_in () = Common.job_build ?expire_in ~arch:Amd64 ()
+
+let job_build_arm64 ?expire_in () =
+  Common.job_build ?expire_in ~arch:Arm64 ~storage:Ramfs ()
+
 let job_gitlab_release =
   job
     ~__POS__
@@ -29,10 +34,7 @@ let job_gitlab_release =
     ~interruptible:false
     ~dependencies:
       (Dependent
-         [
-           Artifacts (Common.job_build ~arch:Amd64 ());
-           Artifacts (Common.job_build ~arch:Arm64 ~storage:Ramfs ());
-         ])
+         [Artifacts (job_build_amd64 ()); Artifacts (job_build_arm64 ())])
     ~name:"gitlab:release"
     ["./teztale/scripts/releases/create_gitlab_release.sh"]
 
@@ -81,8 +83,8 @@ let job_release_page ~test () =
 let jobs ~test () =
   (if test then [] else [job_datadog_pipeline_trace])
   @ [
-      Common.job_build ~expire_in:Never ~arch:Amd64 ();
-      Common.job_build ~expire_in:Never ~arch:Arm64 ~storage:Ramfs ();
+      job_build_amd64 ~expire_in:Never ();
+      job_build_arm64 ~expire_in:Never ();
       job_gitlab_release;
       job_release_page ~test ();
     ]
