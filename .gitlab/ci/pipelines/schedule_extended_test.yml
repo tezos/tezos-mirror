@@ -1118,6 +1118,8 @@ build-layer1-profiling:
   stage: build
   tags:
   - gcp_very_high_cpu
+  rules:
+  - when: always
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes

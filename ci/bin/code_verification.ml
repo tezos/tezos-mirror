@@ -874,7 +874,9 @@ let jobs pipeline_type =
       job_build_teztale ~arch:Arm64 ~storage:Ramfs ();
       job_evm_static_x86_64_experimental;
       job_evm_static_arm64_experimental;
-      job_build_layer1_profiling ();
+      job_build_layer1_profiling
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ();
     ]
     @ Option.to_list job_select_tezts
     @ bin_packages_jobs
