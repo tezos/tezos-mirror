@@ -261,6 +261,7 @@ let changeset_octez =
     List.map
       (fun path -> if Sys.is_directory path then path ^ "/**/*" else path)
       (read_lines_from_file "script-inputs/octez-source-content")
+    |> List.filter (fun f -> f <> "CHANGES.rst" && f <> "LICENSES/**/*")
     |> Changeset.make
   in
   Changeset.(

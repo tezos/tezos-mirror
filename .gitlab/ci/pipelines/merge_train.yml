@@ -542,8 +542,6 @@ oc.build:static-x86_64-linux-binaries:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -642,8 +640,6 @@ oc.build:static-arm64-linux-binaries:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -738,8 +734,6 @@ oc.build_x86_64-released:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -854,8 +848,6 @@ oc.build_x86_64-exp-dev-extra:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1121,8 +1113,6 @@ oc.build_kernels:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1202,8 +1192,6 @@ oc.build_dsn_node:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1277,8 +1265,6 @@ oc.tezt:fetch-records:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1611,8 +1597,6 @@ build-layer1-profiling:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1686,8 +1670,6 @@ select_tezts:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -2076,8 +2058,6 @@ oc.integration:compiler-rejections:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -2140,8 +2120,6 @@ oc.script:test-gen-genesis:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -2269,8 +2247,6 @@ oc.script:test_octez_release_versions:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -2959,8 +2935,6 @@ oc.unit:non-proto-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3115,8 +3089,6 @@ oc.unit:other-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3203,8 +3175,6 @@ oc.unit:proto-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3291,8 +3261,6 @@ oc.unit:non-proto-arm64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3368,8 +3336,6 @@ oc.unit:webassembly-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3416,8 +3382,6 @@ oc.unit:protocol_compiles:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3670,8 +3634,6 @@ tezt:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3764,8 +3726,6 @@ tezt-time-sensitive:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3857,8 +3817,6 @@ tezt-slow:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3949,8 +3907,6 @@ tezt-extra:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -4040,8 +3996,6 @@ tezt-flaky:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -4135,8 +4089,6 @@ tezt:static-binaries:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -4223,8 +4175,6 @@ oc.unified_coverage:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - CHANGES.rst
-    - LICENSES/**/*
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
