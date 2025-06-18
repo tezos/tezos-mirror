@@ -2144,6 +2144,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
            (export_block_descr, (Block_repr.hash first_block, first_block_level)))
     else
       let exception Done in
+      let export_pred_level = Int32.sub (Store.Block.level export_block) 1l in
       let f block =
         (* FIXME: we also write potential branches, it will eventually
            be GCed *)
@@ -2151,7 +2152,11 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           if Block_hash.equal limit_hash (Block_repr.hash block) then raise Done
           else return_unit
         else
-          let block = (* Prune everything  *) {block with metadata = None} in
+          let block =
+            (* Prune everything but the predecessor's metadata *)
+            if Block_repr.level block = export_pred_level then block
+            else {block with metadata = None}
+          in
           let*! () = bpush#push block in
           return_unit
       in
@@ -2254,7 +2259,8 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
      - the target_block is not the genesis
      - the target_block and its predecessor are known
      - the context of the predecessor of the target_block must be known
-     - at least max_op_ttl(target_block) headers must be available
+     - at least max_op_ttl(target_block) headers must be available for the
+       predecessor of the target
   *)
   let check_export_block_validity chain_store block =
     let open Lwt_result_syntax in
@@ -2540,10 +2546,13 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       in
       (* Prune all blocks except for the export_block's predecessor *)
       let floating_block_stream =
+        let export_pred_level = Int32.sub (Store.Block.level export_block) 1l in
         Lwt_stream.of_list
           (List.filter_map
              (fun b ->
-               Some {(Store.Unsafe.repr_of_block b) with metadata = None})
+               if Store.Block.level b = export_pred_level then
+                 Some (Store.Unsafe.repr_of_block b)
+               else Some {(Store.Unsafe.repr_of_block b) with metadata = None})
              floating_blocks)
       in
       (* Protocols *)
