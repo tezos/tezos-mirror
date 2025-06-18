@@ -2027,8 +2027,9 @@ let get_infos_per_level t ~level ~metadata =
     | None -> []
     | Some setup -> setup.operator.account :: setup.operator.batching_operators
   in
-  let block = string_of_int level in
+  let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
   let* operations =
+    let block = string_of_int level in
     RPC_core.call endpoint @@ RPC.get_chain_block_operations ~block ()
   in
   let attested_commitments =
@@ -2060,34 +2061,47 @@ let get_infos_per_level t ~level ~metadata =
     |> Hashtbl.of_seq
   in
   let consensus_operations = JSON.(operations |=> 0 |> as_list) in
-  let is_dal_attestation operation =
-    JSON.(
-      operation |-> "contents" |=> 0 |-> "kind" |> as_string
-      = "attestation_with_dal")
+  let get_dal_attestations operation =
+    let contents = JSON.(operation |-> "contents" |=> 0) in
+    let kind = JSON.(contents |-> "kind" |> as_string) in
+    match kind with
+    | "attestation_with_dal" ->
+        let pkh = JSON.(contents |-> "metadata" |-> "delegate" |> as_string) in
+        let slot = JSON.(contents |-> "slot" |> as_int) in
+        let dal =
+          if slot >= 512 then Out_of_committee
+          else
+            With_DAL
+              JSON.(contents |-> "dal_attestation" |> as_string |> Z.of_string)
+        in
+        [(pkh, dal)]
+    | "attestations_aggregate" ->
+        let metadata_committee =
+          JSON.(contents |-> "metadata" |-> "committee" |> as_list)
+        in
+        let committee_info = JSON.(contents |-> "committee" |> as_list) in
+        List.map2
+          (fun member_info committee_meta ->
+            let slot = JSON.(member_info |-> "slot" |> as_int) in
+            let dal =
+              if slot >= 512 then Out_of_committee
+              else
+                let json = JSON.(member_info |-> "dal_attestation") in
+                if JSON.is_null json then Without_DAL
+                else With_DAL (json |> JSON.as_string |> Z.of_string)
+            in
+            let pkh = JSON.(committee_meta |-> "delegate" |> as_string) in
+            (pkh, dal))
+          committee_info
+          metadata_committee
+    | _ -> []
   in
-  let get_public_key_hash operation =
-    JSON.(
-      operation |-> "contents" |=> 0 |-> "metadata" |-> "delegate" |> as_string)
-  in
-  let get_dal_attestation operation =
-    let first_slot =
-      JSON.(operation |-> "contents" |=> 0 |-> "slot" |> as_int)
-    in
-    if first_slot >= 512 then Out_of_committee
-    else if is_dal_attestation operation then
-      With_DAL
-        JSON.(
-          operation |-> "contents" |=> 0 |-> "dal_attestation" |> as_string
-          |> Z.of_string)
-    else Without_DAL
-  in
-  let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
   let attestations =
     consensus_operations |> List.to_seq
-    |> Seq.map (fun operation ->
-           let public_key_hash = get_public_key_hash operation in
-           let dal_attestation = get_dal_attestation operation in
-           (PKH public_key_hash, dal_attestation))
+    |> Seq.flat_map (fun operation ->
+           get_dal_attestations operation
+           |> List.to_seq
+           |> Seq.map (fun (pkh, dal) -> (PKH pkh, dal)))
     |> Hashtbl.of_seq
   in
   let* etherlink_operator_balance_sum =
