@@ -7,7 +7,7 @@
 
 let simple () =
   Cloud.register
-    ~vms:[Agent.Configuration.make (); Agent.Configuration.make ()]
+    ~vms:(return [Agent.Configuration.make (); Agent.Configuration.make ()])
     ~__FILE__
     ~tags:["simple"; "health"]
     ~title:"Simple health check to check local configuration"
@@ -37,7 +37,7 @@ let simple () =
 
 let run_vm () =
   Cloud.register
-    ~vms:[Agent.Configuration.make ()]
+    ~vms:(return [Agent.Configuration.make ()])
     ~__FILE__
     ~tags:["run"; "vm"]
     ~title:"Run a new VM"
@@ -61,7 +61,7 @@ let run_vm () =
 
 let run_detached () =
   Cloud.register
-    ~vms:[Agent.Configuration.make ()]
+    ~vms:(return [Agent.Configuration.make ()])
     ~__FILE__
     ~tags:["run"; "detach"]
     ~title:"Run a command and detach in a vm"

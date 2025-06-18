@@ -493,7 +493,7 @@ type etherlink_configuration = {
 
 type configuration = {
   with_dal : bool;
-  stake : int list;
+  stake : int list Lwt.t;
   bakers : string list; (* unencrypted secret keys *)
   stake_machine_type : string list option;
   dal_node_producers : int list; (* slot indices *)
@@ -1484,14 +1484,6 @@ module Monitoring_app = struct
       | Some attested, Some published ->
           return (Some (attested /. published), dal_attestation_ratio)
 
-    (* fixme: use the stdlib List.take once we use OCaml 5.3 *)
-    let take n l =
-      let rec loop acc = function
-        | 0, _ | _, [] -> List.rev acc
-        | n, x :: xs -> loop (x :: acc) (pred n, xs)
-      in
-      loop [] (n, l)
-
     let get_current_cycle endpoint =
       let* {cycle; _} =
         RPC_core.call endpoint (RPC.get_chain_block_helper_current_level ())
@@ -1922,14 +1914,6 @@ module Monitoring_app = struct
       let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
       Lwt.return_unit
 
-    let take_and_drop n l =
-      let rec bis acc n = function
-        | [] -> (List.rev acc, [])
-        | hd :: tl as l ->
-            if n = 0 then (List.rev acc, l) else bis (hd :: acc) (n - 1) tl
-      in
-      bis [] n l
-
     let check_for_recently_missed_a_lot =
       (* TODO: This correspond to the number of bakers which activated DAL on mainnet.
          We expect more bakers to run the DAL, this initial size might be then increased
@@ -2014,7 +1998,7 @@ module Monitoring_app = struct
               in
               (* To avoid spawning a high number of RPCs simultaneously, we treat 2 delegates at each level. *)
               let to_treat_now, treat_later =
-                take_and_drop 2 !to_treat_delegates
+                Tezos_stdlib.TzList.split_n 2 !to_treat_delegates
               in
               let* () = Lwt_list.iter_p treat_delegate to_treat_now in
               match treat_later with
@@ -2274,6 +2258,7 @@ let init_public_network cloud (configuration : configuration)
         Lwt.return bootstrap
   in
   let () = toplog "Initializing the bakers" in
+  let* stake = configuration.stake in
   let* baker_accounts =
     Lwt_list.mapi_s
       (fun i _stake ->
@@ -2282,7 +2267,7 @@ let init_public_network cloud (configuration : configuration)
           ~alias_prefix:(Format.sprintf "baker-%d" i)
           1
           bootstrap.client)
-      configuration.stake
+      stake
   in
   let () = toplog "Initializing the producers" in
   let* producer_accounts =
@@ -2456,6 +2441,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         (sf "http://explorus.io?network=%s" (Node.rpc_endpoint bootstrap_node))
   in
   let* client = Client.init ~endpoint:(Node bootstrap_node) () in
+  let* stake = configuration.stake in
   let* baker_accounts =
     Lwt_list.mapi_s
       (fun i _stake ->
@@ -2464,7 +2450,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           ~alias_prefix:(Format.sprintf "baker-%d" i)
           1
           client)
-      configuration.stake
+      stake
   in
   let* producer_accounts =
     Client.stresstest_gen_keys
@@ -2488,8 +2474,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     in
     let bootstrap_accounts =
       List.mapi
-        (fun i key ->
-          (key, Some (List.nth configuration.stake i * 1_000_000_000_000)))
+        (fun i key -> (key, Some (List.nth stake i * 1_000_000_000_000)))
         (List.flatten baker_accounts)
     in
     let additional_bootstrap_accounts =
@@ -2577,10 +2562,12 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
 
 let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
     accounts i agent =
-  let stake =
+  let* stake =
     match stake with
-    | None -> List.nth configuration.stake i
-    | Some stake -> stake
+    | None ->
+        let* stake = configuration.stake in
+        return (List.nth stake i)
+    | Some stake -> return stake
   in
   let name = Format.asprintf "baker-node-%d" i in
   let data_dir =
@@ -3325,6 +3312,7 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
 let init ~(configuration : configuration) etherlink_configuration cloud
     next_agent =
   let () = toplog "Init" in
+  let () = toplog "Agents preparation" in
   let* bootstrap_agent =
     if configuration.bootstrap then
       let name = name_of Bootstrap in
@@ -3332,8 +3320,9 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       Lwt.return_some agent
     else Lwt.return_none
   in
+  let* stake = configuration.stake in
   let* attesters_agents =
-    configuration.stake
+    stake
     |> List.mapi (fun i _stake ->
            let name = name_of (Baker i) in
            next_agent ~name)
@@ -3759,8 +3748,85 @@ let rec loop t level =
   loop t (level + 1)
 
 let register (module Cli : Scenarios_cli.Dal) =
+  let stake =
+    let open Network in
+    match Cli.stake with
+    | Custom distrib -> return distrib
+    | Mimic {network; max_nb_bakers} ->
+        let network_string =
+          match network with
+          | `Mainnet | `Ghostnet | `Rionet -> to_string network
+          | _ ->
+              failwith
+                (Format.sprintf
+                   "Cannot get stake distribution for %s"
+                   (to_string network))
+        in
+        let endpoint =
+          Endpoint.make ~host:"rpc.tzkt.io" ~scheme:"https" ~port:443 ()
+        in
+        let decoder json = JSON.(json |-> "cycle" |> as_int) in
+        let rpc =
+          RPC_core.(
+            make
+              GET
+              [
+                network_string;
+                "chains";
+                "main";
+                "blocks";
+                "head";
+                "helpers";
+                "current_level";
+              ]
+              decoder)
+        in
+        let* response = RPC_core.call_raw endpoint rpc in
+        let cycle =
+          RPC_core.decode_raw ~origin:"Network.cycle" rpc response.body
+        in
+        let get_stake_in_ktez stake =
+          JSON.(
+            (stake |-> "frozen" |> as_int) + (stake |-> "delegated" |> as_int))
+          / 1_000_000_000
+        in
+        let decoder json =
+          json |> JSON.as_list
+          |> List.map (fun json_account ->
+                 let active_stake = JSON.(json_account |-> "active_stake") in
+                 get_stake_in_ktez active_stake)
+        in
+        let rpc =
+          RPC_core.(
+            make
+              GET
+              [
+                network_string;
+                "chains";
+                "main";
+                "blocks";
+                "head";
+                "context";
+                "raw";
+                "json";
+                "cycle";
+                string_of_int cycle;
+                "selected_stake_distribution";
+              ]
+              decoder)
+        in
+        let* response = RPC_core.call_raw endpoint rpc in
+        let distribution =
+          RPC_core.decode_raw ~origin:"Network.cycle" rpc response.body
+        in
+        let distribution =
+          match max_nb_bakers with
+          | None -> distribution
+          | Some n -> Tezos_stdlib.TzList.take_n n distribution
+        in
+        return distribution
+  in
   let configuration, etherlink_configuration =
-    let stake = Cli.stake in
     let stake_machine_type = Cli.stake_machine_type in
     let dal_node_producers =
       let last_index = ref 0 in
@@ -3853,29 +3919,31 @@ let register (module Cli : Scenarios_cli.Dal) =
   in
   toplog "Parsing CLI done" ;
   let vms =
-    [
-      (if configuration.bootstrap then [Bootstrap] else []);
-      List.mapi (fun i _ -> Baker i) configuration.stake;
-      List.map (fun i -> Producer i) configuration.dal_node_producers;
-      List.map
-        (fun index -> Observer (`Index index))
-        configuration.observer_slot_indices;
-      List.map (fun pkh -> Observer (`Pkh pkh)) configuration.observer_pkhs;
-      (if etherlink_configuration <> None then [Etherlink_operator] else []);
-      (match etherlink_configuration with
-      | None | Some {etherlink_dal_slots = []; _} -> []
-      | Some {etherlink_dal_slots = [_]; _} -> [Etherlink_dal_operator]
-      | Some {etherlink_dal_slots; _} ->
-          Reverse_proxy :: Etherlink_dal_operator
-          :: List.map
-               (fun slot_index -> Etherlink_dal_observer {slot_index})
-               etherlink_dal_slots);
-      (match etherlink_configuration with
-      | None -> []
-      | Some {etherlink_producers; _} ->
-          List.init etherlink_producers (fun i -> Etherlink_producer i));
-    ]
-    |> List.concat
+    let* stake = configuration.stake in
+    return
+    @@ List.concat
+         [
+           (if configuration.bootstrap then [Bootstrap] else []);
+           List.mapi (fun i _ -> Baker i) stake;
+           List.map (fun i -> Producer i) configuration.dal_node_producers;
+           List.map
+             (fun index -> Observer (`Index index))
+             configuration.observer_slot_indices;
+           List.map (fun pkh -> Observer (`Pkh pkh)) configuration.observer_pkhs;
+           (if etherlink_configuration <> None then [Etherlink_operator] else []);
+           (match etherlink_configuration with
+           | None | Some {etherlink_dal_slots = []; _} -> []
+           | Some {etherlink_dal_slots = [_]; _} -> [Etherlink_dal_operator]
+           | Some {etherlink_dal_slots; _} ->
+               Reverse_proxy :: Etherlink_dal_operator
+               :: List.map
+                    (fun slot_index -> Etherlink_dal_observer {slot_index})
+                    etherlink_dal_slots);
+           (match etherlink_configuration with
+           | None -> []
+           | Some {etherlink_producers; _} ->
+               List.init etherlink_producers (fun i -> Etherlink_producer i));
+         ]
   in
   let docker_image =
     Option.map
@@ -3886,8 +3954,10 @@ let register (module Cli : Scenarios_cli.Dal) =
     Agent.Configuration.make ?docker_image ~name ()
   in
   let vms =
-    vms
-    |> List.map (fun agent_kind ->
+    let* vms in
+    return
+    @@ List.map
+         (fun agent_kind ->
            let name = name_of agent_kind in
            match agent_kind with
            | Bootstrap -> default_vm_configuration ~name
@@ -3911,6 +3981,7 @@ let register (module Cli : Scenarios_cli.Dal) =
            | Etherlink_operator -> default_vm_configuration ~name
            | Etherlink_producer _ -> default_vm_configuration ~name
            | Reverse_proxy -> default_vm_configuration ~name)
+         vms
   in
   let endpoint, resolver_endpoint = Lwt.wait () in
   Cloud.register

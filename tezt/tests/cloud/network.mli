@@ -21,10 +21,14 @@ type public =
 
 type t = [public | `Sandbox]
 
+type stake_repartition =
+  | Custom of int list
+  | Mimic of {network : public; max_nb_bakers : int option}
+
 val to_public : t -> public
 
 (** ["mainnet" | "ghostnet" | "rionet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
-val to_string : t -> string
+val to_string : [< t] -> string
 
 (** Known protocol used by the network *)
 val default_protocol : t -> Protocol.t

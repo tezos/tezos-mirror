@@ -10,6 +10,10 @@ type public =
 
 type t = [public | `Sandbox]
 
+type stake_repartition =
+  | Custom of int list
+  | Mimic of {network : public; max_nb_bakers : int option}
+
 let to_public = function
   | `Sandbox -> failwith "Sandbox is not public"
   | #public as p -> p
