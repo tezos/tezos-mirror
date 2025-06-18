@@ -515,7 +515,7 @@ let make node_ctxt =
   in
   let* () =
     let oc = Process_worker.output_channel amplificator.process in
-    let* r = Process_worker.write_message oc (Bytes.of_string "0 Ready") in
+    let* r = Process_worker.write_message oc welcome in
     match r with
     | `End_of_file ->
         fail
