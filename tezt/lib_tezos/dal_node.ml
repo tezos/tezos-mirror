@@ -171,11 +171,12 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
   | Some Auto -> ["--history-mode"; "auto"]
   | Some (Custom i) -> ["--history-mode"; string_of_int i]
 
-let spawn_config_update ?(peers = []) ?(attester_profiles = [])
-    ?(operator_profiles = []) ?(observer_profiles = [])
-    ?(bootstrap_profile = false) ?history_mode ?(slots_backup_uris = [])
-    ?(trust_slots_backup_uris = false) dal_node =
-  spawn_command dal_node @@ ["config"; "update"]
+let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
+    ?(attester_profiles = []) ?(operator_profiles = [])
+    ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
+    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false) dal_node =
+  spawn_command dal_node
+  @@ ["config"; "update"; "--expected-pow"; string_of_float expected_pow]
   @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
   @ (if attester_profiles = [] then []
      else ["--attester-profiles"; String.concat "," attester_profiles])
@@ -229,11 +230,12 @@ let init_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
   in
   Process.check process
 
-let update_config ?peers ?attester_profiles ?operator_profiles
+let update_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
     ?observer_profiles ?bootstrap_profile ?history_mode ?slots_backup_uris
     ?trust_slots_backup_uris dal_node =
   let process =
     spawn_config_update
+      ?expected_pow
       ?peers
       ?attester_profiles
       ?operator_profiles
