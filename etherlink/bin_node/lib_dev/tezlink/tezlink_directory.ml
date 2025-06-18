@@ -185,7 +185,9 @@ let build_block_static_directory ~l2_chain_id
          let*? _chain = check_chain chain in
          let*? _block = check_block block in
          let op = operation.protocol_data in
-         let*? mock_result = Mock.Operation_metadata.operation_metadata op in
+         let*? mock_result =
+           Tezlink_mock.Operation_metadata.operation_metadata op
+         in
          return (op, mock_result))
 
 let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
