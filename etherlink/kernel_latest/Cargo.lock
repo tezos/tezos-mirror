@@ -2432,7 +2432,9 @@ dependencies = [
 name = "revm-etherlink"
 version = "0.1.0"
 dependencies = [
+ "alloy-sol-types",
  "format_no_std",
+ "num-bigint",
  "primitive-types",
  "revm",
  "tezos-evm-logging-latest",
@@ -2440,6 +2442,8 @@ dependencies = [
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-storage",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
  "tezos_ethereum_latest",
  "thiserror 1.0.69",
 ]

@@ -1,30 +1,39 @@
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+//
+// SPDX-License-Identifier: MIT
+
 use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
     interpreter::{CallInput, InputsImpl, InterpreterResult},
-    primitives::{hex::FromHex, Address, HashSet},
+    primitives::{hex::FromHex, Address},
 };
-use tezos_evm_runtime::runtime::Runtime;
 
-use crate::{database::AccountDatabase, withdrawal::withdrawal_precompile};
+use crate::{
+    database::PrecompileDatabase,
+    send_outbox_message::{
+        send_outbox_message_precompile, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
+    },
+};
 
-pub struct EtherlinkPrecompiles<'a, Host: Runtime> {
-    host: &'a mut Host,
-    customs: HashSet<Address>,
+pub struct EtherlinkPrecompiles {
+    customs: Vec<Address>,
     builtins: EthPrecompiles,
 }
 
-impl<'a, Host: Runtime> EtherlinkPrecompiles<'a, Host> {
-    #[allow(dead_code)]
-    pub fn new(host: &'a mut Host) -> Self {
+impl Default for EtherlinkPrecompiles {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EtherlinkPrecompiles {
+    pub fn new() -> Self {
         Self {
-            host,
-            customs: HashSet::from([
-                // Withdrawals
-                Address::from_hex("0xff00000000000000000000000000000000000001").unwrap(),
-                // FA bridge
-                Address::from_hex("0xff00000000000000000000000000000000000002").unwrap(),
-            ]),
+            customs: vec![
+                // Send outbox message
+                Address::from_hex(SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS).unwrap(),
+            ],
             builtins: EthPrecompiles::default(),
         }
     }
@@ -47,7 +56,7 @@ impl<'a, Host: Runtime> EtherlinkPrecompiles<'a, Host> {
     ) -> Result<Option<InterpreterResult>, String>
     where
         CTX: ContextTr,
-        CTX::Db: AccountDatabase,
+        CTX::Db: PrecompileDatabase,
     {
         // NIT: can probably do this more efficiently by keeping an immutable
         // reference on the slice but next mutable call makes it nontrivial
@@ -64,11 +73,8 @@ impl<'a, Host: Runtime> EtherlinkPrecompiles<'a, Host> {
             CallInput::Bytes(bytes) => bytes.to_vec(),
         };
 
-        if address
-            == &Address::from_hex("0xff00000000000000000000000000000000000001").unwrap()
-        {
-            let result = withdrawal_precompile(
-                self.host,
+        if address == self.customs.first().unwrap() {
+            let result = send_outbox_message_precompile(
                 &input_bytes,
                 context,
                 is_static,
@@ -82,10 +88,10 @@ impl<'a, Host: Runtime> EtherlinkPrecompiles<'a, Host> {
     }
 }
 
-impl<Host: Runtime, CTX> PrecompileProvider<CTX> for EtherlinkPrecompiles<'_, Host>
+impl<CTX> PrecompileProvider<CTX> for EtherlinkPrecompiles
 where
     CTX: ContextTr,
-    CTX::Db: AccountDatabase,
+    CTX::Db: PrecompileDatabase,
 {
     type Output = InterpreterResult;
 

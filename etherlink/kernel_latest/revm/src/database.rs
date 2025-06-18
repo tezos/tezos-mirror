@@ -1,10 +1,14 @@
 // SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
+
+use std::mem;
 
 use crate::{
     block_storage::{get_block_hash, BLOCKS_STORED},
     code_storage::CodeStorage,
+    send_outbox_message::Withdrawal,
     world_state_handler::{account_path, StorageAccount, WorldStateHandler},
     Error,
 };
@@ -34,6 +38,8 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     /// error and we need to revert the changes made to the durable
     /// storage.
     commit_status: &'a mut bool,
+    /// Withdrawals accumulated by the current execution and consumed at the end of it
+    withdrawals: Vec<Withdrawal>,
 }
 
 // See: https://github.com/rust-lang/rust-clippy/issues/5787
@@ -50,12 +56,15 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
             block,
             world_state_handler,
             commit_status,
+            withdrawals: vec![],
         }
     }
 }
 
-pub trait AccountDatabase: Database {
+pub trait PrecompileDatabase: Database {
     fn get_or_create_account(&self, address: Address) -> Result<StorageAccount, Error>;
+    fn push_withdrawal(&mut self, withdrawal: Withdrawal);
+    fn take_withdrawals(&mut self) -> Vec<Withdrawal>;
 }
 
 impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
@@ -78,13 +87,21 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     }
 }
 
-impl<Host: Runtime> AccountDatabase for EtherlinkVMDB<'_, Host> {
+impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
     fn get_or_create_account(&self, address: Address) -> Result<StorageAccount, Error> {
         // TODO: get_account function should be implemented whenever errors are
         // reintroduced
         self.world_state_handler
             .get_or_create(self.host, &account_path(&address))
             .map_err(|err| Error::Custom(err.to_string()))
+    }
+
+    fn push_withdrawal(&mut self, withdrawal: Withdrawal) {
+        self.withdrawals.push(withdrawal);
+    }
+
+    fn take_withdrawals(&mut self) -> Vec<Withdrawal> {
+        mem::take(&mut self.withdrawals)
     }
 }
 
