@@ -8,15 +8,14 @@ contract XTZWithdrawal {
     uint256 public withdrawalCounter;
 
     event StandardWithdrawalEvent(
-        address indexed sender,
         uint256 amount,
+        address indexed sender,
         bytes22 receiver,
         uint256 withdrawalId
     );
 
-    function withdraw_base58(string calldata b58Address) external payable {
-        // Ticketer and outbox precompile are known
-        string memory ticketer = "KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj";
+    function withdraw_base58(bytes22 ticketer, bytes22 target) external payable {
+        // Outbox precompile is known
         address outboxSender = 0xFF00000000000000000000000000000000000003;
 
         // Convert to mutez (1 mutez = 10^12 Wei)
@@ -33,9 +32,9 @@ contract XTZWithdrawal {
 
         // Call push_withdrawal_to_outbox
         bytes memory payload = abi.encodeWithSignature(
-            "push_withdrawal_to_outbox(string,string,uint256)",
+            "push_withdrawal_to_outbox(bytes22,bytes22,uint256)",
             ticketer,
-            b58Address,
+            target,
             mutezAmount
         );
         (bool ok, ) = outboxSender.call(payload);
@@ -46,10 +45,9 @@ contract XTZWithdrawal {
         require(sent, "Failed to burn");
 
         // Emit withdrawal event
-        bytes22 target = bytes22(bytes(b58Address));
         emit StandardWithdrawalEvent(
-            msg.sender,
             weiAmount,
+            msg.sender,
             target,
             withdrawalCounter
         );
