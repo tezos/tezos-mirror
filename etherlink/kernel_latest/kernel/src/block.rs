@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::apply::{
-    apply_transaction, ExecutionInfo, ExecutionResult, Validity, WITHDRAWAL_OUTBOX_QUEUE,
+    apply_transaction, ExecutionInfo, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE,
 };
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
@@ -124,7 +124,8 @@ fn can_fit_in_reboot(
     tx_gas_limit: u64,
 ) -> bool {
     let max_gas_per_reboot = U256::from(max_gas_per_reboot(limits));
-    used_gas_in_run + U256::from(tx_gas_limit) <= max_gas_per_reboot
+    let capped_gas_limit = u64::min(tx_gas_limit, limits.maximum_gas_limit);
+    used_gas_in_run + U256::from(capped_gas_limit) <= max_gas_per_reboot
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -169,20 +170,6 @@ fn compute<Host: Runtime>(
             return Ok(BlockInProgressComputationResult::RebootNeeded);
         }
 
-        let execution_gas_limit =
-            transaction.execution_gas_limit(&block_constants.block_fees)?;
-        if execution_gas_limit > limits.maximum_gas_limit {
-            log!(
-                host,
-                Debug,
-                "Reason of invalidity: {:?}",
-                Validity::InvalidGasLimitTooHigh
-            );
-            log!(host, Benchmarking, "Transaction type: INVALID");
-            on_invalid_transaction(host, &transaction, block_in_progress, data_size);
-            continue;
-        };
-
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
         match apply_transaction(
@@ -196,6 +183,7 @@ fn compute<Host: Runtime>(
             sequencer_pool_address,
             tracer_input,
             evm_configuration,
+            limits,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,

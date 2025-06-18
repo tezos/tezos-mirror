@@ -34,13 +34,14 @@ let validate_nonce ~next_nonce:(Qty next_nonce)
   if transaction.nonce >= next_nonce then return (Ok ())
   else return (Error "Nonce too low")
 
-let validate_gas_limit ~maximum_gas_limit:(Qty maximum_gas_limit)
-    ~da_fee_per_byte ~minimum_base_fee_per_gas:(Qty minimum_base_fee_per_gas)
+let validate_gas_limit ~storage_version
+    ~maximum_gas_limit:(Qty maximum_gas_limit) ~da_fee_per_byte
+    ~minimum_base_fee_per_gas:(Qty minimum_base_fee_per_gas)
     (transaction : Transaction.transaction) :
     (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
-  (* Constants defined in the kernel: *)
-  let gas_limit = transaction.gas_limit in
+  (* Computing the execution gas limit validates that the gas limit is
+     sufficient to cover the inclusion fees. *)
   let**? execution_gas_limit =
     (* since Dionysus, the execution gas limit is always computed from the
        minimum base fee per gas *)
@@ -48,18 +49,20 @@ let validate_gas_limit ~maximum_gas_limit:(Qty maximum_gas_limit)
       ~da_fee_per_byte
       ~access_list:transaction.access_list
       ~minimum_base_fee_per_gas
-      ~gas_limit
+      ~gas_limit:transaction.gas_limit
       transaction.data
   in
-  if Compare.Z.(execution_gas_limit <= maximum_gas_limit) then return (Ok ())
-  else
-    return
-      (Error
-         (Format.sprintf
-            "Gas limit for execution is too high. Maximum limit is %s, \
-             transaction has %s"
-            (Z.to_string maximum_gas_limit)
-            (Z.to_string execution_gas_limit)))
+  if storage_version < 35 then
+    if Compare.Z.(execution_gas_limit <= maximum_gas_limit) then return (Ok ())
+    else
+      return
+        (Error
+           (Format.sprintf
+              "Gas limit for execution is too high. Maximum limit is %s, \
+               transaction has %s"
+              (Z.to_string maximum_gas_limit)
+              (Z.to_string execution_gas_limit)))
+  else return (Ok ())
 
 let validate_sender_not_a_contract (module Backend_rpc : Services_backend_sig.S)
     caller : (unit, string) result tzresult Lwt.t =
@@ -130,8 +133,12 @@ let minimal_validation ~next_nonce ~max_number_of_chunks backend_rpc transaction
   let* da_fee_per_byte =
     Etherlink_durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
   in
+  let* storage_version =
+    Durable_storage.storage_version (Backend_rpc.Reader.read state)
+  in
   let** () =
     validate_gas_limit
+      ~storage_version
       ~maximum_gas_limit
       ~da_fee_per_byte
       ~minimum_base_fee_per_gas:(Qty minimum_base_fee_per_gas)
