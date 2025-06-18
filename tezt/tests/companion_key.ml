@@ -135,6 +135,33 @@ let init_node_and_client ~protocol =
   in
   return (node, client)
 
+let check_active_companion_and_consensus_keys delegate ~companion_key
+    ~consensus_key client =
+  Log.info "Checking keys are activated" ;
+  let* () =
+    Consensus_key.check_consensus_key
+      ~__LOC__
+      delegate
+      ~expected_active:consensus_key
+      client
+  in
+  let* () =
+    check_companion_key ~__LOC__ delegate ~expected_active:companion_key client
+  in
+  let* () =
+    check_validators_companion_key ~__LOC__ delegate ~expected:None client
+  in
+  let* current_level = get_current_level client in
+  let* () =
+    check_validators_companion_key
+      ~__LOC__
+      ~level:(current_level.level + 1)
+      delegate
+      ~expected:(Some companion_key.public_key_hash)
+      client
+  in
+  unit
+
 let test_update_companion_key =
   Protocol.register_regression_test
     ~__FILE__
@@ -171,32 +198,11 @@ let test_update_companion_key =
 
   Log.info "Waiting for consensus and companion keys activation" ;
   let* () = bake_n_cycles (consensus_rights_delay + 1) client in
-
-  Log.info "Checking keys are activated" ;
   let* () =
-    Consensus_key.check_consensus_key
-      ~__LOC__
+    check_active_companion_and_consensus_keys
       delegate
-      ~expected_active:consensus_key_bls
-      client
-  in
-  let* () =
-    check_companion_key
-      ~__LOC__
-      delegate
-      ~expected_active:companion_key_bls
-      client
-  in
-  let* () =
-    check_validators_companion_key ~__LOC__ delegate ~expected:None client
-  in
-  let* current_level = get_current_level client in
-  let* () =
-    check_validators_companion_key
-      ~__LOC__
-      ~level:(current_level.level + 1)
-      delegate
-      ~expected:(Some companion_key_bls.public_key_hash)
+      ~companion_key:companion_key_bls
+      ~consensus_key:consensus_key_bls
       client
   in
   unit
@@ -295,25 +301,11 @@ let test_update_companion_key_for_tz4_delegate =
 
   Log.info "Waiting for companion key activation" ;
   let* () = bake_n_cycles (consensus_rights_delay + 1) client in
-
-  Log.info "Checking key is activated" ;
   let* () =
-    check_companion_key
-      ~__LOC__
+    check_active_companion_and_consensus_keys
       delegate
-      ~expected_active:companion_key_bls
-      client
-  in
-  let* () =
-    check_validators_companion_key ~__LOC__ delegate ~expected:None client
-  in
-  let* current_level = get_current_level client in
-  let* () =
-    check_validators_companion_key
-      ~__LOC__
-      ~level:(current_level.level + 1)
-      delegate
-      ~expected:(Some companion_key_bls.public_key_hash)
+      ~companion_key:companion_key_bls
+      ~consensus_key:delegate
       client
   in
   unit
@@ -413,32 +405,11 @@ let test_register_keys_and_stake =
 
   Log.info "Waiting for consensus and companion keys activation" ;
   let* () = bake_n_cycles (consensus_rights_delay + 1) client in
-
-  Log.info "Checking keys are activated" ;
   let* () =
-    Consensus_key.check_consensus_key
-      ~__LOC__
+    check_active_companion_and_consensus_keys
       delegate
-      ~expected_active:consensus_key_bls
-      client
-  in
-  let* () =
-    check_companion_key
-      ~__LOC__
-      delegate
-      ~expected_active:companion_key_bls
-      client
-  in
-  let* () =
-    check_validators_companion_key ~__LOC__ delegate ~expected:None client
-  in
-  let* current_level = get_current_level client in
-  let* () =
-    check_validators_companion_key
-      ~__LOC__
-      ~level:(current_level.level + 1)
-      delegate
-      ~expected:(Some companion_key_bls.public_key_hash)
+      ~companion_key:companion_key_bls
+      ~consensus_key:consensus_key_bls
       client
   in
   unit
@@ -516,32 +487,11 @@ let test_register_keys_with_proofs_and_stake =
 
   Log.info "Waiting for consensus and companion keys activation" ;
   let* () = bake_n_cycles (consensus_rights_delay + 1) client in
-
-  Log.info "Checking keys are activated" ;
   let* () =
-    Consensus_key.check_consensus_key
-      ~__LOC__
+    check_active_companion_and_consensus_keys
       delegate
-      ~expected_active:consensus_key_bls
-      client
-  in
-  let* () =
-    check_companion_key
-      ~__LOC__
-      delegate
-      ~expected_active:companion_key_bls
-      client
-  in
-  let* () =
-    check_validators_companion_key ~__LOC__ delegate ~expected:None client
-  in
-  let* current_level = get_current_level client in
-  let* () =
-    check_validators_companion_key
-      ~__LOC__
-      ~level:(current_level.level + 1)
-      delegate
-      ~expected:(Some companion_key_bls.public_key_hash)
+      ~companion_key:companion_key_bls
+      ~consensus_key:consensus_key_bls
       client
   in
   unit
@@ -590,32 +540,11 @@ let test_update_keys_with_proofs =
 
   Log.info "Waiting for consensus and companion keys activation" ;
   let* () = bake_n_cycles (consensus_rights_delay + 1) client in
-
-  Log.info "Checking keys are activated" ;
   let* () =
-    Consensus_key.check_consensus_key
-      ~__LOC__
+    check_active_companion_and_consensus_keys
       delegate
-      ~expected_active:consensus_key_bls
-      client
-  in
-  let* () =
-    check_companion_key
-      ~__LOC__
-      delegate
-      ~expected_active:companion_key_bls
-      client
-  in
-  let* () =
-    check_validators_companion_key ~__LOC__ delegate ~expected:None client
-  in
-  let* current_level = get_current_level client in
-  let* () =
-    check_validators_companion_key
-      ~__LOC__
-      ~level:(current_level.level + 1)
-      delegate
-      ~expected:(Some companion_key_bls.public_key_hash)
+      ~companion_key:companion_key_bls
+      ~consensus_key:consensus_key_bls
       client
   in
   unit
