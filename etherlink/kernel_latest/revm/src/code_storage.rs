@@ -237,4 +237,19 @@ mod test {
             .expect("Could not check if contract exist");
         assert!(!exists, "code storage should not exists");
     }
+
+    #[test]
+    fn test_get_code_from_non_existing_code() {
+        let mut host = MockKernelHost::default();
+
+        let code: Vec<u8> = (0..100).collect();
+        let code_hash = CodeStorage::add(&mut host, &code).unwrap();
+        let code_storage = CodeStorage::new(&code_hash).unwrap();
+        CodeStorage::delete(&mut host, &code_hash).unwrap();
+        let empty_code = code_storage.get_code(&host).unwrap();
+        let empty_hash = empty_code.hash_slow();
+
+        assert_eq!(empty_code, Bytecode::new());
+        assert_eq!(empty_hash, KECCAK_EMPTY);
+    }
 }
