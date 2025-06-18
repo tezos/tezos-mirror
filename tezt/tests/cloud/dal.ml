@@ -141,6 +141,15 @@ module Node = struct
 
   include Node
 
+  let yes_wallet agent =
+    let name = Tezt_cloud.Agent.name agent ^ "-yes-wallet" in
+    Yes_wallet.Agent.create ~name agent
+
+  let yes_crypto_env =
+    String_map.singleton
+      Tezos_crypto.Helpers.yes_crypto_environment_variable
+      "y"
+
   let import_snapshot ?(delete_snapshot_file = false) ~name node
       snapshot_file_path =
     toplog "Importing the snapshot for %s" name ;
@@ -173,8 +182,19 @@ module Node = struct
     in
     Lwt.return_unit
 
-  let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~rpc_external
-      ~name network ~snapshot ?ppx_profiling cloud agent =
+  let get_snapshot_info_network node snapshot_path =
+    let* info = Node.snapshot_info node ~json:true snapshot_path in
+    let json = JSON.parse ~origin:"snapshot_info" info in
+    (match JSON.(json |-> "snapshot_header" |-> "chain_name" |> as_string) with
+    | "TEZOS_ITHACANET_2022-01-25T15:00:00Z" -> "ghostnet"
+    | "TEZOS_RIONET_2025-02-19T12:45:00Z" -> "rionet"
+    | "TEZOS_MAINNET" -> "mainnet"
+    | "TEZOS" | _ -> "sandbox")
+    |> Lwt.return
+
+  let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
+      ~rpc_external ~name network ~with_yes_crypto ~snapshot ?ppx_profiling
+      cloud agent =
     toplog "Initializing an L1 node for %s" name ;
     match network with
     | #Network.public -> (
@@ -198,6 +218,7 @@ module Node = struct
             let* () =
               Node.Agent.run
                 ?ppx_profiling
+                ?env
                 node
                 [Network (Network.to_octez_network_options network)]
             in
@@ -289,6 +310,7 @@ module Node = struct
             let* () =
               Node.Agent.run
                 ?ppx_profiling
+                ?env
                 node
                 (Force_history_mode_switch :: Synchronisation_threshold 1
                :: arguments)
@@ -303,6 +325,9 @@ module Node = struct
         (* For sandbox deployments, we only listen on local interface, hence
            no connection could be made to us from outside networks *)
         let net_addr = "127.0.0.1" in
+        let yes_crypto_arg =
+          if with_yes_crypto then [Allow_yes_crypto] else []
+        in
         match data_dir with
         | None ->
             let* node =
@@ -329,10 +354,22 @@ module Node = struct
                   Lwt.return_some snapshot_path
               | No_snapshot -> Lwt.return_none
             in
+            let* snapshot_network =
+              match snapshot_path with
+              | Some path ->
+                  let* network = get_snapshot_info_network node path in
+                  Lwt.return_some network
+              | None -> Lwt.return_none
+            in
+            (* Set network *)
             let* () =
               Node.Config_file.update
                 node
-                (Node.Config_file.set_ghostnet_sandbox_network ())
+                (match snapshot_network with
+                | Some "mainnet" -> Node.Config_file.set_mainnet_network ()
+                | Some "ghostnet" -> Node.Config_file.set_ghostnet_network ()
+                | Some "rionet" -> Node.Config_file.set_rionet_network ()
+                | _ -> Node.Config_file.set_sandbox_network)
             in
             let* () =
               match dal_config with
@@ -351,6 +388,7 @@ module Node = struct
             let* () =
               Node.Agent.run
                 ?ppx_profiling
+                ?env
                 node
                 ([
                    No_bootstrap_peers;
@@ -358,14 +396,14 @@ module Node = struct
                    Cors_origin "*";
                    Force_history_mode_switch;
                  ]
-                @ arguments)
+                @ yes_crypto_arg @ arguments)
             in
             let* () = wait_for_ready node in
             Lwt.return node
         | Some data_dir ->
             let arguments =
               [No_bootstrap_peers; Synchronisation_threshold 0; Cors_origin "*"]
-              @ arguments
+              @ yes_crypto_arg @ arguments
             in
             let* node =
               Node.Agent.create
@@ -378,7 +416,7 @@ module Node = struct
                 agent
             in
             let* () = may_copy_node_identity_file agent node identity_file in
-            let* () = Node.Agent.run ?ppx_profiling node [] in
+            let* () = Node.Agent.run ?env ?ppx_profiling node arguments in
             let* () = Node.wait_for_ready node in
             Lwt.return node)
 end
@@ -552,6 +590,7 @@ type configuration = {
      reconnection delay *)
   disconnect : (int * int) option;
   network : Network.t;
+  simulate_network : Cli.network_simulation_config;
   snapshot : snapshot_config;
   bootstrap : bool;
   teztale : bool;
@@ -2549,12 +2588,18 @@ let init_public_network cloud (configuration : configuration)
     | Some agent ->
         let () = toplog "Some agent given (%s)" (Agent.name agent) in
         let () = toplog "Initializing the bootstrap node agent" in
+        let with_yes_crypto =
+          match configuration.simulate_network with
+          | Scatter _ | Map _ -> true
+          | Disabled -> false
+        in
         let* node =
           Node.init
             ?identity_file:configuration.bootstrap_node_identity_file
             ~rpc_external:configuration.external_rpc
             ~name:"bootstrap-node"
             configuration.network
+            ~with_yes_crypto
             ~snapshot:configuration.snapshot
             ~ppx_profiling:configuration.ppx_profiling
             cloud
@@ -2678,6 +2723,20 @@ let init_public_network cloud (configuration : configuration)
       etherlink_rollup_operator_key,
       etherlink_batching_operator_keys )
 
+let round_robin_split m lst =
+  assert (m > 0) ;
+  let buckets = Array.make m [] in
+  List.iteri
+    (fun idx x ->
+      let bucket = idx mod m in
+      buckets.(bucket) <- x :: buckets.(bucket))
+    (List.rev lst) ;
+  Array.to_list buckets |> List.rev
+
+let may_set_yes_crypto = function
+  | Cli.Scatter _ | Map _ -> (Some Node.yes_crypto_env, true)
+  | Disabled -> (None, false)
+
 let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     ?(etherlink_configuration : etherlink_configuration option) agent =
   let dal_bootstrap_node_net_port = Agent.next_available_port agent in
@@ -2692,14 +2751,19 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
+  let env, with_yes_crypto =
+    may_set_yes_crypto configuration.simulate_network
+  in
   let* bootstrap_node =
     Node.init
+      ?env
       ?data_dir
       ?identity_file:configuration.bootstrap_node_identity_file
       ~rpc_external:configuration.external_rpc
       ~dal_config
       ~name
       configuration.network
+      ~with_yes_crypto
       ~snapshot:configuration.snapshot
       ~ppx_profiling:configuration.ppx_profiling
       cloud
@@ -2728,9 +2792,85 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~url:
         (sf "http://explorus.io?network=%s" (Node.rpc_endpoint bootstrap_node))
   in
-  let* client = Client.init ~endpoint:(Node bootstrap_node) () in
   let* stake = configuration.stake in
-  let* baker_accounts =
+  let* client =
+    Client.Agent.create
+      ~name:(Tezt_cloud.Agent.name agent ^ "-client")
+      ~endpoint:(Client.Node bootstrap_node)
+      agent
+  in
+  let init_yes_wallet () =
+    let* yes_wallet = Node.yes_wallet agent in
+    let* snapshot_network =
+      match configuration.snapshot with
+      | Docker_embedded path | Local_file path ->
+          let* network = Node.get_snapshot_info_network bootstrap_node path in
+          (* Yes-wallet requires the config url for protocol-specific test
+             networks.*)
+          let network =
+            match network with
+            | ("ghostnet" | "mainnet" | "sandbox") as s -> s
+            | s ->
+                (* We assume that unknown networks are protocol specific ones. *)
+                "https://teztnets.com/" ^ s
+          in
+          Lwt.return network
+      | No_snapshot -> Lwt.return "ghostnet"
+    in
+    let* _filename =
+      Yes_wallet.create_from_context
+        ~node:bootstrap_node
+        ~client
+        ~network:snapshot_network
+        yes_wallet
+    in
+    unit
+  in
+  let* simulated_delegates =
+    match configuration.simulate_network with
+    | Scatter (selected_baker_count, baker_daemons_count) ->
+        let* () = init_yes_wallet () in
+        let* all_delegates_aliases =
+          Client.list_known_addresses client |> Lwt.map (List.map fst)
+        in
+        let selected_delegates =
+          Tezos_stdlib.TzList.take_n selected_baker_count all_delegates_aliases
+        in
+        let* delegates =
+          Lwt_list.map_s
+            (fun alias -> Client.show_address ~alias client)
+            selected_delegates
+        in
+        round_robin_split baker_daemons_count delegates |> Lwt.return
+    | Map (selected_bakers_count, baker_daemons_count) ->
+        let* () = init_yes_wallet () in
+        let* all_delegates_aliases =
+          Client.list_known_addresses client |> Lwt.map (List.map fst)
+        in
+        let selected_delegates_aliases =
+          Tezos_stdlib.TzList.take_n selected_bakers_count all_delegates_aliases
+        in
+        let single_key_bakers_aliases, remaining_baker_aliases =
+          Tezos_stdlib.TzList.split_n
+            (baker_daemons_count - 1)
+            selected_delegates_aliases
+        in
+        let* single_key_bakers =
+          Lwt_list.map_s
+            (fun alias ->
+              let* a = Client.show_address ~alias client in
+              Lwt.return [a])
+            single_key_bakers_aliases
+        in
+        let* remaining_baker =
+          Lwt_list.map_s
+            (fun alias -> Client.show_address ~alias client)
+            remaining_baker_aliases
+        in
+        Lwt.return (single_key_bakers @ [remaining_baker])
+    | Disabled -> Lwt.return_nil
+  in
+  let* generated_baker_accounts =
     Lwt_list.mapi_s
       (fun i _stake ->
         (* We assume that a baker holds only one key. *)
@@ -2740,11 +2880,63 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           client)
       stake
   in
+  let* simulated_bakers =
+    (* Substitute consensus pkh with delegate pkh *)
+    let* yw = Node.yes_wallet agent in
+    let* ckm = Yes_wallet.load_consensus_key_mapping yw ~client in
+    List.map
+      (fun l ->
+        List.map
+          (fun a ->
+            try
+              let ck =
+                List.find
+                  (fun {Yes_wallet.public_key_hash; _} ->
+                    public_key_hash = a.Account.public_key_hash)
+                  ckm
+              in
+              {
+                a with
+                public_key_hash = ck.consensus_public_key_hash;
+                public_key = ck.consensus_public_key;
+              }
+            with Not_found -> a)
+          l)
+      simulated_delegates
+    |> return
+  in
+  (* [baker_accounts] stands for the list of keys that are actually used for
+     baking. Meaning that if a baker uses a consensus key, the baker account
+     will be that consensus key (and not the registered baker one). This aims to
+     be used by bakers and attesters daemons. *)
+  let baker_accounts = generated_baker_accounts @ simulated_bakers in
+  (* [delegate_accounts] stands for the list of delegates keys (registered
+     baking account) that will be used by the producers daemons. Indeed, the
+     producers requires an account holding funds as they aim to inject
+     publishments. *)
+  let delegate_accounts = generated_baker_accounts @ simulated_delegates in
+  List.iteri
+    (fun i l ->
+      toplog
+        "Baker agent %d will run with: %a"
+        i
+        (Format.pp_print_list
+           ~pp_sep:(fun out () -> Format.fprintf out ",")
+           (fun fmt (a : Account.key) -> Format.fprintf fmt "%s" a.alias))
+        l)
+    baker_accounts ;
   let* producer_accounts =
-    Client.stresstest_gen_keys
-      ~alias_prefix:"dal_producer"
-      (List.length configuration.dal_node_producers)
-      client
+    match configuration.simulate_network with
+    | Scatter _ | Map _ ->
+        Tezos_stdlib.TzList.take_n
+          (List.length configuration.dal_node_producers)
+          (List.flatten delegate_accounts)
+        |> return
+    | Disabled ->
+        Client.stresstest_gen_keys
+          ~alias_prefix:"dal_producer"
+          (List.length configuration.dal_node_producers)
+          client
   in
   let* etherlink_rollup_operator_key =
     if etherlink_configuration <> None then
@@ -2756,37 +2948,42 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       Client.stresstest_gen_keys ~alias_prefix:"etherlink_batching" 20 client
     else Lwt.return []
   in
-  let* parameter_file =
-    let base =
-      Either.right (configuration.protocol, Some Protocol.Constants_mainnet)
-    in
-    let bootstrap_accounts =
-      List.mapi
-        (fun i key -> (key, Some (List.nth stake i * 1_000_000_000_000)))
-        (List.flatten baker_accounts)
-    in
-    let additional_bootstrap_accounts =
-      List.map
-        (fun key -> (key, Some 1_000_000_000_000, false))
-        (producer_accounts @ etherlink_rollup_operator_key
-       @ etherlink_batching_operator_keys)
-    in
-    let overrides = [] in
-    Protocol.write_parameter_file
-      ~bootstrap_accounts
-      ~additional_bootstrap_accounts
-      ~base
-      overrides
+  let* () =
+    if configuration.simulate_network = Disabled then
+      let* parameter_file =
+        let base =
+          Either.right (configuration.protocol, Some Protocol.Constants_mainnet)
+        in
+        let bootstrap_accounts =
+          List.mapi
+            (fun i key -> (key, Some (List.nth stake i * 1_000_000_000_000)))
+            (List.flatten baker_accounts)
+        in
+        let additional_bootstrap_accounts =
+          List.map
+            (fun key -> (key, Some 1_000_000_000_000, false))
+            (producer_accounts @ etherlink_rollup_operator_key
+           @ etherlink_batching_operator_keys)
+        in
+        let overrides = [] in
+        Protocol.write_parameter_file
+          ~bootstrap_accounts
+          ~additional_bootstrap_accounts
+          ~base
+          overrides
+      in
+      let* () =
+        Client.activate_protocol_and_wait
+          ~timestamp:Client.Now
+          ~parameter_file
+          ~protocol:configuration.protocol
+          client
+      in
+      Lwt.return_unit
+    else Lwt.return_unit
   in
   let etherlink_rollup_operator_key =
     match etherlink_rollup_operator_key with [key] -> Some key | _ -> None
-  in
-  let* () =
-    Client.activate_protocol_and_wait
-      ~timestamp:Client.Now
-      ~parameter_file
-      ~protocol:configuration.protocol
-      client
   in
   let* () =
     match dal_bootstrap_node with
@@ -2851,25 +3048,35 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       etherlink_batching_operator_keys )
 
 let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
-    accounts i agent =
+    ~baker_accounts i agent =
   let* stake =
-    match stake with
-    | None ->
-        let* stake = configuration.stake in
-        return (List.nth stake i)
-    | Some stake -> return stake
+    (* As simulate_network and stake are mutually exclusive, the stake is used
+       only when the simulation is Disabled. *)
+    match configuration.simulate_network with
+    | Disabled -> (
+        match stake with
+        | None ->
+            let* stake = configuration.stake in
+            return (List.nth stake i)
+        | Some stake -> return stake)
+    | Scatter _ | Map _ -> Lwt.return 0
   in
   let name = Format.asprintf "baker-node-%d" i in
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
+  let env, with_yes_crypto =
+    may_set_yes_crypto configuration.simulate_network
+  in
   let* node =
     Node.init
+      ?env
       ?data_dir
       ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
       ~name:(Format.asprintf "baker-node-%d" i)
       ~rpc_external:configuration.external_rpc
       configuration.network
+      ~with_yes_crypto
       ~snapshot:configuration.snapshot
       ~ppx_profiling:configuration.ppx_profiling
       cloud
@@ -2887,7 +3094,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
           agent
       in
       let attester_profiles =
-        List.map (fun account -> account.Account.public_key_hash) accounts
+        List.map (fun account -> account.Account.public_key_hash) baker_accounts
       in
       let* () =
         Dal_node.init_config
@@ -2929,22 +3136,40 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
               teztale
               ~address:account.Account.public_key_hash
               ~alias:account.Account.alias)
-          accounts
+          baker_accounts
   in
   let* client = Client.Agent.create ~endpoint:(Node node) agent in
   let* () =
-    Lwt_list.iter_s
-      (fun account ->
-        Client.import_secret_key
-          client
-          account.Account.secret_key
-          ~alias:account.alias)
-      accounts
+    match configuration.simulate_network with
+    | Scatter _ | Map _ ->
+        let* yes_wallet = Node.yes_wallet agent in
+        let* () =
+          Lwt_list.iter_s
+            (fun (account : Account.key) ->
+              Client.import_public_key
+                client
+                ~public_key:account.public_key
+                ~alias:account.alias)
+            baker_accounts
+        in
+        let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
+        Lwt.return_unit
+    | Disabled ->
+        Lwt_list.iter_s
+          (fun account ->
+            Client.import_secret_key
+              client
+              account.Account.secret_key
+              ~alias:account.alias)
+          baker_accounts
   in
-  let delegates = List.map (fun account -> account.Account.alias) accounts in
+  let delegates =
+    List.map (fun account -> account.Account.alias) baker_accounts
+  in
   let* baker =
     let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
     Agnostic_baker.Agent.init
+      ?env
       ~name:(Format.asprintf "baker-%d" i)
       ~delegates
       ~client
@@ -2962,7 +3187,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       agent
       (Format.asprintf "baker-%d" i)
   in
-  Lwt.return {node; dal_node; baker; accounts; stake}
+  Lwt.return {node; dal_node; baker; accounts = baker_accounts; stake}
 
 let init_producer cloud configuration ~bootstrap teztale account i slot_index
     agent =
@@ -2972,13 +3197,18 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let () = toplog "Init producer %s: init L1 node" name in
+  let env, with_yes_crypto =
+    may_set_yes_crypto configuration.simulate_network
+  in
   let* node =
     Node.init
+      ?env
       ?data_dir
       ~name
       ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
       ~rpc_external:configuration.external_rpc
       configuration.network
+      ~with_yes_crypto
       ~snapshot:configuration.snapshot
       ~ppx_profiling:configuration.ppx_profiling
       cloud
@@ -3080,13 +3310,18 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
+  let env, with_yes_crypto =
+    may_set_yes_crypto configuration.simulate_network
+  in
   let* node =
     Node.init
+      ?env
       ?data_dir
       ~name
       ~arguments:[Peer bootstrap.node_p2p_endpoint]
       ~rpc_external:configuration.external_rpc
       configuration.network
+      ~with_yes_crypto
       ~snapshot:configuration.snapshot
       ~ppx_profiling:configuration.ppx_profiling
       cloud
@@ -3156,6 +3391,7 @@ let init_etherlink_dal_node
       ppx_profiling;
       ppx_profiling_backends;
       memtrace;
+      simulate_network;
       _;
     } ~bootstrap ~dal_slots ~next_agent ~otel ~cloud =
   match dal_slots with
@@ -3169,13 +3405,16 @@ let init_etherlink_dal_node
       toplog "Etherlink sequencer will run its own DAL node" ;
       let name = name_of Etherlink_dal_operator in
       let* agent = next_agent ~name in
+      let env, with_yes_crypto = may_set_yes_crypto simulate_network in
       let* node =
         Node.init
+          ?env
           ~name
           ~arguments:
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
           ~rpc_external:external_rpc
           network
+          ~with_yes_crypto
           ~snapshot
           cloud
           agent
@@ -3207,13 +3446,16 @@ let init_etherlink_dal_node
       toplog "Etherlink sequencer will use a reverse proxy" ;
       let name = name_of Etherlink_dal_operator in
       let* agent = next_agent ~name in
+      let env, with_yes_crypto = may_set_yes_crypto simulate_network in
       let* node =
         Node.init
+          ?env
           ~name
           ~arguments:
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
           ~rpc_external:external_rpc
           network
+          ~with_yes_crypto
           ~snapshot
           cloud
           agent
@@ -3240,8 +3482,10 @@ let init_etherlink_dal_node
         |> Lwt_list.map_p (fun slot_index ->
                let name = name_of (Etherlink_dal_observer {slot_index}) in
                let* agent = next_agent ~name in
+               let env, with_yes_crypto = may_set_yes_crypto simulate_network in
                let* node =
                  Node.init
+                   ?env
                    ~name
                    ~arguments:
                      [
@@ -3250,6 +3494,7 @@ let init_etherlink_dal_node
                      ]
                    ~rpc_external:external_rpc
                    network
+                   ~with_yes_crypto
                    ~snapshot
                    cloud
                    agent
@@ -3287,14 +3532,19 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
+  let env, with_yes_crypto =
+    may_set_yes_crypto configuration.simulate_network
+  in
   let* node =
     Node.init
+      ?env
       ?data_dir
       ~name
       ~arguments:
         [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
       ~rpc_external:configuration.external_rpc
       configuration.network
+      ~with_yes_crypto
       ~snapshot:configuration.snapshot
       cloud
       agent
@@ -3639,16 +3889,30 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   in
   let* stake = configuration.stake in
   let* attesters_agents =
-    stake
-    |> List.mapi (fun i _stake ->
-           let name = name_of (Baker i) in
-           next_agent ~name)
-    |> Lwt.all
+    (* As simulate_network and stake are mutually exclusive, the stake is used
+       only when the simulation is Disabled. *)
+    match configuration.simulate_network with
+    | Scatter (_, baker_count) | Map (_, baker_count) ->
+        Lwt_list.mapi_s
+          (fun i _ ->
+            let name = name_of (Baker i) in
+            next_agent ~name)
+          (List.init baker_count Fun.id)
+    | Disabled ->
+        stake
+        |> List.mapi (fun i _stake ->
+               let name = name_of (Baker i) in
+               next_agent ~name)
+        |> Lwt.all
   in
   let* bakers_agents =
-    configuration.bakers
+    (match configuration.simulate_network with
+    | Scatter (_selected_baker_count, baker_daemon_count)
+    | Map (_selected_baker_count, baker_daemon_count) ->
+        List.init baker_daemon_count string_of_int
+    | Disabled -> configuration.bakers)
     |> List.mapi (fun i _stake ->
-           let name = Format.asprintf "baker-%d" i in
+           let name = name_of (Baker i) in
            next_agent ~name)
     |> Lwt.all
   in
@@ -3704,39 +3968,62 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           bootstrap_agent
           network
   in
-  let* fresh_bakers =
-    Lwt_list.mapi_p
-      (fun i (agent, account) ->
-        init_baker cloud configuration ~bootstrap teztale account i agent)
-      (List.combine attesters_agents baker_accounts)
-  in
-  let* bakers_with_secret_keys =
-    Lwt_list.mapi_p
-      (fun i (agent, sk) ->
-        let sk = Account.Unencrypted sk in
-        let client = Client.create () in
-        let alias = Format.asprintf "baker-%02d" i in
-        let* () = Client.import_secret_key client sk ~alias in
-        let* accounts =
-          let* addresses = Client.list_known_addresses client in
-          Lwt_list.map_s
-            (fun (alias, _) -> Client.show_address ~alias client)
-            addresses
+  let* bakers =
+    match configuration.simulate_network with
+    | Scatter _ | Map _ ->
+        Lwt_list.mapi_p
+          (fun i (agent, accounts) ->
+            init_baker
+              cloud
+              configuration
+              ~bootstrap
+              teztale
+              ~baker_accounts:accounts
+              i
+              agent)
+          (List.combine attesters_agents baker_accounts)
+    | Disabled ->
+        let* fresh_bakers =
+          Lwt_list.mapi_p
+            (fun i (agent, accounts) ->
+              init_baker
+                cloud
+                configuration
+                ~bootstrap
+                teztale
+                ~baker_accounts:accounts
+                i
+                agent)
+            (List.combine attesters_agents baker_accounts)
         in
-        (* A bit random, to fix later. *)
-        let stake = 1 in
-        init_baker
-          ~stake
-          cloud
-          configuration
-          ~bootstrap
-          teztale
-          accounts
-          i
-          agent)
-      (List.combine bakers_agents configuration.bakers)
+        let* bakers_with_secret_keys =
+          Lwt_list.mapi_p
+            (fun i (agent, sk) ->
+              let sk = Account.Unencrypted sk in
+              let client = Client.create () in
+              let alias = Format.asprintf "baker-%02d" i in
+              let* () = Client.import_secret_key client sk ~alias in
+              let* accounts =
+                let* addresses = Client.list_known_addresses client in
+                Lwt_list.map_s
+                  (fun (alias, _) -> Client.show_address ~alias client)
+                  addresses
+              in
+              (* A bit random, to fix later. *)
+              let stake = 1 in
+              init_baker
+                ~stake
+                cloud
+                configuration
+                ~bootstrap
+                teztale
+                ~baker_accounts:accounts
+                i
+                agent)
+            (List.combine bakers_agents configuration.bakers)
+        in
+        Lwt.return (fresh_bakers @ bakers_with_secret_keys)
   in
-  let bakers = fresh_bakers @ bakers_with_secret_keys in
   let () = toplog "Init: initializing producers and observers" in
   let* producers =
     Lwt_list.mapi_p
@@ -3823,7 +4110,10 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let metrics = Hashtbl.create 101 in
   let* first_level =
     match configuration.network with
-    | `Sandbox -> Lwt.return 1
+    | `Sandbox -> (
+        match configuration.simulate_network with
+        | Disabled -> Lwt.return 1
+        | Scatter _ | Map _ -> Network.get_level some_node_rpc_endpoint)
     | _ -> Network.get_level some_node_rpc_endpoint
   in
   Hashtbl.replace metrics first_level default_metrics ;
@@ -4115,84 +4405,103 @@ let parse_snapshot_arg snapshot_arg =
       | _ -> fail v)
   | None -> No_snapshot
 
+let yes_wallet_exe = Uses.path Constant.yes_wallet
+
+let parse_stake_arg ~stake_arg ~simulation_arg =
+  let open Network in
+  match simulation_arg with
+  | Cli.Disabled -> (
+      match stake_arg with
+      | Custom distrib -> return distrib
+      | Mimic {network; max_nb_bakers} ->
+          let network_string =
+            match network with
+            | `Mainnet | `Ghostnet | `Rionet -> to_string network
+            | _ ->
+                failwith
+                  (Format.sprintf
+                     "Cannot get stake distribution for %s"
+                     (to_string network))
+          in
+          let endpoint =
+            Endpoint.make ~host:"rpc.tzkt.io" ~scheme:"https" ~port:443 ()
+          in
+          let decoder json = JSON.(json |-> "cycle" |> as_int) in
+          let rpc =
+            RPC_core.(
+              make
+                GET
+                [
+                  network_string;
+                  "chains";
+                  "main";
+                  "blocks";
+                  "head";
+                  "helpers";
+                  "current_level";
+                ]
+                decoder)
+          in
+          let* response = RPC_core.call_raw endpoint rpc in
+          let cycle =
+            RPC_core.decode_raw ~origin:"Network.cycle" rpc response.body
+          in
+          let get_stake_in_ktez stake =
+            JSON.(
+              (stake |-> "frozen" |> as_int) + (stake |-> "delegated" |> as_int))
+            / 1_000_000_000
+          in
+          let decoder json =
+            json |> JSON.as_list
+            |> List.map (fun json_account ->
+                   let active_stake = JSON.(json_account |-> "active_stake") in
+                   get_stake_in_ktez active_stake)
+          in
+          let rpc =
+            RPC_core.(
+              make
+                GET
+                [
+                  network_string;
+                  "chains";
+                  "main";
+                  "blocks";
+                  "head";
+                  "context";
+                  "raw";
+                  "json";
+                  "cycle";
+                  string_of_int cycle;
+                  "selected_stake_distribution";
+                ]
+                decoder)
+          in
+          let* response = RPC_core.call_raw endpoint rpc in
+          let distribution =
+            RPC_core.decode_raw ~origin:"Network.cycle" rpc response.body
+          in
+          let distribution =
+            match max_nb_bakers with
+            | None -> distribution
+            | Some n -> Tezos_stdlib.TzList.take_n n distribution
+          in
+          return distribution)
+  | Scatter _ | Map _ -> (
+      match stake_arg with
+      | Custom [] ->
+          (* As simulate_network and stake are mutually exclusive, only empty
+             stake option is allowed. *)
+          Lwt.return []
+      | _ ->
+          Test.fail
+            "Options --simulate and --stake are mutually exclusive. We cannot \
+             set baker stake while using baking power of bakers from a \
+             simulated network.")
+
 let register (module Cli : Scenarios_cli.Dal) =
+  let simulate_network = Cli.simulate_network in
   let stake =
-    let open Network in
-    match Cli.stake with
-    | Custom distrib -> return distrib
-    | Mimic {network; max_nb_bakers} ->
-        let network_string =
-          match network with
-          | `Mainnet | `Ghostnet | `Rionet -> to_string network
-          | _ ->
-              failwith
-                (Format.sprintf
-                   "Cannot get stake distribution for %s"
-                   (to_string network))
-        in
-        let endpoint =
-          Endpoint.make ~host:"rpc.tzkt.io" ~scheme:"https" ~port:443 ()
-        in
-        let decoder json = JSON.(json |-> "cycle" |> as_int) in
-        let rpc =
-          RPC_core.(
-            make
-              GET
-              [
-                network_string;
-                "chains";
-                "main";
-                "blocks";
-                "head";
-                "helpers";
-                "current_level";
-              ]
-              decoder)
-        in
-        let* response = RPC_core.call_raw endpoint rpc in
-        let cycle =
-          RPC_core.decode_raw ~origin:"Network.cycle" rpc response.body
-        in
-        let get_stake_in_ktez stake =
-          JSON.(
-            (stake |-> "frozen" |> as_int) + (stake |-> "delegated" |> as_int))
-          / 1_000_000_000
-        in
-        let decoder json =
-          json |> JSON.as_list
-          |> List.map (fun json_account ->
-                 let active_stake = JSON.(json_account |-> "active_stake") in
-                 get_stake_in_ktez active_stake)
-        in
-        let rpc =
-          RPC_core.(
-            make
-              GET
-              [
-                network_string;
-                "chains";
-                "main";
-                "blocks";
-                "head";
-                "context";
-                "raw";
-                "json";
-                "cycle";
-                string_of_int cycle;
-                "selected_stake_distribution";
-              ]
-              decoder)
-        in
-        let* response = RPC_core.call_raw endpoint rpc in
-        let distribution =
-          RPC_core.decode_raw ~origin:"Network.cycle" rpc response.body
-        in
-        let distribution =
-          match max_nb_bakers with
-          | None -> distribution
-          | Some n -> Tezos_stdlib.TzList.take_n n distribution
-        in
-        return distribution
+    parse_stake_arg ~stake_arg:Cli.stake ~simulation_arg:simulate_network
   in
   let configuration, etherlink_configuration =
     let stake_machine_type = Cli.stake_machine_type in
@@ -4268,6 +4577,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         producer_machine_type;
         disconnect;
         network;
+        simulate_network;
         snapshot;
         bootstrap;
         teztale;
@@ -4290,6 +4600,13 @@ let register (module Cli : Scenarios_cli.Dal) =
     (t, etherlink)
   in
   toplog "Parsing CLI done" ;
+  let baker_daemon_count =
+    match simulate_network with
+    | Scenarios_cli.Disabled -> 0
+    | Scatter (_selected_baker_count, baker_daemon_count)
+    | Map (_selected_baker_count, baker_daemon_count) ->
+        baker_daemon_count
+  in
   let vms =
     let* stake = configuration.stake in
     return
@@ -4297,6 +4614,7 @@ let register (module Cli : Scenarios_cli.Dal) =
          [
            (if configuration.bootstrap then [Bootstrap] else []);
            List.mapi (fun i _ -> Baker i) stake;
+           List.init baker_daemon_count (fun i -> Baker i);
            List.map (fun i -> Producer i) configuration.dal_node_producers;
            List.map
              (fun index -> Observer (`Index index))
@@ -4361,6 +4679,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     ~vms
     ~proxy_files:
       ([
+         yes_wallet_exe;
          Format.asprintf
            "src/%s/parameters/mainnet-parameters.json"
            (Protocol.directory configuration.protocol);
