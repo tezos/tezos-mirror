@@ -128,4 +128,8 @@ module Request (Tag : TAG) (L1_operation : INJECTOR_OPERATION) = struct
           "clear %a"
           (Format.pp_print_option pp_removal_criteria)
           predicate
+
+  let name : type a b. (a, b) t -> string = function
+    | Inject -> "Inject"
+    | Clear _ -> "Clear"
 end

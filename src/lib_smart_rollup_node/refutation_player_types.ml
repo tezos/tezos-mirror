@@ -71,4 +71,8 @@ module Request = struct
           (Data_encoding.Json.construct
              Commitment.encoding
              conflict.our_commitment)
+
+  let name : type a b. (a, b) t -> string = function
+    | Play _ -> "Play"
+    | Play_opening _ -> "Play_opening"
 end

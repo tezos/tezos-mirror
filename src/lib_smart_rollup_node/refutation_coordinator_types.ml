@@ -53,4 +53,6 @@ module Request = struct
           Block_hash.pp
           hash
           level
+
+  let name : type a b. (a, b) t -> string = function Process _ -> "Process"
 end

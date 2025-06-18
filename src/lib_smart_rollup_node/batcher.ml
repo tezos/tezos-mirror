@@ -289,7 +289,7 @@ module Name = struct
   let equal () () = true
 end
 
-module Worker = Worker.MakeSingle (Name) (Request) (Types)
+module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 

@@ -1291,7 +1291,7 @@ module Make (Parameters : PARAMETERS) = struct
   end
 
   (* The worker for the injector. *)
-  module Worker = Worker.MakeSingle (Name) (Request) (Types)
+  module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
   (* The injector worker can have a single pending injection request at a
      time. *)

@@ -56,7 +56,7 @@ module Request : sig
   type view = View : _ t -> view
 
   include
-    Worker_intf.REQUEST
+    Octez_telemetry.Worker.REQUEST
       with type ('a, 'request_error) t := ('a, 'request_error) t
        and type view := view
 end
