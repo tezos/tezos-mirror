@@ -814,7 +814,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
   let rpc_server =
     match (rpc_server, kernel) with
     | Some _, _ -> rpc_server
-    | _, (Mainnet | Ghostnet) -> None (* default *)
+    | _, Mainnet -> None (* default *)
     | _, Latest -> Some Evm_node.Dream (* test with Dream for latest kernel *)
   in
   let l2_chains =
