@@ -42,7 +42,7 @@ Run commands:
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
-      [--private-rpc-port <PORT>]
+      [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
       [--genesis-timestamp <[TIMESTAMP]>]
       [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--disable-da-fees]
@@ -106,6 +106,7 @@ Run commands:
       produced on demand only (see private method produceBlock).
     --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
     --private-rpc-port <PORT>: The EVM node private server rpc port.
+    --sequencer-key <edsk...>: Key to sign the blueprints.
     --genesis-timestamp <[TIMESTAMP]>: Timestamp used for the
       genesis block, uses machine's clock if not provided.
     --kernel <evm_kernel.wasm>: Path to the EVM kernel used to launch the
@@ -150,7 +151,7 @@ Run commands:
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
-      [--private-rpc-port <PORT>]
+      [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
       [--genesis-timestamp <[TIMESTAMP]>]
       [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--disable-da-fees]
@@ -213,6 +214,7 @@ Run commands:
       produced on demand only (see private method produceBlock).
     --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
     --private-rpc-port <PORT>: The EVM node private server rpc port.
+    --sequencer-key <edsk...>: Key to sign the blueprints.
     --genesis-timestamp <[TIMESTAMP]>: Timestamp used for the
       genesis block, uses machine's clock if not provided.
     --kernel <evm_kernel.wasm>: Path to the EVM kernel used to launch the
