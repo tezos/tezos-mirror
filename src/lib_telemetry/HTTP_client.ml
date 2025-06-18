@@ -8,15 +8,15 @@
 open Tezos_rpc
 open Path
 
-let trace_call ?(media_types = []) base rpc b c k =
+let call_service media_types ?logger ?headers ~base rpc b c input =
   let method_ = Service.meth rpc |> Resto.string_of_meth in
   let base_str = Uri.path base in
   let path = Filename.Infix.(base_str // (Service.path rpc |> to_string)) in
-  let full_attr =
-    let req = Tezos_rpc.Service.forge_request ~base rpc b c in
-    ("url.full", `String (Uri.to_string req.uri))
-  in
   let make_attrs () =
+    let full_attr =
+      let req = Tezos_rpc.Service.forge_request ~base rpc b c in
+      ("url.full", `String (Uri.to_string req.uri))
+    in
     let http_server_attr =
       match Uri.host base with
       | Some server -> [("server.name", `String server)]
@@ -51,4 +51,12 @@ let trace_call ?(media_types = []) base rpc b c k =
     Format.(sprintf "%s %s" method_ path)
   @@ fun scope ->
   Opentelemetry_lwt.Trace.add_attrs scope make_attrs ;
-  k scope
+  Tezos_rpc_http_client_unix.RPC_client_unix.call_service
+    media_types
+    ~base
+    ?headers
+    ?logger
+    rpc
+    b
+    c
+    input

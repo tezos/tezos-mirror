@@ -281,15 +281,8 @@ let retry_connection (f : Uri.t -> 'a tzresult Lwt.t) endpoint :
 let call_service ~base ?(media_types = Media_type.all_media_types) rpc b c input
     =
   let open Lwt_result_syntax in
-  Octez_telemetry.HTTP_client.trace_call ~media_types base rpc b c @@ fun _ ->
   let*! res =
-    Tezos_rpc_http_client_unix.RPC_client_unix.call_service
-      media_types
-      ~base
-      rpc
-      b
-      c
-      input
+    Octez_telemetry.HTTP_client.call_service media_types ~base rpc b c input
   in
   match res with
   | Ok res -> return res

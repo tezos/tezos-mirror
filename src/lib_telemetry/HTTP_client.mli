@@ -8,11 +8,31 @@
 (** Follow the OpenTelemetry specs for HTTP client,
     see https://opentelemetry.io/docs/specs/semconv/http/http-spans *)
 
-val trace_call :
-  ?media_types:Tezos_rpc_http.Media_type.t list ->
-  Uri.t ->
+(** [call_service media_types ?logger ?headers ~base service params query body]
+    makes an HTTP request to the specified RPC service with OpenTelemetry
+    tracing.
+
+    This function follows the OpenTelemetry semantic conventions for HTTP client
+    spans, automatically setting appropriate attributes like HTTP method, URL,
+    status code, etc.
+
+    @param media_types List of accepted media types for the request
+    @param logger Optional logger for RPC client operations
+    @param headers Optional additional HTTP headers to include in the request
+    @param base The base URI to which the request will be sent
+    @param service The RPC service definition
+    @param params The path parameters for the service
+    @param query The query parameters for the service
+    @param body The request body
+    @return The result of the RPC call, wrapped in the Tezos error monad
+*)
+val call_service :
+  Tezos_rpc_http.Media_type.t trace ->
+  ?logger:Tezos_rpc_http_client_unix.RPC_client_unix.logger ->
+  ?headers:(string * string) trace ->
+  base:Uri.t ->
   ([< Resto.meth], unit, 'a, 'b, 'c, 'd) Tezos_rpc.Service.t ->
   'a ->
   'b ->
-  (Opentelemetry.Scope.t -> 'r tzresult Lwt.t) ->
-  'r tzresult Lwt.t
+  'c ->
+  'd tzresult Lwt.t

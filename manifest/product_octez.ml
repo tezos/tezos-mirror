@@ -4529,6 +4529,7 @@ let octez_telemetry =
         resto;
         octez_rpc_http;
         octez_rpc_http_server;
+        octez_rpc_http_client_unix;
         octez_workers;
       ]
 
