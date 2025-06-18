@@ -933,7 +933,7 @@ rpm_repo_fedora:
     - stuck_or_timeout_failure
     - runner_system_failure
 
-grafazos.build_grafazos_dashboards:
+grafazos.build_dashboards:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: build
   tags:
@@ -960,9 +960,9 @@ grafazos.gitlab:release:
   tags:
   - gcp
   needs:
-  - grafazos.build_grafazos_dashboards
+  - grafazos.build_dashboards
   dependencies:
-  - grafazos.build_grafazos_dashboards
+  - grafazos.build_dashboards
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -979,9 +979,9 @@ grafazos.publish:release-page:
   - when: manual
     allow_failure: true
   needs:
-  - grafazos.build_grafazos_dashboards
+  - grafazos.build_dashboards
   dependencies:
-  - grafazos.build_grafazos_dashboards
+  - grafazos.build_dashboards
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh

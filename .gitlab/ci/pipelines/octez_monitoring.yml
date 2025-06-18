@@ -93,7 +93,7 @@ datadog_pipeline_trace:
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
-grafazos.build_grafazos_dashboards:
+grafazos.build_dashboards:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: build
   tags:

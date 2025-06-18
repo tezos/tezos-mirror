@@ -14,7 +14,7 @@ let job_gitlab_release =
     ~image:Images.ci_release
     ~stage:Stages.publish
     ~interruptible:false
-    ~dependencies:(Dependent [Artifacts (Common.job_build_grafazos ())])
+    ~dependencies:(Dependent [Artifacts (Common.job_build ())])
     ~name:"gitlab:release"
     ["./grafazos/scripts/releases/create_gitlab_release.sh"]
 
@@ -31,7 +31,7 @@ let job_release_page ~test () =
        accordingly."
     ~name:"publish:release-page"
     ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
-    ~dependencies:(Dependent [Artifacts (Common.job_build_grafazos ())])
+    ~dependencies:(Dependent [Artifacts (Common.job_build ())])
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~expire_in:(Duration (Days 1))
@@ -55,4 +55,4 @@ let job_release_page ~test () =
     ["./grafazos/scripts/releases/publish_release_page.sh"]
 
 let jobs ~test () =
-  [Common.job_build_grafazos (); job_gitlab_release; job_release_page ~test ()]
+  [Common.job_build (); job_gitlab_release; job_release_page ~test ()]

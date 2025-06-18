@@ -18,10 +18,10 @@ let job ~name = job ~name:(prefix ^ "." ^ name)
 let changeset_grafazos = Changeset.(make ["grafazos/**/*"])
 
 (** Job that builds the Grafazos dashboards *)
-let job_build_grafazos ?rules () =
+let job_build ?rules () =
   job
     ~__POS__
-    ~name:"build_grafazos_dashboards"
+    ~name:"build_dashboards"
     ~image:Images.jsonnet
     ~stage:Stages.build
     ?rules

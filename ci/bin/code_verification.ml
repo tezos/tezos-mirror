@@ -809,7 +809,7 @@ let jobs pipeline_type =
     let job_build_grafazos =
       match pipeline_type with
       | Merge_train | Before_merging ->
-          Grafazos_ci.Common.job_build_grafazos
+          Grafazos_ci.Common.job_build
             ~rules:
               [
                 job_rule
@@ -821,9 +821,7 @@ let jobs pipeline_type =
               ]
             ()
       | Schedule_extended_test ->
-          Grafazos_ci.Common.job_build_grafazos
-            ~rules:[job_rule ~when_:Always ()]
-            ()
+          Grafazos_ci.Common.job_build ~rules:[job_rule ~when_:Always ()] ()
     in
     let job_build_teztale ?cpu ~arch ?storage () =
       Teztale.Common.job_build
