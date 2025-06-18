@@ -6,7 +6,7 @@
 (*****************************************************************************)
 
 (* You can run the benchmark using:
-   TEZOS_PPX_PROFILER=t dune build tezt/manual_tests/eio_benchmarks && PROFILING="main->debug" PROFILING_BACKEND=txt _build/default/tezt/manual_tests/eio_benchmarks/test.exe 32
+   TEZOS_PPX_PROFILER=t dune build tezt/manual_tests/eio_benchmarks && PROFILING="main->debug" PROFILING_BACKENDS=txt _build/default/tezt/manual_tests/eio_benchmarks/test.exe 32
 *)
 
 open Tezos_base
@@ -21,12 +21,15 @@ let () =
     exit 1)
 
 let () =
-  match Tezos_profiler_unix.Profiler_instance.selected_backend () with
-  | Some {instance_maker; _} -> (
-      let profiler_maker = instance_maker ~directory:"/tmp" ~name:"main" in
-      match profiler_maker with
-      | Some instance -> Tezos_profiler.Profiler.(plug main) instance
-      | None -> ())
+  match Tezos_profiler_unix.Profiler_instance.selected_backends () with
+  | Some backends ->
+      List.iter
+        (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
+          let profiler_maker = instance_maker ~directory:"/tmp" ~name:"main" in
+          match profiler_maker with
+          | Some instance -> Tezos_profiler.Profiler.(plug main) instance
+          | None -> ())
+        backends
   | None -> ()
 
 module Profiler =

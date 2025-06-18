@@ -102,12 +102,12 @@ encouraged to use their preferred option.
 
 To choose the verbosity of the profiler at runtime, the ``PROFILING``
 environment variable is used. It follows the same pattern as the ``TEZOS_LOG``
-environment variable (see :doc:`../user/logging`).
+environment variable (see :doc:`../user/logging`) except that it doesn't execute
+profilers which verbosity is not set.
 
 Starting a node with
 ``PROFILING='shell_profiling->Notice;mempool_profiling->Debug'`` will set the
-maximum verbosity for these two profilers and execute the rest of the profilers
-with no maximal verbosity.
+maximum verbosity for these two profilers and not execute the rest of the profilers.
 
 We can now easily create an instance for a ``Driver``:
 
@@ -160,7 +160,17 @@ code.
 Since ``Read_profiler`` is already plugged to ``read_instance``, calling
 ``Read_profiler`` functions will work as expected.
 
-We can now start monitoring our code. We can start with a simple change:
+We can now start monitoring our code.
+
+First, we need to plug our profilers to backends to gather results. Plugging a
+profiler to one or more backends is done with ``PROFILER_BACKENDS=<list of ;
+separated backends>``. For example, you could run a node with
+
+.. code-block::
+
+   PROFILING="*->Debug" PROFILER_BACKENDS="txt; json" octez-node run
+
+We can start with a simple change:
 
 .. code-block:: OCaml
 

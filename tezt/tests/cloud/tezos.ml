@@ -39,7 +39,7 @@ module Env = struct
   let ppx_profiler_env enable env =
     env
     |> may_add enable "PROFILING" "Debug"
-    |> may_add enable "PROFILING_BACKEND" "txt"
+    |> may_add enable "PROFILING_BACKENDS" "txt"
 
   let initialize_env ~memtrace ~memtrace_output_filename
       ~disable_shard_validation ~otel_endpoint ~service_name ~ignore_pkhs
