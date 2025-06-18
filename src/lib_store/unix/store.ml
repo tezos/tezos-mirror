@@ -3750,10 +3750,6 @@ module Unsafe = struct
     let genesis_block =
       Block_repr.create_genesis_block ~genesis genesis_context_hash
     in
-    let new_head_descr =
-      ( Block_repr.hash new_head_with_metadata,
-        Block_repr.level new_head_with_metadata )
-    in
     (* Write consistent stored data *)
     let* () =
       Stored_data.write_file
@@ -3765,9 +3761,14 @@ module Unsafe = struct
         (Naming.current_head_file chain_dir)
         (Block.descriptor new_head_with_metadata)
     in
-    (* Checkpoint is the new head *)
+    (* Checkpoint is the predecessor of the target block as we have both the
+       associated context and the block's metadada. *)
+    let new_checkpoint =
+      ( Block_header.hash predecessor_header,
+        predecessor_header.Block_header.shell.level )
+    in
     let* () =
-      Stored_data.write_file (Naming.checkpoint_file chain_dir) new_head_descr
+      Stored_data.write_file (Naming.checkpoint_file chain_dir) new_checkpoint
     in
     (* Cementing highwatermark is set to None *)
     let* () =
@@ -3776,9 +3777,14 @@ module Unsafe = struct
         None
     in
     let* () = Stored_data.write_file (Naming.target_file chain_dir) None in
-    (* Savepoint is the head *)
+    (* Savepoint is the predecessor of the target block as we have both the
+       associated context and the block's metadada. *)
+    let new_savepoint =
+      ( Block_header.hash predecessor_header,
+        predecessor_header.Block_header.shell.level )
+    in
     let* () =
-      Stored_data.write_file (Naming.savepoint_file chain_dir) new_head_descr
+      Stored_data.write_file (Naming.savepoint_file chain_dir) new_savepoint
     in
     (* Depending on the history mode, set the caboose properly *)
     let* caboose_descr =

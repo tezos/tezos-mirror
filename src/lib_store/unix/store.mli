@@ -670,12 +670,11 @@ module Chain : sig
       invariant holds:
       [checkpoint.level >= all_head.last_preserved_block_level]
 
-      The checkpoint will tend to designate the highest block among
-      all chain head's [last_preserved_block_level] in a normal
-      mode. This is not always true. i.e. after a snapshot import
-      where the checkpoint will be set as the imported block and when
-      the [target] block is reached, the checkpoint will be set at
-      this point. *)
+      The checkpoint will tend to designate the highest block among all chain
+      head's [last_preserved_block_level] in a normal mode. This is not always
+      true. i.e. after a snapshot import where the checkpoint will be set as the
+      predecessor of the imported block and when the [target] block is reached,
+      the checkpoint will be set at this point. *)
   val checkpoint : chain_store -> block_descriptor Lwt.t
 
   (** [target chain_store] returns the target block associated to the

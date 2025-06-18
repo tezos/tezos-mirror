@@ -2312,8 +2312,8 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           savepoint_level > Int32.pred block_level && not pred_context_exists)
         (Invalid_export_block {block = Some block_hash; reason = `Pruned_pred})
     in
-    let* block_metadata =
-      let*! o = Store.Block.get_block_metadata_opt chain_store block in
+    let* pred_block_metadata =
+      let*! o = Store.Block.get_block_metadata_opt chain_store pred_block in
       match o with
       | None ->
           tzfail
@@ -2322,13 +2322,15 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     in
     let*! _, caboose_level = Store.Chain.caboose chain_store in
     (* We will need the following blocks
-       [ (target_block - max_op_ttl(target_block)) ; ... ; target_block ] *)
-    let block_max_op_ttl = Store.Block.max_operations_ttl block_metadata in
+       [ (pred(target_block) - max_op_ttl(target_block)) ; ... ; pred(target_block) ] *)
+    let block_max_op_ttl = Store.Block.max_operations_ttl pred_block_metadata in
     let*! genesis_block = Store.Chain.genesis_block chain_store in
     let genesis_level = Store.Block.level genesis_block in
     let minimum_level_needed =
       Compare.Int32.(
-        max genesis_level Int32.(sub block_level (of_int block_max_op_ttl)))
+        max
+          genesis_level
+          Int32.(sub (sub block_level 1l) (of_int block_max_op_ttl)))
     in
     let* () =
       fail_when
@@ -4261,9 +4263,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     return_unit
 end
 
-(* [snapshot_file_kind ~snapshot_path] returns the kind of a
-   snapshot. We assume that a snapshot is valid if the medata can be
-   read. *)
+(* [snapshot_file_kind ~snapshot_path] returns the kind of a snapshot. We assume
+   that a snapshot is valid if the metadata can be read. *)
 let snapshot_file_kind ~snapshot_path =
   let open Lwt_result_syntax in
   let is_valid_uncompressed_snapshot file =
