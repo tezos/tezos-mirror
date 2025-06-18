@@ -129,7 +129,7 @@ mod test {
     use crate::storage_helpers::{concat, read_u64_le};
 
     use revm::{
-        primitives::{alloy_primitives::KECCAK256_EMPTY, Bytes},
+        primitives::{Bytes, KECCAK_EMPTY},
         state::Bytecode,
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -142,7 +142,7 @@ mod test {
         let found_code_hash = CodeStorage::add(&mut host, &empty_code)
             .expect("Could not create code storage");
 
-        assert_eq!(found_code_hash, KECCAK256_EMPTY);
+        assert_eq!(found_code_hash, KECCAK_EMPTY);
     }
 
     #[test]
@@ -196,7 +196,7 @@ mod test {
         let mut host = MockKernelHost::default();
 
         let code_storage =
-            CodeStorage::new(&KECCAK256_EMPTY).expect("Could not find code storage");
+            CodeStorage::new(&KECCAK_EMPTY).expect("Could not find code storage");
 
         let exists = code_storage
             .exists(&host)
@@ -221,7 +221,7 @@ mod test {
             .expect("Could not check if contract exists");
         assert!(exists, "code storage should exist");
 
-        let () = CodeStorage::delete(&mut host, &KECCAK256_EMPTY)
+        let () = CodeStorage::delete(&mut host, &KECCAK_EMPTY)
             .expect("Could not delete code storage");
 
         let exists = code_storage
@@ -229,7 +229,7 @@ mod test {
             .expect("Could not check if contract exists");
         assert!(exists, "code storage should exist");
 
-        let () = CodeStorage::delete(&mut host, &KECCAK256_EMPTY)
+        let () = CodeStorage::delete(&mut host, &KECCAK_EMPTY)
             .expect("Could not delete code storage");
 
         let exists = code_storage
