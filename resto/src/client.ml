@@ -227,11 +227,13 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
           let header = String.lowercase_ascii header in
           if
             header <> "host"
+            && header <> "traceparent"
+               (* https://www.w3.org/TR/trace-context/#traceparent-headertrace *)
             && (String.length header < 2 || String.sub header 0 2 <> "x-")
           then
             invalid_arg
-              "Resto_cohttp.Client.call: only headers \"host\" or starting \
-               with \"x-\" are supported"
+              "Resto_cohttp.Client.call: only headers \"host\", \
+               \"traceparent\" or starting with \"x-\" are supported"
           else Header.replace headers header value)
         init_headers
         headers
