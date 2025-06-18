@@ -169,6 +169,7 @@ Now that everything is in place, we can start the Octez baker.
 
 This service will automatically start all accusers and bakers for all protocols
 shipped with the package.
+It will also start a :doc:`DAL node <../shell/dal_node>` alongside the baker, which is the recommended setting for all bakers.
 
 The logs of the baker are available in ``/var/log/tezos/baker-<protocol name>.log``.
 
