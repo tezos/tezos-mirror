@@ -969,6 +969,16 @@ let jobs pipeline_type =
         ~dependencies:(Dependent [])
         Homebrew.child_pipeline_full
     in
+
+    let job_base_images_trigger =
+      trigger_job
+        ~__POS__
+        ~rules:(make_rules ~manual:No ~changes:changeset_base_images ())
+        ~stage:Stages.images
+        ~dependencies:(Dependent [])
+        Base_images.child_pipeline
+    in
+
     (* check that ksy files are still up-to-date with octez *)
     let job_kaitai_checks : tezos_job =
       job
@@ -1864,6 +1874,7 @@ let jobs pipeline_type =
             job_debian_repository_trigger_full;
             job_rpm_repository_trigger_full;
             job_homebrew_trigger_full;
+            job_base_images_trigger;
           ]
     in
     jobs_debian @ jobs_misc @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_kernels
@@ -2083,6 +2094,14 @@ let jobs pipeline_type =
         ~stage:Stages.manual
         Homebrew.child_pipeline_full
     in
+    let job_base_images_trigger =
+      trigger_job
+        ~__POS__
+        ~rules:(make_rules ~manual:Yes ())
+        ~stage:Stages.manual
+        ~dependencies:(Dependent [])
+        Base_images.child_pipeline
+    in
     match pipeline_type with
     | Before_merging | Merge_train ->
         (* Note: manual jobs in stage [manual] (which is the final
@@ -2131,13 +2150,22 @@ let jobs pipeline_type =
             ["./scripts/ci/docker_verify_signature.sh"]
         in
         let jobs =
-          [job_docker_amd64_test_manual; job_docker_arm64_test_manual]
-          @ [job_docker_verify_test_arm64; job_docker_verify_test_amd64]
+          [
+            job_docker_amd64_test_manual;
+            job_docker_arm64_test_manual;
+            job_docker_verify_test_arm64;
+            job_docker_verify_test_amd64;
+            job_base_images_trigger;
+          ]
         in
         if pipeline_type = Merge_train then jobs
         else
-          job_homebrew_repository_trigger :: job_rpm_repository_trigger_partial
-          :: job_debian_repository_trigger_partial :: jobs
+          [
+            job_homebrew_repository_trigger;
+            job_rpm_repository_trigger_partial;
+            job_debian_repository_trigger_partial;
+          ]
+          @ jobs
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in

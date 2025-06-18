@@ -255,6 +255,9 @@ let changeset_base = Changeset.make [".gitlab/**/*"; ".gitlab-ci.yml"]
 
 let changeset_images = Changeset.make ["images/**/*"]
 
+let changeset_base_images =
+  Changeset.make ["images/base-images/**/*"; "scripts/ci/build-base-images.sh"]
+
 (** Only if octez source code has changed *)
 let changeset_octez =
   let octez_source_content =
