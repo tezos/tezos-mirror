@@ -99,6 +99,10 @@ Client
 - Added ``octez-client set companion key for <delegate> to <bls_key>``, setting a
   companion key for the given delegate. (MR :gl:`!17320`)
 
+- Added ``--initial-stake`` argument to stake at the same time as
+  registering a given key as a delegate or setting a delegate for a
+  contract. (MR :gl:`!18282`)
+
 Signer
 ------
 
