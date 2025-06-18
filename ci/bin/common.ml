@@ -356,7 +356,7 @@ let changeset_rpm_packages =
   Changeset.(
     make
       [
-        "scripts/packaging/build-deb-local.sh";
+        "scripts/packaging/build-rpm-local.sh";
         "scripts/packaging/octez/rpm/*";
         "scripts/packaging/tests/rpm/*";
         "rpm-deps-build.Dockerfile";

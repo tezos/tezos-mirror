@@ -1758,7 +1758,7 @@ trigger:rpm_repository_partial_auto:
     - scripts/ci/build-rpm-packages.sh
     - scripts/ci/create_rpm_repo.sh
     - scripts/ci/prepare-apt-rpm-repo.sh
-    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/build-rpm-local.sh
     - scripts/packaging/octez/rpm/*
     - scripts/packaging/tests/rpm/*
     - scripts/version.sh
