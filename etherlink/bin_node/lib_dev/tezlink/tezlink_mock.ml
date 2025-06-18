@@ -34,10 +34,10 @@ let fitness =
    being replaced by actual data. *)
 let context = Context_hash.of_bytes_exn (Bytes.make 32 '\255')
 
-let contents : Imported_protocol.Block_header_repr.contents =
+let contents : Alpha_context.Block_header.contents =
   {
     payload_hash = Imported_protocol.Block_payload_hash.zero;
-    payload_round = Imported_protocol.Round_repr.zero;
+    payload_round = Alpha_context.Round.zero;
     seed_nonce_hash = None;
     proof_of_work_nonce =
       Bytes.make
@@ -53,7 +53,7 @@ let contents : Imported_protocol.Block_header_repr.contents =
 let signature : Imported_protocol.Alpha_context.signature =
   Unknown (Bytes.make Tezos_crypto.Signature.Ed25519.size '\000')
 
-let protocol_data : Imported_protocol.Block_header_repr.protocol_data =
+let protocol_data : Alpha_context.Block_header.protocol_data =
   {contents; signature}
 
 module Operation_metadata = struct

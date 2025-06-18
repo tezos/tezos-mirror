@@ -107,80 +107,6 @@ module Protocol_types = struct
   let ethereum_to_tezos_block_hash hash =
     hash |> Ethereum_types.block_hash_to_bytes |> Block_hash.of_string
 
-  module type HEADER = sig
-    module Block_services : BLOCK_SERVICES
-
-    val tezlink_block_to_shell_header :
-      L2_types.Tezos_block.t -> Block_header.shell_header tzresult
-
-    val tezlink_block_to_block_header :
-      l2_chain_id:L2_types.chain_id ->
-      L2_types.Tezos_block.t * 'b ->
-      Block_services.block_header tzresult
-
-    val tezlink_block_to_block_info :
-      l2_chain_id:L2_types.chain_id ->
-      'a * L2_types.Tezos_block.t * 'b ->
-      ('a * Block_services.block_info) tzresult
-  end
-
-  module Make_block_header (Block_services : BLOCK_SERVICES) :
-    HEADER with module Block_services = Block_services = struct
-    module Block_services = Block_services
-
-    let tezlink_block_to_shell_header (block : L2_types.Tezos_block.t) :
-        Block_header.shell_header tzresult =
-      let open Result_syntax in
-      let open Tezlink_mock in
-      let* predecessor = ethereum_to_tezos_block_hash block.parent_hash in
-      return
-        Block_header.
-          {
-            level = block.level;
-            proto_level;
-            predecessor;
-            timestamp = block.timestamp;
-            validation_passes;
-            operations_hash;
-            fitness;
-            context;
-          }
-
-    let tezlink_block_to_block_header ~l2_chain_id
-        ((block : L2_types.Tezos_block.t), chain) :
-        Block_services.block_header tzresult =
-      let open Result_syntax in
-      let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
-      let* protocol_data = Block_services.mock_block_header_data in
-      let* hash = ethereum_to_tezos_block_hash block.hash in
-      let* shell = tezlink_block_to_shell_header block in
-      let block_header : Block_services.block_header =
-        {chain_id; hash; shell; protocol_data}
-      in
-      return block_header
-
-    let tezlink_block_to_raw_block_header block =
-      let open Result_syntax in
-      let* protocol_data = Block_services.mock_block_header_data in
-      let* shell = tezlink_block_to_shell_header block in
-      let raw_block_header : Block_services.raw_block_header =
-        {shell; protocol_data}
-      in
-      return raw_block_header
-
-    let tezlink_block_to_block_info ~l2_chain_id (version, block, chain) =
-      let open Result_syntax in
-      let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
-      let* hash =
-        ethereum_to_tezos_block_hash block.L2_types.Tezos_block.hash
-      in
-      let* header = tezlink_block_to_raw_block_header block in
-      let block_info : Block_services.block_info =
-        {chain_id; hash; header; metadata = None; operations = []}
-      in
-      return (version, block_info)
-  end
-
   module Level = struct
     open Tezos_types
 
@@ -250,11 +176,6 @@ module Protocol_types = struct
         }
   end
 end
-
-module Current_block_header = Protocol_types.Make_block_header (Block_services)
-module Zero_block_header = Protocol_types.Make_block_header (Zero_block_services)
-module Genesis_block_header =
-  Protocol_types.Make_block_header (Genesis_block_services)
 
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
