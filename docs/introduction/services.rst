@@ -140,6 +140,8 @@ following command:
     $ sudo su tezos -c "octez-client gen keys alice"
 
 and the baker will use it automatically.
+Indeed, the baker bakes for all the keys for which it has the private key.
+If you want to avoid this behavior, you can specify a specific baking key by editing the file ``/etc/default/octez-baker`` and assigning a value to variable ``BAKER_KEY``.
 
 Configuring the baker
 ---------------------
@@ -167,6 +169,7 @@ Now that everything is in place, we can start the Octez baker.
 
 This service will automatically start all accusers and bakers for all protocols
 shipped with the package.
+It will also start a :doc:`DAL node <../shell/dal_node>` alongside the baker, which is the recommended setting for all bakers.
 
 The logs of the baker are available in ``/var/log/tezos/baker-<protocol name>.log``.
 

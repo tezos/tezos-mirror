@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# The following is needed to allow using "sudo apt-get" below, even though apt-get is
+# defined as an alias in library scripts/packaging/tests/tests-common.inc.sh
+# shellcheck disable=SC2033
+
 distribution=$1
 release=$2
 
@@ -62,7 +66,7 @@ if [ "$RELEASETYPE" = "Master" ]; then
     sudo gpg --dearmor -o /etc/apt/keyrings/octez.gpg
   echo "deb [signed-by=/etc/apt/keyrings/octez.gpg] https://packages.nomadic-labs.com/$distribution $release main" |
     sudo tee /etc/apt/sources.list.d/octez.list
-  apt-get update
+  sudo apt-get update
   # [end add repository]
 else
   apt-get update
