@@ -2721,11 +2721,15 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
   let* _ = Process.wait process in
   let () = toplog "Init producer %s: create agent" name in
   let* dal_node =
+    let ignore_pkhs =
+      if configuration.ignore_pkhs = [] then None
+      else Some configuration.ignore_pkhs
+    in
     Dal_node.Agent.create
       ~name:(Format.asprintf "producer-dal-node-%i" i)
       ~node
       ~disable_shard_validation:configuration.disable_shard_validation
-      ~ignore_pkhs:configuration.ignore_pkhs
+      ?ignore_pkhs
       cloud
       agent
   in
