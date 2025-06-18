@@ -53,7 +53,7 @@ type error += TzCrashError
 
 exception RaisedExn
 
-let create_handlers (type a) ?on_completion ?(slow = false) () =
+let create_handlers (type a) ?on_completion ?on_close ?(slow = false) () =
   (module struct
     type self = a Worker.t
 
@@ -109,7 +109,8 @@ let create_handlers (type a) ?on_completion ?(slow = false) () =
 
     let on_no_request _ = Lwt.return_unit
 
-    let on_close _w = Lwt.return_unit
+    let on_close _w =
+      match on_close with Some f -> f () | None -> Lwt.return_unit
   end : Worker.HANDLERS
     with type self = a Worker.t
      and type launch_error = error trace)
@@ -121,9 +122,9 @@ let create table handlers ?(timeout : float option) name =
   in
   Worker.launch ?timeout table name 0 handlers
 
-let create_queue ?timeout ?on_completion =
+let create_queue ?timeout ?on_completion ?on_close =
   let table = Worker.create_table Queue in
-  create ?timeout table (create_handlers ?on_completion ())
+  create ?timeout table (create_handlers ?on_completion ?on_close ())
 
 let create_bounded ?timeout ?on_completion =
   let table = Worker.create_table (Bounded {size = 2}) in
@@ -264,11 +265,19 @@ let push_and_assert_history w l =
 (* Checks a non crashing request actually doesn't make the worker crash *)
 let test_push_crashing_request () =
   let open Lwt_result_syntax in
-  let* w = create_queue "crashing_worker" in
+  let t, u = Lwt.wait () in
+  let* w =
+    create_queue
+      ~on_close:(fun () ->
+        Lwt.wakeup u () ;
+        Lwt.return_unit)
+      "crashing_worker"
+  in
   assert_status w "Running" ;
   let*! () =
     push_and_assert_history w [Box RqB; Box RqB; Box (RqErr Crash); Box RqB]
   in
+  let*! () = t in
   assert_status w "Closed" ;
   return_unit
 

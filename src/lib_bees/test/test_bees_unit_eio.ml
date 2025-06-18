@@ -41,7 +41,7 @@ let sleep d =
   let env = Tezos_base_unix.Event_loop.env_exn () in
   Eio.Time.sleep env#clock d
 
-let create_handlers (type a) ?on_completion ?(slow = false) () =
+let create_handlers (type a) ?on_completion ?on_close ?(slow = false) () =
   (module struct
     type self = a Worker.t
 
@@ -91,7 +91,7 @@ let create_handlers (type a) ?on_completion ?(slow = false) () =
 
     let on_no_request _ = ()
 
-    let on_close _w = ()
+    let on_close _w = match on_close with Some f -> f () | None -> ()
   end : Worker.EIO_HANDLERS
     with type self = a Worker.t
      and type launch_error = error trace)
@@ -103,9 +103,9 @@ let create table handlers ?(timeout : float option) name =
   in
   Worker.launch_eio ?timeout table ~name 0 handlers
 
-let create_queue ?timeout ?on_completion =
+let create_queue ?timeout ?on_completion ?on_close =
   let table = Worker.create_table Queue in
-  create ?timeout table (create_handlers ?on_completion ())
+  create ?timeout table (create_handlers ?on_completion ?on_close ())
 
 let create_bounded ?timeout ?on_completion =
   let table = Worker.create_table (Bounded {size = 2}) in
@@ -246,12 +246,15 @@ let push_and_assert_history w l =
 (* Checks a non crashing request actually doesn't make the worker crash *)
 let test_push_crashing_request () =
   let open Result_syntax in
-  let* w = create_queue "crashing_worker" in
+  let t, u = Eio.Promise.create () in
+  let* w =
+    create_queue
+      ~on_close:(fun () -> Eio.Promise.resolve u ())
+      "crashing_worker"
+  in
   assert_status w "Running" ;
   push_and_assert_history w [Box RqB; Box RqB; Box (RqErr Crash); Box RqB] ;
-  (* The worker loop run in another fiber, let the scheduler run the shutdown
-     process before continuing. *)
-  let () = sleep 0.1 in
+  let () = Eio.Promise.await t in
   assert_status w "Closed" ;
   return_unit
 
