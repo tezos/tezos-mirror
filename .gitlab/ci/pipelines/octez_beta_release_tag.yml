@@ -933,22 +933,6 @@ rpm_repo_fedora:
     - stuck_or_timeout_failure
     - runner_system_failure
 
-grafazos.datadog_pipeline_trace:
-  image: datadog/ci:v2.44.0
-  stage: start
-  tags:
-  - gcp
-  dependencies: []
-  allow_failure: true
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_info.sh
-  script:
-  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
-  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
-    --tags mr_number:$CI_MERGE_REQUEST_IID
-
 grafazos.build_grafazos_dashboards:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: build

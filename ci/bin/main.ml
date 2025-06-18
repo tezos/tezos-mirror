@@ -234,7 +234,9 @@ let () =
   register
     "grafazos_release_tag_test"
     If.(not_on_tezos_namespace && push && has_tag_match grafazos_release_tag_re)
-    ~jobs:(Grafazos_ci.Release.jobs ~test:true ())
+    ~jobs:
+      (Common.job_datadog_pipeline_trace
+      :: Grafazos_ci.Release.jobs ~test:true ())
     ~description:
       "Test release pipeline for Grafazos.\n\n\
        This pipeline checks that 'grafazos_release_tag' pipelines work as \
