@@ -247,7 +247,7 @@ module For_snapshots = struct
           loop_retry_delay = 10.;
           pre_images_endpoint = None;
           bail_on_disagree = false;
-          otel_profiling = Configuration.default_otel_profiling;
+          opentelemetry = Octez_telemetry.Opentelemetry_config.default;
         }
     in
     let*? l1_ctxt =
@@ -360,7 +360,7 @@ module Internal_for_tests = struct
           history_mode = None;
           cors = Resto_cohttp.Cors.default;
           bail_on_disagree = false;
-          otel_profiling = Configuration.default_otel_profiling;
+          opentelemetry = Octez_telemetry.Opentelemetry_config.default;
         }
     in
     let* lockfile = lock ~data_dir in

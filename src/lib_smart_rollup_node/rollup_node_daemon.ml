@@ -817,7 +817,7 @@ let plugin_of_first_block cctxt (block : Layer1.header) =
   let*? plugin = Protocol_plugins.proto_plugin_for_protocol current_protocol in
   return (current_protocol, plugin)
 
-let setup_opentelemetry Configuration.{otel_profiling = {enable; config}; _} =
+let setup_opentelemetry Configuration.{opentelemetry = {enable; config}; _} =
   Opentelemetry.Globals.service_name := "rollup_node" ;
   Opentelemetry_ambient_context.set_storage_provider
     (Opentelemetry_ambient_context_lwt.storage ()) ;

@@ -6,6 +6,37 @@
 
 ### Configuration changes
 
+### RPCs changes
+
+### Metrics changes
+
+### Execution changes
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.30 (2025-06-18)
+
+This release of the EVM node adds a new database connection pool implementation
+for the store which should eliminate lock ups in the RPC server. The node now
+always checks the gas limit to avoid sending invalid transactions, and
+compatibility is improved with older tools and hardhat. An extensive profiling
+instrumentation was added which will allow developers to precisely analyze and
+improve performance.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
 - New field `"db"` which allows to configure some parameters for the database
   such as the connection pool size and the connection reuse limit. (!18235)
 - New `"enable_revm"` config key feature flag to change the EVM execution's VM
@@ -18,6 +49,11 @@
 
 ### Metrics changes
 
+- Extensive profiling with OpenTelemetry traces. Profiling is disabled by
+  default and can be activated with the configuration field
+  `opentelemetry`. (!18227 !18229 !18279 !18290 !18291
+  !18312 !18315 !18328 !18331 !18337 !18347 !18348 !18368)
+
 ### Execution changes
 
 - Node validation always checks that the gas limit are set correctly.
@@ -25,7 +61,8 @@
 
 ### Storage changes
 
-### Documentation changes
+- New database connection pool which should be more efficient and not suffer
+  from locks. (!18235)
 
 ### Experimental features changes
 

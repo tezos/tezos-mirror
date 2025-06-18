@@ -288,7 +288,7 @@ let evm_node_config =
         octez_rpc_http_server;
         octez_stdlib_unix |> open_;
         evm_node_lib_dev_encoding |> open_;
-        opentelemetry_client_cohttp_lwt;
+        octez_telemetry;
       ]
 
 let evm_node_lib_dev =
