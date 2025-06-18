@@ -53,7 +53,7 @@ let job_container_scanning_slack_notification ?dockerfile_path docker_image :
 
 let jobs ?dockerfile_path docker_image : tezos_job list =
   [
-    Common.job_datadog_pipeline_trace;
+    Tezos_ci.job_datadog_pipeline_trace;
     job_container_scanning ?dockerfile_path docker_image;
     job_container_scanning_slack_notification ?dockerfile_path docker_image;
   ]

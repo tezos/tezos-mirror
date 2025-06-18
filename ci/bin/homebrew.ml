@@ -6,7 +6,6 @@
 (*****************************************************************************)
 
 open Tezos_ci
-open Common
 
 type homebrew_pipeline = Full | Release
 
