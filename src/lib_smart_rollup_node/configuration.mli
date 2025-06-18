@@ -103,11 +103,6 @@ type outbox_message_filter =
       (** Accept transactions which match the filter on their destination and
           entrypoint. *)
 
-type otel_profiling = {
-  enable : bool;
-  config : Opentelemetry_client_cohttp_lwt.Config.t;
-}
-
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   boot_sector_file : string option;
@@ -148,7 +143,7 @@ type t = {
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
   bail_on_disagree : bool;
-  otel_profiling : otel_profiling;
+  opentelemetry : Octez_telemetry.Opentelemetry_config.t;
 }
 
 type error += Empty_operation_kinds_for_custom_mode
@@ -222,8 +217,6 @@ val default_history_mode : history_mode
 
 (** Default filter for executing outbox messages is only whitelist updates.  *)
 val default_execute_outbox_filter : outbox_message_filter list
-
-val default_otel_profiling : otel_profiling
 
 val history_mode_encoding : history_mode Data_encoding.t
 

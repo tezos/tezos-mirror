@@ -240,7 +240,7 @@ Smart Rollup node
   stored on disk. (MR :gl:`!18160`)
 
 - Produce Opentelemetry traces with ``--profiling``, configurable with a field
-  ``"otel_profiling"`` in the configuration. (MR :gl:`!18274`)
+  ``"opentelemetry"`` in the configuration. (MR :gl:`!18274`)
 
 
 Smart Rollup WASM Debugger

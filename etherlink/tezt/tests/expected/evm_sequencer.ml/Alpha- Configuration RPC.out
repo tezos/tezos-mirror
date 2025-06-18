@@ -24,8 +24,7 @@
       "max_lifespan": 100000,
       "tx_per_addr_limit": "100000"
     },
-    "periodic_snapshot_path": null,
-    "otel_profiling": null
+    "periodic_snapshot_path": null
   },
   "proxy": {
     "ignore_block_param": false
@@ -49,6 +48,14 @@
   "finalized_view": false,
   "db": {
     "pool_size": 8
+  },
+  "opentelemetry": {
+    "enable": false,
+    "debug": false,
+    "url_traces": "http://localhost:4318/v1/traces",
+    "headers": [],
+    "batch_traces": 400,
+    "batch_timeout_ms": 500
   }
 }
 {
@@ -88,8 +95,7 @@
       "max_lifespan": 100000,
       "tx_per_addr_limit": "100000"
     },
-    "periodic_snapshot_path": null,
-    "otel_profiling": null
+    "periodic_snapshot_path": null
   },
   "proxy": {
     "ignore_block_param": false
@@ -113,6 +119,14 @@
   "finalized_view": false,
   "db": {
     "pool_size": 8
+  },
+  "opentelemetry": {
+    "enable": false,
+    "debug": false,
+    "url_traces": "http://localhost:4318/v1/traces",
+    "headers": [],
+    "batch_traces": 400,
+    "batch_timeout_ms": 500
   }
 }
 {
@@ -145,8 +159,7 @@
       "max_lifespan": 100000,
       "tx_per_addr_limit": "100000"
     },
-    "periodic_snapshot_path": null,
-    "otel_profiling": null
+    "periodic_snapshot_path": null
   },
   "proxy": {
     "evm_node_endpoint": "hidden",
@@ -171,5 +184,13 @@
   "finalized_view": false,
   "db": {
     "pool_size": 8
+  },
+  "opentelemetry": {
+    "enable": false,
+    "debug": false,
+    "url_traces": "http://localhost:4318/v1/traces",
+    "headers": [],
+    "batch_traces": 400,
+    "batch_timeout_ms": 500
   }
 }

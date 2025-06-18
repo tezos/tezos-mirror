@@ -177,7 +177,6 @@ type experimental_features = {
   l2_chains : l2_chain list option;
   enable_tx_queue : tx_queue option;
   periodic_snapshot_path : string option;
-  otel_profiling : Opentelemetry_client_cohttp_lwt.Config.t option;
 }
 
 type sequencer = {
@@ -257,6 +256,7 @@ type t = {
   finalized_view : bool;
   history_mode : history_mode option;
   db : db;
+  opentelemetry : Octez_telemetry.Opentelemetry_config.t;
 }
 
 let is_tx_queue_enabled {experimental_features = {enable_tx_queue; _}; _} =
@@ -325,7 +325,6 @@ let default_experimental_features =
     l2_chains = default_l2_chains;
     enable_tx_queue = Some default_tx_queue;
     periodic_snapshot_path = None;
-    otel_profiling = None;
   }
 
 let default_rpc_addr = "127.0.0.1"
@@ -441,89 +440,6 @@ let default_fee_history = {max_count = Limit 1024; max_past = None}
 
 let make_pattern_restricted_rpcs raw =
   Pattern {raw; regex = Re.Perl.compile_pat raw}
-
-let otel_config_encoding =
-  let open Data_encoding in
-  let open Opentelemetry_client_cohttp_lwt.Config in
-  conv
-    (fun {
-           debug;
-           url_traces;
-           url_metrics;
-           url_logs;
-           headers;
-           batch_traces;
-           batch_metrics;
-           batch_logs;
-           batch_timeout_ms;
-         } ->
-      ( Some debug,
-        Some url_traces,
-        Some url_metrics,
-        Some url_logs,
-        Some headers,
-        batch_traces,
-        batch_metrics,
-        batch_logs,
-        Some batch_timeout_ms ))
-    (fun ( debug,
-           url_traces,
-           url_metrics,
-           url_logs,
-           headers,
-           batch_traces,
-           batch_metrics,
-           batch_logs,
-           batch_timeout_ms ) ->
-      Opentelemetry_client_cohttp_lwt.Config.make
-        ?debug
-        ?url_traces
-        ?url_metrics
-        ?url_logs
-        ?headers
-        ~batch_traces
-        ~batch_metrics
-        ~batch_logs
-        ?batch_timeout_ms
-        ())
-  @@ obj9
-       (opt "debug" ~description:"Enable debug mode" bool)
-       (opt "url_traces" ~description:"URL to send traces" string)
-       (opt "url_metrics" ~description:"URL to send metrics" string)
-       (opt "url_logs" ~description:"URL to send logs" string)
-       (opt
-          "headers"
-          ~description:"API headers sent to the endpoint"
-          (list (tup2 string string)))
-       (opt "batch_traces" ~description:"Batch traces" int31)
-       (opt "batch_metrics" ~description:"Batch metrics" int31)
-       (opt "batch_logs" ~description:"Batch logs" int31)
-       (opt
-          "batch_timeout_ms"
-          ~description:
-            "Milliseconds after which we emit a batch, even incomplete"
-          int31)
-
-let otel_config_opt_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        ~title:"specified"
-        Json_only
-        (option otel_config_encoding)
-        (function
-          | Some otel_config -> Some (Some otel_config) | None -> Some None)
-        Fun.id;
-      case
-        ~title:"default"
-        Json_only
-        bool
-        (function _ -> None)
-        (function
-          | true -> Some (Opentelemetry_client_cohttp_lwt.Config.make ())
-          | _ -> None);
-    ]
 
 let limit_encoding =
   let open Data_encoding in
@@ -1097,7 +1013,6 @@ let experimental_features_encoding =
            l2_chains : l2_chain list option;
            enable_tx_queue;
            periodic_snapshot_path;
-           otel_profiling;
          } ->
       ( ( drop_duplicate_on_injection,
           blueprints_publisher_order_enabled,
@@ -1109,8 +1024,7 @@ let experimental_features_encoding =
           spawn_rpc,
           l2_chains,
           enable_tx_queue,
-          periodic_snapshot_path,
-          otel_profiling ) ))
+          periodic_snapshot_path ) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
@@ -1121,8 +1035,7 @@ let experimental_features_encoding =
              spawn_rpc,
              l2_chains,
              enable_tx_queue,
-             periodic_snapshot_path,
-             otel_profiling ) ) ->
+             periodic_snapshot_path ) ) ->
       {
         drop_duplicate_on_injection;
         blueprints_publisher_order_enabled;
@@ -1133,7 +1046,6 @@ let experimental_features_encoding =
         l2_chains;
         enable_tx_queue;
         periodic_snapshot_path;
-        otel_profiling;
       })
     (merge_objs
        (obj6
@@ -1184,7 +1096,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj6
+       (obj5
           (dft
              "rpc_server"
              ~description:
@@ -1214,12 +1126,7 @@ let experimental_features_encoding =
              "periodic_snapshot_path"
              ~description:"Path to the periodic snapshot file"
              (option string)
-             default_experimental_features.periodic_snapshot_path)
-          (dft
-             "otel_profiling"
-             ~description:"Enable or disable opentelemetry profiling"
-             otel_config_opt_encoding
-             default_experimental_features.otel_profiling)))
+             default_experimental_features.periodic_snapshot_path)))
 
 let proxy_encoding =
   let open Data_encoding in
@@ -1501,6 +1408,7 @@ let encoding ?network data_dir : t Data_encoding.t =
            finalized_view;
            history_mode;
            db;
+           opentelemetry;
          } ->
       ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
         ( ( tx_pool_timeout_limit,
@@ -1518,7 +1426,8 @@ let encoding ?network data_dir : t Data_encoding.t =
             websockets,
             finalized_view,
             history_mode,
-            db ) ) ))
+            db,
+            opentelemetry ) ) ))
     (fun ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
@@ -1535,7 +1444,8 @@ let encoding ?network data_dir : t Data_encoding.t =
                websockets,
                finalized_view,
                history_mode,
-               db ) ) ) ->
+               db,
+               opentelemetry ) ) ) ->
       {
         public_rpc;
         private_rpc;
@@ -1557,6 +1467,7 @@ let encoding ?network data_dir : t Data_encoding.t =
         finalized_view;
         history_mode;
         db;
+        opentelemetry;
       })
     (merge_objs
        (obj4
@@ -1614,7 +1525,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                 default_experimental_features)
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "fee_history" fee_history_encoding default_fee_history))
-          (obj7
+          (obj8
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding ?network data_dir)
@@ -1642,7 +1553,12 @@ let encoding ?network data_dir : t Data_encoding.t =
                 "db"
                 ~description:"Database connection configuration"
                 db_encoding
-                default_db))))
+                default_db)
+             (dft
+                "opentelemetry"
+                ~description:"Enable or disable opentelemetry profiling"
+                Octez_telemetry.Opentelemetry_config.encoding
+                Octez_telemetry.Opentelemetry_config.default))))
 
 let pp_print_json ~data_dir fmt config =
   let json =
@@ -1856,6 +1772,7 @@ module Cli = struct
       finalized_view = default_finalized_view;
       history_mode = None;
       db = default_db;
+      opentelemetry = Octez_telemetry.Opentelemetry_config.default;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
@@ -2164,6 +2081,7 @@ module Cli = struct
       finalized_view = finalized_view || configuration.finalized_view;
       history_mode = Option.either history_mode configuration.history_mode;
       db = configuration.db;
+      opentelemetry = configuration.opentelemetry;
     }
 
   let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins

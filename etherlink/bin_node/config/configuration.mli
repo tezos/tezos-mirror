@@ -128,7 +128,6 @@ type experimental_features = {
   l2_chains : l2_chain list option;
   enable_tx_queue : tx_queue option;
   periodic_snapshot_path : string option;
-  otel_profiling : Opentelemetry_client_cohttp_lwt.Config.t option;
 }
 
 type sequencer = {
@@ -219,6 +218,7 @@ type t = {
   finalized_view : bool;
   history_mode : history_mode option;
   db : db;
+  opentelemetry : Octez_telemetry.Opentelemetry_config.t;
 }
 
 val is_tx_queue_enabled : t -> bool
