@@ -964,6 +964,7 @@ val set_delegate :
   ?force_low_fee:bool ->
   ?expect_failure:bool ->
   ?simulation:bool ->
+  ?amount:Tez.t ->
   src:string ->
   delegate:string ->
   t ->
@@ -977,6 +978,7 @@ val spawn_set_delegate :
   ?fee_cap:Tez.t ->
   ?force_low_fee:bool ->
   ?simulation:bool ->
+  ?amount:Tez.t ->
   src:string ->
   delegate:string ->
   t ->
@@ -2718,6 +2720,7 @@ val spawn_register_key :
   ?hooks:Process.hooks ->
   ?consensus:string ->
   ?companion:string ->
+  ?amount:Tez.t ->
   string ->
   t ->
   Process.t
@@ -2728,6 +2731,7 @@ val register_key :
   ?expect_failure:bool ->
   ?consensus:string ->
   ?companion:string ->
+  ?amount:Tez.t ->
   string ->
   t ->
   unit Lwt.t
