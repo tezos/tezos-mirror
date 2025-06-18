@@ -98,15 +98,6 @@ module Protocol_types = struct
       else invalid_arg "Cycle_repr.of_int32_exn"
   end
 
-  let tezlink_to_tezos_chain_id ~l2_chain_id _chain =
-    let (L2_types.Chain_id l2_chain_id) = l2_chain_id in
-    let bytes = Bytes.make 4 '\000' in
-    l2_chain_id |> Z.to_int32 |> Bytes.set_int32_be bytes 0 ;
-    Chain_id.of_bytes bytes
-
-  let ethereum_to_tezos_block_hash hash =
-    hash |> Ethereum_types.block_hash_to_bytes |> Block_hash.of_string
-
   module Level = struct
     open Tezos_types
 
@@ -159,21 +150,6 @@ module Protocol_types = struct
         ~name:"counter"
         ~dst:encoding
         ~src:Data_encoding.z
-  end
-
-  module Contract = struct
-    let make_info (contract, contract_balance, counter_z) =
-      let open Result_syntax in
-      let open Imported_protocol_plugin.Contract_services in
-      let* counter = Counter.of_z counter_z in
-      let script = Tezlink_mock.mocked_script contract in
-      return
-        {
-          balance = contract_balance;
-          delegate = None;
-          counter = Some counter;
-          script;
-        }
   end
 end
 

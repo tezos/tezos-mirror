@@ -53,11 +53,33 @@ let check_block =
         (Unsupported_block_parameter
            (Tezos_shell_services.Block_services.to_string block))
 
+let ethereum_to_tezos_block_hash hash =
+  hash |> Ethereum_types.block_hash_to_bytes |> Block_hash.of_string
+
 let protocols () = Lwt_result_syntax.return Tezlink_protocols.current
 
 let version () =
   (* TODO: #7857 need proper implementation *)
   Lwt_result_syntax.return Tezlink_mock.version
+
+let make_contract_info contract contract_balance counter_z =
+  let open Lwt_result_syntax in
+  let open Imported_protocol_plugin.Contract_services in
+  let*? counter = Protocol_types.Counter.of_z counter_z in
+  let script = Tezlink_mock.mocked_script contract in
+  return
+    {
+      balance = contract_balance;
+      delegate = None;
+      counter = Some counter;
+      script;
+    }
+
+let tezlink_to_tezos_chain_id ~l2_chain_id _chain =
+  let (L2_types.Chain_id l2_chain_id) = l2_chain_id in
+  let bytes = Bytes.make 4 '\000' in
+  l2_chain_id |> Z.to_int32 |> Bytes.set_int32_be bytes 0 ;
+  Chain_id.of_bytes bytes
 
 let chain_directory_path = Tezos_shell_services.Chain_services.path
 
@@ -92,9 +114,7 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
       Block_header.shell_header tzresult =
     let open Result_syntax in
     let open Tezlink_mock in
-    let* predecessor =
-      Protocol_types.ethereum_to_tezos_block_hash block.parent_hash
-    in
+    let* predecessor = ethereum_to_tezos_block_hash block.parent_hash in
     return
       Block_header.
         {
@@ -112,11 +132,9 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
       ((block : L2_types.Tezos_block.t), chain) :
       Block_services.block_header tzresult =
     let open Result_syntax in
-    let* chain_id =
-      Protocol_types.tezlink_to_tezos_chain_id ~l2_chain_id chain
-    in
+    let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
     let* protocol_data = Block_services.mock_block_header_data in
-    let* hash = Protocol_types.ethereum_to_tezos_block_hash block.hash in
+    let* hash = ethereum_to_tezos_block_hash block.hash in
     let* shell = tezlink_block_to_shell_header block in
     let block_header : Block_services.block_header =
       {chain_id; hash; shell; protocol_data}
@@ -134,13 +152,8 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
 
   let tezlink_block_to_block_info ~l2_chain_id (version, block, chain) =
     let open Result_syntax in
-    let* chain_id =
-      Protocol_types.tezlink_to_tezos_chain_id ~l2_chain_id chain
-    in
-    let* hash =
-      Protocol_types.ethereum_to_tezos_block_hash
-        block.L2_types.Tezos_block.hash
-    in
+    let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+    let* hash = ethereum_to_tezos_block_hash block.L2_types.Tezos_block.hash in
     let* header = tezlink_block_to_raw_block_header block in
     let block_info : Block_services.block_info =
       {chain_id; hash; header; metadata = None; operations = []}
@@ -192,15 +205,14 @@ let build_block_static_directory ~l2_chain_id
          let*? `Main = check_chain chain in
          let*? _block = check_block block in
          protocols ())
-  |> register_with_conversion
+  |> register
        ~service:Tezos_services.contract_info
        ~impl:(fun ({block; chain}, contract) _query () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          let* balance = Backend.balance chain block contract in
          let* counter = Backend.counter chain block contract in
-         return (contract, balance, counter))
-       ~convert_output:Protocol_types.Contract.make_info
+         make_contract_info contract balance counter)
   |> register
        ~service:Tezos_services.balance
        ~impl:(fun ({chain; block}, contract) _ _ ->
@@ -249,7 +261,7 @@ let build_block_static_directory ~l2_chain_id
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.block_hash chain block)
-       ~convert_output:Protocol_types.ethereum_to_tezos_block_hash
+       ~convert_output:ethereum_to_tezos_block_hash
   |> register
        ~service:Adaptive_issuance_services.expected_issuance
        ~impl:(fun _ () () ->
@@ -355,7 +367,7 @@ let register_chain_services ~l2_chain_id
          ~impl:(fun chain () () ->
            Lwt_result_syntax.return (l2_chain_id, chain))
          ~convert_output:(fun (l2_chain_id, chain) ->
-           Protocol_types.tezlink_to_tezos_chain_id ~l2_chain_id chain)
+           tezlink_to_tezos_chain_id ~l2_chain_id chain)
     |> Tezos_rpc.Directory.map (fun ((), chain) -> Lwt.return chain)
   in
   Tezos_rpc.Directory.merge
@@ -378,7 +390,7 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
         | Some block -> (
             match
               ( Current_block_header.tezlink_block_to_shell_header block,
-                Protocol_types.ethereum_to_tezos_block_hash block.hash )
+                ethereum_to_tezos_block_hash block.hash )
             with
             | Ok shell, Ok hash ->
                 return_some
@@ -408,7 +420,7 @@ let build_dir ~l2_chain_id backend =
        ~impl:(fun () () () -> Backend.bootstrapped ())
        ~convert_output:(fun (input_hash, input_time) ->
          let open Result_syntax in
-         let* hash = Protocol_types.ethereum_to_tezos_block_hash input_hash in
+         let* hash = ethereum_to_tezos_block_hash input_hash in
          return (hash, input_time))
   |> register_monitor_heads backend
   |> register ~service:Tezos_services.version ~impl:(fun () () () -> version ())
