@@ -31,10 +31,10 @@ module type S = sig
   type 'a t = ([< `Read | `Write > `Read] as 'a) store
 
   (** Read/write store {!t}. *)
-  type rw = Store_sigs.rw t
+  type rw = Access_mode.rw t
 
   (** Read only store {!t}. *)
-  type ro = Store_sigs.ro t
+  type ro = Access_mode.ro t
 
   (** Version supported by this code.  *)
   val version : Store_version.t
@@ -51,7 +51,7 @@ module type S = sig
       to disk. [l2_blocks_cache_size] is the number of L2 blocks the rollup node
       will keep in memory. *)
   val load :
-    'a Store_sigs.mode ->
+    'a Access_mode.t ->
     index_buffer_size:int ->
     l2_blocks_cache_size:int ->
     string ->

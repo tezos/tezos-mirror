@@ -41,8 +41,8 @@ val init :
   irmin_cache_size:int ->
   ?log_kernel_debug_file:string ->
   ?last_whitelist_update:Z.t * Int32.t ->
-  store_access:([< `Read | `Write > `Read] as 'store) Store_sigs.mode ->
-  context_access:([< `Read | `Write > `Read] as 'context) Store_sigs.mode ->
+  store_access:([< `Read | `Write > `Read] as 'store) Access_mode.t ->
+  context_access:([< `Read | `Write > `Read] as 'context) Access_mode.t ->
   Layer1.t ->
   genesis_info ->
   lcc:lcc ->

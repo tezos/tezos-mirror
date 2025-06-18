@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Store_sigs
-
 module Equality_witness : sig
   type (_, _) eq = Refl : ('a, 'a) eq
 
@@ -92,7 +90,8 @@ module type S = sig
     [path]. [cache_size] allows to change size of the Context Backend
     in use (for instance, the LRU cache size of Irmin (100_000 by
     default at irmin-pack/config.ml) *)
-  val load : cache_size:int -> 'a mode -> string -> 'a index tzresult Lwt.t
+  val load :
+    cache_size:int -> 'a Access_mode.t -> string -> 'a index tzresult Lwt.t
 
   (** [index context] is the repository of the context [context]. *)
   val index : 'a t -> 'a index

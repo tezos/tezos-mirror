@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Store_sigs
 open Store_errors
 
 (* Helper functions to copy byte sequences or integers in [src] to another byte
@@ -67,7 +66,7 @@ module type SINGLETON_STORE = sig
 
   type value
 
-  val load : path:string -> 'a mode -> 'a t tzresult Lwt.t
+  val load : path:string -> 'a Access_mode.t -> 'a t tzresult Lwt.t
 
   val read : [> `Read] t -> value option tzresult Lwt.t
 
@@ -86,7 +85,10 @@ module type INDEXABLE_STORE = sig
   type value
 
   val load :
-    path:string -> index_buffer_size:int -> 'a mode -> 'a t tzresult Lwt.t
+    path:string ->
+    index_buffer_size:int ->
+    'a Access_mode.t ->
+    'a t tzresult Lwt.t
 
   val mem : [> `Read] t -> key -> bool tzresult Lwt.t
 
@@ -100,7 +102,7 @@ module type INDEXABLE_STORE = sig
 
   val gc :
     ?async:bool ->
-    rw t ->
+    Access_mode.rw t ->
     (key -> value -> bool tzresult Lwt.t) ->
     unit tzresult Lwt.t
 
@@ -144,7 +146,7 @@ module type INDEXED_FILE = sig
     path:string ->
     index_buffer_size:int ->
     cache_size:int ->
-    'a mode ->
+    'a Access_mode.t ->
     'a t tzresult Lwt.t
 
   val close : _ t -> unit tzresult Lwt.t
@@ -153,7 +155,7 @@ module type INDEXED_FILE = sig
 
   val gc :
     ?async:bool ->
-    rw t ->
+    Access_mode.rw t ->
     (key -> header -> value -> bool tzresult Lwt.t) ->
     unit tzresult Lwt.t
 
@@ -336,7 +338,7 @@ module Make_indexable (N : NAME) (K : INDEX_KEY) (V : Index.Value.S) = struct
     let index = I.v ~log_size:index_buffer_size ~readonly index_path in
     {index; index_path}
 
-  let load (type a) ~path ~index_buffer_size (mode : a mode) :
+  let load (type a) ~path ~index_buffer_size (mode : a Access_mode.t) :
       a t tzresult Lwt.t =
     let open Lwt_result_syntax in
     trace (Cannot_load_store {name = N.name; path})
@@ -935,8 +937,8 @@ struct
     in
     return {index; fd; index_path; data_path}
 
-  let load (type a) ~path ~index_buffer_size ~cache_size (mode : a mode) :
-      a t tzresult Lwt.t =
+  let load (type a) ~path ~index_buffer_size ~cache_size
+      (mode : a Access_mode.t) : a t tzresult Lwt.t =
     let open Lwt_result_syntax in
     trace (Cannot_load_store {name = N.name; path})
     @@ protect

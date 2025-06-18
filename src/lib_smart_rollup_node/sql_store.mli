@@ -9,10 +9,10 @@
 type 'a t
 
 (** Read/write store {!t}. *)
-type rw = Store_sigs.rw t
+type rw = Access_mode.rw t
 
 (** Read only store {!t}. *)
-type ro = Store_sigs.ro t
+type ro = Access_mode.ro t
 
 (** Name of SQLite file in data directory. *)
 val sqlite_file_name : string
@@ -21,7 +21,7 @@ val sqlite_file_name : string
 val extra_sqlite_files : string list
 
 (** [init mode ~data_dir] initializes the store and returns it. *)
-val init : 'a Store_sigs.mode -> data_dir:string -> 'a t tzresult Lwt.t
+val init : 'a Access_mode.t -> data_dir:string -> 'a t tzresult Lwt.t
 
 (** Close the store by freeing all resources and closing database
     connections. *)

@@ -39,7 +39,7 @@ type 'a store constraint 'a = [< `Read | `Write > `Read]
 
 (** Exposed functions to manipulate Node_context store outside of this module *)
 module Node_store : sig
-  val init : 'a Store_sigs.mode -> data_dir:string -> 'a store tzresult Lwt.t
+  val init : 'a Access_mode.t -> data_dir:string -> 'a store tzresult Lwt.t
 
   (** [close store] closes the store *)
   val close : 'a store -> unit Lwt.t
@@ -49,7 +49,7 @@ module Node_store : sig
     History mode can be converted from Archive to Full. Trying to
     convert from Full to Archive will trigger an error.*)
   val check_and_set_history_mode :
-    'a Store_sigs.mode ->
+    'a Access_mode.t ->
     'a store ->
     Configuration.history_mode option ->
     unit tzresult Lwt.t
@@ -206,10 +206,10 @@ val dal_supported : _ t -> bool
 val readonly : _ t -> ro
 
 val readonly_store :
-  < store : _ ; context : 'a > t -> < store : Store_sigs.ro ; context : 'a > t
+  < store : _ ; context : 'a > t -> < store : Access_mode.ro ; context : 'a > t
 
 val readonly_context :
-  < store : 'a ; context : _ > t -> < store : 'a ; context : Store_sigs.ro > t
+  < store : 'a ; context : _ > t -> < store : 'a ; context : Access_mode.ro > t
 
 (** {2 Abstraction over store} *)
 

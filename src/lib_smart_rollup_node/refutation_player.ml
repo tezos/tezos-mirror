@@ -28,7 +28,7 @@ open Refutation_game
 
 module Types = struct
   type state = {
-    node_ctxt : Store_sigs.ro Node_context.rw_context;
+    node_ctxt : Access_mode.ro Node_context.rw_context;
     state_cache : Pvm_plugin_sig.state_cache;
     self : Signature.public_key_hash;
     opponent : Signature.public_key_hash;
@@ -39,7 +39,7 @@ module Types = struct
   }
 
   type parameters = {
-    node_ctxt : Store_sigs.ro Node_context.rw_context;
+    node_ctxt : Access_mode.ro Node_context.rw_context;
     self : Signature.public_key_hash;
     conflict : Octez_smart_rollup.Game.conflict;
   }

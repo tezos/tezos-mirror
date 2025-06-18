@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Store_sigs
-
 module Make (N : sig
   val name : string
 end) =
@@ -40,7 +38,7 @@ struct
 
   let name = N.name
 
-  let load : type a. a mode -> string -> a t tzresult Lwt.t =
+  let load : type a. a Access_mode.t -> string -> a t tzresult Lwt.t =
    fun mode data_dir ->
     let open Lwt_result_syntax in
     trace (Store_errors.Cannot_load_store {name = N.name; path = data_dir})

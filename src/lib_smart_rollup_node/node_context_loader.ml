@@ -65,9 +65,9 @@ let create_sync_info () =
 
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     ?log_kernel_debug_file ?last_whitelist_update
-    ~(store_access : 'store Store_sigs.mode)
-    ~(context_access : 'context Store_sigs.mode) l1_ctxt genesis_info
-    ~(lcc : lcc) ~lpc kind current_protocol
+    ~(store_access : 'store Access_mode.t)
+    ~(context_access : 'context Access_mode.t) l1_ctxt genesis_info ~(lcc : lcc)
+    ~lpc kind current_protocol
     Configuration.(
       {sc_rollup_address = rollup_address; dal_node_endpoint; _} as
       configuration) =

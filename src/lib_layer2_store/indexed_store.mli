@@ -35,8 +35,6 @@
     use of the light scheduler provided by {!Lwt_idle_waiter} for exclusive
     write access. *)
 
-open Store_sigs
-
 (** {2 Signatures} *)
 
 (** A store for single updatable values. Values are stored in a file on disk and
@@ -49,7 +47,7 @@ module type SINGLETON_STORE = sig
   type value
 
   (** Load (or initializes) a singleton store in the file [path]. *)
-  val load : path:string -> 'a mode -> 'a t tzresult Lwt.t
+  val load : path:string -> 'a Access_mode.t -> 'a t tzresult Lwt.t
 
   (** Reads the current value from the disk. Returns [None] if the
       file does not exist. *)
@@ -79,7 +77,10 @@ module type INDEXABLE_STORE = sig
   (** Load (or initializes) a store in the file [path]. If [readonly] is [true],
       the store will only be accessed in read only mode. *)
   val load :
-    path:string -> index_buffer_size:int -> 'a mode -> 'a t tzresult Lwt.t
+    path:string ->
+    index_buffer_size:int ->
+    'a Access_mode.t ->
+    'a t tzresult Lwt.t
 
   (** Returns [true] if the key has a value associated in
       the store. *)
@@ -107,7 +108,7 @@ module type INDEXABLE_STORE = sig
       ongoing this new request is ignored and this call is a no-op. *)
   val gc :
     ?async:bool ->
-    rw t ->
+    Access_mode.rw t ->
     (key -> value -> bool tzresult Lwt.t) ->
     unit tzresult Lwt.t
 
@@ -176,7 +177,7 @@ module type INDEXED_FILE = sig
     path:string ->
     index_buffer_size:int ->
     cache_size:int ->
-    'a mode ->
+    'a Access_mode.t ->
     'a t tzresult Lwt.t
 
   (** Close the index and the file. One must call {!load} again to read or write
@@ -192,7 +193,7 @@ module type INDEXED_FILE = sig
       ongoing this new request is ignored and this call is a no-op. *)
   val gc :
     ?async:bool ->
-    rw t ->
+    Access_mode.rw t ->
     (key -> header -> value -> bool tzresult Lwt.t) ->
     unit tzresult Lwt.t
 

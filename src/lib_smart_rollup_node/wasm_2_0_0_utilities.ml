@@ -142,7 +142,7 @@ let dump_durable_storage ~block ~data_dir ~file =
     | None -> tzfail Rollup_node_errors.Cannot_checkout_l2_header
     | Some c -> return c
   in
-  let* context = load_context ~data_dir plugin Store_sigs.Read_only in
+  let* context = load_context ~data_dir plugin Access_mode.Read_only in
   let* state = get_wasm_pvm_state context block_hash context_hash in
   let* instrs = generate_durable_storage ~plugin state in
   let* () = Installer_config.to_file instrs ~output:file in
@@ -191,7 +191,7 @@ let patch_durable_storage ~data_dir ~key ~value =
       (Option.is_some l2_block.header.commitment_hash)
       (Rollup_node_errors.Patch_durable_storage_on_commitment block_level)
   in
-  let* context = load_context ~data_dir plugin Store_sigs.Read_write in
+  let* context = load_context ~data_dir plugin Access_mode.Read_write in
   let* state = get_wasm_pvm_state context block_hash l2_block.header.context in
 
   (* Patches the state via an unsafe patch. *)
