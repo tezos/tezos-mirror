@@ -531,6 +531,170 @@ module Transfer = struct
     in
     Process.check set_delegate_process
 
+  let set_delegate_and_stake =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Set delegate and stake"
+      ~tags:[team; "client"; "set_delegate"; "stake"]
+      ~supports:Protocol.(From_protocol 23)
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let* staker = Client.gen_and_show_keys ~alias:"staker" client in
+    let* () =
+      Client.transfer
+        ~burn_cap:Tez.one
+        ~amount:(Tez.of_int 15_000)
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:staker.alias
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let amount = Tez.of_int 10_000 in
+    let* () =
+      Client.set_delegate
+        ~src:staker.alias
+        ~delegate:staker.alias
+        ~amount
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* staked_balance =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_staked_balance
+           staker.public_key_hash
+    in
+    Check.((staked_balance = Tez.to_mutez amount) ~__LOC__ int)
+      ~error_msg:"Expected staked balance %R to be equal to %L" ;
+    unit
+
+  let set_delegate_and_stake_less_6000 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Set delegate and stake less than 6000 tez"
+      ~tags:[team; "client"; "set_delegate"; "stake"]
+      ~supports:Protocol.(From_protocol 23)
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let* staker = Client.gen_and_show_keys ~alias:"staker" client in
+    let* () =
+      Client.transfer
+        ~burn_cap:Tez.one
+        ~amount:(Tez.of_int 15_000)
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:staker.alias
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let amount = Tez.of_int 3_000 in
+    let* () =
+      Client.set_delegate
+        ~src:staker.alias
+        ~delegate:staker.alias
+        ~amount
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* staked_balance =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_staked_balance
+           staker.public_key_hash
+    in
+    Check.((staked_balance = Tez.to_mutez amount) ~__LOC__ int)
+      ~error_msg:"Expected staked balance %R to be equal to %L" ;
+    unit
+
+  let set_delegate_and_stake_fail =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Set delegate and stake more than balance"
+      ~tags:[team; "client"; "set_delegate"; "stake"]
+      ~supports:Protocol.(From_protocol 23)
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let* staker = Client.gen_and_show_keys ~alias:"staker" client in
+    let* () =
+      Client.transfer
+        ~burn_cap:Tez.one
+        ~amount:(Tez.of_int 15_000)
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:staker.alias
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let amount = Tez.of_int 16_000 in
+    let set_delegate_process =
+      Client.spawn_set_delegate
+        ~src:staker.alias
+        ~delegate:staker.alias
+        ~amount
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* () =
+      Process.check_error
+        ~msg:(rex "Balance of contract ([^ ]+) too low")
+        set_delegate_process
+    in
+    unit
+
+  let set_external_delegate_and_stake =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Set external delegate and stake"
+      ~tags:[team; "client"; "set_delegate"; "stake"]
+      ~supports:Protocol.(From_protocol 23)
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let parameters = JSON.parse_file (Protocol.parameter_file protocol) in
+    let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+    let delegate_parameters_activation_delay =
+      JSON.(get "delegate_parameters_activation_delay" parameters |> as_int)
+    in
+    let delegate = Constant.bootstrap3 in
+    (* [delegate] accepts external staking *)
+    let set_delegate_parameters =
+      Client.spawn_set_delegate_parameters
+        ~delegate:delegate.alias
+        ~limit:"3"
+        ~edge:"0.05"
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* () = set_delegate_parameters |> Process.check in
+    let* () =
+      Client.bake_for_and_wait
+        ~count:(blocks_per_cycle * (delegate_parameters_activation_delay + 1))
+        client
+    in
+    (* create a new account to stake with [delegate] *)
+    let* staker = Client.gen_and_show_keys ~alias:"staker" client in
+    let* () =
+      Client.transfer
+        ~burn_cap:Tez.one
+        ~amount:(Tez.of_int 15_000)
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:staker.alias
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let amount = Tez.of_int 10_000 in
+    let* () =
+      Client.set_delegate
+        ~src:staker.alias
+        ~delegate:delegate.alias
+        ~amount
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* staked_balance =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_staked_balance
+           staker.public_key_hash
+    in
+    Check.((staked_balance = Tez.to_mutez amount) ~__LOC__ int)
+      ~error_msg:"Expected staked balance %R to be equal to %L" ;
+    unit
+
   let balance_too_low =
     Protocol.register_test
       ~__FILE__
@@ -688,6 +852,10 @@ module Transfer = struct
     batch_transfers_tz4 protocols ;
     forbidden_set_delegate_tz4 protocols ;
     allowed_set_delegate_tz4 protocols ;
+    set_delegate_and_stake protocols ;
+    set_delegate_and_stake_less_6000 protocols ;
+    set_delegate_and_stake_fail protocols ;
+    set_external_delegate_and_stake protocols ;
     balance_too_low protocols ;
     transfers_bootstraps5_bootstrap1 protocols ;
     safety_guard protocols
