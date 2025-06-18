@@ -1,8 +1,16 @@
 # Changelog
 
-## Unreleased
+## Version 0.30 (2025-06-18)
 
-### Breaking changes
+This release of the EVM node adds a new database connection pool implementation
+for the store which should eliminate lock ups in the RPC server. The node now
+always checks the gas limit to avoid sending invalid transactions, and
+compatibility is improved with older tools and hardhat. An extensive profiling
+instrumentation was added which will allow developers to precisely analyze and
+improve performance.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
 
 ### Configuration changes
 
@@ -18,6 +26,11 @@
 
 ### Metrics changes
 
+- Extensive profiling with OpenTelemetry traces. Profiling is disabled by
+  default and can be activated with the configuration field
+  `opentelemetry`. (!18227 !18229 !18279 !18290 !18291
+  !18312 !18315 !18328 !18331 !18337 !18347 !18348 !18368)
+
 ### Execution changes
 
 - Node validation always checks that the gas limit are set correctly.
@@ -25,7 +38,8 @@
 
 ### Storage changes
 
-### Documentation changes
+- New database connection pool which should be more efficient and not suffer
+  from locks. (!18235)
 
 ### Experimental features changes
 
