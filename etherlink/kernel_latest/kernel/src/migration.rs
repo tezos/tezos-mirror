@@ -367,6 +367,11 @@ fn migrate_to<Host: Runtime>(
             };
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V35 => {
+            // Dummy migration allowing to version-gate the gas limit
+            // validation in the EVM node
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
