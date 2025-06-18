@@ -606,7 +606,7 @@ type per_level_info = {
 }
 
 type per_baker_dal_summary = {
-  published_slots : int;
+  attestable_slots : int;
   attested_slots : int;
   in_committee : bool;
   attestation_with_dal : bool;
@@ -745,7 +745,7 @@ let pp_metrics t
             Hashtbl.find_opt ratio_attested_commitments_per_baker (PKH pkh)
           with
           | None -> Log.info "We lack information about %s" pkh
-          | Some {published_slots; attested_slots; _} ->
+          | Some {attestable_slots; attested_slots; _} ->
               let alias =
                 Hashtbl.find_opt aliases account.Account.public_key_hash
                 |> Option.value ~default:account.Account.public_key_hash
@@ -756,7 +756,7 @@ let pp_metrics t
                 alias
                 stake
                 pp_ratio
-                (attested_slots, published_slots))
+                (attested_slots, attestable_slots))
         accounts)
     t.bakers ;
   Log.info
@@ -810,13 +810,15 @@ let push_metrics t
       ~name:"tezt_dal_commitments_attested"
       (float_of_int value)
   in
-  let push_published ~labels value =
+  let push_attestable ~labels value =
     Cloud.push_metric
       t.cloud
-      ~help:"Number of published commitments per baker"
+      ~help:
+        "Number of attestable commitments per baker (ie published when the \
+         baker is in the DAL committee at attestation level)"
       ~typ:`Gauge
       ~labels
-      ~name:"tezt_dal_commitments_published"
+      ~name:"tezt_dal_commitments_attestable"
       (float_of_int value)
   in
   let push_dal_attestation_sent ~labels value =
@@ -840,11 +842,11 @@ let push_metrics t
   in
   Hashtbl.iter
     (fun (PKH public_key_hash)
-         {attested_slots; published_slots; in_committee; attestation_with_dal} ->
+         {attested_slots; attestable_slots; in_committee; attestation_with_dal} ->
       if in_committee then (
         let labels = get_labels public_key_hash in
         push_attested ~labels attested_slots ;
-        push_published ~labels published_slots ;
+        push_attestable ~labels attestable_slots ;
         push_dal_attestation_sent ~labels attestation_with_dal)
       else
         let labels = get_labels public_key_hash in
@@ -1094,7 +1096,7 @@ let update_ratio_attested_commitments_per_baker t per_level_info =
         default ()
     | Some published_level_info ->
         (* Retrieves the number of published commitments *)
-        let published_slots =
+        let attestable_slots =
           Hashtbl.length published_level_info.published_commitments
         in
         let table = Hashtbl.(create (length per_level_info.attestations)) in
@@ -1105,7 +1107,7 @@ let update_ratio_attested_commitments_per_baker t per_level_info =
                  (* The baker is in the DAL committee and sent an attestation_with_dal. *)
                  | With_DAL attestation_bitset ->
                      {
-                       published_slots;
+                       attestable_slots;
                        attested_slots = Z.popcount attestation_bitset;
                        in_committee = true;
                        attestation_with_dal = true;
@@ -1113,7 +1115,7 @@ let update_ratio_attested_commitments_per_baker t per_level_info =
                  (* The baker is out of the DAL committee and sent an attestation_with_dal. *)
                  | Out_of_committee ->
                      {
-                       published_slots;
+                       attestable_slots;
                        attested_slots = 0;
                        in_committee = false;
                        attestation_with_dal = false;
@@ -1121,7 +1123,7 @@ let update_ratio_attested_commitments_per_baker t per_level_info =
                  (* The baker is in the DAL committee but sent either an attestation without DAL, or no attestations. *)
                  | Without_DAL | Expected_to_DAL_attest ->
                      {
-                       published_slots;
+                       attestable_slots;
                        attested_slots = 0;
                        in_committee = true;
                        attestation_with_dal = false;
@@ -1541,11 +1543,13 @@ module Monitoring_app = struct
       let* attested = fetch ~decoder:decoder_prometheus_float ~query ~origin in
       let query =
         Format.sprintf
-          "sum_over_time(tezt_dal_commitments_published{attester=\"%s\"}[%dh])"
+          "sum_over_time(tezt_dal_commitments_attestable{attester=\"%s\"}[%dh])"
           tz1
           report_interval
       in
-      let* published = fetch ~decoder:decoder_prometheus_float ~query ~origin in
+      let* attestable =
+        fetch ~decoder:decoder_prometheus_float ~query ~origin
+      in
       let query =
         Format.sprintf
           "avg_over_time(tezt_dal_attestation_sent{attester=\"%s\"}[%dh])"
@@ -1567,9 +1571,9 @@ module Monitoring_app = struct
         Option.is_some out_attestations
       in
       let slot_attestation_rate =
-        match (attested, published) with
+        match (attested, attestable) with
         | None, _ | _, None | _, Some 0. -> None
-        | Some attested, Some published -> Some (attested /. published)
+        | Some attested, Some attestable -> Some (attested /. attestable)
       in
       return
         {
