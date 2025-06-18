@@ -629,12 +629,13 @@ module Version = struct
    * - 6: new context representation introduced by irmin 3.7.2
    * - 7: fix tar snapshots corrupted generation
    * - 8: change cemented files offset format to 64 bits
+   * - 9: export target predecessor contains metadata
    *)
 
   (* Used for old snapshot format versions *)
-  let legacy_version = 7
+  let legacy_version = 8
 
-  let current_version = 8
+  let current_version = 9
 
   (* List of versions that are supported *)
   let supported_versions =
