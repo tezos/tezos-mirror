@@ -17,37 +17,42 @@ let tag = function
   | Eip2930 -> "Eip2930"
 
 let register ?maximum_gas_per_transaction ?set_account_code ?da_fee_per_byte
+    ?(kernels = [Constant.WASM.mainnet_kernel; Constant.WASM.evm_kernel])
     ?minimum_base_fee_per_gas ~title ~tags f tx_types =
   List.iter
-    (fun tx_type ->
-      let tag_tx = tag tx_type in
-      let title = Format.sprintf "%s: %s" tag_tx title in
-      Test.register
-        ~__FILE__
-        ~title
-        ~tags:(String.lowercase_ascii tag_tx :: tags)
-        ~uses_admin_client:false
-        ~uses_client:false
-        ~uses_node:false
-        ~uses:
-          [
-            Constant.octez_evm_node;
-            Constant.WASM.evm_kernel;
-            Constant.smart_rollup_installer;
-          ]
-      @@ fun () ->
-      let patch_config = Evm_node.patch_config_with_experimental_feature () in
-      let* sequencer =
-        init_sequencer_sandbox
-          ?maximum_gas_per_transaction
-          ?set_account_code
-          ?da_fee_per_byte
-          ?minimum_base_fee_per_gas
-          ~patch_config
-          ()
-      in
-      f sequencer tx_type)
-    tx_types
+    (fun kernel ->
+      List.iter
+        (fun tx_type ->
+          let tag_tx = tag tx_type in
+          let title =
+            Format.sprintf "%s: %s (%s)" tag_tx title (Uses.tag kernel)
+          in
+          Test.register
+            ~__FILE__
+            ~title
+            ~tags:(String.lowercase_ascii tag_tx :: Uses.tag kernel :: tags)
+            ~uses_admin_client:false
+            ~uses_client:false
+            ~uses_node:false
+            ~uses:
+              [Constant.octez_evm_node; kernel; Constant.smart_rollup_installer]
+          @@ fun () ->
+          let patch_config =
+            Evm_node.patch_config_with_experimental_feature ()
+          in
+          let* sequencer =
+            init_sequencer_sandbox
+              ?maximum_gas_per_transaction
+              ?set_account_code
+              ?da_fee_per_byte
+              ?minimum_base_fee_per_gas
+              ~kernel
+              ~patch_config
+              ()
+          in
+          f sequencer tx_type)
+        tx_types)
+    kernels
 
 let send_transaction_and_fail_upon_sequencer_validation ~raw_tx sequencer
     ~expected_error ~error_msg =
