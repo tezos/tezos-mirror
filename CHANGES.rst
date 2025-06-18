@@ -49,6 +49,12 @@ Node
   operations are now always resolved in favor of the preexisting
   operation, regardless of contents. (MR :gl:`!18208`)
 
+- ** Breaking change ** Bumped the snapshot version from 8 to 9, to support
+  early baking, just after importing a snapshot. Snapshots of version 8 exported
+  with previous versions of Octez (v22) can still be imported. Snapshots of
+  version 9 are not retro-compatible with previous Octez versions (MR
+  :gl:`!18387`).
+
 Client
 ------
 
