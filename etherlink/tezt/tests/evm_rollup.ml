@@ -3288,7 +3288,7 @@ type storage_migration_results = {
 (* This is the test generator that will trigger the sanity checks for migration
    tests.
    Note that:
-   - it uses the latest version of the ghostnet EVM rollup as a starter kernel.
+   - it uses the latest version of the mainnet EVM rollup as a starter kernel.
    - the upgrade of the kernel during the test will always target the latest one
      on master.
    - everytime a new path/rpc/object is stored in the kernel, a new sanity check
@@ -3332,7 +3332,7 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
   (* Check the values after the upgrade with [sanity_check] results. *)
   scenario_after ~evm_setup ~sanity_check
 
-let test_mainnet_ghostnet_kernel_migration =
+let test_mainnet_latest_kernel_migration =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "migration"; "upgrade"]
@@ -3341,12 +3341,12 @@ let test_mainnet_ghostnet_kernel_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
-        Constant.WASM.ghostnet_kernel;
         Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
       ])
     ~title:
       "Ensures EVM kernel's upgrade succeeds with potential migration(s). \
-       (mainnet -> ghostnet)"
+       (mainnet -> latest)"
   @@ fun protocol ->
   let sender, receiver, deployer =
     ( Eth_account.bootstrap_accounts.(0),
@@ -3419,7 +3419,7 @@ let test_mainnet_ghostnet_kernel_migration =
   in
   gen_kernel_migration_test
     ~from:Mainnet
-    ~to_:Ghostnet
+    ~to_:Latest
     ~scenario_prior
     ~scenario_after
     protocol
@@ -3520,7 +3520,6 @@ let test_latest_kernel_migration protocols =
       ~scenario_after
       protocol
   in
-  latest_kernel_migration ~from:Ghostnet protocols ;
   latest_kernel_migration ~from:Mainnet protocols
 
 let test_cannot_prepayed_leads_to_no_inclusion =
@@ -3613,8 +3612,8 @@ let test_deposit_before_and_after_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
         Constant.WASM.evm_kernel;
-        Constant.WASM.ghostnet_kernel;
       ])
     ~title:"Deposit before and after migration"
   @@ fun protocol ->
@@ -3660,7 +3659,7 @@ let test_deposit_before_and_after_migration =
     check_balance ~receiver ~endpoint Tez.(amount_mutez + amount_mutez)
   in
   gen_kernel_migration_test
-    ~from:Ghostnet
+    ~from:Mainnet
     ~to_:Latest
     ~admin
     ~scenario_prior
@@ -3676,8 +3675,8 @@ let test_block_storage_before_and_after_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
         Constant.WASM.evm_kernel;
-        Constant.WASM.ghostnet_kernel;
       ])
     ~title:"Block storage before and after migration"
   @@ fun protocol ->
@@ -3697,7 +3696,7 @@ let test_block_storage_before_and_after_migration =
     unit
   in
   gen_kernel_migration_test
-    ~from:Ghostnet
+    ~from:Mainnet
     ~to_:Latest
     ~scenario_prior
     ~scenario_after
@@ -3712,8 +3711,8 @@ let test_kernel_upgrade_version_change =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
         Constant.WASM.evm_kernel;
-        Constant.WASM.ghostnet_kernel;
       ])
     ~title:"Kernel version changes after an upgrade"
   @@ fun protocol ->
@@ -3728,7 +3727,7 @@ let test_kernel_upgrade_version_change =
     unit
   in
   gen_kernel_migration_test
-    ~from:Ghostnet
+    ~from:Mainnet
     ~to_:Latest
     ~scenario_prior
     ~scenario_after
@@ -3806,8 +3805,8 @@ let test_transaction_storage_before_and_after_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
         Constant.WASM.evm_kernel;
-        Constant.WASM.ghostnet_kernel;
       ])
     ~title:"Transaction storage before and after migration"
   @@ fun protocol ->
@@ -3828,7 +3827,7 @@ let test_transaction_storage_before_and_after_migration =
     Lwt_list.iter_p (check_one evm_setup) tx_hashes
   in
   gen_kernel_migration_test
-    ~from:Ghostnet
+    ~from:Mainnet
     ~to_:Latest
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~scenario_prior
@@ -3904,7 +3903,7 @@ let test_kernel_root_hash_after_upgrade =
 
 let register_evm_migration ~protocols =
   test_latest_kernel_migration protocols ;
-  test_mainnet_ghostnet_kernel_migration protocols ;
+  test_mainnet_latest_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
   test_block_storage_before_and_after_migration protocols ;
   test_transaction_storage_before_and_after_migration protocols
@@ -5236,28 +5235,28 @@ let test_migrate_proxy_to_sequencer_past =
 
   unit
 
-let test_ghostnet_kernel =
+let test_mainnet_kernel =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "ghostnet"; "version"]
+    ~tags:["evm"; "mainnet"; "version"]
     ~uses:(fun _protocol ->
       [
         Constant.octez_evm_node;
         Constant.octez_smart_rollup_node;
         Constant.smart_rollup_installer;
-        Constant.WASM.ghostnet_kernel;
+        Constant.WASM.mainnet_kernel;
       ])
-    ~title:"Regression test for Ghostnet kernel"
+    ~title:"Regression test for Mainnet kernel"
   @@ fun protocol ->
-  let* {evm_node; _} = setup_evm_kernel ~kernel:Ghostnet ~admin:None protocol in
+  let* {evm_node; _} = setup_evm_kernel ~kernel:Mainnet ~admin:None protocol in
   let*@ version = Rpc.tez_kernelVersion evm_node in
-  Check.((version = Constant.WASM.ghostnet_commit) string)
-    ~error_msg:"The ghostnet kernel has version %L but constant says %R" ;
+  Check.((version = Constant.WASM.mainnet_commit) string)
+    ~error_msg:"The mainnet kernel has version %L but constant says %R" ;
   unit
 
 let test_estimate_gas_out_of_gas =
   register_both
-    ~kernels:[Kernel.Ghostnet; Kernel.Mainnet]
+    ~kernels:[Kernel.Mainnet]
     ~tags:["evm"; "estimate_gas"; "simulate"; "loop"]
     ~title:"estimateGas fails with out of gas for overly costly transaction"
   @@ fun ~protocol:_ ~evm_setup:({evm_node; evm_version; _} as evm_setup) ->
@@ -6662,7 +6661,7 @@ let register_evm_node ~protocols =
   test_l2_timestamp_opcode protocols ;
   test_migrate_proxy_to_sequencer_past protocols ;
   test_migrate_proxy_to_sequencer_future protocols ;
-  test_ghostnet_kernel protocols ;
+  test_mainnet_kernel protocols ;
   test_estimate_gas_out_of_gas protocols ;
   test_l2_call_selfdetruct_contract_in_same_transaction protocols ;
   test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transaction

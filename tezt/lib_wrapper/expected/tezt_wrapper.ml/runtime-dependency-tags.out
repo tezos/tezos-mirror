@@ -5,7 +5,6 @@ dal_echo_kernel: dal_echo_kernel.wasm
 etherlink_governance_observer: etherlink-governance-observer
 debug_kernel: etherlink/kernel_latest/kernel/tests/resources/debug_kernel.wasm
 failed_migration: etherlink/kernel_latest/kernel/tests/resources/failed_migration.wasm
-ghostnet_kernel: etherlink/kernel_latest/kernel/tests/resources/ghostnet_kernel.wasm
 mainnet_kernel: etherlink/kernel_latest/kernel/tests/resources/mainnet_kernel.wasm
 evm_kernel: evm_kernel.wasm
 accuser: octez-accuser

@@ -4098,7 +4098,7 @@ let test_upgrade_kernel_auto_sync =
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_upgrade_all
-    ~kernels:[Mainnet; Ghostnet]
+    ~kernels:[Mainnet]
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"]
@@ -4216,7 +4216,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
   in
   let activation_timestamp = "2020-01-01T00:00:01Z" in
   register_upgrade_all
-    ~kernels:[Mainnet; Ghostnet]
+    ~kernels:[Mainnet]
     ~upgrade_to:(fun _ -> Latest)
     ~genesis_timestamp
     ~time_between_blocks:Nothing
@@ -6114,7 +6114,7 @@ let test_force_kernel_upgrade_too_early =
   in
   register_upgrade_all
     ~kernels:[Latest]
-    ~upgrade_to:(fun _ -> Ghostnet)
+    ~upgrade_to:(fun _ -> Mainnet)
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "force"]
@@ -7522,7 +7522,7 @@ let test_preimages_endpoint =
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]
     ~title:"Sequencer use remote server to get preimages"
     ~kernels:[Latest]
-    ~additional_uses:[Constant.WASM.ghostnet_kernel]
+    ~additional_uses:[Constant.WASM.mainnet_kernel]
     ~genesis_timestamp
   @@ fun {
            sc_rollup_node;
@@ -7626,7 +7626,7 @@ let test_preimages_endpoint =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.ghostnet_kernel
+      ~upgrade_to:Constant.WASM.mainnet_kernel
       ~activation_timestamp
   in
   let* _ =
@@ -7692,7 +7692,7 @@ let test_preimages_endpoint_retry =
     ~tags:["evm"; "sequencer"; "preimages_endpoint"; "retry"; Tag.slow]
     ~title:"Sequencer use remote server to get preimages with retries"
     ~kernels:[Latest]
-    ~additional_uses:[Constant.WASM.ghostnet_kernel]
+    ~additional_uses:[Constant.WASM.mainnet_kernel]
     ~genesis_timestamp
     ~use_multichain:
       (* TODO #7843: Adapt this test to multichain context *)
@@ -7758,7 +7758,7 @@ let test_preimages_endpoint_retry =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.ghostnet_kernel
+      ~upgrade_to:Constant.WASM.mainnet_kernel
       ~activation_timestamp
   in
   let* () = finalizeL1 () in
@@ -7884,7 +7884,7 @@ let test_trace_transaction =
     | _, Error _ -> Test.fail "Trace transaction shouldn't have failed (rpc)"
   in
   register_all
-    ~kernels:Kernel.[Latest; Ghostnet]
+    ~kernels:Kernel.[Latest]
       (* Re-enable on [Mainnet] when the next upgrade happens. *)
     ~tags:["evm"; "rpc"; "run"; "trace"]
     ~title:"Sequencer can run debug_traceTransaction"
@@ -8049,7 +8049,7 @@ let check_trace expect_null expected_returned_value receipt trace =
 
 let test_trace_transaction_call =
   register_all
-    ~kernels:Kernel.[Latest; Ghostnet]
+    ~kernels:Kernel.[Latest; Mainnet]
       (* Re-enable on [Mainnet] when the next upgrade happens. *)
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceTransaction and return a valid log"
@@ -9451,7 +9451,7 @@ let test_fast_withdrawal_l2_caller =
     ~challenge_window
     ~enable_fast_withdrawal:true
     ~time_between_blocks:Nothing
-    ~kernels:[Kernel.Ghostnet; Kernel.Latest]
+    ~kernels:[Kernel.Mainnet; Kernel.Latest]
   @@ fun {sequencer; evm_version; _} _protocol ->
   let fast_withdrawal_contract_address =
     "KT1TczPwz5KjAuuJKvkTmttS7bBioT5gjQ4Y"
@@ -9524,7 +9524,7 @@ let test_deposit_and_fast_withdraw =
     ~challenge_window
     ~enable_fast_withdrawal:true
     ~time_between_blocks:Nothing
-    ~kernels:[Kernel.Ghostnet; Kernel.Latest]
+    ~kernels:[Kernel.Mainnet; Kernel.Latest]
   @@ fun {
            sequencer;
            sc_rollup_address;
@@ -10018,7 +10018,7 @@ let test_patch_kernel =
     ~kernels:[Mainnet]
     ~tags:["evm"; "patch_kernel"; "experimental"]
     ~title:"Can patch the kernel of an existing node"
-    ~additional_uses:[Constant.WASM.ghostnet_kernel]
+    ~additional_uses:[Constant.WASM.mainnet_kernel]
     ~da_fee:Wei.zero
   @@ fun {sequencer; _} _protocol ->
   let* _ =
@@ -10029,7 +10029,7 @@ let test_patch_kernel =
   in
   let* () = Evm_node.terminate sequencer in
   let* () =
-    Evm_node.patch_kernel sequencer Uses.(path Constant.WASM.ghostnet_kernel)
+    Evm_node.patch_kernel sequencer Uses.(path Constant.WASM.mainnet_kernel)
   in
   let* () = Evm_node.run sequencer in
   (* Produce a block so that the migration code is executed *)
@@ -10038,7 +10038,7 @@ let test_patch_kernel =
     check_kernel_version
       ~evm_node:sequencer
       ~equal:true
-      Constant.WASM.ghostnet_commit
+      Constant.WASM.mainnet_commit
   in
   unit
 
