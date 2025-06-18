@@ -1113,3 +1113,6 @@ let bls_key_pop_arg ~long =
 let consensus_key_pop_arg = bls_key_pop_arg ~long:"consensus-key-pop"
 
 let companion_key_pop_arg = bls_key_pop_arg ~long:"companion-key-pop"
+
+let initial_stake_arg =
+  tez_opt_arg ~parameter:"initial-stake" ~doc:"Amount staked from source"
