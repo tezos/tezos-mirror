@@ -2719,7 +2719,9 @@ val spawn_command_with_stdin :
 val spawn_register_key :
   ?hooks:Process.hooks ->
   ?consensus:string ->
+  ?consensus_pop:string ->
   ?companion:string ->
+  ?companion_pop:string ->
   ?amount:Tez.t ->
   string ->
   t ->
@@ -2730,7 +2732,9 @@ val register_key :
   ?hooks:Process.hooks ->
   ?expect_failure:bool ->
   ?consensus:string ->
+  ?consensus_pop:string ->
   ?companion:string ->
+  ?companion_pop:string ->
   ?amount:Tez.t ->
   string ->
   t ->

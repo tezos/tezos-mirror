@@ -3207,12 +3207,15 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
   let* _ = Node.wait_for_level node 1 in
   return (node, client)
 
-let spawn_register_key ?hooks ?consensus ?companion ?amount owner client =
+let spawn_register_key ?hooks ?consensus ?consensus_pop ?companion
+    ?companion_pop ?amount owner client =
   spawn_command
     ?hooks
     client
     (["--wait"; "none"; "register"; "key"; owner; "as"; "delegate"]
     @ optional_arg "initial-stake" Tez.to_string amount
+    @ optional_arg "consensus-key-pop" Fun.id consensus_pop
+    @ optional_arg "companion-key-pop" Fun.id companion_pop
     @
     match (consensus, companion) with
     | None, None -> []
@@ -3220,9 +3223,17 @@ let spawn_register_key ?hooks ?consensus ?companion ?amount owner client =
     | None, Some pk -> ["--companion-key"; pk]
     | Some pk1, Some pk2 -> ["--consensus-key"; pk1; "--companion-key"; pk2])
 
-let register_key ?hooks ?expect_failure ?consensus ?companion ?amount owner
-    client =
-  spawn_register_key ?hooks ?consensus ?companion ?amount owner client
+let register_key ?hooks ?expect_failure ?consensus ?consensus_pop ?companion
+    ?companion_pop ?amount owner client =
+  spawn_register_key
+    ?hooks
+    ?consensus
+    ?consensus_pop
+    ?companion
+    ?companion_pop
+    ?amount
+    owner
+    client
   |> Process.check ?expect_failure
 
 let contract_storage ?hooks ?unparsing_mode ?endpoint address client =
