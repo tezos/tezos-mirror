@@ -14,7 +14,8 @@
 
     This function follows the OpenTelemetry semantic conventions for HTTP client
     spans, automatically setting appropriate attributes like HTTP method, URL,
-    status code, etc.
+    status code, etc. It also adds the header [traceparent] to allow traces
+    across different services.
 
     @param media_types List of accepted media types for the request
     @param logger Optional logger for RPC client operations

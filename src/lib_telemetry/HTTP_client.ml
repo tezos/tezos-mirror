@@ -8,7 +8,14 @@
 open Tezos_rpc
 open Path
 
-let call_service media_types ?logger ?headers ~base rpc b c input =
+let traceparent_header ({trace_id; span_id; _} : Opentelemetry.Scope.t) =
+  ( Opentelemetry.Trace_context.Traceparent.name,
+    Opentelemetry.Trace_context.Traceparent.to_value
+      ~trace_id
+      ~parent_id:span_id
+      () )
+
+let call_service media_types ?logger ?(headers = []) ~base rpc b c input =
   let method_ = Service.meth rpc |> Resto.string_of_meth in
   let base_str = Uri.path base in
   let path = Filename.Infix.(base_str // (Service.path rpc |> to_string)) in
@@ -51,10 +58,15 @@ let call_service media_types ?logger ?headers ~base rpc b c input =
     Format.(sprintf "%s %s" method_ path)
   @@ fun scope ->
   Opentelemetry_lwt.Trace.add_attrs scope make_attrs ;
+  let headers =
+    if Opentelemetry.Collector.has_backend () then
+      traceparent_header scope :: headers
+    else headers
+  in
   Tezos_rpc_http_client_unix.RPC_client_unix.call_service
     media_types
     ~base
-    ?headers
+    ~headers
     ?logger
     rpc
     b
