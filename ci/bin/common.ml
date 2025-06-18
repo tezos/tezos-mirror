@@ -261,6 +261,7 @@ let changeset_octez =
     List.map
       (fun path -> if Sys.is_directory path then path ^ "/**/*" else path)
       (read_lines_from_file "script-inputs/octez-source-content")
+    |> List.filter (fun f -> f <> "CHANGES.rst" && f <> "LICENSES/**/*")
     |> Changeset.make
   in
   Changeset.(
@@ -356,7 +357,7 @@ let changeset_rpm_packages =
   Changeset.(
     make
       [
-        "scripts/packaging/build-deb-local.sh";
+        "scripts/packaging/build-rpm-local.sh";
         "scripts/packaging/octez/rpm/*";
         "scripts/packaging/tests/rpm/*";
         "rpm-deps-build.Dockerfile";
@@ -897,11 +898,12 @@ let job_datadog_pipeline_trace : tezos_job =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
-let job_build_layer1_profiling ?(expire_in = Duration (Days 1)) () =
+let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
   job
     ~__POS__
     ~stage:Stages.build
     ~image:Images.CI.build
+    ?rules
     ~name:"build-layer1-profiling"
     ~cpu:Very_high
     ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
