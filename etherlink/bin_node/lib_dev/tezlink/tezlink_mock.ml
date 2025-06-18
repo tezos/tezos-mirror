@@ -226,3 +226,12 @@ let mocked_script (contract : Alpha_context.Contract.t) =
   else if address = Liquidity_baking.lq_fallback_token then
     Some Liquidity_baking.fallback_script
   else None
+
+let version =
+  let open Tezos_version.Octez_node_version in
+  Tezos_version.
+    {
+      version = Tezos_version_parser.default;
+      network_version = Network_version.Internal_for_tests.mock ();
+      commit_info = Some {commit_hash = ""; commit_date = ""};
+    }

@@ -199,27 +199,6 @@ type tezlink_rpc_context = {block : block; chain : chain}
 let make_env (chain : chain) (block : block) : tezlink_rpc_context Lwt.t =
   Lwt.return {block; chain}
 
-module Tezlink_version = struct
-  type version = Tezos_version.Octez_node_version.t = {
-    version : Tezos_version.Version.t;
-    network_version : Tezos_version.Network_version.t;
-    commit_info : commit_info option;
-  }
-
-  and commit_info = Tezos_version.Octez_node_version.commit_info = {
-    commit_hash : string;
-    commit_date : string;
-  }
-
-  let mock =
-    Tezos_version.
-      {
-        version = Tezos_version_parser.default;
-        network_version = Network_version.Internal_for_tests.mock ();
-        commit_info = Some {commit_hash = ""; commit_date = ""};
-      }
-end
-
 module Tezlink_protocols = struct
   module Shell_impl = Tezos_shell_services.Block_services
 
@@ -366,7 +345,7 @@ let version :
       unit,
       unit,
       unit,
-      Tezlink_version.version )
+      Tezos_version.Octez_node_version.t )
     Tezos_rpc.Service.t =
   Tezos_shell_services.Version_services.S.version
 

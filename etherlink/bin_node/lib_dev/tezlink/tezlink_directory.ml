@@ -57,7 +57,7 @@ let protocols () = Lwt_result_syntax.return Tezlink_protocols.current
 
 let version () =
   (* TODO: #7857 need proper implementation *)
-  Lwt_result_syntax.return Tezlink_version.mock
+  Lwt_result_syntax.return Tezlink_mock.version
 
 let chain_directory_path = Tezos_shell_services.Chain_services.path
 
