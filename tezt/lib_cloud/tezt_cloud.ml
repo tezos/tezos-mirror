@@ -298,3 +298,7 @@ let register ~tags =
 module Prometheus = struct
   let get_query_endpoint ~query = Prometheus.get_query_endpoint ~query
 end
+
+module Tezt_cloud_cli = struct
+  let prometheus = Cli.prometheus
+end

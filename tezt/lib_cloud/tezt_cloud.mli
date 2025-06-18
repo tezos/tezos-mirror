@@ -241,6 +241,11 @@ module Prometheus : sig
   val get_query_endpoint : query:string -> Uri.t option
 end
 
+module Tezt_cloud_cli : sig
+  (** Equivalent to [Cli.prometheus] *)
+  val prometheus : bool
+end
+
 (** [register ~tags] register a set of jobs that can be used for setting
    requirements related to cloud scenarios. Some tags can be given for all the
    registered jobs. *)

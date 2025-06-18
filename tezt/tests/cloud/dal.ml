@@ -2227,6 +2227,7 @@ let init_public_network cloud (configuration : configuration)
             let otel = Cloud.open_telemetry_endpoint cloud in
             let* () =
               Dal_node.Agent.run
+                ~prometheus:Tezt_cloud_cli.prometheus
                 ?otel
                 ~memtrace:configuration.memtrace
                 ~event_level:`Notice
@@ -2534,6 +2535,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
             configuration.bootstrap_dal_node_identity_file
         in
         Dal_node.Agent.run
+          ~prometheus:Tezt_cloud_cli.prometheus
           ?otel
           ~memtrace:configuration.memtrace
           ~event_level:`Notice
@@ -2626,6 +2628,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       let otel = Cloud.open_telemetry_endpoint cloud in
       let* () =
         Dal_node.Agent.run
+          ~prometheus:Tezt_cloud_cli.prometheus
           ?otel
           ~memtrace:configuration.memtrace
           ~event_level:`Notice
@@ -2775,6 +2778,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       else Some configuration.ignore_pkhs
     in
     Dal_node.Agent.run
+      ~prometheus:Tezt_cloud_cli.prometheus
       ?otel
       ~memtrace:configuration.memtrace
       ~event_level:`Notice
@@ -2848,6 +2852,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   let otel = Cloud.open_telemetry_endpoint cloud in
   let* () =
     Dal_node.Agent.run
+      ~prometheus:Tezt_cloud_cli.prometheus
       ?otel
       ~memtrace:configuration.memtrace
       ~event_level:`Notice
@@ -3626,6 +3631,7 @@ let on_new_level t level ~metadata =
               (* Invariant: Option.get don't fail because t.configuration.dal is true *)
               let dal_node = baker_to_reconnect.dal_node |> Option.get in
               Dal_node.Agent.run
+                ~prometheus:Tezt_cloud_cli.prometheus
                 ?otel:t.otel
                 ~memtrace:t.configuration.memtrace
                 ~ppx_profiling:t.configuration.ppx_profiling

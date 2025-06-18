@@ -36,20 +36,33 @@ module Env = struct
     | Some (_ :: _) -> add Dal_node.ignore_topics_environment_variable "yes" env
     | _ -> env
 
-  let ppx_profiler_env enable env =
+  let default_profiling_verbosity = "Debug"
+
+  let default_profiling_backends = ["txt"; "json"]
+
+  let ppx_profiler_env ?prometheus ?otel enable env =
+    let cons_if b v l = if b then v :: l else l in
+    let profiling_backends =
+      default_profiling_backends
+      |> cons_if (Option.is_some otel) "opentelemetry"
+      |> cons_if (Option.is_some prometheus) "prometheus"
+    in
     env
-    |> may_add enable "PROFILING" "Debug"
-    |> may_add enable "PROFILING_BACKENDS" "txt"
+    |> may_add enable "PROFILING" default_profiling_verbosity
+    |> may_add
+         enable
+         "PROFILING_BACKENDS"
+         (String.concat ";" profiling_backends)
 
   let initialize_env ~memtrace ~memtrace_output_filename
-      ~disable_shard_validation ~otel_endpoint ~service_name ~ignore_pkhs
-      ~ppx_profiling =
+      ~disable_shard_validation ~prometheus ~otel_endpoint ~service_name
+      ~ignore_pkhs ~ppx_profiling =
     empty
     |> memtrace_env memtrace memtrace_output_filename
     |> otel_env otel_endpoint service_name
     |> disable_shard_validation_env disable_shard_validation
     |> ignore_topics_env ignore_pkhs
-    |> ppx_profiler_env ppx_profiling
+    |> ppx_profiler_env ?prometheus ?otel:otel_endpoint ppx_profiling
 end
 
 let may_add_profiling_to_env ~ppx_profiling = function
@@ -283,7 +296,7 @@ module Dal_node = struct
         ~l1_node_endpoint:(Node.as_rpc_endpoint node)
         agent
 
-    let run ?otel ?(memtrace = false) ?event_level
+    let run ?prometheus ?otel ?(memtrace = false) ?event_level
         ?(disable_shard_validation = false) ?ignore_pkhs
         ?(ppx_profiling = false) dal_node =
       let service_name = name dal_node in
@@ -295,6 +308,7 @@ module Dal_node = struct
           ~memtrace
           ~memtrace_output_filename
           ~disable_shard_validation
+          ~prometheus
           ~otel_endpoint:otel
           ~service_name
           ~ignore_pkhs
