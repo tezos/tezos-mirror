@@ -210,9 +210,9 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?remove_whitelist ?enable_fa_bridge
-    ?enable_dal ?dal_slots ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
-    ?enable_multichain ?set_account_code ?max_delayed_inbox_blueprint_length
-    ?evm_version ~output () =
+    ?enable_revm ?enable_dal ?dal_slots ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal ?enable_multichain ?set_account_code
+    ?max_delayed_inbox_blueprint_length ?evm_version ~output () =
   let eth_bootstrap_accounts =
     let open Ethereum_types in
     match eth_bootstrap_accounts with
@@ -310,6 +310,7 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     @ eth_bootstrap_accounts @ set_account_code
     @ make_instr remove_whitelist
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_fa_bridge
+    @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_revm
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_dal
     @ make_instr
         ~path_prefix:["evm"; "world_state"; "feature_flags"]

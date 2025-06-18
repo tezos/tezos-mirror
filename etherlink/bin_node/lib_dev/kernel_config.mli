@@ -35,6 +35,7 @@ val make :
   ?max_blueprint_lookahead_in_seconds:string * string ->
   ?remove_whitelist:string * string ->
   ?enable_fa_bridge:string * string ->
+  ?enable_revm:string * string ->
   ?enable_dal:string * string ->
   ?dal_slots:string * string ->
   ?enable_fast_withdrawal:string * string ->
