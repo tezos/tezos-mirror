@@ -3314,11 +3314,13 @@ dependencies = [
 name = "tezos_tezlink_latest"
 version = "0.1.0"
 dependencies = [
+ "fixed-hash",
  "hex",
  "mir",
  "nom",
  "num-bigint",
  "primitive-types",
+ "rand 0.9.1",
  "rlp",
  "tezos-smart-rollup",
  "tezos_crypto_rs",

@@ -22,3 +22,6 @@ nom.workspace = true
 rlp.workspace = true
 mir.workspace = true
 
+[dev-dependencies]
+fixed-hash = { version = "0.8", features = ["rand"] }
+rand = "0.9.1"
