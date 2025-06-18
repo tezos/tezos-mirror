@@ -927,6 +927,12 @@ let mode () =
   return state.mode
 
 module Tx_container = struct
+  type address = Ethereum_types.address
+
+  type legacy_transaction_object = Ethereum_types.legacy_transaction_object
+
+  type transaction_object = Transaction_object.t
+
   let nonce ~next_nonce:_ address = nonce address
 
   let add ~next_nonce:_ tx_object ~raw_tx =
