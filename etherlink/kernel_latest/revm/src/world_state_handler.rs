@@ -22,7 +22,6 @@ use crate::{
     Error,
 };
 
-#[cfg(test)]
 /// Path where EVM accounts are stored.
 pub const EVM_ACCOUNTS_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/eth_accounts");
@@ -224,7 +223,6 @@ impl From<OwnedPath> for StorageAccount {
 
 pub type WorldStateHandler = Storage<StorageAccount>;
 
-#[cfg(test)]
 pub fn new_world_state_handler() -> Result<WorldStateHandler, Error> {
     Storage::<StorageAccount>::init(&EVM_ACCOUNTS_PATH)
         .map_err(|err| Error::Custom(err.to_string()))

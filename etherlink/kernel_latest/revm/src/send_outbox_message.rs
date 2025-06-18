@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -61,7 +62,6 @@ pub type FastWithdrawalInterface = MichelsonPair<
 
 /// Outbox messages that implements the different withdrawal interfaces,
 /// ready to be encoded and posted.
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum Withdrawal {
     Standard(OutboxMessage<RouterInterface>),
