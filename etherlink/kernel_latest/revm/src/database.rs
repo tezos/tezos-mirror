@@ -28,6 +28,12 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     world_state_handler: &'a mut WorldStateHandler,
     /// Constants for the current block
     block: &'a BlockConstants,
+    /// Commit guard, the `DatabaseCommit` trait and in particular
+    /// its `commit` function does NOT return errors.
+    /// We need this guard to change if there's an unrecoverable
+    /// error and we need to revert the changes made to the durable
+    /// storage.
+    commit_status: &'a mut bool,
 }
 
 // See: https://github.com/rust-lang/rust-clippy/issues/5787
@@ -37,11 +43,13 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
         host: &'a mut Host,
         block: &'a BlockConstants,
         world_state_handler: &'a mut WorldStateHandler,
+        commit_status: &'a mut bool,
     ) -> Self {
         EtherlinkVMDB {
             host,
             block,
             world_state_handler,
+            commit_status,
         }
     }
 }
@@ -141,6 +149,7 @@ impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
                 AccountStatus::Touched => match self.get_or_create_account(address) {
                     Ok(mut storage_account) => {
                         if let Err(err) = storage_account.set_info(self.host, info) {
+                            *self.commit_status = false;
                             log!(self.host, LogError, "DatabaseCommit `set_info` error: {err:?}");
                         }
 
@@ -150,11 +159,15 @@ impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
                                 &key,
                                 &present_value,
                             ) {
+                                *self.commit_status = false;
                                 log!(self.host, LogError, "DatabaseCommit `set_storage` error: {err:?}");
                             }
                         }
                     }
-                    Err(err) => log!(self.host, LogError, "DatabaseCommit `get_or_create_account` error: {err:?}"),
+                    Err(err) => {
+                        *self.commit_status = false;
+                        log!(self.host, LogError, "DatabaseCommit `get_or_create_account` error: {err:?}")
+                    },
                 },
                 AccountStatus::Created
                 | AccountStatus::CreatedLocal

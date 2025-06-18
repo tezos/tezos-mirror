@@ -175,6 +175,7 @@ pub fn run_transaction<'a, Host: Runtime>(
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
     let _ignore_tracer = tracer;
 
+    let mut commit_status = true;
     let block_env = block_env(block_constants)?;
     let tx = tx_env(
         host,
@@ -188,11 +189,23 @@ pub fn run_transaction<'a, Host: Runtime>(
         access_list,
     )?;
 
-    let db = EtherlinkVMDB::new(host, block_constants, world_state_handler);
+    let db = EtherlinkVMDB::new(
+        host,
+        block_constants,
+        world_state_handler,
+        &mut commit_status,
+    );
 
     let evm = evm(db, &block_env, &tx);
 
     let execution_result = evm.with_precompiles(precompiles).transact_commit(&tx)?;
+
+    // !commit_status := if something went wrong while commiting
+    if !commit_status {
+        return Err(EVMError::Custom(
+            "Comitting ended up in an incorrect state change: reverting.".to_owned(),
+        ));
+    }
 
     Ok(ExecutionOutcome {
         result: execution_result, // contains logs and gas_used.
@@ -294,14 +307,16 @@ mod test {
         }
 
         pub(crate) fn etherlink_vm_db<'a>(
+            commit_status: Option<bool>,
             block_env: &BlockEnv,
         ) -> EtherlinkVMDB<'a, MockKernelHost> {
+            let commit_status = Box::leak(Box::new(commit_status.unwrap_or(true)));
             let host = Box::leak(Box::new(MockKernelHost::default()));
             let world_state_handler =
                 Box::leak(Box::new(new_world_state_handler().unwrap()));
             let block_constants = Box::leak(Box::new(block_constants(block_env)));
 
-            EtherlinkVMDB::new(host, block_constants, world_state_handler)
+            EtherlinkVMDB::new(host, block_constants, world_state_handler, commit_status)
         }
 
         type EvmContext<'a> = Evm<
@@ -365,7 +380,7 @@ mod test {
             None,
         );
 
-        let mut db = etherlink_vm_db(&block);
+        let mut db = etherlink_vm_db(None, &block);
 
         let account_info = AccountInfo {
             balance: U256::MAX,
@@ -409,7 +424,7 @@ mod test {
             None,
         );
 
-        let mut db = etherlink_vm_db(&block);
+        let mut db = etherlink_vm_db(None, &block);
 
         let account_info = AccountInfo {
             balance: U256::MAX,
@@ -470,7 +485,7 @@ mod test {
             None,
         );
 
-        let mut db = etherlink_vm_db(&block);
+        let mut db = etherlink_vm_db(None, &block);
 
         let caller_info = AccountInfo {
             balance: U256::MAX,
