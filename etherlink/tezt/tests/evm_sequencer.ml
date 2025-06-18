@@ -254,9 +254,9 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
     ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
-    ?additional_uses ?rpc_server ?websockets ?enable_fast_withdrawal
-    ?enable_fast_fa_withdrawal ?history_mode
+    ?enable_fa_bridge ?enable_revm ?rollup_history_mode ?commitment_period
+    ?challenge_window ?additional_uses ?rpc_server ?websockets
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration) ?enable_tx_queue
@@ -325,6 +325,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
                 ?maximum_gas_per_transaction
                 ?max_blueprint_lookahead_in_seconds
                 ?enable_fa_bridge
+                ?enable_revm
                 ?enable_fast_withdrawal
                 ?enable_fast_fa_withdrawal
                 ?additional_uses

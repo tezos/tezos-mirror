@@ -13,7 +13,7 @@ use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
 use crate::storage::{
-    read_chain_id, read_storage_version, store_backlog, store_dal_slots,
+    is_revm_enabled, read_chain_id, read_storage_version, store_backlog, store_dal_slots,
     store_storage_version, tweak_dal_activation, StorageVersion, DELAYED_BRIDGE,
     ENABLE_FA_BRIDGE, KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE,
     SEQUENCER_GOVERNANCE,
@@ -359,6 +359,13 @@ fn migrate_to<Host: Runtime>(
             } else {
                 Ok(MigrationStatus::None)
             }
+        }
+        StorageVersion::V34 => {
+            if is_revm_enabled(host)? {
+                // Add anything that's needed for the REVM migration, in particular
+                // the new bytecodes for custom precompile contracts.
+            };
+            Ok(MigrationStatus::Done)
         }
     }
 }

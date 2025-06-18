@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2023-2025 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -2157,7 +2157,7 @@ let make_kernel_config_command =
     ~group:Groups.kernel
     ~desc:"Create a configuration for the kernel installer."
     (merge_options
-       (args23
+       (args24
           mainnet_compat_arg
           (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
           (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
@@ -2190,6 +2190,7 @@ let make_kernel_config_command =
           eth_bootstrap_balance_arg
           eth_bootstrap_account_arg
           (config_key_flag ~name:"enable_fa_bridge")
+          (config_key_flag ~name:"enable_revm")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
        (args8
           (config_key_flag ~name:"enable_dal")
@@ -2230,6 +2231,7 @@ let make_kernel_config_command =
              eth_bootstrap_balance,
              eth_bootstrap_accounts,
              enable_fa_bridge,
+             enable_revm,
              dal_slots ),
            ( enable_dal,
              enable_multichain,
@@ -2267,6 +2269,7 @@ let make_kernel_config_command =
         ?eth_bootstrap_accounts
         ?enable_fa_bridge
         ?enable_dal
+        ?enable_revm
         ?dal_slots
         ?enable_multichain
         ?set_account_code

@@ -825,7 +825,7 @@ Kernel commands:
       [--maximum-gas-per-transaction <30000...>]
       [--max-blueprint-lookahead-in-seconds <500>] [--remove-whitelist]
       [--eth-bootstrap-balance <9999000000000000000000>]
-      [--eth-bootstrap-account <0x...>] [--enable-fa-bridge]
+      [--eth-bootstrap-account <0x...>] [--enable-fa-bridge] [--enable-revm]
       [--dal-slots <0,1,4,6,...>] [--enable-dal] [--enable-multichain]
       [--l2-chain-id <1>] [--max-delayed-inbox-blueprint-length <1000>]
       [--enable-fast-withdrawal] [--enable-fast-fa-withdrawal]
@@ -871,6 +871,7 @@ Kernel commands:
     --eth-bootstrap-account <0x...>: Add an etherlink bootstrap account in
       the installer config.
     --enable-fa-bridge: Enable flag enable_fa_bridge in the installer config.
+    --enable-revm: Enable flag enable_revm in the installer config.
     --dal-slots <0,1,4,6,...>: Value for dal_slots in the installer config.
     --enable-dal: Enable flag enable_dal in the installer config.
     --enable-multichain: Enable flag enable_multichain in the installer
