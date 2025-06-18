@@ -920,6 +920,9 @@ let register_dynamic_block_services ~l2_chain_id
       ~path:block_directory_path
       (fun (((), _chain), block) ->
         match block with
+        (* Trying to access the first blocks info using `Head offset will lead
+           to incoherent results. If it becomes a pb we will need to ignore
+           potential errors from Backend.current_level. *)
         | `Genesis | `Level 0l -> Lwt.return dynamic_dir_zero_proto
         | `Level 1l -> Lwt.return dynamic_dir_genesis_proto
         | _ -> Lwt.return dynamic_dir_current_proto)
