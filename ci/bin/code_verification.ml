@@ -776,29 +776,6 @@ let jobs pipeline_type =
         ["etherlink/lib_wasm_runtime/lint.sh"]
       |> enable_cargo_cache |> enable_sccache
     in
-    let job_ocaml_check : tezos_job =
-      job
-        ~__POS__
-        ~name:"ocaml-check"
-        ~cpu:Very_high
-        ~image:Images.CI.build
-        ~stage
-        ~retry:
-          {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_ocaml_check_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        (* Stops on first error for easier detection of problems in
-           the log and to reduce time to merge of other MRs further
-           down the merge train. *)
-        ["dune build @check --stop-on-first-error"]
-      |> enable_cargo_cache |> enable_sccache |> enable_dune_cache
-    in
     let build_octez_source =
       (* We check compilation of the octez tarball on scheduled
          pipelines because it's not worth testing it for every merge
@@ -864,7 +841,6 @@ let jobs pipeline_type =
       job_build_x86_64_release;
       job_build_x86_64_exp_dev_extra;
       wasm_runtime_check;
-      job_ocaml_check;
       job_build_kernels;
       job_build_dsn_node;
       job_tezt_fetch_records;
@@ -910,6 +886,29 @@ let jobs pipeline_type =
 
   (* Test jobs*)
   let test =
+    let job_ocaml_check : tezos_job =
+      job
+        ~__POS__
+        ~name:"ocaml-check"
+        ~cpu:Very_high
+        ~image:Images.CI.build
+        ~stage:Stages.test
+        ~retry:
+          {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
+        ~dependencies:dependencies_needs_start
+        ~rules:(make_rules ~changes:changeset_ocaml_check_files ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        (* Stops on first error for easier detection of problems in
+           the log and to reduce time to merge of other MRs further
+           down the merge train. *)
+        ["dune build @check --stop-on-first-error"]
+      |> enable_cargo_cache |> enable_sccache |> enable_dune_cache
+    in
     (* This job triggers the debian child pipeline automatically if any
        files in the changeset is modified. It's the same as
        job_debian_repository_trigger that can be run manually.
@@ -1260,6 +1259,7 @@ let jobs pipeline_type =
           ["dune runtest resto"]
       in
       [
+        job_ocaml_check;
         oc_unit_non_proto_x86_64;
         oc_unit_etherlink_x86_64;
         oc_unit_other_x86_64;
@@ -1761,7 +1761,6 @@ let jobs pipeline_type =
       in
       let job_check_riscv_kernels : tezos_job =
         make_job_kernel
-          ~stage:Stages.build
           ~__POS__
           ~name:"check_riscv_kernels"
           ~changes:changeset_riscv_kernels
