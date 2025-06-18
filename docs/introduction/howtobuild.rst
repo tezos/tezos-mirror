@@ -25,20 +25,7 @@ and then do:
 
 .. warning::
 
-   If you are updating to :doc:`Octez v14<../releases/version-14>`
-   using a development environment which had been used to build Octez
-   versions up to v13.x, and also you have previously exported the
-   ``tezos`` directory to the ``$PATH`` environment variable, the
-   following stanza is necessary to avoid potential issues with opam
-   in the ``make build-deps`` step::
-
-     PATH=${PATH##"$HOME"/tezos/:}
-
-   Otherwise, it is possible for ``make build-deps`` to fail with the
-   following (or a similar) error::
-
-     make: opam: Permission denied
-     Makefile:53: *** Unexpected opam version (found: , expected: 2.*).  Stop.
+  If you rerun the procedure above in an already cloned repository, typically by restarting from ``git checkout $BRANCH`` after upgrading the sources to a new version of Octez, you should do a ``git fetch`` before, to ensure that the tags for the latest release are known to Git. Otherwise, the sources compile perfectly fine but Octez executables may report their version incorrectly (e.g. ``21.2+dev`` instead of ``22.0``).
 
 The following sections describe the individual steps above in more detail.
 
