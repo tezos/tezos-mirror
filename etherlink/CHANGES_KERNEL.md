@@ -6,6 +6,8 @@
 
 - The EVM now supports optional access lists.
   See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930). (!17766)
+- Introduces a new feature flag to enable REVM as the EVM execution
+  engine instead of Sputnik. (!18384)
 
 ### Bug fixes
 
