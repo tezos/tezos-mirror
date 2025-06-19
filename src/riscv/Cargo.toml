@@ -21,6 +21,7 @@ version = "0.26.1"
 features = ["derive"]
 
 [workspace.dependencies.octez-riscv]
+# The locked version can be updated via `make update-riscv-pvm`
 git = "https://github.com/tezos/riscv-pvm.git"
 
 [workspace.dependencies.ocaml]

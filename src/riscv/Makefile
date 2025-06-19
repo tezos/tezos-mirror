@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2023-2025 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
@@ -25,24 +25,35 @@ SANDBOX_ENABLE_FEATURES ?=
 # The version of nightly that we use for anything that requires it
 NIGHTLY_VERSION = nightly-2025-01-30
 
+# Prefix for downloading assets from the riscv-pvm repo
+RISCV_PVM_REPO = https://raw.githubusercontent.com/tezos/riscv-pvm/refs/heads/main
+
 .PHONY: build
 build:
 	@cargo build --release --workspace $(NATIVE_OPT) $(EXTRA_FLAGS)
 
-# Update checked-in binaries
+# Update checked-in binaries and regression files
 .PHONY: update-assets
-update-assets: assets/riscv-dummy.elf assets/jstz
+update-assets: assets/riscv-dummy.elf assets/jstz assets/jstz_proof_initial
+
+# Update to the latest version of `riscv-pvm`. Assets will be updated accordingly.
+.PHONY: update-riscv-pvm
+update-riscv-pvm: update-assets
+	@cargo update octez-riscv
 
 # Update the compiled dummy kernel used in CI tests
 assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
-	@cargo install --config .cargo/config.toml --locked --git https://github.com/tezos/riscv-pvm.git --branch ole/github --target riscv64gc-unknown-linux-musl --root assets riscv-dummy
-	@mv assets/bin/riscv-dummy $@
-	@sha256sum $@ > $@.checksum
+	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/assets/riscv-dummy.elf
+	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/src/riscv/assets/riscv-dummy.elf.checksum
 
+# Update the compiled jstz kernel used in CI tests
 assets/jstz assets/jstz.checksum::
-	@cargo install --config .cargo/config.toml --locked --git https://github.com/tezos/riscv-pvm.git --branch ole/github --target riscv64gc-unknown-linux-musl --root assets jstz
-	@mv assets/bin/jstz $@
-	@sha256sum $@ > $@.checksum
+	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/assets/jstz
+	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/src/riscv/assets/jstz.checksum
+
+# Update the serialised proof for the initial tick of jstz used in the CI tests
+assets/jstz_proof_initial:
+	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/lib/tests/expected/jstz/proof_initial
 
 .PHONY: build-deps
 build-deps:
