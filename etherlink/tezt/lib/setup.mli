@@ -263,6 +263,7 @@ val setup_sequencer :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
+  ?enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?threshold_encryption:bool ->
