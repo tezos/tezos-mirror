@@ -6,8 +6,9 @@ set -eu
 # In case of failures with this pipeline, contact the maintainer.
 # Maintainer: Alain Mebsout <alain.mebsout@functori.com>
 
-# shellcheck source=./scripts/ci/octez-smart-rollup-node-release.sh
-. ./scripts/ci/octez-smart-rollup-node-release.sh
+# shellcheck source=./scripts/rollup_node/release.sh
+. ./scripts/rollup_node/release.sh
+
 gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_binaries_package_name}/${gitlab_package_version}"
 
 # Copied from `create_gitlab_release.sh`.
