@@ -116,6 +116,14 @@ module Get_delegates = struct
 
     let deactivated ctxt pkh =
       deactivated ctxt pkh |> Lwt.map Environment.wrap_tzresult
+
+    let consensus_key ctxt pkh : Signature.public_key tzresult Lwt.t =
+      let open Lwt_result_syntax in
+      let* {consensus_pk; _} =
+        Alpha_context.Delegate.Consensus_key.active_pubkey ctxt pkh
+        |> Lwt.map Environment.wrap_tzresult
+      in
+      return consensus_pk
   end
 
   let prepare_context ctxt ~level ~predecessor_timestamp ~timestamp =

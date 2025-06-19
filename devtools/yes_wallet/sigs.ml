@@ -138,6 +138,11 @@ module type PROTOCOL = sig
 
     val deactivated :
       context -> Signature.public_key_hash -> bool tzresult Lwt.t
+
+    val consensus_key :
+      context ->
+      Signature.public_key_hash ->
+      Signature.public_key tzresult Lwt.t
   end
 
   val hash : Protocol_hash.t
