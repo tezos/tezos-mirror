@@ -13,7 +13,7 @@ use revm::{
         DBErrorMarker, Evm, LocalContext, TxEnv,
     },
     context_interface::block::BlobExcessGasAndPrice,
-    handler::{instructions::EthInstructions, EthPrecompiles},
+    handler::instructions::EthInstructions,
     interpreter::interpreter::EthInterpreter,
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, U256},
     Context, ExecuteCommitEvm, Journal, MainBuilder,
@@ -131,13 +131,14 @@ type EvmContext<'a, Host> = Evm<
         EthInterpreter,
         Context<&'a BlockEnv, &'a TxEnv, CfgEnv, EtherlinkVMDB<'a, Host>>,
     >,
-    EthPrecompiles,
+    EtherlinkPrecompiles,
 >;
 
 fn evm<'a, Host: Runtime>(
     db: EtherlinkVMDB<'a, Host>,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
+    precompiles: EtherlinkPrecompiles,
 ) -> EvmContext<'a, Host> {
     let cfg = CfgEnv::new()
         .with_chain_id(ETHERLINK_CHAIN_ID)
@@ -153,11 +154,13 @@ fn evm<'a, Host: Runtime>(
         LocalContext,
     > = Context::new(db, DEFAULT_SPEC_ID);
 
-    context
+    let evm = context
         .with_block(block)
         .with_tx(tx)
         .with_cfg(cfg)
-        .build_mainnet()
+        .build_mainnet();
+
+    evm.with_precompiles(precompiles)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -195,19 +198,24 @@ pub fn run_transaction<'a, Host: Runtime>(
         &mut commit_status,
     );
 
-    let evm = evm(db, &block_env, &tx);
+    let mut evm = evm(db, &block_env, &tx, precompiles);
 
-    let mut evm_context = evm.with_precompiles(precompiles);
+    evm.db_mut().initialize_storage()?;
 
-    let execution_result = evm_context.transact_commit(&tx)?;
+    let execution_result = evm.transact_commit(&tx)?;
 
-    let withdrawals = evm_context.db_mut().take_withdrawals();
+    let withdrawals = evm.db_mut().take_withdrawals();
 
-    // !commit_status := if something went wrong while commiting
-    if !commit_status {
+    if !evm.db_mut().commit_status() {
+        // If something went wrong while commiting we drop the state changes
+        // made to the durable storage to avoid ending up in inconsistent state.
+        evm.db_mut().drop_storage()?;
+
         return Err(EVMError::Custom(
             "Comitting ended up in an incorrect state change: reverting.".to_owned(),
         ));
+    } else {
+        evm.db_mut().commit_storage()?;
     }
 
     Ok(ExecutionOutcome {

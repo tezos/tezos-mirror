@@ -85,6 +85,32 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
             .get_storage(self.host, &storage_key)
             .unwrap()
     }
+
+    pub fn abort(&mut self) {
+        *self.commit_status = false;
+    }
+
+    pub fn commit_status(&self) -> bool {
+        *self.commit_status
+    }
+
+    pub fn initialize_storage(&mut self) -> Result<(), Error> {
+        self.world_state_handler
+            .begin_transaction(self.host)
+            .map_err(|err| Error::Custom(err.to_string()))
+    }
+
+    pub fn commit_storage(&mut self) -> Result<(), Error> {
+        self.world_state_handler
+            .commit_transaction(self.host)
+            .map_err(|err| Error::Custom(err.to_string()))
+    }
+
+    pub fn drop_storage(&mut self) -> Result<(), Error> {
+        self.world_state_handler
+            .rollback_transaction(self.host)
+            .map_err(|err| Error::Custom(err.to_string()))
+    }
 }
 
 impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
@@ -166,7 +192,7 @@ impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
                 AccountStatus::Touched => match self.get_or_create_account(address) {
                     Ok(mut storage_account) => {
                         if let Err(err) = storage_account.set_info(self.host, info) {
-                            *self.commit_status = false;
+                            self.abort();
                             log!(self.host, LogError, "DatabaseCommit `set_info` error: {err:?}");
                         }
 
@@ -176,13 +202,13 @@ impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
                                 &key,
                                 &present_value,
                             ) {
-                                *self.commit_status = false;
+                                self.abort();
                                 log!(self.host, LogError, "DatabaseCommit `set_storage` error: {err:?}");
                             }
                         }
                     }
                     Err(err) => {
-                        *self.commit_status = false;
+                        self.abort();
                         log!(self.host, LogError, "DatabaseCommit `get_or_create_account` error: {err:?}")
                     },
                 },
