@@ -1738,6 +1738,12 @@ module Hooks = struct
 
   let master = ref []
 
+  let global_release = ref []
+
+  let global_test_release = ref []
+
+  let global_scheduled_test_release = ref []
+
   let release_tags = ref []
 end
 
