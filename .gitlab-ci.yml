@@ -67,7 +67,7 @@ workflow:
     when: always
   - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^octez-smart-rollup-node-v\d+\.\d+(?:\-rc\d+)?$/
     variables:
-      PIPELINE_TYPE: octez_smart_rollup_node_release_tag
+      PIPELINE_TYPE: octez_smart_rollup_node_release_tag_test
     when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
@@ -235,7 +235,7 @@ include:
   rules:
   - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
     when: always
-- local: .gitlab/ci/pipelines/octez_smart_rollup_node_release_tag.yml
+- local: .gitlab/ci/pipelines/octez_smart_rollup_node_release_tag_test.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^octez-smart-rollup-node-v\d+\.\d+(?:\-rc\d+)?$/
     when: always
