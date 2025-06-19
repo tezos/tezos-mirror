@@ -42,3 +42,5 @@ module Worker (C : Gossipsub_intf.WORKER_CONFIGURATION) :
      and module Monad = C.Monad
      and module Stream = C.Stream
      and module Point = C.Point
+
+module Profiler = Gossipsub_profiler
