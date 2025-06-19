@@ -7188,13 +7188,16 @@ let register_riscv_jstz ~protocols =
       (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz" ())
       (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz.checksum" ())
   in
+  (* The jstz inbox is generated using
+   * `./jstz/inbox-bench generate --inbox-file jstz-inbox.json --transfers 1 --address sr1N6iTfzhj2iGYfxACdy5kgHX5qzuW6xubY` *)
+  let jstz_inbox_path = "tezt/tests/riscv-tests/jstz-inbox.json" in
+  let inbox_file_uses = Uses.make ~tag:"riscv" ~path:jstz_inbox_path () in
   test_advances_state_with_inbox
     protocols
     ~kind
     ~title:"node advances PVM state with jstz kernel"
     ~boot_sector
-    ~inbox_file:
-      (Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/jstz-inbox.json" ()) ;
+    ~inbox_file:inbox_file_uses ;
   test_refutation_scenario
     ~kind
     ~ci_disabled:true
@@ -7205,18 +7208,11 @@ let register_riscv_jstz ~protocols =
       (* Setting the timestamp results in blocks being produced more slowly *)
     ~commitment_period:10
     ~variant:"pvm_proof_0"
-    ~uses:(fun _protocol ->
-      [Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/jstz-inbox.json" ()])
+    ~uses:(fun _protocol -> [inbox_file_uses])
     ~boot_sector
     (refutation_scenario_parameters
        ~loser_modes:["5 0 1000"]
-       (List.map
-          (fun x -> [x])
-          (read_jstz_inbox
-             (Uses.make
-                ~tag:"riscv"
-                ~path:"tezt/tests/riscv-tests/jstz-inbox.json"
-                ())))
+       (List.map (fun x -> [x]) (read_jstz_inbox inbox_file_uses))
        ~input_format:`Hex
        ~final_level:500
        ~priority:`No_priority)
