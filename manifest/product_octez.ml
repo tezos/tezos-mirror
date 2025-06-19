@@ -5346,6 +5346,7 @@ let octez_dal_node_lib =
         prometheus;
         octez_crawler |> open_;
         octez_profiler |> open_;
+        octez_profiler_complex_backends |> open_;
       ]
     ~preprocess
     ~preprocessor_deps
@@ -9094,6 +9095,7 @@ let _octez_dal_node =
          octez_dal_node_lib |> open_;
          memtrace;
          octez_profiler_backends |> open_;
+         octez_profiler_complex_backends |> open_;
        ]
       @ protocol_deps)
     ~conflicts:[Conflicts.checkseum]

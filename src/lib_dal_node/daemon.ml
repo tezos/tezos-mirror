@@ -408,6 +408,14 @@ let run ?(disable_logging = false) ?(disable_shard_validation = false)
       else limits
     in
     let identity = p2p_config.P2p.identity in
+    (* Initialize the OpenTelemetry profiler only when identity is available, to
+       allow discriminating the different services. *)
+    ()
+    [@profiler.overwrite
+      {driver_ids = [Opentelemetry]}
+        (Opentelemetry_profiler.initialize
+           ~unique_identifier:(P2p_peer.Id.to_b58check identity.peer_id)
+           config.service_name)] ;
     let self =
       (* What matters is the identity, the reachable point is more like a placeholder here. *)
       Types.Peer.

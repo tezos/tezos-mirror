@@ -37,7 +37,8 @@
   octez-libs.prometheus-app
   octez-libs.prometheus
   octez-crawler
-  octez-libs.octez-profiler)
+  octez-libs.octez-profiler
+  octez-libs.octez-profiler.complex_backends)
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
@@ -61,4 +62,5 @@
   -open Tezos_base_p2p_identity_file
   -open Tezos_shell_services
   -open Octez_crawler
-  -open Tezos_profiler))
+  -open Tezos_profiler
+  -open Tezos_profiler_complex_backends))

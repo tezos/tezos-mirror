@@ -14,6 +14,7 @@
   tezos-dal-node-lib
   memtrace
   octez-libs.octez-profiler.backends
+  octez-libs.octez-profiler.complex_backends
   (select void_for_linking-octez-protocol-021-PsQuebec-libs-dal from
    (octez-protocol-021-PsQuebec-libs.dal -> void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty)
    (-> void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty))
@@ -31,7 +32,8 @@
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
   -open Tezos_dal_node_lib
-  -open Tezos_profiler_backends))
+  -open Tezos_profiler_backends
+  -open Tezos_profiler_complex_backends))
 
 (rule
  (action
