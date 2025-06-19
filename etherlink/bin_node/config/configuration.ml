@@ -1807,14 +1807,15 @@ module Cli = struct
   let patch_configuration_from_args ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins ?cors_headers ?enable_websocket ?tx_pool_timeout_limit
       ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?keep_alive
-      ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?preimages
-      ?preimages_endpoint ?native_execution_policy ?time_between_blocks
-      ?max_number_of_chunks ?private_rpc_port ?sequencer_key ?evm_node_endpoint
-      ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
-      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
-      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?history_mode ?dal_slots configuration =
+      ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
+      ?preimages ?preimages_endpoint ?native_execution_policy
+      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
+      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
+      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+      ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
+      ?finalized_view ?proxy_ignore_block_param ?history_mode ?dal_slots
+      configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -1841,6 +1842,11 @@ module Cli = struct
       match verbose with
       | Some true -> Internal_event.Debug
       | _ -> configuration.verbose
+    in
+    let opentelemetry =
+      match profiling with
+      | None -> configuration.opentelemetry
+      | Some enable -> {configuration.opentelemetry with enable}
     in
     let sequencer =
       let sequencer_config = configuration.sequencer in
@@ -2081,13 +2087,13 @@ module Cli = struct
       finalized_view = finalized_view || configuration.finalized_view;
       history_mode = Option.either history_mode configuration.history_mode;
       db = configuration.db;
-      opentelemetry = configuration.opentelemetry;
+      opentelemetry;
     }
 
   let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
       ?cors_headers ?enable_websocket ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
-      ?dont_track_rollup_node ?verbose ?preimages ?preimages_endpoint
+      ?dont_track_rollup_node ?verbose ?profiling ?preimages ?preimages_endpoint
       ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
       ?private_rpc_port ?sequencer_key ?evm_node_endpoint
       ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
@@ -2110,6 +2116,7 @@ module Cli = struct
          ?rollup_node_endpoint
          ?dont_track_rollup_node
          ?verbose
+         ?profiling
          ?preimages
          ?preimages_endpoint
          ?native_execution_policy
@@ -2136,14 +2143,15 @@ module Cli = struct
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins ?cors_headers ?enable_websocket ?tx_pool_timeout_limit
       ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?keep_alive
-      ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?preimages
-      ?preimages_endpoint ?native_execution_policy ?time_between_blocks
-      ?max_number_of_chunks ?private_rpc_port ?sequencer_key ?evm_node_endpoint
-      ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
-      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode config_file =
+      ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
+      ?preimages ?preimages_endpoint ?native_execution_policy
+      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
+      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
+      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+      ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
+      ?log_filter_chunk_size ?sequencer_sidecar_endpoint ?restricted_rpcs
+      ?finalized_view ?proxy_ignore_block_param ?dal_slots ?network
+      ?history_mode config_file =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -2191,6 +2199,7 @@ module Cli = struct
           ?rollup_node_endpoint
           ?dont_track_rollup_node
           ?verbose
+          ?profiling
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
@@ -2233,6 +2242,7 @@ module Cli = struct
           ?rollup_node_endpoint
           ?dont_track_rollup_node
           ?verbose
+          ?profiling
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size

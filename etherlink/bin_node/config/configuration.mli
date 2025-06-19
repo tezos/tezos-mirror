@@ -341,6 +341,7 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
     ?verbose:bool ->
+    ?profiling:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
@@ -381,6 +382,7 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
     ?verbose:bool ->
+    ?profiling:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
@@ -421,6 +423,7 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
     ?verbose:bool ->
+    ?profiling:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
